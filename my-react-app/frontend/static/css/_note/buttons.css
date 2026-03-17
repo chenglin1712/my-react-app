@@ -1,0 +1,75 @@
+/* 基本按鈕尺寸（保留你原本的寫法） */
+button,
+.btn { min-width: 100px; border-radius: 10px; padding: 10px 16px; cursor: pointer; }
+
+
+.btn-primary {
+  background-color: var(--danger);
+  color: #fff;
+  border: none;
+  transition: background-color .2s ease;
+}
+.btn-primary:hover { background-color: var(--brand-red-600); }
+
+.btn-ghost {
+  background: var(--ghost-bg);
+  color: var(--ghost-fg);
+  border: 1px solid transparent;
+}
+.btn-ghost:hover { filter: brightness(0.98); }
+
+.btn-upload {
+  background-color: var(--ghost-bg);
+  color: var(--ghost-fg);
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-upload:hover { filter: brightness(0.98); }
+
+/* 危險 */
+.btn-danger {
+  background: gray;
+  color:#fff;
+  border: none;
+}
+.btn-danger:hover { background: var(--ghost-fg); }
+
+.btn-add {
+  background-color: #28a745;
+}
+.btn-add:hover { background-color: #218838; }
+
+.btn-page {
+  color: var(--bs-btn-disabled-color);
+  background-color: var(--bs-btn-disabled-bg);
+  border-color: var(--bs-btn-disabled-border-color);
+  opacity: var(--bs-btn-disabled-opacity);
+}
+
+.btn-page:hover {
+  background-color: var(--bs-btn-active-bg);
+}
+
+.btn-page.btn:disabled {
+  background: var(--ghost-bg);
+  color: var(--ghost-fg);
+}
+
+/* 舊版相容：讓 .morandi-blue 等於主紅按鈕 */
+/* 若不支援 composes，可直接重覆宣告： */
+.morandi-blue {
+  background-color: var(--brand-red);
+  color:#fff; border:none;
+  transition: background-color .2s ease;
+}
+.morandi-blue:hover { background-color: var(--brand-red-600); }
+
+@media (max-width: 768px) {
+  .btn-primary, .btn-danger, .btn-ghost, .morandi-blue {
+    width: 100%;
+    max-width: 300px;
+  }
+}

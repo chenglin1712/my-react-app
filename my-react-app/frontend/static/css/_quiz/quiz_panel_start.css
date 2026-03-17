@@ -1,0 +1,133 @@
+.panel-start-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 3%;
+}
+
+.panel-start-card {
+    background: white;
+    width: 100%;
+    margin-top: 5%;
+    margin-bottom: 5px;
+}
+
+.panel-subtitle {
+    font-size: 18px;
+    text-align: center;
+}
+
+.level-selection {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.level-card {
+    position: relative;
+    overflow: visible;
+    width: 20%;
+    background-color: #fff;
+    border-radius: 12px;
+    border: 1px solid #333;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.level-recommend-img {
+    position: absolute;
+    top: -15px;
+    left: -20px;
+    height: 40px;
+    z-index: 10;
+}
+
+.level-card-icon {
+    margin-top: 12px;
+}
+
+.level-icon-text {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.level-1 .level-icon-text {
+    background-color: #B98B82;
+}
+
+.level-2 .level-icon-text {
+    background-color: #8FBC8F;
+}
+
+.level-3 .level-icon-text {
+    background-color: #F4A460;
+}
+
+.level-4 .level-icon-text {
+    background-color: #4682B4;
+}
+
+.level-5 .level-icon-text {
+    background-color: #DA70D6;
+}
+
+.level-card-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #333;
+    margin: 12px 0 6px 0;
+    text-align: center;
+}
+
+.level-card-info {
+    font-size: 0.85rem;
+    color: #666;
+    text-align: center;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.level-card-btn {
+    background-color: white;
+    border: 1px solid #333;
+    color: #333;
+    padding: 4px 6px;
+    border-radius: 6px;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.level-card-btn:hover {
+    background-color: #F4C7C3;
+    color: #8B0000;
+    border: 1px solid #8B0000;
+}
+
+.level-card.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.level-card.disabled .level-card-btn {
+    background-color: #ccc;
+    color: #666;
+    cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+    .panel-start-container {
+        flex-direction: column;
+        text-align: center;
+    }
+}

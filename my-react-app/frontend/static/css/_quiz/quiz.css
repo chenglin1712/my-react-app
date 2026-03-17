@@ -1,0 +1,10 @@
+.quiz-title {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0px;
+    color: #000;
+    display: inline-block;
+    padding: 4px 12px;
+    background-color: #F4C7C3;
+    border-radius: 16px;
+}

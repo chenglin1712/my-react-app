@@ -1,0 +1,44 @@
+.events {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    text-align: center;
+    position: relative;
+}
+
+.event-card {
+    min-height: 50%;
+    width: 100%;
+    overflow: hidden;
+}
+
+.event-card img {
+    width: 100%;
+    height: auto;
+}
+
+.activities-btn {
+    background: none;
+    color: rgba(0, 0, 0, 0.5);
+    border: none;
+    padding: 8px;
+    border-radius: 50%;
+    cursor: pointer;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: background 0.3s ease-in-out;
+}
+
+.activities-btn:hover {
+    color: rgba(0, 0, 0, 0.8);
+}
+
+.activities-btn.left {
+    left: 10px;
+}
+
+.activities-btn.right {
+    right: 10px;
+}

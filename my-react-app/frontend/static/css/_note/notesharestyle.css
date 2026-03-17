@@ -1,0 +1,164 @@
+/* ===============================
+   NoteShare.css  —  完整樣式檔
+   =============================== */
+
+:root{
+  --rose-700:#9B1B30;         /* 主色（可依品牌調整） */
+  --rose-50: #fff3f5;         /* 淡底色 */
+  --text-main:#5a0f1a;        /* 主要文字色 */
+  --border:#f4dfe3;           /* 卡片邊框色 */
+  --shadow:0 4px 10px rgba(0,0,0,.06);
+}
+
+.ns-wrap{padding:1.5rem 1rem;}
+@media(min-width:768px){.ns-wrap{padding:1.5rem 2rem;}}
+
+/* ── Toolbar ───────────────────────────────── */
+.ns-toolbar{
+  display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between;
+  gap:.75rem; margin-bottom:1.25rem;
+}
+
+/* 搜尋框 */
+.ns-search{
+  display:flex; align-items:center; gap:.5rem;
+  border:1px solid var(--rose-700);
+  padding:.25rem 1rem; border-radius:999px; background:#fff;
+}
+.ns-search-icon{color:#888;}
+.ns-search-input{
+  border:none; outline:none; background:transparent;
+  width:11rem;
+}
+@media(min-width:768px){.ns-search-input{width:16rem;}}
+
+/* 分頁籤與刷新 */
+.ns-tabs{display:flex; align-items:center; gap:.5rem;}
+.ns-tab{
+  border:1px solid var(--rose-700); color:var(--rose-700);
+  background:#fff; padding:.5rem 1rem; border-radius:999px; transition:.2s;
+}
+.ns-tab.active{background:var(--rose-700); color:#fff;}
+.ns-refresh{
+  border:1px solid var(--rose-700); color:var(--rose-700);
+  background:#fff; padding:.5rem .75rem; border-radius:999px; cursor:pointer;
+}
+.ns-refresh:hover{background:#fff6f7;}
+
+/* ── 空狀態 ───────────────────────────────── */
+.ns-empty{ text-align:center; color:#777; margin-bottom:1rem; }
+
+/* ── Grid & Card ───────────────────────────── */
+.ns-grid{
+  display:grid; gap:1.25rem;
+  grid-template-columns:1fr;
+}
+@media(min-width:640px){.ns-grid{grid-template-columns:repeat(2,1fr);}}
+@media(min-width:900px){.ns-grid{grid-template-columns:repeat(3,1fr);}}
+@media(min-width:1200px){.ns-grid{grid-template-columns:repeat(4,1fr);}}
+
+/* 卡片 */
+.ns-card{
+  background:rgba(255,245,247,.7);
+  border:1px solid var(--border);
+  border-radius:1rem; box-shadow:var(--shadow);
+  cursor:pointer; overflow:hidden; transition:box-shadow .2s, transform .2s;
+}
+.ns-card:hover{box-shadow:0 8px 16px rgba(0,0,0,.08); transform:translateY(-1px);}
+
+/* 卡片頭 */
+.ns-card-head{
+  display:flex; gap:.75rem; align-items:flex-start;
+  padding:1.25rem 1.25rem 0 1.25rem;
+}
+.ns-avatar{
+  width:40px; height:40px; border-radius:999px; object-fit:cover; border:1px solid #ddd; flex:0 0 auto;
+}
+.ns-avatar-fallback{
+  display:flex; align-items:center; justify-content:center; background:#cfcfcf; color:#fff;
+}
+.ns-meta{flex:1;}
+.ns-username{color:var(--text-main); font-weight:600;}
+.ns-time{font-size:.78rem; color:#777; margin-top:.1rem;}
+.ns-edit{color:var(--rose-700); font-size:.9rem;}
+
+/* 卡片身 */
+.ns-card-body{ padding: .75rem 1rem; }
+.ns-title{ color:var(--text-main); font-weight:700; font-size:1.1rem; margin-bottom:.25rem; }
+
+/* 預覽（3行截斷的簡易作法，與實際內容高度搭配） */
+.ns-preview{
+  color:#7b1e2a; font-size:.95rem; max-height:4.2rem; overflow:hidden;
+}
+
+/* 讚列 */
+.ns-like-row{
+  display:flex; justify-content:flex-end; align-items:center; gap:.5rem;
+  color:var(--rose-700); margin-top:.5rem;
+}
+.ns-like-btn{
+  background:none; border:none; color:var(--rose-700); text-decoration:none; padding:0; display: contents;
+}
+/* 已按讚的視覺（可自行加上填色愛心等） */
+.ns-like-btn.is-liked{ text-decoration:none; font-weight:600; }
+
+/* 分頁*/
+.ns-pager{
+  display:flex; flex-direction:column; align-items:center; gap:.5rem;
+  margin-top:2rem; color:var(--rose-700);
+}
+.ns-pager-btns{ display:flex; gap:.75rem; }
+.ns-page-btn{
+  border:1px solid #ccc; background:#fff; border-radius:999px;
+  padding:.5rem 1rem; cursor:pointer;
+}
+.ns-page-btn:disabled{opacity:.5; cursor:not-allowed;}
+/* .ns-page-info{} */
+.ns-page-num{ font-size:1.4rem; }
+
+/* ── Modal ─────────────────────────────────── */
+.ns-modal-mask{
+  position:fixed; inset:0; background:rgba(0,0,0,.5);
+  display:flex; align-items:center; justify-content:center; z-index:50;
+}
+.ns-modal{
+  background:#fff; width:95%; max-width:720px; max-height:90vh; overflow:auto;
+  border-radius:1rem; box-shadow:var(--shadow); padding:1.25rem 1.25rem 1rem;
+}
+.ns-modal-title{ font-size:1.25rem; font-weight:600; margin-bottom:.25rem; }
+.ns-modal-sub{ font-size:.9rem; color:#666; margin-bottom:.75rem; }
+.ns-modal-page{ border-top:1px solid #eee; padding-top:.75rem; margin-bottom:1rem; }
+.ns-page-label{ font-size:.75rem; color:#999; margin-bottom:.25rem; }
+.ns-modal-content{ font-size:.95rem; line-height:1.6; }
+
+/* Modal 底部按鈕 */
+.ns-modal-actions{
+  display:flex; justify-content:flex-end; gap:.5rem; margin-top:.5rem;
+}
+.ns-btn{
+  background:#e5e5e5; border:none; border-radius:.5rem;
+  padding:.4rem .8rem; cursor:pointer;
+}
+.ns-btn:hover{ background:#d8d8d8; }
+.ns-btn.danger{ background:#e54545; color:#fff; }
+.ns-btn.danger:hover{ background:#cc3c3c; }
+
+/* ── Toast（未登入提示等） ─────────────────── */
+.ns-toast{
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,.8);
+  color:#fff;
+  padding: .6rem .9rem;
+  border-radius: .5rem;
+  font-size: .95rem;
+  z-index: 1000;
+  box-shadow: 0 6px 16px rgba(0,0,0,.2);
+  animation: ns-fadein .15s ease-out;
+}
+@keyframes ns-fadein {
+  from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}

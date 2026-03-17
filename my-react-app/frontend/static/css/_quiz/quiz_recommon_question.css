@@ -1,0 +1,151 @@
+/* ---------------- 通用按鈕樣式 ---------------- */
+.custom-btn, .custom0-btn, .confirm-btn {
+  border-radius: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 10px 20px;
+  transition: transform 0.2s ease, background-color 0.3s ease, color 0.3s ease/*, box-shadow 0.15s ease*/;
+}
+
+/* ---------------- custom-btn ---------------- */
+.custom-btn {
+  background-color: white;
+  color: #9B1B30;
+  border: 2px solid #9B1B30;
+  width: 100%;
+  max-width: 200px;
+  
+}
+
+.custom-btn:hover {
+  background-color: #9B1B30;
+  color: white;
+}
+
+.custom-btn:active {
+  transform: scale(0.95); /* 只縮放，不改顏色 */
+}
+
+/* 選中 / 正確 / 錯誤狀態 */
+.custom-btn.selected {
+  background: #9B1B30;
+  color: white;
+  border-color: #9B1B30;
+}
+
+.custom-btn.correct {
+  background: #007500;
+  color: white;
+  border-color: #007500;
+}
+
+.custom-btn.wrong {
+  background: #930000;
+  color: white;
+  border-color: #930000;
+}
+
+/* ---------------- custom0-btn ---------------- */
+.custom0-btn {
+  background-color: white;
+  color: black;
+  border: 2px solid transparent;
+  min-width: 200px;
+}
+
+.custom0-btn:hover {
+  background-color: #9B1B30;
+  color: white;
+}
+
+/* ---------------- confirm-btn ---------------- */
+.confirm-btn {
+  background-color: #9B1B30;
+  color: white;
+  border: 2px solid #9B1B30;
+  min-width: 200px;
+  padding: 10px 24px;
+  /*box-shadow: 0 4px 6px rgba(0,0,0,0.1);*/
+}
+
+.confirm-btn:hover {
+  background-color: #7a1524;
+}
+
+.confirm-btn:active {
+  transform: scale(0.95);
+  /*box-shadow: 0 2px 4px rgba(0,0,0,0.2);*/
+}
+
+.confirm-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  border: 2px solid #ccc;
+}
+.left,.right{
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 20px;
+  min-width: 200px;
+  max-width: 200px;
+}
+
+
+/* ---------------- 排版 ---------------- */
+.options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.options-grid {
+  display: flex;
+  justify-content: center; /* 置中整個配對區 */
+  align-items: flex-start;
+  gap: 60px;               /* 左右間距 */
+  margin-bottom: 20px;
+  
+}
+
+/* ---------------- 手機響應式 ---------------- */
+@media (max-width: 600px) {
+  options-grid {
+    width: 45%;
+    display: flex;              /* 左右排列 */
+    justify-content: center;    /* 整個區塊置中 */
+    align-items: flex-start;    /* 上對齊 */
+    gap: 10px;                  /* 左右間距 */
+    margin-bottom: 20px;
+  }
+  .left,.right{
+    width: 45%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 20px;
+    min-width: 5px;
+    max-width: 5px;
+  }
+
+  .custom-btn, .custom0-btn, .confirm-btn {
+    min-width: 180px;           
+    max-width: 180px;      
+    padding: 12px 16px;
+    font-size: 16px;
+    margin: 0 auto;        
+    transition: transform 0.15s ease, background-color 0.3s ease, color 0.3s ease, box-shadow 0.15s ease;
+  }
+
+  /* 手機點擊回饋動畫 */
+  .custom-btn:active,
+  .custom0-btn:active,
+  .confirm-btn:active {
+    transform: scale(0.95);
+    /*box-shadow: 0 2px 4px rgba(0,0,0,0.2);*/
+  }
+}

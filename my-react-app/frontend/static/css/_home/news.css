@@ -1,0 +1,166 @@
+.event-container {
+    display: flex;
+    flex-direction: row;
+    gap: 2rem;
+    padding: 2rem;
+    background-color: #fff;
+    font-family: "Noto Sans TC", sans-serif;
+    color: #222;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.event-left {
+    width: 360px;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.slide {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.slide img {
+    width: 100%;
+    height: 500px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.slide-info {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    backdrop-filter: blur(3px);
+}
+
+.slide-info h3 {
+    font-size: 1.1rem;
+    margin: 0.4rem 0;
+}
+
+.slide-info .slide-date {
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: #ffe28a;
+}
+
+.slide-info a {
+    color: #ffe28a;
+    text-decoration: underline;
+    font-size: 0.85rem;
+}
+
+.swiper-button-next,
+.swiper-button-prev {
+    color: white !important;
+    width: 30px !important;
+    height: 30px !important;
+    transform: translateY(-50%) !important;
+}
+
+.event-right {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    max-width: 55%;
+}
+
+.news-title {
+    font-size: 1.75rem;
+    font-weight: bold;
+    color: #9B1B30;
+    border-bottom: 2px solid #9B1B30;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.news-subtitle {
+    font-size: 0.95rem;
+    color: #888;
+    margin-bottom: 1rem;
+}
+
+.text-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.text-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 0.8rem 0;
+    border-bottom: 1px dotted #ccc;
+    text-decoration: none;
+}
+
+.text-item-date {
+    width: 85px;
+    color: #222;
+    font-size: 0.9rem;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.text-item-content {
+    flex: 1;
+    padding-left: 1rem;
+    max-width: 100%;
+}
+
+.text-item h4 {
+    margin: 0;
+    font-size: 1rem;
+    color: #333;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.text-item .tag {
+    display: inline-block;
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    color: #fff;
+    margin-bottom: 0.25rem;
+    background-color: #9B1B30;
+}
+
+.text-item .tag[data-tag*="展覽"] {
+    background-color: #E0A100;
+}
+
+.text-item .tag[data-tag*="園區"] {
+    background-color: #4E7F63;
+}
+
+.text-item .tag[data-tag*="消息"] {
+    background-color: #FF6F61;
+}
+
+@media (max-width: 768px) {
+    .event-container {
+        flex-direction: column;
+    }
+
+    .event-left {
+        width: 100%;
+    }
+
+    .slide img {
+        height: 300px;
+    }
+
+    .text-item h4 {
+        white-space: normal;
+    }
+}

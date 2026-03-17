@@ -1,0 +1,77 @@
+.situation-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  box-sizing: border-box;
+}
+
+.situation-header {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0px;
+  color: #000;
+  padding: 4px 12px;
+  background-color: #F4C7C3;
+  border-radius: 16px;
+  width: fit-content;
+}
+
+.situation-filter-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+/* 圓餅圖 + 雷達圖 */
+.situation-chart-radar-wrapper {
+  display: flex;
+  gap: 2rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* 折線圖 */
+.situation-line-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 無資料提示框 */
+.no-data-box {
+  width: 100%;
+  max-width: 300px;
+  margin: 20px auto;
+  padding: 20px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 500;
+  color: #9b1b30ec;
+  border: 2px dashed #9B1B30;
+  border-radius: 12px;
+  background-color: #fff9f9;
+}
+
+
+@media (max-width: 600px) {
+  .situation-chart-title,
+  .situation-radar-title,
+  .situation-line-title {
+    font-size: 20px;
+  }
+
+  .situation-container {
+    padding: 1rem;
+  }
+
+  .filter-container {
+    width: 95%;
+    padding: 1rem;
+  }
+}

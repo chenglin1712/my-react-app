@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="UTF-8">
+    <title>泰雅語對話練習</title>
+    <style>
+        #chatHistory {
+            border: 1px solid #ccc;
+            padding: 10px;
+            width: 90%;
+            height: 300px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            background: #f9f9f9;
+            font-family: sans-serif;
+        }
+
+        .user-message {
+            color: blue;
+            margin: 5px 0;
+        }
+
+        .bot-message {
+            color: green;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>泰雅語對話測試</h1>
+    <div id="chatHistory"></div>
+    <form id="chatForm">
+        <input type="text" id="userMessage" placeholder="請輸入訊息" required>
+        <button type="submit">送出</button>
+    </form>
+
+    <script>
+        const form = document.getElementById('chatForm');
+        const input = document.getElementById('userMessage');
+        const chatHistory = document.getElementById('chatHistory');
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const userText = input.value.trim();
+            if (!userText) return;
+
+            appendMessage("你", userText, "user-message");
+
+            fetch('http://127.0.0.1:8000/AIModel/tayal_chat/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: input.value })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    const reply = data.message || data.error || "發生錯誤";
+                    appendMessage("系統", reply, "bot-message");
+                    input.value = '';
+                })
+                .catch(error => {
+                    appendMessage("系統", "發生錯誤：" + error, "bot-message");
+                });
+        });
+
+        function appendMessage(sender, text, className) {
+            const message = document.createElement('div');
+            message.className = className;
+            message.textContent = `${sender}：${text}`;
+            chatHistory.appendChild(message);
+        }
+    </script>
+</body>
+
+</html>

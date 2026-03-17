@@ -1,0 +1,361 @@
+.navbar {
+    background-color: #9B1B30;
+    color: white;
+    padding: 16px !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1300px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.logo {
+    font-size: 24px;
+    font-weight: bold;
+    color: white;
+    font-family: "Arial", sans-serif;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.logo img {
+    width: 40px;
+}
+
+.menu {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    background-color: #9B1B30;
+    color: white;
+    padding: 10px 10px;
+    border-radius: 6px;
+    font-size: 16px;
+    font-family: "Arial", sans-serif;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.3s;
+    text-align: left;
+}
+
+.menu-item:hover {
+    background-color: #F4F4F4;
+    color: #9B1B30;
+}
+
+.menu-item svg {
+    margin-right: 5px;
+}
+
+.menu-item.active {
+    background-color: #fff;
+    color: #9B1B30;
+}
+
+.menu-item.active svg {
+    color: #9B1B30;
+}
+
+.auth-container {
+    cursor: pointer;
+}
+
+.auth-container-user {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    /* 跟 menu-item 一致 */
+    gap: 5px;
+    padding: 10px 10px;
+    /* 跟 menu-item 一致 */
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-family: "Arial", sans-serif;
+    background-color: #9B1B30;
+    color: white;
+    transition: background-color 0.3s, transform 0.3s;
+    text-align: left;
+}
+
+.auth-container-user p {
+    margin: 0;
+    font-size: 16px;
+    color: white;
+}
+
+.auth-container-user:hover {
+    background-color: #F4F4F4;
+    color: #9B1B30;
+}
+
+.auth-container-user:hover p {
+    color: #9B1B30;
+}
+
+.auth-container-user img.auth-image {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.auth-container p {
+    margin: 0px;
+    color: white;
+    font-weight: 600;
+}
+
+.auth-container button {
+    height: fit-content;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 16px;
+    background-color: #9B1B30;
+    color: white;
+    border: none;
+    transition: background-color 0.3s, transform 0.3s;
+}
+
+.auth-container button:hover {
+    background-color: #F4F4F4;
+    color: #9B1B30;
+}
+
+/* 響應式選單 */
+.menu-mobile {
+    display: none;
+}
+
+.menu-mobile.active {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background-color: #9B1B30;
+    padding: 16px;
+    border-radius: 8px;
+}
+
+.menu-mobile-item {
+    display: flex;
+    align-items: center;
+    font-size: 18px;
+    color: white;
+    cursor: pointer;
+    font-family: "Arial", sans-serif;
+    padding: 10px 20px;
+    border-radius: 8px;
+    transition: background-color 0.3s, transform 0.3s;
+    margin-bottom: 8px;
+}
+
+.menu-mobile-item:hover {
+    background-color: #F4F4F4;
+    color: #9B1B30;
+}
+
+.menu-mobile-item svg {
+    margin-right: 12px;
+}
+
+.menu-toggle {
+    display: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: #F4F4F4;
+    background-color: #9B1B30;
+    border: none;
+    border-radius: 8px;
+}
+
+.menu-toggle:hover {
+    background-color: #F4F4F4;
+    color: #9B1B30;
+    border: none;
+}
+
+.menu-mobile-item.active {
+    background-color: #F4F4F4;
+    color: #1D4ED8;
+}
+
+.mobile-container-user {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    /* 跟 menu-item 一致 */
+    gap: 10px;
+    padding: 10px 10px;
+    /* 跟 menu-item 一致 */
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-family: "Arial", sans-serif;
+    background-color: #9B1B30;
+    color: white;
+    transition: background-color 0.3s, transform 0.3s;
+    text-align: left;
+}
+
+.mobile-container-user p {
+    margin: 0;
+    font-size: 16px;
+    color: white;
+}
+
+.mobile-container-user:hover {
+    background-color: #F4F4F4;
+    color: #9B1B30;
+}
+
+.mobile-container-user:hover p {
+    color: #9B1B30;
+}
+
+.mobile-container-user img.mobile-image {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+/* userSidebar */
+.sidebar {
+    position: fixed;
+    top: 0;
+    right: -350px;
+    width: 350px;
+    height: 100%;
+    background-color: #fff;
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+    z-index: 1001;
+    transition: right 0.3s ease;
+    overflow-y: auto;
+}
+
+.sidebar.open {
+    right: 0;
+}
+
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    transition: opacity 0.3s ease;
+}
+
+.sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px;
+    border-bottom: 1px solid #eee;
+}
+
+.sidebar-header h3 {
+    margin: 0;
+    margin-left: 15px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #999;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #999;
+    margin: 0;
+    margin-right: 20px;
+    
+}
+
+.close-btn:hover {
+    color: #333;
+}
+
+/* 筆記專區下拉選單 */
+.note-dropdown {
+    position: relative;
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 8px;
+    background-color: #9B1B30;
+    min-width: 140px;
+    z-index: 1002;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    flex-direction: column;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.dropdown-item {
+    padding: 10px 16px;
+    color: white;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.3s, color 0.3s;
+    font-family: "Arial", sans-serif;
+    white-space: nowrap;
+    background-color: #9B1B30;
+}
+
+.dropdown-item:hover {
+    background-color: #F4F4F4;
+    color: #9B1B30;
+}
+
+.note-dropdown:hover .dropdown-content,
+.dropdown-content.active {
+    display: flex;
+}
+
+@media (max-width: 948px) {
+    .menu {
+        display: none;
+    }
+
+    .menu-toggle {
+        display: block;
+    }
+
+    .menu-mobile {
+        display: none;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .sidebar {
+        width: 100vw;
+        right: -100vw;
+    }
+
+    .sidebar.open {
+        right: 0;
+    }
+}

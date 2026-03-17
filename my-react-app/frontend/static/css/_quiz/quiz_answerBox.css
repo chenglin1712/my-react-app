@@ -1,0 +1,87 @@
+.box-container {
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    width: 280px;
+    height: fit-content;
+    text-align: center;
+    border: 2px solid #ddd;
+}
+
+.box-title {
+    font-size: 22px;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 16px;
+}
+
+.box-question-list {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin: 12px 0;
+}
+
+.box-question-btn {
+    position: relative;
+    background-color: #e0e0e0;
+    color: #333;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 8px;
+    transition: all 0.3s ease;
+    min-width: 20%;
+}
+
+.box-question-btn:hover {
+    text-decoration: underline;
+    background-color: #d1e7ff;
+    color: #007bff;
+}
+
+.box-question-btn.answer {
+    background-color: #4CAF50;
+    color: white;
+    border: 2px solid #388e3c;
+}
+
+.box-question-btn.answer:hover {
+    background-color: #66bb6a;
+    border-color: #388e3c;
+}
+
+.box-timer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #34495e;
+    margin: 20px 0 8px 0;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.box-submit-btn {
+    background-color: transparent;
+    color: #e74c3c;
+    border: none;
+    display: flex;
+    align-items: center;
+    transition: all 0.3s;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.box-submit-btn:hover {
+    text-decoration: underline;
+    color: #c0392b;
+}
+
+.star-indicator {
+    position: absolute;
+    top: -10px;
+    right: -8px;
+    font-size: 14px;
+    background-color: white;
+    border-radius: 50%;
+    padding: 1px 3px;
+}

@@ -1,0 +1,14 @@
+.quiz-body {
+    display: flex;
+    background-color: #f9f9f9;
+    padding-left: 3%;
+}
+
+.quiz-content-container {
+    margin: 1% 0;
+    padding: 20px;
+    background: white;
+    border: 1px solid #ccc;
+    width: 75%;
+    min-height: calc(100vh - 110px);
+}

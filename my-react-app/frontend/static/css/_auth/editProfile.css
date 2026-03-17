@@ -1,0 +1,124 @@
+.edit-container {
+    max-width: 500px;
+    margin: 40px auto;
+    background: #fff;
+    padding: 32px;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.edit-title {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 24px;
+    color: #9B1B30;
+    text-align: center;
+}
+
+.avatar-uploader {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 24px;
+    border-radius: 50%;
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.3s;
+}
+
+.avatar-uploader:hover {
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+}
+
+.avatar-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.edit-overlay {
+    position: absolute;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.45);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    font-size: 13px;
+    text-align: center;
+    pointer-events: none;
+}
+
+.avatar-uploader:hover .edit-overlay {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.edit-overlay svg {
+    margin-bottom: 4px;
+}
+
+.edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: #444;
+}
+
+select,
+input {
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 15px;
+    transition: border 0.2s ease;
+}
+
+input:focus,
+select:focus {
+    outline: none;
+    border-color: #9B1B30;
+}
+
+.edit-container button {
+    flex: 1;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.save-btn {
+    background-color: #9b1b30;
+    color: white;
+    border: none;
+    gap: 6px;
+}
+
+.save-btn:hover {
+    background-color: #7e1726;
+}
+
+.cancel-btn {
+    background-color: #f5f5f5;
+    border: 1px solid #ccc;
+    color: #444;
+}
+
+.cancel-btn:hover {
+    background-color: #e0e0e0;
+}

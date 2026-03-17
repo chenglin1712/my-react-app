@@ -1,0 +1,42 @@
+.subcategory-scroll {
+  display: flex;
+  overflow-x: auto;
+  gap: 12px;
+  padding: 8px;
+  scroll-behavior: smooth;
+}
+
+.subcategory-card {
+  flex: 0 0 auto;
+  width: 190px;
+  height: 190px;
+  text-align: center;
+  border-radius: 10px;
+  padding: 6px;
+  background-color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.subcategory-card img {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+}
+
+.subcategory-card span {
+  display: block;
+  font-size: 13px;
+  margin-top: 4px;
+  color: #333;
+}
+
+.subcategory-card:hover {
+  background-color: #fbcfcf;
+}
+
+.subcategory-card.active {
+  
+  background-color: #f6bdbd;
+}

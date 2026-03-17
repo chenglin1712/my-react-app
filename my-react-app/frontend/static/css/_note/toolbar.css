@@ -1,0 +1,50 @@
+/* 文字工具列（上方） */
+.editor-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 14px 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border-rose);
+  padding: 12px 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.editor-toolbar .group { display: flex; align-items: center; gap: 8px; }
+.editor-toolbar .divider { width:1px; height:20px; background:#e5e7eb; }
+
+/* 選色條（示意） */
+.editor-toolbar .colorbar { display:flex; align-items:center; gap:10px; height:4px; }
+.editor-toolbar .colorbar span { display:block; width:120px; height:4px; background:#000; }
+
+/* 底部工具列（上一頁 / 下一頁 / 分享等） */
+.bottom-toolbar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background-color: #fff;
+  border-top: 1px solid #dee2e6;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 20px;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 999;
+}
+.toolbar-page-info {
+  align-self: center;
+  font-weight: bold;
+}
+
+/* RWD */
+@media (max-width: 768px) {
+  .bottom-toolbar {
+    flex-direction: column;
+    align-items: center;
+    padding: 15px 10px;
+  }
+  .toolbar-page-info { margin: 10px 0; }
+}

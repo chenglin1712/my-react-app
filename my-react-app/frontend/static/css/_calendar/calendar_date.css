@@ -1,0 +1,189 @@
+.calendar-wrapper {
+    max-width: 900px;
+    height: 385px;
+    margin: 40px auto;
+    display: flex;
+    gap: 24px;
+    padding: 24px;
+    background-color: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.calendar-left {
+    flex: 1;
+}
+
+.calendar-right {
+    flex: 1.2;
+    display: flex;
+    flex-direction: column;
+}
+
+.calendar-right h2 {
+    font-size: 18px;
+    color: #9b1b30;
+    margin-bottom: 16px;
+}
+
+.react-calendar {
+    width: 100% !important;
+    border: none !important;
+    font-family: inherit;
+}
+
+.react-calendar__tile--now {
+    background: #fce4ec !important;
+    color: #9b1b30 !important;
+    font-weight: bold !important;
+}
+
+.react-calendar__tile--active {
+    background: #9b1b30 !important;
+    color: white !important;
+}
+
+.react-calendar__month-view__days button {
+    min-width: 100% !important;
+    border-radius: 6px !important;
+    padding: 10px 6px;
+}
+
+.react-calendar__month-view__weekdays,
+.react-calendar__month-view__days {
+    display: grid !important;
+    grid-template-columns: repeat(7, 1fr);
+}
+
+.event-list-scroll {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 300px;
+    margin-bottom: 16px;
+}
+
+.event-card {
+    background-color: #fff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    border: 1px solid #eee;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 15px;
+    position: relative;
+}
+
+.event-card button {
+    background: none;
+    border: none;
+    color: #c62828;
+    cursor: pointer;
+}
+
+.event-card:hover {
+    background-color: #f3f3f3;
+}
+
+
+.event-card h4 {
+    margin: 0 0 6px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1f1f1f;
+}
+
+.event-card p {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: #555;
+    line-height: 1.4;
+}
+
+.event-card span {
+    font-size: 12px;
+    color: #888;
+    font-weight: 500;
+}
+
+.event-card .delete-btn {
+    position: absolute;
+    top: 0px;
+    right: 0px;
+    background: none;
+    border: none;
+    color: #c00;
+}
+
+.event-card .delete-btn:hover {
+    color: #f00;
+}
+
+.go-quiz-btn {
+    margin-top: 8px;
+    padding: 6px 12px;
+    background-color: #9b1b30;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    border-radius: 6px;
+}
+
+.go-quiz-btn:hover {
+    background-color: #9b1b30;
+    color: white;
+}
+
+.no-event {
+    color: #888;
+    text-align: center;
+    font-size: 14px;
+    padding: 16px;
+}
+
+.event-input-bar {
+    display: flex;
+    gap: 8px;
+}
+
+.event-input-bar input {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.event-input-bar input:focus {
+    border-color: #9b1b30;
+    outline: none;
+}
+
+.event-input-bar button {
+    padding: 10px 16px;
+    background-color: #9b1b30;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.event-input-bar button:hover {
+    background-color: #801526;
+}
+
+.dot-indicator {
+    margin-top: 4px;
+    width: 6px;
+    height: 6px;
+    background-color: #9b1b30;
+    border-radius: 50%;
+    margin-left: auto;
+    margin-right: auto;
+}

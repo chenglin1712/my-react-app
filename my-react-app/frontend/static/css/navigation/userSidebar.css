@@ -1,0 +1,251 @@
+/* 頂部個人資料 */
+.sidebar-container {
+    border-left: 1px solid #e5e5e5;
+}
+
+.sidebar-profile {
+    background-color: #9b1b30;
+    padding: 10px 20px;
+    color: white;
+}
+
+.profile-avatar-container {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 10px;
+}
+
+.profile-avatar-container img {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #e8c39e;
+}
+
+.profile-info h3 {
+    margin: 0 0 5px 0;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.profile-info p {
+    margin: 0;
+    color: white;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.profile-info span {
+    background-color: #543729;
+    display: inline-block;
+    margin-top: 6px;
+    border-radius: 12px;
+    padding: 4px 10px;
+    font-size: 12px;
+}
+
+.profile-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.profile-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 20px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.edit-btn {
+    background-color: #F9F5F0;
+    color: #9B1B30;
+}
+
+.edit-btn:hover {
+    background-color: #e8e1d9;
+}
+
+.logout-btn {
+    background-color: #543729;
+    color: white;
+}
+
+.logout-btn:hover {
+    background-color: #6b4a38;
+}
+
+.icon {
+    margin-right: 4px;
+    color: currentColor;
+}
+
+.profile-details {
+    margin-bottom: 30px;
+}
+
+/* 導航列-選項 */
+.sidebar-nav {
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+}
+
+.nav-button {
+    width: 100%;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: transparent;
+    color: #543729;
+    border: none;
+    border-radius: 12px;
+    border-right: 4px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+}
+
+.nav-button:hover {
+    background-color: #ffffff;
+    color: #9B1B30;
+    border-right: 4px solid #9B1B30;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.nav-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.nav-icon svg,
+.nav-chevron {
+    color: inherit;
+}
+
+/* 導覽列-個人詞語庫 */
+.content-panel {
+    padding: 16px;
+    border-radius: 8px;
+}
+
+.section-title {
+    font-weight: bold;
+    font-size: 18px;
+    margin-bottom: 16px;
+    color: #543729;
+}
+
+.favorites-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.favorite-item {
+    background-color: #F9F5F0;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+    border-right: 3px solid #9B1B30;
+}
+
+.item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.item-title {
+    font-weight: 600;
+    color: #543729;
+    font-size: 16px;
+}
+
+.item-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toggle-icon {
+    cursor: pointer;
+}
+
+.word-list {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background-color: #f9f5f0;
+    padding-top: 4px;
+    border-radius: 8px;
+}
+
+.word-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 8px;
+    padding: 12px 16px;
+    background-color: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.word-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.word-term {
+    font-weight: bold;
+    color: #543729;
+    font-size: 16px;
+}
+
+.word-translation {
+    font-size: 14px;
+    color: #777;
+}
+
+.word-actions {
+    display: flex;
+    align-items: center;
+}
+
+.audio-player {
+    width: 20px;
+    height: 20px;
+    color: #9B1B30;
+    cursor: pointer;
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.audio-player:hover {
+    color: #7d1526;
+    transform: scale(1.1);
+}
+
+.material-link {
+    color: #9B1B30;
+    font-size: 14px;
+    margin-left: 8px;
+    transition: color 0.2s ease;
+    cursor: pointer;
+}
+
+.empty-text {
+    text-align: center;
+    font-size: 14px;
+    color: #999999;
+    padding: 16px 0;
+}

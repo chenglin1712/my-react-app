@@ -1,0 +1,26 @@
+@media (max-width: 768px) {
+    .game-background {
+        width: 90%;
+    }
+}
+
+body {
+    background-color: transparent;
+    height: 100%;
+    margin: 0;
+}
+
+.background {
+    place-items: center;
+}
+
+.game-title {
+    text-align: center;
+    font-family: Comic Sans MS, DFKai-SB;
+}
+
+.game-background {
+    background-color: #FFF5F5;
+    width: 60%;
+    border-radius: 10px;
+}
