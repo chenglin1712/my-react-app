@@ -356,9 +356,15 @@ def bytes_to_tensor(wav_io):
         waveform = waveform.mean(dim=0, keepdim=True)
     return waveform, sr
 
-# 4. wav2vec2
-bundle = torchaudio.pipelines.WAV2VEC2_BASE
-wav2vec2 = bundle.get_model()
+# 4. wav2vec2（懶載入，第一次呼叫時才下載模型）
+_wav2vec2_model = None
+
+def get_wav2vec2():
+    global _wav2vec2_model
+    if _wav2vec2_model is None:
+        bundle = torchaudio.pipelines.WAV2VEC2_BASE
+        _wav2vec2_model = bundle.get_model()
+    return _wav2vec2_model
 
 
 @router.post("/compare_audio/")
@@ -403,8 +409,9 @@ async def compare_audio(
 
         # Step E — embedding
         try:
-            emb1 = wav2vec2.extract_features(target_wave)[0].mean(dim=1)
-            emb2 = wav2vec2.extract_features(user_wave)[0].mean(dim=1)
+            model = get_wav2vec2()
+            emb1 = model.extract_features(target_wave)[0].mean(dim=1)
+            emb2 = model.extract_features(user_wave)[0].mean(dim=1)
         except Exception as e:
             return make_error("embedding", str(e))
 

@@ -13,7 +13,7 @@ router = APIRouter()
 VITE_CLOUD_API_KEY = os.getenv("VITE_CLOUD_API_KEY")
 VITE_CLOUD_API_URL = os.getenv("VITE_CLOUD_API_URL")
 if not VITE_CLOUD_API_KEY:
-    raise RuntimeError("CLOUD_API_KEY 環境變數未設定")
+    print("WARNING: CLOUD_API_KEY 環境變數未設定，影像辨識功能將無法使用")
 
 def translate_with_retry(text: str, retries=3, delay=1) -> str | None:
     if not text.strip():

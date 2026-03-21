@@ -408,14 +408,15 @@ word_list = [
     ['mksingut', '小黑人'],
 ]
 
-a = Crossword(13, 13, '-', 5000, word_list)
-a.compute_crossword(2)
-print(a.word_bank())
-print(a.solution())
-print(a.word_find())
-print(a.display())
-print(a.legend())
-print(len(a.current_word_list), 'out of', len(word_list))
-print(a.debug)
+if __name__ == "__main__":
+    a = Crossword(13, 13, '-', 5000, word_list)
+    a.compute_crossword(2)
+    print(a.word_bank())
+    print(a.solution())
+    print(a.word_find())
+    print(a.display())
+    print(a.legend())
+    print(len(a.current_word_list), 'out of', len(word_list))
+    print(a.debug)
 #end_full = float(time.time())
 #print(end_full - start_full)
