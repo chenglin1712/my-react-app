@@ -241,9 +241,11 @@ const App = () => {
     await updateDoc(userDocRef, { favorites: newFavorites });
   }
 
+  const TRIBES_WITH_DATA = ['泰雅', '阿美'];
+
   const handleSearch = async (tribeOverride = null) => {
     const tribe = tribeOverride ?? selectedTribe;
-    if (tribe !== '泰雅') {
+    if (!TRIBES_WITH_DATA.includes(tribe)) {
       setDefinitions({ exact_match_results: {}, fuzzy_match_results: {}, all_results: {} });
       return;
     }
@@ -252,10 +254,10 @@ const App = () => {
     try {
       let res;
       if (query.trim() === '') {
-        res = await axios.post(import.meta.env.VITE_API_SEARCH_ALL_URL);
+        res = await axios.post(import.meta.env.VITE_API_SEARCH_ALL_URL, { keyword: '', tribe });
         setDefinitions({ exact_match_results: {}, fuzzy_match_results: {}, all_results: res.data.all_results || {} });
       } else {
-        res = await axios.post(import.meta.env.VITE_API_SEARCH_KEY_URL, { keyword: query.trim() });
+        res = await axios.post(import.meta.env.VITE_API_SEARCH_KEY_URL, { keyword: query.trim(), tribe });
         setDefinitions({
           exact_match_results: Array.isArray(res.data.exact_match_results) ? { [query.trim()]: res.data.exact_match_results } : res.data.exact_match_results,
           fuzzy_match_results: res.data.fuzzy_match_results || {},
@@ -651,7 +653,7 @@ const App = () => {
       {loading && <Spinner animation="border" variant="primary" />}
       {error && <Alert variant="danger">{error}</Alert>}
 
-      {selectedTribe !== '泰雅' && !loading && (
+      {!TRIBES_WITH_DATA.includes(selectedTribe) && !loading && (
         <div className="tribe-empty-state">
           <div
             className="tribe-empty-badge"
@@ -664,7 +666,7 @@ const App = () => {
         </div>
       )}
 
-      {selectedTribe === '泰雅' && Object.keys(definitions.all_results).length > 0 && (() => {
+      {TRIBES_WITH_DATA.includes(selectedTribe) && Object.keys(definitions.all_results).length > 0 && (() => {
         const allWordsFlat = Object.values(definitions.all_results).flat();
         const filteredSorted = filterAndSortWords(allWordsFlat);
         return (
@@ -696,7 +698,7 @@ const App = () => {
         );
       })()}
 
-      {selectedTribe === '泰雅' && Object.keys(definitions.exact_match_results).length > 0 && (() => {
+      {TRIBES_WITH_DATA.includes(selectedTribe) && Object.keys(definitions.exact_match_results).length > 0 && (() => {
 
         const allWordsFlat = Object.values(definitions.exact_match_results).flat();
         const filteredSorted = filterAndSortWords(allWordsFlat);
@@ -728,7 +730,7 @@ const App = () => {
         );
       })()}
       <br />
-      {selectedTribe === '泰雅' && Object.keys(definitions.fuzzy_match_results).length > 0 && (() => {
+      {TRIBES_WITH_DATA.includes(selectedTribe) && Object.keys(definitions.fuzzy_match_results).length > 0 && (() => {
 
         const allWordsFlat = Object.values(definitions.fuzzy_match_results)
           .flatMap(wordGroup => Object.values(wordGroup).flat());

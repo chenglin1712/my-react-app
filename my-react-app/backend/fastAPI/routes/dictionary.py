@@ -1,7 +1,7 @@
 import json, re, logging, httpx
 from typing import List, Dict, Tuple, Optional
 
-from fastapi import APIRouter, Request, Depends, Response
+from fastapi import APIRouter, Request, Depends, Response, Body
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -74,8 +74,17 @@ class WordResult(BaseModel):
     isOtherDialect: Optional[bool] = None
 
 
+TRIBE_MAP = {
+    '泰雅': '泰雅語',
+    '阿美': '阿美語',
+    '布農': '布農語',
+    '葛瑪蘭': '葛瑪蘭語',
+    '排灣': '排灣語',
+}
+
 class KeywordRequest(BaseModel):
-    keyword: str
+    keyword: Optional[str] = ''
+    tribe: Optional[str] = '泰雅'
 
 
 # ------------------------- Utilities -------------------------
@@ -188,9 +197,9 @@ def parse_audios(value) -> List[AudioItem]:
 
 
 # ------------------------- 搜尋邏輯 -------------------------
-def search_by_chinese(db: Session, keyword: str) -> Tuple[List[WordResult], List[str]]:
+def search_by_chinese(db: Session, keyword: str, tribe: str = '泰雅語') -> Tuple[List[WordResult], List[str]]:
     """完全比對中文解釋"""
-    words = db.query(Word).all()
+    words = db.query(Word).filter(Word.tribe == tribe).all()
 
     results = []
     matched_names = []
@@ -231,9 +240,9 @@ def search_by_chinese(db: Session, keyword: str) -> Tuple[List[WordResult], List
 
 
 
-def fuzzy_search_by_chinese(db: Session, keyword: str, exclude_names: List[str]) -> Dict[str, List[WordResult]]:
+def fuzzy_search_by_chinese(db: Session, keyword: str, exclude_names: List[str], tribe: str = '泰雅語') -> Dict[str, List[WordResult]]:
     """模糊搜尋中文解釋"""
-    words = db.query(Word).all()
+    words = db.query(Word).filter(Word.tribe == tribe).all()
     fuzzy_content = {}
 
     for word in words:
@@ -274,9 +283,9 @@ def fuzzy_search_by_chinese(db: Session, keyword: str, exclude_names: List[str])
 
     return fuzzy_content
 
-def search(db: Session, keyword: str) -> Tuple[List[WordResult], List[str]]:
+def search(db: Session, keyword: str, tribe: str = '泰雅語') -> Tuple[List[WordResult], List[str]]:
     """完全比對族語"""
-    words = db.query(Word).filter(Word.name.like(f"%{keyword}%")).all()
+    words = db.query(Word).filter(Word.tribe == tribe, Word.name.like(f"%{keyword}%")).all()
 
     results = []
     matched_names = []
@@ -316,9 +325,9 @@ def search(db: Session, keyword: str) -> Tuple[List[WordResult], List[str]]:
 
 
 
-def fuzzy_search(db: Session, keyword: str, exclude_names: List[str]) -> Dict[str, List[WordResult]]:
+def fuzzy_search(db: Session, keyword: str, exclude_names: List[str], tribe: str = '泰雅語') -> Dict[str, List[WordResult]]:
     """模糊搜尋族語"""
-    words = db.query(Word).filter(Word.name.like(f"%{keyword}%")).all()
+    words = db.query(Word).filter(Word.tribe == tribe, Word.name.like(f"%{keyword}%")).all()
     fuzzy_content = {}
 
     for word in words:
@@ -359,9 +368,9 @@ def fuzzy_search(db: Session, keyword: str, exclude_names: List[str]) -> Dict[st
 
     return fuzzy_content
 
-def search_all(db: Session) -> Dict[str, List[WordResult]]:
+def search_all(db: Session, tribe: str = '泰雅語') -> Dict[str, List[WordResult]]:
     """回傳所有詞條"""
-    words = db.query(Word).all()
+    words = db.query(Word).filter(Word.tribe == tribe).all()
     content = {}
 
     for word in words:
@@ -408,6 +417,7 @@ async def search_tayal_dictionary(request: Request, db: Session = Depends(get_db
     try:
         data = await request.json()
         words = data.get("words", [])
+        tribe_name = TRIBE_MAP.get(data.get("tribe", "泰雅"), '泰雅語')
         if not words:
             return JSONResponse({"error": "查詢字詞不可為空"}, status_code=400)
 
@@ -416,16 +426,16 @@ async def search_tayal_dictionary(request: Request, db: Session = Depends(get_db
 
         for word in words:
             if is_chinese(word):
-                results, matched_names = search_by_chinese(db, word)
+                results, matched_names = search_by_chinese(db, word, tribe=tribe_name)
                 exact_match_results[word] = [r.dict() for r in results]
 
-                fuzzy = fuzzy_search_by_chinese(db, word, exclude_names=matched_names)
+                fuzzy = fuzzy_search_by_chinese(db, word, exclude_names=matched_names, tribe=tribe_name)
                 fuzzy_match_results[word] = {k: [r.dict() for r in v] for k, v in fuzzy.items()}
             else:
-                results, matched_names = search(db, word)
+                results, matched_names = search(db, word, tribe=tribe_name)
                 exact_match_results[word] = [r.dict() for r in results]
 
-                fuzzy = fuzzy_search(db, word, exclude_names=matched_names)
+                fuzzy = fuzzy_search(db, word, exclude_names=matched_names, tribe=tribe_name)
                 fuzzy_match_results[word] = {k: [r.dict() for r in v] for k, v in fuzzy.items()}
 
         return JSONResponse(
@@ -439,10 +449,16 @@ async def search_tayal_dictionary(request: Request, db: Session = Depends(get_db
 
 
 @router.post("/all/")
-async def all_tayal_dictionary(db: Session = Depends(get_db)):
+async def all_tayal_dictionary(request: Request, db: Session = Depends(get_db)):
     """查詢所有詞條"""
     try:
-        results = search_all(db)
+        try:
+            body = await request.json()
+            tribe = body.get('tribe', '泰雅') or '泰雅'
+        except Exception:
+            tribe = '泰雅'
+        tribe_name = TRIBE_MAP.get(tribe, '泰雅語')
+        results = search_all(db, tribe=tribe_name)
         return JSONResponse({"all_results": {k: [r.dict() for r in v] for k, v in results.items()}}, status_code=200)
     except Exception as e:
         logger.exception(e)
@@ -456,13 +472,14 @@ async def allsearch_tayal_dictionary(request: KeywordRequest, db: Session = Depe
         keyword = request.keyword.strip().replace("　", "")
         if not keyword:
             return JSONResponse({"error": "查詢字詞不可為空"}, status_code=400)
-        
+        tribe_name = TRIBE_MAP.get(request.tribe or '泰雅', '泰雅語')
+
         if is_chinese(keyword):
-            exact, matched_names = search_by_chinese(db, keyword)
-            fuzzy = fuzzy_search_by_chinese(db, keyword, exclude_names=matched_names)
+            exact, matched_names = search_by_chinese(db, keyword, tribe=tribe_name)
+            fuzzy = fuzzy_search_by_chinese(db, keyword, exclude_names=matched_names, tribe=tribe_name)
         else:
-            exact, matched_names = search(db, keyword)
-            fuzzy = fuzzy_search(db, keyword, exclude_names=matched_names)
+            exact, matched_names = search(db, keyword, tribe=tribe_name)
+            fuzzy = fuzzy_search(db, keyword, exclude_names=matched_names, tribe=tribe_name)
 
         return JSONResponse(
             {
