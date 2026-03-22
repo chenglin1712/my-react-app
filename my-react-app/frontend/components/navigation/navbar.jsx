@@ -145,7 +145,7 @@ const Navbar = ({ }) => {
           <>
             <div className="auth-container">
               <div className="mobile-container-user" onClick={handleUserSidebar}>
-                <img src={AvatarImg} className="mobile-image" />
+                <img src={userData?.firestoreData?.avatarUrl || AvatarImg} className="mobile-image" />
                 <p>{userData.firestoreData.name}</p>
               </div>
             </div>

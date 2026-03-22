@@ -3,7 +3,7 @@ from django.template import loader
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from django.http import JsonResponse
-import openai
+from openai import OpenAI
 import os
 from dotenv import load_dotenv
 import sqlite3
@@ -12,12 +12,14 @@ import datetime
 
 load_dotenv()
 
-openai.api_key = os.getenv("GITHUB_TOKEN")
-openai.api_base = "https://models.github.ai/inference"
+client = OpenAI(
+    api_key=os.getenv("GITHUB_TOKEN"),
+    base_url="https://models.github.ai/inference"
+)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-DB_PATH = os.path.join(BASE_DIR, "dictionary.db")
+DB_PATH = os.path.join(BASE_DIR, "fastAPI", "routes", "dictionary.db")
 
 #使用者答題情形資料
 userData = {
@@ -37,8 +39,6 @@ def main(request):
 def tayal_chat(request):
     if request.method == "POST":
         try:
-            print("收到POST請求")
-
             body = json.loads(request.body)
             user_message = body.get("message", "").strip()
 
@@ -90,14 +90,14 @@ def tayal_chat(request):
             使用者的程度是： {userData.get('level', 'beginner')}
             今天的日期是：{today.isoformat()}
             """
-            response = openai.ChatCompletion.create(
+            response = client.chat.completions.create(
                 model="openai/gpt-4o",
                 messages=[
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": user_message}
                 ]
             )
-            result = response["choices"][0]["message"]["content"]
+            result = response.choices[0].message.content
 
             try:
                 if result.strip().startswith("{"):
@@ -166,14 +166,14 @@ def review_tayal_chat(request):
 
             """
 
-            response = openai.ChatCompletion.create(
+            response = client.chat.completions.create(
                 model="openai/gpt-4o",
                 messages=[
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": user_message}
                 ]
             )
-            ai_text = response["choices"][0]["message"]["content"]
+            ai_text = response.choices[0].message.content
 
             return JsonResponse({
                 "original": user_message,
@@ -199,48 +199,44 @@ def search_tayal_words(keyword=None, limit=8):
     results = []
     try:
         if keyword:
-            # 改成完全匹配
-            query = """
-            SELECT *
-            FROM words 
-            WHERE word_tayal = ? OR word_fre = ? OR word_str = ? OR defins = ?
-            LIMIT ?
-            """
-            cursor.execute(query, (keyword, keyword, keyword, keyword, limit))
+            query = "SELECT * FROM words WHERE name = ? LIMIT ?"
+            cursor.execute(query, (keyword, limit))
         else:
-            query = """
-            SELECT *
-            FROM words 
-            ORDER BY id
-            LIMIT ?
-            """
+            query = "SELECT * FROM words ORDER BY id LIMIT ?"
             cursor.execute(query, (limit,))
-        
+
         results = cursor.fetchall()
     except Exception as e:
         print(f"[DB ERROR] 查詢失敗: {e}")
     finally:
         conn.close()
 
-    # 沒找到就回傳空陣列
     if not results:
         return []
 
     words_data = []
     for row in results:
+        # 欄位順序: id(0) tribe_id(1) tribe(2) dialect(3) name(4) ... explanation_items(14) audio_items(15)
         try:
-            definitions = json.loads(row[5]) if row[5] else []
+            explanations = json.loads(row[14]) if row[14] else []
         except (json.JSONDecodeError, TypeError):
-            definitions = []
+            explanations = []
 
         chinese = ""
-        if isinstance(definitions, list) and definitions:
-            chinese = definitions[0].get("word_ch", "")
+        if isinstance(explanations, list) and explanations:
+            chinese = explanations[0].get("chineseExplanation", "")
+
+        try:
+            audio_items = json.loads(row[15]) if row[15] else []
+        except (json.JSONDecodeError, TypeError):
+            audio_items = []
+
+        audio = audio_items[0].get("fileId", "") if audio_items else ""
 
         words_data.append({
-            'tayal': row[1],
-            'audio': row[2],
+            'tayal': row[4],
+            'audio': audio,
             'chinese': chinese
         })
-    
+
     return words_data

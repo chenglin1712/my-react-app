@@ -109,118 +109,67 @@ def format_quiz_data_2(data):
     format_data["parts"].append(format_part2)
     return format_data
 
-# 爬取活動及族語認證資料
+# 爬取活動及族語認證資料（使用 tacp.gov.tw 官方 API）
 def get_tayal_imformation(request):
-    # 活動的(有圖片)
-    url = "https://www.tacp.gov.tw/"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-        "Cache-Control": "max-age=0"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json",
+        "Accept-Language": "zh-TW",
     }
-
-    res = requests.get(url, headers=headers)
-    soup = BeautifulSoup(res.text, "html.parser")
 
     data = []
 
-    slides = soup.select(".secWrap .swiper-slide")
-    for slide in slides:
-        # 活動細節url
-        a_tag = slide.select_one("a")
-        a_url = "https://www.tacp.gov.tw/"+a_tag["href"] if a_tag else None
+    # 原住民族文化發展中心最新消息（官方 API）
+    try:
+        res = requests.get(
+            "https://event.tacp.gov.tw/api/frontend/announcements/latest",
+            headers=headers,
+            timeout=10
+        )
+        if res.status_code == 200:
+            result = res.json()
+            for item in result.get("data", []):
+                import json as _json
+                raw_images = item.get("images", [])
+                images = _json.loads(raw_images) if isinstance(raw_images, str) else raw_images
+                img_url = images[0].get("url") if isinstance(images, list) and images and isinstance(images[0], dict) else None
+                data.append({
+                    "title": item.get("title"),
+                    "detail": f"https://www.tacp.gov.tw/news/{item.get('category_id')}/{item.get('id')}",
+                    "image": img_url,
+                    "start_date": item.get("start_date") or item.get("published_at"),
+                    "end_date": item.get("end_date"),
+                    "tag": item.get("category", {}).get("title") if isinstance(item.get("category"), dict) else None,
+                    "isExam": "F"
+                })
+    except Exception as e:
+        print(f"tacp API error: {e}")
 
-        # 活動圖片url
-        img_tag = slide.select_one("img")
-        img_url = "https://www.tacp.gov.tw"+img_tag["src"] if img_tag else None
+    # 族語認證（師範大學原住民族語言認證考試）
+    try:
+        url_exam = "https://exam.sce.ntnu.edu.tw/abst/"
+        res_exam = requests.get(url_exam, headers={**headers, "Accept": "text/html"}, timeout=10)
+        soup_exam = BeautifulSoup(res_exam.text, "html.parser")
+        count = 0
+        for info in soup_exam.select(".pnlArticles li"):
+            if count >= 5:
+                break
+            date_tag = info.select_one("small")
+            date = date_tag.get_text(strip=True) if date_tag else None
+            detail_tag = info.select_one("a")
+            title = detail_tag.get_text(strip=True) if detail_tag else None
+            detail = url_exam + detail_tag["href"] if detail_tag else None
+            data.append({
+                "title": title,
+                "detail": detail,
+                "image": None,
+                "start_date": date,
+                "end_date": None,
+                "tag": None,
+                "isExam": "T"
+            })
+            count += 1
+    except Exception as e:
+        print(f"exam API error: {e}")
 
-        # 活動主題
-        title_tag = slide.select_one("h4.news__index__item__title")
-        title = title_tag.get_text(strip=True) if title_tag else None
-
-        # 活動日期
-        date_parts = slide.select("li._date, li._year")
-        dates = [d.get_text(strip=True) for d in date_parts]
-
-        # dates會取得類似['07/05', '2025', '10/12', '2025']的資料
-        # 用len避免空值出現錯誤
-        start_date = f"{dates[1]}-{dates[0]}" if len(dates) >= 2 else None
-        end_date = f"{dates[3]}-{dates[2]}" if len(dates) >= 4 else None
-
-        data.append({
-            "title": title,
-            "detail": a_url,
-            "image": img_url,
-            "start_date": start_date,
-            "end_date": end_date,
-            "tag": None,
-            "isExam": "F"
-        })
-    
-    # 活動的(無圖片)
-    news = soup.select(".secWrap .mainNewsBox li")
-    count = 0
-    for new in news:
-        if count >= 5: # 只爬最新的五筆
-            break
-        # 活動細節url
-        a_tag = new.select_one("a")
-        a_url = "https://www.tacp.gov.tw"+a_tag["href"] if a_tag else None
-
-        # 活動時間
-        time_tag = new.select_one("time")
-        time = time_tag.getText(strip=True) if time_tag else None
-
-        # 活動標籤
-        tag_tag = new.select_one(".modTag")
-        tag = tag_tag.getText(strip=True) if tag_tag else None
-
-        # 活動主題
-        title_tag = new.select_one("span")
-        title = title_tag.get_text(strip=True) if title_tag else None
-
-        data.append({
-            "title": title,
-            "detail": a_url,
-            "image": None,
-            "start_date": time,
-            "end_date": None,
-            "tag": tag,
-            "isExam": "F"
-        })
-        count = count + 1
-    
-    # 族語認證的
-    url_exam = "https://exam.sce.ntnu.edu.tw/abst/"
-    
-    res_exam = requests.get(url_exam, headers=headers)
-    soup_exam = BeautifulSoup(res_exam.text, "html.parser")
-
-    count = 0
-    infos = soup_exam.select(".pnlArticles li")
-    for info in infos:
-        if count >= 5: # 只爬最新的5筆
-            break
-        date_tag = info.select_one("small")
-        date = date_tag.get_text(strip=True) if date_tag else None
-
-        detail_tag = info.select_one("a")
-        title = detail_tag.get_text(strip=True) if detail_tag else None
-        detail = url_exam+detail_tag["href"] if detail_tag else None
-
-        data.append({
-            "title": title,
-            "detail": detail,
-            "image": None,
-            "start_date": date,
-            "end_date": None,
-            "tag": None,
-            "isExam": "T"
-        })
-        count = count + 1
-        
     return JsonResponse(data, safe=False, json_dumps_params={'ensure_ascii': False, 'indent': 2})

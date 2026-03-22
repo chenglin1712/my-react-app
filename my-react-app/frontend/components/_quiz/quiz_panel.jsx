@@ -55,10 +55,11 @@ const Panel = ({ }) => {
                     if (responseData && responseData.parts &&
                         responseData.parts[0] && responseData.parts[0].questions) {
                         setTimeout(() => {
+                            const qLen = responseData.parts[0].questions.length;
                             setIsLoading(false);
-                            setDataLen(responseData.parts[0].questions.length);
-                            setUserAnswers(Array(dataLen).fill(null));
-                            setUserStars(Array(responseData.parts[0].questions.length).fill("F"));
+                            setDataLen(qLen);
+                            setUserAnswers(Array(qLen).fill(null));
+                            setUserStars(Array(qLen).fill("F"));
                         }, 1000);
                     }
                 }
