@@ -496,17 +496,12 @@ def test_db(db: Session = Depends(get_db)):
         "sample_row": sample_row
     }
 
+ILRDF_AUDIO_API = "https://e-dictionary.ilrdf.org.tw/api/app/file/download-file/"
+
 @router.get("/audio/{file_id}")
 async def proxy_audio(file_id: str):
     try:
-        load_dotenv()
-        VITE_AUDIO_FILE_URL = os.getenv("VITE_AUDIO_FILE_URL", "")
-
-        # 未設定或仍是預設佔位符時回傳 404
-        if not VITE_AUDIO_FILE_URL or "your_audio_api_url" in VITE_AUDIO_FILE_URL:
-            return Response(content="Audio API URL not configured", media_type="text/plain", status_code=404)
-
-        first_url = VITE_AUDIO_FILE_URL + file_id
+        first_url = ILRDF_AUDIO_API + file_id
 
         async with httpx.AsyncClient(follow_redirects=False, timeout=10) as client:
             res = await client.get(first_url)
