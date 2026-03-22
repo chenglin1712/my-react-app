@@ -500,27 +500,34 @@ def test_db(db: Session = Depends(get_db)):
 async def proxy_audio(file_id: str):
     try:
         load_dotenv()
-        VITE_AUDIO_FILE_URL=os.getenv("VITE_AUDIO_FILE_URL")
-        first_url = VITE_AUDIO_FILE_URL+file_id
+        VITE_AUDIO_FILE_URL = os.getenv("VITE_AUDIO_FILE_URL", "")
 
-        async with httpx.AsyncClient(follow_redirects=False) as client:
+        # 未設定或仍是預設佔位符時回傳 404
+        if not VITE_AUDIO_FILE_URL or "your_audio_api_url" in VITE_AUDIO_FILE_URL:
+            return Response(content="Audio API URL not configured", media_type="text/plain", status_code=404)
+
+        first_url = VITE_AUDIO_FILE_URL + file_id
+
+        async with httpx.AsyncClient(follow_redirects=False, timeout=10) as client:
             res = await client.get(first_url)
-            
-            # 如果它是重導向，取出 Location
+
             if res.status_code in [301, 302, 303, 307, 308]:
-                final_url = res.headers.get("Location")
+                final_url = res.headers.get("Location", "")
             else:
-                # 有些會直接回傳文字包含 URL
                 final_url = res.text.strip()
 
             if not final_url or "http" not in final_url:
-                return Response(content=f"Invalid redirect: {res.text}", media_type="text/plain", status_code=500)
+                return Response(content="Unable to resolve audio URL", media_type="text/plain", status_code=404)
 
-            # 第二層：真正抓音檔
-            async with httpx.AsyncClient() as c2:
+            async with httpx.AsyncClient(timeout=15) as c2:
                 audio_res = await c2.get(final_url)
-                return Response(content=audio_res.content, media_type="audio/mpeg")
+                if audio_res.status_code != 200:
+                    return Response(content="Audio file not found", media_type="text/plain", status_code=404)
+                content_type = audio_res.headers.get("content-type", "audio/mpeg")
+                return Response(content=audio_res.content, media_type=content_type)
 
+    except httpx.ConnectError:
+        return Response(content="Audio API unreachable", media_type="text/plain", status_code=503)
     except Exception as e:
         return Response(content=str(e), media_type="text/plain", status_code=500)
     

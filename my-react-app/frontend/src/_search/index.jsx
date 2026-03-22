@@ -85,13 +85,13 @@ const renderStars = (fre) => {
 };
 
 /* eslint-disable react/prop-types */
-const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFavorite, playAudio, isFavorited }) => (
+const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFavorite, playAudio, isFavorited, failedAudio, audioAvailable }) => (
   <ListGroup.Item key={keyName} className="d-flex flex-column">
     <div className="d-flex justify-content-between align-items-center">
       <div onClick={() => toggleExpand(keyName)} style={{ cursor: 'pointer', flex: 1 }}>
         <h3 className="fw-bolder text-danger">
           {result.name || '無資料'}
-          {result.audioItems.length !== 0 ? (
+          {audioAvailable && result.audioItems.length !== 0 && !failedAudio?.has(result.audioItems[0].fileId) ? (
             <Button variant="link" onClick={(e) => { e.stopPropagation(); if (result.audioItems?.length) playAudio(result.audioItems[0].fileId); }}>
               <FaPlayCircle size={20} className="text-warning" />
             </Button>
@@ -125,7 +125,7 @@ const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFav
                   <ListGroup.Item key={`${i}-${ei}`}>
                     <h6 className="fw-bolder text-danger">
                       {ex.originalSentence}
-                      {ex.audioItems.length !== 0 ? (
+                      {audioAvailable && ex.audioItems.length !== 0 && !failedAudio?.has(ex.audioItems[0].fileId) ? (
                         <Button variant="link" onClick={() => { if (ex.audioItems?.length) playAudio(ex.audioItems[0].fileId); }}>
                           <FaPlayCircle size={20} className="text-warning" />
                         </Button>
@@ -163,6 +163,8 @@ const App = () => {
   const [activeTab, setActiveTab] = useState('語法與功能');
   const [selectedSubCategory, setSelectedSubCategory] = useState(null);
   const [selectedTribe, setSelectedTribe] = useState('泰雅');
+  const [failedAudio, setFailedAudio] = useState(new Set());
+  const [audioAvailable] = useState(true);
 
   const tribes = ['泰雅', '阿美', '布農', '葛瑪蘭', '排灣'];
 
@@ -286,6 +288,7 @@ const App = () => {
     window.addEventListener('resize', checkScreenSize);
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
+
   useEffect(() => {
     const saved = localStorage.getItem('favoriteWords');
     if (saved) setFavoriteWords(new Set(JSON.parse(saved)));
@@ -306,19 +309,24 @@ const App = () => {
   }, []);
 
   const playAudio = async (fileId) => {
-    if (!fileId) return;
-
+    if (!fileId || failedAudio.has(fileId)) return;
 
     if (audio) {
       audio.pause();
       audio.currentTime = 0;
     }
 
-
     const proxyUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL + fileId;
     const newAudio = new Audio(proxyUrl);
 
-    newAudio.play().catch(err => console.error("播放失敗:", err));
+    newAudio.onerror = () => {
+      setFailedAudio(prev => new Set([...prev, fileId]));
+    };
+
+    newAudio.play().catch(() => {
+      setFailedAudio(prev => new Set([...prev, fileId]));
+    });
+
     setAudio(newAudio);
   };
 
@@ -678,6 +686,8 @@ const App = () => {
                     toggleFavorite={() => toggleFavorite(wordData.name)}
                     playAudio={playAudio}
                     isFavorited={favoriteWords.has(wordData.name)}
+                    failedAudio={failedAudio}
+                    audioAvailable={audioAvailable}
                   />
                 );
               })}
@@ -708,6 +718,8 @@ const App = () => {
                     toggleFavorite={() => toggleFavorite(wordData.name)}
                     playAudio={playAudio}
                     isFavorited={favoriteWords.has(wordData.name)}
+                    failedAudio={failedAudio}
+                    audioAvailable={audioAvailable}
                   />
                 );
               })}
@@ -740,6 +752,8 @@ const App = () => {
                     toggleFavorite={() => toggleFavorite(wordData.name)}
                     playAudio={playAudio}
                     isFavorited={favoriteWords.has(wordData.name)}
+                    failedAudio={failedAudio}
+                    audioAvailable={audioAvailable}
                   />
                 );
               })}
