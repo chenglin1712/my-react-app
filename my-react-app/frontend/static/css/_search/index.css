@@ -1,3 +1,94 @@
+/* ── 族語選擇器 ──────────────────────────────── */
+.tribe-selector {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin: 1rem 0 1.25rem;
+}
+
+.tribe-btn {
+  padding: 0.45rem 1.2rem;
+  border-radius: 999px;
+  border: 2px solid #9B1B30;
+  background: transparent;
+  color: #9B1B30;
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: "Noto Sans TC", sans-serif;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+  white-space: nowrap;
+}
+
+.tribe-btn:hover,
+.tribe-btn.active {
+  background: #9B1B30;
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.18);
+}
+
+/* 各族語顏色 */
+.tribe-btn[data-tribe="阿美"]                     { border-color: #D4890A; color: #D4890A; }
+.tribe-btn[data-tribe="阿美"]:hover,
+.tribe-btn[data-tribe="阿美"].active              { background: #D4890A; color: #fff; border-color: #D4890A; }
+
+.tribe-btn[data-tribe="布農"]                     { border-color: #4E7F63; color: #4E7F63; }
+.tribe-btn[data-tribe="布農"]:hover,
+.tribe-btn[data-tribe="布農"].active              { background: #4E7F63; color: #fff; border-color: #4E7F63; }
+
+.tribe-btn[data-tribe="葛瑪蘭"]                   { border-color: #4A7FA5; color: #4A7FA5; }
+.tribe-btn[data-tribe="葛瑪蘭"]:hover,
+.tribe-btn[data-tribe="葛瑪蘭"].active            { background: #4A7FA5; color: #fff; border-color: #4A7FA5; }
+
+.tribe-btn[data-tribe="排灣"]                     { border-color: #6B4FAA; color: #6B4FAA; }
+.tribe-btn[data-tribe="排灣"]:hover,
+.tribe-btn[data-tribe="排灣"].active              { background: #6B4FAA; color: #fff; border-color: #6B4FAA; }
+
+/* 空白狀態徽章顏色 */
+.tribe-empty-badge[data-tribe="泰雅"]   { background: #9B1B30; }
+.tribe-empty-badge[data-tribe="阿美"]   { background: #D4890A; }
+.tribe-empty-badge[data-tribe="布農"]   { background: #4E7F63; }
+.tribe-empty-badge[data-tribe="葛瑪蘭"] { background: #4A7FA5; }
+.tribe-empty-badge[data-tribe="排灣"]   { background: #6B4FAA; }
+
+/* ── 族語空白狀態 ──────────────────────────── */
+.tribe-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 5rem 2rem;
+  text-align: center;
+}
+
+.tribe-empty-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 800;
+  font-family: "Noto Sans TC", sans-serif;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+}
+
+.tribe-empty-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+.tribe-empty-desc {
+  font-size: 1rem;
+  color: #888;
+  margin: 0;
+}
+
 .subcategory-scroll {
   display: flex;
   overflow-x: auto;

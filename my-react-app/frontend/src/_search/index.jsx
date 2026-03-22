@@ -1,17 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
   Container, ListGroup, Alert, Spinner, Button, InputGroup, Form,
   Dropdown, Offcanvas
 } from 'react-bootstrap';
 import { FaHeart, FaRegHeart, FaPlayCircle } from 'react-icons/fa';
-import { toggleFavoriteWord, authChanges } from "../../src/userServives/userServive";
+import { authChanges } from "../../src/userServives/userServive";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import "../../static/css/_search/index.css";
 
 
-import { Tabs, Tab, Row, Col } from 'react-bootstrap';
+import { Tabs, Tab } from 'react-bootstrap';
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
 
 import pronoun from "../../static/assets/images/pronoun.png";
@@ -84,13 +84,14 @@ const renderStars = (fre) => {
   );
 };
 
+/* eslint-disable react/prop-types */
 const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFavorite, playAudio, isFavorited }) => (
   <ListGroup.Item key={keyName} className="d-flex flex-column">
     <div className="d-flex justify-content-between align-items-center">
       <div onClick={() => toggleExpand(keyName)} style={{ cursor: 'pointer', flex: 1 }}>
         <h3 className="fw-bolder text-danger">
           {result.name || '無資料'}
-          {result.audioItems.length != 0 ? (
+          {result.audioItems.length !== 0 ? (
             <Button variant="link" onClick={(e) => { e.stopPropagation(); if (result.audioItems?.length) playAudio(result.audioItems[0].fileId); }}>
               <FaPlayCircle size={20} className="text-warning" />
             </Button>
@@ -124,7 +125,7 @@ const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFav
                   <ListGroup.Item key={`${i}-${ei}`}>
                     <h6 className="fw-bolder text-danger">
                       {ex.originalSentence}
-                      {ex.audioItems.length != 0 ? (
+                      {ex.audioItems.length !== 0 ? (
                         <Button variant="link" onClick={() => { if (ex.audioItems?.length) playAudio(ex.audioItems[0].fileId); }}>
                           <FaPlayCircle size={20} className="text-warning" />
                         </Button>
@@ -160,7 +161,10 @@ const App = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [showCategories, setShowCategories] = useState(false);
   const [activeTab, setActiveTab] = useState('語法與功能');
-  const [selectedSubCategory, setSelectedSubCategory] = useState(null)
+  const [selectedSubCategory, setSelectedSubCategory] = useState(null);
+  const [selectedTribe, setSelectedTribe] = useState('泰雅');
+
+  const tribes = ['泰雅', '阿美', '布農', '葛瑪蘭', '排灣'];
 
 
 
@@ -235,18 +239,21 @@ const App = () => {
     await updateDoc(userDocRef, { favorites: newFavorites });
   }
 
-  const handleSearch = async () => {
+  const handleSearch = async (tribeOverride = null) => {
+    const tribe = tribeOverride ?? selectedTribe;
+    if (tribe !== '泰雅') {
+      setDefinitions({ exact_match_results: {}, fuzzy_match_results: {}, all_results: {} });
+      return;
+    }
     setLoading(true);
     setError('');
     try {
       let res;
       if (query.trim() === '') {
         res = await axios.post(import.meta.env.VITE_API_SEARCH_ALL_URL);
-        console.log('API回傳(search):', res.data);
         setDefinitions({ exact_match_results: {}, fuzzy_match_results: {}, all_results: res.data.all_results || {} });
       } else {
         res = await axios.post(import.meta.env.VITE_API_SEARCH_KEY_URL, { keyword: query.trim() });
-        console.log('API回傳(search):', res.data);
         setDefinitions({
           exact_match_results: Array.isArray(res.data.exact_match_results) ? { [query.trim()]: res.data.exact_match_results } : res.data.exact_match_results,
           fuzzy_match_results: res.data.fuzzy_match_results || {},
@@ -258,6 +265,17 @@ const App = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleTribeChange = (tribe) => {
+    setSelectedTribe(tribe);
+    setQuery('');
+    setFilterLetter('');
+    setFrequencyFilter('');
+    setSelectedSubCategory(null);
+    setShowCategories(false);
+    setDefinitions({ exact_match_results: {}, fuzzy_match_results: {}, all_results: {} });
+    handleSearch(tribe);
   };
 
   useEffect(() => {
@@ -423,7 +441,21 @@ const App = () => {
             <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0" />
           </svg>&nbsp; 單詞查詢
         </h2>
-        <br />
+
+        {/* 族語選擇器 */}
+        <div className="tribe-selector">
+          {tribes.map(name => (
+            <button
+              key={name}
+              className={`tribe-btn${selectedTribe === name ? ' active' : ''}`}
+              data-tribe={name}
+              onClick={() => handleTribeChange(name)}
+            >
+              {name}族語
+            </button>
+          ))}
+        </div>
+
         <InputGroup className="mb-3">
           <Form.Control
             placeholder="請輸入查詢內容"
@@ -611,7 +643,20 @@ const App = () => {
       {loading && <Spinner animation="border" variant="primary" />}
       {error && <Alert variant="danger">{error}</Alert>}
 
-      {Object.keys(definitions.all_results).length > 0 && (() => {
+      {selectedTribe !== '泰雅' && !loading && (
+        <div className="tribe-empty-state">
+          <div
+            className="tribe-empty-badge"
+            data-tribe={selectedTribe}
+          >
+            {selectedTribe}
+          </div>
+          <h3 className="tribe-empty-title">{selectedTribe}族語詞典</h3>
+          <p className="tribe-empty-desc">詞典資料建置中，敬請期待</p>
+        </div>
+      )}
+
+      {selectedTribe === '泰雅' && Object.keys(definitions.all_results).length > 0 && (() => {
         const allWordsFlat = Object.values(definitions.all_results).flat();
         const filteredSorted = filterAndSortWords(allWordsFlat);
         return (
@@ -641,7 +686,7 @@ const App = () => {
         );
       })()}
 
-      {Object.keys(definitions.exact_match_results).length > 0 && (() => {
+      {selectedTribe === '泰雅' && Object.keys(definitions.exact_match_results).length > 0 && (() => {
 
         const allWordsFlat = Object.values(definitions.exact_match_results).flat();
         const filteredSorted = filterAndSortWords(allWordsFlat);
@@ -671,7 +716,7 @@ const App = () => {
         );
       })()}
       <br />
-      {Object.keys(definitions.fuzzy_match_results).length > 0 && (() => {
+      {selectedTribe === '泰雅' && Object.keys(definitions.fuzzy_match_results).length > 0 && (() => {
 
         const allWordsFlat = Object.values(definitions.fuzzy_match_results)
           .flatMap(wordGroup => Object.values(wordGroup).flat());
