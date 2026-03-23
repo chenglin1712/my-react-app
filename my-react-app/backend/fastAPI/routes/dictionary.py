@@ -591,3 +591,45 @@ async def debug_audio(audio_id: str):
             "success": False,
             "error": str(e)
         }
+
+
+@router.post("/sentence-audio/")
+async def get_sentence_audio(request: Request, db: Session = Depends(get_db)):
+    """
+    將句子拆成詞，依序查詢各詞在字典中的音檔 fileId，
+    回傳有音檔的詞清單（依句子順序），供前端逐詞串接播放。
+    """
+    from sqlalchemy import func as sa_func
+    body = await request.json()
+    sentence: str = body.get("sentence", "")
+    tribe: str = body.get("tribe", "布農")
+    tribe_name = TRIBE_MAP.get(tribe, tribe)
+
+    # 以空白與標點切詞，保留字母、撇號、連字號
+    tokens = re.findall(r"[a-zA-ZʼʻΩ'\-]+", sentence)
+
+    audio_tokens = []
+    seen_file_ids: set = set()
+
+    for token in tokens:
+        token_lower = token.lower()
+        word = db.query(Word).filter(
+            Word.tribe == tribe_name,
+            sa_func.lower(Word.name) == token_lower
+        ).first()
+
+        if not word:
+            continue
+
+        audios = json.loads(word.audio_items or "[]")
+        if not audios:
+            continue
+
+        file_id = audios[0].get("fileId")
+        if not file_id or file_id in seen_file_ids:
+            continue
+
+        seen_file_ids.add(file_id)
+        audio_tokens.append({"word": token, "fileId": file_id})
+
+    return JSONResponse({"audioTokens": audio_tokens})

@@ -85,7 +85,7 @@ const renderStars = (fre) => {
 };
 
 /* eslint-disable react/prop-types */
-const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFavorite, playAudio, isFavorited, failedAudio, audioAvailable }) => (
+const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFavorite, playAudio, playSentence, isFavorited, failedAudio, audioAvailable }) => (
   <ListGroup.Item key={keyName} className="d-flex flex-column">
     <div className="d-flex justify-content-between align-items-center">
       <div onClick={() => toggleExpand(keyName)} style={{ cursor: 'pointer', flex: 1 }}>
@@ -121,15 +121,20 @@ const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFav
               {def.sentenceItems?.map((ex, ei) => {
                 const hasText = ex.originalSentence?.trim() || ex.chineseSentence?.trim();
                 if (!hasText) return null;
+                const hasNativeAudio = audioAvailable && ex.audioItems?.length > 0 && !failedAudio?.has(ex.audioItems[0].fileId);
                 return (
                   <ListGroup.Item key={`${i}-${ei}`}>
                     <h6 className="fw-bolder text-danger">
                       {ex.originalSentence}
-                      {audioAvailable && ex.audioItems?.length > 0 && !failedAudio?.has(ex.audioItems[0].fileId) ? (
-                        <Button variant="link" onClick={() => { if (ex.audioItems?.length) playAudio(ex.audioItems[0].fileId); }}>
+                      {hasNativeAudio ? (
+                        <Button variant="link" onClick={() => playAudio(ex.audioItems[0].fileId)}>
                           <FaPlayCircle size={20} className="text-warning" />
                         </Button>
-                      ) : (<></>)}
+                      ) : ex.originalSentence?.trim() ? (
+                        <Button variant="link" onClick={() => playSentence(ex.originalSentence)}>
+                          <FaPlayCircle size={20} className="text-warning" />
+                        </Button>
+                      ) : null}
                     </h6>
                     <h6 className="fw-bolder">{ex.chineseSentence}</h6>
                     <h6 className="fw-bolder">{ex.englishSentence || ''}</h6>
@@ -332,6 +337,25 @@ const App = () => {
     setAudio(newAudio);
   };
 
+  const playSentence = async (sentence) => {
+    try {
+      const res = await axios.post('/dictionary/sentence-audio/', { sentence, tribe: selectedTribe });
+      const tokens = res.data.audioTokens || [];
+      if (tokens.length === 0) return;
+      if (audio) { audio.pause(); audio.currentTime = 0; }
+      for (const { fileId } of tokens) {
+        await new Promise((resolve) => {
+          const proxyUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL + fileId;
+          const a = new Audio(proxyUrl);
+          a.onended = resolve;
+          a.onerror = resolve;
+          a.play().catch(resolve);
+        });
+      }
+    } catch (e) {
+      console.error('playSentence error:', e);
+    }
+  };
 
   const categoryGroups = {
     "語法與功能": [
@@ -690,6 +714,7 @@ const App = () => {
                     toggleExpand={toggleExpand}
                     toggleFavorite={() => toggleFavorite(wordData.name)}
                     playAudio={playAudio}
+                    playSentence={playSentence}
                     isFavorited={favoriteWords.has(wordData.name)}
                     failedAudio={failedAudio}
                     audioAvailable={audioAvailable}
@@ -722,6 +747,7 @@ const App = () => {
                     toggleExpand={toggleExpand}
                     toggleFavorite={() => toggleFavorite(wordData.name)}
                     playAudio={playAudio}
+                    playSentence={playSentence}
                     isFavorited={favoriteWords.has(wordData.name)}
                     failedAudio={failedAudio}
                     audioAvailable={audioAvailable}
@@ -756,6 +782,7 @@ const App = () => {
                     toggleExpand={toggleExpand}
                     toggleFavorite={() => toggleFavorite(wordData.name)}
                     playAudio={playAudio}
+                    playSentence={playSentence}
                     isFavorited={favoriteWords.has(wordData.name)}
                     failedAudio={failedAudio}
                     audioAvailable={audioAvailable}
