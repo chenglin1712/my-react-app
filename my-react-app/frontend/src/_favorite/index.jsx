@@ -296,7 +296,7 @@ const SearchAndFilterControls = ({ tab, state, onStateChange, alphabet, isMobile
                     <Button
                       variant="outline-dark"
                       onClick={() => {
-                        setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+                        onStateChange('sortOrder', state.sortOrder === 'asc' ? 'desc' : 'asc');
                         setShowFilterPanel(false);
                       }}
                     >
@@ -304,7 +304,7 @@ const SearchAndFilterControls = ({ tab, state, onStateChange, alphabet, isMobile
                     </Button>
 
                     <Dropdown onSelect={val => {
-                      setFilterLetter(val);
+                      onStateChange('filterLetter', val);
                       setShowFilterPanel(false);
                     }}>
                       <Dropdown.Toggle variant="outline-dark" className="btn">
@@ -319,7 +319,7 @@ const SearchAndFilterControls = ({ tab, state, onStateChange, alphabet, isMobile
                     </Dropdown>
 
                     <Dropdown onSelect={(val) => {
-                      setFrequencyFilter(val);
+                      onStateChange('frequencyFilter', val);
                       setShowFilterPanel(false);
                     }}>
                       <Dropdown.Toggle variant="outline-dark">
@@ -521,7 +521,7 @@ const useFilterAndSort = (allWords) => {
     const lowerQuery = query.toLowerCase();
     const tayal = (wordObj.name || '').toLowerCase();
     const defins = wordObj.explanationItems || [];
-    const ch = (defins[0].chineseExplanation || '').toLowerCase();
+    const ch = defins.length > 0 ? (defins[0].chineseExplanation || '').toLowerCase() : '';
 
     return (
       tayal.includes(lowerQuery) ||

@@ -22,6 +22,8 @@ def get_quiz_data(request):
             format_data = format_quiz_data_1(data)
         elif level == "2":
             format_data = format_quiz_data_2(data)
+        else:
+            return JsonResponse({"Error": f"不支援的等級: {level}"}, status=400)
         return JsonResponse(format_data, safe=False)
     else:
         return JsonResponse({"Error: ": "讀取資料失敗"}, status=500)

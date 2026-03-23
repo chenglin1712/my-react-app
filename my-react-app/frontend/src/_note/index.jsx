@@ -150,8 +150,8 @@ function NotePage() {
       return;
     }
 
-    const effectiveName = userData.firestoreData.name ? userData?.firestoreData.name : "匿名";
-    const effectiveImg = userData.firestoreData.avatarUrl ? userData?.firestoreData.avatarUrl : null;
+    const effectiveName = userData?.firestoreData?.name || "匿名";
+    const effectiveImg = userData?.firestoreData?.avatarUrl || null;
 
     try {
       let uploadedImageUrl = "";

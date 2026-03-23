@@ -17,9 +17,8 @@ import torchaudio
 import torch.nn.functional as F
 from dotenv import load_dotenv
 import os
-from pydub import AudioSegment
+import json
 import soundfile as sf
-import torch
 
 AudioSegment.converter = r"C:\Program Files\ffmpeg\bin\ffmpeg.exe"
 AudioSegment.ffprobe = r"C:\Program Files\ffmpeg\bin\ffmpeg.exe"
@@ -222,14 +221,26 @@ def generate_quiz_frontend(user_data: dict = Body(...), db: Session = Depends(ge
         Ptheta = compute_P_theta(theta, bw, a_q, DEFAULT_GUESS)
         others = [o for o in all_words if o.name!=w.name]
         random.shuffle(others)
-        distractors = [o.explanation_items[0]['chineseExplanation'] if (o.explanation_items and isinstance(o.explanation_items,list)) else "未知" for o in others[:3]]
-        correct_cn = (w.explanation_items[0]['chineseExplanation'] if (w.explanation_items and isinstance(w.explanation_items,list)) else "未知")
+        def _get_cn(word_obj):
+            try:
+                items = json.loads(word_obj.explanation_items or "[]")
+                return (items[0].get('chineseExplanation') or '未知') if items else '未知'
+            except Exception:
+                return '未知'
+        def _get_audio(word_obj):
+            try:
+                items = json.loads(word_obj.audio_items or "[]")
+                return items[0].get('fileId') if items else None
+            except Exception:
+                return None
+        distractors = [_get_cn(o) for o in others[:3]]
+        correct_cn = _get_cn(w)
         opts = [correct_cn]+distractors
         random.shuffle(opts)
         generated.append({
             "id":f"wt-{w.id}-{i}",
             "type":"word-translate",
-            "payload":{"tayal":{"word":w.name,"audio":getattr(w,"audio_items",[{}])[0].get("fileId") if getattr(w,"audio_items",None) else None},
+            "payload":{"tayal":{"word":w.name,"audio":_get_audio(w)},
                        "cn":correct_cn,
                        "options":opts},
             "difficulty":bw,

@@ -15,7 +15,7 @@ const App = () => {
     const handleImageChange = (event) => {
         const newFile = event.target.files.length > 0 ? event.target.files[0] : null; 
         if (newFile==null) {
-            setFileName(file.name); 
+            setFileName(file ? file.name : "請選擇圖片");
         }
         if (newFile) {
             const reader = new FileReader();
