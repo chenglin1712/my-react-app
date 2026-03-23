@@ -130,7 +130,7 @@ const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFav
                         <Button variant="link" onClick={() => playAudio(ex.audioItems[0].fileId)}>
                           <FaPlayCircle size={20} className="text-warning" />
                         </Button>
-                      ) : ex.originalSentence?.trim() && result.tribe === '布農語' ? (
+                      ) : ex.originalSentence?.trim() && (result.tribe === '布農語' || result.tribe === '排灣語') ? (
                         <Button variant="link" onClick={() => playSentence(ex.originalSentence)}>
                           <FaPlayCircle size={20} className="text-warning" />
                         </Button>
