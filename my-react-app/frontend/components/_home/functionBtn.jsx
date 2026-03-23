@@ -35,7 +35,7 @@ const FunctionBtn = ({ }) => {
                     <div className="card-content">
                         <h2>測驗學習</h2>
                         <p>AI適性測驗學習模組測驗將根據使用者的語言能力，動態調整測驗題目，提供個人化語言評估、加強學習策略。透過AI生成適應性題目，確保學習內容能動態適應使用者的進度。</p>
-                        <button onClick={() => navigate('/quiz')}>立即前往</button>
+                        <button onClick={() => navigate('/quiz/select')}>立即前往</button>
                     </div>
                 </div>
             </div>

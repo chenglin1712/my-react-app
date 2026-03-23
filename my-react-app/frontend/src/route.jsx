@@ -19,6 +19,7 @@ import GamePage from './_game/index';
 import VocabularyPage from './_game/vocabulary';
 import TayalGame from './_game/tayal_game';
 //測驗
+import QuizTribeSelect from './_quiz/tribeSelect';
 import QuizPage from './_quiz/index';
 import Comp_quiz from "../components/_quiz/quiz"
 import Comp_quiz_start from "../components/_quiz/quiz_panel_start"
@@ -52,6 +53,7 @@ const App = () => {
       <Route path="/game" element={<GamePage />} />
       <Route path="/game/vocabulary" element={<VocabularyPage />} />
       <Route path="/game/vocabulary/tayal" element={<TayalGame />} />
+      <Route path="/quiz/select" element={<QuizTribeSelect />} />
       <Route path="/quiz" element={<QuizPage />} >
         <Route path="" element={<Comp_quiz />} >
           <Route index element={<Comp_quiz_start />} />

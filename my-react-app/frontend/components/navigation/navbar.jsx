@@ -23,7 +23,7 @@ const Navbar = ({ }) => {
     { id: 'search', label: '單詞查詢', icon: <TextSearch size={20} />, route: '/search' },
     { id: 'camera', label: '影像辨識', icon: <Camera size={20} />, route: '/camera' },
     { id: 'game', label: '遊戲專區', icon: <Gamepad2 size={20} />, route: '/game' },
-    { id: 'quiz', label: '測驗', icon: <BookOpenCheck size={20} />, route: '/quiz' }
+    { id: 'quiz', label: '測驗', icon: <BookOpenCheck size={20} />, route: '/quiz/select', activePrefix: '/quiz' }
   ];
 
   const handleDropdownSelect = (path) => {
@@ -48,10 +48,11 @@ const Navbar = ({ }) => {
 
         {/* 導覽列 */}
         <div className="menu">
-          {menuItem.map(({ id, label, icon, route }) => {
+          {menuItem.map(({ id, label, icon, route, activePrefix }) => {
+            const prefix = activePrefix || route;
             const isActive =
               location.pathname === route ||
-              (route !== "/" && location.pathname.startsWith(route));
+              (prefix !== "/" && location.pathname.startsWith(prefix));
 
             return (
               <div key={id} className={`menu-item ${isActive ? "active" : ""}`} onClick={() => navigate(route)}>
