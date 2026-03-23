@@ -91,7 +91,7 @@ const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFav
       <div onClick={() => toggleExpand(keyName)} style={{ cursor: 'pointer', flex: 1 }}>
         <h3 className="fw-bolder text-danger">
           {result.name || '無資料'}
-          {audioAvailable && result.audioItems.length !== 0 && !failedAudio?.has(result.audioItems[0].fileId) ? (
+          {audioAvailable && result.audioItems?.length > 0 && !failedAudio?.has(result.audioItems[0].fileId) ? (
             <Button variant="link" onClick={(e) => { e.stopPropagation(); if (result.audioItems?.length) playAudio(result.audioItems[0].fileId); }}>
               <FaPlayCircle size={20} className="text-warning" />
             </Button>
@@ -111,7 +111,7 @@ const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFav
           {result.variant ? <ListGroup.Item><strong>異體詞：</strong>{result.variant || ''}</ListGroup.Item> : <></>}
           {result.formationWord ? <ListGroup.Item><strong>構詞：</strong>{result.formationWord || ''}</ListGroup.Item> : <></>}
           {result.derivativeRoot ? <ListGroup.Item><strong>衍生詞根：</strong>{result.derivativeRoot || ''}</ListGroup.Item> : <></>}
-          {result.dictionaryNote.replace(/[\r\n]+/g, '') ? <ListGroup.Item><strong>備註：</strong>{result.dictionaryNote || ''}</ListGroup.Item> : <></>}
+          {result.dictionaryNote?.replace(/[\r\n]+/g, '') ? <ListGroup.Item><strong>備註：</strong>{result.dictionaryNote || ''}</ListGroup.Item> : <></>}
           {result.explanationItems?.map((def, i) => (
             <ListGroup.Item key={i}>
               <h5 className="fw-bolder">{def.chineseExplanation || ''}  {def.englishExplanation || ''}</h5>
@@ -125,7 +125,7 @@ const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFav
                   <ListGroup.Item key={`${i}-${ei}`}>
                     <h6 className="fw-bolder text-danger">
                       {ex.originalSentence}
-                      {audioAvailable && ex.audioItems.length !== 0 && !failedAudio?.has(ex.audioItems[0].fileId) ? (
+                      {audioAvailable && ex.audioItems?.length > 0 && !failedAudio?.has(ex.audioItems[0].fileId) ? (
                         <Button variant="link" onClick={() => { if (ex.audioItems?.length) playAudio(ex.audioItems[0].fileId); }}>
                           <FaPlayCircle size={20} className="text-warning" />
                         </Button>
