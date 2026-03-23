@@ -199,7 +199,8 @@ def parse_audios(value) -> List[AudioItem]:
 # ------------------------- 搜尋邏輯 -------------------------
 def search_by_chinese(db: Session, keyword: str, tribe: str = '泰雅語') -> Tuple[List[WordResult], List[str]]:
     """完全比對中文解釋"""
-    words = db.query(Word).filter(Word.tribe == tribe).all()
+    from sqlalchemy import func
+    words = db.query(Word).filter(Word.tribe == tribe).order_by(func.lower(Word.name)).all()
 
     results = []
     matched_names = []
