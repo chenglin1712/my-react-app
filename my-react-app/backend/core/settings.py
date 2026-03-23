@@ -11,6 +11,9 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,14 +23,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-mqy*z9-jtpcs@$(p=^yb(@-#z^-&=qk!t$i9bx5kcxo1ax$_2o"
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-mqy*z9-jtpcs@$(p=^yb(@-#z^-&=qk!t$i9bx5kcxo1ax$_2o")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", os.getenv("RENDER_EXTERNAL_HOSTNAME", ""), "*"]
-
-APPEND_SLASH = False
 
 APPEND_SLASH = False
 # Application definition
@@ -70,7 +71,6 @@ CSRF_TRUSTED_ORIGINS = [
 #字元
 DEFAULT_CHARSET = 'utf-8'
 
-CORS_ORIGIN_ALLOW_ALL = True  
 
 ROOT_URLCONF = "core.urls"
 

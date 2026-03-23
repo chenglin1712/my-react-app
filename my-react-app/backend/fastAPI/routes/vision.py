@@ -13,7 +13,9 @@ router = APIRouter()
 VITE_CLOUD_API_KEY = os.getenv("VITE_CLOUD_API_KEY")
 VITE_CLOUD_API_URL = os.getenv("VITE_CLOUD_API_URL")
 if not VITE_CLOUD_API_KEY:
-    print("WARNING: CLOUD_API_KEY 環境變數未設定，影像辨識功能將無法使用")
+    print("WARNING: VITE_CLOUD_API_KEY 環境變數未設定，影像辨識功能將無法使用")
+if not VITE_CLOUD_API_URL:
+    print("WARNING: VITE_CLOUD_API_URL 環境變數未設定，影像辨識功能將無法使用")
 
 def translate_with_retry(text: str, retries=3, delay=1) -> str | None:
     if not text.strip():
@@ -43,7 +45,9 @@ async def analyze_image(request: Request):
         contents = await file.read()
         image_base64 = base64.b64encode(contents).decode("utf-8")
 
-        url = VITE_CLOUD_API_URL+VITE_CLOUD_API_KEY
+        if not VITE_CLOUD_API_URL or not VITE_CLOUD_API_KEY:
+            raise HTTPException(status_code=503, detail="影像辨識 API 環境變數未設定")
+        url = VITE_CLOUD_API_URL + VITE_CLOUD_API_KEY
         headers = {"Content-Type": "application/json"}
         data = {
             "requests": [
@@ -59,7 +63,7 @@ async def analyze_image(request: Request):
         print("📡 Google Vision 回傳原始資料:", response.text)
 
         result = response.json()
-        if "responses" not in result:
+        if "responses" not in result or len(result["responses"]) == 0:
             raise HTTPException(status_code=500, detail="Google API 回傳格式錯誤（缺少 responses）")
 
         if "error" in result["responses"][0]:
