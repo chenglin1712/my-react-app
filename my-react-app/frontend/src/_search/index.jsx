@@ -413,20 +413,23 @@ const App = () => {
         const aFirst = (a.name || '').toLowerCase();
         const bFirst = (b.name || '').toLowerCase();
 
+        // 跳過非字母前綴（-、ʼ、' 等），取第一個字母作為排序依據
+        const getKey = (s) => s.replace(/^[^a-z]+/, '') || s;
+        const aKey = getKey(aFirst);
+        const bKey = getKey(bFirst);
 
-        const aInitial = aFirst[0] || '';
-        const bInitial = bFirst[0] || '';
+        // 純非字母開頭的詞條（如 -a、-an）排在最後
+        const aIsPrefix = /^[^a-z]/.test(aFirst);
+        const bIsPrefix = /^[^a-z]/.test(bFirst);
 
         if (sortOrder === 'asc') {
-          // 升冪：A → Z → '
-          if (aInitial === "'" && bInitial !== "'") return 1;
-          if (aInitial !== "'" && bInitial === "'") return -1;
-          return aFirst.localeCompare(bFirst);
+          if (aIsPrefix && !bIsPrefix) return 1;
+          if (!aIsPrefix && bIsPrefix) return -1;
+          return aKey.localeCompare(bKey, undefined, { sensitivity: 'base' }) || aFirst.localeCompare(bFirst, undefined, { sensitivity: 'base' });
         } else {
-          // 降冪：' → Z → A
-          if (aInitial === "'" && bInitial !== "'") return -1;
-          if (aInitial !== "'" && bInitial === "'") return 1;
-          return bFirst.localeCompare(aFirst);
+          if (aIsPrefix && !bIsPrefix) return -1;
+          if (!aIsPrefix && bIsPrefix) return 1;
+          return bKey.localeCompare(aKey, undefined, { sensitivity: 'base' }) || bFirst.localeCompare(aFirst, undefined, { sensitivity: 'base' });
         }
       });
   };
