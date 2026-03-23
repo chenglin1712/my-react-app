@@ -22,7 +22,7 @@ const Navbar = ({ }) => {
     { id: 'home', label: '首頁', icon: <House size={20} />, route: '/' },
     { id: 'search', label: '單詞查詢', icon: <TextSearch size={20} />, route: '/search' },
     { id: 'camera', label: '影像辨識', icon: <Camera size={20} />, route: '/camera' },
-    { id: 'game', label: '詞彙遊戲', icon: <Gamepad2 size={20} />, route: '/game' },
+    { id: 'game', label: '遊戲專區', icon: <Gamepad2 size={20} />, route: '/game' },
     { id: 'quiz', label: '測驗', icon: <BookOpenCheck size={20} />, route: '/quiz' }
   ];
 

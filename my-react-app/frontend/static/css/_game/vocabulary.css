@@ -1,0 +1,171 @@
+/* ── 詞彙遊戲族語選擇 ────────────────────────── */
+.vocab-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+.vocab-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+  position: relative;
+}
+
+.vocab-back-btn {
+  position: absolute;
+  left: 0;
+  top: 0.3rem;
+  background: none;
+  border: none;
+  color: #9B1B30;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.vocab-back-btn:hover {
+  background: #fdecea;
+}
+
+.vocab-title {
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: #9B1B30;
+  margin-bottom: 0.3rem;
+}
+
+.vocab-subtitle {
+  font-size: 1rem;
+  color: #888;
+  margin: 0;
+}
+
+/* ── 族語選擇卡片 ──────────────────────────── */
+.vocab-tribe-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+
+.vocab-tribe-card {
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1.25rem 0.75rem 1rem;
+  border-radius: 14px;
+  border: 2px solid var(--tribe-color);
+  cursor: pointer;
+  transition: transform 0.18s, box-shadow 0.18s, background 0.18s;
+  background: #fff;
+  text-align: center;
+}
+
+.vocab-tribe-card:hover,
+.vocab-tribe-card.selected {
+  background: color-mix(in srgb, var(--tribe-color) 8%, white);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+}
+
+.vocab-tribe-card.coming-soon {
+  opacity: 0.7;
+}
+
+.vocab-tribe-badge {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 800;
+  font-family: "Noto Sans TC", sans-serif;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.vocab-tribe-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #333;
+}
+
+.vocab-tribe-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+}
+
+.vocab-tribe-tag.available {
+  background: #9B1B30;
+  color: #fff;
+}
+
+.vocab-tribe-tag.building {
+  background: #f0f0f0;
+  color: #999;
+}
+
+/* ── 建置中空白狀態 ────────────────────────── */
+.vocab-coming-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3rem 1rem;
+  text-align: center;
+  animation: fadeIn 0.25s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.vocab-coming-badge {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 1.3rem;
+  font-weight: 800;
+  font-family: "Noto Sans TC", sans-serif;
+  margin-bottom: 1rem;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+}
+
+.vocab-coming-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 0.4rem;
+}
+
+.vocab-coming-desc {
+  font-size: 1rem;
+  color: #888;
+  margin: 0;
+}
+
+@media (max-width: 600px) {
+  .vocab-back-btn {
+    position: static;
+    display: block;
+    margin: 0 auto 1rem;
+    text-align: left;
+  }
+  .vocab-tribe-card {
+    width: 130px;
+  }
+}

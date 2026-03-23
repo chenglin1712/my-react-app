@@ -16,6 +16,8 @@ import Result from "./_camera/result";
 import SearchPage from "./_search/index";
 //遊戲
 import GamePage from './_game/index';
+import VocabularyPage from './_game/vocabulary';
+import TayalGame from './_game/tayal_game';
 //測驗
 import QuizPage from './_quiz/index';
 import Comp_quiz from "../components/_quiz/quiz"
@@ -48,6 +50,8 @@ const App = () => {
       <Route path="/camera/result" element={<Result />} />
       <Route path="/favorite" element={<FavoritePage />} />
       <Route path="/game" element={<GamePage />} />
+      <Route path="/game/vocabulary" element={<VocabularyPage />} />
+      <Route path="/game/vocabulary/tayal" element={<TayalGame />} />
       <Route path="/quiz" element={<QuizPage />} >
         <Route path="" element={<Comp_quiz />} >
           <Route index element={<Comp_quiz_start />} />

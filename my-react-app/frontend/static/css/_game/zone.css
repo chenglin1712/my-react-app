@@ -1,0 +1,116 @@
+/* ── 遊戲專區 Landing ─────────────────────────── */
+.zone-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+}
+
+.zone-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.zone-title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #9B1B30;
+  margin-bottom: 0.4rem;
+}
+
+.zone-subtitle {
+  font-size: 1rem;
+  color: #888;
+  margin: 0;
+}
+
+/* ── 遊戲卡片 Grid ──────────────────────────── */
+.zone-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.25rem;
+}
+
+.zone-card {
+  background: #fff;
+  border-radius: 14px;
+  border: 2px solid #eee;
+  padding: 1.5rem 1.25rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+  position: relative;
+}
+
+.zone-card.available {
+  cursor: pointer;
+  border-color: #9B1B30;
+}
+
+.zone-card.available:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(155, 27, 48, 0.18);
+}
+
+.zone-card.disabled {
+  opacity: 0.55;
+  cursor: default;
+  border-color: #ddd;
+}
+
+.zone-card-emoji {
+  font-size: 2.8rem;
+  margin-bottom: 0.75rem;
+  line-height: 1;
+}
+
+.zone-card-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #222;
+  margin: 0 0 0.2rem;
+}
+
+.zone-card-subtitle {
+  font-size: 0.8rem;
+  color: #9B1B30;
+  font-weight: 600;
+  margin: 0 0 0.6rem;
+  font-family: "Courier New", monospace;
+}
+
+.zone-card-desc {
+  font-size: 0.85rem;
+  color: #666;
+  line-height: 1.5;
+  margin: 0 0 1rem;
+  flex: 1;
+}
+
+.zone-card-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.3rem 0.9rem;
+  border-radius: 999px;
+  margin-top: auto;
+}
+
+.badge-open {
+  background: #9B1B30;
+  color: #fff;
+}
+
+.badge-soon {
+  background: #f0f0f0;
+  color: #999;
+}
+
+@media (max-width: 600px) {
+  .zone-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .zone-title {
+    font-size: 1.6rem;
+  }
+}
