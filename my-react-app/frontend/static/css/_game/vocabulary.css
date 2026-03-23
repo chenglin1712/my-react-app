@@ -69,7 +69,7 @@
 
 .vocab-tribe-card:hover,
 .vocab-tribe-card.selected {
-  background: color-mix(in srgb, var(--tribe-color) 8%, white);
+  background: #fdf5f5;
   transform: translateY(-3px);
   box-shadow: 0 6px 18px rgba(0,0,0,0.12);
 }
