@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import {
   Container, ListGroup, Alert, Spinner, Button, InputGroup, Form,
@@ -130,7 +130,7 @@ const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFav
                         <Button variant="link" onClick={() => playAudio(ex.audioItems[0].fileId)}>
                           <FaPlayCircle size={20} className="text-warning" />
                         </Button>
-                      ) : ex.originalSentence?.trim() ? (
+                      ) : ex.originalSentence?.trim() && result.tribe === '布農語' ? (
                         <Button variant="link" onClick={() => playSentence(ex.originalSentence)}>
                           <FaPlayCircle size={20} className="text-warning" />
                         </Button>
@@ -170,6 +170,7 @@ const App = () => {
   const [selectedTribe, setSelectedTribe] = useState('泰雅');
   const [failedAudio, setFailedAudio] = useState(new Set());
   const [audioAvailable] = useState(true);
+  const playbackGenRef = useRef(0);
 
   const tribes = ['泰雅', '阿美', '布農', '葛瑪蘭', '排灣'];
 
@@ -318,6 +319,13 @@ const App = () => {
   const playAudio = async (fileId) => {
     if (!fileId || failedAudio.has(fileId)) return;
 
+    // 取消任何進行中的句子播放
+    playbackGenRef.current += 1;
+    if (playbackGenRef.currentAudio) {
+      playbackGenRef.currentAudio.pause();
+      playbackGenRef.currentAudio = null;
+    }
+
     if (audio) {
       audio.pause();
       audio.currentTime = 0;
@@ -338,20 +346,25 @@ const App = () => {
   };
 
   const playSentence = async (sentence) => {
+    // 取得本次播放的 generation token，後續每步確認是否已被取消
+    const myGen = (playbackGenRef.current += 1);
+    if (audio) { audio.pause(); audio.currentTime = 0; }
     try {
       const res = await axios.post('/dictionary/sentence-audio/', { sentence, tribe: selectedTribe });
       const tokens = res.data.audioTokens || [];
-      if (tokens.length === 0) return;
-      if (audio) { audio.pause(); audio.currentTime = 0; }
+      if (tokens.length === 0 || playbackGenRef.current !== myGen) return;
       for (const { fileId } of tokens) {
+        if (playbackGenRef.current !== myGen) break;
         await new Promise((resolve) => {
           const proxyUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL + fileId;
           const a = new Audio(proxyUrl);
+          playbackGenRef.currentAudio = a;
           a.onended = resolve;
           a.onerror = resolve;
           a.play().catch(resolve);
         });
       }
+      playbackGenRef.currentAudio = null;
     } catch (e) {
       console.error('playSentence error:', e);
     }
