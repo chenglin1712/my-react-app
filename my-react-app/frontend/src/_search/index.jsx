@@ -107,7 +107,7 @@ const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFav
       <div className="mt-2 pt-2 border-top">
         <ListGroup variant="flush">
           {result.frequency ? <ListGroup.Item><strong>詞頻：</strong>{renderStars(result.frequency)}</ListGroup.Item> : <></>}
-          {result.sources ? <ListGroup.Item><strong>收錄來源：</strong>{Array.isArray(result.sources) ? result.sources.join('、') : result.sources || ''}</ListGroup.Item> : <></>}
+          {result.sources?.length > 0 ? <ListGroup.Item><strong>收錄來源：</strong>{Array.isArray(result.sources) ? result.sources.join('、') : result.sources}</ListGroup.Item> : <></>}
           {result.variant ? <ListGroup.Item><strong>異體詞：</strong>{result.variant || ''}</ListGroup.Item> : <></>}
           {result.formationWord ? <ListGroup.Item><strong>構詞：</strong>{result.formationWord || ''}</ListGroup.Item> : <></>}
           {result.derivativeRoot ? <ListGroup.Item><strong>衍生詞根：</strong>{result.derivativeRoot || ''}</ListGroup.Item> : <></>}
