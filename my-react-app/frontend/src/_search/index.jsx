@@ -241,7 +241,7 @@ const App = () => {
     await updateDoc(userDocRef, { favorites: newFavorites });
   }
 
-  const TRIBES_WITH_DATA = ['泰雅', '阿美'];
+  const TRIBES_WITH_DATA = ['泰雅', '阿美', '布農'];
 
   const handleSearch = async (tribeOverride = null) => {
     const tribe = tribeOverride ?? selectedTribe;
