@@ -250,6 +250,7 @@ const Review = ({ }) => {
                                                 <p className="question-ch">{selectedQuestion.question_ch}</p>
                                             </div>
                                         </div>
+                                        {selectedQuestion.images ? (
                                         <div className="answer-row answer-images">
                                             <div className="answer-block">
                                                 <span>我的答案</span>
@@ -273,6 +274,12 @@ const Review = ({ }) => {
                                                 </div>
                                             </div>
                                         </div>
+                                        ) : (
+                                        <div className="answer-row">
+                                            <p>你的答案：<strong>{selectedQuestion.userAnswer === 1 ? "O（符合）" : selectedQuestion.userAnswer === 2 ? "X（不符合）" : "未作答"}</strong></p>
+                                            <p>正確答案：<strong>{selectedQuestion.answer === 1 ? "O（符合）" : "X（不符合）"}</strong></p>
+                                        </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
