@@ -182,26 +182,12 @@ const App = () => {
         setError("查詢失敗: " + (err.response?.data?.error || err.message));
       })
       .finally(() => setLoading(false));
-      const saved = localStorage.getItem('favoriteWords');
-          if (saved) setFavoriteWords(new Set(JSON.parse(saved)));
-
-          const unsubscribe = authChanges(async (userData) => {
-          if (userData) {
-            setUser(userData);
-            const baseCategory = userData.firestoreData.favorites.find(fav => fav.id === 1);
-            const favoriteSet = new Set(baseCategory?.content || []);
-            setFavoriteWords(favoriteSet);
-          } else {
-            setUser(null);
-            setFavoriteWords(new Set());
-          }
-        });
-        return () => unsubscribe();
   }, [selectedWords]);
 
   const toggleExpand = (key) => setExpandedWord(prev => (prev === key ? null : key));
 
   const toggleFavorite = async (wordTayal) => {
+    if (!user) return;
   setFavoriteWords(prev => {
     const newSet = new Set(prev);
     if (newSet.has(wordTayal)) {

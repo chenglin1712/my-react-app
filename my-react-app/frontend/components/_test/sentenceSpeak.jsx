@@ -85,28 +85,31 @@ export default function sentenceSpeak({ question, selected, checked, onSelect, o
     formData.append("user_audio", audioBlob, "speech.webm");
     formData.append("audio_id", question.tayal.audio);
 
-    const res = await fetch(import.meta.env.VITE_API_QUIZ_AUDIO_URL, {
-      method: "POST",
-      body: formData,
-    });
-
-    const data = await res.json();
-    setScore(data.score);
-    setResult(data.passed ? "correct" : "wrong");
-    onSelect?.({
-      result: data.passed,
-      userAnswer: audioBlob, 
-      correctAnswer:  question.answer, 
-      question: question.tayal.sentence, 
-      answer: question.tayal.audio,
-    })
+    try {
+      const res = await fetch(import.meta.env.VITE_API_QUIZ_AUDIO_URL, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      setScore(data.score);
+      setResult(data.passed ? "correct" : "wrong");
+      onSelect?.({
+        result: data.passed,
+        userAnswer: audioBlob,
+        correctAnswer: question.answer,
+        question: question.tayal.sentence,
+        answer: question.tayal.audio,
+      });
       onConfirm?.(true);
-
-     if (data.passed) {
+      if (data.passed) {
         const correctSound = new Audio(correctAudio);
         correctSound.play();
         setShowAnimation(true);
       }
+    } catch (err) {
+      console.error('submitSpeaking error:', err);
+      onConfirm?.(true);
+    }
   };
 
 

@@ -68,10 +68,10 @@ const Game_result = ({ results }) => {
                     setUser(currentUser);
                 }
                 else {
-                    const __initial_auth_token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                    if (__initial_auth_token) {
+                    const authToken = typeof window.__initial_auth_token !== 'undefined' ? window.__initial_auth_token : null;
+                    if (authToken) {
                         try {
-                            await signInWithCustomToken(auth, __initial_auth_token);
+                            await signInWithCustomToken(auth, authToken);
                         }
                         catch (error) {
                             console.error("Firebase Custom Token sign-in failed:", error);

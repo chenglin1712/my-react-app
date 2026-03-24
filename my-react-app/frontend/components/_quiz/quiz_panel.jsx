@@ -144,7 +144,7 @@ const Panel = ({ }) => {
 
     //點擊提交
     const handleSubmmit = async () => {
-        if (userAnswers.length == 0 || userAnswers.length != dataLen) {
+        if (userAnswers.some(a => a === null)) {
             const confirmSubmit = window.confirm("⚠️您尚未作答完成，確定要繳交嗎？");
             if (!confirmSubmit) {
                 return;

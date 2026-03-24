@@ -85,7 +85,7 @@ const Game_areaTest = forwardRef(({ gameDataLoaded }, ref) => {
         className="area-grid"
         style={{
           // 根據 grid_solution 的長度來設定網格寬度
-          gridTemplateColumns: `repeat(${crosswordData.grid_solution[0].replace(/\s/g, "").length
+          gridTemplateColumns: `repeat(${(crosswordData.grid_solution[0] || "").replace(/\s/g, "").length
             }, 35px)`,
         }}
       >

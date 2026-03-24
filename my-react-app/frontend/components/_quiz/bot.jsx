@@ -1,10 +1,13 @@
 import "../../static/css/_quiz/bot.css"
 import { useState, useRef } from "react";
 import { Bot, ChevronLeft } from "lucide-react"
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import StudyPlanComponent from "./bot_study_plan"
 
 const Advice = ({ onClose }) => {
+    const navigate = useNavigate();
+    const handleClose = onClose ?? (() => navigate(-1));
     const [messages, setMessages] = useState([
         { id: 1, text: "lokah su 你好！我是您的泰雅AI助手，有什麼我可以幫您的嗎？", role: "bot" }
     ]);
@@ -84,7 +87,7 @@ const Advice = ({ onClose }) => {
             >
                 <div className="chat-header">
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         className="chat-return"
                     >
                         <ChevronLeft size={22} />
@@ -109,7 +112,7 @@ const Advice = ({ onClose }) => {
                             <div className="message-bubble">
                                 <p>{message.text}</p>
                                 {message.studyPlan && (
-                                    <StudyPlanComponent plan={message.studyPlan} onClose={onClose} />
+                                    <StudyPlanComponent plan={message.studyPlan} onClose={handleClose} />
                                 )}
                             </div>
                         </div>

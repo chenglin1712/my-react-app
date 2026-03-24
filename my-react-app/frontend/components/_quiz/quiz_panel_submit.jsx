@@ -14,7 +14,7 @@ const Panel_Submit = ({ }) => {
     const [score, setScore] = useState(0);
 
     const location = useLocation();
-    const quizId = location.state;
+    const quizId = location.state?.situationID;
     useEffect(() => {
         const fetchData = async () => {
             try {

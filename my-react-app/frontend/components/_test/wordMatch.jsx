@@ -64,6 +64,7 @@ export default function WordMatch({ question, selected, checked, onSelect, onCon
       const cn = isCn ? word : selectedWord.word;
       const tayal = isCn ? selectedWord.word : word;
       const pair = question.pairs.find((p) => p.cn === cn);
+      if (!pair) { setSelectedWord(null); return; }
 
       if (pair.tayal.word === tayal) {
         // ✅ 正確配對
