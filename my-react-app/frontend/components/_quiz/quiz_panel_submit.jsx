@@ -38,6 +38,8 @@ const Panel_Submit = ({ }) => {
 
         if (quizId) {
             fetchData();
+        } else {
+            setIsLoad(false);
         }
     }, [quizId]);
 

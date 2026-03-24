@@ -199,6 +199,11 @@ export const getUserSituation = async () => {
             globalPromise,
         ]);
 
+        if (userQuerySnapshot.empty) {
+            console.log("未找到使用者答題記錄");
+            return null;
+        }
+
         let userData = {};
         let globalData = {};
 
