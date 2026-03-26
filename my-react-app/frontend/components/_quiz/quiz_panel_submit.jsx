@@ -15,7 +15,9 @@ const Panel_Submit = ({ }) => {
 
     const location = useLocation();
     const quizId = location.state?.situationID;
-    const fallback = location.state?.fallback;
+    const fallback = location.state?.fallback ?? (() => {
+        try { return JSON.parse(sessionStorage.getItem('quizFallback')); } catch { return null; }
+    })();
 
     useEffect(() => {
         const fetchData = async () => {

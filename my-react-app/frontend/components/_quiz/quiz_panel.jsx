@@ -153,15 +153,17 @@ const Panel = ({ }) => {
             }
         }
         const situationID = await handleUploadSituation();
+        const fallbackData = {
+            title: level_ch,
+            questions: savedQuestions,
+            answers: userAnswers,
+            correctAnswers: quizInfo?.ans ?? []
+        };
+        sessionStorage.setItem('quizFallback', JSON.stringify(fallbackData));
         navigate(`/quiz/${level}/submit`, {
             state: {
                 situationID,
-                fallback: {
-                    title: level_ch,
-                    questions: savedQuestions,
-                    answers: userAnswers,
-                    correctAnswers: quizInfo?.ans ?? []
-                }
+                fallback: fallbackData
             }
         });
     };
