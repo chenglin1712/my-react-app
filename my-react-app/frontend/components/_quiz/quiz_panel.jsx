@@ -23,6 +23,7 @@ const Panel = ({ }) => {
     const [isLoading, setIsLoading] = useState(true);
 
     const [quizInfo, setQuizInfo] = useState(null);
+    const [savedQuestions, setSavedQuestions] = useState([]);
 
     const [showIntro, setShowIntro] = useState(false);
 
@@ -108,6 +109,7 @@ const Panel = ({ }) => {
                     };
                 }
             });
+            setSavedQuestions(formatted);
             const quiz = await uploadQuizDB(level_ch, formatted);
             setQuizInfo(quiz);
         };
@@ -151,7 +153,17 @@ const Panel = ({ }) => {
             }
         }
         const situationID = await handleUploadSituation();
-        navigate(`/quiz/${level}/submit`, { state: { situationID } });
+        navigate(`/quiz/${level}/submit`, {
+            state: {
+                situationID,
+                fallback: {
+                    title: level_ch,
+                    questions: savedQuestions,
+                    answers: userAnswers,
+                    correctAnswers: quizInfo?.ans ?? []
+                }
+            }
+        });
     };
 
     //答題情形傳至資料庫
