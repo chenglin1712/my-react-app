@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
 
-from fastAPI.routes.connect import get_db, engine
+from fastAPI.routes.connect import get_db
 from fastAPI.routes.model import Word
 
 router = APIRouter()
@@ -495,30 +495,52 @@ async def allsearch_tayal_dictionary(request: KeywordRequest, db: Session = Depe
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-# ------------------------- 測試資料庫 -------------------------
-@router.get("/test-db/")
-def test_db(db: Session = Depends(get_db)):
-    db_path = str(engine.url)
-    tables = db.execute(text("SELECT name FROM sqlite_master WHERE type='table';")).fetchall()
-    tables = [t[0] for t in tables]
+# ------------------------- 文法資料 -------------------------
+@router.get("/grammar/{tribe}")
+def get_grammar(tribe: str, db: Session = Depends(get_db)):
+    """查詢指定族語的文法章節"""
+    try:
+        tribe_name = TRIBE_MAP.get(tribe, tribe)
+        rows = db.execute(
+            text("SELECT section_order, section_key, title, content FROM grammar WHERE tribe = :tribe ORDER BY section_order"),
+            {"tribe": tribe_name}
+        ).fetchall()
+        if not rows:
+            return JSONResponse({"error": f"找不到 {tribe_name} 的文法資料"}, status_code=404)
+        sections = [
+            {
+                "order": row[0],
+                "section_key": row[1],
+                "title": row[2],
+                "content": json.loads(row[3]),
+            }
+            for row in rows
+        ]
+        return JSONResponse({"tribe": tribe_name, "sections": sections}, status_code=200)
+    except Exception as e:
+        logger.exception(e)
+        return JSONResponse({"error": str(e)}, status_code=500)
 
-    sample_row = None
-    if "words" in tables:
-        result = db.execute(text("SELECT * FROM words LIMIT 1")).fetchone()
-        if result:
-            sample_row = dict(result._mapping)
-
-    return {
-        "database_url": db_path,
-        "tables": tables,
-        "sample_row": sample_row
-    }
 
 ILRDF_AUDIO_API = "https://e-dictionary.ilrdf.org.tw/api/app/file/download-file/"
 
-@router.get("/audio/{file_id}")
+STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
+
+@router.get("/audio/{file_id:path}")
 async def proxy_audio(file_id: str):
     try:
+        # 本地音檔（葛瑪蘭語等離線族語）
+        if file_id.startswith("local/"):
+            local_path = file_id[len("local/"):]
+            full_path = os.path.join(STATIC_DIR, local_path)
+            if not os.path.isfile(full_path):
+                return Response(content=f"File not found: {local_path}", media_type="text/plain", status_code=404)
+            with open(full_path, "rb") as f:
+                content = f.read()
+            media_type = "audio/wav" if full_path.endswith(".wav") else "audio/mpeg"
+            return Response(content=content, media_type=media_type)
+
+        # 外部 API 音檔（原有邏輯）
         first_url = ILRDF_AUDIO_API + file_id
 
         async with httpx.AsyncClient(follow_redirects=False, timeout=10) as client:

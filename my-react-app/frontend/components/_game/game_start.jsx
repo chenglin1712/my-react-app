@@ -26,62 +26,25 @@ function Game_Start() {
       const crosswordGridDisplay =
         gameAreaTestRef.current.getCrosswordGridDisplay();
 
-      console.log("提交數據:", {
-        userAns,
-        curentAns,
-        crosswordLegend,
-        crosswordGridDisplay,
-      });
-
       try {
         const response = await axios.post(
           "http://127.0.0.1:8000/CrosswordPuzzle/submit/",
           {
             user_answers: userAns,
-            crossword_solution: curentAns, // 將正確答案傳給後端比較
-            crossword_legend: crosswordLegend, // 驗證每個單字
-            crossword_grid_display: crosswordGridDisplay, // 傳遞網格結構(空白or-)
+            crossword_solution: curentAns,
+            crossword_legend: crosswordLegend,
+            crossword_grid_display: crosswordGridDisplay,
           }
         );
-        console.log("API 回應:", response.data);
-        setGameResults(response.data); // 儲存後端返回的驗證結果
-
-        console.log("API 呼叫成功！：", response.data);
+        setGameResults(response.data);
       } catch (error) {
-        console.error("呼叫 API 時發生錯誤:", error);
-        console.error("錯誤詳情:", error.response?.data);
-        // 測試用：模擬結果
-        const mockResults = {
-          total_words: 11,
-          correct_words_count: 5,
-          word_details: [
-            {
-              number: 1,
-              clue: "一氧化炭",
-              direction: "across",
-              is_correct: true,
-              correct_word: "iyanghwatan",
-              user_word: "iyanghwatan",
-            },
-            {
-              number: 2,
-              clue: "紅外線",
-              direction: "down",
-              is_correct: false,
-              correct_word: "hongwaysen",
-              user_word: "hongway",
-            },
-          ],
-        };
-        console.log("使用模擬結果:", mockResults);
-        setGameResults(mockResults);
+        console.error("填字遊戲提交失敗:", error.response?.data ?? error.message);
       }
     }
   };
 
-  const setgameDataLoaded = (data, initialAnswers) => {
-    // 存储游戏数据供其他功能使用
-    console.log("游戏数据已加载:", data, initialAnswers);
+  const setgameDataLoaded = (_data, _initialAnswers) => {
+    // 資料載入回呼，保留供後續擴充使用
   };
 
   return (

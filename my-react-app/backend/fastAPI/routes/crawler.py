@@ -109,7 +109,7 @@ def query(keyword):
 
     # 取得查詢結果頁面
     url = f"{BASE_URL}/tay/search/list.htm"
-    response = session.get(url, headers=headers)
+    response = session.get(url, headers=headers, timeout=10)
     soup = BeautifulSoup(response.text, 'html5lib')
 
     # 找到第一個詞彙連結
@@ -118,7 +118,7 @@ def query(keyword):
 
     if link_tag:
         word_url = f"{BASE_URL}{link_tag['href']}"
-        word_response = session.get(word_url)
+        word_response = session.get(word_url, timeout=10)
         word_soup = BeautifulSoup(word_response.text, 'html5lib')
         return parse_word_html(word_soup)
     

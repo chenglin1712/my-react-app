@@ -51,8 +51,6 @@ const Panel = ({ }) => {
                 const responseData = await response.json();
                 if (isMounted) {
                     setData(responseData);
-                    console.log("data: " + JSON.stringify(responseData, null, 2));
-
                     if (responseData && responseData.parts &&
                         responseData.parts[0] && responseData.parts[0].questions) {
                         setTimeout(() => {
@@ -82,7 +80,6 @@ const Panel = ({ }) => {
         if (!data || !data.parts || !data.parts[0]?.questions) return;
         const handlleUploadQuiz = async () => {
             const questions = data.parts[0].questions;
-            console.log(data.parts[0].type);
             const formatted = questions.map((q) => {
                 if (data.parts[0].type === "true_false") {
                     return {

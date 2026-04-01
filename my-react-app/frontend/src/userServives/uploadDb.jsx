@@ -95,7 +95,7 @@ export const getQuizSubmitById = async (id) => {
                         quiz: quizData
                     };
                 } else {
-                    console.log("未找到對應的quiz");
+                    // quiz not found
                     return {
                         ...submitData,
                         quiz: null
@@ -105,11 +105,11 @@ export const getQuizSubmitById = async (id) => {
 
             return submitData;
         } else {
-            console.log("未找到提交測驗");
+            // situation not found
             return null;
         }
     } catch (error) {
-        console.log("取得提交的測驗失敗: ", error);
+        console.error("取得提交的測驗失敗:", error);
     }
 };
 //取得最近的答題情形
@@ -154,7 +154,7 @@ export const getCurrentSituation = async () => {
         // console.log("取得的答題情形：", situations);
         return enrichedSituations;
     } catch (error) {
-        console.log("取得失敗: ", error);
+        console.error("取得答題情形失敗:", error);
         return [];
     }
 };
@@ -168,11 +168,11 @@ export const getQuizById = async (id) => {
             const quizData = quizSnap.data();
             return quizData;
         } else {
-            console.log("未找到對應的quiz");
+            // quiz not found
             return null;
         }
     } catch (error) {
-        console.log("從id取得測驗失敗: ", error);
+        console.error("從id取得測驗失敗:", error);
     }
 };
 //取得使用者答題情形
@@ -180,7 +180,7 @@ export const getUserSituation = async () => {
     const user = auth.currentUser;
 
     if (!user) {
-        console.log("使用者未登入");
+        // 使用者未登入，回傳 null
         return null;
     }
 
@@ -200,7 +200,7 @@ export const getUserSituation = async () => {
         ]);
 
         if (userQuerySnapshot.empty) {
-            console.log("未找到使用者答題記錄");
+            // 無答題記錄
             return null;
         }
 
@@ -256,7 +256,7 @@ export const getUserSituation = async () => {
         const allData = { ...userData, accuracyByType: mergedAccuracyByType, monthlyAccuracy: mergedAccuracyByMonth };
 
         if (Object.keys(allData).length === 0) {
-            console.log("未找到");
+            // 無資料
             return null;
         }
         return allData;
@@ -271,7 +271,7 @@ export const getCalendar = async () => {
     const user = auth.currentUser;
 
     if (!user) {
-        console.log("使用者未登入");
+        // 使用者未登入，回傳 null
         return null;
     }
 

@@ -24,8 +24,6 @@ const loginForm = ({ }) => {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
             setIsLogin(true);
-            console.log("登入成功:", user);
-
             setTimeout(() => {
                 navigate("/");
             }, 1800);
@@ -39,7 +37,6 @@ const loginForm = ({ }) => {
             } else {
                 alert("登入失敗: " + error.message);
             }
-            console.log("登入失敗: ", error.message);
         }
     };
 

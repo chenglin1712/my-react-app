@@ -7,12 +7,12 @@ import { AuthProvider } from "./userServives/authContext";
 
 
 createRoot(document.getElementById('root')).render(
-  //<StrictMode>
+  <StrictMode>
     <BrowserRouter>
       <AuthProvider>
         <Navbar />
         <Route />
       </AuthProvider>
     </BrowserRouter>
-  //</StrictMode>
+  </StrictMode>
 )

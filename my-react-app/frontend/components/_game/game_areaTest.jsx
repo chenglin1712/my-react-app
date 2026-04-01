@@ -38,7 +38,6 @@ const Game_areaTest = forwardRef(({ gameDataLoaded }, ref) => {
         );
         const data = response.data;
         setCrosswordData(data);
-        console.log("Crossword Data:", data);
 
         // 根據解答網格初始化使用者答案網格
         const initialAnswers = data.grid_solution.map((rowStr) => {

@@ -1,13 +1,14 @@
 import math
 import random
+import threading
+import shutil
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Body, HTTPException, Depends, File, UploadFile, Form
 from pydantic import BaseModel
 
-# 假設還是用 SQLAlchemy 取得所有詞庫
 from sqlalchemy.orm import Session
 from fastAPI.routes.connect import get_db
-from fastAPI.routes.model import Word  # Word model, 需依你專案路徑
+from fastAPI.routes.model import Word
 
 import io
 import requests
@@ -20,8 +21,26 @@ import os
 import json
 import soundfile as sf
 
-AudioSegment.converter = r"C:\Program Files\ffmpeg\bin\ffmpeg.exe"
-AudioSegment.ffprobe = r"C:\Program Files\ffmpeg\bin\ffmpeg.exe"
+# 自動偵測 ffmpeg，優先讀環境變數，找不到才用 shutil.which
+# 啟動時只發出警告，呼叫 /compare_audio 時才真正檢查
+import logging as _logging
+
+def _find_ffmpeg() -> str | None:
+    from_env = os.getenv("FFMPEG_PATH")
+    if from_env and os.path.isfile(from_env):
+        return from_env
+    found = shutil.which("ffmpeg")
+    return found
+
+_ffmpeg_path = _find_ffmpeg()
+if _ffmpeg_path:
+    AudioSegment.converter = _ffmpeg_path
+    AudioSegment.ffprobe   = _ffmpeg_path
+else:
+    _logging.warning(
+        "[quiz] 找不到 ffmpeg，語音比對功能 (/compare_audio) 將無法使用。"
+        "請安裝 ffmpeg 或在 .env 設定 FFMPEG_PATH=/path/to/ffmpeg"
+    )
 
 
 
@@ -321,7 +340,7 @@ def fetch_audio_from_id(audio_id: str):
     api_url = VITE_AUDIO_FILE_URL + audio_id
 
     # 第一次請求取得重導向 URL
-    resp = requests.get(api_url, allow_redirects=False)
+    resp = requests.get(api_url, allow_redirects=False, timeout=10)
     if resp.status_code in [301, 302, 303, 307, 308]:
         final_url = resp.headers.get("Location")
     else:
@@ -331,7 +350,7 @@ def fetch_audio_from_id(audio_id: str):
         raise Exception(f"無法取得真正音檔 URL: {resp.text}")
 
     # 第二次請求下載真正音檔
-    audio_resp = requests.get(final_url)
+    audio_resp = requests.get(final_url, timeout=15)
     if audio_resp.status_code != 200:
         raise Exception(f"下載音檔失敗 (HTTP {audio_resp.status_code})")
 
@@ -367,14 +386,17 @@ def bytes_to_tensor(wav_io):
         waveform = waveform.mean(dim=0, keepdim=True)
     return waveform, sr
 
-# 4. wav2vec2（懶載入，第一次呼叫時才下載模型）
+# 4. wav2vec2（懶載入，第一次呼叫時才下載模型，Lock 保護執行緒安全）
 _wav2vec2_model = None
+_wav2vec2_lock = threading.Lock()
 
 def get_wav2vec2():
     global _wav2vec2_model
     if _wav2vec2_model is None:
-        bundle = torchaudio.pipelines.WAV2VEC2_BASE
-        _wav2vec2_model = bundle.get_model()
+        with _wav2vec2_lock:
+            if _wav2vec2_model is None:
+                bundle = torchaudio.pipelines.WAV2VEC2_BASE
+                _wav2vec2_model = bundle.get_model()
     return _wav2vec2_model
 
 
@@ -383,6 +405,8 @@ async def compare_audio(
     user_audio: UploadFile = File(...),
     audio_id: str = Form(...)
 ):
+    if not _ffmpeg_path:
+        return make_error("ffmpeg_missing", "伺服器未安裝 ffmpeg，語音比對功能暫時無法使用")
     try:
         # Step A — download target audio
         try:

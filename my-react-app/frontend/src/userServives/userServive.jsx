@@ -7,22 +7,17 @@ import { onAuthStateChanged, createUserWithEmailAndPassword } from "firebase/aut
 export const authChanges = (callback) => {
     return onAuthStateChanged(auth, async (user) => {
         if (user) {
-            //console.log("使用者已登入:", user);
             const userData = await getCurrentUser(user.uid);
-             if (userData) {
-                 console.log("firestore的使用者資料: ", JSON.stringify(userData));
-             }
 
             try {
                 setupPresence(user.uid);
             } catch (e) {
-                console.log("[authChanges] setupPresence error:", e);
+                console.error("[authChanges] setupPresence error:", e);
             }
 
             callback({ firestoreData: userData, uid: user.uid });
             initUserFields(user.uid);
         } else {
-            console.log("X使用者未登入");
             callback(null);
         }
     });
@@ -35,12 +30,11 @@ export const getCurrentUser = async (uid) => {
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
             return docSnap.data();
-        } else {
-            console.log("X 尚未登入");
-            return null;
         }
+        return null;
     } catch (error) {
-        console.log("取得currentUser失敗: ", error);
+        console.error("取得currentUser失敗: ", error);
+        return null;
     }
 };
 
@@ -54,7 +48,7 @@ export const getAllUsers = async () => {
         }));
         return users;
     } catch (error) {
-        console.log("取得所有使用者失敗: ", error);
+        console.error("取得所有使用者失敗: ", error);
         return [];
     }
 };
@@ -63,8 +57,6 @@ export const registerWithImg = async (name, email, password, identity, avatarUrl
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
-        console.log("註冊成功: ", user);
-
         //把其他需要的資料存到firestore的users
         await setDoc(doc(db, "users", user.uid), {
             name: name,
@@ -93,7 +85,7 @@ export const registerWithImg = async (name, email, password, identity, avatarUrl
         });
 
     } catch (error) {
-        console.log("X 註冊錯誤: ", error.code, error.message);
+        console.error("X 註冊錯誤: ", error.code, error.message);
         throw error;
     }
 };
@@ -132,7 +124,7 @@ export const updateProfile = async (uid, newData) => {
         };
 
     } catch (error) {
-        console.log("X 更新失敗: ", error.code, error.message);
+        console.error("X 更新失敗: ", error.code, error.message);
         throw error;
     }
 };
@@ -167,9 +159,6 @@ export const initUserFields = async (uid) => {
 
         if (Object.keys(updateData).length > 0) {
             await updateDoc(userRef, updateData);
-            console.log(`成功新增欄位：${addedFields.join(", ")}`);
-        } else {
-            console.log("所有欄位已存在，無需初始化");
         }
 
     } catch (error) {
@@ -199,9 +188,8 @@ export const toggleFavoriteWord = async (uid, wordTayal) => {
             });
 
             await updateDoc(userRef, { favorites: updatedFavorites });
-            console.log(`${wordTayal} 已 ${updatedFavorites[0].content.includes(wordTayal) ? '加入' : '移除'} 收藏`);
         } else {
-            console.warn("X 使用者不存在");
+            console.error("X 使用者不存在");
         }
     } catch (err) {
         console.error("X 收藏寫入失敗：", err.message);
@@ -219,7 +207,6 @@ export const updateUserErrors = async (uid, wordTayal, increment = 1) => {
     errors[wordTayal] = (errors[wordTayal] || 0) + increment;
 
     await updateDoc(userRef, { user_errors: errors });
-    console.log(`${wordTayal} 答錯次數更新為 ${errors[wordTayal]}`);
   } catch (err) {
     console.error("X 更新答錯次數失敗：", err.message);
   }
@@ -230,7 +217,7 @@ export const signOut = async () => {
     try {
         await auth.signOut();
     } catch (error) {
-        console.log("X 登出失敗: ", error.message);
+        console.error("X 登出失敗: ", error.message);
         alert("登出失敗：" + error.message);
     }
 };
@@ -262,9 +249,9 @@ export const setupPresence = (uid) => {
                 lastChanged: serverTimestamp(),
             });
         } catch (e) {
-            console.log("[presence] error while setting presence:", e);
+            console.error("[presence] error while setting presence:", e);
         }
     }, (err) => {
-        console.log("[presence] .info/connected error:", err);
+        console.error("[presence] .info/connected error:", err);
     });
 };

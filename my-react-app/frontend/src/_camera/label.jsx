@@ -53,13 +53,7 @@ const App = () => {
                     }
                 })
                 .catch((error) => {
-                    console.error("API 錯誤:", error);
-                    if (error.response) {
-                        console.log("📄 錯誤狀態碼:", error.response.status);
-                        console.log("📄 錯誤訊息:", error.response.data);
-                    } else {
-                        console.log("❌ 無法連線到伺服器");
-                    }
+                    console.error("影像辨識 API 錯誤:", error.response?.data ?? error.message);
                     setError(true);
                 })
                 .finally(() => {
