@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from .routes import crawler, vision, dictionary, quiz
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 import os
 
@@ -26,7 +25,4 @@ app.include_router(vision.router, prefix="/vision")
 app.include_router(dictionary.router, prefix="/dictionary")
 app.include_router(quiz.router, prefix="/quiz")
 
-STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
-if os.path.isdir(STATIC_DIR):
-    app.mount("/dictionary/static", StaticFiles(directory=STATIC_DIR), name="static")
 

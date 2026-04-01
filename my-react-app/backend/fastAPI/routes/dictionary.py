@@ -524,23 +524,9 @@ def get_grammar(tribe: str, db: Session = Depends(get_db)):
 
 ILRDF_AUDIO_API = "https://e-dictionary.ilrdf.org.tw/api/app/file/download-file/"
 
-STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
-
 @router.get("/audio/{file_id:path}")
 async def proxy_audio(file_id: str):
     try:
-        # 本地音檔（葛瑪蘭語等離線族語）
-        if file_id.startswith("local/"):
-            local_path = file_id[len("local/"):]
-            full_path = os.path.join(STATIC_DIR, local_path)
-            if not os.path.isfile(full_path):
-                return Response(content=f"File not found: {local_path}", media_type="text/plain", status_code=404)
-            with open(full_path, "rb") as f:
-                content = f.read()
-            media_type = "audio/wav" if full_path.endswith(".wav") else "audio/mpeg"
-            return Response(content=content, media_type=media_type)
-
-        # 外部 API 音檔（原有邏輯）
         first_url = ILRDF_AUDIO_API + file_id
 
         async with httpx.AsyncClient(follow_redirects=False, timeout=10) as client:
