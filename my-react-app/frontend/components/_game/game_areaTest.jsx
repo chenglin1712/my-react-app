@@ -34,7 +34,7 @@ const Game_areaTest = forwardRef(({ gameDataLoaded }, ref) => {
     const fetchCrossword = async () => {
       try {
         const response = await axios.get(
-          "http://127.0.0.1:8000/CrosswordPuzzle/generate/"
+          "/CrosswordPuzzle/generate/"
         );
         const data = response.data;
         setCrosswordData(data);

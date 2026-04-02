@@ -116,6 +116,10 @@ export const getQuizSubmitById = async (id) => {
 export const getCurrentSituation = async () => {
     const user = auth.currentUser;
 
+    if (!user) {
+        return [];
+    }
+
     const q = query(
         collection(db, "situations"),
         where("userId", "==", user.uid),

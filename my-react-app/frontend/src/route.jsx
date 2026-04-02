@@ -70,6 +70,7 @@ const App = () => {
       </Route>
       <Route path="/bot" element={<Comp_bot />} />
       <Route path='/note' element={<NotePage />} />
+      <Route path='/note/share' element={<NoteShare />} />
       <Route path='/share/:id' element={<NoteShare />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />

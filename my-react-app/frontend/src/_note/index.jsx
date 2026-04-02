@@ -8,6 +8,7 @@ import "../../static/css/_note/notestyle.css";
 import "../../static/css/_note/toolbar.css";
 import "../../static/css/_note/buttons.css";
 import { Image } from "lucide-react";
+import DOMPurify from "dompurify";
 
 function NotePage() {
   const navigate = useNavigate();
@@ -47,6 +48,7 @@ function NotePage() {
     localStorage.setItem(LOCAL_KEY, JSON.stringify(updatedNotes));
   };
 
+  const [isDirty, setIsDirty] = useState(false);
   const [selectedImageFile, setSelectedImageFile] = useState(null);
   const execStyle = (command, value = null) => {
     if (command === "insertImage" && value) {
@@ -124,7 +126,6 @@ function NotePage() {
   const handleClearSelect = () => setSelectedPages([]);
 
   //有尚未儲存的更改
-  const [isDirty, setIsDirty] = useState(false);
   const handleContentChange = () => {
     if (!contentRef.current) return;
     const currentHTML = contentRef.current.innerHTML;
@@ -278,7 +279,7 @@ function NotePage() {
             className="note-text"
             contentEditable
             suppressContentEditableWarning
-            dangerouslySetInnerHTML={{ __html: currentNote.content }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentNote.content) }}
             onInput={handleContentChange}
           />
 

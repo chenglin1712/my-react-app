@@ -7,7 +7,7 @@ import { useAuth } from "../../src/userServives/authContext"
 import AvatarImg from "../../static/assets/_auth/avatar.webp"
 import UserSidebar from "./userSidebar"
 
-const Navbar = ({ }) => {
+const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();

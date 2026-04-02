@@ -5,7 +5,7 @@ import gameBtn from "../../static/assets/_home/Btn3.webp"
 import { GripHorizontal } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const FunctionBtn = ({ }) => {
+const FunctionBtn = () => {
     const navigate = useNavigate();
     return (
         <>

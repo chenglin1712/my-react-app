@@ -1,4 +1,5 @@
 import json
+import asyncio
 import requests
 from fastapi import APIRouter,Request
 from fastapi.responses import JSONResponse
@@ -134,7 +135,10 @@ async def search_tayal_dictionary(request: Request):
         if not words:
             return JSONResponse({"error": "查詢字詞不可為空"}, status_code=400)
 
-        results = {word: query(word) for word in words}
+        loop = asyncio.get_event_loop()
+        tasks = [loop.run_in_executor(None, query, word) for word in words]
+        results_list = await asyncio.gather(*tasks)
+        results = dict(zip(words, results_list))
 
         return JSONResponse({"definitions": results}, status_code=200)
 

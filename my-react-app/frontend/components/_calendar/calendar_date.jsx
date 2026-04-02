@@ -6,7 +6,7 @@ import { Trash2 } from "lucide-react";
 import { getCalendar } from "../../src/userServives/uploadDb"
 import { useNavigate } from "react-router-dom";
 
-const userCalendar = ({ }) => {
+const UserCalendar = () => {
     const navigate = useNavigate();
     const [date, setDate] = useState(new Date());
     const [newEvent, setNewEvent] = useState("");
@@ -144,4 +144,4 @@ const userCalendar = ({ }) => {
         </div>
     );
 };
-export default userCalendar;
+export default UserCalendar;

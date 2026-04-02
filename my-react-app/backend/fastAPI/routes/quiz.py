@@ -133,9 +133,7 @@ def compute_Tw(recent_times: List[float], t_avg_all: float) -> float:
     return t_w / (t_avg_all or 1.0)
 
 def compute_Bq(F_w: float, R_w: float, Delta_w: float, T_w: float, fprime: float) -> float:
-    denom = BETA1 + BETA2 + BETA3 + BETA4 + BETA5
-    if denom == 0: return 0.0
-    return (BETA1*F_w + BETA2*R_w + BETA3*Delta_w + BETA4*T_w + BETA5*fprime) / denom
+    return (BETA1*F_w + BETA2*R_w + BETA3*Delta_w + BETA4*T_w + BETA5*fprime)
 
 def compute_score(Ptheta: float, Bq: float) -> float:
     return Ptheta * (1 + Bq)
@@ -229,45 +227,196 @@ def generate_quiz_frontend(user_data: dict = Body(...), db: Session = Depends(ge
         used.add(c["word"].name)
         return c
 
-    # word-translate 題型示範（其他題型同理，可按原邏輯增加）
+    def _get_cn(word_obj):
+        try:
+            items = json.loads(word_obj.explanation_items or "[]")
+            return (items[0].get('chineseExplanation') or '未知') if items else '未知'
+        except Exception:
+            return '未知'
+
+    def _get_audio(word_obj):
+        try:
+            items = json.loads(word_obj.audio_items or "[]")
+            return items[0].get('fileId') if items else None
+        except Exception:
+            return None
+
+    def _get_sentence_fill_payload(w, all_words_list):
+        """嘗試從句子範例建立填空題；若無資料回傳 None"""
+        try:
+            items = json.loads(w.explanation_items or "[]")
+            for item in items:
+                for sent in (item.get("sentenceItems") or []):
+                    orig = (sent.get("originalSentence") or "").strip()
+                    ch_sent = (sent.get("chineseSentence") or "").strip()
+                    if not orig or w.name not in orig:
+                        continue
+                    blank_sent = orig.replace(w.name, "___", 1)
+                    sent_audios = sent.get("audioItems") or []
+                    sent_audio = sent_audios[0].get("fileId") if sent_audios else None
+                    pool = [o for o in all_words_list if o.name != w.name]
+                    random.shuffle(pool)
+                    distractors = [{"word": o.name, "audio": _get_audio(o)} for o in pool[:3]]
+                    options = [{"word": w.name, "audio": _get_audio(w)}] + distractors
+                    random.shuffle(options)
+                    return {
+                        "tayal": {"word": w.name, "exsentence": orig, "sentence": blank_sent,
+                                  "cn": ch_sent, "audio": sent_audio},
+                        "options": options,
+                        "answer": w.name,
+                    }
+        except Exception:
+            pass
+        return None
+
+    def _get_sentence_order_payload(w, all_words_list):
+        """嘗試從句子範例建立排序題；若無資料回傳 None"""
+        try:
+            items = json.loads(w.explanation_items or "[]")
+            for item in items:
+                for sent in (item.get("sentenceItems") or []):
+                    orig = (sent.get("originalSentence") or "").strip()
+                    ch_sent = (sent.get("chineseSentence") or "").strip()
+                    if not orig:
+                        continue
+                    words_in_sent = orig.split()
+                    if len(words_in_sent) < 2:
+                        continue
+                    sent_audios = sent.get("audioItems") or []
+                    sent_audio = sent_audios[0].get("fileId") if sent_audios else None
+                    word_list = [{"word": ww, "audio": None} for ww in words_in_sent]
+                    return {
+                        "tayal": {"word": w.name, "sentence": orig, "cn": ch_sent, "audio": sent_audio},
+                        "words": word_list,
+                        "answer": words_in_sent,
+                    }
+        except Exception:
+            pass
+        return None
+
+    # --- word-translate ---
     for i in range(type_count["wordTranslate"]):
         c = next_candidate()
         if not c: break
         w = c["word"]
-        Dt = c["Dt_map"].get("word-translate",0.5)
+        Dt = c["Dt_map"].get("word-translate", 0.5)
         Dq, bw = compute_Dq_and_bw(c["Dw"], Dt, c["fprime"])
-        a_q = TYPE_AQ.get("word-translate",1.0)
+        a_q = TYPE_AQ.get("word-translate", 1.0)
         Ptheta = compute_P_theta(theta, bw, a_q, DEFAULT_GUESS)
-        others = [o for o in all_words if o.name!=w.name]
+        others = [o for o in all_words if o.name != w.name]
         random.shuffle(others)
-        def _get_cn(word_obj):
-            try:
-                items = json.loads(word_obj.explanation_items or "[]")
-                return (items[0].get('chineseExplanation') or '未知') if items else '未知'
-            except Exception:
-                return '未知'
-        def _get_audio(word_obj):
-            try:
-                items = json.loads(word_obj.audio_items or "[]")
-                return items[0].get('fileId') if items else None
-            except Exception:
-                return None
         distractors = [_get_cn(o) for o in others[:3]]
         correct_cn = _get_cn(w)
-        opts = [correct_cn]+distractors
+        opts = [correct_cn] + distractors
         random.shuffle(opts)
         generated.append({
-            "id":f"wt-{w.id}-{i}",
-            "type":"word-translate",
-            "payload":{"tayal":{"word":w.name,"audio":_get_audio(w)},
-                       "cn":correct_cn,
-                       "options":opts},
-            "difficulty":bw,
-            "meta":{"Ptheta":Ptheta,"Bq":c["Bq"],"Dq":Dq}
+            "id": f"wt-{w.id}-{i}",
+            "type": "word-translate",
+            "payload": {"tayal": {"word": w.name, "audio": _get_audio(w)},
+                        "cn": correct_cn, "options": opts},
+            "difficulty": bw,
+            "meta": {"Ptheta": Ptheta, "Bq": c["Bq"], "Dq": Dq}
         })
 
-    # 回傳
-    qlist = [QuizQuestion(id=q["id"], type=q["type"], payload=q["payload"], difficulty=q.get("difficulty"), meta=q.get("meta")) for q in generated[:TOTAL_QUESTIONS]]
+    # --- word-match（每題取 5 個單詞組成配對題）---
+    for i in range(type_count["wordMatch"]):
+        group = []
+        for _ in range(5):
+            c = next_candidate()
+            if not c: break
+            group.append(c)
+        if not group: break
+        pairs = [{"cn": _get_cn(gc["word"]),
+                  "tayal": {"word": gc["word"].name, "audio": _get_audio(gc["word"])}}
+                 for gc in group]
+        generated.append({
+            "id": f"wm-{i}",
+            "type": "word-match",
+            "payload": {"pairs": pairs},
+            "difficulty": None,
+            "meta": None
+        })
+
+    # --- sentence-fill ---
+    fill_needed = type_count["sentenceFill"]
+    fill_done = 0
+    fill_fallback = []
+    while fill_done < fill_needed:
+        c = next_candidate()
+        if not c: break
+        w = c["word"]
+        payload = _get_sentence_fill_payload(w, all_words)
+        if payload:
+            generated.append({
+                "id": f"sf-{w.id}-{fill_done}",
+                "type": "sentence-fill",
+                "payload": payload,
+                "difficulty": None,
+                "meta": None
+            })
+            fill_done += 1
+        else:
+            fill_fallback.append(c)
+    # 若句子資料不足，以 word-translate 補足
+    for c in fill_fallback[:fill_needed - fill_done]:
+        w = c["word"]
+        others = [o for o in all_words if o.name != w.name]
+        random.shuffle(others)
+        distractors = [_get_cn(o) for o in others[:3]]
+        correct_cn = _get_cn(w)
+        opts = [correct_cn] + distractors
+        random.shuffle(opts)
+        generated.append({
+            "id": f"sf-fb-{w.id}",
+            "type": "word-translate",
+            "payload": {"tayal": {"word": w.name, "audio": _get_audio(w)},
+                        "cn": correct_cn, "options": opts},
+            "difficulty": None,
+            "meta": None
+        })
+
+    # --- sentence-order ---
+    order_needed = type_count["sentenceOrder"]
+    order_done = 0
+    order_fallback = []
+    while order_done < order_needed:
+        c = next_candidate()
+        if not c: break
+        w = c["word"]
+        payload = _get_sentence_order_payload(w, all_words)
+        if payload:
+            generated.append({
+                "id": f"so-{w.id}-{order_done}",
+                "type": "sentence-order",
+                "payload": payload,
+                "difficulty": None,
+                "meta": None
+            })
+            order_done += 1
+        else:
+            order_fallback.append(c)
+    # 若句子資料不足，以 word-translate 補足
+    for c in order_fallback[:order_needed - order_done]:
+        w = c["word"]
+        others = [o for o in all_words if o.name != w.name]
+        random.shuffle(others)
+        distractors = [_get_cn(o) for o in others[:3]]
+        correct_cn = _get_cn(w)
+        opts = [correct_cn] + distractors
+        random.shuffle(opts)
+        generated.append({
+            "id": f"so-fb-{w.id}",
+            "type": "word-translate",
+            "payload": {"tayal": {"word": w.name, "audio": _get_audio(w)},
+                        "cn": correct_cn, "options": opts},
+            "difficulty": None,
+            "meta": None
+        })
+
+    random.shuffle(generated)
+    qlist = [QuizQuestion(id=q["id"], type=q["type"], payload=q["payload"],
+                          difficulty=q.get("difficulty"), meta=q.get("meta"))
+             for q in generated[:TOTAL_QUESTIONS]]
     return {"questions": qlist}
 
 # ----------------------------

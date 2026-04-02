@@ -2,7 +2,7 @@ import "../../static/css/_quiz/review_AI.css"
 import { useState, useEffect } from "react";
 import { UserCircle, Send, Bot, X } from "lucide-react";
 
-const Discussion = ({ }) => {
+const Discussion = () => {
     const [messages, setMessages] = useState([
         {
             id: 1,

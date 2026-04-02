@@ -7,7 +7,7 @@ import { auth } from "../../../firebase";
 import lottie from 'lottie-web';
 import successAnimation from "../../src/animations/success.json"
 
-const loginForm = ({ }) => {
+const LoginForm = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const navigate = useNavigate();
@@ -21,8 +21,7 @@ const loginForm = ({ }) => {
             return;
         }
         try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
+            await signInWithEmailAndPassword(auth, email, password);
             setIsLogin(true);
             setTimeout(() => {
                 navigate("/");
@@ -84,4 +83,4 @@ const loginForm = ({ }) => {
         </div>
     );
 };
-export default loginForm;
+export default LoginForm;

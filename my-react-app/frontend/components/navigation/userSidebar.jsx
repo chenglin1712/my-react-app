@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import OverlayAdvice from "../_quiz/bot";
 import { AnimatePresence } from "framer-motion";
 
-const userSidebar = ({ userData, closeSidebar }) => {
+const UserSidebar = ({ userData, closeSidebar }) => {
 
     const navigate = useNavigate();
     const [showBot, setShowBot] = useState(false);
@@ -96,4 +96,4 @@ const userSidebar = ({ userData, closeSidebar }) => {
         </>
     );
 };
-export default userSidebar;
+export default UserSidebar;

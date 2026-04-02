@@ -4,7 +4,7 @@ import lottie from 'lottie-web';
 import permissionAnimation from "../animations/permission restriction.json"
 import "../../static/css/userServives/permissionProtect.css"
 
-const permission_protect = () => {
+const PermissionProtect = () => {
     const navigate = useNavigate();
 
     //加載動畫
@@ -32,4 +32,4 @@ const permission_protect = () => {
         </div>
     );
 };
-export default permission_protect;
+export default PermissionProtect;

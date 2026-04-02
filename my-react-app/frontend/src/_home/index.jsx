@@ -5,7 +5,7 @@ import Calendar from "../../components/_home/calendar"
 import { useEffect, useState } from 'react';
 import BannerImg from "../../static/assets/_home/home.webp"
 
-const App = ({ }) => {
+const App = () => {
     const [newsWithImage, setNewsWithImage] = useState([]);
     const [newsWithoutImage, setNewsWithoutImage] = useState([]);
     const [examInfo, setExamInfo] = useState([]);

@@ -1,6 +1,6 @@
 import RegisterForm from '../../components/_auth/registerForm'
 
-const App = ({ }) => {
+const App = () => {
     return (
         <RegisterForm />
     );

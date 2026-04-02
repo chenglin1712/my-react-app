@@ -4,7 +4,7 @@ import "../../static/css/_quiz/sideBar.css"
 import { ClipboardList, ChartPie, Star, Play, X, Menu } from "lucide-react"
 import { useLocation } from 'react-router-dom';
 
-const SideBar = ({ }) => {
+const SideBar = () => {
     const icons = {
         quiz: <ClipboardList size={24} fill="#A6E3A1" color="#28A745" />,
         situation: <ChartPie size={24} color="#007BFF" />,

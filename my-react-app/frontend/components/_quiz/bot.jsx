@@ -29,8 +29,9 @@ const Advice = ({ onClose }) => {
     const handleSend = async () => {
         if (input.trim() === "") return;
 
-        const newUserMessage = { id: messages.length + 1, text: input, role: "user" };
-        setMessages([...messages, newUserMessage]);
+        const userText = input;
+        const newUserMessage = { id: Date.now(), text: userText, role: "user" };
+        setMessages(prev => [...prev, newUserMessage]);
         setInput("");
         setIsType(true);
 
@@ -40,13 +41,13 @@ const Advice = ({ onClose }) => {
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({ message: input })
+                body: JSON.stringify({ message: userText })
             });
 
             const data = await response.json();
 
             const botResponse = {
-                id: messages.length + 2,
+                id: Date.now() + 1,
                 text: data.message,
                 role: "bot",
                 studyPlan: data.study_plan || null
@@ -55,7 +56,7 @@ const Advice = ({ onClose }) => {
             setMessages(prev => [...prev, botResponse]);
         } catch (error) {
             const errorResponse = {
-                id: messages.length + 2,
+                id: Date.now() + 1,
                 text: "很抱歉，無法取得回應，請稍後再試。",
                 role: "bot"
             };

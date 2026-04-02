@@ -429,7 +429,7 @@ const SearchAndFilterControls = ({ tab, state, onStateChange, alphabet, isMobile
 
 //狀態管理
 const useTabState = (favorites) => {
-  const [tabStates, setTabStates] = useState({});
+  const [tabStates, setTabStates] = useState();
 
   useEffect(() => {
     const newTabStates = {};

@@ -2,7 +2,7 @@ import "../../static/css/_quiz/review_discussion.css"
 import { useState } from "react";
 import { UserCircle, Send, MessageCircle, ThumbsUp, CornerDownRight } from "lucide-react";
 
-const Discussion = ({ }) => {
+const Discussion = () => {
     const [messages, setMessages] = useState([
         {
             id: 1,

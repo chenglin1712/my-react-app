@@ -2,7 +2,7 @@ import "../../static/css/_quiz/quiz_panel_start.css"
 import { useNavigate } from "react-router-dom";
 import RecommonImg from "../../static/assets/_quiz/recommon.png"
 
-const Panel_Start = ({ }) => {
+const Panel_Start = () => {
     const navigate = useNavigate();
 
     const levels = [
@@ -12,18 +12,7 @@ const Panel_Start = ({ }) => {
         { name: "高級", short: "高", time: "20 分鐘", type: "閱讀填空", disabled: true }
     ];
 
-    const getRecommendedLevelIndex = (situations) => {
-        return 1;
-        if (!situations || situations.length === 0) return 0; //無紀錄，預設推薦初級
-
-        const lastExam = situations[situations.length - 1];
-        const score = countScore(lastExam.results);
-
-        if (score < 60) return 0;           // 初級
-        else if (score < 80) return 1;      // 中級
-        else return 2;                       // 高級
-    };
-    const recommendedLevelIndex = getRecommendedLevelIndex(null);
+    const recommendedLevelIndex = 1;
 
     return (
         <div className="panel-start-container">

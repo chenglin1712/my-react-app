@@ -1,7 +1,7 @@
 import "../../static/css/_quiz/quiz.css"
 import { Outlet } from "react-router-dom";
 
-const Quiz = ({ }) => {
+const Quiz = () => {
 
     return (
         <>

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import "../../static/css/_game/game_result.css"
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged, signInWithCustomToken, signInAnonymously } from 'firebase/auth';
-import { getFirestore, doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
+import { db, auth } from '../../../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
 
 const GameResultCard = ({ word, isCorrect, toggleFavorite, isFavorited }) => {
     return (
@@ -38,74 +38,32 @@ const LikeButton = ({ isFavorited, onToggle }) => {
 
 /**
  * 顯示填字遊戲的結果
- * @param {object} props 
- * @param {object} props.results 
+ * @param {object} props
+ * @param {object} props.results
  */
 const Game_result = ({ results }) => {
     const [favorites, setFavorites] = useState([]);
     const [isAuthReady, setIsAuthReady] = useState(false);
-    const [db, setDb] = useState(null);
     const [user, setUser] = useState(null);
 
     useEffect(() => {
-        try {
-            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-
-            let app;
-            if (getApps().length === 0) {
-                app = initializeApp(firebaseConfig);
-            }
-            else {
-                app = getApp();
-            }
-
-            const auth = getAuth(app);
-            const firestoreDb = getFirestore(app);
-            setDb(firestoreDb);
-
-            const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-                if (currentUser) {
-                    setUser(currentUser);
-                }
-                else {
-                    const authToken = typeof window.__initial_auth_token !== 'undefined' ? window.__initial_auth_token : null;
-                    if (authToken) {
-                        try {
-                            await signInWithCustomToken(auth, authToken);
-                        }
-                        catch (error) {
-                            console.error("Firebase Custom Token sign-in failed:", error);
-                            await signInAnonymously(auth);
-                        }
-                    }
-                    else {
-                        await signInAnonymously(auth);
-                    }
-                }
-                setIsAuthReady(true);
-            });
-            return () => unsubscribe();
-        }
-        catch (err) {
-            console.error("Firebase initialization failed:", err);
-        }
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+            setIsAuthReady(true);
+        });
+        return () => unsubscribe();
     }, []);
 
     useEffect(() => {
-        if (!isAuthReady || !db || !user) {
-            return;
-        }
+        if (!isAuthReady || !user) return;
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const userDocRef = doc(db, "users", user.uid);
-
         const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
             if (docSnap.exists()) {
-                const data = docSnap.data();
-                setFavorites(data.favorites || []);
-            }
-            else {
-                setDoc(userDocRef, { favorites: [{ id: 1, content: [] }] }).catch(err => console.error("Failed to create user profile doc:", err));
+                setFavorites(docSnap.data().favorites || []);
+            } else {
+                setDoc(userDocRef, { favorites: [{ id: 1, content: [] }] })
+                    .catch(err => console.error("Failed to create user profile doc:", err));
                 setFavorites([]);
             }
         }, (error) => {
@@ -113,14 +71,12 @@ const Game_result = ({ results }) => {
         });
 
         return () => unsubscribe();
-    }, [isAuthReady, db, user]);
+    }, [isAuthReady, user]);
 
     const toggleFavorite = async (word, categoryId) => {
-        if (!user || !db) return;
+        if (!user) return;
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const userRef = doc(db, "users", user.uid);
-
         try {
             const currentFavorites = favorites;
             const categoryIndex = currentFavorites.findIndex(fav => fav.id === categoryId);
@@ -130,33 +86,24 @@ const Game_result = ({ results }) => {
                 const category = currentFavorites[categoryIndex];
                 const content = category.content || [];
                 const wordExists = content.includes(word);
-
                 const newContent = wordExists
                     ? content.filter(w => w !== word)
                     : [...content, word];
-
                 newFavorites = [...currentFavorites];
                 newFavorites[categoryIndex] = { ...category, content: newContent };
-            }
-            else {
+            } else {
                 newFavorites = [...currentFavorites, { id: categoryId, content: [word] }];
             }
 
-            // 更新資料庫
             await updateDoc(userRef, { favorites: newFavorites });
-        }
-        catch (err) {
+        } catch (err) {
             console.error("收藏操作失敗：", err);
         }
     };
 
-    if (!results) {
-        return null;
-    }
+    if (!results) return null;
 
     const { total_words, correct_words_count, word_details } = results;
-
-    // 將單字分類為正確和錯誤兩組
     const correctWords = word_details.filter(word => word.is_correct);
     const incorrectWords = word_details.filter(word => !word.is_correct);
 
@@ -167,10 +114,7 @@ const Game_result = ({ results }) => {
 
     return (
         <div className='result-background'>
-
-            <h2 className='result-title'>
-                遊戲結果
-            </h2>
+            <h2 className='result-title'>遊戲結果</h2>
             <div className='stats-container'>
                 <div className='result-total'>
                     <p>總單字數</p>
@@ -186,10 +130,8 @@ const Game_result = ({ results }) => {
                 </div>
             </div>
 
-            {/* 正確的單字列表 */}
             <div>
                 <h3 className='result-correctword'>✅ 正確的單字 ({correctWords.length})</h3>
-
                 <div>
                     {correctWords.length > 0 ? (
                         correctWords.map((word, index) => (
@@ -207,7 +149,6 @@ const Game_result = ({ results }) => {
                 </div>
             </div>
 
-            {/* 錯誤的單字列表 */}
             <div>
                 <h3 className='result-incorrectword'>❌ 錯誤的單字 ({incorrectWords.length})</h3>
                 <div>

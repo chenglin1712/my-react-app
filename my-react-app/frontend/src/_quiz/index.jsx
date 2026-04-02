@@ -4,7 +4,7 @@ import "../../static/css/_quiz/index.css"
 import PermissionProtect from "../userServives/permissionProtect"
 import { useAuth } from "../userServives/authContext"
 
-const App = ({ }) => {
+const App = () => {
     const { userData } = useAuth();
 
     return (

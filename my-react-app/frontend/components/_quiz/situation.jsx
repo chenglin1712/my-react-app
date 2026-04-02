@@ -39,8 +39,6 @@ const Situation = () => {
         <Filter
           selectedTypes={selectedTypes}
           setSelectedTypes={setSelectedTypes}
-          selectedDate
-          setSelectedDate
         />
       </div>
 

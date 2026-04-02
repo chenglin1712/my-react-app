@@ -16,6 +16,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "axios": "^1.8.1",
+    "dompurify": "^3.2.4",
     "bootstrap": "^5.3.3",
     "firebase": "^11.3.1",
     "framer-motion": "^12.23.12",
@@ -32,6 +33,7 @@
     "swiper": "^11.2.10"
   },
   "devDependencies": {
+    "@types/dompurify": "^3.0.5",
     "@eslint/js": "^9.19.0",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",

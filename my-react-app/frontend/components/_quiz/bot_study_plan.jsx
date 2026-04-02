@@ -5,15 +5,12 @@ import { useNavigate } from "react-router-dom";
 import lottie from 'lottie-web';
 import successAnimation from "../../src/animations/success.json"
 
-const studyPlan = ({ plan, onClose }) => {
+const StudyPlan = ({ plan, onClose }) => {
     const navigate = useNavigate();
     const [events, setEvents] = useState({});
     const animation = useRef(null);
     const [showSuccess, setShowSuccess] = useState(false);
 
-    if (!plan || !plan.events || plan.events.length === 0) {
-        return null;
-    }
     //單一事件加入行事曆
     const handleAddToCalendar = async (event) => {
         try {
@@ -112,6 +109,10 @@ const studyPlan = ({ plan, onClose }) => {
         }
     }, [showSuccess]);
 
+    if (!plan || !plan.events || plan.events.length === 0) {
+        return null;
+    }
+
     return (
         <>
             {showSuccess && (
@@ -194,4 +195,4 @@ const studyPlan = ({ plan, onClose }) => {
         </>
     );
 };
-export default studyPlan;
+export default StudyPlan;

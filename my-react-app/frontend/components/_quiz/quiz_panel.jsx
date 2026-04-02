@@ -7,7 +7,7 @@ import loadingAnimation from "../../src/animations/loading.json"
 import { Star, CircleHelp } from "lucide-react";
 import { uploadQuizDB, uploadSituationDB } from "../../src/userServives/uploadDb"
 
-const Panel = ({ }) => {
+const Panel = () => {
     const levels = ["初級", "中級", "中高級", "高級"];
     const { level } = useParams();
     const level_ch = levels[parseInt(level) - 1];
@@ -29,6 +29,7 @@ const Panel = ({ }) => {
 
     //加載loading動畫
     useEffect(() => {
+        if (!animation.current) return;
         const instance = lottie.loadAnimation({
             container: animation.current,
             renderer: 'svg',
@@ -37,7 +38,7 @@ const Panel = ({ }) => {
             animationData: loadingAnimation,
         });
         return () => instance.destroy();
-    }, []);
+    }, [isLoading]);
 
     //取得後端初級測驗資料
     useEffect(() => {

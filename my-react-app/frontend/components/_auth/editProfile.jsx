@@ -71,7 +71,7 @@ const Edit = () => {
             } else {
                 alert("失敗: " + result.message);
             }
-        } catch (err) {
+        } catch {
             alert("更新失敗");
         }
     };

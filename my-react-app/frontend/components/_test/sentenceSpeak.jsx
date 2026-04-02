@@ -5,7 +5,7 @@ import lottie from "lottie-web";
 import successAnimation from "../../src/animations/success.json";
 import correctAudio from "../../static/assets/_quiz/correct.mp3";
 
-export default function sentenceSpeak({ question, selected, checked, onSelect, onConfirm }) {
+export default function SentenceSpeak({ question, selected, checked, onSelect, onConfirm }) {
   const [audioBlob, setAudioBlob] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
   const [recording, setRecording] = useState(false);

@@ -1,4 +1,4 @@
-const Time = ({ }) => {
+const Time = () => {
     return (
         <></>
     );

@@ -5,7 +5,7 @@ import successAnimation from "../../src/animations/success.json";
 import correctAudio from "../../static/assets/_quiz/correct.mp3";
 
 export default function WordMatch({ question, selected, checked, onSelect, onConfirm }) {
-  const [matches, setMatches] = useState({});
+  const [matches, setMatches] = useState();
   const [selectedWord, setSelectedWord] = useState(null);
   const [isFinished, setIsFinished] = useState(false);
   const [wrongPair, setWrongPair] = useState(null);

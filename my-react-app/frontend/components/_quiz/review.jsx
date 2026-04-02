@@ -6,7 +6,7 @@ import Comp_page from "./review_page"
 import Comp_discussion from "./review_discussion"
 import Comp_atayalAI from "./review_AI"
 
-const Review = ({ }) => {
+const Review = () => {
     const [situations, setSituations] = useState([]);
     const [loading, setLoading] = useState(true);
     const navs = ["測驗紀錄", "討論", "泰雅助手"];
@@ -176,15 +176,16 @@ const Review = ({ }) => {
                                             <table className="review-table">
                                                 <thead>
                                                     <tr>
-                                                        <th>　　</th>
+                                                        <th></th>
                                                         <th>題目</th>
-                                                        <th>　　</th>
+                                                        <th></th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     {selectedQuiz.data.map((q, idx) => {
                                                         const result = selectedQuiz.results?.[idx];
                                                         const isCorrect = result?.isCorrect;
+                                                        const questionLabel = q.question_ab || q.question_ch || `第 ${idx + 1} 題`;
                                                         return (
                                                             <tr key={idx}>
                                                                 <td>
@@ -192,7 +193,7 @@ const Review = ({ }) => {
                                                                     {isCorrect === true && <CheckCircle size={16} color="#388e3c" />}
                                                                     {isCorrect === false && <XCircle size={16} color="#d32f2f" />}
                                                                 </td>
-                                                                <td>{q.question_ab}</td>
+                                                                <td>{questionLabel}</td>
                                                                 <td>
                                                                     <button
                                                                         className="view-btn"

@@ -7,7 +7,7 @@ import { registerWithImg } from "../../src/userServives/userServive"
 import lottie from 'lottie-web';
 import successAnimation from "../../src/animations/success.json"
 
-const registerForm = ({ }) => {
+const RegisterForm = () => {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -61,8 +61,8 @@ const registerForm = ({ }) => {
 
         const formData = new FormData();
         formData.append("file", file);
-        data.append("upload_preset", import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
-        data.append("cloud_name", import.meta.env.VITE_CLOUDINARY_CLOUD_NAME);
+        formData.append("upload_preset", import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
+        formData.append("cloud_name", import.meta.env.VITE_CLOUDINARY_CLOUD_NAME);
 
         try {
             const res = await fetch(`https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/f_auto,q_auto`, {
@@ -153,4 +153,4 @@ const registerForm = ({ }) => {
         </div>
     );
 };
-export default registerForm;
+export default RegisterForm;

@@ -7,6 +7,7 @@ import { db } from "../../../firebase";
 import { useAuth } from "../../src/userServives/authContext";
 import "../../static/css/_note/./notesharestyle.css";
 import { Heart } from "lucide-react"
+import DOMPurify from "dompurify";
 
 function timeAgo(ts) {
   if (!ts) return "";
@@ -267,7 +268,7 @@ export default function NoteShare() {
                 <div
                   className="ns-preview"
                   dangerouslySetInnerHTML={{
-                    __html: note.preview || "<p>內容</p>",
+                    __html: DOMPurify.sanitize(note.preview || "<p>內容</p>"),
                   }}
                 />
                 <div className="ns-like-row">
@@ -315,7 +316,7 @@ export default function NoteShare() {
           <div className="ns-modal" onClick={(e) => e.stopPropagation()}>
             <h2 className="ns-modal-title">{modalNote.pages[0].title || "筆記內容"}</h2>
             <p className="ns-modal-sub">
-              分享者：{modalNote.username || "匿名者"}　❤️ {modalNote.likes || 0}
+              分享者：{modalNote.username || "匿名者"} ❤️ {modalNote.likes || 0}
             </p>
 
             {userData && !isMine(modalNote) && (
@@ -334,7 +335,7 @@ export default function NoteShare() {
                 <div className="ns-page-label">第 {i + 1} 頁</div>
                 <div
                   className="ns-modal-content"
-                  dangerouslySetInnerHTML={{ __html: pg.content }}
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(pg.content) }}
                 />
               </div>
             ))}

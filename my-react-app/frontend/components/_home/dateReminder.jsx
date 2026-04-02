@@ -12,8 +12,8 @@ const DateReminder = () => {
         const stored = localStorage.getItem("dismissedPhases");
         return stored ? JSON.parse(stored) : [];
     });
-    const [doNotRemindMap, setDoNotRemindMap] = useState({});
-    const notifiedRef = useRef({});
+    const [doNotRemindMap, setDoNotRemindMap] = useState();
+    const notifiedRef = useRef();
 
     const examSchedule = [
         {

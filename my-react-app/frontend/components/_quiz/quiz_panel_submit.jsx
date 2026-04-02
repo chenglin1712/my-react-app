@@ -3,9 +3,13 @@ import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { CheckCircle, XCircle, Star } from "lucide-react"
 import { getQuizSubmitById, countScore } from "../../src/userServives/uploadDb"
+import { useAuth } from "../../src/userServives/authContext"
 
-const Panel_Submit = ({ }) => {
+const DIFFICULTY_MAP = { "初級": 1, "中級": 2, "中高級": 3, "高級": 4 };
+
+const Panel_Submit = () => {
     const navigate = useNavigate();
+    const { userData } = useAuth();
     const [isLoad, setIsLoad] = useState(true);
 
     const [data, setData] = useState(null);
@@ -72,15 +76,16 @@ const Panel_Submit = ({ }) => {
     const displayData = data || buildFallbackData();
     const displayScore = data ? score : countScore(displayData?.results ?? []);
 
-    const difficulty = 2;
+    const difficulty = DIFFICULTY_MAP[displayData?.quiz?.title] ?? 1;
     const labels = ["A", "B", "C"];
+    const displayName = userData?.firestoreData?.name ?? "未登入";
 
     return (
         <div className="submit-container">
             <div className="submit-paper">
                 <div className="paper-header">
                     <div className="paper-info">
-                        <p>姓名：<span className="user-info">史努比</span></p>
+                        <p>姓名：<span className="user-info">{displayName}</span></p>
                         <div className="user-infoo">
                             <p>類型：
                                 <span className="user-info">{displayData?.quiz?.title}</span>

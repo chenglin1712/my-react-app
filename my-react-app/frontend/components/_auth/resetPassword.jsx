@@ -5,7 +5,7 @@ import { getAuth, updatePassword, EmailAuthProvider, reauthenticateWithCredentia
 import lottie from 'lottie-web';
 import successAnimation from "../../src/animations/success.json"
 
-const Forgot = ({ }) => {
+const Forgot = () => {
     const auth = getAuth();
     const user = auth.currentUser;
     const navigate = useNavigate();

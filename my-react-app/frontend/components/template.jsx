@@ -1,4 +1,4 @@
-const Template = ({ }) => {
+const Template = () => {
     return (
         <div>context</div>
     );

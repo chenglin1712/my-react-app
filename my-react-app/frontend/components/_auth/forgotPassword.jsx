@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAuth, sendPasswordResetEmail } from "firebase/auth";
 
-const Forgot = ({ }) => {
+const Forgot = () => {
     const navigate = useNavigate();
 
     const [email, setEmail] = useState("");

@@ -84,7 +84,6 @@ const renderStars = (fre) => {
   );
 };
 
-/* eslint-disable react/prop-types */
 const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFavorite, playAudio, playSentence, isFavorited, failedAudio, audioAvailable }) => (
   <ListGroup.Item key={keyName} className="d-flex flex-column">
     <div className="d-flex justify-content-between align-items-center">

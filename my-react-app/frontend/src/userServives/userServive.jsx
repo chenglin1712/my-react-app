@@ -203,7 +203,7 @@ export const updateUserErrors = async (uid, wordTayal, increment = 1) => {
     if (!userSnap.exists()) return;
 
     const userData = userSnap.data();
-    const errors = userData.user_errors || {};
+    const errors = { ...(userData.user_errors || {}) };
     errors[wordTayal] = (errors[wordTayal] || 0) + increment;
 
     await updateDoc(userRef, { user_errors: errors });
