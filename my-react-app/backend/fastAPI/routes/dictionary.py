@@ -499,7 +499,7 @@ async def allsearch_tayal_dictionary(request: KeywordRequest, db: Session = Depe
 
 @router.get("/grammar/{tribe}")
 def get_grammar(tribe: str, db: Session = Depends(get_db)):
-    """查詢指定族語的所有文法章節（含規則與例句）"""
+    """查詢指定族語的所有文法章節（含規則、例句、詞綴）"""
     try:
         tribe_name = TRIBE_MAP.get(tribe, tribe)
 
@@ -516,16 +516,28 @@ def get_grammar(tribe: str, db: Session = Depends(get_db)):
             sec_id, s_order, s_key, s_title, s_desc = sec
 
             rules = db.execute(
-                text("SELECT id, rule_order, rule_key, title, structure, function, notes, affix_tags FROM grammar_rule WHERE section_id = :sid ORDER BY rule_order"),
+                text("SELECT id, rule_order, rule_key, title, structure, function, notes FROM grammar_rule WHERE section_id = :sid ORDER BY rule_order"),
                 {"sid": sec_id}
             ).fetchall()
 
+            # 一次取出本 section 所有 rule 對應的詞綴
+            rule_ids = [r[0] for r in rules]
+            affix_map: Dict[int, list] = {rid: [] for rid in rule_ids}
+            if rule_ids:
+                placeholders = ",".join("?" * len(rule_ids))
+                affix_rows = db.execute(
+                    text(f"SELECT ra.rule_id, a.affix FROM grammar_rule_affix ra JOIN grammar_affix a ON a.id = ra.affix_id WHERE ra.rule_id IN ({placeholders})"),
+                    rule_ids
+                ).fetchall()
+                for r_id, affix in affix_rows:
+                    affix_map[r_id].append(affix)
+
             rules_out = []
             for rule in rules:
-                r_id, r_order, r_key, r_title, r_struct, r_func, r_notes, r_tags = rule
+                r_id, r_order, r_key, r_title, r_struct, r_func, r_notes = rule
 
                 examples = db.execute(
-                    text("SELECT id, example_order, tribe_text, chinese_text, analysis, linked_word_ids FROM grammar_example WHERE rule_id = :rid ORDER BY example_order"),
+                    text("SELECT id, example_order, tribe_text, chinese_text, analysis FROM grammar_example WHERE rule_id = :rid ORDER BY example_order"),
                     {"rid": r_id}
                 ).fetchall()
 
@@ -537,14 +549,14 @@ def get_grammar(tribe: str, db: Session = Depends(get_db)):
                     "structure": r_struct,
                     "function": r_func,
                     "notes": r_notes,
-                    "affix_tags": json.loads(r_tags or "[]"),
+                    "affix_tags": affix_map.get(r_id, []),
                     "examples": [
                         {
                             "id": ex[0],
                             "tribe_text": ex[2],
                             "chinese_text": ex[3],
                             "analysis": ex[4],
-                            "linked_word_ids": json.loads(ex[5] or "[]"),
+                            "linked_word_ids": [],
                         }
                         for ex in examples
                     ],
@@ -555,7 +567,7 @@ def get_grammar(tribe: str, db: Session = Depends(get_db)):
                 "order": s_order,
                 "section_key": s_key,
                 "title": s_title,
-                "description": json.loads(s_desc) if s_desc else None,
+                "description": s_desc,   # 純文字，直接回傳
                 "rules": rules_out,
             })
 
@@ -567,40 +579,51 @@ def get_grammar(tribe: str, db: Session = Depends(get_db)):
 
 @router.get("/grammar/{tribe}/search")
 def search_grammar(tribe: str, q: str, db: Session = Depends(get_db)):
-    """搜尋文法規則或例句（用於 C：文法規則搜尋）
+    """搜尋文法規則或例句
     q: 關鍵字，可搜尋規則標題、功能說明、例句原文、中文翻譯
     """
     try:
         tribe_name = TRIBE_MAP.get(tribe, tribe)
         kw = f"%{q}%"
 
+        # 透過 JOIN grammar_section 取得 tribe，不再依賴 grammar_rule.tribe
         rule_rows = db.execute(
             text("""
-                SELECT id, rule_key, title, structure, function, notes, affix_tags
-                FROM grammar_rule
-                WHERE tribe = :tribe
-                  AND (title LIKE :kw OR function LIKE :kw OR notes LIKE :kw OR structure LIKE :kw OR affix_tags LIKE :kw)
-                ORDER BY rule_order
+                SELECT r.id, r.rule_key, r.title, r.structure, r.function, r.notes
+                FROM grammar_rule r
+                JOIN grammar_section s ON r.section_id = s.id
+                WHERE s.tribe = :tribe
+                  AND (r.title LIKE :kw OR r.function LIKE :kw OR r.notes LIKE :kw OR r.structure LIKE :kw)
+                ORDER BY r.rule_order
             """),
             {"tribe": tribe_name, "kw": kw}
         ).fetchall()
+
+        # 取各 rule 的詞綴
+        rule_ids = [r[0] for r in rule_rows]
+        affix_map: Dict[int, list] = {rid: [] for rid in rule_ids}
+        if rule_ids:
+            placeholders = ",".join("?" * len(rule_ids))
+            for r_id, affix in db.execute(
+                text(f"SELECT ra.rule_id, a.affix FROM grammar_rule_affix ra JOIN grammar_affix a ON a.id = ra.affix_id WHERE ra.rule_id IN ({placeholders})"),
+                rule_ids
+            ).fetchall():
+                affix_map[r_id].append(affix)
 
         example_rows = db.execute(
             text("""
                 SELECT e.id, e.rule_id, e.tribe_text, e.chinese_text, e.analysis
                 FROM grammar_example e
-                WHERE e.tribe = :tribe
+                JOIN grammar_rule r  ON e.rule_id   = r.id
+                JOIN grammar_section s ON r.section_id = s.id
+                WHERE s.tribe = :tribe
                   AND (e.tribe_text LIKE :kw OR e.chinese_text LIKE :kw OR e.analysis LIKE :kw)
             """),
             {"tribe": tribe_name, "kw": kw}
         ).fetchall()
 
         affix_rows = db.execute(
-            text("""
-                SELECT id, affix, affix_type, function, example_form
-                FROM grammar_affix
-                WHERE tribe = :tribe AND (affix LIKE :kw OR function LIKE :kw)
-            """),
+            text("SELECT id, affix, affix_type, function, example_form FROM grammar_affix WHERE tribe = :tribe AND (affix LIKE :kw OR function LIKE :kw)"),
             {"tribe": tribe_name, "kw": kw}
         ).fetchall()
 
@@ -610,7 +633,7 @@ def search_grammar(tribe: str, q: str, db: Session = Depends(get_db)):
             "rules": [
                 {"id": r[0], "rule_key": r[1], "title": r[2],
                  "structure": r[3], "function": r[4], "notes": r[5],
-                 "affix_tags": json.loads(r[6] or "[]")}
+                 "affix_tags": affix_map.get(r[0], [])}
                 for r in rule_rows
             ],
             "examples": [
@@ -631,19 +654,35 @@ def search_grammar(tribe: str, q: str, db: Session = Depends(get_db)):
 
 @router.get("/grammar/{tribe}/affixes")
 def get_grammar_affixes(tribe: str, affix_type: Optional[str] = None, db: Session = Depends(get_db)):
-    """取得詞綴清單（用於 C：詞綴搜尋）
-    affix_type: prefix / suffix / infix / reduplication（不傳則回傳全部）
+    """取得詞綴清單
+    affix_type: prefix / suffix / infix / circumfix / reduplication / auxiliary（不傳則回傳全部）
     """
     try:
         tribe_name = TRIBE_MAP.get(tribe, tribe)
         if affix_type:
             rows = db.execute(
-                text("SELECT id, affix, affix_type, function, example_form, rule_ids FROM grammar_affix WHERE tribe = :tribe AND affix_type = :at ORDER BY affix"),
+                text("""
+                    SELECT a.id, a.affix, a.affix_type, a.function, a.example_form,
+                           GROUP_CONCAT(ra.rule_id) AS rule_ids
+                    FROM grammar_affix a
+                    LEFT JOIN grammar_rule_affix ra ON ra.affix_id = a.id
+                    WHERE a.tribe = :tribe AND a.affix_type = :at
+                    GROUP BY a.id
+                    ORDER BY a.affix
+                """),
                 {"tribe": tribe_name, "at": affix_type}
             ).fetchall()
         else:
             rows = db.execute(
-                text("SELECT id, affix, affix_type, function, example_form, rule_ids FROM grammar_affix WHERE tribe = :tribe ORDER BY affix_type, affix"),
+                text("""
+                    SELECT a.id, a.affix, a.affix_type, a.function, a.example_form,
+                           GROUP_CONCAT(ra.rule_id) AS rule_ids
+                    FROM grammar_affix a
+                    LEFT JOIN grammar_rule_affix ra ON ra.affix_id = a.id
+                    WHERE a.tribe = :tribe
+                    GROUP BY a.id
+                    ORDER BY a.affix_type, a.affix
+                """),
                 {"tribe": tribe_name}
             ).fetchall()
 
@@ -652,7 +691,7 @@ def get_grammar_affixes(tribe: str, affix_type: Optional[str] = None, db: Sessio
             "affixes": [
                 {"id": r[0], "affix": r[1], "affix_type": r[2],
                  "function": r[3], "example_form": r[4],
-                 "rule_ids": json.loads(r[5] or "[]")}
+                 "rule_ids": [int(x) for x in r[5].split(",")] if r[5] else []}
                 for r in rows
             ]
         }, status_code=200)
@@ -663,7 +702,7 @@ def get_grammar_affixes(tribe: str, affix_type: Optional[str] = None, db: Sessio
 
 @router.get("/grammar/{tribe}/quiz")
 def get_grammar_quiz_material(tribe: str, section_key: Optional[str] = None, db: Session = Depends(get_db)):
-    """取得有例句的規則清單（用於 B：自動生成測驗題）
+    """取得有例句的規則清單（用於自動生成測驗題）
     section_key: 指定章節 key（不傳則回傳全部有例句的規則）
     """
     try:
@@ -672,12 +711,13 @@ def get_grammar_quiz_material(tribe: str, section_key: Optional[str] = None, db:
         if section_key:
             rows = db.execute(
                 text("""
-                    SELECT r.id, r.rule_key, r.title, r.structure, r.function, r.affix_tags,
-                           e.id, e.tribe_text, e.chinese_text, e.analysis, e.linked_word_ids
+                    SELECT r.id, r.rule_key, r.title, r.structure, r.function,
+                           e.id, e.tribe_text, e.chinese_text, e.analysis
                     FROM grammar_rule r
                     JOIN grammar_section s ON r.section_id = s.id
                     JOIN grammar_example e ON e.rule_id = r.id
-                    WHERE r.tribe = :tribe AND s.section_key LIKE :sk
+                    WHERE s.tribe = :tribe AND s.section_key LIKE :sk
+                      AND e.tribe_text IS NOT NULL AND e.tribe_text != ''
                     ORDER BY r.rule_order, e.example_order
                 """),
                 {"tribe": tribe_name, "sk": f"%{section_key}%"}
@@ -685,19 +725,31 @@ def get_grammar_quiz_material(tribe: str, section_key: Optional[str] = None, db:
         else:
             rows = db.execute(
                 text("""
-                    SELECT r.id, r.rule_key, r.title, r.structure, r.function, r.affix_tags,
-                           e.id, e.tribe_text, e.chinese_text, e.analysis, e.linked_word_ids
+                    SELECT r.id, r.rule_key, r.title, r.structure, r.function,
+                           e.id, e.tribe_text, e.chinese_text, e.analysis
                     FROM grammar_rule r
+                    JOIN grammar_section s ON r.section_id = s.id
                     JOIN grammar_example e ON e.rule_id = r.id
-                    WHERE r.tribe = :tribe
-                      AND e.tribe_text != ''
+                    WHERE s.tribe = :tribe
+                      AND e.tribe_text IS NOT NULL AND e.tribe_text != ''
                     ORDER BY r.rule_order, e.example_order
                 """),
                 {"tribe": tribe_name}
             ).fetchall()
 
+        # 取詞綴資料
+        rule_ids = list({row[0] for row in rows})
+        affix_map: Dict[int, list] = {rid: [] for rid in rule_ids}
+        if rule_ids:
+            placeholders = ",".join("?" * len(rule_ids))
+            for r_id, affix in db.execute(
+                text(f"SELECT ra.rule_id, a.affix FROM grammar_rule_affix ra JOIN grammar_affix a ON a.id = ra.affix_id WHERE ra.rule_id IN ({placeholders})"),
+                rule_ids
+            ).fetchall():
+                affix_map[r_id].append(affix)
+
         # 將例句聚合到各規則下
-        rules_map: Dict[str, dict] = {}
+        rules_map: Dict[int, dict] = {}
         for row in rows:
             r_id = row[0]
             if r_id not in rules_map:
@@ -707,15 +759,15 @@ def get_grammar_quiz_material(tribe: str, section_key: Optional[str] = None, db:
                     "title": row[2],
                     "structure": row[3],
                     "function": row[4],
-                    "affix_tags": json.loads(row[5] or "[]"),
+                    "affix_tags": affix_map.get(r_id, []),
                     "examples": [],
                 }
             rules_map[r_id]["examples"].append({
-                "id": row[6],
-                "tribe_text": row[7],
-                "chinese_text": row[8],
-                "analysis": row[9],
-                "linked_word_ids": json.loads(row[10] or "[]"),
+                "id": row[5],
+                "tribe_text": row[6],
+                "chinese_text": row[7],
+                "analysis": row[8],
+                "linked_word_ids": [],
             })
 
         return JSONResponse({

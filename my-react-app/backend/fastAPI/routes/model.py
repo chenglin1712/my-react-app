@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean
+from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey
 from fastAPI.routes.connect import Base
 
 class Word(Base):
@@ -30,52 +30,68 @@ class GrammarSection(Base):
     """文法章節（最高層級，例如「一、時態與時貌系統」）"""
     __tablename__ = "grammar_section"
 
-    id = Column(String, nullable=False, primary_key=True)
-    tribe = Column(String, nullable=False, index=True)
+    id            = Column(Integer, primary_key=True, autoincrement=True)
+    tribe         = Column(String, nullable=False, index=True)
     section_order = Column(Integer)
-    section_key = Column(String)   # 短識別鍵，例如 "TAM"、"focus"、"case"
-    title = Column(String)         # 顯示用標題
-    description = Column(Text)     # 章節說明（JSON 字串，存非規則的補充資訊）
+    section_key   = Column(String)
+    title         = Column(String)
+    description   = Column(Text)    # 純文字，不需 JSON 編碼
 
 
 class GrammarRule(Base):
-    """文法規則（章節內的個別規則，例如「現在進行式」「主事焦點」）"""
+    """文法規則（章節內的個別規則，例如「進行式」「施事者焦點」）"""
     __tablename__ = "grammar_rule"
 
-    id = Column(String, nullable=False, primary_key=True)
-    section_id = Column(String, nullable=False, index=True)  # FK → grammar_section.id
-    tribe = Column(String, nullable=False, index=True)
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    section_id = Column(Integer, ForeignKey("grammar_section.id", ondelete="CASCADE"),
+                        nullable=False, index=True)
     rule_order = Column(Integer)
-    rule_key = Column(String)      # 原始 JSON key，例如 "1_現在進行式"
-    title = Column(String)         # 顯示用標題
-    structure = Column(Text)       # 句型結構說明
-    function = Column(Text)        # 功能說明
-    notes = Column(Text)           # 補充說明、例外、方言差異
-    affix_tags = Column(Text)      # JSON array，關聯詞綴，供搜尋用，例如 ["mi-", "ma-"]
+    rule_key   = Column(String)
+    title      = Column(String)
+    structure  = Column(Text)
+    function   = Column(Text)
+    notes      = Column(Text)
+    # 多對多關係改由 grammar_rule_affix junction table 維護
 
 
 class GrammarExample(Base):
-    """文法例句（可關聯 words 表的單字）"""
+    """文法例句"""
     __tablename__ = "grammar_example"
 
-    id = Column(String, nullable=False, primary_key=True)
-    rule_id = Column(String, nullable=False, index=True)  # FK → grammar_rule.id
-    tribe = Column(String, nullable=False, index=True)
+    id            = Column(Integer, primary_key=True, autoincrement=True)
+    rule_id       = Column(Integer, ForeignKey("grammar_rule.id", ondelete="CASCADE"),
+                           nullable=False, index=True)
     example_order = Column(Integer)
-    tribe_text = Column(Text)       # 族語原文
-    chinese_text = Column(Text)     # 中文翻譯
-    analysis = Column(Text)         # 形態分析
-    linked_word_ids = Column(Text)  # JSON array，對應 words.id，供題目生成與關聯用
+    tribe_text    = Column(Text)
+    chinese_text  = Column(Text)
+    analysis      = Column(Text)
+    # 多對多關係改由 grammar_example_word junction table 維護
 
 
 class GrammarAffix(Base):
     """詞綴索引（供搜尋、題目生成用）"""
     __tablename__ = "grammar_affix"
 
-    id = Column(String, nullable=False, primary_key=True)
-    tribe = Column(String, nullable=False, index=True)
-    affix = Column(String, nullable=False, index=True)  # 例如 "mi-"、"-en"、"-an"
-    affix_type = Column(String)    # prefix / suffix / infix / reduplication / circumfix
-    function = Column(Text)        # 功能說明
-    example_form = Column(Text)    # 用法範例，例如 "mi-facal（洗）"
-    rule_ids = Column(Text)        # JSON array，關聯的 grammar_rule.id
+    id           = Column(Integer, primary_key=True, autoincrement=True)
+    tribe        = Column(String, nullable=False, index=True)
+    affix        = Column(String, nullable=False, index=True)
+    affix_type   = Column(String)    # prefix / suffix / infix / circumfix / reduplication / auxiliary
+    function     = Column(Text)
+    example_form = Column(Text)
+    # 多對多關係改由 grammar_rule_affix junction table 維護
+
+
+class GrammarRuleAffix(Base):
+    """grammar_rule ↔ grammar_affix 多對多 junction table"""
+    __tablename__ = "grammar_rule_affix"
+
+    rule_id  = Column(Integer, ForeignKey("grammar_rule.id",  ondelete="CASCADE"), primary_key=True)
+    affix_id = Column(Integer, ForeignKey("grammar_affix.id", ondelete="CASCADE"), primary_key=True)
+
+
+class GrammarExampleWord(Base):
+    """grammar_example ↔ words 多對多 junction table"""
+    __tablename__ = "grammar_example_word"
+
+    example_id = Column(Integer, ForeignKey("grammar_example.id", ondelete="CASCADE"), primary_key=True)
+    word_id    = Column(String, primary_key=True)  # 對應 words.id（TEXT）

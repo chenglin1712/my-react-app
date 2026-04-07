@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, declarative_base
 import os
 
@@ -10,6 +10,13 @@ DB_PATH = os.path.join(BASE_DIR, "dictionary.db")
 engine = create_engine(
     f"sqlite:///{DB_PATH}", echo=True, connect_args={"check_same_thread": False}
 )
+
+# 啟用 SQLite Foreign Key 約束（每次連線都需要設定）
+@event.listens_for(engine, "connect")
+def set_sqlite_pragma(dbapi_conn, _):
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON")
+    cursor.close()
 
 # 建立 SessionLocal 工廠
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
