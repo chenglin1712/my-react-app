@@ -496,27 +496,232 @@ async def allsearch_tayal_dictionary(request: KeywordRequest, db: Session = Depe
 
 
 # ------------------------- 文法資料 -------------------------
+
 @router.get("/grammar/{tribe}")
 def get_grammar(tribe: str, db: Session = Depends(get_db)):
-    """查詢指定族語的文法章節"""
+    """查詢指定族語的所有文法章節（含規則與例句）"""
     try:
         tribe_name = TRIBE_MAP.get(tribe, tribe)
-        rows = db.execute(
-            text("SELECT section_order, section_key, title, content FROM grammar WHERE tribe = :tribe ORDER BY section_order"),
+
+        sections = db.execute(
+            text("SELECT id, section_order, section_key, title, description FROM grammar_section WHERE tribe = :tribe ORDER BY section_order"),
             {"tribe": tribe_name}
         ).fetchall()
-        if not rows:
+
+        if not sections:
             return JSONResponse({"error": f"找不到 {tribe_name} 的文法資料"}, status_code=404)
-        sections = [
-            {
-                "order": row[0],
-                "section_key": row[1],
-                "title": row[2],
-                "content": json.loads(row[3]),
-            }
-            for row in rows
-        ]
-        return JSONResponse({"tribe": tribe_name, "sections": sections}, status_code=200)
+
+        result = []
+        for sec in sections:
+            sec_id, s_order, s_key, s_title, s_desc = sec
+
+            rules = db.execute(
+                text("SELECT id, rule_order, rule_key, title, structure, function, notes, affix_tags FROM grammar_rule WHERE section_id = :sid ORDER BY rule_order"),
+                {"sid": sec_id}
+            ).fetchall()
+
+            rules_out = []
+            for rule in rules:
+                r_id, r_order, r_key, r_title, r_struct, r_func, r_notes, r_tags = rule
+
+                examples = db.execute(
+                    text("SELECT id, example_order, tribe_text, chinese_text, analysis, linked_word_ids FROM grammar_example WHERE rule_id = :rid ORDER BY example_order"),
+                    {"rid": r_id}
+                ).fetchall()
+
+                rules_out.append({
+                    "id": r_id,
+                    "order": r_order,
+                    "rule_key": r_key,
+                    "title": r_title,
+                    "structure": r_struct,
+                    "function": r_func,
+                    "notes": r_notes,
+                    "affix_tags": json.loads(r_tags or "[]"),
+                    "examples": [
+                        {
+                            "id": ex[0],
+                            "tribe_text": ex[2],
+                            "chinese_text": ex[3],
+                            "analysis": ex[4],
+                            "linked_word_ids": json.loads(ex[5] or "[]"),
+                        }
+                        for ex in examples
+                    ],
+                })
+
+            result.append({
+                "id": sec_id,
+                "order": s_order,
+                "section_key": s_key,
+                "title": s_title,
+                "description": json.loads(s_desc) if s_desc else None,
+                "rules": rules_out,
+            })
+
+        return JSONResponse({"tribe": tribe_name, "sections": result}, status_code=200)
+    except Exception as e:
+        logger.exception(e)
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.get("/grammar/{tribe}/search")
+def search_grammar(tribe: str, q: str, db: Session = Depends(get_db)):
+    """搜尋文法規則或例句（用於 C：文法規則搜尋）
+    q: 關鍵字，可搜尋規則標題、功能說明、例句原文、中文翻譯
+    """
+    try:
+        tribe_name = TRIBE_MAP.get(tribe, tribe)
+        kw = f"%{q}%"
+
+        rule_rows = db.execute(
+            text("""
+                SELECT id, rule_key, title, structure, function, notes, affix_tags
+                FROM grammar_rule
+                WHERE tribe = :tribe
+                  AND (title LIKE :kw OR function LIKE :kw OR notes LIKE :kw OR structure LIKE :kw OR affix_tags LIKE :kw)
+                ORDER BY rule_order
+            """),
+            {"tribe": tribe_name, "kw": kw}
+        ).fetchall()
+
+        example_rows = db.execute(
+            text("""
+                SELECT e.id, e.rule_id, e.tribe_text, e.chinese_text, e.analysis
+                FROM grammar_example e
+                WHERE e.tribe = :tribe
+                  AND (e.tribe_text LIKE :kw OR e.chinese_text LIKE :kw OR e.analysis LIKE :kw)
+            """),
+            {"tribe": tribe_name, "kw": kw}
+        ).fetchall()
+
+        affix_rows = db.execute(
+            text("""
+                SELECT id, affix, affix_type, function, example_form
+                FROM grammar_affix
+                WHERE tribe = :tribe AND (affix LIKE :kw OR function LIKE :kw)
+            """),
+            {"tribe": tribe_name, "kw": kw}
+        ).fetchall()
+
+        return JSONResponse({
+            "tribe": tribe_name,
+            "query": q,
+            "rules": [
+                {"id": r[0], "rule_key": r[1], "title": r[2],
+                 "structure": r[3], "function": r[4], "notes": r[5],
+                 "affix_tags": json.loads(r[6] or "[]")}
+                for r in rule_rows
+            ],
+            "examples": [
+                {"id": r[0], "rule_id": r[1], "tribe_text": r[2],
+                 "chinese_text": r[3], "analysis": r[4]}
+                for r in example_rows
+            ],
+            "affixes": [
+                {"id": r[0], "affix": r[1], "affix_type": r[2],
+                 "function": r[3], "example_form": r[4]}
+                for r in affix_rows
+            ],
+        }, status_code=200)
+    except Exception as e:
+        logger.exception(e)
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.get("/grammar/{tribe}/affixes")
+def get_grammar_affixes(tribe: str, affix_type: Optional[str] = None, db: Session = Depends(get_db)):
+    """取得詞綴清單（用於 C：詞綴搜尋）
+    affix_type: prefix / suffix / infix / reduplication（不傳則回傳全部）
+    """
+    try:
+        tribe_name = TRIBE_MAP.get(tribe, tribe)
+        if affix_type:
+            rows = db.execute(
+                text("SELECT id, affix, affix_type, function, example_form, rule_ids FROM grammar_affix WHERE tribe = :tribe AND affix_type = :at ORDER BY affix"),
+                {"tribe": tribe_name, "at": affix_type}
+            ).fetchall()
+        else:
+            rows = db.execute(
+                text("SELECT id, affix, affix_type, function, example_form, rule_ids FROM grammar_affix WHERE tribe = :tribe ORDER BY affix_type, affix"),
+                {"tribe": tribe_name}
+            ).fetchall()
+
+        return JSONResponse({
+            "tribe": tribe_name,
+            "affixes": [
+                {"id": r[0], "affix": r[1], "affix_type": r[2],
+                 "function": r[3], "example_form": r[4],
+                 "rule_ids": json.loads(r[5] or "[]")}
+                for r in rows
+            ]
+        }, status_code=200)
+    except Exception as e:
+        logger.exception(e)
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.get("/grammar/{tribe}/quiz")
+def get_grammar_quiz_material(tribe: str, section_key: Optional[str] = None, db: Session = Depends(get_db)):
+    """取得有例句的規則清單（用於 B：自動生成測驗題）
+    section_key: 指定章節 key（不傳則回傳全部有例句的規則）
+    """
+    try:
+        tribe_name = TRIBE_MAP.get(tribe, tribe)
+
+        if section_key:
+            rows = db.execute(
+                text("""
+                    SELECT r.id, r.rule_key, r.title, r.structure, r.function, r.affix_tags,
+                           e.id, e.tribe_text, e.chinese_text, e.analysis, e.linked_word_ids
+                    FROM grammar_rule r
+                    JOIN grammar_section s ON r.section_id = s.id
+                    JOIN grammar_example e ON e.rule_id = r.id
+                    WHERE r.tribe = :tribe AND s.section_key LIKE :sk
+                    ORDER BY r.rule_order, e.example_order
+                """),
+                {"tribe": tribe_name, "sk": f"%{section_key}%"}
+            ).fetchall()
+        else:
+            rows = db.execute(
+                text("""
+                    SELECT r.id, r.rule_key, r.title, r.structure, r.function, r.affix_tags,
+                           e.id, e.tribe_text, e.chinese_text, e.analysis, e.linked_word_ids
+                    FROM grammar_rule r
+                    JOIN grammar_example e ON e.rule_id = r.id
+                    WHERE r.tribe = :tribe
+                      AND e.tribe_text != ''
+                    ORDER BY r.rule_order, e.example_order
+                """),
+                {"tribe": tribe_name}
+            ).fetchall()
+
+        # 將例句聚合到各規則下
+        rules_map: Dict[str, dict] = {}
+        for row in rows:
+            r_id = row[0]
+            if r_id not in rules_map:
+                rules_map[r_id] = {
+                    "id": r_id,
+                    "rule_key": row[1],
+                    "title": row[2],
+                    "structure": row[3],
+                    "function": row[4],
+                    "affix_tags": json.loads(row[5] or "[]"),
+                    "examples": [],
+                }
+            rules_map[r_id]["examples"].append({
+                "id": row[6],
+                "tribe_text": row[7],
+                "chinese_text": row[8],
+                "analysis": row[9],
+                "linked_word_ids": json.loads(row[10] or "[]"),
+            })
+
+        return JSONResponse({
+            "tribe": tribe_name,
+            "rules": list(rules_map.values()),
+        }, status_code=200)
     except Exception as e:
         logger.exception(e)
         return JSONResponse({"error": str(e)}, status_code=500)
