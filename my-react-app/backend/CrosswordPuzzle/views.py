@@ -1,11 +1,71 @@
 import json
+import re
+import sqlite3
+from pathlib import Path
 from django.http import HttpResponse, JsonResponse
-from .crossword import Crossword, Word as CrosswordWord, word_list 
+from .crossword import Crossword, Word as CrosswordWord, word_list
 from django.views.decorators.csrf import csrf_exempt
 
+# dictionary.db 路徑（與 fastAPI routes 共用同一個 DB）
+_DB_PATH = Path(__file__).resolve().parent.parent / 'fastAPI' / 'routes' / 'dictionary.db'
+
+# 各族語對應的 tribe_id（UUID）
+_TRIBE_IDS = {
+    'amis':    'e68273b9-1f2b-4c42-8d95-f52189ab24b7',
+    'bunun':   '865a96e3-3384-45b3-8bd0-e1f799b75515',
+    'kavalan': 'c5974f37-b49d-466a-ab24-6893ab4ef6a5',
+    'paiwan':  '19c77a3b-3a81-496f-b0f4-afe6d9155edd',
+}
+
+def _get_words_from_db(tribe_id: str, limit: int = 30):
+    """從 dictionary.db 取出純英文字母、長度 4-10、有中文解釋的詞彙。"""
+    try:
+        conn = sqlite3.connect(str(_DB_PATH))
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT name, explanation_items FROM words WHERE tribe_id = ? AND explanation_items IS NOT NULL',
+            (tribe_id,)
+        )
+        rows = cursor.fetchall()
+        conn.close()
+    except Exception as e:
+        return [], str(e)
+
+    results = []
+    for name, exp_json in rows:
+        if not re.match(r'^[a-zA-Z]+$', name):
+            continue
+        if not (4 <= len(name) <= 10):
+            continue
+        try:
+            exp = json.loads(exp_json)
+        except Exception:
+            continue
+        cn = exp[0].get('chineseExplanation', '') if exp else ''
+        if not cn:
+            continue
+        results.append([name.lower(), cn])
+        if len(results) >= limit:
+            break
+
+    return results, None
+
+
 def generate_crossword(request):
+    tribe = request.GET.get('tribe', 'tayal')
+
+    # 依族語選擇詞庫
+    if tribe in _TRIBE_IDS:
+        selected_words, err = _get_words_from_db(_TRIBE_IDS[tribe])
+        if err:
+            return JsonResponse({'error': f'資料庫讀取失敗：{err}'}, status=500)
+        if len(selected_words) < 5:
+            return JsonResponse({'error': f'詞庫不足，無法生成填字遊戲（僅找到 {len(selected_words)} 筆）'}, status=500)
+    else:
+        selected_words = [[item[0], item[1]] for item in word_list]
+
     available_words_for_generator = []
-    for item in word_list:  #匯入crossword.py的word_list
+    for item in selected_words:
         available_words_for_generator.append(
             CrosswordWord(item[0], item[1])   #[單字, 提示] 的列表
         )

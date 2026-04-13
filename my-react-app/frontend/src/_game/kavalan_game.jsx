@@ -1,19 +1,19 @@
 import Game_Start from "../../components/_game/game_start";
-import "../../static/css/_game/index.css"
+import "../../static/css/_game/index.css";
 import { useAuth } from "../userServives/authContext";
-import PermissionProtect from "../userServives/permissionProtect"
+import PermissionProtect from "../userServives/permissionProtect";
 
-const TayalGame = () => {
+const KavalanGame = () => {
     const { userData } = useAuth();
 
     return (
         <div className="background">
-            <h1 className="game-title">Tninun ATAYAL - 編織泰雅</h1>
+            <h1 className="game-title">Sinawlan Kavalan - 葛瑪蘭之語</h1>
             {userData == null ?
                 (<PermissionProtect />) :
                 (
                     <div className="game-background">
-                        <Game_Start tribe="tayal" />
+                        <Game_Start tribe="kavalan" />
                     </div>
                 )
             }
@@ -21,4 +21,4 @@ const TayalGame = () => {
     );
 };
 
-export default TayalGame;
+export default KavalanGame;

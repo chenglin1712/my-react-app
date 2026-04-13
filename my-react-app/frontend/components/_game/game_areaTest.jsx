@@ -3,7 +3,7 @@ import PropTypes from "prop-types";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import "../../static/css/_game/game_areaTest.css";
 
-const Game_areaTest = forwardRef(({ gameDataLoaded }, ref) => {
+const Game_areaTest = forwardRef(({ gameDataLoaded, tribe }, ref) => {
   const [crosswordData, setCrosswordData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -34,7 +34,7 @@ const Game_areaTest = forwardRef(({ gameDataLoaded }, ref) => {
     const fetchCrossword = async () => {
       try {
         const response = await axios.get(
-          "/CrosswordPuzzle/generate/"
+          `/CrosswordPuzzle/generate/?tribe=${tribe || 'tayal'}`
         );
         const data = response.data;
         setCrosswordData(data);
@@ -174,6 +174,7 @@ Game_areaTest.displayName = "Game_areaTest";
 
 Game_areaTest.propTypes = {
   gameDataLoaded: PropTypes.func,
+  tribe: PropTypes.string,
 };
 
 export default Game_areaTest;

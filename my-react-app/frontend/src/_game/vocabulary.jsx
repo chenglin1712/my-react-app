@@ -3,11 +3,11 @@ import { useNavigate } from "react-router-dom";
 import "../../static/css/_game/vocabulary.css";
 
 const TRIBES = [
-  { name: "泰雅", color: "#9B1B30", hasGame: true },
-  { name: "阿美", color: "#D4890A", hasGame: false },
-  { name: "布農", color: "#4E7F63", hasGame: false },
-  { name: "葛瑪蘭", color: "#4A7FA5", hasGame: false },
-  { name: "排灣", color: "#6B4FAA", hasGame: false },
+  { name: "泰雅", color: "#9B1B30", hasGame: true,  route: "/game/vocabulary/tayal" },
+  { name: "阿美", color: "#D4890A", hasGame: true,  route: "/game/vocabulary/amis"  },
+  { name: "布農", color: "#4E7F63", hasGame: true,  route: "/game/vocabulary/bunun" },
+  { name: "葛瑪蘭", color: "#4A7FA5", hasGame: true,  route: "/game/vocabulary/kavalan" },
+  { name: "排灣", color: "#6B4FAA", hasGame: true,  route: "/game/vocabulary/paiwan" },
 ];
 
 const VocabularyPage = () => {
@@ -15,8 +15,8 @@ const VocabularyPage = () => {
   const [selectedTribe, setSelectedTribe] = useState(null);
 
   const handleTribeClick = (tribe) => {
-    if (tribe.hasGame) {
-      navigate("/game/vocabulary/tayal");
+    if (tribe.hasGame && tribe.route) {
+      navigate(tribe.route);
     } else {
       setSelectedTribe(tribe.name === selectedTribe ? null : tribe.name);
     }

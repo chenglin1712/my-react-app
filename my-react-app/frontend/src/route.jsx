@@ -18,6 +18,10 @@ import SearchPage from "./_search/index";
 import GamePage from './_game/index';
 import VocabularyPage from './_game/vocabulary';
 import TayalGame from './_game/tayal_game';
+import AmisGame from './_game/amis_game';
+import BununGame from './_game/bunun_game';
+import KavalanGame from './_game/kavalan_game';
+import PaiwanGame from './_game/paiwan_game';
 //測驗
 import QuizTribeSelect from './_quiz/tribeSelect';
 import QuizPage from './_quiz/index';
@@ -53,6 +57,10 @@ const App = () => {
       <Route path="/game" element={<GamePage />} />
       <Route path="/game/vocabulary" element={<VocabularyPage />} />
       <Route path="/game/vocabulary/tayal" element={<TayalGame />} />
+      <Route path="/game/vocabulary/amis" element={<AmisGame />} />
+      <Route path="/game/vocabulary/bunun" element={<BununGame />} />
+      <Route path="/game/vocabulary/kavalan" element={<KavalanGame />} />
+      <Route path="/game/vocabulary/paiwan" element={<PaiwanGame />} />
       <Route path="/quiz/select" element={<QuizTribeSelect />} />
       <Route path="/quiz" element={<QuizPage />} >
         <Route path="" element={<Comp_quiz />} >
