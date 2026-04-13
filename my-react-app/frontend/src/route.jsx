@@ -22,6 +22,12 @@ import AmisGame from './_game/amis_game';
 import BununGame from './_game/bunun_game';
 import KavalanGame from './_game/kavalan_game';
 import PaiwanGame from './_game/paiwan_game';
+import ListeningPage from './_game/listening';
+import TayalListeningGame from './_game/tayal_listening';
+import AmisListeningGame from './_game/amis_listening';
+import BununListeningGame from './_game/bunun_listening';
+import KavalanListeningGame from './_game/kavalan_listening';
+import PaiwanListeningGame from './_game/paiwan_listening';
 //測驗
 import QuizTribeSelect from './_quiz/tribeSelect';
 import QuizPage from './_quiz/index';
@@ -61,6 +67,12 @@ const App = () => {
       <Route path="/game/vocabulary/bunun" element={<BununGame />} />
       <Route path="/game/vocabulary/kavalan" element={<KavalanGame />} />
       <Route path="/game/vocabulary/paiwan" element={<PaiwanGame />} />
+      <Route path="/game/listening" element={<ListeningPage />} />
+      <Route path="/game/listening/tayal" element={<TayalListeningGame />} />
+      <Route path="/game/listening/amis" element={<AmisListeningGame />} />
+      <Route path="/game/listening/bunun" element={<BununListeningGame />} />
+      <Route path="/game/listening/kavalan" element={<KavalanListeningGame />} />
+      <Route path="/game/listening/paiwan" element={<PaiwanListeningGame />} />
       <Route path="/quiz/select" element={<QuizTribeSelect />} />
       <Route path="/quiz" element={<QuizPage />} >
         <Route path="" element={<Comp_quiz />} >

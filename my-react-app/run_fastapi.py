@@ -10,7 +10,11 @@ if sys.stderr.encoding != 'utf-8':
     sys.stderr.reconfigure(encoding='utf-8')
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(BASE_DIR, "backend"))
+BACKEND_DIR = os.path.join(BASE_DIR, "backend")
+# 確保 backend 目錄排在最前面，reload subprocess 也能找到模組
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+os.environ["PYTHONPATH"] = BACKEND_DIR + os.pathsep + os.environ.get("PYTHONPATH", "")
 
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
@@ -48,9 +52,9 @@ if missing_required:
 # ────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    from fastAPI.main import app  # noqa: E402  直接 import，不依賴 reload subprocess 重新解析路徑
     uvicorn.run(
-        "fastAPI.main:app",
+        app,
         host="127.0.0.1",
         port=8001,
-        reload=True
     )

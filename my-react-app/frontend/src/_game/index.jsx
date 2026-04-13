@@ -15,10 +15,11 @@ const GAMES = [
   {
     id: "listening",
     title: "聽力遊戲",
-    subtitle: "Coming Soon",
-    desc: "聆聽族語發音，辨識正確詞彙",
+    subtitle: "Misaniq ATAYAL",
+    desc: "聆聽族語發音，辨識正確詞彙，訓練耳朵的敏銳度",
     emoji: "🎧",
-    available: false,
+    available: true,
+    route: "/game/listening",
   },
   {
     id: "pronunciation",
