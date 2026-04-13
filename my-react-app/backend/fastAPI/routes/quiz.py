@@ -486,6 +486,11 @@ def make_error(step: str, msg: str):
 def fetch_audio_from_id(audio_id: str):
     load_dotenv()
     VITE_AUDIO_FILE_URL = os.getenv("VITE_AUDIO_FILE_URL")
+    if not VITE_AUDIO_FILE_URL:
+        raise EnvironmentError(
+            "環境變數 VITE_AUDIO_FILE_URL 未設定，語音比對功能無法使用。"
+            "請在 .env 填入音檔 API URL。"
+        )
     api_url = VITE_AUDIO_FILE_URL + audio_id
 
     # 第一次請求取得重導向 URL

@@ -12,8 +12,15 @@ import datetime
 
 load_dotenv()
 
+_GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+if not _GITHUB_TOKEN:
+    raise EnvironmentError(
+        "[AIModel] 環境變數 GITHUB_TOKEN 未設定，AI 對話功能無法啟動。"
+        "請在 .env 填入 GitHub Personal Access Token。"
+    )
+
 client = OpenAI(
-    api_key=os.getenv("GITHUB_TOKEN"),
+    api_key=_GITHUB_TOKEN,
     base_url="https://models.github.ai/inference"
 )
 
