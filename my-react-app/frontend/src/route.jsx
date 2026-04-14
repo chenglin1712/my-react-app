@@ -24,6 +24,12 @@ import KavalanGame from './_game/kavalan_game';
 import PaiwanGame from './_game/paiwan_game';
 import ListeningPage from './_game/listening';
 import TayalListeningGame from './_game/tayal_listening';
+import PronunciationPage from './_game/pronunciation';
+import TayalPronunciationGame from './_game/tayal_pronunciation';
+import AmisPronunciationGame from './_game/amis_pronunciation';
+import BununPronunciationGame from './_game/bunun_pronunciation';
+import KavalanPronunciationGame from './_game/kavalan_pronunciation';
+import PaiwanPronunciationGame from './_game/paiwan_pronunciation';
 import AmisListeningGame from './_game/amis_listening';
 import BununListeningGame from './_game/bunun_listening';
 import KavalanListeningGame from './_game/kavalan_listening';
@@ -68,6 +74,12 @@ const App = () => {
       <Route path="/game/vocabulary/kavalan" element={<KavalanGame />} />
       <Route path="/game/vocabulary/paiwan" element={<PaiwanGame />} />
       <Route path="/game/listening" element={<ListeningPage />} />
+      <Route path="/game/pronunciation" element={<PronunciationPage />} />
+      <Route path="/game/pronunciation/tayal" element={<TayalPronunciationGame />} />
+      <Route path="/game/pronunciation/amis" element={<AmisPronunciationGame />} />
+      <Route path="/game/pronunciation/bunun" element={<BununPronunciationGame />} />
+      <Route path="/game/pronunciation/kavalan" element={<KavalanPronunciationGame />} />
+      <Route path="/game/pronunciation/paiwan" element={<PaiwanPronunciationGame />} />
       <Route path="/game/listening/tayal" element={<TayalListeningGame />} />
       <Route path="/game/listening/amis" element={<AmisListeningGame />} />
       <Route path="/game/listening/bunun" element={<BununListeningGame />} />

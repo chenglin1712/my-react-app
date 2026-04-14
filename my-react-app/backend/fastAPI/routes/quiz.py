@@ -32,10 +32,34 @@ def _find_ffmpeg() -> str | None:
     found = shutil.which("ffmpeg")
     return found
 
-_ffmpeg_path = _find_ffmpeg()
+def _find_ffprobe() -> str | None:
+    # 優先從 FFPROBE_PATH，否則從 FFMPEG_PATH 推導同目錄的 ffprobe
+    from_env = os.getenv("FFPROBE_PATH")
+    if from_env and os.path.isfile(from_env):
+        return from_env
+    ffmpeg = _find_ffmpeg()
+    if ffmpeg:
+        ffprobe = os.path.join(os.path.dirname(ffmpeg), "ffprobe.exe")
+        if os.path.isfile(ffprobe):
+            return ffprobe
+        # Linux/macOS 無 .exe
+        ffprobe_nix = os.path.join(os.path.dirname(ffmpeg), "ffprobe")
+        if os.path.isfile(ffprobe_nix):
+            return ffprobe_nix
+    found = shutil.which("ffprobe")
+    return found
+
+_ffmpeg_path  = _find_ffmpeg()
+_ffprobe_path = _find_ffprobe()
+
 if _ffmpeg_path:
+    # 把 ffmpeg bin 目錄加進 PATH，讓 pydub subprocess 找得到 ffprobe
+    _bin_dir = os.path.dirname(_ffmpeg_path)
+    if _bin_dir not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = _bin_dir + os.pathsep + os.environ.get("PATH", "")
     AudioSegment.converter = _ffmpeg_path
-    AudioSegment.ffprobe   = _ffmpeg_path
+    if _ffprobe_path:
+        AudioSegment.ffprobe = _ffprobe_path
 else:
     _logging.warning(
         "[quiz] 找不到 ffmpeg，語音比對功能 (/compare_audio) 將無法使用。"
@@ -554,67 +578,86 @@ def get_wav2vec2():
     return _wav2vec2_model
 
 
+def _get_embedding(model, wave):
+    """wav tensor → 最後一層 transformer 特徵向量"""
+    features, _ = model.extract_features(wave)
+    return features[-1].mean(dim=1)
+
+
+def _score_from_bytes(model, user_emb, audio_bytes):
+    """把 audio bytes 轉成嵌入後與 user_emb 計算相似度，回傳 0-100 分"""
+    wav = convert_to_wav(audio_bytes)
+    wave, _ = bytes_to_tensor(wav)
+    emb = _get_embedding(model, wave)
+    sim = F.cosine_similarity(user_emb, emb).item()
+    return round(sim * 100, 2)
+
+
 @router.post("/compare_audio/")
 async def compare_audio(
     user_audio: UploadFile = File(...),
-    audio_id: str = Form(...)
+    audio_id: str = Form(...),
+    reference_urls: str = Form(default=""),   # 逗號分隔的 Firebase Storage 公開 URL
 ):
     if not _ffmpeg_path:
         return make_error("ffmpeg_missing", "伺服器未安裝 ffmpeg，語音比對功能暫時無法使用")
     try:
-        # Step A — download target audio
-        try:
-            target_bytes = fetch_audio_from_id(audio_id)
-        except Exception as e:
-            return make_error("download_target", str(e))
-
-        # Step B — read user audio
+        # Step A — 讀取使用者錄音
         try:
             user_bytes = await user_audio.read()
         except Exception as e:
             return make_error("read_user_audio", str(e))
 
-        # Step C — convert BOTH to WAV
+        # Step B — 使用者錄音轉 WAV + 取得嵌入
         try:
-            target_wav = convert_to_wav(target_bytes)   # MP3 → WAV
-        except Exception as e:
-            return make_error("convert_target_to_wav", str(e))
-
-        try:
-            user_wav = convert_to_wav(user_bytes)       # WebM → WAV
+            user_wav = convert_to_wav(user_bytes)
+            user_wave, _ = bytes_to_tensor(user_wav)
         except Exception as e:
             return make_error("convert_user_to_wav", str(e))
 
-        # Step D — WAV → tensor
-        try:
-            target_wave, sr1 = bytes_to_tensor(target_wav)
-        except Exception as e:
-            return make_error("target_to_tensor", str(e))
-
-        try:
-            user_wave, sr2 = bytes_to_tensor(user_wav)
-        except Exception as e:
-            return make_error("user_to_tensor", str(e))
-
-        # Step E — embedding
         try:
             model = get_wav2vec2()
-            emb1 = model.extract_features(target_wave)[0].mean(dim=1)
-            emb2 = model.extract_features(user_wave)[0].mean(dim=1)
+            user_emb = _get_embedding(model, user_wave)
         except Exception as e:
-            return make_error("embedding", str(e))
+            return make_error("user_embedding", str(e))
 
-        # Step F — similarity
+        # Step C — 官方音檔比對
         try:
-            sim = F.cosine_similarity(emb1, emb2).item()
-            score = round(sim * 100, 2)
+            target_bytes = fetch_audio_from_id(audio_id)
         except Exception as e:
-            return make_error("similarity_calc", str(e))
+            return make_error("download_target", str(e))
+
+        try:
+            official_score = _score_from_bytes(model, user_emb, target_bytes)
+        except Exception as e:
+            return make_error("official_similarity", str(e))
+
+        # Step D — 真人參考音檔比對（Firebase Storage 公開 URL，用 httpx 非同步抓取）
+        best_ref_score = None
+        if reference_urls.strip():
+            import httpx
+            urls = [u.strip() for u in reference_urls.split(",") if u.strip()][:5]
+            async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+                for url in urls:
+                    try:
+                        resp = await client.get(url)
+                        ref_score = _score_from_bytes(model, user_emb, resp.content)
+                        if best_ref_score is None or ref_score > best_ref_score:
+                            best_ref_score = ref_score
+                    except Exception:
+                        continue
+
+        # Step E — 取最終分數（有真人音檔則取兩者最高）
+        final_score = official_score
+        if best_ref_score is not None:
+            final_score = max(official_score, best_ref_score)
 
         return {
             "success": True,
-            "score": score,
-            "passed": score >= 70
+            "score": final_score,
+            "official_score": official_score,
+            "ref_score": best_ref_score,
+            "passed": final_score >= 70,
         }
 
     except Exception as e:

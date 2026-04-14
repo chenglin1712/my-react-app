@@ -24,10 +24,11 @@ const GAMES = [
   {
     id: "pronunciation",
     title: "發音練習",
-    subtitle: "Coming Soon",
-    desc: "跟著發音範本，練習族語正確發音",
+    subtitle: "Qmisan ATAYAL",
+    desc: "跟著發音範本錄音，AI 即時評分你的發音準確度",
     emoji: "🎤",
-    available: false,
+    available: true,
+    route: "/game/pronunciation",
   },
   {
     id: "sentence",
