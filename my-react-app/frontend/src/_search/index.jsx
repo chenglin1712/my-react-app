@@ -304,7 +304,7 @@ const App = () => {
       //console.log("authChanges 回傳:", userData);
       if (userData) {
         setUser(userData);
-        const baseCategory = userData.firestoreData.favorites.find(fav => fav.id === 1);
+        const baseCategory = userData.firestoreData?.favorites?.find(fav => fav.id === 1);
         const favoriteSet = new Set(baseCategory?.content || []);
         setFavoriteWords(favoriteSet);
       } else {

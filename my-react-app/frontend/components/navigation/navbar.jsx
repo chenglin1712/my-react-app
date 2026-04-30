@@ -92,7 +92,7 @@ const Navbar = () => {
             </div>
           </div>
 
-          {userData == null ? (
+          {userData == null || !userData.firestoreData ? (
             <div className="menu-item" onClick={() => navigate('/login')} >
               <User size={24} style={{ marginRight: '5px' }} />
               <span>登入</span>
@@ -102,7 +102,7 @@ const Navbar = () => {
               <div className="auth-container">
                 <div className="auth-container-user" onClick={handleUserSidebar}>
                   <img src={userData?.firestoreData?.avatarUrl || AvatarImg} className="auth-image" />
-                  <p>{userData.firestoreData.name}</p>
+                  <p>{userData?.firestoreData?.name}</p>
                 </div>
               </div>
 
@@ -137,7 +137,7 @@ const Navbar = () => {
 
       {/* Mobile Menu */}
       < div className={`menu-mobile ${isOpen ? 'active' : ''}`}>
-        {userData == null ? (
+        {userData == null || !userData.firestoreData ? (
           <div className="menu-mobile-item" onClick={() => navigate('/login')} >
             <User size={20} />
             <span>登入</span>
@@ -147,7 +147,7 @@ const Navbar = () => {
             <div className="auth-container">
               <div className="mobile-container-user" onClick={handleUserSidebar}>
                 <img src={userData?.firestoreData?.avatarUrl || AvatarImg} className="mobile-image" />
-                <p>{userData.firestoreData.name}</p>
+                <p>{userData?.firestoreData?.name}</p>
               </div>
             </div>
 

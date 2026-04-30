@@ -75,11 +75,11 @@ class WordResult(BaseModel):
 
 
 TRIBE_MAP = {
-    '泰雅': '泰雅語',
-    '阿美': '阿美語',
-    '布農': '布農語',
-    '葛瑪蘭': '葛瑪蘭語',
-    '排灣': '排灣語',
+    '泰雅': '泰雅語', 'tayal': '泰雅語',
+    '阿美': '阿美語', 'amis': '阿美語',
+    '布農': '布農語', 'bunun': '布農語',
+    '葛瑪蘭': '葛瑪蘭語', 'kavalan': '葛瑪蘭語',
+    '排灣': '排灣語', 'paiwan': '排灣語',
 }
 
 class KeywordRequest(BaseModel):

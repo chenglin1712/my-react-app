@@ -632,7 +632,7 @@ const App = () => {
     const unsubscribe = authChanges((userData) => {
       if (userData) {
         setUser(userData);
-        setFavorites(userData.firestoreData.favorites || []);
+        setFavorites(userData.firestoreData?.favorites || []);
       }
     });
 

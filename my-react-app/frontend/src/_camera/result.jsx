@@ -201,7 +201,7 @@ const App = () => {
   
     try {
       
-      const baseCategory = user.firestoreData.favorites.find(fav => fav.id === 1);
+      const baseCategory = user.firestoreData?.favorites?.find(fav => fav.id === 1);
       let newContent = baseCategory?.content || [];
 
       if (newContent.includes(wordTayal)) {
@@ -217,7 +217,7 @@ const App = () => {
 
       setUser(prevUser => {
         if (!prevUser) return prevUser;
-        const newFavorites = prevUser.firestoreData.favorites.map(fav => {
+        const newFavorites = (prevUser.firestoreData?.favorites || []).map(fav => {
           if (fav.id === 1) {
             return { ...fav, content: newContent };
           }
