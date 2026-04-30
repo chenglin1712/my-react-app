@@ -163,12 +163,21 @@ def compute_score(Ptheta: float, Bq: float) -> float:
     return Ptheta * (1 + Bq)
 
 # ----------------------------
-# DB helper: load all words
+# DB helper: load all words (module-level cache)
 # ----------------------------
+_words_cache: List[Word] = []
+_words_cache_lock = threading.Lock()
+
 def load_all_words(db: Optional[Session] = None) -> List[Word]:
-    if db:
-        return db.query(Word).all()
-    return []  # 如果完全不用 DB 可改成靜態列表
+    global _words_cache
+    if _words_cache:
+        return _words_cache
+    if not db:
+        return []
+    with _words_cache_lock:
+        if not _words_cache:
+            _words_cache = db.query(Word).all()
+    return _words_cache
 
 # ----------------------------
 # API: 產生 quiz

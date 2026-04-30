@@ -34,9 +34,12 @@ if SECRET_KEY == _INSECURE_DEFAULT_KEY:
     )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DJANGO_DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", os.getenv("RENDER_EXTERNAL_HOSTNAME", ""), "*"]
+_render_host = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+if _render_host:
+    ALLOWED_HOSTS.append(_render_host)
 
 APPEND_SLASH = False
 # Application definition
@@ -68,7 +71,8 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True
+_raw_cors = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+CORS_ALLOWED_ORIGINS = [o.strip() for o in _raw_cors.split(",") if o.strip()]
 # CSRF
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8000",

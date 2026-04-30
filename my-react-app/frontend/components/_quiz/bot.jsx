@@ -1,19 +1,57 @@
 import "../../static/css/_quiz/bot.css"
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Bot, ChevronLeft } from "lucide-react"
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import StudyPlanComponent from "./bot_study_plan"
+import { useAuth } from "../../src/userServives/authContext";
+import { getUserSituation } from "../../src/userServives/uploadDb";
+import { auth } from "../../../firebase";
 
 const Advice = ({ onClose }) => {
     const navigate = useNavigate();
     const handleClose = onClose ?? (() => navigate(-1));
+    const { userData } = useAuth();
     const [messages, setMessages] = useState([
         { id: 1, text: "lokah su 你好！我是您的泰雅AI助手，有什麼我可以幫您的嗎？", role: "bot" }
     ]);
     const [input, setInput] = useState("");
     const [isType, setIsType] = useState(false);
     const messageEndRef = useRef(null);
+    const [userStats, setUserStats] = useState({
+        correct: 0, incorrect: 0, unanswered: 0, common_errors: [], level: "beginner"
+    });
+
+    // 在元件掛載後，從 Firebase 讀取使用者真實學習資料
+    useEffect(() => {
+        if (!userData) return;
+        const userErrors = userData?.firestoreData?.user_errors || {};
+        const commonErrors = Object.entries(userErrors)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 3)
+            .map(([word, cnt]) => `${word}（答錯${cnt}次）`);
+        const totalErrors = Object.values(userErrors).reduce((sum, n) => sum + n, 0);
+
+        getUserSituation()
+            .then(sit => {
+                setUserStats({
+                    correct: 0,
+                    incorrect: totalErrors,
+                    unanswered: 0,
+                    common_errors: commonErrors,
+                    level: sit?.level || "beginner",
+                });
+            })
+            .catch(() => {
+                setUserStats({
+                    correct: 0,
+                    incorrect: totalErrors,
+                    unanswered: 0,
+                    common_errors: commonErrors,
+                    level: "beginner",
+                });
+            });
+    }, [userData]);
 
     const suggestions = [
         "我想了解我的學習狀況",
@@ -36,12 +74,14 @@ const Advice = ({ onClose }) => {
         setIsType(true);
 
         try {
+            const token = await auth.currentUser?.getIdToken();
             const response = await fetch(import.meta.env.VITE_API_AI_BOT_URL, {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    ...(token ? { "Authorization": `Bearer ${token}` } : {}),
                 },
-                body: JSON.stringify({ message: userText })
+                body: JSON.stringify({ message: userText, user_stats: userStats }),
             });
 
             const data = await response.json();

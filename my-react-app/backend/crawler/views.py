@@ -55,57 +55,32 @@ def format_quiz_data_1(data):
 
 def format_quiz_data_2(data):
     format_data = {
-        "chapter_name":data["data"]["display_dialect_name"],
-        "parts":[]
+        "chapter_name": data["data"]["display_dialect_name"],
+        "parts": []
     }
+
+    part2 = data["data"].get("part2")
+    if not part2:
+        return format_data
+
+    questions_raw = part2.get("questions", [])
+    answers_raw = part2.get("answers", [])
+
     format_part2 = {
         "type": "choice",
-        "title": "第二部分：選擇題",
-        "intro": "試卷上每題有三個圖片，根據題目選一個與所聽到語意最相符的圖片",
-        "questions":[
+        "title": part2.get("title", "第二部分：選擇題"),
+        "intro": part2.get("intro", ""),
+        "questions": [
             {
-                "question_ab": "cyux inu' kkyalan / renwa' nha'?",
-                "question_ch": "他們的電話在哪裡？",
-                "audio": "https://api.lokahsu.org.tw/public/junior/sound/6/4choiceOne/2_2_C.mp3",
-                "imageA": "https://api.lokahsu.org.tw/public/junior/graphics/choiceOne/2_2A.png",
-                "imageB": "https://api.lokahsu.org.tw/public/junior/graphics/choiceOne/2_2B.png",
-                "imageC": "https://api.lokahsu.org.tw/public/junior/graphics/choiceOne/2_2C.png",
-                "answer": "3"
-            },{
-                "question_ab": "cyux matas biru' qu 'laqi' mlikuy qasa.",
-                "question_ch": "那個男孩子正在畫圖。",
-                "audio": "https://api.lokahsu.org.tw/public/junior/sound/6/4choiceOne/3_5_A.mp3",
-                "imageA": "https://api.lokahsu.org.tw/public/junior/graphics/choiceOne/3_5A.png",
-                "imageB": "https://api.lokahsu.org.tw/public/junior/graphics/choiceOne/3_5B.png",
-                "imageC": "https://api.lokahsu.org.tw/public/junior/graphics/choiceOne/3_5C.png",
-                "answer": "1"
-            },{
-                "question_ab": "smoya' mita' teribiy qu kkneril qasa.",
-                "question_ch": "那些女孩子喜歡看電視。",
-                "audio": "https://api.lokahsu.org.tw/public/junior/sound/6/4choiceOne/4_2_A.mp3",
-                "imageA": "https://api.lokahsu.org.tw/public/junior/graphics/choiceOne/4_2A.png",
-                "imageB": "https://api.lokahsu.org.tw/public/junior/graphics/choiceOne/4_2B.png",
-                "imageC": "https://api.lokahsu.org.tw/public/junior/graphics/choiceOne/4_2C.png",
-                "answer": "1"
-            },
-            {
-                "question_ab": "baq su' matas biru'?",
-                "question_ch": "你會畫圖嗎？",
-                "audio": "https://api.lokahsu.org.tw/public/junior/sound/6/4choiceOne/4_3_A.mp3",
-                "imageA": "https://api.lokahsu.org.tw/public/junior/graphics/choiceOne/4_3A.png",
-                "imageB": "https://api.lokahsu.org.tw/public/junior/graphics/choiceOne/4_3B.png",
-                "imageC": "https://api.lokahsu.org.tw/public/junior/graphics/choiceOne/4_3C.png",
-                "answer": "1"
-            },
-            {
-                "question_ab": "smoya' mqwas qu lelaqi' qasa.",
-                "question_ch": "那些孩子喜歡唱歌。",
-                "audio": "https://api.lokahsu.org.tw/public/junior/sound/6/4choiceOne/4_4_A.mp3",
-                "imageA": "https://api.lokahsu.org.tw/public/junior/graphics/choiceOne/4_4A.png",
-                "imageB": "https://api.lokahsu.org.tw/public/junior/graphics/choiceOne/4_4B.png",
-                "imageC": "https://api.lokahsu.org.tw/public/junior/graphics/choiceOne/4_4C.png",
-                "answer": "1"
+                "question_ab": q.get("question_ab", ""),
+                "question_ch": q.get("question_ch", ""),
+                "audio": q.get("audio", ""),
+                "imageA": q.get("imageA") or q.get("image_a", ""),
+                "imageB": q.get("imageB") or q.get("image_b", ""),
+                "imageC": q.get("imageC") or q.get("image_c", ""),
+                "answer": answers_raw[i] if i < len(answers_raw) else "",
             }
+            for i, q in enumerate(questions_raw)
         ]
     }
     format_data["parts"].append(format_part2)

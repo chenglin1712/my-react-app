@@ -13,8 +13,7 @@ const App = () => {
     const [selectedLabels, setSelectedLabels] = useState(new Set());
     const [error, setError] = useState(false);
     const [useMockData, setUseMockData] = useState(false);
-    const [annotatedImage, setAnnotatedImage] = useState(null);
-    const [loading, setLoading] = useState(false); 
+    const [loading, setLoading] = useState(false);
     useEffect(() => {
         if (!file) {
             console.error("未成功上傳圖片，將返回頁面");
@@ -49,7 +48,6 @@ const App = () => {
                         setError(true);
                     } else {
                         setLabels(response.data.labels || []);
-                        setAnnotatedImage(response.data.annotated_image || null);
                     }
                 })
                 .catch((error) => {
@@ -105,13 +103,6 @@ const App = () => {
                                 </div>
                             ) : error ? (
                                 <h4 className="text-danger">辨識失敗</h4>
-                            ) : annotatedImage ? (
-                                <img
-                                    src={annotatedImage}
-                                    alt="辨識圖片"
-                                    className="img-fluid rounded shadow"
-                                    style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-                                />
                             ) : image ? (
                                 <img
                                     src={image}

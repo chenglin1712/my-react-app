@@ -77,11 +77,8 @@ async def analyze_image(request: Request):
                     "score": round(label["score"], 2)
                 })
 
-        image_uri = f"data:image/jpeg;base64,{image_base64}"
-
         return {
             "labels": label_data,
-            "annotated_image": image_uri,
         }
 
     except HTTPException:

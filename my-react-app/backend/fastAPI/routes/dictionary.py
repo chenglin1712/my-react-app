@@ -524,10 +524,9 @@ def get_grammar(tribe: str, db: Session = Depends(get_db)):
             rule_ids = [r[0] for r in rules]
             affix_map: Dict[int, list] = {rid: [] for rid in rule_ids}
             if rule_ids:
-                placeholders = ",".join("?" * len(rule_ids))
+                id_list = ",".join(str(i) for i in rule_ids)
                 affix_rows = db.execute(
-                    text(f"SELECT ra.rule_id, a.affix FROM grammar_rule_affix ra JOIN grammar_affix a ON a.id = ra.affix_id WHERE ra.rule_id IN ({placeholders})"),
-                    rule_ids
+                    text(f"SELECT ra.rule_id, a.affix FROM grammar_rule_affix ra JOIN grammar_affix a ON a.id = ra.affix_id WHERE ra.rule_id IN ({id_list})")
                 ).fetchall()
                 for r_id, affix in affix_rows:
                     affix_map[r_id].append(affix)
@@ -603,10 +602,9 @@ def search_grammar(tribe: str, q: str, db: Session = Depends(get_db)):
         rule_ids = [r[0] for r in rule_rows]
         affix_map: Dict[int, list] = {rid: [] for rid in rule_ids}
         if rule_ids:
-            placeholders = ",".join("?" * len(rule_ids))
+            id_list = ",".join(str(i) for i in rule_ids)
             for r_id, affix in db.execute(
-                text(f"SELECT ra.rule_id, a.affix FROM grammar_rule_affix ra JOIN grammar_affix a ON a.id = ra.affix_id WHERE ra.rule_id IN ({placeholders})"),
-                rule_ids
+                text(f"SELECT ra.rule_id, a.affix FROM grammar_rule_affix ra JOIN grammar_affix a ON a.id = ra.affix_id WHERE ra.rule_id IN ({id_list})")
             ).fetchall():
                 affix_map[r_id].append(affix)
 
@@ -741,10 +739,9 @@ def get_grammar_quiz_material(tribe: str, section_key: Optional[str] = None, db:
         rule_ids = list({row[0] for row in rows})
         affix_map: Dict[int, list] = {rid: [] for rid in rule_ids}
         if rule_ids:
-            placeholders = ",".join("?" * len(rule_ids))
+            id_list = ",".join(str(i) for i in rule_ids)
             for r_id, affix in db.execute(
-                text(f"SELECT ra.rule_id, a.affix FROM grammar_rule_affix ra JOIN grammar_affix a ON a.id = ra.affix_id WHERE ra.rule_id IN ({placeholders})"),
-                rule_ids
+                text(f"SELECT ra.rule_id, a.affix FROM grammar_rule_affix ra JOIN grammar_affix a ON a.id = ra.affix_id WHERE ra.rule_id IN ({id_list})")
             ).fetchall():
                 affix_map[r_id].append(affix)
 

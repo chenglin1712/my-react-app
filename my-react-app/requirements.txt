@@ -21,3 +21,4 @@ pydub==0.25.1
 soundfile==0.13.1
 torchaudio==2.10.0
 python-multipart==0.0.22
+firebase-admin==6.5.0

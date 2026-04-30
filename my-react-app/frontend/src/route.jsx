@@ -1,4 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
+import { useAuth } from './userServives/authContext';
+import PermissionProtect from './userServives/permissionProtect';
 //首頁
 import HomePage from './_home/index';
 //登入、註冊、編輯資料
@@ -57,36 +59,43 @@ import FavoritePage from "./_favorite/index"
 import CalendarPage from "../components/_calendar/calendar_date"
 
 
+const ProtectedRoute = ({ children }) => {
+  const { userData, loading } = useAuth();
+  if (loading) return null;
+  if (!userData) return <PermissionProtect />;
+  return children;
+};
+
 const App = () => {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/search" element={<SearchPage />} />
-      <Route path="/camera" element={<CameraPage />} />
-      <Route path="/camera/label" element={<Label />} />
-      <Route path="/camera/result" element={<Result />} />
-      <Route path="/favorite" element={<FavoritePage />} />
-      <Route path="/game" element={<GamePage />} />
-      <Route path="/game/vocabulary" element={<VocabularyPage />} />
-      <Route path="/game/vocabulary/tayal" element={<TayalGame />} />
-      <Route path="/game/vocabulary/amis" element={<AmisGame />} />
-      <Route path="/game/vocabulary/bunun" element={<BununGame />} />
-      <Route path="/game/vocabulary/kavalan" element={<KavalanGame />} />
-      <Route path="/game/vocabulary/paiwan" element={<PaiwanGame />} />
-      <Route path="/game/listening" element={<ListeningPage />} />
-      <Route path="/game/pronunciation" element={<PronunciationPage />} />
-      <Route path="/game/pronunciation/tayal" element={<TayalPronunciationGame />} />
-      <Route path="/game/pronunciation/amis" element={<AmisPronunciationGame />} />
-      <Route path="/game/pronunciation/bunun" element={<BununPronunciationGame />} />
-      <Route path="/game/pronunciation/kavalan" element={<KavalanPronunciationGame />} />
-      <Route path="/game/pronunciation/paiwan" element={<PaiwanPronunciationGame />} />
-      <Route path="/game/listening/tayal" element={<TayalListeningGame />} />
-      <Route path="/game/listening/amis" element={<AmisListeningGame />} />
-      <Route path="/game/listening/bunun" element={<BununListeningGame />} />
-      <Route path="/game/listening/kavalan" element={<KavalanListeningGame />} />
-      <Route path="/game/listening/paiwan" element={<PaiwanListeningGame />} />
-      <Route path="/quiz/select" element={<QuizTribeSelect />} />
-      <Route path="/quiz" element={<QuizPage />} >
+      <Route path="/camera" element={<ProtectedRoute><CameraPage /></ProtectedRoute>} />
+      <Route path="/camera/label" element={<ProtectedRoute><Label /></ProtectedRoute>} />
+      <Route path="/camera/result" element={<ProtectedRoute><Result /></ProtectedRoute>} />
+      <Route path="/favorite" element={<ProtectedRoute><FavoritePage /></ProtectedRoute>} />
+      <Route path="/game" element={<ProtectedRoute><GamePage /></ProtectedRoute>} />
+      <Route path="/game/vocabulary" element={<ProtectedRoute><VocabularyPage /></ProtectedRoute>} />
+      <Route path="/game/vocabulary/tayal" element={<ProtectedRoute><TayalGame /></ProtectedRoute>} />
+      <Route path="/game/vocabulary/amis" element={<ProtectedRoute><AmisGame /></ProtectedRoute>} />
+      <Route path="/game/vocabulary/bunun" element={<ProtectedRoute><BununGame /></ProtectedRoute>} />
+      <Route path="/game/vocabulary/kavalan" element={<ProtectedRoute><KavalanGame /></ProtectedRoute>} />
+      <Route path="/game/vocabulary/paiwan" element={<ProtectedRoute><PaiwanGame /></ProtectedRoute>} />
+      <Route path="/game/listening" element={<ProtectedRoute><ListeningPage /></ProtectedRoute>} />
+      <Route path="/game/pronunciation" element={<ProtectedRoute><PronunciationPage /></ProtectedRoute>} />
+      <Route path="/game/pronunciation/tayal" element={<ProtectedRoute><TayalPronunciationGame /></ProtectedRoute>} />
+      <Route path="/game/pronunciation/amis" element={<ProtectedRoute><AmisPronunciationGame /></ProtectedRoute>} />
+      <Route path="/game/pronunciation/bunun" element={<ProtectedRoute><BununPronunciationGame /></ProtectedRoute>} />
+      <Route path="/game/pronunciation/kavalan" element={<ProtectedRoute><KavalanPronunciationGame /></ProtectedRoute>} />
+      <Route path="/game/pronunciation/paiwan" element={<ProtectedRoute><PaiwanPronunciationGame /></ProtectedRoute>} />
+      <Route path="/game/listening/tayal" element={<ProtectedRoute><TayalListeningGame /></ProtectedRoute>} />
+      <Route path="/game/listening/amis" element={<ProtectedRoute><AmisListeningGame /></ProtectedRoute>} />
+      <Route path="/game/listening/bunun" element={<ProtectedRoute><BununListeningGame /></ProtectedRoute>} />
+      <Route path="/game/listening/kavalan" element={<ProtectedRoute><KavalanListeningGame /></ProtectedRoute>} />
+      <Route path="/game/listening/paiwan" element={<ProtectedRoute><PaiwanListeningGame /></ProtectedRoute>} />
+      <Route path="/quiz/select" element={<ProtectedRoute><QuizTribeSelect /></ProtectedRoute>} />
+      <Route path="/quiz" element={<ProtectedRoute><QuizPage /></ProtectedRoute>} >
         <Route path="" element={<Comp_quiz />} >
           <Route index element={<Comp_quiz_start />} />
           <Route path=":level" element={<Comp_quiz_panel />} />
@@ -100,9 +109,9 @@ const App = () => {
         <Route path="situation" element={<Comp_situation />} />
         <Route path="review" element={<Comp_review />} />
       </Route>
-      <Route path="/bot" element={<Comp_bot />} />
-      <Route path='/note' element={<NotePage />} />
-      <Route path='/note/share' element={<NoteShare />} />
+      <Route path="/bot" element={<ProtectedRoute><Comp_bot /></ProtectedRoute>} />
+      <Route path='/note' element={<ProtectedRoute><NotePage /></ProtectedRoute>} />
+      <Route path='/note/share' element={<ProtectedRoute><NoteShare /></ProtectedRoute>} />
       <Route path='/share/:id' element={<NoteShare />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />

@@ -5,23 +5,23 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
     const [userData, setUserData] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // 監聽使用者是否更換
         const unsubscribe = authChanges((user) => {
             setUserData(user);
+            setLoading(false);
         });
 
-        return () => unsubscribe(); // 清除監聽器
+        return () => unsubscribe();
     }, []);
 
-    // 監聽使用者資料是否更新
     const updateUserData = (newUserData) => {
         setUserData(newUserData);
     };
 
     return (
-        <AuthContext.Provider value={{ userData, updateUserData }}>
+        <AuthContext.Provider value={{ userData, updateUserData, loading }}>
             {children}
         </AuthContext.Provider>
     );
