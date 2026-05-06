@@ -115,10 +115,10 @@ const App = () => {
       <Route path='/share/:id' element={<NoteShare />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
-      <Route path="/edit" element={<EditPage />} />
+      <Route path="/edit" element={<ProtectedRoute><EditPage /></ProtectedRoute>} />
       <Route path="/forgot" element={<ForgotPage />} />
       <Route path="/reset" element={<ResetPage />} />
-      <Route path="/calendar" element={<CalendarPage />} />
+      <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
     </Routes>
   );
 };

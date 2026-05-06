@@ -59,7 +59,7 @@ const Game_areaTest = forwardRef(({ gameDataLoaded, tribe }, ref) => {
       }
     };
     fetchCrossword();
-  }, [gameDataLoaded]);
+  }, [gameDataLoaded, tribe]);
 
   useImperativeHandle(ref, () => ({
     getUserAnswers: () => userAnswersGrid,

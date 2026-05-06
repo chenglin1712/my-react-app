@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation , useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
@@ -144,7 +144,7 @@ const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFav
 const App = () => {
   const [query, setQuery] = useState('');
   const location = useLocation();
-  const selectedWords = location.state?.selectedWords || [];
+  const selectedWords = useMemo(() => location.state?.selectedWords || [], [location.state?.selectedWords]);
 
   const [definitions, setDefinitions] = useState({ exact_match_results: {}, fuzzy_match_results: {} });
   const [loading, setLoading] = useState(false);

@@ -27,11 +27,6 @@ const Box = ({ dataLen, userAnswers, userStars, setCurrentQuestionIndex }) => {
         };
     }, [isRunning]);
 
-    const timeStart = () => {
-        setIsRunning(true);
-        startTimeRef.current = Date.now() - time;
-    };
-
     const timeStopAndReset = () => {
         setTime(0);
         setIsRunning(false);
@@ -49,7 +44,8 @@ const Box = ({ dataLen, userAnswers, userStars, setCurrentQuestionIndex }) => {
     };
 
     useEffect(() => {
-        timeStart();
+        setIsRunning(true);
+        startTimeRef.current = Date.now();
     }, []);
     //--------------------------------------//
 

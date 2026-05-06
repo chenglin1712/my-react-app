@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { CheckCircle, XCircle, RefreshCw, BookOpen, Check, Timer, ChartColumn } from "lucide-react";
 import "../../static/css/_quiz/quiz_recommon_result.css";
 
-function ResultSummary({ totalTime, accuracy, analysis, suggestion, onRetry, onReview }) {
+function ResultSummary({ onReview }) {
   const { state } = useLocation();
   const navigate = useNavigate();
 
@@ -22,7 +22,7 @@ function ResultSummary({ totalTime, accuracy, analysis, suggestion, onRetry, onR
         </div>
         <div className="stat-card">
           <h3 className="fw-bolder mb-4"><Check /> 答對率</h3>
-          <p className={accuracy >= 80 ? "good" : accuracy >= 50 ? "average" : "bad"}>
+          <p className={state.accuracy >= 80 ? "good" : state.accuracy >= 50 ? "average" : "bad"}>
             {state.accuracy}%
           </p>
         </div>
