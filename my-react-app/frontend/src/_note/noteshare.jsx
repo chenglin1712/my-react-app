@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  doc, getDocs, getDoc, updateDoc, collection,
+  doc, getDocs, getDoc, updateDoc, collection, query, where, limit,
 } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { useAuth } from "../../src/userServives/authContext";
@@ -49,12 +49,14 @@ export default function NoteShare() {
   useEffect(() => {
     (async () => {
       try {
-        const snap = await getDocs(collection(db, "sharedNotes"));
+        const q = query(
+          collection(db, "sharedNotes"),
+          where("deleted", "==", false),
+          limit(200)
+        );
+        const snap = await getDocs(q);
         const rows = [];
-        snap.forEach((d) => {
-          const data = d.data();
-          if (!data.deleted) rows.push({ id: d.id, ...data });
-        });
+        snap.forEach((d) => rows.push({ id: d.id, ...d.data() }));
         setAllNotes(rows);
         setCurrentPage(1);
       } catch (e) {

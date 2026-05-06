@@ -166,7 +166,7 @@ export const initUserFields = async (uid) => {
     }
 };
 
-export const toggleFavoriteWord = async (uid, wordTayal) => {
+export const toggleFavoriteWord = async (uid, wordTayal, favId = 1) => {
     try {
         const userRef = doc(db, "users", uid);
         const userSnap = await getDoc(userRef);
@@ -176,7 +176,7 @@ export const toggleFavoriteWord = async (uid, wordTayal) => {
             const favorites = userData.favorites || [];
 
             const updatedFavorites = favorites.map(fav => {
-                if (fav.id === 1) {
+                if (fav.id === favId) {
                     const content = Array.isArray(fav.content) ? fav.content : [];
                     const exists = content.includes(wordTayal);
                     const newContent = exists

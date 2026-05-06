@@ -54,6 +54,10 @@ def _ensure_firebase():
 def verify_firebase_token(request):
     """驗證 Firebase ID Token。DEBUG 模式下跳過驗證（開發環境用）。"""
     if django_settings.DEBUG:
+        logger.warning(
+            "verify_firebase_token: SKIPPED (DEBUG=True). "
+            "Set DJANGO_DEBUG=False in production to enforce authentication."
+        )
         return {"uid": "dev-user"}, None
 
     auth_header = request.META.get("HTTP_AUTHORIZATION", "")

@@ -43,7 +43,7 @@ function NotePage() {
   const updateCurrentContent = () => {
     if (!contentRef.current) return;
     const updatedNotes = [...notes];
-    updatedNotes[currentPage].content = contentRef.current.innerHTML;
+    updatedNotes[currentPage].content = DOMPurify.sanitize(contentRef.current.innerHTML);
     setNotes(updatedNotes);
     localStorage.setItem(LOCAL_KEY, JSON.stringify(updatedNotes));
   };
@@ -170,9 +170,14 @@ function NotePage() {
         uploadedImageUrl = data.secure_url;
       }
 
+      const sanitizedPages = pagesToShare.map(p => ({
+        ...p,
+        content: DOMPurify.sanitize(p.content || ""),
+      }));
+
       const docRef = await addDoc(collection(db, "sharedNotes"), {
-        pages: pagesToShare,
-        preview: pagesToShare[0]?.content || "<p></p>",
+        pages: sanitizedPages,
+        preview: DOMPurify.sanitize(pagesToShare[0]?.content || "<p></p>"),
         image: uploadedImageUrl || "",
         createdAt: serverTimestamp(),
         likes: 0,

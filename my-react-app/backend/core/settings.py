@@ -106,6 +106,10 @@ WSGI_APPLICATION = "core.wsgi.application"
 #ASGI_APPLICATION = "core.asgi.application"
 
 # Database
+# WARNING: SQLite 僅適用於開發環境。
+# 生產環境請切換至 PostgreSQL：
+#   ENGINE: django.db.backends.postgresql
+#   NAME/USER/PASSWORD/HOST/PORT 從環境變數讀取
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
