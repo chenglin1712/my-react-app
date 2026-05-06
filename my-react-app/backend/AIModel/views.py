@@ -1,4 +1,5 @@
 import json
+import logging
 from django.template import loader
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
@@ -10,6 +11,8 @@ from dotenv import load_dotenv
 import sqlite3
 import traceback
 import datetime
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -232,7 +235,7 @@ def review_tayal_chat(request):
             })
 
         except Exception as e:
-            print(traceback.format_exc())
+            logger.error(traceback.format_exc())
             return JsonResponse({"error": str(e)}, status=500)
     else:
         return JsonResponse({"error": "只接受 POST 請求"}, status=405)
@@ -245,7 +248,7 @@ def search_tayal_words_bulk(keywords: list) -> dict:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
     except Exception as e:
-        print(f"[DB ERROR] 資料庫連線失敗: {e}")
+        logger.error("[DB ERROR] DB connection failed: %s", e)
         return {}
 
     result_map = {}
@@ -255,7 +258,7 @@ def search_tayal_words_bulk(keywords: list) -> dict:
         cursor.execute(query, keywords)
         rows = cursor.fetchall()
     except Exception as e:
-        print(f"[DB ERROR] 查詢失敗: {e}")
+        logger.error("[DB ERROR] Query failed: %s", e)
         rows = []
     finally:
         conn.close()
@@ -285,7 +288,7 @@ def search_tayal_words(keyword=None, limit=8):
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
     except Exception as e:
-        print(f"[DB ERROR] 資料庫連線失敗: {e}")
+        logger.error("[DB ERROR] DB connection failed: %s", e)
         return []
 
     results = []
@@ -299,7 +302,7 @@ def search_tayal_words(keyword=None, limit=8):
 
         results = cursor.fetchall()
     except Exception as e:
-        print(f"[DB ERROR] 查詢失敗: {e}")
+        logger.error("[DB ERROR] Query failed: %s", e)
     finally:
         conn.close()
 

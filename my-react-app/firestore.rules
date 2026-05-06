@@ -1,11 +1,23 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // 使用者資料：只有本人可讀寫
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+
+    // 共享筆記：登入者可讀；作者可建立/刪除；登入者可更新（按讚等互動）
+    match /sharedNotes/{noteId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+
+    // 其他所有文件：預設拒絕，避免未知集合被誤開放
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if false;
     }
   }
 }
