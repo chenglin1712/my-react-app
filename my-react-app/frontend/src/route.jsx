@@ -39,6 +39,7 @@ import PaiwanListeningGame from './_game/paiwan_listening';
 import SentencePage from './_game/sentence';
 import TayalSentenceGame from './_game/tayal_sentence';
 import AmisSentenceGame from './_game/amis_sentence';
+import BununSentenceGame from './_game/bunun_sentence';
 //測驗
 import QuizTribeSelect from './_quiz/tribeSelect';
 import QuizPage from './_quiz/index';
@@ -100,6 +101,7 @@ const App = () => {
       <Route path="/game/sentence" element={<ProtectedRoute><SentencePage /></ProtectedRoute>} />
       <Route path="/game/sentence/tayal" element={<ProtectedRoute><TayalSentenceGame /></ProtectedRoute>} />
       <Route path="/game/sentence/amis" element={<ProtectedRoute><AmisSentenceGame /></ProtectedRoute>} />
+      <Route path="/game/sentence/bunun" element={<ProtectedRoute><BununSentenceGame /></ProtectedRoute>} />
       <Route path="/quiz/select" element={<ProtectedRoute><QuizTribeSelect /></ProtectedRoute>} />
       <Route path="/quiz" element={<ProtectedRoute><QuizPage /></ProtectedRoute>} >
         <Route path="" element={<Comp_quiz />} >

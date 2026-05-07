@@ -5,7 +5,7 @@ import "../../static/css/_game/vocabulary.css";
 const TRIBES = [
   { name: "泰雅", color: "#9B1B30", hasGame: true,  route: "/game/sentence/tayal" },
   { name: "阿美", color: "#D4890A", hasGame: true,  route: "/game/sentence/amis" },
-  { name: "布農", color: "#4E7F63", hasGame: false, route: null },
+  { name: "布農", color: "#4E7F63", hasGame: true,  route: "/game/sentence/bunun" },
   { name: "葛瑪蘭", color: "#4A7FA5", hasGame: false, route: null },
   { name: "排灣", color: "#6B4FAA", hasGame: false, route: null },
 ];
