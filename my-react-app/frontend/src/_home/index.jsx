@@ -23,7 +23,8 @@ const App = () => {
                 const withoutImg = news.filter((item) => !item.image);
                 setNewsWithImage(withImg);
                 setNewsWithoutImage(withoutImg);
-            });
+            })
+            .catch(() => {});
     }, []);
 
     return (

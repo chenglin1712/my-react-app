@@ -240,8 +240,9 @@ const Review = () => {
                                             <button
                                                 className="play-btn"
                                                 onClick={() => {
-                                                    const audio = new Audio(selectedQuestion.audio);
-                                                    audio.play();
+                                                    if (selectedQuestion.audio) {
+                                                        new Audio(selectedQuestion.audio).play().catch(() => {});
+                                                    }
                                                 }}
                                             >
                                                 <Play size={20} />
