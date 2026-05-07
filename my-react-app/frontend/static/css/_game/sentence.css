@@ -1,0 +1,279 @@
+/* ── 句型練習共用容器 ─────────────────────────── */
+.sent-intro,
+.sent-game,
+.sent-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem 1.5rem 2.5rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── 介紹畫面 ──────────────────────────────────── */
+.sent-intro-line {
+  font-size: 0.95rem;
+  color: #444;
+  text-align: center;
+  margin: 0.3rem 0;
+  line-height: 1.7;
+  font-family: "Noto Sans TC", sans-serif;
+}
+
+.sent-error {
+  color: #c0392b;
+  font-size: 0.9rem;
+  margin-top: 0.8rem;
+}
+
+/* ── 主要按鈕 ──────────────────────────────────── */
+.sent-btn-primary {
+  margin-top: 1.8rem;
+  padding: 0.65rem 2.5rem;
+  background: #9B1B30;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.15s;
+}
+.sent-btn-primary:hover:not(:disabled) {
+  background: #7a1326;
+  transform: translateY(-2px);
+}
+.sent-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.sent-btn-secondary {
+  margin-top: 1.8rem;
+  padding: 0.65rem 1.8rem;
+  background: #fff;
+  color: #9B1B30;
+  border: 2px solid #9B1B30;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.15s;
+}
+.sent-btn-secondary:hover {
+  background: #fdf5f5;
+  transform: translateY(-2px);
+}
+
+/* ── 進度條 ───────────────────────────────────── */
+.sent-progress {
+  width: 100%;
+  max-width: 520px;
+  height: 6px;
+  background: #eee;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 0.6rem;
+}
+.sent-progress-bar {
+  height: 100%;
+  background: #9B1B30;
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+.sent-counter {
+  font-size: 0.85rem;
+  color: #888;
+  margin: 0 0 1.5rem;
+}
+
+/* ── 例句卡 ───────────────────────────────────── */
+.sent-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #fdf5f5;
+  border: 1.5px solid #f0c0c5;
+  border-radius: 14px;
+  padding: 1.5rem 2rem;
+  width: 100%;
+  max-width: 520px;
+  margin-bottom: 1.4rem;
+  gap: 0.75rem;
+}
+
+.sent-sentence {
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #9B1B30;
+  margin: 0;
+  text-align: center;
+  letter-spacing: 0.02em;
+  line-height: 1.45;
+}
+
+.sent-play-btn {
+  padding: 0.45rem 1.4rem;
+  background: #9B1B30;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.15s;
+}
+.sent-play-btn:hover {
+  background: #7a1326;
+  transform: translateY(-1px);
+}
+.sent-play-btn.playing {
+  background: #c0392b;
+  animation: sentPulse 0.9s infinite;
+}
+@keyframes sentPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(155, 27, 48, 0.45); }
+  70%  { box-shadow: 0 0 0 12px rgba(155, 27, 48, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(155, 27, 48, 0); }
+}
+
+.sent-question-hint {
+  font-size: 0.92rem;
+  color: #777;
+  margin: 0 0 0.75rem;
+}
+
+/* ── 答案選項 ─────────────────────────────────── */
+.sent-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  width: 100%;
+  max-width: 520px;
+}
+
+.sent-option {
+  padding: 0.85rem 1rem;
+  border: 2px solid #ddd;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.12s;
+  text-align: left;
+  line-height: 1.45;
+}
+.sent-option:hover:not(:disabled) {
+  border-color: #9B1B30;
+  background: #fdf5f5;
+  transform: translateX(4px);
+}
+.sent-option.correct {
+  border-color: #27ae60;
+  background: #eafaf1;
+  color: #1e8449;
+  font-weight: 700;
+}
+.sent-option.wrong {
+  border-color: #e74c3c;
+  background: #fdedec;
+  color: #c0392b;
+}
+.sent-option.dimmed {
+  opacity: 0.4;
+}
+
+/* ── 答題回饋 ─────────────────────────────────── */
+.sent-feedback {
+  margin-top: 1rem;
+  font-size: 1rem;
+  font-weight: 700;
+  animation: sentFadeIn 0.3s ease;
+  text-align: center;
+}
+.sent-feedback.correct { color: #1e8449; }
+.sent-feedback.wrong   { color: #c0392b; }
+
+@keyframes sentFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── 結果畫面 ─────────────────────────────────── */
+.sent-result-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #9B1B30;
+  margin-bottom: 1.2rem;
+}
+
+.sent-result-score {
+  text-align: center;
+  padding: 1rem 2.5rem;
+  border-radius: 14px;
+  margin-bottom: 1.8rem;
+}
+.sent-result-score.excellent { background: #eafaf1; border: 1.5px solid #a9dfbf; }
+.sent-result-score.good      { background: #eaf4fb; border: 1.5px solid #a9cce3; }
+.sent-result-score.fair      { background: #fef9e7; border: 1.5px solid #f9e79f; }
+.sent-result-score.poor      { background: #fdedec; border: 1.5px solid #f5b7b1; }
+
+.sent-result-num   { font-size: 3.5rem; font-weight: 900; color: #9B1B30; line-height: 1; }
+.sent-result-denom { font-size: 1.6rem; color: #888; }
+.sent-result-pct   { font-size: 1.1rem; color: #aaa; margin: 0.3rem 0 0; }
+
+.sent-result-list {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.sent-result-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+.sent-result-row.correct {
+  background: #eafaf1;
+  border: 1px solid #a9dfbf;
+}
+.sent-result-row.wrong {
+  background: #fdedec;
+  border: 1px solid #f5b7b1;
+}
+
+.sent-result-icon { font-size: 1rem; flex-shrink: 0; margin-top: 0.15rem; }
+.sent-result-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+}
+.sent-result-tayal {
+  font-weight: 700;
+  color: #9B1B30;
+  font-size: 0.95rem;
+}
+.sent-result-ans { color: #555; font-size: 0.88rem; }
+
+.sent-result-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ── RWD ──────────────────────────────────────── */
+@media (max-width: 480px) {
+  .sent-sentence { font-size: 1.25rem; }
+  .sent-card { padding: 1.25rem 1rem; }
+  .sent-option { font-size: 0.88rem; }
+}

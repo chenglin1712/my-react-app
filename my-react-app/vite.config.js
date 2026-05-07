@@ -54,6 +54,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      '/sentence': {
+        target: 'http://127.0.0.1:8001',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   }
 })

@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from .routes import crawler, vision, dictionary, quiz, listening
+from .routes import crawler, vision, dictionary, quiz, listening, sentence
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
@@ -25,5 +25,6 @@ app.include_router(vision.router, prefix="/vision")
 app.include_router(dictionary.router, prefix="/dictionary")
 app.include_router(quiz.router, prefix="/quiz")
 app.include_router(listening.router, prefix="/listening")
+app.include_router(sentence.router, prefix="/sentence")
 
 

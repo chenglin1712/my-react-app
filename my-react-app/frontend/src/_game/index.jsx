@@ -33,10 +33,11 @@ const GAMES = [
   {
     id: "sentence",
     title: "句型練習",
-    subtitle: "Coming Soon",
-    desc: "學習族語基礎句型與日常用語",
+    subtitle: "Lmuhuw ATAYAL",
+    desc: "閱讀族語例句，選出正確的中文意思，訓練句型理解能力",
     emoji: "📖",
-    available: false,
+    available: true,
+    route: "/game/sentence",
   },
 ];
 

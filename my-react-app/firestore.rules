@@ -7,7 +7,37 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // 共享筆記：登入者可讀；作者可建立/刪除；登入者可更新（按讚等互動）
+    // 測驗題目：登入者可讀；登入者可建立
+    match /quizs/{quizId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+    }
+
+    // 答題情形：只有本人可讀；只有本人可建立
+    match /situations/{situationId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
+    // 使用者學習統計：本人可讀自己的資料；globalAverages 所有登入者可讀；只由後端寫入
+    match /userSituation/{docId} {
+      allow read: if request.auth != null &&
+                     (docId == "globalAverages" || resource.data.userId == request.auth.uid);
+      allow write: if false;
+    }
+
+    // 個人行事曆：只有本人可讀寫
+    match /calendar/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // 發音錄音：登入者可讀；登入者可建立自己的錄音
+    match /pronunciations/{tribe}/recordings/{recordingId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+    }
+
+    // 共享筆記：登入者可讀；登入者可建立；登入者可更新（按讚）；作者可刪除
     match /sharedNotes/{noteId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
