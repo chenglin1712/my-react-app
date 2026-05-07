@@ -5,7 +5,7 @@ import "../../static/css/_game/sentence.css";
 
 const TRIBE_INTRO = {
   tayal: {
-    title: "Lmuhuw ATAYAL - 泰雅句型練習",
+    hint: "這句泰雅語的意思是？",
     lines: [
       "歡迎來到《Lmuhuw ATAYAL - 泰雅句型練習》的世界！",
       "泰雅族語中，句型是連接詞彙與文化表達的橋樑",
@@ -13,6 +13,17 @@ const TRIBE_INTRO = {
       "學習常見句型，讓你更自然地理解並開口說族語",
       "每次練習 5 個句型，由淺入深，循序漸進",
       "準備好了嗎？跟著我們一起，感受泰雅語的句子之美！",
+    ],
+  },
+  amis: {
+    hint: "這句阿美語的意思是？",
+    lines: [
+      "歡迎來到《Lmuhuw AMIS - 阿美句型練習》的世界！",
+      "阿美族語是台灣原住民族中使用人口最多的語言",
+      "每一道題目展示一個阿美語例句，請選出正確的中文意思",
+      "學習常見句型，讓你更自然地理解並開口說族語",
+      "每次練習 5 個句型，由淺入深，循序漸進",
+      "準備好了嗎？跟著我們一起，感受阿美語的句子之美！",
     ],
   },
 };
@@ -148,7 +159,7 @@ function SentenceGame({ tribe = "tayal" }) {
           )}
         </div>
 
-        <p className="sent-question-hint">這句泰雅語的意思是？</p>
+        <p className="sent-question-hint">{config.hint}</p>
 
         <div className="sent-options">
           {q.options.map((opt) => {

@@ -44,6 +44,12 @@ def get_sentence_questions(
                         continue
                     audio_items = sent.get('audioItems') or []
                     audio_id = audio_items[0].get('fileId') if audio_items else None
+                    if not audio_id:
+                        try:
+                            word_audio = json.loads(w.audio_items or '[]')
+                            audio_id = word_audio[0].get('fileId') if word_audio else None
+                        except Exception:
+                            pass
                     valid_sentences.append({
                         'tayal':    original,
                         'chinese':  chinese,
