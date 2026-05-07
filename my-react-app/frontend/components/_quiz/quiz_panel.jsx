@@ -182,9 +182,19 @@ const Panel = () => {
     //在一開始先加載所有圖片，避免切換題目有延遲
     useEffect(() => {
         if (data?.parts?.[0]?.questions) {
+            const type = data.parts[0].type;
             data.parts[0].questions.forEach((q) => {
-                const img = new Image();
-                img.src = q.image;
+                if (type === "true_false" && q.image) {
+                    const img = new Image();
+                    img.src = q.image;
+                } else if (type === "choice") {
+                    ["imageA", "imageB", "imageC"].forEach((key) => {
+                        if (q[key]) {
+                            const img = new Image();
+                            img.src = q[key];
+                        }
+                    });
+                }
             });
         }
     }, [data]);

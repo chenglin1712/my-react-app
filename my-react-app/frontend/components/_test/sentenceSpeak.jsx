@@ -58,7 +58,7 @@ export default function SentenceSpeak({ question, selected, checked, onSelect, o
     const proxyUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL + fileId;
     const newAudio = new Audio(proxyUrl);
 
-    newAudio.play().catch(err => console.error("播放失敗:", err));
+    newAudio.play().catch(() => {});
     setAudio(newAudio);
   };
   // ▶ 播放自己的錄音
