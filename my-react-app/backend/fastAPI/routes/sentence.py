@@ -58,7 +58,7 @@ def get_sentence_questions(
         except Exception:
             continue
 
-    # 以 tayal 句子去重
+    # 以 tayal 句子去重，優先保留有音訊的版本
     seen = set()
     unique_sentences = []
     for s in valid_sentences:
@@ -66,11 +66,15 @@ def get_sentence_questions(
             seen.add(s['tayal'])
             unique_sentences.append(s)
 
-    if len(unique_sentences) < 4:
+    # 只從有音訊的句子中抽題，確保每題都有發音輔助
+    with_audio = [s for s in unique_sentences if s['audio_id']]
+    pool = with_audio if len(with_audio) >= 4 else unique_sentences
+
+    if len(pool) < 4:
         raise HTTPException(status_code=500, detail='例句資料不足，無法生成句型題目')
 
     # 隨機抽題
-    selected = random.sample(unique_sentences, min(count, len(unique_sentences)))
+    selected = random.sample(pool, min(count, len(pool)))
     all_chinese = list({s['chinese'] for s in unique_sentences})
 
     questions = []
