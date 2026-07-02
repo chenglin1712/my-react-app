@@ -138,6 +138,26 @@
     width: 24px;
 }
 
+.quiz-user-answer-text,
+.quiz-correct-answer-text {
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.quiz-user-answer-text.correct {
+    color: #155724;
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+}
+
+.quiz-user-answer-text.wrong {
+    color: #721c24;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+}
+
 .submit-question-q2 {
     display: flex;
     justify-content: space-between;

@@ -2,6 +2,8 @@ import "../../static/css/_quiz/quiz_panel.css"
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from 'react'
 import AnswerBox from "./quiz_answerBox"
+import MatchingQuestion from "./quiz_matching_question"
+import ClozeQuestion from "./quiz_cloze_question"
 import lottie from 'lottie-web';
 import loadingAnimation from "../../src/animations/loading.json"
 import { Star, CircleHelp } from "lucide-react";
@@ -103,6 +105,18 @@ const Panel = () => {
                             B: q.imageB,
                             C: q.imageC
                         },
+                        answer: parseInt(q.answer)
+                    };
+                } else if (data.parts[0].type === "matching") {
+                    return {
+                        pairs: q.pairs,
+                        answer: q.answer
+                    };
+                } else if (data.parts[0].type === "cloze") {
+                    return {
+                        passage_ab: q.passage_ab,
+                        passage_ch: q.passage_ch,
+                        options: q.options,
                         answer: parseInt(q.answer)
                     };
                 }
@@ -248,18 +262,19 @@ const Panel = () => {
                         <div className="question-container">
                             <div className="title-container">
                                 <p><strong>題目{currentQuestionIndex + 1}：</strong></p>
-                                {data.parts[0].type === "true_false" ? (
+                                {data.parts[0].type === "true_false" && (
                                     <audio controls>
                                         <source src={currentQuestion.audio} type="audio/mpeg" />
                                         您的瀏覽器不支持音檔。
                                     </audio>
-                                ) : (
+                                )}
+                                {data.parts[0].type === "choice" && (
                                     <p>{currentQuestion.question_ab}</p>
                                 )}
                                 <Star size={24} className={`${userStars[currentQuestionIndex] === "T" ? 'star' : ''}`} onClick={handleStar} />
                             </div>
 
-                            {data.parts[0].type === "true_false" ? (
+                            {data.parts[0].type === "true_false" && (
                                 <>
                                     <img src={currentQuestion.image} alt="Question" className="question-image" />
                                     <div className="answers">
@@ -271,7 +286,9 @@ const Panel = () => {
                                         </button>
                                     </div>
                                 </>
-                            ) : (
+                            )}
+
+                            {data.parts[0].type === "choice" && (
                                 <div className="quiz-multi-images">
                                     {["A", "B", "C"].map((label, idx) => (
                                         <div
@@ -287,6 +304,24 @@ const Panel = () => {
                                         </div>
                                     ))}
                                 </div>
+                            )}
+
+                            {data.parts[0].type === "matching" && (
+                                <MatchingQuestion
+                                    key={currentQuestionIndex}
+                                    question={currentQuestion}
+                                    answered={userAnswers[currentQuestionIndex] != null}
+                                    resultValue={userAnswers[currentQuestionIndex]}
+                                    onAnswer={handleAnswer}
+                                />
+                            )}
+
+                            {data.parts[0].type === "cloze" && (
+                                <ClozeQuestion
+                                    question={currentQuestion}
+                                    selected={userAnswers[currentQuestionIndex]}
+                                    onSelect={handleAnswer}
+                                />
                             )}
                         </div>
 

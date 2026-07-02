@@ -77,7 +77,7 @@ const Panel_Submit = () => {
     const displayScore = data ? score : countScore(displayData?.results ?? []);
 
     const difficulty = DIFFICULTY_MAP[displayData?.quiz?.title] ?? 1;
-    const labels = ["A", "B", "C"];
+    const labels = ["A", "B", "C", "D"];
     const displayName = userData?.firestoreData?.name ?? "未登入";
 
     return (
@@ -155,6 +155,30 @@ const Panel_Submit = () => {
                                             </div>
                                             <span className={`quiz-user-answer ${isCorrect ? "correct" : "wrong"}`}>{userAnswer}</span>
                                             <span className="quiz-correct-answer">{correctAnswer}</span>
+                                        </>
+                                    ) : displayData.quiz.title === "中高級" ? (
+                                        <>
+                                            <div className="submit-question-q">
+                                                <span>配合題：{item.pairs?.map(p => `${p.cn}→${p.tayal.word}`).join('；')}</span>
+                                            </div>
+                                            <span className={`quiz-user-answer-text ${isCorrect ? "correct" : "wrong"}`}>
+                                                {userAnswerNum === 1 ? "全對" : userAnswerNum === 2 ? "有錯" : "未作答"}
+                                            </span>
+                                            <span className="quiz-correct-answer-text">全對</span>
+                                        </>
+                                    ) : displayData.quiz.title === "高級" ? (
+                                        <>
+                                            <div className="submit-question-q2">
+                                                <span>{item.passage_ab}</span>
+                                                <div>
+                                                    <button>中</button>
+                                                    <p style={{margin:"0"}}>{item.passage_ch}</p>
+                                                </div>
+                                            </div>
+                                            <span className={`quiz-user-answer-text ${isCorrect ? "correct" : "wrong"}`}>
+                                                {item.options?.[userAnswerNum - 1] ?? "未作答"}
+                                            </span>
+                                            <span className="quiz-correct-answer-text">{item.options?.[correctAnswerNum - 1] ?? "-"}</span>
                                         </>
                                     ) : (
                                         <>

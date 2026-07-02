@@ -8,8 +8,8 @@ const Panel_Start = () => {
     const levels = [
         { name: "初級", short: "初", time: "5 分鐘", type: "是非題", disabled: false },
         { name: "中級", short: "中", time: "10 分鐘", type: "選擇題", disabled: false },
-        { name: "中高級", short: "中+", time: "10 分鐘", type: "配合題", disabled: true },
-        { name: "高級", short: "高", time: "20 分鐘", type: "閱讀填空", disabled: true }
+        { name: "中高級", short: "中+", time: "10 分鐘", type: "配合題", disabled: false },
+        { name: "高級", short: "高", time: "20 分鐘", type: "閱讀填空", disabled: false }
     ];
 
     const recommendedLevelIndex = 1;

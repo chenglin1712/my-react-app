@@ -1,12 +1,29 @@
 import requests
 from django.http import JsonResponse
 from bs4 import BeautifulSoup
+from .tayal_bank import build_matching_test, build_cloze_test
 
-#爬取線上測驗題目(初級)
+DISPLAY_DIALECT_NAME = "泰雅語 - 賽考利克泰雅語"
+
+#爬取線上測驗題目(初級/中級)，中高級/高級改用本地題庫（見下方說明）
 def get_quiz_data(request):
     #取得等級，預設1
     level = request.GET.get("level","1")
-    url = "https://api.lokahsu.org.tw/api/front_end/start_exam?dialect_id=6&level=1"
+
+    # 中高級(3)、高級(4)：官方練習介面 start_exam 對這兩個等級一律回傳
+    # part1~part4 = null（實測過 dialect_id 1~10 皆同），代表該 demo API
+    # 根本沒有開放這兩級的題目資料，因此不打外部API，改走本地題庫的
+    # 選題公式（tayal_bank.py 內有完整命題邏輯說明）。
+    if level == "3":
+        format_data = {"chapter_name": DISPLAY_DIALECT_NAME, "parts": [build_matching_test()]}
+        return JsonResponse(format_data, safe=False)
+    elif level == "4":
+        format_data = {"chapter_name": DISPLAY_DIALECT_NAME, "parts": [build_cloze_test()]}
+        return JsonResponse(format_data, safe=False)
+    elif level not in ("1", "2"):
+        return JsonResponse({"Error": f"不支援的等級: {level}"}, status=400)
+
+    url = f"https://api.lokahsu.org.tw/api/front_end/start_exam?dialect_id=6&level={level}"
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
@@ -20,10 +37,8 @@ def get_quiz_data(request):
 
         if level == "1":
             format_data = format_quiz_data_1(data)
-        elif level == "2":
-            format_data = format_quiz_data_2(data)
         else:
-            return JsonResponse({"Error": f"不支援的等級: {level}"}, status=400)
+            format_data = format_quiz_data_2(data)
         return JsonResponse(format_data, safe=False)
     else:
         return JsonResponse({"Error: ": "讀取資料失敗"}, status=500)
