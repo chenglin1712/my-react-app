@@ -22,11 +22,11 @@ const SideBar = () => {
     const [open, setOpen] = useState(false);
     const currentUrl = useLocation().pathname;
     const [selectFunc, setSelectFunc] = useState(currentUrl); //預設為開始測驗
+    const quizBasePath = currentUrl.startsWith("/quiz/amis") ? "/quiz/amis" : "/quiz";
 
     //點功能選單
     const clickFunc = (func) => {
-        let path = "/quiz";
-        path += func.includes("quiz") ? "" : "/" + func;
+        let path = func.includes("quiz") ? quizBasePath : "/quiz/" + func;
         navigate(path);
         setSelectFunc(func);
     };

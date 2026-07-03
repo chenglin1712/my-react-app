@@ -155,7 +155,7 @@ def build_matching_test():
             "pairs": [
                 {
                     "cn": item["chinese"],
-                    "tayal": {"word": item["tayal"], "audio": ""},
+                    "word": {"word": item["tayal"], "audio": ""},
                 }
                 for item in chunk
             ],

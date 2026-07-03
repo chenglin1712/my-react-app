@@ -1,12 +1,15 @@
 import { db, auth } from "../../../firebase";
 import { collection, addDoc, serverTimestamp, query, where, doc, getDoc, getDocs, orderBy } from "firebase/firestore";
 
+const TRIBE_NAME = { tayal: "泰雅語", amis: "阿美語" };
+
 //測驗題目存至資料庫
-export const uploadQuizDB = async (level_ch, data) => {
+export const uploadQuizDB = async (level_ch, data, tribe = "tayal") => {
     const correctAnswers = data.map(q => q.answer);
 
     const quizSet = {
         title: level_ch,
+        tribe,
         createdAt: serverTimestamp(),
         data
     };
@@ -143,9 +146,13 @@ export const getCurrentSituation = async () => {
                         const quizRef = doc(db, "quizs", s.quizId);
                         const quizSnap = await getDoc(quizRef);
                         if (quizSnap.exists()) {
+                            const quizData = quizSnap.data();
+                            // 舊資料沒有 tribe 欄位，一律視為泰雅語（該功能上線時唯一支援的語言）
+                            const tribe = quizData.tribe || "tayal";
+                            const title = quizData.title || "未知";
                             return {
                                 ...s,
-                                quizType: quizSnap.data().title || "未知",
+                                quizType: tribe === "tayal" ? title : `${TRIBE_NAME[tribe] || tribe}-${title}`,
                             };
                         }
                     } catch (err) {

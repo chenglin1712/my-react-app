@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef } from "react";
 import "../../static/css/_quiz/quiz_answerBox.css"
 import { Timer } from "lucide-react"
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 
 const Box = ({ dataLen, userAnswers, userStars, setCurrentQuestionIndex }) => {
     const { level } = useParams();
     const navigate = useNavigate();
+    const basePath = useLocation().pathname.startsWith("/quiz/amis") ? "/quiz/amis" : "/quiz";
 
     const questions = Array.from({ length: dataLen }, (num, i) => (i + 1).toString());
 
@@ -62,7 +63,7 @@ const Box = ({ dataLen, userAnswers, userStars, setCurrentQuestionIndex }) => {
                 return;
             }
         }
-        navigate(`/quiz/${level}/submit`);
+        navigate(`${basePath}/${level}/submit`);
     };
 
     return (

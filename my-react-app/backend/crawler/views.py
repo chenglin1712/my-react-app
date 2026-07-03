@@ -1,29 +1,50 @@
 import requests
 from django.http import JsonResponse
 from bs4 import BeautifulSoup
-from .tayal_bank import build_matching_test, build_cloze_test
+from . import tayal_bank
+from . import amis_bank
 
-DISPLAY_DIALECT_NAME = "泰雅語 - 賽考利克泰雅語"
+# 各族語對應的官方練習介面 dialect_id、顯示名稱、以及中高級/高級本地題庫的
+# 選題公式進入點。要新增族語時只需在這裡多加一個 key，不用動 get_quiz_data 邏輯。
+TRIBE_CONFIG = {
+    "tayal": {
+        "dialect_id": 6,
+        "display_name": "泰雅語 - 賽考利克泰雅語",
+        "matching_test": tayal_bank.build_matching_test,
+        "cloze_test": tayal_bank.build_cloze_test,
+    },
+    "amis": {
+        "dialect_id": 2,
+        "display_name": "阿美語 - 秀姑巒阿美語",
+        "matching_test": amis_bank.build_matching_test,
+        "cloze_test": amis_bank.build_cloze_test,
+    },
+}
 
 #爬取線上測驗題目(初級/中級)，中高級/高級改用本地題庫（見下方說明）
 def get_quiz_data(request):
-    #取得等級，預設1
-    level = request.GET.get("level","1")
+    #取得族語與等級，預設泰雅語/1
+    tribe = request.GET.get("tribe", "tayal")
+    level = request.GET.get("level", "1")
+
+    config = TRIBE_CONFIG.get(tribe)
+    if not config:
+        return JsonResponse({"Error": f"不支援的族語: {tribe}"}, status=400)
 
     # 中高級(3)、高級(4)：官方練習介面 start_exam 對這兩個等級一律回傳
-    # part1~part4 = null（實測過 dialect_id 1~10 皆同），代表該 demo API
-    # 根本沒有開放這兩級的題目資料，因此不打外部API，改走本地題庫的
-    # 選題公式（tayal_bank.py 內有完整命題邏輯說明）。
+    # part1~part4 = null（實測過阿美語 dialect_id 1~5、泰雅語 dialect_id 1~10
+    # 皆同），代表該 demo API 根本沒有開放這兩級的題目資料，因此不打外部API，
+    # 改走本地題庫的選題公式（tayal_bank.py／amis_bank.py 內有完整命題邏輯說明）。
     if level == "3":
-        format_data = {"chapter_name": DISPLAY_DIALECT_NAME, "parts": [build_matching_test()]}
+        format_data = {"chapter_name": config["display_name"], "parts": [config["matching_test"]()]}
         return JsonResponse(format_data, safe=False)
     elif level == "4":
-        format_data = {"chapter_name": DISPLAY_DIALECT_NAME, "parts": [build_cloze_test()]}
+        format_data = {"chapter_name": config["display_name"], "parts": [config["cloze_test"]()]}
         return JsonResponse(format_data, safe=False)
     elif level not in ("1", "2"):
         return JsonResponse({"Error": f"不支援的等級: {level}"}, status=400)
 
-    url = f"https://api.lokahsu.org.tw/api/front_end/start_exam?dialect_id=6&level={level}"
+    url = f"https://api.lokahsu.org.tw/api/front_end/start_exam?dialect_id={config['dialect_id']}&level={level}"
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",

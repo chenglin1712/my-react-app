@@ -26,7 +26,7 @@ const MatchingQuestion = ({ question, answered, resultValue, onAnswer }) => {
             return newArr;
         };
         setLeftList(shuffle(question.pairs.map((p) => p.cn)));
-        setRightList(shuffle(question.pairs.map((p) => p.tayal)));
+        setRightList(shuffle(question.pairs.map((p) => p.word)));
         setSelectedWord(null);
         setMatches({});
         setWrongPair(null);
@@ -45,7 +45,7 @@ const MatchingQuestion = ({ question, answered, resultValue, onAnswer }) => {
                         <div className="match-answer-key-row" key={p.cn}>
                             <span>{p.cn}</span>
                             <span className="match-answer-arrow">→</span>
-                            <span>{p.tayal.word}</span>
+                            <span>{p.word.word}</span>
                         </div>
                     ))}
                 </div>
@@ -66,12 +66,12 @@ const MatchingQuestion = ({ question, answered, resultValue, onAnswer }) => {
         }
 
         const cn = isCn ? word : selectedWord.word;
-        const tayal = isCn ? selectedWord.word : word;
+        const wordVal = isCn ? selectedWord.word : word;
         const pair = question.pairs.find((p) => p.cn === cn);
         if (!pair) { setSelectedWord(null); return; }
 
-        if (pair.tayal.word === tayal) {
-            const newMatches = { ...matches, [cn]: tayal };
+        if (pair.word.word === wordVal) {
+            const newMatches = { ...matches, [cn]: wordVal };
             setMatches(newMatches);
             setSelectedWord(null);
 
@@ -80,7 +80,7 @@ const MatchingQuestion = ({ question, answered, resultValue, onAnswer }) => {
                 onAnswer(1);
             }
         } else {
-            setWrongPair({ cn, chosen: tayal, correct: pair.tayal.word });
+            setWrongPair({ cn, chosen: wordVal, correct: pair.word.word });
             setIsFinished(true);
             onAnswer(2);
         }
@@ -111,14 +111,14 @@ const MatchingQuestion = ({ question, answered, resultValue, onAnswer }) => {
                     ))}
                 </div>
                 <div className="match-col">
-                    {rightList.map((tayal) => (
+                    {rightList.map((wordItem) => (
                         <button
-                            key={tayal.word}
-                            className={getButtonClass(tayal.word, false)}
-                            onClick={() => handleSelect(tayal.word, false)}
+                            key={wordItem.word}
+                            className={getButtonClass(wordItem.word, false)}
+                            onClick={() => handleSelect(wordItem.word, false)}
                             disabled={isFinished}
                         >
-                            {tayal.word}
+                            {wordItem.word}
                         </button>
                     ))}
                 </div>

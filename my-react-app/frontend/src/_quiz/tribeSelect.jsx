@@ -16,7 +16,8 @@ const TRIBES = [
     name: "阿美",
     subtitle: "Amis",
     emoji: "📝",
-    available: false,
+    available: true,
+    route: "/quiz/amis",
   },
   {
     id: "bunun",

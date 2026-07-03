@@ -6,9 +6,11 @@ import { getQuizSubmitById, countScore } from "../../src/userServives/uploadDb"
 import { useAuth } from "../../src/userServives/authContext"
 
 const DIFFICULTY_MAP = { "初級": 1, "中級": 2, "中高級": 3, "高級": 4 };
+const TRIBE_NAME = { tayal: "泰雅語", amis: "阿美語" };
 
-const Panel_Submit = () => {
+const Panel_Submit = ({ tribe = "tayal" }) => {
     const navigate = useNavigate();
+    const basePath = tribe === "tayal" ? "/quiz" : `/quiz/${tribe}`;
     const { userData } = useAuth();
     const [isLoad, setIsLoad] = useState(true);
 
@@ -88,7 +90,7 @@ const Panel_Submit = () => {
                         <p>姓名：<span className="user-info">{displayName}</span></p>
                         <div className="user-infoo">
                             <p>類型：
-                                <span className="user-info">{displayData?.quiz?.title}</span>
+                                <span className="user-info">{TRIBE_NAME[tribe] ?? ""} {displayData?.quiz?.title}</span>
                                 <span className="stars">
                                     {Array.from({ length: 5 }, (_, i) => (
                                         <Star
@@ -159,7 +161,7 @@ const Panel_Submit = () => {
                                     ) : displayData.quiz.title === "中高級" ? (
                                         <>
                                             <div className="submit-question-q">
-                                                <span>配合題：{item.pairs?.map(p => `${p.cn}→${p.tayal.word}`).join('；')}</span>
+                                                <span>配合題：{item.pairs?.map(p => `${p.cn}→${p.word.word}`).join('；')}</span>
                                             </div>
                                             <span className={`quiz-user-answer-text ${isCorrect ? "correct" : "wrong"}`}>
                                                 {userAnswerNum === 1 ? "全對" : userAnswerNum === 2 ? "有錯" : "未作答"}
@@ -200,7 +202,7 @@ const Panel_Submit = () => {
                 </div>
 
                 <div className="submit-actions">
-                    <button className="btn-secondary" onClick={() => navigate('/quiz')}>
+                    <button className="btn-secondary" onClick={() => navigate(basePath)}>
                         返回開始測驗
                     </button>
                     <button className="btn-primary" onClick={() => navigate('/quiz/situation')}>

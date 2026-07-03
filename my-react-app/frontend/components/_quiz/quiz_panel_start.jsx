@@ -2,8 +2,9 @@ import "../../static/css/_quiz/quiz_panel_start.css"
 import { useNavigate } from "react-router-dom";
 import RecommonImg from "../../static/assets/_quiz/recommon.png"
 
-const Panel_Start = () => {
+const Panel_Start = ({ tribe = "tayal" }) => {
     const navigate = useNavigate();
+    const basePath = tribe === "tayal" ? "/quiz" : `/quiz/${tribe}`;
 
     const levels = [
         { name: "初級", short: "初", time: "5 分鐘", type: "是非題", disabled: false },
@@ -45,7 +46,7 @@ const Panel_Start = () => {
                                 className="level-card-btn"
                                 onClick={() => {
                                     if (!level.disabled) {
-                                        navigate(`/quiz/${index + 1}`);
+                                        navigate(`${basePath}/${index + 1}`);
                                     }
                                 }}
                             >

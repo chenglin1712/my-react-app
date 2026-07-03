@@ -9,10 +9,11 @@ import loadingAnimation from "../../src/animations/loading.json"
 import { Star, CircleHelp } from "lucide-react";
 import { uploadQuizDB, uploadSituationDB } from "../../src/userServives/uploadDb"
 
-const Panel = () => {
+const Panel = ({ tribe = "tayal" }) => {
     const levels = ["初級", "中級", "中高級", "高級"];
     const { level } = useParams();
     const level_ch = levels[parseInt(level) - 1];
+    const basePath = tribe === "tayal" ? "/quiz" : `/quiz/${tribe}`;
 
     const navigate = useNavigate();
     const animation = useRef(null);
@@ -47,7 +48,7 @@ const Panel = () => {
         let isMounted = true;
         async function fetchData() {
             try {
-                const response = await fetch(`${import.meta.env.VITE_API_QUIZ_URL}?level=${level}`);
+                const response = await fetch(`${import.meta.env.VITE_API_QUIZ_URL}?level=${level}&tribe=${tribe}`);
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
@@ -122,11 +123,11 @@ const Panel = () => {
                 }
             });
             setSavedQuestions(formatted);
-            const quiz = await uploadQuizDB(level_ch, formatted);
+            const quiz = await uploadQuizDB(level_ch, formatted, tribe);
             setQuizInfo(quiz);
         };
         handlleUploadQuiz();
-    }, [data, level_ch]);
+    }, [data, level_ch, tribe]);
 
     // 下一題
     const nextQuestion = () => {
@@ -167,12 +168,13 @@ const Panel = () => {
         const situationID = await handleUploadSituation();
         const fallbackData = {
             title: level_ch,
+            tribe,
             questions: savedQuestions,
             answers: userAnswers,
             correctAnswers: quizInfo?.ans ?? []
         };
         sessionStorage.setItem('quizFallback', JSON.stringify(fallbackData));
-        navigate(`/quiz/${level}/submit`, {
+        navigate(`${basePath}/${level}/submit`, {
             state: {
                 situationID,
                 fallback: fallbackData
@@ -237,7 +239,7 @@ const Panel = () => {
                             onClick={() => {
                                 const isConfirmed = window.confirm("你確定要離開測驗嗎？未完成的測驗將不會保存。");
                                 if (isConfirmed) {
-                                    navigate('/quiz');
+                                    navigate(basePath);
                                 }
                             }}
                         >離開測驗</button>
