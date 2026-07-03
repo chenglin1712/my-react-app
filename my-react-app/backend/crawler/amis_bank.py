@@ -11,19 +11,26 @@
 
 題庫來源與可信度
 ----------------
-詞彙、例句均直接取自本專案既有的 `backend/fastAPI/routes/dictionary.db`——
-這顆 SQLite 資料庫就是「辭典搜尋」「詞彙遊戲」等既有功能實際在用的同一份資料，
-內容來源標記為「線上辭典」，經核對即財團法人原住民族語言研究發展基金會（ILRDF）
-建置、原住民族委員會委託的「原住民族語言線上辭典」(e-dictionary.ilrdf.org.tw)，
+配合題詞彙**不再把外語內容寫死在程式碼裡**，而是在每次出題時即時查詢
+本專案既有的 `backend/fastAPI/routes/dictionary.db`——這顆 SQLite 資料庫
+就是「辭典搜尋」「詞彙遊戲」等既有功能實際在用的同一份資料，內容來源標記為
+「線上辭典」，經核對即財團法人原住民族語言研究發展基金會（ILRDF）建置、
+原住民族委員會委託的「原住民族語言線上辭典」(e-dictionary.ilrdf.org.tw)，
 方言別統一為「秀姑巒阿美語」(tribe_id = e68273b9-1f2b-4c42-8d95-f52189ab24b7)。
 
-    註：泰雅語題庫當初引用的 pqwasan.org.tw 課綱教材網站，實測已經停站
-    （網站顯示「主機到期，服務暫停」），因此阿美語改以本專案內部已有、
-    仍可實際查得到的 dictionary.db 作為題庫來源，而非重新尋找外部網站。
+程式碼裡只留下 CATEGORY_TARGETS——也就是「這一類要考哪些中文詞義」的課程
+設計清單，不是外語內容本身；實際的阿美語拼寫一律由 `dictionary_source.
+fetch_words_by_glosses()` 在出題當下查詢，資料庫內容如果之後被訂正、擴充，
+題庫會自動反映最新資料，不會有「程式碼裡的內容跟資料庫兜不起來」的問題。
 
-    ⚠️ 重要聲明：這裡的內容是「練習用」的示範題庫，詞彙與短文都經過人工
-    從 dictionary.db 篩選、核對過真實例句，但畢竟不是官方認證考古題，
-    部署為正式教材前，建議請阿美語族語老師或通過族語認證的師資再次審定。
+    註：泰雅語題庫當初引用的 pqwasan.org.tw 課綱教材網站，實測已經停站
+    （網站顯示「主機到期，服務暫停」），本專案內部也沒有等效的泰雅語資料庫
+    可查，因此 `tayal_bank.py` 仍維持人工整理的詞彙清單（該檔案開頭有說明）。
+
+    ⚠️ 重要聲明：閱讀克漏字的短文本身仍是人工從 dictionary.db 的真實例句裡
+    挑選、核對過設計而成（見下方 CLOZE_PASSAGES 說明），這部分需要挑選語意
+    通順、能設計出干擾選項的例句組合，沒辦法單純查詢自動產生；部署為正式
+    教材前，建議請阿美語族語老師或通過族語認證的師資再次審定。
 
 命題邏輯對齊官方考試的地方
 --------------------------
@@ -34,77 +41,30 @@
 
 import random
 
+from . import dictionary_source
+
 # ---------------------------------------------------------------------------
-# 中高級（Level 3）配合題：詞彙庫
+# 中高級（Level 3）配合題：選題公式
 # ---------------------------------------------------------------------------
-# 每個詞都是直接從 dictionary.db 查詢 tribe_id=e68273b9-...(阿美語/秀姑巒方言)
-# 撈出的真實辭典詞條（name + chineseExplanation），category 為本題庫依詞義
-# 人工歸類（dictionary.db 本身的 category 標記只覆蓋約15%詞條且不完全一致，
-# 這裡改用跟 tayal_bank.py 一樣的五分類，方便共用同一套選題公式）。
-VOCAB_BANK = [
+# CATEGORY_TARGETS 只列出「這一類要考哪些中文詞義」，字串必須是
+# dictionary.db 裡 chineseExplanation 的精確值（含資料庫原有的標點/括註），
+# 這樣 fetch_words_by_glosses() 才能查到對應詞條；顯示給使用者看的中文
+# 一律照資料庫原文呈現，不另外改寫遣詞。
+CATEGORY_TARGETS = {
     # noun（具象名詞，延續初中級的動植物、物品類）
-    {"amis": "waco", "chinese": "狗", "category": "noun"},
-    {"amis": "fafoy", "chinese": "豬", "category": "noun"},
-    {"amis": "kolong", "chinese": "牛", "category": "noun"},
-    {"amis": "siri", "chinese": "羊", "category": "noun"},
-    {"amis": "lotong", "chinese": "猴子", "category": "noun"},
-    {"amis": "foting", "chinese": "魚", "category": "noun"},
-    {"amis": "ʼayam", "chinese": "鳥", "category": "noun"},
-    {"amis": "hana", "chinese": "花", "category": "noun"},
-    {"amis": "kilang", "chinese": "樹", "category": "noun"},
-    {"amis": "pawli", "chinese": "香蕉", "category": "noun"},
-    {"amis": "codad", "chinese": "書", "category": "noun"},
-    {"amis": "parad", "chinese": "桌子", "category": "noun"},
-    {"amis": "ʼanengan", "chinese": "椅子", "category": "noun"},
-    {"amis": "fodoy", "chinese": "衣服", "category": "noun"},
-    {"amis": "cacilakan", "chinese": "雨傘", "category": "noun"},
+    "noun": ["狗", "豬", "牛", "羊", "猴子", "魚", "鳥", "花", "樹", "香蕉",
+             "書", "桌子", "椅子", "衣服", "雨傘"],
     # verb（中高級新增的詞彙面向）
-    {"amis": "tayni", "chinese": "來", "category": "verb"},
-    {"amis": "tayra", "chinese": "去", "category": "verb"},
-    {"amis": "kaen", "chinese": "吃", "category": "verb"},
-    {"amis": "lomowad", "chinese": "起床", "category": "verb"},
-    {"amis": "mafotiʼ", "chinese": "睡覺", "category": "verb"},
-    {"amis": "micodad", "chinese": "讀書", "category": "verb"},
-    {"amis": "romadiw", "chinese": "唱歌", "category": "verb"},
-    {"amis": "makero", "chinese": "跳舞", "category": "verb"},
-    {"amis": "mirenaf", "chinese": "畫圖", "category": "verb"},
-    {"amis": "misalama^", "chinese": "玩耍", "category": "verb"},
-    {"amis": "maolah", "chinese": "喜歡", "category": "verb"},
-    {"amis": "fanaʼ", "chinese": "會、懂、能", "category": "verb"},
-    {"amis": "mifacaʼ", "chinese": "洗衣服", "category": "verb"},
+    "verb": ["來", "去", "吃", "起床", "睡覺", "讀書", "唱歌", "跳舞", "玩",
+             "畫圖", "喜歡", "會；懂；認識", "洗衣服"],
     # time（中高級新增的詞彙面向）
-    {"amis": "mihecaan", "chinese": "年", "category": "time"},
-    {"amis": "romiʼad", "chinese": "日子、天", "category": "time"},
-    {"amis": "anini", "chinese": "今天", "category": "time"},
-    {"amis": "inacila^", "chinese": "昨天", "category": "time"},
-    {"amis": "anocila", "chinese": "明天", "category": "time"},
-    {"amis": "dafak", "chinese": "早上", "category": "time"},
-    {"amis": "dadaya^", "chinese": "晚上", "category": "time"},
-    {"amis": "herek no lahok", "chinese": "下午", "category": "time"},
-    {"amis": "imatini", "chinese": "現在", "category": "time"},
+    "time": ["年", "日子", "今天", "昨天", "明天", "早上", "晚上", "下午", "現在"],
     # function / pronoun（代詞／功能詞，抽象度最高）
-    {"amis": "kako", "chinese": "我", "category": "function"},
-    {"amis": "miso", "chinese": "你的", "category": "function"},
-    {"amis": "kiso", "chinese": "你", "category": "function"},
-    {"amis": "cira", "chinese": "他、她", "category": "function"},
-    {"amis": "cima^", "chinese": "誰", "category": "function"},
-    {"amis": "maan", "chinese": "什麼", "category": "function"},
-    {"amis": "icowa", "chinese": "哪裡", "category": "function"},
-    {"amis": "hacowa", "chinese": "多少", "category": "function"},
-    {"amis": "hay", "chinese": "是的", "category": "function"},
-    {"amis": "Caay", "chinese": "不、不是", "category": "function"},
+    "function": ["我", "你的", "你", "他", "誰", "什麼", "哪裡", "多少", "是的", "不是"],
     # kin / people（親屬稱謂／人物）
-    {"amis": "akong", "chinese": "祖父、外公、爺爺、阿公", "category": "kin"},
-    {"amis": "ama:", "chinese": "祖母", "category": "kin"},
-    {"amis": "kaka^", "chinese": "哥哥、姊姊", "category": "kin"},
-    {"amis": "safa^", "chinese": "弟弟、妹妹", "category": "kin"},
-    {"amis": "faʼinayan", "chinese": "男人", "category": "kin"},
-    {"amis": "fafahyian", "chinese": "女人", "category": "kin"},
-    {"amis": "idang", "chinese": "朋友", "category": "kin"},
-    {"amis": "singsi^", "chinese": "老師", "category": "kin"},
-    {"amis": "matoʼasay", "chinese": "老人、長輩", "category": "kin"},
-    {"amis": "micodaday", "chinese": "學生", "category": "kin"},
-]
+    "kin": ["祖父；外公；爺爺；阿公", "祖母", "（哥哥；姊姊）通稱", "（弟弟；妹妹）通稱",
+            "雄性（動物）；男人", "女人", "朋友", "老師", "長輩；老人家", "學生"],
+}
 
 # 中高級配合題選題公式：跟 tayal_bank.py 完全同一套公式（配額抽樣 + 平均分題組）。
 BOARD_COUNT = 5
@@ -119,14 +79,8 @@ CATEGORY_QUOTA = {
 
 
 def _pick_matching_vocab():
-    """依 CATEGORY_QUOTA 對每個類別做不放回抽樣，回傳打散後的詞彙清單。"""
-    picked = []
-    for category, quota in CATEGORY_QUOTA.items():
-        pool = [v for v in VOCAB_BANK if v["category"] == category]
-        quota = min(quota, len(pool))
-        picked.extend(random.sample(pool, quota))
-    random.shuffle(picked)
-    return picked
+    """即時查詢 dictionary.db，依 CATEGORY_QUOTA 對每個類別做不放回抽樣。"""
+    return dictionary_source.sample_matching_vocab("amis", CATEGORY_TARGETS, CATEGORY_QUOTA)
 
 
 def build_matching_test():
@@ -140,7 +94,7 @@ def build_matching_test():
             "pairs": [
                 {
                     "cn": item["chinese"],
-                    "word": {"word": item["amis"], "audio": ""},
+                    "word": {"word": item["word"], "audio": ""},
                 }
                 for item in chunk
             ],

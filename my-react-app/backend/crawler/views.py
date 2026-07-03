@@ -3,6 +3,7 @@ from django.http import JsonResponse
 from bs4 import BeautifulSoup
 from . import tayal_bank
 from . import amis_bank
+from . import bunun_bank
 
 # 各族語對應的官方練習介面 dialect_id、顯示名稱、以及中高級/高級本地題庫的
 # 選題公式進入點。要新增族語時只需在這裡多加一個 key，不用動 get_quiz_data 邏輯。
@@ -18,6 +19,12 @@ TRIBE_CONFIG = {
         "display_name": "阿美語 - 秀姑巒阿美語",
         "matching_test": amis_bank.build_matching_test,
         "cloze_test": amis_bank.build_cloze_test,
+    },
+    "bunun": {
+        "dialect_id": 22,
+        "display_name": "布農語 - 郡群布農語",
+        "matching_test": bunun_bank.build_matching_test,
+        "cloze_test": bunun_bank.build_cloze_test,
     },
 }
 

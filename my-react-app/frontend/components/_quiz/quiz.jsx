@@ -4,6 +4,7 @@ import { Outlet } from "react-router-dom";
 const TRIBE_TITLE = {
     tayal: "泰雅語線上測驗",
     amis: "阿美語線上測驗",
+    bunun: "布農語線上測驗",
 };
 
 const Quiz = ({ tribe = "tayal" }) => {
