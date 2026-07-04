@@ -7,7 +7,7 @@ import {
 import { FaHeart, FaRegHeart, FaPlayCircle } from 'react-icons/fa';
 import { authChanges } from "../../src/userServives/userServive";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { db } from "../../../firebase";
+import { db, auth } from "../../../firebase";
 import "../../static/css/_search/index.css";
 
 
@@ -257,12 +257,14 @@ const App = () => {
     setLoading(true);
     setError('');
     try {
+      const token = await auth.currentUser?.getIdToken();
+      const authHeaders = token ? { "Authorization": `Bearer ${token}` } : {};
       let res;
       if (query.trim() === '') {
-        res = await axios.post(import.meta.env.VITE_API_SEARCH_ALL_URL, { keyword: '', tribe });
+        res = await axios.post(import.meta.env.VITE_API_SEARCH_ALL_URL, { keyword: '', tribe }, { headers: authHeaders });
         setDefinitions({ exact_match_results: {}, fuzzy_match_results: {}, all_results: res.data.all_results || {} });
       } else {
-        res = await axios.post(import.meta.env.VITE_API_SEARCH_KEY_URL, { keyword: query.trim(), tribe });
+        res = await axios.post(import.meta.env.VITE_API_SEARCH_KEY_URL, { keyword: query.trim(), tribe }, { headers: authHeaders });
         setDefinitions({
           exact_match_results: Array.isArray(res.data.exact_match_results) ? { [query.trim()]: res.data.exact_match_results } : res.data.exact_match_results,
           fuzzy_match_results: res.data.fuzzy_match_results || {},
@@ -349,7 +351,10 @@ const App = () => {
     const myGen = (playbackGenRef.current += 1);
     if (audio) { audio.pause(); audio.currentTime = 0; }
     try {
-      const res = await axios.post('/dictionary/sentence-audio/', { sentence, tribe: selectedTribe });
+      const token = await auth.currentUser?.getIdToken();
+      const res = await axios.post('/dictionary/sentence-audio/', { sentence, tribe: selectedTribe }, {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {},
+      });
       const tokens = res.data.audioTokens || [];
       if (tokens.length === 0 || playbackGenRef.current !== myGen) return;
       for (const { fileId } of tokens) {

@@ -1,5 +1,5 @@
-from fastapi import FastAPI
-from .routes import crawler, vision, dictionary, quiz, listening, sentence
+from fastapi import Depends, FastAPI
+from .routes import crawler, vision, dictionary, quiz, listening, sentence, auth
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
@@ -20,10 +20,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# /vision、/dictionary、/quiz 會被呼叫付費 API（Google Vision）或消耗運算資源
+# （wav2vec2 語音比對、辭典全表查詢），一律要求登入才能呼叫。
+_require_login = [Depends(auth.verify_firebase_token)]
+
 app.include_router(crawler.router, prefix="/crawler")
-app.include_router(vision.router, prefix="/vision")
-app.include_router(dictionary.router, prefix="/dictionary")
-app.include_router(quiz.router, prefix="/quiz")
+app.include_router(vision.router, prefix="/vision", dependencies=_require_login)
+app.include_router(dictionary.router, prefix="/dictionary", dependencies=_require_login)
+app.include_router(quiz.router, prefix="/quiz", dependencies=_require_login)
 app.include_router(listening.router, prefix="/listening")
 app.include_router(sentence.router, prefix="/sentence")
 

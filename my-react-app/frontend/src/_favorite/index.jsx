@@ -5,7 +5,7 @@ import {
 import { useLocation } from 'react-router-dom';
 import { FaHeart, FaRegHeart, FaPlayCircle } from 'react-icons/fa';
 import { doc, updateDoc } from "firebase/firestore";
-import { db } from "../../../firebase";
+import { db, auth } from "../../../firebase";
 import { authChanges } from "../../src/userServives/userServive";
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import PermissionProtect from "../userServives/permissionProtect";
@@ -619,7 +619,10 @@ const App = () => {
   }, [location.state]);
   useEffect(() => {
     setLoading(true);
-    axios.post(import.meta.env.VITE_API_SEARCH_ALL_URL)
+    auth.currentUser?.getIdToken()
+      .then(token => axios.post(import.meta.env.VITE_API_SEARCH_ALL_URL, null, {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {},
+      }))
       .then(res => {
         setAllWords(Object.values(res.data.all_results).flat());
         setLoading(false);

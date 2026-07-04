@@ -4,6 +4,7 @@ import { FaMicrophone, FaStop, FaPlayCircle, FaRedo } from 'react-icons/fa';
 import lottie from "lottie-web";
 import successAnimation from "../../src/animations/success.json";
 import correctAudio from "../../static/assets/_quiz/correct.mp3";
+import { auth } from "../../../firebase";
 
 export default function SentenceSpeak({ question, selected, checked, onSelect, onConfirm }) {
   const [audioBlob, setAudioBlob] = useState(null);
@@ -86,8 +87,10 @@ export default function SentenceSpeak({ question, selected, checked, onSelect, o
     formData.append("audio_id", question.tayal.audio);
 
     try {
+      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch(import.meta.env.VITE_API_QUIZ_AUDIO_URL, {
         method: "POST",
+        headers: idToken ? { "Authorization": `Bearer ${idToken}` } : {},
         body: formData,
       });
       const data = await res.json();

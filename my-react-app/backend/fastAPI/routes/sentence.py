@@ -1,5 +1,6 @@
 import json
 import random
+import threading
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from fastAPI.routes.connect import get_db
@@ -15,6 +16,63 @@ TRIBE_IDS = {
     'paiwan':  '19c77a3b-3a81-496f-b0f4-afe6d9155edd',
 }
 
+# 每個族語去重後的例句清單只在第一次請求時查詢+解析一次，
+# 之後直接從記憶體回傳，不用每個 request 都重新撈全表、重新 parse JSON。
+_unique_sentences_cache: dict[str, list[dict]] = {}
+_unique_sentences_cache_lock = threading.Lock()
+
+
+def _load_unique_sentences(db: Session, tribe_id: str) -> list[dict]:
+    if tribe_id in _unique_sentences_cache:
+        return _unique_sentences_cache[tribe_id]
+
+    with _unique_sentences_cache_lock:
+        if tribe_id in _unique_sentences_cache:
+            return _unique_sentences_cache[tribe_id]
+
+        words = db.query(Word).filter(
+            Word.tribe_id == tribe_id,
+            Word.explanation_items.isnot(None),
+        ).all()
+
+        # 從每個詞彙的 explanation_items → sentenceItems 提取例句
+        valid_sentences = []
+        for w in words:
+            try:
+                exp_items = json.loads(w.explanation_items or '[]')
+                for exp in exp_items:
+                    for sent in (exp.get('sentenceItems') or []):
+                        original = (sent.get('originalSentence') or '').strip()
+                        chinese  = (sent.get('chineseSentence') or '').strip()
+                        if not original or not chinese:
+                            continue
+                        audio_items = sent.get('audioItems') or []
+                        audio_id = audio_items[0].get('fileId') if audio_items else None
+                        if not audio_id:
+                            try:
+                                word_audio = json.loads(w.audio_items or '[]')
+                                audio_id = word_audio[0].get('fileId') if word_audio else None
+                            except Exception:
+                                pass
+                        valid_sentences.append({
+                            'tayal':    original,
+                            'chinese':  chinese,
+                            'audio_id': audio_id,
+                        })
+            except Exception:
+                continue
+
+        # 以 tayal 句子去重，優先保留有音訊的版本
+        seen = set()
+        unique_sentences = []
+        for s in valid_sentences:
+            if s['tayal'] not in seen:
+                seen.add(s['tayal'])
+                unique_sentences.append(s)
+
+        _unique_sentences_cache[tribe_id] = unique_sentences
+        return unique_sentences
+
 
 @router.get("/questions")
 def get_sentence_questions(
@@ -26,45 +84,7 @@ def get_sentence_questions(
     if not tribe_id:
         raise HTTPException(status_code=400, detail=f"不支援的族語：{tribe}")
 
-    words = db.query(Word).filter(
-        Word.tribe_id == tribe_id,
-        Word.explanation_items.isnot(None),
-    ).all()
-
-    # 從每個詞彙的 explanation_items → sentenceItems 提取例句
-    valid_sentences = []
-    for w in words:
-        try:
-            exp_items = json.loads(w.explanation_items or '[]')
-            for exp in exp_items:
-                for sent in (exp.get('sentenceItems') or []):
-                    original = (sent.get('originalSentence') or '').strip()
-                    chinese  = (sent.get('chineseSentence') or '').strip()
-                    if not original or not chinese:
-                        continue
-                    audio_items = sent.get('audioItems') or []
-                    audio_id = audio_items[0].get('fileId') if audio_items else None
-                    if not audio_id:
-                        try:
-                            word_audio = json.loads(w.audio_items or '[]')
-                            audio_id = word_audio[0].get('fileId') if word_audio else None
-                        except Exception:
-                            pass
-                    valid_sentences.append({
-                        'tayal':    original,
-                        'chinese':  chinese,
-                        'audio_id': audio_id,
-                    })
-        except Exception:
-            continue
-
-    # 以 tayal 句子去重，優先保留有音訊的版本
-    seen = set()
-    unique_sentences = []
-    for s in valid_sentences:
-        if s['tayal'] not in seen:
-            seen.add(s['tayal'])
-            unique_sentences.append(s)
+    unique_sentences = _load_unique_sentences(db, tribe_id)
 
     # 只從有音訊的句子中抽題，確保每題都有發音輔助
     with_audio = [s for s in unique_sentences if s['audio_id']]

@@ -5,7 +5,7 @@ class Word(Base):
     __tablename__ = "words"
 
     id = Column(String, primary_key=True, index=True)
-    tribe_id = Column(String)
+    tribe_id = Column(String, index=True)
     tribe = Column(String)
     dialect = Column(String)
     name = Column(String, index=True)

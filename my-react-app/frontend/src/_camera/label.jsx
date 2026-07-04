@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { Container, Button, Row, Col, Card } from "react-bootstrap";
 import pexelsPhoto from "../../static/assets/pexels-photo.webp";
+import { auth } from "../../../firebase";
 
 const App = () => {
     const location = useLocation();
@@ -38,11 +39,17 @@ const App = () => {
             const formData = new FormData();
             formData.append("file", file);
 
-            axios.post(import.meta.env.VITE_API_VISION_URL, formData, {
-                headers: {
-                    "Content-Type": "multipart/form-data",
-                },
-            })
+            const analyze = async () => {
+                const token = await auth.currentUser?.getIdToken();
+                return axios.post(import.meta.env.VITE_API_VISION_URL, formData, {
+                    headers: {
+                        "Content-Type": "multipart/form-data",
+                        ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+                    },
+                });
+            };
+
+            analyze()
                 .then((response) => {
                     if (response.data.error) {
                         setError(true);

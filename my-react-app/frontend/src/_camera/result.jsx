@@ -8,7 +8,7 @@ import {
 import { FaHeart, FaRegHeart, FaPlayCircle, FaChevronDown, FaChevronUp } from "react-icons/fa";
 import { toggleFavoriteWord, authChanges } from "../../src/userServives/userServive";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { db } from "../../../firebase";
+import { db, auth } from "../../../firebase";
 import { Tabs, Tab, Row, Col } from 'react-bootstrap';
 import "../../static/css/_camera/result.css"; 
 
@@ -171,7 +171,10 @@ const App = () => {
     }
 
     setLoading(true);
-    axios.post(import.meta.env.VITE_API_SEARCH_KEYS_URL, { words: selectedWords })
+    auth.currentUser?.getIdToken()
+      .then(token => axios.post(import.meta.env.VITE_API_SEARCH_KEYS_URL, { words: selectedWords }, {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {},
+      }))
       .then(response => {
         setDefinitions({
           exact_match_results: response.data.exact_match_results || {},

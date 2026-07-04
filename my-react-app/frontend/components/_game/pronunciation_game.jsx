@@ -6,7 +6,7 @@ import {
   where, orderBy, limit, serverTimestamp,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "../../../firebase";
+import { db, storage, auth } from "../../../firebase";
 import { useAuth } from "../../src/userServives/authContext";
 import "../../static/css/_game/pronunciation.css";
 
@@ -225,8 +225,10 @@ function PronunciationGame({ tribe = "tayal" }) {
         formData.append("reference_urls", refUrls.join(","));
       }
 
+      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch(import.meta.env.VITE_API_QUIZ_AUDIO_URL, {
         method: "POST",
+        headers: idToken ? { "Authorization": `Bearer ${idToken}` } : {},
         body: formData,
       });
       const data = await res.json();
