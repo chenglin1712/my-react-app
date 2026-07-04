@@ -1,12 +1,24 @@
 from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey
+from sqlalchemy.orm import relationship
 from fastAPI.routes.connect import Base
+
+
+class Tribe(Base):
+    """族語主檔。tribe_id 原本跟 tribe（中文全名）並存於 words 表，
+    兩者是傳遞依賴關係，改成獨立的 Tribe 表，其他表只保留 tribe_id 當 FK。"""
+    __tablename__ = "tribe"
+
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False, unique=True, index=True)   # 中文全名，例如「泰雅語」
+    slug = Column(String, nullable=False, unique=True, index=True)   # 英文代稱，例如「tayal」
+
 
 class Word(Base):
     __tablename__ = "words"
 
     id = Column(String, primary_key=True, index=True)
-    tribe_id = Column(String, index=True)
-    tribe = Column(String)
+    tribe_id = Column(String, ForeignKey("tribe.id"), index=True)
+    tribe_ref = relationship("Tribe")
     dialect = Column(String)
     name = Column(String, index=True)
     pinyin = Column(String)
@@ -31,7 +43,8 @@ class GrammarSection(Base):
     __tablename__ = "grammar_section"
 
     id            = Column(Integer, primary_key=True, autoincrement=True)
-    tribe         = Column(String, nullable=False, index=True)
+    tribe_id      = Column(String, ForeignKey("tribe.id"), nullable=False, index=True)
+    tribe_ref     = relationship("Tribe")
     section_order = Column(Integer)
     section_key   = Column(String)
     title         = Column(String)
@@ -73,7 +86,8 @@ class GrammarAffix(Base):
     __tablename__ = "grammar_affix"
 
     id           = Column(Integer, primary_key=True, autoincrement=True)
-    tribe        = Column(String, nullable=False, index=True)
+    tribe_id     = Column(String, ForeignKey("tribe.id"), nullable=False, index=True)
+    tribe_ref    = relationship("Tribe")
     affix        = Column(String, nullable=False, index=True)
     affix_type   = Column(String)    # prefix / suffix / infix / circumfix / reduplication / auxiliary
     function     = Column(Text)

@@ -4,13 +4,13 @@ from typing import List, Dict, Tuple, Optional
 from fastapi import APIRouter, Request, Depends, Response, Body
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import text, select
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
 
 from fastAPI.routes.connect import get_db
-from fastAPI.routes.model import Word
+from fastAPI.routes.model import Word, Tribe
 
 router = APIRouter()
 
@@ -94,6 +94,10 @@ def simplify_tayal(word: str) -> str:
 
 def is_chinese(text: str) -> bool:
     return any('\u4e00' <= ch <= '\u9fff' for ch in text)
+
+def _tribe_id_subquery(tribe_name: str):
+    # tribe (chinese name) -> tribe_id, replaces the old Word.tribe == tribe_name filter
+    return select(Tribe.id).where(Tribe.name == tribe_name).scalar_subquery()
 
 
 def parse_explanations(value) -> List[ExplanationItem]:
@@ -213,12 +217,12 @@ def _load_tribe_words(db: Session, tribe: str) -> List[WordResult]:
         if tribe in _tribe_words_cache:
             return _tribe_words_cache[tribe]
 
-        words = db.query(Word).filter(Word.tribe == tribe).all()
+        words = db.query(Word).filter(Word.tribe_id == _tribe_id_subquery(tribe)).all()
         results = [
             WordResult(
                 id=word.id,
                 tribeId=word.tribe_id,
-                tribe=word.tribe,
+                tribe=tribe,
                 dialect=word.dialect,
                 name=word.name,
                 pinyin=word.pinyin,
@@ -320,7 +324,7 @@ def fuzzy_search(db: Session, keyword: str, exclude_names: List[str], tribe: str
 def search_all(db: Session, tribe: str = '泰雅語', limit: Optional[int] = None, offset: int = 0) -> Dict[str, List[WordResult]]:
     """回傳所有詞條。limit/offset 為選填的 SQL 層分頁參數，不傳則維持原本回傳全部的行為
     （目前前端一次拿全部資料後在畫面上分批顯示，尚未改成向後端逐頁請求）。"""
-    query = db.query(Word).filter(Word.tribe == tribe).order_by(Word.name)
+    query = db.query(Word).filter(Word.tribe_id == _tribe_id_subquery(tribe)).order_by(Word.name)
     if offset:
         query = query.offset(offset)
     if limit is not None:
@@ -341,7 +345,7 @@ def search_all(db: Session, tribe: str = '泰雅語', limit: Optional[int] = Non
             WordResult(
                 id=word.id,
                         tribeId=word.tribe_id,
-                        tribe=word.tribe,
+                        tribe=tribe,
                         dialect=word.dialect,
                         name=word.name,
                         pinyin=word.pinyin,
@@ -417,7 +421,7 @@ async def all_tayal_dictionary(request: Request, db: Session = Depends(get_db)):
             limit = None
             offset = 0
         tribe_name = TRIBE_MAP.get(tribe, '泰雅語')
-        total = db.query(Word).filter(Word.tribe == tribe_name).count()
+        total = db.query(Word).filter(Word.tribe_id == _tribe_id_subquery(tribe_name)).count()
         results = search_all(db, tribe=tribe_name, limit=limit, offset=offset)
         return JSONResponse(
             {
@@ -482,7 +486,7 @@ def _load_grammar(db: Session, tribe_name: str) -> Optional[dict]:
             return _grammar_cache[tribe_name]
 
         sections = db.execute(
-            text("SELECT id, section_order, section_key, title, description FROM grammar_section WHERE tribe = :tribe ORDER BY section_order"),
+            text("SELECT id, section_order, section_key, title, description FROM grammar_section WHERE tribe_id = (SELECT id FROM tribe WHERE name = :tribe) ORDER BY section_order"),
             {"tribe": tribe_name}
         ).fetchall()
 
@@ -585,7 +589,7 @@ def search_grammar(tribe: str, q: str, db: Session = Depends(get_db)):
                 SELECT r.id, r.rule_key, r.title, r.structure, r.function, r.notes
                 FROM grammar_rule r
                 JOIN grammar_section s ON r.section_id = s.id
-                WHERE s.tribe = :tribe
+                WHERE s.tribe_id = (SELECT id FROM tribe WHERE name = :tribe)
                   AND (r.title LIKE :kw OR r.function LIKE :kw OR r.notes LIKE :kw OR r.structure LIKE :kw)
                 ORDER BY r.rule_order
             """),
@@ -608,14 +612,14 @@ def search_grammar(tribe: str, q: str, db: Session = Depends(get_db)):
                 FROM grammar_example e
                 JOIN grammar_rule r  ON e.rule_id   = r.id
                 JOIN grammar_section s ON r.section_id = s.id
-                WHERE s.tribe = :tribe
+                WHERE s.tribe_id = (SELECT id FROM tribe WHERE name = :tribe)
                   AND (e.tribe_text LIKE :kw OR e.chinese_text LIKE :kw OR e.analysis LIKE :kw)
             """),
             {"tribe": tribe_name, "kw": kw}
         ).fetchall()
 
         affix_rows = db.execute(
-            text("SELECT id, affix, affix_type, function, example_form FROM grammar_affix WHERE tribe = :tribe AND (affix LIKE :kw OR function LIKE :kw)"),
+            text("SELECT id, affix, affix_type, function, example_form FROM grammar_affix WHERE tribe_id = (SELECT id FROM tribe WHERE name = :tribe) AND (affix LIKE :kw OR function LIKE :kw)"),
             {"tribe": tribe_name, "kw": kw}
         ).fetchall()
 
@@ -660,7 +664,7 @@ def _load_grammar_affixes(db: Session, tribe_name: str, affix_type: Optional[str
                            GROUP_CONCAT(ra.rule_id) AS rule_ids
                     FROM grammar_affix a
                     LEFT JOIN grammar_rule_affix ra ON ra.affix_id = a.id
-                    WHERE a.tribe = :tribe AND a.affix_type = :at
+                    WHERE a.tribe_id = (SELECT id FROM tribe WHERE name = :tribe) AND a.affix_type = :at
                     GROUP BY a.id
                     ORDER BY a.affix
                 """),
@@ -673,7 +677,7 @@ def _load_grammar_affixes(db: Session, tribe_name: str, affix_type: Optional[str
                            GROUP_CONCAT(ra.rule_id) AS rule_ids
                     FROM grammar_affix a
                     LEFT JOIN grammar_rule_affix ra ON ra.affix_id = a.id
-                    WHERE a.tribe = :tribe
+                    WHERE a.tribe_id = (SELECT id FROM tribe WHERE name = :tribe)
                     GROUP BY a.id
                     ORDER BY a.affix_type, a.affix
                 """),
@@ -733,7 +737,7 @@ def _load_grammar_quiz_material(db: Session, tribe_name: str, section_key: Optio
                     FROM grammar_rule r
                     JOIN grammar_section s ON r.section_id = s.id
                     JOIN grammar_example e ON e.rule_id = r.id
-                    WHERE s.tribe = :tribe AND s.section_key LIKE :sk
+                    WHERE s.tribe_id = (SELECT id FROM tribe WHERE name = :tribe) AND s.section_key LIKE :sk
                       AND e.tribe_text IS NOT NULL AND e.tribe_text != ''
                     ORDER BY r.rule_order, e.example_order
                 """),
@@ -747,7 +751,7 @@ def _load_grammar_quiz_material(db: Session, tribe_name: str, section_key: Optio
                     FROM grammar_rule r
                     JOIN grammar_section s ON r.section_id = s.id
                     JOIN grammar_example e ON e.rule_id = r.id
-                    WHERE s.tribe = :tribe
+                    WHERE s.tribe_id = (SELECT id FROM tribe WHERE name = :tribe)
                       AND e.tribe_text IS NOT NULL AND e.tribe_text != ''
                     ORDER BY r.rule_order, e.example_order
                 """),
@@ -913,11 +917,12 @@ async def get_sentence_audio(request: Request, db: Session = Depends(get_db)):
 
     audio_tokens = []
     seen_file_ids: set = set()
+    tribe_id_subq = _tribe_id_subquery(tribe_name)
 
     for token in tokens:
         token_lower = token.lower()
         word = db.query(Word).filter(
-            Word.tribe == tribe_name,
+            Word.tribe_id == tribe_id_subq,
             sa_func.lower(Word.name) == token_lower
         ).first()
 

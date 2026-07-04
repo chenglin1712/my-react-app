@@ -8,9 +8,11 @@ from django.conf import settings as django_settings
 from openai import OpenAI
 import os
 from dotenv import load_dotenv
-import sqlite3
 import traceback
 import datetime
+
+from fastAPI.routes.connect import SessionLocal
+from fastAPI.routes.model import Word
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +29,6 @@ client = OpenAI(
     api_key=_GITHUB_TOKEN,
     base_url="https://models.github.ai/inference"
 )
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, "fastAPI", "routes", "dictionary.db")
 
 # ── Firebase Admin SDK（生產環境身份驗證）──────────────────────────
 _firebase_initialized = False
@@ -248,76 +247,58 @@ def search_tayal_words_bulk(keywords: list) -> dict:
     """查詢多個關鍵詞，一次開啟連線，回傳 {keyword: word_dict} 映射。"""
     if not keywords:
         return {}
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-    except Exception as e:
-        logger.error("[DB ERROR] DB connection failed: %s", e)
-        return {}
 
-    result_map = {}
+    db = SessionLocal()
     try:
-        placeholders = ",".join("?" * len(keywords))
-        query = f"SELECT * FROM words WHERE name IN ({placeholders})"
-        cursor.execute(query, keywords)
-        rows = cursor.fetchall()
+        words = db.query(Word).filter(Word.name.in_(keywords)).all()
     except Exception as e:
         logger.error("[DB ERROR] Query failed: %s", e)
-        rows = []
+        words = []
     finally:
-        conn.close()
+        db.close()
 
-    for row in rows:
+    result_map = {}
+    for word in words:
         try:
-            explanations = json.loads(row[14]) if row[14] else []
+            explanations = json.loads(word.explanation_items) if word.explanation_items else []
         except (json.JSONDecodeError, TypeError):
             explanations = []
         chinese = ""
         if isinstance(explanations, list) and explanations:
             chinese = explanations[0].get("chineseExplanation", "")
         try:
-            audio_items = json.loads(row[15]) if row[15] else []
+            audio_items = json.loads(word.audio_items) if word.audio_items else []
         except (json.JSONDecodeError, TypeError):
             audio_items = []
         audio = audio_items[0].get("fileId", "") if audio_items else ""
-        word_name = row[4]
-        if word_name not in result_map:
-            result_map[word_name] = {"tayal": word_name, "audio": audio, "chinese": chinese}
+        if word.name not in result_map:
+            result_map[word.name] = {"tayal": word.name, "audio": audio, "chinese": chinese}
 
     return result_map
 
 
 def search_tayal_words(keyword=None, limit=8):
+    db = SessionLocal()
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-    except Exception as e:
-        logger.error("[DB ERROR] DB connection failed: %s", e)
-        return []
-
-    results = []
-    try:
+        query = db.query(Word)
         if keyword:
-            query = "SELECT * FROM words WHERE name = ? LIMIT ?"
-            cursor.execute(query, (keyword, limit))
+            query = query.filter(Word.name == keyword)
         else:
-            query = "SELECT * FROM words ORDER BY id LIMIT ?"
-            cursor.execute(query, (limit,))
-
-        results = cursor.fetchall()
+            query = query.order_by(Word.id)
+        words = query.limit(limit).all()
     except Exception as e:
         logger.error("[DB ERROR] Query failed: %s", e)
+        words = []
     finally:
-        conn.close()
+        db.close()
 
-    if not results:
+    if not words:
         return []
 
     words_data = []
-    for row in results:
-        # 欄位順序: id(0) tribe_id(1) tribe(2) dialect(3) name(4) ... explanation_items(14) audio_items(15)
+    for word in words:
         try:
-            explanations = json.loads(row[14]) if row[14] else []
+            explanations = json.loads(word.explanation_items) if word.explanation_items else []
         except (json.JSONDecodeError, TypeError):
             explanations = []
 
@@ -326,14 +307,14 @@ def search_tayal_words(keyword=None, limit=8):
             chinese = explanations[0].get("chineseExplanation", "")
 
         try:
-            audio_items = json.loads(row[15]) if row[15] else []
+            audio_items = json.loads(word.audio_items) if word.audio_items else []
         except (json.JSONDecodeError, TypeError):
             audio_items = []
 
         audio = audio_items[0].get("fileId", "") if audio_items else ""
 
         words_data.append({
-            'tayal': row[4],
+            'tayal': word.name,
             'audio': audio,
             'chinese': chinese
         })
