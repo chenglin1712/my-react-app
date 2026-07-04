@@ -1,6 +1,5 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import "bootstrap/dist/css/bootstrap.min.css";
 import { Button, Container, Row, Col } from "react-bootstrap";
 import pexelsPhoto from '../../static/assets/pexels-photo.webp';
 
