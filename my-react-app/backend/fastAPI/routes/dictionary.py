@@ -1,4 +1,4 @@
-import json, re, logging, httpx
+import json, re, logging, httpx, threading
 from typing import List, Dict, Tuple, Optional
 
 from fastapi import APIRouter, Request, Depends, Response, Body
@@ -513,12 +513,25 @@ async def allsearch_tayal_dictionary(request: KeywordRequest, db: Session = Depe
 
 
 # ------------------------- 文法資料 -------------------------
+# 文法資料（章節/規則/例句/詞綴）是固定的參考資料，不會頻繁變動，
+# 但 get_grammar 每次都要對 section/rule/example/affix 做好幾輪查詢，
+# 沿用 listening.py / sentence.py 的做法：每個 tribe 只在第一次請求時
+# 真正查詢一次，之後直接吃記憶體快取，避免重複的多輪 SQL 往返。
+_grammar_cache: Dict[str, Optional[dict]] = {}
+_grammar_cache_lock = threading.Lock()
+_grammar_affixes_cache: Dict[Tuple[str, str], dict] = {}
+_grammar_affixes_cache_lock = threading.Lock()
+_grammar_quiz_cache: Dict[Tuple[str, str], dict] = {}
+_grammar_quiz_cache_lock = threading.Lock()
 
-@router.get("/grammar/{tribe}")
-def get_grammar(tribe: str, db: Session = Depends(get_db)):
-    """查詢指定族語的所有文法章節（含規則、例句、詞綴）"""
-    try:
-        tribe_name = TRIBE_MAP.get(tribe, tribe)
+
+def _load_grammar(db: Session, tribe_name: str) -> Optional[dict]:
+    if tribe_name in _grammar_cache:
+        return _grammar_cache[tribe_name]
+
+    with _grammar_cache_lock:
+        if tribe_name in _grammar_cache:
+            return _grammar_cache[tribe_name]
 
         sections = db.execute(
             text("SELECT id, section_order, section_key, title, description FROM grammar_section WHERE tribe = :tribe ORDER BY section_order"),
@@ -526,7 +539,7 @@ def get_grammar(tribe: str, db: Session = Depends(get_db)):
         ).fetchall()
 
         if not sections:
-            return JSONResponse({"error": f"找不到 {tribe_name} 的文法資料"}, status_code=404)
+            return None
 
         result = []
         for sec in sections:
@@ -587,7 +600,20 @@ def get_grammar(tribe: str, db: Session = Depends(get_db)):
                 "rules": rules_out,
             })
 
-        return JSONResponse({"tribe": tribe_name, "sections": result}, status_code=200)
+        payload = {"tribe": tribe_name, "sections": result}
+        _grammar_cache[tribe_name] = payload
+        return payload
+
+
+@router.get("/grammar/{tribe}")
+def get_grammar(tribe: str, db: Session = Depends(get_db)):
+    """查詢指定族語的所有文法章節（含規則、例句、詞綴）"""
+    try:
+        tribe_name = TRIBE_MAP.get(tribe, tribe)
+        payload = _load_grammar(db, tribe_name)
+        if payload is None:
+            return JSONResponse({"error": f"找不到 {tribe_name} 的文法資料"}, status_code=404)
+        return JSONResponse(payload, status_code=200)
     except Exception as e:
         logger.exception(e)
         return JSONResponse({"error": str(e)}, status_code=500)
@@ -667,13 +693,15 @@ def search_grammar(tribe: str, q: str, db: Session = Depends(get_db)):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-@router.get("/grammar/{tribe}/affixes")
-def get_grammar_affixes(tribe: str, affix_type: Optional[str] = None, db: Session = Depends(get_db)):
-    """取得詞綴清單
-    affix_type: prefix / suffix / infix / circumfix / reduplication / auxiliary（不傳則回傳全部）
-    """
-    try:
-        tribe_name = TRIBE_MAP.get(tribe, tribe)
+def _load_grammar_affixes(db: Session, tribe_name: str, affix_type: Optional[str]) -> dict:
+    key = (tribe_name, affix_type or "")
+    if key in _grammar_affixes_cache:
+        return _grammar_affixes_cache[key]
+
+    with _grammar_affixes_cache_lock:
+        if key in _grammar_affixes_cache:
+            return _grammar_affixes_cache[key]
+
         if affix_type:
             rows = db.execute(
                 text("""
@@ -701,7 +729,7 @@ def get_grammar_affixes(tribe: str, affix_type: Optional[str] = None, db: Sessio
                 {"tribe": tribe_name}
             ).fetchall()
 
-        return JSONResponse({
+        payload = {
             "tribe": tribe_name,
             "affixes": [
                 {"id": r[0], "affix": r[1], "affix_type": r[2],
@@ -709,19 +737,33 @@ def get_grammar_affixes(tribe: str, affix_type: Optional[str] = None, db: Sessio
                  "rule_ids": [int(x) for x in r[5].split(",")] if r[5] else []}
                 for r in rows
             ]
-        }, status_code=200)
+        }
+        _grammar_affixes_cache[key] = payload
+        return payload
+
+
+@router.get("/grammar/{tribe}/affixes")
+def get_grammar_affixes(tribe: str, affix_type: Optional[str] = None, db: Session = Depends(get_db)):
+    """取得詞綴清單
+    affix_type: prefix / suffix / infix / circumfix / reduplication / auxiliary（不傳則回傳全部）
+    """
+    try:
+        tribe_name = TRIBE_MAP.get(tribe, tribe)
+        payload = _load_grammar_affixes(db, tribe_name, affix_type)
+        return JSONResponse(payload, status_code=200)
     except Exception as e:
         logger.exception(e)
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-@router.get("/grammar/{tribe}/quiz")
-def get_grammar_quiz_material(tribe: str, section_key: Optional[str] = None, db: Session = Depends(get_db)):
-    """取得有例句的規則清單（用於自動生成測驗題）
-    section_key: 指定章節 key（不傳則回傳全部有例句的規則）
-    """
-    try:
-        tribe_name = TRIBE_MAP.get(tribe, tribe)
+def _load_grammar_quiz_material(db: Session, tribe_name: str, section_key: Optional[str]) -> dict:
+    key = (tribe_name, section_key or "")
+    if key in _grammar_quiz_cache:
+        return _grammar_quiz_cache[key]
+
+    with _grammar_quiz_cache_lock:
+        if key in _grammar_quiz_cache:
+            return _grammar_quiz_cache[key]
 
         if section_key:
             rows = db.execute(
@@ -784,10 +826,23 @@ def get_grammar_quiz_material(tribe: str, section_key: Optional[str] = None, db:
                 "linked_word_ids": [],
             })
 
-        return JSONResponse({
+        payload = {
             "tribe": tribe_name,
             "rules": list(rules_map.values()),
-        }, status_code=200)
+        }
+        _grammar_quiz_cache[key] = payload
+        return payload
+
+
+@router.get("/grammar/{tribe}/quiz")
+def get_grammar_quiz_material(tribe: str, section_key: Optional[str] = None, db: Session = Depends(get_db)):
+    """取得有例句的規則清單（用於自動生成測驗題）
+    section_key: 指定章節 key（不傳則回傳全部有例句的規則）
+    """
+    try:
+        tribe_name = TRIBE_MAP.get(tribe, tribe)
+        payload = _load_grammar_quiz_material(db, tribe_name, section_key)
+        return JSONResponse(payload, status_code=200)
     except Exception as e:
         logger.exception(e)
         return JSONResponse({"error": str(e)}, status_code=500)

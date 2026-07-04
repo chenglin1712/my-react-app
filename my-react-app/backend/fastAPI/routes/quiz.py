@@ -179,6 +179,12 @@ def load_all_words(db: Optional[Session] = None) -> List[Word]:
             _words_cache = db.query(Word).all()
     return _words_cache
 
+
+def warm_cache(db: Session) -> None:
+    """在 app 啟動時預先跑一次 load_all_words，
+    把全表掃描的成本放在部署當下，而不是留給第一個打 quiz 的使用者請求承擔。"""
+    load_all_words(db)
+
 # ----------------------------
 # API: 產生 quiz
 # ----------------------------

@@ -61,6 +61,13 @@ def _load_valid_words(db: Session, tribe_id: str) -> list[dict]:
         return valid_words
 
 
+def warm_cache(db: Session) -> None:
+    """在 app 啟動時預先為每個族語跑一次 _load_valid_words，
+    把全表掃描的成本放在部署當下，而不是留給第一個打這個族語的使用者請求承擔。"""
+    for tribe_id in TRIBE_IDS.values():
+        _load_valid_words(db, tribe_id)
+
+
 @router.get("/questions")
 def get_listening_questions(
     tribe: str = 'tayal',

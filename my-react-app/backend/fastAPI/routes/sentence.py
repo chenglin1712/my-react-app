@@ -74,6 +74,13 @@ def _load_unique_sentences(db: Session, tribe_id: str) -> list[dict]:
         return unique_sentences
 
 
+def warm_cache(db: Session) -> None:
+    """在 app 啟動時預先為每個族語跑一次 _load_unique_sentences，
+    把全表掃描的成本放在部署當下，而不是留給第一個打這個族語的使用者請求承擔。"""
+    for tribe_id in TRIBE_IDS.values():
+        _load_unique_sentences(db, tribe_id)
+
+
 @router.get("/questions")
 def get_sentence_questions(
     tribe: str = 'tayal',

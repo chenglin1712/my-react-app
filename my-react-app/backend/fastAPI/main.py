@@ -1,12 +1,41 @@
+import logging
+import threading
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI
 from .routes import crawler, vision, dictionary, quiz, listening, sentence, auth
+from .routes.connect import SessionLocal
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 
 load_dotenv()
 
-app = FastAPI()
+logger = logging.getLogger(__name__)
+
+
+def _warm_caches():
+    """listening/sentence/quiz 都用「第一次請求時全表掃描一次、之後吃快取」的策略，
+    在背景執行緒預先跑一次，讓全表掃描的成本落在部署當下，
+    而不是留給部署後第一批使用者的請求承擔。"""
+    db = SessionLocal()
+    try:
+        listening.warm_cache(db)
+        sentence.warm_cache(db)
+        quiz.warm_cache(db)
+    except Exception:
+        logger.exception("快取預熱失敗")
+    finally:
+        db.close()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    threading.Thread(target=_warm_caches, daemon=True).start()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 # 允許的來源：從 .env 的 ALLOWED_ORIGINS 讀取（逗號分隔），開發預設允許 localhost
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
