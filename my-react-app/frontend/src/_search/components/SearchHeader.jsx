@@ -4,8 +4,11 @@ import FilterPanel from './FilterPanel';
 import CategoryBar from './CategoryBar';
 
 // 搜尋頁最上方整個 sticky 區塊：標題、族語選擇器、搜尋框、篩選/排序面板、分類 Tabs。
+const SEARCH_INPUT_MAX_LENGTH = 100;
+
 const SearchHeader = ({
   query, setQuery, handleSearch,
+  loading,
   tribes, selectedTribe, handleTribeChange,
   isMobile,
   showFilterPanel, setShowFilterPanel,
@@ -41,6 +44,7 @@ const SearchHeader = ({
       <Form.Control
         placeholder="請輸入查詢內容"
         value={query}
+        maxLength={SEARCH_INPUT_MAX_LENGTH}
         onChange={e => setQuery(e.target.value)}
         onKeyDown={e => {
           if (e.key === 'Enter') {
@@ -49,7 +53,7 @@ const SearchHeader = ({
           }
         }}
       />
-      <Button variant="danger" onClick={handleSearch} style={{ maxWidth: '60px', paddingLeft: '6px', paddingRight: '6px' }}>
+      <Button variant="danger" onClick={() => handleSearch()} disabled={loading} style={{ maxWidth: '60px', paddingLeft: '6px', paddingRight: '6px' }}>
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" className="bi bi-search" viewBox="0 0 16 16">
           <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0" />
         </svg>

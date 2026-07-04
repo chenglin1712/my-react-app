@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Container, Alert, Spinner } from 'react-bootstrap';
+import { Container, Alert, Spinner, Button } from 'react-bootstrap';
 import { authChanges } from "../../src/userServives/userServive";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db, auth } from "../../../firebase";
@@ -115,6 +115,7 @@ const App = () => {
   const TRIBES_WITH_DATA = ['泰雅', '阿美', '布農', '葛瑪蘭', '排灣'];
 
   const handleSearch = async (tribeOverride = null) => {
+    if (loading) return;
     const tribe = tribeOverride ?? selectedTribe;
     if (!TRIBES_WITH_DATA.includes(tribe)) {
       setDefinitions({ exact_match_results: {}, fuzzy_match_results: {}, all_results: {} });
@@ -245,6 +246,7 @@ const App = () => {
     <Container className="p-4">
       <SearchHeader
         query={query} setQuery={setQuery} handleSearch={handleSearch}
+        loading={loading}
         tribes={tribes} selectedTribe={selectedTribe} handleTribeChange={handleTribeChange}
         isMobile={isMobile}
         showFilterPanel={showFilterPanel} setShowFilterPanel={setShowFilterPanel}
@@ -260,7 +262,14 @@ const App = () => {
 
       <br />
       {loading && <Spinner animation="border" variant="primary" />}
-      {error && <Alert variant="danger">{error}</Alert>}
+      {error && (
+        <Alert variant="danger" className="d-flex justify-content-between align-items-center">
+          <span>{error}</span>
+          <Button variant="outline-danger" size="sm" onClick={() => handleSearch()} disabled={loading}>
+            重試
+          </Button>
+        </Alert>
+      )}
 
       {!TRIBES_WITH_DATA.includes(selectedTribe) && !loading && (
         <div className="tribe-empty-state">
