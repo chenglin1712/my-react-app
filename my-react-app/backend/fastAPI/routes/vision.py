@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, HTTPException, Request
 import base64
 import logging
 import requests
+import threading
 from dotenv import load_dotenv
 import os
 import time
@@ -18,15 +19,28 @@ if not VITE_CLOUD_API_KEY:
 if not VITE_CLOUD_API_URL:
     _logger.warning("VITE_CLOUD_API_URL 環境變數未設定，影像辨識功能將無法使用")
 
+# 圖片辨識同一批 label 常常出現重複的英文單字（例如同一物件被偵測到多次），
+# 用一個簡單的 dict 快取翻譯結果，避免對同一個字重複呼叫 Google Translate。
+# 只在翻譯成功時寫入快取，重試全部失敗時不快取，避免暫時性錯誤永久污染快取。
+_translation_cache: dict[str, str | None] = {}
+_translation_cache_lock = threading.Lock()
+
+
 def translate_with_retry(text: str, retries=3, delay=1) -> str | None:
     if not text.strip():
         return text
+
+    key = text.strip().lower()
+    if key in _translation_cache:
+        return _translation_cache[key]
+
     for i in range(retries):
         try:
             translated = GoogleTranslator(source='en', target='zh-TW').translate(text)
-            if translated.strip().lower() == text.strip().lower():
-                return None
-            return translated
+            result = None if translated.strip().lower() == key else translated
+            with _translation_cache_lock:
+                _translation_cache[key] = result
+            return result
         except Exception:
             time.sleep(delay)
     return None

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import {
   Container, ListGroup, Alert, Spinner, Button, InputGroup, Form,
@@ -160,7 +160,10 @@ const App = () => {
   const [favoriteWords, setFavoriteWords] = useState(new Set());
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterLetter, setFilterLetter] = useState('');
-  const [audio, setAudio] = useState(null);
+  // 只用來暫停「上一首」播放中的音檔，畫面上不會顯示，改用 ref 存放
+  // 這樣就不會每次播放音檔都觸發整個元件重新 render，
+  // 也讓 playAudio/playSentence 可以用 useCallback 穩定住函式參照
+  const audioRef = useRef(null);
   const [user, setUser] = useState(null);
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const [frequencyFilter, setFrequencyFilter] = useState('');
@@ -330,7 +333,7 @@ const App = () => {
     return () => unsubscribe();
   }, []);
 
-  const playAudio = async (fileId) => {
+  const playAudio = useCallback(async (fileId) => {
     if (!fileId || failedAudio.has(fileId)) return;
 
     // 取消任何進行中的句子播放
@@ -340,9 +343,9 @@ const App = () => {
       playbackGenRef.currentAudio = null;
     }
 
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
 
     const proxyUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL + fileId;
@@ -362,13 +365,13 @@ const App = () => {
       setFailedAudio(prev => new Set([...prev, fileId]));
     });
 
-    setAudio(newAudio);
-  };
+    audioRef.current = newAudio;
+  }, [failedAudio]);
 
-  const playSentence = async (sentence) => {
+  const playSentence = useCallback(async (sentence) => {
     // 取得本次播放的 generation token，後續每步確認是否已被取消
     const myGen = (playbackGenRef.current += 1);
-    if (audio) { audio.pause(); audio.currentTime = 0; }
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
     try {
       const token = await auth.currentUser?.getIdToken();
       const res = await axios.post('/dictionary/sentence-audio/', { sentence, tribe: selectedTribe }, {
@@ -397,7 +400,7 @@ const App = () => {
       console.error('playSentence error:', e);
       setError('句子語音播放失敗，請稍後再試');
     }
-  };
+  }, [selectedTribe]);
 
   const categoryGroups = {
     "語法與功能": [

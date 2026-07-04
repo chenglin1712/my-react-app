@@ -150,17 +150,18 @@ def submit_ans(request):
             # 橫向單字比對
             if word_direction == 'across':
                 for i in range(word_length):
-                    if (start_row - 1 < len(user_answers) and 
-                        (start_col - 1 + i) < len(user_answers[start_row - 1])):
-                        
-                        user_char = user_answers[start_row - 1][start_col - 1 + i].lower()
+                    row, col = start_row - 1, start_col - 1 + i
+                    if (row < len(user_answers) and col < len(user_answers[row]) and
+                            row < len(cleaned_solution) and col < len(cleaned_solution[row])):
+
+                        user_char = user_answers[row][col].lower()
                         user_word_chars.append(user_char)
 
-                        correct_char_from_grid = cleaned_solution[start_row - 1][start_col - 1 + i].lower()
+                        correct_char_from_grid = cleaned_solution[row][col].lower()
                         if correct_char_from_grid not in ('-', ''):
                             if correct_char_from_grid != user_char:
                                 is_correct = False
-                                break 
+                                break
                     else:
                         print(f"Warning: Index out of bounds for word {word_number} (across).")
                         is_correct = False
@@ -169,17 +170,18 @@ def submit_ans(request):
             # 縱向單字比對
             elif word_direction == 'down':
                 for i in range(word_length):
-                    if ((start_row - 1 + i) < len(user_answers) and 
-                        start_col - 1 < len(user_answers[start_row - 1 + i])):
+                    row, col = start_row - 1 + i, start_col - 1
+                    if (row < len(user_answers) and col < len(user_answers[row]) and
+                            row < len(cleaned_solution) and col < len(cleaned_solution[row])):
 
-                        user_char = user_answers[start_row - 1 + i][start_col - 1].lower()
+                        user_char = user_answers[row][col].lower()
                         user_word_chars.append(user_char)
-                        
-                        correct_char_from_grid = cleaned_solution[start_row - 1 + i][start_col - 1].lower()
+
+                        correct_char_from_grid = cleaned_solution[row][col].lower()
                         if correct_char_from_grid not in ('-', ''):
                             if correct_char_from_grid != user_char:
                                 is_correct = False
-                                break 
+                                break
                     else:
                         print(f"Warning: Index out of bounds for word {word_number} (down).")
                         is_correct = False

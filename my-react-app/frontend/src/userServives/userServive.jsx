@@ -223,13 +223,24 @@ export const signOut = async () => {
 };
 
 // 監聽上線狀態
+// authChanges 每次 auth 狀態改變都會呼叫一次 setupPresence，
+// 如果不先取消上一個 onValue 訂閱，舊的 listener 會一直留著，
+// 累積下去造成 memory leak，所以用一個模組層級的變數記住目前的 unsubscribe，
+// 每次要建立新的監聽前先把舊的取消掉。
+let _presenceUnsubscribe = null;
+
 export const setupPresence = (uid) => {
     const db = getDatabase();
     const statusRef = ref(db, `/status/${uid}`);
     const connectedRef = ref(db, ".info/connected");
 
+    if (_presenceUnsubscribe) {
+        _presenceUnsubscribe();
+        _presenceUnsubscribe = null;
+    }
+
     // 確認使用者是否連上 RTDB
-    onValue(connectedRef, async (snap) => {
+    _presenceUnsubscribe = onValue(connectedRef, async (snap) => {
         // console.log("[presence] .info/connected =", snap.val());
 
         if (snap.val() === false) {

@@ -15,16 +15,22 @@ logger = logging.getLogger(__name__)
 
 
 def _warm_caches():
-    """listening/sentence/quiz 都用「第一次請求時全表掃描一次、之後吃快取」的策略，
+    """listening/sentence/quiz/dictionary 都用「第一次請求時全表掃描一次、之後吃快取」的策略，
     在背景執行緒預先跑一次，讓全表掃描的成本落在部署當下，
-    而不是留給部署後第一批使用者的請求承擔。"""
+    而不是留給部署後第一批使用者的請求承擔。
+    每個快取各自 try/except，避免其中一個失敗就連帶讓後面的快取都沒被預熱到。"""
     db = SessionLocal()
     try:
-        listening.warm_cache(db)
-        sentence.warm_cache(db)
-        quiz.warm_cache(db)
-    except Exception:
-        logger.exception("快取預熱失敗")
+        for name, warm in (
+            ("listening", listening.warm_cache),
+            ("sentence", sentence.warm_cache),
+            ("quiz", quiz.warm_cache),
+            ("dictionary", dictionary.warm_cache),
+        ):
+            try:
+                warm(db)
+            except Exception:
+                logger.exception("%s 快取預熱失敗", name)
     finally:
         db.close()
 
@@ -59,5 +65,11 @@ app.include_router(dictionary.router, prefix="/dictionary", dependencies=_requir
 app.include_router(quiz.router, prefix="/quiz", dependencies=_require_login)
 app.include_router(listening.router, prefix="/listening", dependencies=_require_login)
 app.include_router(sentence.router, prefix="/sentence", dependencies=_require_login)
+
+
+@app.get("/health")
+def health_check():
+    """給 load balancer / Kubernetes 用的健康檢查端點，不需要登入。"""
+    return {"status": "ok"}
 
 

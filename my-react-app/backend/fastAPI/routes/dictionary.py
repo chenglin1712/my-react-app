@@ -197,43 +197,71 @@ def parse_audios(value) -> List[AudioItem]:
 
 
 # ------------------------- 搜尋邏輯 -------------------------
+# search_by_chinese/fuzzy_search_by_chinese/search/fuzzy_search 這四個函式
+# 原本每次呼叫都對 Word table 做一次 tribe 全表掃描＋JSON parse。
+# 沿用 listening.py 的做法：每個 tribe 的詞條只在第一次用到時真正查詢＋解析一次，
+# 之後直接從記憶體快取的 WordResult 清單做過濾，不用每個 request 都重新打 DB。
+_tribe_words_cache: Dict[str, List[WordResult]] = {}
+_tribe_words_cache_lock = threading.Lock()
+
+
+def _load_tribe_words(db: Session, tribe: str) -> List[WordResult]:
+    if tribe in _tribe_words_cache:
+        return _tribe_words_cache[tribe]
+
+    with _tribe_words_cache_lock:
+        if tribe in _tribe_words_cache:
+            return _tribe_words_cache[tribe]
+
+        words = db.query(Word).filter(Word.tribe == tribe).all()
+        results = [
+            WordResult(
+                id=word.id,
+                tribeId=word.tribe_id,
+                tribe=word.tribe,
+                dialect=word.dialect,
+                name=word.name,
+                pinyin=word.pinyin,
+                variant=word.variant,
+                formationWord=word.formation_word,
+                derivativeRoot=word.derivative_root,
+                frequency=word.frequency,
+                hit=word.hit,
+                dictionaryNote=word.dictionary_note,
+                sources=json.loads(word.sources or "[]"),
+                explanationItems=parse_explanations(word.explanation_items),
+                audioItems=parse_audios(word.audio_items or "[]"),
+                word_img=word.word_img,
+                isDerivativeRoot=word.is_derivative_root,
+                isImage=word.is_image,
+                isZuzucidian=word.is_zuzucidian,
+                isOtherDialect=word.is_other_dialect,
+            )
+            for word in words
+        ]
+        _tribe_words_cache[tribe] = results
+        return results
+
+
+def warm_cache(db: Session) -> None:
+    """在 app 啟動時預先為每個族語跑一次 _load_tribe_words，
+    把全表掃描＋JSON parse 的成本放在部署當下，而不是留給第一批使用者的查詢請求承擔。"""
+    for tribe_name in set(TRIBE_MAP.values()):
+        _load_tribe_words(db, tribe_name)
+
+
 def search_by_chinese(db: Session, keyword: str, tribe: str = '泰雅語') -> Tuple[List[WordResult], List[str]]:
     """完全比對中文解釋"""
-    from sqlalchemy import func
-    words = db.query(Word).filter(Word.tribe == tribe).order_by(func.lower(Word.name)).all()
+    words = sorted(_load_tribe_words(db, tribe), key=lambda w: (w.name or "").lower())
 
     results = []
     matched_names = []
 
     for word in words:
-        explanations = parse_explanations(word.explanation_items)
-        for defin in explanations:
+        for defin in (word.explanationItems or []):
             if defin.chineseExplanation == keyword:
                 matched_names.append(simplify_tayal(word.name))
-                results.append(
-                    WordResult(
-                        id=word.id,
-                        tribeId=word.tribe_id,
-                        tribe=word.tribe,
-                        dialect=word.dialect,
-                        name=word.name,
-                        pinyin=word.pinyin,
-                        variant=word.variant,
-                        formationWord=word.formation_word,
-                        derivativeRoot=word.derivative_root,
-                        frequency=word.frequency,
-                        hit=word.hit,
-                        dictionaryNote=word.dictionary_note,
-                        sources=json.loads(word.sources or "[]"),
-                        explanationItems=explanations,
-                        audioItems=parse_audios(word.audio_items or "[]"),
-                        word_img=word.word_img,
-                        isDerivativeRoot=word.is_derivative_root,
-                        isImage=word.is_image, 
-                        isZuzucidian=word.is_zuzucidian,
-                        isOtherDialect=word.is_other_dialect,
-                    )
-                )
+                results.append(word)
                 break
 
     return results, matched_names
@@ -243,7 +271,7 @@ def search_by_chinese(db: Session, keyword: str, tribe: str = '泰雅語') -> Tu
 
 def fuzzy_search_by_chinese(db: Session, keyword: str, exclude_names: List[str], tribe: str = '泰雅語') -> Dict[str, List[WordResult]]:
     """模糊搜尋中文解釋"""
-    words = db.query(Word).filter(Word.tribe == tribe).all()
+    words = _load_tribe_words(db, tribe)
     fuzzy_content = {}
 
     for word in words:
@@ -251,75 +279,23 @@ def fuzzy_search_by_chinese(db: Session, keyword: str, exclude_names: List[str],
         if name_simple in exclude_names:
             continue
 
-        explanations = parse_explanations(word.explanation_items)
-        for defin in explanations:
+        for defin in (word.explanationItems or []):
             if keyword in (defin.chineseExplanation or ""):
-                if defin.chineseExplanation not in fuzzy_content:
-                    fuzzy_content[defin.chineseExplanation] = []
-
-                fuzzy_content[defin.chineseExplanation].append(
-                    WordResult(
-                        id=word.id,
-                        tribeId=word.tribe_id,
-                        tribe=word.tribe,
-                        dialect=word.dialect,
-                        name=word.name,
-                        pinyin=word.pinyin,
-                        variant=word.variant,
-                        formationWord=word.formation_word,
-                        derivativeRoot=word.derivative_root,
-                        frequency=word.frequency,
-                        hit=word.hit,
-                        dictionaryNote=word.dictionary_note,
-                        sources=json.loads(word.sources or "[]"),
-                        explanationItems=explanations,
-                        audioItems=parse_audios(word.audio_items or "[]"),
-                        word_img=word.word_img,
-                        isDerivativeRoot=word.is_derivative_root,
-                        isImage=word.is_image, 
-                        isZuzucidian=word.is_zuzucidian,
-                        isOtherDialect=word.is_other_dialect,
-                    )
-                )
+                fuzzy_content.setdefault(defin.chineseExplanation, []).append(word)
 
     return fuzzy_content
 
 def search(db: Session, keyword: str, tribe: str = '泰雅語') -> Tuple[List[WordResult], List[str]]:
     """完全比對族語"""
-    words = db.query(Word).filter(Word.tribe == tribe, Word.name.like(f"%{keyword}%")).all()
+    words = _load_tribe_words(db, tribe)
 
     results = []
     matched_names = []
 
     for word in words:
-       
-            if word.name == keyword:
-                matched_names.append(simplify_tayal(word.name))
-                results.append(
-                    WordResult(
-                        id=word.id,
-                        tribeId=word.tribe_id,
-                        tribe=word.tribe,
-                        dialect=word.dialect,
-                        name=word.name,
-                        pinyin=word.pinyin,
-                        variant=word.variant,
-                        formationWord=word.formation_word,
-                        derivativeRoot=word.derivative_root,
-                        frequency=word.frequency,
-                        hit=word.hit,
-                        dictionaryNote=word.dictionary_note,
-                        sources=json.loads(word.sources or "[]"),
-                        explanationItems=parse_explanations(word.explanation_items),
-                        audioItems=parse_audios(word.audio_items or "[]"),
-                        word_img=word.word_img,
-                        isDerivativeRoot=word.is_derivative_root,
-                        isImage=word.is_image, 
-                        isZuzucidian=word.is_zuzucidian,
-                        isOtherDialect=word.is_other_dialect,
-                    )
-                )
-                break
+        if word.name == keyword:
+            matched_names.append(simplify_tayal(word.name))
+            results.append(word)
 
     return results, matched_names
 
@@ -328,7 +304,7 @@ def search(db: Session, keyword: str, tribe: str = '泰雅語') -> Tuple[List[Wo
 
 def fuzzy_search(db: Session, keyword: str, exclude_names: List[str], tribe: str = '泰雅語') -> Dict[str, List[WordResult]]:
     """模糊搜尋族語"""
-    words = db.query(Word).filter(Word.tribe == tribe, Word.name.like(f"%{keyword}%")).all()
+    words = _load_tribe_words(db, tribe)
     fuzzy_content = {}
 
     for word in words:
@@ -336,36 +312,8 @@ def fuzzy_search(db: Session, keyword: str, exclude_names: List[str], tribe: str
         if name_simple in exclude_names:
             continue
 
-       
-        
         if keyword in (word.name or ""):
-                if word.name not in fuzzy_content:
-                    fuzzy_content[word.name] = []
-
-                fuzzy_content[word.name].append(
-                    WordResult(
-                        id=word.id,
-                        tribeId=word.tribe_id,
-                        tribe=word.tribe,
-                        dialect=word.dialect,
-                        name=word.name,
-                        pinyin=word.pinyin,
-                        variant=word.variant,
-                        formationWord=word.formation_word,
-                        derivativeRoot=word.derivative_root,
-                        frequency=word.frequency,
-                        hit=word.hit,
-                        dictionaryNote=word.dictionary_note,
-                        sources=json.loads(word.sources or "[]"),
-                        explanationItems=parse_explanations(word.explanation_items),
-                        audioItems=parse_audios(word.audio_items or "[]"),
-                        word_img=word.word_img,
-                        isDerivativeRoot=word.is_derivative_root,
-                        isImage=word.is_image, 
-                        isZuzucidian=word.is_zuzucidian,
-                        isOtherDialect=word.is_other_dialect,
-                    )
-                )
+            fuzzy_content.setdefault(word.name, []).append(word)
 
     return fuzzy_content
 
@@ -606,14 +554,17 @@ def _load_grammar(db: Session, tribe_name: str) -> Optional[dict]:
 
 
 @router.get("/grammar/{tribe}")
-def get_grammar(tribe: str, db: Session = Depends(get_db)):
-    """查詢指定族語的所有文法章節（含規則、例句、詞綴）"""
+def get_grammar(tribe: str, limit: Optional[int] = None, offset: int = 0, db: Session = Depends(get_db)):
+    """查詢指定族語的所有文法章節（含規則、例句、詞綴）
+    limit/offset 為選填的章節分頁參數，不傳則維持原本回傳全部章節的行為"""
     try:
         tribe_name = TRIBE_MAP.get(tribe, tribe)
         payload = _load_grammar(db, tribe_name)
         if payload is None:
             return JSONResponse({"error": f"找不到 {tribe_name} 的文法資料"}, status_code=404)
-        return JSONResponse(payload, status_code=200)
+        sections = payload["sections"]
+        sliced = sections[offset:offset + limit] if limit is not None else sections[offset:]
+        return JSONResponse({**payload, "sections": sliced, "total": len(sections)}, status_code=200)
     except Exception as e:
         logger.exception(e)
         return JSONResponse({"error": str(e)}, status_code=500)
@@ -743,14 +694,23 @@ def _load_grammar_affixes(db: Session, tribe_name: str, affix_type: Optional[str
 
 
 @router.get("/grammar/{tribe}/affixes")
-def get_grammar_affixes(tribe: str, affix_type: Optional[str] = None, db: Session = Depends(get_db)):
+def get_grammar_affixes(
+    tribe: str,
+    affix_type: Optional[str] = None,
+    limit: Optional[int] = None,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+):
     """取得詞綴清單
     affix_type: prefix / suffix / infix / circumfix / reduplication / auxiliary（不傳則回傳全部）
+    limit/offset 為選填的分頁參數，不傳則維持原本回傳全部詞綴的行為
     """
     try:
         tribe_name = TRIBE_MAP.get(tribe, tribe)
         payload = _load_grammar_affixes(db, tribe_name, affix_type)
-        return JSONResponse(payload, status_code=200)
+        affixes = payload["affixes"]
+        sliced = affixes[offset:offset + limit] if limit is not None else affixes[offset:]
+        return JSONResponse({**payload, "affixes": sliced, "total": len(affixes)}, status_code=200)
     except Exception as e:
         logger.exception(e)
         return JSONResponse({"error": str(e)}, status_code=500)
@@ -835,14 +795,23 @@ def _load_grammar_quiz_material(db: Session, tribe_name: str, section_key: Optio
 
 
 @router.get("/grammar/{tribe}/quiz")
-def get_grammar_quiz_material(tribe: str, section_key: Optional[str] = None, db: Session = Depends(get_db)):
+def get_grammar_quiz_material(
+    tribe: str,
+    section_key: Optional[str] = None,
+    limit: Optional[int] = None,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+):
     """取得有例句的規則清單（用於自動生成測驗題）
     section_key: 指定章節 key（不傳則回傳全部有例句的規則）
+    limit/offset 為選填的分頁參數，不傳則維持原本回傳全部規則的行為
     """
     try:
         tribe_name = TRIBE_MAP.get(tribe, tribe)
         payload = _load_grammar_quiz_material(db, tribe_name, section_key)
-        return JSONResponse(payload, status_code=200)
+        rules = payload["rules"]
+        sliced = rules[offset:offset + limit] if limit is not None else rules[offset:]
+        return JSONResponse({**payload, "rules": sliced, "total": len(rules)}, status_code=200)
     except Exception as e:
         logger.exception(e)
         return JSONResponse({"error": str(e)}, status_code=500)
