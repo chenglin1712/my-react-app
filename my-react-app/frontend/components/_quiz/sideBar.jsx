@@ -24,7 +24,7 @@ const SideBar = () => {
     const [selectFunc, setSelectFunc] = useState(currentUrl); //預設為開始測驗
     // /quiz/amis、/quiz/bunun 等非泰雅語路徑要留在自己的族語底下，
     // 泰雅語沒有族語路徑前綴（歷史因素維持 /quiz 不變）。
-    const tribeMatch = currentUrl.match(/^\/quiz\/(amis|bunun|kavalan)(\/|$)/);
+    const tribeMatch = currentUrl.match(/^\/quiz\/(amis|bunun|kavalan|paiwan)(\/|$)/);
     const quizBasePath = tribeMatch ? `/quiz/${tribeMatch[1]}` : "/quiz";
 
     //點功能選單

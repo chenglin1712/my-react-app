@@ -30,6 +30,7 @@ TRIBE_IDS = {
     "amis": "e68273b9-1f2b-4c42-8d95-f52189ab24b7",
     "bunun": "865a96e3-3384-45b3-8bd0-e1f799b75515",
     "kavalan": "c5974f37-b49d-466a-ab24-6893ab4ef6a5",
+    "paiwan": "19c77a3b-3a81-496f-b0f4-afe6d9155edd",
 }
 
 

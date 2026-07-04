@@ -40,7 +40,8 @@ const TRIBES = [
     name: "排灣",
     subtitle: "Paiwan",
     emoji: "📝",
-    available: false,
+    available: true,
+    route: "/quiz/paiwan",
   },
 ];
 

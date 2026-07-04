@@ -6,6 +6,7 @@ const TRIBE_TITLE = {
     amis: "阿美語線上測驗",
     bunun: "布農語線上測驗",
     kavalan: "噶瑪蘭語線上測驗",
+    paiwan: "排灣語線上測驗",
 };
 
 const Quiz = ({ tribe = "tayal" }) => {
