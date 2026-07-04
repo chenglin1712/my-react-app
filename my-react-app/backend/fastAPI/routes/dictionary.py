@@ -16,6 +16,7 @@ from fastAPI.routes.word_data import (
     load_audio_items_for_words,
     load_explanation_items_for_words,
 )
+from config.tribes import TRIBE_MAP
 
 router = APIRouter()
 
@@ -78,14 +79,6 @@ class WordResult(BaseModel):
     isZuzucidian: Optional[bool] = None
     isOtherDialect: Optional[bool] = None
 
-
-TRIBE_MAP = {
-    '泰雅': '泰雅語', 'tayal': '泰雅語',
-    '阿美': '阿美語', 'amis': '阿美語',
-    '布農': '布農語', 'bunun': '布農語',
-    '葛瑪蘭': '葛瑪蘭語', 'kavalan': '葛瑪蘭語',
-    '排灣': '排灣語', 'paiwan': '排灣語',
-}
 
 class KeywordRequest(BaseModel):
     keyword: Optional[str] = ''

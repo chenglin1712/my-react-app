@@ -5,17 +5,14 @@ from pathlib import Path
 from django.http import HttpResponse, JsonResponse
 from .crossword import Crossword, Word as CrosswordWord, word_list
 from django.views.decorators.csrf import csrf_exempt
+from config.tribes import TRIBE_IDS as _ALL_TRIBE_IDS
 
 # dictionary.db 路徑（與 fastAPI routes 共用同一個 DB）
 _DB_PATH = Path(__file__).resolve().parent.parent / 'fastAPI' / 'routes' / 'dictionary.db'
 
-# 各族語對應的 tribe_id（UUID）
-_TRIBE_IDS = {
-    'amis':    'e68273b9-1f2b-4c42-8d95-f52189ab24b7',
-    'bunun':   '865a96e3-3384-45b3-8bd0-e1f799b75515',
-    'kavalan': 'c5974f37-b49d-466a-ab24-6893ab4ef6a5',
-    'paiwan':  '19c77a3b-3a81-496f-b0f4-afe6d9155edd',
-}
+# 各族語對應的 tribe_id（UUID）。tayal 故意排除：泰雅語填字遊戲沿用內建
+# word_list（見 generate_crossword 的 fallback 分支），不查資料庫。
+_TRIBE_IDS = {slug: tid for slug, tid in _ALL_TRIBE_IDS.items() if slug != 'tayal'}
 
 def _get_words_from_db(tribe_id: str, limit: int = 30):
     """從 dictionary.db 取出純英文字母、長度 4-10、有中文解釋的詞彙。

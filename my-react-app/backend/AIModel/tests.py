@@ -1,29 +1,37 @@
 from django.test import TestCase
-from unittest.mock import patch
-import sqlite3
-import os
+from unittest.mock import patch, MagicMock
 
 from AIModel.views import search_tayal_words, search_tayal_words_bulk
 
 
+class _FakeWord:
+    def __init__(self, id, name):
+        self.id = id
+        self.name = name
+
+
 class SearchTayalWordsTest(TestCase):
-    """測試 search_tayal_words 的基本行為（不依賴真實資料庫）"""
+    """測試 search_tayal_words / search_tayal_words_bulk 的組裝邏輯（不依賴真實資料庫）。
+    這兩個函式底層用 SQLAlchemy 查 fastAPI 的 Word/word_explanation/word_audio 表，
+    這裡 mock 掉 SessionLocal 與 word_data.py 的查詢函式，只驗證組裝結果。"""
 
-    def _make_fake_row(self, name, chinese="test", audio_id="abc"):
-        import json
-        explanations = json.dumps([{"chineseExplanation": chinese}])
-        audio_items = json.dumps([{"fileId": audio_id}])
-        row = [None] * 16
-        row[4] = name
-        row[14] = explanations
-        row[15] = audio_items
-        return tuple(row)
+    def _mock_session(self, mock_session_local, words):
+        mock_db = MagicMock()
+        mock_query = mock_db.query.return_value
+        mock_query.filter.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.all.return_value = words
+        mock_session_local.return_value = mock_db
+        return mock_db
 
-    @patch("AIModel.views.sqlite3.connect")
-    def test_existing_word_returns_list(self, mock_connect):
-        fake_row = self._make_fake_row("cyux", chinese="happy", audio_id="file123")
-        mock_cursor = mock_connect.return_value.cursor.return_value
-        mock_cursor.fetchall.return_value = [fake_row]
+    @patch("AIModel.views.load_audio_items_for_words")
+    @patch("AIModel.views.load_explanation_items_for_words")
+    @patch("AIModel.views.SessionLocal")
+    def test_existing_word_returns_list(self, mock_session_local, mock_explanations, mock_audios):
+        self._mock_session(mock_session_local, [_FakeWord("w1", "cyux")])
+        mock_explanations.return_value = {"w1": [{"chineseExplanation": "happy"}]}
+        mock_audios.return_value = {"w1": [{"fileId": "file123"}]}
 
         result = search_tayal_words("cyux", limit=1)
 
@@ -32,29 +40,36 @@ class SearchTayalWordsTest(TestCase):
         self.assertEqual(result[0]["tayal"], "cyux")
         self.assertEqual(result[0]["chinese"], "happy")
 
-    @patch("AIModel.views.sqlite3.connect")
-    def test_nonexistent_word_returns_empty(self, mock_connect):
-        mock_cursor = mock_connect.return_value.cursor.return_value
-        mock_cursor.fetchall.return_value = []
+    @patch("AIModel.views.load_audio_items_for_words")
+    @patch("AIModel.views.load_explanation_items_for_words")
+    @patch("AIModel.views.SessionLocal")
+    def test_nonexistent_word_returns_empty(self, mock_session_local, mock_explanations, mock_audios):
+        self._mock_session(mock_session_local, [])
+        mock_explanations.return_value = {}
+        mock_audios.return_value = {}
 
         result = search_tayal_words("not_exist", limit=1)
 
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 0)
 
-    @patch("AIModel.views.sqlite3.connect")
-    def test_db_connection_failure_returns_empty(self, mock_connect):
-        mock_connect.side_effect = Exception("DB connection failed")
+    @patch("AIModel.views.SessionLocal")
+    def test_db_connection_failure_returns_empty(self, mock_session_local):
+        mock_db = MagicMock()
+        mock_db.query.side_effect = Exception("DB connection failed")
+        mock_session_local.return_value = mock_db
 
         result = search_tayal_words("cyux", limit=1)
 
         self.assertEqual(result, [])
 
-    @patch("AIModel.views.sqlite3.connect")
-    def test_bulk_search_returns_dict(self, mock_connect):
-        fake_row = self._make_fake_row("mami", chinese="mother", audio_id="file456")
-        mock_cursor = mock_connect.return_value.cursor.return_value
-        mock_cursor.fetchall.return_value = [fake_row]
+    @patch("AIModel.views.load_audio_items_for_words")
+    @patch("AIModel.views.load_explanation_items_for_words")
+    @patch("AIModel.views.SessionLocal")
+    def test_bulk_search_returns_dict(self, mock_session_local, mock_explanations, mock_audios):
+        self._mock_session(mock_session_local, [_FakeWord("w2", "mami")])
+        mock_explanations.return_value = {"w2": [{"chineseExplanation": "mother"}]}
+        mock_audios.return_value = {"w2": [{"fileId": "file456"}]}
 
         result = search_tayal_words_bulk(["mami"])
 

@@ -5,16 +5,9 @@ from sqlalchemy.orm import Session
 from fastAPI.routes.connect import get_db
 from fastAPI.routes.model import Word
 from fastAPI.routes.word_data import load_explanation_items_for_words, load_audio_items_for_words
+from config.tribes import TRIBE_IDS
 
 router = APIRouter()
-
-TRIBE_IDS = {
-    'tayal':   'fc76ed97-0dd8-4587-82ad-7a6dbe125001',
-    'amis':    'e68273b9-1f2b-4c42-8d95-f52189ab24b7',
-    'bunun':   '865a96e3-3384-45b3-8bd0-e1f799b75515',
-    'kavalan': 'c5974f37-b49d-466a-ab24-6893ab4ef6a5',
-    'paiwan':  '19c77a3b-3a81-496f-b0f4-afe6d9155edd',
-}
 
 # 每個族語的有效詞彙（有音檔+有中文解釋）只在第一次請求時查詢+解析一次，
 # 之後直接從記憶體回傳，不用每個 request 都重新撈全表、重新 parse JSON。

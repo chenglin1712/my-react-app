@@ -18,19 +18,10 @@ import os
 import random
 import sqlite3
 
+from config.tribes import TRIBE_IDS
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.normpath(os.path.join(BASE_DIR, "..", "fastAPI", "routes", "dictionary.db"))
-
-# 各族語在 dictionary.db 裡的 tribe_id（跟 fastAPI/routes/listening.py、
-# sentence.py 的 TRIBE_IDS 是同一份資料庫、同一組值，這裡只取本題庫用得到的
-# 幾個族語，避免讓 Django app 額外相依 FastAPI 那邊的模組）。
-TRIBE_IDS = {
-    "tayal": "fc76ed97-0dd8-4587-82ad-7a6dbe125001",
-    "amis": "e68273b9-1f2b-4c42-8d95-f52189ab24b7",
-    "bunun": "865a96e3-3384-45b3-8bd0-e1f799b75515",
-    "kavalan": "c5974f37-b49d-466a-ab24-6893ab4ef6a5",
-    "paiwan": "19c77a3b-3a81-496f-b0f4-afe6d9155edd",
-}
 
 
 def fetch_words_by_glosses(tribe, glosses):

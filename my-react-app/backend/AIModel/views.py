@@ -244,68 +244,58 @@ def review_tayal_chat(request):
     else:
         return JsonResponse({"error": "只接受 POST 請求"}, status=405)
 
+def _words_to_dicts(db, words) -> list:
+    """把 Word ORM 物件轉成 {tayal, audio, chinese} dict 清單（依 words 原本順序，不去重）。
+    search_tayal_words_bulk 與 search_tayal_words 共用同一套組裝邏輯。"""
+    word_ids = [w.id for w in words]
+    explanation_map = load_explanation_items_for_words(db, word_ids=word_ids)
+    audio_map = load_audio_items_for_words(db, word_ids=word_ids)
+
+    result = []
+    for word in words:
+        explanations = explanation_map.get(word.id, [])
+        chinese = explanations[0].get("chineseExplanation", "") if explanations else ""
+        audio_items = audio_map.get(word.id, [])
+        audio = audio_items[0].get("fileId", "") if audio_items else ""
+        result.append({"tayal": word.name, "audio": audio, "chinese": chinese})
+    return result
+
+
+def _query_word_dicts(query_fn) -> list:
+    """開一次 DB session、跑 query_fn(db) 取得 Word 清單並組裝成 dict 清單；
+    查詢失敗記錄錯誤並回傳空清單，連線一律確保關閉。"""
+    db = SessionLocal()
+    try:
+        words = query_fn(db)
+        return _words_to_dicts(db, words)
+    except Exception as e:
+        logger.error("[DB ERROR] Query failed: %s", e)
+        return []
+    finally:
+        db.close()
+
+
 def search_tayal_words_bulk(keywords: list) -> dict:
     """查詢多個關鍵詞，一次開啟連線，回傳 {keyword: word_dict} 映射。"""
     if not keywords:
         return {}
 
-    db = SessionLocal()
-    try:
-        words = db.query(Word).filter(Word.name.in_(keywords)).all()
-        word_ids = [w.id for w in words]
-        explanation_map = load_explanation_items_for_words(db, word_ids=word_ids)
-        audio_map = load_audio_items_for_words(db, word_ids=word_ids)
-    except Exception as e:
-        logger.error("[DB ERROR] Query failed: %s", e)
-        words, explanation_map, audio_map = [], {}, {}
-    finally:
-        db.close()
+    word_dicts = _query_word_dicts(lambda db: db.query(Word).filter(Word.name.in_(keywords)).all())
 
     result_map = {}
-    for word in words:
-        explanations = explanation_map.get(word.id, [])
-        chinese = explanations[0].get("chineseExplanation", "") if explanations else ""
-        audio_items = audio_map.get(word.id, [])
-        audio = audio_items[0].get("fileId", "") if audio_items else ""
-        if word.name not in result_map:
-            result_map[word.name] = {"tayal": word.name, "audio": audio, "chinese": chinese}
-
+    for wd in word_dicts:
+        if wd["tayal"] not in result_map:
+            result_map[wd["tayal"]] = wd
     return result_map
 
 
 def search_tayal_words(keyword=None, limit=8):
-    db = SessionLocal()
-    try:
+    def _query(db):
         query = db.query(Word)
         if keyword:
             query = query.filter(Word.name == keyword)
         else:
             query = query.order_by(Word.id)
-        words = query.limit(limit).all()
-        word_ids = [w.id for w in words]
-        explanation_map = load_explanation_items_for_words(db, word_ids=word_ids)
-        audio_map = load_audio_items_for_words(db, word_ids=word_ids)
-    except Exception as e:
-        logger.error("[DB ERROR] Query failed: %s", e)
-        words, explanation_map, audio_map = [], {}, {}
-    finally:
-        db.close()
+        return query.limit(limit).all()
 
-    if not words:
-        return []
-
-    words_data = []
-    for word in words:
-        explanations = explanation_map.get(word.id, [])
-        chinese = explanations[0].get("chineseExplanation", "") if explanations else ""
-
-        audio_items = audio_map.get(word.id, [])
-        audio = audio_items[0].get("fileId", "") if audio_items else ""
-
-        words_data.append({
-            'tayal': word.name,
-            'audio': audio,
-            'chinese': chinese
-        })
-
-    return words_data
+    return _query_word_dicts(_query)

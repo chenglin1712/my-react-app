@@ -190,15 +190,106 @@ def warm_cache(db: Session) -> None:
     load_all_words(db)
 
 # ----------------------------
-# API: 產生 quiz
+# 出題用小工具（原本是 generate_quiz_frontend 內的巢狀函式，
+# 因為只讀模組級快取＋參數都已明確傳入，不需要 closure，抽成模組層級函式）
 # ----------------------------
-@router.post("/generate_quiz_frontend", response_model=GenerateQuizResponse)
-def generate_quiz_frontend(user_data: dict = Body(...), db: Session = Depends(get_db)):
-    all_words = load_all_words(db)
-    if not all_words:
-        raise HTTPException(status_code=500, detail="No words in DB")
+def _get_cn(word_obj):
+    items = _word_explanations_cache.get(word_obj.id, [])
+    return (items[0].get('chineseExplanation') or '未知') if items else '未知'
 
-    user_model = {
+def _get_audio(word_obj):
+    items = _word_audios_cache.get(word_obj.id, [])
+    return items[0].get('fileId') if items else None
+
+def _build_translate_options(w, all_words_list):
+    others = [o for o in all_words_list if o.name != w.name]
+    random.shuffle(others)
+    distractors = [_get_cn(o) for o in others[:3]]
+    correct_cn = _get_cn(w)
+    opts = [correct_cn] + distractors
+    random.shuffle(opts)
+    return correct_cn, opts
+
+def _build_word_translate_question(w, all_words_list, question_id, difficulty=None, meta=None):
+    correct_cn, opts = _build_translate_options(w, all_words_list)
+    return {
+        "id": question_id,
+        "type": "word-translate",
+        "payload": {"tayal": {"word": w.name, "audio": _get_audio(w)},
+                    "cn": correct_cn, "options": opts},
+        "difficulty": difficulty,
+        "meta": meta,
+    }
+
+def _get_sentence_fill_payload(w, all_words_list):
+    """嘗試從句子範例建立填空題；若無資料回傳 None"""
+    items = _word_explanations_cache.get(w.id, [])
+    for item in items:
+        for sent in (item.get("sentenceItems") or []):
+            orig = (sent.get("originalSentence") or "").strip()
+            ch_sent = (sent.get("chineseSentence") or "").strip()
+            if not orig or w.name not in orig:
+                continue
+            blank_sent = orig.replace(w.name, "___", 1)
+            sent_audios = sent.get("audioItems") or []
+            sent_audio = sent_audios[0].get("fileId") if sent_audios else None
+            pool = [o for o in all_words_list if o.name != w.name]
+            random.shuffle(pool)
+            distractors = [{"word": o.name, "audio": _get_audio(o)} for o in pool[:3]]
+            options = [{"word": w.name, "audio": _get_audio(w)}] + distractors
+            random.shuffle(options)
+            return {
+                "tayal": {"word": w.name, "exsentence": orig, "sentence": blank_sent,
+                          "cn": ch_sent, "audio": sent_audio},
+                "options": options,
+                "answer": w.name,
+            }
+    return None
+
+def _get_sentence_order_payload(w, all_words_list):
+    """嘗試從句子範例建立排序題；若無資料回傳 None"""
+    items = _word_explanations_cache.get(w.id, [])
+    for item in items:
+        for sent in (item.get("sentenceItems") or []):
+            orig = (sent.get("originalSentence") or "").strip()
+            ch_sent = (sent.get("chineseSentence") or "").strip()
+            if not orig:
+                continue
+            words_in_sent = orig.split()
+            if len(words_in_sent) < 2:
+                continue
+            sent_audios = sent.get("audioItems") or []
+            sent_audio = sent_audios[0].get("fileId") if sent_audios else None
+            word_list = [{"word": ww, "audio": None} for ww in words_in_sent]
+            return {
+                "tayal": {"word": w.name, "sentence": orig, "cn": ch_sent, "audio": sent_audio},
+                "words": word_list,
+                "answer": words_in_sent,
+            }
+    return None
+
+
+class _CandidatePicker:
+    """依 Score 排序後的候選字清單，依序挑出下一個「尚未用過」的候選字。
+    四種題型的出題迴圈共用同一個實例，確保同一次出題不會有兩題用到同一個字。"""
+    def __init__(self, candidates_sorted):
+        self._candidates = candidates_sorted
+        self._idx = 0
+        self._used = set()
+
+    def next(self):
+        while self._idx < len(self._candidates) and self._candidates[self._idx]["word"].name in self._used:
+            self._idx += 1
+        if self._idx >= len(self._candidates):
+            return None
+        c = self._candidates[self._idx]
+        self._idx += 1
+        self._used.add(c["word"].name)
+        return c
+
+
+def _build_user_model(user_data: dict) -> dict:
+    return {
         "ability": user_data.get("ability", 0.5),
         "user_errors": user_data.get("user_errors", {}),
         "favorites": user_data.get("favorites", {}),
@@ -211,12 +302,12 @@ def generate_quiz_frontend(user_data: dict = Body(...), db: Session = Depends(ge
         })
     }
 
-    fprime_map = compute_normalized_freq_map(all_words)
-    all_avg_times = [sum(ue.get("recent_times", []))/len(ue.get("recent_times", [])) 
+def _compute_avg_time(user_model: dict) -> float:
+    all_avg_times = [sum(ue.get("recent_times", []))/len(ue.get("recent_times", []))
                      for ue in user_model.get("user_errors", {}).values() if ue.get("recent_times")]
-    t_avg_all = sum(all_avg_times)/len(all_avg_times) if all_avg_times else 1.0
-    theta = user_model.get("ability", 0.5)
+    return sum(all_avg_times)/len(all_avg_times) if all_avg_times else 1.0
 
+def _score_candidates(all_words: List[Word], user_model: dict, theta: float, t_avg_all: float, fprime_map: Dict[str, float]) -> list:
     candidates = []
     for w in all_words:
         name = w.name
@@ -243,9 +334,9 @@ def generate_quiz_frontend(user_data: dict = Body(...), db: Session = Depends(ge
                            "e_w": e_w, "n_w": n_w, "Dq_example":Dq_example, "bw_example":bw_example,
                            "Ptheta_example":Ptheta_example, "Delta_w":Delta_w, "T_w":T_w, "Bq":Bq, "Score":Score})
 
-    candidates_sorted = sorted(candidates, key=lambda x: x["Score"], reverse=True)
+    return sorted(candidates, key=lambda x: x["Score"], reverse=True)
 
-    # 題型比例
+def _compute_type_counts(theta: float) -> Dict[str, int]:
     ratios = {'translate':0.3,'match':0.2,'fill':0.25,'order':0.25} if theta<0.7 else {'translate':0.2,'match':0.1,'fill':0.3,'order':0.4}
     type_count = {
         "wordTranslate": round(TOTAL_QUESTIONS*ratios['translate']),
@@ -256,104 +347,32 @@ def generate_quiz_frontend(user_data: dict = Body(...), db: Session = Depends(ge
     tot_assigned = sum(type_count.values())
     if tot_assigned < TOTAL_QUESTIONS:
         type_count["wordTranslate"] += TOTAL_QUESTIONS - tot_assigned
+    return type_count
 
+
+def _generate_word_translate_questions(picker: _CandidatePicker, all_words: List[Word], theta: float, count: int) -> list:
     generated = []
-    used = set()
-    idx = 0
-    def next_candidate():
-        nonlocal idx
-        while idx < len(candidates_sorted) and candidates_sorted[idx]["word"].name in used:
-            idx += 1
-        if idx >= len(candidates_sorted): return None
-        c = candidates_sorted[idx]
-        idx += 1
-        used.add(c["word"].name)
-        return c
-
-    def _get_cn(word_obj):
-        items = _word_explanations_cache.get(word_obj.id, [])
-        return (items[0].get('chineseExplanation') or '未知') if items else '未知'
-
-    def _get_audio(word_obj):
-        items = _word_audios_cache.get(word_obj.id, [])
-        return items[0].get('fileId') if items else None
-
-    def _get_sentence_fill_payload(w, all_words_list):
-        """嘗試從句子範例建立填空題；若無資料回傳 None"""
-        items = _word_explanations_cache.get(w.id, [])
-        for item in items:
-            for sent in (item.get("sentenceItems") or []):
-                orig = (sent.get("originalSentence") or "").strip()
-                ch_sent = (sent.get("chineseSentence") or "").strip()
-                if not orig or w.name not in orig:
-                    continue
-                blank_sent = orig.replace(w.name, "___", 1)
-                sent_audios = sent.get("audioItems") or []
-                sent_audio = sent_audios[0].get("fileId") if sent_audios else None
-                pool = [o for o in all_words_list if o.name != w.name]
-                random.shuffle(pool)
-                distractors = [{"word": o.name, "audio": _get_audio(o)} for o in pool[:3]]
-                options = [{"word": w.name, "audio": _get_audio(w)}] + distractors
-                random.shuffle(options)
-                return {
-                    "tayal": {"word": w.name, "exsentence": orig, "sentence": blank_sent,
-                              "cn": ch_sent, "audio": sent_audio},
-                    "options": options,
-                    "answer": w.name,
-                }
-        return None
-
-    def _get_sentence_order_payload(w, all_words_list):
-        """嘗試從句子範例建立排序題；若無資料回傳 None"""
-        items = _word_explanations_cache.get(w.id, [])
-        for item in items:
-            for sent in (item.get("sentenceItems") or []):
-                orig = (sent.get("originalSentence") or "").strip()
-                ch_sent = (sent.get("chineseSentence") or "").strip()
-                if not orig:
-                    continue
-                words_in_sent = orig.split()
-                if len(words_in_sent) < 2:
-                    continue
-                sent_audios = sent.get("audioItems") or []
-                sent_audio = sent_audios[0].get("fileId") if sent_audios else None
-                word_list = [{"word": ww, "audio": None} for ww in words_in_sent]
-                return {
-                    "tayal": {"word": w.name, "sentence": orig, "cn": ch_sent, "audio": sent_audio},
-                    "words": word_list,
-                    "answer": words_in_sent,
-                }
-        return None
-
-    # --- word-translate ---
-    for i in range(type_count["wordTranslate"]):
-        c = next_candidate()
+    for i in range(count):
+        c = picker.next()
         if not c: break
         w = c["word"]
         Dt = c["Dt_map"].get("word-translate", 0.5)
         Dq, bw = compute_Dq_and_bw(c["Dw"], Dt, c["fprime"])
         a_q = TYPE_AQ.get("word-translate", 1.0)
         Ptheta = compute_P_theta(theta, bw, a_q, DEFAULT_GUESS)
-        others = [o for o in all_words if o.name != w.name]
-        random.shuffle(others)
-        distractors = [_get_cn(o) for o in others[:3]]
-        correct_cn = _get_cn(w)
-        opts = [correct_cn] + distractors
-        random.shuffle(opts)
-        generated.append({
-            "id": f"wt-{w.id}-{i}",
-            "type": "word-translate",
-            "payload": {"tayal": {"word": w.name, "audio": _get_audio(w)},
-                        "cn": correct_cn, "options": opts},
-            "difficulty": bw,
-            "meta": {"Ptheta": Ptheta, "Bq": c["Bq"], "Dq": Dq}
-        })
+        generated.append(_build_word_translate_question(
+            w, all_words, f"wt-{w.id}-{i}",
+            difficulty=bw, meta={"Ptheta": Ptheta, "Bq": c["Bq"], "Dq": Dq}
+        ))
+    return generated
 
-    # --- word-match（每題取 5 個單詞組成配對題）---
-    for i in range(type_count["wordMatch"]):
+def _generate_word_match_questions(picker: _CandidatePicker, count: int) -> list:
+    """每題取 5 個單詞組成配對題"""
+    generated = []
+    for i in range(count):
         group = []
         for _ in range(5):
-            c = next_candidate()
+            c = picker.next()
             if not c: break
             group.append(c)
         if not group: break
@@ -367,13 +386,14 @@ def generate_quiz_frontend(user_data: dict = Body(...), db: Session = Depends(ge
             "difficulty": None,
             "meta": None
         })
+    return generated
 
-    # --- sentence-fill ---
-    fill_needed = type_count["sentenceFill"]
+def _generate_sentence_fill_questions(picker: _CandidatePicker, all_words: List[Word], count: int) -> list:
+    generated = []
     fill_done = 0
-    fill_fallback = []
-    while fill_done < fill_needed:
-        c = next_candidate()
+    fallback = []
+    while fill_done < count:
+        c = picker.next()
         if not c: break
         w = c["word"]
         payload = _get_sentence_fill_payload(w, all_words)
@@ -387,31 +407,19 @@ def generate_quiz_frontend(user_data: dict = Body(...), db: Session = Depends(ge
             })
             fill_done += 1
         else:
-            fill_fallback.append(c)
+            fallback.append(c)
     # 若句子資料不足，以 word-translate 補足
-    for c in fill_fallback[:fill_needed - fill_done]:
+    for c in fallback[:count - fill_done]:
         w = c["word"]
-        others = [o for o in all_words if o.name != w.name]
-        random.shuffle(others)
-        distractors = [_get_cn(o) for o in others[:3]]
-        correct_cn = _get_cn(w)
-        opts = [correct_cn] + distractors
-        random.shuffle(opts)
-        generated.append({
-            "id": f"sf-fb-{w.id}",
-            "type": "word-translate",
-            "payload": {"tayal": {"word": w.name, "audio": _get_audio(w)},
-                        "cn": correct_cn, "options": opts},
-            "difficulty": None,
-            "meta": None
-        })
+        generated.append(_build_word_translate_question(w, all_words, f"sf-fb-{w.id}"))
+    return generated
 
-    # --- sentence-order ---
-    order_needed = type_count["sentenceOrder"]
+def _generate_sentence_order_questions(picker: _CandidatePicker, all_words: List[Word], count: int) -> list:
+    generated = []
     order_done = 0
-    order_fallback = []
-    while order_done < order_needed:
-        c = next_candidate()
+    fallback = []
+    while order_done < count:
+        c = picker.next()
         if not c: break
         w = c["word"]
         payload = _get_sentence_order_payload(w, all_words)
@@ -425,24 +433,37 @@ def generate_quiz_frontend(user_data: dict = Body(...), db: Session = Depends(ge
             })
             order_done += 1
         else:
-            order_fallback.append(c)
+            fallback.append(c)
     # 若句子資料不足，以 word-translate 補足
-    for c in order_fallback[:order_needed - order_done]:
+    for c in fallback[:count - order_done]:
         w = c["word"]
-        others = [o for o in all_words if o.name != w.name]
-        random.shuffle(others)
-        distractors = [_get_cn(o) for o in others[:3]]
-        correct_cn = _get_cn(w)
-        opts = [correct_cn] + distractors
-        random.shuffle(opts)
-        generated.append({
-            "id": f"so-fb-{w.id}",
-            "type": "word-translate",
-            "payload": {"tayal": {"word": w.name, "audio": _get_audio(w)},
-                        "cn": correct_cn, "options": opts},
-            "difficulty": None,
-            "meta": None
-        })
+        generated.append(_build_word_translate_question(w, all_words, f"so-fb-{w.id}"))
+    return generated
+
+
+# ----------------------------
+# API: 產生 quiz
+# ----------------------------
+@router.post("/generate_quiz_frontend", response_model=GenerateQuizResponse)
+def generate_quiz_frontend(user_data: dict = Body(...), db: Session = Depends(get_db)):
+    all_words = load_all_words(db)
+    if not all_words:
+        raise HTTPException(status_code=500, detail="No words in DB")
+
+    user_model = _build_user_model(user_data)
+    fprime_map = compute_normalized_freq_map(all_words)
+    t_avg_all = _compute_avg_time(user_model)
+    theta = user_model.get("ability", 0.5)
+
+    candidates_sorted = _score_candidates(all_words, user_model, theta, t_avg_all, fprime_map)
+    type_count = _compute_type_counts(theta)
+    picker = _CandidatePicker(candidates_sorted)
+
+    generated = []
+    generated += _generate_word_translate_questions(picker, all_words, theta, type_count["wordTranslate"])
+    generated += _generate_word_match_questions(picker, type_count["wordMatch"])
+    generated += _generate_sentence_fill_questions(picker, all_words, type_count["sentenceFill"])
+    generated += _generate_sentence_order_questions(picker, all_words, type_count["sentenceOrder"])
 
     random.shuffle(generated)
     qlist = [QuizQuestion(id=q["id"], type=q["type"], payload=q["payload"],
