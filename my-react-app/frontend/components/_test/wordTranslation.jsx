@@ -5,6 +5,7 @@ import { FaPlayCircle } from 'react-icons/fa';
 import { Button } from 'react-bootstrap';
 import successAnimation from "../../src/animations/success.json";
 import correctAudio from "../../static/assets/_quiz/correct.mp3";
+import { createAuthorizedAudio } from "../../utils/authAudio";
 
 export default function WordTranslation({ question, selected, checked, onSelect, onConfirm }) {
    const [result, setResult] = useState("");
@@ -40,7 +41,12 @@ export default function WordTranslation({ question, selected, checked, onSelect,
 
 
     const proxyUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL + fileId;
-    const newAudio = new Audio(proxyUrl);
+    let newAudio;
+    try {
+      newAudio = await createAuthorizedAudio(proxyUrl);
+    } catch {
+      return;
+    }
 
     newAudio.play().catch(() => {});
     setAudio(newAudio);

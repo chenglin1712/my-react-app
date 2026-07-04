@@ -9,6 +9,7 @@ import { FaHeart, FaRegHeart, FaPlayCircle, FaChevronDown, FaChevronUp } from "r
 import { toggleFavoriteWord, authChanges } from "../../src/userServives/userServive";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db, auth } from "../../../firebase";
+import { createAuthorizedAudio } from "../../utils/authAudio";
 import { Tabs, Tab, Row, Col } from 'react-bootstrap';
 import "../../static/css/_camera/result.css"; 
 
@@ -295,7 +296,13 @@ useEffect(() => {
 
 
     const proxyUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL + fileId;
-    const newAudio = new Audio(proxyUrl);
+    let newAudio;
+    try {
+      newAudio = await createAuthorizedAudio(proxyUrl);
+    } catch (err) {
+      console.error("播放失敗:", err);
+      return;
+    }
 
     newAudio.play().catch(err => console.error("播放失敗:", err));
     setAudio(newAudio);

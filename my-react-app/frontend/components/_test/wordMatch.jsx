@@ -3,6 +3,7 @@ import { Link, Volume2, CircleCheck, CircleX } from "lucide-react";
 import lottie from "lottie-web";
 import successAnimation from "../../src/animations/success.json";
 import correctAudio from "../../static/assets/_quiz/correct.mp3";
+import { createAuthorizedAudio } from "../../utils/authAudio";
 
 export default function WordMatch({ question, selected, checked, onSelect, onConfirm }) {
   const [matches, setMatches] = useState({});
@@ -139,7 +140,12 @@ export default function WordMatch({ question, selected, checked, onSelect, onCon
 
 
     const proxyUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL + fileId;
-    const newAudio = new Audio(proxyUrl);
+    let newAudio;
+    try {
+      newAudio = await createAuthorizedAudio(proxyUrl);
+    } catch {
+      return;
+    }
 
     newAudio.play().catch(() => {});
     setAudio(newAudio);

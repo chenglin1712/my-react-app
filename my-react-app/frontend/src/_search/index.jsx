@@ -8,6 +8,7 @@ import { FaHeart, FaRegHeart, FaPlayCircle } from 'react-icons/fa';
 import { authChanges } from "../../src/userServives/userServive";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db, auth } from "../../../firebase";
+import { createAuthorizedAudio } from "../../utils/authAudio";
 import "../../static/css/_search/index.css";
 
 
@@ -345,7 +346,13 @@ const App = () => {
     }
 
     const proxyUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL + fileId;
-    const newAudio = new Audio(proxyUrl);
+    let newAudio;
+    try {
+      newAudio = await createAuthorizedAudio(proxyUrl);
+    } catch {
+      setFailedAudio(prev => new Set([...prev, fileId]));
+      return;
+    }
 
     newAudio.onerror = () => {
       setFailedAudio(prev => new Set([...prev, fileId]));
@@ -371,9 +378,14 @@ const App = () => {
       if (tokens.length === 0 || playbackGenRef.current !== myGen) return;
       for (const { fileId } of tokens) {
         if (playbackGenRef.current !== myGen) break;
+        const proxyUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL + fileId;
+        let a;
+        try {
+          a = await createAuthorizedAudio(proxyUrl);
+        } catch {
+          continue;
+        }
         await new Promise((resolve) => {
-          const proxyUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL + fileId;
-          const a = new Audio(proxyUrl);
           playbackGenRef.currentAudio = a;
           a.onended = resolve;
           a.onerror = resolve;

@@ -7,6 +7,7 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage, auth } from "../../../firebase";
+import { createAuthorizedAudio } from "../../utils/authAudio";
 import { useAuth } from "../../src/userServives/authContext";
 import "../../static/css/_game/pronunciation.css";
 
@@ -172,11 +173,16 @@ function PronunciationGame({ tribe = "tayal" }) {
     setOfficialScore(null);
   };
 
-  const handlePlayRef = () => {
+  const handlePlayRef = async () => {
     if (!questions[current]) return;
     const url = audioBaseUrl + questions[current].audio_id;
     if (refAudio.current) refAudio.current.pause();
-    const a = new Audio(url);
+    let a;
+    try {
+      a = await createAuthorizedAudio(url);
+    } catch {
+      return;
+    }
     refAudio.current = a;
     a.play().catch(() => {});
   };

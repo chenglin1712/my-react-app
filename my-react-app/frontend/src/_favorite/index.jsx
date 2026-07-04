@@ -6,6 +6,7 @@ import { useLocation } from 'react-router-dom';
 import { FaHeart, FaRegHeart, FaPlayCircle } from 'react-icons/fa';
 import { doc, updateDoc } from "firebase/firestore";
 import { db, auth } from "../../../firebase";
+import { createAuthorizedAudio } from "../../utils/authAudio";
 import { authChanges } from "../../src/userServives/userServive";
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import PermissionProtect from "../userServives/permissionProtect";
@@ -671,7 +672,12 @@ const App = () => {
 
 
     const proxyUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL + fileId;
-    const newAudio = new Audio(proxyUrl);
+    let newAudio;
+    try {
+      newAudio = await createAuthorizedAudio(proxyUrl);
+    } catch {
+      return;
+    }
 
     newAudio.play().catch(() => {});
     setAudio(newAudio);

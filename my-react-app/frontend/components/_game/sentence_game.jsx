@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "../../static/css/_game/sentence.css";
 import { auth } from "../../../firebase";
+import { createAuthorizedAudio } from "../../utils/authAudio";
 
 const TRIBE_INTRO = {
   tayal: {
@@ -105,12 +106,18 @@ function SentenceGame({ tribe = "tayal" }) {
     setStatus("playing");
   };
 
-  const handlePlay = () => {
+  const handlePlay = async () => {
     const q = questions[current];
     if (!q?.audio_id) return;
     const url = audioBaseUrl + q.audio_id;
     if (audioRef.current) audioRef.current.pause();
-    const audio = new Audio(url);
+    let audio;
+    try {
+      audio = await createAuthorizedAudio(url);
+    } catch {
+      setIsPlaying(false);
+      return;
+    }
     audioRef.current = audio;
     audio.onplay  = () => setIsPlaying(true);
     audio.onended = () => setIsPlaying(false);

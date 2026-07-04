@@ -5,6 +5,7 @@ import lottie from "lottie-web";
 import successAnimation from "../../src/animations/success.json";
 import correctAudio from "../../static/assets/_quiz/correct.mp3";
 import { auth } from "../../../firebase";
+import { createAuthorizedAudio } from "../../utils/authAudio";
 
 export default function SentenceSpeak({ question, selected, checked, onSelect, onConfirm }) {
   const [audioBlob, setAudioBlob] = useState(null);
@@ -59,7 +60,12 @@ export default function SentenceSpeak({ question, selected, checked, onSelect, o
 
 
     const proxyUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL + fileId;
-    const newAudio = new Audio(proxyUrl);
+    let newAudio;
+    try {
+      newAudio = await createAuthorizedAudio(proxyUrl);
+    } catch {
+      return;
+    }
 
     newAudio.play().catch(() => {});
     setAudio(newAudio);
