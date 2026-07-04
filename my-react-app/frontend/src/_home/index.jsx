@@ -9,10 +9,14 @@ const App = () => {
     const [newsWithImage, setNewsWithImage] = useState([]);
     const [newsWithoutImage, setNewsWithoutImage] = useState([]);
     const [examInfo, setExamInfo] = useState([]);
+    const [newsError, setNewsError] = useState(false);
 
     useEffect(() => {
         fetch(`${import.meta.env.VITE_API_NEWS_URL}`)
-            .then((res) => res.json())
+            .then((res) => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
             .then((data) => {
                 const exams = data.filter((item) => item.isExam === "T");
                 const news = data.filter((item) => item.isExam !== "T");
@@ -24,7 +28,10 @@ const App = () => {
                 setNewsWithImage(withImg);
                 setNewsWithoutImage(withoutImg);
             })
-            .catch(() => {});
+            .catch((err) => {
+                console.error("載入首頁最新消息失敗：", err);
+                setNewsError(true);
+            });
     }, []);
 
     return (
@@ -43,6 +50,11 @@ const App = () => {
             {/* <SysIntroduction /> */}
             <FunctionBtn />
             <Calendar examInfo={examInfo} />
+            {newsError && (
+                <p className="text-center text-muted" style={{ margin: '1rem 0' }}>
+                    目前無法載入最新消息，請稍後再試。
+                </p>
+            )}
             <News withImage={newsWithImage} withoutImage={newsWithoutImage} />
         </div>
     );

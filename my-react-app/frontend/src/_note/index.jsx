@@ -166,6 +166,7 @@ function NotePage() {
           `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
           { method: "POST", body: formData }
         );
+        if (!res.ok) throw new Error(`圖片上傳失敗 (HTTP ${res.status})`);
         const data = await res.json();
         uploadedImageUrl = data.secure_url;
       }

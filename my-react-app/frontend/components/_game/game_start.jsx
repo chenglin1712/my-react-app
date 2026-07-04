@@ -61,6 +61,8 @@ function Game_Start({ tribe = "tayal" }) {
   const [showGameArea, setShowGameArea] = useState(false);
   const [showStartButton, setStartButton] = useState(true);
   const [gameResults, setGameResults] = useState(null);
+  const [submitError, setSubmitError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const gameAreaTestRef = useRef(null);
 
@@ -70,29 +72,33 @@ function Game_Start({ tribe = "tayal" }) {
   };
 
   const handleClickSubmit = async () => {
-    setShowGameArea(false);
+    if (!gameAreaTestRef.current) return;
 
-    if (gameAreaTestRef.current) {
-      const userAns = gameAreaTestRef.current.getUserAnswers();
-      const curentAns = gameAreaTestRef.current.getCurrentAnswers();
-      const crosswordLegend = gameAreaTestRef.current.getCrosswordLegend();
-      const crosswordGridDisplay =
-        gameAreaTestRef.current.getCrosswordGridDisplay();
+    const userAns = gameAreaTestRef.current.getUserAnswers();
+    const curentAns = gameAreaTestRef.current.getCurrentAnswers();
+    const crosswordLegend = gameAreaTestRef.current.getCrosswordLegend();
+    const crosswordGridDisplay =
+      gameAreaTestRef.current.getCrosswordGridDisplay();
 
-      try {
-        const response = await axios.post(
-          "/CrosswordPuzzle/submit/",
-          {
-            user_answers: userAns,
-            crossword_solution: curentAns,
-            crossword_legend: crosswordLegend,
-            crossword_grid_display: crosswordGridDisplay,
-          }
-        );
-        setGameResults(response.data);
-      } catch (error) {
-        console.error("填字遊戲提交失敗:", error.response?.data ?? error.message);
-      }
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const response = await axios.post(
+        "/CrosswordPuzzle/submit/",
+        {
+          user_answers: userAns,
+          crossword_solution: curentAns,
+          crossword_legend: crosswordLegend,
+          crossword_grid_display: crosswordGridDisplay,
+        }
+      );
+      setGameResults(response.data);
+      setShowGameArea(false);
+    } catch (error) {
+      console.error("填字遊戲提交失敗:", error.response?.data ?? error.message);
+      setSubmitError("提交失敗，請檢查網路連線後再試一次。");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -125,8 +131,9 @@ function Game_Start({ tribe = "tayal" }) {
               tribe={tribe}
             />
             <div className="cubmit">
-              <button className="cubmit-button" onClick={handleClickSubmit}>
-                完成
+              {submitError && <p className="text-danger">{submitError}</p>}
+              <button className="cubmit-button" onClick={handleClickSubmit} disabled={submitting}>
+                {submitting ? "提交中..." : "完成"}
               </button>
             </div>
           </>

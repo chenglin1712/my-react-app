@@ -148,6 +148,8 @@ const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFav
   </ListGroup.Item>
 );
 
+const PAGE_SIZE = 50;
+
 const App = () => {
   const [query, setQuery] = useState('');
   const [definitions, setDefinitions] = useState({ exact_match_results: {}, fuzzy_match_results: {}, all_results: {} });
@@ -163,6 +165,9 @@ const App = () => {
   const [frequencyFilter, setFrequencyFilter] = useState('');
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [visibleAllCount, setVisibleAllCount] = useState(PAGE_SIZE);
+  const [visibleExactCount, setVisibleExactCount] = useState(PAGE_SIZE);
+  const [visibleFuzzyCount, setVisibleFuzzyCount] = useState(PAGE_SIZE);
   const [showCategories, setShowCategories] = useState(false);
   const [activeTab, setActiveTab] = useState('語法與功能');
   const [selectedSubCategory, setSelectedSubCategory] = useState(null);
@@ -289,6 +294,13 @@ const App = () => {
     handleSearch(tribe);
   };
 
+  // 每次結果或篩選條件變動時，分頁顯示筆數重置回第一頁，避免舊頁碼對到新的（更短的）結果
+  useEffect(() => {
+    setVisibleAllCount(PAGE_SIZE);
+    setVisibleExactCount(PAGE_SIZE);
+    setVisibleFuzzyCount(PAGE_SIZE);
+  }, [definitions, filterLetter, frequencyFilter, showOnlyFavorites, selectedSubCategory, sortOrder]);
+
   useEffect(() => {
     const checkScreenSize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -371,6 +383,7 @@ const App = () => {
       playbackGenRef.currentAudio = null;
     } catch (e) {
       console.error('playSentence error:', e);
+      setError('句子語音播放失敗，請稍後再試');
     }
   };
 
@@ -713,11 +726,12 @@ const App = () => {
       {TRIBES_WITH_DATA.includes(selectedTribe) && Object.keys(definitions.all_results).length > 0 && (() => {
         const allWordsFlat = Object.values(definitions.all_results).flat();
         const filteredSorted = filterAndSortWords(allWordsFlat);
+        const visibleWords = filteredSorted.slice(0, visibleAllCount);
         return (
           <>
             <h4 className="fw-bold text-primary">全部詞條 ({filteredSorted.length})</h4>
             <ListGroup>
-              {filteredSorted.map((wordData, idx) => {
+              {visibleWords.map((wordData, idx) => {
                 const word = wordData.explanationItems?.[0]?.chineseExplanation || wordData.chineseExplanation || '';
                 const key = `${word}-${idx}-${wordData.name || ''}`;
 
@@ -739,6 +753,13 @@ const App = () => {
                 );
               })}
             </ListGroup>
+            {visibleAllCount < filteredSorted.length && (
+              <div className="text-center my-3">
+                <Button variant="outline-danger" onClick={() => setVisibleAllCount(c => c + PAGE_SIZE)}>
+                  載入更多（剩 {filteredSorted.length - visibleAllCount} 筆）
+                </Button>
+              </div>
+            )}
           </>
         );
       })()}
@@ -747,11 +768,12 @@ const App = () => {
 
         const allWordsFlat = Object.values(definitions.exact_match_results).flat();
         const filteredSorted = filterAndSortWords(allWordsFlat);
+        const visibleWords = filteredSorted.slice(0, visibleExactCount);
         return (
           <>
             <h4 className="fw-bold text-success">完全匹配結果 ({filteredSorted.length})</h4>
             <ListGroup>
-              {filteredSorted.map((wordData, idx) => {
+              {visibleWords.map((wordData, idx) => {
                 const word = wordData.explanationItems?.[0]?.chineseExplanation || wordData.chineseExplanation || '';
                 const key = `${word}-${idx}-${wordData.name || ''}`;
                 return (
@@ -772,6 +794,13 @@ const App = () => {
                 );
               })}
             </ListGroup>
+            {visibleExactCount < filteredSorted.length && (
+              <div className="text-center my-3">
+                <Button variant="outline-success" onClick={() => setVisibleExactCount(c => c + PAGE_SIZE)}>
+                  載入更多（剩 {filteredSorted.length - visibleExactCount} 筆）
+                </Button>
+              </div>
+            )}
           </>
         );
       })()}
@@ -781,11 +810,12 @@ const App = () => {
         const allWordsFlat = Object.values(definitions.fuzzy_match_results)
           .flatMap(wordGroup => Object.values(wordGroup).flat());
         const filteredSorted = filterAndSortWords(allWordsFlat);
+        const visibleWords = filteredSorted.slice(0, visibleFuzzyCount);
         return (
           <>
             <h4 className="fw-bold text-warning">相關匹配結果 ({filteredSorted.length})</h4>
             <ListGroup>
-              {filteredSorted.map((wordData, idx) => {
+              {visibleWords.map((wordData, idx) => {
                 const word = wordData.explanationItems?.[0]?.chineseExplanation || wordData.chineseExplanation || '';
                 const key = `${word}-${idx}-${wordData.name || ''}`;
 
@@ -807,6 +837,13 @@ const App = () => {
                 );
               })}
             </ListGroup>
+            {visibleFuzzyCount < filteredSorted.length && (
+              <div className="text-center my-3">
+                <Button variant="outline-warning" onClick={() => setVisibleFuzzyCount(c => c + PAGE_SIZE)}>
+                  載入更多（剩 {filteredSorted.length - visibleFuzzyCount} 筆）
+                </Button>
+              </div>
+            )}
           </>
         );
       })()

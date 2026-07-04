@@ -1,4 +1,5 @@
 import requests
+from django.core.cache import cache
 from django.http import JsonResponse
 from bs4 import BeautifulSoup
 from . import tayal_bank
@@ -144,7 +145,15 @@ def format_quiz_data_2(data):
     return format_data
 
 # 爬取活動及族語認證資料（使用 tacp.gov.tw 官方 API）
+NEWS_CACHE_KEY = "crawler_news_data"
+NEWS_CACHE_TTL = 900  # 15 分鐘，避免每次開首頁都重新爬 tacp 公告 + 師大考試網站
+
+
 def get_tayal_imformation(request):
+    cached = cache.get(NEWS_CACHE_KEY)
+    if cached is not None:
+        return JsonResponse(cached, safe=False, json_dumps_params={'ensure_ascii': False, 'indent': 2})
+
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Accept": "application/json",
@@ -206,4 +215,5 @@ def get_tayal_imformation(request):
     except Exception as e:
         print(f"exam API error: {e}")
 
+    cache.set(NEWS_CACHE_KEY, data, NEWS_CACHE_TTL)
     return JsonResponse(data, safe=False, json_dumps_params={'ensure_ascii': False, 'indent': 2})

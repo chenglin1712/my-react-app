@@ -84,6 +84,7 @@ const Advice = ({ onClose }) => {
                 body: JSON.stringify({ message: userText, user_stats: userStats }),
             });
 
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
 
             const botResponse = {

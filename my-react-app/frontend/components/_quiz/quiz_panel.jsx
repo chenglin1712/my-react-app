@@ -29,6 +29,7 @@ const Panel = ({ tribe = "tayal" }) => {
     const [savedQuestions, setSavedQuestions] = useState([]);
 
     const [showIntro, setShowIntro] = useState(false);
+    const [retryCount, setRetryCount] = useState(0);
 
     //加載loading動畫
     useEffect(() => {
@@ -47,6 +48,7 @@ const Panel = ({ tribe = "tayal" }) => {
     useEffect(() => {
         let isMounted = true;
         async function fetchData() {
+            setIsLoading(true);
             try {
                 const response = await fetch(`${import.meta.env.VITE_API_QUIZ_URL}?level=${level}&tribe=${tribe}`);
                 if (!response.ok) {
@@ -64,6 +66,8 @@ const Panel = ({ tribe = "tayal" }) => {
                             setUserAnswers(Array(qLen).fill(null));
                             setUserStars(Array(qLen).fill("F"));
                         }, 1000);
+                    } else {
+                        setIsLoading(false);
                     }
                 }
             } catch (error) {
@@ -77,7 +81,7 @@ const Panel = ({ tribe = "tayal" }) => {
         return () => {
             isMounted = false;
         };
-    }, []);
+    }, [retryCount]);
 
     //測驗資料傳至資料庫
     useEffect(() => {
@@ -225,7 +229,12 @@ const Panel = ({ tribe = "tayal" }) => {
         );
     } else {
         if (!data || !data.parts || !data.parts[0].questions || data.parts[0].questions.length === 0) {
-            return <div>測驗資料加載失敗，請重試。</div>;
+            return (
+                <div className="quiz-load-error text-center py-5">
+                    <p>測驗資料加載失敗，請重試。</p>
+                    <button onClick={() => setRetryCount((c) => c + 1)}>重新載入</button>
+                </div>
+            );
         }
 
         const currentQuestion = data.parts[0].questions[currentQuestionIndex];

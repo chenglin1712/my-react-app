@@ -578,6 +578,8 @@ const useFilterAndSort = (allWords) => {
   return filterAndSort;
 };
 
+const PAGE_SIZE = 50;
+
 const App = () => {
   const [user, setUser] = useState(null);
   const [favorites, setFavorites] = useState([]);
@@ -586,14 +588,16 @@ const App = () => {
   const [expandedWord, setExpandedWord] = useState(null);
   const [audio, setAudio] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [delayedCheck, setDelayedCheck] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const toggleExpand = (key) => setExpandedWord(prev => (prev === key ? null : key));
 
   const [tabStates, updateTabState] = useTabState(favorites);
   const filterAndSort = useFilterAndSort(allWords);
 
   const location = useLocation();
-  
+
   const [isMobile, setIsMobile] = useState(false);
   const [showCategories, setShowCategories] = useState(false);
   const [activeTabcat, setActiveTabcat] = useState('語法與功能');
@@ -619,6 +623,7 @@ const App = () => {
   }, [location.state]);
   useEffect(() => {
     setLoading(true);
+    setLoadError(false);
     auth.currentUser?.getIdToken()
       .then(token => axios.post(import.meta.env.VITE_API_SEARCH_ALL_URL, null, {
         headers: token ? { "Authorization": `Bearer ${token}` } : {},
@@ -629,6 +634,7 @@ const App = () => {
       })
       .catch(err => {
         console.error("載入單字失敗：", err);
+        setLoadError(true);
         setLoading(false);
       });
 
@@ -647,6 +653,12 @@ const App = () => {
       if (audio) audio.pause();
     };
   }, []);
+
+  // 換分類或篩選條件變動時，分頁顯示筆數重置回第一頁
+  const activeTabStateKey = JSON.stringify(tabStates[activeTab] || {});
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [activeTab, selectedSubCategory, activeTabStateKey]);
 
   const playAudio = async (fileId) => {
     if (!fileId) return;
@@ -746,23 +758,36 @@ const App = () => {
         <div className="text-center py-5">
           <div className="text-muted">載入中...</div>
         </div>
-      ) : (
-        <div className="word-cards-grid">
-          {filteredWords.map((wordData, idx) => (
-            <WordCardWithImg
-              key={wordData.name + idx}
-              keyName={wordData.name + idx}
-              word={wordData.explanationItems?.[0]?.chineseExplanation || wordData.chineseExplanation || ''}
-              category={wordData.explanationItems?.[0]?.category || ''}
-              result={wordData}
-              expandedWord={expandedWord}
-              toggleExpand={toggleExpand}
-              toggleFavorite={() => toggleFavorite(wordData.name, currentTab.id)}
-              playAudio={playAudio}
-              isFavorited={currentTab?.content.includes(wordData.name)}
-            />
-          ))}
+      ) : loadError ? (
+        <div className="text-center py-5 text-danger">
+          單字資料載入失敗，請重新整理頁面再試一次。
         </div>
+      ) : (
+        <>
+          <div className="word-cards-grid">
+            {filteredWords.slice(0, visibleCount).map((wordData, idx) => (
+              <WordCardWithImg
+                key={wordData.name + idx}
+                keyName={wordData.name + idx}
+                word={wordData.explanationItems?.[0]?.chineseExplanation || wordData.chineseExplanation || ''}
+                category={wordData.explanationItems?.[0]?.category || ''}
+                result={wordData}
+                expandedWord={expandedWord}
+                toggleExpand={toggleExpand}
+                toggleFavorite={() => toggleFavorite(wordData.name, currentTab.id)}
+                playAudio={playAudio}
+                isFavorited={currentTab?.content.includes(wordData.name)}
+              />
+            ))}
+          </div>
+          {visibleCount < filteredWords.length && (
+            <div className="text-center my-3">
+              <Button variant="outline-danger" onClick={() => setVisibleCount(c => c + PAGE_SIZE)}>
+                載入更多（剩 {filteredWords.length - visibleCount} 筆）
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </Container>
   );

@@ -15,6 +15,8 @@ export default function SentenceSpeak({ question, selected, checked, onSelect, o
   const chunks = useRef([]);
   const [result, setResult] = useState(null);
   const [score, setScore] = useState(null);
+  const [submitError, setSubmitError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
   const animation = useRef(null);
   const [showAnimation, setShowAnimation] = useState(false);
 
@@ -80,12 +82,14 @@ export default function SentenceSpeak({ question, selected, checked, onSelect, o
       audio.pause();
       audio.currentTime = 0;
     }
-    if (!audioBlob) return;
+    if (!audioBlob || submitting) return;
 
     const formData = new FormData();
     formData.append("user_audio", audioBlob, "speech.webm");
     formData.append("audio_id", question.tayal.audio);
 
+    setSubmitting(true);
+    setSubmitError(null);
     try {
       const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch(import.meta.env.VITE_API_QUIZ_AUDIO_URL, {
@@ -93,6 +97,7 @@ export default function SentenceSpeak({ question, selected, checked, onSelect, o
         headers: idToken ? { "Authorization": `Bearer ${idToken}` } : {},
         body: formData,
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setScore(data.score);
       setResult(data.passed ? "correct" : "wrong");
@@ -111,7 +116,9 @@ export default function SentenceSpeak({ question, selected, checked, onSelect, o
       }
     } catch (err) {
       console.error('submitSpeaking error:', err);
-      onConfirm?.(true);
+      setSubmitError('評分失敗，請檢查網路連線後再試一次。');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -174,14 +181,16 @@ export default function SentenceSpeak({ question, selected, checked, onSelect, o
         )}
         <br/><br/>
         {!checked ? (
-          
+          <>
+            {submitError && <p className="text-danger">{submitError}</p>}
             <button
                 className="confirm-btn"
-                disabled={!audioBlob}
+                disabled={!audioBlob || submitting}
                 onClick={submitSpeaking}
             >
-                <Check />&nbsp; 確認
+                <Check />&nbsp; {submitting ? "評分中..." : "確認"}
             </button>
+          </>
       ):(
         <>
         {result === "correct" ? (

@@ -69,6 +69,7 @@ const RegisterForm = () => {
                 method: "POST",
                 body: formData
             });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             setAvatarUrl(data.secure_url);
         } catch (error) {

@@ -19,29 +19,13 @@ import SearchPage from "./_search/index";
 //遊戲
 import GamePage from './_game/index';
 import VocabularyPage from './_game/vocabulary';
-import TayalGame from './_game/tayal_game';
-import AmisGame from './_game/amis_game';
-import BununGame from './_game/bunun_game';
-import KavalanGame from './_game/kavalan_game';
-import PaiwanGame from './_game/paiwan_game';
+import TribeVocabularyGame from './_game/tribeVocabularyGame';
 import ListeningPage from './_game/listening';
-import TayalListeningGame from './_game/tayal_listening';
+import TribeListeningGame from './_game/tribeListeningGame';
 import PronunciationPage from './_game/pronunciation';
-import TayalPronunciationGame from './_game/tayal_pronunciation';
-import AmisPronunciationGame from './_game/amis_pronunciation';
-import BununPronunciationGame from './_game/bunun_pronunciation';
-import KavalanPronunciationGame from './_game/kavalan_pronunciation';
-import PaiwanPronunciationGame from './_game/paiwan_pronunciation';
-import AmisListeningGame from './_game/amis_listening';
-import BununListeningGame from './_game/bunun_listening';
-import KavalanListeningGame from './_game/kavalan_listening';
-import PaiwanListeningGame from './_game/paiwan_listening';
+import TribePronunciationGame from './_game/tribePronunciationGame';
 import SentencePage from './_game/sentence';
-import TayalSentenceGame from './_game/tayal_sentence';
-import AmisSentenceGame from './_game/amis_sentence';
-import BununSentenceGame from './_game/bunun_sentence';
-import KavalanSentenceGame from './_game/kavalan_sentence';
-import PaiwanSentenceGame from './_game/paiwan_sentence';
+import TribeSentenceGame from './_game/tribeSentenceGame';
 //測驗
 import QuizTribeSelect from './_quiz/tribeSelect';
 import QuizPage from './_quiz/index';
@@ -83,29 +67,13 @@ const App = () => {
       <Route path="/favorite" element={<ProtectedRoute><FavoritePage /></ProtectedRoute>} />
       <Route path="/game" element={<ProtectedRoute><GamePage /></ProtectedRoute>} />
       <Route path="/game/vocabulary" element={<ProtectedRoute><VocabularyPage /></ProtectedRoute>} />
-      <Route path="/game/vocabulary/tayal" element={<ProtectedRoute><TayalGame /></ProtectedRoute>} />
-      <Route path="/game/vocabulary/amis" element={<ProtectedRoute><AmisGame /></ProtectedRoute>} />
-      <Route path="/game/vocabulary/bunun" element={<ProtectedRoute><BununGame /></ProtectedRoute>} />
-      <Route path="/game/vocabulary/kavalan" element={<ProtectedRoute><KavalanGame /></ProtectedRoute>} />
-      <Route path="/game/vocabulary/paiwan" element={<ProtectedRoute><PaiwanGame /></ProtectedRoute>} />
+      <Route path="/game/vocabulary/:tribe" element={<ProtectedRoute><TribeVocabularyGame /></ProtectedRoute>} />
       <Route path="/game/listening" element={<ProtectedRoute><ListeningPage /></ProtectedRoute>} />
+      <Route path="/game/listening/:tribe" element={<ProtectedRoute><TribeListeningGame /></ProtectedRoute>} />
       <Route path="/game/pronunciation" element={<ProtectedRoute><PronunciationPage /></ProtectedRoute>} />
-      <Route path="/game/pronunciation/tayal" element={<ProtectedRoute><TayalPronunciationGame /></ProtectedRoute>} />
-      <Route path="/game/pronunciation/amis" element={<ProtectedRoute><AmisPronunciationGame /></ProtectedRoute>} />
-      <Route path="/game/pronunciation/bunun" element={<ProtectedRoute><BununPronunciationGame /></ProtectedRoute>} />
-      <Route path="/game/pronunciation/kavalan" element={<ProtectedRoute><KavalanPronunciationGame /></ProtectedRoute>} />
-      <Route path="/game/pronunciation/paiwan" element={<ProtectedRoute><PaiwanPronunciationGame /></ProtectedRoute>} />
-      <Route path="/game/listening/tayal" element={<ProtectedRoute><TayalListeningGame /></ProtectedRoute>} />
-      <Route path="/game/listening/amis" element={<ProtectedRoute><AmisListeningGame /></ProtectedRoute>} />
-      <Route path="/game/listening/bunun" element={<ProtectedRoute><BununListeningGame /></ProtectedRoute>} />
-      <Route path="/game/listening/kavalan" element={<ProtectedRoute><KavalanListeningGame /></ProtectedRoute>} />
-      <Route path="/game/listening/paiwan" element={<ProtectedRoute><PaiwanListeningGame /></ProtectedRoute>} />
+      <Route path="/game/pronunciation/:tribe" element={<ProtectedRoute><TribePronunciationGame /></ProtectedRoute>} />
       <Route path="/game/sentence" element={<ProtectedRoute><SentencePage /></ProtectedRoute>} />
-      <Route path="/game/sentence/tayal" element={<ProtectedRoute><TayalSentenceGame /></ProtectedRoute>} />
-      <Route path="/game/sentence/amis" element={<ProtectedRoute><AmisSentenceGame /></ProtectedRoute>} />
-      <Route path="/game/sentence/bunun" element={<ProtectedRoute><BununSentenceGame /></ProtectedRoute>} />
-      <Route path="/game/sentence/kavalan" element={<ProtectedRoute><KavalanSentenceGame /></ProtectedRoute>} />
-      <Route path="/game/sentence/paiwan" element={<ProtectedRoute><PaiwanSentenceGame /></ProtectedRoute>} />
+      <Route path="/game/sentence/:tribe" element={<ProtectedRoute><TribeSentenceGame /></ProtectedRoute>} />
       <Route path="/quiz/select" element={<ProtectedRoute><QuizTribeSelect /></ProtectedRoute>} />
       <Route path="/quiz" element={<ProtectedRoute><QuizPage /></ProtectedRoute>} >
         <Route path="" element={<Comp_quiz />} >
