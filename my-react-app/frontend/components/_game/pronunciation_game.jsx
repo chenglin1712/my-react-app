@@ -141,7 +141,10 @@ function PronunciationGame({ tribe = "tayal" }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await axios.get(`/listening/questions?tribe=${tribe}&count=5`);
+      const token = await auth.currentUser?.getIdToken();
+      const res = await axios.get(`/listening/questions?tribe=${tribe}&count=5`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       setQuestions(res.data.questions);
       return res.data.questions;
     } catch {

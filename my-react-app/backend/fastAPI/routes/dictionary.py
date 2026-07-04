@@ -369,9 +369,15 @@ def fuzzy_search(db: Session, keyword: str, exclude_names: List[str], tribe: str
 
     return fuzzy_content
 
-def search_all(db: Session, tribe: str = '泰雅語') -> Dict[str, List[WordResult]]:
-    """回傳所有詞條"""
-    words = db.query(Word).filter(Word.tribe == tribe).all()
+def search_all(db: Session, tribe: str = '泰雅語', limit: Optional[int] = None, offset: int = 0) -> Dict[str, List[WordResult]]:
+    """回傳所有詞條。limit/offset 為選填的 SQL 層分頁參數，不傳則維持原本回傳全部的行為
+    （目前前端一次拿全部資料後在畫面上分批顯示，尚未改成向後端逐頁請求）。"""
+    query = db.query(Word).filter(Word.tribe == tribe).order_by(Word.name)
+    if offset:
+        query = query.offset(offset)
+    if limit is not None:
+        query = query.limit(limit)
+    words = query.all()
     content = {}
 
     for word in words:
@@ -451,16 +457,27 @@ async def search_tayal_dictionary(request: Request, db: Session = Depends(get_db
 
 @router.post("/all/")
 async def all_tayal_dictionary(request: Request, db: Session = Depends(get_db)):
-    """查詢所有詞條"""
+    """查詢所有詞條。可選傳入 limit / offset 做分頁；不傳則回傳全部（維持原本行為）。"""
     try:
         try:
             body = await request.json()
             tribe = body.get('tribe', '泰雅') or '泰雅'
+            limit = body.get('limit')
+            offset = body.get('offset') or 0
         except Exception:
             tribe = '泰雅'
+            limit = None
+            offset = 0
         tribe_name = TRIBE_MAP.get(tribe, '泰雅語')
-        results = search_all(db, tribe=tribe_name)
-        return JSONResponse({"all_results": {k: [r.dict() for r in v] for k, v in results.items()}}, status_code=200)
+        total = db.query(Word).filter(Word.tribe == tribe_name).count()
+        results = search_all(db, tribe=tribe_name, limit=limit, offset=offset)
+        return JSONResponse(
+            {
+                "all_results": {k: [r.dict() for r in v] for k, v in results.items()},
+                "total": total,
+            },
+            status_code=200
+        )
     except Exception as e:
         logger.exception(e)
         return JSONResponse({"error": str(e)}, status_code=500)

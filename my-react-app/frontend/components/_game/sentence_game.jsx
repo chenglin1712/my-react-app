@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "../../static/css/_game/sentence.css";
+import { auth } from "../../../firebase";
 
 const TRIBE_INTRO = {
   tayal: {
@@ -81,7 +82,10 @@ function SentenceGame({ tribe = "tayal" }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await axios.get(`/sentence/questions?tribe=${tribe}&count=5`);
+      const token = await auth.currentUser?.getIdToken();
+      const res = await axios.get(`/sentence/questions?tribe=${tribe}&count=5`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       setQuestions(res.data.questions);
       return res.data.questions;
     } catch {
