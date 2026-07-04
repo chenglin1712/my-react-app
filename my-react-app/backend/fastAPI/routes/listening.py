@@ -1,10 +1,10 @@
-import json
 import random
 import threading
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from fastAPI.routes.connect import get_db
 from fastAPI.routes.model import Word
+from fastAPI.routes.word_data import load_explanation_items_for_words, load_audio_items_for_words
 
 router = APIRouter()
 
@@ -30,32 +30,27 @@ def _load_valid_words(db: Session, tribe_id: str) -> list[dict]:
         if tribe_id in _valid_words_cache:
             return _valid_words_cache[tribe_id]
 
-        words = db.query(Word).filter(
-            Word.tribe_id == tribe_id,
-            Word.audio_items.isnot(None),
-            Word.explanation_items.isnot(None),
-        ).all()
+        words = db.query(Word).filter(Word.tribe_id == tribe_id).all()
+        audio_map = load_audio_items_for_words(db, tribe_id=tribe_id)
+        explanation_map = load_explanation_items_for_words(db, tribe_id=tribe_id)
 
         # 過濾：有 audio fileId 且有中文解釋
         valid_words = []
         for w in words:
-            try:
-                audio_items = json.loads(w.audio_items or '[]')
-                if not audio_items or not audio_items[0].get('fileId'):
-                    continue
-                exp_items = json.loads(w.explanation_items or '[]')
-                if not exp_items:
-                    continue
-                cn = exp_items[0].get('chineseExplanation', '').strip()
-                if not cn:
-                    continue
-                valid_words.append({
-                    'word': w.name,
-                    'audio_id': audio_items[0]['fileId'],
-                    'meaning': cn,
-                })
-            except Exception:
+            audio_items = audio_map.get(w.id, [])
+            if not audio_items or not audio_items[0].get('fileId'):
                 continue
+            exp_items = explanation_map.get(w.id, [])
+            if not exp_items:
+                continue
+            cn = (exp_items[0].get('chineseExplanation') or '').strip()
+            if not cn:
+                continue
+            valid_words.append({
+                'word': w.name,
+                'audio_id': audio_items[0]['fileId'],
+                'meaning': cn,
+            })
 
         _valid_words_cache[tribe_id] = valid_words
         return valid_words

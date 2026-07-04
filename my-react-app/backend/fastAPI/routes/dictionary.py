@@ -11,6 +11,11 @@ import os
 
 from fastAPI.routes.connect import get_db
 from fastAPI.routes.model import Word, Tribe
+from fastAPI.routes.word_data import (
+    load_sources_for_words,
+    load_audio_items_for_words,
+    load_explanation_items_for_words,
+)
 
 router = APIRouter()
 
@@ -218,6 +223,11 @@ def _load_tribe_words(db: Session, tribe: str) -> List[WordResult]:
             return _tribe_words_cache[tribe]
 
         words = db.query(Word).filter(Word.tribe_id == _tribe_id_subquery(tribe)).all()
+        tribe_id = words[0].tribe_id if words else None
+        sources_map = load_sources_for_words(db, tribe_id)
+        audio_map = load_audio_items_for_words(db, tribe_id)
+        explanation_map = load_explanation_items_for_words(db, tribe_id)
+
         results = [
             WordResult(
                 id=word.id,
@@ -232,9 +242,9 @@ def _load_tribe_words(db: Session, tribe: str) -> List[WordResult]:
                 frequency=word.frequency,
                 hit=word.hit,
                 dictionaryNote=word.dictionary_note,
-                sources=json.loads(word.sources or "[]"),
-                explanationItems=parse_explanations(word.explanation_items),
-                audioItems=parse_audios(word.audio_items or "[]"),
+                sources=sources_map.get(word.id, []),
+                explanationItems=parse_explanations(explanation_map.get(word.id, [])),
+                audioItems=parse_audios(audio_map.get(word.id, [])),
                 word_img=word.word_img,
                 isDerivativeRoot=word.is_derivative_root,
                 isImage=word.is_image,
@@ -332,8 +342,13 @@ def search_all(db: Session, tribe: str = '泰雅語', limit: Optional[int] = Non
     words = query.all()
     content = {}
 
+    word_ids = [word.id for word in words]
+    sources_map = load_sources_for_words(db, word_ids=word_ids)
+    audio_map = load_audio_items_for_words(db, word_ids=word_ids)
+    explanation_map = load_explanation_items_for_words(db, word_ids=word_ids)
+
     for word in words:
-        explanations = parse_explanations(word.explanation_items)
+        explanations = parse_explanations(explanation_map.get(word.id, []))
         if not explanations:
             continue
 
@@ -355,12 +370,12 @@ def search_all(db: Session, tribe: str = '泰雅語', limit: Optional[int] = Non
                         frequency=word.frequency,
                         hit=word.hit,
                         dictionaryNote=word.dictionary_note,
-                        sources=json.loads(word.sources or "[]"),
+                        sources=sources_map.get(word.id, []),
                         explanationItems=explanations,
-                        audioItems=parse_audios(word.audio_items or "[]"),
+                        audioItems=parse_audios(audio_map.get(word.id, [])),
                         word_img=word.word_img,
                         isDerivativeRoot=word.is_derivative_root,
-                        isImage=word.is_image, 
+                        isImage=word.is_image,
                         isZuzucidian=word.is_zuzucidian,
                         isOtherDialect=word.is_other_dialect,
             )
@@ -929,7 +944,7 @@ async def get_sentence_audio(request: Request, db: Session = Depends(get_db)):
         if not word:
             continue
 
-        audios = json.loads(word.audio_items or "[]")
+        audios = load_audio_items_for_words(db, word_ids=[word.id]).get(word.id, [])
         if not audios:
             continue
 

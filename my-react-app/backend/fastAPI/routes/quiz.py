@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from fastAPI.routes.connect import get_db
 from fastAPI.routes.model import Word
+from fastAPI.routes.word_data import load_explanation_items_for_words, load_audio_items_for_words
 
 import io
 import requests
@@ -18,7 +19,6 @@ import torchaudio
 import torch.nn.functional as F
 from dotenv import load_dotenv
 import os
-import json
 import soundfile as sf
 
 # 自動偵測 ffmpeg，優先讀環境變數，找不到才用 shutil.which
@@ -166,10 +166,12 @@ def compute_score(Ptheta: float, Bq: float) -> float:
 # DB helper: load all words (module-level cache)
 # ----------------------------
 _words_cache: List[Word] = []
+_word_explanations_cache: Dict[str, List[dict]] = {}
+_word_audios_cache: Dict[str, List[dict]] = {}
 _words_cache_lock = threading.Lock()
 
 def load_all_words(db: Optional[Session] = None) -> List[Word]:
-    global _words_cache
+    global _words_cache, _word_explanations_cache, _word_audios_cache
     if _words_cache:
         return _words_cache
     if not db:
@@ -177,6 +179,8 @@ def load_all_words(db: Optional[Session] = None) -> List[Word]:
     with _words_cache_lock:
         if not _words_cache:
             _words_cache = db.query(Word).all()
+            _word_explanations_cache = load_explanation_items_for_words(db)
+            _word_audios_cache = load_audio_items_for_words(db)
     return _words_cache
 
 
@@ -267,70 +271,58 @@ def generate_quiz_frontend(user_data: dict = Body(...), db: Session = Depends(ge
         return c
 
     def _get_cn(word_obj):
-        try:
-            items = json.loads(word_obj.explanation_items or "[]")
-            return (items[0].get('chineseExplanation') or '未知') if items else '未知'
-        except Exception:
-            return '未知'
+        items = _word_explanations_cache.get(word_obj.id, [])
+        return (items[0].get('chineseExplanation') or '未知') if items else '未知'
 
     def _get_audio(word_obj):
-        try:
-            items = json.loads(word_obj.audio_items or "[]")
-            return items[0].get('fileId') if items else None
-        except Exception:
-            return None
+        items = _word_audios_cache.get(word_obj.id, [])
+        return items[0].get('fileId') if items else None
 
     def _get_sentence_fill_payload(w, all_words_list):
         """嘗試從句子範例建立填空題；若無資料回傳 None"""
-        try:
-            items = json.loads(w.explanation_items or "[]")
-            for item in items:
-                for sent in (item.get("sentenceItems") or []):
-                    orig = (sent.get("originalSentence") or "").strip()
-                    ch_sent = (sent.get("chineseSentence") or "").strip()
-                    if not orig or w.name not in orig:
-                        continue
-                    blank_sent = orig.replace(w.name, "___", 1)
-                    sent_audios = sent.get("audioItems") or []
-                    sent_audio = sent_audios[0].get("fileId") if sent_audios else None
-                    pool = [o for o in all_words_list if o.name != w.name]
-                    random.shuffle(pool)
-                    distractors = [{"word": o.name, "audio": _get_audio(o)} for o in pool[:3]]
-                    options = [{"word": w.name, "audio": _get_audio(w)}] + distractors
-                    random.shuffle(options)
-                    return {
-                        "tayal": {"word": w.name, "exsentence": orig, "sentence": blank_sent,
-                                  "cn": ch_sent, "audio": sent_audio},
-                        "options": options,
-                        "answer": w.name,
-                    }
-        except Exception:
-            pass
+        items = _word_explanations_cache.get(w.id, [])
+        for item in items:
+            for sent in (item.get("sentenceItems") or []):
+                orig = (sent.get("originalSentence") or "").strip()
+                ch_sent = (sent.get("chineseSentence") or "").strip()
+                if not orig or w.name not in orig:
+                    continue
+                blank_sent = orig.replace(w.name, "___", 1)
+                sent_audios = sent.get("audioItems") or []
+                sent_audio = sent_audios[0].get("fileId") if sent_audios else None
+                pool = [o for o in all_words_list if o.name != w.name]
+                random.shuffle(pool)
+                distractors = [{"word": o.name, "audio": _get_audio(o)} for o in pool[:3]]
+                options = [{"word": w.name, "audio": _get_audio(w)}] + distractors
+                random.shuffle(options)
+                return {
+                    "tayal": {"word": w.name, "exsentence": orig, "sentence": blank_sent,
+                              "cn": ch_sent, "audio": sent_audio},
+                    "options": options,
+                    "answer": w.name,
+                }
         return None
 
     def _get_sentence_order_payload(w, all_words_list):
         """嘗試從句子範例建立排序題；若無資料回傳 None"""
-        try:
-            items = json.loads(w.explanation_items or "[]")
-            for item in items:
-                for sent in (item.get("sentenceItems") or []):
-                    orig = (sent.get("originalSentence") or "").strip()
-                    ch_sent = (sent.get("chineseSentence") or "").strip()
-                    if not orig:
-                        continue
-                    words_in_sent = orig.split()
-                    if len(words_in_sent) < 2:
-                        continue
-                    sent_audios = sent.get("audioItems") or []
-                    sent_audio = sent_audios[0].get("fileId") if sent_audios else None
-                    word_list = [{"word": ww, "audio": None} for ww in words_in_sent]
-                    return {
-                        "tayal": {"word": w.name, "sentence": orig, "cn": ch_sent, "audio": sent_audio},
-                        "words": word_list,
-                        "answer": words_in_sent,
-                    }
-        except Exception:
-            pass
+        items = _word_explanations_cache.get(w.id, [])
+        for item in items:
+            for sent in (item.get("sentenceItems") or []):
+                orig = (sent.get("originalSentence") or "").strip()
+                ch_sent = (sent.get("chineseSentence") or "").strip()
+                if not orig:
+                    continue
+                words_in_sent = orig.split()
+                if len(words_in_sent) < 2:
+                    continue
+                sent_audios = sent.get("audioItems") or []
+                sent_audio = sent_audios[0].get("fileId") if sent_audios else None
+                word_list = [{"word": ww, "audio": None} for ww in words_in_sent]
+                return {
+                    "tayal": {"word": w.name, "sentence": orig, "cn": ch_sent, "audio": sent_audio},
+                    "words": word_list,
+                    "answer": words_in_sent,
+                }
         return None
 
     # --- word-translate ---

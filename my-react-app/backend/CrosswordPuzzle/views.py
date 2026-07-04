@@ -18,12 +18,17 @@ _TRIBE_IDS = {
 }
 
 def _get_words_from_db(tribe_id: str, limit: int = 30):
-    """從 dictionary.db 取出純英文字母、長度 4-10、有中文解釋的詞彙。"""
+    """從 dictionary.db 取出純英文字母、長度 4-10、有中文解釋的詞彙。
+    explanation_items 已經拆到 word_explanation 表，這裡改成 JOIN 取第一筆解釋
+    （sort_order = 0，對應原本 exp[0]），INNER JOIN 本身就篩掉沒有解釋的字。"""
     try:
         conn = sqlite3.connect(str(_DB_PATH))
         cursor = conn.cursor()
         cursor.execute(
-            'SELECT name, explanation_items FROM words WHERE tribe_id = ? AND explanation_items IS NOT NULL',
+            '''SELECT w.name, we.chinese_explanation
+               FROM words w
+               JOIN word_explanation we ON we.word_id = w.id AND we.sort_order = 0
+               WHERE w.tribe_id = ?''',
             (tribe_id,)
         )
         rows = cursor.fetchall()
@@ -32,16 +37,11 @@ def _get_words_from_db(tribe_id: str, limit: int = 30):
         return [], str(e)
 
     results = []
-    for name, exp_json in rows:
+    for name, cn in rows:
         if not re.match(r'^[a-zA-Z]+$', name):
             continue
         if not (4 <= len(name) <= 10):
             continue
-        try:
-            exp = json.loads(exp_json)
-        except Exception:
-            continue
-        cn = exp[0].get('chineseExplanation', '') if exp else ''
         if not cn:
             continue
         results.append([name.lower(), cn])

@@ -13,6 +13,7 @@ import datetime
 
 from fastAPI.routes.connect import SessionLocal
 from fastAPI.routes.model import Word
+from fastAPI.routes.word_data import load_explanation_items_for_words, load_audio_items_for_words
 
 logger = logging.getLogger(__name__)
 
@@ -251,25 +252,20 @@ def search_tayal_words_bulk(keywords: list) -> dict:
     db = SessionLocal()
     try:
         words = db.query(Word).filter(Word.name.in_(keywords)).all()
+        word_ids = [w.id for w in words]
+        explanation_map = load_explanation_items_for_words(db, word_ids=word_ids)
+        audio_map = load_audio_items_for_words(db, word_ids=word_ids)
     except Exception as e:
         logger.error("[DB ERROR] Query failed: %s", e)
-        words = []
+        words, explanation_map, audio_map = [], {}, {}
     finally:
         db.close()
 
     result_map = {}
     for word in words:
-        try:
-            explanations = json.loads(word.explanation_items) if word.explanation_items else []
-        except (json.JSONDecodeError, TypeError):
-            explanations = []
-        chinese = ""
-        if isinstance(explanations, list) and explanations:
-            chinese = explanations[0].get("chineseExplanation", "")
-        try:
-            audio_items = json.loads(word.audio_items) if word.audio_items else []
-        except (json.JSONDecodeError, TypeError):
-            audio_items = []
+        explanations = explanation_map.get(word.id, [])
+        chinese = explanations[0].get("chineseExplanation", "") if explanations else ""
+        audio_items = audio_map.get(word.id, [])
         audio = audio_items[0].get("fileId", "") if audio_items else ""
         if word.name not in result_map:
             result_map[word.name] = {"tayal": word.name, "audio": audio, "chinese": chinese}
@@ -286,9 +282,12 @@ def search_tayal_words(keyword=None, limit=8):
         else:
             query = query.order_by(Word.id)
         words = query.limit(limit).all()
+        word_ids = [w.id for w in words]
+        explanation_map = load_explanation_items_for_words(db, word_ids=word_ids)
+        audio_map = load_audio_items_for_words(db, word_ids=word_ids)
     except Exception as e:
         logger.error("[DB ERROR] Query failed: %s", e)
-        words = []
+        words, explanation_map, audio_map = [], {}, {}
     finally:
         db.close()
 
@@ -297,20 +296,10 @@ def search_tayal_words(keyword=None, limit=8):
 
     words_data = []
     for word in words:
-        try:
-            explanations = json.loads(word.explanation_items) if word.explanation_items else []
-        except (json.JSONDecodeError, TypeError):
-            explanations = []
+        explanations = explanation_map.get(word.id, [])
+        chinese = explanations[0].get("chineseExplanation", "") if explanations else ""
 
-        chinese = ""
-        if isinstance(explanations, list) and explanations:
-            chinese = explanations[0].get("chineseExplanation", "")
-
-        try:
-            audio_items = json.loads(word.audio_items) if word.audio_items else []
-        except (json.JSONDecodeError, TypeError):
-            audio_items = []
-
+        audio_items = audio_map.get(word.id, [])
         audio = audio_items[0].get("fileId", "") if audio_items else ""
 
         words_data.append({
