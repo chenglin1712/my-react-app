@@ -29,6 +29,7 @@ TRIBE_IDS = {
     "tayal": "fc76ed97-0dd8-4587-82ad-7a6dbe125001",
     "amis": "e68273b9-1f2b-4c42-8d95-f52189ab24b7",
     "bunun": "865a96e3-3384-45b3-8bd0-e1f799b75515",
+    "kavalan": "c5974f37-b49d-466a-ab24-6893ab4ef6a5",
 }
 
 
@@ -68,7 +69,9 @@ def fetch_words_by_glosses(tribe, glosses):
         for item in items:
             expl = (item.get("chineseExplanation") or "").strip()
             if expl in gloss_set and expl not in found:
-                found[expl] = {"word": row["name"], "chinese": expl}
+                # 部分詞條的外語拼寫本身在資料庫裡就帶有多餘的前後空白
+                # （資料建檔瑕疵），這裡順手清掉，避免顯示或比對時出錯。
+                found[expl] = {"word": (row["name"] or "").strip(), "chinese": expl}
 
     return found
 

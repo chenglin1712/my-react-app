@@ -6,7 +6,7 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 const Box = ({ dataLen, userAnswers, userStars, setCurrentQuestionIndex }) => {
     const { level } = useParams();
     const navigate = useNavigate();
-    const tribeMatch = useLocation().pathname.match(/^\/quiz\/(amis|bunun)(\/|$)/);
+    const tribeMatch = useLocation().pathname.match(/^\/quiz\/(amis|bunun|kavalan)(\/|$)/);
     const basePath = tribeMatch ? `/quiz/${tribeMatch[1]}` : "/quiz";
 
     const questions = Array.from({ length: dataLen }, (num, i) => (i + 1).toString());

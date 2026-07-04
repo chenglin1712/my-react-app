@@ -32,7 +32,8 @@ const TRIBES = [
     name: "葛瑪蘭",
     subtitle: "Kavalan",
     emoji: "📝",
-    available: false,
+    available: true,
+    route: "/quiz/kavalan",
   },
   {
     id: "paiwan",

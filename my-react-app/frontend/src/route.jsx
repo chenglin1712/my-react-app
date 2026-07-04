@@ -123,6 +123,11 @@ const App = () => {
           <Route path=":level" element={<Comp_quiz_panel tribe="bunun" />} />
           <Route path=":level/submit" element={<Comp_quiz_submit tribe="bunun" />} />
         </Route>
+        <Route path="kavalan" element={<Comp_quiz tribe="kavalan" />} >
+          <Route index element={<Comp_quiz_start tribe="kavalan" />} />
+          <Route path=":level" element={<Comp_quiz_panel tribe="kavalan" />} />
+          <Route path=":level/submit" element={<Comp_quiz_submit tribe="kavalan" />} />
+        </Route>
         <Route path="recommon" element={<Comp_quiz_recommon />} >
           <Route index element={<Comp_quiz_recommon_start />} />
           <Route path="question" element={<Comp_quiz_recommon_question />} />

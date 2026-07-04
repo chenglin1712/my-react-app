@@ -1,7 +1,7 @@
 import { db, auth } from "../../../firebase";
 import { collection, addDoc, serverTimestamp, query, where, doc, getDoc, getDocs, orderBy } from "firebase/firestore";
 
-const TRIBE_NAME = { tayal: "泰雅語", amis: "阿美語", bunun: "布農語" };
+const TRIBE_NAME = { tayal: "泰雅語", amis: "阿美語", bunun: "布農語", kavalan: "噶瑪蘭語" };
 
 //測驗題目存至資料庫
 export const uploadQuizDB = async (level_ch, data, tribe = "tayal") => {
