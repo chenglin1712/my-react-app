@@ -50,7 +50,7 @@ const evaluateAnswers = (correctAns, userAns) => {
     return correctAns.map((correctAnswer, index) => {
         const userAnswer = userAns[index];
         let questionSituation;
-        if (userAnswer == null || userAnswer == undefined) {
+        if (userAnswer === null || userAnswer === undefined) {
             questionSituation = null;
         } else {
             questionSituation = userAnswer === correctAnswer;

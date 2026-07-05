@@ -1,3 +1,4 @@
+import logging.config
 import os
 import sys
 import uvicorn
@@ -52,9 +53,13 @@ if missing_required:
 # ────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    from config.logging import get_logging_config  # noqa: E402
+    logging.config.dictConfig(get_logging_config("fastapi.log"))
+
     from fastAPI.main import app  # noqa: E402  直接 import，不依賴 reload subprocess 重新解析路徑
     uvicorn.run(
         app,
         host="127.0.0.1",
         port=8001,
+        log_config=None,  # 不用 uvicorn 內建的純文字 log 設定，改用上面已套用的 JSON + rotation
     )

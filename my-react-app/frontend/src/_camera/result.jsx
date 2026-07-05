@@ -183,7 +183,7 @@ const App = () => {
         });
       })
       .catch(err => {
-        setError("查詢失敗: " + (err.response?.data?.error || err.message));
+        setError("查詢失敗: " + (err.response?.data?.detail || err.message));
       })
       .finally(() => setLoading(false));
   }, [selectedWords]);

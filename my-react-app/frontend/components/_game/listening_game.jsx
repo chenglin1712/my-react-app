@@ -76,7 +76,7 @@ function ListeningGame({ tribe = "tayal" }) {
   const audioRef = useRef(null);
 
   const config = TRIBE_INTRO[tribe] || TRIBE_INTRO.tayal;
-  const audioBaseUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL || "/dictionary/audio/";
+  const audioBaseUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL || "/api/v1/dictionary/audio/";
 
   // 載入題目，成功回傳題目陣列，失敗回傳 null
   const fetchQuestions = async () => {
@@ -84,7 +84,7 @@ function ListeningGame({ tribe = "tayal" }) {
     setError(null);
     try {
       const token = await auth.currentUser?.getIdToken();
-      const res = await axios.get(`/listening/questions?tribe=${tribe}&count=10`, {
+      const res = await axios.get(`/api/v1/listening/questions?tribe=${tribe}&count=10`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       setQuestions(res.data.questions);

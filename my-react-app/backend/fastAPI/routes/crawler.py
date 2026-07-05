@@ -133,7 +133,7 @@ async def search_tayal_dictionary(request: Request):
         words = data.get("words", [])
 
         if not words:
-            return JSONResponse({"error": "查詢字詞不可為空"}, status_code=400)
+            return JSONResponse({"detail": "查詢字詞不可為空"}, status_code=400)
 
         loop = asyncio.get_event_loop()
         tasks = [loop.run_in_executor(None, query, word) for word in words]
@@ -143,6 +143,6 @@ async def search_tayal_dictionary(request: Request):
         return JSONResponse({"definitions": results}, status_code=200)
 
     except json.JSONDecodeError:
-        return JSONResponse({"error": "無效的 JSON 格式"}, status_code=400)
+        return JSONResponse({"detail": "無效的 JSON 格式"}, status_code=400)
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return JSONResponse({"detail": str(e)}, status_code=500)

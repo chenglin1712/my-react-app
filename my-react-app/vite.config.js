@@ -14,27 +14,27 @@ export default defineConfig({
       interval: 1000,
     },
     proxy: {
-      '/vision': {
+      '/api/v1/vision': {
         target: 'http://127.0.0.1:8001',
         changeOrigin: true,
         secure: false,
       },
-      '/dictionary': {
+      '/api/v1/dictionary': {
         target: 'http://127.0.0.1:8001',
         changeOrigin: true,
         secure: false,
       },
-      '/quiz/compare_audio': {
+      '/api/v1/quiz/compare_audio': {
         target: 'http://127.0.0.1:8001',
         changeOrigin: true,
         secure: false,
       },
-      '/quiz/generate_quiz_frontend': {
+      '/api/v1/quiz/generate_quiz_frontend': {
         target: 'http://127.0.0.1:8001',
         changeOrigin: true,
         secure: false,
       },
-      '/quiz/submit_answer_frontend': {
+      '/api/v1/quiz/submit_answer_frontend': {
         target: 'http://127.0.0.1:8001',
         changeOrigin: true,
         secure: false,
@@ -54,12 +54,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      '/listening': {
+      '/api/v1/listening': {
         target: 'http://127.0.0.1:8001',
         changeOrigin: true,
         secure: false,
       },
-      '/sentence': {
+      '/api/v1/sentence': {
         target: 'http://127.0.0.1:8001',
         changeOrigin: true,
         secure: false,

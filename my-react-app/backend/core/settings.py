@@ -14,6 +14,8 @@ import warnings
 from pathlib import Path
 from dotenv import load_dotenv
 
+from config.logging import get_logging_config
+
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -164,3 +166,6 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# 結構化 JSON log + rotation（見 config/logging.py），FastAPI 端共用同一套設定
+LOGGING = get_logging_config("django.log")

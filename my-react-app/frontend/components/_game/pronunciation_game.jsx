@@ -136,14 +136,14 @@ function PronunciationGame({ tribe = "tayal" }) {
   const chunks = useRef([]);
   const refAudio = useRef(null);
 
-  const audioBaseUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL || "/dictionary/audio/";
+  const audioBaseUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL || "/api/v1/dictionary/audio/";
 
   const fetchQuestions = async () => {
     setLoading(true);
     setError(null);
     try {
       const token = await auth.currentUser?.getIdToken();
-      const res = await axios.get(`/listening/questions?tribe=${tribe}&count=5`, {
+      const res = await axios.get(`/api/v1/listening/questions?tribe=${tribe}&count=5`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       setQuestions(res.data.questions);

@@ -54,7 +54,7 @@ export default function useAudioPlayback(selectedTribe, onError) {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
     try {
       const token = await auth.currentUser?.getIdToken();
-      const res = await axios.post('/dictionary/sentence-audio/', { sentence, tribe: selectedTribe }, {
+      const res = await axios.post('/api/v1/dictionary/sentence-audio/', { sentence, tribe: selectedTribe }, {
         headers: token ? { "Authorization": `Bearer ${token}` } : {},
       });
       const tokens = res.data.audioTokens || [];

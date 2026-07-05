@@ -386,7 +386,7 @@ async def search_tayal_dictionary(request: Request, db: Session = Depends(get_db
         words = data.get("words", [])
         tribe_name = TRIBE_MAP.get(data.get("tribe", "泰雅"), '泰雅語')
         if not words:
-            return JSONResponse({"error": "查詢字詞不可為空"}, status_code=400)
+            return JSONResponse({"detail": "查詢字詞不可為空"}, status_code=400)
 
         exact_match_results = {}
         fuzzy_match_results = {}
@@ -412,7 +412,7 @@ async def search_tayal_dictionary(request: Request, db: Session = Depends(get_db
 
     except Exception as e:
         logger.exception(e)
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return JSONResponse({"detail": str(e)}, status_code=500)
 
 
 @router.post("/all/")
@@ -440,7 +440,7 @@ async def all_tayal_dictionary(request: Request, db: Session = Depends(get_db)):
         )
     except Exception as e:
         logger.exception(e)
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return JSONResponse({"detail": str(e)}, status_code=500)
 
 
 @router.post("/key/")
@@ -449,7 +449,7 @@ async def allsearch_tayal_dictionary(request: KeywordRequest, db: Session = Depe
     try:
         keyword = request.keyword.strip().replace("　", "")
         if not keyword:
-            return JSONResponse({"error": "查詢字詞不可為空"}, status_code=400)
+            return JSONResponse({"detail": "查詢字詞不可為空"}, status_code=400)
         tribe_name = TRIBE_MAP.get(request.tribe or '泰雅', '泰雅語')
 
         if is_chinese(keyword):
@@ -469,7 +469,7 @@ async def allsearch_tayal_dictionary(request: KeywordRequest, db: Session = Depe
 
     except Exception as e:
         logger.exception(e)
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return JSONResponse({"detail": str(e)}, status_code=500)
 
 
 # ------------------------- 文法資料 -------------------------
@@ -573,13 +573,13 @@ def get_grammar(tribe: str, limit: Optional[int] = None, offset: int = 0, db: Se
         tribe_name = TRIBE_MAP.get(tribe, tribe)
         payload = _load_grammar(db, tribe_name)
         if payload is None:
-            return JSONResponse({"error": f"找不到 {tribe_name} 的文法資料"}, status_code=404)
+            return JSONResponse({"detail": f"找不到 {tribe_name} 的文法資料"}, status_code=404)
         sections = payload["sections"]
         sliced = sections[offset:offset + limit] if limit is not None else sections[offset:]
         return JSONResponse({**payload, "sections": sliced, "total": len(sections)}, status_code=200)
     except Exception as e:
         logger.exception(e)
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return JSONResponse({"detail": str(e)}, status_code=500)
 
 
 @router.get("/grammar/{tribe}/search")
@@ -653,7 +653,7 @@ def search_grammar(tribe: str, q: str, db: Session = Depends(get_db)):
         }, status_code=200)
     except Exception as e:
         logger.exception(e)
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return JSONResponse({"detail": str(e)}, status_code=500)
 
 
 def _load_grammar_affixes(db: Session, tribe_name: str, affix_type: Optional[str]) -> dict:
@@ -725,7 +725,7 @@ def get_grammar_affixes(
         return JSONResponse({**payload, "affixes": sliced, "total": len(affixes)}, status_code=200)
     except Exception as e:
         logger.exception(e)
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return JSONResponse({"detail": str(e)}, status_code=500)
 
 
 def _load_grammar_quiz_material(db: Session, tribe_name: str, section_key: Optional[str]) -> dict:
@@ -826,7 +826,7 @@ def get_grammar_quiz_material(
         return JSONResponse({**payload, "rules": sliced, "total": len(rules)}, status_code=200)
     except Exception as e:
         logger.exception(e)
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return JSONResponse({"detail": str(e)}, status_code=500)
 
 
 ILRDF_AUDIO_API = "https://e-dictionary.ilrdf.org.tw/api/app/file/download-file/"

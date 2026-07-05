@@ -51,7 +51,7 @@ const WordResultsSection = ({
       {visibleCount < filteredSorted.length && (
         <div className="text-center my-3">
           <Button variant={buttonVariant} onClick={onLoadMore}>
-            載入更多（剩 {filteredSorted.length - visibleCount} 筆）
+            載入更多（剩 {Math.max(0, filteredSorted.length - visibleCount)} 筆）
           </Button>
         </div>
       )}

@@ -1,8 +1,6 @@
 import json
 import logging
-from django.template import loader
 from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse
 from django.http import JsonResponse
 from django.conf import settings as django_settings
 from openai import OpenAI
@@ -62,7 +60,7 @@ def verify_firebase_token(request):
 
     auth_header = request.META.get("HTTP_AUTHORIZATION", "")
     if not auth_header.startswith("Bearer "):
-        return None, JsonResponse({"error": "需要登入才能使用此功能"}, status=401)
+        return None, JsonResponse({"detail": "需要登入才能使用此功能"}, status=401)
     token = auth_header[7:]
     try:
         _ensure_firebase()
@@ -70,14 +68,9 @@ def verify_firebase_token(request):
         decoded = firebase_auth.verify_id_token(token)
         return decoded, None
     except EnvironmentError as e:
-        return None, JsonResponse({"error": str(e)}, status=503)
+        return None, JsonResponse({"detail": str(e)}, status=503)
     except Exception:
-        return None, JsonResponse({"error": "身份驗證失敗，請重新登入"}, status=401)
-
-# tayal_chat視覺化測試
-def main(request):
-    template = loader.get_template('tayal_chat.html')
-    return HttpResponse(template.render())
+        return None, JsonResponse({"detail": "身份驗證失敗，請重新登入"}, status=401)
 
 @csrf_exempt
 def tayal_chat(request):
@@ -90,7 +83,7 @@ def tayal_chat(request):
             user_message = body.get("message", "").strip()
 
             if not user_message:
-                return JsonResponse({"error": "取得訊息內容失敗"}, status=400)
+                return JsonResponse({"detail": "取得訊息內容失敗"}, status=400)
 
             # 從請求取得真實使用者學習資料（由前端傳入）
             user_stats = body.get("user_stats", {})
@@ -170,10 +163,10 @@ def tayal_chat(request):
                 return JsonResponse({"message": result})
 
         except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
+            return JsonResponse({"detail": str(e)}, status=500)
 
     else:
-        return JsonResponse({"error": "只接受 POST 請求"}, status=405)
+        return JsonResponse({"detail": "只接受 POST 請求"}, status=405)
     
 @csrf_exempt
 def review_tayal_chat(request):
@@ -185,7 +178,7 @@ def review_tayal_chat(request):
             body = json.loads(request.body)
             user_message = body.get("message", "").strip()
             if not user_message:
-                return JsonResponse({"error": "取得失敗"}, status=400)
+                return JsonResponse({"detail": "取得失敗"}, status=400)
 
             # 依空格切詞
             words = [w for w in user_message.split(" ") if w]
@@ -240,9 +233,9 @@ def review_tayal_chat(request):
 
         except Exception as e:
             logger.error(traceback.format_exc())
-            return JsonResponse({"error": str(e)}, status=500)
+            return JsonResponse({"detail": str(e)}, status=500)
     else:
-        return JsonResponse({"error": "只接受 POST 請求"}, status=405)
+        return JsonResponse({"detail": "只接受 POST 請求"}, status=405)
 
 def _words_to_dicts(db, words) -> list:
     """把 Word ORM 物件轉成 {tayal, audio, chinese} dict 清單（依 words 原本順序，不去重）。

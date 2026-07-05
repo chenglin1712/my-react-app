@@ -29,7 +29,7 @@ const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFav
         <h3 className="fw-bolder text-danger">
           {result.name || '無資料'}
           {audioAvailable && result.audioItems?.length > 0 && !failedAudio?.has(result.audioItems[0].fileId) ? (
-            <Button variant="link" onClick={(e) => { e.stopPropagation(); if (result.audioItems?.length) playAudio(result.audioItems[0].fileId); }}>
+            <Button variant="link" aria-label="播放音訊" onClick={(e) => { e.stopPropagation(); if (result.audioItems?.length) playAudio(result.audioItems[0].fileId); }}>
               <FaPlayCircle size={20} className="text-warning" />
             </Button>
           ) : (<></>)}
@@ -64,11 +64,11 @@ const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFav
                     <h6 className="fw-bolder text-danger">
                       {ex.originalSentence}
                       {hasNativeAudio ? (
-                        <Button variant="link" onClick={() => playAudio(ex.audioItems[0].fileId)}>
+                        <Button variant="link" aria-label="播放音訊" onClick={() => playAudio(ex.audioItems[0].fileId)}>
                           <FaPlayCircle size={20} className="text-warning" />
                         </Button>
                       ) : ex.originalSentence?.trim() && (result.tribe === '布農語' || result.tribe === '排灣語') ? (
-                        <Button variant="link" onClick={() => playSentence(ex.originalSentence)}>
+                        <Button variant="link" aria-label="播放音訊" onClick={() => playSentence(ex.originalSentence)}>
                           <FaPlayCircle size={20} className="text-warning" />
                         </Button>
                       ) : null}
