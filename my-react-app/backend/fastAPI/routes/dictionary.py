@@ -324,32 +324,72 @@ def fuzzy_search(db: Session, keyword: str, exclude_names: List[str], tribe: str
 
     return fuzzy_content
 
-def search_all(db: Session, tribe: str = '泰雅語', limit: Optional[int] = None, offset: int = 0) -> Dict[str, List[WordResult]]:
-    """回傳所有詞條。limit/offset 為選填的 SQL 層分頁參數，不傳則維持原本回傳全部的行為
-    （目前前端一次拿全部資料後在畫面上分批顯示，尚未改成向後端逐頁請求）。"""
-    query = db.query(Word).filter(Word.tribe_id == _tribe_id_subquery(tribe)).order_by(Word.name)
-    if offset:
-        query = query.offset(offset)
-    if limit is not None:
-        query = query.limit(limit)
-    words = query.all()
-    content = {}
+def _frequency_bucket(freq: Optional[int]) -> int:
+    """把 frequency 數值換成前端顯示的星等（1~5），跟
+    frontend/src/_search/index.jsx 的 filterAndSortWords 星等換算邏輯保持一致。"""
+    fre = freq if freq is not None else 0
+    if 0 <= fre <= 200:
+        return 1
+    elif fre <= 400:
+        return 2
+    elif fre <= 800:
+        return 3
+    elif fre <= 1000:
+        return 4
+    return 5
+
+
+def _matches_category(word_result: "WordResult", category: Optional[str]) -> bool:
+    if not category:
+        return True
+    return any(category in (exp.category or []) for exp in (word_result.explanationItems or []))
+
+
+def _sort_key_name(name: Optional[str]):
+    """跟前端排序邏輯一致：忽略非字母開頭（-、ʼ 等）取字母部分排序，
+    純非字母開頭的詞條一律排在最後。"""
+    lowered = (name or '').lower()
+    stripped = re.sub(r'^[^a-z]+', '', lowered) or lowered
+    is_prefixed = bool(re.match(r'^[^a-z]', lowered))
+    return (is_prefixed, stripped, lowered)
+
+
+def _sort_words(word_results: List["WordResult"], sort_order: str) -> List["WordResult"]:
+    """降冪排序等於升冪排序結果整個反過來（字母部分與非字母開頭的排列同時翻轉），
+    詳見 frontend/src/_search/index.jsx filterAndSortWords 的排序邏輯。"""
+    ascending = sorted(word_results, key=lambda w: _sort_key_name(w.name))
+    return list(reversed(ascending)) if sort_order == 'desc' else ascending
+
+
+def search_all(
+    db: Session,
+    tribe: str = '泰雅語',
+    limit: Optional[int] = None,
+    offset: int = 0,
+    letter: Optional[str] = None,
+    frequency: Optional[int] = None,
+    category: Optional[str] = None,
+    favorites_only: bool = False,
+    favorite_names: Optional[List[str]] = None,
+    sort_order: str = 'asc',
+) -> Tuple[Dict[str, List[WordResult]], int]:
+    """回傳所有詞條，依 letter/frequency/category/favorites_only 篩選、依 sort_order 排序後，
+    再用 limit/offset 做分頁（篩選+排序完成後才切頁，讓「載入更多」逐頁拿到的資料彼此一致）。
+    全部不傳則維持原本回傳全部（未篩選、未分頁）的行為。回傳 (分組後的當頁資料, 篩選後總筆數)。"""
+    words = db.query(Word).filter(Word.tribe_id == _tribe_id_subquery(tribe)).order_by(Word.name).all()
 
     word_ids = [word.id for word in words]
     sources_map = load_sources_for_words(db, word_ids=word_ids)
     audio_map = load_audio_items_for_words(db, word_ids=word_ids)
     explanation_map = load_explanation_items_for_words(db, word_ids=word_ids)
 
+    all_word_results: List[WordResult] = []
     for word in words:
         explanations = parse_explanations(explanation_map.get(word.id, []))
         if not explanations:
             continue
 
-        key = explanations[0].chineseExplanation or word.name
-        if key not in content:
-            content[key] = []
-
-        content[key].append(
+        all_word_results.append(
             WordResult(
                 id=word.id,
                         tribeId=word.tribe_id,
@@ -374,7 +414,27 @@ def search_all(db: Session, tribe: str = '泰雅語', limit: Optional[int] = Non
             )
         )
 
-    return content
+    favorite_names_set = set(favorite_names or [])
+    filtered = [
+        wr for wr in all_word_results
+        if (not letter or (wr.name or '').lower().startswith(letter.lower()))
+        and (not frequency or _frequency_bucket(wr.frequency) == frequency)
+        and _matches_category(wr, category)
+        and (not favorites_only or wr.name in favorite_names_set)
+    ]
+    ordered = _sort_words(filtered, sort_order)
+    total = len(ordered)
+    page = ordered[offset:offset + limit] if limit is not None else ordered[offset:]
+
+    # 回應仍維持 {key: [WordResult]} 的分組格式（相容既有前端 Object.values(...).flat()
+    # 用法），但 key 一律用該筆在 page 裡的序號，確保每個詞各自一組。
+    # 舊版用 chineseExplanation 當 key，多個詞共用同一個中文釋義時會被歸成同一組，
+    # flatten 後這些詞會被搬到一起，把前面 _sort_words 排好的順序打亂。
+    content: Dict[str, List[WordResult]] = {
+        str(idx): [wr] for idx, wr in enumerate(page)
+    }
+
+    return content, total
 
 
 # ------------------------- API 路由 -------------------------
@@ -417,20 +477,39 @@ async def search_tayal_dictionary(request: Request, db: Session = Depends(get_db
 
 @router.post("/all/")
 async def all_tayal_dictionary(request: Request, db: Session = Depends(get_db)):
-    """查詢所有詞條。可選傳入 limit / offset 做分頁；不傳則回傳全部（維持原本行為）。"""
+    """查詢所有詞條。可選傳入 letter/frequency/category/favorites_only(+favorite_names)/
+    sort_order 做篩選與排序，並用 limit/offset 做分頁；都不傳則維持原本回傳全部
+    （未篩選、未分頁）的行為，供 frontend/src/_favorite/index.jsx 沿用舊行為。"""
     try:
         try:
             body = await request.json()
             tribe = body.get('tribe', '泰雅') or '泰雅'
             limit = body.get('limit')
             offset = body.get('offset') or 0
+            letter = body.get('letter') or None
+            frequency = body.get('frequency')
+            frequency = int(frequency) if frequency not in (None, '') else None
+            category = body.get('category') or None
+            favorites_only = bool(body.get('favorites_only'))
+            favorite_names = body.get('favorite_names') or []
+            sort_order = body.get('sort_order') or 'asc'
         except Exception:
             tribe = '泰雅'
             limit = None
             offset = 0
+            letter = None
+            frequency = None
+            category = None
+            favorites_only = False
+            favorite_names = []
+            sort_order = 'asc'
         tribe_name = TRIBE_MAP.get(tribe, '泰雅語')
-        total = db.query(Word).filter(Word.tribe_id == _tribe_id_subquery(tribe_name)).count()
-        results = search_all(db, tribe=tribe_name, limit=limit, offset=offset)
+        results, total = search_all(
+            db, tribe=tribe_name, limit=limit, offset=offset,
+            letter=letter, frequency=frequency, category=category,
+            favorites_only=favorites_only, favorite_names=favorite_names,
+            sort_order=sort_order,
+        )
         return JSONResponse(
             {
                 "all_results": {k: [r.dict() for r in v] for k, v in results.items()},

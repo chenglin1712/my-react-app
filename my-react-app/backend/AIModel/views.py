@@ -145,22 +145,41 @@ def tayal_chat(request):
                     {"role": "user", "content": user_message}
                 ]
             )
-            result = response.choices[0].message.content
+            result = response.choices[0].message.content or ""
 
-            try:
-                if result.strip().startswith("{"):
-                    plan_data = json.loads(result)
+            plan_data = None
+            if result.strip().startswith("{"):
+                try:
+                    parsed = json.loads(result)
+                except json.JSONDecodeError:
+                    parsed = None
 
-                    # 檢查是否是讀書計畫 JSON
-                    if 'type' in plan_data and plan_data['type'] == 'study_plan':
-                        return JsonResponse({
-                            "study_plan": plan_data
-                        })
+                # 除了 type 是 study_plan，還要確認 events 是非空陣列、
+                # 且每筆都有前端會直接拿去用的欄位（summary/start/end，
+                # 其中 start/end 還會被 event.start.split('T') 處理），
+                # 缺漏的話就不當成有效讀書計畫，改走純文字訊息 fallback，
+                # 避免前端卡在半殘的 JSON 資料上噴錯
+                if (
+                    isinstance(parsed, dict)
+                    and parsed.get('type') == 'study_plan'
+                    and isinstance(parsed.get('events'), list)
+                    and len(parsed['events']) > 0
+                    and all(
+                        isinstance(ev, dict) and ev.get('summary') and ev.get('start') and ev.get('end')
+                        for ev in parsed['events']
+                    )
+                ):
+                    plan_data = parsed
 
-                return JsonResponse({"message": result})
+            if plan_data:
+                # 前端聊天泡泡固定顯示 data.message，讀書計畫這裡原本沒有
+                # 帶這個欄位，會顯示空白泡泡，補上一句簡短確認訊息
+                return JsonResponse({
+                    "message": f"已經為你排好「{plan_data.get('title') or '讀書計畫'}」，點選下方卡片即可加入行事曆。",
+                    "study_plan": plan_data,
+                })
 
-            except json.JSONDecodeError:
-                return JsonResponse({"message": result})
+            return JsonResponse({"message": result})
 
         except Exception as e:
             return JsonResponse({"detail": str(e)}, status=500)

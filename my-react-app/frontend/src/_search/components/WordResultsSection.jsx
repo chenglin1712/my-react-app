@@ -3,6 +3,11 @@ import WordCard from './WordCard';
 
 // 全部詞條／完全匹配／相關匹配三個結果區塊原本各自複製一份幾乎一樣的
 // 「篩選排序 -> 分頁顯示 -> 載入更多」邏輯，這裡抽成共用元件。
+//
+// serverPaginated=true 時（目前用於「全部詞條」區塊）：篩選／排序／分頁都已經在
+// 後端做完，wordsFlat 就是目前已載入的頁面資料（累積），totalCount 是後端算出的
+// 篩選後總筆數，不再套用 filterAndSortWords 或本地 slice；onLoadMore 改成向後端
+// 要下一頁，而不是單純顯示更多已載入的資料。
 const WordResultsSection = ({
   title,
   titleColorClass,
@@ -19,13 +24,18 @@ const WordResultsSection = ({
   favoriteWords,
   failedAudio,
   audioAvailable,
+  serverPaginated = false,
+  totalCount,
+  loadingMore = false,
 }) => {
-  const filteredSorted = filterAndSortWords(wordsFlat);
-  const visibleWords = filteredSorted.slice(0, visibleCount);
+  const filteredSorted = serverPaginated ? wordsFlat : filterAndSortWords(wordsFlat);
+  const visibleWords = serverPaginated ? wordsFlat : filteredSorted.slice(0, visibleCount);
+  const total = serverPaginated ? (totalCount ?? wordsFlat.length) : filteredSorted.length;
+  const remaining = Math.max(0, total - visibleWords.length);
 
   return (
     <>
-      <h4 className={`fw-bold ${titleColorClass}`}>{title} ({filteredSorted.length})</h4>
+      <h4 className={`fw-bold ${titleColorClass}`}>{title} ({total})</h4>
       <ListGroup>
         {visibleWords.map((wordData, idx) => {
           const word = wordData.explanationItems?.[0]?.chineseExplanation || wordData.chineseExplanation || '';
@@ -48,10 +58,10 @@ const WordResultsSection = ({
           );
         })}
       </ListGroup>
-      {visibleCount < filteredSorted.length && (
+      {remaining > 0 && (
         <div className="text-center my-3">
-          <Button variant={buttonVariant} onClick={onLoadMore}>
-            載入更多（剩 {Math.max(0, filteredSorted.length - visibleCount)} 筆）
+          <Button variant={buttonVariant} onClick={onLoadMore} disabled={loadingMore}>
+            {loadingMore ? '載入中...' : `載入更多（剩 ${remaining} 筆）`}
           </Button>
         </div>
       )}

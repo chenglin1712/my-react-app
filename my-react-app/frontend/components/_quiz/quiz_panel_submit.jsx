@@ -22,7 +22,9 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
     const location = useLocation();
     const quizId = location.state?.situationID;
     const fallback = location.state?.fallback ?? (() => {
-        try { return JSON.parse(sessionStorage.getItem('quizFallback')); } catch { return null; }
+        const raw = sessionStorage.getItem('quizFallback');
+        if (!raw) return null;
+        try { return JSON.parse(raw); } catch { return null; }
     })();
 
     useEffect(() => {

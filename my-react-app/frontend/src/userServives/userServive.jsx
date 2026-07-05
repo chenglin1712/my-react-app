@@ -4,10 +4,18 @@ import { db, auth } from "../../../firebase";
 import { onAuthStateChanged, createUserWithEmailAndPassword } from "firebase/auth";
 
 //監聽登入
+// 快速連續觸發 auth 狀態變換時（例如切換帳號、登入後馬上登出），
+// 前一次事件的 getCurrentUser 可能在後一次事件之後才 resolve，
+// 若不處理會用舊事件的資料覆蓋掉新事件的結果。用一個世代編號，
+// 每次事件開始時遞增，非同步操作完成後比對編號是否仍是最新，
+// 不是最新就捨棄這次結果，不呼叫 callback / setupPresence。
 export const authChanges = (callback) => {
+    let currentGen = 0;
     return onAuthStateChanged(auth, async (user) => {
+        const myGen = ++currentGen;
         if (user) {
             const userData = await getCurrentUser(user.uid);
+            if (myGen !== currentGen) return;
 
             try {
                 setupPresence(user.uid);
