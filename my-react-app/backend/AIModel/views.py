@@ -49,6 +49,15 @@ def _ensure_firebase():
         firebase_admin.initialize_app(cred)
     _firebase_initialized = True
 
+def csrf_exempt_in_debug(view_func):
+    """DEBUG=True（本機開發）沿用原本略過 CSRF 檢查的行為；DEBUG=False（正式環境）
+    交回 Django 標準 CSRF 保護。過渡方案：前端目前完全沒有處理 CSRF token/cookie，
+    套用這個保護後，正式環境下這兩個 view 的 POST 請求會被 Django CSRF middleware
+    擋下（403），要嘛前端補上 CSRF token，要嘛之後把這兩個 view 改回 Django 標準
+    的 view-based auth。"""
+    return csrf_exempt(view_func) if django_settings.DEBUG else view_func
+
+
 def verify_firebase_token(request):
     """驗證 Firebase ID Token。DEBUG 模式下跳過驗證（開發環境用）。"""
     if django_settings.DEBUG:
@@ -72,7 +81,7 @@ def verify_firebase_token(request):
     except Exception:
         return None, JsonResponse({"detail": "身份驗證失敗，請重新登入"}, status=401)
 
-@csrf_exempt
+@csrf_exempt_in_debug
 def tayal_chat(request):
     if request.method == "POST":
         decoded, err_resp = verify_firebase_token(request)
@@ -84,6 +93,8 @@ def tayal_chat(request):
 
             if not user_message:
                 return JsonResponse({"detail": "取得訊息內容失敗"}, status=400)
+            if len(user_message) > 1000:
+                return JsonResponse({"detail": "訊息過長，請縮短後再試"}, status=400)
 
             # 從請求取得真實使用者學習資料（由前端傳入）
             user_stats = body.get("user_stats", {})
@@ -187,7 +198,7 @@ def tayal_chat(request):
     else:
         return JsonResponse({"detail": "只接受 POST 請求"}, status=405)
     
-@csrf_exempt
+@csrf_exempt_in_debug
 def review_tayal_chat(request):
     if request.method == "POST":
         decoded, err_resp = verify_firebase_token(request)
@@ -198,6 +209,8 @@ def review_tayal_chat(request):
             user_message = body.get("message", "").strip()
             if not user_message:
                 return JsonResponse({"detail": "取得失敗"}, status=400)
+            if len(user_message) > 1000:
+                return JsonResponse({"detail": "訊息過長，請縮短後再試"}, status=400)
 
             # 依空格切詞
             words = [w for w in user_message.split(" ") if w]

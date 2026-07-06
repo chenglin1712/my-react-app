@@ -37,11 +37,16 @@ service cloud.firestore {
       allow create: if request.auth != null;
     }
 
-    // 共享筆記：登入者可讀；登入者可建立；登入者可更新（按讚）；作者可刪除
+    // 共享筆記：登入者可讀；登入者可建立；作者可更新任何欄位（編輯筆記內容），
+    // 非作者的登入者只能更新 likes/likedBy（按讚，見 noteshare.jsx toggleLike）；
+    // 作者可刪除
     match /sharedNotes/{noteId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
-      allow update: if request.auth != null;
+      allow update: if request.auth != null && (
+        resource.data.uid == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy'])
+      );
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 

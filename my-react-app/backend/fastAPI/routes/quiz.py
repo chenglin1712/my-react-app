@@ -52,6 +52,9 @@ def _find_ffprobe() -> str | None:
 _ffmpeg_path  = _find_ffmpeg()
 _ffprobe_path = _find_ffprobe()
 
+# compare_audio 上傳的使用者錄音大小上限，避免超大音檔送進 wav2vec2 拖垮記憶體
+MAX_AUDIO_BYTES = 10 * 1024 * 1024  # 10 MB
+
 if _ffmpeg_path:
     # 把 ffmpeg bin 目錄加進 PATH，讓 pydub subprocess 找得到 ffprobe
     _bin_dir = os.path.dirname(_ffmpeg_path)
@@ -635,6 +638,9 @@ async def compare_audio(
             user_bytes = await user_audio.read()
         except Exception as e:
             return make_error("read_user_audio", str(e))
+
+        if len(user_bytes) > MAX_AUDIO_BYTES:
+            return make_error("file_too_large", "音檔不得超過 10 MB")
 
         # Step B — 使用者錄音轉 WAV + 取得嵌入
         try:

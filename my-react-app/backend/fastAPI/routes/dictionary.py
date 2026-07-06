@@ -4,7 +4,7 @@ from typing import List, Dict, Tuple, Optional
 from fastapi import APIRouter, Request, Depends, Response, Body
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import text, select
+from sqlalchemy import text, select, bindparam
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
@@ -593,9 +593,10 @@ def _load_grammar(db: Session, tribe_name: str) -> Optional[dict]:
             rule_ids = [r[0] for r in rules]
             affix_map: Dict[int, list] = {rid: [] for rid in rule_ids}
             if rule_ids:
-                id_list = ",".join(str(i) for i in rule_ids)
                 affix_rows = db.execute(
-                    text(f"SELECT ra.rule_id, a.affix FROM grammar_rule_affix ra JOIN grammar_affix a ON a.id = ra.affix_id WHERE ra.rule_id IN ({id_list})")
+                    text("SELECT ra.rule_id, a.affix FROM grammar_rule_affix ra JOIN grammar_affix a ON a.id = ra.affix_id WHERE ra.rule_id IN :rule_ids")
+                    .bindparams(bindparam("rule_ids", expanding=True)),
+                    {"rule_ids": rule_ids}
                 ).fetchall()
                 for r_id, affix in affix_rows:
                     affix_map[r_id].append(affix)
@@ -687,9 +688,10 @@ def search_grammar(tribe: str, q: str, db: Session = Depends(get_db)):
         rule_ids = [r[0] for r in rule_rows]
         affix_map: Dict[int, list] = {rid: [] for rid in rule_ids}
         if rule_ids:
-            id_list = ",".join(str(i) for i in rule_ids)
             for r_id, affix in db.execute(
-                text(f"SELECT ra.rule_id, a.affix FROM grammar_rule_affix ra JOIN grammar_affix a ON a.id = ra.affix_id WHERE ra.rule_id IN ({id_list})")
+                text("SELECT ra.rule_id, a.affix FROM grammar_rule_affix ra JOIN grammar_affix a ON a.id = ra.affix_id WHERE ra.rule_id IN :rule_ids")
+                .bindparams(bindparam("rule_ids", expanding=True)),
+                {"rule_ids": rule_ids}
             ).fetchall():
                 affix_map[r_id].append(affix)
 
@@ -849,9 +851,10 @@ def _load_grammar_quiz_material(db: Session, tribe_name: str, section_key: Optio
         rule_ids = list({row[0] for row in rows})
         affix_map: Dict[int, list] = {rid: [] for rid in rule_ids}
         if rule_ids:
-            id_list = ",".join(str(i) for i in rule_ids)
             for r_id, affix in db.execute(
-                text(f"SELECT ra.rule_id, a.affix FROM grammar_rule_affix ra JOIN grammar_affix a ON a.id = ra.affix_id WHERE ra.rule_id IN ({id_list})")
+                text("SELECT ra.rule_id, a.affix FROM grammar_rule_affix ra JOIN grammar_affix a ON a.id = ra.affix_id WHERE ra.rule_id IN :rule_ids")
+                .bindparams(bindparam("rule_ids", expanding=True)),
+                {"rule_ids": rule_ids}
             ).fetchall():
                 affix_map[r_id].append(affix)
 
