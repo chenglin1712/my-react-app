@@ -47,7 +47,7 @@ function SortableWord({ id, word, audio, onClickWord, onLongPress, isMoving }) {
     startPos.current = { x: e.clientX, y: e.clientY };
     timerRef.current = setTimeout(() => {
       onLongPress(id); // 長按播放音檔
-    }, 0);
+    }, 500);
     
   };
 

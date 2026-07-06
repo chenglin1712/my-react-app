@@ -1,6 +1,6 @@
 import random
 import threading
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from fastAPI.routes.connect import get_db
 from fastAPI.routes.model import Word
@@ -59,7 +59,7 @@ def warm_cache(db: Session) -> None:
 @router.get("/questions")
 def get_listening_questions(
     tribe: str = 'tayal',
-    count: int = 10,
+    count: int = Query(default=10, ge=1, le=50),
     db: Session = Depends(get_db)
 ):
     tribe_id = TRIBE_IDS.get(tribe)
