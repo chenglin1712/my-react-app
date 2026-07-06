@@ -23,3 +23,5 @@ soundfile==0.13.1
 torchaudio==2.10.0
 python-multipart==0.0.22
 firebase-admin==6.5.0
+slowapi==0.1.9
+django-ratelimit==4.1.0

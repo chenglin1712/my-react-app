@@ -7,7 +7,7 @@ FastAPI 版本的 Firebase ID Token 驗證。
 """
 import os
 
-from fastapi import Header, HTTPException
+from fastapi import Header, HTTPException, Request
 
 _firebase_initialized = False
 
@@ -31,14 +31,20 @@ def _ensure_firebase():
     _firebase_initialized = True
 
 
-async def verify_firebase_token(authorization: str = Header(default=None)):
+async def verify_firebase_token(request: Request, authorization: str = Header(default=None)):
     """FastAPI 依賴注入：驗證 Authorization: Bearer <token>。
 
     掛在 include_router(..., dependencies=[Depends(verify_firebase_token)])，
     對整個 router 底下的所有端點生效，不需逐一修改每個函式簽名。
+
+    順便把解出來的使用者資料存進 request.state.user，讓 slowapi 的
+    key_func（main.py 的 _rate_limit_key）可以依 uid 做每用戶速率限制，
+    不必再解一次 token。
     """
     if os.getenv("DJANGO_DEBUG", "False") == "True":
-        return {"uid": "dev-user"}
+        user = {"uid": "dev-user"}
+        request.state.user = user
+        return user
 
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="需要登入才能使用此功能")
@@ -48,6 +54,9 @@ async def verify_firebase_token(authorization: str = Header(default=None)):
     from firebase_admin import auth as firebase_auth
 
     try:
-        return firebase_auth.verify_id_token(token)
+        user = firebase_auth.verify_id_token(token)
     except Exception:
         raise HTTPException(status_code=401, detail="身份驗證失敗，請重新登入")
+
+    request.state.user = user
+    return user

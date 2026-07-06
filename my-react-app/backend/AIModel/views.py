@@ -3,6 +3,7 @@ import logging
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.conf import settings as django_settings
+from django_ratelimit.core import is_ratelimited
 from openai import OpenAI
 import os
 from dotenv import load_dotenv
@@ -81,12 +82,32 @@ def verify_firebase_token(request):
     except Exception:
         return None, JsonResponse({"detail": "身份驗證失敗，請重新登入"}, status=401)
 
+
+def _rate_limited_response(request, decoded, group, rate="10/m"):
+    """依已登入使用者的 uid 限速（這兩個 view 都會呼叫付費的 GitHub Models API）。
+    直接呼叫 is_ratelimited 而不是用 @ratelimit 裝飾器：裝飾器要在呼叫 view 之前
+    就決定 key，但這裡的 key（uid）要等 verify_firebase_token 解出 token 之後才知道，
+    所以放在驗證通過之後手動檢查。目前沒有 Redis，計數存在 Django 預設的記憶體
+    快取（LocMemCache），單一 process 內有效。"""
+    uid = decoded.get("uid", "anon")
+    limited = is_ratelimited(
+        request, group=group, key=lambda g, r: uid,
+        rate=rate, method="POST", increment=True,
+    )
+    if limited:
+        return JsonResponse({"detail": "請求過於頻繁，請稍後再試"}, status=429)
+    return None
+
+
 @csrf_exempt_in_debug
 def tayal_chat(request):
     if request.method == "POST":
         decoded, err_resp = verify_firebase_token(request)
         if err_resp:
             return err_resp
+        limited_resp = _rate_limited_response(request, decoded, group="tayal_chat")
+        if limited_resp:
+            return limited_resp
         try:
             body = json.loads(request.body)
             user_message = body.get("message", "").strip()
@@ -204,6 +225,9 @@ def review_tayal_chat(request):
         decoded, err_resp = verify_firebase_token(request)
         if err_resp:
             return err_resp
+        limited_resp = _rate_limited_response(request, decoded, group="review_tayal_chat")
+        if limited_resp:
+            return limited_resp
         try:
             body = json.loads(request.body)
             user_message = body.get("message", "").strip()

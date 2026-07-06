@@ -17,6 +17,7 @@ from fastAPI.routes.word_data import (
     load_explanation_items_for_words,
 )
 from config.tribes import TRIBE_MAP
+from fastAPI.rate_limit import limiter
 
 router = APIRouter()
 
@@ -439,6 +440,7 @@ def search_all(
 
 # ------------------------- API 路由 -------------------------
 @router.post("/keys/")
+@limiter.limit("60/minute")  # 全表掃描（走快取），每用戶每分鐘最多 60 次避免大量請求造成壓力
 async def search_tayal_dictionary(request: Request, db: Session = Depends(get_db)):
     """多關鍵字搜尋"""
     try:
@@ -476,6 +478,7 @@ async def search_tayal_dictionary(request: Request, db: Session = Depends(get_db
 
 
 @router.post("/all/")
+@limiter.limit("60/minute")  # 全表掃描（走快取），每用戶每分鐘最多 60 次避免 fetchAllWords 大量請求造成壓力
 async def all_tayal_dictionary(request: Request, db: Session = Depends(get_db)):
     """查詢所有詞條。可選傳入 letter/frequency/category/favorites_only(+favorite_names)/
     sort_order 做篩選與排序，並用 limit/offset 做分頁；都不傳則維持原本回傳全部

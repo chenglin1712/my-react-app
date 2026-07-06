@@ -12,6 +12,7 @@ from fastAPI.routes.model import Word
 from fastAPI.routes.word_data import load_explanation_items_for_words, load_audio_items_for_words
 
 import io
+import re
 import requests
 from pydub import AudioSegment
 import torch
@@ -632,6 +633,11 @@ async def compare_audio(
 ):
     if not _ffmpeg_path:
         return make_error("ffmpeg_missing", "伺服器未安裝 ffmpeg，語音比對功能暫時無法使用")
+
+    # audio_id 會直接拼接進下載 URL（fetch_audio_from_id），先驗證格式避免路徑遍歷／SSRF
+    if not re.match(r'^[a-zA-Z0-9._-]+$', audio_id):
+        return make_error("invalid_audio_id", "audio_id 格式不合法")
+
     try:
         # Step A — 讀取使用者錄音
         try:

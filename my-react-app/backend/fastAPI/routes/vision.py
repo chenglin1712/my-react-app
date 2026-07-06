@@ -8,12 +8,17 @@ import os
 import time
 from deep_translator import GoogleTranslator
 
+from fastAPI.rate_limit import limiter
+
 load_dotenv()
 router = APIRouter()
 _logger = logging.getLogger(__name__)
 
 VITE_CLOUD_API_KEY = os.getenv("VITE_CLOUD_API_KEY")
 VITE_CLOUD_API_URL = os.getenv("VITE_CLOUD_API_URL")
+
+# 上傳圖片大小上限，避免超大圖片吃掉伺服器記憶體，也避免白白打一次付費的 Google Cloud Vision API
+MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
 if not VITE_CLOUD_API_KEY:
     _logger.warning("VITE_CLOUD_API_KEY 環境變數未設定，影像辨識功能將無法使用")
 if not VITE_CLOUD_API_URL:
@@ -46,6 +51,7 @@ def translate_with_retry(text: str, retries=3, delay=1) -> str | None:
     return None
 
 @router.post("/analyze_image/")
+@limiter.limit("10/minute")  # 呼叫付費 Google Cloud Vision API，每用戶每分鐘最多 10 次
 async def analyze_image(request: Request):
     try:
         form = await request.form()
@@ -55,6 +61,10 @@ async def analyze_image(request: Request):
             raise HTTPException(status_code=400, detail="未收到圖片")
 
         contents = await file.read()
+
+        if len(contents) > MAX_IMAGE_BYTES:
+            raise HTTPException(status_code=413, detail="圖片不得超過 5 MB")
+
         image_base64 = base64.b64encode(contents).decode("utf-8")
 
         if not VITE_CLOUD_API_URL or not VITE_CLOUD_API_KEY:
