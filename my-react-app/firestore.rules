@@ -31,10 +31,10 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // 發音錄音：登入者可讀；登入者可建立自己的錄音
+    // 發音錄音：登入者可讀；登入者只能建立 uid 為本人的錄音
     match /pronunciations/{tribe}/recordings/{recordingId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
     }
 
     // 共享筆記：登入者可讀；登入者可建立；作者可更新任何欄位（編輯筆記內容），

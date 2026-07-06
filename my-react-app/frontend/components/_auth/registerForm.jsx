@@ -56,6 +56,11 @@ const RegisterForm = () => {
         const file = e.target.files[0];
         if (!file) return;
 
+        if (file.size > 5 * 1024 * 1024) {
+            alert("圖片不得超過 5 MB，請重新選擇。");
+            return;
+        }
+
         setPreview(URL.createObjectURL(file));
         setIsUploading(true);
 

@@ -216,6 +216,10 @@ function PronunciationGame({ tribe = "tayal" }) {
 
   const submitAudio = async () => {
     if (!audioBlob) return;
+    if (audioBlob.size > 10 * 1024 * 1024) {
+      setError("錄音檔過大，請重新錄音。");
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
