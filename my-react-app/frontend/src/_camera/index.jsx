@@ -17,6 +17,10 @@ const App = () => {
             setFileName(file ? file.name : "請選擇圖片");
         }
         if (newFile) {
+            if (newFile.size > 5 * 1024 * 1024) {
+                alert("圖片不得超過 5 MB，請重新選擇。");
+                return;
+            }
             const reader = new FileReader();
             reader.onloadend = () => {
                 setImage(reader.result);

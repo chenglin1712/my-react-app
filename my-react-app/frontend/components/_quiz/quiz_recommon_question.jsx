@@ -78,7 +78,53 @@ function getWordNameForQuestion(question) {
   return question.tayal?.word || "";
 }
 
-export default function QuizPage() {
+const TYPE_LABELS = {
+  "word-translate": "單字翻譯",
+  "word-match": "單字配對",
+  "sentence-fill": "句子填空",
+  "sentence-order": "句子排序",
+};
+
+// 依這次測驗實際答對/答錯的題型分布，計算強項/弱項分析文字，
+// 取代原本無論作答結果為何都顯示同一段固定文字的寫法。
+function buildResultAnalysis(answers) {
+  const stats = {};
+  for (const a of answers) {
+    if (!stats[a.type]) stats[a.type] = { correct: 0, total: 0 };
+    stats[a.type].total += 1;
+    if (a.correct) stats[a.type].correct += 1;
+  }
+
+  const entries = Object.entries(stats).map(([type, { correct, total }]) => ({
+    label: TYPE_LABELS[type] || type,
+    accuracy: total > 0 ? correct / total : 0,
+  }));
+
+  if (entries.length === 0) {
+    return {
+      analysis: "本次測驗尚無足夠資料進行分析。",
+      suggestion: "建議多做幾次測驗，才能看出你的強弱項。",
+    };
+  }
+
+  entries.sort((a, b) => b.accuracy - a.accuracy);
+  const best = entries[0];
+  const worst = entries[entries.length - 1];
+
+  if (entries.length === 1 || best.accuracy === worst.accuracy) {
+    return {
+      analysis: `你在${best.label}的正確率為 ${Math.round(best.accuracy * 100)}%。`,
+      suggestion: `建議持續練習${best.label}，穩固已有的基礎。`,
+    };
+  }
+
+  return {
+    analysis: `你的強項是${best.label}（正確率 ${Math.round(best.accuracy * 100)}%），${worst.label}較弱（正確率 ${Math.round(worst.accuracy * 100)}%）。`,
+    suggestion: `建議多練習${worst.label}，加強相關能力。`,
+  };
+}
+
+export default function QuizPage({ tribe = "tayal" }) {
   const { userData } = useAuth();
   const navigate = useNavigate();
 
@@ -119,7 +165,7 @@ export default function QuizPage() {
         const res = await axios.post(
           import.meta.env.VITE_API_GENERATE_QUIZ_URL,
           storedModel,
-          { headers: authHeaders }
+          { headers: authHeaders, params: { tribe } }
         );
         if (cancelled) return;
 
@@ -141,7 +187,7 @@ export default function QuizPage() {
 
     loadQuiz();
     return () => { cancelled = true; };
-  }, [userData?.uid]);
+  }, [userData?.uid, tribe]);
 
   // 題目載入完成才開始計時，避免把載入等待的時間也算進總花費時間
   useEffect(() => {
@@ -199,7 +245,7 @@ export default function QuizPage() {
             time_spent: questionTime,
           },
         },
-        { headers: authHeaders }
+        { headers: authHeaders, params: { tribe } }
       );
       userModelRef.current = res.data.user_model;
     } catch (err) {
@@ -226,14 +272,15 @@ export default function QuizPage() {
       // 測驗結束 → 導向結果頁
       const correctCount = updatedAnswers.filter((a) => a.correct).length;
       const accuracy = Math.round((correctCount / questionList.length) * 100);
+      const { analysis, suggestion } = buildResultAnalysis(updatedAnswers);
 
       navigate("../result", {
         state: {
           totalTime: formatTime(totalTime),
           accuracy,
           userAnswers: updatedAnswers,
-          analysis: "你的強項是詞彙題，句子排序較弱。",
-          suggestion: "建議多練習句子排序，加強語法理解。",
+          analysis,
+          suggestion,
         },
       });
     }

@@ -32,10 +32,17 @@ const Advice = ({ onClose }) => {
             .map(([word, cnt]) => `${word}（答錯${cnt}次）`);
         const totalErrors = Object.values(userErrors).reduce((sum, n) => sum + n, 0);
 
+        // 薦讀測驗（IRT）累積的 type_stats 內含每種題型的作答次數(n)與錯誤次數(e)，
+        // 答對數 = 總作答次數 - 總錯誤次數，取代原本永遠是 0 的寫死值
+        const typeStats = userData?.firestoreData?.quiz_model?.type_stats || {};
+        const totalAttempts = Object.values(typeStats).reduce((sum, s) => sum + (s.n || 0), 0);
+        const totalTypeErrors = Object.values(typeStats).reduce((sum, s) => sum + (s.e || 0), 0);
+        const totalCorrect = Math.max(totalAttempts - totalTypeErrors, 0);
+
         getUserSituation()
             .then(sit => {
                 setUserStats({
-                    correct: 0,
+                    correct: totalCorrect,
                     incorrect: totalErrors,
                     unanswered: 0,
                     common_errors: commonErrors,
@@ -44,7 +51,7 @@ const Advice = ({ onClose }) => {
             })
             .catch(() => {
                 setUserStats({
-                    correct: 0,
+                    correct: totalCorrect,
                     incorrect: totalErrors,
                     unanswered: 0,
                     common_errors: commonErrors,

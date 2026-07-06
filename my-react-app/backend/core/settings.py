@@ -10,7 +10,6 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 import os
-import warnings
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -26,13 +25,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-_INSECURE_DEFAULT_KEY = "django-insecure-mqy*z9-jtpcs@$(p=^yb(@-#z^-&=qk!t$i9bx5kcxo1ax$_2o"
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", _INSECURE_DEFAULT_KEY)
-if SECRET_KEY == _INSECURE_DEFAULT_KEY:
-    warnings.warn(
-        "[settings] DJANGO_SECRET_KEY 使用預設不安全金鑰，生產環境請在 .env 設定隨機金鑰。\n"
-        "產生方式：python -c \"from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())\"",
-        stacklevel=2,
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "DJANGO_SECRET_KEY 未設定，請在 .env 填入隨機金鑰。\n"
+        "產生方式：python -c \"from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())\""
     )
 
 # SECURITY WARNING: don't run with debug turned on in production!

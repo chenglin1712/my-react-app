@@ -240,6 +240,10 @@ function NotePage() {
             onChange={(e) => {
               const file = e.target.files[0];
               if (file) {
+                if (file.size > 5 * 1024 * 1024) {
+                  setError("圖片不得超過 5 MB，請重新選擇。");
+                  return;
+                }
                 setSelectedImageFile(file);
                 const reader = new FileReader();
                 reader.onload = (event) => execStyle("insertImage", event.target.result);

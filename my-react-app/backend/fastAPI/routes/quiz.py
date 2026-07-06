@@ -3,13 +3,14 @@ import random
 import threading
 import shutil
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Body, HTTPException, Depends, File, UploadFile, Form
+from fastapi import APIRouter, Body, HTTPException, Depends, File, UploadFile, Form, Query
 from pydantic import BaseModel
 
 from sqlalchemy.orm import Session
 from fastAPI.routes.connect import get_db
 from fastAPI.routes.model import Word
 from fastAPI.routes.word_data import load_explanation_items_for_words, load_audio_items_for_words
+from config.tribes import TRIBE_IDS
 
 import io
 import re
@@ -169,29 +170,37 @@ def compute_score(Ptheta: float, Bq: float) -> float:
 # ----------------------------
 # DB helper: load all words (module-level cache)
 # ----------------------------
-_words_cache: List[Word] = []
+_words_cache: Dict[str, List[Word]] = {}
 _word_explanations_cache: Dict[str, List[dict]] = {}
 _word_audios_cache: Dict[str, List[dict]] = {}
 _words_cache_lock = threading.Lock()
 
-def load_all_words(db: Optional[Session] = None) -> List[Word]:
+def load_all_words(db: Optional[Session] = None, tribe_id: Optional[str] = None) -> List[Word]:
+    """依 tribe_id 載入該族語的詞彙清單（模組級快取，每個族語第一次請求時查詢一次）。
+    word id 在 words 表裡全域唯一，不同族語不會撞號，所以 explanation/audio 快取
+    繼續當成單一全域字典累加即可，只有 _words_cache（出題用的候選單字清單）需要
+    依族語分開存，避免出題時把不同族語的單字混在同一份候選池裡。"""
     global _words_cache, _word_explanations_cache, _word_audios_cache
-    if _words_cache:
-        return _words_cache
+    if tribe_id in _words_cache:
+        return _words_cache[tribe_id]
     if not db:
         return []
     with _words_cache_lock:
-        if not _words_cache:
-            _words_cache = db.query(Word).all()
-            _word_explanations_cache = load_explanation_items_for_words(db)
-            _word_audios_cache = load_audio_items_for_words(db)
-    return _words_cache
+        if tribe_id not in _words_cache:
+            query = db.query(Word)
+            if tribe_id:
+                query = query.filter(Word.tribe_id == tribe_id)
+            _words_cache[tribe_id] = query.all()
+            _word_explanations_cache.update(load_explanation_items_for_words(db, tribe_id=tribe_id))
+            _word_audios_cache.update(load_audio_items_for_words(db, tribe_id=tribe_id))
+    return _words_cache[tribe_id]
 
 
 def warm_cache(db: Session) -> None:
-    """在 app 啟動時預先跑一次 load_all_words，
+    """在 app 啟動時預先為每個族語跑一次 load_all_words，
     把全表掃描的成本放在部署當下，而不是留給第一個打 quiz 的使用者請求承擔。"""
-    load_all_words(db)
+    for tribe_id in TRIBE_IDS.values():
+        load_all_words(db, tribe_id)
 
 # ----------------------------
 # 出題用小工具（原本是 generate_quiz_frontend 內的巢狀函式，
@@ -449,8 +458,15 @@ def _generate_sentence_order_questions(picker: _CandidatePicker, all_words: List
 # API: 產生 quiz
 # ----------------------------
 @router.post("/generate_quiz_frontend", response_model=GenerateQuizResponse)
-def generate_quiz_frontend(user_data: dict = Body(...), db: Session = Depends(get_db)):
-    all_words = load_all_words(db)
+def generate_quiz_frontend(
+    user_data: dict = Body(...),
+    tribe: str = Query(default="tayal"),
+    db: Session = Depends(get_db),
+):
+    tribe_id = TRIBE_IDS.get(tribe)
+    if not tribe_id:
+        raise HTTPException(status_code=400, detail=f"不支援的族語：{tribe}")
+    all_words = load_all_words(db, tribe_id)
     if not all_words:
         raise HTTPException(status_code=500, detail="No words in DB")
 
@@ -479,7 +495,14 @@ def generate_quiz_frontend(user_data: dict = Body(...), db: Session = Depends(ge
 # API: submit answer
 # ----------------------------
 @router.post("/submit_answer_frontend", response_model=SubmitAnswerResp)
-def submit_answer_frontend(body: dict = Body(...), db: Session = Depends(get_db)):
+def submit_answer_frontend(
+    body: dict = Body(...),
+    tribe: str = Query(default="tayal"),
+    db: Session = Depends(get_db),
+):
+    tribe_id = TRIBE_IDS.get(tribe)
+    if not tribe_id:
+        raise HTTPException(status_code=400, detail=f"不支援的族語：{tribe}")
     user_model = body.get("user_data", {})
     answer = body.get("answer", {})
 
@@ -510,7 +533,7 @@ def submit_answer_frontend(body: dict = Body(...), db: Session = Depends(get_db)
     e_w, n_w = ue["errors"], ue["attempts"]
     Dw = compute_smoothed_error_rate(e_w,n_w)
     Dt = compute_smoothed_error_rate(type_stats.get(t,{}).get("e",0), type_stats.get(t,{}).get("n",0))
-    all_words = load_all_words(db)
+    all_words = load_all_words(db, tribe_id)
     fprime_map = compute_normalized_freq_map(all_words)
     fprime = fprime_map.get(word_name,0.0)
     Dq, bw = compute_Dq_and_bw(Dw, Dt, fprime)
@@ -571,7 +594,7 @@ def convert_to_wav(audio_bytes):
     try:
         audio = AudioSegment.from_file(io.BytesIO(audio_bytes), format=None)
     except Exception as e:
-        print("DEBUG: 無法解碼音檔，前 10 bytes:", list(audio_bytes[:10]))
+        _logging.warning("[quiz] 無法解碼音檔，前 10 bytes: %s", list(audio_bytes[:10]))
         raise Exception(f"無法解碼音檔：{str(e)}")
 
     wav_io = io.BytesIO()

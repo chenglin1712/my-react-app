@@ -117,6 +117,26 @@ const App = () => {
               <Route path="question" element={<Comp_quiz_recommon_question />} />
               <Route path="result" element={<Comp_quiz_recommon_result />} />
             </Route>
+            <Route path="amis/recommon" element={<Comp_quiz_recommon tribe="amis" />} >
+              <Route index element={<Comp_quiz_recommon_start />} />
+              <Route path="question" element={<Comp_quiz_recommon_question tribe="amis" />} />
+              <Route path="result" element={<Comp_quiz_recommon_result />} />
+            </Route>
+            <Route path="bunun/recommon" element={<Comp_quiz_recommon tribe="bunun" />} >
+              <Route index element={<Comp_quiz_recommon_start />} />
+              <Route path="question" element={<Comp_quiz_recommon_question tribe="bunun" />} />
+              <Route path="result" element={<Comp_quiz_recommon_result />} />
+            </Route>
+            <Route path="kavalan/recommon" element={<Comp_quiz_recommon tribe="kavalan" />} >
+              <Route index element={<Comp_quiz_recommon_start />} />
+              <Route path="question" element={<Comp_quiz_recommon_question tribe="kavalan" />} />
+              <Route path="result" element={<Comp_quiz_recommon_result />} />
+            </Route>
+            <Route path="paiwan/recommon" element={<Comp_quiz_recommon tribe="paiwan" />} >
+              <Route index element={<Comp_quiz_recommon_start />} />
+              <Route path="question" element={<Comp_quiz_recommon_question tribe="paiwan" />} />
+              <Route path="result" element={<Comp_quiz_recommon_result />} />
+            </Route>
             <Route path="situation" element={<Comp_situation />} />
             <Route path="review" element={<Comp_review />} />
           </Route>

@@ -29,7 +29,16 @@ const SideBar = () => {
 
     //點功能選單
     const clickFunc = (func) => {
-        let path = func.includes("quiz") ? quizBasePath : "/quiz/" + func;
+        let path;
+        if (func === "quiz") {
+            path = quizBasePath;
+        } else if (func === "recommon") {
+            // 推薦測驗要留在目前所在的族語底下（呼應上面 quizBasePath 的邏輯），
+            // 不像 situation/review 是跨族語共用的頁面
+            path = `${quizBasePath}/recommon`;
+        } else {
+            path = "/quiz/" + func;
+        }
         navigate(path);
         setSelectFunc(func);
     };
