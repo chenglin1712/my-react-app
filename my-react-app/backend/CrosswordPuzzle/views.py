@@ -1,14 +1,14 @@
 import json
+import logging
 import re
-import sqlite3
-from pathlib import Path
 from django.http import HttpResponse, JsonResponse
+from sqlalchemy import text
 from .crossword import Crossword, Word as CrosswordWord, word_list
 from django.views.decorators.csrf import csrf_exempt
 from config.tribes import TRIBE_IDS as _ALL_TRIBE_IDS
+from fastAPI.routes.connect import SessionLocal
 
-# dictionary.db 路徑（與 fastAPI routes 共用同一個 DB）
-_DB_PATH = Path(__file__).resolve().parent.parent / 'fastAPI' / 'routes' / 'dictionary.db'
+logger = logging.getLogger(__name__)
 
 # 各族語對應的 tribe_id（UUID）。tayal 故意排除：泰雅語填字遊戲沿用內建
 # word_list（見 generate_crossword 的 fallback 分支），不查資料庫。
@@ -17,21 +17,25 @@ _TRIBE_IDS = {slug: tid for slug, tid in _ALL_TRIBE_IDS.items() if slug != 'taya
 def _get_words_from_db(tribe_id: str, limit: int = 30):
     """從 dictionary.db 取出純英文字母、長度 4-10、有中文解釋的詞彙。
     explanation_items 已經拆到 word_explanation 表，這裡改成 JOIN 取第一筆解釋
-    （sort_order = 0，對應原本 exp[0]），INNER JOIN 本身就篩掉沒有解釋的字。"""
+    （sort_order = 0，對應原本 exp[0]），INNER JOIN 本身就篩掉沒有解釋的字。
+
+    走 fastAPI.routes.connect 共用的 SessionLocal（而非原生 sqlite3.connect），
+    這樣才會走 SQLAlchemy 的 QueuePool，且連線時自動套用該 engine 的
+    connect event listener（PRAGMA foreign_keys / journal_mode = WAL），
+    避免高流量下和其他 SQLAlchemy 連線競爭 WAL 鎖。"""
+    db = SessionLocal()
     try:
-        conn = sqlite3.connect(str(_DB_PATH))
-        cursor = conn.cursor()
-        cursor.execute(
-            '''SELECT w.name, we.chinese_explanation
-               FROM words w
-               JOIN word_explanation we ON we.word_id = w.id AND we.sort_order = 0
-               WHERE w.tribe_id = ?''',
-            (tribe_id,)
-        )
-        rows = cursor.fetchall()
-        conn.close()
+        rows = db.execute(
+            text('''SELECT w.name, we.chinese_explanation
+                    FROM words w
+                    JOIN word_explanation we ON we.word_id = w.id AND we.sort_order = 0
+                    WHERE w.tribe_id = :tribe_id'''),
+            {"tribe_id": tribe_id}
+        ).fetchall()
     except Exception as e:
         return [], str(e)
+    finally:
+        db.close()
 
     results = []
     for name, cn in rows:
@@ -55,9 +59,9 @@ def generate_crossword(request):
     if tribe in _TRIBE_IDS:
         selected_words, err = _get_words_from_db(_TRIBE_IDS[tribe])
         if err:
-            return JsonResponse({'error': f'資料庫讀取失敗：{err}'}, status=500)
+            return JsonResponse({'detail': f'資料庫讀取失敗：{err}'}, status=500)
         if len(selected_words) < 5:
-            return JsonResponse({'error': f'詞庫不足，無法生成填字遊戲（僅找到 {len(selected_words)} 筆）'}, status=500)
+            return JsonResponse({'detail': f'詞庫不足，無法生成填字遊戲（僅找到 {len(selected_words)} 筆）'}, status=500)
     else:
         selected_words = [[item[0], item[1]] for item in word_list]
 
@@ -160,7 +164,7 @@ def submit_ans(request):
                                 is_correct = False
                                 break
                     else:
-                        print(f"Warning: Index out of bounds for word {word_number} (across).")
+                        logger.warning("Index out of bounds for word %s (across).", word_number)
                         is_correct = False
                         break
 
@@ -180,7 +184,7 @@ def submit_ans(request):
                                 is_correct = False
                                 break
                     else:
-                        print(f"Warning: Index out of bounds for word {word_number} (down).")
+                        logger.warning("Index out of bounds for word %s (down).", word_number)
                         is_correct = False
                         break
             
@@ -200,4 +204,4 @@ def submit_ans(request):
         
         return JsonResponse(results)
     
-    return JsonResponse({'error': 'Invalid request method'}, status=405)
+    return JsonResponse({'detail': 'Invalid request method'}, status=405)

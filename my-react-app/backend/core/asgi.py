@@ -9,33 +9,15 @@ https://docs.djangoproject.com/en/5.1/howto/deployment/asgi/
 
 import os
 from django.core.asgi import get_asgi_application
-from fastAPI.main import app as fastapi_app  # 匯入你的 FastAPI 應用
-from starlette.applications import Starlette
-from starlette.routing import Mount
 
+# Django 與 FastAPI 是兩個獨立行程（見 run.py／run_fastapi.py，分別跑在不同 port），
+# 這裡只需要匯出 Django 自己的 ASGI callable。之前這裡試過用 Starlette 把兩個
+# app 掛在同一個 ASGI application 下（FastAPI 掛 /api、Django 掛 /），但那個
+# application 馬上又被下面這行覆蓋掉，等於從沒真正生效過，只是白白在這裡
+# import 一次 fastAPI.main（連帶觸發它的 CORS／rate limiter／router 設定），
+# 徒增 Django 啟動的匯入成本，因此移除。
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings")
 
-django_app = get_asgi_application()
-
-application = Starlette(
-    routes=[
-        Mount("/api", app=fastapi_app),
-        Mount("/", app=django_app),
-    ]
-)
-
-# 建立 Django 應用
 application = get_asgi_application()
-
-
-# 建立主 FastAPI 應用
-#app = FastAPI(title="Django + FastAPI")
-
-# 掛載 FastAPI 子應用（例如 /api 開頭）
-#app.mount("/api", fastapi_app)
-
-# 掛載 Django 主網站
-#app.mount("/", application)
-
 

@@ -1,3 +1,4 @@
+import logging
 import requests
 from django.core.cache import cache
 from django.http import JsonResponse
@@ -7,6 +8,8 @@ from . import amis_bank
 from . import bunun_bank
 from . import kavalan_bank
 from . import paiwan_bank
+
+logger = logging.getLogger(__name__)
 
 # 各族語對應的官方練習介面 dialect_id、顯示名稱、以及中高級/高級本地題庫的
 # 選題公式進入點。要新增族語時只需在這裡多加一個 key，不用動 get_quiz_data 邏輯。
@@ -51,7 +54,7 @@ def get_quiz_data(request):
 
     config = TRIBE_CONFIG.get(tribe)
     if not config:
-        return JsonResponse({"Error": f"不支援的族語: {tribe}"}, status=400)
+        return JsonResponse({"detail": f"不支援的族語: {tribe}"}, status=400)
 
     # 中高級(3)、高級(4)：官方練習介面 start_exam 對這兩個等級一律回傳
     # part1~part4 = null（實測過阿美語 dialect_id 1~5、泰雅語 dialect_id 1~10
@@ -64,7 +67,7 @@ def get_quiz_data(request):
         format_data = {"chapter_name": config["display_name"], "parts": [config["cloze_test"]()]}
         return JsonResponse(format_data, safe=False)
     elif level not in ("1", "2"):
-        return JsonResponse({"Error": f"不支援的等級: {level}"}, status=400)
+        return JsonResponse({"detail": f"不支援的等級: {level}"}, status=400)
 
     url = f"https://api.lokahsu.org.tw/api/front_end/start_exam?dialect_id={config['dialect_id']}&level={level}"
 
@@ -84,7 +87,7 @@ def get_quiz_data(request):
             format_data = format_quiz_data_2(data)
         return JsonResponse(format_data, safe=False)
     else:
-        return JsonResponse({"Error: ": "讀取資料失敗"}, status=500)
+        return JsonResponse({"detail": "讀取資料失敗"}, status=500)
 
 #把爬的資料用成我要的格式(第一部分)
 def format_quiz_data_1(data):
@@ -186,7 +189,7 @@ def get_tayal_imformation(request):
                     "isExam": "F"
                 })
     except Exception as e:
-        print(f"tacp API error: {e}")
+        logger.error("tacp API error: %s", e)
 
     # 族語認證（師範大學原住民族語言認證考試）
     try:
@@ -213,7 +216,7 @@ def get_tayal_imformation(request):
             })
             count += 1
     except Exception as e:
-        print(f"exam API error: {e}")
+        logger.error("exam API error: %s", e)
 
     cache.set(NEWS_CACHE_KEY, data, NEWS_CACHE_TTL)
     return JsonResponse(data, safe=False, json_dumps_params={'ensure_ascii': False, 'indent': 2})

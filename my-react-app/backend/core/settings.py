@@ -105,7 +105,7 @@ TEMPLATES = [
     },
 ]
 WSGI_APPLICATION = "core.wsgi.application"
-#ASGI_APPLICATION = "core.asgi.application"
+ASGI_APPLICATION = "core.asgi.application"
 
 # Database
 # WARNING: SQLite 僅適用於開發環境。
