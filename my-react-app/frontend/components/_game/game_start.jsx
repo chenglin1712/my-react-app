@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useRef, useState } from "react";
+import { auth } from "../../../firebase";
 import "../../static/css/_game/game_start.css";
 import Game_areaTest from "./game_areaTest";
 import Game_result from "./game_result";
@@ -83,6 +84,8 @@ function Game_Start({ tribe = "tayal" }) {
     setSubmitting(true);
     setSubmitError(null);
     try {
+      const token = await auth.currentUser?.getIdToken();
+      const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
       const response = await axios.post(
         "/CrosswordPuzzle/submit/",
         {
@@ -90,7 +93,8 @@ function Game_Start({ tribe = "tayal" }) {
           crossword_solution: curentAns,
           crossword_legend: crosswordLegend,
           crossword_grid_display: crosswordGridDisplay,
-        }
+        },
+        { headers: authHeaders }
       );
       setGameResults(response.data);
       setShowGameArea(false);

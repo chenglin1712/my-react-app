@@ -1,6 +1,8 @@
 import json
 import logging
+import os
 import re
+from django.conf import settings as django_settings
 from django.http import HttpResponse, JsonResponse
 from sqlalchemy import text
 from .crossword import Crossword, Word as CrosswordWord, word_list
@@ -9,6 +11,47 @@ from config.tribes import TRIBE_IDS as _ALL_TRIBE_IDS
 from fastAPI.routes.connect import SessionLocal
 
 logger = logging.getLogger(__name__)
+
+# ── Firebase Admin SDK（生產環境身份驗證，邏輯與 AIModel/views.py 一致）──
+_firebase_initialized = False
+
+
+def _ensure_firebase():
+    global _firebase_initialized
+    if _firebase_initialized:
+        return
+    sa_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
+    if not sa_path:
+        raise EnvironmentError(
+            "FIREBASE_SERVICE_ACCOUNT_PATH 未設定，"
+            "請在 .env 填入 Firebase 服務帳戶金鑰路徑。"
+        )
+    import firebase_admin
+    from firebase_admin import credentials
+    if not firebase_admin._apps:
+        cred = credentials.Certificate(sa_path)
+        firebase_admin.initialize_app(cred)
+    _firebase_initialized = True
+
+
+def verify_firebase_token(request):
+    """驗證 Firebase ID Token。DEBUG 模式下跳過驗證（開發環境用）。"""
+    if django_settings.DEBUG:
+        return {"uid": "dev-user"}, None
+
+    auth_header = request.META.get("HTTP_AUTHORIZATION", "")
+    if not auth_header.startswith("Bearer "):
+        return None, JsonResponse({"detail": "需要登入才能使用此功能"}, status=401)
+    token = auth_header[7:]
+    try:
+        _ensure_firebase()
+        from firebase_admin import auth as firebase_auth
+        decoded = firebase_auth.verify_id_token(token)
+        return decoded, None
+    except EnvironmentError as e:
+        return None, JsonResponse({"detail": str(e)}, status=503)
+    except Exception:
+        return None, JsonResponse({"detail": "身份驗證失敗，請重新登入"}, status=401)
 
 # 各族語對應的 tribe_id（UUID）。tayal 故意排除：泰雅語填字遊戲沿用內建
 # word_list（見 generate_crossword 的 fallback 分支），不查資料庫。
@@ -122,6 +165,10 @@ def generate_crossword(request):
 @csrf_exempt
 def submit_ans(request):
     if request.method == 'POST':
+        _, err_resp = verify_firebase_token(request)
+        if err_resp:
+            return err_resp
+
         data = json.loads(request.body)
         user_answers = data.get('user_answers')
         crossword_solution = data.get('crossword_solution')
