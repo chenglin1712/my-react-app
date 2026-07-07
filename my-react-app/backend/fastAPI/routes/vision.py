@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, HTTPException, Request
 import base64
 import logging
-import requests
+import httpx
 import threading
 from dotenv import load_dotenv
 import os
@@ -80,7 +80,8 @@ async def analyze_image(request: Request):
             ]
         }
 
-        response = requests.post(url, headers=headers, json=data)
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.post(url, headers=headers, json=data)
 
         result = response.json()
         if "responses" not in result or len(result["responses"]) == 0:

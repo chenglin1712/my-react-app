@@ -104,7 +104,7 @@ const RegisterForm = () => {
             <div className="register-box">
                 <h2 className="formTitle">註冊</h2>
                 <p className="register-subtitle">立即體驗源·語
-                    <button>
+                    <button type="button" onClick={() => alert("敬請期待")}>
                         <Footprints size={22} />訪客登入
                     </button>
                 </p>

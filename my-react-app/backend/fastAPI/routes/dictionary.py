@@ -945,52 +945,55 @@ async def proxy_audio(file_id: str):
         return Response(content=str(e), media_type="text/plain", status_code=500)
     
 
-@router.get("/debug_audio/{audio_id}")
-async def debug_audio(audio_id: str):
+# /debug_audio 只回傳內部除錯資訊（音檔真實 URL、狀態碼、bytes 內容），只在本機開發時註冊，
+# 正式環境（DJANGO_DEBUG=False）不掛載這個路由，避免暴露內部資訊。
+if os.getenv("DJANGO_DEBUG", "False") == "True":
+    @router.get("/debug_audio/{audio_id}")
+    async def debug_audio(audio_id: str):
 
-    try:
-        # 使用你原本的邏輯抓音檔
-        load_dotenv()
-        VITE_AUDIO_FILE_URL = os.getenv("VITE_AUDIO_FILE_URL")
-        first_url = VITE_AUDIO_FILE_URL + audio_id
+        try:
+            # 使用你原本的邏輯抓音檔
+            load_dotenv()
+            VITE_AUDIO_FILE_URL = os.getenv("VITE_AUDIO_FILE_URL")
+            first_url = VITE_AUDIO_FILE_URL + audio_id
 
-        async with httpx.AsyncClient(follow_redirects=False) as client:
-            res = await client.get(first_url)
+            async with httpx.AsyncClient(follow_redirects=False) as client:
+                res = await client.get(first_url)
 
-            # 判斷是否 redirect
-            if res.status_code in [301, 302, 303, 307, 308]:
-                final_url = res.headers.get("Location")
-            else:
-                final_url = res.text.strip()
+                # 判斷是否 redirect
+                if res.status_code in [301, 302, 303, 307, 308]:
+                    final_url = res.headers.get("Location")
+                else:
+                    final_url = res.text.strip()
 
-            if not final_url or "http" not in final_url:
+                if not final_url or "http" not in final_url:
+                    return {
+                        "success": False,
+                        "step": "resolve_redirect",
+                        "raw_text": res.text
+                    }
+
+            # 第二次請求真正的音檔
+            async with httpx.AsyncClient() as c2:
+                audio_res = await c2.get(final_url)
+
+                target_bytes = audio_res.content
+
+                # 回傳訊息（避免太大，只回前 50 bytes）
                 return {
-                    "success": False,
-                    "step": "resolve_redirect",
-                    "raw_text": res.text
+                    "success": True,
+                    "download_url": final_url,
+                    "status_code": audio_res.status_code,
+                    "content_type": audio_res.headers.get("Content-Type"),
+                    "bytes_length": len(target_bytes),
+                    "bytes_preview": list(target_bytes[:50])
                 }
 
-        # 第二次請求真正的音檔
-        async with httpx.AsyncClient() as c2:
-            audio_res = await c2.get(final_url)
-
-            target_bytes = audio_res.content
-
-            # 回傳訊息（避免太大，只回前 50 bytes）
+        except Exception as e:
             return {
-                "success": True,
-                "download_url": final_url,
-                "status_code": audio_res.status_code,
-                "content_type": audio_res.headers.get("Content-Type"),
-                "bytes_length": len(target_bytes),
-                "bytes_preview": list(target_bytes[:50])
+                "success": False,
+                "error": str(e)
             }
-
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e)
-        }
 
 
 @router.post("/sentence-audio/")
