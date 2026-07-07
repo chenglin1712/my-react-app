@@ -43,7 +43,6 @@ const App = () => {
                 const token = await auth.currentUser?.getIdToken();
                 return axios.post(import.meta.env.VITE_API_VISION_URL, formData, {
                     headers: {
-                        "Content-Type": "multipart/form-data",
                         ...(token ? { "Authorization": `Bearer ${token}` } : {}),
                     },
                 });
