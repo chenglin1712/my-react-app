@@ -27,11 +27,7 @@ const LoginForm = () => {
                 navigate("/");
             }, 1800);
         } catch (error) {
-            if (error.code.includes('auth/user-not-found')) {
-                alert("使用者不存在！");
-            } else if (error.code.includes('auth/wrong-password')) {
-                alert("密碼錯誤！");
-            } else if (error.code.includes('auth/invalid-credential')) {
+            if (error.code.includes('auth/invalid-credential')) {
                 alert("帳號或密碼錯誤，請檢查電子郵件和密碼是否正確！");
             } else {
                 alert("登入失敗: " + error.message);

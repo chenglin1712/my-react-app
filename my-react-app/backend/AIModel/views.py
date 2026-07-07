@@ -13,6 +13,7 @@ import datetime
 from fastAPI.routes.connect import SessionLocal
 from fastAPI.routes.model import Word
 from fastAPI.routes.word_data import load_explanation_items_for_words, load_audio_items_for_words
+from config.tribes import TRIBE_IDS
 
 logger = logging.getLogger(__name__)
 
@@ -329,7 +330,11 @@ def search_tayal_words_bulk(keywords: list) -> dict:
     if not keywords:
         return {}
 
-    word_dicts = _query_word_dicts(lambda db: db.query(Word).filter(Word.name.in_(keywords)).all())
+    word_dicts = _query_word_dicts(
+        lambda db: db.query(Word)
+        .filter(Word.name.in_(keywords), Word.tribe_id == TRIBE_IDS["tayal"])
+        .all()
+    )
 
     result_map = {}
     for wd in word_dicts:
