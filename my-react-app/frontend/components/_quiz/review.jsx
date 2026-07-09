@@ -100,8 +100,9 @@ const Review = () => {
                 <div style={{ width: "50%" }}>
                     <div className="review-nav">
                         {navs.map((nav, index) => {
-                            //關掉AI助手(index = 2)
-                            const isDisabled = index == 2 || (index > 0 && !selectedQuestion);
+                            //AI助手(index = 2) 功能尚未開放
+                            const isComingSoon = index == 2;
+                            const isDisabled = isComingSoon || (index > 0 && !selectedQuestion);
 
                             return (
                                 <div
@@ -110,6 +111,7 @@ const Review = () => {
                                     onClick={() => { if (!isDisabled) setNavIndex(index) }}
                                 >
                                     {nav}
+                                    {isComingSoon && <span className="nav-item-badge">即將推出</span>}
                                 </div>
                             );
                         })}

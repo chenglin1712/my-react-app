@@ -5,7 +5,6 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  cacheDir: 'C:/Users/yucheng/.vite-cache/my-react-app',
   optimizeDeps: {
     entries: ['index.html'],
   },

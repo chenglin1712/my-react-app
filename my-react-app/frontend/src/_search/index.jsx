@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Container, Alert, Spinner, Button } from 'react-bootstrap';
-import { authChanges } from "../../src/userServives/userServive";
+import { useAuth } from "../../src/userServives/authContext";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db, auth } from "../../../firebase";
 import "../../static/css/_search/index.css";
@@ -27,7 +27,7 @@ const App = () => {
   const [favoriteWords, setFavoriteWords] = useState(new Set());
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterLetter, setFilterLetter] = useState('');
-  const [user, setUser] = useState(null);
+  const { userData: user, updateUserData } = useAuth();
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const [frequencyFilter, setFrequencyFilter] = useState('');
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -78,21 +78,18 @@ const App = () => {
 
       await updateUserFavoritesCategory(user.uid, 1, newContent);
 
-      setUser(prevUser => {
-        if (!prevUser) return prevUser;
-        const newFavorites = prevUser.firestoreData.favorites.map(fav => {
-          if (fav.id === 1) {
-            return { ...fav, content: newContent };
-          }
-          return fav;
-        });
-        return {
-          ...prevUser,
-          firestoreData: {
-            ...prevUser.firestoreData,
-            favorites: newFavorites
-          }
-        };
+      const newFavorites = user.firestoreData.favorites.map(fav => {
+        if (fav.id === 1) {
+          return { ...fav, content: newContent };
+        }
+        return fav;
+      });
+      updateUserData({
+        ...user,
+        firestoreData: {
+          ...user.firestoreData,
+          favorites: newFavorites
+        }
       });
     } catch (err) {
       console.error('同步收藏失敗', err);
@@ -247,20 +244,18 @@ const App = () => {
     const saved = localStorage.getItem('favoriteWords');
     if (saved) setFavoriteWords(new Set(JSON.parse(saved)));
     handleSearch();
-    const unsubscribe = authChanges(async (userData) => {
-      //console.log("authChanges 回傳:", userData);
-      if (userData) {
-        setUser(userData);
-        const baseCategory = userData.firestoreData?.favorites?.find(fav => fav.id === 1);
-        const favoriteSet = new Set(baseCategory?.content || []);
-        setFavoriteWords(favoriteSet);
-      } else {
-        setUser(null);
-        setFavoriteWords(new Set());
-      }
-    });
-    return () => unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      const baseCategory = user.firestoreData?.favorites?.find(fav => fav.id === 1);
+      const favoriteSet = new Set(baseCategory?.content || []);
+      setFavoriteWords(favoriteSet);
+    } else {
+      setFavoriteWords(new Set());
+    }
+  }, [user]);
 
   const filterAndSortWords = (words) => {
     return words

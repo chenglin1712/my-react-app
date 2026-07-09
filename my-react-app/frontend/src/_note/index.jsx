@@ -7,12 +7,17 @@ import { useAuth } from "../../src/userServives/authContext";
 import "../../static/css/_note/notestyle.css";
 import "../../static/css/_note/toolbar.css";
 import "../../static/css/_note/buttons.css";
-import { Image } from "lucide-react";
+import { Image as ImageIcon } from "lucide-react";
 import DOMPurify from "dompurify";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import TextStyle from "@tiptap/extension-text-style";
+import Color from "@tiptap/extension-color";
+import ImageExtension from "@tiptap/extension-image";
+import FontSize from "./fontSizeExtension";
 
 function NotePage() {
   const navigate = useNavigate();
-  const contentRef = useRef(null);
   const { userData } = useAuth();
 
   const uid = userData?.uid || "guest";
@@ -24,6 +29,34 @@ function NotePage() {
   const [error, setError] = useState("");
 
   const LOCAL_KEY = `userNotes_${uid}`;
+
+  // onUpdate 是在 useEditor 建立時就固定的閉包，用 ref 保存最新的 notes/currentPage，
+  // 避免比對「是否有未儲存的更改」時讀到過期的值。
+  const notesRef = useRef(notes);
+  const currentPageRef = useRef(currentPage);
+  useEffect(() => { notesRef.current = notes; }, [notes]);
+  useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
+
+  const [isDirty, setIsDirty] = useState(false);
+  const [selectedImageFile, setSelectedImageFile] = useState(null);
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      TextStyle,
+      Color,
+      FontSize,
+      ImageExtension.configure({
+        HTMLAttributes: { style: "max-width: 30%; height: auto;" },
+      }),
+    ],
+    content: "<p></p>",
+    onUpdate: ({ editor }) => {
+      const currentHTML = editor.getHTML();
+      const originalHTML = notesRef.current[currentPageRef.current]?.content || "<p></p>";
+      setIsDirty(currentHTML !== originalHTML);
+    },
+  });
 
   useEffect(() => {
     const stored = localStorage.getItem(LOCAL_KEY);
@@ -40,35 +73,45 @@ function NotePage() {
     setLoading(false);
   }, [LOCAL_KEY]);
 
+  // 換頁時把編輯器內容換成該頁筆記，用筆記 id 當依據，
+  // 避免 currentPage 沒變但 notes 剛載入完成時漏掉初次同步。
+  const currentNoteId = notes[currentPage]?.id;
+  useEffect(() => {
+    if (!editor || currentNoteId == null) return;
+    editor.commands.setContent(notes[currentPage]?.content || "<p></p>", false);
+    setIsDirty(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentNoteId, editor]);
+
   const updateCurrentContent = () => {
-    if (!contentRef.current) return;
+    if (!editor) return;
     const updatedNotes = [...notes];
-    updatedNotes[currentPage].content = DOMPurify.sanitize(contentRef.current.innerHTML);
+    updatedNotes[currentPage].content = DOMPurify.sanitize(editor.getHTML());
     setNotes(updatedNotes);
     localStorage.setItem(LOCAL_KEY, JSON.stringify(updatedNotes));
   };
 
-  const [isDirty, setIsDirty] = useState(false);
-  const [selectedImageFile, setSelectedImageFile] = useState(null);
   const execStyle = (command, value = null) => {
-    if (command === "insertImage" && value) {
-      // 插入img
-      const sel = window.getSelection();
-      if (!sel || !sel.rangeCount) return;
-
-      const range = sel.getRangeAt(0);
-      const img = document.createElement("img");
-      img.src = value;
-      img.style.maxWidth = "30%";
-      img.style.height = "auto";
-      range.insertNode(img);
-
-      range.setStartAfter(img);
-      range.setEndAfter(img);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    } else {
-      document.execCommand(command, false, value);
+    if (!editor) return;
+    const chain = editor.chain().focus();
+    switch (command) {
+      case "bold":
+        chain.toggleBold().run();
+        break;
+      case "italic":
+        chain.toggleItalic().run();
+        break;
+      case "fontSize":
+        chain.setFontSize(value).run();
+        break;
+      case "foreColor":
+        chain.setColor(value).run();
+        break;
+      case "insertImage":
+        if (value) chain.setImage({ src: value }).run();
+        break;
+      default:
+        break;
     }
   };
 
@@ -124,15 +167,6 @@ function NotePage() {
 
   const handleSelectAll = () => setSelectedPages(notes.map((_, index) => index));
   const handleClearSelect = () => setSelectedPages([]);
-
-  //有尚未儲存的更改
-  const handleContentChange = () => {
-    if (!contentRef.current) return;
-    const currentHTML = contentRef.current.innerHTML;
-    const originalHTML = notes[currentPage]?.content || "<p></p>";
-
-    setIsDirty(currentHTML !== originalHTML);
-  };
 
   const handleShare = async () => {
     handleSave();
@@ -221,10 +255,10 @@ function NotePage() {
       <Row className="editor-toolbar">
         <Col xs="auto" className="group">
           <span className="group-label">大小</span>
-          <select onChange={(e) => execStyle("fontSize", e.target.value)}>
-            <option value="3">小</option>
-            <option value="4">中</option>
-            <option value="5">大</option>
+          <select onChange={(e) => execStyle("fontSize", e.target.value)} defaultValue="24px">
+            <option value="16px">小</option>
+            <option value="24px">中</option>
+            <option value="32px">大</option>
           </select>
         </Col>
         <Col xs="auto" className="group">
@@ -255,7 +289,7 @@ function NotePage() {
             className="btn-upload"
             onClick={() => document.getElementById("image-upload").click()}
           >
-            <Image size={20} />上傳圖片
+            <ImageIcon size={20} />上傳圖片
           </Button>
         </Col>
         <Col xs="auto" className="group">
@@ -283,16 +317,8 @@ function NotePage() {
             placeholder="請輸入筆記標題"
           />
 
-          {/* 編輯器：只保留 .note-text，不再包一層卡片 */}
-          <div
-            key={currentPage}
-            ref={contentRef}
-            className="note-text"
-            contentEditable
-            suppressContentEditableWarning
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentNote.content) }}
-            onInput={handleContentChange}
-          />
+          {/* 編輯區：只保留 .note-text，不再包一層卡片 */}
+          <EditorContent editor={editor} className="note-text" />
 
           {error && <Alert variant="danger" className="mt-3">{error}</Alert>}
         </Col>

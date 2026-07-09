@@ -113,6 +113,16 @@
     cursor: not-allowed;
 }
 
+.nav-item-badge {
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 10px;
+    background-color: #999;
+    color: #fff;
+    white-space: nowrap;
+}
+
 .review-table-container {
     margin: 10px;
     font-family: Arial, sans-serif;

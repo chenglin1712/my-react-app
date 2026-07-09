@@ -53,13 +53,19 @@ body {
 .note-text {
   border: 2px solid var(--brand-red);
   height: 60vh;
-  padding: 12px 14px;
   background-color: #fff;
   border-radius: 14px;
   overflow-y: auto;
+}
+
+/* TipTap 實際可編輯的節點是 .note-text 內的 .ProseMirror */
+.note-text .ProseMirror {
+  padding: 12px 14px;
+  min-height: 100%;
   font-size: 24px;
   line-height: 1.8;
   white-space: pre-wrap;
+  outline: none;
 }
 
 /* ---- 分享頁的內容樣式（純排版） ---- */

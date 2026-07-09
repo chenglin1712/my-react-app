@@ -7,7 +7,7 @@ import { FaHeart, FaRegHeart, FaPlayCircle } from 'react-icons/fa';
 import { doc, updateDoc } from "firebase/firestore";
 import { db, auth } from "../../../firebase";
 import { createAuthorizedAudio } from "../../utils/authAudio";
-import { authChanges } from "../../src/userServives/userServive";
+import { useAuth } from "../../src/userServives/authContext";
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import PermissionProtect from "../userServives/permissionProtect";
 import axios from 'axios';
@@ -583,7 +583,7 @@ const PAGE_SIZE = 50;
 const TRIBES = ['泰雅', '阿美', '布農', '噶瑪蘭', '排灣'];
 
 const App = () => {
-  const [user, setUser] = useState(null);
+  const { userData: user } = useAuth();
   const [favorites, setFavorites] = useState([]);
   const [activeTab, setActiveTab] = useState(1);
   const [allWords, setAllWords] = useState([]);
@@ -645,17 +645,15 @@ const App = () => {
   }, [selectedTribe]);
 
   useEffect(() => {
-    const unsubscribe = authChanges((userData) => {
-      if (userData) {
-        setUser(userData);
-        setFavorites(userData.firestoreData?.favorites || []);
-      }
-    });
+    if (user) {
+      setFavorites(user.firestoreData?.favorites || []);
+    }
+  }, [user]);
 
+  useEffect(() => {
     const timer = setTimeout(() => setDelayedCheck(true), 1500);
 
     return () => {
-      unsubscribe();
       clearTimeout(timer);
       if (audio) audio.pause();
     };

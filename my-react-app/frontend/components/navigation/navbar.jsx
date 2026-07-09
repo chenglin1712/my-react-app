@@ -15,6 +15,7 @@ const Navbar = () => {
 
   const [isUserOpen, setIsUserOpen] = useState(false);
   const sidebarRef = useRef(null);
+  const mobileSidebarRef = useRef(null);
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
@@ -157,7 +158,7 @@ const Navbar = () => {
               )
             }
             <div
-              ref={sidebarRef}
+              ref={mobileSidebarRef}
               className={`sidebar ${isUserOpen ? 'open' : ''}`}
             >
               <div className="sidebar-header">
@@ -178,7 +179,11 @@ const Navbar = () => {
         ))}
         <div className="menu-mobile-item" onClick={() => handleMobileNavigate("/note")}>
           <NotebookPen size={20} />
-          <span>筆記</span>
+          <span>寫筆記</span>
+        </div>
+        <div className="menu-mobile-item" onClick={() => handleMobileNavigate("/note/share")}>
+          <NotebookPen size={20} />
+          <span>筆記分享區</span>
         </div>
       </div >
     </nav >
