@@ -65,7 +65,7 @@ import other from "../../static/assets/images/other.png";
 const StarRating = ({ fre }) => {
   if (fre === null || fre === undefined) return null;
   let starCount = 0;
-  if (fre >= 0 && fre <= 50) starCount = 1;
+  if (fre >= 0 && fre <= 200) starCount = 1;
   else if (fre <= 400) starCount = 2;
   else if (fre <= 800) starCount = 3;
   else if (fre <= 1000) starCount = 4;
@@ -539,7 +539,7 @@ const useFilterAndSort = (allWords) => {
         const matchLetter = !state.filterLetter || tayal.startsWith(state.filterLetter);
         const fre=w.frequency || '';
         let starCount = 0;
-        if (fre >= 0 && fre <= 50) starCount = 1;
+        if (fre >= 0 && fre <= 200) starCount = 1;
         else if (fre <= 400) starCount = 2;
         else if (fre <= 800) starCount = 3;
         else if (fre <= 1000) starCount = 4;

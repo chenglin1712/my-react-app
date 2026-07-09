@@ -90,7 +90,7 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
                 <div className="paper-header">
                     <div className="paper-info">
                         <p>姓名：<span className="user-info">{displayName}</span></p>
-                        <div className="user-infoo">
+                        <div className="user-info-row">
                             <p>類型：
                                 <span className="user-info">{TRIBE_NAME[tribe] ?? ""} {displayData?.quiz?.title}</span>
                                 <span className="stars">

@@ -121,7 +121,7 @@ const App = () => {
                             ref={fileInputRef}
                             style={{ display: "none" }}
                         />
-                        <div className="mt-4 d-flex gap-2" style={{ alignItems: 'center,flex-start' }}>
+                        <div className="mt-4 d-flex gap-2" style={{ alignItems: 'flex-start' }}>
                             &nbsp; 
                             &nbsp; 
                             &nbsp; 
@@ -198,7 +198,7 @@ const App = () => {
                                     </svg>
                                 </div>
                                 <br></br>
-                                <h4 className="text-muted" style={{ marginTop: '10px',textColor:"#7B7B7B" }}>請選擇圖片</h4>
+                                <h4 className="text-muted" style={{ marginTop: '10px', color: "#7B7B7B" }}>請選擇圖片</h4>
                                 </div>
                             )}
                         </div>
