@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useLocation , useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
   Container, ListGroup, Alert, Spinner, Button,
-  Dropdown, DropdownButton, Offcanvas
+  Dropdown, Offcanvas
 } from 'react-bootstrap';
 import { FaHeart, FaRegHeart, FaPlayCircle, FaChevronDown, FaChevronUp } from "react-icons/fa";
-import { toggleFavoriteWord, authChanges } from "../../src/userServives/userServive";
+import { authChanges } from "../../src/userServives/userServive";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db, auth } from "../../../firebase";
 import { createAuthorizedAudio } from "../../utils/authAudio";
-import { Tabs, Tab, Row, Col } from 'react-bootstrap';
+import { Tabs, Tab } from 'react-bootstrap';
 import "../../static/css/_camera/result.css"; 
 
 import pronoun from "../../static/assets/images/pronoun.png";
@@ -143,7 +143,7 @@ const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFav
 );
 
 const App = () => {
-  const [query, setQuery] = useState('');
+  const [_query, _setQuery] = useState('');
   const location = useLocation();
   const selectedWords = useMemo(() => location.state?.selectedWords || [], [location.state?.selectedWords]);
   const tribe = location.state?.tribe || "tayal";
@@ -155,7 +155,7 @@ const App = () => {
   const [favoriteWords, setFavoriteWords] = useState(new Set());
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterLetter, setFilterLetter] = useState('');
-  const [audio, setAudio] = useState(null);
+  const audioRef = useRef(null);
   const [user, setUser] = useState(null);
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const [frequencyFilter, setFrequencyFilter] = useState('');
@@ -290,9 +290,9 @@ useEffect(() => {
     if (!fileId) return;
 
 
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
 
 
@@ -306,7 +306,7 @@ useEffect(() => {
     }
 
     newAudio.play().catch(err => console.error("播放失敗:", err));
-    setAudio(newAudio);
+    audioRef.current = newAudio;
   };
 
 const categoryGroups = {
@@ -412,8 +412,8 @@ const categoryGroups = {
 
 
 
-  const exactMatchFilteredCount = Object.values(definitions.exact_match_results).map(arr => filterAndSortWords(arr).length).reduce((a, b) => a + b, 0);
-  const fuzzyMatchFilteredCount = Object.values(definitions.fuzzy_match_results).flatMap(obj => Object.values(obj).map(list => filterAndSortWords(list).length)).reduce((a, b) => a + b, 0);
+  const _exactMatchFilteredCount = Object.values(definitions.exact_match_results).map(arr => filterAndSortWords(arr).length).reduce((a, b) => a + b, 0);
+  const _fuzzyMatchFilteredCount = Object.values(definitions.fuzzy_match_results).flatMap(obj => Object.values(obj).map(list => filterAndSortWords(list).length)).reduce((a, b) => a + b, 0);
 
   return (
     <Container className="p-4">

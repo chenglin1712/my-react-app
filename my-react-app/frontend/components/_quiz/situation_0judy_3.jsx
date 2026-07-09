@@ -27,6 +27,22 @@ const getPerformance = (score) => {
   return "不及格";
 };
 
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="situation-tooltip-box">
+        <p className="situation-tooltip-title">{`題型: ${label}`}</p>
+        {payload.map((entry, index) => (
+          <p key={index} style={{ color: entry.color }} className='situation-tooltip-subtitle'>
+            {`${entry.name}: ${entry.value}%`}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
 const SituationDashboard = ({ data, typeRatio }) => {
   const performanceData = data.map(item => ({
     ...item,
@@ -38,22 +54,6 @@ const SituationDashboard = ({ data, typeRatio }) => {
     value,
     color: typeMap[key].color
   }));
-
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="situation-tooltip-box">
-          <p className="situation-tooltip-title">{`題型: ${label}`}</p>
-          {payload.map((entry, index) => (
-            <p key={index} style={{ color: entry.color }} className='situation-tooltip-subtitle'>
-              {`${entry.name}: ${entry.value}%`}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
 
   const getPerformanceColor = (performance) => {
     switch (performance) {

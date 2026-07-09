@@ -1,16 +1,16 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, Volume2, CircleCheck, CircleX } from "lucide-react";
 import lottie from "lottie-web";
 import successAnimation from "../../src/animations/success.json";
 import correctAudio from "../../static/assets/_quiz/correct.mp3";
 import { createAuthorizedAudio } from "../../utils/authAudio";
 
-export default function WordMatch({ question, selected, checked, onSelect, onConfirm }) {
+export default function WordMatch({ question, _selected, _checked, onSelect, onConfirm }) {
   const [matches, setMatches] = useState({});
   const [selectedWord, setSelectedWord] = useState(null);
   const [isFinished, setIsFinished] = useState(false);
   const [wrongPair, setWrongPair] = useState(null);
-  const [audio, setAudio] = useState(null);
+  const audioRef = useRef(null);
 
   const [result, setResult] = useState("");
   const [showAnimation, setShowAnimation] = useState(false);
@@ -133,9 +133,9 @@ export default function WordMatch({ question, selected, checked, onSelect, onCon
     if (!fileId) return;
 
 
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
 
 
@@ -148,7 +148,7 @@ export default function WordMatch({ question, selected, checked, onSelect, onCon
     }
 
     newAudio.play().catch(() => {});
-    setAudio(newAudio);
+    audioRef.current = newAudio;
   };
 
   return (

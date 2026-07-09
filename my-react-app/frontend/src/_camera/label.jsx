@@ -14,7 +14,7 @@ const App = () => {
     const [labels, setLabels] = useState([]);
     const [selectedLabels, setSelectedLabels] = useState(new Set());
     const [error, setError] = useState(false);
-    const [useMockData, setUseMockData] = useState(false);
+    const [useMockData, _setUseMockData] = useState(false);
     const [loading, setLoading] = useState(false);
     useEffect(() => {
         if (!file) {
@@ -65,7 +65,7 @@ const App = () => {
                     setLoading(false); // 無論成功或失敗都關閉 loading
                 });
         }
-    }, [file, navigate]);
+    }, [file, navigate, useMockData]);
 
     const toggleLabelSelection = (label) => {
         setSelectedLabels((prev) => {

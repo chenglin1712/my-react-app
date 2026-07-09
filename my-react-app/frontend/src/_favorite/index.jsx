@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Container, Button, InputGroup, Form, Dropdown, Tabs, Tab, Offcanvas
 } from 'react-bootstrap';
@@ -125,7 +125,7 @@ const WordCardImage = ({ imageUrl, word, isFavorited, onToggleFavorite }) => {
   );
 };
 
-const WordCardInfo = ({ result, word, playAudio, category }) => (
+const WordCardInfo = ({ result, word, playAudio, _category }) => (
   <div className="favorite-word-info">
     <h3 className="tayal-word">
       {result.name || '無資料'}
@@ -258,7 +258,7 @@ const WordCardWithImg = ({ word, category, result, keyName, expandedWord, toggle
 };
 
 //搜尋篩選組件
-const SearchAndFilterControls = ({ tab, state, onStateChange, alphabet, isMobile, activeTabcat, setActiveTabcat, 
+const SearchAndFilterControls = ({ _tab, state, onStateChange, alphabet, isMobile, activeTabcat, setActiveTabcat,
    showCategories, setShowCategories, selectedSubCategory, setSelectedSubCategory, showFilterPanel, setShowFilterPanel }) => (
   <>
     <InputGroup className="mb-3">
@@ -448,6 +448,7 @@ const useTabState = (favorites) => {
       }
     });
     setTabStates(newTabStates);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [favorites]);
 
   const updateTabState = (tabId, key, value) => {
@@ -588,7 +589,7 @@ const App = () => {
   const [activeTab, setActiveTab] = useState(1);
   const [allWords, setAllWords] = useState([]);
   const [expandedWord, setExpandedWord] = useState(null);
-  const [audio, setAudio] = useState(null);
+  const audioRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [delayedCheck, setDelayedCheck] = useState(false);
@@ -655,7 +656,7 @@ const App = () => {
 
     return () => {
       clearTimeout(timer);
-      if (audio) audio.pause();
+      if (audioRef.current) audioRef.current.pause();
     };
   }, []);
 
@@ -669,9 +670,9 @@ const App = () => {
     if (!fileId) return;
 
 
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
 
 
@@ -684,7 +685,7 @@ const App = () => {
     }
 
     newAudio.play().catch(() => {});
-    setAudio(newAudio);
+    audioRef.current = newAudio;
   };
 
   const toggleFavorite = async (wordTayal, categoryId) => {

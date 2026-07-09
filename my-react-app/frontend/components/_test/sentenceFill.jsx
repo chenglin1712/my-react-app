@@ -1,7 +1,6 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { RectangleEllipsis, Volume2, Check, CircleCheck, CircleX } from "lucide-react";
 import { FaPlayCircle } from 'react-icons/fa';
-import { Button } from 'react-bootstrap';
 import lottie from "lottie-web";
 import successAnimation from "../../src/animations/success.json";
 import correctAudio from "../../static/assets/_quiz/correct.mp3";
@@ -11,7 +10,7 @@ export default function SentenceFill({ question, selected, checked, onSelect, on
   const [result, setResult] = useState("");
   const [showAnimation, setShowAnimation] = useState(false);
   const animation = useRef(null);
-  const [audio, setAudio] = useState(null);
+  const audioRef = useRef(null);
 
   // ✅ 成功動畫設定
   useEffect(() => {
@@ -37,9 +36,9 @@ export default function SentenceFill({ question, selected, checked, onSelect, on
     if (!fileId) return;
 
 
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
 
 
@@ -52,7 +51,7 @@ export default function SentenceFill({ question, selected, checked, onSelect, on
     }
 
     newAudio.play().catch(() => {});
-    setAudio(newAudio);
+    audioRef.current = newAudio;
   };
 
   const handleSelect = (word) => {
@@ -61,9 +60,9 @@ export default function SentenceFill({ question, selected, checked, onSelect, on
   };
 
   const handleConfirm = () => {
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
     const isCorrect = selected === question.answer;
     setResult(isCorrect ? "correct" : "wrong");

@@ -35,6 +35,11 @@ export default [
         'warn',
         { allowConstantExport: true },
       ],
+      // react-hooks v7 新增的 React Compiler 規則，專案未使用 React Compiler，降為 warn
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/immutability': 'warn',
+      'react-hooks/purity': 'off',
+      'react-hooks/static-components': 'warn',
     },
   },
 ]

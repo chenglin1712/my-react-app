@@ -50,6 +50,7 @@ import abstract from "../../../static/assets/images/abstract.png";
 // === 其他 ===
 import other from "../../../static/assets/images/other.png";
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const categoryGroups = {
   "語法與功能": [
     { name: "代名詞、指示詞", image: pronoun },

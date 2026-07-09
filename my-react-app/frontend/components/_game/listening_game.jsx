@@ -89,7 +89,7 @@ function ListeningGame({ tribe = "tayal" }) {
       });
       setQuestions(res.data.questions);
       return res.data.questions;
-    } catch (e) {
+    } catch {
       setError("題目載入失敗，請確認後端伺服器是否啟動。");
       return null;
     } finally {

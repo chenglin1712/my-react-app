@@ -1,15 +1,14 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Languages, Volume2, Check, CircleCheck, CircleX } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Languages, Check, CircleCheck, CircleX } from "lucide-react";
 import lottie from "lottie-web";
 import { FaPlayCircle } from 'react-icons/fa';
-import { Button } from 'react-bootstrap';
 import successAnimation from "../../src/animations/success.json";
 import correctAudio from "../../static/assets/_quiz/correct.mp3";
 import { createAuthorizedAudio } from "../../utils/authAudio";
 
 export default function WordTranslation({ question, selected, checked, onSelect, onConfirm }) {
    const [result, setResult] = useState("");
-    const [audio, setAudio] = useState(null);
+    const audioRef = useRef(null);
     const [showAnimation, setShowAnimation] = useState(false);
     const animation = useRef(null);
   useEffect(() => {
@@ -34,9 +33,9 @@ export default function WordTranslation({ question, selected, checked, onSelect,
     if (!fileId) return;
 
 
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
 
 
@@ -49,7 +48,7 @@ export default function WordTranslation({ question, selected, checked, onSelect,
     }
 
     newAudio.play().catch(() => {});
-    setAudio(newAudio);
+    audioRef.current = newAudio;
   };
 
   const handleSelect = (word) => {
@@ -57,9 +56,9 @@ export default function WordTranslation({ question, selected, checked, onSelect,
     onSelect(newSelection);
   };
   const handleConfirm = () => {
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
     const isCorrect = selected === question.answer;
     setResult(isCorrect ? "correct" : "wrong");

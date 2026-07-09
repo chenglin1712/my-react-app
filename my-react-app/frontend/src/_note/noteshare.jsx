@@ -215,7 +215,7 @@ export default function NoteShare() {
   };
 
   // 可切換的按讚（含未登入導向）
-  const toggleLike = async (e, note, source = "card") => {
+  const toggleLike = async (e, note, _source = "card") => {
     e.stopPropagation();
 
     if (!userData) {
@@ -346,7 +346,7 @@ export default function NoteShare() {
       {/* 卡片 */}
       <div className="ns-grid">
         {paginatedNotes.map((note) => {
-          const canInteract = userData && !isMine(note);
+          const _canInteract = userData && !isMine(note);
           const iLike = likedByMe(note);
 
           return (

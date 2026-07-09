@@ -1,6 +1,5 @@
-import React, { useState, useRef, useEffect  } from "react";
+import { useState, useRef, useEffect  } from "react";
 import { ArrowDownUp, Volume2, Check, CircleCheck, CircleX } from "lucide-react";
-import { Button } from 'react-bootstrap';
 import { FaPlayCircle } from 'react-icons/fa';
 import {
   DndContext,
@@ -104,11 +103,11 @@ function DroppableArea({ id, children, label }) {
 }
 
 // 主元件
-export default function SentenceOrder({ question, selected, checked, onSelect, onConfirm }) {
+export default function SentenceOrder({ question, _selected, checked, onSelect, onConfirm }) {
   const [bank, setBank] = useState(question.words.map((w) => w.word));
   const [zone, setZone] = useState([]);
   const [movingWordId, setMovingWordId] = useState(null);
-  const [audio, setAudio] = useState(null);
+  const audioRef = useRef(null);
 
   const sensors = useSensors(useSensor(PointerSensor));
 
@@ -186,9 +185,9 @@ export default function SentenceOrder({ question, selected, checked, onSelect, o
     if (!fileId) return;
 
 
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
 
 
@@ -201,13 +200,13 @@ export default function SentenceOrder({ question, selected, checked, onSelect, o
     }
 
     newAudio.play().catch(() => {});
-    setAudio(newAudio);
+    audioRef.current = newAudio;
   };
 
   const handleConfirm = () => {
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
     const isCorrect = JSON.stringify(zone) === JSON.stringify(question.answer);
     setResult(isCorrect ? "correct" : "wrong");

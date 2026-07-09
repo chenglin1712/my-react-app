@@ -23,7 +23,7 @@ function NotePage() {
   const uid = userData?.uid || "guest";
   const [notes, setNotes] = useState([]);
   const [currentPage, setCurrentPage] = useState(0);
-  const [isEditing, setIsEditing] = useState(true);
+  const [_isEditing, setIsEditing] = useState(true);
   const [selectedPages, setSelectedPages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -210,7 +210,7 @@ function NotePage() {
         content: DOMPurify.sanitize(p.content || ""),
       }));
 
-      const docRef = await addDoc(collection(db, "sharedNotes"), {
+      await addDoc(collection(db, "sharedNotes"), {
         pages: sanitizedPages,
         preview: DOMPurify.sanitize(pagesToShare[0]?.content || "<p></p>"),
         image: uploadedImageUrl || "",

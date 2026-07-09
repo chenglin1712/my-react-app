@@ -1,4 +1,3 @@
-import React from "react";
 import { PlayCircle, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import "../../static/css/_quiz/quiz_recommon_start.css";

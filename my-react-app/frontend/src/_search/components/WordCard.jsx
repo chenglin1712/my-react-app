@@ -1,6 +1,7 @@
 import { ListGroup, Button } from 'react-bootstrap';
 import { FaHeart, FaRegHeart, FaPlayCircle } from 'react-icons/fa';
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const renderStars = (fre) => {
   if (fre === null || fre === undefined) return null;
   let starCount = 0;

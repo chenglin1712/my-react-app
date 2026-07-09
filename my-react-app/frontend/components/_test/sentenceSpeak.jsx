@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Mic , Volume2, Check, CircleCheck, CircleX } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Mic, Check, CircleCheck, CircleX } from "lucide-react";
 import { FaMicrophone, FaStop, FaPlayCircle, FaRedo } from 'react-icons/fa';
 import lottie from "lottie-web";
 import successAnimation from "../../src/animations/success.json";
@@ -7,11 +7,11 @@ import correctAudio from "../../static/assets/_quiz/correct.mp3";
 import { auth } from "../../../firebase";
 import { createAuthorizedAudio } from "../../utils/authAudio";
 
-export default function SentenceSpeak({ question, selected, checked, onSelect, onConfirm }) {
+export default function SentenceSpeak({ question, _selected, checked, onSelect, onConfirm }) {
   const [audioBlob, setAudioBlob] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
   const [recording, setRecording] = useState(false);
-  const [audio, setAudio] = useState(null);
+  const audioRef = useRef(null);
   const mediaRecorder = useRef(null);
   const chunks = useRef([]);
   const [result, setResult] = useState(null);
@@ -53,9 +53,9 @@ export default function SentenceSpeak({ question, selected, checked, onSelect, o
     if (!fileId) return;
 
 
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
 
 
@@ -68,7 +68,7 @@ export default function SentenceSpeak({ question, selected, checked, onSelect, o
     }
 
     newAudio.play().catch(() => {});
-    setAudio(newAudio);
+    audioRef.current = newAudio;
   };
   // ▶ 播放自己的錄音
   const playUserAudio = () => {
@@ -84,9 +84,9 @@ export default function SentenceSpeak({ question, selected, checked, onSelect, o
   };  
   // 📤 送到後端比對
   const submitSpeaking = async () => {
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
     if (!audioBlob || submitting) return;
 

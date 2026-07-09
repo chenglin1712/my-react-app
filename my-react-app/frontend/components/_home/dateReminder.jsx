@@ -5,9 +5,45 @@ import {
   Button
 } from 'react-bootstrap';
 
+const examSchedule = [
+    {
+        phase: '報名',
+        date: new Date('2025-09-12'),
+        // date: new Date(),
+        endDate: new Date('2025-10-03'),
+        icon: <User className="w-4 h-4" />,
+    },
+    {
+        phase: '准考證',
+        date: new Date('2025-11-17'),
+        icon: <Mail className="w-4 h-4" />,
+    },
+    {
+        phase: '測驗',
+        date: new Date('2025-12-06'),
+        icon: <FileText className="w-4 h-4" />,
+    },
+    {
+        phase: '成績',
+        date: new Date('2026-02-13'),
+        icon: <Calendar className="w-4 h-4" />,
+    },
+    {
+        phase: '複查',
+        date: new Date('2026-02-13'),
+        endDate: new Date('2026-03-06'),
+        icon: <FileText className="w-4 h-4" />,
+    },
+    {
+        phase: '證書',
+        date: new Date('2026-03-23'),
+        icon: <Award className="w-4 h-4" />,
+    }
+];
+
 const DateReminder = () => {
     const [currentTime, setCurrentTime] = useState(new Date());
-    const [toastList, setToastList] = useState([]); 
+    const [toastList, setToastList] = useState([]);
     const [dismissedPhases, setDismissedPhases] = useState(() => {
         const stored = localStorage.getItem("dismissedPhases");
         return stored ? JSON.parse(stored) : [];
@@ -15,48 +51,21 @@ const DateReminder = () => {
     const [doNotRemindMap, setDoNotRemindMap] = useState({});
     const notifiedRef = useRef({});
 
-    const examSchedule = [
-        {
-            phase: '報名',
-            date: new Date('2025-09-12'),
-            // date: new Date(),
-            endDate: new Date('2025-10-03'),
-            icon: <User className="w-4 h-4" />,
-        },
-        {
-            phase: '准考證',
-            date: new Date('2025-11-17'),
-            icon: <Mail className="w-4 h-4" />,
-        },
-        {
-            phase: '測驗',
-            date: new Date('2025-12-06'),
-            icon: <FileText className="w-4 h-4" />,
-        },
-        {
-            phase: '成績',
-            date: new Date('2026-02-13'),
-            icon: <Calendar className="w-4 h-4" />,
-        },
-        {
-            phase: '複查',
-            date: new Date('2026-02-13'),
-            endDate: new Date('2026-03-06'),
-            icon: <FileText className="w-4 h-4" />,
-        },
-        {
-            phase: '證書',
-            date: new Date('2026-03-23'),
-            icon: <Award className="w-4 h-4" />,
-        }
-    ];
-
     useEffect(() => {
         const timer = setInterval(() => {
             setCurrentTime(new Date());
         }, 60000);
         return () => clearInterval(timer);
     }, []);
+
+    const isToday = (someDate) => {
+        const today = new Date();
+        return (
+            someDate.getFullYear() === today.getFullYear() &&
+            someDate.getMonth() === today.getMonth() &&
+            someDate.getDate() === today.getDate()
+        );
+    };
 
     useEffect(() => {
         const newToasts = [];
@@ -83,15 +92,6 @@ const DateReminder = () => {
             setToastList(prev => [...prev, ...newToasts]);
         }
     }, [currentTime, dismissedPhases]);
-
-    const isToday = (someDate) => {
-        const today = new Date();
-        return (
-            someDate.getFullYear() === today.getFullYear() &&
-            someDate.getMonth() === today.getMonth() &&
-            someDate.getDate() === today.getDate()
-        );
-    };
 
     const calculateDaysLeft = (targetDate) => {
         const difference = targetDate - currentTime;

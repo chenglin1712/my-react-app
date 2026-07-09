@@ -1,4 +1,3 @@
-import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CheckCircle, XCircle, RefreshCw, BookOpen, Check, Timer, ChartColumn } from "lucide-react";
 import "../../static/css/_quiz/quiz_recommon_result.css";

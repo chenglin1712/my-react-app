@@ -1,6 +1,6 @@
 import "../../static/css/_quiz/review_AI.css"
-import { useState, useEffect } from "react";
-import { UserCircle, Send, Bot, X } from "lucide-react";
+import { useState } from "react";
+import { Send, Bot, X } from "lucide-react";
 
 const TRIBE_NAME = { tayal: "泰雅", amis: "阿美", bunun: "布農", kavalan: "噶瑪蘭", paiwan: "排灣" };
 
