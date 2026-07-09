@@ -1,0 +1,6 @@
+/* Preflight (Tailwind's base reset) is intentionally omitted: this app already
+   relies on Bootstrap + hand-written CSS for element defaults across many
+   pages, so a global reset would ripple beyond the components that actually
+   use Tailwind utility classes. */
+@import "tailwindcss/theme.css";
+@import "tailwindcss/utilities.css";

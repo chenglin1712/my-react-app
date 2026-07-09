@@ -65,6 +65,7 @@ const Panel = ({ tribe = "tayal" }) => {
                             setDataLen(qLen);
                             setUserAnswers(Array(qLen).fill(null));
                             setUserStars(Array(qLen).fill("F"));
+                            setCurrentQuestionIndex(0);
                         }, 1000);
                     } else {
                         setIsLoading(false);
@@ -81,7 +82,7 @@ const Panel = ({ tribe = "tayal" }) => {
         return () => {
             isMounted = false;
         };
-    }, [retryCount]);
+    }, [level, tribe, retryCount]);
 
     //測驗資料傳至資料庫
     useEffect(() => {

@@ -285,6 +285,7 @@ function NotePage() {
 
           {/* 編輯器：只保留 .note-text，不再包一層卡片 */}
           <div
+            key={currentPage}
             ref={contentRef}
             className="note-text"
             contentEditable
