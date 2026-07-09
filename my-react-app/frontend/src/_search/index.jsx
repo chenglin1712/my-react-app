@@ -42,7 +42,7 @@ const App = () => {
 
   const { playAudio, playSentence, failedAudio } = useAudioPlayback(selectedTribe, setError);
 
-  const tribes = ['泰雅', '阿美', '布農', '葛瑪蘭', '排灣'];
+  const tribes = ['泰雅', '阿美', '布農', '噶瑪蘭', '排灣'];
 
 
 
@@ -119,7 +119,7 @@ const App = () => {
     await updateDoc(userDocRef, { favorites: newFavorites });
   }
 
-  const TRIBES_WITH_DATA = ['泰雅', '阿美', '布農', '葛瑪蘭', '排灣'];
+  const TRIBES_WITH_DATA = ['泰雅', '阿美', '布農', '噶瑪蘭', '排灣'];
 
   // 「全部詞條」瀏覽（沒有輸入關鍵字）：字母／詞頻／分類／收藏篩選與排序都交給後端做，
   // 這裡只帶目前的篩選條件 + limit/offset 向 /dictionary/all/ 要一頁資料。

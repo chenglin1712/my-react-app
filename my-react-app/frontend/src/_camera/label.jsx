@@ -10,6 +10,7 @@ const App = () => {
     const navigate = useNavigate();
     const image = location.state?.image;
     const file = location.state?.file;
+    const tribe = location.state?.tribe || "tayal";
     const [labels, setLabels] = useState([]);
     const [selectedLabels, setSelectedLabels] = useState(new Set());
     const [error, setError] = useState(false);
@@ -175,7 +176,7 @@ const App = () => {
                                 disabled={selectedLabels.size === 0}
                                 onClick={() =>
                                     navigate("/camera/result", {
-                                        state: { selectedWords: Array.from(selectedLabels) },
+                                        state: { selectedWords: Array.from(selectedLabels), tribe },
                                     })
                                 }
                             >

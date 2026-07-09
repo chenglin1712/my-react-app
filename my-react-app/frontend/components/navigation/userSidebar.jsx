@@ -14,7 +14,7 @@ const UserSidebar = ({ userData, closeSidebar }) => {
 
     const menuItems = [
         { id: 'favorites', label: '個人詞語庫', icon: <Heart size={20} /> },
-        { id: 'bot', label: '泰雅助手', icon: <Bot size={20} /> },
+        { id: 'bot', label: 'AI 助手', icon: <Bot size={20} /> },
         { id: 'calendar', label: '行事曆', icon: <Calendar size={20} /> }
     ];
 
@@ -86,7 +86,7 @@ const UserSidebar = ({ userData, closeSidebar }) => {
 
                 {/* 底部資訊 */}
                 <div className="p-3 border-t text-center text-sm" style={{ borderColor: "rgba(232, 195, 158, 0.314)", color: "#543729" }}>
-                    ⓘ 泰雅族語學習平台
+                    ⓘ 原住民族語學習平台
                 </div>
             </div>
 

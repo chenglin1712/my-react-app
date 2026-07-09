@@ -146,6 +146,7 @@ const App = () => {
   const [query, setQuery] = useState('');
   const location = useLocation();
   const selectedWords = useMemo(() => location.state?.selectedWords || [], [location.state?.selectedWords]);
+  const tribe = location.state?.tribe || "tayal";
 
   const [definitions, setDefinitions] = useState({ exact_match_results: {}, fuzzy_match_results: {} });
   const [loading, setLoading] = useState(false);
@@ -173,7 +174,7 @@ const App = () => {
 
     setLoading(true);
     auth.currentUser?.getIdToken()
-      .then(token => axios.post(import.meta.env.VITE_API_SEARCH_KEYS_URL, { words: selectedWords }, {
+      .then(token => axios.post(import.meta.env.VITE_API_SEARCH_KEYS_URL, { words: selectedWords, tribe }, {
         headers: token ? { "Authorization": `Bearer ${token}` } : {},
       }))
       .then(response => {
@@ -186,7 +187,7 @@ const App = () => {
         setError("查詢失敗: " + (err.response?.data?.detail || err.message));
       })
       .finally(() => setLoading(false));
-  }, [selectedWords]);
+  }, [selectedWords, tribe]);
 
   const toggleExpand = (key) => setExpandedWord(prev => (prev === key ? null : key));
 

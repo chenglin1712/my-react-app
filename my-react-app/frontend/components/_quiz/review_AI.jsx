@@ -2,13 +2,16 @@ import "../../static/css/_quiz/review_AI.css"
 import { useState, useEffect } from "react";
 import { UserCircle, Send, Bot, X } from "lucide-react";
 
-const Discussion = () => {
+const TRIBE_NAME = { tayal: "泰雅", amis: "阿美", bunun: "布農", kavalan: "噶瑪蘭", paiwan: "排灣" };
+
+const Discussion = ({ tribe = "tayal" }) => {
+    const tribeName = TRIBE_NAME[tribe] || "族語";
     const [messages, setMessages] = useState([
         {
             id: 1,
             sender: "assistant",
             type: "intro",
-            text: "哈囉！我是泰雅助手 👋 有什麼想問的嗎？",
+            text: "哈囉！我是AI助手 👋 有什麼想問的嗎？",
         }
     ]);
     const [input, setInput] = useState("");
@@ -35,7 +38,7 @@ const Discussion = () => {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ message: input }),
+                body: JSON.stringify({ message: input, tribe }),
             });
 
             if (!res.ok) {
@@ -113,7 +116,7 @@ const Discussion = () => {
     return (
         <div className="assistant-layout">
             <div className="assistant-header">
-                <h4><Bot size={20} />泰雅助手</h4>
+                <h4><Bot size={20} />{tribeName}AI助手</h4>
             </div>
 
             <div className="assistant-messages">

@@ -6,7 +6,7 @@ const TRIBES = [
   { name: "泰雅", color: "#9B1B30", hasGame: true,  route: "/game/pronunciation/tayal" },
   { name: "阿美", color: "#D4890A", hasGame: true,  route: "/game/pronunciation/amis" },
   { name: "布農", color: "#4E7F63", hasGame: true,  route: "/game/pronunciation/bunun" },
-  { name: "葛瑪蘭", color: "#4A7FA5", hasGame: true,  route: "/game/pronunciation/kavalan" },
+  { name: "噶瑪蘭", color: "#4A7FA5", hasGame: true,  route: "/game/pronunciation/kavalan" },
   { name: "排灣", color: "#6B4FAA", hasGame: true,  route: "/game/pronunciation/paiwan" },
 ];
 

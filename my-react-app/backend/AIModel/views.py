@@ -13,7 +13,7 @@ import datetime
 from fastAPI.routes.connect import SessionLocal
 from fastAPI.routes.model import Word
 from fastAPI.routes.word_data import load_explanation_items_for_words, load_audio_items_for_words
-from config.tribes import TRIBE_IDS
+from config.tribes import TRIBE_IDS, TRIBE_MAP
 
 logger = logging.getLogger(__name__)
 
@@ -126,11 +126,14 @@ def tayal_chat(request):
             common_errors = user_stats.get("common_errors", [])
             level       = user_stats.get("level", "beginner")
 
+            tribe = body.get("tribe", "tayal")
+            tribe_name = TRIBE_MAP.get(tribe, "泰雅語")
+
             today = datetime.date.today()
             tomorrow = (today + datetime.timedelta(days=1)).isoformat()
 
             prompt = f"""
-            你是一位泰雅語老師。你有兩種回應模式：
+            你是一位{tribe_name}老師。你有兩種回應模式：
             ### 模式一：一般對話與學習狀況分析 (預設)
             當使用者進行一般對話，或詢問 "想了解學習狀況" 時：
             1.  根據以下使用者資料，用對話方式進行正向引導（正向，100字內，不用Markdown或換行符號）。
@@ -150,7 +153,7 @@ def tayal_chat(request):
             4.  JSON 格式必須如下 (這是前端需要的格式)：
             {{
                 "type":"study_plan",
-                "title": "（計畫標題，例如：泰雅語一週讀書計畫）",
+                "title": "（計畫標題，例如：{tribe_name}一週讀書計畫）",
                 "events": [
                     {{
                     "summary": "（第一天的學習任務）",
@@ -240,20 +243,24 @@ def review_tayal_chat(request):
             # 依空格切詞
             words = [w for w in user_message.split(" ") if w]
 
+            tribe = body.get("tribe", "tayal")
+            tribe_id = TRIBE_IDS.get(tribe, TRIBE_IDS["tayal"])
+            tribe_name = TRIBE_MAP.get(tribe, "泰雅語")
+
             # 一次查詢所有詞（避免 N 次資料庫連線）
-            word_map = search_tayal_words_bulk(words)
+            word_map = search_tayal_words_bulk(words, tribe_id)
             relevant_words = [
                 word_map.get(w, {"tayal": w, "chinese": "", "audio": ""})
                 for w in words
             ]
 
             # 拼成 prompt context
-            words_context = "**泰雅語詞彙庫參考資料：**\n"
+            words_context = f"**{tribe_name}詞彙庫參考資料：**\n"
             for w in relevant_words:
                 words_context += f"- {w['tayal']} : {w['chinese']}\n"
 
             prompt = f"""
-                你是一位泰雅語老師，幫助學生理解句子。
+                你是一位{tribe_name}老師，幫助學生理解句子。
                 使用者已經有句子的完整中文翻譯，你的任務不是重複翻譯，而是提供額外的補充說明，例如：
                 - 詞彙用法
                 - 語法結構
@@ -325,14 +332,14 @@ def _query_word_dicts(query_fn) -> list:
         db.close()
 
 
-def search_tayal_words_bulk(keywords: list) -> dict:
+def search_tayal_words_bulk(keywords: list, tribe_id: str = TRIBE_IDS["tayal"]) -> dict:
     """查詢多個關鍵詞，一次開啟連線，回傳 {keyword: word_dict} 映射。"""
     if not keywords:
         return {}
 
     word_dicts = _query_word_dicts(
         lambda db: db.query(Word)
-        .filter(Word.name.in_(keywords), Word.tribe_id == TRIBE_IDS["tayal"])
+        .filter(Word.name.in_(keywords), Word.tribe_id == tribe_id)
         .all()
     )
 

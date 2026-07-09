@@ -41,7 +41,7 @@ const App = () => {
             <div className="banner-content">
                 <h1 className="banner-system-name">源·語</h1>
                 <p className="banner-system-desc">
-                    《源·語》是一套為想學習泰雅族語的AI互動學習平台，
+                    《源·語》是一套為想學習原住民族語的AI互動學習平台，
                     涵蓋影像辨識、詞彙遊戲及測驗學習等功能，
                     是教師尋找教學資源、學生自主學習的選擇之一！
                 </p>

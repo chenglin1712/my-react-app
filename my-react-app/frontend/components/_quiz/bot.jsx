@@ -8,12 +8,21 @@ import { useAuth } from "../../src/userServives/authContext";
 import { getUserSituation } from "../../src/userServives/uploadDb";
 import { auth } from "../../../firebase";
 
+const TRIBES = [
+    { slug: "tayal", name: "泰雅" },
+    { slug: "amis", name: "阿美" },
+    { slug: "bunun", name: "布農" },
+    { slug: "kavalan", name: "噶瑪蘭" },
+    { slug: "paiwan", name: "排灣" },
+];
+
 const Advice = ({ onClose }) => {
     const navigate = useNavigate();
     const handleClose = onClose ?? (() => navigate(-1));
     const { userData } = useAuth();
+    const [tribe, setTribe] = useState("tayal");
     const [messages, setMessages] = useState([
-        { id: 1, text: "lokah su 你好！我是您的泰雅AI助手，有什麼我可以幫您的嗎？", role: "bot" }
+        { id: 1, text: "lokah su 你好！我是您的族語 AI 助手，有什麼我可以幫您的嗎？", role: "bot" }
     ]);
     const [input, setInput] = useState("");
     const [isType, setIsType] = useState(false);
@@ -62,7 +71,7 @@ const Advice = ({ onClose }) => {
 
     const suggestions = [
         "我想了解我的學習狀況",
-        "介紹泰雅族的編織藝術",
+        "介紹這個族語的文化特色",
         "幫我排一週讀書計畫"
     ];
 
@@ -88,7 +97,7 @@ const Advice = ({ onClose }) => {
                     "Content-Type": "application/json",
                     ...(token ? { "Authorization": `Bearer ${token}` } : {}),
                 },
-                body: JSON.stringify({ message: userText, user_stats: userStats }),
+                body: JSON.stringify({ message: userText, user_stats: userStats, tribe }),
             });
 
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -145,9 +154,18 @@ const Advice = ({ onClose }) => {
                         <Bot />
                     </div>
                     <div className="header-info">
-                        <h2>泰雅智慧助手</h2>
+                        <h2>{TRIBES.find((t) => t.slug === tribe)?.name}智慧助手</h2>
                         <p className="status online">在線</p>
                     </div>
+                    <select
+                        value={tribe}
+                        onChange={(e) => setTribe(e.target.value)}
+                        style={{ position: "relative", zIndex: 1, borderRadius: 6, border: "none", padding: "4px 6px" }}
+                    >
+                        {TRIBES.map((t) => (
+                            <option key={t.slug} value={t.slug}>{t.name}語</option>
+                        ))}
+                    </select>
                 </div>
 
                 <div className="messages-container">

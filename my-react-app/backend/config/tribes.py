@@ -34,5 +34,10 @@ for _t in TRIBES:
     TRIBE_MAP[_t.slug] = _t.full_name
     TRIBE_MAP[_t.short_name] = _t.full_name
 
+# dictionary.db 的 tribe.name 沿用舊譯名「葛瑪蘭語」（見 kavalan_bank.py 開頭說明），
+# 但「噶瑪蘭」才是正確漢字，前端一律改顯示「噶瑪蘭」後，這裡補一個別名，
+# 讓兩種拼法都能查到同一個 tribe，不必動到既有 DB 資料
+TRIBE_MAP["噶瑪蘭"] = TRIBE_MAP["葛瑪蘭"]
+
 # 英文代稱 -> tribe_id UUID（原本各檔案的 TRIBE_IDS）
 TRIBE_IDS = {_t.slug: _t.id for _t in TRIBES}

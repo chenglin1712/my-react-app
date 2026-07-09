@@ -1,14 +1,23 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Container, Row, Col } from "react-bootstrap";
+import { Button, Container, Row, Col, Dropdown } from "react-bootstrap";
 import pexelsPhoto from '../../static/assets/pexels-photo.webp';
+
+const TRIBES = [
+    { slug: "tayal", name: "泰雅" },
+    { slug: "amis", name: "阿美" },
+    { slug: "bunun", name: "布農" },
+    { slug: "kavalan", name: "噶瑪蘭" },
+    { slug: "paiwan", name: "排灣" },
+];
 
 const App = () => {
     const [image, setImage] = useState(null);
     const [file, setFile] = useState(null);
     const [inputKey, setInputKey] = useState(Date.now());
-    const fileInputRef = useRef(null); 
+    const fileInputRef = useRef(null);
     const [fileName, setFileName] = useState("請選擇圖片");
+    const [tribe, setTribe] = useState("tayal");
     const navigate = useNavigate();
 
     const handleImageChange = (event) => {
@@ -49,7 +58,7 @@ const App = () => {
             const formData = new FormData();
             formData.append("image", file);
 
-            navigate("/camera/label", { state: { image: image, file: file } });
+            navigate("/camera/label", { state: { image: image, file: file, tribe } });
         }
     };
 
@@ -88,9 +97,18 @@ const App = () => {
                             <h3 className="fw-bolder text-secondary">學習更有趣</h3>
                             <br />
                             <h1 className="display-6 fw-bolder">打造專屬你的</h1>
-                            <h1 className="display-5 fw-bolder text-danger">《ATAYAL單字卡》</h1>
+                            <h1 className="display-5 fw-bolder text-danger">《族語單字卡》</h1>
                             <br />
-                            <br />
+                            <Dropdown onSelect={(val) => setTribe(val)}>
+                                <Dropdown.Toggle variant="outline-secondary" size="sm">
+                                    族語：{TRIBES.find((t) => t.slug === tribe)?.name}
+                                </Dropdown.Toggle>
+                                <Dropdown.Menu>
+                                    {TRIBES.map((t) => (
+                                        <Dropdown.Item key={t.slug} eventKey={t.slug}>{t.name}</Dropdown.Item>
+                                    ))}
+                                </Dropdown.Menu>
+                            </Dropdown>
                             <br />
                         </div>
 

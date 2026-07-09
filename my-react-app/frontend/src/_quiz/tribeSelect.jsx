@@ -29,7 +29,7 @@ const TRIBES = [
   },
   {
     id: "kavalan",
-    name: "葛瑪蘭",
+    name: "噶瑪蘭",
     subtitle: "Kavalan",
     emoji: "📝",
     available: true,

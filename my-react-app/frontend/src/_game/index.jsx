@@ -6,7 +6,7 @@ const GAMES = [
   {
     id: "vocabulary",
     title: "詞彙遊戲",
-    subtitle: "Tninun ATAYAL",
+    subtitle: "五大族語皆可挑戰",
     desc: "從族語詞彙中挑選正確對應，訓練詞彙記憶能力",
     emoji: "🧵",
     available: true,
@@ -15,7 +15,7 @@ const GAMES = [
   {
     id: "listening",
     title: "聽力遊戲",
-    subtitle: "Misaniq ATAYAL",
+    subtitle: "五大族語皆可挑戰",
     desc: "聆聽族語發音，辨識正確詞彙，訓練耳朵的敏銳度",
     emoji: "🎧",
     available: true,
@@ -24,7 +24,7 @@ const GAMES = [
   {
     id: "pronunciation",
     title: "發音練習",
-    subtitle: "Qmisan ATAYAL",
+    subtitle: "五大族語皆可挑戰",
     desc: "跟著發音範本錄音，AI 即時評分你的發音準確度",
     emoji: "🎤",
     available: true,
@@ -33,7 +33,7 @@ const GAMES = [
   {
     id: "sentence",
     title: "句型練習",
-    subtitle: "Lmuhuw ATAYAL",
+    subtitle: "五大族語皆可挑戰",
     desc: "閱讀族語例句，選出正確的中文意思，訓練句型理解能力",
     emoji: "📖",
     available: true,

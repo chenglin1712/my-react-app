@@ -580,7 +580,7 @@ const useFilterAndSort = (allWords) => {
 };
 
 const PAGE_SIZE = 50;
-const TRIBES = ['泰雅', '阿美', '布農', '葛瑪蘭', '排灣'];
+const TRIBES = ['泰雅', '阿美', '布農', '噶瑪蘭', '排灣'];
 
 const App = () => {
   const [user, setUser] = useState(null);

@@ -9,7 +9,7 @@ import Comp_atayalAI from "./review_AI"
 const Review = () => {
     const [situations, setSituations] = useState([]);
     const [loading, setLoading] = useState(true);
-    const navs = ["測驗紀錄", "討論", "泰雅助手"];
+    const navs = ["測驗紀錄", "討論", "AI助手"];
     const [navIndex, setNavIndex] = useState(0);
     const [showIntro, setShowIntro] = useState(false);
 
@@ -89,9 +89,9 @@ const Review = () => {
                         <ul>
                             <li><strong>測驗紀錄：</strong>查看歷次測驗紀錄，點選「查看測驗」檢視詳細題目。</li>
                             <li><strong>討論：</strong>與其他使用者一同討論解題思路與學習心得。</li>
-                            <li><strong>泰雅助手：</strong>AI智慧協助，針對題目進行解說、延伸學習。</li>
+                            <li><strong>AI助手：</strong>AI智慧協助，針對題目進行解說、延伸學習。</li>
                         </ul>
-                        <p className="review-hint">💡提示：若尚未選擇題目，「討論」與「泰雅助手」將無法使用。</p>
+                        <p className="review-hint">💡提示：若尚未選擇題目，「討論」與「AI助手」將無法使用。</p>
                     </div>
                 )}
             </div>
@@ -100,7 +100,7 @@ const Review = () => {
                 <div style={{ width: "50%" }}>
                     <div className="review-nav">
                         {navs.map((nav, index) => {
-                            //關掉泰雅助手(index = 2)
+                            //關掉AI助手(index = 2)
                             const isDisabled = index == 2 || (index > 0 && !selectedQuestion);
 
                             return (
@@ -212,7 +212,7 @@ const Review = () => {
                                 )}
 
                                 {navIndex === 1 && (<Comp_discussion />)}
-                                {navIndex === 2 && (<Comp_atayalAI />)}
+                                {navIndex === 2 && (<Comp_atayalAI tribe={selectedQuiz?.tribe || "tayal"} />)}
                             </div>
                         )}
                     </div>

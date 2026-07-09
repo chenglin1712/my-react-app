@@ -8,7 +8,7 @@ const TITLES = {
     tayal: "Lmuhuw ATAYAL - 泰雅句型練習",
     amis: "Lmuhuw AMIS - 阿美句型練習",
     bunun: "Lmuhuw BUNUN - 布農句型練習",
-    kavalan: "Lmuhuw KAVALAN - 葛瑪蘭句型練習",
+    kavalan: "Lmuhuw KAVALAN - 噶瑪蘭句型練習",
     paiwan: "Lmuhuw PAIWAN - 排灣句型練習",
 };
 
