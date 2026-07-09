@@ -49,6 +49,8 @@ const App = () => {
   const toggleExpand = (key) => setExpandedWord(prev => (prev === key ? null : key));
 
   const toggleFavorite = async (wordTayal) => {
+    if (!user) return;
+
     setFavoriteWords(prev => {
       const newSet = new Set(prev);
       if (newSet.has(wordTayal)) {
@@ -62,7 +64,7 @@ const App = () => {
 
     try {
 
-      const baseCategory = user.firestoreData.favorites.find(fav => fav.id === 1);
+      const baseCategory = user.firestoreData?.favorites?.find(fav => fav.id === 1);
       let newContent = baseCategory?.content || [];
 
       if (newContent.includes(wordTayal)) {

@@ -580,6 +580,7 @@ const useFilterAndSort = (allWords) => {
 };
 
 const PAGE_SIZE = 50;
+const TRIBES = ['泰雅', '阿美', '布農', '葛瑪蘭', '排灣'];
 
 const App = () => {
   const [user, setUser] = useState(null);
@@ -592,6 +593,7 @@ const App = () => {
   const [loadError, setLoadError] = useState(false);
   const [delayedCheck, setDelayedCheck] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [selectedTribe, setSelectedTribe] = useState('泰雅');
   const toggleExpand = (key) => setExpandedWord(prev => (prev === key ? null : key));
 
   const [tabStates, updateTabState] = useTabState(favorites);
@@ -622,11 +624,13 @@ const App = () => {
       setActiveTab(location.state.tabId);
     }
   }, [location.state]);
+
+  // 依目前選擇的族語重新查詢單字，避免一次載入不相關族語的全部資料
   useEffect(() => {
     setLoading(true);
     setLoadError(false);
     auth.currentUser?.getIdToken()
-      .then(token => axios.post(import.meta.env.VITE_API_SEARCH_ALL_URL, null, {
+      .then(token => axios.post(import.meta.env.VITE_API_SEARCH_ALL_URL, { tribe: selectedTribe }, {
         headers: token ? { "Authorization": `Bearer ${token}` } : {},
       }))
       .then(res => {
@@ -638,7 +642,9 @@ const App = () => {
         setLoadError(true);
         setLoading(false);
       });
+  }, [selectedTribe]);
 
+  useEffect(() => {
     const unsubscribe = authChanges((userData) => {
       if (userData) {
         setUser(userData);
@@ -655,11 +661,11 @@ const App = () => {
     };
   }, []);
 
-  // 換分類或篩選條件變動時，分頁顯示筆數重置回第一頁
+  // 換分類、族語或篩選條件變動時，分頁顯示筆數重置回第一頁
   const activeTabStateKey = JSON.stringify(tabStates[activeTab] || {});
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [activeTab, selectedSubCategory, activeTabStateKey]);
+  }, [activeTab, selectedTribe, selectedSubCategory, activeTabStateKey]);
 
   const playAudio = async (fileId) => {
     if (!fileId) return;
@@ -729,7 +735,18 @@ const App = () => {
           </svg>
           個人詞語庫
         </h2>
-        
+
+        <Dropdown className="mb-3" onSelect={(val) => setSelectedTribe(val)}>
+          <Dropdown.Toggle variant="outline-secondary" size="sm">
+            族語：{selectedTribe}
+          </Dropdown.Toggle>
+          <Dropdown.Menu>
+            {TRIBES.map(t => (
+              <Dropdown.Item key={t} eventKey={t}>{t}</Dropdown.Item>
+            ))}
+          </Dropdown.Menu>
+        </Dropdown>
+
         {/* <Tabs
           activeKey={activeTab}
           onSelect={(k) => setActiveTab(parseInt(k))}

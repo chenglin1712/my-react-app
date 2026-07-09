@@ -2,7 +2,7 @@ import News from "../../components/_home/news"
 import FunctionBtn from "../../components/_home/functionBtn"
 import "../../static/css/_home/index.css"
 import Calendar from "../../components/_home/calendar"
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import BannerImg from "../../static/assets/_home/home.webp"
 
 const App = () => {
@@ -10,6 +10,7 @@ const App = () => {
     const [newsWithoutImage, setNewsWithoutImage] = useState([]);
     const [examInfo, setExamInfo] = useState([]);
     const [newsError, setNewsError] = useState(false);
+    const functionBtnRef = useRef(null);
 
     useEffect(() => {
         fetch(`${import.meta.env.VITE_API_NEWS_URL}`)
@@ -44,11 +45,16 @@ const App = () => {
                     涵蓋影像辨識、詞彙遊戲及測驗學習等功能，
                     是教師尋找教學資源、學生自主學習的選擇之一！
                 </p>
-                <button className="banner-learn-more-btn">了解更多</button>
+                <button
+                    className="banner-learn-more-btn"
+                    onClick={() => functionBtnRef.current?.scrollIntoView({ behavior: "smooth" })}
+                >了解更多</button>
             </div>
 
             {/* <SysIntroduction /> */}
-            <FunctionBtn />
+            <div ref={functionBtnRef}>
+                <FunctionBtn />
+            </div>
             <Calendar examInfo={examInfo} />
             {newsError && (
                 <p className="text-center text-muted" style={{ margin: '1rem 0' }}>
