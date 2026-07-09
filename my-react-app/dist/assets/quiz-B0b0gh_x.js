@@ -1,0 +1,1 @@
+import{t as e}from"./jsx-runtime-D8nDyRPw.js";import{n as t}from"./chunk-KS7C4IRE-U6XZyaLH.js";var n=e(),r={tayal:`泰雅語線上測驗`,amis:`阿美語線上測驗`,bunun:`布農語線上測驗`,kavalan:`噶瑪蘭語線上測驗`,paiwan:`排灣語線上測驗`},i=({tribe:e=`tayal`})=>(0,n.jsxs)(n.Fragment,{children:[(0,n.jsx)(`h2`,{className:`quiz-title`,children:r[e]??r.tayal}),(0,n.jsx)(t,{})]});export{i as default};

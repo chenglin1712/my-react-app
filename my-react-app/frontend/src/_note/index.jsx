@@ -10,10 +10,10 @@ import "../../static/css/_note/buttons.css";
 import { Image as ImageIcon } from "lucide-react";
 import DOMPurify from "dompurify";
 import { useEditor, EditorContent } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import TextStyle from "@tiptap/extension-text-style";
-import Color from "@tiptap/extension-color";
-import ImageExtension from "@tiptap/extension-image";
+import { StarterKit } from "@tiptap/starter-kit";
+import { TextStyle } from "@tiptap/extension-text-style";
+import { Color } from "@tiptap/extension-color";
+import { Image as ImageExtension } from "@tiptap/extension-image";
 import FontSize from "./fontSizeExtension";
 
 function NotePage() {

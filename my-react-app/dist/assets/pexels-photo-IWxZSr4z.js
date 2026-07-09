@@ -1,0 +1,1 @@
+var e=`/assets/pexels-photo-CCe2MHI-.webp`;export{e as t};
