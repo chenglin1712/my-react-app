@@ -1,11 +1,12 @@
 import "../../static/css/navigation/userSidebar.css"
 import AvatarImg from "../../static/assets/_auth/avatar.webp"
 import { Heart, LogOut, Edit, ChevronDown, Bot, Calendar } from 'lucide-react';
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { signOut } from "../../src/userServives/userServive";
 import { useNavigate } from "react-router-dom";
-import OverlayAdvice from "../_quiz/bot";
 import { AnimatePresence } from "framer-motion";
+
+const OverlayAdvice = lazy(() => import("../_quiz/bot"));
 
 const UserSidebar = ({ userData, closeSidebar }) => {
 
@@ -90,9 +91,11 @@ const UserSidebar = ({ userData, closeSidebar }) => {
                 </div>
             </div>
 
-            <AnimatePresence>
-                {showBot && <OverlayAdvice onClose={() => setShowBot(false)} />}
-            </AnimatePresence>
+            <Suspense fallback={null}>
+                <AnimatePresence>
+                    {showBot && <OverlayAdvice onClose={() => setShowBot(false)} />}
+                </AnimatePresence>
+            </Suspense>
         </>
     );
 };
