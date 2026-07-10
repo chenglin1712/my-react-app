@@ -120,6 +120,7 @@ const App = () => {
                             onChange={handleImageChange}
                             ref={fileInputRef}
                             style={{ display: "none" }}
+                            aria-label="選擇圖片檔案"
                         />
                         <div className="mt-4 d-flex gap-2" style={{ alignItems: 'flex-start' }}>
                             &nbsp; 

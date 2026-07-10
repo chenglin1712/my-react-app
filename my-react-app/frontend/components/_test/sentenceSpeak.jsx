@@ -166,12 +166,12 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
 
       {/* 錄音按鈕 */}
       {!recording ? (
-        <button className="btn btn-danger mb-3" onClick={startRecording} disabled={audioBlob} style={{padding: "20px"}}>
-          <FaMicrophone size={60}/> 
+        <button className="btn btn-danger mb-3" onClick={startRecording} disabled={audioBlob} style={{padding: "20px"}} aria-label="開始錄音">
+          <FaMicrophone size={60}/>
         </button>
       ) : (
-        <button className="btn btn-secondary mb-3" onClick={stopRecording}style={{padding: "30px"}}>
-          <FaStop size={30}/> 
+        <button className="btn btn-secondary mb-3" onClick={stopRecording}style={{padding: "30px"}} aria-label="停止錄音">
+          <FaStop size={30}/>
         </button>
       )}
        {audioBlob && !recording &&(

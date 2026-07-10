@@ -149,7 +149,7 @@ const DateReminder = () => {
                     <div className="toast-notification" key={toast.phase}>
                         <div className="toast-header">
                             📢 {toast.phase} 今日開始！
-                            <button className="close-btn" onClick={() => handleCloseToast(toast.phase)}>✕</button>
+                            <button className="close-btn" onClick={() => handleCloseToast(toast.phase)} aria-label="關閉">✕</button>
                         </div>
                         <div className="toast-body">
                             {toast.url ? (

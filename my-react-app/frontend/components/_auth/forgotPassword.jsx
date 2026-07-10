@@ -40,6 +40,7 @@ const Forgot = () => {
             <input
                 type="email"
                 placeholder="輸入您的 Email"
+                aria-label="電子郵件"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
             />

@@ -147,6 +147,7 @@ const Advice = ({ onClose }) => {
                     <button
                         onClick={handleClose}
                         className="chat-return"
+                        aria-label="返回"
                     >
                         <ChevronLeft size={22} />
                     </button>
@@ -161,6 +162,7 @@ const Advice = ({ onClose }) => {
                         value={tribe}
                         onChange={(e) => setTribe(e.target.value)}
                         style={{ position: "relative", zIndex: 1, borderRadius: 6, border: "none", padding: "4px 6px" }}
+                        aria-label="選擇族語"
                     >
                         {TRIBES.map((t) => (
                             <option key={t.slug} value={t.slug}>{t.name}語</option>
@@ -226,6 +228,7 @@ const Advice = ({ onClose }) => {
                         onKeyPress={handleKeyPress}
                         placeholder="輸入您的訊息..."
                         className="message-input"
+                        aria-label="輸入訊息"
                     />
                     <button
                         className={`send-button ${input.trim() ? 'active' : ''}`}

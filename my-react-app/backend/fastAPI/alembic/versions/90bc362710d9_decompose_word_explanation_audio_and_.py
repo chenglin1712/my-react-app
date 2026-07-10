@@ -368,6 +368,16 @@ def upgrade() -> None:
     # 確保資料落地（不這麼做的話，交由呼叫端事後的動作決定要不要 commit 並不可靠）。
     bind.commit()
 
+    # 上面這次手動 commit() 之後，這個連線會在下一次 execute 時（SQLAlchemy 2.x 的
+    # autobegin）自動重新開一個新交易；alembic 緊接著要把 alembic_version 更新成這支
+    # migration 的版本號，剛好就落在這個新交易裡，而 alembic 在 SQLite 的「非交易式
+    # DDL」模式下不會主動 commit，交易會在連線關閉時被靜默 rollback——alembic_version
+    # 因此停留在上一版（down_revision），下次執行 `alembic upgrade head` 會誤以為這支
+    # migration 還沒套用而重新執行一次，撞上資料表已存在而失敗（已在全新空 DB 上實測
+    # 重現）。把連線切成 AUTOCOMMIT，讓「這支 migration 的 DML」跟「alembic 接下來
+    # 自己寫入版本號」都各自立刻落地，不再依賴會被靜默吃掉的顯式 commit。
+    bind.execution_options(isolation_level="AUTOCOMMIT")
+
 
 def downgrade() -> None:
     bind = op.get_bind()
@@ -512,6 +522,12 @@ def downgrade() -> None:
         )
 
     bind.commit()
+
+    # 同 upgrade() 下方的說明：手動 commit() 之後這個連線會自動重新開一個新交易，
+    # 下面這一串 drop_table 以及 alembic 接下來要寫回 alembic_version 舊版本號的
+    # UPDATE 都會落在裡面，若不主動 commit 會在連線關閉時被靜默 rollback。切成
+    # AUTOCOMMIT 讓每一步都立刻落地。
+    bind.execution_options(isolation_level="AUTOCOMMIT")
 
     op.drop_table("word_explanation_anaphora_item")
     op.drop_table("word_explanation_anaphora")

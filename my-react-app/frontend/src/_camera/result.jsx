@@ -6,9 +6,8 @@ import {
   Dropdown, Offcanvas
 } from 'react-bootstrap';
 import { FaHeart, FaRegHeart, FaPlayCircle, FaChevronDown, FaChevronUp } from "react-icons/fa";
-import { authChanges } from "../../src/userServives/userServive";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { db, auth } from "../../../firebase";
+import { auth } from "../../../firebase";
+import { useFavorites } from "../../src/userServives/useFavorites";
 import { createAuthorizedAudio } from "../../utils/authAudio";
 import { Tabs, Tab } from 'react-bootstrap';
 import "../../static/css/_camera/result.css"; 
@@ -152,11 +151,14 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [expandedWord, setExpandedWord] = useState(null);
-  const [favoriteWords, setFavoriteWords] = useState(new Set());
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterLetter, setFilterLetter] = useState('');
   const audioRef = useRef(null);
-  const [user, setUser] = useState(null);
+  const { favorites, toggleFavorite } = useFavorites();
+  const favoriteWords = useMemo(
+    () => new Set(favorites.find(fav => fav.id === 1)?.content || []),
+    [favorites]
+  );
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const [frequencyFilter, setFrequencyFilter] = useState('');
   const navigate = useNavigate();
@@ -191,99 +193,13 @@ const App = () => {
 
   const toggleExpand = (key) => setExpandedWord(prev => (prev === key ? null : key));
 
-  const toggleFavorite = async (wordTayal) => {
-    if (!user) return;
-  setFavoriteWords(prev => {
-    const newSet = new Set(prev);
-    if (newSet.has(wordTayal)) {
-      newSet.delete(wordTayal);
-    } else {
-      newSet.add(wordTayal);
-    }
-    return newSet;
-  });
-
-  
-    try {
-      
-      const baseCategory = user.firestoreData?.favorites?.find(fav => fav.id === 1);
-      let newContent = baseCategory?.content || [];
-
-      if (newContent.includes(wordTayal)) {
-    
-        newContent = newContent.filter(w => w !== wordTayal);
-      } else {
-      
-        newContent = [...newContent, wordTayal];
-      }
-
-     
-      await updateUserFavoritesCategory(user.uid, 1, newContent);
-
-      setUser(prevUser => {
-        if (!prevUser) return prevUser;
-        const newFavorites = (prevUser.firestoreData?.favorites || []).map(fav => {
-          if (fav.id === 1) {
-            return { ...fav, content: newContent };
-          }
-          return fav;
-        });
-        return { ...prevUser, 
-          firestoreData: {
-          ...prevUser.firestoreData,
-          favorites: newFavorites
-          } 
-        };
-      });
-    } catch (err) {
-      console.error('同步收藏失敗', err);
-    }
-  
-};
-
-async function updateUserFavoritesCategory(userId, categoryId, newContent) {
-  const userDocRef = doc(db, "users", userId);
-
-  const userSnap = await getDoc(userDocRef);
-  if (!userSnap.exists()) throw new Error("使用者文件不存在");
-
-  const userData = userSnap.data();
-  const favorites = userData.favorites || [];
-
-  const newFavorites = favorites.map(fav => {
-    if (fav.id === categoryId) {
-      return { ...fav, content: newContent };
-    }
-    return fav;
-  });
-
-  await updateDoc(userDocRef, { favorites: newFavorites });
-}
-useEffect(() => {
+  useEffect(() => {
     const checkScreenSize = () => {
       setIsMobile(window.innerWidth < 768);
     };
     checkScreenSize();
     window.addEventListener('resize', checkScreenSize);
     return () => window.removeEventListener('resize', checkScreenSize);
-  }, []);
-  useEffect(() => {
-    const saved = localStorage.getItem('favoriteWords');
-    if (saved) setFavoriteWords(new Set(JSON.parse(saved)));
-    
-    const unsubscribe = authChanges(async (userData) => {
-      //console.log("authChanges 回傳:", userData);
-      if (userData) {
-        setUser(userData);
-        const baseCategory = userData.firestoreData.favorites.find(fav => fav.id === 1);
-        const favoriteSet = new Set(baseCategory?.content || []);
-        setFavoriteWords(favoriteSet);
-      } else {
-        setUser(null);
-        setFavoriteWords(new Set());
-      }
-    });
-    return () => unsubscribe();
   }, []);
 
   const playAudio = async (fileId) => {

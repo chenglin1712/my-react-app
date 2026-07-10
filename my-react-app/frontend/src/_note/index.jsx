@@ -254,16 +254,16 @@ function NotePage() {
       {/* 上方編輯工具列 */}
       <Row className="editor-toolbar">
         <Col xs="auto" className="group">
-          <span className="group-label">大小</span>
-          <select onChange={(e) => execStyle("fontSize", e.target.value)} defaultValue="24px">
+          <label htmlFor="note-font-size-select" className="group-label">大小</label>
+          <select id="note-font-size-select" onChange={(e) => execStyle("fontSize", e.target.value)} defaultValue="24px">
             <option value="16px">小</option>
             <option value="24px">中</option>
             <option value="32px">大</option>
           </select>
         </Col>
         <Col xs="auto" className="group">
-          <Button className="btn-ghost" onClick={() => execStyle("bold")}>𝐁</Button>
-          <Button className="btn-ghost" onClick={() => execStyle("italic")}>𝑰</Button>
+          <Button className="btn-ghost" onClick={() => execStyle("bold")} aria-label="粗體">𝐁</Button>
+          <Button className="btn-ghost" onClick={() => execStyle("italic")} aria-label="斜體">𝑰</Button>
         </Col>
         <Col xs="auto" className="group">
           <input
@@ -271,6 +271,7 @@ function NotePage() {
             accept="image/*"
             id="image-upload"
             style={{ display: "none" }}
+            aria-label="上傳圖片"
             onChange={(e) => {
               const file = e.target.files[0];
               if (file) {
@@ -300,6 +301,7 @@ function NotePage() {
               className="color-box"
               style={{ backgroundColor: color, width: 40, height: 6, border: "none", borderRadius: "6px" }}
               onClick={() => execStyle("foreColor", color)}
+              aria-label={`文字顏色：${{ red: "紅色", blue: "藍色", black: "黑色", orange: "橘色" }[color]}`}
             />
           ))}
         </Col>
@@ -315,6 +317,7 @@ function NotePage() {
             value={currentNote.title}
             onChange={handleTitleChange}
             placeholder="請輸入筆記標題"
+            aria-label="筆記標題"
           />
 
           {/* 編輯區：只保留 .note-text，不再包一層卡片 */}
@@ -334,6 +337,7 @@ function NotePage() {
             {notes.map((note, index) => (
               <Form.Check
                 key={index}
+                id={`note-page-select-${index}`}
                 type="checkbox"
                 label={`第 ${index + 1} 頁：${note.title || "（未命名）"}${index === currentPage && isDirty ? "*" : ""}`}
                 checked={selectedPages.includes(index)}

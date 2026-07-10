@@ -1,6 +1,7 @@
 import axios from "axios";
 import PropTypes from "prop-types";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { auth } from "../../../firebase";
 import "../../static/css/_game/game_areaTest.css";
 
 const Game_areaTest = forwardRef(({ gameDataLoaded, tribe }, ref) => {
@@ -33,8 +34,10 @@ const Game_areaTest = forwardRef(({ gameDataLoaded, tribe }, ref) => {
   useEffect(() => {
     const fetchCrossword = async () => {
       try {
+        const token = await auth.currentUser?.getIdToken();
         const response = await axios.get(
-          `/CrosswordPuzzle/generate/?tribe=${tribe || 'tayal'}`
+          `/CrosswordPuzzle/generate/?tribe=${tribe || 'tayal'}`,
+          { headers: token ? { Authorization: `Bearer ${token}` } : {} }
         );
         const data = response.data;
         setCrosswordData(data);
@@ -129,6 +132,7 @@ const Game_areaTest = forwardRef(({ gameDataLoaded, tribe }, ref) => {
                     value={userAnswersGrid[rowIndex]?.[colIndex] || ""}
                     onChange={(e) => handleCellChange(rowIndex, colIndex, e)}
                     readOnly={isNonInputCell}
+                    aria-label={`填字方格，第 ${rowIndex + 1} 列第 ${colIndex + 1} 欄`}
                     style={{
                       cursor: isNonInputCell ? "default" : "text",
                       textTransform: "lowercase",

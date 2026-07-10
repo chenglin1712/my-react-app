@@ -113,8 +113,9 @@ const Discussion = () => {
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         placeholder="輸入留言..."
+                        aria-label="輸入留言"
                     />
-                    <button onClick={handleSend}><Send size={18} /></button>
+                    <button onClick={handleSend} aria-label="送出留言"><Send size={18} /></button>
                 </div>
             </div>
         </div>

@@ -42,10 +42,26 @@ const Navbar = () => {
     setIsUserOpen(!isUserOpen);
   };
 
+  // 選單項目原本是 <div onClick>，滑鼠可點但鍵盤完全無法聚焦／觸發；補上
+  // role="button" + tabIndex + 這個 Enter/Space 處理常式，讓它們符合原生
+  // button 的鍵盤操作方式，同時不用改動 className 對應的既有 CSS 版面。
+  const handleKeyActivate = (callback) => (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      callback();
+    }
+  };
+
   return (
     <nav className="navbar">
       <div className="navbar-container">
-        <div className="logo" onClick={() => { navigate("/") }}>源·語</div>
+        <div
+          className="logo"
+          role="button"
+          tabIndex={0}
+          onClick={() => { navigate("/") }}
+          onKeyDown={handleKeyActivate(() => navigate("/"))}
+        >源·語</div>
 
         {/* 導覽列 */}
         <div className="menu">
@@ -56,7 +72,14 @@ const Navbar = () => {
               (prefix !== "/" && location.pathname.startsWith(prefix));
 
             return (
-              <div key={id} className={`menu-item ${isActive ? "active" : ""}`} onClick={() => navigate(route)}>
+              <div
+                key={id}
+                className={`menu-item ${isActive ? "active" : ""}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(route)}
+                onKeyDown={handleKeyActivate(() => navigate(route))}
+              >
                 {icon}
                 <span>{label}</span>
               </div>
@@ -65,7 +88,12 @@ const Navbar = () => {
 
           <div
             className={`menu-item note-dropdown ${location.pathname.startsWith("/note") ? "active" : ""}`}
+            role="button"
+            tabIndex={0}
+            aria-haspopup="true"
+            aria-expanded={isDropdownOpen}
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            onKeyDown={handleKeyActivate(() => setIsDropdownOpen(!isDropdownOpen))}
           >
             <div className="flex items-center gap-1">
               <NotebookPen size={20} />
@@ -80,13 +108,19 @@ const Navbar = () => {
             >
               <div
                 className="dropdown-item"
+                role="button"
+                tabIndex={0}
                 onClick={() => handleDropdownSelect("/note")}
+                onKeyDown={handleKeyActivate(() => handleDropdownSelect("/note"))}
               >
                 寫筆記
               </div>
               <div
                 className="dropdown-item"
+                role="button"
+                tabIndex={0}
                 onClick={() => handleDropdownSelect("/note/share")}
+                onKeyDown={handleKeyActivate(() => handleDropdownSelect("/note/share"))}
               >
                 筆記分享區
               </div>
@@ -94,15 +128,28 @@ const Navbar = () => {
           </div>
 
           {userData == null || !userData.firestoreData ? (
-            <div className="menu-item" onClick={() => navigate('/login')} >
+            <div
+              className="menu-item"
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate('/login')}
+              onKeyDown={handleKeyActivate(() => navigate('/login'))}
+            >
               <User size={24} style={{ marginRight: '5px' }} />
               <span>登入</span>
             </div>
           ) : (
             <>
               <div className="auth-container">
-                <div className="auth-container-user" onClick={handleUserSidebar}>
-                  <img src={userData?.firestoreData?.avatarUrl || AvatarImg} className="auth-image" />
+                <div
+                  className="auth-container-user"
+                  role="button"
+                  tabIndex={0}
+                  aria-label="開啟個人資料選單"
+                  onClick={handleUserSidebar}
+                  onKeyDown={handleKeyActivate(handleUserSidebar)}
+                >
+                  <img src={userData?.firestoreData?.avatarUrl || AvatarImg} className="auth-image" alt="" />
                   <p>{userData?.firestoreData?.name}</p>
                 </div>
               </div>
@@ -118,7 +165,7 @@ const Navbar = () => {
               >
                 <div className="sidebar-header">
                   <h3> 個人資料</h3>
-                  <span className="close-btn" onClick={() => setIsUserOpen(false)}>×</span>
+                  <button className="close-btn" aria-label="關閉個人資料選單" onClick={() => setIsUserOpen(false)}>×</button>
                 </div>
 
                 <UserSidebar userData={userData} closeSidebar={() => setIsUserOpen(false)} />
@@ -130,6 +177,8 @@ const Navbar = () => {
         {/* Mobile Menu Toggle Button */}
         < button
           className="menu-toggle"
+          aria-label={isOpen ? "關閉選單" : "開啟選單"}
+          aria-expanded={isOpen}
           onClick={() => setIsOpen(!isOpen)}
         >
           {isOpen ? <X size={28} /> : <Menu size={28} />}
@@ -139,15 +188,28 @@ const Navbar = () => {
       {/* Mobile Menu */}
       < div className={`menu-mobile ${isOpen ? 'active' : ''}`}>
         {userData == null || !userData.firestoreData ? (
-          <div className="menu-mobile-item" onClick={() => navigate('/login')} >
+          <div
+            className="menu-mobile-item"
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate('/login')}
+            onKeyDown={handleKeyActivate(() => navigate('/login'))}
+          >
             <User size={20} />
             <span>登入</span>
           </div>
         ) : (
           <>
             <div className="auth-container">
-              <div className="mobile-container-user" onClick={handleUserSidebar}>
-                <img src={userData?.firestoreData?.avatarUrl || AvatarImg} className="mobile-image" />
+              <div
+                className="mobile-container-user"
+                role="button"
+                tabIndex={0}
+                aria-label="開啟個人資料選單"
+                onClick={handleUserSidebar}
+                onKeyDown={handleKeyActivate(handleUserSidebar)}
+              >
+                <img src={userData?.firestoreData?.avatarUrl || AvatarImg} className="mobile-image" alt="" />
                 <p>{userData?.firestoreData?.name}</p>
               </div>
             </div>
@@ -163,7 +225,7 @@ const Navbar = () => {
             >
               <div className="sidebar-header">
                 <h3>&nbsp;個人資料</h3>
-                <button className="close-btn" onClick={() => setIsUserOpen(false)}>×</button>
+                <button className="close-btn" aria-label="關閉個人資料選單" onClick={() => setIsUserOpen(false)}>×</button>
               </div>
 
               <UserSidebar userData={userData} closeSidebar={() => setIsUserOpen(false)} />
@@ -172,16 +234,35 @@ const Navbar = () => {
         )}
 
         {menuItem.map(({ id, label, icon, route }) => (
-          <div key={id} className="menu-mobile-item" onClick={() => handleMobileNavigate(route)}>
+          <div
+            key={id}
+            className="menu-mobile-item"
+            role="button"
+            tabIndex={0}
+            onClick={() => handleMobileNavigate(route)}
+            onKeyDown={handleKeyActivate(() => handleMobileNavigate(route))}
+          >
             {icon}
             <span>{label}</span>
           </div>
         ))}
-        <div className="menu-mobile-item" onClick={() => handleMobileNavigate("/note")}>
+        <div
+          className="menu-mobile-item"
+          role="button"
+          tabIndex={0}
+          onClick={() => handleMobileNavigate("/note")}
+          onKeyDown={handleKeyActivate(() => handleMobileNavigate("/note"))}
+        >
           <NotebookPen size={20} />
           <span>寫筆記</span>
         </div>
-        <div className="menu-mobile-item" onClick={() => handleMobileNavigate("/note/share")}>
+        <div
+          className="menu-mobile-item"
+          role="button"
+          tabIndex={0}
+          onClick={() => handleMobileNavigate("/note/share")}
+          onKeyDown={handleKeyActivate(() => handleMobileNavigate("/note/share"))}
+        >
           <NotebookPen size={20} />
           <span>筆記分享區</span>
         </div>

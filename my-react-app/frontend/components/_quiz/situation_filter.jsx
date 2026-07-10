@@ -40,12 +40,14 @@ const Filter = ({ selectedTypes, setSelectedTypes, selectedDate, setSelectedDate
           }
           className="filter-date-input"
           disabled={dateMode === "all"}
+          aria-label="篩選日期"
         />
       </div>
       <select
         className="filter-select"
         value={selectedTypes}
         onChange={(e) => setSelectedTypes(e.target.value)}
+        aria-label="篩選題型"
       >
         {types.map((item) => (
           <option key={item.key} value={item.key}>

@@ -1,1 +1,0 @@
-import{n as e,s as t,t as n}from"./jsx-runtime-D8nDyRPw.js";import{a as r}from"./ThemeProvider-DMygBDCt.js";var i=t(e()),a=t(r()),o=n(),s=(e=>i.forwardRef((t,n)=>(0,o.jsx)(`div`,{...t,ref:n,className:(0,a.default)(t.className,e)})));export{s as t};

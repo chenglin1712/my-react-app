@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  frontend:
+    name: Frontend (lint / build / test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+
+  backend:
+    name: Backend (Django + FastAPI tests)
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_SECRET_KEY: ci-test-secret-key-not-for-production
+      DJANGO_DEBUG: "True"
+      AUTH_DEV_BYPASS: "True"
+      GITHUB_TOKEN: ci-dummy-token
+      VITE_AUDIO_FILE_URL: https://example.invalid/audio/
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      # torch/torchaudio/torchvision 需要從 PyTorch 的 CPU wheel index 安裝，
+      # 直接 pip install -r requirements.txt 會嘗試抓預設 index、可能抓到不對的
+      # build 或抓不到（見 requirements.txt 開頭註解）。CI 不需要 GPU，先裝 CPU 版。
+      - name: Install PyTorch (CPU)
+        run: pip install torch==2.10.0 torchaudio==2.10.0 torchvision==0.25.0 --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install remaining Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Django tests (CrosswordPuzzle / crawler / AIModel)
+        working-directory: backend
+        run: python manage.py test
+
+      - name: FastAPI tests
+        working-directory: backend
+        run: pytest fastAPI/tests -v

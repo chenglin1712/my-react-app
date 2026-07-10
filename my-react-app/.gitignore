@@ -36,5 +36,18 @@ venv/
 db.sqlite3
 media/
 
+# 建置產物：dist/（Vite build）與 backend/staticfiles/（Django collectstatic）
+# 都是可從原始碼重新產生的輸出，不該進版控——直接進 repo 只會讓每次建置在
+# git history 裡留下大量重複的雜湊檔名檔案。
+dist/
+backend/staticfiles/
+
+# FastAPI 的 dictionary.db 是可從 Alembic migration 重建的資料庫（見
+# backend/fastAPI/alembic/），不是原始碼，不該進版控；-shm/-wal 是 SQLite
+# WAL 模式的暫時性執行期檔案，本來就不該被追蹤。
+*.db
+*.db-shm
+*.db-wal
+
 # run project
 *.bat

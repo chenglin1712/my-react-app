@@ -85,7 +85,7 @@ const SideBar = () => {
 
             {/* Mobile bar */}
             <div className="mobile-bar-menu">
-                <button className="mobile-menu-button" onClick={() => setOpen(!open)}>
+                <button className="mobile-menu-button" onClick={() => setOpen(!open)} aria-label={open ? "關閉選單" : "開啟選單"}>
                     {icons[selectFunc]}
                     <div className="mobile-menu-indicator">{icons.menu}</div>
                 </button>
@@ -94,7 +94,7 @@ const SideBar = () => {
                     <div className="mobile-menu">
                         <div className="mobile-menu-header">
                             <span>功能選單</span>
-                            <button className="mobile-closeBtn" onClick={() => setOpen(false)}>
+                            <button className="mobile-closeBtn" onClick={() => setOpen(false)} aria-label="關閉選單">
                                 {icons.close}
                             </button>
                         </div>

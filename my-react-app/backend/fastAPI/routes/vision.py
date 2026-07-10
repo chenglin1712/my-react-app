@@ -1,4 +1,5 @@
 from fastapi import APIRouter, UploadFile, HTTPException, Request
+import asyncio
 import base64
 import logging
 import httpx
@@ -95,7 +96,10 @@ async def analyze_image(request: Request):
         label_data = []
         for label in labels:
             desc_en = label["description"]
-            desc_zh = translate_with_retry(desc_en)
+            # translate_with_retry 是同步呼叫（GoogleTranslator + time.sleep 重試，
+            # 最長可能卡住數秒），丟到執行緒池執行避免佔住 event loop、卡住同一個
+            # worker 上的其他請求。
+            desc_zh = await asyncio.to_thread(translate_with_retry, desc_en)
             if desc_zh is not None:
                 label_data.append({
                     "description": desc_zh,

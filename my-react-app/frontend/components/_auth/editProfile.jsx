@@ -96,14 +96,16 @@ const Edit = () => {
                     accept="image/*"
                     ref={fileInputRef}
                     onChange={handleChange}
+                    aria-label="變更圖片"
                     style={{ display: "none" }}
                 />
             </div>
 
             <div className="edit-form">
                 <div className="form-group">
-                    <label><User size={16} /> 姓名</label>
+                    <label htmlFor="profile-name-input"><User size={16} /> 姓名</label>
                     <input
+                        id="profile-name-input"
                         type="text"
                         value={formData.name}
                         onChange={e => handleInputChange("name", e.target.value)}
@@ -112,8 +114,9 @@ const Edit = () => {
                 </div>
 
                 <div className="form-group">
-                    <label><Shield size={16} /> 身分</label>
+                    <label htmlFor="profile-identity-select"><Shield size={16} /> 身分</label>
                     <select
+                        id="profile-identity-select"
                         value={formData.identity}
                         onChange={e => handleInputChange("identity", e.target.value)}
                     >
@@ -124,8 +127,9 @@ const Edit = () => {
                 </div>
 
                 <div className="form-group">
-                    <label><Calendar size={16} /> 加入日期</label>
+                    <label htmlFor="profile-joindate-input"><Calendar size={16} /> 加入日期</label>
                     <input
+                        id="profile-joindate-input"
                         type="text"
                         value={new Date(formData.joinDate).toLocaleDateString("zh-TW")}
                         disabled
@@ -134,8 +138,9 @@ const Edit = () => {
                 </div>
 
                 <div className="form-group">
-                    <label><Mail size={16} /> 信箱</label>
+                    <label htmlFor="profile-email-input"><Mail size={16} /> 信箱</label>
                     <input
+                        id="profile-email-input"
                         type="email"
                         value={formData.email}
                         disabled
@@ -144,8 +149,9 @@ const Edit = () => {
                 </div>
 
                 <div className="form-group">
-                    <label><Lock size={16} /> 密碼</label>
+                    <label htmlFor="profile-password-input"><Lock size={16} /> 密碼</label>
                     <input
+                        id="profile-password-input"
                         type="password"
                         value={formData.password}
                         disabled

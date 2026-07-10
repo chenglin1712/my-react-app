@@ -1,8 +1,5 @@
-import { useState, useEffect } from 'react';
 import "../../static/css/_game/game_result.css"
-import { db, auth } from '../../../firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
+import { useFavorites } from "../../src/userServives/useFavorites";
 
 const GameResultCard = ({ word, isCorrect, toggleFavorite, isFavorited }) => {
     return (
@@ -30,6 +27,7 @@ const LikeButton = ({ isFavorited, onToggle }) => {
         <button
             onClick={onToggle}
             className='result-likebtn'
+            aria-label={isFavorited ? "取消收藏" : "加入收藏"}
         >
             {isFavorited ? '❤️' : '♡'}
         </button>
@@ -42,64 +40,7 @@ const LikeButton = ({ isFavorited, onToggle }) => {
  * @param {object} props.results
  */
 const Game_result = ({ results }) => {
-    const [favorites, setFavorites] = useState([]);
-    const [isAuthReady, setIsAuthReady] = useState(false);
-    const [user, setUser] = useState(null);
-
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser);
-            setIsAuthReady(true);
-        });
-        return () => unsubscribe();
-    }, []);
-
-    useEffect(() => {
-        if (!isAuthReady || !user) return;
-
-        const userDocRef = doc(db, "users", user.uid);
-        const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
-            if (docSnap.exists()) {
-                setFavorites(docSnap.data().favorites || []);
-            } else {
-                setDoc(userDocRef, { favorites: [{ id: 1, content: [] }] })
-                    .catch(err => console.error("Failed to create user profile doc:", err));
-                setFavorites([]);
-            }
-        }, (error) => {
-            console.error("Error fetching user data:", error);
-        });
-
-        return () => unsubscribe();
-    }, [isAuthReady, user]);
-
-    const toggleFavorite = async (word, categoryId) => {
-        if (!user) return;
-
-        const userRef = doc(db, "users", user.uid);
-        try {
-            const currentFavorites = favorites;
-            const categoryIndex = currentFavorites.findIndex(fav => fav.id === categoryId);
-
-            let newFavorites;
-            if (categoryIndex > -1) {
-                const category = currentFavorites[categoryIndex];
-                const content = category.content || [];
-                const wordExists = content.includes(word);
-                const newContent = wordExists
-                    ? content.filter(w => w !== word)
-                    : [...content, word];
-                newFavorites = [...currentFavorites];
-                newFavorites[categoryIndex] = { ...category, content: newContent };
-            } else {
-                newFavorites = [...currentFavorites, { id: categoryId, content: [word] }];
-            }
-
-            await updateDoc(userRef, { favorites: newFavorites });
-        } catch (err) {
-            console.error("收藏操作失敗：", err);
-        }
-    };
+    const { favorites, toggleFavorite } = useFavorites();
 
     if (!results) return null;
 

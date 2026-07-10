@@ -4,10 +4,10 @@ import {
 } from 'react-bootstrap';
 import { useLocation } from 'react-router-dom';
 import { FaHeart, FaRegHeart, FaPlayCircle } from 'react-icons/fa';
-import { doc, updateDoc } from "firebase/firestore";
-import { db, auth } from "../../../firebase";
+import { auth } from "../../../firebase";
 import { createAuthorizedAudio } from "../../utils/authAudio";
 import { useAuth } from "../../src/userServives/authContext";
+import { useFavorites } from "../../src/userServives/useFavorites";
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import PermissionProtect from "../userServives/permissionProtect";
 import axios from 'axios';
@@ -585,7 +585,7 @@ const TRIBES = ['泰雅', '阿美', '布農', '噶瑪蘭', '排灣'];
 
 const App = () => {
   const { userData: user } = useAuth();
-  const [favorites, setFavorites] = useState([]);
+  const { favorites, toggleFavorite } = useFavorites();
   const [activeTab, setActiveTab] = useState(1);
   const [allWords, setAllWords] = useState([]);
   const [expandedWord, setExpandedWord] = useState(null);
@@ -646,12 +646,6 @@ const App = () => {
   }, [selectedTribe]);
 
   useEffect(() => {
-    if (user) {
-      setFavorites(user.firestoreData?.favorites || []);
-    }
-  }, [user]);
-
-  useEffect(() => {
     const timer = setTimeout(() => setDelayedCheck(true), 1500);
 
     return () => {
@@ -686,27 +680,6 @@ const App = () => {
 
     newAudio.play().catch(() => {});
     audioRef.current = newAudio;
-  };
-
-  const toggleFavorite = async (wordTayal, categoryId) => {
-    try {
-      const updatedFavorites = favorites.map(fav => {
-        if (fav.id !== categoryId) return fav;
-
-        const exists = fav.content.includes(wordTayal);
-        const newContent = exists
-          ? fav.content.filter(w => w !== wordTayal)
-          : [...fav.content, wordTayal];
-
-        return { ...fav, content: newContent };
-      });
-
-      const userRef = doc(db, "users", user.uid);
-      await updateDoc(userRef, { favorites: updatedFavorites });
-      setFavorites(updatedFavorites);
-    } catch (err) {
-      console.error("收藏操作失敗：", err);
-    }
   };
 
   if (!user && delayedCheck) return <PermissionProtect />;

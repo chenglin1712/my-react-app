@@ -2,14 +2,20 @@
 FastAPI 版本的 Firebase ID Token 驗證。
 
 邏輯與 backend/AIModel/views.py 的 verify_firebase_token 一致（兩邊共用同一份根目錄
-.env）：DJANGO_DEBUG=True 時跳過驗證（本機開發用），DJANGO_DEBUG=False（正式環境）
-則要求帶有效的 Authorization: Bearer <Firebase ID Token>。
+.env）：AUTH_DEV_BYPASS=True（且 DJANGO_DEBUG=True）時跳過驗證（僅限本機開發），
+否則要求帶有效的 Authorization: Bearer <Firebase ID Token>。故意跟 DJANGO_DEBUG 分開
+成獨立旗標，避免正式環境誤設 DEBUG=True 就連帶讓認證形同虛設。
 """
 import os
 
 from fastapi import Header, HTTPException, Request
 
 _firebase_initialized = False
+
+
+def _auth_dev_bypass() -> bool:
+    debug = os.getenv("DJANGO_DEBUG", "False") == "True"
+    return debug and os.getenv("AUTH_DEV_BYPASS", "False") == "True"
 
 
 def _ensure_firebase():
@@ -41,7 +47,7 @@ async def verify_firebase_token(request: Request, authorization: str = Header(de
     key_func（main.py 的 _rate_limit_key）可以依 uid 做每用戶速率限制，
     不必再解一次 token。
     """
-    if os.getenv("DJANGO_DEBUG", "False") == "True":
+    if _auth_dev_bypass():
         user = {"uid": "dev-user"}
         request.state.user = user
         return user

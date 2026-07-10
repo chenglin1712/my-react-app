@@ -1,9 +1,10 @@
+import asyncio
 import math
 import random
 import threading
 import shutil
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Body, HTTPException, Depends, File, UploadFile, Form, Query
+from fastapi import APIRouter, Body, HTTPException, Depends, File, UploadFile, Form, Query, Request
 from pydantic import BaseModel
 
 from sqlalchemy.orm import Session
@@ -11,10 +12,12 @@ from fastAPI.routes.connect import get_db
 from fastAPI.routes.model import Word
 from fastAPI.routes.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS
+from fastAPI.rate_limit import limiter
 
 import io
 import re
 import requests
+from urllib.parse import urlparse
 from pydub import AudioSegment
 import torch
 import torchaudio
@@ -56,6 +59,23 @@ _ffprobe_path = _find_ffprobe()
 
 # compare_audio 上傳的使用者錄音大小上限，避免超大音檔送進 wav2vec2 拖垮記憶體
 MAX_AUDIO_BYTES = 10 * 1024 * 1024  # 10 MB
+
+# reference_urls 是前端傳入、後端直接發 GET 請求的網址（真人參考音檔），若不限制網域，
+# 等於讓伺服器變成一個開放的請求轉發器（SSRF）：可被用來對內網位址（例如雲端環境的
+# metadata endpoint 169.254.169.254）或任意外部主機發出請求。只允許 Firebase Storage
+# 的公開音檔網域，且限定 https。
+_ALLOWED_REF_HOSTS = ("firebasestorage.googleapis.com", "storage.googleapis.com")
+
+
+def _is_allowed_reference_url(url: str) -> bool:
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    if parsed.scheme != "https" or not parsed.hostname:
+        return False
+    host = parsed.hostname.lower()
+    return any(host == allowed or host.endswith(f".{allowed}") for allowed in _ALLOWED_REF_HOSTS)
 
 if _ffmpeg_path:
     # 把 ffmpeg bin 目錄加進 PATH，讓 pydub subprocess 找得到 ffprobe
@@ -649,7 +669,9 @@ def _score_from_bytes(model, user_emb, audio_bytes):
 
 
 @router.post("/compare_audio/")
+@limiter.limit("20/minute")  # CPU 密集的 wav2vec2 推論 + 對外下載，每用戶每分鐘最多 20 次
 async def compare_audio(
+    request: Request,
     user_audio: UploadFile = File(...),
     audio_id: str = Form(...),
     reference_urls: str = Form(default=""),   # 逗號分隔的 Firebase Storage 公開 URL
@@ -672,26 +694,28 @@ async def compare_audio(
             return make_error("file_too_large", "音檔不得超過 10 MB")
 
         # Step B — 使用者錄音轉 WAV + 取得嵌入
+        # 以下都是同步、CPU 密集或（下載官方音檔時）阻塞式 I/O，用 asyncio.to_thread
+        # 丟到執行緒池執行，避免卡住 event loop、拖慢同一 worker 上的其他請求。
         try:
-            user_wav = convert_to_wav(user_bytes)
-            user_wave, _ = bytes_to_tensor(user_wav)
+            user_wav = await asyncio.to_thread(convert_to_wav, user_bytes)
+            user_wave, _ = await asyncio.to_thread(bytes_to_tensor, user_wav)
         except Exception as e:
             return make_error("convert_user_to_wav", str(e))
 
         try:
-            model = get_wav2vec2()
-            user_emb = _get_embedding(model, user_wave)
+            model = await asyncio.to_thread(get_wav2vec2)
+            user_emb = await asyncio.to_thread(_get_embedding, model, user_wave)
         except Exception as e:
             return make_error("user_embedding", str(e))
 
         # Step C — 官方音檔比對
         try:
-            target_bytes = fetch_audio_from_id(audio_id)
+            target_bytes = await asyncio.to_thread(fetch_audio_from_id, audio_id)
         except Exception as e:
             return make_error("download_target", str(e))
 
         try:
-            official_score = _score_from_bytes(model, user_emb, target_bytes)
+            official_score = await asyncio.to_thread(_score_from_bytes, model, user_emb, target_bytes)
         except Exception as e:
             return make_error("official_similarity", str(e))
 
@@ -700,11 +724,18 @@ async def compare_audio(
         if reference_urls.strip():
             import httpx
             urls = [u.strip() for u in reference_urls.split(",") if u.strip()][:5]
-            async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+            # follow_redirects=False：即使初始網址通過白名單，也不能放行伺服器端重導向，
+            # 否則白名單可被「先指到合法網域、再 302 到內網位址」繞過（redirect-based SSRF）。
+            # Firebase Storage 下載網址本來就是直接回傳檔案內容，不需要重導向。
+            async with httpx.AsyncClient(timeout=10, follow_redirects=False) as client:
                 for url in urls:
+                    if not _is_allowed_reference_url(url):
+                        continue
                     try:
                         resp = await client.get(url)
-                        ref_score = _score_from_bytes(model, user_emb, resp.content)
+                        if resp.is_redirect:
+                            continue
+                        ref_score = await asyncio.to_thread(_score_from_bytes, model, user_emb, resp.content)
                         if best_ref_score is None or ref_score > best_ref_score:
                             best_ref_score = ref_score
                     except Exception:

@@ -116,20 +116,21 @@ const RegisterForm = () => {
                             type="file"
                             accept="image/*"
                             className="input-field"
+                            aria-label="上傳大頭貼"
                             onChange={handleFileChange}
                         />
                     </div>
                     <div className="input-wrapper">
                         <User size={24} className="icon" />
-                        <input type="text" className="input-field" placeholder="使用者名稱" required onChange={(e) => setName(e.target.value)} />
+                        <input type="text" className="input-field" placeholder="使用者名稱" aria-label="使用者名稱" required onChange={(e) => setName(e.target.value)} />
                     </div>
                     <div className="input-wrapper">
                         <Mail size={24} className="icon" />
-                        <input type="email" className="input-field" placeholder="帳號" required onChange={(e) => setEmail(e.target.value)} />
+                        <input type="email" className="input-field" placeholder="帳號" aria-label="帳號" required onChange={(e) => setEmail(e.target.value)} />
                     </div>
                     <div className="input-wrapper">
                         <LockKeyhole size={24} className="icon" />
-                        <input type="password" className="input-field" placeholder="密碼" required onChange={handlePasswordChange} value={password} />
+                        <input type="password" className="input-field" placeholder="密碼" aria-label="密碼" required onChange={handlePasswordChange} value={password} />
                     </div>
                     <div className="password-requirements">
                         <span className={`check-icon ${isPasswordValid ? 'valid' : 'invalid'}`}>
@@ -138,7 +139,7 @@ const RegisterForm = () => {
                         <p>密碼至少需要 6 個字元</p>
                     </div>
                     <div className="input-wrapper">
-                        <select name="identity" className="input-field" style={{ cursor: "pointer" }} value={identity} onChange={(e) => setIdentity(e.target.value)}>
+                        <select name="identity" className="input-field" style={{ cursor: "pointer" }} aria-label="身分" value={identity} onChange={(e) => setIdentity(e.target.value)}>
                             <option value="學生">學生</option>
                         </select>
                     </div>

@@ -57,11 +57,11 @@ const LoginForm = () => {
             <form action="#" className="loginForm">
                 <div className="input-wrapper">
                     <Mail size={24} className="icon" />
-                    <input type="email" className="input-field" placeholder="帳號" required onChange={(e) => { setEmail(e.target.value) }} />
+                    <input type="email" className="input-field" placeholder="帳號" aria-label="帳號" required onChange={(e) => { setEmail(e.target.value) }} />
                 </div>
                 <div className="input-wrapper">
                     <LockKeyhole size={24} className="icon" />
-                    <input type="password" className="input-field" placeholder="密碼" required onChange={(e) => { setPassword(e.target.value) }} />
+                    <input type="password" className="input-field" placeholder="密碼" aria-label="密碼" required onChange={(e) => { setPassword(e.target.value) }} />
                 </div>
                 <a className="forgot-pass" onClick={() => { navigate("/forgot"); }}>忘記密碼?</a>
                 <button className="login-button" onClick={handleLogin}>登入</button>

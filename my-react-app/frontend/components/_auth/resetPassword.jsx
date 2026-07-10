@@ -66,12 +66,14 @@ const Forgot = () => {
             <input
                 type="password"
                 placeholder="目前密碼"
+                aria-label="目前密碼"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
             />
             <input
                 type="password"
                 placeholder="新密碼"
+                aria-label="新密碼"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
             />

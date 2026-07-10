@@ -309,6 +309,7 @@ export default function NoteShare() {
               onChange={(e) => setKeyword(e.target.value)}
               placeholder="搜尋..."
               className="ns-search-input"
+              aria-label="搜尋筆記"
             />
           </div>
           <span className="ns-search-hint">僅搜尋目前頁面已載入的筆記</span>
@@ -332,6 +333,7 @@ export default function NoteShare() {
           <button
             className="ns-refresh"
             title="重新整理"
+            aria-label="重新整理"
             onClick={() => setRefreshTick((x) => x + 1)}
           >
             ⟳
@@ -382,6 +384,7 @@ export default function NoteShare() {
                   <button
                     className={`ns-like-btn ${iLike ? "is-liked" : ""}`}
                     onClick={(e) => toggleLike(e, note, "card")}
+                    aria-label={iLike ? "取消按讚" : "按讚"}
                   >
                     <Heart size={20} fill={iLike ? "red" : "none"} /><span>{note.likes || 0}</span>
                   </button>

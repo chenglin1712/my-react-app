@@ -68,7 +68,7 @@ app.add_middleware(
 # 或消耗運算資源（wav2vec2 語音比對、辭典全表查詢、題目生成全表掃描），一律要求登入才能呼叫。
 _require_login = [Depends(auth.verify_firebase_token)]
 
-app.include_router(crawler.router, prefix="/api/v1/crawler")
+app.include_router(crawler.router, prefix="/api/v1/crawler", dependencies=_require_login)
 app.include_router(vision.router, prefix="/api/v1/vision", dependencies=_require_login)
 app.include_router(dictionary.router, prefix="/api/v1/dictionary", dependencies=_require_login)
 app.include_router(quiz.router, prefix="/api/v1/quiz", dependencies=_require_login)

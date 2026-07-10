@@ -211,6 +211,7 @@ function ListeningGame({ tribe = "tayal" }) {
             className={`listening-play-btn ${isPlaying ? "playing" : ""}`}
             onClick={handlePlay}
             title="播放音頻"
+            aria-label={isPlaying ? "播放中" : "播放發音"}
           >
             {isPlaying ? "♪" : "▶"}
           </button>

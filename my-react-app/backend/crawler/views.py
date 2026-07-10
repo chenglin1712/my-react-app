@@ -2,14 +2,31 @@ import logging
 import requests
 from django.core.cache import cache
 from django.http import JsonResponse
+from django_ratelimit.core import is_ratelimited
 from bs4 import BeautifulSoup
 from . import tayal_bank
 from . import amis_bank
 from . import bunun_bank
 from . import kavalan_bank
 from . import paiwan_bank
+from config.firebase_auth import verify_firebase_token
 
 logger = logging.getLogger(__name__)
+
+# 外部 API 呼叫的逾時秒數（get_quiz_data 原本完全沒設，一個掛住的上游請求
+# 會佔用 worker 到系統預設逾時甚至永遠不回應）。
+_EXTERNAL_TIMEOUT = 10
+
+
+def _rate_limited_response(request, key, group, rate, method):
+    """依 key（已登入使用者 uid 或 IP）限速，邏輯與 AIModel/views.py 一致。"""
+    limited = is_ratelimited(
+        request, group=group, key=lambda g, r: key,
+        rate=rate, method=method, increment=True,
+    )
+    if limited:
+        return JsonResponse({"detail": "請求過於頻繁，請稍後再試"}, status=429)
+    return None
 
 # 各族語對應的官方練習介面 dialect_id、顯示名稱、以及中高級/高級本地題庫的
 # 選題公式進入點。要新增族語時只需在這裡多加一個 key，不用動 get_quiz_data 邏輯。
@@ -48,6 +65,17 @@ TRIBE_CONFIG = {
 
 #爬取線上測驗題目(初級/中級)，中高級/高級改用本地題庫（見下方說明）
 def get_quiz_data(request):
+    # 會對外打第三方 API（無逾時風險）且完全沒有認證/限流保護，可被匿名重複呼叫，
+    # 故加上登入 + 限流，與 CrosswordPuzzle.generate_crossword 同標準。
+    decoded, err_resp = verify_firebase_token(request)
+    if err_resp:
+        return err_resp
+    limited_resp = _rate_limited_response(
+        request, decoded.get("uid", "anon"), group="get_quiz_data", rate="30/m", method="GET"
+    )
+    if limited_resp:
+        return limited_resp
+
     #取得族語與等級，預設泰雅語/1
     tribe = request.GET.get("tribe", "tayal")
     level = request.GET.get("level", "1")
@@ -76,7 +104,7 @@ def get_quiz_data(request):
         "Accept": "application/json"
     }
 
-    response = requests.get(url,headers=headers)
+    response = requests.get(url, headers=headers, timeout=_EXTERNAL_TIMEOUT)
 
     if response.status_code == 200:
         data = response.json()
@@ -153,6 +181,15 @@ NEWS_CACHE_TTL = 900  # 15 分鐘，避免每次開首頁都重新爬 tacp 公�
 
 
 def get_tayal_imformation(request):
+    # 首頁新聞維持公開（不要求登入），但仍加 IP 限流防止匿名濫用；已有 15 分鐘
+    # 快取，即使被打穿限流，實際對外部網站的請求量也有上限。
+    client_ip = request.META.get("REMOTE_ADDR", "unknown")
+    limited_resp = _rate_limited_response(
+        request, client_ip, group="get_tayal_imformation", rate="60/m", method="GET"
+    )
+    if limited_resp:
+        return limited_resp
+
     cached = cache.get(NEWS_CACHE_KEY)
     if cached is not None:
         return JsonResponse(cached, safe=False, json_dumps_params={'ensure_ascii': False, 'indent': 2})

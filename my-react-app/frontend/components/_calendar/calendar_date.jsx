@@ -112,7 +112,7 @@ const UserCalendar = () => {
                                 {new Date(event.start).toLocaleTimeString()} -{" "}
                                 {new Date(event.end).toLocaleTimeString()}
                             </span>
-                            <button onClick={() => handleDelete(index)} title="刪除" className="delete-btn">
+                            <button onClick={() => handleDelete(index)} title="刪除" className="delete-btn" aria-label="刪除">
                                 <Trash2 size={16} />
                             </button>
                             {/(測驗)/.test(event.summary + event.description) && (
@@ -137,6 +137,7 @@ const UserCalendar = () => {
                         onKeyPress={(e) => {
                             if (e.key === "Enter") handleAddEvent();
                         }}
+                        aria-label="新增事件"
                     />
                     <button onClick={handleAddEvent}>新增</button>
                 </div>

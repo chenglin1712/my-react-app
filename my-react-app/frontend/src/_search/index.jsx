@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
 import { Container, Alert, Spinner, Button } from 'react-bootstrap';
-import { useAuth } from "../../src/userServives/authContext";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { db, auth } from "../../../firebase";
+import { useFavorites } from "../../src/userServives/useFavorites";
+import { auth } from "../../../firebase";
 import "../../static/css/_search/index.css";
 
 import SearchHeader from './components/SearchHeader';
@@ -24,10 +23,13 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [expandedWord, setExpandedWord] = useState(null);
-  const [favoriteWords, setFavoriteWords] = useState(new Set());
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterLetter, setFilterLetter] = useState('');
-  const { userData: user, updateUserData } = useAuth();
+  const { favorites, toggleFavorite } = useFavorites();
+  const favoriteWords = useMemo(
+    () => new Set(favorites.find(fav => fav.id === 1)?.content || []),
+    [favorites]
+  );
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const [frequencyFilter, setFrequencyFilter] = useState('');
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -47,74 +49,6 @@ const App = () => {
 
 
   const toggleExpand = (key) => setExpandedWord(prev => (prev === key ? null : key));
-
-  const toggleFavorite = async (wordTayal) => {
-    if (!user) return;
-
-    setFavoriteWords(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(wordTayal)) {
-        newSet.delete(wordTayal);
-      } else {
-        newSet.add(wordTayal);
-      }
-      return newSet;
-    });
-
-
-    try {
-
-      const baseCategory = user.firestoreData?.favorites?.find(fav => fav.id === 1);
-      let newContent = baseCategory?.content || [];
-
-      if (newContent.includes(wordTayal)) {
-
-        newContent = newContent.filter(w => w !== wordTayal);
-      } else {
-
-        newContent = [...newContent, wordTayal];
-      }
-
-
-      await updateUserFavoritesCategory(user.uid, 1, newContent);
-
-      const newFavorites = user.firestoreData.favorites.map(fav => {
-        if (fav.id === 1) {
-          return { ...fav, content: newContent };
-        }
-        return fav;
-      });
-      updateUserData({
-        ...user,
-        firestoreData: {
-          ...user.firestoreData,
-          favorites: newFavorites
-        }
-      });
-    } catch (err) {
-      console.error('同步收藏失敗', err);
-    }
-
-  };
-
-  async function updateUserFavoritesCategory(userId, categoryId, newContent) {
-    const userDocRef = doc(db, "users", userId);
-
-    const userSnap = await getDoc(userDocRef);
-    if (!userSnap.exists()) throw new Error("使用者文件不存在");
-
-    const userData = userSnap.data();
-    const favorites = userData.favorites || [];
-
-    const newFavorites = favorites.map(fav => {
-      if (fav.id === categoryId) {
-        return { ...fav, content: newContent };
-      }
-      return fav;
-    });
-
-    await updateDoc(userDocRef, { favorites: newFavorites });
-  }
 
   const TRIBES_WITH_DATA = ['泰雅', '阿美', '布農', '噶瑪蘭', '排灣'];
 
@@ -241,21 +175,9 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    const saved = localStorage.getItem('favoriteWords');
-    if (saved) setFavoriteWords(new Set(JSON.parse(saved)));
     handleSearch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    if (user) {
-      const baseCategory = user.firestoreData?.favorites?.find(fav => fav.id === 1);
-      const favoriteSet = new Set(baseCategory?.content || []);
-      setFavoriteWords(favoriteSet);
-    } else {
-      setFavoriteWords(new Set());
-    }
-  }, [user]);
 
   const filterAndSortWords = (words) => {
     return words

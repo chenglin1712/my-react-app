@@ -35,10 +35,22 @@ if not SECRET_KEY:
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DJANGO_DEBUG", "False") == "True"
 
-_render_host = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+# 是否略過 Firebase token 驗證（僅限本機開發）。故意跟 DEBUG 分開：
+# DEBUG 只應該控制錯誤訊息詳細度／SQL echo 這類「除錯資訊」，不該同時是
+# 「要不要驗證身份」的開關——否則正式環境若誤把 DJANGO_DEBUG 設成 True，
+# 會在完全沒人注意到的情況下讓全站認證形同虛設。要略過驗證必須另外明確
+# 設定這個旗標，且僅在 DEBUG 也是 True 時才生效（雙重確認，避免正式環境
+# 誤設 AUTH_DEV_BYPASS=True 卻忘記同時把 DEBUG 打開）。
+AUTH_DEV_BYPASS = DEBUG and os.getenv("AUTH_DEV_BYPASS", "False") == "True"
+
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+# Render 會自動注入 RENDER_EXTERNAL_HOSTNAME；其他平台（Cloud Run 等）沒有這個
+# 環境變數，改用 DJANGO_ALLOWED_HOSTS（逗號分隔）手動指定，兩者可並存。
+_render_host = os.getenv("RENDER_EXTERNAL_HOSTNAME")
 if _render_host:
     ALLOWED_HOSTS.append(_render_host)
+_extra_hosts = os.getenv("DJANGO_ALLOWED_HOSTS", "")
+ALLOWED_HOSTS += [h.strip() for h in _extra_hosts.split(",") if h.strip()]
 
 APPEND_SLASH = False
 # Application definition
@@ -73,12 +85,15 @@ MIDDLEWARE = [
 _raw_cors = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
 CORS_ALLOWED_ORIGINS = [o.strip() for o in _raw_cors.split(",") if o.strip()]
 # CSRF
-CSRF_TRUSTED_ORIGINS = [
-    "http://127.0.0.1:8000",
-    "http://127.0.0.1:8001",
-    "http://localhost:5173",
-    "https://myapp-670241888799.asia-east1.run.app"
-]
+# 正式部署的網域跟 ALLOWED_HOSTS 一樣改讀環境變數（逗號分隔），不再寫死單一
+# 平台的網址——先前寫死一個 Cloud Run URL，但 ALLOWED_HOSTS 只認 Render 的
+# 環境變數，兩者對不上，換一個部署環境（甚至只是換 Cloud Run 專案/區域）就要
+# 改程式碼才能生效。本機開發預設值維持不變。
+_raw_csrf_origins = os.getenv(
+    "CSRF_TRUSTED_ORIGINS",
+    "http://127.0.0.1:8000,http://127.0.0.1:8001,http://localhost:5173",
+)
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in _raw_csrf_origins.split(",") if o.strip()]
 #字元
 DEFAULT_CHARSET = 'utf-8'
 

@@ -143,15 +143,16 @@ const Discussion = ({ tribe = "tayal" }) => {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="輸入你的問題..."
+                    aria-label="輸入問題"
                 />
-                <button onClick={handleSend}><Send size={18} /></button>
+                <button onClick={handleSend} aria-label="傳送訊息"><Send size={18} /></button>
             </div>
 
             {/* 放大訊息 Modal */}
             {expanded && (
                 <div className="modal-overlay" onClick={() => setExpanded(null)}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <button className="close-btn" onClick={() => setExpanded(null)}>
+                        <button className="close-btn" onClick={() => setExpanded(null)} aria-label="關閉">
                             <X size={20} />
                         </button>
                         {expanded.type === "translation" ? (

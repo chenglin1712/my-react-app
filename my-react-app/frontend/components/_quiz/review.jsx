@@ -246,6 +246,7 @@ const Review = () => {
                                                         new Audio(selectedQuestion.audio).play().catch(() => {});
                                                     }
                                                 }}
+                                                aria-label="播放音訊"
                                             >
                                                 <Play size={20} />
                                             </button>

@@ -2,7 +2,6 @@ import json
 import logging
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
-from django.conf import settings as django_settings
 from django_ratelimit.core import is_ratelimited
 from openai import OpenAI
 import os
@@ -14,6 +13,7 @@ from fastAPI.routes.connect import SessionLocal
 from fastAPI.routes.model import Word
 from fastAPI.routes.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS, TRIBE_MAP
+from config.firebase_auth import verify_firebase_token
 
 logger = logging.getLogger(__name__)
 
@@ -31,59 +31,6 @@ client = OpenAI(
     base_url="https://models.github.ai/inference"
 )
 
-# ── Firebase Admin SDK（生產環境身份驗證）──────────────────────────
-_firebase_initialized = False
-
-def _ensure_firebase():
-    global _firebase_initialized
-    if _firebase_initialized:
-        return
-    sa_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
-    if not sa_path:
-        raise EnvironmentError(
-            "FIREBASE_SERVICE_ACCOUNT_PATH 未設定，"
-            "請在 .env 填入 Firebase 服務帳戶金鑰路徑。"
-        )
-    import firebase_admin
-    from firebase_admin import credentials
-    if not firebase_admin._apps:
-        cred = credentials.Certificate(sa_path)
-        firebase_admin.initialize_app(cred)
-    _firebase_initialized = True
-
-def csrf_exempt_in_debug(view_func):
-    """DEBUG=True（本機開發）沿用原本略過 CSRF 檢查的行為；DEBUG=False（正式環境）
-    交回 Django 標準 CSRF 保護。過渡方案：前端目前完全沒有處理 CSRF token/cookie，
-    套用這個保護後，正式環境下這兩個 view 的 POST 請求會被 Django CSRF middleware
-    擋下（403），要嘛前端補上 CSRF token，要嘛之後把這兩個 view 改回 Django 標準
-    的 view-based auth。"""
-    return csrf_exempt(view_func) if django_settings.DEBUG else view_func
-
-
-def verify_firebase_token(request):
-    """驗證 Firebase ID Token。DEBUG 模式下跳過驗證（開發環境用）。"""
-    if django_settings.DEBUG:
-        logger.warning(
-            "verify_firebase_token: SKIPPED (DEBUG=True). "
-            "Set DJANGO_DEBUG=False in production to enforce authentication."
-        )
-        return {"uid": "dev-user"}, None
-
-    auth_header = request.META.get("HTTP_AUTHORIZATION", "")
-    if not auth_header.startswith("Bearer "):
-        return None, JsonResponse({"detail": "需要登入才能使用此功能"}, status=401)
-    token = auth_header[7:]
-    try:
-        _ensure_firebase()
-        from firebase_admin import auth as firebase_auth
-        decoded = firebase_auth.verify_id_token(token)
-        return decoded, None
-    except EnvironmentError as e:
-        return None, JsonResponse({"detail": str(e)}, status=503)
-    except Exception:
-        return None, JsonResponse({"detail": "身份驗證失敗，請重新登入"}, status=401)
-
-
 def _rate_limited_response(request, decoded, group, rate="10/m"):
     """依已登入使用者的 uid 限速（這兩個 view 都會呼叫付費的 GitHub Models API）。
     直接呼叫 is_ratelimited 而不是用 @ratelimit 裝飾器：裝飾器要在呼叫 view 之前
@@ -100,7 +47,12 @@ def _rate_limited_response(request, decoded, group, rate="10/m"):
     return None
 
 
-@csrf_exempt_in_debug
+# 這兩個 view 只認 Authorization: Bearer <Firebase ID Token>，不是 cookie/session-based
+# 認證，瀏覽器不會替跨站請求自動附上這個 header，所以本來就不受 CSRF 攻擊影響——
+# csrf_exempt 在這裡不是「豁免掉一項保護」，而是「這項保護原本就不適用」，永久生效，
+# 不隨 DEBUG 變動（過去曾經只在 DEBUG=True 才豁免，DEBUG=False 時前端從未處理過
+# CSRF token/cookie，會讓這兩個 view 一律 403）。
+@csrf_exempt
 def tayal_chat(request):
     if request.method == "POST":
         decoded, err_resp = verify_firebase_token(request)
@@ -223,7 +175,7 @@ def tayal_chat(request):
     else:
         return JsonResponse({"detail": "只接受 POST 請求"}, status=405)
     
-@csrf_exempt_in_debug
+@csrf_exempt
 def review_tayal_chat(request):
     if request.method == "POST":
         decoded, err_resp = verify_firebase_token(request)
