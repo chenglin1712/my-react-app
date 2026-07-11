@@ -141,12 +141,22 @@ export default function NoteShare() {
     }
   };
 
+  // fetchPage/fetchTotalCount 每次渲染都重新建立，這裡只想在 filter／refreshTick／
+  // myUid 真的變動時才重新抓，不想因為函式參照變了就多跑一次，用 ref 保存最新版本。
+  const fetchPageRef = useRef(fetchPage);
+  useEffect(() => {
+    fetchPageRef.current = fetchPage;
+  });
+  const fetchTotalCountRef = useRef(fetchTotalCount);
+  useEffect(() => {
+    fetchTotalCountRef.current = fetchTotalCount;
+  });
+
   // 切換 tab／重新整理／登入狀態改變：清空分頁快取，從第 1 頁重新抓
   useEffect(() => {
     pageCacheRef.current = {};
-    fetchPage(filter, 1);
-    fetchTotalCount(filter);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchPageRef.current(filter, 1);
+    fetchTotalCountRef.current(filter);
   }, [filter, refreshTick, myUid]);
 
   const goToPage = (page) => {

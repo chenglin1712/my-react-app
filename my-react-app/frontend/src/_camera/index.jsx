@@ -2,14 +2,7 @@ import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Alert, Button, Container, Row, Col, Dropdown } from "react-bootstrap";
 import pexelsPhoto from '../../static/assets/pexels-photo.webp';
-
-const TRIBES = [
-    { slug: "tayal", name: "泰雅" },
-    { slug: "amis", name: "阿美" },
-    { slug: "bunun", name: "布農" },
-    { slug: "kavalan", name: "噶瑪蘭" },
-    { slug: "paiwan", name: "排灣" },
-];
+import { TRIBES } from "../constants/tribes";
 
 const App = () => {
     const [image, setImage] = useState(null);

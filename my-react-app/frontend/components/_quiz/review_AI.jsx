@@ -1,8 +1,7 @@
 import "../../static/css/_quiz/review_AI.css"
 import { useState } from "react";
 import { Send, Bot, X } from "lucide-react";
-
-const TRIBE_NAME = { tayal: "泰雅", amis: "阿美", bunun: "布農", kavalan: "噶瑪蘭", paiwan: "排灣" };
+import { TRIBE_NAME_BY_SLUG as TRIBE_NAME } from "../../src/constants/tribes";
 
 const Discussion = ({ tribe = "tayal" }) => {
     const tribeName = TRIBE_NAME[tribe] || "族語";

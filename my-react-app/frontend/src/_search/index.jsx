@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
 import { Container, Alert, Spinner, Button } from 'react-bootstrap';
 import { useFavorites } from "../../src/userServives/useFavorites";
+import { TRIBE_NAMES } from "../constants/tribes";
 import { auth } from "../../../firebase";
 import "../../static/css/_search/index.css";
 
@@ -44,13 +45,13 @@ const App = () => {
 
   const { playAudio, playSentence, failedAudio } = useAudioPlayback(selectedTribe, setError);
 
-  const tribes = ['泰雅', '阿美', '布農', '噶瑪蘭', '排灣'];
-
-
+  const tribes = TRIBE_NAMES;
 
   const toggleExpand = (key) => setExpandedWord(prev => (prev === key ? null : key));
 
-  const TRIBES_WITH_DATA = ['泰雅', '阿美', '布農', '噶瑪蘭', '排灣'];
+  // 目前資料庫已有資料的族語跟支援的族語清單相同，用同一份共用清單；未來若新增
+  // 族語但辭典資料還沒建好，這裡可以改成 TRIBE_NAMES 的子集合。
+  const TRIBES_WITH_DATA = TRIBE_NAMES;
 
   // 「全部詞條」瀏覽（沒有輸入關鍵字）：字母／詞頻／分類／收藏篩選與排序都交給後端做，
   // 這裡只帶目前的篩選條件 + limit/offset 向 /dictionary/all/ 要一頁資料。
@@ -117,6 +118,28 @@ const App = () => {
     }
   };
 
+  // handleSearch 每次渲染都重新建立，下面幾個 effect 只想在特定條件變動時呼叫
+  // 「當下最新版」的 handleSearch，不想因為 handleSearch 本身參照變了就多重新
+  // 執行一次（那會跟 loading/allOffset 等它自己會更新的狀態形成循環）。用一個
+  // ref 保存最新版本，effect 依賴列表只放真正要反應的條件，不用再關掉
+  // exhaustive-deps 檢查。
+  const handleSearchRef = useRef(handleSearch);
+  useEffect(() => {
+    handleSearchRef.current = handleSearch;
+  });
+  // 同理，下面兩個 effect 內的 query.trim() === ''／showOnlyFavorites 只是判斷
+  // 「現在要不要真的觸發查詢」的 guard，不是它們要反應的觸發條件（showOnlyFavorites
+  // 本身變動已經由上一個 effect 的依賴陣列處理，這裡如果也放進依賴陣列，切換「只顯示
+  // 收藏」時會兩個 effect 各打一次、變成重複請求），一樣用 ref 讀最新值。
+  const queryRef = useRef(query);
+  useEffect(() => {
+    queryRef.current = query;
+  });
+  const showOnlyFavoritesRef = useRef(showOnlyFavorites);
+  useEffect(() => {
+    showOnlyFavoritesRef.current = showOnlyFavorites;
+  });
+
   // 這裡不直接呼叫 handleSearch(tribe)：因為 setFilterLetter('') 等 setState
   // 要到下次重新渲染才會生效，若在同一個事件處理常式裡緊接著呼叫 handleSearch，
   // fetchAllWords 讀到的仍是舊的篩選條件（stale closure）。改成把狀態重置好，
@@ -150,19 +173,17 @@ const App = () => {
       didMountFilterEffect.current = true;
       return;
     }
-    if (query.trim() === '') {
-      handleSearch();
+    if (queryRef.current.trim() === '') {
+      handleSearchRef.current();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTribe, filterLetter, frequencyFilter, showOnlyFavorites, selectedSubCategory, sortOrder]);
 
   // 收藏清單變動時，如果目前正用「只顯示收藏」瀏覽全部詞條，重新拉一次目前頁次，
   // 讓被取消收藏的詞條即時從畫面上消失（showOnlyFavorites 預設 false，掛載當下不會誤觸發）
   useEffect(() => {
-    if (showOnlyFavorites && query.trim() === '') {
-      handleSearch();
+    if (showOnlyFavoritesRef.current && queryRef.current.trim() === '') {
+      handleSearchRef.current();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [favoriteWords]);
 
   useEffect(() => {
@@ -175,8 +196,7 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    handleSearch();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    handleSearchRef.current();
   }, []);
 
   const filterAndSortWords = (words) => {

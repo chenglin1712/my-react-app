@@ -1,49 +1,20 @@
 import { useNavigate } from "react-router-dom";
 import "../../static/css/_game/zone.css";
 import { Container } from "react-bootstrap";
+import { TRIBES as TRIBE_LIST } from "../constants/tribes";
 
-const TRIBES = [
-  {
-    id: "tayal",
-    name: "泰雅",
-    subtitle: "Tayal",
-    emoji: "📝",
-    available: true,
-    route: "/quiz",
-  },
-  {
-    id: "amis",
-    name: "阿美",
-    subtitle: "Amis",
-    emoji: "📝",
-    available: true,
-    route: "/quiz/amis",
-  },
-  {
-    id: "bunun",
-    name: "布農",
-    subtitle: "Bunun",
-    emoji: "📝",
-    available: true,
-    route: "/quiz/bunun",
-  },
-  {
-    id: "kavalan",
-    name: "噶瑪蘭",
-    subtitle: "Kavalan",
-    emoji: "📝",
-    available: true,
-    route: "/quiz/kavalan",
-  },
-  {
-    id: "paiwan",
-    name: "排灣",
-    subtitle: "Paiwan",
-    emoji: "📝",
-    available: true,
-    route: "/quiz/paiwan",
-  },
-];
+// subtitle/emoji/available/route 是這個頁面自己的呈現用資料，跟名稱對照表分開放；
+// 名稱（name）跟英文代稱（id，沿用原本 tribe.id 這個欄位名）一律從共用的
+// TRIBE_LIST 取得，subtitle 就是 slug 首字大寫。
+const TRIBE_ROUTES = { tayal: "/quiz", amis: "/quiz/amis", bunun: "/quiz/bunun", kavalan: "/quiz/kavalan", paiwan: "/quiz/paiwan" };
+const TRIBES = TRIBE_LIST.map((t) => ({
+  id: t.slug,
+  name: t.name,
+  subtitle: t.slug.charAt(0).toUpperCase() + t.slug.slice(1),
+  emoji: "📝",
+  available: true,
+  route: TRIBE_ROUTES[t.slug],
+}));
 
 const QuizTribeSelect = () => {
   const navigate = useNavigate();

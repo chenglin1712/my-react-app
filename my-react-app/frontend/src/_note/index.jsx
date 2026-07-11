@@ -75,13 +75,15 @@ function NotePage() {
   }, [LOCAL_KEY]);
 
   // 換頁時把編輯器內容換成該頁筆記，用筆記 id 當依據，
-  // 避免 currentPage 沒變但 notes 剛載入完成時漏掉初次同步。
+  // 避免 currentPage 沒變但 notes 剛載入完成時漏掉初次同步。只想在「換到不同一篇
+  // 筆記」時重新同步，不想在同一篇筆記的內容變動（例如 updateCurrentContent 把
+  // 編輯器目前內容寫回 notes）時也跟著重跑，所以透過既有的 notesRef/currentPageRef
+  // 讀最新值，不把 notes/currentPage 整包放進依賴陣列。
   const currentNoteId = notes[currentPage]?.id;
   useEffect(() => {
     if (!editor || currentNoteId == null) return;
-    editor.commands.setContent(notes[currentPage]?.content || "<p></p>", false);
+    editor.commands.setContent(notesRef.current[currentPageRef.current]?.content || "<p></p>", false);
     setIsDirty(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentNoteId, editor]);
 
   const updateCurrentContent = () => {

@@ -11,6 +11,7 @@ import { useFavorites } from "../../src/userServives/useFavorites";
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import PermissionProtect from "../userServives/permissionProtect";
 import ErrorBoundary from "../errorBoundary";
+import { TRIBE_NAMES as TRIBES } from "../constants/tribes";
 import axios from 'axios';
 import "../../static/css/_favorite/index_judy.css"
 
@@ -434,22 +435,23 @@ const useTabState = (favorites) => {
   const [tabStates, setTabStates] = useState({});
 
   useEffect(() => {
-    const newTabStates = {};
-    favorites.forEach(fav => {
-      if (!tabStates[fav.id]) {
-        newTabStates[fav.id] = {
+    // 用 setState 的 updater function 讀「當下」的 tabStates（prev），不透過外層
+    // closure 讀 state：這樣 tabStates 本身就不需要出現在依賴陣列裡，也不用關掉
+    // exhaustive-deps 檢查——本來就不能把 tabStates 放進依賴陣列，這個 effect
+    // 自己會呼叫 setTabStates，放進去會變成無限迴圈。
+    setTabStates(prev => {
+      const newTabStates = {};
+      favorites.forEach(fav => {
+        newTabStates[fav.id] = prev[fav.id] || {
           inputValue: '',
           activeQuery: '',
           sortOrder: 'asc',
           filterLetter: '',
           frequencyFilter: ''
         };
-      } else {
-        newTabStates[fav.id] = tabStates[fav.id];
-      }
+      });
+      return newTabStates;
     });
-    setTabStates(newTabStates);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [favorites]);
 
   const updateTabState = (tabId, key, value) => {
@@ -582,7 +584,6 @@ const useFilterAndSort = (allWords) => {
 };
 
 const PAGE_SIZE = 50;
-const TRIBES = ['泰雅', '阿美', '布農', '噶瑪蘭', '排灣'];
 
 const App = () => {
   const { userData: user } = useAuth();

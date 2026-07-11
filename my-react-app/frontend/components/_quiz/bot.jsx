@@ -6,15 +6,8 @@ import { motion } from "framer-motion";
 import StudyPlanComponent from "./bot_study_plan"
 import { useAuth } from "../../src/userServives/authContext";
 import { getUserSituation } from "../../src/userServives/uploadDb";
+import { TRIBES } from "../../src/constants/tribes";
 import { auth } from "../../../firebase";
-
-const TRIBES = [
-    { slug: "tayal", name: "泰雅" },
-    { slug: "amis", name: "阿美" },
-    { slug: "bunun", name: "布農" },
-    { slug: "kavalan", name: "噶瑪蘭" },
-    { slug: "paiwan", name: "排灣" },
-];
 
 const Advice = ({ onClose }) => {
     const navigate = useNavigate();

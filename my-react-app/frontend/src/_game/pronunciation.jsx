@@ -1,14 +1,17 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../../static/css/_game/vocabulary.css";
+import { TRIBES as TRIBE_LIST } from "../constants/tribes";
 
-const TRIBES = [
-  { name: "泰雅", color: "#9B1B30", hasGame: true,  route: "/game/pronunciation/tayal" },
-  { name: "阿美", color: "#D4890A", hasGame: true,  route: "/game/pronunciation/amis" },
-  { name: "布農", color: "#4E7F63", hasGame: true,  route: "/game/pronunciation/bunun" },
-  { name: "噶瑪蘭", color: "#4A7FA5", hasGame: true,  route: "/game/pronunciation/kavalan" },
-  { name: "排灣", color: "#6B4FAA", hasGame: true,  route: "/game/pronunciation/paiwan" },
-];
+// 顏色是這個頁面自己的呈現用資料，不是族語本身的屬性，跟名稱對照表分開放；
+// 名稱一律從共用的 TRIBE_LIST 取得。
+const TRIBE_COLORS = { tayal: "#9B1B30", amis: "#D4890A", bunun: "#4E7F63", kavalan: "#4A7FA5", paiwan: "#6B4FAA" };
+const TRIBES = TRIBE_LIST.map((t) => ({
+  name: t.name,
+  color: TRIBE_COLORS[t.slug],
+  hasGame: true,
+  route: `/game/pronunciation/${t.slug}`,
+}));
 
 const PronunciationPage = () => {
   const navigate = useNavigate();

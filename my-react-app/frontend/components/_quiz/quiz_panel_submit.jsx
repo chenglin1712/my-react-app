@@ -4,9 +4,9 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { CheckCircle, XCircle, Star } from "lucide-react"
 import { getQuizSubmitById, countScore } from "../../src/userServives/uploadDb"
 import { useAuth } from "../../src/userServives/authContext"
+import { TRIBE_FULL_NAME_BY_SLUG as TRIBE_NAME } from "../../src/constants/tribes"
 
 const DIFFICULTY_MAP = { "初級": 1, "中級": 2, "中高級": 3, "高級": 4 };
-const TRIBE_NAME = { tayal: "泰雅語", amis: "阿美語", bunun: "布農語", kavalan: "噶瑪蘭語", paiwan: "排灣語" };
 
 const Panel_Submit = ({ tribe = "tayal" }) => {
     const navigate = useNavigate();
