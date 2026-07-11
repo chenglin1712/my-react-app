@@ -9,6 +9,7 @@ import "../../static/css/_note/toolbar.css";
 import "../../static/css/_note/buttons.css";
 import { Image as ImageIcon } from "lucide-react";
 import DOMPurify from "dompurify";
+import ErrorBoundary from "../errorBoundary";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
 import { TextStyle } from "@tiptap/extension-text-style";
@@ -235,7 +236,7 @@ function NotePage() {
       setError("");
     } catch (error) {
       console.error("分享失敗：", error);
-      alert("分享失敗，請稍後再試。");
+      setError("分享失敗，請稍後再試。");
     }
   };
 
@@ -320,8 +321,11 @@ function NotePage() {
             aria-label="筆記標題"
           />
 
-          {/* 編輯區：只保留 .note-text，不再包一層卡片 */}
-          <EditorContent editor={editor} className="note-text" />
+          {/* 編輯區：只保留 .note-text，不再包一層卡片。
+              包一層 ErrorBoundary，避免 TipTap 出錯時把整個筆記頁清空。 */}
+          <ErrorBoundary fallback={<Alert variant="warning" className="mt-2">編輯器發生錯誤，請重新整理頁面再試一次。</Alert>}>
+            <EditorContent editor={editor} className="note-text" />
+          </ErrorBoundary>
 
           {error && <Alert variant="danger" className="mt-3">{error}</Alert>}
         </Col>

@@ -12,6 +12,7 @@ const UserSidebar = ({ userData, closeSidebar }) => {
 
     const navigate = useNavigate();
     const [showBot, setShowBot] = useState(false);
+    const [signOutError, setSignOutError] = useState("");
 
     const menuItems = [
         { id: 'favorites', label: '個人詞語庫', icon: <Heart size={20} /> },
@@ -19,9 +20,13 @@ const UserSidebar = ({ userData, closeSidebar }) => {
         { id: 'calendar', label: '行事曆', icon: <Calendar size={20} /> }
     ];
 
-    const handleSignOut = () => {
-        signOut();
-        navigate("/");
+    const handleSignOut = async () => {
+        try {
+            await signOut();
+            navigate("/");
+        } catch (err) {
+            setSignOutError("登出失敗：" + err.message);
+        }
     };
 
     return (
@@ -52,6 +57,9 @@ const UserSidebar = ({ userData, closeSidebar }) => {
                             <LogOut size={14} className="icon" /> 登出
                         </button>
                     </div>
+                    {signOutError && (
+                        <p className="text-danger small mt-2 mb-0" role="alert">{signOutError}</p>
+                    )}
                 </div>
 
                 {/* 導航列 */}

@@ -2,6 +2,7 @@ import "../../static/css/_auth/loginForm.css"
 import { Mail, LockKeyhole, User } from "lucide-react"
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { Alert } from "react-bootstrap";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../../firebase";
 import lottie from 'lottie-web';
@@ -10,14 +11,16 @@ import successAnimation from "../../src/animations/success.json"
 const LoginForm = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [errorMsg, setErrorMsg] = useState("");
     const navigate = useNavigate();
 
     //使用者登入
     const handleLogin = async (e) => {
         e.preventDefault();
+        setErrorMsg("");
 
         if (!email || !password) {
-            alert("請輸入電子郵件和密碼！");
+            setErrorMsg("請輸入電子郵件和密碼！");
             return;
         }
         try {
@@ -28,9 +31,9 @@ const LoginForm = () => {
             }, 1800);
         } catch (error) {
             if (error.code.includes('auth/invalid-credential')) {
-                alert("帳號或密碼錯誤，請檢查電子郵件和密碼是否正確！");
+                setErrorMsg("帳號或密碼錯誤，請檢查電子郵件和密碼是否正確！");
             } else {
-                alert("登入失敗: " + error.message);
+                setErrorMsg("登入失敗: " + error.message);
             }
         }
     };
@@ -54,6 +57,7 @@ const LoginForm = () => {
     return (
         <div className="login-box">
             <h2 className="formTitle"><User size={30} />登入</h2>
+            {errorMsg && <Alert variant="danger" className="py-2">{errorMsg}</Alert>}
             <form action="#" className="loginForm">
                 <div className="input-wrapper">
                     <Mail size={24} className="icon" />

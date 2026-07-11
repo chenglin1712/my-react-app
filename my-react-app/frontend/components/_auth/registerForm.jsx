@@ -2,6 +2,7 @@ import "../../static/css/_auth/registerForm.css"
 import { User, Mail, LockKeyhole, Footprints, CheckCircle } from "lucide-react"
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { Alert } from "react-bootstrap";
 import avatarImage from '../../static/assets/_auth/avatar.webp';
 import { registerWithImg } from "../../src/userServives/userServive"
 import lottie from 'lottie-web';
@@ -13,6 +14,7 @@ const RegisterForm = () => {
     const [password, setPassword] = useState("");
     const [isPasswordValid, setIsPasswordValid] = useState(false);
     const [identity, setIdentity] = useState("學生");
+    const [errorMsg, setErrorMsg] = useState("");
 
     const [preview, setPreview] = useState(null);
     const [avatarUrl, setAvatarUrl] = useState(null);
@@ -24,6 +26,7 @@ const RegisterForm = () => {
 
     //使用者註冊
     const handleRegister = async () => {
+        setErrorMsg("");
         try {
             await registerWithImg(name, email, password, identity, avatarUrl);
             setIsRegistered(true);
@@ -32,9 +35,9 @@ const RegisterForm = () => {
             }, 1500);
         } catch (error) {
             if (error.code === "auth/email-already-in-use") {
-                alert("Email 已被註冊過");
+                setErrorMsg("Email 已被註冊過");
             } else {
-                alert("註冊失敗");
+                setErrorMsg("註冊失敗");
             }
             setIsRegistered(false);
         }
@@ -57,9 +60,10 @@ const RegisterForm = () => {
         if (!file) return;
 
         if (file.size > 5 * 1024 * 1024) {
-            alert("圖片不得超過 5 MB，請重新選擇。");
+            setErrorMsg("圖片不得超過 5 MB，請重新選擇。");
             return;
         }
+        setErrorMsg("");
 
         setPreview(URL.createObjectURL(file));
         setIsUploading(true);
@@ -79,7 +83,7 @@ const RegisterForm = () => {
             setAvatarUrl(data.secure_url);
         } catch (error) {
             console.error("圖片上傳失敗", error);
-            alert("圖片上傳失敗");
+            setErrorMsg("圖片上傳失敗");
         } finally {
             setIsUploading(false);
         }
@@ -108,6 +112,7 @@ const RegisterForm = () => {
                         <Footprints size={22} />訪客登入
                     </button>
                 </p>
+                {errorMsg && <Alert variant="danger" className="py-2">{errorMsg}</Alert>}
                 <form action="#" className="registerForm">
                     <div className="input-wrapper">
                         <img src={preview || avatarImage} style={{ height: "101px", padding: "inherit" }} />

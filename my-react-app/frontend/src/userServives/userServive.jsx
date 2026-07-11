@@ -174,33 +174,36 @@ export const initUserFields = async (uid) => {
     }
 };
 
+// 失敗時往上拋，讓呼叫端（useFavorites hook）決定要不要還原樂觀更新、
+// 在畫面上提示使用者，而不是在這裡默默吞掉錯誤。
 export const toggleFavoriteWord = async (uid, wordTayal, favId = 1) => {
     try {
         const userRef = doc(db, "users", uid);
         const userSnap = await getDoc(userRef);
 
-        if (userSnap.exists()) {
-            const userData = userSnap.data();
-            const favorites = userData.favorites || [];
-
-            const updatedFavorites = favorites.map(fav => {
-                if (fav.id === favId) {
-                    const content = Array.isArray(fav.content) ? fav.content : [];
-                    const exists = content.includes(wordTayal);
-                    const newContent = exists
-                        ? content.filter(w => w !== wordTayal)
-                        : [...content, wordTayal];
-                    return { ...fav, content: newContent };
-                }
-                return fav;
-            });
-
-            await updateDoc(userRef, { favorites: updatedFavorites });
-        } else {
-            console.error("X 使用者不存在");
+        if (!userSnap.exists()) {
+            throw new Error("使用者資料不存在");
         }
+
+        const userData = userSnap.data();
+        const favorites = userData.favorites || [];
+
+        const updatedFavorites = favorites.map(fav => {
+            if (fav.id === favId) {
+                const content = Array.isArray(fav.content) ? fav.content : [];
+                const exists = content.includes(wordTayal);
+                const newContent = exists
+                    ? content.filter(w => w !== wordTayal)
+                    : [...content, wordTayal];
+                return { ...fav, content: newContent };
+            }
+            return fav;
+        });
+
+        await updateDoc(userRef, { favorites: updatedFavorites });
     } catch (err) {
         console.error("X 收藏寫入失敗：", err.message);
+        throw err;
     }
 };
 
@@ -221,12 +224,14 @@ export const updateUserErrors = async (uid, wordTayal, increment = 1) => {
 };
 
 //登出
+// 失敗時往上拋，讓呼叫端（userSidebar.jsx）決定怎麼在畫面上提示使用者，
+// 而不是在這個不屬於任何元件的共用函式裡直接跳 alert()。
 export const signOut = async () => {
     try {
         await auth.signOut();
     } catch (error) {
         console.error("X 登出失敗: ", error.message);
-        alert("登出失敗：" + error.message);
+        throw error;
     }
 };
 

@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Container, Row, Col, Dropdown } from "react-bootstrap";
+import { Alert, Button, Container, Row, Col, Dropdown } from "react-bootstrap";
 import pexelsPhoto from '../../static/assets/pexels-photo.webp';
 
 const TRIBES = [
@@ -18,18 +18,20 @@ const App = () => {
     const fileInputRef = useRef(null);
     const [fileName, setFileName] = useState("請選擇圖片");
     const [tribe, setTribe] = useState("tayal");
+    const [errorMsg, setErrorMsg] = useState("");
     const navigate = useNavigate();
 
     const handleImageChange = (event) => {
-        const newFile = event.target.files.length > 0 ? event.target.files[0] : null; 
+        const newFile = event.target.files.length > 0 ? event.target.files[0] : null;
         if (newFile==null) {
             setFileName(file ? file.name : "請選擇圖片");
         }
         if (newFile) {
             if (newFile.size > 5 * 1024 * 1024) {
-                alert("圖片不得超過 5 MB，請重新選擇。");
+                setErrorMsg("圖片不得超過 5 MB，請重新選擇。");
                 return;
             }
+            setErrorMsg("");
             const reader = new FileReader();
             reader.onloadend = () => {
                 setImage(reader.result);
@@ -111,6 +113,8 @@ const App = () => {
                             </Dropdown>
                             <br />
                         </div>
+
+                        {errorMsg && <Alert variant="danger" className="py-2">{errorMsg}</Alert>}
 
                         <input
                             key={inputKey}

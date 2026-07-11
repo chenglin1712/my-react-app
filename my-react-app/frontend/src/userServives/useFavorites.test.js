@@ -74,4 +74,21 @@ describe('useFavorites', () => {
     expect(toggleFavoriteWord).not.toHaveBeenCalled();
     expect(updateUserData).not.toHaveBeenCalled();
   });
+
+  test('toggleFavorite reverts the optimistic update and surfaces an error when the write fails', async () => {
+    useAuth.mockReturnValue({ userData: baseUser, updateUserData });
+    toggleFavoriteWord.mockRejectedValue(new Error('network down'));
+    const { result } = renderHook(() => useFavorites());
+
+    await act(async () => {
+      await result.current.toggleFavorite('tayal-word-b', 1);
+    });
+
+    // 第一次呼叫是樂觀更新（多了 tayal-word-b），第二次是寫入失敗後的還原
+    expect(updateUserData).toHaveBeenCalledTimes(2);
+    const revertedCall = updateUserData.mock.calls[1][0];
+    const category1 = revertedCall.firestoreData.favorites.find((f) => f.id === 1);
+    expect(category1.content).toEqual(['tayal-word-a']);
+    expect(result.current.error).toBeTruthy();
+  });
 });

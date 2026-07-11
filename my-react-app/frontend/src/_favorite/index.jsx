@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  Container, Button, InputGroup, Form, Dropdown, Tabs, Tab, Offcanvas
+  Alert, Container, Button, InputGroup, Form, Dropdown, Tabs, Tab, Offcanvas
 } from 'react-bootstrap';
 import { useLocation } from 'react-router-dom';
 import { FaHeart, FaRegHeart, FaPlayCircle } from 'react-icons/fa';
@@ -10,6 +10,7 @@ import { useAuth } from "../../src/userServives/authContext";
 import { useFavorites } from "../../src/userServives/useFavorites";
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import PermissionProtect from "../userServives/permissionProtect";
+import ErrorBoundary from "../errorBoundary";
 import axios from 'axios';
 import "../../static/css/_favorite/index_judy.css"
 
@@ -585,7 +586,7 @@ const TRIBES = ['泰雅', '阿美', '布農', '噶瑪蘭', '排灣'];
 
 const App = () => {
   const { userData: user } = useAuth();
-  const { favorites, toggleFavorite } = useFavorites();
+  const { favorites, toggleFavorite, error: favoritesError } = useFavorites();
   const [activeTab, setActiveTab] = useState(1);
   const [allWords, setAllWords] = useState([]);
   const [expandedWord, setExpandedWord] = useState(null);
@@ -749,6 +750,8 @@ const App = () => {
         )}
       </div>
 
+      {favoritesError && <Alert variant="danger">{favoritesError}</Alert>}
+
       {loading ? (
         <div className="text-center py-5">
           <div className="text-muted">載入中...</div>
@@ -761,18 +764,23 @@ const App = () => {
         <>
           <div className="word-cards-grid">
             {filteredWords.slice(0, visibleCount).map((wordData, idx) => (
-              <WordCardWithImg
+              // 單張字卡渲染出錯時只讓那張卡片顯示錯誤提示，不要讓整個收藏格線消失。
+              <ErrorBoundary
                 key={wordData.name + idx}
-                keyName={wordData.name + idx}
-                word={wordData.explanationItems?.[0]?.chineseExplanation || wordData.chineseExplanation || ''}
-                category={wordData.explanationItems?.[0]?.category || ''}
-                result={wordData}
-                expandedWord={expandedWord}
-                toggleExpand={toggleExpand}
-                toggleFavorite={() => toggleFavorite(wordData.name, currentTab.id)}
-                playAudio={playAudio}
-                isFavorited={currentTab?.content.includes(wordData.name)}
-              />
+                fallback={<div className="text-danger small p-2">這個詞條顯示時發生錯誤。</div>}
+              >
+                <WordCardWithImg
+                  keyName={wordData.name + idx}
+                  word={wordData.explanationItems?.[0]?.chineseExplanation || wordData.chineseExplanation || ''}
+                  category={wordData.explanationItems?.[0]?.category || ''}
+                  result={wordData}
+                  expandedWord={expandedWord}
+                  toggleExpand={toggleExpand}
+                  toggleFavorite={() => toggleFavorite(wordData.name, currentTab.id)}
+                  playAudio={playAudio}
+                  isFavorited={currentTab?.content.includes(wordData.name)}
+                />
+              </ErrorBoundary>
             ))}
           </div>
           {visibleCount < filteredWords.length && (

@@ -25,7 +25,7 @@ const App = () => {
   const [expandedWord, setExpandedWord] = useState(null);
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterLetter, setFilterLetter] = useState('');
-  const { favorites, toggleFavorite } = useFavorites();
+  const { favorites, toggleFavorite, error: favoritesError } = useFavorites();
   const favoriteWords = useMemo(
     () => new Set(favorites.find(fav => fav.id === 1)?.content || []),
     [favorites]
@@ -258,6 +258,7 @@ const App = () => {
           </Button>
         </Alert>
       )}
+      {favoritesError && <Alert variant="danger">{favoritesError}</Alert>}
 
       {!TRIBES_WITH_DATA.includes(selectedTribe) && !loading && (
         <div className="tribe-empty-state">

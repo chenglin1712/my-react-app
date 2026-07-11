@@ -1,6 +1,7 @@
 import "../../static/css/_auth/resetPassword.css"
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { Alert } from "react-bootstrap";
 import { getAuth, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import lottie from 'lottie-web';
 import successAnimation from "../../src/animations/success.json"
@@ -13,9 +14,11 @@ const Forgot = () => {
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [isSuccess, setIsSuccess] = useState(false);
+    const [errorMsg, setErrorMsg] = useState("");
     const animation = useRef(null);
 
     const handleChangePassword = async () => {
+        setErrorMsg("");
         try {
             // 驗證使用者
             const credential = EmailAuthProvider.credential(user.email, currentPassword);
@@ -35,13 +38,13 @@ const Forgot = () => {
             switch (error.code) {
                 case "auth/wrong-password":
                 case "auth/invalid-credential":
-                    alert("密碼錯誤，請再試一次。");
+                    setErrorMsg("密碼錯誤，請再試一次。");
                     break;
                 case "auth/weak-password":
-                    alert("新密碼強度不足，請使用至少 6 個字元。");
+                    setErrorMsg("新密碼強度不足，請使用至少 6 個字元。");
                     break;
                 default:
-                    alert("密碼更新失敗");
+                    setErrorMsg("密碼更新失敗");
             };
         };
     };
@@ -63,6 +66,7 @@ const Forgot = () => {
     return (
         <div className="reset-container">
             <h2>變更密碼</h2>
+            {errorMsg && <Alert variant="danger" className="py-2">{errorMsg}</Alert>}
             <input
                 type="password"
                 placeholder="目前密碼"

@@ -9,6 +9,7 @@ import { FaHeart, FaRegHeart, FaPlayCircle, FaChevronDown, FaChevronUp } from "r
 import { auth } from "../../../firebase";
 import { useFavorites } from "../../src/userServives/useFavorites";
 import { createAuthorizedAudio } from "../../utils/authAudio";
+import ErrorBoundary from "../errorBoundary";
 import { Tabs, Tab } from 'react-bootstrap';
 import "../../static/css/_camera/result.css"; 
 
@@ -154,7 +155,7 @@ const App = () => {
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterLetter, setFilterLetter] = useState('');
   const audioRef = useRef(null);
-  const { favorites, toggleFavorite } = useFavorites();
+  const { favorites, toggleFavorite, error: favoritesError } = useFavorites();
   const favoriteWords = useMemo(
     () => new Set(favorites.find(fav => fav.id === 1)?.content || []),
     [favorites]
@@ -529,7 +530,8 @@ const categoryGroups = {
       </div>
       {loading && <Spinner animation="border" variant="primary" />}
       {error && <Alert variant="danger">{error}</Alert>}
-      
+      {favoritesError && <Alert variant="danger">{favoritesError}</Alert>}
+
      
       <br />
       {Object.keys(definitions.exact_match_results).length > 0 && (() => {
@@ -544,17 +546,21 @@ const categoryGroups = {
                 const word = wordData.explanationItems?.[0]?.chineseExplanation || wordData.chineseExplanation || '';
                 const key = `${word}-${idx}-${wordData.name || ''}`;
                   return (
-                    <WordCard
+                    <ErrorBoundary
                       key={key}
-                      keyName={key}
-                      word={word}
-                      result={wordData}
-                      expandedWord={expandedWord}
-                      toggleExpand={toggleExpand}
-                      toggleFavorite={() =>toggleFavorite(wordData.name)}
-                      playAudio={playAudio}
-                      isFavorited={favoriteWords.has(wordData.name)}
-                    />
+                      fallback={<ListGroup.Item className="text-danger small">這個詞條顯示時發生錯誤。</ListGroup.Item>}
+                    >
+                      <WordCard
+                        keyName={key}
+                        word={word}
+                        result={wordData}
+                        expandedWord={expandedWord}
+                        toggleExpand={toggleExpand}
+                        toggleFavorite={() =>toggleFavorite(wordData.name)}
+                        playAudio={playAudio}
+                        isFavorited={favoriteWords.has(wordData.name)}
+                      />
+                    </ErrorBoundary>
                   );
               })}
             </ListGroup>
@@ -576,17 +582,21 @@ const categoryGroups = {
                 const key = `${word}-${idx}-${wordData.name || ''}`;
                   
                     return (
-                      <WordCard
+                      <ErrorBoundary
                         key={key}
-                        keyName={key}
-                        word={word}
-                        result={wordData}
-                        expandedWord={expandedWord}
-                        toggleExpand={toggleExpand}
-                        toggleFavorite={() =>toggleFavorite(wordData.name)}
-                        playAudio={playAudio}
-                        isFavorited={favoriteWords.has(wordData.name)}
-                      />
+                        fallback={<ListGroup.Item className="text-danger small">這個詞條顯示時發生錯誤。</ListGroup.Item>}
+                      >
+                        <WordCard
+                          keyName={key}
+                          word={word}
+                          result={wordData}
+                          expandedWord={expandedWord}
+                          toggleExpand={toggleExpand}
+                          toggleFavorite={() =>toggleFavorite(wordData.name)}
+                          playAudio={playAudio}
+                          isFavorited={favoriteWords.has(wordData.name)}
+                        />
+                      </ErrorBoundary>
                 );
               })}
             </ListGroup>

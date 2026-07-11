@@ -2,6 +2,7 @@ import "../../static/css/_auth/editProfile.css"
 import { Edit2, User, Mail, Shield, Save, Calendar, Lock } from "lucide-react";
 import { useState, useRef } from "react";
 import { useLocation } from "react-router-dom";
+import { Alert } from "react-bootstrap";
 import AvatarImg from "../../static/assets/_auth/avatar.webp"
 import { useNavigate } from "react-router-dom";
 import { updateProfile } from "../../src/userServives/userServive"
@@ -23,6 +24,7 @@ const Edit = () => {
     const fileInputRef = useRef(null);
     const [previewUrl, setPreviewUrl] = useState(formData.avatarUrl);
     const [isUploading, setIsUploading] = useState(false);
+    const [errorMsg, setErrorMsg] = useState("");
 
     const handleImageClick = () => {
         fileInputRef.current.click();
@@ -33,9 +35,10 @@ const Edit = () => {
         if (!file) return;
 
         if (file.size > 5 * 1024 * 1024) {
-            alert("圖片不得超過 5 MB，請重新選擇。");
+            setErrorMsg("圖片不得超過 5 MB，請重新選擇。");
             return;
         }
+        setErrorMsg("");
 
         setPreviewUrl(URL.createObjectURL(file));
         setIsUploading(true);
@@ -55,7 +58,7 @@ const Edit = () => {
             setFormData(prev => ({ ...prev, avatarUrl: result.secure_url }));
         } catch (err) {
             console.error("圖片上傳失敗", err);
-            alert("圖片上傳失敗");
+            setErrorMsg("圖片上傳失敗");
         } finally {
             setIsUploading(false);
         }
@@ -67,6 +70,7 @@ const Edit = () => {
 
     const { updateUserData } = useAuth();
     const handleSave = async () => {
+        setErrorMsg("");
         try {
             const result = await updateProfile(userData.uid, formData);
 
@@ -74,16 +78,17 @@ const Edit = () => {
                 updateUserData(result);
                 navigate("/");
             } else {
-                alert("失敗: " + result.message);
+                setErrorMsg("失敗: " + result.message);
             }
         } catch {
-            alert("更新失敗");
+            setErrorMsg("更新失敗");
         }
     };
 
     return (
         <div className="edit-container">
             <h2 className="edit-title">編輯個人資料</h2>
+            {errorMsg && <Alert variant="danger" className="py-2">{errorMsg}</Alert>}
 
             <div className="avatar-uploader" onClick={handleImageClick}>
                 <img src={previewUrl} alt="頭像" className="avatar-image" />

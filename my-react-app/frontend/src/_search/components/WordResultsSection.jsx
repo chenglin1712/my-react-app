@@ -1,5 +1,6 @@
 import { ListGroup, Button } from 'react-bootstrap';
 import WordCard from './WordCard';
+import ErrorBoundary from '../../errorBoundary';
 
 // 全部詞條／完全匹配／相關匹配三個結果區塊原本各自複製一份幾乎一樣的
 // 「篩選排序 -> 分頁顯示 -> 載入更多」邏輯，這裡抽成共用元件。
@@ -41,20 +42,26 @@ const WordResultsSection = ({
           const word = wordData.explanationItems?.[0]?.chineseExplanation || wordData.chineseExplanation || '';
           const key = `${word}-${idx}-${wordData.name || ''}`;
           return (
-            <WordCard
+            // 單張字卡的資料若有缺陷導致渲染出錯，只讓這一張卡片顯示錯誤提示，
+            // 不要讓整個搜尋結果列表跟著消失。
+            <ErrorBoundary
               key={key}
-              keyName={key}
-              word={word}
-              result={wordData}
-              expandedWord={expandedWord}
-              toggleExpand={toggleExpand}
-              toggleFavorite={() => toggleFavorite(wordData.name)}
-              playAudio={playAudio}
-              playSentence={playSentence}
-              isFavorited={favoriteWords.has(wordData.name)}
-              failedAudio={failedAudio}
-              audioAvailable={audioAvailable}
-            />
+              fallback={<ListGroup.Item className="text-danger small">這個詞條顯示時發生錯誤。</ListGroup.Item>}
+            >
+              <WordCard
+                keyName={key}
+                word={word}
+                result={wordData}
+                expandedWord={expandedWord}
+                toggleExpand={toggleExpand}
+                toggleFavorite={() => toggleFavorite(wordData.name)}
+                playAudio={playAudio}
+                playSentence={playSentence}
+                isFavorited={favoriteWords.has(wordData.name)}
+                failedAudio={failedAudio}
+                audioAvailable={audioAvailable}
+              />
+            </ErrorBoundary>
           );
         })}
       </ListGroup>

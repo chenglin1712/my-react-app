@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAuth } from "./authContext";
 import { toggleFavoriteWord } from "./userServive";
 
@@ -12,6 +13,7 @@ const DEFAULT_CATEGORY_ID = 1;
 export function useFavorites() {
     const { userData: user, updateUserData } = useAuth();
     const favorites = user?.firestoreData?.favorites || [];
+    const [error, setError] = useState("");
 
     const isFavorited = (word, categoryId = DEFAULT_CATEGORY_ID) => {
         const category = favorites.find((fav) => fav.id === categoryId);
@@ -20,7 +22,9 @@ export function useFavorites() {
 
     const toggleFavorite = async (word, categoryId = DEFAULT_CATEGORY_ID) => {
         if (!user) return;
+        setError("");
 
+        const previousFavorites = favorites;
         const newFavorites = favorites.map((fav) => {
             if (fav.id !== categoryId) return fav;
             const content = Array.isArray(fav.content) ? fav.content : [];
@@ -37,8 +41,19 @@ export function useFavorites() {
             firestoreData: { ...user.firestoreData, favorites: newFavorites },
         });
 
-        await toggleFavoriteWord(user.uid, word, categoryId);
+        try {
+            await toggleFavoriteWord(user.uid, word, categoryId);
+        } catch (err) {
+            // 實際寫入失敗，還原樂觀更新，並讓消費這個 hook 的頁面知道要顯示錯誤，
+            // 不然使用者會以為收藏成功了，但 Firestore 其實沒有真的存進去。
+            updateUserData({
+                ...user,
+                firestoreData: { ...user.firestoreData, favorites: previousFavorites },
+            });
+            setError("收藏失敗，請稍後再試。");
+            console.error("同步收藏失敗", err);
+        }
     };
 
-    return { favorites, isFavorited, toggleFavorite };
+    return { favorites, isFavorited, toggleFavorite, error };
 }

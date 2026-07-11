@@ -2,6 +2,7 @@ import "../../static/css/_quiz/bot_study_plan.css"
 import { useState, useEffect, useRef } from "react";
 import { ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Alert } from "react-bootstrap";
 import lottie from 'lottie-web';
 import successAnimation from "../../src/animations/success.json"
 
@@ -10,9 +11,11 @@ const StudyPlan = ({ plan, onClose }) => {
     const [events, setEvents] = useState({});
     const animation = useRef(null);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [errorMsg, setErrorMsg] = useState("");
 
     //單一事件加入行事曆
     const handleAddToCalendar = async (event) => {
+        setErrorMsg("");
         try {
             const date = event.start.split('T')[0];
 
@@ -35,11 +38,12 @@ const StudyPlan = ({ plan, onClose }) => {
 
         } catch (error) {
             console.error("加入行事曆失敗:", error);
-            alert("加入行事曆失敗");
+            setErrorMsg("加入行事曆失敗");
         }
     };
     //全部加入行事曆
     const handleAddAllToCalendar = async () => {
+        setErrorMsg("");
         try {
             const newEvents = { ...events };
 
@@ -73,7 +77,7 @@ const StudyPlan = ({ plan, onClose }) => {
             }, 1000);
         } catch (error) {
             console.error("加入行事曆失敗:", error);
-            alert("加入行事曆失敗,請稍後再試。");
+            setErrorMsg("加入行事曆失敗,請稍後再試。");
         }
     };
 
@@ -157,6 +161,8 @@ const StudyPlan = ({ plan, onClose }) => {
                         </button>
                     </div>
                 </div>
+
+                {errorMsg && <Alert variant="danger" className="py-2">{errorMsg}</Alert>}
 
                 <div className="study-plan-list">
                     {plan.events.map((event, index) => (

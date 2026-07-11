@@ -22,6 +22,11 @@ class ErrorBoundary extends Component {
 
   render() {
     if (this.state.hasError) {
+      // 包在單一小區塊（例如一張字卡、一個編輯器）外層時，傳入 fallback 顯示一個
+      // 不搶版面的小提示，而不是整頁被換成「回首頁」這種頁面等級的錯誤畫面。
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
       return (
         <div
           style={{

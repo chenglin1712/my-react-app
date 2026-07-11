@@ -1,4 +1,5 @@
 import "../../static/css/_game/game_result.css"
+import { Alert } from "react-bootstrap";
 import { useFavorites } from "../../src/userServives/useFavorites";
 
 const GameResultCard = ({ word, isCorrect, toggleFavorite, isFavorited }) => {
@@ -40,7 +41,7 @@ const LikeButton = ({ isFavorited, onToggle }) => {
  * @param {object} props.results
  */
 const Game_result = ({ results }) => {
-    const { favorites, toggleFavorite } = useFavorites();
+    const { favorites, toggleFavorite, error: favoritesError } = useFavorites();
 
     if (!results) return null;
 
@@ -56,6 +57,7 @@ const Game_result = ({ results }) => {
     return (
         <div className='result-background'>
             <h2 className='result-title'>遊戲結果</h2>
+            {favoritesError && <Alert variant="danger">{favoritesError}</Alert>}
             <div className='stats-container'>
                 <div className='result-total'>
                     <p>總單字數</p>
