@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import "../../static/css/_game/sentence.css";
-import { auth } from "../../../firebase";
-import { createAuthorizedAudio } from "../../utils/authAudio";
+import { useGameSession } from "./useGameSession";
+import { useGameAudioPlayer } from "./useGameAudioPlayer";
 
 const TRIBE_INTRO = {
   tayal: {
@@ -66,63 +65,24 @@ const TRIBE_INTRO = {
 function SentenceGame({ tribe = "tayal" }) {
   const navigate = useNavigate();
   const config = TRIBE_INTRO[tribe] || TRIBE_INTRO.tayal;
-
-  const [status, setStatus] = useState("intro");
-  const [questions, setQuestions] = useState([]);
-  const [current, setCurrent] = useState(0);
-  const [selected, setSelected] = useState(null);
-  const [answers, setAnswers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useRef(null);
-
   const audioBaseUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL || "/api/v1/dictionary/audio/";
 
-  const fetchQuestions = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const token = await auth.currentUser?.getIdToken();
-      const res = await axios.get(`/api/v1/sentence/questions?tribe=${tribe}&count=5`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      setQuestions(res.data.questions);
-      return res.data.questions;
-    } catch {
-      setError("題目載入失敗，請確認後端伺服器是否啟動。");
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    status, questions, current, answers, setAnswers, loading, error,
+    start, restart, goToNext, progressPct,
+  } = useGameSession({ endpoint: "/api/v1/sentence/questions", tribe, count: 5 });
+  const { isPlaying, play: playAudio, stop: stopAudio } = useGameAudioPlayer(audioBaseUrl);
+
+  const [selected, setSelected] = useState(null);
 
   const handleStart = async () => {
-    const qs = await fetchQuestions();
-    if (!qs || qs.length === 0) return;
-    setCurrent(0);
-    setAnswers([]);
-    setSelected(null);
-    setStatus("playing");
+    const ok = await start();
+    if (ok) setSelected(null);
   };
 
-  const handlePlay = async () => {
+  const handlePlay = () => {
     const q = questions[current];
-    if (!q?.audio_id) return;
-    const url = audioBaseUrl + q.audio_id;
-    if (audioRef.current) audioRef.current.pause();
-    let audio;
-    try {
-      audio = await createAuthorizedAudio(url);
-    } catch {
-      setIsPlaying(false);
-      return;
-    }
-    audioRef.current = audio;
-    audio.onplay  = () => setIsPlaying(true);
-    audio.onended = () => setIsPlaying(false);
-    audio.onerror = () => setIsPlaying(false);
-    audio.play().catch(() => setIsPlaying(false));
+    playAudio(q?.audio_id);
   };
 
   const handleSelect = (option) => {
@@ -136,30 +96,20 @@ function SentenceGame({ tribe = "tayal" }) {
     ]);
 
     setTimeout(() => {
-      if (current + 1 < questions.length) {
-        setCurrent((c) => c + 1);
-        setSelected(null);
-        setIsPlaying(false);
-      } else {
-        setStatus("result");
-      }
+      setSelected(null);
+      stopAudio();
+      goToNext();
     }, 1400);
   };
 
   const handleRestart = () => {
-    setStatus("intro");
-    setQuestions([]);
-    setCurrent(0);
+    restart();
     setSelected(null);
-    setAnswers([]);
   };
 
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    }
-  }, [current]);
+    stopAudio();
+  }, [current, stopAudio]);
 
   // ── 介紹畫面 ─────────────────────────────────────
   if (status === "intro") {
@@ -186,7 +136,7 @@ function SentenceGame({ tribe = "tayal" }) {
         <div className="sent-progress">
           <div
             className="sent-progress-bar"
-            style={{ width: `${((current + 1) / questions.length) * 100}%` }}
+            style={{ width: `${progressPct}%` }}
           />
         </div>
         <p className="sent-counter">第 {current + 1} / {questions.length} 題</p>
@@ -241,7 +191,7 @@ function SentenceGame({ tribe = "tayal" }) {
   if (status === "result") {
     const score = answers.filter((a) => a.isCorrect).length;
     const total = answers.length;
-    const pct   = Math.round((score / total) * 100);
+    const pct   = total > 0 ? Math.round((score / total) * 100) : 0;
     const ratingCls =
       pct >= 80 ? "excellent" : pct >= 60 ? "good" : pct >= 40 ? "fair" : "poor";
 

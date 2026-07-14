@@ -47,14 +47,12 @@ const Review = () => {
 
     const viewQuiz = async (quizId, results, answers) => {
         const quizData = await getQuizById(quizId);
-        // console.log(quizData);
         if (quizData) {
             const enrichedQuiz = {
                 ...quizData,
                 results,
                 answers
             };
-            // console.log(enrichedQuiz);
             setSelectedQuiz(enrichedQuiz);
             setSelectedQuestion(null);
             setNavIndex(0);
@@ -63,14 +61,12 @@ const Review = () => {
 
     const viewQuestion = async (q, idx) => {
         if (q) {
-            // console.log(q);
             const enrichedQuestion = {
                 ...q,
                 userAnswer: selectedQuiz.answers[idx],
                 isCorrect: selectedQuiz.results[idx].isCorrect,
                 idx: idx
             };
-            // console.log(enrichedQuestion);
             setSelectedQuestion(enrichedQuestion);
         }
     };

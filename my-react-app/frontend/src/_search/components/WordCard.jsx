@@ -1,3 +1,4 @@
+import { memo, useCallback } from 'react';
 import { ListGroup, Button } from 'react-bootstrap';
 import { FaHeart, FaRegHeart, FaPlayCircle } from 'react-icons/fa';
 
@@ -23,7 +24,12 @@ export const renderStars = (fre) => {
   );
 };
 
-const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFavorite, playAudio, playSentence, isFavorited, failedAudio, audioAvailable }) => (
+const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggleFavorite, wordName, playAudio, playSentence, isFavorited, failedAudio, audioAvailable }) => {
+  const handleToggleFavorite = useCallback(() => {
+    toggleFavorite(wordName);
+  }, [toggleFavorite, wordName]);
+
+  return (
   <ListGroup.Item key={keyName} className="d-flex flex-column">
     <div className="d-flex justify-content-between align-items-center">
       <div onClick={() => toggleExpand(keyName)} style={{ cursor: 'pointer', flex: 1 }}>
@@ -37,11 +43,11 @@ const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFav
         </h3>
         <h5 className="fw-bolder">{word}</h5>
       </div>
-      <Button variant="link" onClick={() => toggleFavorite(keyName)}>
+      <Button variant="link" onClick={handleToggleFavorite}>
         {isFavorited ? <FaHeart color="red" /> : <FaRegHeart color="black" />}
       </Button>
     </div>
-    {expandedWord === keyName && (
+    {isExpanded && (
       <div className="mt-2 pt-2 border-top">
         <ListGroup variant="flush">
           {result.frequency ? <ListGroup.Item><strong>詞頻：</strong>{renderStars(result.frequency)}</ListGroup.Item> : <></>}
@@ -85,6 +91,8 @@ const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFav
       </div>
     )}
   </ListGroup.Item>
-);
+  );
+});
+WordCard.displayName = "WordCard";
 
 export default WordCard;

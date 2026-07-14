@@ -4,11 +4,11 @@ import axios from "axios";
 import { db, auth } from "../../../firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useAuth } from "../../src/userServives/authContext";
-import SentenceFill from "../_test/sentenceFill";
-import SentenceSpeak from "../_test/sentenceSpeak";
-import SentenceOrder from "../_test/sentenceOrder";
-import WordMatch from "../_test/wordMatch";
-import WordTranslation from "../_test/wordTranslation";
+import SentenceFill from "../_quiz_questions/sentenceFill";
+import SentenceSpeak from "../_quiz_questions/sentenceSpeak";
+import SentenceOrder from "../_quiz_questions/sentenceOrder";
+import WordMatch from "../_quiz_questions/wordMatch";
+import WordTranslation from "../_quiz_questions/wordTranslation";
 import "../../static/css/_quiz/quiz_recommon_question.css";
 
 

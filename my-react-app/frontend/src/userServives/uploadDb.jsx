@@ -15,7 +15,6 @@ export const uploadQuizDB = async (level_ch, data, tribe = "tayal") => {
 
     try {
         const docRef = await addDoc(collection(db, "quizs"), quizSet);
-        // console.log("成功上傳測驗 ID:", docRef.id);
         return { id: docRef.id, ans: correctAnswers };
     } catch (e) {
         console.error("上傳失敗", e);
@@ -37,7 +36,6 @@ export const uploadSituationDB = async (quizId, correctAns, userAns, stars) => {
 
     try {
         const docRef = await addDoc(collection(db, "situations"), situationSet);
-        // console.log("成功上傳答題情形 ID:", docRef.id);
         return docRef.id
     } catch (e) {
         console.error("上傳失敗", e);
@@ -161,7 +159,6 @@ export const getCurrentSituation = async () => {
                 return { ...s, quizType: "未知類型" };
             })
         );
-        // console.log("取得的答題情形：", situations);
         return enrichedSituations;
     } catch (error) {
         console.error("取得答題情形失敗:", error);

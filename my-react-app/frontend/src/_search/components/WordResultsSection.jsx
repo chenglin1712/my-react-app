@@ -52,9 +52,10 @@ const WordResultsSection = ({
                 keyName={key}
                 word={word}
                 result={wordData}
-                expandedWord={expandedWord}
+                isExpanded={expandedWord === key}
                 toggleExpand={toggleExpand}
-                toggleFavorite={() => toggleFavorite(wordData.name)}
+                toggleFavorite={toggleFavorite}
+                wordName={wordData.name}
                 playAudio={playAudio}
                 playSentence={playSentence}
                 isFavorited={favoriteWords.has(wordData.name)}

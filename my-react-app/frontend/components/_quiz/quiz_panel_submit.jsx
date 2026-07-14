@@ -154,7 +154,7 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
                                     {displayData.quiz.title === "初級" ? (
                                         <>
                                             <div className="submit-question-q">
-                                                <img src={item.image} className="submit-question-image" />
+                                                <img src={item.image} className="submit-question-image" loading="lazy" />
                                                 <span>{item.question_ab}</span>
                                             </div>
                                             <span className={`quiz-user-answer ${isCorrect ? "correct" : "wrong"}`}>{userAnswer}</span>
@@ -193,8 +193,8 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
                                                     <p style={{margin:"0"}}>{item.question_ch}</p>
                                                 </div>
                                             </div>
-                                            <img className={`quiz-user-answer2 ${isCorrect ? "correct" : "wrong"}`} src={item.images?.[userLabel] ?? ""}></img>
-                                            <img className="quiz-correct-answer2" src={item.images?.[correctLabel] ?? ""}></img>
+                                            <img className={`quiz-user-answer2 ${isCorrect ? "correct" : "wrong"}`} src={item.images?.[userLabel] ?? ""} loading="lazy"></img>
+                                            <img className="quiz-correct-answer2" src={item.images?.[correctLabel] ?? ""} loading="lazy"></img>
                                         </>
                                     )}
                                 </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { Container, Alert, Spinner, Button } from 'react-bootstrap';
 import { useFavorites } from "../../src/userServives/useFavorites";
@@ -47,7 +47,7 @@ const App = () => {
 
   const tribes = TRIBE_NAMES;
 
-  const toggleExpand = (key) => setExpandedWord(prev => (prev === key ? null : key));
+  const toggleExpand = useCallback((key) => setExpandedWord(prev => (prev === key ? null : key)), []);
 
   // 目前資料庫已有資料的族語跟支援的族語清單相同，用同一份共用清單；未來若新增
   // 族語但辭典資料還沒建好，這裡可以改成 TRIBE_NAMES 的子集合。

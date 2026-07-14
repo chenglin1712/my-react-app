@@ -8,6 +8,35 @@ export default defineConfig({
   optimizeDeps: {
     entries: ['index.html'],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // situation-*.js（recharts 圖表）與 _note-*.js（tiptap 編輯器）兩個路由
+        // chunk 各約 440KB，絕大部分是這兩個第三方套件本身的體積，不是頁面程式碼。
+        // 拆成獨立、清楚命名的 vendor chunk：一方面讓建置輸出能直接看出是哪個套件
+        // 造成體積，另一方面套件版本沒變時瀏覽器能單獨快取，不會因為頁面邏輯小改動
+        // 就整包重新下載。這兩個套件只有各自的路由在用，其餘地方沒有直接 import。
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          if (
+            id.includes('recharts') ||
+            id.includes('victory-vendor') ||
+            /[\\/]d3-/.test(id) ||
+            id.includes('@reduxjs') ||
+            id.includes('react-redux') ||
+            id.includes('immer') ||
+            id.includes('reselect') ||
+            id.includes('decimal.js-light')
+          ) {
+            return 'vendor-recharts';
+          }
+          if (id.includes('@tiptap') || /[\\/]prosemirror-/.test(id)) {
+            return 'vendor-tiptap';
+          }
+        },
+      },
+    },
+  },
   test: {
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.js'],

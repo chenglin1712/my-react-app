@@ -102,7 +102,7 @@ const Discussion = ({ tribe = "tayal" }) => {
                                     </div>
                                 ))}
                             </div>
-                            {msg.image && <img src={msg.image} alt="相關圖示" className="reply-image" />}
+                            {msg.image && <img src={msg.image} alt="相關圖示" className="reply-image" loading="lazy" />}
                         </div>
                     ) : (
                         <p>{msg.text}</p>

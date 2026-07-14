@@ -254,8 +254,6 @@ export const setupPresence = (uid) => {
 
     // 確認使用者是否連上 RTDB
     _presenceUnsubscribe = onValue(connectedRef, async (snap) => {
-        // console.log("[presence] .info/connected =", snap.val());
-
         if (snap.val() === false) {
             return;
         }

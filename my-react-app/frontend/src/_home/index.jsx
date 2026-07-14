@@ -51,7 +51,6 @@ const App = () => {
                 >了解更多</button>
             </div>
 
-            {/* <SysIntroduction /> */}
             <div ref={functionBtnRef}>
                 <FunctionBtn />
             </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import {
   Alert, Container, Button, InputGroup, Form, Dropdown, Tabs, Tab, Offcanvas
 } from 'react-bootstrap';
@@ -111,6 +111,7 @@ const WordCardImage = ({ imageUrl, word, isFavorited, onToggleFavorite }) => {
         src={imageUrl || defaultImage}
         alt={word}
         className="word-image"
+        loading="lazy"
       />
 
       <Button
@@ -205,8 +206,12 @@ const DefinitionDetails = ({ definitions, playAudio }) => {
 };
 
 //單字卡
-const WordCardWithImg = ({ word, category, result, keyName, expandedWord, toggleExpand, toggleFavorite, playAudio, isFavorited }) => {
-  const isFlipped = expandedWord === keyName;
+const WordCardWithImg = memo(({ word, category, result, keyName, isExpanded, toggleExpand, toggleFavorite, wordName, categoryId, playAudio, isFavorited }) => {
+  const isFlipped = isExpanded;
+
+  const handleToggleFavorite = useCallback(() => {
+    toggleFavorite(wordName, categoryId);
+  }, [toggleFavorite, wordName, categoryId]);
 
   return (
     <div className="word-card-container" key={keyName}>
@@ -217,7 +222,7 @@ const WordCardWithImg = ({ word, category, result, keyName, expandedWord, toggle
             imageUrl={result.word_img}
             word={result.name}
             isFavorited={isFavorited}
-            onToggleFavorite={toggleFavorite}
+            onToggleFavorite={handleToggleFavorite}
           />
 
           <div className="word-card-header">
@@ -257,7 +262,8 @@ const WordCardWithImg = ({ word, category, result, keyName, expandedWord, toggle
       </div>
     </div>
   );
-};
+});
+WordCardWithImg.displayName = "WordCardWithImg";
 
 //搜尋篩選組件
 const SearchAndFilterControls = ({ _tab, state, onStateChange, alphabet, isMobile, activeTabcat, setActiveTabcat,
@@ -416,7 +422,7 @@ const SearchAndFilterControls = ({ _tab, state, onStateChange, alphabet, isMobil
                                     );setShowCategories(!showCategories)}
                                   }
                                 >
-                                  <img src={sub.image} alt={sub.name} />
+                                  <img src={sub.image} alt={sub.name} loading="lazy" />
                                   <h5 className="fw-bold">{sub.name}</h5>
                                 </div>
                               ))}
@@ -597,7 +603,7 @@ const App = () => {
   const [delayedCheck, setDelayedCheck] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [selectedTribe, setSelectedTribe] = useState('泰雅');
-  const toggleExpand = (key) => setExpandedWord(prev => (prev === key ? null : key));
+  const toggleExpand = useCallback((key) => setExpandedWord(prev => (prev === key ? null : key)), []);
 
   const [tabStates, updateTabState] = useTabState(favorites);
   const filterAndSort = useFilterAndSort(allWords);
@@ -662,7 +668,7 @@ const App = () => {
     setVisibleCount(PAGE_SIZE);
   }, [activeTab, selectedTribe, selectedSubCategory, activeTabStateKey]);
 
-  const playAudio = async (fileId) => {
+  const playAudio = useCallback(async (fileId) => {
     if (!fileId) return;
 
 
@@ -682,7 +688,7 @@ const App = () => {
 
     newAudio.play().catch(() => {});
     audioRef.current = newAudio;
-  };
+  }, []);
 
   if (!user && delayedCheck) return <PermissionProtect />;
 
@@ -720,17 +726,6 @@ const App = () => {
             ))}
           </Dropdown.Menu>
         </Dropdown>
-
-        {/* <Tabs
-          activeKey={activeTab}
-          onSelect={(k) => setActiveTab(parseInt(k))}
-          justify
-          className="mb-3"
-        >
-          {favorites.map(tab => (
-            <Tab key={tab.id} eventKey={tab.id} title={tab.title} />
-          ))}
-        </Tabs> */}
 
         {currentTab && (
           <SearchAndFilterControls
@@ -775,9 +770,11 @@ const App = () => {
                   word={wordData.explanationItems?.[0]?.chineseExplanation || wordData.chineseExplanation || ''}
                   category={wordData.explanationItems?.[0]?.category || ''}
                   result={wordData}
-                  expandedWord={expandedWord}
+                  isExpanded={expandedWord === wordData.name + idx}
                   toggleExpand={toggleExpand}
-                  toggleFavorite={() => toggleFavorite(wordData.name, currentTab.id)}
+                  toggleFavorite={toggleFavorite}
+                  wordName={wordData.name}
+                  categoryId={currentTab.id}
                   playAudio={playAudio}
                   isFavorited={currentTab?.content.includes(wordData.name)}
                 />

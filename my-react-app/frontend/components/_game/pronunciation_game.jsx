@@ -1,14 +1,14 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import {
   collection, addDoc, getDocs, query,
   where, orderBy, limit, serverTimestamp,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage, auth } from "../../../firebase";
-import { createAuthorizedAudio } from "../../utils/authAudio";
 import { useAuth } from "../../src/userServives/authContext";
+import { useGameSession } from "./useGameSession";
+import { useGameAudioPlayer } from "./useGameAudioPlayer";
 import "../../static/css/_game/pronunciation.css";
 
 const TRIBE_INTRO = {
@@ -116,12 +116,13 @@ function PronunciationGame({ tribe = "tayal" }) {
   const navigate = useNavigate();
   const { userData } = useAuth();
   const config = TRIBE_INTRO[tribe] || TRIBE_INTRO.tayal;
+  const audioBaseUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL || "/api/v1/dictionary/audio/";
 
-  const [status, setStatus] = useState("intro");
-  const [questions, setQuestions] = useState([]);
-  const [current, setCurrent] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const {
+    status, questions, current, answers, setAnswers, loading, error, setError,
+    start, restart, goToNext, progressPct,
+  } = useGameSession({ endpoint: "/api/v1/listening/questions", tribe, count: 5 });
+  const { play: playRefAudio, stop: stopRefAudio } = useGameAudioPlayer(audioBaseUrl);
 
   const [recState, setRecState] = useState("idle");
   const [audioBlob, setAudioBlob] = useState(null);
@@ -130,39 +131,12 @@ function PronunciationGame({ tribe = "tayal" }) {
   const [officialScore, setOfficialScore] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const [answers, setAnswers] = useState([]);
-
   const mediaRecorder = useRef(null);
   const chunks = useRef([]);
-  const refAudio = useRef(null);
-
-  const audioBaseUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL || "/api/v1/dictionary/audio/";
-
-  const fetchQuestions = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const token = await auth.currentUser?.getIdToken();
-      const res = await axios.get(`/api/v1/listening/questions?tribe=${tribe}&count=5`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      setQuestions(res.data.questions);
-      return res.data.questions;
-    } catch {
-      setError("題目載入失敗，請確認後端伺服器是否啟動。");
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleStart = async () => {
-    const qs = await fetchQuestions();
-    if (!qs || qs.length === 0) return;
-    setCurrent(0);
-    setAnswers([]);
-    resetRecState();
-    setStatus("playing");
+    const ok = await start();
+    if (ok) resetRecState();
   };
 
   const resetRecState = () => {
@@ -173,18 +147,9 @@ function PronunciationGame({ tribe = "tayal" }) {
     setOfficialScore(null);
   };
 
-  const handlePlayRef = async () => {
+  const handlePlayRef = () => {
     if (!questions[current]) return;
-    const url = audioBaseUrl + questions[current].audio_id;
-    if (refAudio.current) refAudio.current.pause();
-    let a;
-    try {
-      a = await createAuthorizedAudio(url);
-    } catch {
-      return;
-    }
-    refAudio.current = a;
-    a.play().catch(() => {});
+    playRefAudio(questions[current].audio_id);
   };
 
   const startRecording = async () => {
@@ -277,26 +242,19 @@ function PronunciationGame({ tribe = "tayal" }) {
   };
 
   const handleNext = () => {
-    if (refAudio.current) refAudio.current.pause();
-    if (current + 1 < questions.length) {
-      setCurrent((c) => c + 1);
-      resetRecState();
-    } else {
-      setStatus("result");
-    }
+    stopRefAudio();
+    resetRecState();
+    goToNext();
   };
 
   const handleRestart = () => {
-    setStatus("intro");
-    setQuestions([]);
-    setCurrent(0);
-    setAnswers([]);
+    restart();
     resetRecState();
   };
 
   useEffect(() => {
-    if (refAudio.current) refAudio.current.pause();
-  }, [current]);
+    stopRefAudio();
+  }, [current, stopRefAudio]);
 
   // ── 介紹畫面 ──────────────────────────────────
   if (status === "intro") {
@@ -324,7 +282,7 @@ function PronunciationGame({ tribe = "tayal" }) {
         <div className="pron-progress">
           <div
             className="pron-progress-bar"
-            style={{ width: `${((current + 1) / questions.length) * 100}%` }}
+            style={{ width: `${progressPct}%` }}
           />
         </div>
         <p className="pron-counter">第 {current + 1} / {questions.length} 題</p>

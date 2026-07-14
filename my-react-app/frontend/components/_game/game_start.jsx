@@ -2,7 +2,7 @@ import axios from "axios";
 import { useRef, useState } from "react";
 import { auth } from "../../../firebase";
 import "../../static/css/_game/game_start.css";
-import Game_areaTest from "./game_areaTest";
+import Game_crossword_board from "./game_crossword_board";
 import Game_result from "./game_result";
 
 const TRIBE_INTRO = {
@@ -128,8 +128,8 @@ function Game_Start({ tribe = "tayal" }) {
       <div>
         {showGameArea && (
           <>
-            {/* 對應game_areaTest的if(gameDataLoaded){...} */}
-            <Game_areaTest
+            {/* 對應 game_crossword_board 的 if(gameDataLoaded){...} */}
+            <Game_crossword_board
               ref={gameAreaTestRef}
               gameDataLoaded={setgameDataLoaded}
               tribe={tribe}

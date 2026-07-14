@@ -147,7 +147,7 @@ const CategoryBar = ({
                     }
                     }
                   >
-                    <img src={sub.image} alt={sub.name} />
+                    <img src={sub.image} alt={sub.name} loading="lazy" />
                     <h5 className="fw-bold">{sub.name}</h5>
                   </div>
                 ))}

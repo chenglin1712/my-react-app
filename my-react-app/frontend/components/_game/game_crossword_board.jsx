@@ -2,9 +2,9 @@ import axios from "axios";
 import PropTypes from "prop-types";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { auth } from "../../../firebase";
-import "../../static/css/_game/game_areaTest.css";
+import "../../static/css/_game/game_crossword_board.css";
 
-const Game_areaTest = forwardRef(({ gameDataLoaded, tribe }, ref) => {
+const Game_crossword_board = forwardRef(({ gameDataLoaded, tribe }, ref) => {
   const [crosswordData, setCrosswordData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -174,11 +174,11 @@ const Game_areaTest = forwardRef(({ gameDataLoaded, tribe }, ref) => {
   );
 });
 
-Game_areaTest.displayName = "Game_areaTest";
+Game_crossword_board.displayName = "Game_crossword_board";
 
-Game_areaTest.propTypes = {
+Game_crossword_board.propTypes = {
   gameDataLoaded: PropTypes.func,
   tribe: PropTypes.string,
 };
 
-export default Game_areaTest;
+export default Game_crossword_board;

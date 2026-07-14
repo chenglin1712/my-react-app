@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import "../../static/css/_game/listening.css";
-import { auth } from "../../../firebase";
-import { createAuthorizedAudio } from "../../utils/authAudio";
+import { useGameSession } from "./useGameSession";
+import { useGameAudioPlayer } from "./useGameAudioPlayer";
 
 const TRIBE_INTRO = {
   tayal: {
@@ -65,66 +64,26 @@ const TRIBE_INTRO = {
 
 function ListeningGame({ tribe = "tayal" }) {
   const navigate = useNavigate();
-  const [status, setStatus] = useState("intro");   // intro | playing | result
-  const [questions, setQuestions] = useState([]);
-  const [current, setCurrent] = useState(0);
-  const [selected, setSelected] = useState(null);   // 使用者選的答案
-  const [answers, setAnswers] = useState([]);        // 每題結果紀錄
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useRef(null);
-
   const config = TRIBE_INTRO[tribe] || TRIBE_INTRO.tayal;
   const audioBaseUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL || "/api/v1/dictionary/audio/";
 
-  // 載入題目，成功回傳題目陣列，失敗回傳 null
-  const fetchQuestions = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const token = await auth.currentUser?.getIdToken();
-      const res = await axios.get(`/api/v1/listening/questions?tribe=${tribe}&count=10`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      setQuestions(res.data.questions);
-      return res.data.questions;
-    } catch {
-      setError("題目載入失敗，請確認後端伺服器是否啟動。");
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    status, questions, current, answers, setAnswers, loading, error,
+    start, restart, goToNext, progressPct,
+  } = useGameSession({ endpoint: "/api/v1/listening/questions", tribe, count: 10 });
+  const { isPlaying, play: playAudio, stop: stopAudio } = useGameAudioPlayer(audioBaseUrl);
+
+  const [selected, setSelected] = useState(null);   // 使用者選的答案
 
   const handleStart = async () => {
-    const qs = await fetchQuestions();
-    if (!qs || qs.length === 0) return;  // 失敗則停在介紹畫面
-    setCurrent(0);
-    setAnswers([]);
-    setSelected(null);
-    setStatus("playing");
+    const ok = await start();
+    if (ok) setSelected(null);
   };
 
   // 播放音頻
-  const handlePlay = async () => {
+  const handlePlay = () => {
     if (!questions[current]) return;
-    const url = audioBaseUrl + questions[current].audio_id;
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    let audio;
-    try {
-      audio = await createAuthorizedAudio(url);
-    } catch {
-      setIsPlaying(false);
-      return;
-    }
-    audioRef.current = audio;
-    audio.onplay  = () => setIsPlaying(true);
-    audio.onended = () => setIsPlaying(false);
-    audio.onerror = () => setIsPlaying(false);
-    audio.play().catch(() => setIsPlaying(false));
+    playAudio(questions[current].audio_id);
   };
 
   // 選擇答案
@@ -138,37 +97,25 @@ function ListeningGame({ tribe = "tayal" }) {
       userAnswer: option,
       isCorrect,
     };
-
-    const newAnswers = [...answers, record];
-    setAnswers(newAnswers);
+    setAnswers((prev) => [...prev, record]);
 
     // 1.4 秒後進入下一題或結果
     setTimeout(() => {
-      if (current + 1 < questions.length) {
-        setCurrent(c => c + 1);
-        setSelected(null);
-        setIsPlaying(false);
-      } else {
-        setStatus("result");
-      }
+      setSelected(null);
+      stopAudio();
+      goToNext();
     }, 1400);
   };
 
   const handleRestart = () => {
-    setStatus("intro");
-    setQuestions([]);
-    setCurrent(0);
+    restart();
     setSelected(null);
-    setAnswers([]);
   };
 
   // 切換題目時停止音頻
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    }
-  }, [current]);
+    stopAudio();
+  }, [current, stopAudio]);
 
   // ── 介紹畫面 ───────────────────────────────────────
   if (status === "intro") {
@@ -200,7 +147,7 @@ function ListeningGame({ tribe = "tayal" }) {
         <div className="listening-progress">
           <div
             className="listening-progress-bar"
-            style={{ width: `${((current + 1) / questions.length) * 100}%` }}
+            style={{ width: `${progressPct}%` }}
           />
         </div>
         <p className="listening-counter">第 {current + 1} / {questions.length} 題</p>
@@ -256,7 +203,7 @@ function ListeningGame({ tribe = "tayal" }) {
   if (status === "result") {
     const score = answers.filter(a => a.isCorrect).length;
     const total = answers.length;
-    const pct   = Math.round((score / total) * 100);
+    const pct   = total > 0 ? Math.round((score / total) * 100) : 0;
 
     return (
       <div className="listening-result">

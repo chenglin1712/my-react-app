@@ -365,7 +365,7 @@ export default function NoteShare() {
             <div key={note.id} className="ns-card" onClick={() => openModal(note)}>
               <div className="ns-card-head">
                 {note.avatarUrl ? (
-                  <img src={note.avatarUrl} alt="avatar" className="ns-avatar" />
+                  <img src={note.avatarUrl} alt="avatar" className="ns-avatar" loading="lazy" />
                 ) : (
                   <div className="ns-avatar ns-avatar-fallback">👤</div>
                 )}

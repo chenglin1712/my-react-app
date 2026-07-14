@@ -62,6 +62,12 @@ const Advice = ({ onClose }) => {
             });
     }, [userData]);
 
+    // 新訊息或「輸入中」指示器出現/消失時自動捲到底部，messageEndRef 原本宣告了
+    // 卻從沒呼叫 scrollIntoView，訊息一多使用者得自己手動往下滑。
+    useEffect(() => {
+        messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages, isType]);
+
     const suggestions = [
         "我想了解我的學習狀況",
         "介紹這個族語的文化特色",
