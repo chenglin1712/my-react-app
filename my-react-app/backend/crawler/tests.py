@@ -79,6 +79,43 @@ class GetQuizDataTest(TestCase):
         response = self.client.get('/crawler/?tribe=tayal&level=1')
         self.assertEqual(response.status_code, 500)
 
+    @patch('crawler.views.requests.get')
+    def test_upstream_timeout_returns_502_not_500(self, mock_get):
+        # 原本 requests.get 完全沒包 try/except，逾時／連線失敗的例外會一路往外拋，
+        # 被 Django 預設的 500 處理接住。
+        import requests
+        mock_get.side_effect = requests.exceptions.ConnectTimeout("upstream timed out")
+
+        response = self.client.get('/crawler/?tribe=tayal&level=1')
+
+        self.assertEqual(response.status_code, 502)
+
+    @patch('crawler.views.requests.get')
+    def test_level_1_2_response_is_cached_across_requests(self, mock_get):
+        # start_exam 只依 dialect_id/level 決定內容，同一組合快取後第二次呼叫
+        # 不該再打一次第三方 API（見 views.py 的稽核修正）。
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "data": {
+                "display_dialect_name": "泰雅語",
+                "part1": {
+                    "title": "t", "intro": "",
+                    "questions": [{"question_ab": "cyux", "question_ch": "高興", "audio": "", "image": ""}],
+                    "answers": [True],
+                },
+            }
+        }
+        mock_get.return_value = mock_response
+
+        first = self.client.get('/crawler/?tribe=tayal&level=1')
+        second = self.client.get('/crawler/?tribe=tayal&level=1')
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(first.json(), second.json())
+        mock_get.assert_called_once()
+
 
 class FormatQuizDataTest(TestCase):
     def test_format_quiz_data_1_maps_questions_and_answers(self):
@@ -141,4 +178,39 @@ class GetTayalImformationTest(TestCase):
                 mock_response.text = "<html></html>"
                 mock_get.return_value = mock_response
                 response = self.client.get('/crawler/news/')
+        self.assertEqual(response.status_code, 200)
+
+    @patch('crawler.views.BeautifulSoup')
+    @patch('crawler.views.requests.get')
+    def test_both_sources_failing_returns_502_not_cached_empty_200(self, mock_get, mock_soup):
+        # 原本兩個來源都用 bare except 吞掉例外、只記 log，最後一律回 200，呼叫端
+        # 沒辦法分辨「今天真的沒新聞」跟「爬蟲已經壞掉」。兩個來源都真的丟例外時
+        # 應該回 502，且不該把這次的空結果快取下來（否則要等 TTL 過期才會重新
+        # 嘗試，502 狀況會被快取的空結果多拖 15 分鐘）。
+        mock_get.side_effect = Exception("tacp/exam 皆連線失敗")
+
+        response = self.client.get('/crawler/news/')
+
+        self.assertEqual(response.status_code, 502)
+        from django.core.cache import cache as django_cache
+        self.assertIsNone(django_cache.get('crawler_news_data'))
+
+    @patch('crawler.views.requests.get')
+    def test_partial_success_still_returns_200(self, mock_get):
+        # tacp 來源成功、exam 來源（BeautifulSoup 解析）就算沒抓到任何項目也不算
+        # 「失敗」，只要有一個來源正常跑完，就仍視為部分成功。
+        def fake_get(url, headers=None, timeout=None):
+            resp = MagicMock()
+            if "tacp.gov.tw" in url:
+                resp.status_code = 200
+                resp.json.return_value = {"data": []}
+            else:
+                resp.status_code = 200
+                resp.text = "<html></html>"
+            return resp
+
+        mock_get.side_effect = fake_get
+
+        response = self.client.get('/crawler/news/')
+
         self.assertEqual(response.status_code, 200)

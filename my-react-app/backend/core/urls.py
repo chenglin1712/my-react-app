@@ -52,3 +52,10 @@ if settings.DEBUG:
 #    re_path(r"^(?!api/).*", TemplateView.as_view(template_name="index.html")),
 #]
 
+# 全站統一回 JSON 錯誤（見 error_views.py 說明），這個專案底下沒有任何 HTML 頁面，
+# 不該讓沒被個別 view 接住的例外變成 Django 預設的 HTML 錯誤頁。
+handler400 = "core.error_views.json_400"
+handler403 = "core.error_views.json_403"
+handler404 = "core.error_views.json_404"
+handler500 = "core.error_views.json_500"
+

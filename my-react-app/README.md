@@ -84,6 +84,7 @@ alembic upgrade head
 - 啟動 Django（gunicorn）前需先執行一次 `python manage.py collectstatic --noinput`：admin／DRF 頁面的 CSS/JS 由 WhiteNoise 直接從 `STATIC_ROOT`（`backend/staticfiles/`）提供，沒跑過這個指令樣式會跑掉。
 - `DJANGO_DEBUG=False` 時 Swagger UI（`/docs/`）不會掛載（404），只在開發環境可用。
 - `DJANGO_DEBUG=False` 會自動啟用 `SECURE_SSL_REDIRECT`／`SESSION_COOKIE_SECURE`／`CSRF_COOKIE_SECURE`／HSTS；部署平台（Render、Cloud Run）需在反向代理層正確設定 `X-Forwarded-Proto`（兩者預設都會），Django 已透過 `SECURE_PROXY_SSL_HEADER` 讀取這個標頭判斷連線是否為 HTTPS。
+- `REDIS_URL`：gunicorn 若開多個 worker，務必設定，否則 AIModel/CrosswordPuzzle/crawler 的限流計數會退回單一 process 的 LocMemCache，門檻被 worker 數量乘倍放大。
 
 ## 測試
 

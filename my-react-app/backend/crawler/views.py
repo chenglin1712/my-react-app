@@ -17,6 +17,12 @@ logger = logging.getLogger(__name__)
 # 會佔用 worker 到系統預設逾時甚至永遠不回應）。
 _EXTERNAL_TIMEOUT = 10
 
+# get_quiz_data 第 1/2 級題目原本每次都重打第三方 API（get_tayal_imformation
+# 的新聞已有 15 分鐘快取，這裡原本沒有）。同一 tribe+level 組合對應同一份固定
+# 題庫（start_exam 只依 dialect_id/level 決定內容，非個人化、非隨機），快取
+# 可以直接降低對第三方站的請求量，也降低被當成打第三方 API 的放大器的風險。
+_QUIZ_DATA_CACHE_TTL = 900
+
 
 def _rate_limited_response(request, key, group, rate, method):
     """依 key（已登入使用者 uid 或 IP）限速，邏輯與 AIModel/views.py 一致。"""
@@ -97,6 +103,11 @@ def get_quiz_data(request):
     elif level not in ("1", "2"):
         return JsonResponse({"detail": f"不支援的等級: {level}"}, status=400)
 
+    cache_key = f"crawler_quiz_data:{tribe}:{level}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return JsonResponse(cached, safe=False)
+
     url = f"https://api.lokahsu.org.tw/api/front_end/start_exam?dialect_id={config['dialect_id']}&level={level}"
 
     headers = {
@@ -104,7 +115,11 @@ def get_quiz_data(request):
         "Accept": "application/json"
     }
 
-    response = requests.get(url, headers=headers, timeout=_EXTERNAL_TIMEOUT)
+    try:
+        response = requests.get(url, headers=headers, timeout=_EXTERNAL_TIMEOUT)
+    except requests.RequestException as e:
+        logger.error("get_quiz_data 上游請求失敗: %s", e)
+        return JsonResponse({"detail": "讀取資料失敗，請稍後再試"}, status=502)
 
     if response.status_code == 200:
         data = response.json()
@@ -113,6 +128,7 @@ def get_quiz_data(request):
             format_data = format_quiz_data_1(data)
         else:
             format_data = format_quiz_data_2(data)
+        cache.set(cache_key, format_data, _QUIZ_DATA_CACHE_TTL)
         return JsonResponse(format_data, safe=False)
     else:
         return JsonResponse({"detail": "讀取資料失敗"}, status=500)
@@ -201,6 +217,13 @@ def get_tayal_imformation(request):
     }
 
     data = []
+    # 原本兩個來源都用 bare except 吞掉例外、只記 log 就繼續，最後一律回 200，
+    # 呼叫端（前端首頁）沒辦法分辨「今天真的沒新聞」跟「爬蟲已經壞掉」。
+    # 用這兩個旗標分別記錄「這個來源這次有沒有跑完」，只要有一個來源正常跑完
+    # （即使該來源本身回傳 0 筆），就仍視為部分成功、回 200；只有兩個來源
+    # 都真的丟例外失敗，才回 502 讓呼叫端知道整個功能目前不可用。
+    tacp_ok = False
+    exam_ok = False
 
     # 原住民族文化發展中心最新消息（官方 API）
     try:
@@ -225,6 +248,7 @@ def get_tayal_imformation(request):
                     "tag": item.get("category", {}).get("title") if isinstance(item.get("category"), dict) else None,
                     "isExam": "F"
                 })
+        tacp_ok = True
     except Exception as e:
         logger.error("tacp API error: %s", e)
 
@@ -252,8 +276,12 @@ def get_tayal_imformation(request):
                 "isExam": "T"
             })
             count += 1
+        exam_ok = True
     except Exception as e:
         logger.error("exam API error: %s", e)
+
+    if not tacp_ok and not exam_ok:
+        return JsonResponse({"detail": "最新消息暫時無法取得，請稍後再試"}, status=502)
 
     cache.set(NEWS_CACHE_KEY, data, NEWS_CACHE_TTL)
     return JsonResponse(data, safe=False, json_dumps_params={'ensure_ascii': False, 'indent': 2})

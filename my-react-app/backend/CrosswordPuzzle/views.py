@@ -9,6 +9,7 @@ from django.views.decorators.csrf import csrf_exempt
 from config.tribes import TRIBE_IDS as _ALL_TRIBE_IDS
 from config.firebase_auth import verify_firebase_token
 from fastAPI.routes.connect import SessionLocal
+from .serializers import SubmitAnsSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,10 @@ def _get_words_from_db(tribe_id: str, limit: int = 30):
             {"tribe_id": tribe_id}
         ).fetchall()
     except Exception as e:
-        return [], str(e)
+        # 原本把 str(e) 一路往上傳、直接回給前端，可能洩漏資料庫查詢細節。
+        # 錯誤只留在伺服器端的 log，呼叫端只拿到「有沒有失敗」這個布林資訊。
+        logger.error("[CrosswordPuzzle] 查詢詞庫失敗: %s", e)
+        return [], True
     finally:
         db.close()
 
@@ -83,7 +87,7 @@ def generate_crossword(request):
     if tribe in _TRIBE_IDS:
         selected_words, err = _get_words_from_db(_TRIBE_IDS[tribe])
         if err:
-            return JsonResponse({'detail': f'資料庫讀取失敗：{err}'}, status=500)
+            return JsonResponse({'detail': '資料庫讀取失敗，請稍後再試'}, status=500)
         if len(selected_words) < 5:
             return JsonResponse({'detail': f'詞庫不足，無法生成填字遊戲（僅找到 {len(selected_words)} 筆）'}, status=500)
     else:
@@ -135,9 +139,9 @@ def generate_crossword(request):
         'legend': legend_data,                  #數字和方向的提示
         'word_bank': word_bank_list,            #填字遊戲中使用的單字列表
         'info': {
-            'placed_words_count': len(crossword_generator.current_word_list), 
-            'total_words_available': len(available_words_for_generator),    
-            'debug_loops': crossword_generator.debug,                       
+            'placed_words_count': len(crossword_generator.current_word_list),
+            'total_words_available': len(available_words_for_generator),
+            # debug_loops（內部運算迴圈次數，純除錯用）不對外回傳。
         }
     }
 
@@ -146,15 +150,33 @@ def generate_crossword(request):
 @csrf_exempt
 def submit_ans(request):
     if request.method == 'POST':
-        _, err_resp = verify_firebase_token(request)
+        decoded, err_resp = verify_firebase_token(request)
         if err_resp:
             return err_resp
+        # 原本只有認證、完全沒限流；答案比對本身不貴，但沒有上限的話一樣能被
+        # 重複呼叫拿來當簡單的濫用管道，跟 generate_crossword 用同一套標準。
+        limited_resp = _rate_limited_response(request, decoded, group="submit_ans", rate="30/m", method="POST")
+        if limited_resp:
+            return limited_resp
 
-        data = json.loads(request.body)
-        user_answers = data.get('user_answers')
-        crossword_solution = data.get('crossword_solution')
-        crossword_legend = data.get('crossword_legend')
-        
+        # 原本直接 json.loads(request.body) 後就用 dict.get()／list index 存取，
+        # 完全沒驗證請求結構——欄位缺漏或型別不對時例外會一路往外拋，被 Django
+        # 預設的 500 處理接住，正式環境回一頁 HTML，跟這個 API 統一回 JSON 的
+        # 約定不一致。改成先安全解析 JSON，再用 SubmitAnsSerializer 驗證結構。
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'detail': '請求格式錯誤'}, status=400)
+
+        serializer = SubmitAnsSerializer(data=data)
+        if not serializer.is_valid():
+            return JsonResponse({'detail': '請求參數錯誤', 'errors': serializer.errors}, status=400)
+        validated = serializer.validated_data
+
+        user_answers = validated['user_answers']
+        crossword_solution = validated['crossword_solution']
+        crossword_legend = validated['crossword_legend']
+
         # 移除空格，使其與 user_answers 的格式一致
         cleaned_solution = [row.replace(' ', '') for row in crossword_solution]
 
@@ -163,7 +185,7 @@ def submit_ans(request):
             'correct_words_count': 0,
             'word_details': []
         }
-        
+
         for clue in crossword_legend:
             word_number = clue['number']
             word_clue = clue['clue']

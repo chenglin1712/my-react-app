@@ -14,6 +14,7 @@ from fastAPI.routes.model import Word
 from fastAPI.routes.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS, TRIBE_MAP
 from config.firebase_auth import verify_firebase_token
+from .serializers import TayalChatSerializer, ReviewTayalChatSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +49,9 @@ def _rate_limited_response(request, decoded, group, rate="10/m"):
     """依已登入使用者的 uid 限速（這兩個 view 都會呼叫付費的 GitHub Models API）。
     直接呼叫 is_ratelimited 而不是用 @ratelimit 裝飾器：裝飾器要在呼叫 view 之前
     就決定 key，但這裡的 key（uid）要等 verify_firebase_token 解出 token 之後才知道，
-    所以放在驗證通過之後手動檢查。目前沒有 Redis，計數存在 Django 預設的記憶體
-    快取（LocMemCache），單一 process 內有效。"""
+    所以放在驗證通過之後手動檢查。計數存放位置見 core/settings.py 的 CACHES
+    設定：正式環境設定 REDIS_URL 後所有 gunicorn worker 共用同一份計數，門檻才會
+    如實生效；未設定時退回 Django 預設的 LocMemCache，僅單一 process 內有效。"""
     uid = decoded.get("uid", "anon")
     limited = is_ratelimited(
         request, group=group, key=lambda g, r: uid,
@@ -78,26 +80,34 @@ def tayal_chat(request):
             client = _get_client()
         except EnvironmentError as e:
             return JsonResponse({"detail": str(e)}, status=503)
+
         try:
             body = json.loads(request.body)
-            user_message = body.get("message", "").strip()
+        except json.JSONDecodeError:
+            return JsonResponse({"detail": "請求格式錯誤"}, status=400)
 
-            if not user_message:
-                return JsonResponse({"detail": "取得訊息內容失敗"}, status=400)
-            if len(user_message) > 1000:
-                return JsonResponse({"detail": "訊息過長，請縮短後再試"}, status=400)
+        serializer = TayalChatSerializer(data=body)
+        if not serializer.is_valid():
+            return JsonResponse({"detail": "請求參數錯誤", "errors": serializer.errors}, status=400)
+        validated = serializer.validated_data
 
-            # 從請求取得真實使用者學習資料（由前端傳入）
-            user_stats = body.get("user_stats", {})
-            correct     = user_stats.get("correct", 0)
-            incorrect   = user_stats.get("incorrect", 0)
-            unanswered  = user_stats.get("unanswered", 0)
-            common_errors = user_stats.get("common_errors", [])
-            level       = user_stats.get("level", "beginner")
+        user_message = validated["message"].strip()
+        if not user_message:
+            return JsonResponse({"detail": "取得訊息內容失敗"}, status=400)
 
-            tribe = body.get("tribe", "tayal")
-            tribe_name = TRIBE_MAP.get(tribe, "泰雅語")
+        # 從請求取得真實使用者學習資料（由前端傳入，已經過 TayalChatSerializer
+        # 驗證型別與長度上限，見 serializers.py 說明）
+        user_stats = validated.get("user_stats", {})
+        correct     = user_stats.get("correct", 0)
+        incorrect   = user_stats.get("incorrect", 0)
+        unanswered  = user_stats.get("unanswered", 0)
+        common_errors = user_stats.get("common_errors", [])
+        level       = user_stats.get("level", "beginner")
 
+        tribe = validated.get("tribe", "tayal")
+        tribe_name = TRIBE_MAP.get(tribe, "泰雅語")
+
+        try:
             today = datetime.date.today()
             tomorrow = (today + datetime.timedelta(days=1)).isoformat()
 
@@ -186,12 +196,16 @@ def tayal_chat(request):
 
             return JsonResponse({"message": result})
 
-        except Exception as e:
-            return JsonResponse({"detail": str(e)}, status=500)
+        except Exception:
+            # 原本直接把 str(e) 回給前端，不論 DEBUG 與否都會洩漏內部例外訊息
+            # （可能包含 API 回應細節、內部路徑等），且完全沒有寫 log，出錯時
+            # 伺服器端反而看不到記錄。改成記錄完整 traceback，只回通用訊息。
+            logger.error("[tayal_chat] 處理失敗\n%s", traceback.format_exc())
+            return JsonResponse({"detail": "AI 服務暫時無法回應，請稍後再試"}, status=502)
 
     else:
         return JsonResponse({"detail": "只接受 POST 請求"}, status=405)
-    
+
 @csrf_exempt
 def review_tayal_chat(request):
     if request.method == "POST":
@@ -205,20 +219,28 @@ def review_tayal_chat(request):
             client = _get_client()
         except EnvironmentError as e:
             return JsonResponse({"detail": str(e)}, status=503)
+
         try:
             body = json.loads(request.body)
-            user_message = body.get("message", "").strip()
-            if not user_message:
-                return JsonResponse({"detail": "取得失敗"}, status=400)
-            if len(user_message) > 1000:
-                return JsonResponse({"detail": "訊息過長，請縮短後再試"}, status=400)
+        except json.JSONDecodeError:
+            return JsonResponse({"detail": "請求格式錯誤"}, status=400)
 
+        serializer = ReviewTayalChatSerializer(data=body)
+        if not serializer.is_valid():
+            return JsonResponse({"detail": "請求參數錯誤", "errors": serializer.errors}, status=400)
+        validated = serializer.validated_data
+
+        user_message = validated["message"].strip()
+        if not user_message:
+            return JsonResponse({"detail": "取得失敗"}, status=400)
+
+        tribe = validated.get("tribe", "tayal")
+        tribe_id = TRIBE_IDS.get(tribe, TRIBE_IDS["tayal"])
+        tribe_name = TRIBE_MAP.get(tribe, "泰雅語")
+
+        try:
             # 依空格切詞
             words = [w for w in user_message.split(" ") if w]
-
-            tribe = body.get("tribe", "tayal")
-            tribe_id = TRIBE_IDS.get(tribe, TRIBE_IDS["tayal"])
-            tribe_name = TRIBE_MAP.get(tribe, "泰雅語")
 
             # 一次查詢所有詞（避免 N 次資料庫連線）
             word_map = search_tayal_words_bulk(words, tribe_id)
@@ -268,9 +290,11 @@ def review_tayal_chat(request):
                 "image": None  # 之後可以依詞彙加圖
             })
 
-        except Exception as e:
-            logger.error(traceback.format_exc())
-            return JsonResponse({"detail": str(e)}, status=500)
+        except Exception:
+            # 原本有記 log 但仍把 str(e) 回給前端；跟 tayal_chat 一樣，例外訊息
+            # 只留在伺服器端的 log，回應改成通用訊息。
+            logger.error("[review_tayal_chat] 處理失敗\n%s", traceback.format_exc())
+            return JsonResponse({"detail": "AI 服務暫時無法回應，請稍後再試"}, status=502)
     else:
         return JsonResponse({"detail": "只接受 POST 請求"}, status=405)
 

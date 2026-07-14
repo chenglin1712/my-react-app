@@ -34,6 +34,8 @@ class GenerateCrosswordTest(TestCase):
         self.assertIn('legend', data)
         self.assertIn('word_bank', data)
         self.assertGreater(len(data['word_bank']), 0)
+        # debug_loops 是內部運算迴圈次數，純除錯用，正式環境 API 不該外露。
+        self.assertNotIn('debug_loops', data['info'])
 
 
 class GetWordsFromDbTest(TestCase):
@@ -53,14 +55,17 @@ class GetWordsFromDbTest(TestCase):
         self.assertIsNone(err)
         self.assertEqual(results, [["cyux", "高興"]])
 
-    def test_db_error_returns_error_message(self):
+    def test_db_error_returns_error_flag_without_leaking_exception_message(self):
+        # err 現在只是「有沒有失敗」的旗標，不再是原始例外訊息本身——原本直接把
+        # str(e) 一路傳到 generate_crossword 的 JSON 回應裡，會把資料庫查詢細節
+        # 洩漏給前端呼叫端。
         mock_db = MagicMock()
         mock_db.execute.side_effect = Exception("db is locked")
         with patch('CrosswordPuzzle.views.SessionLocal', return_value=mock_db):
             results, err = _get_words_from_db("some-tribe-id")
 
         self.assertEqual(results, [])
-        self.assertIn("db is locked", err)
+        self.assertTrue(err)
 
 
 class SubmitAnsTest(TestCase):
@@ -106,3 +111,42 @@ class SubmitAnsTest(TestCase):
     def test_get_method_not_allowed(self):
         response = self.client.get('/CrosswordPuzzle/submit/')
         self.assertEqual(response.status_code, 405)
+
+    def test_malformed_json_returns_400_not_html_500(self):
+        # 原本沒驗證請求結構，畸形請求會讓例外一路往外拋、被 Django 預設的 500
+        # 處理接住（正式環境回一頁 HTML），跟這個 API 統一回 JSON 的約定不一致。
+        response = self.client.post(
+            '/CrosswordPuzzle/submit/',
+            data="not valid json",
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_missing_required_field_returns_400(self):
+        payload = self._payload("cyux")
+        del payload["crossword_legend"]
+        response = self.client.post(
+            '/CrosswordPuzzle/submit/',
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_wrong_field_type_returns_400(self):
+        payload = self._payload("cyux")
+        payload["crossword_solution"] = "not-a-list"
+        response = self.client.post(
+            '/CrosswordPuzzle/submit/',
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+
+    @patch('CrosswordPuzzle.views.is_ratelimited', return_value=True)
+    def test_rate_limited_returns_429(self, _mock_limited):
+        response = self.client.post(
+            '/CrosswordPuzzle/submit/',
+            data=json.dumps(self._payload("cyux")),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 429)

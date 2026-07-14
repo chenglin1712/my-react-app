@@ -208,6 +208,24 @@ STORAGES = {
     },
 }
 
+# 限流（AIModel/CrosswordPuzzle/crawler 的 is_ratelimited）計數存放位置。
+# 沒設定 REDIS_URL 時沿用 Django 預設的 LocMemCache：僅限單一 process 內有效，
+# gunicorn 開多個 worker 時，因為每個 worker 各自一份記憶體、互不共享計數，
+# 同一個限流門檻（例如「每分鐘 30 次」）會被 worker 數量乘倍放大（4 個 worker
+# 實際上變成每分鐘 120 次）。設定 REDIS_URL 後，所有 worker 共用同一份計數，
+# 門檻才會如實生效；本機開發／未設定 Redis 時維持原本行為，不強制要求 Redis。
+_redis_url = os.getenv("REDIS_URL")
+if _redis_url:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": _redis_url,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            },
+        }
+    }
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
