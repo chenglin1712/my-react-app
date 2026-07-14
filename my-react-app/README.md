@@ -81,6 +81,9 @@ alembic upgrade head
 - `CSRF_TRUSTED_ORIGINS`：逗號分隔，填正式網域（需含協定，例如 `https://your-app.example.com`）。
 - `ALLOWED_ORIGINS`：Django + FastAPI 共用的 CORS 允許來源，逗號分隔。
 - `DJANGO_DEBUG=False`、`AUTH_DEV_BYPASS=False`（或留空）、`FIREBASE_SERVICE_ACCOUNT_PATH` 指到服務帳戶金鑰 JSON。
+- 啟動 Django（gunicorn）前需先執行一次 `python manage.py collectstatic --noinput`：admin／DRF 頁面的 CSS/JS 由 WhiteNoise 直接從 `STATIC_ROOT`（`backend/staticfiles/`）提供，沒跑過這個指令樣式會跑掉。
+- `DJANGO_DEBUG=False` 時 Swagger UI（`/docs/`）不會掛載（404），只在開發環境可用。
+- `DJANGO_DEBUG=False` 會自動啟用 `SECURE_SSL_REDIRECT`／`SESSION_COOKIE_SECURE`／`CSRF_COOKIE_SECURE`／HSTS；部署平台（Render、Cloud Run）需在反向代理層正確設定 `X-Forwarded-Proto`（兩者預設都會），Django 已透過 `SECURE_PROXY_SSL_HEADER` 讀取這個標頭判斷連線是否為 HTTPS。
 
 ## 測試
 

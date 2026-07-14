@@ -43,6 +43,27 @@ DEBUG = os.getenv("DJANGO_DEBUG", "False") == "True"
 # 誤設 AUTH_DEV_BYPASS=True 卻忘記同時把 DEBUG 打開）。
 AUTH_DEV_BYPASS = DEBUG and os.getenv("AUTH_DEV_BYPASS", "False") == "True"
 
+
+# 正式環境安全設定（manage.py check --deploy 的 W004/W008/W012/W016）。用 not DEBUG
+# 而非另開環境變數：本機開發本來就走 HTTP，強制 SSL redirect／secure cookie 會直接
+# 讓本機登入失敗，這些設定只在「非 DEBUG＝視為正式環境」時才需要生效。
+# SECURE_PROXY_SSL_HEADER 例外，兩種環境都設定：Render/Cloud Run 對外都是 HTTPS，
+# 但反向代理到 Django process 這一段是 HTTP，Django 原生的 request.is_secure() 會誤判
+# 成不安全連線，導致 SECURE_SSL_REDIRECT 陷入重導迴圈、secure cookie 也不會被送出。
+# 這兩個平台都會在自己的邊緣層蓋掉用戶端送來的 X-Forwarded-Proto，不會讓外部請求
+# 偽造這個標頭，才能放心依它判斷；本機開發沒有反向代理，不會有這個標頭，不受影響。
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    # 先從 1 小時開始（Django 官方文件建議的做法）：確認正式環境 HTTPS 運作正常、
+    # 沒有把自己鎖在外面之後，再逐步拉長這個數字。
+    SECURE_HSTS_SECONDS = 3600
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 # Render 會自動注入 RENDER_EXTERNAL_HOSTNAME；其他平台（Cloud Run 等）沒有這個
 # 環境變數，改用 DJANGO_ALLOWED_HOSTS（逗號分隔）手動指定，兩者可並存。
@@ -74,6 +95,12 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     "django.middleware.security.SecurityMiddleware",
+    # 緊接在 SecurityMiddleware 之後（WhiteNoise 官方要求的順序）。專案沒有另外的
+    # nginx/CDN 幫 Django 服務 static/，STATIC_ROOT 之前又是註解掉的狀態，
+    # collectstatic 沒有輸出目的地，正式環境等於沒有任何機制能提供 admin／DRF／
+    # Swagger UI 需要的 CSS/JS，畫面樣式會跑掉。WhiteNoise 讓 Django process
+    # 自己把 collectstatic 的輸出檔案送出去，不需要額外起一個靜態檔伺服器。
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -172,7 +199,14 @@ TEMPLATES[0]["DIRS"] = [BASE_DIR/"dist"]
 
 STATIC_URL = "static/"
 #STATIC_URL = "/assets/"
-#STATIC_ROOT = BASE_DIR / "staticfiles"
+# collectstatic 的輸出目的地；WhiteNoise（見上方 MIDDLEWARE）在正式環境從這裡讀檔
+# 送出去。部署流程需要在啟動前執行一次 `python manage.py collectstatic --noinput`。
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field

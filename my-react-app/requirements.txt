@@ -5,6 +5,7 @@ django-cors-headers==4.9.0
 django-ratelimit==4.1.0
 drf-yasg==1.21.15
 gunicorn==26.0.0
+whitenoise==6.12.0
 
 # FastAPI / ASGI
 fastapi==0.139.0

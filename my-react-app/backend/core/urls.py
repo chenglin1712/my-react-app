@@ -14,29 +14,35 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from django.conf import settings
 from django.urls import path, include
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
-schema_view = get_schema_view(
-   openapi.Info(
-      title="My API",
-      default_version='v1',
-      description="API docs",
-   ),
-   public=True,
-   permission_classes=(permissions.AllowAny,),
-)
-
 urlpatterns = [
     #path("admin/", admin.site.urls),
-    path('docs/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    
     path('crawler/',include('crawler.urls')),
     path('AIModel/',include('AIModel.urls')),
     path('CrosswordPuzzle/',include('CrosswordPuzzle.urls'))
     ]
+
+# Swagger UI 只在開發環境掛載，跟 fastAPI/routes/dictionary.py 的除錯用路由同一個
+# 標準：正式環境（DEBUG=False）完全不註冊這個 URL（直接 404），而不是註冊了再靠
+# permission_classes 擋，避免不小心漏改成 IsAuthenticated 之類的設定就整個曝光。
+if settings.DEBUG:
+    schema_view = get_schema_view(
+       openapi.Info(
+          title="My API",
+          default_version='v1',
+          description="API docs",
+       ),
+       public=True,
+       permission_classes=(permissions.AllowAny,),
+    )
+    urlpatterns.append(
+        path('docs/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    )
 
 #if settings.DEBUG:
 #    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATICFILES_DIRS[0])

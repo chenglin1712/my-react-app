@@ -19,17 +19,30 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-_GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-if not _GITHUB_TOKEN:
-    raise EnvironmentError(
-        "[AIModel] 環境變數 GITHUB_TOKEN 未設定，AI 對話功能無法啟動。"
-        "請在 .env 填入 GitHub Personal Access Token。"
-    )
+_client = None
 
-client = OpenAI(
-    api_key=_GITHUB_TOKEN,
-    base_url="https://models.github.ai/inference"
-)
+
+def _get_client():
+    """延遲初始化 OpenAI client，第一次真的呼叫 AI 對話功能時才檢查 GITHUB_TOKEN。
+
+    core/urls.py 一定會 import 到這個模組（掛載 AIModel.urls），若在模組載入當下就
+    檢查並拋錯，少一把金鑰會讓整個 Django process 啟動失敗，連跟 AI 功能無關的
+    其他端點都連帶壞掉。延後到實際呼叫時才檢查，缺金鑰只會讓這兩個 AI 端點回
+    503，其他功能不受影響。"""
+    global _client
+    if _client is not None:
+        return _client
+    github_token = os.getenv("GITHUB_TOKEN")
+    if not github_token:
+        raise EnvironmentError(
+            "[AIModel] 環境變數 GITHUB_TOKEN 未設定，AI 對話功能無法使用。"
+            "請在 .env 填入 GitHub Personal Access Token。"
+        )
+    _client = OpenAI(
+        api_key=github_token,
+        base_url="https://models.github.ai/inference"
+    )
+    return _client
 
 def _rate_limited_response(request, decoded, group, rate="10/m"):
     """依已登入使用者的 uid 限速（這兩個 view 都會呼叫付費的 GitHub Models API）。
@@ -61,6 +74,10 @@ def tayal_chat(request):
         limited_resp = _rate_limited_response(request, decoded, group="tayal_chat")
         if limited_resp:
             return limited_resp
+        try:
+            client = _get_client()
+        except EnvironmentError as e:
+            return JsonResponse({"detail": str(e)}, status=503)
         try:
             body = json.loads(request.body)
             user_message = body.get("message", "").strip()
@@ -184,6 +201,10 @@ def review_tayal_chat(request):
         limited_resp = _rate_limited_response(request, decoded, group="review_tayal_chat")
         if limited_resp:
             return limited_resp
+        try:
+            client = _get_client()
+        except EnvironmentError as e:
+            return JsonResponse({"detail": str(e)}, status=503)
         try:
             body = json.loads(request.body)
             user_message = body.get("message", "").strip()
