@@ -3,14 +3,16 @@ import FunctionBtn from "../../components/_home/functionBtn"
 import "../../static/css/_home/index.css"
 import Calendar from "../../components/_home/calendar"
 import { useEffect, useRef, useState } from 'react';
-import BannerImg from "../../static/assets/_home/home.webp"
+import { TRIBES } from "../constants/tribes";
 
 const App = () => {
     const [newsWithImage, setNewsWithImage] = useState([]);
     const [newsWithoutImage, setNewsWithoutImage] = useState([]);
     const [examInfo, setExamInfo] = useState([]);
     const [newsError, setNewsError] = useState(false);
+    const [tribe, setTribe] = useState(0);
     const functionBtnRef = useRef(null);
+    const activeTribe = TRIBES[tribe];
 
     useEffect(() => {
         fetch(`${import.meta.env.VITE_API_NEWS_URL}`)
@@ -36,20 +38,78 @@ const App = () => {
     }, []);
 
     return (
-        <div className="homepage">
-            <img src={BannerImg} className="banner-img" />
-            <div className="banner-content">
-                <h1 className="banner-system-name">源·語</h1>
-                <p className="banner-system-desc">
-                    《源·語》是一套為想學習原住民族語的AI互動學習平台，
-                    涵蓋影像辨識、詞彙遊戲及測驗學習等功能，
-                    是教師尋找教學資源、學生自主學習的選擇之一！
-                </p>
+        <div className="yy-page homepage">
+            <section className="yy-hero home-hero">
+                <span className="home-blob home-blob--gold" />
+                <span className="home-blob home-blob--red" />
+
+                <div className="yy-fade-up">
+                    <span className="yy-eyebrow">◆ 原住民族語 · 五族共學 ◆</span>
+                    <h1 className="home-title">五族語言，<br />刻進<span className="yy-holo-text">織紋</span>裡的學習旅程</h1>
+                    <p className="home-desc">泰雅、布農、阿美、噶瑪蘭、排灣——影像辨識、詞彙遊戲與適性測驗，用鮮明色彩延續族語文化的生命力。</p>
+                </div>
+
+                <div className="yy-fade-up home-console">
+                    <div className="home-console-shell">
+                        <div className="home-console-screen">
+                            <div className="home-console-brand">YUAN・YU<span className="home-console-cursor">_</span></div>
+                            <div className="home-console-sub">FIVE TRIBES ONLINE</div>
+                        </div>
+                        <div className="home-console-footer">
+                            <span className="home-console-bar" />
+                            <span className="home-console-dots">
+                                <span />
+                                <span />
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
                 <button
-                    className="banner-learn-more-btn"
+                    type="button"
+                    className="yy-fade-up home-cta"
                     onClick={() => functionBtnRef.current?.scrollIntoView({ behavior: "smooth" })}
-                >了解更多</button>
-            </div>
+                >▸ 開始學習 PRESS START!</button>
+            </section>
+
+            <div className="yy-divider" />
+
+            <section className="home-tribes-section">
+                <div className="home-tribes-grid">
+                    <div className="yy-card yy-fade-up home-tribe-list">
+                        <div className="home-tribe-list-title">◆ 五族語言 »</div>
+                        {TRIBES.map((t, i) => (
+                            <div
+                                key={t.slug}
+                                role="button"
+                                tabIndex={0}
+                                className="home-tribe-row"
+                                style={{ transform: `scale(${i === tribe ? 1.04 : 1})` }}
+                                onClick={() => setTribe(i)}
+                                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setTribe(i); } }}
+                            >
+                                <span className="home-tribe-swatch" style={{ background: t.color }} />
+                                <span className="home-tribe-name">{t.name}</span>
+                                <span className="home-tribe-roman">{t.roman}</span>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="yy-card yy-fade-up home-feature-card">
+                        <div className="home-feature-head">
+                            <span>現正主打</span>
+                            <span>◆ ◆ ◆ ◆ ◆</span>
+                        </div>
+                        <div className="home-feature-image">
+                            <span>IMAGE PLACEHOLDER</span>
+                        </div>
+                        <div className="home-feature-body">
+                            <div className="home-feature-title">{activeTribe.name}語主題週</div>
+                            <div className="home-feature-sub">{activeTribe.roman} · 點左側清單切換族語</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
             <div ref={functionBtnRef}>
                 <FunctionBtn />

@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Spinner } from 'react-bootstrap';
 import { useAuth } from './userServives/authContext';
 import PermissionProtect from './userServives/permissionProtect';
@@ -13,10 +13,8 @@ const EditPage = lazy(() => import('../components/_auth/editProfile'));
 //忘記密碼、重設密碼
 const ForgotPage = lazy(() => import('../components/_auth/forgotPassword'));
 const ResetPage = lazy(() => import('../components/_auth/resetPassword'));
-//影像辨識
+//影像辨識（單頁 3 步驟精靈，見 _camera/index.jsx；label.jsx/result.jsx 是內部步驟元件，不再是獨立路由頁面）
 const CameraPage = lazy(() => import('./_camera/index'));
-const Label = lazy(() => import('./_camera/label'));
-const Result = lazy(() => import('./_camera/result'));
 //辭典
 const SearchPage = lazy(() => import('./_search/index'));
 //遊戲
@@ -73,8 +71,8 @@ const App = () => {
           <Route path="/" element={<HomePage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/camera" element={<ProtectedRoute><CameraPage /></ProtectedRoute>} />
-          <Route path="/camera/label" element={<ProtectedRoute><Label /></ProtectedRoute>} />
-          <Route path="/camera/result" element={<ProtectedRoute><Result /></ProtectedRoute>} />
+          <Route path="/camera/label" element={<Navigate to="/camera" replace />} />
+          <Route path="/camera/result" element={<Navigate to="/camera" replace />} />
           <Route path="/favorite" element={<ProtectedRoute><FavoritePage /></ProtectedRoute>} />
           <Route path="/game" element={<ProtectedRoute><GamePage /></ProtectedRoute>} />
           <Route path="/game/vocabulary" element={<ProtectedRoute><VocabularyPage /></ProtectedRoute>} />

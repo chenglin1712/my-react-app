@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
-import { useLocation , useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
-  Container, ListGroup, Alert, Spinner, Button,
+  ListGroup, Alert, Spinner, Button,
   Dropdown, Offcanvas
 } from 'react-bootstrap';
 import { FaHeart, FaRegHeart, FaPlayCircle, FaChevronDown, FaChevronUp } from "react-icons/fa";
@@ -142,12 +141,10 @@ const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFav
   </ListGroup.Item>
 );
 
-const App = () => {
-  const [_query, _setQuery] = useState('');
-  const location = useLocation();
-  const selectedWords = useMemo(() => location.state?.selectedWords || [], [location.state?.selectedWords]);
-  const tribe = location.state?.tribe || "tayal";
-
+// 影像辨識精靈第 3 步：查詢辨識出的單詞並顯示完整詞典結果。
+// selectedWords/tribe 由 index.jsx（精靈容器）傳入，取代原本從路由 state 讀取；
+// onRestart 取代原本「返回 /camera」的導頁，改成重置精靈狀態回到第 1 步。
+const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
   const [definitions, setDefinitions] = useState({ exact_match_results: {}, fuzzy_match_results: {} });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -162,7 +159,6 @@ const App = () => {
   );
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const [frequencyFilter, setFrequencyFilter] = useState('');
-  const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(false);
   const [showCategories, setShowCategories] = useState(false);
   const [activeTab, setActiveTab] = useState('語法與功能');
@@ -333,24 +329,12 @@ const categoryGroups = {
   const _fuzzyMatchFilteredCount = Object.values(definitions.fuzzy_match_results).flatMap(obj => Object.values(obj).map(list => filterAndSortWords(list).length)).reduce((a, b) => a + b, 0);
 
   return (
-    <Container className="p-4">
-      <div style={{ 
-        position: 'sticky', 
-        top: 0, 
-        background: 'white', 
-        zIndex: 900, 
-        paddingBottom: '1rem', 
-        marginBottom: '1rem', 
-        borderBottom: '1px solid #ccc' 
-      }}>
-        <br />
-      <h2 className="fw-bolder center" style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', marginBottom: 0 }}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" fill="currentColor" className="bi bi-search" viewBox="0 0 16 16">
-          <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0" />
-        </svg>&nbsp; 查詢結果
-      </h2>
-      <br />
-      <div className="d-flex mb-3 align-items-center">
+    <div className="yy-fade-up camera-step3">
+      <div className="camera-step3-header">
+        <h2 className="camera-step3-title">查詢結果</h2>
+        <button type="button" className="yy-btn-outline" onClick={onRestart}>↺ 重新辨識</button>
+      </div>
+      <div className="camera-step3-filters">
                {isMobile ? (
             <>
               <Button variant="outline-dark" className="mb-3" onClick={() => setShowFilterPanel(true)}>
@@ -414,13 +398,13 @@ const categoryGroups = {
                     </Button>
 
                     
-                    <Button  variant="outline-danger" onClick={() => navigate("/camera")}>
+                    <Button  variant="outline-danger" onClick={onRestart}>
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-arrow-return-left" viewBox="0 0 16 16">
                         <path fillRule="evenodd" d="M14.5 1.5a.5.5 0 0 1 .5.5v4.8a2.5 2.5 0 0 1-2.5 2.5H2.707l3.347 3.346a.5.5 0 0 1-.708.708l-4.2-4.2a.5.5 0 0 1 0-.708l4-4a.5.5 0 1 1 .708.708L2.707 8.3H12.5A1.5 1.5 0 0 0 14 6.8V2a.5.5 0 0 1 .5-.5" />
                       </svg>
                       &nbsp; 返回
                     </Button>
-      
+
                   </div>
                 </Offcanvas.Body>
               </Offcanvas>
@@ -467,7 +451,7 @@ const categoryGroups = {
                 {showOnlyFavorites ? '顯示全部' : '只顯示收藏'}
               </Button>
 
-              <Button className="ms-3" variant="outline-danger" onClick={() => navigate("/camera")}>
+              <Button className="ms-3" variant="outline-danger" onClick={onRestart}>
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-arrow-return-left" viewBox="0 0 16 16">
                         <path fillRule="evenodd" d="M14.5 1.5a.5.5 0 0 1 .5.5v4.8a2.5 2.5 0 0 1-2.5 2.5H2.707l3.347 3.346a.5.5 0 0 1-.708.708l-4.2-4.2a.5.5 0 0 1 0-.708l4-4a.5.5 0 1 1 .708.708L2.707 8.3H12.5A1.5 1.5 0 0 0 14 6.8V2a.5.5 0 0 1 .5-.5" />
                       </svg>
@@ -480,14 +464,16 @@ const categoryGroups = {
       
                  {/* 📂 分類Bar */}
       <div
-        className="category-bar d-flex justify-content-between align-items-center p-2 bg-light rounded shadow-sm"
+        className="category-bar yy-card d-flex justify-content-between align-items-center"
+        role="button"
+        tabIndex={0}
         onClick={() => setShowCategories(!showCategories)}
-        style={{ cursor: 'pointer',backgroundColor:"#fbcfcf",fontWeight: "bold" }}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowCategories(!showCategories); } }}
       >
-        <span className="fw-bold">單詞分類
+        <span className="fw-bold">📂 單詞分類
           {selectedSubCategory && (
       <span style={{ marginLeft: "8px" }}>
-        - <span style={{color: "#ac3044ff" }}>{selectedSubCategory}</span>
+        - <span style={{color: "var(--yy-red)" }}>{selectedSubCategory}</span>
       </span>
     )}</span>
         {showCategories ? <FaChevronUp /> : <FaChevronDown />}
@@ -495,7 +481,7 @@ const categoryGroups = {
 
       {/* 展開分類 Tabs */}
       {showCategories && (
-        <div className="mt-2 p-2 bg-white rounded shadow-sm">
+        <div className="category-panel yy-card mt-2">
           <Tabs
             activeKey={activeTab}
             onSelect={(k) => setActiveTab(k)}
@@ -527,7 +513,6 @@ const categoryGroups = {
           </Tabs>
         </div>
       )}
-      </div>
       {loading && <Spinner animation="border" variant="primary" />}
       {error && <Alert variant="danger">{error}</Alert>}
       {favoritesError && <Alert variant="danger">{favoritesError}</Alert>}
@@ -604,8 +589,8 @@ const categoryGroups = {
         );
       })()
     }
-    </Container>
+    </div>
   );
 };
 
-export default App;
+export default CameraResultStep;

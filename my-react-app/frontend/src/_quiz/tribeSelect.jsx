@@ -2,6 +2,9 @@ import { useNavigate } from "react-router-dom";
 import "../../static/css/_game/zone.css";
 import { Container } from "react-bootstrap";
 import { TRIBES as TRIBE_LIST } from "../constants/tribes";
+import StepBar from "../../components/ui/StepBar";
+
+const QUIZ_STEPS = ["選擇族語", "選擇等級", "開始作答", "成績單"];
 
 // subtitle/emoji/available/route 是這個頁面自己的呈現用資料，跟名稱對照表分開放；
 // 名稱（name）跟英文代稱（id，沿用原本 tribe.id 這個欄位名）一律從共用的
@@ -20,11 +23,16 @@ const QuizTribeSelect = () => {
   const navigate = useNavigate();
 
   return (
+    <div className="yy-page">
     <Container>
       <div className="zone-page">
         <div className="zone-header">
-          <h1 className="zone-title">測驗</h1>
-          <p className="zone-subtitle">選擇族語，開始自適應測驗學習</p>
+          <span className="yy-eyebrow">◆ QUIZ MODE ◆</span>
+          <h1 className="zone-title" style={{ marginTop: 12 }}>測驗</h1>
+          <p className="zone-subtitle">選擇族語與等級，開始自適應測驗學習。</p>
+          <div style={{ marginTop: 28, marginBottom: 8 }}>
+            <StepBar steps={QUIZ_STEPS} current={1} />
+          </div>
         </div>
 
         <div className="zone-grid">
@@ -53,12 +61,13 @@ const QuizTribeSelect = () => {
         </div>
       </div>
     </Container>
+    </div>
   );
 };
 
 function getTribeColor(id) {
   const colors = {
-    tayal: "#9B1B30",
+    tayal: "#9E1B24",
     amis: "#D4890A",
     bunun: "#4E7F63",
     kavalan: "#4A7FA5",

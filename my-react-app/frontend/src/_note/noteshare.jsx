@@ -9,6 +9,7 @@ import { useAuth } from "../../src/userServives/authContext";
 import "../../static/css/_note/./notesharestyle.css";
 import { Heart } from "lucide-react"
 import DOMPurify from "dompurify";
+import TabSwitch from "../../components/ui/TabSwitch";
 
 function timeAgo(ts) {
   if (!ts) return "";
@@ -308,6 +309,16 @@ export default function NoteShare() {
   }, []);
 
   return (
+    <div className="yy-page">
+    <div className="note-hero yy-fade-up">
+      <span className="yy-eyebrow">◆ NOTES ◆</span>
+      <h1 className="note-hero-title">筆記</h1>
+      <TabSwitch
+        tabs={[{ key: "write", label: "✎ 寫筆記" }, { key: "share", label: "☺ 筆記分享區" }]}
+        active="share"
+        onChange={(key) => { if (key === "write") navigate("/note"); }}
+      />
+    </div>
     <div className="ns-wrap">
       {/* Toolbar */}
       <div className="ns-toolbar">
@@ -483,6 +494,7 @@ export default function NoteShare() {
           {toast.text}
         </div>
       )}
+    </div>
     </div>
   );
 }

@@ -251,6 +251,7 @@ const App = () => {
 
 
   return (
+    <div className="yy-page search-page">
     <Container className="p-4">
       <SearchHeader
         query={query} setQuery={setQuery} handleSearch={handleSearch}
@@ -354,6 +355,7 @@ const App = () => {
         />
       )}
     </Container>
+    </div>
   );
 };
 

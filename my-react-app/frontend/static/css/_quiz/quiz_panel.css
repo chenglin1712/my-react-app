@@ -36,7 +36,7 @@
 }
 
 .panel-quiz-container button:hover {
-    background-color: #9B1B30;
+    background-color: #9E1B24;
     color: white;
 }
 
@@ -89,7 +89,7 @@
 }
 
 .panel-header button.intro-btn:hover {
-    color: #9B1B30;
+    color: #9E1B24;
 }
 
 .intro-box {
@@ -117,7 +117,7 @@
 .intro-box .parts-title {
     font-weight: bold;
     margin-bottom: 6px;
-    color: #9B1B30;
+    color: #9E1B24;
 }
 
 .question-container {
@@ -175,7 +175,7 @@ audio {
 }
 
 .answers button:hover {
-    border-color: #9B1B30;
+    border-color: #9E1B24;
     background-color: #f8d7da;
     color: #721c24;
 }
@@ -222,12 +222,12 @@ audio {
 }
 
 .quiz-image-box:hover {
-    border-color: #9B1B30;
+    border-color: #9E1B24;
 }
 
 .quiz-image-box.selected {
     background-color: #f8d7da;
-    border-color: #9B1B30;
+    border-color: #9E1B24;
 }
 
 .quiz-label {
@@ -261,7 +261,7 @@ audio {
 .match-board-title {
     display: flex;
     align-items: center;
-    color: #9B1B30;
+    color: #9E1B24;
     font-weight: bold;
     margin-bottom: 14px;
 }
@@ -290,13 +290,13 @@ audio {
 }
 
 .match-btn:hover:not(:disabled) {
-    border-color: #9B1B30;
+    border-color: #9E1B24;
     background-color: #f8d7da !important;
     color: #721c24;
 }
 
 .match-btn.selected {
-    border-color: #9B1B30;
+    border-color: #9E1B24;
     background-color: #f8d7da;
     color: #721c24;
 }
@@ -347,7 +347,7 @@ audio {
 }
 
 .match-answer-arrow {
-    color: #9B1B30;
+    color: #9E1B24;
 }
 
 /* ---------------- 高級：閱讀填空 ---------------- */
@@ -358,7 +358,7 @@ audio {
 .cloze-board-title {
     display: flex;
     align-items: center;
-    color: #9B1B30;
+    color: #9E1B24;
     font-weight: bold;
     margin-bottom: 10px;
 }
@@ -374,7 +374,7 @@ audio {
 
 .cloze-blank {
     display: inline-block;
-    color: #9B1B30;
+    color: #9E1B24;
     font-weight: bold;
     margin: 0 2px;
 }
@@ -405,13 +405,13 @@ audio {
 }
 
 .cloze-option-btn:hover {
-    border-color: #9B1B30;
+    border-color: #9E1B24;
     background-color: #f8d7da;
     color: #721c24;
 }
 
 .cloze-option-btn.selected {
-    border-color: #9B1B30;
+    border-color: #9E1B24;
     background-color: #f8d7da;
     color: #721c24;
 }
@@ -423,7 +423,7 @@ audio {
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    background: #9B1B30;
+    background: #9E1B24;
     color: #fff;
     font-weight: bold;
     font-size: 14px;

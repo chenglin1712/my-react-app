@@ -10,6 +10,7 @@ import "../../static/css/_note/buttons.css";
 import { Image as ImageIcon } from "lucide-react";
 import DOMPurify from "dompurify";
 import ErrorBoundary from "../errorBoundary";
+import TabSwitch from "../../components/ui/TabSwitch";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
 import { TextStyle } from "@tiptap/extension-text-style";
@@ -253,6 +254,16 @@ function NotePage() {
   const currentNote = notes[currentPage] || { title: "", content: "<p></p>" };
 
   return (
+    <div className="yy-page">
+    <div className="note-hero yy-fade-up">
+      <span className="yy-eyebrow">◆ NOTES ◆</span>
+      <h1 className="note-hero-title">筆記</h1>
+      <TabSwitch
+        tabs={[{ key: "write", label: "✎ 寫筆記" }, { key: "share", label: "☺ 筆記分享區" }]}
+        active="write"
+        onChange={(key) => { if (key === "share") navigate("/note/share"); }}
+      />
+    </div>
     <Container fluid className="main-container">
       {/* 上方編輯工具列 */}
       <Row className="editor-toolbar">
@@ -374,6 +385,7 @@ function NotePage() {
         <Button onClick={handleDelete} className="btn-danger">刪除</Button>
       </div>
     </Container>
+    </div>
   );
 }
 

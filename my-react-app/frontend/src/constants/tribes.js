@@ -12,12 +12,15 @@
  */
 
 export const TRIBES = [
-  { slug: "tayal", name: "泰雅", fullName: "泰雅語" },
-  { slug: "amis", name: "阿美", fullName: "阿美語" },
-  { slug: "bunun", name: "布農", fullName: "布農語" },
-  { slug: "kavalan", name: "噶瑪蘭", fullName: "噶瑪蘭語" },
-  { slug: "paiwan", name: "排灣", fullName: "排灣語" },
+  { slug: "tayal", name: "泰雅", fullName: "泰雅語", roman: "Tayal", color: "#9E1B24" },
+  { slug: "amis", name: "阿美", fullName: "阿美語", roman: "Pangcah", color: "#1F3A5C" },
+  { slug: "bunun", name: "布農", fullName: "布農語", roman: "Bunun", color: "#4B6B3A" },
+  { slug: "kavalan", name: "噶瑪蘭", fullName: "噶瑪蘭語", roman: "Kebalan", color: "#2C6E7F" },
+  { slug: "paiwan", name: "排灣", fullName: "排灣語", roman: "Payuan", color: "#D9A227" },
 ];
+
+// slug -> 族語識別色（YUAN・YU v2 設計系統，design_handoff_v2/README.md）
+export const TRIBE_COLOR_BY_SLUG = Object.fromEntries(TRIBES.map((t) => [t.slug, t.color]));
 
 // 中文簡稱清單，例如下拉選單、族語切換按鈕列表
 export const TRIBE_NAMES = TRIBES.map((t) => t.name);

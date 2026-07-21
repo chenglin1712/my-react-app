@@ -1,55 +1,188 @@
-/* ── 族語選擇器 ──────────────────────────────── */
+.search-sticky-header {
+  position: sticky;
+  top: 0;
+  background: var(--yy-cream);
+  z-index: 900;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid var(--yy-ink);
+}
+
+/* ── 頁首 hero ──────────────────────────────── */
+.search-hero-head {
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.search-hero-title {
+  font-size: 34px;
+  margin: 10px 0 10px;
+  font-weight: 900;
+  color: var(--yy-ink);
+}
+
+.search-hero-desc {
+  font-size: 14.5px;
+  color: var(--yy-text-secondary);
+  margin: 0 0 1rem;
+}
+
+/* ── 族語選擇器（YUAN・YU v2：赭紅/靛藍/綠/藍綠/赤金）───── */
 .tribe-selector {
   display: flex;
   gap: 0.6rem;
   flex-wrap: wrap;
+  justify-content: center;
   margin: 1rem 0 1.25rem;
 }
 
 .tribe-btn {
-  padding: 0.45rem 1.2rem;
-  border-radius: 999px;
-  border: 2px solid #9B1B30;
-  background: transparent;
-  color: #9B1B30;
-  font-size: 0.9rem;
-  font-weight: 600;
-  font-family: "Noto Sans TC", sans-serif;
+  padding: 9px 18px;
+  border-radius: 6px;
+  border: 3px solid var(--yy-ink);
+  background: #fff;
+  color: var(--yy-ink);
+  font-size: 14.5px;
+  font-weight: 700;
+  font-family: var(--yy-font-body);
   cursor: pointer;
-  transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+  transition: all 0.18s ease;
   white-space: nowrap;
+  box-shadow: var(--yy-shadow-sm);
 }
 
-.tribe-btn:hover,
+.tribe-btn:hover {
+  transform: translateY(-2px);
+}
+
 .tribe-btn.active {
-  background: #9B1B30;
+  background: var(--yy-red);
   color: #fff;
-  box-shadow: 0 3px 10px rgba(0,0,0,0.18);
+  transform: scale(1.06);
+  box-shadow: 4px 4px 0 rgba(34, 24, 18, 0.45);
 }
 
 /* 各族語顏色 */
-.tribe-btn[data-tribe="阿美"]                     { border-color: #D4890A; color: #D4890A; }
-.tribe-btn[data-tribe="阿美"]:hover,
-.tribe-btn[data-tribe="阿美"].active              { background: #D4890A; color: #fff; border-color: #D4890A; }
-
-.tribe-btn[data-tribe="布農"]                     { border-color: #4E7F63; color: #4E7F63; }
-.tribe-btn[data-tribe="布農"]:hover,
-.tribe-btn[data-tribe="布農"].active              { background: #4E7F63; color: #fff; border-color: #4E7F63; }
-
-.tribe-btn[data-tribe="葛瑪蘭"]                   { border-color: #4A7FA5; color: #4A7FA5; }
-.tribe-btn[data-tribe="葛瑪蘭"]:hover,
-.tribe-btn[data-tribe="葛瑪蘭"].active            { background: #4A7FA5; color: #fff; border-color: #4A7FA5; }
-
-.tribe-btn[data-tribe="排灣"]                     { border-color: #6B4FAA; color: #6B4FAA; }
-.tribe-btn[data-tribe="排灣"]:hover,
-.tribe-btn[data-tribe="排灣"].active              { background: #6B4FAA; color: #fff; border-color: #6B4FAA; }
+.tribe-btn[data-tribe="阿美"].active              { background: var(--yy-blue); }
+.tribe-btn[data-tribe="布農"].active              { background: var(--yy-green); }
+.tribe-btn[data-tribe="噶瑪蘭"].active            { background: var(--yy-blue-light); }
+.tribe-btn[data-tribe="排灣"].active              { background: var(--yy-gold); color: var(--yy-ink); }
 
 /* 空白狀態徽章顏色 */
-.tribe-empty-badge[data-tribe="泰雅"]   { background: #9B1B30; }
-.tribe-empty-badge[data-tribe="阿美"]   { background: #D4890A; }
-.tribe-empty-badge[data-tribe="布農"]   { background: #4E7F63; }
-.tribe-empty-badge[data-tribe="葛瑪蘭"] { background: #4A7FA5; }
-.tribe-empty-badge[data-tribe="排灣"]   { background: #6B4FAA; }
+.tribe-empty-badge[data-tribe="泰雅"]   { background: var(--yy-red); }
+.tribe-empty-badge[data-tribe="阿美"]   { background: var(--yy-blue); }
+.tribe-empty-badge[data-tribe="布農"]   { background: var(--yy-green); }
+.tribe-empty-badge[data-tribe="噶瑪蘭"] { background: var(--yy-blue-light); }
+.tribe-empty-badge[data-tribe="排灣"]   { background: var(--yy-gold); }
+
+/* ── 搜尋卡：終端機輸入框 + 篩選列 ─────────────── */
+.search-card {
+  max-width: 720px;
+  margin: 0 auto 20px;
+  padding: 22px 26px;
+}
+
+.search-terminal {
+  background: linear-gradient(160deg, #264C73, #1B3452);
+  border: 2px solid var(--yy-gold);
+  border-radius: var(--yy-radius-btn);
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+
+.search-terminal-prompt {
+  display: flex;
+  align-items: center;
+  padding: 0 0 0 16px;
+  background: transparent;
+  border: none;
+  color: var(--yy-gold);
+  font-family: var(--yy-font-pixel);
+  font-size: 16px;
+}
+
+.search-terminal-input,
+.search-terminal-input.form-control {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: var(--yy-cream) !important;
+  font-family: var(--yy-font-pixel);
+  font-size: 14px;
+  padding: 14px 10px;
+}
+
+.search-terminal-input::placeholder {
+  color: rgba(243, 231, 207, 0.6);
+}
+
+.search-go-btn.btn {
+  background: var(--yy-gold);
+  border: none;
+  border-left: 2px solid var(--yy-gold);
+  color: var(--yy-ink);
+  font-family: var(--yy-font-pixel);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 0 20px;
+}
+
+.search-go-btn.btn:hover,
+.search-go-btn.btn:disabled {
+  background: var(--yy-gold-light);
+  color: var(--yy-ink);
+}
+
+.search-filter-panel .yy-btn-outline {
+  font-size: 13px;
+  padding: 8px 16px;
+}
+
+.search-freq-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-left: 6px;
+}
+
+.search-freq-label {
+  font-size: 12.5px;
+  color: var(--yy-text-tertiary);
+  font-weight: 700;
+  margin-right: 2px;
+}
+
+.search-freq-chip,
+.search-letter-chip {
+  border: 2px solid var(--yy-ink);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--yy-ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.search-freq-chip {
+  width: 34px;
+  height: 30px;
+  font-size: 12.5px;
+}
+
+.search-letter-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.search-letter-chip {
+  width: 26px;
+  height: 26px;
+  font-size: 11.5px;
+  font-family: var(--yy-font-pixel);
+  border-radius: 4px;
+}
 
 /* ── 族語空白狀態 ──────────────────────────── */
 .tribe-empty-state {
@@ -89,6 +222,20 @@
   margin: 0;
 }
 
+.category-bar {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px 22px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.category-panel {
+  max-width: 720px;
+  margin: 14px auto 0;
+  padding: 20px 22px;
+}
+
 .subcategory-scroll {
   display: flex;
   overflow-x: auto;
@@ -102,12 +249,12 @@
   width: 190px;
   height: 190px;
   text-align: center;
-  border-radius: 10px;
+  border-radius: var(--yy-radius-card);
   padding: 6px;
   background-color: #ffffff;
   cursor: pointer;
   transition: all 0.2s ease;
-  border: 2px solid transparent;
+  border: 2px solid var(--yy-ink);
 }
 
 .subcategory-card img {
@@ -124,11 +271,42 @@
 }
 
 .subcategory-card:hover {
-  background-color: #fbcfcf;
+  border-color: var(--yy-gold);
+  box-shadow: var(--yy-shadow-sm);
 }
 
 .subcategory-card.active {
-  
-  background-color: #f6bdbd;
+  border-color: var(--yy-red);
+  background-color: var(--yy-cream);
+  box-shadow: var(--yy-shadow-sm);
+}
+
+/* ── 查詢結果卡片 ──────────────────────────────── */
+.search-page .list-group-item {
+  border: 3px solid var(--yy-ink) !important;
+  border-radius: var(--yy-radius-card) !important;
+  margin-bottom: 14px;
+  box-shadow: var(--yy-shadow-sm);
+  padding: 18px 20px;
+}
+
+.search-page .list-group-item .list-group-item {
+  border: none !important;
+  border-top: 2px dashed rgba(34, 24, 18, 0.2) !important;
+  border-radius: 0 !important;
+  box-shadow: none;
+  margin-bottom: 0;
+}
+
+.search-page h4.fw-bold {
+  font-family: var(--yy-font-pixel);
+  font-size: 16px;
+  max-width: 720px;
+  margin: 20px auto 14px;
+}
+
+.search-page .list-group {
+  max-width: 720px;
+  margin: 0 auto;
 }
 

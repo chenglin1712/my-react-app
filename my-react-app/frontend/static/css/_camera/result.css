@@ -37,6 +37,77 @@
 }
 
 .subcategory-card.active {
-  
+
   background-color: #f6bdbd;
+}
+
+/* ---------- Step 3：查詢結果（YUAN・YU v2）---------- */
+
+.camera-step3 {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.camera-step3-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.camera-step3-title {
+  font-size: 22px;
+  font-weight: 900;
+  margin: 0;
+}
+
+.camera-step3-filters {
+  margin-bottom: 14px;
+}
+
+.camera-step3 .category-bar {
+  padding: 16px 22px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.camera-step3 .category-panel {
+  padding: 20px 22px;
+}
+
+.camera-step3 .subcategory-card {
+  border: 2px solid var(--yy-ink);
+  border-radius: var(--yy-radius-card);
+}
+
+.camera-step3 .subcategory-card:hover {
+  border-color: var(--yy-gold);
+  box-shadow: var(--yy-shadow-sm);
+}
+
+.camera-step3 .subcategory-card.active {
+  border-color: var(--yy-red);
+  background-color: var(--yy-cream) !important;
+  box-shadow: var(--yy-shadow-sm);
+}
+
+.camera-step3 .list-group-item {
+  border: 3px solid var(--yy-ink) !important;
+  border-radius: var(--yy-radius-card) !important;
+  margin-bottom: 14px;
+  box-shadow: var(--yy-shadow-sm);
+  padding: 18px 20px;
+}
+
+.camera-step3 .list-group-item .list-group-item {
+  border: none !important;
+  border-top: 2px dashed rgba(34, 24, 18, 0.2) !important;
+  border-radius: 0 !important;
+  box-shadow: none;
+  margin-bottom: 0;
+}
+
+.camera-step3 h4.fw-bold {
+  font-family: var(--yy-font-pixel);
+  font-size: 16px;
 }

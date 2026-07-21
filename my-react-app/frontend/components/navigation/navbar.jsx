@@ -53,6 +53,7 @@ const Navbar = () => {
   };
 
   return (
+    <>
     <nav className="navbar">
       <div className="navbar-container">
         <div
@@ -61,7 +62,7 @@ const Navbar = () => {
           tabIndex={0}
           onClick={() => { navigate("/") }}
           onKeyDown={handleKeyActivate(() => navigate("/"))}
-        >源·語</div>
+        >YUAN・YU</div>
 
         {/* 導覽列 */}
         <div className="menu">
@@ -129,7 +130,7 @@ const Navbar = () => {
 
           {userData == null || !userData.firestoreData ? (
             <div
-              className="menu-item"
+              className="menu-item login-btn"
               role="button"
               tabIndex={0}
               onClick={() => navigate('/login')}
@@ -268,6 +269,8 @@ const Navbar = () => {
         </div>
       </div >
     </nav >
+    <div className="navbar-marquee" />
+    </>
   );
 };
 export default Navbar;

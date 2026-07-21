@@ -218,7 +218,7 @@
 }
 
 .btn-primary {
-    background: #9B1B30;
+    background: #9E1B24;
     color: #fff;
     border: none;
     padding: 12px 20px;
@@ -229,8 +229,8 @@
 
 .btn-secondary {
     background: #fff;
-    color: #9B1B30;
-    border: 2px solid #9B1B30;
+    color: #9E1B24;
+    border: 2px solid #9E1B24;
     padding: 12px 20px;
     border-radius: 8px;
     font-size: 16px;

@@ -111,21 +111,23 @@ const CategoryBar = ({
 }) => (
   <>
     <div
-      className="category-bar d-flex justify-content-between align-items-center p-2 bg-light rounded shadow-sm"
+      className="category-bar yy-card d-flex justify-content-between align-items-center"
+      role="button"
+      tabIndex={0}
       onClick={() => setShowCategories(!showCategories)}
-      style={{ cursor: 'pointer', backgroundColor: "#fbcfcf", fontWeight: "bold" }}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowCategories(!showCategories); } }}
     >
-      <span className="fw-bold">單詞分類
+      <span className="fw-bold">📂 單詞分類
         {selectedSubCategory && (
           <span style={{ marginLeft: "8px" }}>
-            - <span style={{ color: "#ac3044ff" }}>{selectedSubCategory}</span>
+            - <span style={{ color: "var(--yy-red)" }}>{selectedSubCategory}</span>
           </span>
         )}</span>
       {showCategories ? <FaChevronUp /> : <FaChevronDown />}
     </div>
 
     {showCategories && (
-      <div className="mt-2 p-2 bg-white rounded shadow-sm">
+      <div className="category-panel yy-card mt-2">
         <Tabs
           activeKey={activeTab}
           onSelect={(k) => setActiveTab(k)}

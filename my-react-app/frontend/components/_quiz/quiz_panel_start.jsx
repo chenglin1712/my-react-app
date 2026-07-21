@@ -1,6 +1,9 @@
 import "../../static/css/_quiz/quiz_panel_start.css"
 import { useNavigate } from "react-router-dom";
 import RecommonImg from "../../static/assets/_quiz/recommon.png"
+import StepBar from "../ui/StepBar";
+
+const QUIZ_STEPS = ["選擇族語", "選擇等級", "開始作答", "成績單"];
 
 const Panel_Start = ({ tribe = "tayal" }) => {
     const navigate = useNavigate();
@@ -17,6 +20,9 @@ const Panel_Start = ({ tribe = "tayal" }) => {
 
     return (
         <div className="panel-start-container">
+            <div style={{ marginBottom: 22 }}>
+                <StepBar steps={QUIZ_STEPS} current={2} />
+            </div>
 
             <div className="panel-start-card">
                 <p className="panel-subtitle">請選擇你的測驗等級</p>

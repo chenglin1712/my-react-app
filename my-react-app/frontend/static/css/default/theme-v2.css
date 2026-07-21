@@ -1,0 +1,453 @@
+/*
+ * YUAN・YU v2 設計系統（Y2K × 原民強對比配色）design tokens。
+ * 來源：Claude Design 專案「原住民族語教學平台」design_handoff_v2/README.md。
+ * 全站共用的 CSS 變數、keyframes 與 utility class，供各頁面 CSS 取用，
+ * 取代原型 .dc.html 內大量重複的 inline style。
+ *
+ * 字體（Noto Sans TC / Silkscreen）由 index.html 的 <link rel="stylesheet"> 載入，
+ * 這裡不用 CSS @import（會拖慢首次渲染，見該處註解）。
+ */
+
+:root {
+  --yy-red: #9E1B24;
+  --yy-red-dark: #8A171F;
+  --yy-blue: #1F3A5C;
+  --yy-blue-light: #2C6E7F;
+  --yy-gold: #D9A227;
+  --yy-gold-light: #F6D77B;
+  --yy-green: #4B6B3A;
+  --yy-cream: #F3E7CF;
+  --yy-cream-dim: #EFE1C4;
+  --yy-ink: #221812;
+  --yy-text-secondary: #3E3226;
+  --yy-text-tertiary: #5A4B3B;
+  --yy-text-muted: #6B5A47;
+  --yy-font-body: 'Noto Sans TC', sans-serif;
+  --yy-font-pixel: 'Silkscreen', monospace;
+  --yy-radius-card: 10px;
+  --yy-radius-btn: 6px;
+  --yy-shadow-sm: 3px 3px 0 var(--yy-ink);
+  --yy-shadow-md: 5px 5px 0 var(--yy-ink);
+  --yy-shadow-lg: 7px 7px 0 var(--yy-ink);
+}
+
+@keyframes yy-holo {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
+}
+@keyframes yy-floaty {
+  0% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-14px) rotate(10deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+@keyframes yy-pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 162, 39, 0.55); }
+  50% { box-shadow: 0 0 0 12px rgba(217, 162, 39, 0); }
+}
+@keyframes yy-marquee {
+  0% { background-position: 0 0; }
+  100% { background-position: 200px 0; }
+}
+@keyframes yy-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+@keyframes yy-fade-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes yy-pop {
+  0% { transform: scale(0.7); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+/* ---------- 版面基礎 ---------- */
+
+.yy-page {
+  font-family: var(--yy-font-body);
+  color: var(--yy-ink);
+  background: var(--yy-cream);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.yy-fade-up {
+  animation: yy-fade-up .6s cubic-bezier(.2, .7, .3, 1) both;
+}
+
+/* 頁首下方織紋跑馬燈色條 */
+.yy-marquee-bar {
+  height: 16px;
+  background-image: repeating-conic-gradient(var(--yy-red) 0deg 90deg, var(--yy-gold) 90deg 180deg, var(--yy-blue) 180deg 270deg, var(--yy-cream) 270deg 360deg);
+  background-size: 32px 32px;
+  animation: yy-marquee 6s linear infinite;
+  border-bottom: 2px solid var(--yy-ink);
+}
+
+/* 區塊分隔鋸齒條，預設赭紅/赤金；.yy-divider--blue 為靛藍/赤金 */
+.yy-divider {
+  height: 16px;
+  background-image:
+    linear-gradient(45deg, var(--yy-red) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--yy-red) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--yy-gold) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--yy-gold) 75%);
+  background-size: 24px 24px;
+  border-top: 2px solid var(--yy-ink);
+  border-bottom: 2px solid var(--yy-ink);
+}
+.yy-divider--blue {
+  background-image:
+    linear-gradient(45deg, var(--yy-blue) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--yy-blue) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--yy-gold) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--yy-gold) 75%);
+  border-top: none;
+}
+
+/* Hero 區塊：淡菱形織紋底 + 浮動光斑容器 */
+.yy-hero {
+  position: relative;
+  padding: 64px 56px 50px;
+  text-align: center;
+  overflow: hidden;
+}
+.yy-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-conic-gradient(var(--yy-red) 0deg 90deg, var(--yy-gold) 90deg 180deg, var(--yy-blue) 180deg 270deg, transparent 270deg 360deg);
+  background-size: 64px 64px;
+  opacity: .05;
+  pointer-events: none;
+}
+.yy-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(28px);
+  pointer-events: none;
+  animation: yy-floaty 10s ease-in-out infinite;
+}
+
+.yy-eyebrow {
+  display: inline-block;
+  padding: 6px 18px;
+  border-radius: 4px;
+  background: var(--yy-ink);
+  border: 2px solid var(--yy-gold);
+  font-family: var(--yy-font-pixel);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--yy-gold);
+}
+
+.yy-holo-text {
+  background: linear-gradient(90deg, var(--yy-red), var(--yy-gold), var(--yy-red));
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: yy-holo 4s linear infinite;
+}
+
+/* ---------- 卡片 / 按鈕 ---------- */
+
+.yy-card {
+  background: #fff;
+  border: 3px solid var(--yy-ink);
+  border-radius: var(--yy-radius-card);
+  box-shadow: var(--yy-shadow-md);
+}
+.yy-card--hover {
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.yy-card--hover:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 8px 8px 0 var(--yy-ink);
+}
+
+.yy-btn-primary {
+  padding: 14px;
+  border-radius: var(--yy-radius-btn);
+  border: 3px solid var(--yy-ink);
+  background: var(--yy-red);
+  color: var(--yy-cream);
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  box-shadow: 4px 4px 0 var(--yy-ink);
+  animation: yy-pulse-glow 2.8s ease-in-out infinite;
+  transition: transform .15s ease, background .15s ease;
+}
+.yy-btn-primary:hover {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--yy-ink);
+  background: var(--yy-red-dark);
+}
+.yy-btn-primary:disabled {
+  background: #B79A8A;
+  cursor: not-allowed;
+  animation: none;
+}
+
+.yy-btn-outline {
+  padding: 11px 18px;
+  border-radius: var(--yy-radius-btn);
+  border: 2.5px solid var(--yy-ink);
+  background: #fff;
+  color: var(--yy-ink);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.yy-btn-outline:hover {
+  background: var(--yy-cream);
+}
+.yy-btn-outline:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+/* ---------- 族語切換膠囊 (TribePill) ---------- */
+
+.yy-pill {
+  padding: 9px 18px;
+  border-radius: var(--yy-radius-btn);
+  background: #fff;
+  color: var(--yy-ink);
+  border: 3px solid var(--yy-ink);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: var(--yy-shadow-sm);
+  transform: scale(1);
+  transition: all .2s ease;
+}
+.yy-pill.active {
+  color: #fff;
+  transform: scale(1.06);
+  box-shadow: 4px 4px 0 rgba(34, 24, 18, 0.45);
+}
+
+/* ---------- 步驟流程條 (StepBar) ---------- */
+
+.yy-stepbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.yy-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.yy-step-diamond {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--yy-radius-btn);
+  border: 3px solid var(--yy-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--yy-font-pixel);
+  font-weight: 700;
+  font-size: 15px;
+  transform: rotate(45deg);
+  background: #fff;
+  color: var(--yy-ink);
+  box-shadow: var(--yy-shadow-sm);
+}
+.yy-step-diamond span {
+  transform: rotate(-45deg);
+}
+.yy-step-diamond.active,
+.yy-step-diamond.done {
+  background: var(--yy-red);
+  color: var(--yy-cream);
+}
+.yy-step-diamond.active {
+  box-shadow: 4px 4px 0 var(--yy-gold);
+}
+.yy-step-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--yy-text-secondary);
+  white-space: nowrap;
+}
+.yy-step-connector {
+  width: 60px;
+  height: 3px;
+  background: repeating-linear-gradient(90deg, var(--yy-ink) 0 6px, transparent 6px 11px);
+  margin: 0 10px 22px;
+}
+
+/* ---------- 切換頁籤 (TabSwitch: 登入/註冊、寫筆記/分享區) ---------- */
+
+.yy-tabswitch {
+  display: inline-flex;
+  border: 3px solid var(--yy-ink);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--yy-shadow-md);
+}
+.yy-tabswitch__tab {
+  padding: 11px 28px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  background: #fff;
+  color: var(--yy-ink);
+  border: none;
+  border-left: 3px solid var(--yy-ink);
+}
+.yy-tabswitch__tab:first-child {
+  border-left: none;
+}
+.yy-tabswitch__tab.active {
+  background: var(--yy-red);
+  color: var(--yy-cream);
+}
+
+/* ---------- 菱形徽章 (DiamondBadge) ---------- */
+
+.yy-diamond-badge {
+  border-radius: var(--yy-radius-btn);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  transform: rotate(45deg);
+  border: 2px solid var(--yy-ink);
+}
+.yy-diamond-badge span {
+  transform: rotate(-45deg);
+}
+
+/* ---------- 終端機風格輸入列 ---------- */
+
+.yy-terminal {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: linear-gradient(160deg, #264C73, #1B3452);
+  border: 2px solid var(--yy-gold);
+  border-radius: var(--yy-radius-btn);
+  padding: 14px 18px;
+}
+.yy-terminal__prompt {
+  font-family: var(--yy-font-pixel);
+  color: var(--yy-gold);
+  font-size: 16px;
+}
+.yy-terminal__input {
+  flex: 1;
+  font-family: var(--yy-font-pixel);
+  font-size: 14px;
+  color: var(--yy-cream);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+.yy-terminal__input::placeholder {
+  color: rgba(243, 231, 207, 0.6);
+}
+.yy-terminal__cursor {
+  animation: yy-blink 1s step-end infinite;
+  color: var(--yy-gold);
+}
+
+/* ---------- 成功提示 Modal ---------- */
+
+.yy-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(34, 24, 18, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+}
+.yy-modal-box {
+  animation: yy-pop .5s ease both;
+  background: #fff;
+  border: 4px solid var(--yy-ink);
+  border-radius: 14px;
+  box-shadow: 8px 8px 0 var(--yy-ink);
+  padding: 40px 50px;
+  text-align: center;
+  max-width: 90vw;
+}
+.yy-modal-icon {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--yy-gold), var(--yy-gold-light), var(--yy-gold));
+  background-size: 300% 300%;
+  animation: yy-holo 3s linear infinite;
+  border: 3px solid var(--yy-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  color: var(--yy-ink);
+  margin: 0 auto 18px;
+}
+.yy-modal-text {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0;
+}
+
+/* ---------- Footer ---------- */
+
+.yy-footer {
+  padding: 36px 56px;
+  background: var(--yy-ink);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.yy-footer__logo {
+  font-family: var(--yy-font-pixel);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--yy-gold);
+}
+.yy-footer__tribes {
+  font-size: 12.5px;
+  color: #D8C4A0;
+}
+.yy-footer__copyright {
+  font-size: 11.5px;
+  color: #A88E6C;
+}
+
+@media (max-width: 720px) {
+  .yy-hero,
+  .yy-footer {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+
+/* ---------- 筆記頁共用頁首（寫筆記／分享區共用）---------- */
+
+.note-hero {
+  text-align: center;
+  padding: 48px 24px 26px;
+}
+
+.note-hero-title {
+  font-size: 38px;
+  margin: 8px 0 20px;
+  font-weight: 900;
+  color: var(--yy-ink);
+  font-family: var(--yy-font-body);
+}

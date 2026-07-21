@@ -24,3 +24,214 @@ body {
     width: 60%;
     border-radius: 10px;
 }
+
+/* ── 遊戲專區 Landing（YUAN・YU v2）───────────── */
+
+.gamehub-hero {
+    padding-bottom: 30px;
+}
+
+.gamehub-blob {
+    position: absolute;
+    width: 220px;
+    height: 200px;
+    border-radius: 50%;
+    filter: blur(28px);
+    opacity: .4;
+    pointer-events: none;
+    animation: yy-floaty 10s ease-in-out infinite;
+}
+
+.gamehub-blob--gold {
+    left: 6%;
+    top: 10%;
+    background: radial-gradient(circle, var(--yy-gold-light), transparent 68%);
+}
+
+.gamehub-blob--blue {
+    right: 5%;
+    top: 8%;
+    background: radial-gradient(circle, var(--yy-blue), transparent 68%);
+    animation-direction: reverse;
+}
+
+.gamehub-title {
+    position: relative;
+    font-size: 40px;
+    margin: 10px 0 12px;
+    font-weight: 900;
+    color: var(--yy-ink);
+}
+
+.gamehub-desc {
+    position: relative;
+    max-width: 520px;
+    margin: 0 auto;
+    font-size: 15.5px;
+    line-height: 1.8;
+    color: var(--yy-text-secondary);
+}
+
+.gamehub-grid-section {
+    position: relative;
+    padding: 50px 56px 90px;
+}
+
+.gamehub-grid {
+    max-width: 900px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 26px;
+}
+
+.gamehub-card {
+    padding: 0;
+    overflow: hidden;
+    cursor: pointer;
+    transition: box-shadow .2s ease;
+}
+
+.gamehub-card-head {
+    padding: 24px 26px;
+    display: flex;
+    gap: 18px;
+    align-items: flex-start;
+    background-size: 300% 100%;
+    animation: yy-holo 6s linear infinite;
+    border-bottom: 3px solid var(--yy-ink);
+}
+
+.gamehub-card-emoji {
+    width: 56px;
+    height: 56px;
+    border-radius: var(--yy-radius-btn);
+    background: #fff;
+    border: 2.5px solid var(--yy-ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    flex-shrink: 0;
+}
+
+.gamehub-card-title {
+    font-size: 19px;
+    margin: 0 0 4px;
+    font-weight: 800;
+    color: var(--yy-ink);
+}
+
+.gamehub-card-subtitle {
+    font-family: var(--yy-font-pixel);
+    font-size: 11.5px;
+    color: var(--yy-text-tertiary);
+    letter-spacing: 0.04em;
+}
+
+.gamehub-card-body {
+    padding: 20px 26px 24px;
+}
+
+.gamehub-card-body p {
+    font-size: 13.5px;
+    line-height: 1.8;
+    color: var(--yy-text-tertiary);
+    margin: 0 0 16px;
+    min-height: 64px;
+}
+
+.gamehub-card-badge {
+    display: inline-block;
+    padding: 8px 18px;
+    border-radius: 20px;
+    background: var(--yy-cream);
+    color: var(--yy-ink);
+    font-family: var(--yy-font-pixel);
+    font-size: 12px;
+    font-weight: 700;
+    border: 2px solid var(--yy-ink);
+}
+
+.gamehub-card-badge.active {
+    background: var(--yy-red);
+    color: var(--yy-cream);
+}
+
+.gamehub-panel {
+    max-width: 900px;
+    margin: 26px auto 0;
+    padding: 30px 32px;
+}
+
+.gamehub-panel-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.gamehub-panel-head h3 {
+    font-size: 19px;
+    font-weight: 800;
+    margin: 0;
+}
+
+.gamehub-panel-sub {
+    font-size: 13px;
+    color: var(--yy-text-tertiary);
+    margin: 0 0 22px;
+}
+
+.gamehub-tribe-grid {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.gamehub-tribe-card {
+    width: 150px;
+    padding: 20px 14px;
+    border-radius: var(--yy-radius-card);
+    border: 3px solid var(--yy-ink);
+    background: #fff;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: var(--yy-shadow-sm);
+    transition: all .2s ease;
+}
+
+.gamehub-tribe-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--yy-ink);
+}
+
+.gamehub-confirm {
+    margin-top: 26px;
+    padding: 22px 26px;
+    border-radius: var(--yy-radius-card);
+    background: linear-gradient(160deg, var(--yy-cream), var(--yy-cream-dim));
+    border: 2px dashed var(--yy-ink);
+    text-align: center;
+}
+
+.gamehub-confirm h4 {
+    font-size: 17px;
+    font-weight: 800;
+    margin: 0 0 6px;
+}
+
+.gamehub-confirm p {
+    font-size: 12.5px;
+    color: var(--yy-text-muted);
+    margin: 0 0 18px;
+}
+
+@media (max-width: 720px) {
+    .gamehub-grid {
+        grid-template-columns: 1fr;
+    }
+}

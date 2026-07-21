@@ -8,7 +8,7 @@ import { registerWithImg } from "../../src/userServives/userServive"
 import lottie from 'lottie-web';
 import successAnimation from "../../src/animations/success.json"
 
-const RegisterForm = () => {
+const RegisterForm = ({ onSwitchToLogin }) => {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -151,7 +151,13 @@ const RegisterForm = () => {
                     <button type="button" className="register-button" onClick={handleRegister} disabled={isUploading}>
                         {isUploading ? "上傳頭像中..." : "註冊"}
                     </button>
-                    <p>已經有帳戶了?<a href="/login">登入</a></p>
+                    <p>已經有帳戶了?
+                        {onSwitchToLogin ? (
+                            <a onClick={(e) => { e.preventDefault(); onSwitchToLogin(); }} href="/login">登入</a>
+                        ) : (
+                            <a href="/login">登入</a>
+                        )}
+                    </p>
                 </form>
                 {isRegistered && (
                     <div className="overlay">

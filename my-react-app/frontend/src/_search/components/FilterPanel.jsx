@@ -82,46 +82,50 @@ const FilterPanel = ({
   }
 
   return (
-    <div className="d-flex mb-3 align-items-center flex-wrap gap-2">
-      <Button
-        variant="outline-dark"
-        className="me-3"
-        onClick={() => setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'))}
-      >
-        排序： {sortOrder === 'asc' ? 'A→Z' : 'Z→A'}
-      </Button>
+    <div className="search-filter-panel">
+      <div className="d-flex mb-2 align-items-center flex-wrap gap-2">
+        <button type="button" className="yy-btn-outline" onClick={() => setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'))}>
+          排序：{sortOrder === 'asc' ? 'A → Z' : 'Z → A'}
+        </button>
 
-      <Dropdown onSelect={val => setFilterLetter(val)}>
-        <Dropdown.Toggle variant="outline-dark" className="btn">
-          開頭： {filterLetter || '全部'}
-        </Dropdown.Toggle>
-        <Dropdown.Menu style={{ maxHeight: '400px', overflowY: 'auto' }}>
-          <Dropdown.Item eventKey="">全部</Dropdown.Item>
-          {alphabet.map(l => (
-            <Dropdown.Item key={l} eventKey={l}>{l}</Dropdown.Item>
+        <button
+          type="button"
+          className="yy-btn-outline"
+          style={showOnlyFavorites ? { background: 'var(--yy-red)', color: 'var(--yy-cream)' } : undefined}
+          onClick={() => setShowOnlyFavorites(prev => !prev)}
+        >
+          {showOnlyFavorites ? '顯示全部' : '只顯示收藏'}
+        </button>
+
+        <div className="search-freq-row">
+          <span className="search-freq-label">詞頻</span>
+          {[1, 2, 3, 4, 5].map(n => (
+            <button
+              type="button"
+              key={n}
+              className="search-freq-chip"
+              style={frequencyFilter === String(n) || frequencyFilter === n ? { background: 'var(--yy-gold)' } : undefined}
+              onClick={() => setFrequencyFilter(prev => (String(prev) === String(n) ? '' : n))}
+            >
+              {n}★
+            </button>
           ))}
-        </Dropdown.Menu>
-      </Dropdown>
+        </div>
+      </div>
 
-      <Dropdown onSelect={(val) => setFrequencyFilter(val)} className="ms-3">
-        <Dropdown.Toggle variant="outline-dark">
-          詞頻： {frequencyFilter ? `${frequencyFilter}★` : '全部'}
-        </Dropdown.Toggle>
-        <Dropdown.Menu>
-          <Dropdown.Item eventKey="">全部</Dropdown.Item>
-          {[5, 4, 3, 2, 1].map(n => (
-            <Dropdown.Item key={n} eventKey={n}>{`${n}★`}</Dropdown.Item>
-          ))}
-        </Dropdown.Menu>
-      </Dropdown>
-
-      <Button
-        className="ms-3"
-        variant={showOnlyFavorites ? "danger" : "outline-dark"}
-        onClick={() => setShowOnlyFavorites(prev => !prev)}
-      >
-        {showOnlyFavorites ? '顯示全部' : '只顯示收藏'}
-      </Button>
+      <div className="search-letter-row">
+        {alphabet.map(l => (
+          <button
+            type="button"
+            key={l}
+            className="search-letter-chip"
+            style={filterLetter === l ? { background: 'var(--yy-blue)', color: '#fff' } : undefined}
+            onClick={() => setFilterLetter(prev => (prev === l ? '' : l))}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
     </div>
   );
 };

@@ -8,7 +8,7 @@ import { auth } from "../../../firebase";
 import lottie from 'lottie-web';
 import successAnimation from "../../src/animations/success.json"
 
-const LoginForm = () => {
+const LoginForm = ({ onSwitchToRegister }) => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [errorMsg, setErrorMsg] = useState("");
@@ -70,7 +70,13 @@ const LoginForm = () => {
                 <a className="forgot-pass" onClick={() => { navigate("/forgot"); }}>忘記密碼?</a>
                 <button className="login-button" onClick={handleLogin}>登入</button>
             </form>
-            <p>還沒有帳號?<a href="/register">註冊</a></p>
+            <p>還沒有帳號?
+                {onSwitchToRegister ? (
+                    <a onClick={(e) => { e.preventDefault(); onSwitchToRegister(); }} href="/register">註冊</a>
+                ) : (
+                    <a href="/register">註冊</a>
+                )}
+            </p>
 
             {isLogin && (
                 <div className="overlay">

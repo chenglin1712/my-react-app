@@ -1,7 +1,7 @@
 /* ---- 主題變數（全站共用） ---- */
 :root{
-  --brand-red: #9B1B30;      /* 主紅 */
-  --brand-red-600: #b1253b;  /* hover 紅 */
+  --brand-red: #9E1B24;      /* 主紅（YUAN・YU v2） */
+  --brand-red-600: #8A171F;  /* hover 紅 */
   --danger: #e54545;
   --danger-dark: #cc3c3c;
   --ghost-bg: #eef2f6;

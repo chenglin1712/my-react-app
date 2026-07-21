@@ -1,0 +1,239 @@
+.camera-hero {
+    padding-bottom: 30px;
+}
+
+.camera-title {
+    font-size: 40px;
+    margin: 10px 0 12px;
+    font-weight: 900;
+    color: var(--yy-ink);
+}
+
+.camera-desc {
+    max-width: 540px;
+    margin: 0 auto;
+    font-size: 15.5px;
+    line-height: 1.8;
+    color: var(--yy-text-secondary);
+}
+
+.camera-tribe-row {
+    margin-top: 28px;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.camera-stepbar-wrap {
+    margin-top: 36px;
+}
+
+.camera-body {
+    position: relative;
+    padding: 44px 56px 90px;
+}
+
+/* ---------- Step 1：上傳 ---------- */
+
+.camera-step1 {
+    max-width: 820px;
+    margin: 0 auto;
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.camera-dropzone {
+    width: 340px;
+    height: 340px;
+    border-radius: var(--yy-radius-card);
+    background: #fff;
+    border: 3px dashed var(--yy-ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.camera-dropzone-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.camera-dropzone-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    color: var(--yy-text-muted);
+}
+
+.camera-dropzone-placeholder span:first-child {
+    font-size: 44px;
+}
+
+.camera-dropzone-placeholder span:last-child {
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.camera-step1-panel {
+    width: 340px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.camera-step1-card {
+    padding: 20px;
+}
+
+.camera-step1-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.camera-filename {
+    font-size: 13px;
+    color: var(--yy-text-tertiary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.camera-hint {
+    font-size: 12.5px;
+    color: var(--yy-text-muted);
+    margin: 10px 0 0;
+}
+
+.camera-step1-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.camera-step1-actions .yy-btn-primary {
+    flex: 1;
+}
+
+/* ---------- Step 2：選擇單詞 ---------- */
+
+.camera-step2 {
+    max-width: 820px;
+    margin: 0 auto;
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.camera-step2-preview {
+    width: 300px;
+    height: 300px;
+    border-radius: var(--yy-radius-card);
+    border: 3px solid var(--yy-ink);
+    overflow: hidden;
+    box-shadow: var(--yy-shadow-md);
+    background: var(--yy-cream-dim);
+}
+
+.camera-step2-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.camera-step2-panel {
+    width: 360px;
+}
+
+.camera-step2-title {
+    font-size: 18px;
+    font-weight: 800;
+    margin: 0 0 4px;
+}
+
+.camera-step2-sub {
+    font-size: 13px;
+    color: var(--yy-text-tertiary);
+    margin: 0 0 16px;
+}
+
+.camera-step2-sub span {
+    color: var(--yy-red);
+    font-weight: 800;
+}
+
+.camera-loading,
+.camera-error {
+    font-weight: 700;
+    color: var(--yy-red);
+}
+
+.camera-label-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.camera-label-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-radius: var(--yy-radius-btn);
+    border: 3px solid var(--yy-ink);
+    background: #fff;
+    color: var(--yy-ink);
+    cursor: pointer;
+    box-shadow: var(--yy-shadow-sm);
+}
+
+.camera-label-name {
+    font-weight: 700;
+    font-size: 15px;
+}
+
+.camera-label-score {
+    font-family: var(--yy-font-pixel);
+    font-size: 12px;
+}
+
+.camera-step2-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.camera-step2-actions .yy-btn-primary {
+    flex: 1;
+}
+
+.camera-warning {
+    font-size: 12px;
+    color: var(--yy-red);
+    font-weight: 700;
+    margin-top: 14px;
+}
+
+@media (max-width: 720px) {
+    .camera-body {
+        padding: 34px 24px 60px;
+    }
+
+    .camera-dropzone,
+    .camera-step1-panel,
+    .camera-step2-preview,
+    .camera-step2-panel {
+        width: 100%;
+    }
+}

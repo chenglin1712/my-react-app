@@ -2,48 +2,47 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 20px;
 }
 
 .register-box {
-    padding: 1rem 2rem 1rem;
-    border-radius: 16px;
+    padding: 0;
+    border-radius: 0;
     text-align: center;
-    border: 3px solid lightgray;
-    max-width: 40%;
+    border: none;
+    max-width: 100%;
     width: 100%;
-    background-color: #FFEAEA;
-
+    background-color: transparent;
 }
 
 .formTitle {
-    font-size: 34px;
-    font-weight: bold;
-    color: #D80000;
-    margin-bottom: 5px;
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--yy-ink);
+    margin-bottom: 8px;
 }
 
 .register-subtitle {
-    font-size: 16px;
-    color: #444;
+    font-size: 12.5px;
+    color: var(--yy-text-tertiary);
     margin-bottom: 20px;
-    font-weight: 700;
+    font-weight: 600;
     display: flex;
     justify-content: center;
     align-items: center;
 }
 
 .register-subtitle button {
-    border: none;
-    background-color: #FFEAEA;
-    margin-left: 10px;
-    font-size: 16px;
-    color: #D80000;
-    font-weight: bold;
-    border-radius: 8px;
+    border: 1.5px solid var(--yy-ink);
+    background-color: transparent;
+    margin-left: 6px;
+    font-size: 12px;
+    color: var(--yy-ink);
+    font-weight: 700;
+    border-radius: 12px;
+    padding: 4px 10px;
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
     cursor: pointer;
     transition: transform 0.3s ease;
 }
@@ -51,29 +50,31 @@
 .registerForm {
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 14px;
 }
 
 .input-wrapper {
     display: flex;
     align-items: center;
-    background: white;
-    border-radius: 10px;
-    padding: 5px 12px;
+    gap: 10px;
+    background: #fff;
+    border-radius: 8px;
+    padding: 10px 16px;
     width: 100%;
-    border: 2px solid transparent;
-    transition: border-color 0.3s;
+    border: 2.5px solid var(--yy-ink);
+    box-sizing: border-box;
+    transition: box-shadow 0.2s;
 }
 
 .input-wrapper:hover,
 .input-wrapper:focus-within {
-    border-color: #d32f2f;
-    box-shadow: 0px 4px 8px rgba(211, 47, 47, 0.2);
+    box-shadow: 3px 3px 0 var(--yy-ink);
 }
 
 .input-wrapper svg {
-    color: #666;
-    margin-right: 10px;
+    color: var(--yy-text-muted);
+    margin-right: 0;
+    flex-shrink: 0;
 }
 
 .input-field {
@@ -81,21 +82,21 @@
     outline: none;
     background: none;
     flex: 1;
-    font-size: 16px;
-    padding: 5px;
+    font-size: 14px;
+    padding: 2px;
 }
 
 .password-requirements {
     display: flex;
-    align-items: stretch;
+    align-items: center;
+    gap: 8px;
     font-size: 12px;
-    color: #666;
+    color: var(--yy-text-tertiary);
     height: 20px;
 }
 
 .check-icon {
-    margin-right: 8px;
-    color: #F5F5F5;
+    color: #C9BBA0;
 }
 
 .check-icon.valid {
@@ -103,42 +104,52 @@
 }
 
 .check-icon.invalid {
-    color: #ccc;
+    color: #C9BBA0;
 }
 
 .register-button {
-    background: #d32f2f;
-    color: white;
-    border: none;
+    background: var(--yy-red);
+    color: var(--yy-cream);
+    border: 3px solid var(--yy-ink);
     padding: 14px;
-    font-size: 18px;
-    font-weight: bold;
+    font-size: 15px;
+    font-weight: 700;
     border-radius: 8px;
     cursor: pointer;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 4px 4px 0 var(--yy-ink);
+    animation: yy-pulse-glow 2.8s ease-in-out infinite;
+    transition: transform 0.15s ease, background 0.15s ease;
 }
 
 .register-button:hover {
-    transform: scale(1.05);
-    box-shadow: 0px 5px 12px rgba(183, 28, 28, 0.3);
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 var(--yy-ink);
+    background: var(--yy-red-dark);
 }
 
-p {
-    font-size: 14px;
-    color: #333;
-    margin-top: 15px;
+.register-button:disabled {
+    background: #B79A8A;
+    animation: none;
+    cursor: not-allowed;
 }
 
-p a {
-    color: #d32f2f;
-    font-weight: bold;
+.register-box p {
+    font-size: 13px;
+    color: var(--yy-text-tertiary);
+    margin-top: 4px;
+}
+
+.register-box p a,
+.register-box p a[href] {
+    color: var(--yy-red);
+    font-weight: 700;
     text-decoration: none;
-    margin-left: 5px;
+    margin-left: 4px;
     transition: color 0.3s;
 }
 
-p a:hover {
-    color: #b71c1c;
+.register-box p a:hover {
+    text-decoration: underline;
 }
 
 .overlay {
@@ -147,21 +158,23 @@ p a:hover {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(34, 24, 18, 0.55);
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1000;
+    z-index: 1050;
 }
 
 .animation-container {
     display: flex;
     flex-direction: column;
     align-items: center;
-    background-color: rgba(0, 0, 0, 0.7);
-    padding: 20px;
-    border-radius: 8px;
-    width: 300px;
+    background-color: #fff;
+    border: 4px solid var(--yy-ink);
+    border-radius: 14px;
+    box-shadow: 8px 8px 0 var(--yy-ink);
+    padding: 30px 24px;
+    width: 260px;
 }
 
 .animation-container div {
@@ -169,13 +182,8 @@ p a:hover {
 }
 
 .animation-container p {
-    color: white;
-    font-size: 18px;
+    color: var(--yy-ink);
+    font-size: 15px;
+    font-weight: 800;
     text-align: center;
-}
-
-@media (max-width:768px) {
-    .register-box {
-        max-width: 80%;
-    }
 }
