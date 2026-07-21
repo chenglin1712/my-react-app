@@ -376,49 +376,22 @@ def search_all(
 ) -> Tuple[Dict[str, List[WordResult]], int]:
     """回傳所有詞條，依 letter/frequency/category/favorites_only 篩選、依 sort_order 排序後，
     再用 limit/offset 做分頁（篩選+排序完成後才切頁，讓「載入更多」逐頁拿到的資料彼此一致）。
-    全部不傳則維持原本回傳全部（未篩選、未分頁）的行為。回傳 (分組後的當頁資料, 篩選後總筆數)。"""
-    words = db.query(Word).filter(Word.tribe_id == _tribe_id_subquery(tribe)).order_by(Word.name).all()
+    全部不傳則維持原本回傳全部（未篩選、未分頁）的行為。回傳 (分組後的當頁資料, 篩選後總筆數)。
 
-    word_ids = [word.id for word in words]
-    sources_map = load_sources_for_words(db, word_ids=word_ids)
-    audio_map = load_audio_items_for_words(db, word_ids=word_ids)
-    explanation_map = load_explanation_items_for_words(db, word_ids=word_ids)
-
-    all_word_results: List[WordResult] = []
-    for word in words:
-        explanations = parse_explanations(explanation_map.get(word.id, []))
-        if not explanations:
-            continue
-
-        all_word_results.append(
-            WordResult(
-                id=word.id,
-                        tribeId=word.tribe_id,
-                        tribe=tribe,
-                        dialect=word.dialect,
-                        name=word.name,
-                        pinyin=word.pinyin,
-                        variant=word.variant,
-                        formationWord=word.formation_word,
-                        derivativeRoot=word.derivative_root,
-                        frequency=word.frequency,
-                        hit=word.hit,
-                        dictionaryNote=word.dictionary_note,
-                        sources=sources_map.get(word.id, []),
-                        explanationItems=explanations,
-                        audioItems=parse_audios(audio_map.get(word.id, [])),
-                        word_img=word.word_img,
-                        isDerivativeRoot=word.is_derivative_root,
-                        isImage=word.is_image,
-                        isZuzucidian=word.is_zuzucidian,
-                        isOtherDialect=word.is_other_dialect,
-            )
-        )
+    這支原本每次呼叫都重新查整個 tribe 的 Word + 逐一批次查 sources/audio/explanation
+    再組成 WordResult（單詞查詢頁一進頁面就會自動打這支 API，實測泰雅語 6,202 筆詞
+    要價約 11.7 秒，「載入更多」等後續分頁請求 filter/sort 前一樣要整套重跑一次，
+    約 8.7 秒），是全站唯一沒吃到 search()/fuzzy_search() 等既有 _load_tribe_words()
+    tribe 級快取（見上方、app 啟動時已由 warm_cache() 預熱）的查詢路徑。改成沿用
+    同一份快取後，篩選/排序/分頁全部改在這份已經解析好的清單上做，DB 查詢與逐詞
+    組裝 WordResult 的成本只會在該 tribe 第一次被用到時付一次。"""
+    all_word_results = _load_tribe_words(db, tribe)
 
     favorite_names_set = set(favorite_names or [])
     filtered = [
         wr for wr in all_word_results
-        if (not letter or (wr.name or '').lower().startswith(letter.lower()))
+        if wr.explanationItems  # 沿用原本「沒有釋義的詞不列入查詢結果」的行為
+        and (not letter or (wr.name or '').lower().startswith(letter.lower()))
         and (not frequency or _frequency_bucket(wr.frequency) == frequency)
         and _matches_category(wr, category)
         and (not favorites_only or wr.name in favorite_names_set)
