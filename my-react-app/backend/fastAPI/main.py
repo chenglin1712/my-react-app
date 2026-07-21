@@ -18,6 +18,27 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+# 錯誤追蹤／告警（選用，設定 SENTRY_DSN 後才會啟用），與 Django 端
+# core/settings.py 同一套邏輯與說明。未設定時完全不影響現有行為。
+_sentry_dsn = os.getenv("SENTRY_DSN")
+if _sentry_dsn:
+    import sentry_sdk
+    from sentry_sdk.integrations.starlette import StarletteIntegration
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.logging import LoggingIntegration
+
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        environment=os.getenv("SENTRY_ENVIRONMENT", "production"),
+        integrations=[
+            StarletteIntegration(),
+            FastApiIntegration(),
+            LoggingIntegration(level=None, event_level="ERROR"),
+        ],
+        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0")),
+        send_default_pii=False,
+    )
+
 
 def _warm_caches():
     """listening/sentence/quiz/dictionary 都用「第一次請求時全表掃描一次、之後吃快取」的策略，

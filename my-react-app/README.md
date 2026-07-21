@@ -64,6 +64,8 @@ cd backend
 uvicorn fastAPI.main:app --reload --port 8001
 ```
 
+根目錄的 `run.py`／`run_fastapi.py` 是另一組開發用啟動腳本（啟動前會檢查必填環境變數是否已設定），一樣只綁定 `127.0.0.1`，僅供本機開發使用，**不是**正式環境的啟動方式（見下方「正式部署」）。
+
 ## 辭典資料庫（dictionary.db）
 
 `backend/fastAPI/routes/dictionary.db` 是 FastAPI 端辭典／文法資料的 SQLite 檔案，**不進版控**（見 `.gitignore`），schema 由 Alembic migration 管理：
@@ -85,6 +87,17 @@ alembic upgrade head
 - `DJANGO_DEBUG=False` 時 Swagger UI（`/docs/`）不會掛載（404），只在開發環境可用。
 - `DJANGO_DEBUG=False` 會自動啟用 `SECURE_SSL_REDIRECT`／`SESSION_COOKIE_SECURE`／`CSRF_COOKIE_SECURE`／HSTS；部署平台（Render、Cloud Run）需在反向代理層正確設定 `X-Forwarded-Proto`（兩者預設都會），Django 已透過 `SECURE_PROXY_SSL_HEADER` 讀取這個標頭判斷連線是否為 HTTPS。
 - `REDIS_URL`：gunicorn 若開多個 worker，務必設定，否則 AIModel/CrosswordPuzzle/crawler 的限流計數會退回單一 process 的 LocMemCache，門檻被 worker 數量乘倍放大。
+- `SENTRY_DSN`：設定後 Django／FastAPI 的 ERROR 等級例外會送到 Sentry，容器重啟後仍查得到記錄，也能收到告警通知；不設定不影響現有行為。
+- 健康檢查端點：Django 為 `/health/`，FastAPI 為 `/health`，皆不需要登入，回傳 `{"status": "ok"}`。
+- `run.py`／`run_fastapi.py` 僅供本機開發（綁定 `127.0.0.1`），正式環境須直接用 gunicorn／uvicorn 啟動，例如：
+  ```sh
+  # Django（WSGI）
+  cd backend && gunicorn core.wsgi:application --bind 0.0.0.0:$PORT
+
+  # FastAPI（ASGI）
+  cd backend && uvicorn fastAPI.main:app --host 0.0.0.0 --port $PORT
+  ```
+  目前 repo 內沒有 Dockerfile／Procfile／docker-compose 之類的部署腳本，也還沒決定實際要部署到 Render 或 Cloud Run（`ALLOWED_HOSTS`／`CSRF_TRUSTED_ORIGINS` 的設計對兩者都相容，但實際容器化與啟動流程尚未建立）；`dist/` 要如何接給 Django 服務（SPA 路由、靜態檔案）目前也還沒決定（`core/urls.py` 內對應程式碼仍註解掉），視前端是否要跟後端服務分開部署而定。
 
 ## 測試
 

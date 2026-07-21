@@ -49,5 +49,10 @@ backend/staticfiles/
 *.db-shm
 *.db-wal
 
+# Firebase Admin SDK 服務帳戶私鑰（import_firebase.py 說明照著操作會把下載的
+# JSON 存成這個檔名放在 repo 根目錄）；私鑰本身不該進版控，這裡明確排除，
+# 避免照腳本指示操作後又剛好下了 git add -A 就整把私鑰提交進 git。
+serviceAccountKey.json
+
 # run project
 *.bat

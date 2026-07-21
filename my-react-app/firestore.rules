@@ -7,10 +7,21 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // 測驗題目：登入者可讀；登入者可建立
+    // 測驗題目：登入者可讀；登入者可建立，且限制內容形狀——原本只檢查有沒有
+    // 登入，任何已登入使用者都能寫入任意垃圾文件。uploadDb.jsx 的
+    // uploadQuizDB 固定寫入 title/tribe/createdAt/data 四個欄位，這裡驗證
+    // 型別、族語限定在已知清單、data 非空且有合理上限，createdAt 必須是
+    // 真正的伺服器時間（擋掉客戶端偽造時間戳記）。
     match /quizs/{quizId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll(['title', 'tribe', 'createdAt', 'data'])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 100
+        && request.resource.data.tribe in ['tayal', 'amis', 'bunun', 'kavalan', 'paiwan']
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.data is list
+        && request.resource.data.data.size() > 0 && request.resource.data.data.size() <= 200;
     }
 
     // 答題情形：只有本人可讀；只有本人可建立
@@ -40,9 +51,15 @@ service cloud.firestore {
     // 共享筆記：任何人（含未登入）可讀，配合 /share/:id 這條公開分享連結路由
     // （見 route.jsx，該路由沒有包 ProtectedRoute）；登入者可建立；作者可更新任何欄位
     // （編輯筆記內容），非作者的登入者只能更新 likes/likedBy（按讚，見 noteshare.jsx
-    // toggleLike）；作者可刪除
+    // toggleLike）；作者可刪除。
+    // 刪除是軟刪除（noteshare.jsx 的 handleModalDelete 只是 updateDoc 把 deleted
+    // 設成 true，文件並未真的移除），列表查詢都有帶 where("deleted","==",false)
+    // 過濾，但原本這裡的 read 規則沒有擋，直接用文件 ID 讀取（/share/:id 分享連結）
+    // 仍能打開已刪除的筆記。用 .get('deleted', false) 而非直接比對欄位，讓這個
+    // 軟刪除功能上線之前建立、沒有 deleted 欄位的舊文件預設視為未刪除，不會被
+    // 這條新規則擋掉。
     match /sharedNotes/{noteId} {
-      allow read: if true;
+      allow read: if resource.data.get('deleted', false) == false;
       allow create: if request.auth != null;
       allow update: if request.auth != null && (
         resource.data.uid == request.auth.uid ||

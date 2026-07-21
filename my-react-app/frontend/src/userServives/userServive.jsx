@@ -1,4 +1,4 @@
-import { doc, getDoc, getDocs, setDoc, updateDoc, collection } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { getDatabase, ref, onDisconnect, set, onValue, serverTimestamp } from "firebase/database";
 import { db, auth } from "../../../firebase";
 import { onAuthStateChanged, createUserWithEmailAndPassword } from "firebase/auth";
@@ -43,21 +43,6 @@ export const getCurrentUser = async (uid) => {
     } catch (error) {
         console.error("取得currentUser失敗: ", error);
         return null;
-    }
-};
-
-//取得所有使用者（僅回傳公開資訊，避免 email、identity、favorites 等隱私欄位外流）
-export const getAllUsers = async () => {
-    try {
-        const docSnap = await getDocs(collection(db, "users"));
-        const users = docSnap.docs.map((doc) => {
-            const { name, avatarUrl, joinDate } = doc.data();
-            return { id: doc.id, name, avatarUrl, joinDate };
-        });
-        return users;
-    } catch (error) {
-        console.error("取得所有使用者失敗: ", error);
-        return [];
     }
 };
 

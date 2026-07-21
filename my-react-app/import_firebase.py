@@ -3,11 +3,16 @@ Firebase 資料庫匯入腳本
 執行前請先：
   1. 從 Firebase Console → 專案設定 → 服務帳戶 → 產生新的私密金鑰
   2. 把下載的 JSON 改名為 serviceAccountKey.json，放在本腳本同一層資料夾
-執行方式：python import_firebase.py
+     （這個檔名已列在 .gitignore，但仍建議操作時避免下 git add -A，改用
+     git add 明確列出要加入的檔案，降低私鑰誤入版控的風險）
+  3. 設定環境變數 FIREBASE_IMPORT_BACKUP_DIR，指向備份檔案所在資料夾
+     （原本寫死一段本機路徑，換一台機器或換人操作就會找不到檔案）
+執行方式：FIREBASE_IMPORT_BACKUP_DIR=/path/to/backup python import_firebase.py
 """
 
 import json
 import os
+import secrets
 import sys
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
@@ -15,7 +20,11 @@ from firebase_admin import credentials, firestore, auth
 # ── 設定路徑 ──────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 KEY_FILE = os.path.join(BASE_DIR, "serviceAccountKey.json")
-BACKUP_DIR = r"\\Mac\Home\Desktop\win\7.系統資料庫備份檔案"
+
+BACKUP_DIR = os.environ.get("FIREBASE_IMPORT_BACKUP_DIR")
+if not BACKUP_DIR:
+    print("❌ 請先設定環境變數 FIREBASE_IMPORT_BACKUP_DIR，指向備份檔案所在資料夾")
+    sys.exit(1)
 
 FIRESTORE_FILES = {
     "users":         os.path.join(BACKUP_DIR, "firestore", "users.json"),
@@ -65,9 +74,14 @@ for col_name, file_path in FIRESTORE_FILES.items():
     import_collection(col_name, file_path)
 
 # ── 建立測試帳號（因舊密碼 hash 無法移植，改用臨時密碼）─────
+# 原本所有帳號共用同一組寫死的臨時密碼 "Test1234"：如果之後對正式專案重新
+# 跑這支腳本，在使用者改密碼之前，任何人都能用「email + 這組公開已知的
+# 密碼」登入任一帳號，等於帳號被接管。改成每個帳號各自產生一組不可預期的
+# 隨機密碼，帳號之間互不相通，未改密碼前的風險只限於「知道這組密碼的人」
+# （也就是執行這支腳本、看得到輸出的操作者本人），而不是任何人都能猜到。
 print("\n── 建立 Authentication 帳號 ─────────────────────────")
-print("⚠️  舊密碼 hash 無法移植到新專案，將用臨時密碼 'Test1234' 建立帳號")
-print("   帳號建立後請自行至 Firebase Console 或應用程式修改密碼\n")
+print("⚠️  舊密碼 hash 無法移植到新專案，將為每個帳號各自產生一組隨機臨時密碼")
+print("   請盡快把對應密碼轉交給各帳號使用者，並提醒登入後立即自行修改密碼\n")
 
 if not os.path.exists(AUTH_FILE):
     print(f"❌ 找不到：{AUTH_FILE}")
@@ -78,15 +92,16 @@ else:
     for u in users:
         uid   = u["uid"]
         email = u["email"]
+        temp_password = secrets.token_urlsafe(12)
         try:
             auth.create_user(
                 uid=uid,
                 email=email,
-                password="Test1234",
+                password=temp_password,
                 email_verified=u.get("emailVerified", False),
                 disabled=u.get("disabled", False),
             )
-            print(f"  ✅ 建立帳號：{email}  (uid: {uid})")
+            print(f"  ✅ 建立帳號：{email}  (uid: {uid})  臨時密碼：{temp_password}")
         except auth.UidAlreadyExistsError:
             print(f"  ℹ️  已存在：{email}，略過")
         except auth.EmailAlreadyExistsError:
@@ -95,5 +110,5 @@ else:
             print(f"  ❌ 失敗：{email} → {e}")
 
 print("\n✅ 匯入完成！")
-print("所有帳號的臨時密碼為：Test1234")
+print("每個帳號的臨時密碼各自不同，請參考上方輸出逐一轉交給對應使用者。")
 print("請提醒用戶登入後自行修改密碼。")

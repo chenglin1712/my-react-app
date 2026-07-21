@@ -233,3 +233,26 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # 結構化 JSON log + rotation（見 config/logging.py），FastAPI 端共用同一套設定
 LOGGING = get_logging_config("django.log")
+
+# 錯誤追蹤／告警（選用，設定 SENTRY_DSN 後才會啟用）。原本沒有接任何錯誤追蹤
+# 服務，結構化 log 只寫在容器本機檔案，Cloud Run/Render 重啟就消失，出錯（含
+# 呼叫 Google Vision、GitHub Models 這些按用量計費的外部服務失敗）不會有人
+# 主動被通知。未設定 SENTRY_DSN 時完全不影響現有行為。
+_sentry_dsn = os.getenv("SENTRY_DSN")
+if _sentry_dsn:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.logging import LoggingIntegration
+
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        environment=os.getenv("SENTRY_ENVIRONMENT", "production" if not DEBUG else "development"),
+        integrations=[
+            DjangoIntegration(),
+            # 結構化 log（config/logging.py）本來就會記錄的 ERROR 等級以上訊息，
+            # 一併送一份到 Sentry 當成事件，不用另外在每個 view 補呼叫。
+            LoggingIntegration(level=None, event_level="ERROR"),
+        ],
+        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0")),
+        send_default_pii=False,
+    )
