@@ -6,6 +6,12 @@
   <link rel="icon" type="image/svg+xml" href="/languages.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>源·語</title>
+  <!-- YUAN・YU v2 設計系統字體：用 <link> 而非 CSS @import，讓瀏覽器一解析到
+       <head> 就能立刻並行抓取，不用等 theme-v2.css 載完才「發現」還要再抓字體。
+       見 static/css/default/theme-v2.css 開頭註解。 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800;900&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
