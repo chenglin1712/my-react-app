@@ -1,14 +1,15 @@
 .secWrap-half {
-    padding: 0px 5%;
+    padding: 40px 5% 56px;
     width: 100%;
     max-width: 100%;
-    background-color: #FFF5F5;
+    background-color: var(--yy-cream, #F3E7CF);
 }
 
 .secRow {
     width: 100%;
     display: flex;
     flex-wrap: wrap;
+    gap: 24px;
 }
 
 .cleft-half {
@@ -16,7 +17,7 @@
     flex: 0 0 45%;
     position: relative;
     align-items: center;
-    margin: 20px 0px;
+    margin: 0;
 }
 
 .cright-half {
@@ -24,7 +25,7 @@
     max-width: 53%;
     flex: 0 0 53%;
     position: relative;
-    margin: 10px auto;
+    margin: 0;
     justify-content: space-between;
     display: flex;
     flex-wrap: wrap;
@@ -32,27 +33,29 @@
 }
 
 .exam-section {
-    padding: 20px;
-    background-color: #fffaf4;
-    border-radius: 12px;
+    width: 100%;
+    padding: 24px;
+    background-color: #fff;
+    border: 3px solid var(--yy-ink, #221812);
+    border-radius: var(--yy-radius-card, 10px);
+    box-shadow: var(--yy-shadow-md, 5px 5px 0 #221812);
 }
 
 .exam-title {
-    font-size: 20px;
-    font-weight: bold;
-    color: #9b1b30;
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--yy-ink, #221812);
     margin-bottom: 16px;
-    border-bottom: 2px solid #9b1b30;
-    padding-bottom: 4px;
+    border-bottom: 2px solid var(--yy-gold, #D9A227);
+    padding-bottom: 8px;
 }
 
 .exam-card {
-    background-color: #fff;
-    border-left: 4px solid #9b1b30;
+    background-color: var(--yy-cream, #F3E7CF);
+    border-left: 4px solid var(--yy-red, #9E1B24);
     padding: 12px 16px;
-    margin-bottom: 16px;
-    border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    margin-bottom: 12px;
+    border-radius: 6px;
     transition: transform 0.2s ease;
 }
 
@@ -61,27 +64,37 @@
 }
 
 .exam-card-header {
-    font-size: 14px;
-    color: #777;
+    font-size: 13px;
+    color: var(--yy-text-muted, #6B5A47);
     margin-bottom: 6px;
 }
 
 .exam-date {
-    background: #fce4ec;
-    padding: 2px 8px;
+    background: #fff;
+    border: 1.5px solid var(--yy-red, #9E1B24);
+    padding: 2px 10px;
     border-radius: 20px;
-    color: #9b1b30;
-    font-weight: bold;
+    color: var(--yy-red, #9E1B24);
+    font-weight: 700;
 }
 
 .exam-link {
-    color: #333;
-    font-size: 16px;
-    font-weight: 500;
+    color: var(--yy-ink, #221812);
+    font-size: 15px;
+    font-weight: 600;
     text-decoration: none;
 }
 
 .exam-link:hover {
     text-decoration: underline;
-    color: #9b1b30;
+    color: var(--yy-red, #9E1B24);
+}
+
+@media (max-width: 900px) {
+    .cleft-half,
+    .cright-half {
+        width: 100%;
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
 }

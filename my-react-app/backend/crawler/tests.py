@@ -214,3 +214,114 @@ class GetTayalImformationTest(TestCase):
         response = self.client.get('/crawler/news/')
 
         self.assertEqual(response.status_code, 200)
+
+
+# 官網（exam.sce.ntnu.edu.tw/abst/）日程表頁面結構的精簡版，只留下解析邏輯真正
+# 依賴的部分：排除 news-tab 的第一個梯次分頁按鈕（取得梯次標題），以及該分頁
+# 底下 table 的其中兩列（期程名稱 + 帶 dates= 參數的 Google 行事曆連結）。
+FAKE_EXAM_SCHEDULE_HTML = """
+<html><body>
+<ul class="nav nav-tabs">
+  <li><button class="nav-link active" id="news-tab">最新消息</button></li>
+  <li><button class="nav-link" id="0-tab">115年度第1次原住民族語言能力認證測驗日程表</button></li>
+</ul>
+<div class="tab-pane" id="news-pane"></div>
+<div class="tab-pane" id="0-pane">
+  <table><tbody>
+    <tr>
+      <td><span class="fw-bold">報名日期</span></td>
+      <td><a href="https://www.google.com/calendar/event?action=TEMPLATE&text=x&dates=20260121T100000/20260226T235900">115年1月21日(三) ~ 115年2月26日(四)</a></td>
+    </tr>
+    <tr>
+      <td><span class="fw-bold">測驗日期</span></td>
+      <td><a href="https://www.google.com/calendar/event?action=TEMPLATE&text=x&dates=20260418T000000/20260418T000000">115年4月18日(六)</a></td>
+    </tr>
+  </tbody></table>
+</div>
+</body></html>
+"""
+
+
+class GetExamScheduleTest(TestCase):
+    """族語認證考試時程：爬官網日程表取代前端原本寫死的 examSchedule 假資料。"""
+
+    def setUp(self):
+        self.client = Client()
+        cache.clear()
+
+    @patch('crawler.views.is_ratelimited', return_value=True)
+    def test_rate_limited_returns_429(self, _mock_limited):
+        response = self.client.get('/crawler/exam_schedule/')
+        self.assertEqual(response.status_code, 429)
+
+    def test_does_not_require_login(self):
+        with override_settings(AUTH_DEV_BYPASS=False):
+            with patch('crawler.views.requests.get') as mock_get:
+                mock_response = MagicMock()
+                mock_response.status_code = 200
+                mock_response.text = FAKE_EXAM_SCHEDULE_HTML
+                mock_get.return_value = mock_response
+                response = self.client.get('/crawler/exam_schedule/')
+        self.assertEqual(response.status_code, 200)
+
+    @patch('crawler.views.requests.get')
+    def test_upstream_request_failure_returns_502(self, mock_get):
+        import requests
+        mock_get.side_effect = requests.exceptions.ConnectTimeout("upstream timed out")
+
+        response = self.client.get('/crawler/exam_schedule/')
+
+        self.assertEqual(response.status_code, 502)
+
+    @patch('crawler.views.requests.get')
+    def test_no_phases_parsed_returns_502_not_cached(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = "<html><body>沒有日程表</body></html>"
+        mock_get.return_value = mock_response
+
+        response = self.client.get('/crawler/exam_schedule/')
+
+        self.assertEqual(response.status_code, 502)
+        from django.core.cache import cache as django_cache
+        self.assertIsNone(django_cache.get('crawler_exam_schedule_data'))
+
+    @patch('crawler.views.requests.get')
+    def test_parses_session_name_and_phases_with_dates(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = FAKE_EXAM_SCHEDULE_HTML
+        mock_get.return_value = mock_response
+
+        response = self.client.get('/crawler/exam_schedule/')
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['session'], '115年度第1次原住民族語言能力認證測驗日程表')
+        self.assertEqual(len(data['phases']), 2)
+
+        registration = data['phases'][0]
+        self.assertEqual(registration['phase'], '報名')
+        self.assertEqual(registration['start_date'], '2026-01-21')
+        self.assertEqual(registration['end_date'], '2026-02-26')
+
+        exam_date = data['phases'][1]
+        self.assertEqual(exam_date['phase'], '測驗')
+        self.assertEqual(exam_date['start_date'], '2026-04-18')
+        # 起訖同一天時 end_date 應為 None，不是重複同一天的日期字串
+        self.assertIsNone(exam_date['end_date'])
+
+    @patch('crawler.views.requests.get')
+    def test_response_is_cached_across_requests(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = FAKE_EXAM_SCHEDULE_HTML
+        mock_get.return_value = mock_response
+
+        first = self.client.get('/crawler/exam_schedule/')
+        second = self.client.get('/crawler/exam_schedule/')
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(first.json(), second.json())
+        mock_get.assert_called_once()

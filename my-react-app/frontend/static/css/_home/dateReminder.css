@@ -1,16 +1,16 @@
 .exam-info-card {
     position: relative;
     overflow: hidden;
-    border-radius: 1rem;
-    background: white;
-    color: #4B1B1B;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
-    border: 1px solid #FCDCDC;
+    border-radius: var(--yy-radius-card, 10px);
+    background: #fff;
+    color: var(--yy-ink, #221812);
+    box-shadow: var(--yy-shadow-md, 5px 5px 0 #221812);
+    border: 3px solid var(--yy-ink, #221812);
 }
 
 .circle {
     position: absolute;
-    background: #FFF1F1;
+    background: var(--yy-cream, #F3E7CF);
     border-radius: 50%;
 }
 
@@ -43,33 +43,35 @@
     justify-content: center;
     gap: 0.5rem;
     margin-bottom: 0.5rem;
-    color: #B91C1C;
+    color: var(--yy-red, #9E1B24);
 }
 
 .countdown-box {
-    background: #FEE2E2;
+    background: var(--yy-cream, #F3E7CF);
+    border: 2px solid var(--yy-ink, #221812);
     border-radius: 0.75rem;
     padding: 1rem;
 }
 
 .days-left {
+    font-family: var(--yy-font-pixel, 'Silkscreen', monospace);
     font-size: 1.875rem;
-    font-weight: 900;
+    font-weight: 700;
     margin-bottom: 0.25rem;
-    color: #9B1B30;
+    color: var(--yy-red, #9E1B24);
 }
 
 .days-label {
     font-size: 0.875rem;
     opacity: 0.8;
-    color: #B91C1C;
+    color: var(--yy-text-tertiary, #5A4B3B);
 }
 
 .date-range {
     font-size: 0.75rem;
     opacity: 0.7;
     margin-top: 0.5rem;
-    color: #6B7280;
+    color: var(--yy-text-muted, #6B5A47);
 }
 
 .schedule {
@@ -78,10 +80,10 @@
 
 .schedule-title {
     font-size: 0.875rem;
-    font-weight: 600;
+    font-weight: 700;
     opacity: 0.9;
     margin-bottom: 0.5rem;
-    color: #9B1B30;
+    color: var(--yy-red, #9E1B24);
 }
 
 .schedule-grid {
@@ -96,8 +98,9 @@
     border-radius: 0.5rem;
     font-size: 0.75rem;
     transition: all 0.2s;
-    background: #FDEDED;
-    color: #6B1B1B;
+    background: var(--yy-cream, #F3E7CF);
+    color: var(--yy-text-secondary, #3E3226);
+    border: 1.5px solid transparent;
 }
 
 .schedule-item .icon {
@@ -105,7 +108,7 @@
 }
 
 .schedule-item .phase {
-    font-weight: 500;
+    font-weight: 700;
 }
 
 .schedule-item .date {
@@ -119,17 +122,25 @@
 }
 
 .schedule-item.current {
-    background: #FADBD8;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    background: #fff;
+    border-color: var(--yy-gold, #D9A227);
+    box-shadow: 3px 3px 0 var(--yy-ink, #221812);
 }
 
 .schedule-item.past {
-    background: #FFF0F0;
-    opacity: 0.6;
+    opacity: 0.55;
 }
 
 .schedule-item.upcoming {
-    background: #FDEDED;
+    background: var(--yy-cream, #F3E7CF);
+}
+
+.schedule-loading-text,
+.schedule-error-text {
+    font-size: 0.85rem;
+    opacity: 0.7;
+    text-align: center;
+    margin-top: 0.5rem;
 }
 
 .note {
@@ -138,18 +149,19 @@
     text-align: center;
     margin-top: 1rem;
     line-height: 1.5;
-    color: #8B5E5E;
+    color: var(--yy-text-muted, #6B5A47);
 }
 
 .toast-notification {
   position: fixed;
   top: 20px;
   right: 20px;
-  background-color: #fff9e5;
-  border-left: 5px solid #facc15;
+  background-color: #fff;
+  border: 3px solid var(--yy-ink, #221812);
+  border-left: 6px solid var(--yy-gold, #D9A227);
   padding: 1rem 1.5rem;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--yy-shadow-md, 5px 5px 0 #221812);
   z-index: 1000;
   width: fixed;
 }
@@ -166,9 +178,9 @@
 }
 
 .toast-link {
-  color: #1d4ed8;
+  color: var(--yy-red, #9E1B24);
   text-decoration: underline;
-  font-weight: 500;
+  font-weight: 700;
 }
 
 .close-btn {
@@ -176,20 +188,6 @@
   border: none;
   font-size: 16px;
   cursor: pointer;
-}
-
-.toast-notification .dismiss-option {
-    margin-top: 8px;
-    text-align: right;
-}
-
-.dismiss-forever-btn {
-    background: none;
-    border: none;
-    color: #555;
-    font-size: 0.85rem;
-    cursor: pointer;
-    text-decoration: underline;
 }
 
 .toast-notification .dismiss-option {
@@ -226,7 +224,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(34, 24, 18, 0.55);
     z-index: 1000;
     transition: opacity 0.3s ease;
 }

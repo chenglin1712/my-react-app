@@ -2,46 +2,26 @@ import "../../static/css/_home/dateReminder.css";
 import { useState, useEffect, useRef } from 'react';
 import { Calendar, User, FileText, Award, Mail, Bell} from 'lucide-react';
 import {
-  Button
+  Button, Spinner
 } from 'react-bootstrap';
 
-const examSchedule = [
-    {
-        phase: '報名',
-        date: new Date('2025-09-12'),
-        // date: new Date(),
-        endDate: new Date('2025-10-03'),
-        icon: <User className="w-4 h-4" />,
-    },
-    {
-        phase: '准考證',
-        date: new Date('2025-11-17'),
-        icon: <Mail className="w-4 h-4" />,
-    },
-    {
-        phase: '測驗',
-        date: new Date('2025-12-06'),
-        icon: <FileText className="w-4 h-4" />,
-    },
-    {
-        phase: '成績',
-        date: new Date('2026-02-13'),
-        icon: <Calendar className="w-4 h-4" />,
-    },
-    {
-        phase: '複查',
-        date: new Date('2026-02-13'),
-        endDate: new Date('2026-03-06'),
-        icon: <FileText className="w-4 h-4" />,
-    },
-    {
-        phase: '證書',
-        date: new Date('2026-03-23'),
-        icon: <Award className="w-4 h-4" />,
-    }
-];
+// phase（後端 /crawler/exam_schedule/ 回傳的簡短期程代稱）-> 圖示，純前端呈現用，
+// 不影響資料本身；後端未對到的新期程名稱就沿用 FileText 當預設圖示。
+const PHASE_ICONS = {
+    報名: <User className="w-4 h-4" />,
+    准考證: <Mail className="w-4 h-4" />,
+    測驗: <FileText className="w-4 h-4" />,
+    成績: <Calendar className="w-4 h-4" />,
+    複查: <FileText className="w-4 h-4" />,
+    成績單寄發: <Mail className="w-4 h-4" />,
+    證書: <Award className="w-4 h-4" />,
+};
 
 const DateReminder = () => {
+    const [examSchedule, setExamSchedule] = useState([]);
+    const [sessionName, setSessionName] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [toastList, setToastList] = useState([]);
     const [dismissedPhases, setDismissedPhases] = useState(() => {
@@ -50,6 +30,31 @@ const DateReminder = () => {
     });
     const [doNotRemindMap, setDoNotRemindMap] = useState({});
     const notifiedRef = useRef({});
+
+    // 考試時程改成向後端拿真實資料（爬官網日程表），取代原本寫死在前端、
+    // 早就過期的假資料（見 backend/crawler/views.py 的 get_exam_schedule）。
+    useEffect(() => {
+        fetch(`${import.meta.env.VITE_API_EXAM_SCHEDULE_URL}`)
+            .then((res) => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
+            .then((data) => {
+                const phases = (data.phases || []).map((p) => ({
+                    phase: p.phase,
+                    date: new Date(p.start_date),
+                    endDate: p.end_date ? new Date(p.end_date) : undefined,
+                    icon: PHASE_ICONS[p.phase] || <FileText className="w-4 h-4" />,
+                }));
+                setExamSchedule(phases);
+                setSessionName(data.session || null);
+            })
+            .catch((err) => {
+                console.error("載入考試時程失敗：", err);
+                setError(true);
+            })
+            .finally(() => setLoading(false));
+    }, []);
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -91,7 +96,7 @@ const DateReminder = () => {
         if (newToasts.length > 0) {
             setToastList(prev => [...prev, ...newToasts]);
         }
-    }, [currentTime, dismissedPhases]);
+    }, [currentTime, dismissedPhases, examSchedule]);
 
     const calculateDaysLeft = (targetDate) => {
         const difference = targetDate - currentTime;
@@ -173,59 +178,76 @@ const DateReminder = () => {
                     </div>
                 ))}
 
-                {nextEvent && (
-                    <div className="text-center mb-4">
-                        <div className="event-head">
-                            {nextEvent.icon}
-                            <span className="text-lg font-semibold">{nextEvent.phase}</span>
-                        </div>
-
-                        <div className="countdown-box">
-                            <div className="days-left">{calculateDaysLeft(nextEvent.date)}</div>
-                            <div className="days-label">天後</div>
-                        </div>
-
-                        <div className="date-range">
-                            {nextEvent.endDate
-                                ? `${nextEvent.date.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })} - ${nextEvent.endDate.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}`
-                                : nextEvent.date.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}
-                        </div>
+                {loading && (
+                    <div className="text-center py-4">
+                        <Spinner animation="border" size="sm" />
+                        <p className="schedule-loading-text">時程載入中...</p>
                     </div>
                 )}
 
-                <div className="schedule">
-                    <div className="schedule-title">完整時程</div>
-                    <div className="schedule-grid">
-                        {examSchedule.map((event, index) => {
-                            const daysLeft = calculateDaysLeft(event.date);
-                            const isPast = event.date < currentTime;
-                            const isCurrent = nextEvent && event.phase === nextEvent.phase;
+                {!loading && error && (
+                    <p className="schedule-error-text">目前無法載入考試時程，請稍後再試。</p>
+                )}
 
-                            return (
-                                <div
-                                    key={index}
-                                    className={`schedule-item ${isCurrent
-                                        ? "current"
-                                        : isPast
-                                            ? "past"
-                                            : "upcoming"
-                                        }`}
-                                >
-                                    <div className="icon">{event.icon}</div>
-                                    <div className="phase">{event.phase}</div>
-                                    <div className="date">
-                                        {event.date.toLocaleDateString('zh-TW', { year: 'numeric', month: 'numeric', day: 'numeric' })}
-                                    </div>
-                                    {!isPast && (
-                                        <div className="days">{daysLeft > 0 ? `${daysLeft}天` : '今日'}</div>
-                                    )}
+                {!loading && !error && (
+                    <>
+                        {nextEvent && (
+                            <div className="text-center mb-4">
+                                <div className="event-head">
+                                    {nextEvent.icon}
+                                    <span className="text-lg font-semibold">{nextEvent.phase}</span>
                                 </div>
-                            );
-                        })}
-                    </div>
-                </div>
 
-                <div className="note">※ 實際日期以原民會公告為準</div>
+                                <div className="countdown-box">
+                                    <div className="days-left">{calculateDaysLeft(nextEvent.date)}</div>
+                                    <div className="days-label">天後</div>
+                                </div>
+
+                                <div className="date-range">
+                                    {nextEvent.endDate
+                                        ? `${nextEvent.date.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })} - ${nextEvent.endDate.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}`
+                                        : nextEvent.date.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="schedule">
+                            <div className="schedule-title">
+                                完整時程{sessionName ? `｜${sessionName.replace(/日程表$/, '')}` : ''}
+                            </div>
+                            <div className="schedule-grid">
+                                {examSchedule.map((event, index) => {
+                                    const daysLeft = calculateDaysLeft(event.date);
+                                    const isPast = event.date < currentTime;
+                                    const isCurrent = nextEvent && event.phase === nextEvent.phase;
+
+                                    return (
+                                        <div
+                                            key={index}
+                                            className={`schedule-item ${isCurrent
+                                                ? "current"
+                                                : isPast
+                                                    ? "past"
+                                                    : "upcoming"
+                                                }`}
+                                        >
+                                            <div className="icon">{event.icon}</div>
+                                            <div className="phase">{event.phase}</div>
+                                            <div className="date">
+                                                {event.date.toLocaleDateString('zh-TW', { year: 'numeric', month: 'numeric', day: 'numeric' })}
+                                            </div>
+                                            {!isPast && (
+                                                <div className="days">{daysLeft > 0 ? `${daysLeft}天` : '今日'}</div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="note">※ 實際日期以原民會公告為準，資料每 15 分鐘自動更新</div>
+                    </>
+                )}
             </div>
         </div>
     );

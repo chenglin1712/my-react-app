@@ -1,4 +1,6 @@
 import logging
+import re
+from datetime import datetime
 import requests
 from django.core.cache import cache
 from django.http import JsonResponse
@@ -191,6 +193,32 @@ def format_quiz_data_2(data):
     format_data["parts"].append(format_part2)
     return format_data
 
+# get_tayal_imformation（族語認證最新公告區塊）跟 get_exam_schedule（完整時程）
+# 都需要解析 exam.sce.ntnu.edu.tw/abst/ 這同一個頁面，原本各自獨立 requests.get，
+# 首頁一次載入等於對同一個外部網站發送兩次請求；雖然兩支各自有 15 分鐘快取，
+# 但快取沒命中時（例如剛啟動後端、或剛好 TTL 過期）兩個請求會疊加，使用者會感覺
+# 首頁載入變慢。這裡把「抓原始 HTML」抽成共用快取，兩支各自的解析邏輯不變，
+# 只是不用各自重打一次外部網站。
+EXAM_SITE_HTML_CACHE_KEY = "crawler_exam_site_html"
+EXAM_SITE_HTML_CACHE_TTL = 900  # 15 分鐘，跟兩支端點自己的資料快取一致
+
+
+def _fetch_exam_site_html():
+    """回傳 exam.sce.ntnu.edu.tw/abst/ 的原始 HTML（有共用快取）。連線/逾時等例外
+    交給呼叫端各自的 try/except 處理，這裡不吞例外。"""
+    cached = cache.get(EXAM_SITE_HTML_CACHE_KEY)
+    if cached is not None:
+        return cached
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "text/html",
+    }
+    res = requests.get("https://exam.sce.ntnu.edu.tw/abst/", headers=headers, timeout=_EXTERNAL_TIMEOUT)
+    res.raise_for_status()
+    cache.set(EXAM_SITE_HTML_CACHE_KEY, res.text, EXAM_SITE_HTML_CACHE_TTL)
+    return res.text
+
+
 # 爬取活動及族語認證資料（使用 tacp.gov.tw 官方 API）
 NEWS_CACHE_KEY = "crawler_news_data"
 NEWS_CACHE_TTL = 900  # 15 分鐘，避免每次開首頁都重新爬 tacp 公告 + 師大考試網站
@@ -255,8 +283,7 @@ def get_tayal_imformation(request):
     # 族語認證（師範大學原住民族語言認證考試）
     try:
         url_exam = "https://exam.sce.ntnu.edu.tw/abst/"
-        res_exam = requests.get(url_exam, headers={**headers, "Accept": "text/html"}, timeout=10)
-        soup_exam = BeautifulSoup(res_exam.text, "html.parser")
+        soup_exam = BeautifulSoup(_fetch_exam_site_html(), "html.parser")
         count = 0
         for info in soup_exam.select(".pnlArticles li"):
             if count >= 5:
@@ -284,4 +311,79 @@ def get_tayal_imformation(request):
         return JsonResponse({"detail": "最新消息暫時無法取得，請稍後再試"}, status=502)
 
     cache.set(NEWS_CACHE_KEY, data, NEWS_CACHE_TTL)
+    return JsonResponse(data, safe=False, json_dumps_params={'ensure_ascii': False, 'indent': 2})
+
+
+# 族語認證考試時程（取代首頁原本寫死在前端 dateReminder.jsx 的 examSchedule 假資料）。
+# 官網日程表本身就是一份乾淨的靜態 HTML table，每列是「期程名稱 + 可加入 Google
+# 行事曆的連結」，連結的 dates= 參數就是機讀的 YYYYMMDDTHHMMSS 起訖時間，不需要
+# 自己解析民國年中文日期文字，直接從這個參數取值最穩定。
+EXAM_SCHEDULE_CACHE_KEY = "crawler_exam_schedule_data"
+EXAM_SCHEDULE_CACHE_TTL = 900  # 15 分鐘，跟 news 一致
+
+# 官方日程表的期程名稱 -> 前端沿用的簡短 phase 代稱（對應 dateReminder.jsx 的 icon/連結判斷）
+EXAM_SCHEDULE_PHASE_MAP = {
+    "報名日期": "報名",
+    "准考證下載、寄發": "准考證",
+    "測驗日期": "測驗",
+    "成績公告日期": "成績",
+    "申請成績複查": "複查",
+    "寄發成績通知單": "成績單寄發",
+    "寄發合格證書": "證書",
+}
+
+
+def get_exam_schedule(request):
+    # 首頁行事曆維持公開（不要求登入），比照 get_tayal_imformation 加 IP 限流 + 快取。
+    client_ip = request.META.get("REMOTE_ADDR", "unknown")
+    limited_resp = _rate_limited_response(
+        request, client_ip, group="get_exam_schedule", rate="60/m", method="GET"
+    )
+    if limited_resp:
+        return limited_resp
+
+    cached = cache.get(EXAM_SCHEDULE_CACHE_KEY)
+    if cached is not None:
+        return JsonResponse(cached, safe=False, json_dumps_params={'ensure_ascii': False, 'indent': 2})
+
+    try:
+        html = _fetch_exam_site_html()
+    except requests.RequestException as e:
+        logger.error("get_exam_schedule 上游請求失敗: %s", e)
+        return JsonResponse({"detail": "考試時程暫時無法取得，請稍後再試"}, status=502)
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    # 官網目前置頂顯示的梯次（排除「最新消息」tab 後的第一個），日程表在同一個
+    # tab-pane 底下的 table 裡；用官網目前把「最新消息」排在最前面、後面接梯次
+    # tab 的既有頁面結構，選第一個梯次 tab 取得標題文字。
+    session_tab = soup.select_one(".nav-tabs button.nav-link[id$='-tab']:not(#news-tab)")
+    session_name = session_tab.get_text(strip=True) if session_tab else None
+
+    phases = []
+    table_body = soup.select_one(".tab-pane table tbody")
+    if table_body:
+        for row in table_body.select("tr"):
+            label_el = row.select_one("td span.fw-bold")
+            link_el = row.select_one("td a[href*='dates=']")
+            if not label_el or not link_el:
+                continue
+            m = re.search(r"dates=(\d{8}T\d{6})/(\d{8}T\d{6})", link_el.get("href", ""))
+            if not m:
+                continue
+            label = label_el.get_text(strip=True)
+            start_dt = datetime.strptime(m.group(1), "%Y%m%dT%H%M%S")
+            end_dt = datetime.strptime(m.group(2), "%Y%m%dT%H%M%S")
+            phases.append({
+                "phase": EXAM_SCHEDULE_PHASE_MAP.get(label, label),
+                "label": label,
+                "start_date": start_dt.date().isoformat(),
+                "end_date": end_dt.date().isoformat() if end_dt.date() != start_dt.date() else None,
+            })
+
+    if not phases:
+        return JsonResponse({"detail": "考試時程暫時無法取得，請稍後再試"}, status=502)
+
+    data = {"source_url": "https://exam.sce.ntnu.edu.tw/abst/", "session": session_name, "phases": phases}
+    cache.set(EXAM_SCHEDULE_CACHE_KEY, data, EXAM_SCHEDULE_CACHE_TTL)
     return JsonResponse(data, safe=False, json_dumps_params={'ensure_ascii': False, 'indent': 2})
