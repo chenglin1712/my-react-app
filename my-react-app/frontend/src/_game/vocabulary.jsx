@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../../static/css/_game/vocabulary.css";
-import { TRIBES as TRIBE_LIST } from "../constants/tribes";
+import { TRIBES as TRIBE_LIST, TRIBE_COLOR_BY_SLUG } from "../constants/tribes";
 
-// 顏色是這個頁面自己的呈現用資料，不是族語本身的屬性，跟名稱對照表分開放；
-// 名稱一律從共用的 TRIBE_LIST 取得。
-const TRIBE_COLORS = { tayal: "#9B1B30", amis: "#D4890A", bunun: "#4E7F63", kavalan: "#4A7FA5", paiwan: "#6B4FAA" };
+// 名稱與族語識別色一律從共用的 TRIBE_LIST／TRIBE_COLOR_BY_SLUG 取得，
+// 避免各頁面各自寫一份色票（同一族語在不同頁面顯示不同顏色）。
 const TRIBES = TRIBE_LIST.map((t) => ({
   name: t.name,
-  color: TRIBE_COLORS[t.slug],
+  color: TRIBE_COLOR_BY_SLUG[t.slug],
   hasGame: true,
   route: `/game/vocabulary/${t.slug}`,
 }));

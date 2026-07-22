@@ -60,7 +60,10 @@ service cloud.firestore {
     // 這條新規則擋掉。
     match /sharedNotes/{noteId} {
       allow read: if resource.data.get('deleted', false) == false;
-      allow create: if request.auth != null;
+      // 原本只檢查有沒有登入，任何登入使用者都能建立一筆冒充別人 uid 的筆記——
+      // 而 update／delete 規則（見下方）又是直接信任這個可被偽造的 uid 欄位。
+      // 比照同檔案 situations／pronunciations 的作法，要求寫入的 uid 就是本人。
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
       allow update: if request.auth != null && (
         resource.data.uid == request.auth.uid ||
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy'])

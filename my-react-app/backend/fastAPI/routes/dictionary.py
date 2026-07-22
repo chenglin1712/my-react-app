@@ -1,4 +1,4 @@
-import json, re, logging, httpx, threading
+import asyncio, json, re, logging, httpx, threading
 from typing import List, Dict, Tuple, Optional
 
 from fastapi import APIRouter, Request, Depends, Response, Body
@@ -412,6 +412,27 @@ def search_all(
 
 
 # ------------------------- API 路由 -------------------------
+def _search_multi_words(db: Session, words: List[str], tribe_name: str) -> Tuple[dict, dict]:
+    exact_match_results = {}
+    fuzzy_match_results = {}
+
+    for word in words:
+        if is_chinese(word):
+            results, matched_names = search_by_chinese(db, word, tribe=tribe_name)
+            exact_match_results[word] = [r.dict() for r in results]
+
+            fuzzy = fuzzy_search_by_chinese(db, word, exclude_names=matched_names, tribe=tribe_name)
+            fuzzy_match_results[word] = {k: [r.dict() for r in v] for k, v in fuzzy.items()}
+        else:
+            results, matched_names = search(db, word, tribe=tribe_name)
+            exact_match_results[word] = [r.dict() for r in results]
+
+            fuzzy = fuzzy_search(db, word, exclude_names=matched_names, tribe=tribe_name)
+            fuzzy_match_results[word] = {k: [r.dict() for r in v] for k, v in fuzzy.items()}
+
+    return exact_match_results, fuzzy_match_results
+
+
 @router.post("/keys/")
 @limiter.limit("60/minute")  # 全表掃描（走快取），每用戶每分鐘最多 60 次避免大量請求造成壓力
 async def search_tayal_dictionary(request: Request, db: Session = Depends(get_db)):
@@ -423,22 +444,12 @@ async def search_tayal_dictionary(request: Request, db: Session = Depends(get_db
         if not words:
             return JSONResponse({"detail": "查詢字詞不可為空"}, status_code=400)
 
-        exact_match_results = {}
-        fuzzy_match_results = {}
-
-        for word in words:
-            if is_chinese(word):
-                results, matched_names = search_by_chinese(db, word, tribe=tribe_name)
-                exact_match_results[word] = [r.dict() for r in results]
-
-                fuzzy = fuzzy_search_by_chinese(db, word, exclude_names=matched_names, tribe=tribe_name)
-                fuzzy_match_results[word] = {k: [r.dict() for r in v] for k, v in fuzzy.items()}
-            else:
-                results, matched_names = search(db, word, tribe=tribe_name)
-                exact_match_results[word] = [r.dict() for r in results]
-
-                fuzzy = fuzzy_search(db, word, exclude_names=matched_names, tribe=tribe_name)
-                fuzzy_match_results[word] = {k: [r.dict() for r in v] for k, v in fuzzy.items()}
+        # 冷快取時 _load_tribe_words 是同步的全表掃描＋JSON parse，直接呼叫會卡住
+        # 整個 event loop（同一 worker 上的其他請求，包含 /health，都會被一起卡住）。
+        # 丟到執行緒池執行，跟同一支檔案已修好的 compare_audio／analyze_image 同一套作法。
+        exact_match_results, fuzzy_match_results = await asyncio.to_thread(
+            _search_multi_words, db, words, tribe_name
+        )
 
         return JSONResponse(
             {"exact_match_results": exact_match_results, "fuzzy_match_results": fuzzy_match_results},
@@ -480,8 +491,10 @@ async def all_tayal_dictionary(request: Request, db: Session = Depends(get_db)):
             favorite_names = []
             sort_order = 'asc'
         tribe_name = TRIBE_MAP.get(tribe, '泰雅語')
-        results, total = search_all(
-            db, tribe=tribe_name, limit=limit, offset=offset,
+        # 冷快取時 search_all -> _load_tribe_words 是同步的全表掃描＋JSON parse，
+        # 丟到執行緒池執行，避免卡住 event loop（見 /keys/ 同樣的說明）。
+        results, total = await asyncio.to_thread(
+            search_all, db, tribe=tribe_name, limit=limit, offset=offset,
             letter=letter, frequency=frequency, category=category,
             favorites_only=favorites_only, favorite_names=favorite_names,
             sort_order=sort_order,
@@ -498,6 +511,16 @@ async def all_tayal_dictionary(request: Request, db: Session = Depends(get_db)):
         return JSONResponse({"detail": str(e)}, status_code=500)
 
 
+def _search_single_keyword(db: Session, keyword: str, tribe_name: str):
+    if is_chinese(keyword):
+        exact, matched_names = search_by_chinese(db, keyword, tribe=tribe_name)
+        fuzzy = fuzzy_search_by_chinese(db, keyword, exclude_names=matched_names, tribe=tribe_name)
+    else:
+        exact, matched_names = search(db, keyword, tribe=tribe_name)
+        fuzzy = fuzzy_search(db, keyword, exclude_names=matched_names, tribe=tribe_name)
+    return exact, fuzzy
+
+
 @router.post("/key/")
 async def allsearch_tayal_dictionary(request: KeywordRequest, db: Session = Depends(get_db)):
     """單一字搜尋"""
@@ -507,12 +530,9 @@ async def allsearch_tayal_dictionary(request: KeywordRequest, db: Session = Depe
             return JSONResponse({"detail": "查詢字詞不可為空"}, status_code=400)
         tribe_name = TRIBE_MAP.get(request.tribe or '泰雅', '泰雅語')
 
-        if is_chinese(keyword):
-            exact, matched_names = search_by_chinese(db, keyword, tribe=tribe_name)
-            fuzzy = fuzzy_search_by_chinese(db, keyword, exclude_names=matched_names, tribe=tribe_name)
-        else:
-            exact, matched_names = search(db, keyword, tribe=tribe_name)
-            fuzzy = fuzzy_search(db, keyword, exclude_names=matched_names, tribe=tribe_name)
+        # 冷快取時是同步的全表掃描＋JSON parse，丟到執行緒池執行，
+        # 避免卡住 event loop（見 /keys/ 同樣的說明）。
+        exact, fuzzy = await asyncio.to_thread(_search_single_keyword, db, keyword, tribe_name)
 
         return JSONResponse(
             {
@@ -984,29 +1004,36 @@ async def get_sentence_audio(request: Request, db: Session = Depends(get_db)):
     # 以空白與標點切詞，保留字母、撇號、連字號
     tokens = re.findall(r"[a-zA-ZʼʻΩ'\-]+", sentence)
 
-    audio_tokens = []
-    seen_file_ids: set = set()
-    tribe_id_subq = _tribe_id_subquery(tribe_name)
+    def _lookup_audio_tokens():
+        audio_tokens = []
+        seen_file_ids: set = set()
+        tribe_id_subq = _tribe_id_subquery(tribe_name)
 
-    for token in tokens:
-        token_lower = token.lower()
-        word = db.query(Word).filter(
-            Word.tribe_id == tribe_id_subq,
-            sa_func.lower(Word.name) == token_lower
-        ).first()
+        for token in tokens:
+            token_lower = token.lower()
+            word = db.query(Word).filter(
+                Word.tribe_id == tribe_id_subq,
+                sa_func.lower(Word.name) == token_lower
+            ).first()
 
-        if not word:
-            continue
+            if not word:
+                continue
 
-        audios = load_audio_items_for_words(db, word_ids=[word.id]).get(word.id, [])
-        if not audios:
-            continue
+            audios = load_audio_items_for_words(db, word_ids=[word.id]).get(word.id, [])
+            if not audios:
+                continue
 
-        file_id = audios[0].get("fileId")
-        if not file_id or file_id in seen_file_ids:
-            continue
+            file_id = audios[0].get("fileId")
+            if not file_id or file_id in seen_file_ids:
+                continue
 
-        seen_file_ids.add(file_id)
-        audio_tokens.append({"word": token, "fileId": file_id})
+            seen_file_ids.add(file_id)
+            audio_tokens.append({"word": token, "fileId": file_id})
+
+        return audio_tokens
+
+    # 逐詞同步查詢，句子長時一樣會累積成有感的阻塞時間，丟到執行緒池執行
+    # 避免卡住 event loop（見 /keys/ 同樣的說明）。
+    audio_tokens = await asyncio.to_thread(_lookup_audio_tokens)
 
     return JSONResponse({"audioTokens": audio_tokens})

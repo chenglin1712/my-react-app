@@ -172,10 +172,19 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
     }
 
     setLoading(true);
-    auth.currentUser?.getIdToken()
-      .then(token => axios.post(import.meta.env.VITE_API_SEARCH_KEYS_URL, { words: selectedWords, tribe }, {
+    // auth.currentUser?.getIdToken() 若 currentUser 是 null 會短路成 undefined，
+    // 若直接接在這個 optional chain 後面 .then/.catch/.finally 整條都不會執行，
+    // loading 會卡住、也不會顯示任何錯誤。改成 await 包在一個一定會回傳 Promise
+    // 的 async function 裡（沿用同層 label.jsx 的 analyze() 寫法），undefined
+    // token 只影響要不要帶 Authorization header，不會讓整條鏈路短路。
+    const fetchResults = async () => {
+      const token = await auth.currentUser?.getIdToken();
+      return axios.post(import.meta.env.VITE_API_SEARCH_KEYS_URL, { words: selectedWords, tribe }, {
         headers: token ? { "Authorization": `Bearer ${token}` } : {},
-      }))
+      });
+    };
+
+    fetchResults()
       .then(response => {
         setDefinitions({
           exact_match_results: response.data.exact_match_results || {},
