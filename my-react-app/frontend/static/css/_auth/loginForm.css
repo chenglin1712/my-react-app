@@ -40,6 +40,14 @@
     font-size: 14px;
 }
 
+/* input-field 拿掉了瀏覽器預設的 outline（緊貼卡片圓角邊框，預設焦點框會被邊框
+   蓋住/切角，視覺上很醜），但拿掉後鍵盤 Tab 移動時完全看不出焦點在哪一個欄位。
+   改成欄位內任何一個子元素取得焦點時，在外層卡片本身畫出可見的焦點框。 */
+.loginForm .input-wrapper:focus-within {
+    outline: 3px solid var(--yy-red);
+    outline-offset: 2px;
+}
+
 .loginForm .icon {
     color: var(--yy-text-muted);
     flex-shrink: 0;

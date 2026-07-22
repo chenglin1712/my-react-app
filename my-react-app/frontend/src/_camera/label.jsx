@@ -20,12 +20,17 @@ const CameraLabelStep = ({ image, file, onConfirm, onBack }) => {
         const formData = new FormData();
         formData.append("file", file);
 
+        // 步驟卸載（例如使用者在辨識完成前就按上一步／換了新圖）時，原本的請求
+        // 還是會繼續跑到底，回來時對已經卸載的元件 setState、也白白浪費一次
+        // 按用量計費的 Google Cloud Vision API 呼叫。用 AbortController 取消。
+        const controller = new AbortController();
         const analyze = async () => {
             const token = await auth.currentUser?.getIdToken();
             return axios.post(import.meta.env.VITE_API_VISION_URL, formData, {
                 headers: {
                     ...(token ? { "Authorization": `Bearer ${token}` } : {}),
                 },
+                signal: controller.signal,
             });
         };
 
@@ -38,10 +43,15 @@ const CameraLabelStep = ({ image, file, onConfirm, onBack }) => {
                 }
             })
             .catch((err) => {
+                if (axios.isCancel(err)) return;
                 console.error("影像辨識 API 錯誤:", err.response?.data ?? err.message);
                 setError(true);
             })
-            .finally(() => setLoading(false));
+            .finally(() => {
+                if (!controller.signal.aborted) setLoading(false);
+            });
+
+        return () => controller.abort();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [file]);
 

@@ -20,12 +20,16 @@ export default function useAudioPlayback(selectedTribe, onError) {
     playbackGenRef.current += 1;
     if (playbackGenRef.currentAudio) {
       playbackGenRef.currentAudio.pause();
+      // pause() 不會觸發 createAuthorizedAudio 內建的 ended/error revoke，
+      // 手動中斷播放要自己呼叫，不然快速切換發音時前一個 blob URL 永遠不會被釋放。
+      playbackGenRef.currentAudio.revokeObjectUrl?.();
       playbackGenRef.currentAudio = null;
     }
 
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
+      audioRef.current.revokeObjectUrl?.();
     }
 
     const proxyUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL + fileId;
@@ -51,7 +55,11 @@ export default function useAudioPlayback(selectedTribe, onError) {
   const playSentence = useCallback(async (sentence) => {
     // 取得本次播放的 generation token，後續每步確認是否已被取消
     const myGen = (playbackGenRef.current += 1);
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current.revokeObjectUrl?.();
+    }
     try {
       const token = await auth.currentUser?.getIdToken();
       const res = await axios.post('/api/v1/dictionary/sentence-audio/', { sentence, tribe: selectedTribe }, {

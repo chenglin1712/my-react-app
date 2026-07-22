@@ -54,10 +54,12 @@ describe('CameraWizard', () => {
     // disabled={!image} 要等 FileReader 的 onloadend 跑完才會變成可點擊。
     await waitFor(() => expect(screen.getByText('提交辨識 ▸')).not.toBeDisabled());
     fireEvent.click(screen.getByText('提交辨識 ▸'));
-    expect(screen.getByText('label-step')).toBeInTheDocument();
+    // 第 2、3 步改成 lazy load，包在 Suspense 底下，即使模組本身已被 mock，
+    // dynamic import() 仍是非同步的，掛載後要等一個 microtask 才會真的出現。
+    await waitFor(() => expect(screen.getByText('label-step')).toBeInTheDocument());
 
     fireEvent.click(screen.getByText('confirm-label'));
-    expect(screen.getByText(/result-step words=balay tribe=tayal/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/result-step words=balay tribe=tayal/)).toBeInTheDocument());
   });
 
   test('第 3 步按下重新辨識，會清空狀態回到第 1 步', async () => {
@@ -67,8 +69,9 @@ describe('CameraWizard', () => {
     selectFile(file);
     await waitFor(() => expect(screen.getByText('提交辨識 ▸')).not.toBeDisabled());
     fireEvent.click(screen.getByText('提交辨識 ▸'));
+    await waitFor(() => expect(screen.getByText('label-step')).toBeInTheDocument());
     fireEvent.click(screen.getByText('confirm-label'));
-    expect(screen.getByText(/result-step/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/result-step/)).toBeInTheDocument());
 
     fireEvent.click(screen.getByText('restart'));
 

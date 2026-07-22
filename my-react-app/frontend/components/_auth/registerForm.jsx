@@ -7,6 +7,7 @@ import avatarImage from '../../static/assets/_auth/avatar.webp';
 import { registerWithImg } from "../../src/userServives/userServive"
 import lottie from 'lottie-web';
 import successAnimation from "../../src/animations/success.json"
+import SuccessModal from "../ui/SuccessModal";
 
 const RegisterForm = ({ onSwitchToLogin }) => {
     const [name, setName] = useState("");
@@ -25,7 +26,8 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     const animation = useRef(null);
 
     //使用者註冊
-    const handleRegister = async () => {
+    const handleRegister = async (e) => {
+        e.preventDefault();
         setErrorMsg("");
         try {
             await registerWithImg(name, email, password, identity, avatarUrl);
@@ -113,9 +115,9 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                     </button>
                 </p>
                 {errorMsg && <Alert variant="danger" className="py-2">{errorMsg}</Alert>}
-                <form action="#" className="registerForm">
+                <form action="#" className="registerForm" onSubmit={handleRegister}>
                     <div className="input-wrapper">
-                        <img src={preview || avatarImage} style={{ height: "101px", padding: "inherit" }} />
+                        <img src={preview || avatarImage} alt="使用者頭像預覽" style={{ height: "101px", padding: "inherit" }} />
                         <input
                             id="avatarInput"
                             type="file"
@@ -127,18 +129,18 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                     </div>
                     <div className="input-wrapper">
                         <User size={24} className="icon" />
-                        <input type="text" className="input-field" placeholder="使用者名稱" aria-label="使用者名稱" required onChange={(e) => setName(e.target.value)} />
+                        <input type="text" className="input-field" placeholder="使用者名稱" aria-label="使用者名稱" autoComplete="name" required onChange={(e) => setName(e.target.value)} />
                     </div>
                     <div className="input-wrapper">
                         <Mail size={24} className="icon" />
-                        <input type="email" className="input-field" placeholder="帳號" aria-label="帳號" required onChange={(e) => setEmail(e.target.value)} />
+                        <input type="email" className="input-field" placeholder="帳號" aria-label="帳號" autoComplete="email" required onChange={(e) => setEmail(e.target.value)} />
                     </div>
                     <div className="input-wrapper">
                         <LockKeyhole size={24} className="icon" />
-                        <input type="password" className="input-field" placeholder="密碼" aria-label="密碼" required onChange={handlePasswordChange} value={password} />
+                        <input type="password" className="input-field" placeholder="密碼" aria-label="密碼" autoComplete="new-password" required onChange={handlePasswordChange} value={password} />
                     </div>
                     <div className="password-requirements">
-                        <span className={`check-icon ${isPasswordValid ? 'valid' : 'invalid'}`}>
+                        <span className={`check-icon ${isPasswordValid ? 'valid' : 'invalid'}`} aria-hidden="true">
                             <CheckCircle size={20} />
                         </span>
                         <p>密碼至少需要 6 個字元</p>
@@ -148,7 +150,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                             <option value="學生">學生</option>
                         </select>
                     </div>
-                    <button type="button" className="register-button" onClick={handleRegister} disabled={isUploading}>
+                    <button type="submit" className="register-button" disabled={isUploading}>
                         {isUploading ? "上傳頭像中..." : "註冊"}
                     </button>
                     <p>已經有帳戶了?
@@ -159,14 +161,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                         )}
                     </p>
                 </form>
-                {isRegistered && (
-                    <div className="overlay">
-                        <div className="animation-container">
-                            <div ref={animation} />
-                            <p>註冊成功！您將移至登入頁面</p>
-                        </div>
-                    </div>
-                )}
+                <SuccessModal show={isRegistered} text="註冊成功！您將移至登入頁面" icon={<div ref={animation} />} />
             </div>
         </div>
     );

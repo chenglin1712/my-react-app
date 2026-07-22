@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import {
   ListGroup, Alert, Spinner, Button,
@@ -7,59 +7,12 @@ import {
 import { FaHeart, FaRegHeart, FaPlayCircle, FaChevronDown, FaChevronUp } from "react-icons/fa";
 import { auth } from "../../../firebase";
 import { useFavorites } from "../../src/userServives/useFavorites";
-import { createAuthorizedAudio } from "../../utils/authAudio";
 import ErrorBoundary from "../errorBoundary";
 import { Tabs, Tab } from 'react-bootstrap';
-import "../../static/css/_camera/result.css"; 
-
-import pronoun from "../../static/assets/images/pronoun.png";
-import auxiliary from "../../static/assets/images/auxiliary.png";
-import particle from "../../static/assets/images/particle.png";
-import negative from "../../static/assets/images/negative.png";
-import question from "../../static/assets/images/question.png";
-
-// === 人與社會 ===
-import person from "../../static/assets/images/person.png";
-import family from "../../static/assets/images/family.png";
-import culture from "../../static/assets/images/culture.png";
-import religion from "../../static/assets/images/religion.png";
-import clothing from "../../static/assets/images/clothing.png";
-import action from "../../static/assets/images/action.png";
-
-// === 自然與環境 ===
-import animal from "../../static/assets/images/animal.png";
-import plant from "../../static/assets/images/plant.png";
-import mountain from "../../static/assets/images/mountain.png";
-import nature from "../../static/assets/images/nature.png";
-import hunting from "../../static/assets/images/hunting.png";
-import farming from "../../static/assets/images/farming.png";
-
-// === 物質與生活 ===
-import building from "../../static/assets/images/building.png";
-import transport from "../../static/assets/images/transport.png";
-import object from "../../static/assets/images/object.png";
-import food from "../../static/assets/images/food.png";
-import diet from "../../static/assets/images/diet.png";
-import daily from "../../static/assets/images/daily.png";
-
-// === 身體與感官 ===
-import body from "../../static/assets/images/body.png";
-import move from "../../static/assets/images/move.png";
-import sense from "../../static/assets/images/sense.png";
-import emotion from "../../static/assets/images/emotion.png";
-import sound from "../../static/assets/images/sound.png";
-import life from "../../static/assets/images/life.png";
-
-// === 抽象概念 ===
-import time from "../../static/assets/images/time.png";
-import number from "../../static/assets/images/number.png";
-import space from "../../static/assets/images/space.png";
-import feature from "../../static/assets/images/feature.png";
-import color from "../../static/assets/images/color.png";
-import abstract from "../../static/assets/images/abstract.png";
-
-// === 其他 ===
-import other from "../../static/assets/images/other.png";
+import "../../static/css/_camera/result.css";
+import { categoryGroups } from "../constants/categoryGroups";
+import { filterAndSortWords as sortWords } from "../../utils/wordFilterSort";
+import useAudioPlayback from "../_search/hooks/useAudioPlayback";
 
 const renderStars = (fre) => {
  if (fre === null || fre === undefined) return null;
@@ -82,14 +35,20 @@ const renderStars = (fre) => {
   );
 };
 
-const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFavorite, playAudio, isFavorited }) => (
+const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFavorite, playAudio, isFavorited, failedAudio }) => (
   <ListGroup.Item key={keyName} className="d-flex flex-column">
     <div className="d-flex justify-content-between align-items-center">
-      <div onClick={() => toggleExpand(keyName)} style={{ cursor: 'pointer', flex: 1 }}>
+      <div
+        onClick={() => toggleExpand(keyName)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleExpand(keyName); } }}
+        style={{ cursor: 'pointer', flex: 1 }}
+      >
         <h3 className="fw-bolder text-danger">
           {result.name || '無資料'}
-          {result.audioItems?.length ? (
-            <Button variant="link" onClick={(e) => { e.stopPropagation(); playAudio(result.audioItems[0].fileId); }}>
+          {result.audioItems?.length && !failedAudio?.has(result.audioItems[0].fileId) ? (
+            <Button variant="link" aria-label="播放音訊" onClick={(e) => { e.stopPropagation(); playAudio(result.audioItems[0].fileId); }}>
               <FaPlayCircle size={20} className="text-warning" />
             </Button>
           ) : (<></>)}
@@ -111,7 +70,7 @@ const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFav
           {result.dictionaryNote?.replace(/[\r\n]+/g, '') ? <ListGroup.Item><strong>備註：</strong>{result.dictionaryNote}</ListGroup.Item> : <></>}
           {result.explanationItems?.map((def, i) => (
             <ListGroup.Item key={i}>
-              <h5 className="fw-bolder">{def.chineseExplanation || ''}  {def.englishExplanation || ''}</h5>           
+              <h5 className="fw-bolder">{def.chineseExplanation || ''}  {def.englishExplanation || ''}</h5>
               {def.category && def.category.length > 0 ?<h6><strong>分類：</strong>{def.category || ''}</h6>:<></>}
               {def.partOfSpeech&& def.partOfSpeech.length > 0?<h6><strong>詞性：</strong>{def.partOfSpeech || ''}</h6>:<></>}
               {def.focus&& def.focus.length > 0?<h6><strong>焦點：</strong>{def.focus || ''}</h6>:<></>}
@@ -122,8 +81,8 @@ const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFav
                   <ListGroup.Item key={`${i}-${ei}`}>
                     <h6 className="fw-bolder text-danger">
                       {ex.originalSentence}
-                      {ex.audioItems?.length ? (
-                        <Button variant="link" onClick={() => playAudio(ex.audioItems[0].fileId)}>
+                      {ex.audioItems?.length && !failedAudio?.has(ex.audioItems[0].fileId) ? (
+                        <Button variant="link" aria-label="播放音訊" onClick={() => playAudio(ex.audioItems[0].fileId)}>
                           <FaPlayCircle size={20} className="text-warning" />
                         </Button>
                       ) : (<></>)}
@@ -151,7 +110,6 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
   const [expandedWord, setExpandedWord] = useState(null);
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterLetter, setFilterLetter] = useState('');
-  const audioRef = useRef(null);
   const { favorites, toggleFavorite, error: favoritesError } = useFavorites();
   const favoriteWords = useMemo(
     () => new Set(favorites.find(fav => fav.id === 1)?.content || []),
@@ -208,127 +166,14 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
-  const playAudio = async (fileId) => {
-    if (!fileId) return;
+  // playAudio 改用 _search 頁面共用的 hook：原本這裡自己維護一份 playAudio，
+  // 缺少 hook 版本後來補上的「取消上一次播放的請求」（避免快速連續點擊時舊音檔
+  // 蓋掉新音檔）與「失敗音檔追蹤」（播放失敗過的 fileId 不再顯示播放鈕）。
+  const { playAudio, failedAudio } = useAudioPlayback(tribe, setError);
 
-
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
-
-
-    const proxyUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL + fileId;
-    let newAudio;
-    try {
-      newAudio = await createAuthorizedAudio(proxyUrl);
-    } catch (err) {
-      console.error("播放失敗:", err);
-      return;
-    }
-
-    newAudio.play().catch(err => console.error("播放失敗:", err));
-    audioRef.current = newAudio;
-  };
-
-const categoryGroups = {
-  "語法與功能": [
-    { name: "代名詞、指示詞", image: pronoun },
-    { name: "助動詞", image: auxiliary },
-    { name: "助詞或其他", image: particle },
-    { name: "否定詞", image: negative },
-    { name: "疑問詞", image: question },
-  ],
-  "人與社會": [
-    { name: "人物、身分", image: person },
-    { name: "親屬稱謂", image: family },
-    { name: "傳統文化與習俗", image: culture },
-    { name: "宗教", image: religion },
-    { name: "織布服飾", image: clothing },
-    { name: "行動", image: action },
-  ],
-  "自然與環境": [
-    { name: "動物(含昆蟲)", image: animal },
-    { name: "植物", image: plant },
-    { name: "山川地理", image: mountain },
-    { name: "自然景觀", image: nature },
-    { name: "狩獵", image: hunting },
-    { name: "農耕", image: farming },
-  ],
-  "物質與生活": [
-    { name: "建築", image: building },
-    { name: "交通", image: transport },
-    { name: "物品(不含食品)", image: object },
-    { name: "食物(非植物)", image: food },
-    { name: "飲食", image: diet },
-    { name: "生活作息", image: daily },
-  ],
-  "身體與感官": [
-    { name: "身體部位", image: body },
-    { name: "肢體動作", image: move },
-    { name: "認知感官", image: sense },
-    { name: "情緒思維", image: emotion },
-    { name: "聲音", image: sound },
-    { name: "生老病死傷", image: life },
-  ],
-  "抽象概念": [
-    { name: "時間", image: time },
-    { name: "數字計量", image: number },
-    { name: "空間", image: space },
-    { name: "特徵", image: feature },
-    { name: "顏色", image: color },
-    { name: "抽象名詞", image: abstract },
-  ],
-  "其他": [
-    { name: "其他", image: other },
-  ],
-};
-
-
-  const filterAndSortWords = (words) => {
-    return words
-      .filter(w => {
-        const tayal = (w.name || '').toLowerCase();
-        const matchesLetter = !filterLetter || tayal.startsWith(filterLetter);
-        const isFavorite = favoriteWords.has(w.name);
-
-        const fre = w.frequency || '';
-        let starCount = 0;
-        if (fre >= 0 && fre <= 200) starCount = 1;
-        else if (fre <= 400) starCount = 2;
-        else if (fre <= 800) starCount = 3;
-        else if (fre <= 1000) starCount = 4;
-        else starCount = 5;
-        const matchesFrequency = !frequencyFilter || starCount === parseInt(frequencyFilter);
-
-        const matchesCategory =
-          !selectedSubCategory ||
-          (w.explanationItems?.some(def => def.category?.includes(selectedSubCategory)) ||
-          w.category === selectedSubCategory);
-
-        return matchesLetter && (!showOnlyFavorites || isFavorite) && matchesFrequency && matchesCategory;
-      })
-      .sort((a, b) => {
-        const aFirst = (a.name || '').toLowerCase();
-        const bFirst = (b.name || '').toLowerCase();
-
-        
-        const aInitial = aFirst[0] || '';
-        const bInitial = bFirst[0] || '';
-
-        if (sortOrder === 'asc') {
-          // 升冪：A → Z → '
-          if (aInitial === "'" && bInitial !== "'") return 1;
-          if (aInitial !== "'" && bInitial === "'") return -1;
-          return aFirst.localeCompare(bFirst);
-        } else {
-          // 降冪：' → Z → A
-          if (aInitial === "'" && bInitial !== "'") return -1;
-          if (aInitial !== "'" && bInitial === "'") return 1;
-          return bFirst.localeCompare(aFirst);
-        }
-      });
-  };
+  const filterAndSortWords = (words) => sortWords(words, {
+    filterLetter, frequencyFilter, showOnlyFavorites, favoriteWords, selectedSubCategory, sortOrder,
+  });
   const excludedLetters = ['d', 'f', 'j', 'v'];
   const alphabet = Array.from({ length: 26 }, (_, i) => String.fromCharCode(97 + i)).concat("'").filter(l => !excludedLetters.includes(l));
 
@@ -553,6 +398,7 @@ const categoryGroups = {
                         toggleFavorite={() =>toggleFavorite(wordData.name)}
                         playAudio={playAudio}
                         isFavorited={favoriteWords.has(wordData.name)}
+                        failedAudio={failedAudio}
                       />
                     </ErrorBoundary>
                   );
@@ -589,6 +435,7 @@ const categoryGroups = {
                           toggleFavorite={() =>toggleFavorite(wordData.name)}
                           playAudio={playAudio}
                           isFavorited={favoriteWords.has(wordData.name)}
+                          failedAudio={failedAudio}
                         />
                       </ErrorBoundary>
                 );

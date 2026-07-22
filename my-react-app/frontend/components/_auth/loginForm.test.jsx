@@ -78,6 +78,28 @@ describe('LoginForm', () => {
     expect(screen.getByText('登入失敗: Network Error')).toBeInTheDocument();
   });
 
+  test('非 Firebase 例外（沒有 code 欄位）不會在 catch 區塊內再丟一次，仍顯示通用錯誤訊息', async () => {
+    signInWithEmailAndPassword.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    render(<LoginForm />);
+    fillLoginForm('a@b.com', 'secret1');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '登入' }));
+    });
+
+    expect(screen.getByText('登入失敗: Failed to fetch')).toBeInTheDocument();
+  });
+
+  test('忘記密碼連結有 href，鍵盤使用者可以直接 Tab 到並用 Enter 觸發導頁', () => {
+    render(<LoginForm />);
+    const forgotLink = screen.getByText('忘記密碼?');
+
+    expect(forgotLink).toHaveAttribute('href', '/forgot');
+
+    fireEvent.click(forgotLink);
+    expect(mockNavigate).toHaveBeenCalledWith('/forgot');
+  });
+
   test('登入成功後顯示成功動畫，並在延遲後導向首頁', async () => {
     vi.useFakeTimers();
     try {

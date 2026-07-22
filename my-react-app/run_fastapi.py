@@ -21,8 +21,8 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 # ── 啟動前環境變數檢查 ──────────────────────────────────────────
 REQUIRED_VARS = {
-    "VITE_CLOUD_API_KEY": "Google Cloud Vision API 金鑰（影像辨識功能）",
-    "VITE_CLOUD_API_URL": "Google Cloud Vision API URL",
+    "CLOUD_API_KEY": "Google Cloud Vision API 金鑰（影像辨識功能）",
+    "CLOUD_API_URL": "Google Cloud Vision API URL",
     "VITE_AUDIO_FILE_URL": "音檔 API URL（語音比對功能）",
 }
 OPTIONAL_VARS = {

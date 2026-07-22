@@ -15,15 +15,19 @@ load_dotenv()
 router = APIRouter()
 _logger = logging.getLogger(__name__)
 
-VITE_CLOUD_API_KEY = os.getenv("VITE_CLOUD_API_KEY")
-VITE_CLOUD_API_URL = os.getenv("VITE_CLOUD_API_URL")
+# 這兩個是 Google Cloud Vision API 的伺服器端金鑰／URL，只在 FastAPI 這裡讀取，
+# 前端沒有也不該引用。原本沿用了 VITE_ 前綴命名，容易讓人誤以為要打包進前端
+# bundle（Vite 只會把 VITE_ 開頭的環境變數暴露給前端 import.meta.env），改掉
+# 前綴避免未來有人誤解成可以公開曝露。
+CLOUD_API_KEY = os.getenv("CLOUD_API_KEY")
+CLOUD_API_URL = os.getenv("CLOUD_API_URL")
 
 # 上傳圖片大小上限，避免超大圖片吃掉伺服器記憶體，也避免白白打一次付費的 Google Cloud Vision API
 MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
-if not VITE_CLOUD_API_KEY:
-    _logger.warning("VITE_CLOUD_API_KEY 環境變數未設定，影像辨識功能將無法使用")
-if not VITE_CLOUD_API_URL:
-    _logger.warning("VITE_CLOUD_API_URL 環境變數未設定，影像辨識功能將無法使用")
+if not CLOUD_API_KEY:
+    _logger.warning("CLOUD_API_KEY 環境變數未設定，影像辨識功能將無法使用")
+if not CLOUD_API_URL:
+    _logger.warning("CLOUD_API_URL 環境變數未設定，影像辨識功能將無法使用")
 
 # 圖片辨識同一批 label 常常出現重複的英文單字（例如同一物件被偵測到多次），
 # 用一個簡單的 dict 快取翻譯結果，避免對同一個字重複呼叫 Google Translate。
@@ -68,9 +72,9 @@ async def analyze_image(request: Request):
 
         image_base64 = base64.b64encode(contents).decode("utf-8")
 
-        if not VITE_CLOUD_API_URL or not VITE_CLOUD_API_KEY:
+        if not CLOUD_API_URL or not CLOUD_API_KEY:
             raise HTTPException(status_code=503, detail="影像辨識 API 環境變數未設定")
-        url = VITE_CLOUD_API_URL + VITE_CLOUD_API_KEY
+        url = CLOUD_API_URL + CLOUD_API_KEY
         headers = {"Content-Type": "application/json"}
         data = {
             "requests": [

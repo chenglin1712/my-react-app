@@ -36,15 +36,15 @@ const FunctionBtn = () => {
                 <span className="yy-eyebrow">LEARNING TOOLS</span>
                 <h2 className="function-section-title">功能模組</h2>
             </div>
+            {/* 整張卡片仍可用滑鼠點擊導頁，但鍵盤焦點只留給卡片內「前往體驗」這顆真正的
+                button——原本外層 div 也掛 role="button"+tabIndex，鍵盤 Tab 會先停在
+                整張卡片、再停在裡面的按鈕，兩個停駐點做同一件事，多一次沒有意義的 Tab。 */}
             <div className="card-container">
                 {FUNCTION_CARDS.map((card) => (
                     <div
                         key={card.route}
                         className="card yy-card--hover"
-                        role="button"
-                        tabIndex={0}
                         onClick={() => navigate(card.route)}
-                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(card.route); } }}
                     >
                         <div className="card-head" style={{ background: card.headerBg }}>
                             <span className="card-tag">{card.tag}</span>

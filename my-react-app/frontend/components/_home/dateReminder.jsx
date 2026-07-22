@@ -150,33 +150,38 @@ const DateReminder = () => {
                     <Button variant="outline-danger" onClick={handleResetNotifications}><Bell /> 開啟通知</Button>
                 </div>
 
-                {toastList.map((toast) => (
-                    <div className="toast-notification" key={toast.phase}>
-                        <div className="toast-header">
-                            📢 {toast.phase} 今日開始！
-                            <button className="close-btn" onClick={() => handleCloseToast(toast.phase)} aria-label="關閉">✕</button>
-                        </div>
-                        <div className="toast-body">
-                            {toast.url ? (
-                                <a href={toast.url} target="_blank" rel="noopener noreferrer" className="toast-link">
-                                    點我前往 {toast.phase} 頁面
-                                </a>
-                            ) : (
-                                <p>請注意 {toast.phase} 的相關事宜！</p>
-                            )}
-                            <div className="dismiss-option">
-                                <label className="checkbox-label">
-                                    <input
-                                        type="checkbox"
-                                        checked={!!doNotRemindMap[toast.phase]}
-                                        onChange={(e) => handleToggleRemind(toast.phase, e.target.checked)}
-                                    />
-                                    不再提醒此項目
-                                </label>
+                {/* aria-live 包在這個常駐的外層容器上（而不是各自的 toast-notification
+                    div），content 變動（toast 出現/消失）才會可靠地被螢幕報讀器唸出來——
+                    原本完全沒有，畫面上彈出通知但螢幕報讀器不會有任何提示。 */}
+                <div aria-live="polite" role="status">
+                    {toastList.map((toast) => (
+                        <div className="toast-notification" key={toast.phase}>
+                            <div className="toast-header">
+                                📢 {toast.phase} 今日開始！
+                                <button className="close-btn" onClick={() => handleCloseToast(toast.phase)} aria-label="關閉">✕</button>
+                            </div>
+                            <div className="toast-body">
+                                {toast.url ? (
+                                    <a href={toast.url} target="_blank" rel="noopener noreferrer" className="toast-link">
+                                        點我前往 {toast.phase} 頁面
+                                    </a>
+                                ) : (
+                                    <p>請注意 {toast.phase} 的相關事宜！</p>
+                                )}
+                                <div className="dismiss-option">
+                                    <label className="checkbox-label">
+                                        <input
+                                            type="checkbox"
+                                            checked={!!doNotRemindMap[toast.phase]}
+                                            onChange={(e) => handleToggleRemind(toast.phase, e.target.checked)}
+                                        />
+                                        不再提醒此項目
+                                    </label>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    ))}
+                </div>
 
                 {loading && (
                     <div className="text-center py-4">

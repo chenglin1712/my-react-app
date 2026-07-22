@@ -58,4 +58,28 @@ describe('CameraLabelStep', () => {
 
     await waitFor(() => expect(screen.getByText('辨識失敗')).toBeInTheDocument());
   });
+
+  test('請求會帶上 AbortController 的 signal，卸載時中斷請求且不會噴例外', async () => {
+    let resolvePost;
+    axios.post.mockReturnValueOnce(new Promise((resolve) => { resolvePost = resolve; }));
+    const file = new File(['x'], 'test.png', { type: 'image/png' });
+
+    const { unmount } = render(<CameraLabelStep image="x" file={file} onConfirm={vi.fn()} onBack={vi.fn()} />);
+
+    // analyze() 在呼叫 axios.post 前先 await getIdToken()，要等這個微任務跑完
+    await waitFor(() => expect(axios.post).toHaveBeenCalled());
+
+    expect(axios.post).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(FormData),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    const { signal } = axios.post.mock.calls[0][2];
+    expect(signal.aborted).toBe(false);
+
+    expect(() => unmount()).not.toThrow();
+    expect(signal.aborted).toBe(true);
+
+    resolvePost({ data: { labels: [] } });
+  });
 });

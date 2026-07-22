@@ -4,6 +4,7 @@ import { Container, Alert, Spinner, Button } from 'react-bootstrap';
 import { useFavorites } from "../../src/userServives/useFavorites";
 import { TRIBE_NAMES } from "../constants/tribes";
 import { auth } from "../../../firebase";
+import { filterAndSortWords as sortWords } from "../../utils/wordFilterSort";
 import "../../static/css/_search/index.css";
 
 import SearchHeader from './components/SearchHeader';
@@ -199,53 +200,9 @@ const App = () => {
     handleSearchRef.current();
   }, []);
 
-  const filterAndSortWords = (words) => {
-    return words
-      .filter(w => {
-        const tayal = (w.name || '').toLowerCase();
-        const matchesLetter = !filterLetter || tayal.startsWith(filterLetter);
-        const isFavorite = favoriteWords.has(w.name);
-
-        const fre = w.frequency || '';
-        let starCount = 0;
-        if (fre >= 0 && fre <= 200) starCount = 1;
-        else if (fre <= 400) starCount = 2;
-        else if (fre <= 800) starCount = 3;
-        else if (fre <= 1000) starCount = 4;
-        else starCount = 5;
-        const matchesFrequency = !frequencyFilter || starCount === parseInt(frequencyFilter);
-
-        const matchesCategory =
-          !selectedSubCategory ||
-          (w.explanationItems?.some(def => def.category?.includes(selectedSubCategory)) ||
-            w.category === selectedSubCategory);
-
-        return matchesLetter && (!showOnlyFavorites || isFavorite) && matchesFrequency && matchesCategory;
-      })
-      .sort((a, b) => {
-        const aFirst = (a.name || '').toLowerCase();
-        const bFirst = (b.name || '').toLowerCase();
-
-        // 跳過非字母前綴（-、ʼ、' 等），取第一個字母作為排序依據
-        const getKey = (s) => s.replace(/^[^a-z]+/, '') || s;
-        const aKey = getKey(aFirst);
-        const bKey = getKey(bFirst);
-
-        // 純非字母開頭的詞條（如 -a、-an）排在最後
-        const aIsPrefix = /^[^a-z]/.test(aFirst);
-        const bIsPrefix = /^[^a-z]/.test(bFirst);
-
-        if (sortOrder === 'asc') {
-          if (aIsPrefix && !bIsPrefix) return 1;
-          if (!aIsPrefix && bIsPrefix) return -1;
-          return aKey.localeCompare(bKey, undefined, { sensitivity: 'base' }) || aFirst.localeCompare(bFirst, undefined, { sensitivity: 'base' });
-        } else {
-          if (aIsPrefix && !bIsPrefix) return -1;
-          if (!aIsPrefix && bIsPrefix) return 1;
-          return bKey.localeCompare(aKey, undefined, { sensitivity: 'base' }) || bFirst.localeCompare(aFirst, undefined, { sensitivity: 'base' });
-        }
-      });
-  };
+  const filterAndSortWords = (words) => sortWords(words, {
+    filterLetter, frequencyFilter, showOnlyFavorites, favoriteWords, selectedSubCategory, sortOrder,
+  });
   const excludedLetters = ['d', 'f', 'j', 'v'];
   const alphabet = Array.from({ length: 26 }, (_, i) => String.fromCharCode(97 + i)).concat("'").filter(l => !excludedLetters.includes(l));
 

@@ -101,6 +101,22 @@ describe('RegisterForm', () => {
     }
   });
 
+  test('註冊按鈕是 type="submit"，必填欄位留空時瀏覽器原生驗證會擋下送出，不呼叫 registerWithImg', async () => {
+    render(<RegisterForm />);
+    // 故意不填任何必填欄位
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '註冊' }));
+    });
+
+    expect(registerWithImg).not.toHaveBeenCalled();
+  });
+
+  test('大頭貼預覽圖有 alt 文字', () => {
+    render(<RegisterForm />);
+    expect(screen.getByAltText('使用者頭像預覽')).toBeInTheDocument();
+  });
+
   test('上傳圖片超過 5MB 時顯示錯誤，不會呼叫上傳 API', () => {
     render(<RegisterForm />);
     const bigFile = new File(['x'.repeat(10)], 'big.png', { type: 'image/png' });

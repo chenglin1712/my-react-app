@@ -20,7 +20,7 @@ REQUIRED_VARS = {
     "DJANGO_SECRET_KEY": "Django 安全金鑰",
 }
 OPTIONAL_VARS = {
-    "VITE_CLOUD_API_KEY": "Google Cloud Vision API 金鑰（影像辨識，未設定時該功能不可用）",
+    "CLOUD_API_KEY": "Google Cloud Vision API 金鑰（影像辨識，未設定時該功能不可用）",
     "VITE_AUDIO_FILE_URL": "音檔 API URL（語音比對，未設定時該功能不可用）",
 }
 

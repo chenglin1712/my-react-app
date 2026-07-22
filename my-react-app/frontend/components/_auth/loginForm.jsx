@@ -7,6 +7,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../../firebase";
 import lottie from 'lottie-web';
 import successAnimation from "../../src/animations/success.json"
+import SuccessModal from "../ui/SuccessModal";
 
 const LoginForm = ({ onSwitchToRegister }) => {
     const [email, setEmail] = useState("");
@@ -30,7 +31,10 @@ const LoginForm = ({ onSwitchToRegister }) => {
                 navigate("/");
             }, 1800);
         } catch (error) {
-            if (error.code.includes('auth/invalid-credential')) {
+            // error.code 只有 Firebase 的錯誤才會有，非 Firebase 的例外（例如網路層
+            // 的 TypeError）沒有這個欄位，直接呼叫 .includes() 會在這個 catch 區塊
+            // 內再丟一次例外，讓使用者連通用錯誤訊息都看不到。
+            if (error.code?.includes('auth/invalid-credential')) {
                 setErrorMsg("帳號或密碼錯誤，請檢查電子郵件和密碼是否正確！");
             } else {
                 setErrorMsg("登入失敗: " + error.message);
@@ -61,13 +65,13 @@ const LoginForm = ({ onSwitchToRegister }) => {
             <form action="#" className="loginForm">
                 <div className="input-wrapper">
                     <Mail size={24} className="icon" />
-                    <input type="email" className="input-field" placeholder="帳號" aria-label="帳號" required onChange={(e) => { setEmail(e.target.value) }} />
+                    <input type="email" className="input-field" placeholder="帳號" aria-label="帳號" autoComplete="email" required onChange={(e) => { setEmail(e.target.value) }} />
                 </div>
                 <div className="input-wrapper">
                     <LockKeyhole size={24} className="icon" />
-                    <input type="password" className="input-field" placeholder="密碼" aria-label="密碼" required onChange={(e) => { setPassword(e.target.value) }} />
+                    <input type="password" className="input-field" placeholder="密碼" aria-label="密碼" autoComplete="current-password" required onChange={(e) => { setPassword(e.target.value) }} />
                 </div>
-                <a className="forgot-pass" onClick={() => { navigate("/forgot"); }}>忘記密碼?</a>
+                <a className="forgot-pass" href="/forgot" onClick={(e) => { e.preventDefault(); navigate("/forgot"); }}>忘記密碼?</a>
                 <button className="login-button" onClick={handleLogin}>登入</button>
             </form>
             <p>還沒有帳號?
@@ -78,14 +82,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
                 )}
             </p>
 
-            {isLogin && (
-                <div className="overlay">
-                    <div className="animation-container">
-                        <div ref={animation} />
-                        <p>登入成功！您將移至首頁</p>
-                    </div>
-                </div>
-            )}
+            <SuccessModal show={isLogin} text="登入成功！您將移至首頁" icon={<div ref={animation} />} />
         </div>
     );
 };

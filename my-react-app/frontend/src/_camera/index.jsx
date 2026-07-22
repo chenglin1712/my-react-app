@@ -1,13 +1,23 @@
-import { useState, useRef } from "react";
-import { Alert } from "react-bootstrap";
+import { useState, useRef, lazy, Suspense } from "react";
+import { Alert, Spinner } from "react-bootstrap";
 import "../../static/css/_camera/wizard.css";
 import { TRIBES } from "../constants/tribes";
 import StepBar from "../../components/ui/StepBar";
 import TribePill from "../../components/ui/TribePill";
-import CameraLabelStep from "./label";
-import CameraResultStep from "./result";
+
+// 第 2、3 步各自 lazy load：第 1 步（選圖）原本會把三步全部一起打包進去，
+// 含第 3 步查詢結果頁引用的 36 張分類圖（見 constants/categoryGroups.js），
+// 使用者可能選了圖片卻還沒送出辨識，就已經先付了這些成本。
+const CameraLabelStep = lazy(() => import("./label"));
+const CameraResultStep = lazy(() => import("./result"));
 
 const STEP_LABELS = ["上傳圖片", "選擇單詞", "查詢結果"];
+
+const StepLoading = () => (
+    <div className="camera-step-loading d-flex justify-content-center py-5">
+        <Spinner animation="border" variant="primary" />
+    </div>
+);
 
 const CameraWizard = () => {
     const [step, setStep] = useState(1);
@@ -123,20 +133,24 @@ const CameraWizard = () => {
                 )}
 
                 {step === 2 && (
-                    <CameraLabelStep
-                        image={image}
-                        file={file}
-                        onConfirm={(words) => { setSelectedWords(words); setStep(3); }}
-                        onBack={() => setStep(1)}
-                    />
+                    <Suspense fallback={<StepLoading />}>
+                        <CameraLabelStep
+                            image={image}
+                            file={file}
+                            onConfirm={(words) => { setSelectedWords(words); setStep(3); }}
+                            onBack={() => setStep(1)}
+                        />
+                    </Suspense>
                 )}
 
                 {step === 3 && (
-                    <CameraResultStep
-                        selectedWords={selectedWords}
-                        tribe={tribe}
-                        onRestart={restart}
-                    />
+                    <Suspense fallback={<StepLoading />}>
+                        <CameraResultStep
+                            selectedWords={selectedWords}
+                            tribe={tribe}
+                            onRestart={restart}
+                        />
+                    </Suspense>
                 )}
             </section>
         </div>
