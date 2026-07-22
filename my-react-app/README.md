@@ -97,7 +97,20 @@ alembic upgrade head
   # FastAPI（ASGI）
   cd backend && uvicorn fastAPI.main:app --host 0.0.0.0 --port $PORT
   ```
-  目前 repo 內沒有 Dockerfile／Procfile／docker-compose 之類的部署腳本，也還沒決定實際要部署到 Render 或 Cloud Run（`ALLOWED_HOSTS`／`CSRF_TRUSTED_ORIGINS` 的設計對兩者都相容，但實際容器化與啟動流程尚未建立）；`dist/` 要如何接給 Django 服務（SPA 路由、靜態檔案）目前也還沒決定（`core/urls.py` 內對應程式碼仍註解掉），視前端是否要跟後端服務分開部署而定。
+
+### 用容器重現部署環境
+
+repo 根目錄現在有 `backend/Dockerfile`（Django／FastAPI 共用同一個 image，python:3.10-slim + 上面同一套 pip 安裝順序 + ffmpeg／libsndfile1／libgl1／libglib2.0-0 等系統套件）與 `docker-compose.yml`（`django`／`fastapi` 兩個 service，各自從這個 image 用不同 `command:` 啟動），可以在本機重現跟正式部署一致的容器環境：
+
+```sh
+# 需先準備好根目錄 .env（見上方「安裝與設定」）
+docker compose up --build
+```
+
+- Django 在 `http://localhost:8000`、FastAPI 在 `http://localhost:8001`，兩者的健康檢查端點（`/health/`、`/health`）都已接上 `docker-compose.yml` 的 `healthcheck:`。
+- `backend/fastAPI/routes/dictionary.db` 與 Django 的 `backend/db.sqlite3`（皆為 gitignored 的 SQLite 檔案）透過 bind mount 從本機掛進容器，不會被打進 image；本機沒有這兩個檔案時容器仍能啟動，但對應的資料查詢不會有內容，細節見 `docker-compose.yml` 內的註解。
+- **這只解決「容器裡能不能重現環境」的問題，實際部署平台（Render／Cloud Run／其他）仍未定案**——`Dockerfile`／`docker-compose.yml` 兩個平台都相容（都只是跑一個監聽 `$PORT` 的標準容器），不代表已經選定平台；`dist/` 要如何接給 Django 服務（SPA 路由、靜態檔案）目前也還沒決定（`core/urls.py` 內對應程式碼仍註解掉），視前端是否要跟後端服務分開部署而定。
+- 沒有本機 Docker 環境時，仍可依上方「啟動專案（開發環境）」或本節手動 gunicorn／uvicorn 指令直接跑，不強制要求用容器。
 
 ## 測試
 

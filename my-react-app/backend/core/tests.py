@@ -129,3 +129,46 @@ class SentryInitTest(TestCase):
     def test_startup_succeeds_with_sentry_dsn_set(self):
         result = self._run_check({"SENTRY_DSN": "https://fake@fake.ingest.sentry.io/123"})
         self.assertEqual(result.returncode, 0, result.stderr)
+
+
+class CsrfTrustedOriginsBlankEnvTest(TestCase):
+    """os.getenv(key, default) 的 default 只有在 key 完全沒出現在環境變數裡才會
+    生效——.env 裡寫 CSRF_TRUSTED_ORIGINS=（有這一行、值是空字串，.env.example
+    就是留空當範本）一樣算「有出現」，會直接把內建的本機開發預設值蓋掉變成空
+    清單。settings.py 是 process 啟動時才算一次的模組層級程式碼，沒辦法在同一個
+    測試進程裡乾淨地用不同的環境變數重新載入，改用子進程實際驗證這個情境。
+    """
+
+    def test_blank_csrf_trusted_origins_falls_back_to_default(self):
+        env = os.environ.copy()
+        env["DJANGO_SECRET_KEY"] = env.get("DJANGO_SECRET_KEY", "test-secret")
+        env["DJANGO_SETTINGS_MODULE"] = "core.settings"
+        env["CSRF_TRUSTED_ORIGINS"] = ""
+        result = subprocess.run(
+            [sys.executable, "-c", "import django; django.setup(); from django.conf import settings; print(settings.CSRF_TRUSTED_ORIGINS)"],
+            cwd=str(BASE_DIR),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("127.0.0.1:8000", result.stdout)
+        self.assertNotEqual(result.stdout.strip(), "[]")
+
+    def test_blank_allowed_origins_falls_back_to_default(self):
+        env = os.environ.copy()
+        env["DJANGO_SECRET_KEY"] = env.get("DJANGO_SECRET_KEY", "test-secret")
+        env["DJANGO_SETTINGS_MODULE"] = "core.settings"
+        env["ALLOWED_ORIGINS"] = ""
+        result = subprocess.run(
+            [sys.executable, "-c", "import django; django.setup(); from django.conf import settings; print(settings.CORS_ALLOWED_ORIGINS)"],
+            cwd=str(BASE_DIR),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("localhost:5173", result.stdout)
+        self.assertNotEqual(result.stdout.strip(), "[]")

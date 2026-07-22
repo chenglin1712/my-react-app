@@ -1,0 +1,59 @@
+# .dockerignore
+#
+# backend/Dockerfile 只會 COPY 根目錄的 requirements.txt 與 backend/ 兩樣東西
+# 進 image，但 .dockerignore 影響的是「送去給 Docker daemon 的整個 build
+# context」，跟這裡列出來的東西是否真的被 COPY 無關——排除用不到的東西
+# （尤其 node_modules/、.git/）可以大幅縮短 build context 的傳輸與雜湊時間。
+# 內容盡量對齊根目錄 .gitignore，理由同上：本來就不該進版控的東西，
+# 也沒理由送進 build context。
+
+# Git
+.git
+.gitignore
+
+# 前端（frontend/ 這個 task 明確不動；build context 仍會掃到，排除掉
+# node_modules／建置產物即可，backend/Dockerfile 本來就不會 COPY frontend/）
+node_modules
+frontend/node_modules
+dist
+dist-ssr
+*.local
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+
+# Django：db.sqlite3、collectstatic 輸出，都是可重新產生／不該進版控的東西，
+# 且 docker-compose.yml 會把本機的 backend/db.sqlite3 用 bind mount 掛進容器，
+# 不需要（也不應該）先打進 image 裡。
+backend/db.sqlite3
+backend/staticfiles/
+
+# FastAPI 的 dictionary.db（~71MB，gitignored，見根目錄 .gitignore 說明）刻意
+# 不放進 image：本地是否存在因人而異，打進 image 會讓建置結果不可重現；改由
+# docker-compose.yml bind mount 從本機掛進容器（見該檔案 fastapi service 的
+# volumes 說明）。-shm/-wal 是 SQLite WAL 模式的暫時性執行期檔案。
+*.db
+*.db-shm
+*.db-wal
+
+# 環境變數與密鑰——不該出現在 image 裡的任何一層
+.env
+*.env
+*.env_cloudrun.yaml
+serviceAccountKey.json
+imported_credentials_*.txt
+
+# Logs
+logs/
+*.log
+
+# 編輯器／系統雜項
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.bat

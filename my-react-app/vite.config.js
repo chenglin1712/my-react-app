@@ -42,6 +42,10 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.js'],
     globals: true,
     css: true,
+    // 限定在 frontend/ 底下：firestore.rules.test.js 放在專案根目錄，需要真的連線
+    // Firestore emulator（見 @vitest-environment node 註解），不屬於這裡（jsdom）
+    // 的一般前端單元測試，要透過 npm run test:rules 另外對著模擬器單獨執行。
+    include: ['frontend/**/*.{test,spec}.?(c|m)[jt]s?(x)'],
   },
   server: {
     watch: {

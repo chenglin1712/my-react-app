@@ -22,6 +22,30 @@ jobs:
       - run: npm run build
       - run: npm test
 
+  firestore-rules:
+    name: Firestore rules (emulator behavior tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Firestore emulator 需要 Java 執行環境。
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - run: npm ci
+
+      # 原本 CI 完全沒有涵蓋 firestore.rules，規則被不小心改壞（例如 sharedNotes
+      # 的作者身份檢查被拿掉）語法上仍然合法，只有實際跑一次讀寫才抓得到。
+      # emulators:exec 會自動啟動模擬器、跑完測試後關掉，不需要額外手動起停。
+      - run: npx firebase emulators:exec --only firestore "npm run test:rules"
+
   backend:
     name: Backend (Django + FastAPI tests)
     runs-on: ubuntu-latest

@@ -63,7 +63,22 @@ service cloud.firestore {
       // 原本只檢查有沒有登入，任何登入使用者都能建立一筆冒充別人 uid 的筆記——
       // 而 update／delete 規則（見下方）又是直接信任這個可被偽造的 uid 欄位。
       // 比照同檔案 situations／pronunciations 的作法，要求寫入的 uid 就是本人。
-      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      // 同一批修復替 quizs 加了必填欄位檢查與內容長度上限，這裡原本沒有套用，
+      // 補上型別、長度、初始狀態（讚數／讚清單／deleted 都必須是剛建立時的值，
+      // 不能一開始就偽造已經有讚或已經被標成刪除）與 createdAt 防偽造。
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasAll(['pages', 'preview', 'uid', 'username', 'createdAt', 'likes', 'likedBy', 'deleted'])
+        && request.resource.data.pages is list
+        && request.resource.data.pages.size() > 0 && request.resource.data.pages.size() <= 50
+        && request.resource.data.preview is string
+        && request.resource.data.preview.size() <= 5000
+        && request.resource.data.username is string
+        && request.resource.data.username.size() > 0 && request.resource.data.username.size() <= 100
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.likes == 0
+        && request.resource.data.likedBy is list && request.resource.data.likedBy.size() == 0
+        && request.resource.data.deleted == false;
       allow update: if request.auth != null && (
         resource.data.uid == request.auth.uid ||
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy'])

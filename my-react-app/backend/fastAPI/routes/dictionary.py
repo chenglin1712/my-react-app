@@ -1,11 +1,11 @@
 import asyncio, json, re, logging, httpx, threading
-from typing import List, Dict, Tuple, Optional
+from typing import Annotated, Any, List, Dict, Tuple, Optional
 
 from fastapi import APIRouter, Request, Depends, Response, Body
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text, select, bindparam
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 import os
 
@@ -18,6 +18,7 @@ from fastAPI.routes.word_data import (
 )
 from config.tribes import TRIBE_MAP
 from fastAPI.rate_limit import limiter
+from fastAPI.url_safety import is_safe_redirect_target
 
 router = APIRouter()
 
@@ -82,8 +83,8 @@ class WordResult(BaseModel):
 
 
 class KeywordRequest(BaseModel):
-    keyword: Optional[str] = ''
-    tribe: Optional[str] = '泰雅'
+    keyword: Optional[str] = Field(default='', max_length=100)
+    tribe: Optional[str] = Field(default='泰雅', max_length=50)
 
 
 # ------------------------- Utilities -------------------------
@@ -199,20 +200,40 @@ def parse_audios(value) -> List[AudioItem]:
 
 
 
+class _KeyedLock:
+    """依 key 各自一把鎖，取代「所有 key 共用同一把鎖」。下面幾個快取原本都是
+    一個 dict 配一把 threading.Lock()，同一把鎖保護所有族語／章節 key——冷啟動時
+    若同時有兩個不同族語（或不同章節）的請求進來，即使彼此完全獨立，後面那個
+    也得先排隊等前一個查完、放鎖才能開始查自己的，白白拖長冷啟動時間。改成
+    依 key 各自一把鎖，不同 key 可以並行各自查各自的，只有同一個 key 的重複
+    請求才需要互相等待（純效能調整，不影響正確性——原本的雙重檢查鎖定寫法
+    不變）。"""
+    def __init__(self):
+        self._locks: Dict[Any, threading.Lock] = {}
+        self._meta_lock = threading.Lock()
+
+    def get(self, key) -> threading.Lock:
+        if key not in self._locks:
+            with self._meta_lock:
+                if key not in self._locks:
+                    self._locks[key] = threading.Lock()
+        return self._locks[key]
+
+
 # ------------------------- 搜尋邏輯 -------------------------
 # search_by_chinese/fuzzy_search_by_chinese/search/fuzzy_search 這四個函式
 # 原本每次呼叫都對 Word table 做一次 tribe 全表掃描＋JSON parse。
 # 沿用 listening.py 的做法：每個 tribe 的詞條只在第一次用到時真正查詢＋解析一次，
 # 之後直接從記憶體快取的 WordResult 清單做過濾，不用每個 request 都重新打 DB。
 _tribe_words_cache: Dict[str, List[WordResult]] = {}
-_tribe_words_cache_lock = threading.Lock()
+_tribe_words_locks = _KeyedLock()
 
 
 def _load_tribe_words(db: Session, tribe: str) -> List[WordResult]:
     if tribe in _tribe_words_cache:
         return _tribe_words_cache[tribe]
 
-    with _tribe_words_cache_lock:
+    with _tribe_words_locks.get(tribe):
         if tribe in _tribe_words_cache:
             return _tribe_words_cache[tribe]
 
@@ -433,14 +454,21 @@ def _search_multi_words(db: Session, words: List[str], tribe_name: str) -> Tuple
     return exact_match_results, fuzzy_match_results
 
 
+class MultiWordSearchRequest(BaseModel):
+    # 原本直接吃 request.json() 後用 dict.get() 存取，沒有 Pydantic 驗證，words
+    # 陣列長度、單一詞長度都沒有上限——請求成本只靠呼叫次數被限流，不靠內容大小；
+    # 一次塞幾千個超長字串一樣只算「一次請求」。改用 Pydantic model 加上限。
+    words: List[Annotated[str, Field(max_length=100)]] = Field(default_factory=list, max_length=50)
+    tribe: str = Field(default="泰雅", max_length=50)
+
+
 @router.post("/keys/")
 @limiter.limit("60/minute")  # 全表掃描（走快取），每用戶每分鐘最多 60 次避免大量請求造成壓力
-async def search_tayal_dictionary(request: Request, db: Session = Depends(get_db)):
+async def search_tayal_dictionary(request: Request, body: MultiWordSearchRequest, db: Session = Depends(get_db)):
     """多關鍵字搜尋"""
     try:
-        data = await request.json()
-        words = data.get("words", [])
-        tribe_name = TRIBE_MAP.get(data.get("tribe", "泰雅"), '泰雅語')
+        words = body.words
+        tribe_name = TRIBE_MAP.get(body.tribe, '泰雅語')
         if not words:
             return JSONResponse({"detail": "查詢字詞不可為空"}, status_code=400)
 
@@ -457,47 +485,43 @@ async def search_tayal_dictionary(request: Request, db: Session = Depends(get_db
         )
 
     except Exception as e:
+        # 原始例外訊息只記 log，不回給 client——可能包含內部路徑、SQL、其他
+        # 實作細節，Django 端「不外洩內部錯誤」的修正原本沒有搬過來這邊。
         logger.exception(e)
-        return JSONResponse({"detail": str(e)}, status_code=500)
+        return JSONResponse({"detail": "伺服器發生錯誤，請稍後再試"}, status_code=500)
+
+
+class AllWordsRequest(BaseModel):
+    # 原本直接吃 request.json() 後用 dict.get() 存取，格式不對時整個 try/except
+    # 靜默退回預設值（連 client 打錯欄位名稱都看不出來），也沒有任何長度／範圍
+    # 上限。改用 Pydantic model：型別或範圍不對時 FastAPI 會直接回 422，
+    # favorite_names 的筆數／長度也加上限。
+    tribe: str = Field(default="泰雅", max_length=50)
+    limit: Optional[int] = Field(default=None, ge=1, le=500)
+    offset: int = Field(default=0, ge=0)
+    letter: Optional[str] = Field(default=None, max_length=5)
+    frequency: Optional[int] = Field(default=None, ge=1, le=5)
+    category: Optional[str] = Field(default=None, max_length=50)
+    favorites_only: bool = False
+    favorite_names: List[Annotated[str, Field(max_length=100)]] = Field(default_factory=list, max_length=500)
+    sort_order: str = Field(default="asc", pattern="^(asc|desc)$")
 
 
 @router.post("/all/")
 @limiter.limit("60/minute")  # 全表掃描（走快取），每用戶每分鐘最多 60 次避免 fetchAllWords 大量請求造成壓力
-async def all_tayal_dictionary(request: Request, db: Session = Depends(get_db)):
+async def all_tayal_dictionary(request: Request, body: AllWordsRequest, db: Session = Depends(get_db)):
     """查詢所有詞條。可選傳入 letter/frequency/category/favorites_only(+favorite_names)/
     sort_order 做篩選與排序，並用 limit/offset 做分頁；都不傳則維持原本回傳全部
     （未篩選、未分頁）的行為，供 frontend/src/_favorite/index.jsx 沿用舊行為。"""
     try:
-        try:
-            body = await request.json()
-            tribe = body.get('tribe', '泰雅') or '泰雅'
-            limit = body.get('limit')
-            offset = body.get('offset') or 0
-            letter = body.get('letter') or None
-            frequency = body.get('frequency')
-            frequency = int(frequency) if frequency not in (None, '') else None
-            category = body.get('category') or None
-            favorites_only = bool(body.get('favorites_only'))
-            favorite_names = body.get('favorite_names') or []
-            sort_order = body.get('sort_order') or 'asc'
-        except Exception:
-            tribe = '泰雅'
-            limit = None
-            offset = 0
-            letter = None
-            frequency = None
-            category = None
-            favorites_only = False
-            favorite_names = []
-            sort_order = 'asc'
-        tribe_name = TRIBE_MAP.get(tribe, '泰雅語')
+        tribe_name = TRIBE_MAP.get(body.tribe, '泰雅語')
         # 冷快取時 search_all -> _load_tribe_words 是同步的全表掃描＋JSON parse，
         # 丟到執行緒池執行，避免卡住 event loop（見 /keys/ 同樣的說明）。
         results, total = await asyncio.to_thread(
-            search_all, db, tribe=tribe_name, limit=limit, offset=offset,
-            letter=letter, frequency=frequency, category=category,
-            favorites_only=favorites_only, favorite_names=favorite_names,
-            sort_order=sort_order,
+            search_all, db, tribe=tribe_name, limit=body.limit, offset=body.offset,
+            letter=body.letter, frequency=body.frequency, category=body.category,
+            favorites_only=body.favorites_only, favorite_names=body.favorite_names,
+            sort_order=body.sort_order,
         )
         return JSONResponse(
             {
@@ -507,8 +531,10 @@ async def all_tayal_dictionary(request: Request, db: Session = Depends(get_db)):
             status_code=200
         )
     except Exception as e:
+        # 原始例外訊息只記 log，不回給 client——可能包含內部路徑、SQL、其他
+        # 實作細節，Django 端「不外洩內部錯誤」的修正原本沒有搬過來這邊。
         logger.exception(e)
-        return JSONResponse({"detail": str(e)}, status_code=500)
+        return JSONResponse({"detail": "伺服器發生錯誤，請稍後再試"}, status_code=500)
 
 
 def _search_single_keyword(db: Session, keyword: str, tribe_name: str):
@@ -522,13 +548,14 @@ def _search_single_keyword(db: Session, keyword: str, tribe_name: str):
 
 
 @router.post("/key/")
-async def allsearch_tayal_dictionary(request: KeywordRequest, db: Session = Depends(get_db)):
+@limiter.limit("60/minute")  # 原本沒有限流，見同檔案其他端點的說明
+async def allsearch_tayal_dictionary(request: Request, body: KeywordRequest, db: Session = Depends(get_db)):
     """單一字搜尋"""
     try:
-        keyword = request.keyword.strip().replace("　", "")
+        keyword = body.keyword.strip().replace("　", "")
         if not keyword:
             return JSONResponse({"detail": "查詢字詞不可為空"}, status_code=400)
-        tribe_name = TRIBE_MAP.get(request.tribe or '泰雅', '泰雅語')
+        tribe_name = TRIBE_MAP.get(body.tribe or '泰雅', '泰雅語')
 
         # 冷快取時是同步的全表掃描＋JSON parse，丟到執行緒池執行，
         # 避免卡住 event loop（見 /keys/ 同樣的說明）。
@@ -543,8 +570,10 @@ async def allsearch_tayal_dictionary(request: KeywordRequest, db: Session = Depe
         )
 
     except Exception as e:
+        # 原始例外訊息只記 log，不回給 client——可能包含內部路徑、SQL、其他
+        # 實作細節，Django 端「不外洩內部錯誤」的修正原本沒有搬過來這邊。
         logger.exception(e)
-        return JSONResponse({"detail": str(e)}, status_code=500)
+        return JSONResponse({"detail": "伺服器發生錯誤，請稍後再試"}, status_code=500)
 
 
 # ------------------------- 文法資料 -------------------------
@@ -553,18 +582,18 @@ async def allsearch_tayal_dictionary(request: KeywordRequest, db: Session = Depe
 # 沿用 listening.py / sentence.py 的做法：每個 tribe 只在第一次請求時
 # 真正查詢一次，之後直接吃記憶體快取，避免重複的多輪 SQL 往返。
 _grammar_cache: Dict[str, Optional[dict]] = {}
-_grammar_cache_lock = threading.Lock()
+_grammar_locks = _KeyedLock()
 _grammar_affixes_cache: Dict[Tuple[str, str], dict] = {}
-_grammar_affixes_cache_lock = threading.Lock()
+_grammar_affixes_locks = _KeyedLock()
 _grammar_quiz_cache: Dict[Tuple[str, str], dict] = {}
-_grammar_quiz_cache_lock = threading.Lock()
+_grammar_quiz_locks = _KeyedLock()
 
 
 def _load_grammar(db: Session, tribe_name: str) -> Optional[dict]:
     if tribe_name in _grammar_cache:
         return _grammar_cache[tribe_name]
 
-    with _grammar_cache_lock:
+    with _grammar_locks.get(tribe_name):
         if tribe_name in _grammar_cache:
             return _grammar_cache[tribe_name]
 
@@ -654,8 +683,10 @@ def get_grammar(tribe: str, limit: Optional[int] = None, offset: int = 0, db: Se
         sliced = sections[offset:offset + limit] if limit is not None else sections[offset:]
         return JSONResponse({**payload, "sections": sliced, "total": len(sections)}, status_code=200)
     except Exception as e:
+        # 原始例外訊息只記 log，不回給 client——可能包含內部路徑、SQL、其他
+        # 實作細節，Django 端「不外洩內部錯誤」的修正原本沒有搬過來這邊。
         logger.exception(e)
-        return JSONResponse({"detail": str(e)}, status_code=500)
+        return JSONResponse({"detail": "伺服器發生錯誤，請稍後再試"}, status_code=500)
 
 
 @router.get("/grammar/{tribe}/search")
@@ -729,8 +760,10 @@ def search_grammar(tribe: str, q: str, db: Session = Depends(get_db)):
             ],
         }, status_code=200)
     except Exception as e:
+        # 原始例外訊息只記 log，不回給 client——可能包含內部路徑、SQL、其他
+        # 實作細節，Django 端「不外洩內部錯誤」的修正原本沒有搬過來這邊。
         logger.exception(e)
-        return JSONResponse({"detail": str(e)}, status_code=500)
+        return JSONResponse({"detail": "伺服器發生錯誤，請稍後再試"}, status_code=500)
 
 
 def _load_grammar_affixes(db: Session, tribe_name: str, affix_type: Optional[str]) -> dict:
@@ -738,7 +771,7 @@ def _load_grammar_affixes(db: Session, tribe_name: str, affix_type: Optional[str
     if key in _grammar_affixes_cache:
         return _grammar_affixes_cache[key]
 
-    with _grammar_affixes_cache_lock:
+    with _grammar_affixes_locks.get(key):
         if key in _grammar_affixes_cache:
             return _grammar_affixes_cache[key]
 
@@ -801,8 +834,10 @@ def get_grammar_affixes(
         sliced = affixes[offset:offset + limit] if limit is not None else affixes[offset:]
         return JSONResponse({**payload, "affixes": sliced, "total": len(affixes)}, status_code=200)
     except Exception as e:
+        # 原始例外訊息只記 log，不回給 client——可能包含內部路徑、SQL、其他
+        # 實作細節，Django 端「不外洩內部錯誤」的修正原本沒有搬過來這邊。
         logger.exception(e)
-        return JSONResponse({"detail": str(e)}, status_code=500)
+        return JSONResponse({"detail": "伺服器發生錯誤，請稍後再試"}, status_code=500)
 
 
 def _load_grammar_quiz_material(db: Session, tribe_name: str, section_key: Optional[str]) -> dict:
@@ -810,7 +845,7 @@ def _load_grammar_quiz_material(db: Session, tribe_name: str, section_key: Optio
     if key in _grammar_quiz_cache:
         return _grammar_quiz_cache[key]
 
-    with _grammar_quiz_cache_lock:
+    with _grammar_quiz_locks.get(key):
         if key in _grammar_quiz_cache:
             return _grammar_quiz_cache[key]
 
@@ -903,14 +938,17 @@ def get_grammar_quiz_material(
         sliced = rules[offset:offset + limit] if limit is not None else rules[offset:]
         return JSONResponse({**payload, "rules": sliced, "total": len(rules)}, status_code=200)
     except Exception as e:
+        # 原始例外訊息只記 log，不回給 client——可能包含內部路徑、SQL、其他
+        # 實作細節，Django 端「不外洩內部錯誤」的修正原本沒有搬過來這邊。
         logger.exception(e)
-        return JSONResponse({"detail": str(e)}, status_code=500)
+        return JSONResponse({"detail": "伺服器發生錯誤，請稍後再試"}, status_code=500)
 
 
 ILRDF_AUDIO_API = "https://e-dictionary.ilrdf.org.tw/api/app/file/download-file/"
 
 @router.get("/audio/{file_id:path}")
-async def proxy_audio(file_id: str):
+@limiter.limit("60/minute")  # 原本沒有限流，見同檔案其他端點的說明
+async def proxy_audio(request: Request, file_id: str):
     try:
         first_url = ILRDF_AUDIO_API + file_id
 
@@ -925,6 +963,12 @@ async def proxy_audio(file_id: str):
             if not final_url or "http" not in final_url:
                 return Response(content="Unable to resolve audio URL", media_type="text/plain", status_code=404)
 
+            # 第二次請求的目標網址完全由第一次請求的回應內容決定，發出前先擋掉
+            # 明顯指向內網／loopback／link-local（含雲端 metadata endpoint）的
+            # 位址，避免被當成 SSRF 跳板（見 url_safety.py 說明）。
+            if not is_safe_redirect_target(final_url):
+                return Response(content="Audio URL not allowed", media_type="text/plain", status_code=502)
+
             async with httpx.AsyncClient(timeout=15) as c2:
                 audio_res = await c2.get(final_url)
                 if audio_res.status_code != 200:
@@ -935,7 +979,8 @@ async def proxy_audio(file_id: str):
     except httpx.ConnectError:
         return Response(content="Audio API unreachable", media_type="text/plain", status_code=503)
     except Exception as e:
-        return Response(content=str(e), media_type="text/plain", status_code=500)
+        logger.exception(e)
+        return Response(content="伺服器發生錯誤，請稍後再試", media_type="text/plain", status_code=500)
     
 
 # /debug_audio 只回傳內部除錯資訊（音檔真實 URL、狀態碼、bytes 內容），只在本機開發時註冊，
@@ -966,6 +1011,15 @@ if os.getenv("DJANGO_DEBUG", "False") == "True":
                         "raw_text": res.text
                     }
 
+                # 第二次請求的目標網址完全由第一次請求的回應內容決定，發出前先
+                # 擋掉明顯指向內網／loopback／link-local 的位址（見 url_safety.py）。
+                if not is_safe_redirect_target(final_url):
+                    return {
+                        "success": False,
+                        "step": "unsafe_redirect_target",
+                        "final_url": final_url,
+                    }
+
             # 第二次請求真正的音檔
             async with httpx.AsyncClient() as c2:
                 audio_res = await c2.get(final_url)
@@ -989,51 +1043,64 @@ if os.getenv("DJANGO_DEBUG", "False") == "True":
             }
 
 
+class SentenceAudioRequest(BaseModel):
+    sentence: str = Field(default="", max_length=2000)
+    tribe: str = Field(default="布農", max_length=50)
+
+
 @router.post("/sentence-audio/")
-async def get_sentence_audio(request: Request, db: Session = Depends(get_db)):
+@limiter.limit("60/minute")  # 原本沒有限流，見同檔案其他端點的說明
+async def get_sentence_audio(request: Request, body: SentenceAudioRequest, db: Session = Depends(get_db)):
     """
     將句子拆成詞，依序查詢各詞在字典中的音檔 fileId，
     回傳有音檔的詞清單（依句子順序），供前端逐詞串接播放。
+
+    原本直接吃 request.json() 後用 dict.get() 存取，沒有 Pydantic 驗證，整支函式
+    也完全沒有 try/except：格式不對的輸入（例如 tribe 傳陣列）會讓
+    TRIBE_MAP.get(tribe, tribe) 對不可雜湊的 key 丟 TypeError，變成未處理的 500。
+    改用 Pydantic model 驗證（型別、長度上限），格式不對會在這裡就被 FastAPI
+    擋成 422，不會走到後面的邏輯；其餘非預期例外也補上 try/except，統一回應格式。
     """
-    from sqlalchemy import func as sa_func
-    body = await request.json()
-    sentence: str = body.get("sentence", "")
-    tribe: str = body.get("tribe", "布農")
-    tribe_name = TRIBE_MAP.get(tribe, tribe)
+    try:
+        from sqlalchemy import func as sa_func
+        tribe_name = TRIBE_MAP.get(body.tribe, body.tribe)
 
-    # 以空白與標點切詞，保留字母、撇號、連字號
-    tokens = re.findall(r"[a-zA-ZʼʻΩ'\-]+", sentence)
+        # 以空白與標點切詞，保留字母、撇號、連字號
+        tokens = re.findall(r"[a-zA-ZʼʻΩ'\-]+", body.sentence)
 
-    def _lookup_audio_tokens():
-        audio_tokens = []
-        seen_file_ids: set = set()
-        tribe_id_subq = _tribe_id_subquery(tribe_name)
+        def _lookup_audio_tokens():
+            audio_tokens = []
+            seen_file_ids: set = set()
+            tribe_id_subq = _tribe_id_subquery(tribe_name)
 
-        for token in tokens:
-            token_lower = token.lower()
-            word = db.query(Word).filter(
-                Word.tribe_id == tribe_id_subq,
-                sa_func.lower(Word.name) == token_lower
-            ).first()
+            for token in tokens:
+                token_lower = token.lower()
+                word = db.query(Word).filter(
+                    Word.tribe_id == tribe_id_subq,
+                    sa_func.lower(Word.name) == token_lower
+                ).first()
 
-            if not word:
-                continue
+                if not word:
+                    continue
 
-            audios = load_audio_items_for_words(db, word_ids=[word.id]).get(word.id, [])
-            if not audios:
-                continue
+                audios = load_audio_items_for_words(db, word_ids=[word.id]).get(word.id, [])
+                if not audios:
+                    continue
 
-            file_id = audios[0].get("fileId")
-            if not file_id or file_id in seen_file_ids:
-                continue
+                file_id = audios[0].get("fileId")
+                if not file_id or file_id in seen_file_ids:
+                    continue
 
-            seen_file_ids.add(file_id)
-            audio_tokens.append({"word": token, "fileId": file_id})
+                seen_file_ids.add(file_id)
+                audio_tokens.append({"word": token, "fileId": file_id})
 
-        return audio_tokens
+            return audio_tokens
 
-    # 逐詞同步查詢，句子長時一樣會累積成有感的阻塞時間，丟到執行緒池執行
-    # 避免卡住 event loop（見 /keys/ 同樣的說明）。
-    audio_tokens = await asyncio.to_thread(_lookup_audio_tokens)
+        # 逐詞同步查詢，句子長時一樣會累積成有感的阻塞時間，丟到執行緒池執行
+        # 避免卡住 event loop（見 /keys/ 同樣的說明）。
+        audio_tokens = await asyncio.to_thread(_lookup_audio_tokens)
 
-    return JSONResponse({"audioTokens": audio_tokens})
+        return JSONResponse({"audioTokens": audio_tokens})
+    except Exception as e:
+        logger.exception(e)
+        return JSONResponse({"detail": "伺服器發生錯誤，請稍後再試"}, status_code=500)

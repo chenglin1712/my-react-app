@@ -3,6 +3,7 @@ import math
 import random
 import threading
 import shutil
+from dataclasses import dataclass
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Body, HTTPException, Depends, File, UploadFile, Form, Query, Request
 from pydantic import BaseModel
@@ -13,6 +14,21 @@ from fastAPI.routes.model import Word
 from fastAPI.routes.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS
 from fastAPI.rate_limit import limiter
+from fastAPI.url_safety import is_safe_redirect_target
+
+
+@dataclass(frozen=True)
+class WordDTO:
+    """出題快取用的最小快照，只帶這支檔案實際會用到的欄位。原本快取直接存
+    SQLAlchemy ORM 物件（db.query(Word).all()），這些物件跟建立當下的 db
+    session 綁在一起；session 關閉後物件雖然還留在記憶體快取裡，若之後有程式碼
+    去讀取沒有預先載入的欄位或關聯（例如 Word.tribe_ref，lazy-loaded 關聯），
+    會觸發 SQLAlchemy 嘗試用已關閉的 session 重新查詢，丟 DetachedInstanceError。
+    快照成獨立的 DTO 後，快取內容完全跟 session 生命週期脫鉤，也不可能不小心
+    誤用到 ORM 物件上其他沒被快取到的欄位／關聯。"""
+    id: str
+    name: str
+    frequency: Optional[int]
 
 import io
 import re
@@ -148,7 +164,7 @@ class SubmitAnswerResp(BaseModel):
 # ----------------------------
 # 工具函數（IRT、score 計算）
 # ----------------------------
-def compute_normalized_freq_map(words: List[Word]) -> Dict[str, float]:
+def compute_normalized_freq_map(words: List[WordDTO]) -> Dict[str, float]:
     log_vals = [math.log(1 + (w.frequency or 0)) for w in words]
     max_log = max(log_vals) if log_vals else 1.0
     if max_log == 0: max_log = 1.0
@@ -190,12 +206,12 @@ def compute_score(Ptheta: float, Bq: float) -> float:
 # ----------------------------
 # DB helper: load all words (module-level cache)
 # ----------------------------
-_words_cache: Dict[str, List[Word]] = {}
+_words_cache: Dict[str, List[WordDTO]] = {}
 _word_explanations_cache: Dict[str, List[dict]] = {}
 _word_audios_cache: Dict[str, List[dict]] = {}
 _words_cache_lock = threading.Lock()
 
-def load_all_words(db: Optional[Session] = None, tribe_id: Optional[str] = None) -> List[Word]:
+def load_all_words(db: Optional[Session] = None, tribe_id: Optional[str] = None) -> List[WordDTO]:
     """依 tribe_id 載入該族語的詞彙清單（模組級快取，每個族語第一次請求時查詢一次）。
     word id 在 words 表裡全域唯一，不同族語不會撞號，所以 explanation/audio 快取
     繼續當成單一全域字典累加即可，只有 _words_cache（出題用的候選單字清單）需要
@@ -210,7 +226,9 @@ def load_all_words(db: Optional[Session] = None, tribe_id: Optional[str] = None)
             query = db.query(Word)
             if tribe_id:
                 query = query.filter(Word.tribe_id == tribe_id)
-            _words_cache[tribe_id] = query.all()
+            _words_cache[tribe_id] = [
+                WordDTO(id=w.id, name=w.name, frequency=w.frequency) for w in query.all()
+            ]
             _word_explanations_cache.update(load_explanation_items_for_words(db, tribe_id=tribe_id))
             _word_audios_cache.update(load_audio_items_for_words(db, tribe_id=tribe_id))
     return _words_cache[tribe_id]
@@ -340,7 +358,7 @@ def _compute_avg_time(user_model: dict) -> float:
                      for ue in user_model.get("user_errors", {}).values() if ue.get("recent_times")]
     return sum(all_avg_times)/len(all_avg_times) if all_avg_times else 1.0
 
-def _score_candidates(all_words: List[Word], user_model: dict, theta: float, t_avg_all: float, fprime_map: Dict[str, float]) -> list:
+def _score_candidates(all_words: List[WordDTO], user_model: dict, theta: float, t_avg_all: float, fprime_map: Dict[str, float]) -> list:
     candidates = []
     for w in all_words:
         name = w.name
@@ -383,7 +401,7 @@ def _compute_type_counts(theta: float) -> Dict[str, int]:
     return type_count
 
 
-def _generate_word_translate_questions(picker: _CandidatePicker, all_words: List[Word], theta: float, count: int) -> list:
+def _generate_word_translate_questions(picker: _CandidatePicker, all_words: List[WordDTO], theta: float, count: int) -> list:
     generated = []
     for i in range(count):
         c = picker.next()
@@ -421,7 +439,7 @@ def _generate_word_match_questions(picker: _CandidatePicker, count: int) -> list
         })
     return generated
 
-def _generate_sentence_fill_questions(picker: _CandidatePicker, all_words: List[Word], count: int) -> list:
+def _generate_sentence_fill_questions(picker: _CandidatePicker, all_words: List[WordDTO], count: int) -> list:
     generated = []
     fill_done = 0
     fallback = []
@@ -447,7 +465,7 @@ def _generate_sentence_fill_questions(picker: _CandidatePicker, all_words: List[
         generated.append(_build_word_translate_question(w, all_words, f"sf-fb-{w.id}"))
     return generated
 
-def _generate_sentence_order_questions(picker: _CandidatePicker, all_words: List[Word], count: int) -> list:
+def _generate_sentence_order_questions(picker: _CandidatePicker, all_words: List[WordDTO], count: int) -> list:
     generated = []
     order_done = 0
     fallback = []
@@ -602,8 +620,15 @@ def fetch_audio_from_id(audio_id: str):
     if not final_url or not final_url.startswith("http"):
         raise Exception(f"無法取得真正音檔 URL: {resp.text}")
 
+    # 第二次請求的目標網址完全由第一次請求的回應內容決定，發出前先擋掉明顯
+    # 指向內網／loopback／link-local（含雲端 metadata endpoint）的位址，
+    # 避免被當成 SSRF 跳板（見 url_safety.py 說明，跟 compare_audio.reference_urls
+    # 已經修好的白名單機制互補）。
+    if not is_safe_redirect_target(final_url):
+        raise Exception("音檔 URL 指向不允許的位址")
+
     # 第二次請求下載真正音檔
-    audio_resp = requests.get(final_url, timeout=15)
+    audio_resp = requests.get(final_url, timeout=15, allow_redirects=False)
     if audio_resp.status_code != 200:
         raise Exception(f"下載音檔失敗 (HTTP {audio_resp.status_code})")
 

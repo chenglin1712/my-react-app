@@ -10,6 +10,7 @@ Authorization: Bearer <Firebase ID Token>。故意跟 DJANGO_DEBUG 分開成獨�
 .env 的 AUTH_DEV_BYPASS；本機開發若想讓 FastAPI 走真實驗證、只繞過 Django（或反過來），
 可以額外設定 FASTAPI_AUTH_DEV_BYPASS，設定時優先於共用的 AUTH_DEV_BYPASS 生效。
 """
+import asyncio
 import logging
 import os
 
@@ -68,7 +69,11 @@ async def verify_firebase_token(request: Request, authorization: str = Header(de
     from firebase_admin import auth as firebase_auth
 
     try:
-        user = firebase_auth.verify_id_token(token)
+        # verify_id_token 是同步呼叫，快取的公鑰過期那一刻會發生阻塞式網路請求
+        # （向 Google 重新抓憑證）。這個依賴掛在幾乎所有路由上，跟 dictionary.py
+        # 冷快取那個問題同類但影響範圍更廣、單次影響更小——丟到執行緒池執行，
+        # 避免卡住 event loop。
+        user = await asyncio.to_thread(firebase_auth.verify_id_token, token)
     except firebase_auth.InvalidIdTokenError:
         # 單一使用者 token 過期／被撤銷／格式不對，是每天都會發生的正常流量，
         # 不記錄也不送 Sentry，避免把告警灌爆。

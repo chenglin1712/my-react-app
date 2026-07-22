@@ -1,0 +1,83 @@
+# docker-compose.yml
+#
+# 目的：在本機用容器重現 Django／FastAPI 的部署環境（呼應 README「正式部署」
+# 一節提到的 gunicorn／uvicorn 啟動方式），不是完整的 production
+# orchestration——這個專案用 SQLite 檔案，沒有 nginx/reverse-proxy/postgres
+# 這類額外服務。也不代表已經選定 Render 或 Cloud Run：兩個平台都只是跑一個
+# 監聽 $PORT 的標準容器，這個檔案對兩者皆適用，部署平台本身仍未定案。
+#
+# 用法（需先準備好根目錄 .env，見 README「安裝與設定」）：
+#   docker compose up --build
+#
+# 兩個 service 都從同一份 backend/Dockerfile 建置（同一個 image，只是
+# command 不同），刻意不加 depends_on：Django 與 FastAPI 是互相獨立的
+# process，只共用同一份程式碼與 .env，彼此不會直接呼叫對方。
+
+services:
+  django:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - .env
+    environment:
+      # PORT 是「這個服務監聽哪個 port」，跟平台/密鑰無關，刻意不放進共用的
+      # .env（FastAPI 也讀同一份 .env，兩服務需要的 PORT 不同），對應 README
+      # 文件裡 `gunicorn core.wsgi:application --bind 0.0.0.0:$PORT` 的 8000。
+      - PORT=8000
+    ports:
+      - "8000:8000"
+    # 跟 README「正式部署」一節文件的指令完全一致：gunicorn 啟動前需先跑一次
+    # collectstatic，admin／DRF/Swagger 頁面的 CSS/JS 由 WhiteNoise 從
+    # STATIC_ROOT（backend/staticfiles/）提供，沒跑過這個指令樣式會跑掉。
+    command: python manage.py collectstatic --noinput && gunicorn core.wsgi:application --bind 0.0.0.0:$$PORT
+    volumes:
+      # backend/db.sqlite3（Django 的 SQLite，見 core/settings.py 的
+      # DATABASES）在 .gitignore 裡，新 clone 下來不會有這個檔案。用 bind
+      # mount 掛進容器，讓資料在容器重建/重啟後還在，也能沿用本機既有的開發
+      # 資料庫。注意：如果宿主機上這個檔案還不存在，Docker 會在該路徑建立
+      # 一個「資料夾」而不是掛載檔案，容器內 migrate 會失敗——建置前請先手動
+      # 建立空檔案（Windows：`type nul > backend\db.sqlite3`；macOS/Linux：
+      # `touch backend/db.sqlite3`），或直接複製一份既有的 db.sqlite3 過去。
+      - ./backend/db.sqlite3:/app/backend/db.sqlite3
+    healthcheck:
+      # core/urls.py 設定 APPEND_SLASH=False，路徑務必帶結尾斜線。
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - .env
+    environment:
+      - PORT=8001
+    ports:
+      - "8001:8001"
+    command: uvicorn fastAPI.main:app --host 0.0.0.0 --port $$PORT
+    volumes:
+      # backend/fastAPI/routes/dictionary.db（~71MB，gitignored，schema 由
+      # Alembic migration 管理，見 README「辭典資料庫」一節）新 clone 下來不
+      # 會有這個檔案，build context 也刻意排除了它（見 .dockerignore），不會
+      # 被打進 image。用 bind mount 從本機掛進容器；本機沒有這個檔案時容器
+      # 仍能啟動，但辭典相關端點不會有真實資料可查。同一個「宿主機路徑不存在
+      # 時 Docker 會建立資料夾」的陷阱在這裡一樣適用，見上面 django service
+      # 的說明，此檔案需先跑過 `cd backend/fastAPI && alembic upgrade head`
+      # 建出 schema。實際部署到 Render/Cloud Run 時，改用該平台的持久化儲存
+      # 或客製 image layer 提供這個檔案，而不是靠 bind mount（本機專用）。
+      - ./backend/fastAPI/routes/dictionary.db:/app/backend/fastAPI/routes/dictionary.db
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+# 補充：若 .env 內 AUTH_DEV_BYPASS 不是 True（也就是要真的驗證 Firebase
+# token），FIREBASE_SERVICE_ACCOUNT_PATH 指到的服務帳戶金鑰 JSON 檔案也需要
+# 額外用 volumes 掛進容器（本檔案預設沒加，因為 .env.example 預設
+# AUTH_DEV_BYPASS=True，多數本機開發情境用不到）。

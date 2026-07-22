@@ -106,17 +106,20 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-_raw_cors = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+# os.getenv(key, default) 的 default 只有在 key 完全沒出現在環境變數裡才會生效；
+# .env 裡寫了 KEY=（有這一行、值是空字串）一樣算「有出現」，default 不會生效，
+# 會直接把內建的本機開發預設值蓋掉變成空清單。.env.example 的 CSRF_TRUSTED_ORIGINS
+# 就是留空當範本（要求填正式網域），照抄不改就會踩到這個情況——目前因為 Django
+# admin 未啟用、其餘端點都走 Bearer token 而沒有實際影響，但未來一旦啟用 admin
+# 就會踩到。改用 `os.getenv(key) or default`，空字串跟完全沒設定都會落到預設值。
+_raw_cors = os.getenv("ALLOWED_ORIGINS") or "http://localhost:5173,http://127.0.0.1:5173"
 CORS_ALLOWED_ORIGINS = [o.strip() for o in _raw_cors.split(",") if o.strip()]
 # CSRF
 # 正式部署的網域跟 ALLOWED_HOSTS 一樣改讀環境變數（逗號分隔），不再寫死單一
 # 平台的網址——先前寫死一個 Cloud Run URL，但 ALLOWED_HOSTS 只認 Render 的
 # 環境變數，兩者對不上，換一個部署環境（甚至只是換 Cloud Run 專案/區域）就要
 # 改程式碼才能生效。本機開發預設值維持不變。
-_raw_csrf_origins = os.getenv(
-    "CSRF_TRUSTED_ORIGINS",
-    "http://127.0.0.1:8000,http://127.0.0.1:8001,http://localhost:5173",
-)
+_raw_csrf_origins = os.getenv("CSRF_TRUSTED_ORIGINS") or "http://127.0.0.1:8000,http://127.0.0.1:8001,http://localhost:5173"
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in _raw_csrf_origins.split(",") if o.strip()]
 #字元
 DEFAULT_CHARSET = 'utf-8'
