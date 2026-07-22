@@ -35,6 +35,145 @@
     animation-direction: reverse;
 }
 
+.home-blob--blue {
+    left: 10%;
+    bottom: 4%;
+    width: 220px;
+    height: 200px;
+    background: radial-gradient(circle, var(--yy-blue), transparent 68%);
+    opacity: .35;
+    animation-duration: 13s;
+}
+
+/* 設計稿裡原本就有、實作時漏掉的一批純裝飾小動畫元素：兩道холо色光斑條、
+   三顆浮動小菱形、左下角 YUAN・YU 貼紙徽章、右側大菱形 ◆ 字符。都是
+   aria-hidden，不影響可存取樹或鍵盤操作。 */
+.home-streak {
+    position: absolute;
+    height: 9px;
+    background-size: 300% 100%;
+    filter: blur(3px);
+    opacity: .55;
+    border-radius: 6px;
+    animation: yy-holo 6s linear infinite;
+    pointer-events: none;
+}
+
+.home-streak--1 {
+    left: 4%;
+    top: 34%;
+    width: 180px;
+    background: linear-gradient(90deg, var(--yy-red), var(--yy-gold), var(--yy-blue), var(--yy-red));
+    transform: rotate(-16deg);
+}
+
+.home-streak--2 {
+    right: 3%;
+    top: 52%;
+    width: 160px;
+    height: 8px;
+    opacity: .5;
+    background: linear-gradient(90deg, var(--yy-blue), var(--yy-gold), var(--yy-red), var(--yy-blue));
+    transform: rotate(14deg);
+    animation-duration: 7.5s;
+    animation-direction: reverse;
+}
+
+.home-sprite {
+    position: absolute;
+    display: inline-block;
+    transform: rotate(45deg);
+    animation: yy-floaty 6s ease-in-out infinite;
+    pointer-events: none;
+}
+
+.home-sprite--gold {
+    left: 9%;
+    top: 20%;
+    width: 22px;
+    height: 22px;
+    background: linear-gradient(135deg, #fff, var(--yy-gold));
+    box-shadow: 3px 3px 0 var(--yy-ink);
+}
+
+.home-sprite--red {
+    right: 10%;
+    top: 16%;
+    width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, #fff, var(--yy-red));
+    box-shadow: 2px 2px 0 var(--yy-ink);
+    animation-duration: 7s;
+    animation-direction: reverse;
+}
+
+.home-sprite--blue {
+    right: 7%;
+    bottom: 14%;
+    width: 26px;
+    height: 26px;
+    background: linear-gradient(135deg, #fff, var(--yy-blue));
+    box-shadow: 3px 3px 0 var(--yy-ink);
+    animation-duration: 8s;
+}
+
+.home-sticker {
+    position: absolute;
+    left: 16%;
+    bottom: 8%;
+    transform: rotate(-8deg);
+    animation: yy-floaty 8.5s ease-in-out infinite;
+    pointer-events: none;
+}
+
+.home-sticker-eyelet {
+    display: block;
+    width: 10px;
+    height: 10px;
+    border: 3px solid var(--yy-ink);
+    border-radius: 50%;
+    margin: 0 auto 2px;
+}
+
+.home-sticker-badge {
+    display: block;
+    padding: 7px 16px;
+    border-radius: 8px;
+    background: linear-gradient(100deg, var(--yy-gold), var(--yy-red), var(--yy-blue), var(--yy-gold));
+    background-size: 300% 100%;
+    border: 2.5px solid var(--yy-ink);
+    color: #fff;
+    font-family: var(--yy-font-pixel);
+    font-weight: 700;
+    font-size: 12px;
+    box-shadow: 3px 3px 0 var(--yy-ink);
+    animation: yy-holo 5.5s linear infinite;
+}
+
+.home-diamond-glyph {
+    position: absolute;
+    right: 14%;
+    top: 44%;
+    font-size: 40px;
+    line-height: 1;
+    background: linear-gradient(135deg, #fff, var(--yy-gold) 40%, var(--yy-red) 75%, #fff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(2px 3px 0 rgba(34, 24, 18, 0.35));
+    animation: yy-floaty 7.5s ease-in-out infinite reverse;
+    pointer-events: none;
+}
+
+@media (max-width: 720px) {
+    .home-streak,
+    .home-sprite,
+    .home-sticker,
+    .home-diamond-glyph {
+        display: none;
+    }
+}
+
 .home-title {
     position: relative;
     font-size: 46px;

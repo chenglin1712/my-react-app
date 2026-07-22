@@ -42,6 +42,21 @@ const App = () => {
             <section className="yy-hero home-hero">
                 <span className="home-blob home-blob--gold" />
                 <span className="home-blob home-blob--red" />
+                <span className="home-blob home-blob--blue" />
+
+                <span className="home-streak home-streak--1" aria-hidden="true" />
+                <span className="home-streak home-streak--2" aria-hidden="true" />
+
+                <span className="home-sprite home-sprite--gold" aria-hidden="true" />
+                <span className="home-sprite home-sprite--red" aria-hidden="true" />
+                <span className="home-sprite home-sprite--blue" aria-hidden="true" />
+
+                <div className="home-sticker" aria-hidden="true">
+                    <span className="home-sticker-eyelet" />
+                    <span className="home-sticker-badge">YUAN・YU</span>
+                </div>
+
+                <span className="home-diamond-glyph" aria-hidden="true">◆</span>
 
                 <div className="yy-fade-up">
                     <span className="yy-eyebrow">◆ 原住民族語 · 五族共學 ◆</span>
