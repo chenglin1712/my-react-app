@@ -98,7 +98,7 @@ class Crossword(object):
                                 # make sure word doesn't go off of grid
                                 if ((rowc - glc) + word.length) <= self.rows:
                                     coordlist.append([colc, rowc-glc, 1, colc+(rowc-glc),0])
-                        except:
+                        except Exception:
                             pass
 
                         # suggest horizontal placement
@@ -108,7 +108,7 @@ class Crossword(object):
                                 # make sure word doesn't go off of grid
                                 if ((colc - glc) + word.length) <= self.cols:
                                     coordlist.append([colc-glc, rowc, 0, rowc+(colc-glc),0])
-                        except:
+                        except Exception:
                             pass
 
         # example: coordlist[0] = [col, row, vertical, col + row, score]

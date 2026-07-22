@@ -258,7 +258,7 @@ def get_tayal_imformation(request):
         res = requests.get(
             "https://event.tacp.gov.tw/api/frontend/announcements/latest",
             headers=headers,
-            timeout=10
+            timeout=_EXTERNAL_TIMEOUT
         )
         if res.status_code == 200:
             result = res.json()

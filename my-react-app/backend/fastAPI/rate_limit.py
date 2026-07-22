@@ -2,9 +2,14 @@
 （vision.py、dictionary.py）都能匯入同一個 limiter 實例，
 避免 main.py 匯入 routes、routes 又要匯入 main.py 造成 circular import。
 
-目前後端沒有 Redis 等共用儲存，limiter 用預設的記憶體計數：單一 process 內有效；
-多 worker 部署時每個 worker 各自計數，實際上限會是「設定值 × worker 數」。
+限流計數存放位置：沒設定 REDIS_URL 時用 slowapi 預設的記憶體計數，單一 process
+內有效，多 worker 部署時每個 worker 各自計數，實際上限會是「設定值 × worker 數」。
+設定 REDIS_URL 後改用 Redis 存放，所有 worker 共用同一份計數，門檻才會如實生效。
+跟 Django 端（core/settings.py 的 CACHES）讀同一個環境變數，設定一次同時對兩個
+服務生效（先前只有 Django 端接了 REDIS_URL，FastAPI 這邊被漏掉）。
 """
+import os
+
 from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -24,4 +29,8 @@ def rate_limit_key(request: Request) -> str:
 # 這個專案根目錄的 .env 含非 ASCII 內容，會讓 slowapi 在讀檔時直接以
 # UnicodeDecodeError 掛掉。指到不存在的檔名讓它略過讀取（Starlette Config 對不存在
 # 的 env_file 只會 warn，不會噴例外）。
-limiter = Limiter(key_func=rate_limit_key, config_filename="__slowapi_no_dotenv__")
+limiter = Limiter(
+    key_func=rate_limit_key,
+    config_filename="__slowapi_no_dotenv__",
+    storage_uri=os.getenv("REDIS_URL"),  # 未設定時是 None，slowapi 退回預設的記憶體儲存
+)

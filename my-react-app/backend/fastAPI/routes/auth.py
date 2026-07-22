@@ -1,21 +1,29 @@
 """
 FastAPI 版本的 Firebase ID Token 驗證。
 
-邏輯與 backend/AIModel/views.py 的 verify_firebase_token 一致（兩邊共用同一份根目錄
-.env）：AUTH_DEV_BYPASS=True（且 DJANGO_DEBUG=True）時跳過驗證（僅限本機開發），
-否則要求帶有效的 Authorization: Bearer <Firebase ID Token>。故意跟 DJANGO_DEBUG 分開
-成獨立旗標，避免正式環境誤設 DEBUG=True 就連帶讓認證形同虛設。
+邏輯與 backend/AIModel/views.py 的 verify_firebase_token 一致：AUTH_DEV_BYPASS=True
+（且 DJANGO_DEBUG=True）時跳過驗證（僅限本機開發），否則要求帶有效的
+Authorization: Bearer <Firebase ID Token>。故意跟 DJANGO_DEBUG 分開成獨立旗標，
+避免正式環境誤設 DEBUG=True 就連帶讓認證形同虛設。
+
+互鎖判斷邏輯與 Django 端共用（見 config/auth_flags.py）。兩服務預設共用同一份根目錄
+.env 的 AUTH_DEV_BYPASS；本機開發若想讓 FastAPI 走真實驗證、只繞過 Django（或反過來），
+可以額外設定 FASTAPI_AUTH_DEV_BYPASS，設定時優先於共用的 AUTH_DEV_BYPASS 生效。
 """
+import logging
 import os
 
 from fastapi import Header, HTTPException, Request
+
+from config.auth_flags import auth_dev_bypass
+
+logger = logging.getLogger(__name__)
 
 _firebase_initialized = False
 
 
 def _auth_dev_bypass() -> bool:
-    debug = os.getenv("DJANGO_DEBUG", "False") == "True"
-    return debug and os.getenv("AUTH_DEV_BYPASS", "False") == "True"
+    return auth_dev_bypass("FASTAPI_AUTH_DEV_BYPASS")
 
 
 def _ensure_firebase():
@@ -61,7 +69,16 @@ async def verify_firebase_token(request: Request, authorization: str = Header(de
 
     try:
         user = firebase_auth.verify_id_token(token)
+    except firebase_auth.InvalidIdTokenError:
+        # 單一使用者 token 過期／被撤銷／格式不對，是每天都會發生的正常流量，
+        # 不記錄也不送 Sentry，避免把告警灌爆。
+        raise HTTPException(status_code=401, detail="身份驗證失敗，請重新登入")
     except Exception:
+        # 落到這裡的是 InvalidIdTokenError 以外的例外（憑證抓取失敗、SDK 內部
+        # 錯誤等），代表驗證機制本身可能已經整個掛掉，記錄下來讓 Sentry 能告警——
+        # 原本這裡完全沒有 log，Firebase 驗證若整個掛掉，全站需登入端點會靜默
+        # 401，看起來像是使用者沒登入，而不是系統故障。
+        logger.exception("Firebase ID Token 驗證發生非預期例外")
         raise HTTPException(status_code=401, detail="身份驗證失敗，請重新登入")
 
     request.state.user = user

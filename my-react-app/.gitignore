@@ -54,5 +54,8 @@ backend/staticfiles/
 # 避免照腳本指示操作後又剛好下了 git add -A 就整把私鑰提交進 git。
 serviceAccountKey.json
 
+# import_firebase.py 產生的臨時密碼明文檔案，同樣不該進版控。
+imported_credentials_*.txt
+
 # run project
 *.bat

@@ -8,10 +8,13 @@ _ensure_firebase/verify_firebase_token，crawler app 完全沒有這層防護。
 FastAPI 版本邏輯相同但介面不同（Header 依賴注入），維持獨立實作於
 backend/fastAPI/routes/auth.py。
 """
+import logging
 import os
 
 from django.conf import settings as django_settings
 from django.http import JsonResponse
+
+logger = logging.getLogger(__name__)
 
 _firebase_initialized = False
 
@@ -53,6 +56,17 @@ def verify_firebase_token(request):
         decoded = firebase_auth.verify_id_token(token)
         return decoded, None
     except EnvironmentError as e:
+        # 服務帳戶金鑰沒設定，代表這個部署的驗證機制根本沒接上，記下來讓 Sentry
+        # 能告警——原本這裡完全沒有 log，全站需登入端點會靜默回應，看起來像是
+        # 使用者沒登入，而不是系統設定有問題。
+        logger.error("Firebase 服務帳戶未設定，需登入端點將回應 503：%s", e)
         return None, JsonResponse({"detail": str(e)}, status=503)
+    except firebase_auth.InvalidIdTokenError:
+        # 單一使用者 token 過期／被撤銷／格式不對，是每天都會發生的正常流量，
+        # 不記錄也不送 Sentry，避免把告警灌爆。
+        return None, JsonResponse({"detail": "身份驗證失敗，請重新登入"}, status=401)
     except Exception:
+        # 落到這裡的是 InvalidIdTokenError 以外的例外（憑證抓取失敗、SDK 內部
+        # 錯誤等），代表驗證機制本身可能已經整個掛掉，記錄下來讓 Sentry 能告警。
+        logger.exception("Firebase ID Token 驗證發生非預期例外")
         return None, JsonResponse({"detail": "身份驗證失敗，請重新登入"}, status=401)

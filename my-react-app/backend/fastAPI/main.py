@@ -27,9 +27,13 @@ if _sentry_dsn:
     from sentry_sdk.integrations.fastapi import FastApiIntegration
     from sentry_sdk.integrations.logging import LoggingIntegration
 
+    # SENTRY_ENVIRONMENT 沒設定時的預設值跟著 DJANGO_DEBUG 走（兩服務共用同一個
+    # 旗標），跟 core/settings.py 同一套邏輯：原本這裡固定寫死 "production"，
+    # 本機開發（DJANGO_DEBUG=True）測試時觸發的錯誤會被誤標成 production 事件。
+    _fastapi_debug = os.getenv("DJANGO_DEBUG", "False") == "True"
     sentry_sdk.init(
         dsn=_sentry_dsn,
-        environment=os.getenv("SENTRY_ENVIRONMENT", "production"),
+        environment=os.getenv("SENTRY_ENVIRONMENT", "production" if not _fastapi_debug else "development"),
         integrations=[
             StarletteIntegration(),
             FastApiIntegration(),

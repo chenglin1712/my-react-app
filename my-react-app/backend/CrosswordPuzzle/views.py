@@ -147,6 +147,10 @@ def generate_crossword(request):
 
     return JsonResponse(response_data)
 
+# csrf_exempt 在這裡不是「豁免掉一項保護」，而是「這項保護原本就不適用」，永久生效，
+# 不隨 DEBUG 變動：這是無狀態的 Bearer-token JSON API（見下方 verify_firebase_token），
+# 前端從不帶 CSRF cookie/token，CSRF 保護針對的是瀏覽器自動夾帶 session cookie
+# 的情境，跟這裡的認證機制無關（比照 AIModel/views.py 同樣的 Bearer-token 端點）。
 @csrf_exempt
 def submit_ans(request):
     if request.method == 'POST':

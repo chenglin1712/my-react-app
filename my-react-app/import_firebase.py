@@ -10,6 +10,7 @@ Firebase 資料庫匯入腳本
 執行方式：FIREBASE_IMPORT_BACKUP_DIR=/path/to/backup python import_firebase.py
 """
 
+import datetime
 import json
 import os
 import secrets
@@ -83,12 +84,21 @@ print("\n── 建立 Authentication 帳號 ───────────�
 print("⚠️  舊密碼 hash 無法移植到新專案，將為每個帳號各自產生一組隨機臨時密碼")
 print("   請盡快把對應密碼轉交給各帳號使用者，並提醒登入後立即自行修改密碼\n")
 
+# 臨時密碼改寫進獨立檔案、不印到 stdout：這支腳本的輸出常會被導向 log 檔或
+# CI/操作紀錄留存，直接印明文密碼會讓密碼隨著那些輸出一起被留存下來。獨立檔案
+# 才會包含密碼，檔名帶時間戳記避免覆蓋前一次執行的結果，且已被 .gitignore
+# 排除（見下方 imported_credentials_*.txt 規則）。
+CREDENTIALS_FILE = os.path.join(
+    BASE_DIR, f"imported_credentials_{datetime.datetime.now():%Y%m%d_%H%M%S}.txt"
+)
+
 if not os.path.exists(AUTH_FILE):
     print(f"❌ 找不到：{AUTH_FILE}")
 else:
     with open(AUTH_FILE, "r", encoding="utf-8") as f:
         users = json.load(f)
 
+    credentials_lines = []
     for u in users:
         uid   = u["uid"]
         email = u["email"]
@@ -101,7 +111,8 @@ else:
                 email_verified=u.get("emailVerified", False),
                 disabled=u.get("disabled", False),
             )
-            print(f"  ✅ 建立帳號：{email}  (uid: {uid})  臨時密碼：{temp_password}")
+            credentials_lines.append(f"{email}\t{uid}\t{temp_password}\n")
+            print(f"  ✅ 建立帳號：{email}  (uid: {uid})")
         except auth.UidAlreadyExistsError:
             print(f"  ℹ️  已存在：{email}，略過")
         except auth.EmailAlreadyExistsError:
@@ -109,6 +120,12 @@ else:
         except Exception as e:
             print(f"  ❌ 失敗：{email} → {e}")
 
+    if credentials_lines:
+        with open(CREDENTIALS_FILE, "w", encoding="utf-8") as f:
+            f.writelines(credentials_lines)
+        print(f"\n⚠️  臨時密碼（明文）已寫入：{CREDENTIALS_FILE}")
+        print("   請盡快逐一轉交給對應使用者後刪除此檔案，切勿提交進版控或留在他人可存取的地方。")
+
 print("\n✅ 匯入完成！")
-print("每個帳號的臨時密碼各自不同，請參考上方輸出逐一轉交給對應使用者。")
+print("每個帳號的臨時密碼各自不同，請參考上面提到的憑證檔案逐一轉交給對應使用者。")
 print("請提醒用戶登入後自行修改密碼。")

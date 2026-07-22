@@ -14,6 +14,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from config.logging import get_logging_config
+from config.auth_flags import auth_dev_bypass
 
 load_dotenv()
 
@@ -35,13 +36,9 @@ if not SECRET_KEY:
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DJANGO_DEBUG", "False") == "True"
 
-# 是否略過 Firebase token 驗證（僅限本機開發）。故意跟 DEBUG 分開：
-# DEBUG 只應該控制錯誤訊息詳細度／SQL echo 這類「除錯資訊」，不該同時是
-# 「要不要驗證身份」的開關——否則正式環境若誤把 DJANGO_DEBUG 設成 True，
-# 會在完全沒人注意到的情況下讓全站認證形同虛設。要略過驗證必須另外明確
-# 設定這個旗標，且僅在 DEBUG 也是 True 時才生效（雙重確認，避免正式環境
-# 誤設 AUTH_DEV_BYPASS=True 卻忘記同時把 DEBUG 打開）。
-AUTH_DEV_BYPASS = DEBUG and os.getenv("AUTH_DEV_BYPASS", "False") == "True"
+# 是否略過 Firebase token 驗證（僅限本機開發）。互鎖判斷邏輯與 FastAPI 端共用
+# （見 config/auth_flags.py），避免兩邊各自實作、修一處忘了改另一處。
+AUTH_DEV_BYPASS = auth_dev_bypass()
 
 
 # 正式環境安全設定（manage.py check --deploy 的 W004/W008/W012/W016）。用 not DEBUG
