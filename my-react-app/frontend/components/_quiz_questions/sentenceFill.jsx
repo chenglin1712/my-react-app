@@ -3,8 +3,8 @@ import { RectangleEllipsis, Volume2, Check, CircleCheck, CircleX } from "lucide-
 import { FaPlayCircle } from 'react-icons/fa';
 import lottie from "lottie-web";
 import successAnimation from "../../src/animations/success.json";
-import correctAudio from "../../static/assets/_quiz/correct.mp3";
 import { createAuthorizedAudio } from "../../utils/authAudio";
+import { playCorrectSound } from "../../utils/correctSound";
 
 export default function SentenceFill({ question, selected, checked, onSelect, onConfirm }) {
   const [result, setResult] = useState("");
@@ -75,8 +75,7 @@ export default function SentenceFill({ question, selected, checked, onSelect, on
     })
       onConfirm?.(true);
     if (isCorrect) {
-    const correctSound = new Audio(correctAudio);
-    correctSound.play();
+    playCorrectSound();
     setShowAnimation(true);
   }
   

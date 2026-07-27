@@ -8,7 +8,7 @@ import "../../static/css/_search/index.css";
 
 import SearchHeader from './components/SearchHeader';
 import WordResultsSection from './components/WordResultsSection';
-import useAudioPlayback from './hooks/useAudioPlayback';
+import useAudioPlayback from '../../hooks/useAudioPlayback';
 
 const PAGE_SIZE = 50;
 

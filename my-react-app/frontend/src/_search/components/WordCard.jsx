@@ -1,28 +1,7 @@
 import { memo, useCallback } from 'react';
 import { ListGroup, Button } from 'react-bootstrap';
 import { FaHeart, FaRegHeart, FaPlayCircle } from 'react-icons/fa';
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const renderStars = (fre) => {
-  if (fre === null || fre === undefined) return null;
-  let starCount = 0;
-  if (fre >= 0 && fre <= 200) starCount = 1;
-  else if (fre <= 400) starCount = 2;
-  else if (fre <= 800) starCount = 3;
-  else if (fre <= 1000) starCount = 4;
-  else starCount = 5;
-
-  return (
-    <>
-      {[...Array(starCount)].map((_, i) => (
-        <span key={i} >
-          <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 640 640"><path fill="#FCC603" d="M341.5 45.1C337.4 37.1 329.1 32 320.1 32C311.1 32 302.8 37.1 298.7 45.1L225.1 189.3L65.2 214.7C56.3 216.1 48.9 222.4 46.1 231C43.3 239.6 45.6 249 51.9 255.4L166.3 369.9L141.1 529.8C139.7 538.7 143.4 547.7 150.7 553C158 558.3 167.6 559.1 175.7 555L320.1 481.6L464.4 555C472.4 559.1 482.1 558.3 489.4 553C496.7 547.7 500.4 538.8 499 529.8L473.7 369.9L588.1 255.4C594.5 249 596.7 239.6 593.9 231C591.1 222.4 583.8 216.1 574.8 214.7L415 189.3L341.5 45.1z" /></svg>
-        </span>
-      ))}
-      {fre && <span style={{ marginLeft: '2px', color: '#666' }}>（{fre}）</span>}
-    </>
-  );
-};
+import StarRating from '../../../components/ui/StarRating';
 
 const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggleFavorite, wordName, playAudio, playSentence, isFavorited, failedAudio, audioAvailable = true }) => {
   const handleToggleFavorite = useCallback(() => {
@@ -56,7 +35,7 @@ const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggle
     {isExpanded && (
       <div className="mt-2 pt-2 border-top">
         <ListGroup variant="flush">
-          {result.frequency ? <ListGroup.Item><strong>詞頻：</strong>{renderStars(result.frequency)}</ListGroup.Item> : <></>}
+          {result.frequency ? <ListGroup.Item><strong>詞頻：</strong><StarRating frequency={result.frequency} /></ListGroup.Item> : <></>}
           {result.sources?.length > 0 ? <ListGroup.Item><strong>收錄來源：</strong>{Array.isArray(result.sources) ? result.sources.join('、') : result.sources}</ListGroup.Item> : <></>}
           {result.variant ? <ListGroup.Item><strong>異體詞：</strong>{result.variant || ''}</ListGroup.Item> : <></>}
           {result.formationWord ? <ListGroup.Item><strong>構詞：</strong>{result.formationWord || ''}</ListGroup.Item> : <></>}

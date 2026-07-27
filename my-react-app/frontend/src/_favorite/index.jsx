@@ -1,463 +1,18 @@
-import { useState, useEffect, useRef, useCallback, memo } from 'react';
-import {
-  Alert, Container, Button, InputGroup, Form, Dropdown, Tabs, Tab, Offcanvas
-} from 'react-bootstrap';
+import { useState, useEffect, useCallback } from 'react';
+import { Alert, Container, Button, Dropdown } from 'react-bootstrap';
 import { useLocation } from 'react-router-dom';
-import { FaHeart, FaRegHeart, FaPlayCircle } from 'react-icons/fa';
-import { createAuthorizedAudio } from "../../utils/authAudio";
 import { useAuth } from "../../src/userServives/authContext";
 import { useFavorites } from "../../src/userServives/useFavorites";
-import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import PermissionProtect from "../userServives/permissionProtect";
 import ErrorBoundary from "../errorBoundary";
 import { TRIBE_NAMES as TRIBES } from "../constants/tribes";
-import { categoryGroups } from "../constants/categoryGroups";
-import { filterAndSortWords } from "../../utils/wordFilterSort";
 import { apiPost } from "../../utils/apiClient";
+import useAudioPlayback from "../../hooks/useAudioPlayback";
+import { useTabState } from "./hooks/useTabState";
+import { useFilterAndSort } from "./hooks/useFilterAndSort";
+import WordCardWithImg from "./components/WordCardWithImg";
+import SearchAndFilterControls from "./components/SearchAndFilterControls";
 import "../../static/css/_favorite/index_judy.css"
-
-const StarRating = ({ fre }) => {
-  if (fre === null || fre === undefined) return null;
-  let starCount = 0;
-  if (fre >= 0 && fre <= 200) starCount = 1;
-  else if (fre <= 400) starCount = 2;
-  else if (fre <= 800) starCount = 3;
-  else if (fre <= 1000) starCount = 4;
-  else starCount = 5;
-
-  return (
-    <>
-      {[...Array(starCount)].map((_, i) => (
-        <span key={i} >
-          <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 640 640"><path fill="#FCC603" d="M341.5 45.1C337.4 37.1 329.1 32 320.1 32C311.1 32 302.8 37.1 298.7 45.1L225.1 189.3L65.2 214.7C56.3 216.1 48.9 222.4 46.1 231C43.3 239.6 45.6 249 51.9 255.4L166.3 369.9L141.1 529.8C139.7 538.7 143.4 547.7 150.7 553C158 558.3 167.6 559.1 175.7 555L320.1 481.6L464.4 555C472.4 559.1 482.1 558.3 489.4 553C496.7 547.7 500.4 538.8 499 529.8L473.7 369.9L588.1 255.4C594.5 249 596.7 239.6 593.9 231C591.1 222.4 583.8 216.1 574.8 214.7L415 189.3L341.5 45.1z"/></svg>
-          </span>
-      ))}
-      {fre && <span style={{ marginLeft: '2px', color: '#666' }}>（{fre}）</span>}
-    </>
-  );
-};
-
-//播放按鈕組件
-const AudioButton = ({ audioUrl, onPlay, size }) => {
-  if (!audioUrl) return null;
-  return (
-    <Button
-      variant="link"
-      className="audio-button"
-      onClick={(e) => {
-        e.stopPropagation();
-        onPlay(audioUrl);
-      }}
-    >
-      <FaPlayCircle size={size} className="text-warning" />
-    </Button>
-  );
-};
-
-const WordCardImage = ({ imageUrl, word, isFavorited, onToggleFavorite }) => {
-  const defaultImage = `https://www.shutterstock.com/image-vector/no-image-vector-symbol-missing-260nw-2151420819.jpg`;
-
-  return (
-    <div className="word-image-wrapper">
-      <img
-        src={imageUrl || defaultImage}
-        alt={word}
-        className="word-image"
-        loading="lazy"
-      />
-
-      <Button
-        variant="link"
-        className="favorite-btn"
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleFavorite();
-        }}
-      >
-        {isFavorited ? <FaHeart color="#dc2626" /> : <FaRegHeart color="#6b7280" />}
-      </Button>
-    </div>
-  );
-};
-
-const WordCardInfo = ({ result, word, playAudio, _category }) => (
-  <div className="favorite-word-info">
-    <h3 className="tayal-word">
-      {result.name || '無資料'}
-      <AudioButton audioUrl={result.audioItems?.[0]?.fileId} onPlay={playAudio} size={18} />
-    </h3>
-    <h5 className="chinese-word">{word}</h5>
-
-    <div className="word-meta">
-      {result.frequency && (
-        <div className="word-frequency-label">
-          詞頻：<StarRating fre={result.frequency} />
-        </div>
-      )}
-      {result.explanationItems && (
-  <>
-    {result.explanationItems.map((def, i) =>
-      def.category && def.category.length > 0 ? (
-        <div className="word-category-label" key={i}>
-          <span>{def.category}</span>
-        </div>
-      ) : null
-    )}
-  </>
-)}
-
-    </div>
-  </div>
-);
-
-//例句組件
-const ExampleItem = ({ example, playAudio }) => {
-  const hasText = example.originalSentence?.trim() || example.chineseSentence?.trim();
-  if (!hasText) return null;
-
-  return (
-    <div className="example-item">
-      <div className="example-tayal">
-        {example.originalSentence}
-        <AudioButton audioUrl={example.audioItems?.[0]?.fileId} onPlay={playAudio} size={14} />
-      </div>
-      <div className="example-ch">{example.chineseSentence}</div>
-    </div>
-  );
-};
-
-//詳情組件
-const DefinitionDetails = ({ definitions, playAudio }) => {
-  if (!definitions?.length) return null;
-
-  return (
-    <div className="definitions-container">
-      {definitions.map((def, i) => (
-        <div key={i} className="definition-item">
-          {def.category && (
-            <h6 className="definition-category">
-              <strong>例句</strong>
-            </h6>
-          )}
-
-          {def.sentenceItems?.length > 0 && (
-            <div className="examples-container">
-              {def.sentenceItems.map((example, ei) => (
-                <ExampleItem
-                  key={ei}
-                  example={example}
-                  playAudio={playAudio}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-};
-
-//單字卡
-const WordCardWithImg = memo(({ word, category, result, keyName, isExpanded, toggleExpand, toggleFavorite, wordName, categoryId, playAudio, isFavorited }) => {
-  const isFlipped = isExpanded;
-
-  const handleToggleFavorite = useCallback(() => {
-    toggleFavorite(wordName, categoryId);
-  }, [toggleFavorite, wordName, categoryId]);
-
-  return (
-    <div className="word-card-container" key={keyName}>
-      <div className={`word-card ${isFlipped ? 'flipped' : ''}`}>
-        {/* 正面 */}
-        <div className="word-card-front" onClick={() => toggleExpand(keyName)}>
-          <WordCardImage
-            imageUrl={result.word_img}
-            word={result.name}
-            isFavorited={isFavorited}
-            onToggleFavorite={handleToggleFavorite}
-          />
-
-          <div className="word-card-header">
-            <WordCardInfo
-              result={result}
-              word={word}
-              playAudio={playAudio}
-              category={category}
-            />
-          </div>
-        </div>
-
-        {/* 背面 */}
-        <div className="word-card-back" onClick={() => toggleExpand(keyName)}>
-          <div className="word-card-back-header">
-            <h4 className="tayal-word-back">
-              {result.name || '無資料'}
-              <AudioButton audioUrl={result.audioItems?.[0]?.fileId} onPlay={playAudio} size={18} />
-            </h4>
-            <h5 className="chinese-word-back">{word}</h5>
-          </div>
-
-          <div className="word-card-details">
-            <DefinitionDetails
-              definitions={result.explanationItems}
-              playAudio={(url) => {
-                playAudio(url);
-              }}
-            />
-          </div>
-
-          {/* 返回按鈕 */}
-          <div className="flip-back-btn">
-            <small className="text-muted">點擊返回</small>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-});
-WordCardWithImg.displayName = "WordCardWithImg";
-
-//搜尋篩選組件
-const SearchAndFilterControls = ({ _tab, state, onStateChange, alphabet, isMobile, activeTabcat, setActiveTabcat,
-   showCategories, setShowCategories, selectedSubCategory, setSelectedSubCategory, showFilterPanel, setShowFilterPanel }) => (
-  <>
-    <InputGroup className="mb-3">
-      <Form.Control
-        placeholder="請輸入查詢內容"
-        value={state.inputValue || ''}
-        onChange={e => onStateChange('inputValue', e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter') {
-            onStateChange('activeQuery', state.inputValue);
-          }
-        }}
-      />
-      <Button
-        variant="danger"
-        onClick={() => onStateChange('activeQuery', state.inputValue)}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" className="bi bi-search" viewBox="0 0 16 16">
-          <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0" />
-        </svg>
-      </Button>
-    </InputGroup>
-    <div className="d-flex mb-3 align-items-center">
-          {isMobile ? (
-            <>
-              <Button variant="outline-dark" className="mb-3" onClick={() => setShowFilterPanel(true)}>
-                篩選 / 排序
-              </Button>
-
-              <Offcanvas show={showFilterPanel} onHide={() => setShowFilterPanel(false)} placement="end">
-                <Offcanvas.Header closeButton>
-                  <Offcanvas.Title>篩選 / 排序選項</Offcanvas.Title>
-                </Offcanvas.Header>
-                <Offcanvas.Body>
-                  <div className="d-flex flex-column gap-3">
-                    <Button
-                      variant="outline-dark"
-                      onClick={() => {
-                        onStateChange('sortOrder', state.sortOrder === 'asc' ? 'desc' : 'asc');
-                        setShowFilterPanel(false);
-                      }}
-                    >
-                      排序： {state.sortOrder === 'asc' ? 'A→Z' : 'Z→A'}
-                    </Button>
-
-                    <Dropdown onSelect={val => {
-                      onStateChange('filterLetter', val);
-                      setShowFilterPanel(false);
-                    }}>
-                      <Dropdown.Toggle variant="outline-dark" className="btn">
-                        開頭： {state.filterLetter || '全部'}
-                      </Dropdown.Toggle>
-                      <Dropdown.Menu style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                        <Dropdown.Item eventKey="">全部</Dropdown.Item>
-                        {alphabet.map(l => (
-                          <Dropdown.Item key={l} eventKey={l}>{l}</Dropdown.Item>
-                        ))}
-                      </Dropdown.Menu>
-                    </Dropdown>
-
-                    <Dropdown onSelect={(val) => {
-                      onStateChange('frequencyFilter', val);
-                      setShowFilterPanel(false);
-                    }}>
-                      <Dropdown.Toggle variant="outline-dark">
-                        詞頻： {state.frequencyFilter ? `${state.frequencyFilter}★` : '全部'}
-                      </Dropdown.Toggle>
-                      <Dropdown.Menu>
-                        <Dropdown.Item eventKey="">全部</Dropdown.Item>
-                        {[5, 4, 3, 2, 1].map(n => (
-                          <Dropdown.Item key={n} eventKey={n}>{`${n}★`}</Dropdown.Item>
-                        ))}
-                      </Dropdown.Menu>
-                    </Dropdown>
-
-                  </div>
-                </Offcanvas.Body>
-              </Offcanvas>
-            </>
-          ) : (    
-            <div className="d-flex align-items-center flex-wrap gap-2">
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                onClick={() => onStateChange('sortOrder', state.sortOrder === 'asc' ? 'desc' : 'asc')}
-              >
-                排序：{state.sortOrder === 'asc' ? 'A→Z' : 'Z→A'}
-              </Button>
-
-              <Dropdown onSelect={(val) => onStateChange('filterLetter', val)}>
-                <Dropdown.Toggle variant="outline-secondary" size="sm">
-                  開頭：{state.filterLetter || '全部'}
-                </Dropdown.Toggle>
-                <Dropdown.Menu style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                  <Dropdown.Item eventKey="">全部</Dropdown.Item>
-                  {alphabet.map(l => (
-                    <Dropdown.Item key={l} eventKey={l}>{l}</Dropdown.Item>
-                  ))}
-                </Dropdown.Menu>
-              </Dropdown>
-
-              <Dropdown onSelect={(val) => onStateChange('frequencyFilter', val)}>
-                <Dropdown.Toggle variant="outline-secondary" size="sm">
-                  詞頻：{state.frequencyFilter ? `${state.frequencyFilter}★` : '全部'}
-                </Dropdown.Toggle>
-                <Dropdown.Menu>
-                  <Dropdown.Item eventKey="">全部</Dropdown.Item>
-                  {[5, 4, 3, 2, 1].map(n => (
-                    <Dropdown.Item key={n} eventKey={n}>{`${n}★`}</Dropdown.Item>
-                  ))}
-                </Dropdown.Menu>
-              </Dropdown>     
-              </div>
-            )}
-           
-        </div>
-         {/* 📂 分類Bar */}
-                  <div
-                    className="category-bar d-flex justify-content-between align-items-center p-2 bg-light rounded shadow-sm"
-                    onClick={() => setShowCategories(!showCategories)}
-                    style={{ cursor: 'pointer',backgroundColor:"#fbcfcf",fontWeight: "bold" }}
-                  >
-                    <span className="fw-bold">單詞分類
-                      {selectedSubCategory && (
-                  <span style={{ marginLeft: "8px" }}>
-                    - <span style={{color: "#ac3044ff" }}>{selectedSubCategory}</span>
-                  </span>
-                )}</span>
-                    {showCategories ? <FaChevronUp /> : <FaChevronDown />}
-                  </div>
-            
-                  {/* 展開分類 Tabs */}
-                  {showCategories && (
-                    <div className="mt-2 p-2 bg-white rounded shadow-sm">
-                      <Tabs
-                        activeKey={activeTabcat}
-                        onSelect={(k) => setActiveTabcat(k)}
-                        className="mb-3"
-                        justify
-                      >
-                        {Object.keys(categoryGroups).map((group) => (
-                          <Tab eventKey={group} title={group} key={group}>
-                            <div className="subcategory-scroll">
-                              {categoryGroups[group].map((sub) => (
-                                <div
-                                  key={sub.name}
-                                  className={`subcategory-card ${
-                                    selectedSubCategory === sub.name ? 'active' : ''
-                                  }`}
-                                  onClick={() =>{                        
-                                    setSelectedSubCategory(
-                                      selectedSubCategory === sub.name ? null : sub.name
-                                    );setShowCategories(!showCategories)}
-                                  }
-                                >
-                                  <img src={sub.image} alt={sub.name} loading="lazy" />
-                                  <h5 className="fw-bold">{sub.name}</h5>
-                                </div>
-                              ))}
-                            </div>
-                          </Tab>
-                        ))}
-                      </Tabs>
-                    </div>
-                  )}
-      
-  </>
-);
-
-//狀態管理
-const useTabState = (favorites) => {
-  const [tabStates, setTabStates] = useState({});
-
-  useEffect(() => {
-    // 用 setState 的 updater function 讀「當下」的 tabStates（prev），不透過外層
-    // closure 讀 state：這樣 tabStates 本身就不需要出現在依賴陣列裡，也不用關掉
-    // exhaustive-deps 檢查——本來就不能把 tabStates 放進依賴陣列，這個 effect
-    // 自己會呼叫 setTabStates，放進去會變成無限迴圈。
-    setTabStates(prev => {
-      const newTabStates = {};
-      favorites.forEach(fav => {
-        newTabStates[fav.id] = prev[fav.id] || {
-          inputValue: '',
-          activeQuery: '',
-          sortOrder: 'asc',
-          filterLetter: '',
-          frequencyFilter: ''
-        };
-      });
-      return newTabStates;
-    });
-  }, [favorites]);
-
-  const updateTabState = (tabId, key, value) => {
-    setTabStates(prev => ({
-      ...prev,
-      [tabId]: {
-        ...prev[tabId],
-        [key]: value
-      }
-    }));
-  };
-
-  return [tabStates, updateTabState];
-};
-
-//篩選和排序功能
-const useFilterAndSort = (allWords) => {
-  const matchSearchCriteria = (wordObj, query) => {
-    if (!query) return true;
-    const lowerQuery = query.toLowerCase();
-    const tayal = (wordObj.name || '').toLowerCase();
-    const defins = wordObj.explanationItems || [];
-    const ch = defins.length > 0 ? (defins[0].chineseExplanation || '').toLowerCase() : '';
-
-    return (
-      tayal.includes(lowerQuery) ||
-      ch.includes(lowerQuery) ||
-      defins.some(def => (def.chineseExplanation || '').toLowerCase().includes(lowerQuery))
-    );
-  };
-
-  // contentIds（收藏分類的內容）跟搜尋文字這兩項篩選是收藏頁特有的，篩過後
-  // 交給 utils/wordFilterSort.js 的共用函式處理開頭字母／詞頻／分類篩選與排序，
-  // 跟搜尋頁、相機頁使用同一套排序規則（含 -、ʼ 前綴修正）。
-  const filterAndSort = (contentIds, state, selectedSubCategory) => {
-    const inTab = allWords.filter(
-      (w) => contentIds.includes(w.name) && matchSearchCriteria(w, state.activeQuery)
-    );
-    return filterAndSortWords(inTab, {
-      filterLetter: state.filterLetter,
-      frequencyFilter: state.frequencyFilter,
-      selectedSubCategory,
-      sortOrder: state.sortOrder,
-    });
-  };
-
-  return filterAndSort;
-};
 
 const PAGE_SIZE = 50;
 
@@ -467,7 +22,6 @@ const App = () => {
   const [activeTab, setActiveTab] = useState(1);
   const [allWords, setAllWords] = useState([]);
   const [expandedWord, setExpandedWord] = useState(null);
-  const audioRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [delayedCheck, setDelayedCheck] = useState(false);
@@ -477,6 +31,7 @@ const App = () => {
 
   const [tabStates, updateTabState] = useTabState(favorites);
   const filterAndSort = useFilterAndSort(allWords);
+  const { playAudio } = useAudioPlayback(selectedTribe);
 
   const location = useLocation();
 
@@ -486,7 +41,7 @@ const App = () => {
   const [selectedSubCategory, setSelectedSubCategory] = useState(null)
   const [showFilterPanel, setShowFilterPanel] = useState(false);
 
-  
+
   const excludedLetters = ['d', 'f', 'j', 'v'];
   const alphabet = Array.from({ length: 26 }, (_, i) => String.fromCharCode(97 + i)).concat("'").filter(l => !excludedLetters.includes(l));
 
@@ -525,11 +80,7 @@ const App = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => setDelayedCheck(true), 1500);
-
-    return () => {
-      clearTimeout(timer);
-      if (audioRef.current) audioRef.current.pause();
-    };
+    return () => clearTimeout(timer);
   }, []);
 
   // 換分類、族語或篩選條件變動時，分頁顯示筆數重置回第一頁
@@ -537,28 +88,6 @@ const App = () => {
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
   }, [activeTab, selectedTribe, selectedSubCategory, activeTabStateKey]);
-
-  const playAudio = useCallback(async (fileId) => {
-    if (!fileId) return;
-
-
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
-
-
-    const proxyUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL + fileId;
-    let newAudio;
-    try {
-      newAudio = await createAuthorizedAudio(proxyUrl);
-    } catch {
-      return;
-    }
-
-    newAudio.play().catch(() => {});
-    audioRef.current = newAudio;
-  }, []);
 
   if (!user && delayedCheck) return <PermissionProtect />;
 

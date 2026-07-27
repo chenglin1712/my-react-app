@@ -17,8 +17,8 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import lottie from "lottie-web";
-import correctAudio from "../../static/assets/_quiz/correct.mp3";
 import { createAuthorizedAudio } from "../../utils/authAudio";
+import { playCorrectSound } from "../../utils/correctSound";
 
 import successAnimation from "../../src/animations/success.json";
 
@@ -219,8 +219,7 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
     });
     onConfirm?.(true);
      if (isCorrect) {
-            const correctSound = new Audio(correctAudio);
-            correctSound.play();
+            playCorrectSound();
             setShowAnimation(true);
           }
   };

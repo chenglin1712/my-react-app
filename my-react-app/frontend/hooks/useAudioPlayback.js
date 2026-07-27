@@ -1,9 +1,12 @@
 import { useState, useRef, useCallback } from 'react';
-import { createAuthorizedAudio } from "../../../utils/authAudio";
-import { apiPost } from "../../../utils/apiClient";
+import { createAuthorizedAudio } from "../utils/authAudio";
+import { apiPost } from "../utils/apiClient";
 
-// 單詞發音／整句發音的播放狀態與邏輯，從 _search/index.jsx 抽出來，
-// 讓頁面元件不用管音檔播放的細節（generation token 取消機制、失敗記錄等）。
+// 單詞發音／整句發音的播放狀態與邏輯，原本在 _search/index.jsx 裡，抽出來讓頁面
+// 元件不用管音檔播放的細節（generation token 取消機制、失敗記錄等）。原本住在
+// _search/hooks/ 底下，但 _camera/result.jsx 也在用——「搜尋頁專用」的 hook
+// 事實上已經是跨功能共用依賴，搬到這裡（跟 utils/authAudio.js 同一層）比較符合
+// 實際的共用範圍。
 export default function useAudioPlayback(selectedTribe, onError) {
   // 只用來暫停「上一首」播放中的音檔，畫面上不會顯示，改用 ref 存放
   // 這樣就不會每次播放音檔都觸發整個元件重新 render，

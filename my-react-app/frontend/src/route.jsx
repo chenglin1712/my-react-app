@@ -4,6 +4,7 @@ import { Spinner } from 'react-bootstrap';
 import { useAuth } from './userServives/authContext';
 import PermissionProtect from './userServives/permissionProtect';
 import ErrorBoundary from './errorBoundary';
+import { TRIBES } from './constants/tribes';
 //首頁
 const HomePage = lazy(() => import('./_home/index'));
 //登入、註冊、編輯資料
@@ -85,56 +86,29 @@ const App = () => {
           <Route path="/game/sentence/:tribe" element={<ProtectedRoute><TribeSentenceGame /></ProtectedRoute>} />
           <Route path="/quiz/select" element={<ProtectedRoute><QuizTribeSelect /></ProtectedRoute>} />
           <Route path="/quiz" element={<ProtectedRoute><QuizPage /></ProtectedRoute>} >
-            <Route path="" element={<Comp_quiz />} >
-              <Route index element={<Comp_quiz_start />} />
-              <Route path=":level" element={<Comp_quiz_panel />} />
-              <Route path=":level/submit" element={<Comp_quiz_submit />} />
-            </Route>
-            <Route path="amis" element={<Comp_quiz tribe="amis" />} >
-              <Route index element={<Comp_quiz_start tribe="amis" />} />
-              <Route path=":level" element={<Comp_quiz_panel tribe="amis" />} />
-              <Route path=":level/submit" element={<Comp_quiz_submit tribe="amis" />} />
-            </Route>
-            <Route path="bunun" element={<Comp_quiz tribe="bunun" />} >
-              <Route index element={<Comp_quiz_start tribe="bunun" />} />
-              <Route path=":level" element={<Comp_quiz_panel tribe="bunun" />} />
-              <Route path=":level/submit" element={<Comp_quiz_submit tribe="bunun" />} />
-            </Route>
-            <Route path="kavalan" element={<Comp_quiz tribe="kavalan" />} >
-              <Route index element={<Comp_quiz_start tribe="kavalan" />} />
-              <Route path=":level" element={<Comp_quiz_panel tribe="kavalan" />} />
-              <Route path=":level/submit" element={<Comp_quiz_submit tribe="kavalan" />} />
-            </Route>
-            <Route path="paiwan" element={<Comp_quiz tribe="paiwan" />} >
-              <Route index element={<Comp_quiz_start tribe="paiwan" />} />
-              <Route path=":level" element={<Comp_quiz_panel tribe="paiwan" />} />
-              <Route path=":level/submit" element={<Comp_quiz_submit tribe="paiwan" />} />
-            </Route>
-            <Route path="recommon" element={<Comp_quiz_recommon />} >
-              <Route index element={<Comp_quiz_recommon_start />} />
-              <Route path="question" element={<Comp_quiz_recommon_question />} />
-              <Route path="result" element={<Comp_quiz_recommon_result />} />
-            </Route>
-            <Route path="amis/recommon" element={<Comp_quiz_recommon tribe="amis" />} >
-              <Route index element={<Comp_quiz_recommon_start />} />
-              <Route path="question" element={<Comp_quiz_recommon_question tribe="amis" />} />
-              <Route path="result" element={<Comp_quiz_recommon_result />} />
-            </Route>
-            <Route path="bunun/recommon" element={<Comp_quiz_recommon tribe="bunun" />} >
-              <Route index element={<Comp_quiz_recommon_start />} />
-              <Route path="question" element={<Comp_quiz_recommon_question tribe="bunun" />} />
-              <Route path="result" element={<Comp_quiz_recommon_result />} />
-            </Route>
-            <Route path="kavalan/recommon" element={<Comp_quiz_recommon tribe="kavalan" />} >
-              <Route index element={<Comp_quiz_recommon_start />} />
-              <Route path="question" element={<Comp_quiz_recommon_question tribe="kavalan" />} />
-              <Route path="result" element={<Comp_quiz_recommon_result />} />
-            </Route>
-            <Route path="paiwan/recommon" element={<Comp_quiz_recommon tribe="paiwan" />} >
-              <Route index element={<Comp_quiz_recommon_start />} />
-              <Route path="question" element={<Comp_quiz_recommon_question tribe="paiwan" />} />
-              <Route path="result" element={<Comp_quiz_recommon_result />} />
-            </Route>
+            {/* 每個族語原本各自手寫一份完全相同的 3 層巢狀結構（泰雅語用 path=""
+                不特別傳 tribe，其餘 4 族語用 path={slug} 並傳 tribe={slug}）；
+                元件本身的 tribe prop 預設值就是 "tayal"，所以泰雅語改成一併明確
+                傳入 tribe="tayal" 後，解析出來的行為跟原本省略不傳完全一樣，
+                可以安全地跟其他族語用同一段迴圈產生。 */}
+            {TRIBES.map((t) => (
+              <Route key={t.slug} path={t.slug === 'tayal' ? '' : t.slug} element={<Comp_quiz tribe={t.slug} />} >
+                <Route index element={<Comp_quiz_start tribe={t.slug} />} />
+                <Route path=":level" element={<Comp_quiz_panel tribe={t.slug} />} />
+                <Route path=":level/submit" element={<Comp_quiz_submit tribe={t.slug} />} />
+              </Route>
+            ))}
+            {/* recommon（薦讀測驗）區塊原本就沒有把 tribe 傳給 Comp_quiz_recommon_start／
+                _result（這兩個子頁面本身也沒有 tribe prop，結果頁只顯示已經算好的
+                作答結果，不需要知道族語），維持原樣、只有 Comp_quiz_recommon 和
+                Comp_quiz_recommon_question 需要 tribe。 */}
+            {TRIBES.map((t) => (
+              <Route key={`${t.slug}-recommon`} path={t.slug === 'tayal' ? 'recommon' : `${t.slug}/recommon`} element={<Comp_quiz_recommon tribe={t.slug} />} >
+                <Route index element={<Comp_quiz_recommon_start />} />
+                <Route path="question" element={<Comp_quiz_recommon_question tribe={t.slug} />} />
+                <Route path="result" element={<Comp_quiz_recommon_result />} />
+              </Route>
+            ))}
             <Route path="situation" element={<Comp_situation />} />
             <Route path="review" element={<Comp_review />} />
           </Route>

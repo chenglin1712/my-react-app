@@ -4,11 +4,13 @@ import { useState, useEffect, useRef } from 'react'
 import AnswerBox from "./quiz_answerBox"
 import MatchingQuestion from "./quiz_matching_question"
 import ClozeQuestion from "./quiz_cloze_question"
+import TrueFalseQuestion from "./quiz_true_false_question"
+import ChoiceQuestion from "./quiz_choice_question"
 import lottie from 'lottie-web';
 import loadingAnimation from "../../src/animations/loading.json"
 import { Star, CircleHelp } from "lucide-react";
-import { uploadQuizDB, uploadSituationDB } from "../../src/userServives/uploadDb"
-import { apiGet } from "../../utils/apiClient"
+import { uploadSituationDB } from "../../src/userServives/uploadDb"
+import { useQuizPanelData } from "./useQuizPanelData"
 
 const Panel = ({ tribe = "tayal" }) => {
     const levels = ["初級", "中級", "中高級", "高級"];
@@ -19,18 +21,13 @@ const Panel = ({ tribe = "tayal" }) => {
     const navigate = useNavigate();
     const animation = useRef(null);
 
-    const [data, setData] = useState([]);
-    const [dataLen, setDataLen] = useState(0);
-    const [userAnswers, setUserAnswers] = useState([]);
-    const [userStars, setUserStars] = useState([]);
-    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-    const [isLoading, setIsLoading] = useState(true);
-
-    const [quizInfo, setQuizInfo] = useState(null);
-    const [savedQuestions, setSavedQuestions] = useState([]);
+    const {
+        data, dataLen, isLoading, quizInfo, savedQuestions,
+        userAnswers, userStars, currentQuestionIndex, setCurrentQuestionIndex,
+        handleStar, handleAnswer, retry,
+    } = useQuizPanelData(level, tribe, level_ch);
 
     const [showIntro, setShowIntro] = useState(false);
-    const [retryCount, setRetryCount] = useState(0);
 
     //加載loading動畫
     useEffect(() => {
@@ -44,92 +41,6 @@ const Panel = ({ tribe = "tayal" }) => {
         });
         return () => instance.destroy();
     }, [isLoading]);
-
-    //取得後端初級測驗資料
-    useEffect(() => {
-        let isMounted = true;
-        async function fetchData() {
-            setIsLoading(true);
-            try {
-                const responseData = await apiGet(import.meta.env.VITE_API_QUIZ_URL, { params: { level, tribe } });
-                if (isMounted) {
-                    setData(responseData);
-                    if (responseData && responseData.parts &&
-                        responseData.parts[0] && responseData.parts[0].questions) {
-                        setTimeout(() => {
-                            const qLen = responseData.parts[0].questions.length;
-                            setIsLoading(false);
-                            setDataLen(qLen);
-                            setUserAnswers(Array(qLen).fill(null));
-                            setUserStars(Array(qLen).fill("F"));
-                            setCurrentQuestionIndex(0);
-                        }, 1000);
-                    } else {
-                        setIsLoading(false);
-                    }
-                }
-            } catch (error) {
-                console.error('取得資料失敗: ', error);
-                if (isMounted) {
-                    setIsLoading(false);
-                }
-            }
-        }
-        fetchData();
-        return () => {
-            isMounted = false;
-        };
-    }, [level, tribe, retryCount]);
-
-    //測驗資料傳至資料庫
-    useEffect(() => {
-        if (!data || !data.parts || !data.parts[0]?.questions) return;
-        const handlleUploadQuiz = async () => {
-            const questions = data.parts[0].questions;
-            const formatted = questions.map((q) => {
-                if (data.parts[0].type === "true_false") {
-                    return {
-                        question_ab: q.question_ab,
-                        image: q.image,
-                        audio: q.audio,
-                        options: {
-                            "1": "O (符合)",
-                            "2": "X (不符合)"
-                        },
-                        answer: q.answer
-                    };
-                } else if (data.parts[0].type === "choice") {
-                    return {
-                        question_ab: q.question_ab,
-                        question_ch: q.question_ch,
-                        audio: q.audio,
-                        images: {
-                            A: q.imageA,
-                            B: q.imageB,
-                            C: q.imageC
-                        },
-                        answer: parseInt(q.answer)
-                    };
-                } else if (data.parts[0].type === "matching") {
-                    return {
-                        pairs: q.pairs,
-                        answer: q.answer
-                    };
-                } else if (data.parts[0].type === "cloze") {
-                    return {
-                        passage_ab: q.passage_ab,
-                        passage_ch: q.passage_ch,
-                        options: q.options,
-                        answer: parseInt(q.answer)
-                    };
-                }
-            });
-            setSavedQuestions(formatted);
-            const quiz = await uploadQuizDB(level_ch, formatted, tribe);
-            setQuizInfo(quiz);
-        };
-        handlleUploadQuiz();
-    }, [data, level_ch, tribe]);
 
     // 下一題
     const nextQuestion = () => {
@@ -145,18 +56,17 @@ const Panel = ({ tribe = "tayal" }) => {
         }
     };
 
-    //點擊星星
-    const handleStar = () => {
-        const updateStars = [...userStars];
-        updateStars[currentQuestionIndex] = updateStars[currentQuestionIndex] == "T" ? "F" : "T";
-        setUserStars(updateStars);
-    };
+    //答題情形傳至資料庫
+    const handleUploadSituation = async () => {
+        if (!quizInfo) return;
 
-    //點擊選項
-    const handleAnswer = (choice) => {
-        const updateAns = [...userAnswers];
-        updateAns[currentQuestionIndex] = choice;
-        setUserAnswers(updateAns);
+        let situationId = null;
+        if (userAnswers.length == 0) {
+            situationId = await uploadSituationDB(quizInfo.id, null, null, null);
+        } else {
+            situationId = await uploadSituationDB(quizInfo.id, quizInfo.ans, userAnswers, userStars);
+        }
+        return situationId;
     };
 
     //點擊提交
@@ -184,39 +94,6 @@ const Panel = ({ tribe = "tayal" }) => {
         });
     };
 
-    //答題情形傳至資料庫
-    const handleUploadSituation = async () => {
-        if (!quizInfo) return;
-
-        let situationId = null;
-        if (userAnswers.length == 0) {
-            situationId = await uploadSituationDB(quizInfo.id, null, null, null);
-        } else {
-            situationId = await uploadSituationDB(quizInfo.id, quizInfo.ans, userAnswers, userStars);
-        }
-        return situationId;
-    };
-
-    //在一開始先加載所有圖片，避免切換題目有延遲
-    useEffect(() => {
-        if (data?.parts?.[0]?.questions) {
-            const type = data.parts[0].type;
-            data.parts[0].questions.forEach((q) => {
-                if (type === "true_false" && q.image) {
-                    const img = new Image();
-                    img.src = q.image;
-                } else if (type === "choice") {
-                    ["imageA", "imageB", "imageC"].forEach((key) => {
-                        if (q[key]) {
-                            const img = new Image();
-                            img.src = q[key];
-                        }
-                    });
-                }
-            });
-        }
-    }, [data]);
-
     //加載題目畫面
     if (isLoading) {
         return (
@@ -230,12 +107,13 @@ const Panel = ({ tribe = "tayal" }) => {
             return (
                 <div className="quiz-load-error text-center py-5">
                     <p>測驗資料加載失敗，請重試。</p>
-                    <button onClick={() => setRetryCount((c) => c + 1)}>重新載入</button>
+                    <button onClick={retry}>重新載入</button>
                 </div>
             );
         }
 
         const currentQuestion = data.parts[0].questions[currentQuestionIndex];
+        const currentType = data.parts[0].type;
 
         return (
             <div className="panel-container">
@@ -271,51 +149,35 @@ const Panel = ({ tribe = "tayal" }) => {
                         <div className="question-container">
                             <div className="title-container">
                                 <p><strong>題目{currentQuestionIndex + 1}：</strong></p>
-                                {data.parts[0].type === "true_false" && (
+                                {currentType === "true_false" && (
                                     <audio controls>
                                         <source src={currentQuestion.audio} type="audio/mpeg" />
                                         您的瀏覽器不支持音檔。
                                     </audio>
                                 )}
-                                {data.parts[0].type === "choice" && (
+                                {currentType === "choice" && (
                                     <p>{currentQuestion.question_ab}</p>
                                 )}
                                 <Star size={24} className={`${userStars[currentQuestionIndex] === "T" ? 'star' : ''}`} onClick={handleStar} />
                             </div>
 
-                            {data.parts[0].type === "true_false" && (
-                                <>
-                                    <img src={currentQuestion.image} alt="Question" className="question-image" />
-                                    <div className="answers">
-                                        <button className={`${userAnswers[currentQuestionIndex] === 1 ? 'selected' : ''}`} onClick={() => handleAnswer(1)}>
-                                            O (符合)
-                                        </button>
-                                        <button className={`${userAnswers[currentQuestionIndex] === 2 ? 'selected' : ''}`} onClick={() => handleAnswer(2)}>
-                                            X (不符合)
-                                        </button>
-                                    </div>
-                                </>
+                            {currentType === "true_false" && (
+                                <TrueFalseQuestion
+                                    question={currentQuestion}
+                                    selected={userAnswers[currentQuestionIndex]}
+                                    onSelect={handleAnswer}
+                                />
                             )}
 
-                            {data.parts[0].type === "choice" && (
-                                <div className="quiz-multi-images">
-                                    {["A", "B", "C"].map((label, idx) => (
-                                        <div
-                                            key={idx}
-                                            className={`quiz-image-box ${userAnswers[currentQuestionIndex] === idx + 1 ? "selected" : ""}`}
-                                            onClick={() => handleAnswer(idx + 1)}
-                                        >
-                                            <span className="quiz-label">{label}</span>
-                                            <img
-                                                src={currentQuestion[`image${label}`]}
-                                                alt={`選項 ${label}`}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
+                            {currentType === "choice" && (
+                                <ChoiceQuestion
+                                    question={currentQuestion}
+                                    selected={userAnswers[currentQuestionIndex]}
+                                    onSelect={handleAnswer}
+                                />
                             )}
 
-                            {data.parts[0].type === "matching" && (
+                            {currentType === "matching" && (
                                 <MatchingQuestion
                                     key={currentQuestionIndex}
                                     question={currentQuestion}
@@ -325,7 +187,7 @@ const Panel = ({ tribe = "tayal" }) => {
                                 />
                             )}
 
-                            {data.parts[0].type === "cloze" && (
+                            {currentType === "cloze" && (
                                 <ClozeQuestion
                                     question={currentQuestion}
                                     selected={userAnswers[currentQuestionIndex]}

@@ -1,176 +1,43 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { Container, Button, Row, Col, Spinner, Form, Alert } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../../../firebase";
 import { useAuth } from "../../src/userServives/authContext";
+import { shareNote } from "../userServives/noteService";
 import "../../static/css/_note/notestyle.css";
 import "../../static/css/_note/toolbar.css";
 import "../../static/css/_note/buttons.css";
-import { Image as ImageIcon } from "lucide-react";
 import DOMPurify from "dompurify";
 import ErrorBoundary from "../errorBoundary";
 import TabSwitch from "../../components/ui/TabSwitch";
-import { useEditor, EditorContent } from "@tiptap/react";
-import { StarterKit } from "@tiptap/starter-kit";
-import { TextStyle } from "@tiptap/extension-text-style";
-import { Color } from "@tiptap/extension-color";
-import { Image as ImageExtension } from "@tiptap/extension-image";
-import FontSize from "./fontSizeExtension";
+import { EditorContent } from "@tiptap/react";
+import { useNotePages } from "./hooks/useNotePages";
+import EditorToolbar from "./components/EditorToolbar";
+import PageSidebar from "./components/PageSidebar";
 
 function NotePage() {
   const navigate = useNavigate();
   const { userData } = useAuth();
-
   const uid = userData?.uid || "guest";
-  const [notes, setNotes] = useState([]);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [_isEditing, setIsEditing] = useState(true);
-  const [selectedPages, setSelectedPages] = useState([]);
-  const [loading, setLoading] = useState(true);
+
   const [error, setError] = useState("");
-
-  const LOCAL_KEY = `userNotes_${uid}`;
-
-  // onUpdate 是在 useEditor 建立時就固定的閉包，用 ref 保存最新的 notes/currentPage，
-  // 避免比對「是否有未儲存的更改」時讀到過期的值。
-  const notesRef = useRef(notes);
-  const currentPageRef = useRef(currentPage);
-  useEffect(() => { notesRef.current = notes; }, [notes]);
-  useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
-
-  const [isDirty, setIsDirty] = useState(false);
   const [selectedImageFile, setSelectedImageFile] = useState(null);
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      TextStyle,
-      Color,
-      FontSize,
-      ImageExtension.configure({
-        HTMLAttributes: { style: "max-width: 30%; height: auto;" },
-      }),
-    ],
-    content: "<p></p>",
-    onUpdate: ({ editor }) => {
-      const currentHTML = editor.getHTML();
-      const originalHTML = notesRef.current[currentPageRef.current]?.content || "<p></p>";
-      setIsDirty(currentHTML !== originalHTML);
-    },
-  });
+  const {
+    editor, notes, currentPage, selectedPages, loading, isDirty,
+    execStyle, handleAdd, handleDelete, handleSave, handleChangePage,
+    handleToggleSelect, handleTitleChange, handleSelectAll, handleClearSelect,
+  } = useNotePages(uid);
 
-  useEffect(() => {
-    const stored = localStorage.getItem(LOCAL_KEY);
-    if (stored) {
-      setNotes(JSON.parse(stored));
-    } else {
-      const defaultNote = [
-        { id: Date.now(), title: "", content: "" },
-      ];
-      localStorage.setItem(LOCAL_KEY, JSON.stringify(defaultNote));
-      setNotes(defaultNote);
+  const handleImageFileSelected = (file) => {
+    if (file.size > 5 * 1024 * 1024) {
+      setError("圖片不得超過 5 MB，請重新選擇。");
+      return;
     }
-    setCurrentPage(0);
-    setLoading(false);
-  }, [LOCAL_KEY]);
-
-  // 換頁時把編輯器內容換成該頁筆記，用筆記 id 當依據，
-  // 避免 currentPage 沒變但 notes 剛載入完成時漏掉初次同步。只想在「換到不同一篇
-  // 筆記」時重新同步，不想在同一篇筆記的內容變動（例如 updateCurrentContent 把
-  // 編輯器目前內容寫回 notes）時也跟著重跑，所以透過既有的 notesRef/currentPageRef
-  // 讀最新值，不把 notes/currentPage 整包放進依賴陣列。
-  const currentNoteId = notes[currentPage]?.id;
-  useEffect(() => {
-    if (!editor || currentNoteId == null) return;
-    editor.commands.setContent(notesRef.current[currentPageRef.current]?.content || "<p></p>", false);
-    setIsDirty(false);
-  }, [currentNoteId, editor]);
-
-  const updateCurrentContent = () => {
-    if (!editor) return;
-    const updatedNotes = [...notes];
-    updatedNotes[currentPage].content = DOMPurify.sanitize(editor.getHTML());
-    setNotes(updatedNotes);
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(updatedNotes));
+    setSelectedImageFile(file);
+    const reader = new FileReader();
+    reader.onload = (event) => execStyle("insertImage", event.target.result);
+    reader.readAsDataURL(file);
   };
-
-  const execStyle = (command, value = null) => {
-    if (!editor) return;
-    const chain = editor.chain().focus();
-    switch (command) {
-      case "bold":
-        chain.toggleBold().run();
-        break;
-      case "italic":
-        chain.toggleItalic().run();
-        break;
-      case "fontSize":
-        chain.setFontSize(value).run();
-        break;
-      case "foreColor":
-        chain.setColor(value).run();
-        break;
-      case "insertImage":
-        if (value) chain.setImage({ src: value }).run();
-        break;
-      default:
-        break;
-    }
-  };
-
-  const handleAdd = () => {
-    updateCurrentContent();
-    const newNote = { id: Date.now(), title: "未命名筆記", content: "<p></p>" };
-    const updatedNotes = [...notes, newNote];
-    setNotes(updatedNotes);
-    setCurrentPage(updatedNotes.length - 1);
-    setIsEditing(true);
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(updatedNotes));
-  };
-
-  const handleDelete = () => {
-    if (!window.confirm("確定要刪除這則筆記？")) return;
-    const newNotes = notes.filter((_, i) => i !== currentPage);
-    const newPage = Math.max(currentPage - 1, 0);
-
-    const finalNotes = newNotes.length
-      ? newNotes
-      : [{ id: Date.now(), title: "未命名筆記", content: "<p></p>" }];
-
-    setNotes(finalNotes);
-    setCurrentPage(newNotes.length ? newPage : 0);
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(finalNotes));
-  };
-
-  const handleSave = () => {
-    updateCurrentContent();
-    setIsEditing(false);
-    setIsDirty(false);
-  };
-
-  const handleChangePage = (offset) => {
-    updateCurrentContent();
-    const newPage = Math.min(Math.max(currentPage + offset, 0), notes.length - 1);
-    setCurrentPage(newPage);
-    setIsEditing(false);
-  };
-
-  const handleToggleSelect = (index) => {
-    setSelectedPages((prev) =>
-      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
-    );
-  };
-
-  const handleTitleChange = (e) => {
-    const updatedNotes = [...notes];
-    updatedNotes[currentPage].title = e.target.value;
-    setNotes(updatedNotes);
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(updatedNotes));
-  };
-
-  const handleSelectAll = () => setSelectedPages(notes.map((_, index) => index));
-  const handleClearSelect = () => setSelectedPages([]);
 
   const handleShare = async () => {
     handleSave();
@@ -214,17 +81,13 @@ function NotePage() {
         content: DOMPurify.sanitize(p.content || ""),
       }));
 
-      await addDoc(collection(db, "sharedNotes"), {
+      await shareNote({
         pages: sanitizedPages,
         preview: DOMPurify.sanitize(pagesToShare[0]?.content || "<p></p>"),
-        image: uploadedImageUrl || "",
-        createdAt: serverTimestamp(),
-        likes: 0,
-        likedBy: [],
-        uid: uid,
+        image: uploadedImageUrl,
+        uid,
         username: effectiveName,
         avatarUrl: effectiveImg,
-        deleted: false,
       });
 
       const goToShare = window.confirm(
@@ -265,61 +128,7 @@ function NotePage() {
       />
     </div>
     <Container fluid className="main-container">
-      {/* 上方編輯工具列 */}
-      <Row className="editor-toolbar">
-        <Col xs="auto" className="group">
-          <label htmlFor="note-font-size-select" className="group-label">大小</label>
-          <select id="note-font-size-select" onChange={(e) => execStyle("fontSize", e.target.value)} defaultValue="24px">
-            <option value="16px">小</option>
-            <option value="24px">中</option>
-            <option value="32px">大</option>
-          </select>
-        </Col>
-        <Col xs="auto" className="group">
-          <Button className="btn-ghost" onClick={() => execStyle("bold")} aria-label="粗體">𝐁</Button>
-          <Button className="btn-ghost" onClick={() => execStyle("italic")} aria-label="斜體">𝑰</Button>
-        </Col>
-        <Col xs="auto" className="group">
-          <input
-            type="file"
-            accept="image/*"
-            id="image-upload"
-            style={{ display: "none" }}
-            aria-label="上傳圖片"
-            onChange={(e) => {
-              const file = e.target.files[0];
-              if (file) {
-                if (file.size > 5 * 1024 * 1024) {
-                  setError("圖片不得超過 5 MB，請重新選擇。");
-                  return;
-                }
-                setSelectedImageFile(file);
-                const reader = new FileReader();
-                reader.onload = (event) => execStyle("insertImage", event.target.result);
-                reader.readAsDataURL(file);
-              }
-            }}
-          />
-          <Button
-            className="btn-upload"
-            onClick={() => document.getElementById("image-upload").click()}
-          >
-            <ImageIcon size={20} />上傳圖片
-          </Button>
-        </Col>
-        <Col xs="auto" className="group">
-          {["red", "blue", "black", "orange"].map((color) => (
-            <button
-              key={color}
-              type="button"
-              className="color-box"
-              style={{ backgroundColor: color, width: 40, height: 6, border: "none", borderRadius: "6px" }}
-              onClick={() => execStyle("foreColor", color)}
-              aria-label={`文字顏色：${{ red: "紅色", blue: "藍色", black: "黑色", orange: "橘色" }[color]}`}
-            />
-          ))}
-        </Col>
-      </Row>
+      <EditorToolbar execStyle={execStyle} onImageFileSelected={handleImageFileSelected} />
 
       <Row>
         {/* 左：編輯區 */}
@@ -345,33 +154,16 @@ function NotePage() {
 
         {/* 右：分享頁面選擇（移到右側，且 sticky） */}
         <Col md={3} className="sticky-top" style={{ top: 80, height: "calc(100vh - 70px)", zIndex: "100" }}>
-          <h5 className="mt-2">分享頁面選擇</h5>
-          <div className="mb-2 d-flex gap-2">
-            <Button size="sm" className="btn-ghost" onClick={handleSelectAll}>全選</Button>
-            <Button size="sm" className="btn-ghost" onClick={handleClearSelect}>取消</Button>
-          </div>
-          <Form>
-            {notes.map((note, index) => (
-              <Form.Check
-                key={index}
-                id={`note-page-select-${index}`}
-                type="checkbox"
-                label={`第 ${index + 1} 頁：${note.title || "（未命名）"}${index === currentPage && isDirty ? "*" : ""}`}
-                checked={selectedPages.includes(index)}
-                onChange={() => handleToggleSelect(index)}
-                className="mb-1"
-              />
-            ))}
-          </Form>
-
-          {selectedPages.length > 0 && (
-            <Button
-              className="btn-primary mt-2 w-100"
-              onClick={handleShare}
-            >
-              分享
-            </Button>
-          )}
+          <PageSidebar
+            notes={notes}
+            currentPage={currentPage}
+            isDirty={isDirty}
+            selectedPages={selectedPages}
+            onToggleSelect={handleToggleSelect}
+            onSelectAll={handleSelectAll}
+            onClearSelect={handleClearSelect}
+            onShare={handleShare}
+          />
         </Col>
       </Row>
 

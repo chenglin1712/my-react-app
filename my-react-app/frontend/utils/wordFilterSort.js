@@ -1,3 +1,5 @@
+import { frequencyToStarCount } from './frequencyStars';
+
 /**
  * 詞條清單的篩選＋排序邏輯單一資料來源。
  *
@@ -21,13 +23,7 @@ export function filterAndSortWords(words, {
       const matchesLetter = !filterLetter || tayal.startsWith(filterLetter);
       const isFavorite = favoriteWords?.has(w.name);
 
-      const fre = w.frequency || '';
-      let starCount = 0;
-      if (fre >= 0 && fre <= 200) starCount = 1;
-      else if (fre <= 400) starCount = 2;
-      else if (fre <= 800) starCount = 3;
-      else if (fre <= 1000) starCount = 4;
-      else starCount = 5;
+      const starCount = frequencyToStarCount(w.frequency);
       const matchesFrequency = !frequencyFilter || starCount === parseInt(frequencyFilter, 10);
 
       const matchesCategory =

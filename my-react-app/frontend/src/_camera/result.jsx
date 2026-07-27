@@ -1,23 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  ListGroup, Alert, Spinner, Button,
-  Dropdown, Offcanvas
-} from 'react-bootstrap';
-import { FaChevronDown, FaChevronUp } from "react-icons/fa";
+import { Alert, Spinner } from 'react-bootstrap';
 import { apiPost } from "../../utils/apiClient";
 import { useFavorites } from "../../src/userServives/useFavorites";
-import ErrorBoundary from "../errorBoundary";
-import { Tabs, Tab } from 'react-bootstrap';
 import "../../static/css/_camera/result.css";
-import { categoryGroups } from "../constants/categoryGroups";
 import { filterAndSortWords as sortWords } from "../../utils/wordFilterSort";
-import useAudioPlayback from "../_search/hooks/useAudioPlayback";
-// 這裡跟 useAudioPlayback 一樣直接吃 _search 頁面的共用元件：原本這裡自己維護
-// 一份幾乎相同的 WordCard，缺少 _search 版本後來補上的發音播放／音檔可用性
-// 判斷，_search 版本則原本缺少這裡的鍵盤可操作性，兩邊各自修過的東西沒同步，
-// 已經悄悄分岔。改成兩邊共用同一份，_search/components/WordCard.jsx 已經
-// 補上鍵盤存取支援，欄位、bug 修正只需要改一個地方。
-import WordCard from "../_search/components/WordCard";
+import useAudioPlayback from "../../hooks/useAudioPlayback";
+import CameraFilterControls from "./components/CameraFilterControls";
+import MatchResultsList from "./components/MatchResultsList";
 
 // 影像辨識精靈第 3 步：查詢辨識出的單詞並顯示完整詞典結果。
 // selectedWords/tribe 由 index.jsx（精靈容器）傳入，取代原本從路由 state 讀取；
@@ -87,10 +76,10 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
   const excludedLetters = ['d', 'f', 'j', 'v'];
   const alphabet = Array.from({ length: 26 }, (_, i) => String.fromCharCode(97 + i)).concat("'").filter(l => !excludedLetters.includes(l));
 
-
-
-  const _exactMatchFilteredCount = Object.values(definitions.exact_match_results).map(arr => filterAndSortWords(arr).length).reduce((a, b) => a + b, 0);
-  const _fuzzyMatchFilteredCount = Object.values(definitions.fuzzy_match_results).flatMap(obj => Object.values(obj).map(list => filterAndSortWords(list).length)).reduce((a, b) => a + b, 0);
+  const exactMatchWords = filterAndSortWords(Object.values(definitions.exact_match_results).flat());
+  const fuzzyMatchWords = filterAndSortWords(
+    Object.values(definitions.fuzzy_match_results).flatMap(wordGroup => Object.values(wordGroup).flat())
+  );
 
   return (
     <div className="yy-fade-up camera-step3">
@@ -98,265 +87,57 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
         <h2 className="camera-step3-title">查詢結果</h2>
         <button type="button" className="yy-btn-outline" onClick={onRestart}>↺ 重新辨識</button>
       </div>
-      <div className="camera-step3-filters">
-               {isMobile ? (
-            <>
-              <Button variant="outline-dark" className="mb-3" onClick={() => setShowFilterPanel(true)}>
-                篩選 / 排序
-              </Button>
 
-              <Offcanvas show={showFilterPanel} onHide={() => setShowFilterPanel(false)} placement="end">
-                <Offcanvas.Header closeButton>
-                  <Offcanvas.Title>篩選 / 排序選項</Offcanvas.Title>
-                </Offcanvas.Header>
-                <Offcanvas.Body>
-                  <div className="d-flex flex-column gap-3">
-                    <Button
-                      variant="outline-dark"
-                      onClick={() => {
-                        setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
-                        setShowFilterPanel(false);
-                      }}
-                    >
-                      排序： {sortOrder === 'asc' ? 'A→Z' : 'Z→A'}
-                    </Button>
+      <CameraFilterControls
+        isMobile={isMobile}
+        showFilterPanel={showFilterPanel}
+        setShowFilterPanel={setShowFilterPanel}
+        sortOrder={sortOrder}
+        setSortOrder={setSortOrder}
+        filterLetter={filterLetter}
+        setFilterLetter={setFilterLetter}
+        alphabet={alphabet}
+        frequencyFilter={frequencyFilter}
+        setFrequencyFilter={setFrequencyFilter}
+        showOnlyFavorites={showOnlyFavorites}
+        setShowOnlyFavorites={setShowOnlyFavorites}
+        showCategories={showCategories}
+        setShowCategories={setShowCategories}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        selectedSubCategory={selectedSubCategory}
+        setSelectedSubCategory={setSelectedSubCategory}
+        onRestart={onRestart}
+      />
 
-                    <Dropdown onSelect={val => {
-                      setFilterLetter(val);
-                      setShowFilterPanel(false);
-                    }}>
-                      <Dropdown.Toggle variant="outline-dark" className="btn">
-                        開頭： {filterLetter || '全部'}
-                      </Dropdown.Toggle>
-                      <Dropdown.Menu style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                        <Dropdown.Item eventKey="">全部</Dropdown.Item>
-                        {alphabet.map(l => (
-                          <Dropdown.Item key={l} eventKey={l}>{l}</Dropdown.Item>
-                        ))}
-                      </Dropdown.Menu>
-                    </Dropdown>
-
-                    <Dropdown onSelect={(val) => {
-                      setFrequencyFilter(val);
-                      setShowFilterPanel(false);
-                    }}>
-                      <Dropdown.Toggle variant="outline-dark">
-                        詞頻： {frequencyFilter ? `${frequencyFilter}★` : '全部'}
-                      </Dropdown.Toggle>
-                      <Dropdown.Menu>
-                        <Dropdown.Item eventKey="">全部</Dropdown.Item>
-                        {[5, 4, 3, 2, 1].map(n => (
-                          <Dropdown.Item key={n} eventKey={n}>{`${n}★`}</Dropdown.Item>
-                        ))}
-                      </Dropdown.Menu>
-                    </Dropdown>
-
-                    <Button
-                      variant={showOnlyFavorites ? "danger" : "outline-dark"}
-                      onClick={() => {
-                        setShowOnlyFavorites(prev => !prev);
-                        setShowFilterPanel(false);
-                      }}
-                    >
-                      {showOnlyFavorites ? '顯示全部' : '只顯示收藏'}
-                    </Button>
-
-                    
-                    <Button  variant="outline-danger" onClick={onRestart}>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-arrow-return-left" viewBox="0 0 16 16">
-                        <path fillRule="evenodd" d="M14.5 1.5a.5.5 0 0 1 .5.5v4.8a2.5 2.5 0 0 1-2.5 2.5H2.707l3.347 3.346a.5.5 0 0 1-.708.708l-4.2-4.2a.5.5 0 0 1 0-.708l4-4a.5.5 0 1 1 .708.708L2.707 8.3H12.5A1.5 1.5 0 0 0 14 6.8V2a.5.5 0 0 1 .5-.5" />
-                      </svg>
-                      &nbsp; 返回
-                    </Button>
-
-                  </div>
-                </Offcanvas.Body>
-              </Offcanvas>
-            </>
-          ) : (
-            <div className="d-flex mb-3 align-items-center flex-wrap gap-2">
-              <Button
-                variant="outline-dark"
-                className="me-3"
-                onClick={() => setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'))}
-              >
-                排序： {sortOrder === 'asc' ? 'A→Z' : 'Z→A'}
-              </Button>
-
-              <Dropdown onSelect={val => setFilterLetter(val)}>
-                <Dropdown.Toggle variant="outline-dark" className="btn">
-                  開頭： {filterLetter || '全部'}
-                </Dropdown.Toggle>
-                <Dropdown.Menu style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                  <Dropdown.Item eventKey="">全部</Dropdown.Item>
-                  {alphabet.map(l => (
-                    <Dropdown.Item key={l} eventKey={l}>{l}</Dropdown.Item>
-                  ))}
-                </Dropdown.Menu>
-              </Dropdown>
-
-              <Dropdown onSelect={(val) => setFrequencyFilter(val)} className="ms-3">
-                <Dropdown.Toggle variant="outline-dark">
-                  詞頻： {frequencyFilter ? `${frequencyFilter}★` : '全部'}
-                </Dropdown.Toggle>
-                <Dropdown.Menu>
-                  <Dropdown.Item eventKey="">全部</Dropdown.Item>
-                  {[5, 4, 3, 2, 1].map(n => (
-                    <Dropdown.Item key={n} eventKey={n}>{`${n}★`}</Dropdown.Item>
-                  ))}
-                </Dropdown.Menu>
-              </Dropdown>
-
-              <Button
-                className="ms-3"
-                variant={showOnlyFavorites ? "danger" : "outline-dark"}
-                onClick={() => setShowOnlyFavorites(prev => !prev)}
-              >
-                {showOnlyFavorites ? '顯示全部' : '只顯示收藏'}
-              </Button>
-
-              <Button className="ms-3" variant="outline-danger" onClick={onRestart}>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-arrow-return-left" viewBox="0 0 16 16">
-                        <path fillRule="evenodd" d="M14.5 1.5a.5.5 0 0 1 .5.5v4.8a2.5 2.5 0 0 1-2.5 2.5H2.707l3.347 3.346a.5.5 0 0 1-.708.708l-4.2-4.2a.5.5 0 0 1 0-.708l4-4a.5.5 0 1 1 .708.708L2.707 8.3H12.5A1.5 1.5 0 0 0 14 6.8V2a.5.5 0 0 1 .5-.5" />
-                      </svg>
-                      &nbsp; 返回
-                    </Button>
-            </div>
-          )}
-
-      </div>
-      
-                 {/* 📂 分類Bar */}
-      <div
-        className="category-bar yy-card d-flex justify-content-between align-items-center"
-        role="button"
-        tabIndex={0}
-        onClick={() => setShowCategories(!showCategories)}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowCategories(!showCategories); } }}
-      >
-        <span className="fw-bold">📂 單詞分類
-          {selectedSubCategory && (
-      <span style={{ marginLeft: "8px" }}>
-        - <span style={{color: "var(--yy-red)" }}>{selectedSubCategory}</span>
-      </span>
-    )}</span>
-        {showCategories ? <FaChevronUp /> : <FaChevronDown />}
-      </div>
-
-      {/* 展開分類 Tabs */}
-      {showCategories && (
-        <div className="category-panel yy-card mt-2">
-          <Tabs
-            activeKey={activeTab}
-            onSelect={(k) => setActiveTab(k)}
-            className="mb-3"
-            justify
-          >
-            {Object.keys(categoryGroups).map((group) => (
-              <Tab eventKey={group} title={group} key={group}>
-                <div className="subcategory-scroll">
-                  {categoryGroups[group].map((sub) => (
-                    <div
-                      key={sub.name}
-                      className={`subcategory-card ${
-                        selectedSubCategory === sub.name ? 'active' : ''
-                      }`}
-                      onClick={() =>{                        
-                        setSelectedSubCategory(
-                          selectedSubCategory === sub.name ? null : sub.name
-                        );setShowCategories(!showCategories)}
-                      }
-                    >
-                      <img src={sub.image} alt={sub.name} loading="lazy" />
-                      <h5 className="fw-bold">{sub.name}</h5>
-                    </div>
-                  ))}
-                </div>
-              </Tab>
-            ))}
-          </Tabs>
-        </div>
-      )}
       {loading && <Spinner animation="border" variant="primary" />}
       {error && <Alert variant="danger">{error}</Alert>}
       {favoritesError && <Alert variant="danger">{favoritesError}</Alert>}
 
-     
       <br />
-      {Object.keys(definitions.exact_match_results).length > 0 && (() => {
-       
-          const allWordsFlat = Object.values(definitions.exact_match_results).flat();
-          const filteredSorted = filterAndSortWords(allWordsFlat);
-          return (            
-              <>
-                 <h4 className="fw-bold text-success">完全匹配結果 ({filteredSorted.length})</h4>
-                 <ListGroup>
-                 {filteredSorted.map((wordData, idx) => {
-                const word = wordData.explanationItems?.[0]?.chineseExplanation || wordData.chineseExplanation || '';
-                const key = `${word}-${idx}-${wordData.name || ''}`;
-                  return (
-                    <ErrorBoundary
-                      key={key}
-                      fallback={<ListGroup.Item className="text-danger small">這個詞條顯示時發生錯誤。</ListGroup.Item>}
-                    >
-                      <WordCard
-                        keyName={key}
-                        word={word}
-                        result={wordData}
-                        isExpanded={expandedWord === key}
-                        toggleExpand={toggleExpand}
-                        toggleFavorite={toggleFavorite}
-                        wordName={wordData.name}
-                        playAudio={playAudio}
-                        isFavorited={favoriteWords.has(wordData.name)}
-                        failedAudio={failedAudio}
-                      />
-                    </ErrorBoundary>
-                  );
-              })}
-            </ListGroup>
-          </>
-        );
-      })()}
+      <MatchResultsList
+        title="完全匹配結果"
+        titleColorClass="text-success"
+        words={exactMatchWords}
+        expandedWord={expandedWord}
+        toggleExpand={toggleExpand}
+        toggleFavorite={toggleFavorite}
+        playAudio={playAudio}
+        favoriteWords={favoriteWords}
+        failedAudio={failedAudio}
+      />
       <br />
-      {Object.keys(definitions.fuzzy_match_results).length > 0 && (() => {
-        
-         const allWordsFlat = Object.values(definitions.fuzzy_match_results)
-     .flatMap(wordGroup => Object.values(wordGroup).flat());
-        const filteredSorted = filterAndSortWords(allWordsFlat);
-        return (
-          <>  
-          <h4 className="fw-bold text-warning">相關匹配結果 ({filteredSorted.length})</h4>
-          <ListGroup>
-              {filteredSorted.map((wordData, idx) => {
-                const word = wordData.explanationItems?.[0]?.chineseExplanation || wordData.chineseExplanation || '';
-                const key = `${word}-${idx}-${wordData.name || ''}`;
-                  
-                    return (
-                      <ErrorBoundary
-                        key={key}
-                        fallback={<ListGroup.Item className="text-danger small">這個詞條顯示時發生錯誤。</ListGroup.Item>}
-                      >
-                        <WordCard
-                          keyName={key}
-                          word={word}
-                          result={wordData}
-                          isExpanded={expandedWord === key}
-                          toggleExpand={toggleExpand}
-                          toggleFavorite={toggleFavorite}
-                          wordName={wordData.name}
-                          playAudio={playAudio}
-                          isFavorited={favoriteWords.has(wordData.name)}
-                          failedAudio={failedAudio}
-                        />
-                      </ErrorBoundary>
-                );
-              })}
-            </ListGroup>
-          </>
-        );
-      })()
-    }
+      <MatchResultsList
+        title="相關匹配結果"
+        titleColorClass="text-warning"
+        words={fuzzyMatchWords}
+        expandedWord={expandedWord}
+        toggleExpand={toggleExpand}
+        toggleFavorite={toggleFavorite}
+        playAudio={playAudio}
+        favoriteWords={favoriteWords}
+        failedAudio={failedAudio}
+      />
     </div>
   );
 };

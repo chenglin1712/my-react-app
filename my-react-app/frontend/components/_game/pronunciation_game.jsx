@@ -1,69 +1,16 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  collection, addDoc, getDocs, query,
-  where, orderBy, limit, serverTimestamp,
-} from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "../../../firebase";
 import { useAuth } from "../../src/userServives/authContext";
 import { useGameSession } from "./useGameSession";
 import { useGameAudioPlayer } from "./useGameAudioPlayer";
 import { apiPost } from "../../utils/apiClient";
+import { TRIBE_INTRO } from "./pronunciation/pronunciationIntro";
+import { fetchReferenceUrls, uploadRecording, saveRecordingMeta } from "./pronunciation/pronunciationRecordingService";
+import { useAudioRecorder } from "./pronunciation/useAudioRecorder";
+import IntroScreen from "./pronunciation/IntroScreen";
+import PlayingScreen from "./pronunciation/PlayingScreen";
+import ResultScreen from "./pronunciation/ResultScreen";
 import "../../static/css/_game/pronunciation.css";
-
-const TRIBE_INTRO = {
-  tayal: {
-    lines: [
-      "歡迎來到《Qmisan ATAYAL - 泰雅發音練習》的世界！",
-      "發音是學習族語最重要的第一步",
-      "跟著每一題的範本發音，錄下你的聲音送出比對",
-      "系統會幫你評分，讓你知道發音有多準確",
-      "每次練習 5 個詞彙，反覆練習讓發音更標準",
-      "準備好麥克風，跟著我們一起，開口說泰雅！",
-    ],
-  },
-  amis: {
-    lines: [
-      "歡迎來到《Qmisan PANGCAH - 阿美族語發音練習》的世界！",
-      "發音是學習族語最重要的第一步",
-      "跟著每一題的範本發音，錄下你的聲音送出比對",
-      "系統會幫你評分，讓你知道發音有多準確",
-      "每次練習 5 個詞彙，反覆練習讓發音更標準",
-      "準備好麥克風，跟著我們一起，開口說阿美語！",
-    ],
-  },
-  bunun: {
-    lines: [
-      "歡迎來到《Qmisan BUNUN - 布農族語發音練習》的世界！",
-      "發音是學習族語最重要的第一步",
-      "跟著每一題的範本發音，錄下你的聲音送出比對",
-      "系統會幫你評分，讓你知道發音有多準確",
-      "每次練習 5 個詞彙，反覆練習讓發音更標準",
-      "準備好麥克風，跟著我們一起，開口說布農語！",
-    ],
-  },
-  kavalan: {
-    lines: [
-      "歡迎來到《Qmisan KAVALAN - 噶瑪蘭族語發音練習》的世界！",
-      "發音是學習族語最重要的第一步",
-      "跟著每一題的範本發音，錄下你的聲音送出比對",
-      "系統會幫你評分，讓你知道發音有多準確",
-      "每次練習 5 個詞彙，反覆練習讓發音更標準",
-      "準備好麥克風，跟著我們一起，開口說噶瑪蘭語！",
-    ],
-  },
-  paiwan: {
-    lines: [
-      "歡迎來到《Qmisan PAIWAN - 排灣族語發音練習》的世界！",
-      "發音是學習族語最重要的第一步",
-      "跟著每一題的範本發音，錄下你的聲音送出比對",
-      "系統會幫你評分，讓你知道發音有多準確",
-      "每次練習 5 個詞彙，反覆練習讓發音更標準",
-      "準備好麥克風，跟著我們一起，開口說排灣語！",
-    ],
-  },
-};
 
 const RATING = (score) => {
   if (score >= 80) return { label: "優秀", cls: "excellent" };
@@ -71,47 +18,6 @@ const RATING = (score) => {
   if (score >= 40) return { label: "繼續加油", cls: "fair" };
   return { label: "再試試", cls: "poor" };
 };
-
-// ── Firebase 工具 ──────────────────────────────────────────────
-
-// 取得該詞高分真人音檔（score >= 70，最多 5 筆）
-async function fetchReferenceUrls(tribe, word) {
-  try {
-    const q = query(
-      collection(db, "pronunciations", tribe, "recordings"),
-      where("word", "==", word),
-      where("score", ">=", 70),
-      orderBy("score", "desc"),
-      limit(5),
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map((d) => d.data().storageUrl).filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
-// 上傳錄音到 Firebase Storage，回傳公開 download URL
-async function uploadRecording(tribe, word, uid, blob) {
-  const filename = `${Date.now()}_${uid}.webm`;
-  const storageRef = ref(storage, `pronunciations/${tribe}/${word}/${filename}`);
-  await uploadBytes(storageRef, blob, { contentType: "audio/webm" });
-  return await getDownloadURL(storageRef);
-}
-
-// 寫 Firestore metadata
-async function saveRecordingMeta(tribe, word, uid, score, storageUrl) {
-  await addDoc(collection(db, "pronunciations", tribe, "recordings"), {
-    word,
-    tribe,
-    uid,
-    score,
-    storageUrl,
-    createdAt: serverTimestamp(),
-  });
-}
-
-// ── 主元件 ────────────────────────────────────────────────────
 
 function PronunciationGame({ tribe = "tayal" }) {
   const navigate = useNavigate();
@@ -125,59 +31,28 @@ function PronunciationGame({ tribe = "tayal" }) {
   } = useGameSession({ endpoint: import.meta.env.VITE_API_LISTENING_QUESTIONS_URL, tribe, count: 5 });
   const { play: playRefAudio, stop: stopRefAudio } = useGameAudioPlayer(audioBaseUrl);
 
-  const [recState, setRecState] = useState("idle");
-  const [audioBlob, setAudioBlob] = useState(null);
-  const [audioUrl, setAudioUrl] = useState(null);
+  const {
+    recState, setRecState, audioBlob,
+    reset: resetRecording, start: startRecording, stop: stopRecording, playUserAudio,
+  } = useAudioRecorder(setError);
   const [score, setScore] = useState(null);
   const [officialScore, setOfficialScore] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const mediaRecorder = useRef(null);
-  const chunks = useRef([]);
+  const resetRecState = () => {
+    resetRecording();
+    setScore(null);
+    setOfficialScore(null);
+  };
 
   const handleStart = async () => {
     const ok = await start();
     if (ok) resetRecState();
   };
 
-  const resetRecState = () => {
-    setRecState("idle");
-    setAudioBlob(null);
-    setAudioUrl(null);
-    setScore(null);
-    setOfficialScore(null);
-  };
-
   const handlePlayRef = () => {
     if (!questions[current]) return;
     playRefAudio(questions[current].audio_id);
-  };
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder.current = new MediaRecorder(stream);
-      chunks.current = [];
-      mediaRecorder.current.ondataavailable = (e) => chunks.current.push(e.data);
-      mediaRecorder.current.onstop = () => {
-        const blob = new Blob(chunks.current, { type: "audio/webm" });
-        setAudioBlob(blob);
-        setAudioUrl(URL.createObjectURL(blob));
-        setRecState("recorded");
-      };
-      mediaRecorder.current.start();
-      setRecState("recording");
-    } catch {
-      setError("無法存取麥克風，請確認瀏覽器權限。");
-    }
-  };
-
-  const stopRecording = () => {
-    mediaRecorder.current?.stop();
-  };
-
-  const playUserAudio = () => {
-    if (audioUrl) new Audio(audioUrl).play();
   };
 
   const submitAudio = async () => {
@@ -251,93 +126,38 @@ function PronunciationGame({ tribe = "tayal" }) {
     stopRefAudio();
   }, [current, stopRefAudio]);
 
-  // ── 介紹畫面 ──────────────────────────────────
   if (status === "intro") {
-    return (
-      <div className="pron-intro">
-        {config.lines.map((line, i) => (
-          <p key={i} className="pron-intro-line">{line}</p>
-        ))}
-        {error && <p className="pron-error">{error}</p>}
-        <button className="pron-btn-primary" onClick={handleStart} disabled={loading}>
-          {loading ? "載入中..." : "開始"}
-        </button>
-      </div>
-    );
+    return <IntroScreen config={config} error={error} loading={loading} onStart={handleStart} />;
   }
 
-  // ── 遊戲畫面 ──────────────────────────────────
   if (status === "playing") {
     if (!questions.length) return null;
     const q = questions[current];
     const rating = score !== null ? RATING(score) : null;
 
     return (
-      <div className="pron-game">
-        <div className="pron-progress">
-          <div
-            className="pron-progress-bar"
-            style={{ width: `${progressPct}%` }}
-          />
-        </div>
-        <p className="pron-counter">第 {current + 1} / {questions.length} 題</p>
-
-        <div className="pron-card">
-          <p className="pron-word">{q.word}</p>
-          <p className="pron-meaning">{q.correct}</p>
-          <button className="pron-play-btn" onClick={handlePlayRef}>
-            ▶ 聽範本發音
-          </button>
-        </div>
-
-        <div className="pron-record-area">
-          {recState === "idle" && (
-            <button className="pron-mic-btn" onClick={startRecording}>
-              🎤<span>開始錄音</span>
-            </button>
-          )}
-          {recState === "recording" && (
-            <button className="pron-mic-btn recording" onClick={stopRecording}>
-              ⏹<span>停止錄音</span>
-            </button>
-          )}
-          {(recState === "recorded" || recState === "submitted") && (
-            <div className="pron-recorded-actions">
-              <button className="pron-btn-outline" onClick={playUserAudio}>▶ 重聽錄音</button>
-              {recState === "recorded" && (
-                <>
-                  <button className="pron-btn-outline" onClick={resetRecState}>↺ 重新錄音</button>
-                  <button className="pron-btn-primary" onClick={submitAudio} disabled={submitting}>
-                    {submitting ? "比對中..." : "送出比對"}
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-
-        {recState === "submitted" && rating && (
-          <div className={`pron-score-box ${rating.cls}`}>
-            <span className="pron-score-num">{score}</span>
-            <span className="pron-score-label">分 — {rating.label}</span>
-            {officialScore !== null && score !== officialScore && (
-              <span className="pron-score-ref">（官方音檔：{officialScore} 分 · 真人音檔優化）</span>
-            )}
-          </div>
-        )}
-
-        {error && <p className="pron-error">{error}</p>}
-
-        {recState === "submitted" && (
-          <button className="pron-btn-primary pron-next-btn" onClick={handleNext}>
-            {current + 1 < questions.length ? "下一題 →" : "查看結果"}
-          </button>
-        )}
-      </div>
+      <PlayingScreen
+        progressPct={progressPct}
+        current={current}
+        questions={questions}
+        q={q}
+        rating={rating}
+        onPlayRef={handlePlayRef}
+        recState={recState}
+        onStartRecording={startRecording}
+        onStopRecording={stopRecording}
+        onPlayUserAudio={playUserAudio}
+        onResetRecState={resetRecState}
+        submitting={submitting}
+        onSubmit={submitAudio}
+        score={score}
+        officialScore={officialScore}
+        error={error}
+        onNext={handleNext}
+      />
     );
   }
 
-  // ── 結果畫面 ──────────────────────────────────
   if (status === "result") {
     const avg = answers.length
       ? Math.round(answers.reduce((s, a) => s + a.score, 0) / answers.length)
@@ -345,40 +165,14 @@ function PronunciationGame({ tribe = "tayal" }) {
     const avgRating = RATING(avg);
 
     return (
-      <div className="pron-result">
-        <h2 className="pron-result-title">發音練習結果</h2>
-
-        <div className={`pron-result-score ${avgRating.cls}`}>
-          <span className="pron-result-num">{avg}</span>
-          <span className="pron-result-unit">分</span>
-          <p className="pron-result-rating">{avgRating.label}</p>
-        </div>
-
-        <div className="pron-result-list">
-          {answers.map((a, i) => {
-            const r = RATING(a.score);
-            return (
-              <div key={i} className={`pron-result-row ${r.cls}`}>
-                <span className="pron-result-word">{a.word}</span>
-                <span className="pron-result-meaning">{a.meaning}</span>
-                <span className={`pron-result-tag ${r.cls}`}>
-                  {a.score} 分{a.usedRef ? " ✦" : ""}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-        <p className="pron-result-hint">✦ 表示有真人音檔參與比對</p>
-
-        <div className="pron-result-actions">
-          <button className="pron-btn-secondary" onClick={() => navigate("/game/pronunciation")}>
-            ← 返回遊戲頁面
-          </button>
-          <button className="pron-btn-primary" onClick={handleRestart}>
-            再練一次
-          </button>
-        </div>
-      </div>
+      <ResultScreen
+        avg={avg}
+        avgRating={avgRating}
+        answers={answers}
+        ratingOf={RATING}
+        onBack={() => navigate("/game/pronunciation")}
+        onRestart={handleRestart}
+      />
     );
   }
 

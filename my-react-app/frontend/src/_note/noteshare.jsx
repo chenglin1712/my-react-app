@@ -1,170 +1,40 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import {
-  doc, getDocs, getDoc, updateDoc, collection, query, where, orderBy, limit, startAfter,
-  getCountFromServer,
-} from "firebase/firestore";
-import { db } from "../../../firebase";
 import { useAuth } from "../../src/userServives/authContext";
+import { fetchSharedNoteById, setNoteLikeState, softDeleteNote } from "../userServives/noteService";
+import { useSharedNotesPager } from "./hooks/useSharedNotesPager";
+import { useToast } from "./hooks/useToast";
+import NoteCard from "./components/NoteCard";
+import NoteModal from "./components/NoteModal";
 import "../../static/css/_note/./notesharestyle.css";
-import { Heart } from "lucide-react"
-import DOMPurify from "dompurify";
 import TabSwitch from "../../components/ui/TabSwitch";
-
-function timeAgo(ts) {
-  if (!ts) return "";
-  const ms = (ts.seconds ? ts.seconds * 1000 : ts) - 0;
-  const diff = Date.now() - ms;
-  const sec = Math.floor(diff / 1000);
-  const min = Math.floor(sec / 60);
-  const hr = Math.floor(min / 60);
-  const day = Math.floor(hr / 24);
-  if (sec < 60) return "剛剛";
-  if (min < 60) return `${min} 分鐘前`;
-  if (hr < 24) return `${hr} 小時前`;
-  if (day === 1) return "昨天";
-  return `${day} 天前`;
-}
-
-// 分頁 tab 對應的 Firestore orderBy 欄位（sharedNotes 建立時一律會寫入
-// createdAt/likes，見 _note/index.jsx 的 addDoc，故 orderBy 不會漏掉正常建立的筆記）
-const SORT_FIELD = { latest: "createdAt", hot: "likes", my: "createdAt" };
 
 export default function NoteShare() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { userData } = useAuth();
 
-  const [pageNotes, setPageNotes] = useState([]); // 目前這一頁的筆記（未經關鍵字篩選）
   const [filter, setFilter] = useState("latest"); // latest | hot | my
   const [keyword, setKeyword] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [totalCount, setTotalCount] = useState(null);
-  const [loadingPage, setLoadingPage] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [modalNote, setModalNote] = useState(null);
-  const [refreshTick, setRefreshTick] = useState(0);
 
-  // 每個 filter tab 各自的分頁快取：{ [filter]: { [page]: { notes, lastDoc, hasMore } } }
-  // 上一頁/下一頁在已經看過的頁面之間切換時直接用快取，不用重新查詢 Firestore
-  const pageCacheRef = useRef({});
-
-  // toast
-  const [toast, setToast] = useState({ show: false, text: "" });
-  const toastTimerRef = useRef(null);
-  const redirectTimerRef = useRef(null);
-
-  const notesPerPage = 8;
   const myUid = userData?.uid || null;
   const isMyTab = filter === "my";
 
-  // 依 filter tab 建立 Firestore 查詢條件（不含 limit/startAfter）。
-  // "my" 分頁需要 uid 相等 + createdAt 排序，"latest"/"hot" 只要一個排序欄位，
-  // 三種都是「等式篩選 + 對其他欄位排序」，Firestore 都需要對應的複合索引
-  // （見 firestore.indexes.json）
-  const buildFilterConstraints = (f) => {
-    const constraints = [where("deleted", "==", false)];
-    if (f === "my") constraints.push(where("uid", "==", myUid));
-    constraints.push(orderBy(SORT_FIELD[f], "desc"));
-    return constraints;
-  };
+  const {
+    pageNotes, setPageNotes,
+    currentPage, hasMore, totalPages, loadingPage,
+    goToPage, refresh, updateCurrentPageCache, decrementTotalCount,
+  } = useSharedNotesPager(filter, myUid);
+  const { toast, showToast } = useToast();
 
-  const fetchPage = async (f, page) => {
-    if (f === "my" && !myUid) {
-      setPageNotes([]);
-      setHasMore(false);
-      return;
-    }
-    setLoadingPage(true);
-    try {
-      const cacheForFilter = pageCacheRef.current[f] || {};
-      const cached = cacheForFilter[page];
-      if (cached) {
-        // 這一頁之前看過，直接用快取，不用再查一次 Firestore
-        setPageNotes(cached.notes);
-        setHasMore(cached.hasMore);
-        setCurrentPage(page);
-        return;
-      }
-
-      let q;
-      if (page === 1) {
-        q = query(collection(db, "sharedNotes"), ...buildFilterConstraints(f), limit(notesPerPage + 1));
-      } else {
-        const prevPage = cacheForFilter[page - 1];
-        if (!prevPage) return; // 只能逐頁往前推進，上一頁必定已在快取中
-        q = query(
-          collection(db, "sharedNotes"),
-          ...buildFilterConstraints(f),
-          startAfter(prevPage.lastDoc),
-          limit(notesPerPage + 1)
-        );
-      }
-
-      const snap = await getDocs(q);
-      const rows = [];
-      snap.forEach((d) => rows.push({ id: d.id, ...d.data() }));
-      // 多抓 1 筆只是用來判斷「還有沒有下一頁」，實際顯示仍是 notesPerPage 筆
-      const more = rows.length > notesPerPage;
-      const pageRows = rows.slice(0, notesPerPage);
-      const lastDoc = snap.docs[Math.min(notesPerPage, snap.docs.length) - 1] || null;
-
-      pageCacheRef.current = {
-        ...pageCacheRef.current,
-        [f]: { ...cacheForFilter, [page]: { notes: pageRows, lastDoc, hasMore: more } },
-      };
-      setPageNotes(pageRows);
-      setHasMore(more);
-      setCurrentPage(page);
-    } catch (e) {
-      console.error("Fetch sharedNotes error:", e);
-      setPageNotes([]);
-      setHasMore(false);
-    } finally {
-      setLoadingPage(false);
-    }
-  };
-
-  const fetchTotalCount = async (f) => {
-    if (f === "my" && !myUid) {
-      setTotalCount(0);
-      return;
-    }
-    try {
-      const constraints = [where("deleted", "==", false)];
-      if (f === "my") constraints.push(where("uid", "==", myUid));
-      const countSnap = await getCountFromServer(query(collection(db, "sharedNotes"), ...constraints));
-      setTotalCount(countSnap.data().count);
-    } catch (e) {
-      console.error("Fetch sharedNotes count error:", e);
-      setTotalCount(null);
-    }
-  };
-
-  // fetchPage/fetchTotalCount 每次渲染都重新建立，這裡只想在 filter／refreshTick／
-  // myUid 真的變動時才重新抓，不想因為函式參照變了就多跑一次，用 ref 保存最新版本。
-  const fetchPageRef = useRef(fetchPage);
+  const redirectTimerRef = useRef(null);
   useEffect(() => {
-    fetchPageRef.current = fetchPage;
-  });
-  const fetchTotalCountRef = useRef(fetchTotalCount);
-  useEffect(() => {
-    fetchTotalCountRef.current = fetchTotalCount;
-  });
-
-  // 切換 tab／重新整理／登入狀態改變：清空分頁快取，從第 1 頁重新抓
-  useEffect(() => {
-    pageCacheRef.current = {};
-    fetchPageRef.current(filter, 1);
-    fetchTotalCountRef.current(filter);
-  }, [filter, refreshTick, myUid]);
-
-  const goToPage = (page) => {
-    if (page < 1 || loadingPage) return;
-    if (page > currentPage && !hasMore) return;
-    fetchPage(filter, page);
-  };
+    return () => {
+      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+    };
+  }, []);
 
   // 關鍵字搜尋只在目前這一頁（已載入的筆記）內比對，不會跨頁搜尋整個資料庫，
   // 見下方搜尋框旁的說明文字
@@ -179,29 +49,15 @@ export default function NoteShare() {
     });
   }, [pageNotes, keyword]);
 
-  const totalPages = totalCount != null ? Math.max(1, Math.ceil(totalCount / notesPerPage)) : null;
-  const paginatedNotes = filteredNotes;
-
-  // 讚數／刪除這種對單筆筆記的局部更新，同步寫回目前頁面的快取，
-  // 避免使用者切到別頁再切回來時看到刷新前的舊資料
-  const updateCurrentPageCache = (updater) => {
-    const cacheForFilter = pageCacheRef.current[filter];
-    const cached = cacheForFilter?.[currentPage];
-    if (!cached) return;
-    pageCacheRef.current = {
-      ...pageCacheRef.current,
-      [filter]: {
-        ...cacheForFilter,
-        [currentPage]: { ...cached, notes: updater(cached.notes) },
-      },
-    };
-  };
+  const isMine = (note) => userData && note.uid === userData.uid;
+  const likedByMe = (note) =>
+    userData ? (note.likedBy || []).includes(userData.uid) : false;
 
   const openModal = async (note) => {
     try {
-      const full = await getDoc(doc(db, "sharedNotes", note.id));
-      if (full.exists()) {
-        setModalNote({ id: full.id, ...full.data() });
+      const full = await fetchSharedNoteById(note.id);
+      if (full) {
+        setModalNote(full);
         setShowModal(true);
       }
     } catch (e) {
@@ -212,17 +68,6 @@ export default function NoteShare() {
   const closeModal = () => {
     setShowModal(false);
     setModalNote(null);
-  };
-
-  const isMine = (note) => userData && note.uid === userData.uid;
-  const likedByMe = (note) =>
-    userData ? (note.likedBy || []).includes(userData.uid) : false;
-
-  // 顯示 toast（會自動隱藏）
-  const showToast = (text, duration = 2500) => {
-    setToast({ show: true, text });
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = setTimeout(() => setToast({ show: false, text: "" }), duration);
   };
 
   // 可切換的按讚（含未登入導向）
@@ -238,7 +83,6 @@ export default function NoteShare() {
     if (isMine(note)) return;
 
     const already = likedByMe(note);
-    const noteRef = doc(db, "sharedNotes", note.id);
     const newLikedBy = already
       ? (note.likedBy || []).filter((uid) => uid !== userData.uid)
       : [...(note.likedBy || []), userData.uid];
@@ -257,7 +101,7 @@ export default function NoteShare() {
     );
 
     try {
-      await updateDoc(noteRef, { likes: newLikes, likedBy: newLikedBy });
+      await setNoteLikeState(note.id, { likes: newLikes, likedBy: newLikedBy });
     } catch (e) {
       console.error("toggleLike error:", e);
       // 回滾
@@ -272,10 +116,10 @@ export default function NoteShare() {
     if (!modalNote || !isMyTab || myUid !== modalNote.uid) return;
     if (!window.confirm("確定要刪除這則筆記？")) return;
     try {
-      await updateDoc(doc(db, "sharedNotes", modalNote.id), { deleted: true });
+      await softDeleteNote(modalNote.id);
       setPageNotes((prev) => prev.filter((n) => n.id !== modalNote.id));
       updateCurrentPageCache((notes) => notes.filter((n) => n.id !== modalNote.id));
-      setTotalCount((prev) => (prev != null ? Math.max(0, prev - 1) : prev));
+      decrementTotalCount();
       closeModal();
     } catch (e) {
       console.error("Delete error:", e);
@@ -289,9 +133,9 @@ export default function NoteShare() {
     if (!id) return;
     (async () => {
       try {
-        const full = await getDoc(doc(db, "sharedNotes", id));
-        if (full.exists()) {
-          setModalNote({ id: full.id, ...full.data() });
+        const full = await fetchSharedNoteById(id);
+        if (full) {
+          setModalNote(full);
           setShowModal(true);
         }
       } catch (e) {
@@ -299,14 +143,6 @@ export default function NoteShare() {
       }
     })();
   }, [id]);
-
-  // 清理計時器
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
-    };
-  }, []);
 
   return (
     <div className="yy-page">
@@ -355,7 +191,7 @@ export default function NoteShare() {
             className="ns-refresh"
             title="重新整理"
             aria-label="重新整理"
-            onClick={() => setRefreshTick((x) => x + 1)}
+            onClick={refresh}
           >
             ⟳
           </button>
@@ -368,55 +204,20 @@ export default function NoteShare() {
 
       {/* 卡片 */}
       <div className="ns-grid">
-        {paginatedNotes.map((note) => {
-          const _canInteract = userData && !isMine(note);
-          const iLike = likedByMe(note);
-
-          return (
-            <div key={note.id} className="ns-card" onClick={() => openModal(note)}>
-              <div className="ns-card-head">
-                {note.avatarUrl ? (
-                  <img src={note.avatarUrl} alt="avatar" className="ns-avatar" loading="lazy" />
-                ) : (
-                  <div className="ns-avatar ns-avatar-fallback">👤</div>
-                )}
-
-                <div className="ns-meta">
-                  <div className="ns-username">{note.username || "使用者名稱"}</div>
-                  <div className="ns-time">{timeAgo(note.createdAt)}</div>
-                </div>
-
-                {isMyTab && myUid === note.uid && <span className="ns-edit">編輯</span>}
-              </div>
-
-              <div className="ns-card-body">
-                <div className="ns-title">
-                  {note.pages && note.pages.length > 0
-                    ? note.pages[0].title || "標題"
-                    : "標題"}
-                </div>
-                <div
-                  className="ns-preview"
-                  dangerouslySetInnerHTML={{
-                    __html: DOMPurify.sanitize(note.preview || "<p>內容</p>"),
-                  }}
-                />
-                <div className="ns-like-row">
-                  <button
-                    className={`ns-like-btn ${iLike ? "is-liked" : ""}`}
-                    onClick={(e) => toggleLike(e, note, "card")}
-                    aria-label={iLike ? "取消按讚" : "按讚"}
-                  >
-                    <Heart size={20} fill={iLike ? "red" : "none"} /><span>{note.likes || 0}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        {filteredNotes.map((note) => (
+          <NoteCard
+            key={note.id}
+            note={note}
+            isMyTab={isMyTab}
+            isMine={isMine(note)}
+            iLike={likedByMe(note)}
+            onOpen={openModal}
+            onToggleLike={toggleLike}
+          />
+        ))}
       </div>
 
-      {/* 分頁：上一頁/下一頁對應 Firestore 的游標分頁（見 fetchPage），
+      {/* 分頁：上一頁/下一頁對應 Firestore 的游標分頁（見 useSharedNotesPager），
           hasMore 是這次查詢實際多抓的那 1 筆是否存在，才是「還有沒有下一頁」的準確依據；
           totalPages 只是用 getCountFromServer 抓到的總筆數換算，僅供顯示參考 */}
       {(pageNotes.length > 0 || currentPage > 1) && (
@@ -446,46 +247,15 @@ export default function NoteShare() {
 
       {/* Modal */}
       {showModal && modalNote && (
-        <div className="ns-modal-mask" onClick={closeModal}>
-          <div className="ns-modal" onClick={(e) => e.stopPropagation()}>
-            <h2 className="ns-modal-title">{modalNote.pages[0].title || "筆記內容"}</h2>
-            <p className="ns-modal-sub">
-              分享者：{modalNote.username || "匿名者"} ❤️ {modalNote.likes || 0}
-            </p>
-
-            {userData && !isMine(modalNote) && (
-              <div style={{ marginBottom: "0.75rem" }}>
-                <button
-                  className={`ns-like-btn ${likedByMe(modalNote) ? "is-liked" : ""}`}
-                  onClick={(e) => toggleLike(e, modalNote, "modal")}
-                >
-                  {likedByMe(modalNote) ? "收回讚" : "按讚"}
-                </button>
-              </div>
-            )}
-
-            {(modalNote.pages || []).map((pg, i) => (
-              <div key={i} className="ns-modal-page">
-                <div className="ns-page-label">第 {i + 1} 頁</div>
-                <div
-                  className="ns-modal-content"
-                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(pg.content) }}
-                />
-              </div>
-            ))}
-
-            <div className="ns-modal-actions">
-              {isMyTab && myUid && modalNote.uid === myUid && (
-                <button className="ns-btn danger" onClick={handleModalDelete}>
-                  刪除筆記
-                </button>
-              )}
-              <button className="ns-btn" onClick={closeModal}>
-                關閉
-              </button>
-            </div>
-          </div>
-        </div>
+        <NoteModal
+          note={modalNote}
+          canLike={Boolean(userData) && !isMine(modalNote)}
+          iLike={likedByMe(modalNote)}
+          canDelete={isMyTab && Boolean(myUid) && modalNote.uid === myUid}
+          onToggleLike={toggleLike}
+          onDelete={handleModalDelete}
+          onClose={closeModal}
+        />
       )}
 
       {/* Toast */}

@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { Link, Volume2, CircleCheck, CircleX } from "lucide-react";
 import lottie from "lottie-web";
 import successAnimation from "../../src/animations/success.json";
-import correctAudio from "../../static/assets/_quiz/correct.mp3";
 import { createAuthorizedAudio } from "../../utils/authAudio";
+import { playCorrectSound } from "../../utils/correctSound";
 
 export default function WordMatch({ question, _selected, _checked, onSelect, onConfirm }) {
   const [matches, setMatches] = useState({});
@@ -85,9 +85,8 @@ export default function WordMatch({ question, _selected, _checked, onSelect, onC
           });
           setShowAnimation(true);
           
-          const correctSound = new Audio(correctAudio);
-          correctSound.play();
-          
+          playCorrectSound();
+
           onConfirm?.(true);
         }
       } else {
