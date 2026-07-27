@@ -7,7 +7,7 @@ import StudyPlanComponent from "./bot_study_plan"
 import { useAuth } from "../../src/userServives/authContext";
 import { getUserSituation } from "../../src/userServives/uploadDb";
 import { TRIBES } from "../../src/constants/tribes";
-import { auth } from "../../../firebase";
+import { apiPost } from "../../utils/apiClient";
 
 const Advice = ({ onClose }) => {
     const navigate = useNavigate();
@@ -89,18 +89,7 @@ const Advice = ({ onClose }) => {
         setIsType(true);
 
         try {
-            const token = await auth.currentUser?.getIdToken();
-            const response = await fetch(import.meta.env.VITE_API_AI_BOT_URL, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    ...(token ? { "Authorization": `Bearer ${token}` } : {}),
-                },
-                body: JSON.stringify({ message: userText, user_stats: userStats, tribe }),
-            });
-
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const data = await response.json();
+            const data = await apiPost(import.meta.env.VITE_API_AI_BOT_URL, { message: userText, user_stats: userStats, tribe });
 
             const botResponse = {
                 id: Date.now() + 1,

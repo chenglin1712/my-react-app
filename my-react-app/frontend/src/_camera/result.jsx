@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import {
   ListGroup, Alert, Spinner, Button,
   Dropdown, Offcanvas
 } from 'react-bootstrap';
 import { FaChevronDown, FaChevronUp } from "react-icons/fa";
-import { auth } from "../../../firebase";
+import { apiPost } from "../../utils/apiClient";
 import { useFavorites } from "../../src/userServives/useFavorites";
 import ErrorBoundary from "../errorBoundary";
 import { Tabs, Tab } from 'react-bootstrap';
@@ -50,27 +49,18 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
     }
 
     setLoading(true);
-    // auth.currentUser?.getIdToken() 若 currentUser 是 null 會短路成 undefined，
-    // 若直接接在這個 optional chain 後面 .then/.catch/.finally 整條都不會執行，
-    // loading 會卡住、也不會顯示任何錯誤。改成 await 包在一個一定會回傳 Promise
-    // 的 async function 裡（沿用同層 label.jsx 的 analyze() 寫法），undefined
-    // token 只影響要不要帶 Authorization header，不會讓整條鏈路短路。
-    const fetchResults = async () => {
-      const token = await auth.currentUser?.getIdToken();
-      return axios.post(import.meta.env.VITE_API_SEARCH_KEYS_URL, { words: selectedWords, tribe }, {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {},
-      });
-    };
-
-    fetchResults()
-      .then(response => {
+    // apiPost 內部一定會回傳 Promise（即使 auth.currentUser 是 null，token 只影響
+    // 要不要帶 Authorization header），不會有「未登入時整條 .then/.catch/.finally
+    // 都不執行、loading 卡住」的問題。
+    apiPost(import.meta.env.VITE_API_SEARCH_KEYS_URL, { words: selectedWords, tribe })
+      .then(data => {
         setDefinitions({
-          exact_match_results: response.data.exact_match_results || {},
-          fuzzy_match_results: response.data.fuzzy_match_results || {},
+          exact_match_results: data.exact_match_results || {},
+          fuzzy_match_results: data.fuzzy_match_results || {},
         });
       })
       .catch(err => {
-        setError("查詢失敗: " + (err.response?.data?.detail || err.message));
+        setError("查詢失敗: " + err.message);
       })
       .finally(() => setLoading(false));
   }, [selectedWords, tribe]);

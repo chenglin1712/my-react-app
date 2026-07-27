@@ -5,10 +5,11 @@ import {
   where, orderBy, limit, serverTimestamp,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage, auth } from "../../../firebase";
+import { db, storage } from "../../../firebase";
 import { useAuth } from "../../src/userServives/authContext";
 import { useGameSession } from "./useGameSession";
 import { useGameAudioPlayer } from "./useGameAudioPlayer";
+import { apiPost } from "../../utils/apiClient";
 import "../../static/css/_game/pronunciation.css";
 
 const TRIBE_INTRO = {
@@ -116,12 +117,12 @@ function PronunciationGame({ tribe = "tayal" }) {
   const navigate = useNavigate();
   const { userData } = useAuth();
   const config = TRIBE_INTRO[tribe] || TRIBE_INTRO.tayal;
-  const audioBaseUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL || "/api/v1/dictionary/audio/";
+  const audioBaseUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL;
 
   const {
     status, questions, current, answers, setAnswers, loading, error, setError,
     start, restart, goToNext, progressPct,
-  } = useGameSession({ endpoint: "/api/v1/listening/questions", tribe, count: 5 });
+  } = useGameSession({ endpoint: import.meta.env.VITE_API_LISTENING_QUESTIONS_URL, tribe, count: 5 });
   const { play: playRefAudio, stop: stopRefAudio } = useGameAudioPlayer(audioBaseUrl);
 
   const [recState, setRecState] = useState("idle");
@@ -203,13 +204,7 @@ function PronunciationGame({ tribe = "tayal" }) {
         formData.append("reference_urls", refUrls.join(","));
       }
 
-      const idToken = await auth.currentUser?.getIdToken();
-      const res = await fetch(import.meta.env.VITE_API_QUIZ_AUDIO_URL, {
-        method: "POST",
-        headers: idToken ? { "Authorization": `Bearer ${idToken}` } : {},
-        body: formData,
-      });
-      const data = await res.json();
+      const data = await apiPost(import.meta.env.VITE_API_QUIZ_AUDIO_URL, formData);
 
       if (!data.success) {
         setError(`比對失敗：${data.error || "未知錯誤"}`);

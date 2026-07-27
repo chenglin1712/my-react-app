@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
-import { db, auth } from "../../../firebase";
+import { db } from "../../../firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { apiPost } from "../../utils/apiClient";
 import { useAuth } from "../../src/userServives/authContext";
 import SentenceFill from "../_quiz_questions/sentenceFill";
 import SentenceSpeak from "../_quiz_questions/sentenceSpeak";
@@ -160,16 +160,14 @@ export default function QuizPage({ tribe = "tayal" }) {
         const storedModel = snap.exists() ? (snap.data().quiz_model || {}) : {};
         userModelRef.current = storedModel;
 
-        const token = await auth.currentUser?.getIdToken();
-        const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
-        const res = await axios.post(
+        const data = await apiPost(
           import.meta.env.VITE_API_GENERATE_QUIZ_URL,
           storedModel,
-          { headers: authHeaders, params: { tribe } }
+          { params: { tribe } }
         );
         if (cancelled) return;
 
-        const flat = (res.data.questions || []).map((q) => ({
+        const flat = (data.questions || []).map((q) => ({
           id: q.id,
           type: q.type,
           ...q.payload,
@@ -178,7 +176,7 @@ export default function QuizPage({ tribe = "tayal" }) {
         }));
         setQuestionList(flat);
       } catch (err) {
-        console.error("載入薦讀測驗題目失敗:", err.response?.data ?? err.message);
+        console.error("載入薦讀測驗題目失敗:", err.data ?? err.message);
         if (!cancelled) setLoadError("題目載入失敗，請稍後再試。");
       } finally {
         if (!cancelled) setLoading(false);
@@ -231,9 +229,7 @@ export default function QuizPage({ tribe = "tayal" }) {
     // 把這題的作答結果送回 IRT 引擎，更新 ability/user_errors，
     // 下一次 generate_quiz_frontend（不論是這次測驗還是下一次）都會依最新結果出題
     try {
-      const token = await auth.currentUser?.getIdToken();
-      const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
-      const res = await axios.post(
+      const data = await apiPost(
         import.meta.env.VITE_API_SUBMIT_QUIZ_ANSWER_URL,
         {
           user_data: userModelRef.current,
@@ -245,11 +241,11 @@ export default function QuizPage({ tribe = "tayal" }) {
             time_spent: questionTime,
           },
         },
-        { headers: authHeaders, params: { tribe } }
+        { params: { tribe } }
       );
-      userModelRef.current = res.data.user_model;
+      userModelRef.current = data.user_model;
     } catch (err) {
-      console.error("提交答題紀錄失敗:", err.response?.data ?? err.message);
+      console.error("提交答題紀錄失敗:", err.data ?? err.message);
     }
 
     if (current + 1 < questionList.length) {

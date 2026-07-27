@@ -1,6 +1,5 @@
-import axios from "axios";
 import { useRef, useState } from "react";
-import { auth } from "../../../firebase";
+import { apiPost } from "../../utils/apiClient";
 import "../../static/css/_game/game_start.css";
 import Game_crossword_board from "./game_crossword_board";
 import Game_result from "./game_result";
@@ -84,22 +83,16 @@ function Game_Start({ tribe = "tayal" }) {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const token = await auth.currentUser?.getIdToken();
-      const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
-      const response = await axios.post(
-        "/CrosswordPuzzle/submit/",
-        {
-          user_answers: userAns,
-          crossword_solution: curentAns,
-          crossword_legend: crosswordLegend,
-          crossword_grid_display: crosswordGridDisplay,
-        },
-        { headers: authHeaders }
-      );
-      setGameResults(response.data);
+      const data = await apiPost("/CrosswordPuzzle/submit/", {
+        user_answers: userAns,
+        crossword_solution: curentAns,
+        crossword_legend: crosswordLegend,
+        crossword_grid_display: crosswordGridDisplay,
+      });
+      setGameResults(data);
       setShowGameArea(false);
     } catch (error) {
-      console.error("填字遊戲提交失敗:", error.response?.data ?? error.message);
+      console.error("填字遊戲提交失敗:", error.data ?? error.message);
       setSubmitError("提交失敗，請檢查網路連線後再試一次。");
     } finally {
       setSubmitting(false);

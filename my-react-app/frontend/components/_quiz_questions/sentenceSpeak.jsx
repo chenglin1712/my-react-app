@@ -4,8 +4,8 @@ import { FaMicrophone, FaStop, FaPlayCircle, FaRedo } from 'react-icons/fa';
 import lottie from "lottie-web";
 import successAnimation from "../../src/animations/success.json";
 import correctAudio from "../../static/assets/_quiz/correct.mp3";
-import { auth } from "../../../firebase";
 import { createAuthorizedAudio } from "../../utils/authAudio";
+import { apiPost } from "../../utils/apiClient";
 
 export default function SentenceSpeak({ question, _selected, checked, onSelect, onConfirm }) {
   const [audioBlob, setAudioBlob] = useState(null);
@@ -97,17 +97,11 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const idToken = await auth.currentUser?.getIdToken();
-      const res = await fetch(import.meta.env.VITE_API_QUIZ_AUDIO_URL, {
-        method: "POST",
-        headers: idToken ? { "Authorization": `Bearer ${idToken}` } : {},
-        body: formData,
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const data = await apiPost(import.meta.env.VITE_API_QUIZ_AUDIO_URL, formData);
 
       // compare_audio 失敗（ffmpeg 缺失、下載失敗、解碼錯誤等）時 HTTP 狀態碼仍是 200，
-      // 只有 body 的 success 欄位是 false，res.ok 完全看不出來，得另外檢查。
+      // 只有 body 的 success 欄位是 false，這是 app 層的失敗，不是 HTTP 錯誤，
+      // apiPost 不會把它轉成例外，得另外檢查。
       if (!data.success) {
         setSubmitError(`比對失敗：${data.error || "未知錯誤"}`);
         setSubmitting(false);

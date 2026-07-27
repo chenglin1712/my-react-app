@@ -4,7 +4,6 @@ import {
 } from 'react-bootstrap';
 import { useLocation } from 'react-router-dom';
 import { FaHeart, FaRegHeart, FaPlayCircle } from 'react-icons/fa';
-import { auth } from "../../../firebase";
 import { createAuthorizedAudio } from "../../utils/authAudio";
 import { useAuth } from "../../src/userServives/authContext";
 import { useFavorites } from "../../src/userServives/useFavorites";
@@ -14,7 +13,7 @@ import ErrorBoundary from "../errorBoundary";
 import { TRIBE_NAMES as TRIBES } from "../constants/tribes";
 import { categoryGroups } from "../constants/categoryGroups";
 import { filterAndSortWords } from "../../utils/wordFilterSort";
-import axios from 'axios';
+import { apiPost } from "../../utils/apiClient";
 import "../../static/css/_favorite/index_judy.css"
 
 const StarRating = ({ fre }) => {
@@ -509,20 +508,12 @@ const App = () => {
   useEffect(() => {
     setLoading(true);
     setLoadError(false);
-    // auth.currentUser?.getIdToken() 若 currentUser 是 null 會短路成 undefined，
-    // 若直接接在這個 optional chain 後面 .then/.catch 整條都不會執行，loading
-    // 會卡住、也不會顯示任何錯誤。改成 await 包在一個一定會回傳 Promise 的
-    // async function 裡，undefined token 只影響要不要帶 Authorization header。
-    const fetchAllWords = async () => {
-      const token = await auth.currentUser?.getIdToken();
-      return axios.post(import.meta.env.VITE_API_SEARCH_ALL_URL, { tribe: selectedTribe }, {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {},
-      });
-    };
-
-    fetchAllWords()
-      .then(res => {
-        setAllWords(Object.values(res.data.all_results).flat());
+    // apiPost 內部一定會回傳 Promise（即使 auth.currentUser 是 null，token 只影響
+    // 要不要帶 Authorization header），不會有「未登入時整條 .then/.catch 都不執行、
+    // loading 卡住」的問題。
+    apiPost(import.meta.env.VITE_API_SEARCH_ALL_URL, { tribe: selectedTribe })
+      .then(data => {
+        setAllWords(Object.values(data.all_results).flat());
         setLoading(false);
       })
       .catch(err => {

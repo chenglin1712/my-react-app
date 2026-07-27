@@ -8,7 +8,7 @@ import lottie from 'lottie-web';
 import loadingAnimation from "../../src/animations/loading.json"
 import { Star, CircleHelp } from "lucide-react";
 import { uploadQuizDB, uploadSituationDB } from "../../src/userServives/uploadDb"
-import { auth } from "../../../firebase"
+import { apiGet } from "../../utils/apiClient"
 
 const Panel = ({ tribe = "tayal" }) => {
     const levels = ["初級", "中級", "中高級", "高級"];
@@ -51,14 +51,7 @@ const Panel = ({ tribe = "tayal" }) => {
         async function fetchData() {
             setIsLoading(true);
             try {
-                const token = await auth.currentUser?.getIdToken();
-                const response = await fetch(`${import.meta.env.VITE_API_QUIZ_URL}?level=${level}&tribe=${tribe}`, {
-                    headers: token ? { Authorization: `Bearer ${token}` } : {},
-                });
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                const responseData = await response.json();
+                const responseData = await apiGet(import.meta.env.VITE_API_QUIZ_URL, { params: { level, tribe } });
                 if (isMounted) {
                     setData(responseData);
                     if (responseData && responseData.parts &&

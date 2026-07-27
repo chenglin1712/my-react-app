@@ -1,6 +1,5 @@
 import { useState } from "react";
-import axios from "axios";
-import { auth } from "../../../firebase";
+import { apiGet } from "../../utils/apiClient";
 
 /**
  * listening_game.jsx／sentence_game.jsx／pronunciation_game.jsx 共用的「載入題目
@@ -24,12 +23,9 @@ export function useGameSession({ endpoint, tribe, count }) {
     setLoading(true);
     setError(null);
     try {
-      const token = await auth.currentUser?.getIdToken();
-      const res = await axios.get(`${endpoint}?tribe=${tribe}&count=${count}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      setQuestions(res.data.questions);
-      return res.data.questions;
+      const data = await apiGet(endpoint, { params: { tribe, count } });
+      setQuestions(data.questions);
+      return data.questions;
     } catch {
       setError("題目載入失敗，請確認後端伺服器是否啟動。");
       return null;

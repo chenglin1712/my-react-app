@@ -65,12 +65,12 @@ const TRIBE_INTRO = {
 function ListeningGame({ tribe = "tayal" }) {
   const navigate = useNavigate();
   const config = TRIBE_INTRO[tribe] || TRIBE_INTRO.tayal;
-  const audioBaseUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL || "/api/v1/dictionary/audio/";
+  const audioBaseUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL;
 
   const {
     status, questions, current, answers, setAnswers, loading, error,
     start, restart, goToNext, progressPct,
-  } = useGameSession({ endpoint: "/api/v1/listening/questions", tribe, count: 10 });
+  } = useGameSession({ endpoint: import.meta.env.VITE_API_LISTENING_QUESTIONS_URL, tribe, count: 10 });
   const { isPlaying, play: playAudio, stop: stopAudio } = useGameAudioPlayer(audioBaseUrl);
 
   const [selected, setSelected] = useState(null);   // 使用者選的答案

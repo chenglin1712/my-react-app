@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
-import axios from 'axios';
-import { auth } from "../../../../firebase";
 import { createAuthorizedAudio } from "../../../utils/authAudio";
+import { apiPost } from "../../../utils/apiClient";
 
 // 單詞發音／整句發音的播放狀態與邏輯，從 _search/index.jsx 抽出來，
 // 讓頁面元件不用管音檔播放的細節（generation token 取消機制、失敗記錄等）。
@@ -61,11 +60,8 @@ export default function useAudioPlayback(selectedTribe, onError) {
       audioRef.current.revokeObjectUrl?.();
     }
     try {
-      const token = await auth.currentUser?.getIdToken();
-      const res = await axios.post('/api/v1/dictionary/sentence-audio/', { sentence, tribe: selectedTribe }, {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {},
-      });
-      const tokens = res.data.audioTokens || [];
+      const data = await apiPost(import.meta.env.VITE_API_SENTENCE_AUDIO_URL, { sentence, tribe: selectedTribe });
+      const tokens = data.audioTokens || [];
       if (tokens.length === 0 || playbackGenRef.current !== myGen) return;
       for (const { fileId } of tokens) {
         if (playbackGenRef.current !== myGen) break;

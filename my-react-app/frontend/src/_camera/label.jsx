@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { auth } from "../../../firebase";
+import { apiPost } from "../../utils/apiClient";
 
 // 影像辨識精靈第 2 步：顯示 vision API 辨識出的候選單詞，讓使用者複選。
 // image/file/tribe 由 index.jsx（精靈容器）傳入，取代原本從路由 state 讀取。
@@ -24,27 +24,17 @@ const CameraLabelStep = ({ image, file, onConfirm, onBack }) => {
         // 還是會繼續跑到底，回來時對已經卸載的元件 setState、也白白浪費一次
         // 按用量計費的 Google Cloud Vision API 呼叫。用 AbortController 取消。
         const controller = new AbortController();
-        const analyze = async () => {
-            const token = await auth.currentUser?.getIdToken();
-            return axios.post(import.meta.env.VITE_API_VISION_URL, formData, {
-                headers: {
-                    ...(token ? { "Authorization": `Bearer ${token}` } : {}),
-                },
-                signal: controller.signal,
-            });
-        };
+        const analyze = () => apiPost(import.meta.env.VITE_API_VISION_URL, formData, { signal: controller.signal });
 
+        // vision.py 成功時（2xx）從不在回應內帶 error 欄位，錯誤一律走
+        // HTTPException／下面的 .catch，不需要另外檢查 response.data.error。
         analyze()
-            .then((response) => {
-                if (response.data.error) {
-                    setError(true);
-                } else {
-                    setLabels(response.data.labels || []);
-                }
+            .then((data) => {
+                setLabels(data.labels || []);
             })
             .catch((err) => {
                 if (axios.isCancel(err)) return;
-                console.error("影像辨識 API 錯誤:", err.response?.data ?? err.message);
+                console.error("影像辨識 API 錯誤:", err.data ?? err.message);
                 setError(true);
             })
             .finally(() => {

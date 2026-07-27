@@ -1,7 +1,6 @@
-import axios from "axios";
 import PropTypes from "prop-types";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
-import { auth } from "../../../firebase";
+import { apiGet } from "../../utils/apiClient";
 import "../../static/css/_game/game_crossword_board.css";
 
 const Game_crossword_board = forwardRef(({ gameDataLoaded, tribe }, ref) => {
@@ -34,12 +33,7 @@ const Game_crossword_board = forwardRef(({ gameDataLoaded, tribe }, ref) => {
   useEffect(() => {
     const fetchCrossword = async () => {
       try {
-        const token = await auth.currentUser?.getIdToken();
-        const response = await axios.get(
-          `/CrosswordPuzzle/generate/?tribe=${tribe || 'tayal'}`,
-          { headers: token ? { Authorization: `Bearer ${token}` } : {} }
-        );
-        const data = response.data;
+        const data = await apiGet('/CrosswordPuzzle/generate/', { params: { tribe: tribe || 'tayal' } });
         setCrosswordData(data);
 
         // 根據解答網格初始化使用者答案網格

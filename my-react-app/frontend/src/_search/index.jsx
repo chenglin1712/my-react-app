@@ -1,9 +1,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import axios from 'axios';
 import { Container, Alert, Spinner, Button } from 'react-bootstrap';
 import { useFavorites } from "../../src/userServives/useFavorites";
 import { TRIBE_NAMES } from "../constants/tribes";
-import { auth } from "../../../firebase";
+import { apiPost } from "../../utils/apiClient";
 import { filterAndSortWords as sortWords } from "../../utils/wordFilterSort";
 import "../../static/css/_search/index.css";
 
@@ -58,8 +57,6 @@ const App = () => {
   // 這裡只帶目前的篩選條件 + limit/offset 向 /dictionary/all/ 要一頁資料。
   // append=true 時是「載入更多」，接在目前已載入的 allWords 後面；append=false 是重新查詢，取代整份清單。
   const fetchAllWords = async (tribe, { append = false } = {}) => {
-    const token = await auth.currentUser?.getIdToken();
-    const authHeaders = token ? { "Authorization": `Bearer ${token}` } : {};
     const offset = append ? allOffset : 0;
     const body = { tribe, limit: PAGE_SIZE, offset, sort_order: sortOrder };
     if (filterLetter) body.letter = filterLetter;
@@ -69,10 +66,10 @@ const App = () => {
       body.favorites_only = true;
       body.favorite_names = Array.from(favoriteWords);
     }
-    const res = await axios.post(import.meta.env.VITE_API_SEARCH_ALL_URL, body, { headers: authHeaders });
-    const pageWords = Object.values(res.data.all_results || {}).flat();
+    const data = await apiPost(import.meta.env.VITE_API_SEARCH_ALL_URL, body);
+    const pageWords = Object.values(data.all_results || {}).flat();
     setAllWords(prev => (append ? [...prev, ...pageWords] : pageWords));
-    setAllTotal(res.data.total ?? pageWords.length);
+    setAllTotal(data.total ?? pageWords.length);
     setAllOffset(offset + pageWords.length);
   };
 
@@ -82,7 +79,7 @@ const App = () => {
     try {
       await fetchAllWords(selectedTribe, { append: true });
     } catch (e) {
-      setError('載入更多失敗: ' + (e.response?.data?.detail || e.message));
+      setError('載入更多失敗: ' + e.message);
     } finally {
       setLoadingMoreAll(false);
     }
@@ -103,17 +100,15 @@ const App = () => {
         await fetchAllWords(tribe, { append: false });
         setDefinitions({ exact_match_results: {}, fuzzy_match_results: {} });
       } else {
-        const token = await auth.currentUser?.getIdToken();
-        const authHeaders = token ? { "Authorization": `Bearer ${token}` } : {};
-        const res = await axios.post(import.meta.env.VITE_API_SEARCH_KEY_URL, { keyword: query.trim(), tribe }, { headers: authHeaders });
+        const data = await apiPost(import.meta.env.VITE_API_SEARCH_KEY_URL, { keyword: query.trim(), tribe });
         setDefinitions({
-          exact_match_results: Array.isArray(res.data.exact_match_results) ? { [query.trim()]: res.data.exact_match_results } : res.data.exact_match_results,
-          fuzzy_match_results: res.data.fuzzy_match_results || {},
+          exact_match_results: Array.isArray(data.exact_match_results) ? { [query.trim()]: data.exact_match_results } : data.exact_match_results,
+          fuzzy_match_results: data.fuzzy_match_results || {},
         });
         setAllWords([]); setAllTotal(0); setAllOffset(0);
       }
     } catch (e) {
-      setError('查詢失敗: ' + (e.response?.data?.detail || e.message));
+      setError('查詢失敗: ' + e.message);
     } finally {
       setLoading(false);
     }
