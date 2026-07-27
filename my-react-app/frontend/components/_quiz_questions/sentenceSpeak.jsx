@@ -105,6 +105,15 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+
+      // compare_audio 失敗（ffmpeg 缺失、下載失敗、解碼錯誤等）時 HTTP 狀態碼仍是 200，
+      // 只有 body 的 success 欄位是 false，res.ok 完全看不出來，得另外檢查。
+      if (!data.success) {
+        setSubmitError(`比對失敗：${data.error || "未知錯誤"}`);
+        setSubmitting(false);
+        return;
+      }
+
       setScore(data.score);
       setResult(data.passed ? "correct" : "wrong");
       onSelect?.({

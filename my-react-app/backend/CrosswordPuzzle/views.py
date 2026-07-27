@@ -8,7 +8,7 @@ from .crossword import Crossword, Word as CrosswordWord, word_list
 from django.views.decorators.csrf import csrf_exempt
 from config.tribes import TRIBE_IDS as _ALL_TRIBE_IDS
 from config.firebase_auth import verify_firebase_token
-from fastAPI.routes.connect import SessionLocal
+from dictionary_db.connect import SessionLocal
 from .serializers import SubmitAnsSerializer
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ def _get_words_from_db(tribe_id: str, limit: int = 30):
     explanation_items 已經拆到 word_explanation 表，這裡改成 JOIN 取第一筆解釋
     （sort_order = 0，對應原本 exp[0]），INNER JOIN 本身就篩掉沒有解釋的字。
 
-    走 fastAPI.routes.connect 共用的 SessionLocal（而非原生 sqlite3.connect），
+    走 dictionary_db.connect 共用的 SessionLocal（而非原生 sqlite3.connect），
     這樣才會走 SQLAlchemy 的 QueuePool，且連線時自動套用該 engine 的
     connect event listener（PRAGMA foreign_keys / journal_mode = WAL），
     避免高流量下和其他 SQLAlchemy 連線競爭 WAL 鎖。"""

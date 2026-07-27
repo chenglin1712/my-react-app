@@ -16,7 +16,7 @@ from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
-from fastAPI.routes.model import (
+from dictionary_db.model import (
     Word,
     Source, WordSource,
     WordAudio,

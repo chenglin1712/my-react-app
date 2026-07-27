@@ -14,6 +14,7 @@ my-react-app/
 │   ├── AIModel/          # Django app：AI 學習助手（tayal_chat / review_tayal_chat）
 │   ├── CrosswordPuzzle/   # Django app：填字遊戲
 │   ├── crawler/          # Django app：測驗題目與首頁新聞（爬第三方 API）
+│   ├── dictionary_db/    # 辭典資料庫 engine/ORM（Django、FastAPI 共用，見下方「辭典資料庫」一節）
 │   └── fastAPI/          # FastAPI 服務：辭典查詢、測驗生成、語音比對、影像辨識
 │       └── alembic/        # 辭典資料庫（dictionary.db）的 schema migration
 ├── dist/                # `npm run build` 產物（不進版控）
@@ -59,7 +60,7 @@ cd backend
 python manage.py runserver
 
 # FastAPI（預設 http://127.0.0.1:8001；務必在 backend/ 目錄下執行，
-# 專案內部用 `fastAPI.routes.xxx` 這種絕對 import，模組搜尋路徑要從 backend/ 開始）
+# 專案內部用 `fastAPI.routes.xxx`、`dictionary_db.xxx` 這種絕對 import，模組搜尋路徑要從 backend/ 開始）
 cd backend
 uvicorn fastAPI.main:app --reload --port 8001
 ```
@@ -68,7 +69,7 @@ uvicorn fastAPI.main:app --reload --port 8001
 
 ## 辭典資料庫（dictionary.db）
 
-`backend/fastAPI/routes/dictionary.db` 是 FastAPI 端辭典／文法資料的 SQLite 檔案，**不進版控**（見 `.gitignore`），schema 由 Alembic migration 管理：
+`backend/dictionary_db/dictionary.db` 是 Django、FastAPI 兩服務共用的辭典／文法資料 SQLite 檔案（獨立成 `dictionary_db` package，避免 Django 得反過來 import `fastAPI.routes.*` 內部模組），**不進版控**（見 `.gitignore`），schema 由 Alembic migration 管理：
 
 ```sh
 cd backend/fastAPI
@@ -108,7 +109,7 @@ docker compose up --build
 ```
 
 - Django 在 `http://localhost:8000`、FastAPI 在 `http://localhost:8001`，兩者的健康檢查端點（`/health/`、`/health`）都已接上 `docker-compose.yml` 的 `healthcheck:`。
-- `backend/fastAPI/routes/dictionary.db` 與 Django 的 `backend/db.sqlite3`（皆為 gitignored 的 SQLite 檔案）透過 bind mount 從本機掛進容器，不會被打進 image；本機沒有這兩個檔案時容器仍能啟動，但對應的資料查詢不會有內容，細節見 `docker-compose.yml` 內的註解。
+- `backend/dictionary_db/dictionary.db` 與 Django 的 `backend/db.sqlite3`（皆為 gitignored 的 SQLite 檔案）透過 bind mount 從本機掛進容器，不會被打進 image；本機沒有這兩個檔案時容器仍能啟動，但對應的資料查詢不會有內容，細節見 `docker-compose.yml` 內的註解。
 - **這只解決「容器裡能不能重現環境」的問題，實際部署平台（Render／Cloud Run／其他）仍未定案**——`Dockerfile`／`docker-compose.yml` 兩個平台都相容（都只是跑一個監聽 `$PORT` 的標準容器），不代表已經選定平台；`dist/` 要如何接給 Django 服務（SPA 路由、靜態檔案）目前也還沒決定（`core/urls.py` 內對應程式碼仍註解掉），視前端是否要跟後端服務分開部署而定。
 - 沒有本機 Docker 環境時，仍可依上方「啟動專案（開發環境）」或本節手動 gunicorn／uvicorn 指令直接跑，不強制要求用容器。
 

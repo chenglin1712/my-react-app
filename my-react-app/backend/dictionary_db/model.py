@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
-from fastAPI.routes.connect import Base
+from dictionary_db.connect import Base
 
 
 class Tribe(Base):

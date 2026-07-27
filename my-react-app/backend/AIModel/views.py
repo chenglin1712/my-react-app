@@ -9,9 +9,9 @@ from dotenv import load_dotenv
 import traceback
 import datetime
 
-from fastAPI.routes.connect import SessionLocal
-from fastAPI.routes.model import Word
-from fastAPI.routes.word_data import load_explanation_items_for_words, load_audio_items_for_words
+from dictionary_db.connect import SessionLocal
+from dictionary_db.model import Word
+from dictionary_db.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS, TRIBE_MAP
 from config.firebase_auth import verify_firebase_token
 from .serializers import TayalChatSerializer, ReviewTayalChatSerializer

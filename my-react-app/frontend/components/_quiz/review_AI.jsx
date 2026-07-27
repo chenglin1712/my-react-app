@@ -2,6 +2,7 @@ import "../../static/css/_quiz/review_AI.css"
 import { useState } from "react";
 import { Send, Bot, X } from "lucide-react";
 import { TRIBE_NAME_BY_SLUG as TRIBE_NAME } from "../../src/constants/tribes";
+import { auth } from "../../../firebase";
 
 const Discussion = ({ tribe = "tayal" }) => {
     const tribeName = TRIBE_NAME[tribe] || "族語";
@@ -32,10 +33,12 @@ const Discussion = ({ tribe = "tayal" }) => {
         setIsType(true);
 
         try {
+            const token = await auth.currentUser?.getIdToken();
             const res = await fetch(import.meta.env.VITE_API_REVIEW_BOT_URL, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
+                    ...(token ? { "Authorization": `Bearer ${token}` } : {}),
                 },
                 body: JSON.stringify({ message: input, tribe }),
             });

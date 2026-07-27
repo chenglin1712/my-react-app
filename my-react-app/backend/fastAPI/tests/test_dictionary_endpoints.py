@@ -8,7 +8,7 @@ request: Request，這裡直接用 TestClient 驗證整條路徑不會噴例外�
 
 /audio/{file_id} 原本完全沒有 Request 參數，同樣需要先補上才能加限流。
 
-用 fastAPI.routes.dictionary._load_tribe_words 直接回傳假資料，避免依賴
+用 fastAPI.routes.dictionary.search._load_tribe_words 直接回傳假資料，避免依賴
 本機是否真的有那個 71MB、被 .gitignore 排除的 dictionary.db（CI 環境不會有）。
 """
 from unittest.mock import AsyncMock, patch
@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 
 from fastAPI.main import app
 from fastAPI.routes import auth as auth_module
-from fastAPI.routes.connect import get_db
+from dictionary_db.connect import get_db
 
 
 def _fake_get_db():
@@ -35,7 +35,7 @@ def client():
     app.dependency_overrides[get_db] = _fake_get_db
     app.dependency_overrides[auth_module.verify_firebase_token] = _fake_auth
     try:
-        with patch("fastAPI.routes.dictionary._load_tribe_words", return_value=[]):
+        with patch("fastAPI.routes.dictionary.search._load_tribe_words", return_value=[]):
             with TestClient(app) as test_client:
                 yield test_client
     finally:

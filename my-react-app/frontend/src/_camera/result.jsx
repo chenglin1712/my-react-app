@@ -4,7 +4,7 @@ import {
   ListGroup, Alert, Spinner, Button,
   Dropdown, Offcanvas
 } from 'react-bootstrap';
-import { FaHeart, FaRegHeart, FaPlayCircle, FaChevronDown, FaChevronUp } from "react-icons/fa";
+import { FaChevronDown, FaChevronUp } from "react-icons/fa";
 import { auth } from "../../../firebase";
 import { useFavorites } from "../../src/userServives/useFavorites";
 import ErrorBoundary from "../errorBoundary";
@@ -13,92 +13,12 @@ import "../../static/css/_camera/result.css";
 import { categoryGroups } from "../constants/categoryGroups";
 import { filterAndSortWords as sortWords } from "../../utils/wordFilterSort";
 import useAudioPlayback from "../_search/hooks/useAudioPlayback";
-
-const renderStars = (fre) => {
- if (fre === null || fre === undefined) return null;
-  let starCount = 0;
-  if (fre >= 0 && fre <= 200) starCount = 1;
-  else if (fre <= 400) starCount = 2;
-  else if (fre <= 800) starCount = 3;
-  else if (fre <= 1000) starCount = 4;
-  else starCount = 5;
-
-  return (
-    <>
-      {[...Array(starCount)].map((_, i) => (
-        <span key={i} >
-          <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 640 640"><path fill="#FCC603" d="M341.5 45.1C337.4 37.1 329.1 32 320.1 32C311.1 32 302.8 37.1 298.7 45.1L225.1 189.3L65.2 214.7C56.3 216.1 48.9 222.4 46.1 231C43.3 239.6 45.6 249 51.9 255.4L166.3 369.9L141.1 529.8C139.7 538.7 143.4 547.7 150.7 553C158 558.3 167.6 559.1 175.7 555L320.1 481.6L464.4 555C472.4 559.1 482.1 558.3 489.4 553C496.7 547.7 500.4 538.8 499 529.8L473.7 369.9L588.1 255.4C594.5 249 596.7 239.6 593.9 231C591.1 222.4 583.8 216.1 574.8 214.7L415 189.3L341.5 45.1z"/></svg>
-          </span>
-      ))}
-      {fre && <span style={{ marginLeft: '2px', color: '#666' }}>（{fre}）</span>}
-    </>
-  );
-};
-
-const WordCard = ({ word, result, keyName, expandedWord, toggleExpand, toggleFavorite, playAudio, isFavorited, failedAudio }) => (
-  <ListGroup.Item key={keyName} className="d-flex flex-column">
-    <div className="d-flex justify-content-between align-items-center">
-      <div
-        onClick={() => toggleExpand(keyName)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleExpand(keyName); } }}
-        style={{ cursor: 'pointer', flex: 1 }}
-      >
-        <h3 className="fw-bolder text-danger">
-          {result.name || '無資料'}
-          {result.audioItems?.length && !failedAudio?.has(result.audioItems[0].fileId) ? (
-            <Button variant="link" aria-label="播放音訊" onClick={(e) => { e.stopPropagation(); playAudio(result.audioItems[0].fileId); }}>
-              <FaPlayCircle size={20} className="text-warning" />
-            </Button>
-          ) : (<></>)}
-        </h3>
-        <h5 className="fw-bolder">{word}</h5>
-      </div>
-      <Button variant="link" onClick={() => toggleFavorite(keyName)}>
-        {isFavorited ? <FaHeart color="red" /> : <FaRegHeart color="black" />}
-      </Button>
-    </div>
-    {expandedWord === keyName && (
-      <div className="mt-2 pt-2 border-top">
-        <ListGroup variant="flush">
-          {result.frequency?<ListGroup.Item><strong>詞頻：</strong>{renderStars(result.frequency)}</ListGroup.Item>:<></>}
-          {result.sources?<ListGroup.Item><strong>收錄來源：</strong>{Array.isArray(result.sources) ? result.sources.join('、') : result.sources || ''}</ListGroup.Item>:<></>}
-          {result.variant?<ListGroup.Item><strong>異體詞：</strong>{result.variant || ''}</ListGroup.Item>:<></>}
-          {result.formationWord?<ListGroup.Item><strong>構詞：</strong>{result.formationWord || ''}</ListGroup.Item>:<></>}
-          {result.derivativeRoot?<ListGroup.Item><strong>衍生詞根：</strong>{result.derivativeRoot || ''}</ListGroup.Item>:<></>}
-          {result.dictionaryNote?.replace(/[\r\n]+/g, '') ? <ListGroup.Item><strong>備註：</strong>{result.dictionaryNote}</ListGroup.Item> : <></>}
-          {result.explanationItems?.map((def, i) => (
-            <ListGroup.Item key={i}>
-              <h5 className="fw-bolder">{def.chineseExplanation || ''}  {def.englishExplanation || ''}</h5>
-              {def.category && def.category.length > 0 ?<h6><strong>分類：</strong>{def.category || ''}</h6>:<></>}
-              {def.partOfSpeech&& def.partOfSpeech.length > 0?<h6><strong>詞性：</strong>{def.partOfSpeech || ''}</h6>:<></>}
-              {def.focus&& def.focus.length > 0?<h6><strong>焦點：</strong>{def.focus || ''}</h6>:<></>}
-              {def.sentenceItems?.map((ex, ei) => {
-                const hasText = ex.originalSentence?.trim() || ex.chineseSentence?.trim();
-                if (!hasText) return null;
-                return (
-                  <ListGroup.Item key={`${i}-${ei}`}>
-                    <h6 className="fw-bolder text-danger">
-                      {ex.originalSentence}
-                      {ex.audioItems?.length && !failedAudio?.has(ex.audioItems[0].fileId) ? (
-                        <Button variant="link" aria-label="播放音訊" onClick={() => playAudio(ex.audioItems[0].fileId)}>
-                          <FaPlayCircle size={20} className="text-warning" />
-                        </Button>
-                      ) : (<></>)}
-                    </h6>
-                    <h6 className="fw-bolder">{ex.chineseSentence}</h6>
-                    <h6 className="fw-bolder">{ex.englishSentence || ''}</h6>
-                  </ListGroup.Item>
-                );
-              })}
-            </ListGroup.Item>
-          ))}
-        </ListGroup>
-      </div>
-    )}
-  </ListGroup.Item>
-);
+// 這裡跟 useAudioPlayback 一樣直接吃 _search 頁面的共用元件：原本這裡自己維護
+// 一份幾乎相同的 WordCard，缺少 _search 版本後來補上的發音播放／音檔可用性
+// 判斷，_search 版本則原本缺少這裡的鍵盤可操作性，兩邊各自修過的東西沒同步，
+// 已經悄悄分岔。改成兩邊共用同一份，_search/components/WordCard.jsx 已經
+// 補上鍵盤存取支援，欄位、bug 修正只需要改一個地方。
+import WordCard from "../_search/components/WordCard";
 
 // 影像辨識精靈第 3 步：查詢辨識出的單詞並顯示完整詞典結果。
 // selectedWords/tribe 由 index.jsx（精靈容器）傳入，取代原本從路由 state 讀取；
@@ -393,9 +313,10 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
                         keyName={key}
                         word={word}
                         result={wordData}
-                        expandedWord={expandedWord}
+                        isExpanded={expandedWord === key}
                         toggleExpand={toggleExpand}
-                        toggleFavorite={() =>toggleFavorite(wordData.name)}
+                        toggleFavorite={toggleFavorite}
+                        wordName={wordData.name}
                         playAudio={playAudio}
                         isFavorited={favoriteWords.has(wordData.name)}
                         failedAudio={failedAudio}
@@ -430,9 +351,10 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
                           keyName={key}
                           word={word}
                           result={wordData}
-                          expandedWord={expandedWord}
+                          isExpanded={expandedWord === key}
                           toggleExpand={toggleExpand}
-                          toggleFavorite={() =>toggleFavorite(wordData.name)}
+                          toggleFavorite={toggleFavorite}
+                          wordName={wordData.name}
                           playAudio={playAudio}
                           isFavorited={favoriteWords.has(wordData.name)}
                           failedAudio={failedAudio}

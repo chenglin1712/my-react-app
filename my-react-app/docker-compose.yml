@@ -60,7 +60,7 @@ services:
       - "8001:8001"
     command: uvicorn fastAPI.main:app --host 0.0.0.0 --port $$PORT
     volumes:
-      # backend/fastAPI/routes/dictionary.db（~71MB，gitignored，schema 由
+      # backend/dictionary_db/dictionary.db（~71MB，gitignored，schema 由
       # Alembic migration 管理，見 README「辭典資料庫」一節）新 clone 下來不
       # 會有這個檔案，build context 也刻意排除了它（見 .dockerignore），不會
       # 被打進 image。用 bind mount 從本機掛進容器；本機沒有這個檔案時容器
@@ -69,7 +69,7 @@ services:
       # 的說明，此檔案需先跑過 `cd backend/fastAPI && alembic upgrade head`
       # 建出 schema。實際部署到 Render/Cloud Run 時，改用該平台的持久化儲存
       # 或客製 image layer 提供這個檔案，而不是靠 bind mount（本機專用）。
-      - ./backend/fastAPI/routes/dictionary.db:/app/backend/fastAPI/routes/dictionary.db
+      - ./backend/dictionary_db/dictionary.db:/app/backend/dictionary_db/dictionary.db
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=3)"]
       interval: 30s

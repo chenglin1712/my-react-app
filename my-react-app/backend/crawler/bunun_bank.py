@@ -14,7 +14,7 @@ level=3、level=4 在布農語（dialect_id=18/19/20/22，實測涵蓋卓群/卡
 題庫來源與可信度
 ----------------
 配合題詞彙**不寫死在程式碼裡**，出題當下即時查詢本專案既有的
-`backend/fastAPI/routes/dictionary.db`（辭典搜尋、詞彙遊戲等既有功能實際
+`backend/dictionary_db/dictionary.db`（辭典搜尋、詞彙遊戲等既有功能實際
 在用的同一份資料，來源標記「線上辭典」，即財團法人原住民族語言研究發展
 基金會 ILRDF 建置、原住民族委員會委託的「原住民族語言線上辭典」）。
 dictionary.db 裡的布農語詞條沒有標記次方言別（`dialect` 欄位皆為空），

@@ -24,7 +24,7 @@ export const renderStars = (fre) => {
   );
 };
 
-const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggleFavorite, wordName, playAudio, playSentence, isFavorited, failedAudio, audioAvailable }) => {
+const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggleFavorite, wordName, playAudio, playSentence, isFavorited, failedAudio, audioAvailable = true }) => {
   const handleToggleFavorite = useCallback(() => {
     toggleFavorite(wordName);
   }, [toggleFavorite, wordName]);
@@ -32,7 +32,13 @@ const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggle
   return (
   <ListGroup.Item key={keyName} className="d-flex flex-column">
     <div className="d-flex justify-content-between align-items-center">
-      <div onClick={() => toggleExpand(keyName)} style={{ cursor: 'pointer', flex: 1 }}>
+      <div
+        onClick={() => toggleExpand(keyName)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleExpand(keyName); } }}
+        style={{ cursor: 'pointer', flex: 1 }}
+      >
         <h3 className="fw-bolder text-danger">
           {result.name || '無資料'}
           {audioAvailable && result.audioItems?.length > 0 && !failedAudio?.has(result.audioItems[0].fileId) ? (
@@ -74,7 +80,7 @@ const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggle
                         <Button variant="link" aria-label="播放音訊" onClick={() => playAudio(ex.audioItems[0].fileId)}>
                           <FaPlayCircle size={20} className="text-warning" />
                         </Button>
-                      ) : ex.originalSentence?.trim() && (result.tribe === '布農語' || result.tribe === '排灣語') ? (
+                      ) : playSentence && ex.originalSentence?.trim() && (result.tribe === '布農語' || result.tribe === '排灣語') ? (
                         <Button variant="link" aria-label="播放音訊" onClick={() => playSentence(ex.originalSentence)}>
                           <FaPlayCircle size={20} className="text-warning" />
                         </Button>

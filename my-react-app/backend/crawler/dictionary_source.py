@@ -1,5 +1,5 @@
 """
-共用工具：即時查詢本專案既有的 `backend/fastAPI/routes/dictionary.db`
+共用工具：即時查詢本專案既有的 `backend/dictionary_db/dictionary.db`
 （原住民族語言線上辭典 ILRDF 資料，跟辭典搜尋、詞彙遊戲等功能共用同一份資料庫），
 供各族語 `xxx_bank.py` 的「中高級配合題」選題公式使用。
 
@@ -21,7 +21,7 @@ import sqlite3
 from config.tribes import TRIBE_IDS
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.normpath(os.path.join(BASE_DIR, "..", "fastAPI", "routes", "dictionary.db"))
+DB_PATH = os.path.normpath(os.path.join(BASE_DIR, "..", "dictionary_db", "dictionary.db"))
 
 
 def fetch_words_by_glosses(tribe, glosses):

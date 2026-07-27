@@ -5,7 +5,7 @@ crawler/dictionary_source.py（TRIBE_IDS）、CrosswordPuzzle/views.py（_TRIBE_
 各自重複寫了一份幾乎相同的族語對照表，新增族語要改五個地方。這裡集中成
 唯一資料來源，其餘檔案改成從這裡 import。
 
-id 對應 dictionary.db 的 tribe.id（見 fastAPI/routes/model.py 的 Tribe 表、
+id 對應 dictionary.db 的 tribe.id（見 dictionary_db/model.py 的 Tribe 表、
 alembic/versions/00a315a8dfa8_...），純資料、不依賴 Django 或 FastAPI，
 兩邊都能直接 import。
 """

@@ -13,6 +13,7 @@ import PermissionProtect from "../userServives/permissionProtect";
 import ErrorBoundary from "../errorBoundary";
 import { TRIBE_NAMES as TRIBES } from "../constants/tribes";
 import { categoryGroups } from "../constants/categoryGroups";
+import { filterAndSortWords } from "../../utils/wordFilterSort";
 import axios from 'axios';
 import "../../static/css/_favorite/index_judy.css"
 
@@ -440,50 +441,20 @@ const useFilterAndSort = (allWords) => {
       defins.some(def => (def.chineseExplanation || '').toLowerCase().includes(lowerQuery))
     );
   };
-  
+
+  // contentIds（收藏分類的內容）跟搜尋文字這兩項篩選是收藏頁特有的，篩過後
+  // 交給 utils/wordFilterSort.js 的共用函式處理開頭字母／詞頻／分類篩選與排序，
+  // 跟搜尋頁、相機頁使用同一套排序規則（含 -、ʼ 前綴修正）。
   const filterAndSort = (contentIds, state, selectedSubCategory) => {
-    return allWords
-      .filter(w => {
-        const tayal = (w.name || '').toLowerCase();
-        const matchId = contentIds.includes(w.name);
-        const matchLetter = !state.filterLetter || tayal.startsWith(state.filterLetter);
-        const fre=w.frequency || '';
-        let starCount = 0;
-        if (fre >= 0 && fre <= 200) starCount = 1;
-        else if (fre <= 400) starCount = 2;
-        else if (fre <= 800) starCount = 3;
-        else if (fre <= 1000) starCount = 4;
-        else starCount = 5;
-        const matchFreq = !state.frequencyFilter || starCount === parseInt(state.frequencyFilter);
-        const matchQuery = matchSearchCriteria(w, state.activeQuery);
-
-        const matchesCategory =
-          !selectedSubCategory ||
-          (w.explanationItems?.some(def => def.category?.includes(selectedSubCategory)) ||
-          w.category === selectedSubCategory);
-
-        return matchId && matchLetter && matchFreq && matchQuery && matchesCategory;
-      })
-      .sort((a, b) => {
-        const aFirst = (a.name || '').toLowerCase();
-        const bFirst = (b.name || '').toLowerCase();
-
-        
-        const aInitial = aFirst[0] || '';
-        const bInitial = bFirst[0] || '';
-
-        if (state.sortOrder === 'asc') {
-          // 升冪：A → Z → '
-          if (aInitial === "'" && bInitial !== "'") return 1;
-          if (aInitial !== "'" && bInitial === "'") return -1;
-          return aFirst.localeCompare(bFirst);
-        } else {
-          // 降冪：' → Z → A
-          if (aInitial === "'" && bInitial !== "'") return -1;
-          if (aInitial !== "'" && bInitial === "'") return 1;
-          return bFirst.localeCompare(aFirst);
-        }
-      });
+    const inTab = allWords.filter(
+      (w) => contentIds.includes(w.name) && matchSearchCriteria(w, state.activeQuery)
+    );
+    return filterAndSortWords(inTab, {
+      filterLetter: state.filterLetter,
+      frequencyFilter: state.frequencyFilter,
+      selectedSubCategory,
+      sortOrder: state.sortOrder,
+    });
   };
 
   return filterAndSort;

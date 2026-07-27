@@ -7,7 +7,7 @@ SQLAlchemy ORM 物件：原本快取直接存 db.query(Word).all() 的結果，�
 from unittest.mock import MagicMock
 
 from fastAPI.routes import quiz as quiz_module
-from fastAPI.routes.model import Word
+from dictionary_db.model import Word
 from fastAPI.routes.quiz import WordDTO, load_all_words
 
 

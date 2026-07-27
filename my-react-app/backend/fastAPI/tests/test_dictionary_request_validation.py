@@ -1,4 +1,4 @@
-"""測試 fastAPI/routes/dictionary.py 新增的 Pydantic 請求驗證：/keys/、/all/、
+"""測試 fastAPI/routes/dictionary/schemas.py 新增的 Pydantic 請求驗證：/keys/、/all/、
 /sentence-audio/ 原本直接吃 request.json() 後用 dict.get() 存取，沒有型別／長度
 驗證。這裡直接測 Pydantic model 本身（不用 TestClient 整套啟動 app——app 的
 lifespan 會觸發真正的 DB 快取預熱，不需要為了測請求驗證而牽扯進去）。

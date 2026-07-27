@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from .routes import crawler, vision, dictionary, quiz, listening, sentence, auth
-from .routes.connect import SessionLocal
+from dictionary_db.connect import SessionLocal
 from .rate_limit import limiter
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -77,8 +77,11 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
-# 允許的來源：從 .env 的 ALLOWED_ORIGINS 讀取（逗號分隔），開發預設允許 localhost
-_raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+# 允許的來源：從 .env 的 ALLOWED_ORIGINS 讀取（逗號分隔），開發預設允許 localhost。
+# 用 `os.getenv(key) or default` 而非 `os.getenv(key, default)`：後者的 default 只有在
+# key 完全沒出現在環境變數裡才生效，.env 留空字串（.env.example 的範本狀態）一樣算「有出現」，
+# 會變成空白名單擋掉所有跨來源請求。跟 Django 端 core/settings.py 的 ALLOWED_ORIGINS 同一套邏輯。
+_raw_origins = os.getenv("ALLOWED_ORIGINS") or "http://localhost:5173,http://127.0.0.1:5173"
 _allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 
 app.add_middleware(

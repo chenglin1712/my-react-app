@@ -1,4 +1,4 @@
-"""測試 fastAPI/routes/dictionary.py 的 _KeyedLock：原本 5 個部落（跟 3 個文法
+"""測試 fastAPI/routes/dictionary/keyed_lock.py 的 _KeyedLock：原本 5 個部落（跟 3 個文法
 快取）都共用同一把 threading.Lock()，冷啟動時不同部落的請求會不必要地互相排隊。
 改成依 key 各自一把鎖，這裡驗證同一個 key 每次拿到同一把鎖（真的能互斥同一個
 key 的重複請求），不同 key 拿到不同鎖（彼此不會互相排隊）。

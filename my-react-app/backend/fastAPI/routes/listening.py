@@ -2,9 +2,9 @@ import random
 import threading
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from fastAPI.routes.connect import get_db
-from fastAPI.routes.model import Word
-from fastAPI.routes.word_data import load_explanation_items_for_words, load_audio_items_for_words
+from dictionary_db.connect import get_db
+from dictionary_db.model import Word
+from dictionary_db.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS
 
 router = APIRouter()

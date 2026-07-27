@@ -12,7 +12,7 @@
 題庫來源與可信度
 ----------------
 配合題詞彙**不再把外語內容寫死在程式碼裡**，而是在每次出題時即時查詢
-本專案既有的 `backend/fastAPI/routes/dictionary.db`——這顆 SQLite 資料庫
+本專案既有的 `backend/dictionary_db/dictionary.db`——這顆 SQLite 資料庫
 就是「辭典搜尋」「詞彙遊戲」等既有功能實際在用的同一份資料，內容來源標記為
 「線上辭典」，經核對即財團法人原住民族語言研究發展基金會（ILRDF）建置、
 原住民族委員會委託的「原住民族語言線上辭典」(e-dictionary.ilrdf.org.tw)，

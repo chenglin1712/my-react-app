@@ -4,8 +4,8 @@
 落地的 bug 已修好——該 bug 會讓第二次 `upgrade head` 誤判 migration 還沒套用而
 重跑，撞上資料表已存在而失敗）。
 
-用 monkeypatch 把 fastAPI.routes.connect 的 engine 換成暫存檔案，完全不會碰到
-真正的 backend/fastAPI/routes/dictionary.db。
+用 monkeypatch 把 dictionary_db.connect 的 engine 換成暫存檔案，完全不會碰到
+真正的 backend/dictionary_db/dictionary.db。
 """
 import os
 
@@ -15,7 +15,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, event, inspect
 from sqlalchemy.pool import QueuePool
 
-from fastAPI.routes import connect as connect_module
+from dictionary_db import connect as connect_module
 
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ALEMBIC_DIR = os.path.join(BACKEND_DIR, "fastAPI", "alembic")

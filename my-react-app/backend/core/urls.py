@@ -30,7 +30,7 @@ urlpatterns = [
     path('CrosswordPuzzle/',include('CrosswordPuzzle.urls'))
     ]
 
-# Swagger UI 只在開發環境掛載，跟 fastAPI/routes/dictionary.py 的除錯用路由同一個
+# Swagger UI 只在開發環境掛載，跟 fastAPI/routes/dictionary/audio_proxy.py 的除錯用路由同一個
 # 標準：正式環境（DEBUG=False）完全不註冊這個 URL（直接 404），而不是註冊了再靠
 # permission_classes 擋，避免不小心漏改成 IsAuthenticated 之類的設定就整個曝光。
 if settings.DEBUG:
