@@ -1,4 +1,3 @@
-import logging.config
 import os
 import sys
 import uvicorn
@@ -23,7 +22,6 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 REQUIRED_VARS = {
     "CLOUD_API_KEY": "Google Cloud Vision API 金鑰（影像辨識功能）",
     "CLOUD_API_URL": "Google Cloud Vision API URL",
-    "VITE_AUDIO_FILE_URL": "音檔 API URL（語音比對功能）",
 }
 OPTIONAL_VARS = {
     "FFMPEG_PATH": "ffmpeg 路徑（語音比對功能，若系統 PATH 已有 ffmpeg 可省略）",
@@ -53,13 +51,12 @@ if missing_required:
 # ────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    from config.logging import get_logging_config  # noqa: E402
-    logging.config.dictConfig(get_logging_config("fastapi.log"))
-
+    # fastAPI.main 匯入時就會自己套用 config/logging.py 的 JSON + rotation 設定
+    # （不再只靠這支開發用啟動腳本手動呼叫，正式環境直接用 uvicorn 啟動也會套用）。
     from fastAPI.main import app  # noqa: E402  直接 import，不依賴 reload subprocess 重新解析路徑
     uvicorn.run(
         app,
         host="127.0.0.1",
         port=8001,
-        log_config=None,  # 不用 uvicorn 內建的純文字 log 設定，改用上面已套用的 JSON + rotation
+        log_config=None,  # 不用 uvicorn 內建的純文字 log 設定，改用 fastAPI.main 已套用的 JSON + rotation
     )

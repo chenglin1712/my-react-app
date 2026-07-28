@@ -5,6 +5,7 @@ from django.test import TestCase, Client
 from unittest.mock import patch, MagicMock
 
 from AIModel.views import search_tayal_words, search_tayal_words_bulk
+from AIModel.services import run_tayal_chat, run_review_tayal_chat
 
 
 class _FakeWord:
@@ -194,3 +195,68 @@ class ReviewTayalChatViewTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["translation"], "補充說明")
+
+
+class RunTayalChatServiceTest(TestCase):
+    """AIModel/services.py 的 run_tayal_chat：從 views.py 抽出來的 prompt 組裝／
+    LLM 呼叫／讀書計畫 JSON 解析邏輯，這裡直接測函式本身（不透過 HTTP），
+    確認抽取後行為跟原本內嵌在 view 裡時一致。"""
+
+    def test_plain_reply_returns_message_only(self):
+        client = _mock_chat_client("lokah su! 你的學習狀況不錯。")
+
+        result = run_tayal_chat(client, "泰雅語", "你好", {"level": "beginner"})
+
+        self.assertEqual(result, {"message": "lokah su! 你的學習狀況不錯。"})
+
+    def test_valid_study_plan_json_returns_plan_and_confirmation_message(self):
+        plan = {
+            "type": "study_plan",
+            "title": "一週讀書計畫",
+            "events": [
+                {"summary": "第一天", "start": "2026-01-02T10:00:00+08:00", "end": "2026-01-02T10:30:00+08:00"},
+            ],
+        }
+        client = _mock_chat_client(json.dumps(plan))
+
+        result = run_tayal_chat(client, "泰雅語", "幫我排一週讀書計畫", {})
+
+        self.assertEqual(result["study_plan"], plan)
+        self.assertIn("一週讀書計畫", result["message"])
+
+    def test_study_plan_missing_required_event_fields_falls_back_to_message(self):
+        # events 存在但缺 start/end，前端會直接用 event.start.split('T')，
+        # 不完整就不該被當成有效計畫
+        malformed = {"type": "study_plan", "title": "x", "events": [{"summary": "只有摘要"}]}
+        raw = json.dumps(malformed)
+        client = _mock_chat_client(raw)
+
+        result = run_tayal_chat(client, "泰雅語", "排計畫", {})
+
+        self.assertNotIn("study_plan", result)
+        self.assertEqual(result["message"], raw)
+
+    def test_non_json_reply_falls_back_to_message(self):
+        client = _mock_chat_client("{ this is not valid json")
+
+        result = run_tayal_chat(client, "泰雅語", "你好", {})
+
+        self.assertEqual(result, {"message": "{ this is not valid json"})
+
+
+class RunReviewTayalChatServiceTest(TestCase):
+    """AIModel/services.py 的 run_review_tayal_chat：確認回傳形狀與 relevant_words
+    原樣帶出（不重新查詢/不遺漏欄位）。"""
+
+    def test_returns_expected_shape(self):
+        client = _mock_chat_client("補充說明文字")
+        relevant_words = [{"tayal": "lokah", "audio": "f1", "chinese": "加油"}]
+
+        result = run_review_tayal_chat(client, "泰雅語", "lokah su", relevant_words)
+
+        self.assertEqual(result, {
+            "original": "lokah su",
+            "words": relevant_words,
+            "translation": "補充說明文字",
+            "image": None,
+        })

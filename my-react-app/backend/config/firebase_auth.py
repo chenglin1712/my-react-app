@@ -5,36 +5,18 @@ _ensure_firebase/verify_firebase_token，crawler app 完全沒有這層防護。
 統一抽到這裡，三處都改成 import，避免同一段邏輯（含 AUTH_DEV_BYPASS 判斷）
 散落多份、修一處忘了改另一處。
 
-FastAPI 版本邏輯相同但介面不同（Header 依賴注入），維持獨立實作於
-backend/fastAPI/routes/auth.py。
+FastAPI 版本介面不同（Header 依賴注入），獨立實作於 backend/fastAPI/routes/auth.py，
+但 SDK 初始化本身（ensure_firebase_initialized）已經抽到 config/firebase_init.py
+共用，兩邊只有各自把「金鑰沒設定」的例外轉成自己框架慣用的錯誤回應這段不同。
 """
 import logging
-import os
 
 from django.conf import settings as django_settings
 from django.http import JsonResponse
 
+from config.firebase_init import ensure_firebase_initialized
+
 logger = logging.getLogger(__name__)
-
-_firebase_initialized = False
-
-
-def _ensure_firebase():
-    global _firebase_initialized
-    if _firebase_initialized:
-        return
-    sa_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
-    if not sa_path:
-        raise EnvironmentError(
-            "FIREBASE_SERVICE_ACCOUNT_PATH 未設定，"
-            "請在 .env 填入 Firebase 服務帳戶金鑰路徑。"
-        )
-    import firebase_admin
-    from firebase_admin import credentials
-    if not firebase_admin._apps:
-        cred = credentials.Certificate(sa_path)
-        firebase_admin.initialize_app(cred)
-    _firebase_initialized = True
 
 
 def verify_firebase_token(request):
@@ -51,7 +33,7 @@ def verify_firebase_token(request):
         return None, JsonResponse({"detail": "需要登入才能使用此功能"}, status=401)
     token = auth_header[7:]
     try:
-        _ensure_firebase()
+        ensure_firebase_initialized()
         from firebase_admin import auth as firebase_auth
         decoded = firebase_auth.verify_id_token(token)
         return decoded, None

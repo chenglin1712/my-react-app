@@ -68,7 +68,7 @@ def test_valid_token_sets_request_state(monkeypatch):
     monkeypatch.setenv("AUTH_DEV_BYPASS", "False")
     request = _FakeRequest()
 
-    with patch.object(auth_module, "_ensure_firebase"):
+    with patch.object(auth_module, "ensure_firebase_initialized"):
         with patch("firebase_admin.auth.verify_id_token", return_value={"uid": "real-user"}):
             result = _run(auth_module.verify_firebase_token(request, authorization="Bearer sometoken"))
 
@@ -81,8 +81,26 @@ def test_invalid_token_returns_401(monkeypatch):
     monkeypatch.setenv("AUTH_DEV_BYPASS", "False")
     request = _FakeRequest()
 
-    with patch.object(auth_module, "_ensure_firebase"):
+    with patch.object(auth_module, "ensure_firebase_initialized"):
         with patch("firebase_admin.auth.verify_id_token", side_effect=Exception("bad token")):
             with pytest.raises(HTTPException) as exc_info:
                 _run(auth_module.verify_firebase_token(request, authorization="Bearer badtoken"))
     assert exc_info.value.status_code == 401
+
+
+def test_missing_service_account_returns_503(monkeypatch):
+    # ensure_firebase_initialized（config/firebase_init.py 共用）沒設定服務帳戶金鑰
+    # 時拋 EnvironmentError，這裡驗證 verify_firebase_token 有接住並轉成 503，
+    # 不會讓原始 EnvironmentError 直接往外傳。
+    monkeypatch.setenv("DJANGO_DEBUG", "False")
+    monkeypatch.setenv("AUTH_DEV_BYPASS", "False")
+    request = _FakeRequest()
+
+    with patch.object(
+        auth_module,
+        "ensure_firebase_initialized",
+        side_effect=EnvironmentError("FIREBASE_SERVICE_ACCOUNT_PATH 未設定"),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            _run(auth_module.verify_firebase_token(request, authorization="Bearer sometoken"))
+    assert exc_info.value.status_code == 503

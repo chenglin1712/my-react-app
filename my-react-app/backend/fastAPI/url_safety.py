@@ -2,8 +2,9 @@
 
 routes/dictionary.py 的 proxy_audio／debug_audio 與 routes/quiz.py 的
 fetch_audio_from_id 都是同一種模式：先對一個固定、半信任的第三方來源
-（ILRDF_AUDIO_API／VITE_AUDIO_FILE_URL）發第一次請求，取得它回傳的重導向網址
-或純文字網址，再對「那個網址」發第二次請求把實際內容抓回來。第二次請求的目標
+（見 config/audio_source.py 的 get_ilrdf_audio_api）發第一次請求，取得它
+回傳的重導向網址或純文字網址，再對「那個網址」發第二次請求把實際內容抓
+回來。第二次請求的目標
 完全由第一次請求的回應內容決定，原本沒有任何檢查——與 quiz.py 的
 compare_audio.reference_urls 已經修好、有白名單＋禁止 redirect 的作法不一致。
 

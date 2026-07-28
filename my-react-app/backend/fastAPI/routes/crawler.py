@@ -1,11 +1,23 @@
+"""即時爬取 ILRDF 線上辭典網站（e-dictionary.ilrdf.org.tw）的詞彙查詢頁面，
+直接解析回傳的 HTML（parse_word_html）取得詞義/例句/音檔連結。
+
+跟 routes/dictionary/ 套件的差異：dictionary/ 查的是本機 dictionary.db
+（ILRDF 資料已預先同步進來的 SQLite 副本），是主要辭典搜尋功能（前端 /search
+頁面）實際在用的路徑，走行程內快取，不必每次都對外發請求。這支檔案則是每次
+呼叫都即時對 ILRDF 網站送出請求＋解析 HTML，用於本機 DB 還沒收錄、需要直接
+從來源網站現查的情境；目前前端沒有呼叫這支端點（無對應的 fetch 呼叫），是
+獨立於主要搜尋功能之外、供手動查驗或未來收錄新詞彙用的輔助工具。
+"""
 import json
 import asyncio
+import logging
 import requests
 from fastapi import APIRouter,Request
 from fastapi.responses import JSONResponse
 from bs4 import BeautifulSoup
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 BASE_URL = "https://e-dictionary.ilrdf.org.tw"
 
@@ -145,4 +157,8 @@ async def search_tayal_dictionary(request: Request):
     except json.JSONDecodeError:
         return JSONResponse({"detail": "無效的 JSON 格式"}, status_code=400)
     except Exception as e:
-        return JSONResponse({"detail": str(e)}, status_code=500)
+        # 原本直接把 str(e) 回給前端，可能洩漏爬蟲實作細節（目標網站結構、
+        # 內部路徑等）；跟 dictionary.py 等其他端點的修正同一套做法，改成只
+        # 記 log，回傳通用訊息。
+        logger.exception(e)
+        return JSONResponse({"detail": "伺服器發生錯誤，請稍後再試"}, status_code=500)

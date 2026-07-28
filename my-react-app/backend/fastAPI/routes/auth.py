@@ -12,38 +12,17 @@ Authorization: Bearer <Firebase ID Token>。故意跟 DJANGO_DEBUG 分開成獨�
 """
 import asyncio
 import logging
-import os
 
 from fastapi import Header, HTTPException, Request
 
 from config.auth_flags import auth_dev_bypass
+from config.firebase_init import ensure_firebase_initialized
 
 logger = logging.getLogger(__name__)
-
-_firebase_initialized = False
 
 
 def _auth_dev_bypass() -> bool:
     return auth_dev_bypass("FASTAPI_AUTH_DEV_BYPASS")
-
-
-def _ensure_firebase():
-    global _firebase_initialized
-    if _firebase_initialized:
-        return
-    sa_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
-    if not sa_path:
-        raise HTTPException(
-            status_code=503,
-            detail="FIREBASE_SERVICE_ACCOUNT_PATH 未設定，請在 .env 填入 Firebase 服務帳戶金鑰路徑。",
-        )
-    import firebase_admin
-    from firebase_admin import credentials
-
-    if not firebase_admin._apps:
-        cred = credentials.Certificate(sa_path)
-        firebase_admin.initialize_app(cred)
-    _firebase_initialized = True
 
 
 async def verify_firebase_token(request: Request, authorization: str = Header(default=None)):
@@ -65,7 +44,10 @@ async def verify_firebase_token(request: Request, authorization: str = Header(de
         raise HTTPException(status_code=401, detail="需要登入才能使用此功能")
 
     token = authorization[len("Bearer "):]
-    _ensure_firebase()
+    try:
+        ensure_firebase_initialized()
+    except EnvironmentError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     from firebase_admin import auth as firebase_auth
 
     try:

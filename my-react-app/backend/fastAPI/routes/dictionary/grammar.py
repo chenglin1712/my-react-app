@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from dictionary_db.connect import get_db
 from config.tribes import TRIBE_MAP
 
-from .keyed_lock import _KeyedLock
+from ..keyed_cache import KeyedCache
 
 router = APIRouter()
 
@@ -21,93 +21,107 @@ logger = logging.getLogger(__name__)
 # 但 get_grammar 每次都要對 section/rule/example/affix 做好幾輪查詢，
 # 沿用 listening.py / sentence.py 的做法：每個 tribe 只在第一次請求時
 # 真正查詢一次，之後直接吃記憶體快取，避免重複的多輪 SQL 往返。
-_grammar_cache: Dict[str, Optional[dict]] = {}
-_grammar_locks = _KeyedLock()
-_grammar_affixes_cache: Dict[Tuple[str, str], dict] = {}
-_grammar_affixes_locks = _KeyedLock()
-_grammar_quiz_cache: Dict[Tuple[str, str], dict] = {}
-_grammar_quiz_locks = _KeyedLock()
+_grammar_cache: KeyedCache[str, dict] = KeyedCache()
+_grammar_affixes_cache: KeyedCache[Tuple[str, str], dict] = KeyedCache()
+_grammar_quiz_cache: KeyedCache[Tuple[str, str], dict] = KeyedCache()
+
+
+# _load_grammar 原本查詢與組裝混在同一個函式：4 層巢狀迴圈裡，每撈一批 row
+# 就地組進回應 dict，想確認「這條 SQL 對不對」或「這欄位怎麼組出來的」都得
+# 整個函式一起讀。拆成 _fetch_*（只呼叫 db.execute，回傳原始 row，不組任何
+# dict）與 _format_*（純資料轉換，不碰 db）兩類函式，查詢的次數/順序/範圍
+# 跟原本完全一致（例如詞綴仍是「每個 section 各查一次、只查該 section 內
+# 的 rule_ids」，不是合併成一次全 tribe 查詢）。
+
+def _fetch_grammar_sections(db: Session, tribe_name: str):
+    return db.execute(
+        text("SELECT id, section_order, section_key, title, description FROM grammar_section WHERE tribe_id = (SELECT id FROM tribe WHERE name = :tribe) ORDER BY section_order"),
+        {"tribe": tribe_name}
+    ).fetchall()
+
+
+def _fetch_section_rules(db: Session, section_id) -> list:
+    return db.execute(
+        text("SELECT id, rule_order, rule_key, title, structure, function, notes FROM grammar_rule WHERE section_id = :sid ORDER BY rule_order"),
+        {"sid": section_id}
+    ).fetchall()
+
+
+def _fetch_rule_affix_map(db: Session, rule_ids: list) -> Dict[int, list]:
+    affix_map: Dict[int, list] = {rid: [] for rid in rule_ids}
+    if rule_ids:
+        affix_rows = db.execute(
+            text("SELECT ra.rule_id, a.affix FROM grammar_rule_affix ra JOIN grammar_affix a ON a.id = ra.affix_id WHERE ra.rule_id IN :rule_ids")
+            .bindparams(bindparam("rule_ids", expanding=True)),
+            {"rule_ids": rule_ids}
+        ).fetchall()
+        for r_id, affix in affix_rows:
+            affix_map[r_id].append(affix)
+    return affix_map
+
+
+def _fetch_rule_examples(db: Session, rule_id) -> list:
+    return db.execute(
+        text("SELECT id, example_order, tribe_text, chinese_text, analysis FROM grammar_example WHERE rule_id = :rid ORDER BY example_order"),
+        {"rid": rule_id}
+    ).fetchall()
+
+
+def _format_rule(rule_row, affix_map: Dict[int, list], examples: list) -> dict:
+    r_id, r_order, r_key, r_title, r_struct, r_func, r_notes = rule_row
+    return {
+        "id": r_id,
+        "order": r_order,
+        "rule_key": r_key,
+        "title": r_title,
+        "structure": r_struct,
+        "function": r_func,
+        "notes": r_notes,
+        "affix_tags": affix_map.get(r_id, []),
+        "examples": [
+            {
+                "id": ex[0],
+                "tribe_text": ex[2],
+                "chinese_text": ex[3],
+                "analysis": ex[4],
+                "linked_word_ids": [],
+            }
+            for ex in examples
+        ],
+    }
+
+
+def _format_section(section_row, rules_out: list) -> dict:
+    sec_id, s_order, s_key, s_title, s_desc = section_row
+    return {
+        "id": sec_id,
+        "order": s_order,
+        "section_key": s_key,
+        "title": s_title,
+        "description": s_desc,   # 純文字，直接回傳
+        "rules": rules_out,
+    }
 
 
 def _load_grammar(db: Session, tribe_name: str) -> Optional[dict]:
-    if tribe_name in _grammar_cache:
-        return _grammar_cache[tribe_name]
-
-    with _grammar_locks.get(tribe_name):
-        if tribe_name in _grammar_cache:
-            return _grammar_cache[tribe_name]
-
-        sections = db.execute(
-            text("SELECT id, section_order, section_key, title, description FROM grammar_section WHERE tribe_id = (SELECT id FROM tribe WHERE name = :tribe) ORDER BY section_order"),
-            {"tribe": tribe_name}
-        ).fetchall()
-
+    def _compute():
+        sections = _fetch_grammar_sections(db, tribe_name)
         if not sections:
             return None
 
         result = []
         for sec in sections:
-            sec_id, s_order, s_key, s_title, s_desc = sec
+            rules = _fetch_section_rules(db, sec[0])
+            affix_map = _fetch_rule_affix_map(db, [r[0] for r in rules])
+            rules_out = [
+                _format_rule(rule, affix_map, _fetch_rule_examples(db, rule[0]))
+                for rule in rules
+            ]
+            result.append(_format_section(sec, rules_out))
 
-            rules = db.execute(
-                text("SELECT id, rule_order, rule_key, title, structure, function, notes FROM grammar_rule WHERE section_id = :sid ORDER BY rule_order"),
-                {"sid": sec_id}
-            ).fetchall()
+        return {"tribe": tribe_name, "sections": result}
 
-            # 一次取出本 section 所有 rule 對應的詞綴
-            rule_ids = [r[0] for r in rules]
-            affix_map: Dict[int, list] = {rid: [] for rid in rule_ids}
-            if rule_ids:
-                affix_rows = db.execute(
-                    text("SELECT ra.rule_id, a.affix FROM grammar_rule_affix ra JOIN grammar_affix a ON a.id = ra.affix_id WHERE ra.rule_id IN :rule_ids")
-                    .bindparams(bindparam("rule_ids", expanding=True)),
-                    {"rule_ids": rule_ids}
-                ).fetchall()
-                for r_id, affix in affix_rows:
-                    affix_map[r_id].append(affix)
-
-            rules_out = []
-            for rule in rules:
-                r_id, r_order, r_key, r_title, r_struct, r_func, r_notes = rule
-
-                examples = db.execute(
-                    text("SELECT id, example_order, tribe_text, chinese_text, analysis FROM grammar_example WHERE rule_id = :rid ORDER BY example_order"),
-                    {"rid": r_id}
-                ).fetchall()
-
-                rules_out.append({
-                    "id": r_id,
-                    "order": r_order,
-                    "rule_key": r_key,
-                    "title": r_title,
-                    "structure": r_struct,
-                    "function": r_func,
-                    "notes": r_notes,
-                    "affix_tags": affix_map.get(r_id, []),
-                    "examples": [
-                        {
-                            "id": ex[0],
-                            "tribe_text": ex[2],
-                            "chinese_text": ex[3],
-                            "analysis": ex[4],
-                            "linked_word_ids": [],
-                        }
-                        for ex in examples
-                    ],
-                })
-
-            result.append({
-                "id": sec_id,
-                "order": s_order,
-                "section_key": s_key,
-                "title": s_title,
-                "description": s_desc,   # 純文字，直接回傳
-                "rules": rules_out,
-            })
-
-        payload = {"tribe": tribe_name, "sections": result}
-        _grammar_cache[tribe_name] = payload
-        return payload
+    return _grammar_cache.get_or_compute(tribe_name, _compute)
 
 
 @router.get("/grammar/{tribe}")
@@ -208,13 +222,8 @@ def search_grammar(tribe: str, q: str, db: Session = Depends(get_db)):
 
 def _load_grammar_affixes(db: Session, tribe_name: str, affix_type: Optional[str]) -> dict:
     key = (tribe_name, affix_type or "")
-    if key in _grammar_affixes_cache:
-        return _grammar_affixes_cache[key]
 
-    with _grammar_affixes_locks.get(key):
-        if key in _grammar_affixes_cache:
-            return _grammar_affixes_cache[key]
-
+    def _compute():
         if affix_type:
             rows = db.execute(
                 text("""
@@ -242,7 +251,7 @@ def _load_grammar_affixes(db: Session, tribe_name: str, affix_type: Optional[str
                 {"tribe": tribe_name}
             ).fetchall()
 
-        payload = {
+        return {
             "tribe": tribe_name,
             "affixes": [
                 {"id": r[0], "affix": r[1], "affix_type": r[2],
@@ -251,8 +260,8 @@ def _load_grammar_affixes(db: Session, tribe_name: str, affix_type: Optional[str
                 for r in rows
             ]
         }
-        _grammar_affixes_cache[key] = payload
-        return payload
+
+    return _grammar_affixes_cache.get_or_compute(key, _compute)
 
 
 @router.get("/grammar/{tribe}/affixes")
@@ -282,13 +291,8 @@ def get_grammar_affixes(
 
 def _load_grammar_quiz_material(db: Session, tribe_name: str, section_key: Optional[str]) -> dict:
     key = (tribe_name, section_key or "")
-    if key in _grammar_quiz_cache:
-        return _grammar_quiz_cache[key]
 
-    with _grammar_quiz_locks.get(key):
-        if key in _grammar_quiz_cache:
-            return _grammar_quiz_cache[key]
-
+    def _compute():
         if section_key:
             rows = db.execute(
                 text("""
@@ -351,12 +355,12 @@ def _load_grammar_quiz_material(db: Session, tribe_name: str, section_key: Optio
                 "linked_word_ids": [],
             })
 
-        payload = {
+        return {
             "tribe": tribe_name,
             "rules": list(rules_map.values()),
         }
-        _grammar_quiz_cache[key] = payload
-        return payload
+
+    return _grammar_quiz_cache.get_or_compute(key, _compute)
 
 
 @router.get("/grammar/{tribe}/quiz")

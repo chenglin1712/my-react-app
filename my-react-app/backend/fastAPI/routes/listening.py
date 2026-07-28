@@ -1,28 +1,21 @@
 import random
-import threading
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from dictionary_db.connect import get_db
 from dictionary_db.model import Word
 from dictionary_db.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS
+from .keyed_cache import KeyedCache
 
 router = APIRouter()
 
 # 每個族語的有效詞彙（有音檔+有中文解釋）只在第一次請求時查詢+解析一次，
 # 之後直接從記憶體回傳，不用每個 request 都重新撈全表、重新 parse JSON。
-_valid_words_cache: dict[str, list[dict]] = {}
-_valid_words_cache_lock = threading.Lock()
+_valid_words_cache: KeyedCache[str, list] = KeyedCache()
 
 
 def _load_valid_words(db: Session, tribe_id: str) -> list[dict]:
-    if tribe_id in _valid_words_cache:
-        return _valid_words_cache[tribe_id]
-
-    with _valid_words_cache_lock:
-        if tribe_id in _valid_words_cache:
-            return _valid_words_cache[tribe_id]
-
+    def _compute():
         words = db.query(Word).filter(Word.tribe_id == tribe_id).all()
         audio_map = load_audio_items_for_words(db, tribe_id=tribe_id)
         explanation_map = load_explanation_items_for_words(db, tribe_id=tribe_id)
@@ -44,9 +37,9 @@ def _load_valid_words(db: Session, tribe_id: str) -> list[dict]:
                 'audio_id': audio_items[0]['fileId'],
                 'meaning': cn,
             })
-
-        _valid_words_cache[tribe_id] = valid_words
         return valid_words
+
+    return _valid_words_cache.get_or_compute(tribe_id, _compute)
 
 
 def warm_cache(db: Session) -> None:

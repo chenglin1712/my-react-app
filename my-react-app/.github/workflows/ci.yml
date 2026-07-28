@@ -54,7 +54,7 @@ jobs:
       DJANGO_DEBUG: "True"
       AUTH_DEV_BYPASS: "True"
       GITHUB_TOKEN: ci-dummy-token
-      VITE_AUDIO_FILE_URL: https://example.invalid/audio/
+      AUDIO_FILE_URL: https://example.invalid/audio/
     steps:
       - uses: actions/checkout@v4
 

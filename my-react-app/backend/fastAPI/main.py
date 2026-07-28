@@ -1,4 +1,5 @@
 import logging
+import logging.config
 import threading
 from contextlib import asynccontextmanager
 
@@ -8,40 +9,35 @@ from dictionary_db.connect import SessionLocal
 from .rate_limit import limiter
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-import os
 
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
+from config.logging import get_logging_config
+from config.sentry_init import init_sentry
+from config.cors import get_allowed_origins
+
 load_dotenv()
+
+# 結構化 JSON log + rotation（見 config/logging.py），Django 端共用同一套設定
+# （core/settings.py 的 LOGGING）。原本只有 run_fastapi.py 這個本機開發用的
+# 啟動腳本會呼叫，正式環境直接用 `uvicorn fastAPI.main:app` 啟動時從未套用，
+# 等於正式環境的 FastAPI log 全部落回 uvicorn 預設的純文字輸出（沒有 JSON
+# 格式、沒有 rotation）。搬到這裡讓 main.py 本身在任何啟動方式下都會套用。
+logging.config.dictConfig(get_logging_config("fastapi.log"))
 
 logger = logging.getLogger(__name__)
 
-# 錯誤追蹤／告警（選用，設定 SENTRY_DSN 後才會啟用），與 Django 端
-# core/settings.py 同一套邏輯與說明。未設定時完全不影響現有行為。
-_sentry_dsn = os.getenv("SENTRY_DSN")
-if _sentry_dsn:
-    import sentry_sdk
+# 錯誤追蹤／告警（選用，設定 SENTRY_DSN 後才會啟用）。共用邏輯見
+# config/sentry_init.py（Django 端 core/settings.py 呼叫同一個函式）。
+def _fastapi_sentry_integrations():
     from sentry_sdk.integrations.starlette import StarletteIntegration
     from sentry_sdk.integrations.fastapi import FastApiIntegration
-    from sentry_sdk.integrations.logging import LoggingIntegration
+    return [StarletteIntegration(), FastApiIntegration()]
 
-    # SENTRY_ENVIRONMENT 沒設定時的預設值跟著 DJANGO_DEBUG 走（兩服務共用同一個
-    # 旗標），跟 core/settings.py 同一套邏輯：原本這裡固定寫死 "production"，
-    # 本機開發（DJANGO_DEBUG=True）測試時觸發的錯誤會被誤標成 production 事件。
-    _fastapi_debug = os.getenv("DJANGO_DEBUG", "False") == "True"
-    sentry_sdk.init(
-        dsn=_sentry_dsn,
-        environment=os.getenv("SENTRY_ENVIRONMENT", "production" if not _fastapi_debug else "development"),
-        integrations=[
-            StarletteIntegration(),
-            FastApiIntegration(),
-            LoggingIntegration(level=None, event_level="ERROR"),
-        ],
-        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0")),
-        send_default_pii=False,
-    )
+
+init_sentry(_fastapi_sentry_integrations)
 
 
 def _warm_caches():
@@ -77,16 +73,11 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
-# 允許的來源：從 .env 的 ALLOWED_ORIGINS 讀取（逗號分隔），開發預設允許 localhost。
-# 用 `os.getenv(key) or default` 而非 `os.getenv(key, default)`：後者的 default 只有在
-# key 完全沒出現在環境變數裡才生效，.env 留空字串（.env.example 的範本狀態）一樣算「有出現」，
-# 會變成空白名單擋掉所有跨來源請求。跟 Django 端 core/settings.py 的 ALLOWED_ORIGINS 同一套邏輯。
-_raw_origins = os.getenv("ALLOWED_ORIGINS") or "http://localhost:5173,http://127.0.0.1:5173"
-_allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
-
+# 允許的來源：讀取/預設值邏輯見 config/cors.py（跟 Django 端 core/settings.py
+# 的 CORS_ALLOWED_ORIGINS 共用同一份，避免兩邊各自維護一份一模一樣的寫法）。
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_allowed_origins,
+    allow_origins=get_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

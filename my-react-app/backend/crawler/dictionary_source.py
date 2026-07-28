@@ -14,14 +14,12 @@ dictionary.db 查詢，不再把詞彙內容複製一份寫死在程式碼裡—
 的 CLOZE_PASSAGES 仍是人工從 dictionary.db 的真實例句裡挑選、核對後寫入。
 """
 
-import os
 import random
-import sqlite3
+
+from sqlalchemy import text
 
 from config.tribes import TRIBE_IDS
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.normpath(os.path.join(BASE_DIR, "..", "dictionary_db", "dictionary.db"))
+from dictionary_db.connect import SessionLocal
 
 
 def fetch_words_by_glosses(tribe, glosses):
@@ -40,29 +38,32 @@ def fetch_words_by_glosses(tribe, glosses):
     gloss_set = set(glosses)
     found = {}
 
+    # 走 dictionary_db.connect 共用的 SessionLocal（而非原生 sqlite3.connect
+    # 直接開檔），這樣才會走 SQLAlchemy 的 QueuePool，且連線時自動套用該
+    # engine 的 connect event listener（PRAGMA foreign_keys / journal_mode =
+    # WAL），避免高流量下和其他 SQLAlchemy 連線競爭 WAL 鎖——同一顆
+    # dictionary.db 同時被 FastAPI 辭典/測驗端點與這裡存取，理由跟
+    # CrosswordPuzzle/views.py 的 _get_words_from_db 一致。
     # explanation_items 已經拆到 word_explanation 表，改成 JOIN 一次撈出
     # 每個字的所有解釋（一個字可能有多筆解釋，所以不能只取第一筆）。
-    con = sqlite3.connect(DB_PATH)
+    db = SessionLocal()
     try:
-        con.row_factory = sqlite3.Row
-        cur = con.cursor()
-        cur.execute(
-            """SELECT w.name AS name, we.chinese_explanation AS chinese_explanation
-               FROM words w
-               JOIN word_explanation we ON we.word_id = w.id
-               WHERE w.tribe_id = ?""",
-            (tribe_id,),
-        )
-        rows = cur.fetchall()
+        rows = db.execute(
+            text("""SELECT w.name AS name, we.chinese_explanation AS chinese_explanation
+                    FROM words w
+                    JOIN word_explanation we ON we.word_id = w.id
+                    WHERE w.tribe_id = :tribe_id"""),
+            {"tribe_id": tribe_id},
+        ).fetchall()
     finally:
-        con.close()
+        db.close()
 
     for row in rows:
-        expl = (row["chinese_explanation"] or "").strip()
+        expl = (row.chinese_explanation or "").strip()
         if expl in gloss_set and expl not in found:
             # 部分詞條的外語拼寫本身在資料庫裡就帶有多餘的前後空白
             # （資料建檔瑕疵），這裡順手清掉，避免顯示或比對時出錯。
-            found[expl] = {"word": (row["name"] or "").strip(), "chinese": expl}
+            found[expl] = {"word": (row.name or "").strip(), "chinese": expl}
 
     return found
 

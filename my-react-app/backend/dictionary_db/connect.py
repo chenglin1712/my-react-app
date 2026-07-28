@@ -3,13 +3,15 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import QueuePool
 import os
 
+from config.debug_flag import is_debug
+
 # 替換為實際路徑，這裡假設在同一資料夾中
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "dictionary.db")
 
 # 與 Django 共用同一份 .env：DJANGO_DEBUG=True 時才印出每一條 SQL（本機開發用），
 # 正式環境（DJANGO_DEBUG=False）不印，避免拖垮效能。
-_DEBUG = os.getenv("DJANGO_DEBUG", "False") == "True"
+_DEBUG = is_debug()
 
 # 連線引擎（connect_args 是 SQLite 特有的）
 # 明確指定 QueuePool 大小並開啟 pool_pre_ping，取代預設值，

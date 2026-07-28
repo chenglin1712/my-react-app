@@ -18,7 +18,7 @@ from dictionary_db.word_data import (
 from config.tribes import TRIBE_MAP
 from fastAPI.rate_limit import limiter
 
-from .keyed_lock import _KeyedLock
+from ..keyed_cache import KeyedCache
 from .schemas import (
     AllWordsRequest,
     KeywordRequest,
@@ -51,25 +51,18 @@ def _tribe_id_subquery(tribe_name: str):
 # 原本每次呼叫都對 Word table 做一次 tribe 全表掃描＋JSON parse。
 # 沿用 listening.py 的做法：每個 tribe 的詞條只在第一次用到時真正查詢＋解析一次，
 # 之後直接從記憶體快取的 WordResult 清單做過濾，不用每個 request 都重新打 DB。
-_tribe_words_cache: Dict[str, List[WordResult]] = {}
-_tribe_words_locks = _KeyedLock()
+_tribe_words_cache: KeyedCache[str, List[WordResult]] = KeyedCache()
 
 
 def _load_tribe_words(db: Session, tribe: str) -> List[WordResult]:
-    if tribe in _tribe_words_cache:
-        return _tribe_words_cache[tribe]
-
-    with _tribe_words_locks.get(tribe):
-        if tribe in _tribe_words_cache:
-            return _tribe_words_cache[tribe]
-
+    def _compute():
         words = db.query(Word).filter(Word.tribe_id == _tribe_id_subquery(tribe)).all()
         tribe_id = words[0].tribe_id if words else None
         sources_map = load_sources_for_words(db, tribe_id)
         audio_map = load_audio_items_for_words(db, tribe_id)
         explanation_map = load_explanation_items_for_words(db, tribe_id)
 
-        results = [
+        return [
             WordResult(
                 id=word.id,
                 tribeId=word.tribe_id,
@@ -94,8 +87,8 @@ def _load_tribe_words(db: Session, tribe: str) -> List[WordResult]:
             )
             for word in words
         ]
-        _tribe_words_cache[tribe] = results
-        return results
+
+    return _tribe_words_cache.get_or_compute(tribe, _compute)
 
 
 def warm_cache(db: Session) -> None:

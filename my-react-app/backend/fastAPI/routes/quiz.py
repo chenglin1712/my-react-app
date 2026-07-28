@@ -13,8 +13,10 @@ from dictionary_db.connect import get_db
 from dictionary_db.model import Word
 from dictionary_db.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS
+from config.audio_source import get_ilrdf_audio_api
 from fastAPI.rate_limit import limiter
 from fastAPI.url_safety import is_safe_redirect_target
+from .keyed_cache import KeyedCache
 
 
 @dataclass(frozen=True)
@@ -38,7 +40,6 @@ from pydub import AudioSegment
 import torch
 import torchaudio
 import torch.nn.functional as F
-from dotenv import load_dotenv
 import os
 import soundfile as sf
 
@@ -206,32 +207,30 @@ def compute_score(Ptheta: float, Bq: float) -> float:
 # ----------------------------
 # DB helper: load all words (module-level cache)
 # ----------------------------
-_words_cache: Dict[str, List[WordDTO]] = {}
+_words_cache: KeyedCache[str, List[WordDTO]] = KeyedCache()
 _word_explanations_cache: Dict[str, List[dict]] = {}
 _word_audios_cache: Dict[str, List[dict]] = {}
-_words_cache_lock = threading.Lock()
 
 def load_all_words(db: Optional[Session] = None, tribe_id: Optional[str] = None) -> List[WordDTO]:
     """依 tribe_id 載入該族語的詞彙清單（模組級快取，每個族語第一次請求時查詢一次）。
     word id 在 words 表裡全域唯一，不同族語不會撞號，所以 explanation/audio 快取
     繼續當成單一全域字典累加即可，只有 _words_cache（出題用的候選單字清單）需要
     依族語分開存，避免出題時把不同族語的單字混在同一份候選池裡。"""
-    global _words_cache, _word_explanations_cache, _word_audios_cache
     if tribe_id in _words_cache:
-        return _words_cache[tribe_id]
+        return _words_cache.get(tribe_id)
     if not db:
         return []
-    with _words_cache_lock:
-        if tribe_id not in _words_cache:
-            query = db.query(Word)
-            if tribe_id:
-                query = query.filter(Word.tribe_id == tribe_id)
-            _words_cache[tribe_id] = [
-                WordDTO(id=w.id, name=w.name, frequency=w.frequency) for w in query.all()
-            ]
-            _word_explanations_cache.update(load_explanation_items_for_words(db, tribe_id=tribe_id))
-            _word_audios_cache.update(load_audio_items_for_words(db, tribe_id=tribe_id))
-    return _words_cache[tribe_id]
+
+    def _compute():
+        query = db.query(Word)
+        if tribe_id:
+            query = query.filter(Word.tribe_id == tribe_id)
+        words = [WordDTO(id=w.id, name=w.name, frequency=w.frequency) for w in query.all()]
+        _word_explanations_cache.update(load_explanation_items_for_words(db, tribe_id=tribe_id))
+        _word_audios_cache.update(load_audio_items_for_words(db, tribe_id=tribe_id))
+        return words
+
+    return _words_cache.get_or_compute(tribe_id, _compute)
 
 
 def warm_cache(db: Session) -> None:
@@ -601,14 +600,11 @@ def make_error(step: str, msg: str):
 
 # 1. 下載語音
 def fetch_audio_from_id(audio_id: str):
-    load_dotenv()
-    VITE_AUDIO_FILE_URL = os.getenv("VITE_AUDIO_FILE_URL")
-    if not VITE_AUDIO_FILE_URL:
-        raise EnvironmentError(
-            "環境變數 VITE_AUDIO_FILE_URL 未設定，語音比對功能無法使用。"
-            "請在 .env 填入音檔 API URL。"
-        )
-    api_url = VITE_AUDIO_FILE_URL + audio_id
+    # 網址單一資料來源見 config/audio_source.py：原本這裡跟 dictionary/
+    # audio_proxy.py 的 debug_audio 各自讀環境變數，audio_proxy.py 的正式路徑
+    # （proxy_audio，全站辭典發音實際在走的路徑）卻是另一個寫死的 Python 常數，
+    # 三處各自一份、容易改了環境變數卻漏改寫死常數那條路徑。
+    api_url = get_ilrdf_audio_api() + audio_id
 
     # 第一次請求取得重導向 URL
     resp = requests.get(api_url, allow_redirects=False, timeout=10)

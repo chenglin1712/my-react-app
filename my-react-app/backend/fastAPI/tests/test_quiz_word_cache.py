@@ -7,6 +7,7 @@ SQLAlchemy ORM 物件：原本快取直接存 db.query(Word).all() 的結果，�
 from unittest.mock import MagicMock
 
 from fastAPI.routes import quiz as quiz_module
+from fastAPI.routes.keyed_cache import KeyedCache
 from dictionary_db.model import Word
 from fastAPI.routes.quiz import WordDTO, load_all_words
 
@@ -20,7 +21,7 @@ def _make_fake_word(word_id, name, frequency):
 
 
 def test_load_all_words_caches_dto_not_orm_object(monkeypatch):
-    monkeypatch.setattr(quiz_module, "_words_cache", {})
+    monkeypatch.setattr(quiz_module, "_words_cache", KeyedCache())
     monkeypatch.setattr(quiz_module, "_word_explanations_cache", {})
     monkeypatch.setattr(quiz_module, "_word_audios_cache", {})
     monkeypatch.setattr(quiz_module, "load_explanation_items_for_words", lambda db, tribe_id=None: {})
@@ -40,7 +41,7 @@ def test_load_all_words_caches_dto_not_orm_object(monkeypatch):
 def test_cached_dto_survives_after_db_session_is_gone(monkeypatch):
     # 模擬「快取住的物件跟 session 生命週期脫鉤」：DTO 建好之後，就算原本的
     # db/query 物件被丟棄或關閉，快取裡的 DTO 仍然是完整、獨立可用的純資料。
-    monkeypatch.setattr(quiz_module, "_words_cache", {})
+    monkeypatch.setattr(quiz_module, "_words_cache", KeyedCache())
     monkeypatch.setattr(quiz_module, "_word_explanations_cache", {})
     monkeypatch.setattr(quiz_module, "_word_audios_cache", {})
     monkeypatch.setattr(quiz_module, "load_explanation_items_for_words", lambda db, tribe_id=None: {})

@@ -1,28 +1,21 @@
 import random
-import threading
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from dictionary_db.connect import get_db
 from dictionary_db.model import Word
 from dictionary_db.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS
+from .keyed_cache import KeyedCache
 
 router = APIRouter()
 
 # 每個族語去重後的例句清單只在第一次請求時查詢+解析一次，
 # 之後直接從記憶體回傳，不用每個 request 都重新撈全表、重新 parse JSON。
-_unique_sentences_cache: dict[str, list[dict]] = {}
-_unique_sentences_cache_lock = threading.Lock()
+_unique_sentences_cache: KeyedCache[str, list] = KeyedCache()
 
 
 def _load_unique_sentences(db: Session, tribe_id: str) -> list[dict]:
-    if tribe_id in _unique_sentences_cache:
-        return _unique_sentences_cache[tribe_id]
-
-    with _unique_sentences_cache_lock:
-        if tribe_id in _unique_sentences_cache:
-            return _unique_sentences_cache[tribe_id]
-
+    def _compute():
         words = db.query(Word).filter(Word.tribe_id == tribe_id).all()
         explanation_map = load_explanation_items_for_words(db, tribe_id=tribe_id)
         audio_map = load_audio_items_for_words(db, tribe_id=tribe_id)
@@ -54,9 +47,9 @@ def _load_unique_sentences(db: Session, tribe_id: str) -> list[dict]:
             if s['tayal'] not in seen:
                 seen.add(s['tayal'])
                 unique_sentences.append(s)
-
-        _unique_sentences_cache[tribe_id] = unique_sentences
         return unique_sentences
+
+    return _unique_sentences_cache.get_or_compute(tribe_id, _compute)
 
 
 def warm_cache(db: Session) -> None:

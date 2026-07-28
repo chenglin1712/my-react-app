@@ -15,6 +15,9 @@ from dotenv import load_dotenv
 
 from config.logging import get_logging_config
 from config.auth_flags import auth_dev_bypass
+from config.debug_flag import is_debug
+from config.sentry_init import init_sentry
+from config.cors import get_allowed_origins
 
 load_dotenv()
 
@@ -34,7 +37,7 @@ if not SECRET_KEY:
     )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO_DEBUG", "False") == "True"
+DEBUG = is_debug()
 
 # 是否略過 Firebase token 驗證（僅限本機開發）。互鎖判斷邏輯與 FastAPI 端共用
 # （見 config/auth_flags.py），避免兩邊各自實作、修一處忘了改另一處。
@@ -106,14 +109,9 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-# os.getenv(key, default) 的 default 只有在 key 完全沒出現在環境變數裡才會生效；
-# .env 裡寫了 KEY=（有這一行、值是空字串）一樣算「有出現」，default 不會生效，
-# 會直接把內建的本機開發預設值蓋掉變成空清單。.env.example 的 CSRF_TRUSTED_ORIGINS
-# 就是留空當範本（要求填正式網域），照抄不改就會踩到這個情況——目前因為 Django
-# admin 未啟用、其餘端點都走 Bearer token 而沒有實際影響，但未來一旦啟用 admin
-# 就會踩到。改用 `os.getenv(key) or default`，空字串跟完全沒設定都會落到預設值。
-_raw_cors = os.getenv("ALLOWED_ORIGINS") or "http://localhost:5173,http://127.0.0.1:5173"
-CORS_ALLOWED_ORIGINS = [o.strip() for o in _raw_cors.split(",") if o.strip()]
+# 讀取/預設值邏輯見 config/cors.py（跟 fastAPI/main.py 共用同一份，
+# 避免兩邊各自維護一份一模一樣的 os.getenv(key) or default 寫法）。
+CORS_ALLOWED_ORIGINS = get_allowed_origins()
 # CSRF
 # 正式部署的網域跟 ALLOWED_HOSTS 一樣改讀環境變數（逗號分隔），不再寫死單一
 # 平台的網址——先前寫死一個 Cloud Run URL，但 ALLOWED_HOSTS 只認 Render 的
@@ -237,22 +235,11 @@ LOGGING = get_logging_config("django.log")
 # 錯誤追蹤／告警（選用，設定 SENTRY_DSN 後才會啟用）。原本沒有接任何錯誤追蹤
 # 服務，結構化 log 只寫在容器本機檔案，Cloud Run/Render 重啟就消失，出錯（含
 # 呼叫 Google Vision、GitHub Models 這些按用量計費的外部服務失敗）不會有人
-# 主動被通知。未設定 SENTRY_DSN 時完全不影響現有行為。
-_sentry_dsn = os.getenv("SENTRY_DSN")
-if _sentry_dsn:
-    import sentry_sdk
+# 主動被通知。未設定 SENTRY_DSN 時完全不影響現有行為。共用邏輯見
+# config/sentry_init.py（FastAPI 端 fastAPI/main.py 呼叫同一個函式）。
+def _django_sentry_integrations():
     from sentry_sdk.integrations.django import DjangoIntegration
-    from sentry_sdk.integrations.logging import LoggingIntegration
+    return [DjangoIntegration()]
 
-    sentry_sdk.init(
-        dsn=_sentry_dsn,
-        environment=os.getenv("SENTRY_ENVIRONMENT", "production" if not DEBUG else "development"),
-        integrations=[
-            DjangoIntegration(),
-            # 結構化 log（config/logging.py）本來就會記錄的 ERROR 等級以上訊息，
-            # 一併送一份到 Sentry 當成事件，不用另外在每個 view 補呼叫。
-            LoggingIntegration(level=None, event_level="ERROR"),
-        ],
-        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0")),
-        send_default_pii=False,
-    )
+
+init_sentry(_django_sentry_integrations)

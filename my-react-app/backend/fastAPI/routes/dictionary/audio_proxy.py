@@ -1,10 +1,8 @@
 import asyncio
 import logging
-import os
 import re
 
 import httpx
-from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -13,6 +11,8 @@ from dictionary_db.connect import get_db
 from dictionary_db.model import Word
 from dictionary_db.word_data import load_audio_items_for_words
 from config.tribes import TRIBE_MAP
+from config.debug_flag import is_debug
+from config.audio_source import get_ilrdf_audio_api
 from fastAPI.rate_limit import limiter
 from fastAPI.url_safety import is_safe_redirect_target
 
@@ -23,13 +23,11 @@ router = APIRouter()
 
 logger = logging.getLogger(__name__)
 
-ILRDF_AUDIO_API = "https://e-dictionary.ilrdf.org.tw/api/app/file/download-file/"
-
 @router.get("/audio/{file_id:path}")
 @limiter.limit("60/minute")  # 原本沒有限流，見同檔案其他端點的說明
 async def proxy_audio(request: Request, file_id: str):
     try:
-        first_url = ILRDF_AUDIO_API + file_id
+        first_url = get_ilrdf_audio_api() + file_id
 
         async with httpx.AsyncClient(follow_redirects=False, timeout=10) as client:
             res = await client.get(first_url)
@@ -64,15 +62,12 @@ async def proxy_audio(request: Request, file_id: str):
 
 # /debug_audio 只回傳內部除錯資訊（音檔真實 URL、狀態碼、bytes 內容），只在本機開發時註冊，
 # 正式環境（DJANGO_DEBUG=False）不掛載這個路由，避免暴露內部資訊。
-if os.getenv("DJANGO_DEBUG", "False") == "True":
+if is_debug():
     @router.get("/debug_audio/{audio_id}")
     async def debug_audio(audio_id: str):
 
         try:
-            # 使用你原本的邏輯抓音檔
-            load_dotenv()
-            VITE_AUDIO_FILE_URL = os.getenv("VITE_AUDIO_FILE_URL")
-            first_url = VITE_AUDIO_FILE_URL + audio_id
+            first_url = get_ilrdf_audio_api() + audio_id
 
             async with httpx.AsyncClient(follow_redirects=False) as client:
                 res = await client.get(first_url)

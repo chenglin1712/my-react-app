@@ -14,6 +14,8 @@ SQL echo 這類「除錯資訊」，不該同時是「要不要驗證身份」�
 """
 import os
 
+from config.debug_flag import is_debug
+
 
 def auth_dev_bypass(flag_env: str = "AUTH_DEV_BYPASS") -> bool:
     """flag_env 讓呼叫端指定要讀哪個環境變數。Django／FastAPI 預設共用同一份根目錄
@@ -22,8 +24,7 @@ def auth_dev_bypass(flag_env: str = "AUTH_DEV_BYPASS") -> bool:
     該旗標有明確設定時優先生效，沒有設定則沿用共用的 AUTH_DEV_BYPASS，維持原本
     「兩服務共用一份設定」的預設行為不變。
     """
-    debug = os.getenv("DJANGO_DEBUG", "False") == "True"
-    if not debug:
+    if not is_debug():
         return False
     if flag_env != "AUTH_DEV_BYPASS":
         override = os.getenv(flag_env)

@@ -82,7 +82,7 @@ class VerifyFirebaseTokenTest(TestCase):
 
     @override_settings(AUTH_DEV_BYPASS=False)
     def test_valid_token_returns_decoded_claims(self):
-        with patch("config.firebase_auth._ensure_firebase"):
+        with patch("config.firebase_auth.ensure_firebase_initialized"):
             with patch("firebase_admin.auth.verify_id_token", return_value={"uid": "real-user"}):
                 decoded, error = verify_firebase_token(_FakeRequest(auth_header="Bearer sometoken"))
         self.assertEqual(decoded, {"uid": "real-user"})
@@ -93,7 +93,7 @@ class VerifyFirebaseTokenTest(TestCase):
         # 單一使用者 token 過期／被撤銷是正常流量，不應該被記成 error log。
         import firebase_admin.auth as fa
 
-        with patch("config.firebase_auth._ensure_firebase"):
+        with patch("config.firebase_auth.ensure_firebase_initialized"):
             with patch("firebase_admin.auth.verify_id_token", side_effect=fa.ExpiredIdTokenError("expired", cause=None)):
                 with patch("config.firebase_auth.logger") as mock_logger:
                     decoded, error = verify_firebase_token(_FakeRequest(auth_header="Bearer badtoken"))
@@ -105,7 +105,7 @@ class VerifyFirebaseTokenTest(TestCase):
     def test_unexpected_exception_returns_401_and_logs(self):
         # 這是本輪修正的重點：非 InvalidIdTokenError 的例外（憑證抓取失敗等）
         # 代表驗證機制本身可能整個掛掉，必須被記錄下來才能讓 Sentry 告警。
-        with patch("config.firebase_auth._ensure_firebase"):
+        with patch("config.firebase_auth.ensure_firebase_initialized"):
             with patch("firebase_admin.auth.verify_id_token", side_effect=RuntimeError("boom")):
                 with patch("config.firebase_auth.logger") as mock_logger:
                     decoded, error = verify_firebase_token(_FakeRequest(auth_header="Bearer sometoken"))
@@ -116,7 +116,7 @@ class VerifyFirebaseTokenTest(TestCase):
     @override_settings(AUTH_DEV_BYPASS=False)
     def test_missing_service_account_returns_503_and_logs(self):
         with patch(
-            "config.firebase_auth._ensure_firebase",
+            "config.firebase_auth.ensure_firebase_initialized",
             side_effect=EnvironmentError("FIREBASE_SERVICE_ACCOUNT_PATH 未設定"),
         ):
             with patch("config.firebase_auth.logger") as mock_logger:

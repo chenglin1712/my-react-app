@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 
 from django.core.cache import cache
@@ -5,6 +6,7 @@ from django.test import TestCase, Client
 from django.test.utils import override_settings
 
 from crawler.views import format_quiz_data_1, format_quiz_data_2
+from crawler.dictionary_source import fetch_words_by_glosses
 
 
 class GetQuizDataTest(TestCase):
@@ -325,3 +327,54 @@ class GetExamScheduleTest(TestCase):
         self.assertEqual(second.status_code, 200)
         self.assertEqual(first.json(), second.json())
         mock_get.assert_called_once()
+
+
+class FetchWordsByGlossesTest(TestCase):
+    """dictionary_source.fetch_words_by_glosses 原本用原生 sqlite3.connect() 直接開檔，
+    繞過 dictionary_db/connect.py 的連線池與 WAL/外鍵 PRAGMA 保護（跟 CrosswordPuzzle
+    的 _get_words_from_db 一致的問題，那邊已經修過，這裡原本沒有跟上）。改成
+    SessionLocal + text() 之後，這裡驗證：查詢有透過共用的 SessionLocal、
+    正確依詞義篩選比對、同一詞義取第一筆、查無資料的族語回傳空字典。"""
+
+    def _fake_rows(self, rows):
+        db = MagicMock()
+        db.execute.return_value.fetchall.return_value = [
+            SimpleNamespace(name=name, chinese_explanation=chinese) for name, chinese in rows
+        ]
+        return db
+
+    @patch('crawler.dictionary_source.SessionLocal')
+    def test_uses_shared_session_local(self, mock_session_local):
+        db = self._fake_rows([("balay", "真的")])
+        mock_session_local.return_value = db
+
+        fetch_words_by_glosses("tayal", ["真的"])
+
+        mock_session_local.assert_called_once()
+        db.close.assert_called_once()
+
+    @patch('crawler.dictionary_source.SessionLocal')
+    def test_filters_to_requested_glosses_only(self, mock_session_local):
+        mock_session_local.return_value = self._fake_rows([
+            ("balay", "真的"), ("cyux", "在"), ("maku", "我的"),
+        ])
+
+        result = fetch_words_by_glosses("tayal", ["真的", "我的"])
+
+        self.assertEqual(set(result.keys()), {"真的", "我的"})
+        self.assertEqual(result["真的"], {"word": "balay", "chinese": "真的"})
+        self.assertNotIn("在", result)
+
+    @patch('crawler.dictionary_source.SessionLocal')
+    def test_keeps_first_match_when_gloss_has_multiple_words(self, mock_session_local):
+        mock_session_local.return_value = self._fake_rows([
+            ("balay", "真的"), ("balay2", "真的"),
+        ])
+
+        result = fetch_words_by_glosses("tayal", ["真的"])
+
+        self.assertEqual(result["真的"]["word"], "balay")
+
+    def test_unknown_tribe_returns_empty_dict_without_querying(self):
+        result = fetch_words_by_glosses("not-a-real-tribe", ["真的"])
+        self.assertEqual(result, {})
