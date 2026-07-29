@@ -37,6 +37,13 @@ class GenerateCrosswordTest(TestCase):
         # debug_loops 是內部運算迴圈次數，純除錯用，正式環境 API 不該外露。
         self.assertNotIn('debug_loops', data['info'])
 
+    def test_unsupported_tribe_returns_400_instead_of_silent_tayal_fallback(self):
+        # 回歸測試：修正前，任何不在 _ALL_TRIBE_IDS 裡的族語值都會落到跟 tayal
+        # 一模一樣的 else 分支（沿用內建 word_list），靜默回傳泰雅語填字遊戲而非
+        # 報錯——使用者以為自己玩的是別的族語，實際上悄悄拿到錯部落的題目。
+        response = self.client.get('/CrosswordPuzzle/generate/?tribe=not-a-real-tribe')
+        self.assertEqual(response.status_code, 400)
+
 
 class GetWordsFromDbTest(TestCase):
     """_get_words_from_db 的過濾邏輯：只留純英文字母、長度 4-10、有中文解釋的詞。"""

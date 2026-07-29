@@ -9,6 +9,36 @@ from django.test import TestCase, override_settings
 
 from config.auth_flags import auth_dev_bypass
 from config.firebase_auth import verify_firebase_token
+from config.tribes import resolve_tribe_name
+
+
+class ResolveTribeNameTest(TestCase):
+    """config/tribes.py 的 resolve_tribe_name()：這波稽核發現多個 dictionary 端點
+    用 TRIBE_MAP.get(tribe, 某個預設值) 這種「查無則吃預設值」的寫法解析族語參數，
+    導致打錯字或帶入不支援的族語時，會靜默回傳（甚至是錯部落的）資料而非報錯。
+    """
+
+    def test_accepts_slug(self):
+        self.assertEqual(resolve_tribe_name("tayal"), "泰雅語")
+
+    def test_accepts_short_name(self):
+        self.assertEqual(resolve_tribe_name("泰雅"), "泰雅語")
+
+    def test_accepts_full_name_passthrough(self):
+        # grammar.py 原本的 fallback 行為（TRIBE_MAP.get(tribe, tribe)）會讓直接
+        # 傳全名的呼叫命中，這裡維持相容，不能因為這次修正而擋掉原本能動的用法。
+        self.assertEqual(resolve_tribe_name("泰雅語"), "泰雅語")
+
+    def test_accepts_kavalan_alias(self):
+        self.assertEqual(resolve_tribe_name("噶瑪蘭"), resolve_tribe_name("葛瑪蘭"))
+
+    def test_rejects_unsupported_value(self):
+        with self.assertRaises(ValueError):
+            resolve_tribe_name("這不是一個族語")
+
+    def test_rejects_empty_string(self):
+        with self.assertRaises(ValueError):
+            resolve_tribe_name("")
 
 
 class AuthDevBypassTest(TestCase):
@@ -124,3 +154,20 @@ class VerifyFirebaseTokenTest(TestCase):
         self.assertIsNone(decoded)
         self.assertEqual(error.status_code, 503)
         mock_logger.error.assert_called_once()
+
+    @override_settings(AUTH_DEV_BYPASS=False)
+    def test_malformed_service_account_returns_503_instead_of_crashing(self):
+        # 回歸測試：ensure_firebase_initialized() 丟出的若不是 EnvironmentError
+        # （例如服務帳戶金鑰檔案存在但格式損毀，firebase_admin.credentials.Certificate
+        # 會丟 ValueError），原本的寫法會在比對 `except firebase_auth.InvalidIdTokenError`
+        # 這個子句時，因為 firebase_auth 這個名字（本該在 try 區塊內 import）根本還沒被
+        # 賦值,直接讓 UnboundLocalError 往外拋，不會被任何 except 接住。
+        with patch(
+            "config.firebase_auth.ensure_firebase_initialized",
+            side_effect=ValueError("Invalid certificate"),
+        ):
+            with patch("config.firebase_auth.logger") as mock_logger:
+                decoded, error = verify_firebase_token(_FakeRequest(auth_header="Bearer sometoken"))
+        self.assertIsNone(decoded)
+        self.assertEqual(error.status_code, 503)
+        mock_logger.exception.assert_called_once()

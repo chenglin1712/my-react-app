@@ -83,6 +83,13 @@ def generate_crossword(request):
 
     tribe = request.GET.get('tribe', 'tayal')
 
+    # 先前沒有驗證：不支援的族語值會落到下面的 else 分支，跟 tayal（故意排除、
+    # 沿用內建 word_list）拿到一模一樣的結果，靜默回傳泰雅語填字遊戲而非報錯。
+    # listening.py／sentence.py／quiz.py 對同一種情況會正確回傳 400，這裡補上
+    # 同樣的驗證，只是 tayal 本身仍要留在合法值裡（見上面 _TRIBE_IDS 的排除說明）。
+    if tribe not in _ALL_TRIBE_IDS:
+        return JsonResponse({'detail': f'不支援的族語：{tribe}'}, status=400)
+
     # 依族語選擇詞庫
     if tribe in _TRIBE_IDS:
         selected_words, err = _get_words_from_db(_TRIBE_IDS[tribe])

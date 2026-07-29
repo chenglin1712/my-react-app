@@ -15,7 +15,7 @@ from dictionary_db.word_data import (
     load_explanation_items_for_words,
     load_sources_for_words,
 )
-from config.tribes import TRIBE_MAP
+from config.tribes import TRIBE_MAP, resolve_tribe_name
 from fastAPI.rate_limit import limiter
 
 from ..keyed_cache import KeyedCache
@@ -275,7 +275,10 @@ async def search_tayal_dictionary(request: Request, body: MultiWordSearchRequest
     """多關鍵字搜尋"""
     try:
         words = body.words
-        tribe_name = TRIBE_MAP.get(body.tribe, '泰雅語')
+        try:
+            tribe_name = resolve_tribe_name(body.tribe)
+        except ValueError as e:
+            return JSONResponse({"detail": str(e)}, status_code=400)
         if not words:
             return JSONResponse({"detail": "查詢字詞不可為空"}, status_code=400)
 
@@ -305,7 +308,10 @@ async def all_tayal_dictionary(request: Request, body: AllWordsRequest, db: Sess
     sort_order 做篩選與排序，並用 limit/offset 做分頁；都不傳則維持原本回傳全部
     （未篩選、未分頁）的行為，供 frontend/src/_favorite/index.jsx 沿用舊行為。"""
     try:
-        tribe_name = TRIBE_MAP.get(body.tribe, '泰雅語')
+        try:
+            tribe_name = resolve_tribe_name(body.tribe)
+        except ValueError as e:
+            return JSONResponse({"detail": str(e)}, status_code=400)
         # 冷快取時 search_all -> _load_tribe_words 是同步的全表掃描＋JSON parse，
         # 丟到執行緒池執行，避免卡住 event loop（見 /keys/ 同樣的說明）。
         results, total = await asyncio.to_thread(
@@ -346,7 +352,10 @@ async def allsearch_tayal_dictionary(request: Request, body: KeywordRequest, db:
         keyword = body.keyword.strip().replace("　", "")
         if not keyword:
             return JSONResponse({"detail": "查詢字詞不可為空"}, status_code=400)
-        tribe_name = TRIBE_MAP.get(body.tribe or '泰雅', '泰雅語')
+        try:
+            tribe_name = resolve_tribe_name(body.tribe or '泰雅')
+        except ValueError as e:
+            return JSONResponse({"detail": str(e)}, status_code=400)
 
         # 冷快取時是同步的全表掃描＋JSON parse，丟到執行緒池執行，
         # 避免卡住 event loop（見 /keys/ 同樣的說明）。

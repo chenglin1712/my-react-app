@@ -41,3 +41,25 @@ TRIBE_MAP["噶瑪蘭"] = TRIBE_MAP["葛瑪蘭"]
 
 # 英文代稱 -> tribe_id UUID（原本各檔案的 TRIBE_IDS）
 TRIBE_IDS = {_t.slug: _t.id for _t in TRIBES}
+
+_VALID_FULL_NAMES = frozenset(_t.full_name for _t in TRIBES)
+
+
+def resolve_tribe_name(tribe: str) -> str:
+    """把使用者輸入的族語代稱／簡稱／全名解析成 tribe.name 全名，找不到就丟 ValueError。
+
+    先前多處呼叫端是用 TRIBE_MAP.get(tribe, 某個預設值) 這種「查無則吃預設值」的寫法：
+    dictionary/search.py 直接預設成泰雅語，打錯字或帶入不支援的族語時會靜默回傳泰雅語
+    的真實資料而非報錯；dictionary/grammar.py、audio_proxy.py 則是預設成輸入本身，
+    查無資料時安靜回傳空結果／404，一樣不會讓呼叫端知道自己傳的族語是錯的。
+    listening.py／sentence.py／quiz.py 用 TRIBE_IDS.get(tribe) 對同一種情況正確回傳
+    400，這裡統一成同樣「查無則報錯」的行為。允許直接傳全名（如「泰雅語」）通過，
+    是因為 grammar.py 這幾個端點原本的 fallback 行為就會讓全名直接命中，這裡維持
+    相容，只收斂「傳完全不存在的族語」這個真正的錯誤情況。
+    """
+    name = TRIBE_MAP.get(tribe)
+    if name is not None:
+        return name
+    if tribe in _VALID_FULL_NAMES:
+        return tribe
+    raise ValueError(f"不支援的族語：{tribe}")

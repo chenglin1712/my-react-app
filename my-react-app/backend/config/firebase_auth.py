@@ -32,17 +32,32 @@ def verify_firebase_token(request):
     if not auth_header.startswith("Bearer "):
         return None, JsonResponse({"detail": "需要登入才能使用此功能"}, status=401)
     token = auth_header[7:]
+
+    # ensure_firebase_initialized() 的例外獨立成一個 try/except：先前這行跟下面
+    # 的 import 綁在同一個 try 裡，若丟出的不是 EnvironmentError（例如服務帳戶
+    # 金鑰檔案損毀、格式錯誤會丟 ValueError），import 永遠不會執行到，緊接著的
+    # `except firebase_auth.InvalidIdTokenError` 子句在比對當下就會因為
+    # firebase_auth 這個名字還沒被賦值而丟出 UnboundLocalError，且不會被後面的
+    # `except Exception` 接住（比對 except 子句時發生的例外不會回頭試下一個
+    # except），導致這條共用邏輯掛在的所有需登入端點都跟著壞掉。
     try:
         ensure_firebase_initialized()
-        from firebase_admin import auth as firebase_auth
-        decoded = firebase_auth.verify_id_token(token)
-        return decoded, None
     except EnvironmentError as e:
         # 服務帳戶金鑰沒設定，代表這個部署的驗證機制根本沒接上，記下來讓 Sentry
         # 能告警——原本這裡完全沒有 log，全站需登入端點會靜默回應，看起來像是
         # 使用者沒登入，而不是系統設定有問題。
         logger.error("Firebase 服務帳戶未設定，需登入端點將回應 503：%s", e)
         return None, JsonResponse({"detail": str(e)}, status=503)
+    except Exception:
+        # 憑證檔案存在但損毀／格式錯誤等其他初始化失敗，同樣代表驗證機制掛掉，
+        # 記錄下來讓 Sentry 能告警，並乾淨地回 503，而不是讓例外一路往外拋。
+        logger.exception("Firebase 初始化發生非預期例外")
+        return None, JsonResponse({"detail": "身份驗證服務暫時無法使用，請稍後再試"}, status=503)
+
+    from firebase_admin import auth as firebase_auth
+    try:
+        decoded = firebase_auth.verify_id_token(token)
+        return decoded, None
     except firebase_auth.InvalidIdTokenError:
         # 單一使用者 token 過期／被撤銷／格式不對，是每天都會發生的正常流量，
         # 不記錄也不送 Sentry，避免把告警灌爆。

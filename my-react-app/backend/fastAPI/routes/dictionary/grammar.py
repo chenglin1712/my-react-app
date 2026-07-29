@@ -7,7 +7,7 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
 from dictionary_db.connect import get_db
-from config.tribes import TRIBE_MAP
+from config.tribes import resolve_tribe_name
 
 from ..keyed_cache import KeyedCache
 
@@ -129,7 +129,10 @@ def get_grammar(tribe: str, limit: Optional[int] = None, offset: int = 0, db: Se
     """查詢指定族語的所有文法章節（含規則、例句、詞綴）
     limit/offset 為選填的章節分頁參數，不傳則維持原本回傳全部章節的行為"""
     try:
-        tribe_name = TRIBE_MAP.get(tribe, tribe)
+        try:
+            tribe_name = resolve_tribe_name(tribe)
+        except ValueError as e:
+            return JSONResponse({"detail": str(e)}, status_code=400)
         payload = _load_grammar(db, tribe_name)
         if payload is None:
             return JSONResponse({"detail": f"找不到 {tribe_name} 的文法資料"}, status_code=404)
@@ -149,7 +152,10 @@ def search_grammar(tribe: str, q: str, db: Session = Depends(get_db)):
     q: 關鍵字，可搜尋規則標題、功能說明、例句原文、中文翻譯
     """
     try:
-        tribe_name = TRIBE_MAP.get(tribe, tribe)
+        try:
+            tribe_name = resolve_tribe_name(tribe)
+        except ValueError as e:
+            return JSONResponse({"detail": str(e)}, status_code=400)
         kw = f"%{q}%"
 
         # 透過 JOIN grammar_section 取得 tribe，不再依賴 grammar_rule.tribe
@@ -277,7 +283,10 @@ def get_grammar_affixes(
     limit/offset 為選填的分頁參數，不傳則維持原本回傳全部詞綴的行為
     """
     try:
-        tribe_name = TRIBE_MAP.get(tribe, tribe)
+        try:
+            tribe_name = resolve_tribe_name(tribe)
+        except ValueError as e:
+            return JSONResponse({"detail": str(e)}, status_code=400)
         payload = _load_grammar_affixes(db, tribe_name, affix_type)
         affixes = payload["affixes"]
         sliced = affixes[offset:offset + limit] if limit is not None else affixes[offset:]
@@ -376,7 +385,10 @@ def get_grammar_quiz_material(
     limit/offset 為選填的分頁參數，不傳則維持原本回傳全部規則的行為
     """
     try:
-        tribe_name = TRIBE_MAP.get(tribe, tribe)
+        try:
+            tribe_name = resolve_tribe_name(tribe)
+        except ValueError as e:
+            return JSONResponse({"detail": str(e)}, status_code=400)
         payload = _load_grammar_quiz_material(db, tribe_name, section_key)
         rules = payload["rules"]
         sliced = rules[offset:offset + limit] if limit is not None else rules[offset:]

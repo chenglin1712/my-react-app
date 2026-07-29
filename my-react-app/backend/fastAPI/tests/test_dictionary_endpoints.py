@@ -63,3 +63,27 @@ def test_audio_endpoint_has_request_param_and_does_not_crash(client):
         mock_get.return_value = httpx.Response(status_code=404, request=httpx.Request("GET", "http://x"))
         response = client.get("/api/v1/dictionary/audio/some-file-id")
     assert response.status_code == 404
+
+
+# 回歸測試：修正前 /key/、/keys/、/all/ 用 TRIBE_MAP.get(tribe, 某個預設值) 解析
+# tribe 參數，不支援的值會靜默 fallback 成泰雅語並回傳 200 與看似正常、實則錯
+# 部落的真實資料，而不是像 listening.py／sentence.py／quiz.py 一樣回 400。
+def test_key_endpoint_rejects_unsupported_tribe(client):
+    response = client.post(
+        "/api/v1/dictionary/key/", json={"keyword": "balay", "tribe": "這不是一個族語"}
+    )
+    assert response.status_code == 400
+
+
+def test_keys_endpoint_rejects_unsupported_tribe(client):
+    response = client.post(
+        "/api/v1/dictionary/keys/", json={"words": ["balay"], "tribe": "這不是一個族語"}
+    )
+    assert response.status_code == 400
+
+
+def test_all_endpoint_rejects_unsupported_tribe(client):
+    response = client.post(
+        "/api/v1/dictionary/all/", json={"tribe": "這不是一個族語"}
+    )
+    assert response.status_code == 400

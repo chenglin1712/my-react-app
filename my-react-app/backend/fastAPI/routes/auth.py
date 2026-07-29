@@ -48,6 +48,13 @@ async def verify_firebase_token(request: Request, authorization: str = Header(de
         ensure_firebase_initialized()
     except EnvironmentError as e:
         raise HTTPException(status_code=503, detail=str(e))
+    except Exception:
+        # 憑證檔案存在但損毀／格式錯誤等其他初始化失敗，同樣代表驗證機制掛掉，
+        # 記錄下來讓 Sentry 能告警，並乾淨地回 503，而不是讓例外未經處理地往外拋
+        # （Django 端 config/firebase_auth.py 同一種情境曾經因為 import 順序問題
+        # 直接變成 UnboundLocalError，這裡雖然不會崩潰，但同樣該給乾淨的 503）。
+        logger.exception("Firebase 初始化發生非預期例外")
+        raise HTTPException(status_code=503, detail="身份驗證服務暫時無法使用，請稍後再試")
     from firebase_admin import auth as firebase_auth
 
     try:

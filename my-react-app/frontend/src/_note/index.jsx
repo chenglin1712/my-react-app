@@ -13,6 +13,7 @@ import { EditorContent } from "@tiptap/react";
 import { useNotePages } from "./hooks/useNotePages";
 import EditorToolbar from "./components/EditorToolbar";
 import PageSidebar from "./components/PageSidebar";
+import { buildPreview, SHARE_MAX_PAGES } from "../../utils/notePreview";
 
 function NotePage() {
   const navigate = useNavigate();
@@ -51,6 +52,10 @@ function NotePage() {
       setError("請至少選擇一頁要分享的筆記。");
       return;
     }
+    if (pagesToShare.length > SHARE_MAX_PAGES) {
+      setError(`最多只能分享 ${SHARE_MAX_PAGES} 頁筆記，目前選取了 ${pagesToShare.length} 頁，請減少選取頁數。`);
+      return;
+    }
     if (hasEmptyTitle) {
       setError("所選頁面中包含空白標題，請填寫後再分享。");
       return;
@@ -83,7 +88,7 @@ function NotePage() {
 
       await shareNote({
         pages: sanitizedPages,
-        preview: DOMPurify.sanitize(pagesToShare[0]?.content || "<p></p>"),
+        preview: buildPreview(pagesToShare[0]?.content),
         image: uploadedImageUrl,
         uid,
         username: effectiveName,

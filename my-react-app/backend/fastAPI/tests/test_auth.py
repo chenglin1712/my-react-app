@@ -104,3 +104,24 @@ def test_missing_service_account_returns_503(monkeypatch):
         with pytest.raises(HTTPException) as exc_info:
             _run(auth_module.verify_firebase_token(request, authorization="Bearer sometoken"))
     assert exc_info.value.status_code == 503
+
+
+def test_malformed_service_account_returns_503_not_uncaught_500(monkeypatch):
+    # ensure_firebase_initialized() 丟出非 EnvironmentError（例如服務帳戶金鑰檔案
+    # 存在但格式損毀，firebase_admin.credentials.Certificate 會丟 ValueError）時，
+    # 原本沒有對應的 except 分支，例外會直接往外傳，變成未經處理的 500——回應仍是
+    # JSON（Starlette 的預設例外處理器接住），但語意上該是「服務暫時不可用」的 503。
+    # Django 端同一種情境曾經因為 import 順序問題直接變成 UnboundLocalError；FastAPI
+    # 這邊 import 順序沒有問題，但同樣缺了乾淨的 503 對應，這裡一併補上。
+    monkeypatch.setenv("DJANGO_DEBUG", "False")
+    monkeypatch.setenv("AUTH_DEV_BYPASS", "False")
+    request = _FakeRequest()
+
+    with patch.object(
+        auth_module,
+        "ensure_firebase_initialized",
+        side_effect=ValueError("Invalid certificate"),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            _run(auth_module.verify_firebase_token(request, authorization="Bearer sometoken"))
+    assert exc_info.value.status_code == 503

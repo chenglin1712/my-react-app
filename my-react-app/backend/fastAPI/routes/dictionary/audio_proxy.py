@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from dictionary_db.connect import get_db
 from dictionary_db.model import Word
 from dictionary_db.word_data import load_audio_items_for_words
-from config.tribes import TRIBE_MAP
+from config.tribes import resolve_tribe_name
 from config.debug_flag import is_debug
 from config.audio_source import get_ilrdf_audio_api
 from fastAPI.rate_limit import limiter
@@ -132,7 +132,10 @@ async def get_sentence_audio(request: Request, body: SentenceAudioRequest, db: S
     """
     try:
         from sqlalchemy import func as sa_func
-        tribe_name = TRIBE_MAP.get(body.tribe, body.tribe)
+        try:
+            tribe_name = resolve_tribe_name(body.tribe)
+        except ValueError as e:
+            return JSONResponse({"detail": str(e)}, status_code=400)
 
         # 以空白與標點切詞，保留字母、撇號、連字號
         tokens = re.findall(r"[a-zA-ZʼʻΩ'\-]+", body.sentence)
