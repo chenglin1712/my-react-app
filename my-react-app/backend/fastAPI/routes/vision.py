@@ -117,4 +117,9 @@ async def analyze_image(request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # 原本直接把 str(e) 回給前端，可能洩漏 Google Vision 回應內容／內部細節，
+        # 且這個 except 完全沒有記 log，呼叫失敗時伺服器端也查不出原因。跟同一輪
+        # 稽核的 search.py／grammar.py／audio_proxy.py 同一套做法：只記 log，
+        # 回給前端的是通用訊息。
+        _logger.exception(e)
+        raise HTTPException(status_code=500, detail="伺服器發生錯誤，請稍後再試")

@@ -157,3 +157,38 @@ class SubmitAnsTest(TestCase):
             content_type='application/json',
         )
         self.assertEqual(response.status_code, 429)
+
+    # 稽核修正：length/start_col/start_row 原本只是普通 IntegerField，沒有下限，
+    # 0 或負數會讓判分整個失準（length<=0 時 for i in range(word_length) 迴圈
+    # 不執行，預設 True 的 is_correct 永遠不會被推翻；start_row/start_col 為 0
+    # 則會讓 start_row - 1 算出 -1，繞成負索引比對到陣列最後一列/欄），
+    # 現在應該在序列化驗證階段就被擋成 400。
+    def test_rejects_non_positive_length(self):
+        payload = self._payload("")
+        payload["crossword_legend"][0]["length"] = 0
+        response = self.client.post(
+            '/CrosswordPuzzle/submit/',
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_rejects_non_positive_start_row(self):
+        payload = self._payload("cyux")
+        payload["crossword_legend"][0]["start_row"] = 0
+        response = self.client.post(
+            '/CrosswordPuzzle/submit/',
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_rejects_non_positive_start_col(self):
+        payload = self._payload("cyux")
+        payload["crossword_legend"][0]["start_col"] = 0
+        response = self.client.post(
+            '/CrosswordPuzzle/submit/',
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)

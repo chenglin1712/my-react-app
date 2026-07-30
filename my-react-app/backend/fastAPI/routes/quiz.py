@@ -6,7 +6,7 @@ import shutil
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Body, HTTPException, Depends, File, UploadFile, Form, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from sqlalchemy.orm import Session
 from dictionary_db.connect import get_db
@@ -161,6 +161,41 @@ class SubmitAnswerResp(BaseModel):
     new_theta: float
     updated_user_errors: Dict[str, Any]
     user_model: Dict[str, Any]
+
+
+# generate_quiz_frontend／submit_answer_frontend 原本都用 Body(...): dict 收
+# 原始 dict，沒有 Pydantic schema，handler 裡也沒有 try/except，直接對內容做
+# 連鎖 .get() 與數學運算（compute_P_theta 的 math.exp() 等）。user_data 來自
+# 使用者自己帳號可寫入的 Firestore 文件（quiz_model），內容毀損或欄位型別被
+# 竄改（例如 ability 傳成字串）就會一路傳進運算式才炸成未捕捉的 500。
+# 這裡改用 Pydantic model：型別不對的請求在進入 handler 前就被擋成 422，
+# 跟同一輪稽核的 dictionary/search.py（KeywordRequest 等）同一套做法。
+class UserErrorStat(BaseModel):
+    """user_errors 內單一單字的統計；缺欄位視為全新單字，補預設值。"""
+    attempts: int = 0
+    errors: int = 0
+    recent_results: List[int] = Field(default_factory=list)
+    recent_times: List[float] = Field(default_factory=list)
+    avg_time: float = 0.0
+
+class TypeStat(BaseModel):
+    e: int = 0
+    n: int = 0
+
+class UserModelReq(BaseModel):
+    """使用者的 IRT 學習模型，對應 _build_user_model 需要用到的欄位。"""
+    ability: float = 0.5
+    user_errors: Dict[str, UserErrorStat] = Field(default_factory=dict)
+    favorites: Dict[str, bool] = Field(default_factory=dict)
+    explorations: Dict[str, float] = Field(default_factory=dict)
+    type_stats: Dict[str, TypeStat] = Field(default_factory=dict)
+
+
+class SubmitAnswerFrontendReq(BaseModel):
+    # answer 沿用上面既有的 SubmitAnswerReq（欄位本來就對應前端
+    # quiz_recommon_question.jsx 送出的 answer 物件形狀）。
+    user_data: UserModelReq = Field(default_factory=UserModelReq)
+    answer: SubmitAnswerReq
 
 # ----------------------------
 # 工具函數（IRT、score 計算）
@@ -496,93 +531,108 @@ def _generate_sentence_order_questions(picker: _CandidatePicker, all_words: List
 # ----------------------------
 @router.post("/generate_quiz_frontend", response_model=GenerateQuizResponse)
 def generate_quiz_frontend(
-    user_data: dict = Body(...),
+    user_data: UserModelReq = Body(...),
     tribe: str = Query(default="tayal"),
     db: Session = Depends(get_db),
 ):
-    tribe_id = TRIBE_IDS.get(tribe)
-    if not tribe_id:
-        raise HTTPException(status_code=400, detail=f"不支援的族語：{tribe}")
-    all_words = load_all_words(db, tribe_id)
-    if not all_words:
-        raise HTTPException(status_code=500, detail="No words in DB")
+    try:
+        tribe_id = TRIBE_IDS.get(tribe)
+        if not tribe_id:
+            raise HTTPException(status_code=400, detail=f"不支援的族語：{tribe}")
+        all_words = load_all_words(db, tribe_id)
+        if not all_words:
+            raise HTTPException(status_code=500, detail="No words in DB")
 
-    user_model = _build_user_model(user_data)
-    fprime_map = compute_normalized_freq_map(all_words)
-    t_avg_all = _compute_avg_time(user_model)
-    theta = user_model.get("ability", 0.5)
+        user_model = _build_user_model(user_data.model_dump())
+        fprime_map = compute_normalized_freq_map(all_words)
+        t_avg_all = _compute_avg_time(user_model)
+        theta = user_model.get("ability", 0.5)
 
-    candidates_sorted = _score_candidates(all_words, user_model, theta, t_avg_all, fprime_map)
-    type_count = _compute_type_counts(theta)
-    picker = _CandidatePicker(candidates_sorted)
+        candidates_sorted = _score_candidates(all_words, user_model, theta, t_avg_all, fprime_map)
+        type_count = _compute_type_counts(theta)
+        picker = _CandidatePicker(candidates_sorted)
 
-    generated = []
-    generated += _generate_word_translate_questions(picker, all_words, theta, type_count["wordTranslate"])
-    generated += _generate_word_match_questions(picker, type_count["wordMatch"])
-    generated += _generate_sentence_fill_questions(picker, all_words, type_count["sentenceFill"])
-    generated += _generate_sentence_order_questions(picker, all_words, type_count["sentenceOrder"])
+        generated = []
+        generated += _generate_word_translate_questions(picker, all_words, theta, type_count["wordTranslate"])
+        generated += _generate_word_match_questions(picker, type_count["wordMatch"])
+        generated += _generate_sentence_fill_questions(picker, all_words, type_count["sentenceFill"])
+        generated += _generate_sentence_order_questions(picker, all_words, type_count["sentenceOrder"])
 
-    random.shuffle(generated)
-    qlist = [QuizQuestion(id=q["id"], type=q["type"], payload=q["payload"],
-                          difficulty=q.get("difficulty"), meta=q.get("meta"))
-             for q in generated[:TOTAL_QUESTIONS]]
-    return {"questions": qlist}
+        random.shuffle(generated)
+        qlist = [QuizQuestion(id=q["id"], type=q["type"], payload=q["payload"],
+                              difficulty=q.get("difficulty"), meta=q.get("meta"))
+                 for q in generated[:TOTAL_QUESTIONS]]
+        return {"questions": qlist}
+    except HTTPException:
+        raise
+    except Exception as e:
+        # user_data 的型別已由 UserModelReq 驗證過，這裡是防禦剩餘的例外
+        # （例如資料內容本身導致的執行期錯誤）；只記 log、回傳通用訊息，
+        # 跟同一輪稽核的 vision.py／dictionary/search.py 同一套做法。
+        _logging.exception(e)
+        raise HTTPException(status_code=500, detail="伺服器發生錯誤，請稍後再試")
 
 # ----------------------------
 # API: submit answer
 # ----------------------------
 @router.post("/submit_answer_frontend", response_model=SubmitAnswerResp)
 def submit_answer_frontend(
-    body: dict = Body(...),
+    body: SubmitAnswerFrontendReq = Body(...),
     tribe: str = Query(default="tayal"),
     db: Session = Depends(get_db),
 ):
-    tribe_id = TRIBE_IDS.get(tribe)
-    if not tribe_id:
-        raise HTTPException(status_code=400, detail=f"不支援的族語：{tribe}")
-    user_model = body.get("user_data", {})
-    answer = body.get("answer", {})
+    try:
+        tribe_id = TRIBE_IDS.get(tribe)
+        if not tribe_id:
+            raise HTTPException(status_code=400, detail=f"不支援的族語：{tribe}")
+        user_model = body.user_data.model_dump()
+        answer = body.answer.model_dump()
 
-    word_name = answer.get("word_name")
-    if not word_name:
-        raise HTTPException(status_code=400, detail="word_name required")
-    t = answer.get("question_type")
-    type_stats = user_model.get("type_stats", {})
-    user_errors = user_model.get("user_errors", {})
+        word_name = answer.get("word_name")
+        if not word_name:
+            raise HTTPException(status_code=400, detail="word_name required")
+        t = answer.get("question_type")
+        type_stats = user_model.get("type_stats", {})
+        user_errors = user_model.get("user_errors", {})
 
-    # 更新 type_stats
-    if t not in type_stats: type_stats[t] = {"e":0,"n":0}
-    type_stats[t]["n"] += 1
-    if not answer.get("correct"): type_stats[t]["e"] += 1
+        # 更新 type_stats
+        if t not in type_stats: type_stats[t] = {"e":0,"n":0}
+        type_stats[t]["n"] += 1
+        if not answer.get("correct"): type_stats[t]["e"] += 1
 
-    # 更新 user_errors
-    ue = user_errors.get(word_name, {"attempts":0,"errors":0,"recent_results":[],"recent_times":[],"avg_time":0.0})
-    ue["attempts"] += 1
-    if not answer.get("correct"): ue["errors"] += 1
-    ue["recent_results"].append(0 if answer.get("correct") else 1)
-    if len(ue["recent_results"])>5: ue["recent_results"].pop(0)
-    ue["recent_times"].append(answer.get("time_spent",0.0))
-    if len(ue["recent_times"])>5: ue["recent_times"].pop(0)
-    ue["avg_time"] = sum(ue["recent_times"])/len(ue["recent_times"])
-    user_errors[word_name] = ue
+        # 更新 user_errors
+        ue = user_errors.get(word_name, {"attempts":0,"errors":0,"recent_results":[],"recent_times":[],"avg_time":0.0})
+        ue["attempts"] += 1
+        if not answer.get("correct"): ue["errors"] += 1
+        ue["recent_results"].append(0 if answer.get("correct") else 1)
+        if len(ue["recent_results"])>5: ue["recent_results"].pop(0)
+        ue["recent_times"].append(answer.get("time_spent",0.0))
+        if len(ue["recent_times"])>5: ue["recent_times"].pop(0)
+        ue["avg_time"] = sum(ue["recent_times"])/len(ue["recent_times"])
+        user_errors[word_name] = ue
 
-    # 計算 theta
-    e_w, n_w = ue["errors"], ue["attempts"]
-    Dw = compute_smoothed_error_rate(e_w,n_w)
-    Dt = compute_smoothed_error_rate(type_stats.get(t,{}).get("e",0), type_stats.get(t,{}).get("n",0))
-    all_words = load_all_words(db, tribe_id)
-    fprime_map = compute_normalized_freq_map(all_words)
-    fprime = fprime_map.get(word_name,0.0)
-    Dq, bw = compute_Dq_and_bw(Dw, Dt, fprime)
-    a_q = TYPE_AQ.get(t,1.0)
-    current_theta = user_model.get("ability",0.5)
-    Ptheta = compute_P_theta(current_theta, bw, a_q, DEFAULT_GUESS)
-    theta_new = update_theta(current_theta, answer.get("correct"), Ptheta, LEARNING_RATE)
-    user_model["ability"] = theta_new
-    user_model["type_stats"] = type_stats
-    user_model["user_errors"] = user_errors
+        # 計算 theta
+        e_w, n_w = ue["errors"], ue["attempts"]
+        Dw = compute_smoothed_error_rate(e_w,n_w)
+        Dt = compute_smoothed_error_rate(type_stats.get(t,{}).get("e",0), type_stats.get(t,{}).get("n",0))
+        all_words = load_all_words(db, tribe_id)
+        fprime_map = compute_normalized_freq_map(all_words)
+        fprime = fprime_map.get(word_name,0.0)
+        Dq, bw = compute_Dq_and_bw(Dw, Dt, fprime)
+        a_q = TYPE_AQ.get(t,1.0)
+        current_theta = user_model.get("ability",0.5)
+        Ptheta = compute_P_theta(current_theta, bw, a_q, DEFAULT_GUESS)
+        theta_new = update_theta(current_theta, answer.get("correct"), Ptheta, LEARNING_RATE)
+        user_model["ability"] = theta_new
+        user_model["type_stats"] = type_stats
+        user_model["user_errors"] = user_errors
 
-    return {"new_theta": theta_new, "updated_user_errors":{word_name:user_errors[word_name]}, "user_model":user_model}
+        return {"new_theta": theta_new, "updated_user_errors":{word_name:user_errors[word_name]}, "user_model":user_model}
+    except HTTPException:
+        raise
+    except Exception as e:
+        _logging.exception(e)
+        raise HTTPException(status_code=500, detail="伺服器發生錯誤，請稍後再試")
 
 
 

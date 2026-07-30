@@ -12,9 +12,14 @@ class CrosswordLegendItemSerializer(serializers.Serializer):
     word = serializers.CharField(max_length=100)
     clue = serializers.CharField(max_length=500, allow_blank=True)
     direction = serializers.ChoiceField(choices=["across", "down"])
-    start_col = serializers.IntegerField()
-    start_row = serializers.IntegerField()
-    length = serializers.IntegerField()
+    # min_value=1：start_col/start_row 是 1-based 座標（views.py 用
+    # start_row - 1 換算成 0-based index），0 或負數會讓換算後的 index 變成
+    # -1，繞成 Python 負索引比對到陣列最後一列/欄；length<=1 則會讓判分迴圈
+    # for i in range(word_length) 整段不執行，預設 True 的 is_correct 永遠
+    # 不會被推翻。
+    start_col = serializers.IntegerField(min_value=1)
+    start_row = serializers.IntegerField(min_value=1)
+    length = serializers.IntegerField(min_value=1)
 
 
 class SubmitAnsSerializer(serializers.Serializer):
