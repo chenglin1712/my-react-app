@@ -18,8 +18,13 @@ export default function useAudioPlayback(selectedTribe, onError) {
   const playAudio = useCallback(async (fileId) => {
     if (!fileId || failedAudio.has(fileId)) return;
 
-    // 取消任何進行中的句子播放
-    playbackGenRef.current += 1;
+    // 取消任何進行中的句子播放。myGen 記下這次呼叫的世代編號：
+    // createAuthorizedAudio（真正的網路請求 + getIdToken()）是非同步的，
+    // 這段等待期間使用者可能又點了別的單字，讓 playbackGenRef.current
+    // 被那次更新的呼叫繼續往前推進——沿用 playSentence() 已經有的作法，
+    // 每個非同步斷點之後都要重新比對 myGen 是否還是最新，不是的話就當這次
+    // 呼叫已經過期，不能再播放或覆蓋 audioRef.current。
+    const myGen = (playbackGenRef.current += 1);
     if (playbackGenRef.currentAudio) {
       playbackGenRef.currentAudio.pause();
       // pause() 不會觸發 createAuthorizedAudio 內建的 ended/error revoke，
@@ -39,19 +44,35 @@ export default function useAudioPlayback(selectedTribe, onError) {
     try {
       newAudio = await createAuthorizedAudio(proxyUrl);
     } catch {
-      setFailedAudio(prev => new Set([...prev, fileId]));
+      if (playbackGenRef.current === myGen) {
+        setFailedAudio(prev => new Set([...prev, fileId]));
+      }
+      return;
+    }
+
+    if (playbackGenRef.current !== myGen) {
+      // 這段等待期間已經有更新的呼叫覆蓋掉這次請求：不要播放、也不要動
+      // audioRef.current（可能已經是新一次呼叫設定的音檔），把剛拿到、
+      // 用不到的 blob URL 直接釋放掉。
+      newAudio.revokeObjectUrl?.();
       return;
     }
 
     newAudio.onerror = () => {
-      setFailedAudio(prev => new Set([...prev, fileId]));
+      if (playbackGenRef.current === myGen) {
+        setFailedAudio(prev => new Set([...prev, fileId]));
+      }
     };
 
-    newAudio.play().catch(() => {
-      setFailedAudio(prev => new Set([...prev, fileId]));
-    });
-
     audioRef.current = newAudio;
+    newAudio.play().catch(() => {
+      // play() 進行中如果被更新一次呼叫的 pause() 中斷，瀏覽器會用
+      // AbortError reject 這個 promise——那不是真正的播放失敗，只有這次
+      // 呼叫仍是最新一次時才算數，否則會把明明正常的音檔永久標記成失敗。
+      if (playbackGenRef.current === myGen) {
+        setFailedAudio(prev => new Set([...prev, fileId]));
+      }
+    });
   }, [failedAudio]);
 
   const playSentence = useCallback(async (sentence) => {

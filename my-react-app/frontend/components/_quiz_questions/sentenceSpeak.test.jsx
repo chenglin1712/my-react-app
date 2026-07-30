@@ -34,11 +34,11 @@ describe('SentenceSpeak 錄音', () => {
 
   beforeEach(() => {
     fakeTracks = [{ stop: vi.fn() }];
-    global.navigator.mediaDevices = {
+    window.navigator.mediaDevices = {
       getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => fakeTracks }),
     };
-    global.MediaRecorder = FakeMediaRecorder;
-    global.URL.createObjectURL = vi.fn(() => 'blob:fake-url');
+    window.MediaRecorder = FakeMediaRecorder;
+    window.URL.createObjectURL = vi.fn(() => 'blob:fake-url');
   });
 
   test('停止錄音會釋放麥克風的每個 track', async () => {

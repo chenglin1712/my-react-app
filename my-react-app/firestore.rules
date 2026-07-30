@@ -2,6 +2,24 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // sharedNotes 非作者的按讚更新（見下方 update 規則）：原本只檢查改動的
+    // 欄位只有 likes/likedBy，沒有驗證兩者是否一致、也沒有限制 likedBy 只能
+    // 新增／移除呼叫者自己的 uid。任何登入使用者原本可以把 likes 設成任意
+    // 數字、把別人的 uid 塞進 likedBy（偽造別人按讚）或清空別人的讚——
+    // noteshare.jsx 的 toggleLike 在本地算好新值才寫入，但 Firestore 規則
+    // 才是真正的信任邊界。這裡驗證：(1) likes 必須等於 likedBy.size()，
+    // (2) 新舊 likedBy 唯一的差異只能是呼叫者自己的 uid（用對稱差集
+    // toSet().difference()/union() 表示，同時涵蓋新增讚與取消讚兩種情況）。
+    function isValidLikeToggle(oldData, newData, uid) {
+      let oldSet = oldData.likedBy.toSet();
+      let newSet = newData.likedBy.toSet();
+      let changedUids = oldSet.difference(newSet).union(newSet.difference(oldSet));
+      return newData.likedBy is list
+        && newData.likes is int
+        && newData.likes == newData.likedBy.size()
+        && changedUids == [uid].toSet();
+    }
+
     // 使用者資料：只有本人可讀寫
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
@@ -12,6 +30,11 @@ service cloud.firestore {
     // uploadQuizDB 固定寫入 title/tribe/createdAt/data 四個欄位，這裡驗證
     // 型別、族語限定在已知清單、data 非空且有合理上限，createdAt 必須是
     // 真正的伺服器時間（擋掉客戶端偽造時間戳記）。
+    // data 裡每題原本帶有正確答案（answer 欄位），任何登入使用者都能在作答
+    // 前直接用 Firestore SDK 讀到全部正確答案。uploadQuizDB 現在寫入前會先
+    // 把每題的 answer 拿掉，正確答案改存進本人才能讀的 situations 文件
+    // （見 uploadSituationDB／下方 situations 規則），這裡的 read 規則維持
+    // 「登入者可讀」不變——data 已經不含機密內容。
     match /quizs/{quizId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null
@@ -81,7 +104,10 @@ service cloud.firestore {
         && request.resource.data.deleted == false;
       allow update: if request.auth != null && (
         resource.data.uid == request.auth.uid ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy'])
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy']) &&
+          isValidLikeToggle(resource.data, request.resource.data, request.auth.uid)
+        )
       );
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }

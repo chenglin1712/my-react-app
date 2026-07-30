@@ -121,6 +121,80 @@ describe('sharedNotes create 規則', () => {
   });
 });
 
+describe('sharedNotes update 規則（按讚完整性）', () => {
+  const seedNote = async (noteId, overrides = {}) => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `sharedNotes/${noteId}`), {
+        ...validSharedNote('alice'),
+        ...overrides,
+      });
+    });
+  };
+
+  test('非作者按讚：likes 正確等於 likedBy.size() 時可以成功', async () => {
+    await seedNote('n1');
+    const bob = testEnv.authenticatedContext('bob');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertSucceeds(
+      updateDoc(doc(bob.firestore(), 'sharedNotes/n1'), { likes: 1, likedBy: ['bob'] })
+    );
+  });
+
+  test('非作者取消讚：把自己的 uid 從 likedBy 移除也可以成功', async () => {
+    await seedNote('n1', { likes: 1, likedBy: ['bob'] });
+    const bob = testEnv.authenticatedContext('bob');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertSucceeds(
+      updateDoc(doc(bob.firestore(), 'sharedNotes/n1'), { likes: 0, likedBy: [] })
+    );
+  });
+
+  test('likes 跟 likedBy.size() 對不上會被拒絕（偽造讚數）', async () => {
+    await seedNote('n1');
+    const bob = testEnv.authenticatedContext('bob');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(bob.firestore(), 'sharedNotes/n1'), { likes: 9999, likedBy: ['bob'] })
+    );
+  });
+
+  test('把別人的 uid 塞進 likedBy 會被拒絕（冒名按讚）', async () => {
+    await seedNote('n1');
+    const bob = testEnv.authenticatedContext('bob');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(bob.firestore(), 'sharedNotes/n1'), { likes: 1, likedBy: ['carol'] })
+    );
+  });
+
+  test('清空別人已經按的讚會被拒絕', async () => {
+    await seedNote('n1', { likes: 1, likedBy: ['carol'] });
+    const bob = testEnv.authenticatedContext('bob');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(bob.firestore(), 'sharedNotes/n1'), { likes: 0, likedBy: [] })
+    );
+  });
+
+  test('一次改動兩個以上 uid 的 likedBy 會被拒絕', async () => {
+    await seedNote('n1');
+    const bob = testEnv.authenticatedContext('bob');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(bob.firestore(), 'sharedNotes/n1'), { likes: 2, likedBy: ['bob', 'carol'] })
+    );
+  });
+
+  test('作者本人更新仍不受按讚完整性限制（可編輯任何欄位）', async () => {
+    await seedNote('n1');
+    const alice = testEnv.authenticatedContext('alice');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertSucceeds(
+      updateDoc(doc(alice.firestore(), 'sharedNotes/n1'), { preview: '<p>改過的內容</p>' })
+    );
+  });
+});
+
 describe('sharedNotes read 規則（軟刪除）', () => {
   test('deleted:true 的筆記讀不到（即使知道文件 ID 直接讀取）', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {

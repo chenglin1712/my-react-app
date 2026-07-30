@@ -24,11 +24,11 @@ describe('useAudioRecorder', () => {
   beforeEach(() => {
     fakeTracks = [{ stop: vi.fn() }, { stop: vi.fn() }];
     fakeStream = { getTracks: () => fakeTracks };
-    global.navigator.mediaDevices = {
+    window.navigator.mediaDevices = {
       getUserMedia: vi.fn().mockResolvedValue(fakeStream),
     };
-    global.MediaRecorder = FakeMediaRecorder;
-    global.URL.createObjectURL = vi.fn(() => 'blob:fake-url');
+    window.MediaRecorder = FakeMediaRecorder;
+    window.URL.createObjectURL = vi.fn(() => 'blob:fake-url');
   });
 
   afterEach(() => {
@@ -52,7 +52,7 @@ describe('useAudioRecorder', () => {
   });
 
   test('取得麥克風權限失敗時呼叫 onError，不會噴例外', async () => {
-    global.navigator.mediaDevices.getUserMedia = vi.fn().mockRejectedValue(new Error('denied'));
+    window.navigator.mediaDevices.getUserMedia = vi.fn().mockRejectedValue(new Error('denied'));
     const onError = vi.fn();
     const { result } = renderHook(() => useAudioRecorder(onError));
 

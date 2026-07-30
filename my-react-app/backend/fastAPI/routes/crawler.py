@@ -16,10 +16,18 @@ from fastapi import APIRouter,Request
 from fastapi.responses import JSONResponse
 from bs4 import BeautifulSoup
 
+from fastAPI.rate_limit import limiter
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://e-dictionary.ilrdf.org.tw"
+
+# 每個字都會對 ILRDF 網站發 2 次外部請求（query() 內部：先查搜尋列表頁，
+# 再抓字詞詳情頁），且都丟進 loop.run_in_executor 的全域預設執行緒池執行
+# （跟其他請求共用）。沒有上限的話，帶一個超大的 words 陣列就能對外部字典站
+# 發起放大請求，同時占滿本機執行緒池。
+MAX_WORDS_PER_REQUEST = 20
 
 def misencode_word(word: str) -> str:
     """ 將詞彙進行錯誤編碼，模擬網站請求格式 """
@@ -138,6 +146,7 @@ def query(keyword):
     return None
 
 @router.post("/dictionary/")
+@limiter.limit("10/minute")  # 對外部網站的放大請求，比照 vision.py 呼叫外部 API 的保守限流
 async def search_tayal_dictionary(request: Request):
     """ 查詢 Tayal 字典 API """
     try:
@@ -146,6 +155,11 @@ async def search_tayal_dictionary(request: Request):
 
         if not words:
             return JSONResponse({"detail": "查詢字詞不可為空"}, status_code=400)
+        if len(words) > MAX_WORDS_PER_REQUEST:
+            return JSONResponse(
+                {"detail": f"一次最多查詢 {MAX_WORDS_PER_REQUEST} 個字詞"},
+                status_code=400,
+            )
 
         loop = asyncio.get_event_loop()
         tasks = [loop.run_in_executor(None, query, word) for word in words]

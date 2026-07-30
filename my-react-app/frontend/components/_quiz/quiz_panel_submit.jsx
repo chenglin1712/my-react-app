@@ -73,6 +73,7 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
         return {
             quiz: { title: fallback.title, data: fallback.questions },
             answers: fallback.answers,
+            correctAnswers: fallback.correctAnswers,
             results
         };
     };
@@ -133,7 +134,11 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
                             const userAnswer = userAnswerNum === 1 ? "O" : userAnswerNum === 2 ? "X" : "未作答";
                             const userLabel = labels[userAnswerNum - 1];
 
-                            const correctAnswerNum = item.answer;
+                            // 正確答案不再存在 quizs 文件的 data[i].answer（見
+                            // uploadDb.jsx 的 uploadQuizDB 說明），改從本人專屬的
+                            // situations 文件（getQuizSubmitById 回傳的 result.correctAnswers）
+                            // 或 fallback 資料讀取。
+                            const correctAnswerNum = displayData.correctAnswers?.[idx];
                             const correctAnswer = correctAnswerNum === 1 ? "O" : correctAnswerNum === 2 ? "X" : "-";
                             const correctLabel = labels[correctAnswerNum - 1];
 

@@ -5,12 +5,17 @@ import { TRIBE_FULL_NAME_BY_SLUG as TRIBE_NAME } from "../constants/tribes";
 //測驗題目存至資料庫
 export const uploadQuizDB = async (level_ch, data, tribe = "tayal") => {
     const correctAnswers = data.map(q => q.answer);
+    // 正確答案不該進到 firestore.rules 裡任何登入使用者都能讀的 quizs 文件——
+    // 寫入前先把每題的 answer 拿掉，correctAnswers 保留在記憶體（回傳值 ans）
+    // 供這次作答流程使用；真正要長期保存的正確答案改存進 situations（見
+    // uploadSituationDB），那份文件本來就只有本人可讀。
+    const sanitizedData = data.map(({ answer: _answer, ...rest }) => rest);
 
     const quizSet = {
         title: level_ch,
         tribe,
         createdAt: serverTimestamp(),
-        data
+        data: sanitizedData
     };
 
     try {
@@ -30,7 +35,15 @@ export const uploadSituationDB = async (quizId, correctAns, userAns, stars) => {
         quizId: quizId,
         answeredAt: serverTimestamp(),
         stars: stars ?? [],
-        answers: userAns,
+        // quiz_panel.jsx 的 handleUploadSituation 在使用者一題都沒作答就繳交時
+        // 會傳 null（見下方 evaluateAnswers 的說明）。存成 [] 而不是 null，
+        // 讓 review.jsx／quiz_panel_submit.jsx 對 answers[idx] 的直接索引不會
+        // 因為 null[idx] 而噴例外（跟 stars ?? [] 同一套防呆）。
+        answers: userAns ?? [],
+        // 正確答案改存在這裡（本人才能讀的文件）而不是 quizs（見 uploadQuizDB
+        // 的說明），review.jsx／quiz_panel_submit.jsx 顯示「正確答案」時改讀
+        // 這裡而不是 quizs 文件的 data[i].answer。
+        correctAnswers: correctAns ?? null,
         results: results
     }
 
@@ -44,8 +57,12 @@ export const uploadSituationDB = async (quizId, correctAns, userAns, stars) => {
 
 //比對回答是否正確
 const evaluateAnswers = (correctAns, userAns) => {
+    // 使用者一題都沒作答就繳交時，quiz_panel.jsx 會傳 correctAns=null（見
+    // handleUploadSituation），原本 correctAns.map(...) 會直接對 null 呼叫
+    // .map() 丟出未捕捉的 TypeError，讓整個繳交流程卡住、無法導向結果頁。
+    if (!correctAns) return [];
     return correctAns.map((correctAnswer, index) => {
-        const userAnswer = userAns[index];
+        const userAnswer = userAns?.[index];
         let questionSituation;
         if (userAnswer === null || userAnswer === undefined) {
             questionSituation = null;

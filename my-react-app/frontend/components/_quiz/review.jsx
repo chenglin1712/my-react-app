@@ -45,13 +45,14 @@ const Review = () => {
         return "score-bad";
     };
 
-    const viewQuiz = async (quizId, results, answers) => {
+    const viewQuiz = async (quizId, results, answers, correctAnswers) => {
         const quizData = await getQuizById(quizId);
         if (quizData) {
             const enrichedQuiz = {
                 ...quizData,
                 results,
-                answers
+                answers,
+                correctAnswers
             };
             setSelectedQuiz(enrichedQuiz);
             setSelectedQuestion(null);
@@ -61,8 +62,13 @@ const Review = () => {
 
     const viewQuestion = async (q, idx) => {
         if (q) {
+            // 正確答案不再存在 quizs 文件的 data[i].answer（見 uploadDb.jsx 的
+            // uploadQuizDB 說明），從本人專屬的 situations 文件
+            // （selectedQuiz.correctAnswers，見 viewQuiz）補回這個題目物件上，
+            // 下面的畫面渲染邏輯不用跟著改。
             const enrichedQuestion = {
                 ...q,
+                answer: selectedQuiz.correctAnswers?.[idx],
                 userAnswer: selectedQuiz.answers[idx],
                 isCorrect: selectedQuiz.results[idx].isCorrect,
                 idx: idx
@@ -145,7 +151,7 @@ const Review = () => {
                                                                     {score}
                                                                 </span></td>
                                                             <td>
-                                                                <button className="view-btn" onClick={() => { viewQuiz(s.quizId, s.results, s.answers) }} >查看測驗</button>
+                                                                <button className="view-btn" onClick={() => { viewQuiz(s.quizId, s.results, s.answers, s.correctAnswers) }} >查看測驗</button>
                                                             </td>
                                                         </tr>
                                                     </React.Fragment>

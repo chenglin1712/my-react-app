@@ -7,8 +7,12 @@ offset/limit 原本是裸的 int，沒有下限驗證，負值會用 Python 負�
 
 第 6 項：get_grammar_affixes 的 affix_type 原本是完全沒有白名單限制的自由
 字串，直接查詢也直接拿去當快取 key；改成白名單驗證後，不支援的值應該回 400。
+
+（另一輪稽核）第 5 項：grammar.py 的 4 支端點原本完全沒有限流，這裡驗證
+@limiter.limit(...) 真的有生效（連續打超過門檻會回 429），search_grammar
+沒有走快取、每次都是全表掃描，門檻比其他 3 支端點更嚴格。
 """
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -83,3 +87,47 @@ class TestAffixTypeWhitelist:
     def test_omitted_affix_type_still_returns_all(self, client):
         response = client.get("/api/v1/dictionary/grammar/tayal/affixes")
         assert response.status_code == 200
+
+
+class TestRateLimiting:
+    def test_get_grammar_rate_limited_after_60_calls(self, client):
+        from fastAPI.rate_limit import limiter
+        limiter.reset()
+        try:
+            for _ in range(60):
+                response = client.get("/api/v1/dictionary/grammar/tayal")
+                assert response.status_code == 200
+            response = client.get("/api/v1/dictionary/grammar/tayal")
+            assert response.status_code == 429
+        finally:
+            limiter.reset()
+
+    def test_search_grammar_rate_limited_after_20_calls(self):
+        # search_grammar 沒有走快取、每次都是全表掃描，門檻比其他端點更嚴格
+        # （20/minute）。它不經過 client fixture 已經 patch 的 _load_grammar_*，
+        # 直接對 db 發 SQL，這裡另外給一個會回空結果的假 db。
+        from fastAPI.rate_limit import limiter
+
+        fake_db = MagicMock()
+        fake_db.execute.return_value.fetchall.return_value = []
+
+        def _fake_search_db():
+            yield fake_db
+
+        app.dependency_overrides[get_db] = _fake_search_db
+        app.dependency_overrides[auth_module.verify_firebase_token] = _fake_auth
+        limiter.reset()
+        try:
+            with TestClient(app) as search_client:
+                for _ in range(20):
+                    response = search_client.get(
+                        "/api/v1/dictionary/grammar/tayal/search", params={"q": "test"}
+                    )
+                    assert response.status_code == 200
+                response = search_client.get(
+                    "/api/v1/dictionary/grammar/tayal/search", params={"q": "test"}
+                )
+            assert response.status_code == 429
+        finally:
+            limiter.reset()
+            app.dependency_overrides.clear()
