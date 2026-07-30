@@ -14,7 +14,7 @@ from config.tribes import resolve_tribe_name
 from config.debug_flag import is_debug
 from config.audio_source import get_ilrdf_audio_api
 from fastAPI.rate_limit import limiter
-from fastAPI.url_safety import is_safe_redirect_target
+from fastAPI.url_safety import UnsafeConnectionError, assert_response_from_safe_peer, is_safe_redirect_target
 
 from .schemas import SentenceAudioRequest
 from .search import _tribe_id_subquery
@@ -48,11 +48,20 @@ async def proxy_audio(request: Request, file_id: str):
 
             async with httpx.AsyncClient(timeout=15) as c2:
                 audio_res = await c2.get(final_url)
+                # is_safe_redirect_target 檢查的那次 DNS 解析，跟這裡 c2.get()
+                # 實際連線時 httpx 自己重新做的 DNS 解析是兩次獨立的查詢——如果
+                # 網域在中間變更了解析結果（低 TTL、DNS rebinding），前面的檢查
+                # 就形同虛設。這裡改成檢查「實際建立連線的那個 IP」本身安不
+                # 安全（見 url_safety.py 的 assert_response_from_safe_peer），
+                # 不安全就整段內容都不回傳給呼叫端。
+                assert_response_from_safe_peer(audio_res)
                 if audio_res.status_code != 200:
                     return Response(content="Audio file not found", media_type="text/plain", status_code=404)
                 content_type = audio_res.headers.get("content-type", "audio/mpeg")
                 return Response(content=audio_res.content, media_type=content_type)
 
+    except UnsafeConnectionError:
+        return Response(content="Audio URL not allowed", media_type="text/plain", status_code=502)
     except httpx.ConnectError:
         return Response(content="Audio API unreachable", media_type="text/plain", status_code=503)
     except Exception as e:
@@ -97,6 +106,17 @@ if is_debug():
             # 第二次請求真正的音檔
             async with httpx.AsyncClient() as c2:
                 audio_res = await c2.get(final_url)
+
+                # 跟 proxy_audio 同樣的 DNS rebinding TOCTOU 防護：確認實際
+                # 建立連線的 IP 安全，才信任這次的回應內容（見 url_safety.py）。
+                try:
+                    assert_response_from_safe_peer(audio_res)
+                except UnsafeConnectionError as e:
+                    return {
+                        "success": False,
+                        "step": "unsafe_connection_peer",
+                        "error": str(e),
+                    }
 
                 target_bytes = audio_res.content
 

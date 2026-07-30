@@ -135,6 +135,9 @@ export default function WordMatch({ question, _selected, _checked, onSelect, onC
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
+      // pause() 不會觸發 authAudio.js 內建的 ended/error revoke，手動切換/
+      // 停止播放要自己呼叫，不然每切一次語音就洩漏一個 blob URL。
+      audioRef.current.revokeObjectUrl?.();
     }
 
 

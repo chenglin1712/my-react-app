@@ -36,13 +36,31 @@ function buildConfig(headers, { params, signal } = {}) {
   return config;
 }
 
+/** 把 detail／error 欄位轉成可讀字串。FastAPI 的 Pydantic 驗證失敗時，detail
+ * 不是字串，而是錯誤物件陣列（[{type, loc, msg, input}, ...]）；直接把它交給
+ * `new Error(message)`，JS 會用 String() 轉換，陣列裡的物件變成沒有意義的
+ * "[object Object]"。這裡改成抓每一項的 msg 組成一句可讀訊息。 */
+function extractMessage(value) {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    if (value.length === 0) return null;
+    return value
+      .map((item) => (item && typeof item === 'object' && item.msg) || JSON.stringify(item))
+      .join('；');
+  }
+  if (value && typeof value === 'object') {
+    return value.msg || JSON.stringify(value);
+  }
+  return null;
+}
+
 function normalizeError(err) {
   // 呼叫端可能仍用 axios.isCancel(err) 判斷主動中斷的請求（見 _camera/label.jsx），
   // 這種情況原樣往外丟，不包成 ApiError。
   if (axios.isCancel(err)) throw err;
   const status = err.response?.status;
   const respData = err.response?.data;
-  const message = respData?.detail || respData?.error || err.message || '請求失敗';
+  const message = extractMessage(respData?.detail) || extractMessage(respData?.error) || err.message || '請求失敗';
   throw new ApiError(message, { status, data: respData });
 }
 

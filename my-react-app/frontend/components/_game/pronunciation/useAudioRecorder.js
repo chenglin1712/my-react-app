@@ -13,6 +13,7 @@ export function useAudioRecorder(onError) {
 
   const mediaRecorder = useRef(null);
   const chunks = useRef([]);
+  const stream = useRef(null);
 
   const reset = () => {
     setRecState("idle");
@@ -22,8 +23,9 @@ export function useAudioRecorder(onError) {
 
   const start = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder.current = new MediaRecorder(stream);
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.current = s;
+      mediaRecorder.current = new MediaRecorder(s);
       chunks.current = [];
       mediaRecorder.current.ondataavailable = (e) => chunks.current.push(e.data);
       mediaRecorder.current.onstop = () => {
@@ -41,6 +43,10 @@ export function useAudioRecorder(onError) {
 
   const stop = () => {
     mediaRecorder.current?.stop();
+    // MediaRecorder.stop() 只是停止錄製，不會釋放底層 getUserMedia 拿到的
+    // stream，瀏覽器分頁/系統的錄音中指示燈會持續亮著，使用者會誤以為還在
+    // 錄音。停止 stream 上每個 track 才會真正釋放麥克風。
+    stream.current?.getTracks().forEach((t) => t.stop());
   };
 
   const playUserAudio = () => {

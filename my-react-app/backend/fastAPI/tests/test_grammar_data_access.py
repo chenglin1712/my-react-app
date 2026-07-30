@@ -12,6 +12,7 @@ from fastAPI.routes.dictionary.grammar import (
     _format_rule,
     _format_section,
     _load_grammar,
+    _load_grammar_quiz_material,
 )
 from fastAPI.routes.keyed_cache import KeyedCache
 
@@ -126,3 +127,50 @@ class TestLoadGrammarOrchestration:
 
         assert first is second  # 同一個快取住的 dict 物件
         assert db.execute.call_count == call_count_after_first
+
+
+class TestLoadGrammarQuizMaterialCacheBounding:
+    """_load_grammar_quiz_material 的 section_key 是自由文字模糊搜尋，不像
+    affix_type 能收斂成固定白名單；如果直接拿它當快取 key，任何已登入使用者
+    每次帶不同字串就能讓 _grammar_quiz_cache 無上限成長（稽核修正第 6 項）。
+    驗證：帶 section_key 一律不快取（每次都重新查 DB），只有「查全部規則」
+    （section_key 為 None）才走快取，key 空間只剩 tribe_name，跟其他呼叫端
+    一樣有限。"""
+
+    def setup_method(self):
+        grammar_module._grammar_quiz_cache = KeyedCache()
+
+    def test_section_key_query_bypasses_cache_every_call(self):
+        db = MagicMock()
+        db.execute.return_value.fetchall.side_effect = [[], []]
+
+        _load_grammar_quiz_material(db, "泰雅語", "section-a")
+        count_after_first = db.execute.call_count
+        _load_grammar_quiz_material(db, "泰雅語", "section-a")
+
+        # 就算 tribe/section_key 完全相同，第二次呼叫還是要重新查 DB——
+        # 這正是要堵住的漏洞：如果快取住了，攻擊者帶入的任意字串就會變成
+        # 一筆永久快取。
+        assert db.execute.call_count > count_after_first
+
+    def test_different_section_keys_never_accumulate_in_cache(self):
+        db = MagicMock()
+        db.execute.return_value.fetchall.return_value = []
+
+        for i in range(5):
+            _load_grammar_quiz_material(db, "泰雅語", f"random-{i}")
+
+        # KeyedCache 沒有 eviction/TTL，只增不減；section_key 一律不快取，
+        # 所以無論帶多少個不同字串，_grammar_quiz_cache 內部都不會累積任何一筆。
+        assert len(grammar_module._grammar_quiz_cache._values) == 0
+
+    def test_no_section_key_uses_bounded_tribe_key_cache(self):
+        db = MagicMock()
+        db.execute.return_value.fetchall.side_effect = [[]]
+
+        first = _load_grammar_quiz_material(db, "泰雅語", None)
+        count_after_first = db.execute.call_count
+        second = _load_grammar_quiz_material(db, "泰雅語", None)
+
+        assert first is second  # 同一個快取住的 dict 物件
+        assert db.execute.call_count == count_after_first

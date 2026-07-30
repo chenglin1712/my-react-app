@@ -57,6 +57,7 @@ export function useQuizPanelData(level, tribe, level_ch) {
     //取得後端初級測驗資料
     useEffect(() => {
         let isMounted = true;
+        let timeoutId = null;
         async function fetchData() {
             setIsLoading(true);
             try {
@@ -65,7 +66,15 @@ export function useQuizPanelData(level, tribe, level_ch) {
                     setData(responseData);
                     if (responseData && responseData.parts &&
                         responseData.parts[0] && responseData.parts[0].questions) {
-                        setTimeout(() => {
+                        // isMounted 只擋住了「排入 setTimeout」這一步，1000ms 後真正
+                        // 觸發的 callback 本身既沒有重新檢查 isMounted，清除函式也沒有
+                        // 把它 clear 掉。使用者在等待期間快速切換 level／tribe 或連點
+                        // 重試（retryCount 變動、這個 effect 重跑），舊的 callback 仍會
+                        // 照常觸發，用上一輪的資料把作答進度蓋掉。timeoutId 記下來，
+                        // effect 清除時一併 clearTimeout；callback 內再檢查一次
+                        // isMounted 當作雙重保險。
+                        timeoutId = setTimeout(() => {
+                            if (!isMounted) return;
                             const qLen = responseData.parts[0].questions.length;
                             setIsLoading(false);
                             setDataLen(qLen);
@@ -87,6 +96,7 @@ export function useQuizPanelData(level, tribe, level_ch) {
         fetchData();
         return () => {
             isMounted = false;
+            clearTimeout(timeoutId);
         };
     }, [level, tribe, retryCount]);
 

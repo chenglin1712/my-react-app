@@ -15,7 +15,7 @@ from dictionary_db.word_data import load_explanation_items_for_words, load_audio
 from config.tribes import TRIBE_IDS
 from config.audio_source import get_ilrdf_audio_api
 from fastAPI.rate_limit import limiter
-from fastAPI.url_safety import is_safe_redirect_target
+from fastAPI.url_safety import UnsafeConnectionError, assert_response_from_safe_peer, is_safe_redirect_target
 from .keyed_cache import KeyedCache
 
 
@@ -35,6 +35,7 @@ class WordDTO:
 import io
 import re
 import requests
+import httpx
 from urllib.parse import urlparse
 from pydub import AudioSegment
 import torch
@@ -673,8 +674,20 @@ def fetch_audio_from_id(audio_id: str):
     if not is_safe_redirect_target(final_url):
         raise Exception("音檔 URL 指向不允許的位址")
 
-    # 第二次請求下載真正音檔
-    audio_resp = requests.get(final_url, timeout=15, allow_redirects=False)
+    # 第二次請求下載真正音檔。這裡改用 httpx（而非 requests）：is_safe_redirect_target
+    # 剛剛做的 DNS 解析，跟接下來實際連線時重新做的 DNS 解析是兩次獨立的查詢——
+    # 如果網域在中間變更了解析結果（低 TTL、DNS rebinding），前面的檢查就形同
+    # 虛設。httpx 能在連線建立「之後」告訴我們實際連到的是哪個 IP
+    # （response.extensions["network_stream"]），藉此改成檢查「真正被拿去
+    # 收發資料的那個位址」本身安全（見 url_safety.py 的
+    # assert_response_from_safe_peer），不再只依賴檢查當下的解析結果。
+    with httpx.Client(timeout=15, follow_redirects=False) as client:
+        audio_resp = client.get(final_url)
+        try:
+            assert_response_from_safe_peer(audio_resp)
+        except UnsafeConnectionError:
+            raise Exception("音檔 URL 指向不允許的位址")
+
     if audio_resp.status_code != 200:
         raise Exception(f"下載音檔失敗 (HTTP {audio_resp.status_code})")
 
@@ -793,7 +806,6 @@ async def compare_audio(
         # Step D — 真人參考音檔比對（Firebase Storage 公開 URL，用 httpx 非同步抓取）
         best_ref_score = None
         if reference_urls.strip():
-            import httpx
             urls = [u.strip() for u in reference_urls.split(",") if u.strip()][:5]
             # follow_redirects=False：即使初始網址通過白名單，也不能放行伺服器端重導向，
             # 否則白名單可被「先指到合法網域、再 302 到內網位址」繞過（redirect-based SSRF）。

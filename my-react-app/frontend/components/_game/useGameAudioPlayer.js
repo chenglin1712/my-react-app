@@ -18,6 +18,10 @@ export function useGameAudioPlayer(audioBaseUrl) {
   const stop = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
+      // pause() 不會觸發 authAudio.js 內建的 ended/error revoke，手動停止播放
+      // 要自己呼叫，不然每停一次／切一次音檔就洩漏一個 blob URL（見
+      // hooks/useAudioPlayback.js 同樣的做法）。
+      audioRef.current.revokeObjectUrl?.();
     }
     setIsPlaying(false);
   }, []);
@@ -27,6 +31,7 @@ export function useGameAudioPlayer(audioBaseUrl) {
     const url = audioBaseUrl + audioId;
     if (audioRef.current) {
       audioRef.current.pause();
+      audioRef.current.revokeObjectUrl?.();
     }
     let audio;
     try {

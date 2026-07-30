@@ -1,7 +1,7 @@
 import logging
 from typing import Dict, Optional, Tuple
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
@@ -23,7 +23,19 @@ logger = logging.getLogger(__name__)
 # 真正查詢一次，之後直接吃記憶體快取，避免重複的多輪 SQL 往返。
 _grammar_cache: KeyedCache[str, dict] = KeyedCache()
 _grammar_affixes_cache: KeyedCache[Tuple[str, str], dict] = KeyedCache()
-_grammar_quiz_cache: KeyedCache[Tuple[str, str], dict] = KeyedCache()
+# section_key 是自由文字模糊搜尋（見 _load_grammar_quiz_material 的 LIKE
+# 查詢），不像 affix_type 能收斂成固定白名單，key 只用 tribe_name（見
+# _load_grammar_quiz_material 的說明：帶 section_key 的查詢一律略過快取）。
+_grammar_quiz_cache: KeyedCache[str, dict] = KeyedCache()
+
+# get_grammar_affixes 的 affix_type 原本是完全沒有白名單限制的自由字串，
+# 直接拿來當 _grammar_affixes_cache 的 key 一部分：KeyedCache 沒有
+# eviction／TTL，任何已登入使用者只要每次帶不同字串發請求，就能讓伺服器
+# 記憶體無上限成長。這裡收斂成固定的已知詞綴類型（同函式原本 docstring
+# 就列出的值），額外帶來的好處是不支援的值會直接 400，而不是靜默回傳空清單。
+_VALID_AFFIX_TYPES = frozenset({
+    "prefix", "suffix", "infix", "circumfix", "reduplication", "auxiliary",
+})
 
 
 # _load_grammar 原本查詢與組裝混在同一個函式：4 層巢狀迴圈裡，每撈一批 row
@@ -125,9 +137,21 @@ def _load_grammar(db: Session, tribe_name: str) -> Optional[dict]:
 
 
 @router.get("/grammar/{tribe}")
-def get_grammar(tribe: str, limit: Optional[int] = None, offset: int = 0, db: Session = Depends(get_db)):
+def get_grammar(
+    tribe: str,
+    limit: Optional[int] = Query(default=None, ge=1),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+):
     """查詢指定族語的所有文法章節（含規則、例句、詞綴）
-    limit/offset 為選填的章節分頁參數，不傳則維持原本回傳全部章節的行為"""
+    limit/offset 為選填的章節分頁參數，不傳則維持原本回傳全部章節的行為
+
+    limit/offset 原本是裸的 int，沒有下限驗證：sections[offset:offset+limit]
+    在 offset 或 limit 為負值時會命中 Python 的負索引切片，不會報錯，而是
+    安靜地從陣列尾端切一段回來（total 卻仍回報正確總筆數，變成「總數正確、
+    內容對不上頁碼」的資料）。比照 dictionary/schemas.py 的
+    AllWordsRequest.offset/limit 加上 ge 下限，交給 FastAPI 在進 handler 前
+    就擋成 422。"""
     try:
         try:
             tribe_name = resolve_tribe_name(tribe)
@@ -274,19 +298,21 @@ def _load_grammar_affixes(db: Session, tribe_name: str, affix_type: Optional[str
 def get_grammar_affixes(
     tribe: str,
     affix_type: Optional[str] = None,
-    limit: Optional[int] = None,
-    offset: int = 0,
+    limit: Optional[int] = Query(default=None, ge=1),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
     """取得詞綴清單
     affix_type: prefix / suffix / infix / circumfix / reduplication / auxiliary（不傳則回傳全部）
-    limit/offset 為選填的分頁參數，不傳則維持原本回傳全部詞綴的行為
+    limit/offset 為選填的分頁參數，不傳則維持原本回傳全部詞綴的行為（下限驗證見 get_grammar 說明）
     """
     try:
         try:
             tribe_name = resolve_tribe_name(tribe)
         except ValueError as e:
             return JSONResponse({"detail": str(e)}, status_code=400)
+        if affix_type is not None and affix_type not in _VALID_AFFIX_TYPES:
+            return JSONResponse({"detail": f"不支援的詞綴類型：{affix_type}"}, status_code=400)
         payload = _load_grammar_affixes(db, tribe_name, affix_type)
         affixes = payload["affixes"]
         sliced = affixes[offset:offset + limit] if limit is not None else affixes[offset:]
@@ -299,8 +325,6 @@ def get_grammar_affixes(
 
 
 def _load_grammar_quiz_material(db: Session, tribe_name: str, section_key: Optional[str]) -> dict:
-    key = (tribe_name, section_key or "")
-
     def _compute():
         if section_key:
             rows = db.execute(
@@ -369,20 +393,30 @@ def _load_grammar_quiz_material(db: Session, tribe_name: str, section_key: Optio
             "rules": list(rules_map.values()),
         }
 
-    return _grammar_quiz_cache.get_or_compute(key, _compute)
+    if section_key:
+        # section_key 是自由文字模糊搜尋（上面 LIKE 查詢），不像 affix_type
+        # 能收斂成固定白名單。如果比照 affix_type 直接拿使用者輸入當 key 快取，
+        # KeyedCache 沒有 eviction／TTL，等於任何已登入使用者只要每次帶不同
+        # 字串發請求，就能讓 _grammar_quiz_cache 無上限成長（見稽核報告：帶 5
+        # 個隨機字串就留下 5 筆永久快取）。改成有 section_key 時一律略過快取、
+        # 直接查 DB；只有「查全部規則」（section_key 為 None，呼叫端固定只會
+        # 用到 tribe_name 這個有限的 key）才會走快取，回到跟其他呼叫端一樣
+        # 「key 空間有限」的安全狀態。
+        return _compute()
+    return _grammar_quiz_cache.get_or_compute(tribe_name, _compute)
 
 
 @router.get("/grammar/{tribe}/quiz")
 def get_grammar_quiz_material(
     tribe: str,
     section_key: Optional[str] = None,
-    limit: Optional[int] = None,
-    offset: int = 0,
+    limit: Optional[int] = Query(default=None, ge=1),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
     """取得有例句的規則清單（用於自動生成測驗題）
     section_key: 指定章節 key（不傳則回傳全部有例句的規則）
-    limit/offset 為選填的分頁參數，不傳則維持原本回傳全部規則的行為
+    limit/offset 為選填的分頁參數，不傳則維持原本回傳全部規則的行為（下限驗證見 get_grammar 說明）
     """
     try:
         try:

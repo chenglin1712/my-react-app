@@ -14,6 +14,7 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
   const audioRef = useRef(null);
   const mediaRecorder = useRef(null);
   const chunks = useRef([]);
+  const stream = useRef(null);
   const [result, setResult] = useState(null);
   const [score, setScore] = useState(null);
   const [submitError, setSubmitError] = useState(null);
@@ -27,8 +28,9 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
   const startRecording = async () => {
     setResult(null);
     setScore(null);
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder.current = new MediaRecorder(stream);
+    const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.current = s;
+    mediaRecorder.current = new MediaRecorder(s);
     chunks.current = [];
 
     mediaRecorder.current.ondataavailable = (e) => chunks.current.push(e.data);
@@ -45,6 +47,10 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
   // 🛑 停止錄音
   const stopRecording = () => {
     mediaRecorder.current.stop();
+    // MediaRecorder.stop() 不會釋放底層 stream，麥克風錄音中指示燈會持續亮著
+    // （這裡是獨立內嵌重寫的錄音邏輯，沒有共用 _game/pronunciation/useAudioRecorder.js，
+    // 同樣的問題要在這裡另外修一次）。
+    stream.current?.getTracks().forEach((t) => t.stop());
     setRecording(false);
   };
 
@@ -56,6 +62,9 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
+      // pause() 不會觸發 authAudio.js 內建的 ended/error revoke，手動切換/
+      // 停止播放要自己呼叫，不然每切一次語音就洩漏一個 blob URL。
+      audioRef.current.revokeObjectUrl?.();
     }
 
 
@@ -87,6 +96,7 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
+      audioRef.current.revokeObjectUrl?.();
     }
     if (!audioBlob || submitting) return;
 
