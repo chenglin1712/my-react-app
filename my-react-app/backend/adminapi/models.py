@@ -38,9 +38,39 @@ class Announcement(models.Model):
         (CATEGORY_MAINTENANCE, '系統維護'),
     ]
 
+    SOURCE_ADMIN = 'admin'
+    SOURCE_CRAWLER = 'crawler'
+    SOURCE_CHOICES = [
+        (SOURCE_ADMIN, '後台建立'),
+        (SOURCE_CRAWLER, '爬蟲匯入'),
+    ]
+
     title = models.CharField(max_length=100)
     body = models.TextField(blank=True)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default=CATEGORY_ANNOUNCEMENT)
+    # 這篇是後台人員自己寫的，還是 crawler_sync.sync_crawler_announcements()
+    # 從外部爬蟲資料自動匯入的——只是標記，不影響狀態機或任何權限判斷，純粹
+    # 給後台列表篩選／徽章顯示用。序列化時務必只讀（見 serializers.py），
+    # 不能讓一般 create/update 直接寫這個欄位。
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default=SOURCE_ADMIN)
+    # 爬蟲匯入專用的去重鍵，格式為「來源:原始 id」（例如 "tacp:12345"、
+    # "ntnu-abst:https://..."），確保跨資料來源不會撞鍵。null=True 是刻意的：
+    # 後台自建的公告這個欄位一律是 NULL，unique 約束底下多個 NULL 彼此不算
+    # 衝突（Postgres／SQLite 皆然），只有非 NULL 值才真的互斥比對。
+    # 絕對不能開放給 serializer 寫入——否則兩篇後台自建公告的這個欄位都會
+    # 是序列化器預設值（可能是空字串 ''），第二篇存檔時就會撞上唯一約束。
+    external_id = models.CharField(max_length=255, null=True, blank=True, unique=True, default=None)
+    # 爬蟲來源本身的顯示用日期文字（例如活動起訖日、考試新聞的公告日期），
+    # 純顯示、不參與任何排程或篩選邏輯——不能塞進 publish_at／unpublish_at，
+    # 那兩個欄位的語意是「後台何時讓這篇在首頁曝光」，跟「這個活動本身哪天
+    # 舉辦」是兩件事，硬塞在一起會讓活動還沒開始就因為 publish_at 在未來而
+    # 被首頁查詢條件擋住不顯示。後台自建公告不需要這個欄位，留空即可。
+    display_date_text = models.CharField(max_length=50, blank=True)
+    # 爬蟲來源原始的分類文字（例如 tacp 的「展覽」「園區活動」），只用來讓
+    # 首頁消息卡片的標籤顏色維持原本的多樣性（見 static/css/_home/news.css
+    # 依 data-tag 內文字比對顏色的規則）；不是後台的分類欄位，不參與任何
+    # 篩選或狀態判斷，後台自建公告不需要這個欄位。
+    source_tag = models.CharField(max_length=50, blank=True)
     # 適用族語：空陣列＝全部族語（比照前台 config/tribes.py 的 slug 值，
     # 例如 ["tayal","amis"]）。這裡沒有做值域檢查（是不是真的存在的 slug），
     # 留給 serializer 驗證，model 層只負責存放。
@@ -73,6 +103,7 @@ class Announcement(models.Model):
         indexes = [
             models.Index(fields=['status']),
             models.Index(fields=['category']),
+            models.Index(fields=['source']),
         ]
 
     def clean(self):
@@ -153,6 +184,45 @@ class ExamScheduleCrawlStatus(models.Model):
 
     def __str__(self):
         return f"考試時程爬蟲狀態（連續失敗 {self.consecutive_failures} 次）"
+
+
+class AnnouncementSyncStatus(models.Model):
+    """公告爬蟲同步的執行狀態，單例（永遠只有一筆，pk 固定用 1，見 load()）。
+    跟 ExamScheduleCrawlStatus 是同一種用途、同一套形狀：給後台「上次同步
+    時間／上次失敗原因／連續失敗幾次／上次匯入與略過筆數」顯示用，也順便
+    當 _write_audit_log 需要的 target（一次同步動作沒有單一一筆 Announcement
+    可以當 target，這個單例物件的 pk 就是稽核紀錄的 target_id）。
+    """
+    last_success_at = models.DateTimeField(null=True, blank=True)
+    last_failure_at = models.DateTimeField(null=True, blank=True)
+    last_failure_reason = models.TextField(blank=True)
+    consecutive_failures = models.PositiveIntegerField(default=0)
+    last_imported_count = models.PositiveIntegerField(default=0)
+    last_skipped_count = models.PositiveIntegerField(default=0)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def record_success(self, imported_count, skipped_count):
+        self.last_success_at = timezone.now()
+        self.consecutive_failures = 0
+        self.last_imported_count = imported_count
+        self.last_skipped_count = skipped_count
+        self.save(update_fields=[
+            'last_success_at', 'consecutive_failures',
+            'last_imported_count', 'last_skipped_count',
+        ])
+
+    def record_failure(self, reason):
+        self.last_failure_at = timezone.now()
+        self.last_failure_reason = (reason or '')[:2000]
+        self.consecutive_failures += 1
+        self.save(update_fields=['last_failure_at', 'last_failure_reason', 'consecutive_failures'])
+
+    def __str__(self):
+        return f"公告爬蟲同步狀態（連續失敗 {self.consecutive_failures} 次）"
 
 
 class HomepageConfig(models.Model):

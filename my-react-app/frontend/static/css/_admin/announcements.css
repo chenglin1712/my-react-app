@@ -10,8 +10,10 @@
 .announcement-page-heading h1 { margin: 0 0 4px; font-size: 28px; font-weight: 700; color: var(--yy-blue, #1f3a5c); }
 .announcement-page-heading p { margin: 0; color: var(--yy-text-muted, #6b5a47); }
 .announcement-page-heading .btn, .announcement-editor-actions .btn, .announcement-row-actions .btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.announcement-heading-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.announcement-sync-status { margin: -12px auto 20px; max-width: 1440px; color: var(--yy-text-muted, #6b5a47); font-size: 14px; }
 
-.announcement-filter-panel { display: grid; grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(130px, 1fr)) auto; gap: 12px; max-width: 1440px; margin: 0 auto 20px; padding: 18px; background: #fff; border: 1px solid #dee2e6; border-radius: 10px; box-shadow: 0 2px 8px rgba(31, 58, 92, .06); }
+.announcement-filter-panel { display: grid; grid-template-columns: minmax(220px, 2fr) repeat(4, minmax(130px, 1fr)) auto; gap: 12px; max-width: 1440px; margin: 0 auto 20px; padding: 18px; background: #fff; border: 1px solid #dee2e6; border-radius: 10px; box-shadow: 0 2px 8px rgba(31, 58, 92, .06); }
 .announcement-table-card, .announcement-editor-card { max-width: 1440px; margin: 0 auto; background: #fff; border: 1px solid #dee2e6; border-radius: 10px; box-shadow: 0 2px 10px rgba(31, 58, 92, .07); overflow: hidden; }
 .announcement-table { margin: 0; vertical-align: middle; font-size: 14px; }
 .announcement-table th { padding: 14px 12px; white-space: nowrap; color: var(--yy-blue, #1f3a5c); background: #f1f3f5; font-weight: 650; }

@@ -11,6 +11,7 @@ urlpatterns = [
     path('announcements/<int:pk>/reject/', views.announcement_reject),
     path('announcements/<int:pk>/unpublish/', views.announcement_unpublish),
     path('announcements/<int:pk>/republish/', views.announcement_republish),
+    path('announcements/sync-crawler/', views.announcement_sync_crawler),
     path('audit-log/', views.audit_log_list),
     path('public/announcements/', views.public_announcement_list),
     path('exam-schedule/', views.exam_schedule_admin),

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Badge, Button, Form, Modal, Spinner, Table, Alert } from 'react-bootstrap';
-import { Edit3, Eye, Plus, Send, Trash2, Undo2, Check, X, Archive, Upload } from 'lucide-react';
+import { Edit3, Eye, Plus, RefreshCw, Send, Trash2, Undo2, Check, X, Archive, Upload } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { apiDelete, apiGet, apiPost } from '../../../utils/apiClient';
 import '../../../static/css/_admin/announcements.css';
@@ -12,6 +12,7 @@ const PUBLISHERS = ['owner', 'admin'];
 const CATEGORIES = {
     announcement: '公告', activity: '活動', exam: '考試', maintenance: '系統維護',
 };
+const SOURCES = { admin: '後台建立', crawler: '爬蟲匯入' };
 const TRIBES = {
     tayal: '泰雅語', amis: '阿美語', bunun: '布農語', kavalan: '噶瑪蘭語', paiwan: '排灣語',
 };
@@ -44,7 +45,7 @@ export default function AnnouncementList() {
     // pending_review，這裡只在掛載當下讀一次網址上的 status 帶入初始篩選，
     // 不用 useEffect 同步——使用者在頁面上改篩選條件後，網址不需要跟著變。
     const [searchParams] = useSearchParams();
-    const [filters, setFilters] = useState({ keyword: '', status: searchParams.get('status') ?? '', category: '', tribe: '' });
+    const [filters, setFilters] = useState({ keyword: '', status: searchParams.get('status') ?? '', category: '', tribe: '', source: '' });
     const [query, setQuery] = useState(filters);
     const [data, setData] = useState({ results: [], count: 0, page: 1, page_size: 10 });
     const [page, setPage] = useState(1);
@@ -53,6 +54,9 @@ export default function AnnouncementList() {
     const [error, setError] = useState('');
     const [rejectTarget, setRejectTarget] = useState(null);
     const [rejectReason, setRejectReason] = useState('');
+    const [syncStatus, setSyncStatus] = useState(null);
+    const [syncing, setSyncing] = useState(false);
+    const [syncMessage, setSyncMessage] = useState('');
 
     const loadAnnouncements = useCallback(async () => {
         setLoading(true);
@@ -69,6 +73,36 @@ export default function AnnouncementList() {
     }, [page, query]);
 
     useEffect(() => { loadAnnouncements(); }, [loadAnnouncements]);
+
+    // 只有能觸發同步的角色才需要知道上次同步結果——其餘角色看不到下面的
+    // 同步按鈕，多打這支查詢對他們毫無用處。
+    useEffect(() => {
+        if (!CONTENT_EDITORS.includes(role)) return;
+        (async () => {
+            try {
+                const result = await apiGet('/adminapi/announcements/sync-crawler/');
+                setSyncStatus(result.status);
+            } catch {
+                // 狀態顯示是輔助資訊，載入失敗不阻擋公告列表本身的使用。
+            }
+        })();
+    }, [role]);
+
+    const runSync = async () => {
+        setSyncing(true);
+        setError('');
+        setSyncMessage('');
+        try {
+            const result = await apiPost('/adminapi/announcements/sync-crawler/');
+            setSyncStatus(result.status);
+            setSyncMessage(`已同步：新增 ${result.imported} 筆、略過 ${result.skipped_existing} 筆`);
+            await loadAnnouncements();
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setSyncing(false);
+        }
+    };
 
     const search = (event) => {
         event.preventDefault();
@@ -145,8 +179,23 @@ export default function AnnouncementList() {
         <main className="announcement-admin-page">
             <div className="announcement-page-heading">
                 <div><h1>公告管理</h1><p>建立、審核與發布後台公告</p></div>
-                {CONTENT_EDITORS.includes(role) && <Button as={Link} to="/admin/content/announcements/new"><Plus size={18} /> 新增公告</Button>}
+                {CONTENT_EDITORS.includes(role) && (
+                    <div className="announcement-heading-actions">
+                        <Button as={Link} to="/admin/content/announcements/new"><Plus size={18} /> 新增公告</Button>
+                        <Button variant="outline-primary" disabled={syncing} onClick={runSync}>{syncing ? <Spinner animation="border" size="sm" /> : <RefreshCw size={18} />} 同步爬蟲活動</Button>
+                    </div>
+                )}
             </div>
+            {CONTENT_EDITORS.includes(role) && (
+                <p className="announcement-sync-status">
+                    上次同步：{syncStatus?.last_success_at ? formatDateTime(syncStatus.last_success_at) : '尚未同步過'}
+                    {syncStatus?.last_success_at != null && ` · 新增 ${syncStatus.last_imported_count ?? 0} 筆、略過 ${syncStatus.last_skipped_count ?? 0} 筆`}
+                </p>
+            )}
+            {(syncStatus?.consecutive_failures ?? 0) >= 3 && (
+                <Alert variant="danger">爬蟲同步已連續失敗 {syncStatus.consecutive_failures} 次，請確認外部來源是否正常。</Alert>
+            )}
+            {syncMessage && <Alert variant="success" dismissible onClose={() => setSyncMessage('')}>{syncMessage}</Alert>}
             {error && <Alert variant="danger">{error}</Alert>}
             <Form className="announcement-filter-panel" onSubmit={search}>
                 <Form.Control aria-label="關鍵字搜尋" placeholder="搜尋標題或內文" value={filters.keyword} onChange={(e) => setFilters({ ...filters, keyword: e.target.value })} />
@@ -159,6 +208,9 @@ export default function AnnouncementList() {
                 <Form.Select aria-label="族語" value={filters.tribe} onChange={(e) => setFilters({ ...filters, tribe: e.target.value })}>
                     <option value="">全部族語</option>{Object.entries(TRIBES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </Form.Select>
+                <Form.Select aria-label="來源" value={filters.source} onChange={(e) => setFilters({ ...filters, source: e.target.value })}>
+                    <option value="">全部來源</option>{Object.entries(SOURCES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </Form.Select>
                 <Button type="submit">搜尋</Button>
             </Form>
 
@@ -168,7 +220,7 @@ export default function AnnouncementList() {
                         <thead><tr><th>標題</th><th>分類</th><th>族語</th><th>狀態</th><th>置頂</th><th>建立者</th><th>最後更新</th><th>操作</th></tr></thead>
                         <tbody>{data.results.length ? data.results.map((item) => (
                             <tr key={item.id}>
-                                <td className="announcement-title-cell">{item.title}</td>
+                                <td className="announcement-title-cell">{item.title}{item.source === 'crawler' && <Badge bg="info" className="ms-2">爬蟲</Badge>}</td>
                                 <td>{CATEGORIES[item.category] ?? item.category}</td>
                                 <td>{item.tribes?.length ? item.tribes.map((tribe) => TRIBES[tribe] ?? tribe).join('、') : '全部族語'}</td>
                                 <td><Badge bg={STATUSES[item.status]?.bg ?? 'secondary'}>{STATUSES[item.status]?.label ?? item.status}</Badge></td>

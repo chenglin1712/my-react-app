@@ -18,15 +18,24 @@ class AnnouncementSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'body', 'category', 'tribes', 'cover_image_url',
             'link_url', 'is_pinned', 'pin_until', 'publish_at', 'unpublish_at',
-            'status', 'created_by', 'submitted_by', 'submitted_at',
-            'reviewed_by', 'reviewed_at', 'review_comment',
+            'status', 'source', 'display_date_text', 'created_by', 'submitted_by',
+            'submitted_at', 'reviewed_by', 'reviewed_at', 'review_comment',
             'created_at', 'updated_at',
         ]
         # 狀態機欄位（status 以下）一律由 views.py 的動作端點（submit/approve/
         # reject/...）改，不開放透過一般的 create/update 直接寫入——不然
-        # editor 可以自己把 status 設成 published，繞過核准流程。
+        # editor 可以自己把 status 設成 published，繞過核准流程。source 只讀
+        # 的理由不同：它是「這筆從哪來的」事實記錄，不該被任何 API 呼叫改掉
+        # （crawler_sync.sync_crawler_announcements() 直接用 ORM 寫入，不經過
+        # 這個 serializer）。display_date_text 則相反，刻意開放給後台編輯——
+        # 爬蟲匯入的日期文字如果顯示有誤，允許人工修正。
+        #
+        # 注意：external_id 刻意不放進 fields——它是爬蟲匯入專用的去重鍵，
+        # 如果透過這個 serializer 開放寫入，後台自建公告在沒有明確帶值時
+        # DRF 會送出預設值（空字串），第二篇後台自建公告存檔時就會撞上
+        # 這個欄位的 unique 約束而噴錯。
         read_only_fields = [
-            'id', 'status', 'created_by', 'submitted_by', 'submitted_at',
+            'id', 'status', 'source', 'created_by', 'submitted_by', 'submitted_at',
             'reviewed_by', 'reviewed_at', 'review_comment',
             'created_at', 'updated_at',
         ]
@@ -145,6 +154,7 @@ class PublicAnnouncementSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'body', 'category', 'tribes',
             'cover_image_url', 'link_url', 'is_pinned', 'publish_at',
+            'display_date_text', 'source_tag',
         ]
 
 

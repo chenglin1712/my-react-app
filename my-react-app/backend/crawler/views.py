@@ -1,6 +1,7 @@
 import logging
 import re
 from datetime import datetime
+from urllib.parse import urljoin
 import requests
 from django.core.cache import cache
 from django.http import JsonResponse
@@ -233,20 +234,31 @@ NEWS_CACHE_KEY = "crawler_news_data"
 NEWS_CACHE_TTL = 900  # 15 分鐘，避免每次開首頁都重新爬 tacp 公告 + 師大考試網站
 
 
-def get_tayal_imformation(request):
-    # 首頁新聞維持公開（不要求登入），但仍加 IP 限流防止匿名濫用；已有 15 分鐘
-    # 快取，即使被打穿限流，實際對外部網站的請求量也有上限。
-    client_ip = request.META.get("REMOTE_ADDR", "unknown")
-    limited_resp = _rate_limited_response(
-        request, client_ip, group="get_tayal_imformation", rate="60/m", method="GET"
-    )
-    if limited_resp:
-        return limited_resp
+def _safe_external_url(value):
+    """只放行 http(s) 開頭的網址，其餘（含 javascript: 這類危險 scheme）一律
+    丟棄成 None。這裡的網址最終會被存進 Announcement.link_url／
+    cover_image_url，再由公開首頁當 <a href>／<img src> 渲染給任何訪客，
+    跟 adminapi/serializers.py 的 validate_hero_link_url 是同一種威脅、
+    同一種防法——差別是那邊擋的是後台人員自己填的值，這裡擋的是外部網站
+    回傳的、我們無法控制的資料。"""
+    if value and (value.startswith("http://") or value.startswith("https://")):
+        return value
+    return None
 
-    cached = cache.get(NEWS_CACHE_KEY)
-    if cached is not None:
-        return JsonResponse(cached, safe=False, json_dumps_params={'ensure_ascii': False, 'indent': 2})
 
+def _scrape_news(force_refresh=False):
+    """實際去對外抓 tacp 活動消息 + 族語認證最新公告，不含 NEWS_CACHE_KEY
+    這層快取。回傳 (data, error)：只要有一個來源這次有跑完（即使該來源本身
+    回傳 0 筆），就仍視為部分成功，data 是目前抓到的清單、error 是 None；
+    兩個來源都真的丟例外失敗，才回 (None, error)，跟 _scrape_exam_schedule
+    同一種 (data, error) 回傳慣例，讓呼叫端不需要重寫一次 try/except 就能
+    分辨「今天真的沒新聞」跟「爬蟲已經壞掉」。
+
+    每筆資料多帶一個 source_key：crawler_sync.sync_crawler_announcements()
+    拿它當「這則活動之前是不是已經匯入過」的去重鍵，依來源加上命名空間
+    前綴（"tacp:<id>"／"ntnu-abst:<url>"），避免兩個來源的 id 剛好撞在一起；
+    找不到穩定 id 的項目給 None，呼叫端會直接略過不匯入（無法安全去重）。
+    """
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Accept": "application/json",
@@ -276,14 +288,16 @@ def get_tayal_imformation(request):
                 raw_images = item.get("images", [])
                 images = _json.loads(raw_images) if isinstance(raw_images, str) else raw_images
                 img_url = images[0].get("url") if isinstance(images, list) and images and isinstance(images[0], dict) else None
+                item_id = item.get("id")
                 data.append({
                     "title": item.get("title"),
-                    "detail": f"https://www.tacp.gov.tw/news/{item.get('category_id')}/{item.get('id')}",
-                    "image": img_url,
+                    "detail": _safe_external_url(f"https://www.tacp.gov.tw/news/{item.get('category_id')}/{item_id}"),
+                    "image": _safe_external_url(img_url),
                     "start_date": item.get("start_date") or item.get("published_at"),
                     "end_date": item.get("end_date"),
                     "tag": item.get("category", {}).get("title") if isinstance(item.get("category"), dict) else None,
-                    "isExam": "F"
+                    "isExam": "F",
+                    "source_key": f"tacp:{item_id}" if item_id is not None else None,
                 })
         tacp_ok = True
     except Exception as e:
@@ -292,7 +306,7 @@ def get_tayal_imformation(request):
     # 族語認證（師範大學原住民族語言認證考試）
     try:
         url_exam = "https://exam.sce.ntnu.edu.tw/abst/"
-        soup_exam = BeautifulSoup(_fetch_exam_site_html(), "html.parser")
+        soup_exam = BeautifulSoup(_fetch_exam_site_html(force_refresh=force_refresh), "html.parser")
         count = 0
         for info in soup_exam.select(".pnlArticles li"):
             if count >= 5:
@@ -301,7 +315,13 @@ def get_tayal_imformation(request):
             date = date_tag.get_text(strip=True) if date_tag else None
             detail_tag = info.select_one("a")
             title = detail_tag.get_text(strip=True) if detail_tag else None
-            detail = url_exam + detail_tag["href"] if detail_tag else None
+            href = detail_tag.get("href") if detail_tag else None
+            # urljoin 正確處理相對路徑（原本的字串接法 url_exam + href 在
+            # href 本身是絕對路徑「/abst/x」時會產生重複路徑），但如果上游
+            # HTML 被竄改成 href="javascript:..." 這類危險 scheme，urljoin
+            # 對絕對 scheme 會直接回傳原值、不會被 base 蓋掉——所以還是要靠
+            # _safe_external_url 再擋一層，不能只換掉字串拼接就當作修好了。
+            detail = _safe_external_url(urljoin(url_exam, href)) if href else None
             data.append({
                 "title": title,
                 "detail": detail,
@@ -309,7 +329,8 @@ def get_tayal_imformation(request):
                 "start_date": date,
                 "end_date": None,
                 "tag": None,
-                "isExam": "T"
+                "isExam": "T",
+                "source_key": f"ntnu-abst:{detail}" if detail else None,
             })
             count += 1
         exam_ok = True
@@ -317,9 +338,52 @@ def get_tayal_imformation(request):
         logger.error("exam API error: %s", e)
 
     if not tacp_ok and not exam_ok:
-        return JsonResponse({"detail": "最新消息暫時無法取得，請稍後再試"}, status=502)
+        return None, "最新消息暫時無法取得，請稍後再試"
+
+    return data, None
+
+
+def get_news_data(force_refresh=False):
+    """回傳新聞資料（含 NEWS_CACHE_KEY 這層 15 分鐘快取），data 為 None 代表
+    這次爬取失敗。force_refresh=True 略過快取，強制重新爬一次（後台「同步
+    爬蟲活動」用），並依樣把 force_refresh 往下傳給 _fetch_exam_site_html，
+    否則共用的官網 HTML 快取沒過期時，看起來重爬、其實還是吃舊內容
+    （同一個坑 get_exam_schedule_data 的說明已經記過一次）。"""
+    if not force_refresh:
+        cached = cache.get(NEWS_CACHE_KEY)
+        if cached is not None:
+            return cached
+
+    data, error = _scrape_news(force_refresh=force_refresh)
+    if data is None:
+        logger.error("get_news_data 爬取失敗: %s", error)
+        return None
 
     cache.set(NEWS_CACHE_KEY, data, NEWS_CACHE_TTL)
+    return data
+
+
+def get_tayal_imformation(request):
+    """首頁新聞（族語認證最新公告 + tacp 活動消息）公開端點。
+
+    注意：新增「爬蟲內容匯入後台公告」機制（見 adminapi/crawler_sync.py）
+    之後，首頁本身已改為只讀 /adminapi/public/announcements/，不再直接打
+    這支端點——這支端點刻意保留，供後台「同步爬蟲活動」與直接驗證爬蟲
+    目前實際抓到什麼內容使用，不是死代碼。
+    """
+    # 維持公開（不要求登入），但仍加 IP 限流防止匿名濫用；已有 15 分鐘快取，
+    # 即使被打穿限流，實際對外部網站的請求量也有上限。
+    client_ip = request.META.get("REMOTE_ADDR", "unknown")
+    limited_resp = _rate_limited_response(
+        request, client_ip, group="get_tayal_imformation", rate="60/m", method="GET"
+    )
+    if limited_resp:
+        return limited_resp
+
+    data = get_news_data()
+    if data is None:
+        return JsonResponse({"detail": "最新消息暫時無法取得，請稍後再試"}, status=502)
+
     return JsonResponse(data, safe=False, json_dumps_params={'ensure_ascii': False, 'indent': 2})
 
 

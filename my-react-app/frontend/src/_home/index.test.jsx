@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import App from './index';
 
 // News/Calendar/FunctionBtn 各自有自己的相依（Swiper 輪播、useNavigate 等），
-// 這裡只關心 App 元件怎麼撈資料、怎麼合併排序，不是這幾個子元件怎麼畫——
+// 這裡只關心 App 元件怎麼撈資料、怎麼依分類分流，不是這幾個子元件怎麼畫——
 // mock 掉它們，直接檢查傳進去的 props，避免測試被子元件的實作細節綁住。
 vi.mock('../../components/_home/news', () => ({
   default: (props) => <div data-testid="news-mock">{JSON.stringify(props)}</div>,
@@ -24,18 +24,23 @@ function renderHome() {
   );
 }
 
-const crawlerNewsItem = {
-  title: '外部活動', detail: 'https://tacp.gov.tw/x', image: 'https://img/a.jpg',
-  start_date: '2026-08-01', end_date: null, tag: '活動', isExam: 'F',
-};
-const crawlerExamItem = {
-  title: '族語認證公告', detail: 'https://exam.sce.ntnu.edu.tw/x', image: null,
-  start_date: '2026-08-05', end_date: null, tag: null, isExam: 'T',
-};
+// 首頁現在只讀 /adminapi/public/announcements/ 一個來源（含後台自建與
+// 爬蟲匯入兩種，前端無從分辨也不需要分辨）——這裡的 fixture 涵蓋一般公告、
+// 活動（帶 source_tag／display_date_text，模擬爬蟲匯入）、考試三種分類。
 const announcementItem = {
   id: 1, title: '後台公告', body: '內文', category: 'announcement', tribes: [],
   cover_image_url: 'https://img/b.jpg', link_url: 'https://x.com', is_pinned: false,
-  publish_at: '2026-08-02T03:00:00Z',
+  publish_at: '2026-08-02T03:00:00Z', display_date_text: '', source_tag: '',
+};
+const activityAnnouncementItem = {
+  id: 2, title: '外部活動', body: '', category: 'activity', tribes: [],
+  cover_image_url: 'https://img/a.jpg', link_url: 'https://tacp.gov.tw/x', is_pinned: false,
+  publish_at: '2026-08-01T00:00:00Z', display_date_text: '2026-08-01 ~ 2026-08-10', source_tag: '最新消息',
+};
+const examAnnouncementItem = {
+  id: 3, title: '族語認證公告', body: '', category: 'exam', tribes: [],
+  cover_image_url: '', link_url: 'https://exam.sce.ntnu.edu.tw/x', is_pinned: false,
+  publish_at: '2026-08-05T00:00:00Z', display_date_text: '115年8月5日', source_tag: '',
 };
 
 const DEFAULT_CONFIG = {
@@ -44,11 +49,8 @@ const DEFAULT_CONFIG = {
   button1_enabled: true, button2_enabled: true, button3_enabled: true,
 };
 
-function mockFetchOk(newsData, announcementResults, homepageConfig = DEFAULT_CONFIG) {
+function mockFetchOk(announcementResults, homepageConfig = DEFAULT_CONFIG) {
   vi.stubGlobal('fetch', vi.fn((url) => {
-    if (url.includes('/crawler/news/')) {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(newsData) });
-    }
     if (url.includes('/adminapi/public/announcements/')) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ results: announcementResults }) });
     }
@@ -59,25 +61,13 @@ function mockFetchOk(newsData, announcementResults, homepageConfig = DEFAULT_CON
   }));
 }
 
-describe('首頁 · 後台公告與爬蟲消息合併顯示', () => {
+describe('首頁 · 後台公告（單一來源，含爬蟲匯入內容）', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
-  test('後台公告排在爬蟲消息前面（規劃文件：後台內容永遠排在前面）', async () => {
-    mockFetchOk([crawlerNewsItem, crawlerExamItem], [announcementItem]);
-    renderHome();
-
-    await waitFor(() => {
-      const props = JSON.parse(screen.getByTestId('news-mock').textContent);
-      const allTitles = [...props.withImage, ...props.withoutImage].map((item) => item.title);
-      expect(allTitles[0]).toBe('後台公告');
-      expect(allTitles).toContain('外部活動');
-    });
-  });
-
-  test('isExam=T 的爬蟲項目進 examInfo（考試時程公告），不會混進 News', async () => {
-    mockFetchOk([crawlerNewsItem, crawlerExamItem], []);
+  test('category=exam 的公告進 Calendar 的族語認證公告區塊，不會混進 News', async () => {
+    mockFetchOk([announcementItem, examAnnouncementItem]);
     renderHome();
 
     await waitFor(() => {
@@ -88,11 +78,12 @@ describe('首頁 · 後台公告與爬蟲消息合併顯示', () => {
       const newsProps = JSON.parse(screen.getByTestId('news-mock').textContent);
       const allTitles = [...newsProps.withImage, ...newsProps.withoutImage].map((item) => item.title);
       expect(allTitles).not.toContain('族語認證公告');
+      expect(allTitles).toContain('後台公告');
     });
   });
 
-  test('公告的 link_url 對應到 News 元件用來當連結的 detail 欄位', async () => {
-    mockFetchOk([], [announcementItem]);
+  test('公告的 link_url／cover_image_url 對應到 News 元件的 detail／image 欄位', async () => {
+    mockFetchOk([announcementItem]);
     renderHome();
 
     await waitFor(() => {
@@ -103,29 +94,59 @@ describe('首頁 · 後台公告與爬蟲消息合併顯示', () => {
     });
   });
 
-  test('只有其中一個來源失敗時，另一個來源的資料仍正常顯示，不觸發整體錯誤訊息', async () => {
+  test('有 display_date_text（爬蟲匯入內容）時優先顯示它，不是格式化的 publish_at', async () => {
+    mockFetchOk([activityAnnouncementItem]);
+    renderHome();
+
+    await waitFor(() => {
+      const props = JSON.parse(screen.getByTestId('news-mock').textContent);
+      const mapped = [...props.withImage, ...props.withoutImage][0];
+      expect(mapped.start_date).toBe('2026-08-01 ~ 2026-08-10');
+    });
+  });
+
+  test('沒有 display_date_text（後台自建公告）時退回格式化的 publish_at', async () => {
+    mockFetchOk([announcementItem]);
+    renderHome();
+
+    await waitFor(() => {
+      const props = JSON.parse(screen.getByTestId('news-mock').textContent);
+      const mapped = [...props.withImage, ...props.withoutImage][0];
+      expect(mapped.start_date).not.toBe('');
+      expect(mapped.start_date).not.toBe('2026-08-01 ~ 2026-08-10');
+    });
+  });
+
+  test('有 source_tag（爬蟲原始分類文字）時優先顯示它，不是固定的 4 分類標籤', async () => {
+    mockFetchOk([activityAnnouncementItem]);
+    renderHome();
+
+    await waitFor(() => {
+      const props = JSON.parse(screen.getByTestId('news-mock').textContent);
+      const mapped = [...props.withImage, ...props.withoutImage][0];
+      expect(mapped.tag).toBe('最新消息');
+    });
+  });
+
+  test('沒有 source_tag（後台自建公告）時退回固定分類標籤', async () => {
+    mockFetchOk([announcementItem]);
+    renderHome();
+
+    await waitFor(() => {
+      const props = JSON.parse(screen.getByTestId('news-mock').textContent);
+      const mapped = [...props.withImage, ...props.withoutImage][0];
+      expect(mapped.tag).toBe('公告');
+    });
+  });
+
+  test('公告端點失敗時顯示錯誤提示', async () => {
     vi.stubGlobal('fetch', vi.fn((url) => {
-      if (url.includes('/crawler/news/')) return Promise.reject(new Error('外部站掛了'));
-      if (url.includes('/adminapi/public/announcements/')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [announcementItem] }) });
-      }
+      if (url.includes('/adminapi/public/announcements/')) return Promise.reject(new Error('掛了'));
       if (url.includes('/adminapi/public/homepage-config/')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(DEFAULT_CONFIG) });
       }
       return Promise.reject(new Error(`unexpected url: ${url}`));
     }));
-    renderHome();
-
-    await waitFor(() => {
-      const props = JSON.parse(screen.getByTestId('news-mock').textContent);
-      const allTitles = [...props.withImage, ...props.withoutImage].map((item) => item.title);
-      expect(allTitles).toContain('後台公告');
-    });
-    expect(screen.queryByText('目前無法載入最新消息，請稍後再試。')).not.toBeInTheDocument();
-  });
-
-  test('兩個來源都失敗時才顯示錯誤提示', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('全部掛了'))));
     renderHome();
     expect(await screen.findByText('目前無法載入最新消息，請稍後再試。')).toBeInTheDocument();
   });
@@ -137,7 +158,7 @@ describe('首頁 · 版位設定（HomepageConfig）套用', () => {
   });
 
   test('設定了 hero_image_url 時，主打卡片顯示真的圖片而不是 IMAGE PLACEHOLDER', async () => {
-    mockFetchOk([], [], { ...DEFAULT_CONFIG, hero_image_url: 'https://img/hero.jpg', hero_title_override: '本週主打' });
+    mockFetchOk([], { ...DEFAULT_CONFIG, hero_image_url: 'https://img/hero.jpg', hero_title_override: '本週主打' });
     renderHome();
 
     const img = await screen.findByAltText('本週主打');
@@ -147,7 +168,7 @@ describe('首頁 · 版位設定（HomepageConfig）套用', () => {
   });
 
   test('沒有設定 hero_image_url 時維持原本的 IMAGE PLACEHOLDER 與逐族語標題', async () => {
-    mockFetchOk([], [], DEFAULT_CONFIG);
+    mockFetchOk([], DEFAULT_CONFIG);
     renderHome();
     expect(await screen.findByText('IMAGE PLACEHOLDER')).toBeInTheDocument();
   });
@@ -157,7 +178,7 @@ describe('首頁 · 版位設定（HomepageConfig）套用', () => {
     // fetch 回來前）是純 <div>，「現正主打」文字在 <div> 版跟之後的 <a>
     // 版都存在，findByText 只要找到第一個符合就會結束等待，可能剛好抓到
     // 還沒套用設定的那個版本。
-    mockFetchOk([], [], { ...DEFAULT_CONFIG, hero_link_url: '/quiz/select' });
+    mockFetchOk([], { ...DEFAULT_CONFIG, hero_link_url: '/quiz/select' });
     renderHome();
     await waitFor(() => {
       const card = screen.getByText('現正主打').closest('a');
@@ -166,7 +187,7 @@ describe('首頁 · 版位設定（HomepageConfig）套用', () => {
   });
 
   test('hero_link_url 是外部網址時，用一般 <a target="_blank"> 開啟', async () => {
-    mockFetchOk([], [], { ...DEFAULT_CONFIG, hero_link_url: 'https://example.com' });
+    mockFetchOk([], { ...DEFAULT_CONFIG, hero_link_url: 'https://example.com' });
     renderHome();
     await waitFor(() => {
       const card = screen.getByText('現正主打').closest('a');
@@ -176,25 +197,26 @@ describe('首頁 · 版位設定（HomepageConfig）套用', () => {
   });
 
   test('show_news_section=false 時不渲染 News 元件', async () => {
-    mockFetchOk([crawlerNewsItem], [], { ...DEFAULT_CONFIG, show_news_section: false });
+    mockFetchOk([activityAnnouncementItem], { ...DEFAULT_CONFIG, show_news_section: false });
     renderHome();
     await screen.findByTestId('calendar-mock');
     expect(screen.queryByTestId('news-mock')).not.toBeInTheDocument();
   });
 
   test('show_calendar_section=false 時不渲染 Calendar 元件', async () => {
-    mockFetchOk([], [], { ...DEFAULT_CONFIG, show_calendar_section: false });
+    mockFetchOk([], { ...DEFAULT_CONFIG, show_calendar_section: false });
     renderHome();
     await screen.findByTestId('news-mock');
     expect(screen.queryByTestId('calendar-mock')).not.toBeInTheDocument();
   });
 
-  test('news_display_count 裁切合併後清單的總筆數，不是圖文版各自裁切', async () => {
+  test('news_display_count 裁切清單的總筆數，不是圖文版各自裁切', async () => {
     const manyNews = Array.from({ length: 5 }, (_, i) => ({
-      title: `消息${i}`, detail: '', image: i % 2 === 0 ? `https://img/${i}.jpg` : null,
-      start_date: '2026-08-01', end_date: null, tag: '公告', isExam: 'F',
+      id: i, title: `消息${i}`, body: '', category: 'announcement', tribes: [],
+      cover_image_url: i % 2 === 0 ? `https://img/${i}.jpg` : '', link_url: '', is_pinned: false,
+      publish_at: '2026-08-01T00:00:00Z', display_date_text: '', source_tag: '',
     }));
-    mockFetchOk(manyNews, [], { ...DEFAULT_CONFIG, news_display_count: 2 });
+    mockFetchOk(manyNews, { ...DEFAULT_CONFIG, news_display_count: 2 });
     renderHome();
 
     await waitFor(() => {
@@ -204,7 +226,7 @@ describe('首頁 · 版位設定（HomepageConfig）套用', () => {
   });
 
   test('三顆功能按鈕的啟用旗標會原樣傳給 FunctionBtn', async () => {
-    mockFetchOk([], [], { ...DEFAULT_CONFIG, button1_enabled: false, button2_enabled: true, button3_enabled: false });
+    mockFetchOk([], { ...DEFAULT_CONFIG, button1_enabled: false, button2_enabled: true, button3_enabled: false });
     renderHome();
 
     await waitFor(() => {
@@ -216,7 +238,6 @@ describe('首頁 · 版位設定（HomepageConfig）套用', () => {
   test('版位設定端點失敗時維持預設值，不影響其餘畫面渲染', async () => {
     vi.stubGlobal('fetch', vi.fn((url) => {
       if (url.includes('/adminapi/public/homepage-config/')) return Promise.reject(new Error('設定端點掛了'));
-      if (url.includes('/crawler/news/')) return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
       if (url.includes('/adminapi/public/announcements/')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [] }) });
       }

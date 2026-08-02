@@ -24,7 +24,7 @@ import json
 import logging
 
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Case, Q, When
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -35,8 +35,10 @@ from config.firebase_auth import require_role
 from config.roles import ACCOUNT_MANAGERS, CONTENT_EDITORS, PUBLISHERS, STAFF_ROLES
 from crawler.views import apply_exam_schedule_overrides, get_exam_schedule_data
 
+from .crawler_sync import sync_crawler_announcements
 from .models import (
-    Announcement, AuditLog, ExamScheduleCrawlStatus, ExamScheduleOverride, HomepageConfig,
+    Announcement, AnnouncementSyncStatus, AuditLog, ExamScheduleCrawlStatus,
+    ExamScheduleOverride, HomepageConfig,
 )
 from .serializers import (
     AnnouncementSerializer, ApproveSerializer, AuditLogSerializer,
@@ -155,6 +157,10 @@ def _list_announcements(request):
     if category:
         qs = qs.filter(category=category)
 
+    source = request.GET.get("source")
+    if source:
+        qs = qs.filter(source=source)
+
     keyword = request.GET.get("keyword")
     if keyword:
         # 前端搜尋框的提示文字寫「搜尋標題或內文」，篩選邏輯要對得上，
@@ -242,6 +248,15 @@ def public_announcement_list(request):
         Q(publish_at__isnull=True) | Q(publish_at__lte=now)
     ).filter(
         Q(unpublish_at__isnull=True) | Q(unpublish_at__gt=now)
+    ).order_by(
+        '-is_pinned',
+        # 後台自建內容永遠排在爬蟲匯入內容前面（規劃文件 §3.2.1 的既有要求）。
+        # 爬蟲同步是整批寫入，每次同步的 created_at 都是「現在」，如果沿用
+        # model 預設的 -created_at 排序，一次同步匯入的活動會把所有後台自建
+        # 公告擠到看不見的地方——這裡改成先比對 source（admin=0 排前面，
+        # crawler=1 排後面），同一個 source 內部才用 -created_at 決定順序。
+        Case(When(source=Announcement.SOURCE_ADMIN, then=0), default=1),
+        '-created_at', '-pk',
     )
 
     try:
@@ -532,6 +547,49 @@ def announcement_republish(request, pk):
             before=before, after=AnnouncementSerializer(announcement).data,
         )
         return JsonResponse(AnnouncementSerializer(announcement).data)
+
+
+def _sync_status_payload(status):
+    return {
+        "last_success_at": status.last_success_at,
+        "last_failure_at": status.last_failure_at,
+        "last_failure_reason": status.last_failure_reason,
+        "consecutive_failures": status.consecutive_failures,
+        "last_imported_count": status.last_imported_count,
+        "last_skipped_count": status.last_skipped_count,
+    }
+
+
+@csrf_exempt
+def announcement_sync_crawler(request):
+    """GET：只回目前的同步狀態（給後台頁面載入時顯示「上次同步時間」用，
+    不觸發任何爬取）。POST：手動觸發「把爬蟲抓到的活動/考試消息同步成
+    後台公告」（見 adminapi/crawler_sync.py 的完整說明），跟考試時程的
+    手動重爬（_exam_schedule_refresh）同一層級的 CONTENT_EDITORS 權限；
+    限流比重爬更嚴（5/m，考試時程重爬是 10/m），因為這支同步一次會強制
+    重新爬兩個外部來源，且會實際寫入資料庫。"""
+    decoded, err_resp = require_role(request, CONTENT_EDITORS)
+    if err_resp:
+        return err_resp
+
+    if request.method == "GET":
+        return JsonResponse({"status": _sync_status_payload(AnnouncementSyncStatus.load())})
+
+    if request.method != "POST":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    limited_resp = _rate_limited_response(request, decoded, group="announcement_sync_crawler", rate="5/m")
+    if limited_resp:
+        return limited_resp
+
+    result = sync_crawler_announcements(force_refresh=True)
+    status = AnnouncementSyncStatus.load()
+    _write_audit_log(
+        request, decoded, "sync", status,
+        target_type="announcement_crawler_sync", after=result,
+    )
+
+    return JsonResponse({**result, "status": _sync_status_payload(status)})
 
 
 @csrf_exempt

@@ -218,6 +218,90 @@ class GetTayalImformationTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
 
+    @patch('crawler.views.requests.get')
+    def test_source_key_present_for_tacp_and_ntnu_items(self, mock_get):
+        # source_key 是 adminapi/crawler_sync.py 拿來去重的鍵，格式要能區分
+        # 兩個資料來源（tacp:<id> / ntnu-abst:<url>），不能兩邊撞在一起。
+        def fake_get(url, headers=None, timeout=None):
+            resp = MagicMock()
+            resp.status_code = 200
+            if "tacp.gov.tw" in url:
+                resp.json.return_value = {"data": [
+                    {"id": 999, "category_id": 1, "title": "測試活動", "images": []},
+                ]}
+            else:
+                resp.text = (
+                    '<html><body><div class="pnlArticles"><ul>'
+                    '<li><small>115年8月1日</small><a href="x.html">測試考試新聞</a></li>'
+                    '</ul></div></body></html>'
+                )
+            return resp
+
+        mock_get.side_effect = fake_get
+
+        response = self.client.get('/crawler/news/')
+        data = response.json()
+
+        tacp_item = next(i for i in data if i['isExam'] == 'F')
+        exam_item = next(i for i in data if i['isExam'] == 'T')
+        self.assertEqual(tacp_item['source_key'], 'tacp:999')
+        self.assertEqual(exam_item['source_key'], 'ntnu-abst:https://exam.sce.ntnu.edu.tw/abst/x.html')
+
+    @patch('crawler.views.requests.get')
+    def test_javascript_href_in_exam_news_is_rejected(self, mock_get):
+        # 上游 HTML 若被竄改成危險 scheme 的 href，detail/source_key 都必須
+        # 是 None，不能把 javascript: 網址存進任何後續會被渲染成 <a href>
+        # 的地方（見 _safe_external_url 的說明）。
+        def fake_get(url, headers=None, timeout=None):
+            resp = MagicMock()
+            resp.status_code = 200
+            if "tacp.gov.tw" in url:
+                resp.json.return_value = {"data": []}
+            else:
+                resp.text = (
+                    '<html><body><div class="pnlArticles"><ul>'
+                    '<li><small>115年8月1日</small><a href="javascript:alert(1)">壞連結</a></li>'
+                    '</ul></div></body></html>'
+                )
+            return resp
+
+        mock_get.side_effect = fake_get
+
+        response = self.client.get('/crawler/news/')
+        data = response.json()
+
+        exam_item = next(i for i in data if i['isExam'] == 'T')
+        self.assertIsNone(exam_item['detail'])
+        self.assertIsNone(exam_item['source_key'])
+
+    @patch('crawler.views.requests.get')
+    def test_force_refresh_bypasses_both_cache_layers(self, mock_get):
+        # get_news_data 底下疊了兩層快取（自己的 NEWS_CACHE_KEY，以及跟考試
+        # 時程共用的 EXAM_SITE_HTML_CACHE_KEY）；force_refresh 必須連共用的
+        # HTML 快取也一起略過，否則「看起來重爬、其實還是吃 15 分鐘前的
+        # 內容」——同一個坑 get_exam_schedule_data 已經踩過一次。
+        from crawler.views import get_news_data
+
+        def fake_get(url, headers=None, timeout=None):
+            resp = MagicMock()
+            resp.status_code = 200
+            if "tacp.gov.tw" in url:
+                resp.json.return_value = {"data": []}
+            else:
+                resp.text = "<html></html>"
+            return resp
+
+        mock_get.side_effect = fake_get
+
+        get_news_data()  # 第一次：填滿兩層快取
+        self.assertEqual(mock_get.call_count, 2)  # tacp + exam html 各一次
+
+        get_news_data()  # 快取命中，不應該再打外部網站
+        self.assertEqual(mock_get.call_count, 2)
+
+        get_news_data(force_refresh=True)  # 強制重爬，兩層快取都要略過
+        self.assertEqual(mock_get.call_count, 4)
+
 
 # 官網（exam.sce.ntnu.edu.tw/abst/）日程表頁面結構的精簡版，只留下解析邏輯真正
 # 依賴的部分：排除 news-tab 的第一個梯次分頁按鈕（取得梯次標題），以及該分頁

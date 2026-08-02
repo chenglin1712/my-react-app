@@ -19,20 +19,38 @@ const DEFAULT_HOMEPAGE_CONFIG = {
 };
 
 // 後台公告（backend/adminapi 的 Announcement，見 /adminapi/public/announcements/）
-// 跟這個元件既有的 News 元件（componenets/_home/news.jsx）共用同一套渲染，
-// 轉成同樣的欄位形狀——News.jsx 用 event.detail 當連結網址（沿用爬蟲資料原本
-// 的命名，不是文字內容），公告沒有設定外部連結時給空字串，等同不可點但不會
-// 噴錯（href="" 只是連回目前頁面）。
+// 現在是首頁消息／族語認證公告唯一的資料來源：爬蟲抓到的活動/考試消息會被
+// 後台同步機制（adminapi/crawler_sync.py）匯入成真正的 Announcement 資料列
+// （source='crawler'），首頁不再直接打 /crawler/news/——避免同一則活動被
+// 「即時爬蟲」跟「已匯入的後台公告」同時顯示兩次。
+//
+// 轉成 News.jsx／Calendar.jsx 既有元件的欄位形狀（沿用爬蟲資料原本的命名，
+// 不是文字內容）：
+// - start_date 優先用 display_date_text（活動/考試本身的起訖日期文字，見
+//   models.py 的欄位說明），沒有的話才退回格式化的 publish_at——後台自建
+//   的公告沒有 display_date_text，這時 publish_at 才是唯一能顯示的日期。
+// - tag 優先用 source_tag（爬蟲來源原始的分類文字，保留首頁卡片標籤顏色
+//   的多樣性），沒有的話才退回 4 個固定分類的中文標籤。
+const _formatPublishDate = (publishAt) => (
+    publishAt ? new Intl.DateTimeFormat('zh-TW', { dateStyle: 'medium' }).format(new Date(publishAt)) : ''
+);
+
 const mapAnnouncementToNewsItem = (item) => ({
     title: item.title,
     detail: item.link_url || '',
     image: item.cover_image_url || null,
-    start_date: item.publish_at
-        ? new Intl.DateTimeFormat('zh-TW', { dateStyle: 'medium' }).format(new Date(item.publish_at))
-        : '',
+    start_date: item.display_date_text || _formatPublishDate(item.publish_at),
     end_date: null,
-    tag: ANNOUNCEMENT_CATEGORY_LABELS[item.category] ?? item.category,
+    tag: item.source_tag || ANNOUNCEMENT_CATEGORY_LABELS[item.category] || item.category,
     isExam: 'F',
+});
+
+// Calendar.jsx（族語認證最新公告）只需要 title/detail/start_date 三個欄位，
+// 跟 News.jsx 的形狀不同，不能共用同一個 map 函式。
+const mapAnnouncementToExamItem = (item) => ({
+    title: item.title,
+    detail: item.link_url || '',
+    start_date: item.display_date_text || _formatPublishDate(item.publish_at),
 });
 
 const App = () => {
@@ -65,46 +83,32 @@ const App = () => {
     }, []);
 
     useEffect(() => {
-        // 用 allSettled 而不是 all：外部爬蟲來源（tacp.gov.tw／exam.sce.ntnu.
-        // edu.tw）跟後台公告是兩個獨立來源，其中一個掛掉不該連累另一個也顯示
-        // 不出來——只有兩邊都失敗時才真的顯示「無法載入」。
-        Promise.allSettled([
-            fetch(`${import.meta.env.VITE_API_NEWS_URL}`).then((res) => {
+        fetch('/adminapi/public/announcements/')
+            .then((res) => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return res.json();
-            }),
-            fetch('/adminapi/public/announcements/').then((res) => {
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                return res.json();
-            }),
-        ]).then(([crawlerResult, announcementResult]) => {
-            if (crawlerResult.status === 'rejected') {
-                console.error("載入外部最新消息失敗：", crawlerResult.reason);
-            }
-            if (announcementResult.status === 'rejected') {
-                console.error("載入後台公告失敗：", announcementResult.reason);
-            }
-            if (crawlerResult.status === 'rejected' && announcementResult.status === 'rejected') {
+            })
+            .then((data) => {
+                const announcements = data.results ?? [];
+                // category='exam' 的公告（含爬蟲匯入的族語認證消息）進 Calendar
+                // 的「族語認證最新公告」區塊，其餘進 News 消息區塊——維持匯入
+                // 前「考試消息只出現在 Calendar、不會同時出現在 News」的行為。
+                const examAnnouncements = announcements.filter((item) => item.category === 'exam');
+                const newsAnnouncements = announcements.filter((item) => item.category !== 'exam');
+
+                setExamInfo(examAnnouncements.map(mapAnnouncementToExamItem));
+                setRawNews(newsAnnouncements.map(mapAnnouncementToNewsItem));
+            })
+            .catch((err) => {
+                console.error("載入最新消息失敗：", err);
                 setNewsError(true);
-            }
-
-            const crawlerData = crawlerResult.status === 'fulfilled' ? crawlerResult.value : [];
-            const announcements = announcementResult.status === 'fulfilled' ? (announcementResult.value.results ?? []) : [];
-
-            const exams = crawlerData.filter((item) => item.isExam === "T");
-            const crawlerNews = crawlerData.filter((item) => item.isExam !== "T");
-            // 後台公告排最前面（規劃文件 §3.2.1：「後台內容永遠排在前面」）。
-            const news = [...announcements.map(mapAnnouncementToNewsItem), ...crawlerNews];
-
-            setExamInfo(exams);
-            setRawNews(news);
-        });
+            });
     }, []);
 
     // news_display_count 是後台「消息區塊顯示筆數」設定（規劃文件 §3.2.3），
-    // 裁切整個合併清單（後台公告＋爬蟲消息）的總筆數，不是各自分開裁切——
-    // 圖文版跟純文字版是同一份清單依有沒有圖片分流顯示，裁切要在分流之前做，
-    // 不然「顯示 6 則」實際上會變成最多顯示 12 則（圖文各 6）。
+    // 裁切 rawNews 的總筆數，不是各自分開裁切——圖文版跟純文字版是同一份
+    // 清單依有沒有圖片分流顯示，裁切要在分流之前做，不然「顯示 6 則」實際上
+    // 會變成最多顯示 12 則（圖文各 6）。
     const displayedNews = rawNews.slice(0, homepageConfig.news_display_count);
     const newsWithImage = displayedNews.filter((item) => item.image);
     const newsWithoutImage = displayedNews.filter((item) => !item.image);

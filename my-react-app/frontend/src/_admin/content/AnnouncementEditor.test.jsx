@@ -206,4 +206,62 @@ describe('AnnouncementEditor · 編輯模式', () => {
     expect(screen.getByText(/目前角色沒有內容編輯權限/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /儲存$/ })).not.toBeInTheDocument();
   });
+
+  test('載入既有的 display_date_text 並帶入表單', async () => {
+    apiGet.mockResolvedValueOnce({
+      id: 13, title: '有日期文字的公告', body: '', category: 'activity', tribes: [],
+      cover_image_url: '', link_url: '', is_pinned: false, pin_until: null,
+      publish_at: null, unpublish_at: null, status: 'draft',
+      display_date_text: '2026-08-01 ~ 2026-08-10', source: 'crawler',
+    });
+    renderEdit(13);
+    expect(await screen.findByDisplayValue('2026-08-01 ~ 2026-08-10')).toBeInTheDocument();
+  });
+
+  test('編輯 display_date_text 後儲存，payload 帶上修改後的值', async () => {
+    apiGet.mockResolvedValueOnce({
+      id: 14, title: '待編輯日期文字', body: '', category: 'activity', tribes: [],
+      cover_image_url: '', link_url: '', is_pinned: false, pin_until: null,
+      publish_at: null, unpublish_at: null, status: 'draft',
+      display_date_text: '', source: 'admin',
+    });
+    apiPatch.mockResolvedValueOnce({ status: 'draft' });
+    renderEdit(14);
+    await screen.findByDisplayValue('待編輯日期文字');
+    fireEvent.change(screen.getByLabelText(/顯示日期文字/), { target: { value: '2026-09-01' } });
+    fireEvent.click(screen.getByRole('button', { name: /儲存$/ }));
+
+    await waitFor(() => {
+      const [, payload] = apiPatch.mock.calls[0];
+      expect(payload.display_date_text).toBe('2026-09-01');
+    });
+  });
+
+  test('source=crawler 時顯示「爬蟲匯入」提示', async () => {
+    apiGet.mockResolvedValueOnce({
+      id: 15, title: '爬蟲匯入的公告', body: '', category: 'activity', tribes: [],
+      cover_image_url: '', link_url: '', is_pinned: false, pin_until: null,
+      publish_at: null, unpublish_at: null, status: 'published',
+      display_date_text: '', source: 'crawler',
+    });
+    renderEdit(15);
+    expect(await screen.findByText('爬蟲匯入')).toBeInTheDocument();
+  });
+
+  test('source=admin 時不顯示「爬蟲匯入」提示', async () => {
+    apiGet.mockResolvedValueOnce({
+      id: 16, title: '後台自建的公告', body: '', category: 'announcement', tribes: [],
+      cover_image_url: '', link_url: '', is_pinned: false, pin_until: null,
+      publish_at: null, unpublish_at: null, status: 'draft',
+      display_date_text: '', source: 'admin',
+    });
+    renderEdit(16);
+    await screen.findByDisplayValue('後台自建的公告');
+    expect(screen.queryByText('爬蟲匯入')).not.toBeInTheDocument();
+  });
+
+  test('新增公告模式不顯示「爬蟲匯入」提示（一定是後台自建）', () => {
+    renderNew();
+    expect(screen.queryByText('爬蟲匯入')).not.toBeInTheDocument();
+  });
 });

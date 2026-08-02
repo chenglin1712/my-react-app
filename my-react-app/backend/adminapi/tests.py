@@ -11,7 +11,9 @@ from datetime import timedelta
 
 from config.roles import ADMIN, ANALYST, EDITOR, OWNER, REVIEWER
 
-from .models import Announcement, AuditLog, ExamScheduleCrawlStatus, ExamScheduleOverride
+from .models import (
+    Announcement, AnnouncementSyncStatus, AuditLog, ExamScheduleCrawlStatus, ExamScheduleOverride,
+)
 
 
 @contextmanager
@@ -691,3 +693,159 @@ class PublicHomepageConfigTest(TestCase):
         self.assertNotIn("updated_by", data)
         self.assertNotIn("updated_at", data)
         self.assertFalse(data["show_news_section"])
+
+
+class AnnouncementCrawlerSyncTest(TestCase):
+    """把爬蟲抓到的活動/考試消息同步成後台公告（見 adminapi/crawler_sync.py
+    與 views.py 的 announcement_sync_crawler）。"""
+
+    def setUp(self):
+        self.client = Client()
+        cache.clear()
+
+    def _mock_one_tacp_item(self, mock_get, item_id=1, title="測試活動", end_date=None):
+        def fake_get(url, headers=None, timeout=None):
+            resp = MagicMock()
+            resp.status_code = 200
+            if "tacp.gov.tw" in url:
+                resp.json.return_value = {"data": [{
+                    "id": item_id, "category_id": 1, "title": title,
+                    "start_date": "2026-08-01T00:00:00+08:00",
+                    "end_date": end_date, "images": [],
+                    "category": {"title": "最新消息"},
+                }]}
+            else:
+                resp.text = "<html></html>"  # 族語認證來源這裡不需要
+            return resp
+        mock_get.side_effect = fake_get
+
+    def test_analyst_cannot_trigger_sync(self):
+        with _as_role(ANALYST) as headers:
+            response = _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+        self.assertEqual(response.status_code, 403)
+
+    @patch('crawler.views.requests.get')
+    def test_editor_can_trigger_sync(self, mock_get):
+        self._mock_one_tacp_item(mock_get)
+        with _as_role(EDITOR) as headers:
+            response = _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["imported"], 1)
+
+    @patch('crawler.views.requests.get')
+    def test_get_returns_status_without_triggering_a_crawl(self, mock_get):
+        with _as_role(OWNER) as headers:
+            response = self.client.get('/adminapi/announcements/sync-crawler/', **headers)
+        self.assertEqual(response.status_code, 200)
+        mock_get.assert_not_called()
+
+    @patch('crawler.views.requests.get')
+    def test_imported_row_is_published_and_tagged_as_crawler_source(self, mock_get):
+        self._mock_one_tacp_item(mock_get, item_id=42, title="泰雅文化節")
+        with _as_role(EDITOR) as headers:
+            _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+
+        announcement = Announcement.objects.get(external_id="tacp:42")
+        self.assertEqual(announcement.status, Announcement.STATUS_PUBLISHED)
+        self.assertEqual(announcement.source, Announcement.SOURCE_CRAWLER)
+        self.assertEqual(announcement.category, Announcement.CATEGORY_ACTIVITY)
+        self.assertEqual(announcement.title, "泰雅文化節")
+
+    @patch('crawler.views.requests.get')
+    def test_running_twice_does_not_duplicate(self, mock_get):
+        self._mock_one_tacp_item(mock_get, item_id=7)
+        with _as_role(EDITOR) as headers:
+            first = _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+            second = _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+
+        self.assertEqual(first.json()["imported"], 1)
+        self.assertEqual(second.json()["imported"], 0)
+        self.assertEqual(second.json()["skipped_existing"], 1)
+        self.assertEqual(Announcement.objects.filter(external_id="tacp:7").count(), 1)
+
+    @patch('crawler.views.requests.get')
+    def test_overlong_title_is_truncated_not_rejected(self, mock_get):
+        long_title = "很長的標題" * 30  # 遠超過 title 的 100 字上限
+        self._mock_one_tacp_item(mock_get, item_id=8, title=long_title)
+        with _as_role(EDITOR) as headers:
+            response = _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["imported"], 1)
+        announcement = Announcement.objects.get(external_id="tacp:8")
+        self.assertLessEqual(len(announcement.title), 100)
+        self.assertTrue(announcement.title.endswith("…"))
+
+    @patch('crawler.views.requests.get')
+    def test_missing_image_does_not_raise(self, mock_get):
+        # tacp 沒有圖片的項目 image 是 None，不能讓 NOT NULL 欄位炸掉。
+        self._mock_one_tacp_item(mock_get, item_id=9)
+        with _as_role(EDITOR) as headers:
+            response = _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["imported"], 1)
+        self.assertEqual(Announcement.objects.get(external_id="tacp:9").cover_image_url, "")
+
+    @patch('crawler.views.requests.get')
+    def test_unpublished_imported_row_is_not_resurrected_by_resync(self, mock_get):
+        # 下架一筆爬蟲匯入的項目之後，重新同步不應該讓它復活——因為同步只
+        # 做「這個 external_id 存在嗎」的判斷，不會覆蓋既有資料，這正是
+        # 「下架＝永久不再顯示這則」這個附帶好處的來源。
+        self._mock_one_tacp_item(mock_get, item_id=10)
+        with _as_role(EDITOR) as headers:
+            _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+
+        announcement = Announcement.objects.get(external_id="tacp:10")
+        with _as_role(OWNER) as headers:
+            unpublish_resp = _post_json(
+                self.client, f'/adminapi/announcements/{announcement.pk}/unpublish/', headers,
+            )
+        self.assertEqual(unpublish_resp.status_code, 200)
+
+        with _as_role(EDITOR) as headers:
+            second = _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+        self.assertEqual(second.json()["imported"], 0)
+        self.assertEqual(second.json()["skipped_existing"], 1)
+        announcement.refresh_from_db()
+        self.assertEqual(announcement.status, Announcement.STATUS_UNPUBLISHED)
+
+    @patch('crawler.views.requests.get')
+    def test_sync_writes_audit_log_with_correct_target_type(self, mock_get):
+        self._mock_one_tacp_item(mock_get, item_id=11)
+        with _as_role(EDITOR) as headers:
+            _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+
+        log = AuditLog.objects.filter(target_type="announcement_crawler_sync", action="sync").first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.target_id, str(AnnouncementSyncStatus.load().pk))
+
+    @patch('crawler.views.requests.get')
+    def test_public_list_orders_admin_content_before_crawler_content(self, mock_get):
+        self._mock_one_tacp_item(mock_get, item_id=12)
+        with _as_role(EDITOR) as headers:
+            _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+            create_resp = _post_json(
+                self.client, '/adminapi/announcements/', headers,
+                {"title": "後台自建公告", "body": "x"},
+            )
+        admin_pk = create_resp.json()["id"]
+        with _as_role(OWNER) as headers:
+            _post_json(self.client, f'/adminapi/announcements/{admin_pk}/submit/', headers)
+            _post_json(self.client, f'/adminapi/announcements/{admin_pk}/approve/', headers)
+
+        response = self.client.get('/adminapi/public/announcements/')
+        titles = [item["title"] for item in response.json()["results"]]
+        self.assertEqual(titles[0], "後台自建公告")  # 即使爬蟲那筆先建立、created_at 更早
+
+    @patch('crawler.views.requests.get')
+    def test_source_filter_in_admin_list(self, mock_get):
+        self._mock_one_tacp_item(mock_get, item_id=13)
+        with _as_role(EDITOR) as headers:
+            _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+            _post_json(self.client, '/adminapi/announcements/', headers, {"title": "自建", "body": "x"})
+
+            crawler_only = self.client.get('/adminapi/announcements/?source=crawler', **headers)
+            admin_only = self.client.get('/adminapi/announcements/?source=admin', **headers)
+
+        self.assertEqual(crawler_only.json()["count"], 1)
+        self.assertEqual(admin_only.json()["count"], 1)

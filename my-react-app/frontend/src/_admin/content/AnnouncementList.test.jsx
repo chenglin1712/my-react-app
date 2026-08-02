@@ -172,3 +172,114 @@ describe('AnnouncementList', () => {
     expect(await screen.findByText('伺服器錯誤，請稍後再試')).toBeInTheDocument();
   });
 });
+
+describe('AnnouncementList · 爬蟲同步', () => {
+  const syncStatusResponse = {
+    status: {
+      last_success_at: '2026-08-02T15:46:40Z', last_failure_at: null, last_failure_reason: '',
+      consecutive_failures: 0, last_imported_count: 6, last_skipped_count: 0,
+    },
+  };
+
+  beforeEach(() => {
+    mockRole = 'owner';
+    apiGet.mockReset();
+    apiPost.mockReset();
+    apiDelete.mockReset();
+    // 列表查詢跟同步狀態查詢都打 apiGet，用網址字串分流回應，而不是像
+    // 其他測試那樣直接 mockResolvedValue 同一個形狀給所有呼叫。
+    apiGet.mockImplementation((url) => {
+      if (url.includes('sync-crawler')) return Promise.resolve(syncStatusResponse);
+      return Promise.resolve({ results: [draftItem, pendingItem], count: 2, page: 1, page_size: 10 });
+    });
+  });
+
+  test('reviewer 看不到同步按鈕，也不會打同步狀態查詢', async () => {
+    mockRole = 'reviewer';
+    renderList();
+    await screen.findByText('草稿公告');
+    expect(screen.queryByRole('button', { name: /同步爬蟲活動/ })).not.toBeInTheDocument();
+    expect(apiGet.mock.calls.some(([url]) => url.includes('sync-crawler'))).toBe(false);
+  });
+
+  test('owner 看得到同步按鈕，並顯示上次同步時間與筆數', async () => {
+    renderList();
+    expect(await screen.findByRole('button', { name: /同步爬蟲活動/ })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/上次同步/).textContent).toContain('新增 6 筆、略過 0 筆');
+    });
+  });
+
+  test('從未同步過時顯示「尚未同步過」', async () => {
+    apiGet.mockImplementation((url) => {
+      if (url.includes('sync-crawler')) {
+        return Promise.resolve({ status: { last_success_at: null, consecutive_failures: 0 } });
+      }
+      return Promise.resolve({ results: [], count: 0, page: 1, page_size: 10 });
+    });
+    renderList();
+    expect(await screen.findByText(/尚未同步過/)).toBeInTheDocument();
+  });
+
+  test('連續失敗 3 次以上顯示警告', async () => {
+    apiGet.mockImplementation((url) => {
+      if (url.includes('sync-crawler')) {
+        return Promise.resolve({ status: { last_success_at: null, consecutive_failures: 4 } });
+      }
+      return Promise.resolve({ results: [], count: 0, page: 1, page_size: 10 });
+    });
+    renderList();
+    expect(await screen.findByText(/爬蟲同步已連續失敗 4 次/)).toBeInTheDocument();
+  });
+
+  test('點擊同步按鈕會呼叫 POST 端點、重新載入列表並顯示筆數訊息', async () => {
+    apiPost.mockResolvedValue({
+      available: true, imported: 3, skipped_existing: 1, skipped_invalid: 0, failed: 0,
+      status: { ...syncStatusResponse.status, last_imported_count: 3, last_skipped_count: 1 },
+    });
+    renderList();
+    const button = await screen.findByRole('button', { name: /同步爬蟲活動/ });
+    const listCallsBefore = apiGet.mock.calls.filter(([url]) => !url.includes('sync-crawler')).length;
+
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(apiPost).toHaveBeenCalledWith('/adminapi/announcements/sync-crawler/');
+    });
+    expect(await screen.findByText('已同步：新增 3 筆、略過 1 筆')).toBeInTheDocument();
+    await waitFor(() => {
+      const listCallsAfter = apiGet.mock.calls.filter(([url]) => !url.includes('sync-crawler')).length;
+      expect(listCallsAfter).toBeGreaterThan(listCallsBefore);
+    });
+  });
+
+  test('來源篩選送出後，查詢字串帶上 source 參數', async () => {
+    renderList();
+    await screen.findByText('草稿公告');
+    fireEvent.change(screen.getByLabelText('來源'), { target: { value: 'crawler' } });
+    fireEvent.click(screen.getByRole('button', { name: '搜尋' }));
+
+    await waitFor(() => {
+      const [url] = apiGet.mock.calls.filter(([callUrl]) => !callUrl.includes('sync-crawler')).at(-1);
+      expect(url).toContain('source=crawler');
+    });
+  });
+
+  test('source=crawler 的列會顯示「爬蟲」徽章，後台自建的不會', async () => {
+    apiGet.mockImplementation((url) => {
+      if (url.includes('sync-crawler')) return Promise.resolve(syncStatusResponse);
+      return Promise.resolve({
+        results: [
+          { ...draftItem, source: 'admin' },
+          { ...pendingItem, source: 'crawler' },
+        ],
+        count: 2, page: 1, page_size: 10,
+      });
+    });
+    renderList();
+    const crawlerRow = await screen.findByText('待審公告').then((el) => el.closest('tr'));
+    const adminRow = screen.getByText('草稿公告').closest('tr');
+    expect(within(crawlerRow).getByText('爬蟲')).toBeInTheDocument();
+    expect(within(adminRow).queryByText('爬蟲')).not.toBeInTheDocument();
+  });
+});

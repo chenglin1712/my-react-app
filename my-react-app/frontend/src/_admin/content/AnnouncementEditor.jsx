@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Alert, Button, Form, Spinner } from 'react-bootstrap';
+import { Alert, Badge, Button, Form, Spinner } from 'react-bootstrap';
 import { ArrowLeft, ImagePlus, Save, Send } from 'lucide-react';
 import { apiGet, apiPatch, apiPost } from '../../../utils/apiClient';
 import { useAuth } from '../../userServives/authContext';
@@ -14,7 +14,7 @@ const TRIBES = [
     ['tayal', '泰雅語'], ['amis', '阿美語'], ['bunun', '布農語'], ['kavalan', '噶瑪蘭語'], ['paiwan', '排灣語'],
 ];
 const STATUS_LABELS = { draft: '草稿', pending_review: '送審中', rejected: '已退件', published: '已發布', unpublished: '已下架' };
-const EMPTY_FORM = { title: '', body: '', category: 'announcement', tribes: [], cover_image_url: '', link_url: '', is_pinned: false, pin_until: '', publish_at: '', unpublish_at: '' };
+const EMPTY_FORM = { title: '', body: '', category: 'announcement', tribes: [], cover_image_url: '', link_url: '', is_pinned: false, pin_until: '', publish_at: '', unpublish_at: '', display_date_text: '' };
 
 // 純日期值（例如 "2026-09-01"，只有 pin_until 會走這條路）不能透過
 // new Date(dateOnlyString) 解析——ECMA-262 會把它當 UTC 午夜，再用
@@ -37,6 +37,9 @@ export default function AnnouncementEditor() {
     const role = userData?.role;
     const [form, setForm] = useState(EMPTY_FORM);
     const [status, setStatus] = useState('draft');
+    // 新增公告一定是後台自建（source='admin'），沒有 id 就不用另外打 API
+    // 確認——這個 state 只用來顯示「爬蟲匯入」提示，不參與任何送出的 payload。
+    const [source, setSource] = useState('admin');
     const [loading, setLoading] = useState(Boolean(id));
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -59,10 +62,12 @@ export default function AnnouncementEditor() {
                 const item = await apiGet(`/adminapi/announcements/${id}/`);
                 if (!active) return;
                 setStatus(item.status);
+                setSource(item.source ?? 'admin');
                 setForm({
                     title: item.title ?? '', body: item.body ?? '', category: item.category ?? 'announcement', tribes: item.tribes ?? [],
                     cover_image_url: item.cover_image_url ?? '', link_url: item.link_url ?? '', is_pinned: Boolean(item.is_pinned),
                     pin_until: toLocalInput(item.pin_until, 'date'), publish_at: toLocalInput(item.publish_at), unpublish_at: toLocalInput(item.unpublish_at),
+                    display_date_text: item.display_date_text ?? '',
                 });
                 setPreview(item.cover_image_url ?? '');
             } catch (err) { setError(err.message); }
@@ -111,6 +116,7 @@ export default function AnnouncementEditor() {
         ...form,
         title: form.title.trim(), body: form.body,
         link_url: form.link_url.trim(),
+        display_date_text: form.display_date_text.trim(),
         pin_until: form.is_pinned ? form.pin_until : null,
         publish_at: toIsoOrNull(form.publish_at),
         unpublish_at: toIsoOrNull(form.unpublish_at),
@@ -145,7 +151,7 @@ export default function AnnouncementEditor() {
     return (
         <main className="announcement-admin-page announcement-editor-page">
             <Link className="announcement-back-link" to="/admin/content/announcements"><ArrowLeft size={17} /> 返回公告列表</Link>
-            <div className="announcement-page-heading"><div><h1>{id ? '編輯公告' : '新增公告'}</h1><p>{id ? `目前狀態：${STATUS_LABELS[status] ?? status}` : '建立新的公告草稿'}</p></div></div>
+            <div className="announcement-page-heading"><div><h1>{id ? '編輯公告' : '新增公告'}</h1><p>{id ? `目前狀態：${STATUS_LABELS[status] ?? status}` : '建立新的公告草稿'}{source === 'crawler' && <Badge bg="info" className="ms-2">爬蟲匯入</Badge>}</p></div></div>
             {!editable && (
                 <Alert variant="warning">
                     目前為「{STATUS_LABELS[status] ?? status}」狀態，欄位暫時無法編輯。
@@ -164,6 +170,9 @@ export default function AnnouncementEditor() {
                 <div className="announcement-form-grid">
                     <Form.Group className="announcement-field" controlId="announcement-category"><Form.Label>分類</Form.Label><Form.Select disabled={!editable} value={form.category} onChange={(e) => update('category', e.target.value)}>{CATEGORIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Form.Select></Form.Group>
                     <Form.Group className="announcement-field" controlId="announcement-link"><Form.Label>外部連結</Form.Label><Form.Control type="url" disabled={!editable} value={form.link_url} onChange={(e) => update('link_url', e.target.value)} placeholder="https://" /></Form.Group>
+                    {/* 純文字欄位而不是日期選擇器：爬蟲匯入的活動這裡可能是像
+                        「115年8月1日」這種民國年中文日期，沒有對應的日期元件能表示。 */}
+                    <Form.Group className="announcement-field" controlId="announcement-display-date"><Form.Label>顯示日期文字（選填）</Form.Label><Form.Control disabled={!editable} value={form.display_date_text} onChange={(e) => update('display_date_text', e.target.value)} placeholder="例如：2026-08-01 ~ 2026-08-10" /><Form.Text>爬蟲匯入的活動會自動帶入活動日期，也可以手動填寫或修改。</Form.Text></Form.Group>
                 </div>
                 <fieldset className="announcement-field" disabled={!editable}><legend>適用族語</legend><div className="announcement-tribe-options"><Form.Check id="announcement-tribe-all" type="checkbox" label="全部族語" checked={form.tribes.length === 0} onChange={() => update('tribes', [])} />{TRIBES.map(([value, label]) => <Form.Check key={value} id={`announcement-tribe-${value}`} type="checkbox" label={label} checked={form.tribes.includes(value)} onChange={() => toggleTribe(value)} />)}</div><Form.Text>全部不選即代表適用所有族語。</Form.Text></fieldset>
                 <Form.Group className="announcement-field" controlId="announcement-cover"><Form.Label>封面圖</Form.Label><div className="announcement-cover-uploader">{preview ? <img src={preview} alt="封面圖預覽" /> : <div className="announcement-cover-placeholder"><ImagePlus size={30} /><span>尚未選擇圖片</span></div>}<div><Form.Control type="file" accept="image/*" disabled={!editable || uploading} onChange={handleFileChange} />{uploading && <span className="announcement-upload-status"><Spinner size="sm" /> 圖片上傳中…</span>}</div></div></Form.Group>
