@@ -49,6 +49,9 @@ const NoteShare = lazy(() => import('./_note/noteshare'));
 const FavoritePage = lazy(() => import('./_favorite/index'));
 //行事曆
 const CalendarPage = lazy(() => import('../components/_calendar/calendar_date'));
+//後台管理系統（P0 最小骨架，見規劃文件 §1.4）
+const AdminApp = lazy(() => import('./_admin/AdminApp'));
+const AdminRoute = lazy(() => import('./_admin/AdminRoute'));
 
 
 const ProtectedRoute = ({ children }) => {
@@ -122,6 +125,7 @@ const App = () => {
           <Route path="/forgot" element={<ForgotPage />} />
           <Route path="/reset" element={<ResetPage />} />
           <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
+          <Route path="/admin/*" element={<AdminRoute><AdminApp /></AdminRoute>} />
         </Routes>
       </Suspense>
     </ErrorBoundary>

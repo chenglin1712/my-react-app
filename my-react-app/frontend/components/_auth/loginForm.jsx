@@ -1,7 +1,7 @@
 import "../../static/css/_auth/loginForm.css"
 import { Mail, LockKeyhole, User } from "lucide-react"
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Alert } from "react-bootstrap";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../../firebase";
@@ -14,6 +14,28 @@ const LoginForm = ({ onSwitchToRegister }) => {
     const [password, setPassword] = useState("");
     const [errorMsg, setErrorMsg] = useState("");
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+
+    // 登入後預設回首頁；只有從「先被要求登入才能進去」的頁面過來（例如
+    // AdminRoute 導去 /login?next=/admin）才會帶 next 參數，登入成功後導回
+    // 原本要去的地方。用瀏覽器原生的 URL 解析器判斷是否為同源站內路徑，
+    // 而不是自己手刻字串規則——單純檢查開頭是不是 "/"、"//" 會漏掉瀏覽器
+    // 自己會正規化的變形，例如 "/\evil.com" 在網址解析時會被當成跟
+    // "//evil.com" 等價的協定相對網址，直接跳到別的網站；用同一套 URL
+    // 解析器（new URL）判斷才不會跟實際的導頁行為有認知落差。
+    const getRedirectTarget = () => {
+        const next = searchParams.get("next");
+        if (!next) return "/";
+        try {
+            const resolved = new URL(next, window.location.origin);
+            if (resolved.origin === window.location.origin) {
+                return resolved.pathname + resolved.search + resolved.hash;
+            }
+        } catch {
+            // next 不是合法的 URL 片段，忽略、走預設值
+        }
+        return "/";
+    };
 
     //使用者登入
     const handleLogin = async (e) => {
@@ -27,8 +49,9 @@ const LoginForm = ({ onSwitchToRegister }) => {
         try {
             await signInWithEmailAndPassword(auth, email, password);
             setIsLogin(true);
+            const redirectTarget = getRedirectTarget();
             setTimeout(() => {
-                navigate("/");
+                navigate(redirectTarget);
             }, 1800);
         } catch (error) {
             // error.code 只有 Firebase 的錯誤才會有，非 Firebase 的例外（例如網路層

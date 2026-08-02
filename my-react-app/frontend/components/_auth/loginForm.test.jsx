@@ -4,8 +4,12 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import LoginForm from './loginForm';
 
 const mockNavigate = vi.fn();
+// mockSearchParams 預設是空的（等同沒有 next 參數），個別測試可以在 render 前
+// 重新指派這個變數的內容來模擬帶 ?next=... 的情境。
+let mockSearchParams = new URLSearchParams();
 vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
+  useSearchParams: () => [mockSearchParams],
 }));
 vi.mock('firebase/auth', () => ({
   signInWithEmailAndPassword: vi.fn(),
@@ -26,6 +30,7 @@ describe('LoginForm', () => {
   beforeEach(() => {
     mockNavigate.mockReset();
     signInWithEmailAndPassword.mockReset();
+    mockSearchParams = new URLSearchParams();
   });
 
   test('email 或密碼為空時顯示驗證錯誤，不呼叫 signIn', () => {
@@ -115,6 +120,82 @@ describe('LoginForm', () => {
 
       expect(screen.getByText(/登入成功！您將移至首頁/)).toBeInTheDocument();
       expect(mockNavigate).not.toHaveBeenCalled();
+
+      act(() => {
+        vi.advanceTimersByTime(1800);
+      });
+
+      expect(mockNavigate).toHaveBeenCalledWith('/');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('帶 next 參數登入成功後導向 next 指定的站內路徑（例如 AdminRoute 導來的 /admin）', async () => {
+    mockSearchParams = new URLSearchParams('next=/admin');
+    vi.useFakeTimers();
+    try {
+      signInWithEmailAndPassword.mockResolvedValueOnce({});
+      render(<LoginForm />);
+      fillLoginForm('a@b.com', 'secret1');
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: '登入' }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(1800);
+      });
+
+      expect(mockNavigate).toHaveBeenCalledWith('/admin');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('next 是外部網址（開放重導向）時忽略它，導回首頁', async () => {
+    mockSearchParams = new URLSearchParams('next=' + encodeURIComponent('//evil.example.com'));
+    vi.useFakeTimers();
+    try {
+      signInWithEmailAndPassword.mockResolvedValueOnce({});
+      render(<LoginForm />);
+      fillLoginForm('a@b.com', 'secret1');
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: '登入' }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(1800);
+      });
+
+      expect(mockNavigate).toHaveBeenCalledWith('/');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('next 用反斜線偽裝成站內路徑時仍會被擋下（瀏覽器會把 /\\evil.com 正規化成協定相對網址 //evil.com）', async () => {
+    // 回歸測試：原本用 next.startsWith("/") && !next.startsWith("//") 判斷時，
+    // "/\\evil.example.com" 會通過檢查（它就是單一個 "/" 開頭），但瀏覽器的
+    // URL 解析器會把反斜線當成正斜線處理，實際上等同 "//evil.example.com"，
+    // 導致真的跳到外部網站。改用 new URL() 解析後比對 origin 才能正確擋下。
+    mockSearchParams = new URLSearchParams('next=' + encodeURIComponent('/\\evil.example.com'));
+    vi.useFakeTimers();
+    try {
+      signInWithEmailAndPassword.mockResolvedValueOnce({});
+      render(<LoginForm />);
+      fillLoginForm('a@b.com', 'secret1');
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: '登入' }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
 
       act(() => {
         vi.advanceTimersByTime(1800);

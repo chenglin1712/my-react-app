@@ -8,7 +8,8 @@ from django.http import JsonResponse
 from django.test import TestCase, override_settings
 
 from config.auth_flags import auth_dev_bypass
-from config.firebase_auth import verify_firebase_token
+from config.firebase_auth import require_role, verify_firebase_token
+from config.roles import ADMIN, EDITOR, OWNER, STAFF_ROLES
 from config.tribes import resolve_tribe_name
 
 
@@ -93,8 +94,11 @@ class VerifyFirebaseTokenTest(TestCase):
 
     @override_settings(AUTH_DEV_BYPASS=True)
     def test_dev_bypass_skips_verification(self):
+        # dev bypass 現在會附帶一個角色（預設 owner，見 require_role 之後新增的
+        # AUTH_DEV_BYPASS_ROLE），讓本機開發不用先設定 Firebase custom claim
+        # 就能直接測後台管理系統；沒設定 AUTH_DEV_BYPASS_ROLE 環境變數時預設 owner。
         decoded, error = verify_firebase_token(_FakeRequest())
-        self.assertEqual(decoded, {"uid": "dev-user"})
+        self.assertEqual(decoded, {"uid": "dev-user", "role": "owner"})
         self.assertIsNone(error)
 
     @override_settings(AUTH_DEV_BYPASS=False)
@@ -171,3 +175,54 @@ class VerifyFirebaseTokenTest(TestCase):
         self.assertIsNone(decoded)
         self.assertEqual(error.status_code, 503)
         mock_logger.exception.assert_called_once()
+
+
+class RequireRoleTest(TestCase):
+    """config/firebase_auth.py 的 require_role：後台管理系統每一支 API 都要靠
+    這個函式擋權限，所以特別驗證「沒登入」「登入但角色不夠」「角色剛好在清單內」
+    「dev bypass 也一樣要吃角色限制」這四種情況分別回什麼。
+    """
+
+    @override_settings(AUTH_DEV_BYPASS=False)
+    def test_not_logged_in_returns_verify_firebase_token_error_unchanged(self):
+        # 沒登入時應該直接拿到 verify_firebase_token 原本的 401，不能被角色檢查
+        # 蓋成別的錯誤——呼叫端才能用同一套邏輯判斷「未登入」，不用另外處理。
+        decoded, error = require_role(_FakeRequest(), STAFF_ROLES)
+        self.assertIsNone(decoded)
+        self.assertEqual(error.status_code, 401)
+
+    @override_settings(AUTH_DEV_BYPASS=False)
+    def test_role_in_allowed_list_passes_through_decoded_token(self):
+        with patch("config.firebase_auth.ensure_firebase_initialized"):
+            with patch("firebase_admin.auth.verify_id_token", return_value={"uid": "u1", "role": ADMIN}):
+                decoded, error = require_role(_FakeRequest(auth_header="Bearer t"), (OWNER, ADMIN))
+        self.assertEqual(decoded, {"uid": "u1", "role": ADMIN})
+        self.assertIsNone(error)
+
+    @override_settings(AUTH_DEV_BYPASS=False)
+    def test_role_not_in_allowed_list_returns_403(self):
+        with patch("config.firebase_auth.ensure_firebase_initialized"):
+            with patch("firebase_admin.auth.verify_id_token", return_value={"uid": "u1", "role": EDITOR}):
+                decoded, error = require_role(_FakeRequest(auth_header="Bearer t"), (OWNER, ADMIN))
+        self.assertIsNone(decoded)
+        self.assertEqual(error.status_code, 403)
+
+    @override_settings(AUTH_DEV_BYPASS=False)
+    def test_learner_without_role_claim_returns_403(self):
+        # 一般學習者帳號沒有 role claim，decoded.get("role") 會是 None，
+        # 必須被擋在任何非空的 allowed_roles 清單外，不能因為「沒有這個 key」
+        # 就意外通過 in 判斷。
+        with patch("config.firebase_auth.ensure_firebase_initialized"):
+            with patch("firebase_admin.auth.verify_id_token", return_value={"uid": "learner-1"}):
+                decoded, error = require_role(_FakeRequest(auth_header="Bearer t"), STAFF_ROLES)
+        self.assertIsNone(decoded)
+        self.assertEqual(error.status_code, 403)
+
+    @override_settings(AUTH_DEV_BYPASS=True)
+    def test_dev_bypass_still_enforces_allowed_roles(self):
+        # dev bypass 預設扮演 owner，但這不代表角色檢查本身被繞過——如果呼叫端
+        # 把允許清單縮小到不含 owner，dev bypass 一樣要被擋下，確保「免登入」
+        # 跟「略過角色檢查」是兩件獨立的事，不會因為本機開發模式而混在一起。
+        decoded, error = require_role(_FakeRequest(), (EDITOR,))
+        self.assertIsNone(decoded)
+        self.assertEqual(error.status_code, 403)

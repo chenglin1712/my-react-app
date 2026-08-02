@@ -3,6 +3,20 @@ import { getDatabase, ref, onDisconnect, set, onValue, serverTimestamp } from "f
 import { db, auth } from "../../../firebase";
 import { onAuthStateChanged, createUserWithEmailAndPassword } from "firebase/auth";
 
+// 前端版的角色開發模式開關，對應後端 config/firebase_auth.py 的
+// AUTH_DEV_BYPASS_ROLE：後端的 AUTH_DEV_BYPASS 只影響 API 請求，完全不影響
+// 這裡（前端讀的是 Firebase 帳號本身的 custom claim），沒有這個開關的話，
+// 在 Firebase service account 金鑰設定好、真的執行角色指派之前，本機開發
+// 完全看不到 /admin 長什麼樣子。
+//
+// import.meta.env.DEV 是 Vite 內建、編譯期就決定的常數（`vite dev` 為
+// true、`vite build` 為 false），這個 if 分支在正式建置時會被整段 tree-shake
+// 掉——就算有人不小心在正式環境的 .env 留了 VITE_AUTH_DEV_BYPASS_ROLE，
+// 打包後的產物裡也不會有這段程式碼，不會變成任何使用者都能取得後台權限的破口。
+const DEV_BYPASS_ROLE = import.meta.env.DEV
+    ? import.meta.env.VITE_AUTH_DEV_BYPASS_ROLE || null
+    : null;
+
 //監聽登入
 // 快速連續觸發 auth 狀態變換時（例如切換帳號、登入後馬上登出），
 // 前一次事件的 getCurrentUser 可能在後一次事件之後才 resolve，
@@ -14,7 +28,19 @@ export const authChanges = (callback) => {
     return onAuthStateChanged(auth, async (user) => {
         const myGen = ++currentGen;
         if (user) {
-            const userData = await getCurrentUser(user.uid);
+            // getIdTokenResult 才拿得到 custom claims（role），一般的 user 物件
+            // 本身不帶這個資訊。後台管理系統的 AdminRoute 靠 role 判斷能不能進去
+            // （見 backend/config/roles.py），這裡是前端唯一讀取這個 claim 的地方，
+            // 避免每個要用到角色的元件各自呼叫一次 getIdTokenResult。失敗時
+            // （例如網路問題）不讓整個登入流程掛掉，只是把角色當作沒有，安全的
+            // 失敗方向是「當成一般使用者」而不是「當成有權限」。
+            const [userData, tokenResult] = await Promise.all([
+                getCurrentUser(user.uid),
+                user.getIdTokenResult().catch((e) => {
+                    console.error("[authChanges] getIdTokenResult error:", e);
+                    return null;
+                }),
+            ]);
             if (myGen !== currentGen) return;
 
             try {
@@ -23,7 +49,11 @@ export const authChanges = (callback) => {
                 console.error("[authChanges] setupPresence error:", e);
             }
 
-            callback({ firestoreData: userData, uid: user.uid });
+            callback({
+                firestoreData: userData,
+                uid: user.uid,
+                role: DEV_BYPASS_ROLE || (tokenResult?.claims?.role ?? null),
+            });
             initUserFields(user.uid);
         } else {
             callback(null);

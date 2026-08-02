@@ -218,3 +218,113 @@ describe('sharedNotes read 規則（軟刪除）', () => {
     await assertSucceeds(getDoc(doc(bob.firestore(), 'sharedNotes/legacy-note')));
   });
 });
+
+// 後台管理系統的 isStaff()/isAdmin()：角色透過 authenticatedContext 的第二個
+// 參數模擬 Firebase custom claims（模擬器會把它合併進 request.auth.token，
+// 跟正式環境 set_custom_user_claims() 寫入的位置一致）。這裡只驗證「規則本身
+// 有沒有正確依角色放行/擋下」，不驗證角色是怎麼被指派的（那是後端 adminapi
+// 的責任，屬於 Python 端測試範圍）。
+describe('users 規則（staff 角色）', () => {
+  test('一般使用者讀不到別人的資料（維持原本行為）', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users/alice'), { name: 'Alice' });
+    });
+    const bob = testEnv.authenticatedContext('bob');
+    const { getDoc } = await import('firebase/firestore');
+    await assertFails(getDoc(doc(bob.firestore(), 'users/alice')));
+  });
+
+  test('staff 角色（editor）可以讀別人的資料', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users/alice'), { name: 'Alice' });
+    });
+    const staffBob = testEnv.authenticatedContext('bob', { role: 'editor' });
+    const { getDoc } = await import('firebase/firestore');
+    await assertSucceeds(getDoc(doc(staffBob.firestore(), 'users/alice')));
+  });
+
+  test('沒有 role claim 的一般登入使用者不算 staff', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users/alice'), { name: 'Alice' });
+    });
+    const bob = testEnv.authenticatedContext('bob', {});
+    const { getDoc } = await import('firebase/firestore');
+    await assertFails(getDoc(doc(bob.firestore(), 'users/alice')));
+  });
+
+  test('staff（含 owner）仍然不能寫別人的資料——管理動作只能走後端 Admin SDK，前端不開放直寫', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users/alice'), { name: 'Alice' });
+    });
+    const staffBob = testEnv.authenticatedContext('bob', { role: 'owner' });
+    await assertFails(setDoc(doc(staffBob.firestore(), 'users/alice'), { name: 'Hacked' }));
+  });
+});
+
+describe('sharedNotes 規則（staff 審核）', () => {
+  const seedNote = async (noteId, overrides = {}) => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `sharedNotes/${noteId}`), {
+        ...validSharedNote('alice'),
+        ...overrides,
+      });
+    });
+  };
+
+  test('staff 可以讀到已下架的筆記（審核佇列需要看得到）', async () => {
+    await seedNote('n1', { deleted: true });
+    const staffBob = testEnv.authenticatedContext('bob', { role: 'admin' });
+    const { getDoc } = await import('firebase/firestore');
+    await assertSucceeds(getDoc(doc(staffBob.firestore(), 'sharedNotes/n1')));
+  });
+
+  test('staff 可以把別人的筆記下架，且只改動 deleted 欄位', async () => {
+    await seedNote('n1');
+    const staffBob = testEnv.authenticatedContext('bob', { role: 'admin' });
+    const { updateDoc } = await import('firebase/firestore');
+    await assertSucceeds(updateDoc(doc(staffBob.firestore(), 'sharedNotes/n1'), { deleted: true }));
+  });
+
+  test('staff 下架動作不能夾帶改動其他欄位（例如順便改內文）', async () => {
+    await seedNote('n1');
+    const staffBob = testEnv.authenticatedContext('bob', { role: 'admin' });
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(staffBob.firestore(), 'sharedNotes/n1'), { deleted: true, preview: '<p>被改過</p>' })
+    );
+  });
+
+  test('沒有 staff 角色的一般使用者不能下架別人的筆記', async () => {
+    await seedNote('n1');
+    const bob = testEnv.authenticatedContext('bob');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(updateDoc(doc(bob.firestore(), 'sharedNotes/n1'), { deleted: true }));
+  });
+});
+
+describe('pronunciations 規則（staff 審核）', () => {
+  const seedRecording = async (id, overrides = {}) => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `pronunciations/tayal/recordings/${id}`), {
+        uid: 'alice',
+        word: 'huzil',
+        score: 88,
+        ...overrides,
+      });
+    });
+  };
+
+  test('staff 可以刪除任何人的錄音（內容審核「移除」動作）', async () => {
+    await seedRecording('r1');
+    const staffBob = testEnv.authenticatedContext('bob', { role: 'reviewer' });
+    const { deleteDoc } = await import('firebase/firestore');
+    await assertSucceeds(deleteDoc(doc(staffBob.firestore(), 'pronunciations/tayal/recordings/r1')));
+  });
+
+  test('本人也不能刪除自己的錄音（原本就沒有開放 delete，這裡不能因為加了 staff 例外而意外放寬）', async () => {
+    await seedRecording('r1');
+    const alice = testEnv.authenticatedContext('alice');
+    const { deleteDoc } = await import('firebase/firestore');
+    await assertFails(deleteDoc(doc(alice.firestore(), 'pronunciations/tayal/recordings/r1')));
+  });
+});

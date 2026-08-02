@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+import dj_database_url
 
 from config.logging import get_logging_config
 from config.auth_flags import auth_dev_bypass
@@ -89,7 +90,8 @@ INSTALLED_APPS = [
     'corsheaders',
     "core",
     'CrosswordPuzzle.apps.CrosswordpuzzleConfig',
-    'drf_yasg'
+    'drf_yasg',
+    'adminapi.apps.AdminapiConfig',
 ]
 
 MIDDLEWARE = [
@@ -145,16 +147,30 @@ WSGI_APPLICATION = "core.wsgi.application"
 ASGI_APPLICATION = "core.asgi.application"
 
 # Database
-# WARNING: SQLite 僅適用於開發環境。
-# 生產環境請切換至 PostgreSQL：
-#   ENGINE: django.db.backends.postgresql
-#   NAME/USER/PASSWORD/HOST/PORT 從環境變數讀取
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+# 讀 DATABASE_URL 環境變數（正式環境指向 PostgreSQL），沒設定時退回 SQLite——
+# 本機開發、CI 完全不受影響，維持原本零設定即可跑的行為。後台管理系統的
+# 讀寫（公告、稽核日誌等）需要能撐過容器重啟/重新部署，Render/Cloud Run
+# 的檔案系統是暫時性的，SQLite 檔案在那些平台上撐不住這個需求，這也是
+# 這個專案原本的 README 就已經寫著「生產環境請切換至 PostgreSQL」的原因。
+_database_url = os.getenv("DATABASE_URL")
+if _database_url:
+    DATABASES = {
+        "default": dj_database_url.parse(
+            _database_url,
+            conn_max_age=600,
+            # Render/Cloud Run 這類受管平台的 Postgres 連線一律要求 TLS；
+            # ssl_require=True 只在有設定 DATABASE_URL（代表正式/類正式環境）
+            # 時生效，本機開發走 SQLite 分支完全不受影響。
+            ssl_require=True,
+        )
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators

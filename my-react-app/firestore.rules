@@ -20,9 +20,26 @@ service cloud.firestore {
         && changedUids == [uid].toSet();
     }
 
-    // 使用者資料：只有本人可讀寫
+    // 後台角色透過 Firebase custom claims 寫入 ID token（見規劃文件 §1.1），
+    // 這裡直接讀 request.auth.token.role，不用 get() 額外讀一份 Firestore
+    // 文件——每次規則判斷都省一次計費讀取與延遲。isStaff() 是「能不能看到後台」，
+    // isAdmin() 是「能不能管理別人的帳號」（僅 owner／admin，見規劃文件 §1.2
+    // 權限矩陣），兩者刻意分開，不要把「登入後台」跟「管理帳號」混成同一個判斷。
+    function isStaff() {
+      return request.auth != null &&
+        request.auth.token.role in ['owner', 'admin', 'editor', 'reviewer', 'analyst'];
+    }
+    function isAdmin() {
+      return request.auth != null && request.auth.token.role in ['owner', 'admin'];
+    }
+
+    // 使用者資料：本人可讀寫；staff 角色可讀（後台「使用者帳號」列表/詳情要查
+    // 學習者資料），但寫入仍然只限本人——停權、改角色這類真正的管理動作都
+    // 透過後端 Admin SDK 進行（會繞過這份規則），不開放 staff 直接用前端 SDK
+    // 改寫別人的 Firestore 文件，避免多一個攻擊面。
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && (request.auth.uid == userId || isStaff());
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
 
     // 測驗題目：登入者可讀；登入者可建立，且限制內容形狀——原本只檢查有沒有
@@ -65,10 +82,14 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // 發音錄音：登入者可讀；登入者只能建立 uid 為本人的錄音
+    // 發音錄音：登入者可讀；登入者只能建立 uid 為本人的錄音；staff 可刪除
+    // （內容審核「移除」動作，見規劃文件 §3.7.2）——本人原本就不能刪自己的
+    // 錄音（沒有這條規則以前 delete 完全沒開放），這裡刻意只開放給 staff，
+    // 不順便放開自我刪除，維持原本行為不變。
     match /pronunciations/{tribe}/recordings/{recordingId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow delete: if isStaff();
     }
 
     // 共享筆記：任何人（含未登入）可讀，配合 /share/:id 這條公開分享連結路由
@@ -82,7 +103,10 @@ service cloud.firestore {
     // 軟刪除功能上線之前建立、沒有 deleted 欄位的舊文件預設視為未刪除，不會被
     // 這條新規則擋掉。
     match /sharedNotes/{noteId} {
-      allow read: if resource.data.get('deleted', false) == false;
+      // staff 額外可讀已下架的筆記——審核佇列跟「查看已下架內容」都需要看得到
+      // deleted=true 的文件，一般使用者／未登入訪客則維持原本規則（下架後
+      // /share/:id 連結就打不開）。
+      allow read: if resource.data.get('deleted', false) == false || isStaff();
       // 原本只檢查有沒有登入，任何登入使用者都能建立一筆冒充別人 uid 的筆記——
       // 而 update／delete 規則（見下方）又是直接信任這個可被偽造的 uid 欄位。
       // 比照同檔案 situations／pronunciations 的作法，要求寫入的 uid 就是本人。
@@ -102,11 +126,18 @@ service cloud.firestore {
         && request.resource.data.likes == 0
         && request.resource.data.likedBy is list && request.resource.data.likedBy.size() == 0
         && request.resource.data.deleted == false;
+      // staff 下架／恢復：只能動 deleted 這個欄位，不能連帶改內文、讚數這些
+      // 跟審核無關的欄位——把「作者能改什麼」跟「staff 能改什麼」的權限範圍
+      // 徹底分開，即使 staff 帳號被盜也頂多能下架/恢復內容，改不了內容本身。
       allow update: if request.auth != null && (
         resource.data.uid == request.auth.uid ||
         (
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy']) &&
           isValidLikeToggle(resource.data, request.resource.data, request.auth.uid)
+        ) ||
+        (
+          isStaff() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted'])
         )
       );
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;

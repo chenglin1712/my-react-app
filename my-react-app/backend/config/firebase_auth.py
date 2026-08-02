@@ -10,6 +10,7 @@ FastAPI 版本介面不同（Header 依賴注入），獨立實作於 backend/fa
 共用，兩邊只有各自把「金鑰沒設定」的例外轉成自己框架慣用的錯誤回應這段不同。
 """
 import logging
+import os
 
 from django.conf import settings as django_settings
 from django.http import JsonResponse
@@ -17,6 +18,13 @@ from django.http import JsonResponse
 from config.firebase_init import ensure_firebase_initialized
 
 logger = logging.getLogger(__name__)
+
+# AUTH_DEV_BYPASS 模式下要假裝成哪個角色，預設給最高權限（owner）——本機開發
+# 情境下開發者通常想直接看到完整後台介面，而不是先手動設定 Firebase custom
+# claim 才能測。真的想測「某個角色被擋住」的情境，可另外設定這個環境變數成
+# 較低權限的角色（例如 "editor"）。這個旗標只在 AUTH_DEV_BYPASS=True 時才有
+# 意義，正式環境不會用到。
+_DEV_BYPASS_ROLE = os.getenv("AUTH_DEV_BYPASS_ROLE", "owner")
 
 
 def verify_firebase_token(request):
@@ -26,7 +34,7 @@ def verify_firebase_token(request):
     呼叫端應直接把它當成 view 的回傳值。
     """
     if django_settings.AUTH_DEV_BYPASS:
-        return {"uid": "dev-user"}, None
+        return {"uid": "dev-user", "role": _DEV_BYPASS_ROLE}, None
 
     auth_header = request.META.get("HTTP_AUTHORIZATION", "")
     if not auth_header.startswith("Bearer "):
@@ -67,3 +75,28 @@ def verify_firebase_token(request):
         # 錯誤等），代表驗證機制本身可能已經整個掛掉，記錄下來讓 Sentry 能告警。
         logger.exception("Firebase ID Token 驗證發生非預期例外")
         return None, JsonResponse({"detail": "身份驗證失敗，請重新登入"}, status=401)
+
+
+def require_role(request, allowed_roles):
+    """驗證 Firebase ID Token，並檢查角色是否在 allowed_roles 內（後台管理系統用）。
+
+    先呼叫 verify_firebase_token 驗證登入狀態；沒登入／token 無效時直接把
+    verify_firebase_token 原本的錯誤（401/503）原樣傳回去。登入成功但角色
+    不在允許清單內，回傳統一格式的 403——不區分「完全沒有後台角色」跟
+    「角色不夠高」，避免一般使用者從錯誤訊息內容反推出後台角色分級的存在。
+
+    回傳 (decoded_token, error_response)，用法與 verify_firebase_token 相同：
+    error_response 非 None 時代表被擋下，呼叫端應直接把它當成 view 的回傳值。
+
+    allowed_roles 建議傳 config/roles.py 裡定義好的角色群組常數
+    （例如 ACCOUNT_MANAGERS、CONTENT_APPROVERS），而不是在呼叫端各自寫死
+    一份角色字串清單，避免多處清單互相漂移。
+    """
+    decoded, err_resp = verify_firebase_token(request)
+    if err_resp:
+        return None, err_resp
+
+    if decoded.get("role") not in allowed_roles:
+        return None, JsonResponse({"detail": "沒有權限執行此操作"}, status=403)
+
+    return decoded, None
