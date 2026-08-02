@@ -84,3 +84,26 @@ export async function apiGet(url, options = {}) {
     normalizeError(err);
   }
 }
+
+/** 後台管理系統的端點才會用到 PATCH／DELETE（見 backend/adminapi/），既有
+ * 前台呼叫點目前都只用 GET/POST，所以原本沒有這兩個函式——補上時沿用跟
+ * apiGet/apiPost 完全一樣的 token 附加與錯誤處理方式，不要另外長出一套。 */
+export async function apiPatch(url, data, options = {}) {
+  const headers = await authHeaders();
+  try {
+    const res = await axios.patch(url, data, buildConfig(headers, options));
+    return res.data;
+  } catch (err) {
+    normalizeError(err);
+  }
+}
+
+export async function apiDelete(url, options = {}) {
+  const headers = await authHeaders();
+  try {
+    const res = await axios.delete(url, buildConfig(headers, options));
+    return res.data;
+  } catch (err) {
+    normalizeError(err);
+  }
+}

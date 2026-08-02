@@ -93,6 +93,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      '/adminapi': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        secure: false,
+      },
       '/api/v1/listening': {
         target: 'http://127.0.0.1:8001',
         changeOrigin: true,

@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import axios from 'axios';
-import { apiPost, ApiError } from './apiClient';
+import { apiPost, apiPatch, apiDelete, ApiError } from './apiClient';
 
 vi.mock('axios');
 
@@ -84,5 +84,39 @@ describe('normalizeError（透過 apiPost 間接測試，函式本身沒有 expo
     } catch (err) {
       expect(err.message).toBe('Network Error');
     }
+  });
+});
+
+describe('apiPatch／apiDelete（後台管理系統用，跟 apiGet/apiPost 共用同一套 token 附加與錯誤處理）', () => {
+  beforeEach(() => {
+    mockCurrentUser = { getIdToken: vi.fn().mockResolvedValue('fake-token') };
+    axios.patch.mockReset();
+    axios.delete.mockReset();
+  });
+
+  test('apiPatch 會附上 Authorization header 並回傳 response.data', async () => {
+    axios.patch.mockResolvedValueOnce({ data: { ok: true } });
+    const result = await apiPatch('/adminapi/announcements/1/', { title: '新標題' });
+    expect(result).toEqual({ ok: true });
+    expect(axios.patch).toHaveBeenCalledWith(
+      '/adminapi/announcements/1/',
+      { title: '新標題' },
+      expect.objectContaining({ headers: { Authorization: 'Bearer fake-token' } }),
+    );
+  });
+
+  test('apiDelete 會附上 Authorization header 並回傳 response.data', async () => {
+    axios.delete.mockResolvedValueOnce({ data: { detail: '已刪除' } });
+    const result = await apiDelete('/adminapi/announcements/1/');
+    expect(result).toEqual({ detail: '已刪除' });
+    expect(axios.delete).toHaveBeenCalledWith(
+      '/adminapi/announcements/1/',
+      expect.objectContaining({ headers: { Authorization: 'Bearer fake-token' } }),
+    );
+  });
+
+  test('apiPatch 失敗時一樣包成 ApiError', async () => {
+    axios.patch.mockRejectedValueOnce({ response: { status: 409, data: { detail: '目前狀態無法編輯' } } });
+    await expect(apiPatch('/x', {})).rejects.toMatchObject({ message: '目前狀態無法編輯', status: 409 });
   });
 });

@@ -27,7 +27,8 @@ urlpatterns = [
     path('health/', health_check),
     path('crawler/',include('crawler.urls')),
     path('AIModel/',include('AIModel.urls')),
-    path('CrosswordPuzzle/',include('CrosswordPuzzle.urls'))
+    path('CrosswordPuzzle/',include('CrosswordPuzzle.urls')),
+    path('adminapi/',include('adminapi.urls')),
     ]
 
 # Swagger UI 只在開發環境掛載，跟 fastAPI/routes/dictionary/audio_proxy.py 的除錯用路由同一個
