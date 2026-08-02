@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 import dj_database_url
 
@@ -154,14 +155,17 @@ ASGI_APPLICATION = "core.asgi.application"
 # 這個專案原本的 README 就已經寫著「生產環境請切換至 PostgreSQL」的原因。
 _database_url = os.getenv("DATABASE_URL")
 if _database_url:
+    # Render/Cloud Run 這類受管平台的 Postgres 連線一律要求 TLS，但本機/區網
+    # 的 Postgres（例如開發機上直接裝的 PostgreSQL 服務）預設沒有啟用 SSL，
+    # 強制 ssl_require=True 連線會直接被拒絕。用連線字串裡的 host 自動判斷是
+    # 本機還是遠端，不用另外設一個環境變數區分「本機 Postgres」與「正式環境
+    # Postgres」這兩種情境。
+    _db_host = urlparse(_database_url).hostname
     DATABASES = {
         "default": dj_database_url.parse(
             _database_url,
             conn_max_age=600,
-            # Render/Cloud Run 這類受管平台的 Postgres 連線一律要求 TLS；
-            # ssl_require=True 只在有設定 DATABASE_URL（代表正式/類正式環境）
-            # 時生效，本機開發走 SQLite 分支完全不受影響。
-            ssl_require=True,
+            ssl_require=_db_host not in ("localhost", "127.0.0.1", "::1"),
         )
     }
 else:

@@ -2,6 +2,8 @@ import os
 import sys
 from logging.config import fileConfig
 
+from dotenv import load_dotenv
+
 from alembic import context
 
 # backend/fastAPI/alembic/env.py -> backend/ 才是 `dictionary_db` package 的上層目錄，
@@ -9,6 +11,13 @@ from alembic import context
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
+
+# dictionary_db.connect 在 import 當下就會讀 DICTIONARY_DATABASE_URL/DATABASE_URL
+# 決定要連 SQLite 還是 Postgres（見該檔案），跟 fastAPI/main.py 一樣是獨立的
+# process 進入點，不會自動繼承 Django manage.py 那邊已經載入的環境變數，必須
+# 自己呼叫 load_dotenv()，否則直接執行 `alembic upgrade head` 時永遠只會連到
+# 本機 SQLite 檔案，即使 .env 裡已經設定了 Postgres 連線字串。
+load_dotenv()
 
 from dictionary_db.connect import Base, engine  # noqa: E402
 from dictionary_db import model  # noqa: E402,F401  # 讓所有 model 都註冊進 Base.metadata
