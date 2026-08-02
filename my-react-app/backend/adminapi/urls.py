@@ -12,4 +12,9 @@ urlpatterns = [
     path('announcements/<int:pk>/unpublish/', views.announcement_unpublish),
     path('announcements/<int:pk>/republish/', views.announcement_republish),
     path('audit-log/', views.audit_log_list),
+    path('public/announcements/', views.public_announcement_list),
+    path('exam-schedule/', views.exam_schedule_admin),
+    path('exam-schedule/overrides/<str:phase>/', views.exam_schedule_override_detail),
+    path('homepage-config/', views.homepage_config_admin),
+    path('public/homepage-config/', views.public_homepage_config),
 ]

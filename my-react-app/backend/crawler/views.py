@@ -12,6 +12,7 @@ from . import bunun_bank
 from . import kavalan_bank
 from . import paiwan_bank
 from config.firebase_auth import verify_firebase_token
+from adminapi.models import ExamScheduleCrawlStatus, ExamScheduleOverride
 
 logger = logging.getLogger(__name__)
 
@@ -203,12 +204,20 @@ EXAM_SITE_HTML_CACHE_KEY = "crawler_exam_site_html"
 EXAM_SITE_HTML_CACHE_TTL = 900  # 15 分鐘，跟兩支端點自己的資料快取一致
 
 
-def _fetch_exam_site_html():
+def _fetch_exam_site_html(force_refresh=False):
     """回傳 exam.sce.ntnu.edu.tw/abst/ 的原始 HTML（有共用快取）。連線/逾時等例外
-    交給呼叫端各自的 try/except 處理，這裡不吞例外。"""
-    cached = cache.get(EXAM_SITE_HTML_CACHE_KEY)
-    if cached is not None:
-        return cached
+    交給呼叫端各自的 try/except 處理，這裡不吞例外。
+
+    force_refresh=True 給後台「手動重爬」用：get_exam_schedule_data 的
+    force_refresh 只略過它自己那層 EXAM_SCHEDULE_CACHE_KEY 快取，如果這裡
+    的共用 HTML 快取還沒過期，_scrape_exam_schedule 內部呼叫的還是舊 HTML，
+    對外實際上完全沒有重新請求——手動重爬必須連這一層也一起略過，才是
+    真的重新爬一次，不是「看起來重爬、其實還是吃 15 分鐘前的內容」。
+    """
+    if not force_refresh:
+        cached = cache.get(EXAM_SITE_HTML_CACHE_KEY)
+        if cached is not None:
+            return cached
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Accept": "text/html",
@@ -333,24 +342,19 @@ EXAM_SCHEDULE_PHASE_MAP = {
 }
 
 
-def get_exam_schedule(request):
-    # 首頁行事曆維持公開（不要求登入），比照 get_tayal_imformation 加 IP 限流 + 快取。
-    client_ip = request.META.get("REMOTE_ADDR", "unknown")
-    limited_resp = _rate_limited_response(
-        request, client_ip, group="get_exam_schedule", rate="60/m", method="GET"
-    )
-    if limited_resp:
-        return limited_resp
+def _scrape_exam_schedule(force_refresh=False):
+    """實際去對外抓 + 解析考試時程，不含 EXAM_SCHEDULE_CACHE_KEY 這層快取、
+    不含狀態記錄、不套用覆寫。
 
-    cached = cache.get(EXAM_SCHEDULE_CACHE_KEY)
-    if cached is not None:
-        return JsonResponse(cached, safe=False, json_dumps_params={'ensure_ascii': False, 'indent': 2})
-
+    回傳 (data, error)：成功時 error 是 None；失敗（連線錯誤或解析不出任何
+    期程）時 data 是 None、error 是可讀的失敗原因字串。用回傳值而不是丟例外，
+    因為呼叫端（公開端點、後台重爬端點）都需要同一套「失敗時記錄原因」的
+    邏輯，用例外的話兩邊各自要重寫一次 try/except。
+    """
     try:
-        html = _fetch_exam_site_html()
+        html = _fetch_exam_site_html(force_refresh=force_refresh)
     except requests.RequestException as e:
-        logger.error("get_exam_schedule 上游請求失敗: %s", e)
-        return JsonResponse({"detail": "考試時程暫時無法取得，請稍後再試"}, status=502)
+        return None, f"上游請求失敗：{e}"
 
     soup = BeautifulSoup(html, "html.parser")
 
@@ -382,8 +386,78 @@ def get_exam_schedule(request):
             })
 
     if not phases:
-        return JsonResponse({"detail": "考試時程暫時無法取得，請稍後再試"}, status=502)
+        return None, "解析結果為空（官網頁面結構可能已變更）"
 
-    data = {"source_url": "https://exam.sce.ntnu.edu.tw/abst/", "session": session_name, "phases": phases}
+    return {"source_url": "https://exam.sce.ntnu.edu.tw/abst/", "session": session_name, "phases": phases}, None
+
+
+def get_exam_schedule_data(force_refresh=False):
+    """回傳爬蟲抓到的原始資料（data 為 None 代表這次爬取失敗），不套用後台
+    覆寫——覆寫一律由呼叫端透過 apply_exam_schedule_overrides() 疊加，
+    確保覆寫永遠讀最新狀態，不會被 15 分鐘的爬蟲快取一起卡住。
+
+    force_refresh=True 時略過快取，強制重新爬一次（後台「手動重爬」用）。
+    只有真的觸發爬取（快取沒命中，或 force_refresh）才更新
+    ExamScheduleCrawlStatus，單純的快取命中不算一次「爬蟲執行」。
+    """
+    if not force_refresh:
+        cached = cache.get(EXAM_SCHEDULE_CACHE_KEY)
+        if cached is not None:
+            return cached
+
+    data, error = _scrape_exam_schedule(force_refresh=force_refresh)
+    status = ExamScheduleCrawlStatus.load()
+    if data is None:
+        logger.error("get_exam_schedule 爬取失敗: %s", error)
+        status.record_failure(error)
+        return None
+
+    status.record_success()
     cache.set(EXAM_SCHEDULE_CACHE_KEY, data, EXAM_SCHEDULE_CACHE_TTL)
-    return JsonResponse(data, safe=False, json_dumps_params={'ensure_ascii': False, 'indent': 2})
+    return data
+
+
+def apply_exam_schedule_overrides(phases):
+    """把生效中（is_active=True）的人工覆寫套進爬到的 phases 清單：phase
+    代稱相同就取代該筆，爬蟲沒抓到的 phase（例如剛好爬蟲失敗、或官網當下
+    真的沒有這個期程）則附加在後面。回傳新的 list，不修改傳入的參數。
+    """
+    merged = list(phases)
+    index_by_phase = {p["phase"]: i for i, p in enumerate(merged)}
+    for override in ExamScheduleOverride.objects.filter(is_active=True):
+        entry = {
+            "phase": override.phase,
+            "label": override.label or override.phase,
+            "start_date": override.start_date.isoformat(),
+            "end_date": override.end_date.isoformat() if override.end_date else None,
+        }
+        if override.phase in index_by_phase:
+            merged[index_by_phase[override.phase]] = entry
+        else:
+            merged.append(entry)
+    return merged
+
+
+def get_exam_schedule(request):
+    # 首頁行事曆維持公開（不要求登入），比照 get_tayal_imformation 加 IP 限流 + 快取。
+    client_ip = request.META.get("REMOTE_ADDR", "unknown")
+    limited_resp = _rate_limited_response(
+        request, client_ip, group="get_exam_schedule", rate="60/m", method="GET"
+    )
+    if limited_resp:
+        return limited_resp
+
+    data = get_exam_schedule_data()
+
+    if data is None:
+        # 爬蟲這次失敗，但如果後台有人工鎖定的期程資料，仍然可以只靠覆寫
+        # 資料撐住畫面，不用整個 502——這正是「覆寫」這個功能存在的意義：
+        # 官網改版讓爬蟲解析不出結果時，後台填過的資料還是能正常顯示。
+        override_only = apply_exam_schedule_overrides([])
+        if not override_only:
+            return JsonResponse({"detail": "考試時程暫時無法取得，請稍後再試"}, status=502)
+        fallback = {"source_url": "https://exam.sce.ntnu.edu.tw/abst/", "session": None, "phases": override_only}
+        return JsonResponse(fallback, safe=False, json_dumps_params={'ensure_ascii': False, 'indent': 2})
+
+    merged = {**data, "phases": apply_exam_schedule_overrides(data["phases"])}
+    return JsonResponse(merged, safe=False, json_dumps_params={'ensure_ascii': False, 'indent': 2})

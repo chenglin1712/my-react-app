@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import axios from 'axios';
-import { apiPost, apiPatch, apiDelete, ApiError } from './apiClient';
+import { apiPost, apiPatch, apiPut, apiDelete, ApiError } from './apiClient';
 
 vi.mock('axios');
 
@@ -87,10 +87,11 @@ describe('normalizeError（透過 apiPost 間接測試，函式本身沒有 expo
   });
 });
 
-describe('apiPatch／apiDelete（後台管理系統用，跟 apiGet/apiPost 共用同一套 token 附加與錯誤處理）', () => {
+describe('apiPatch／apiPut／apiDelete（後台管理系統用，跟 apiGet/apiPost 共用同一套 token 附加與錯誤處理）', () => {
   beforeEach(() => {
     mockCurrentUser = { getIdToken: vi.fn().mockResolvedValue('fake-token') };
     axios.patch.mockReset();
+    axios.put.mockReset();
     axios.delete.mockReset();
   });
 
@@ -103,6 +104,22 @@ describe('apiPatch／apiDelete（後台管理系統用，跟 apiGet/apiPost 共�
       { title: '新標題' },
       expect.objectContaining({ headers: { Authorization: 'Bearer fake-token' } }),
     );
+  });
+
+  test('apiPut 會附上 Authorization header 並回傳 response.data', async () => {
+    axios.put.mockResolvedValueOnce({ data: { phase: '報名' } });
+    const result = await apiPut('/adminapi/exam-schedule/overrides/報名/', { start_date: '2026-02-01' });
+    expect(result).toEqual({ phase: '報名' });
+    expect(axios.put).toHaveBeenCalledWith(
+      '/adminapi/exam-schedule/overrides/報名/',
+      { start_date: '2026-02-01' },
+      expect.objectContaining({ headers: { Authorization: 'Bearer fake-token' } }),
+    );
+  });
+
+  test('apiPut 失敗時一樣包成 ApiError', async () => {
+    axios.put.mockRejectedValueOnce({ response: { status: 400, data: { detail: '結束日期不能早於開始日期' } } });
+    await expect(apiPut('/x', {})).rejects.toMatchObject({ message: '結束日期不能早於開始日期', status: 400 });
   });
 
   test('apiDelete 會附上 Authorization header 並回傳 response.data', async () => {

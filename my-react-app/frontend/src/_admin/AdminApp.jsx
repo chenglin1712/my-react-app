@@ -5,6 +5,8 @@ import AdminLayout from './layout/AdminLayout';
 import Dashboard from './dashboard/Dashboard';
 import AnnouncementList from './content/AnnouncementList';
 import AnnouncementEditor from './content/AnnouncementEditor';
+import ExamSchedule from './content/ExamSchedule';
+import HomepageConfig from './content/HomepageConfig';
 
 const AdminApp = () => {
     const [pendingAnnouncementCount, setPendingAnnouncementCount] = useState();
@@ -27,6 +29,8 @@ const AdminApp = () => {
                 <Route path="content/announcements" element={<AnnouncementList />} />
                 <Route path="content/announcements/new" element={<AnnouncementEditor />} />
                 <Route path="content/announcements/:id" element={<AnnouncementEditor />} />
+                <Route path="content/exam-schedule" element={<ExamSchedule />} />
+                <Route path="content/homepage" element={<HomepageConfig />} />
             </Route>
         </Routes>
     );

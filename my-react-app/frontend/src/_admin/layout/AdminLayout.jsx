@@ -7,7 +7,7 @@ const ROLE_LABELS = { owner: '擁有者', admin: '管理員', editor: '內容編
 
 const NAV_GROUPS = [
     { label: '總覽', icon: LayoutDashboard, items: [{ label: '儀表板', to: '/admin', end: true }] },
-    { label: '內容', icon: Megaphone, items: [{ label: '公告管理', to: '/admin/content/announcements', pending: true }, { label: '考試時程' }, { label: '首頁版位' }] },
+    { label: '內容', icon: Megaphone, items: [{ label: '公告管理', to: '/admin/content/announcements', pending: true }, { label: '考試時程', to: '/admin/content/exam-schedule' }, { label: '首頁版位', to: '/admin/content/homepage' }] },
     { label: '辭典', icon: BookOpen, items: [{ label: '詞條' }, { label: '語法' }, { label: '主檔' }] },
     { label: '題庫', icon: FileQuestion, items: [{ label: '中高級／高級' }, { label: '外部題源' }] },
     { label: '審核', icon: ClipboardCheck, items: [{ label: '送審佇列' }, { label: '分享筆記' }] },
@@ -20,6 +20,8 @@ const getBreadcrumb = (pathname) => {
     if (pathname === '/admin' || pathname === '/admin/') return ['總覽', '儀表板'];
     if (pathname === '/admin/content/announcements') return ['內容', '公告管理'];
     if (pathname.startsWith('/admin/content/announcements/')) return ['內容', '公告管理', '編輯'];
+    if (pathname === '/admin/content/exam-schedule') return ['內容', '考試時程'];
+    if (pathname === '/admin/content/homepage') return ['內容', '首頁版位'];
     return [decodeURIComponent(pathname.split('/').filter(Boolean).at(-1) || '總覽')];
 };
 

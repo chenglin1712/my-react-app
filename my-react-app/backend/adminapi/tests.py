@@ -1,7 +1,8 @@
 import json
 from contextlib import contextmanager
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+from django.core.cache import cache
 from django.test import Client, TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
@@ -10,7 +11,7 @@ from datetime import timedelta
 
 from config.roles import ADMIN, ANALYST, EDITOR, OWNER, REVIEWER
 
-from .models import Announcement, AuditLog
+from .models import Announcement, AuditLog, ExamScheduleCrawlStatus, ExamScheduleOverride
 
 
 @contextmanager
@@ -40,6 +41,12 @@ def _post_json(client, url, headers, payload=None):
 
 def _patch_json(client, url, headers, payload):
     return client.patch(
+        url, data=json.dumps(payload), content_type="application/json", **headers,
+    )
+
+
+def _put_json(client, url, headers, payload):
+    return client.put(
         url, data=json.dumps(payload), content_type="application/json", **headers,
     )
 
@@ -374,3 +381,313 @@ class AuditLogListTest(TestCase):
         self.assertEqual(len(results), 2)
         self.assertEqual(results[0]["action"], "submit")
         self.assertEqual(results[1]["action"], "update")
+
+
+class PublicAnnouncementListTest(TestCase):
+    """首頁用的公開端點——見 views.py 的 public_announcement_list。不需要
+    登入，這裡完全不透過 _as_role，直接用沒帶 Authorization header 的
+    client 打，確保真的是匿名可讀。"""
+
+    def setUp(self):
+        self.client = Client()
+
+    def test_anonymous_can_read_without_auth_header(self):
+        Announcement.objects.create(title="公開公告", created_by="u", status=Announcement.STATUS_PUBLISHED)
+        response = self.client.get('/adminapi/public/announcements/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()["results"]), 1)
+
+    def test_only_published_status_included(self):
+        Announcement.objects.create(title="草稿", created_by="u", status=Announcement.STATUS_DRAFT)
+        Announcement.objects.create(title="待審", created_by="u", status=Announcement.STATUS_PENDING_REVIEW)
+        Announcement.objects.create(title="已下架", created_by="u", status=Announcement.STATUS_UNPUBLISHED)
+        Announcement.objects.create(title="已發布", created_by="u", status=Announcement.STATUS_PUBLISHED)
+        response = self.client.get('/adminapi/public/announcements/')
+        titles = [item["title"] for item in response.json()["results"]]
+        self.assertEqual(titles, ["已發布"])
+
+    def test_future_publish_at_excluded(self):
+        future = timezone.now() + timedelta(days=3)
+        Announcement.objects.create(
+            title="排程未到", created_by="u", status=Announcement.STATUS_PUBLISHED, publish_at=future,
+        )
+        response = self.client.get('/adminapi/public/announcements/')
+        self.assertEqual(response.json()["results"], [])
+
+    def test_past_unpublish_at_excluded(self):
+        past = timezone.now() - timedelta(days=1)
+        Announcement.objects.create(
+            title="已過下架時間", created_by="u", status=Announcement.STATUS_PUBLISHED, unpublish_at=past,
+        )
+        response = self.client.get('/adminapi/public/announcements/')
+        self.assertEqual(response.json()["results"], [])
+
+    def test_published_within_window_included(self):
+        past = timezone.now() - timedelta(days=1)
+        future = timezone.now() + timedelta(days=1)
+        Announcement.objects.create(
+            title="生效中", created_by="u", status=Announcement.STATUS_PUBLISHED,
+            publish_at=past, unpublish_at=future,
+        )
+        response = self.client.get('/adminapi/public/announcements/')
+        self.assertEqual(len(response.json()["results"]), 1)
+
+    def test_internal_fields_not_exposed(self):
+        Announcement.objects.create(
+            title="公告", created_by="internal-uid", status=Announcement.STATUS_PUBLISHED,
+            reviewed_by="reviewer-uid", review_comment="內部審查意見",
+        )
+        item = self.client.get('/adminapi/public/announcements/').json()["results"][0]
+        self.assertNotIn("created_by", item)
+        self.assertNotIn("reviewed_by", item)
+        self.assertNotIn("review_comment", item)
+        self.assertNotIn("status", item)
+
+
+FAKE_EXAM_SCHEDULE_HTML = """
+<html><body>
+<ul class="nav nav-tabs">
+  <li><button class="nav-link active" id="news-tab">最新消息</button></li>
+  <li><button class="nav-link" id="0-tab">115年度第1次原住民族語言能力認證測驗日程表</button></li>
+</ul>
+<div class="tab-pane" id="news-pane"></div>
+<div class="tab-pane" id="0-pane">
+  <table><tbody>
+    <tr>
+      <td><span class="fw-bold">報名日期</span></td>
+      <td><a href="https://www.google.com/calendar/event?action=TEMPLATE&text=x&dates=20260121T100000/20260226T235900">x</a></td>
+    </tr>
+  </tbody></table>
+</div>
+</body></html>
+"""
+
+
+class ExamScheduleAdminTest(TestCase):
+    """後台的考試時程比對／覆寫端點（見 views.py 的 exam_schedule_admin
+    與 exam_schedule_override_detail）。"""
+
+    def setUp(self):
+        self.client = Client()
+        cache.clear()
+
+    def _mock_scrape_ok(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = FAKE_EXAM_SCHEDULE_HTML
+        mock_get.return_value = mock_response
+
+    def test_learner_without_staff_role_cannot_view_overview(self):
+        with _as_role(None) as headers:
+            response = self.client.get('/adminapi/exam-schedule/', **headers)
+        self.assertEqual(response.status_code, 403)
+
+    @patch('crawler.views.requests.get')
+    def test_analyst_can_view_overview(self, mock_get):
+        # 只是查詢比對，STAFF_ROLES 都能看，跟公告列表的角色門檻一致。
+        self._mock_scrape_ok(mock_get)
+        with _as_role(ANALYST) as headers:
+            response = self.client.get('/adminapi/exam-schedule/', **headers)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["crawled"]["available"])
+        self.assertEqual(len(data["crawled"]["phases"]), 1)
+
+    @patch('crawler.views.requests.get')
+    def test_overview_includes_effective_phases_with_override_applied(self, mock_get):
+        self._mock_scrape_ok(mock_get)
+        ExamScheduleOverride.objects.create(phase='報名', start_date='2026-02-01')
+        with _as_role(OWNER) as headers:
+            response = self.client.get('/adminapi/exam-schedule/', **headers)
+        effective = {p["phase"]: p for p in response.json()["effective_phases"]}
+        self.assertEqual(effective['報名']['start_date'], '2026-02-01')
+        # crawled 那組維持爬蟲原始值，不該被覆寫污染——左右兩欄才能真的拿來比對。
+        crawled = {p["phase"]: p for p in response.json()["crawled"]["phases"]}
+        self.assertEqual(crawled['報名']['start_date'], '2026-01-21')
+
+    @patch('crawler.views.requests.get')
+    def test_analyst_cannot_trigger_refresh(self, mock_get):
+        self._mock_scrape_ok(mock_get)
+        with _as_role(ANALYST) as headers:
+            response = _post_json(self.client, '/adminapi/exam-schedule/', headers)
+        self.assertEqual(response.status_code, 403)
+
+    @patch('crawler.views.requests.get')
+    def test_editor_can_trigger_refresh_and_it_writes_audit_log(self, mock_get):
+        self._mock_scrape_ok(mock_get)
+        with _as_role(EDITOR) as headers:
+            response = _post_json(self.client, '/adminapi/exam-schedule/', headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["crawled"]["available"])
+        log = AuditLog.objects.filter(target_type="exam_schedule", action="refresh").first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.actor_role, EDITOR)
+
+    @patch('crawler.views.requests.get')
+    def test_refresh_bypasses_cache(self, mock_get):
+        self._mock_scrape_ok(mock_get)
+        with _as_role(OWNER) as headers:
+            _post_json(self.client, '/adminapi/exam-schedule/', headers)
+            _post_json(self.client, '/adminapi/exam-schedule/', headers)
+        self.assertEqual(mock_get.call_count, 2)  # 兩次都真的重爬，不是吃快取
+
+
+class ExamScheduleOverrideWriteTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+    def test_editor_can_create_override(self):
+        with _as_role(EDITOR) as headers:
+            response = _put_json(
+                self.client, '/adminapi/exam-schedule/overrides/報名/', headers,
+                {"start_date": "2026-02-01", "end_date": "2026-03-01"},
+            )
+        self.assertEqual(response.status_code, 200)
+        override = ExamScheduleOverride.objects.get(phase='報名')
+        self.assertEqual(str(override.start_date), '2026-02-01')
+        self.assertEqual(override.updated_by, 'test-uid')
+
+    def test_reviewer_cannot_create_override(self):
+        with _as_role(REVIEWER) as headers:
+            response = _put_json(
+                self.client, '/adminapi/exam-schedule/overrides/報名/', headers,
+                {"start_date": "2026-02-01"},
+            )
+        self.assertEqual(response.status_code, 403)
+
+    def test_end_date_before_start_date_returns_400(self):
+        with _as_role(OWNER) as headers:
+            response = _put_json(
+                self.client, '/adminapi/exam-schedule/overrides/報名/', headers,
+                {"start_date": "2026-03-01", "end_date": "2026-02-01"},
+            )
+        self.assertEqual(response.status_code, 400)
+
+    def test_put_again_updates_existing_override_not_duplicate(self):
+        with _as_role(OWNER) as headers:
+            _put_json(self.client, '/adminapi/exam-schedule/overrides/報名/', headers, {"start_date": "2026-02-01"})
+            _put_json(self.client, '/adminapi/exam-schedule/overrides/報名/', headers, {"start_date": "2026-02-15"})
+        self.assertEqual(ExamScheduleOverride.objects.filter(phase='報名').count(), 1)
+        self.assertEqual(str(ExamScheduleOverride.objects.get(phase='報名').start_date), '2026-02-15')
+
+    def test_delete_removes_override(self):
+        ExamScheduleOverride.objects.create(phase='報名', start_date='2026-02-01')
+        with _as_role(OWNER) as headers:
+            response = self.client.delete('/adminapi/exam-schedule/overrides/報名/', **headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(ExamScheduleOverride.objects.filter(phase='報名').exists())
+
+    def test_delete_nonexistent_returns_404(self):
+        with _as_role(OWNER) as headers:
+            response = self.client.delete('/adminapi/exam-schedule/overrides/不存在/', **headers)
+        self.assertEqual(response.status_code, 404)
+
+    def test_write_actions_write_audit_log_with_correct_target_type(self):
+        with _as_role(OWNER) as headers:
+            _put_json(self.client, '/adminapi/exam-schedule/overrides/報名/', headers, {"start_date": "2026-02-01"})
+        log = AuditLog.objects.filter(target_type="exam_schedule_override", action="upsert").first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.target_id, '報名')
+
+
+class HomepageConfigAdminTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+    def test_default_values_before_any_write(self):
+        with _as_role(OWNER) as headers:
+            response = self.client.get('/adminapi/homepage-config/', **headers)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["hero_image_url"], "")
+        self.assertTrue(data["show_news_section"])
+        self.assertEqual(data["news_display_count"], 6)
+
+    def test_analyst_can_read(self):
+        with _as_role(ANALYST) as headers:
+            response = self.client.get('/adminapi/homepage-config/', **headers)
+        self.assertEqual(response.status_code, 200)
+
+    def test_editor_cannot_write(self):
+        # 首頁設定視同發布動作，跟公告的核准/發布同一層級，只有 PUBLISHERS。
+        with _as_role(EDITOR) as headers:
+            response = _patch_json(self.client, '/adminapi/homepage-config/', headers, {"show_news_section": False})
+        self.assertEqual(response.status_code, 403)
+
+    def test_owner_can_update_and_it_persists(self):
+        with _as_role(OWNER) as headers:
+            response = _patch_json(
+                self.client, '/adminapi/homepage-config/', headers,
+                {"show_news_section": False, "news_display_count": 10},
+            )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertFalse(data["show_news_section"])
+        self.assertEqual(data["news_display_count"], 10)
+        self.assertEqual(data["updated_by"], "test-uid")
+
+        with _as_role(OWNER) as headers:
+            response2 = self.client.get('/adminapi/homepage-config/', **headers)
+        self.assertEqual(response2.json()["news_display_count"], 10)
+
+    def test_hero_link_rejects_javascript_scheme(self):
+        with _as_role(OWNER) as headers:
+            response = _patch_json(
+                self.client, '/adminapi/homepage-config/', headers,
+                {"hero_link_url": "javascript:alert(1)"},
+            )
+        self.assertEqual(response.status_code, 400)
+
+    def test_hero_link_rejects_protocol_relative_url(self):
+        # 跟登入頁 next 參數同樣的開放重導向防護理由：// 開頭會被瀏覽器當成
+        # 外部網址，不是這個網站自己的相對路徑。
+        with _as_role(OWNER) as headers:
+            response = _patch_json(
+                self.client, '/adminapi/homepage-config/', headers,
+                {"hero_link_url": "//evil.com"},
+            )
+        self.assertEqual(response.status_code, 400)
+
+    def test_hero_link_accepts_internal_path(self):
+        with _as_role(OWNER) as headers:
+            response = _patch_json(
+                self.client, '/adminapi/homepage-config/', headers,
+                {"hero_link_url": "/quiz/select"},
+            )
+        self.assertEqual(response.status_code, 200)
+
+    def test_hero_link_accepts_external_https_url(self):
+        with _as_role(OWNER) as headers:
+            response = _patch_json(
+                self.client, '/adminapi/homepage-config/', headers,
+                {"hero_link_url": "https://example.com"},
+            )
+        self.assertEqual(response.status_code, 200)
+
+    def test_news_display_count_out_of_range_rejected(self):
+        with _as_role(OWNER) as headers:
+            response = _patch_json(self.client, '/adminapi/homepage-config/', headers, {"news_display_count": 999})
+        self.assertEqual(response.status_code, 400)
+
+    def test_update_writes_audit_log(self):
+        with _as_role(OWNER) as headers:
+            _patch_json(self.client, '/adminapi/homepage-config/', headers, {"show_news_section": False})
+        log = AuditLog.objects.filter(target_type="homepage_config", action="update").first()
+        self.assertIsNotNone(log)
+
+
+class PublicHomepageConfigTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+    def test_anonymous_can_read_without_auth_header(self):
+        response = self.client.get('/adminapi/public/homepage-config/')
+        self.assertEqual(response.status_code, 200)
+
+    def test_internal_fields_not_exposed(self):
+        with _as_role(OWNER) as headers:
+            _patch_json(self.client, '/adminapi/homepage-config/', headers, {"show_news_section": False})
+        data = self.client.get('/adminapi/public/homepage-config/').json()
+        self.assertNotIn("updated_by", data)
+        self.assertNotIn("updated_at", data)
+        self.assertFalse(data["show_news_section"])

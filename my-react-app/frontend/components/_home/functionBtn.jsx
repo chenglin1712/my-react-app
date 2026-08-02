@@ -28,8 +28,15 @@ const FUNCTION_CARDS = [
     },
 ];
 
-const FunctionBtn = () => {
+// 後台首頁版位設定（見 backend/adminapi 的 HomepageConfig、/adminapi/public/
+// homepage-config/）只開放「顯示/隱藏」這三張卡片，不開放改標題/說明/導向的
+// route——這幾個欄位如果讓後台自由填字，打錯字就會變成連到不存在的路由，
+// 卡片內容跟每個功能模組本身是綁死的，不是可以任意替換的通用版位。
+const DEFAULT_ENABLED = { button1: true, button2: true, button3: true };
+
+const FunctionBtn = ({ enabled = DEFAULT_ENABLED }) => {
     const navigate = useNavigate();
+    const visibleCards = FUNCTION_CARDS.filter((_, index) => enabled[`button${index + 1}`] !== false);
     return (
         <section className="function-section">
             <div className="function-section-header">
@@ -40,7 +47,7 @@ const FunctionBtn = () => {
                 button——原本外層 div 也掛 role="button"+tabIndex，鍵盤 Tab 會先停在
                 整張卡片、再停在裡面的按鈕，兩個停駐點做同一件事，多一次沒有意義的 Tab。 */}
             <div className="card-container">
-                {FUNCTION_CARDS.map((card) => (
+                {visibleCards.map((card) => (
                     <div
                         key={card.route}
                         className="card yy-card--hover"

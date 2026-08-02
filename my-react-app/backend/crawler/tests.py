@@ -7,6 +7,7 @@ from django.test.utils import override_settings
 
 from crawler.views import format_quiz_data_1, format_quiz_data_2
 from crawler.dictionary_source import fetch_words_by_glosses
+from adminapi.models import ExamScheduleCrawlStatus, ExamScheduleOverride
 
 
 class GetQuizDataTest(TestCase):
@@ -326,6 +327,121 @@ class GetExamScheduleTest(TestCase):
         self.assertEqual(first.status_code, 200)
         self.assertEqual(second.status_code, 200)
         self.assertEqual(first.json(), second.json())
+        mock_get.assert_called_once()
+
+
+class ExamScheduleOverrideTest(TestCase):
+    """後台人工覆寫套進公開端點的行為（見 crawler/views.py 的
+    apply_exam_schedule_overrides／get_exam_schedule）。"""
+
+    def setUp(self):
+        self.client = Client()
+        cache.clear()
+
+    @patch('crawler.views.requests.get')
+    def test_active_override_replaces_matching_phase(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = FAKE_EXAM_SCHEDULE_HTML
+        mock_get.return_value = mock_response
+        ExamScheduleOverride.objects.create(
+            phase='報名', label='報名日期（人工修正）', start_date='2026-01-25', end_date='2026-03-01',
+        )
+
+        response = self.client.get('/crawler/exam_schedule/')
+        phases = {p['phase']: p for p in response.json()['phases']}
+
+        self.assertEqual(len(response.json()['phases']), 2)  # 取代既有筆數，不是額外多一筆
+        self.assertEqual(phases['報名']['label'], '報名日期（人工修正）')
+        self.assertEqual(phases['報名']['start_date'], '2026-01-25')
+        self.assertEqual(phases['測驗']['start_date'], '2026-04-18')  # 沒被覆寫的維持爬蟲原值
+
+    @patch('crawler.views.requests.get')
+    def test_inactive_override_does_not_apply(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = FAKE_EXAM_SCHEDULE_HTML
+        mock_get.return_value = mock_response
+        ExamScheduleOverride.objects.create(
+            phase='報名', start_date='2026-01-25', is_active=False,
+        )
+
+        response = self.client.get('/crawler/exam_schedule/')
+        phases = {p['phase']: p for p in response.json()['phases']}
+        self.assertEqual(phases['報名']['start_date'], '2026-01-21')  # 停用的覆寫不生效
+
+    @patch('crawler.views.requests.get')
+    def test_override_for_phase_not_scraped_is_appended(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = FAKE_EXAM_SCHEDULE_HTML
+        mock_get.return_value = mock_response
+        ExamScheduleOverride.objects.create(phase='證書', label='寄發合格證書', start_date='2026-06-01')
+
+        response = self.client.get('/crawler/exam_schedule/')
+        phases = {p['phase']: p for p in response.json()['phases']}
+        self.assertEqual(len(response.json()['phases']), 3)
+        self.assertEqual(phases['證書']['start_date'], '2026-06-01')
+
+    @patch('crawler.views.requests.get')
+    def test_crawl_failure_falls_back_to_override_only_instead_of_502(self, mock_get):
+        import requests
+        mock_get.side_effect = requests.exceptions.ConnectTimeout("upstream timed out")
+        ExamScheduleOverride.objects.create(phase='報名', start_date='2026-01-25', end_date='2026-03-01')
+
+        response = self.client.get('/crawler/exam_schedule/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()['phases']), 1)
+        self.assertEqual(response.json()['phases'][0]['phase'], '報名')
+
+    @patch('crawler.views.requests.get')
+    def test_crawl_failure_without_any_override_still_502s(self, mock_get):
+        import requests
+        mock_get.side_effect = requests.exceptions.ConnectTimeout("upstream timed out")
+
+        response = self.client.get('/crawler/exam_schedule/')
+        self.assertEqual(response.status_code, 502)
+
+    @patch('crawler.views.requests.get')
+    def test_successful_crawl_records_status(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = FAKE_EXAM_SCHEDULE_HTML
+        mock_get.return_value = mock_response
+
+        self.client.get('/crawler/exam_schedule/')
+
+        status = ExamScheduleCrawlStatus.load()
+        self.assertIsNotNone(status.last_success_at)
+        self.assertEqual(status.consecutive_failures, 0)
+
+    @patch('crawler.views.requests.get')
+    def test_failed_crawl_increments_consecutive_failures(self, mock_get):
+        import requests
+        mock_get.side_effect = requests.exceptions.ConnectTimeout("upstream timed out")
+
+        self.client.get('/crawler/exam_schedule/')
+        self.client.get('/crawler/exam_schedule/')
+
+        status = ExamScheduleCrawlStatus.load()
+        self.assertEqual(status.consecutive_failures, 2)
+        self.assertIn('上游請求失敗', status.last_failure_reason)
+
+    @patch('crawler.views.requests.get')
+    def test_cache_hit_does_not_touch_crawl_status(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = FAKE_EXAM_SCHEDULE_HTML
+        mock_get.return_value = mock_response
+
+        self.client.get('/crawler/exam_schedule/')
+        status_after_first = ExamScheduleCrawlStatus.load()
+        first_success_at = status_after_first.last_success_at
+
+        self.client.get('/crawler/exam_schedule/')  # 第二次應該吃快取，不重新爬
+        status_after_second = ExamScheduleCrawlStatus.load()
+        self.assertEqual(status_after_second.last_success_at, first_success_at)
         mock_get.assert_called_once()
 
 

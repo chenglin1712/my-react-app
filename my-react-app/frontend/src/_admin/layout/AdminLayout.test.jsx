@@ -31,12 +31,14 @@ describe('AdminLayout', () => {
     expect(screen.getByText('DASHBOARD_CONTENT')).toBeInTheDocument();
   });
 
-  test('公告管理是真的連結，其餘未上線模組顯示「規劃中」且不是可點的連結', () => {
+  test('公告管理／考試時程／首頁版位是真的連結，其餘未上線模組顯示「規劃中」且不是可點的連結', () => {
     renderLayout();
     expect(screen.getByRole('link', { name: /公告管理/ })).toHaveAttribute('href', '/admin/content/announcements');
-    // 「規劃中」的項目（例如考試時程）不應該渲染成 <a>，避免使用者點了
+    expect(screen.getByRole('link', { name: /考試時程/ })).toHaveAttribute('href', '/admin/content/exam-schedule');
+    expect(screen.getByRole('link', { name: /首頁版位/ })).toHaveAttribute('href', '/admin/content/homepage');
+    // 「規劃中」的項目（例如詞條）不應該渲染成 <a>，避免使用者點了
     // 卻導到一個根本不存在內容的頁面。
-    const plannedItem = screen.getByText('考試時程').closest('li');
+    const plannedItem = screen.getByText('詞條').closest('li');
     expect(within(plannedItem).queryByRole('link')).not.toBeInTheDocument();
     expect(within(plannedItem).getByText('規劃中')).toBeInTheDocument();
   });

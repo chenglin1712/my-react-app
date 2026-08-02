@@ -9,7 +9,7 @@ from rest_framework import serializers
 
 from config.tribes import TRIBE_IDS
 
-from .models import Announcement, AuditLog
+from .models import Announcement, AuditLog, ExamScheduleOverride, HomepageConfig
 
 
 class AnnouncementSerializer(serializers.ModelSerializer):
@@ -76,6 +76,76 @@ class RejectSerializer(serializers.Serializer):
 class ApproveSerializer(serializers.Serializer):
     # 核准時的意見是選填備註，不像退件那樣強制。
     review_comment = serializers.CharField(max_length=1000, allow_blank=True, required=False, default='')
+
+
+class ExamScheduleOverrideSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExamScheduleOverride
+        fields = ['phase', 'label', 'start_date', 'end_date', 'is_active', 'updated_by', 'updated_at']
+        read_only_fields = ['updated_by', 'updated_at']
+
+    def validate(self, data):
+        # model.clean() 也有一份一樣的檢查，這裡在 API 層先擋，錯誤才能回傳
+        # 成一般的 400 + 欄位訊息（理由跟 AnnouncementSerializer.validate 一致）。
+        start_date = data.get('start_date', getattr(self.instance, 'start_date', None))
+        end_date = data.get('end_date', getattr(self.instance, 'end_date', None))
+        if end_date and start_date and end_date < start_date:
+            raise serializers.ValidationError({'end_date': '結束日期不能早於開始日期'})
+        return data
+
+
+class HomepageConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HomepageConfig
+        fields = [
+            'hero_image_url', 'hero_link_url', 'hero_title_override',
+            'show_news_section', 'show_calendar_section', 'news_display_count',
+            'button1_enabled', 'button2_enabled', 'button3_enabled',
+            'updated_by', 'updated_at',
+        ]
+        read_only_fields = ['updated_by', 'updated_at']
+
+    def validate_hero_link_url(self, value):
+        # 這個欄位最終會變成公開首頁的 <a href>，任何訪客都會執行到——只接受
+        # 內部相對路徑（開頭 "/" 但不是 "//"，避免 protocol-relative URL 被
+        # 瀏覽器當成外部網址，跟這個專案登入頁 next 參數的開放重導向防護
+        # 同一個理由）或 http(s) 網址，擋掉 javascript: 之類的危險 scheme。
+        if not value:
+            return value
+        if value.startswith('/') and not value.startswith('//'):
+            return value
+        if value.startswith('http://') or value.startswith('https://'):
+            return value
+        raise serializers.ValidationError('連結必須是內部路徑（以 / 開頭）或 http(s) 網址')
+
+    def validate_news_display_count(self, value):
+        if not (1 <= value <= 20):
+            raise serializers.ValidationError('消息顯示筆數必須介於 1 到 20 之間')
+        return value
+
+
+class PublicHomepageConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HomepageConfig
+        # 公開首頁讀取用，不含 updated_by／updated_at 這些後台維運資訊。
+        fields = [
+            'hero_image_url', 'hero_link_url', 'hero_title_override',
+            'show_news_section', 'show_calendar_section', 'news_display_count',
+            'button1_enabled', 'button2_enabled', 'button3_enabled',
+        ]
+
+
+class PublicAnnouncementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Announcement
+        # 給首頁公開讀取用（見 views.py 的 public_announcement_list，任何人
+        # 不需登入即可打）：只給前台會用到的展示欄位，刻意不含 status／
+        # created_by／submitted_by／reviewed_by／review_comment 這些後台
+        # 工作流程與人員資訊——沒有理由讓匿名訪客看到是誰審核、誰寫的內部意見。
+        fields = [
+            'id', 'title', 'body', 'category', 'tribes',
+            'cover_image_url', 'link_url', 'is_pinned', 'publish_at',
+        ]
 
 
 class AuditLogSerializer(serializers.ModelSerializer):
