@@ -9,7 +9,16 @@ const NAV_GROUPS = [
     { label: '總覽', icon: LayoutDashboard, items: [{ label: '儀表板', to: '/admin', end: true }] },
     { label: '內容', icon: Megaphone, items: [{ label: '公告管理', to: '/admin/content/announcements', pending: true }, { label: '考試時程', to: '/admin/content/exam-schedule' }, { label: '首頁版位', to: '/admin/content/homepage' }] },
     { label: '辭典', icon: BookOpen, items: [{ label: '詞條' }, { label: '語法' }, { label: '主檔' }] },
-    { label: '題庫', icon: FileQuestion, items: [{ label: '中高級／高級' }, { label: '外部題源' }] },
+    {
+        label: '題庫', icon: FileQuestion, items: [
+            { label: '初級是非題', to: '/admin/quiz-bank/true-false' },
+            { label: '中級選擇題', to: '/admin/quiz-bank/choice' },
+            { label: '中高級／高級', to: '/admin/quiz-bank/vocab' },
+            { label: '外部題源', to: '/admin/quiz-bank/sources' },
+            { label: '情境題', to: '/admin/quiz-bank/situations' },
+            { label: 'IRT 參數', to: '/admin/quiz-bank/irt-config' },
+        ],
+    },
     { label: '審核', icon: ClipboardCheck, items: [{ label: '送審佇列' }, { label: '分享筆記' }] },
     { label: '使用者', icon: Users, items: [{ label: '使用者管理' }] },
     { label: '分析', icon: BarChart3, items: [{ label: '學習數據' }] },
@@ -22,6 +31,16 @@ const getBreadcrumb = (pathname) => {
     if (pathname.startsWith('/admin/content/announcements/')) return ['內容', '公告管理', '編輯'];
     if (pathname === '/admin/content/exam-schedule') return ['內容', '考試時程'];
     if (pathname === '/admin/content/homepage') return ['內容', '首頁版位'];
+    if (pathname === '/admin/quiz-bank/true-false') return ['題庫', '初級是非題'];
+    if (pathname === '/admin/quiz-bank/choice') return ['題庫', '中級選擇題'];
+    if (pathname === '/admin/quiz-bank/vocab') return ['題庫', '中高級／高級'];
+    if (pathname.startsWith('/admin/quiz-bank/vocab/')) return ['題庫', '中高級／高級', '編輯'];
+    if (pathname === '/admin/quiz-bank/cloze') return ['題庫', '中高級／高級'];
+    if (pathname.startsWith('/admin/quiz-bank/cloze/')) return ['題庫', '中高級／高級', '編輯'];
+    if (pathname === '/admin/quiz-bank/sources') return ['題庫', '外部題源'];
+    if (pathname === '/admin/quiz-bank/situations') return ['題庫', '情境題'];
+    if (pathname.startsWith('/admin/quiz-bank/situations/')) return ['題庫', '情境題', '編輯'];
+    if (pathname === '/admin/quiz-bank/irt-config') return ['題庫', 'IRT 參數'];
     return [decodeURIComponent(pathname.split('/').filter(Boolean).at(-1) || '總覽')];
 };
 

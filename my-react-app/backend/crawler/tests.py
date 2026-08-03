@@ -5,14 +5,18 @@ from django.core.cache import cache
 from django.test import TestCase, Client
 from django.test.utils import override_settings
 
-from crawler.views import format_quiz_data_1, format_quiz_data_2
 from crawler.dictionary_source import fetch_words_by_glosses
-from adminapi.models import ExamScheduleCrawlStatus, ExamScheduleOverride
+from adminapi.models import (
+    ExamScheduleCrawlStatus, ExamScheduleOverride, QuizChoiceItem, QuizClozePassage,
+    QuizTrueFalseItem, QuizVocabItem,
+)
 
 
 class GetQuizDataTest(TestCase):
-    """get_quiz_data 現在要求登入 + 限流，且對外部 API 呼叫補上了逾時
-    （見 views.py 的稽核修正）。"""
+    """get_quiz_data 現在要求登入 + 限流，且四個等級全部改讀本地題庫（P2.5
+    遷移，見 views.py 的說明）——不再即時代理外部 API，也不再需要
+    QuizSourceConfig 才能回應（那張表現在只給 migrate_quiz_level12_to_db
+    一次性匯入用，不影響即時出題）。"""
 
     def setUp(self):
         self.client = Client()
@@ -39,9 +43,8 @@ class GetQuizDataTest(TestCase):
         self.assertIn('不支援的等級', response.json()['detail'])
 
     def test_level_3_uses_local_bank_not_external_api(self):
-        # TRIBE_CONFIG 在 module import 時就把 tayal_bank.build_matching_test 的函式物件
-        # 綁進字典了，patch 模組屬性不會影響已經綁定的參照，所以這裡直接斷言「不打外部
-        # API」這個真正要驗證的行為，而不去 mock 本地題庫函式本身。
+        # level 3/4 完全不碰 requests.get——資料來源是後台題庫（QuizVocabItem／
+        # QuizClozePassage），不是外部 API，也不是寫死在 *_bank.py 的常數。
         with patch('crawler.views.requests.get') as mock_get:
             response = self.client.get('/crawler/?tribe=tayal&level=3')
         self.assertEqual(response.status_code, 200)
@@ -49,115 +52,111 @@ class GetQuizDataTest(TestCase):
         self.assertIn('parts', data)
         mock_get.assert_not_called()
 
-    @patch('crawler.views.requests.get')
-    def test_level_1_calls_external_api_with_timeout(self, mock_get):
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "data": {
-                "display_dialect_name": "泰雅語",
-                "part1": {
-                    "title": "第一部分", "intro": "",
-                    "questions": [{"question_ab": "cyux", "question_ch": "高興", "audio": "", "image": ""}],
-                    "answers": [True],
-                },
-            }
-        }
-        mock_get.return_value = mock_response
+    def test_level_3_only_serves_published_vocab_items(self):
+        # 草稿／待審核／已退件的詞彙不能被學生抽到——這是把題庫搬進資料庫、
+        # 接上族語老師審定流程的核心目的，不是可有可無的細節。
+        QuizVocabItem.objects.create(
+            tribe='tayal', category='noun', foreign_word='huzil', chinese_gloss='狗',
+            status=QuizVocabItem.STATUS_PUBLISHED, created_by='tester',
+        )
+        QuizVocabItem.objects.create(
+            tribe='tayal', category='noun', foreign_word='bzyok', chinese_gloss='豬',
+            status=QuizVocabItem.STATUS_DRAFT, created_by='tester',
+        )
+
+        response = self.client.get('/crawler/?tribe=tayal&level=3')
+
+        self.assertEqual(response.status_code, 200)
+        all_words = [
+            pair['word']['word']
+            for question in response.json()['parts'][0]['questions']
+            for pair in question['pairs']
+        ]
+        self.assertIn('huzil', all_words)
+        self.assertNotIn('bzyok', all_words)
+
+    def test_level_4_only_serves_published_cloze_passages(self):
+        QuizClozePassage.objects.create(
+            tribe='tayal', passage_foreign='Lokah! {blank1}', passage_chinese='你好！',
+            blanks={'blank1': {'options': ['a', 'b', 'c', 'd'], 'answer': 1}},
+            status=QuizClozePassage.STATUS_PUBLISHED, created_by='tester',
+        )
+        QuizClozePassage.objects.create(
+            tribe='tayal', passage_foreign='Musa {blank1} rgyax.', passage_chinese='去山上。',
+            blanks={'blank1': {'options': ['a', 'b', 'c', 'd'], 'answer': 1}},
+            status=QuizClozePassage.STATUS_DRAFT, created_by='tester',
+        )
+
+        response = self.client.get('/crawler/?tribe=tayal&level=4')
+
+        self.assertEqual(response.status_code, 200)
+        passages = [q['passage_ch'] for q in response.json()['parts'][0]['questions']]
+        self.assertIn('你好！', passages)
+        self.assertNotIn('去山上。', passages)
+
+    def test_level_1_uses_local_bank_not_external_api(self):
+        # level 1/2 也已經改讀本地題庫（QuizTrueFalseItem／QuizChoiceItem），
+        # 完全不碰 requests.get（P2.5 遷移，取代原本即時代理外部 API 的做法）。
+        with patch('crawler.views.requests.get') as mock_get:
+            response = self.client.get('/crawler/?tribe=tayal&level=1')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('parts', data)
+        mock_get.assert_not_called()
+
+    def test_level_1_only_serves_published_true_false_items(self):
+        QuizTrueFalseItem.objects.create(
+            tribe='tayal', question_ab='qani ga, huzil.', question_ch='這是狗。',
+            audio_url='https://res.cloudinary.com/demo/video/upload/a.mp3',
+            image_url='https://res.cloudinary.com/demo/image/upload/a.png',
+            answer=QuizTrueFalseItem.ANSWER_TRUE,
+            status=QuizTrueFalseItem.STATUS_PUBLISHED, created_by='tester',
+        )
+        QuizTrueFalseItem.objects.create(
+            tribe='tayal', question_ab='qani ga, bzyok.', question_ch='這是豬。',
+            audio_url='https://res.cloudinary.com/demo/video/upload/b.mp3',
+            image_url='https://res.cloudinary.com/demo/image/upload/b.png',
+            answer=QuizTrueFalseItem.ANSWER_TRUE,
+            status=QuizTrueFalseItem.STATUS_DRAFT, created_by='tester',
+        )
 
         response = self.client.get('/crawler/?tribe=tayal&level=1')
 
         self.assertEqual(response.status_code, 200)
-        _, kwargs = mock_get.call_args
-        self.assertEqual(kwargs.get('timeout'), 10)
+        questions = [q['question_ab'] for q in response.json()['parts'][0]['questions']]
+        self.assertIn('qani ga, huzil.', questions)
+        self.assertNotIn('qani ga, bzyok.', questions)
+
+    def test_level_2_uses_local_bank_not_external_api(self):
+        with patch('crawler.views.requests.get') as mock_get:
+            response = self.client.get('/crawler/?tribe=tayal&level=2')
+        self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(data['parts'][0]['questions'][0]['question_ab'], 'cyux')
+        self.assertIn('parts', data)
+        mock_get.assert_not_called()
 
-    @patch('crawler.views.requests.get')
-    def test_external_api_failure_returns_500(self, mock_get):
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        mock_get.return_value = mock_response
+    def test_level_2_only_serves_published_choice_items(self):
+        QuizChoiceItem.objects.create(
+            tribe='tayal', question_ab='nyux qutux huzil maku.', question_ch='我有一隻狗。',
+            image_a_url='https://res.cloudinary.com/demo/image/upload/a.png',
+            image_b_url='https://res.cloudinary.com/demo/image/upload/b.png',
+            image_c_url='https://res.cloudinary.com/demo/image/upload/c.png',
+            answer=1, status=QuizChoiceItem.STATUS_PUBLISHED, created_by='tester',
+        )
+        QuizChoiceItem.objects.create(
+            tribe='tayal', question_ab='cyux bbiru nha.', question_ch='他們有鉛筆。',
+            image_a_url='https://res.cloudinary.com/demo/image/upload/d.png',
+            image_b_url='https://res.cloudinary.com/demo/image/upload/e.png',
+            image_c_url='https://res.cloudinary.com/demo/image/upload/f.png',
+            answer=1, status=QuizChoiceItem.STATUS_DRAFT, created_by='tester',
+        )
 
-        response = self.client.get('/crawler/?tribe=tayal&level=1')
-        self.assertEqual(response.status_code, 500)
+        response = self.client.get('/crawler/?tribe=tayal&level=2')
 
-    @patch('crawler.views.requests.get')
-    def test_upstream_timeout_returns_502_not_500(self, mock_get):
-        # 原本 requests.get 完全沒包 try/except，逾時／連線失敗的例外會一路往外拋，
-        # 被 Django 預設的 500 處理接住。
-        import requests
-        mock_get.side_effect = requests.exceptions.ConnectTimeout("upstream timed out")
-
-        response = self.client.get('/crawler/?tribe=tayal&level=1')
-
-        self.assertEqual(response.status_code, 502)
-
-    @patch('crawler.views.requests.get')
-    def test_level_1_2_response_is_cached_across_requests(self, mock_get):
-        # start_exam 只依 dialect_id/level 決定內容，同一組合快取後第二次呼叫
-        # 不該再打一次第三方 API（見 views.py 的稽核修正）。
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "data": {
-                "display_dialect_name": "泰雅語",
-                "part1": {
-                    "title": "t", "intro": "",
-                    "questions": [{"question_ab": "cyux", "question_ch": "高興", "audio": "", "image": ""}],
-                    "answers": [True],
-                },
-            }
-        }
-        mock_get.return_value = mock_response
-
-        first = self.client.get('/crawler/?tribe=tayal&level=1')
-        second = self.client.get('/crawler/?tribe=tayal&level=1')
-
-        self.assertEqual(first.status_code, 200)
-        self.assertEqual(second.status_code, 200)
-        self.assertEqual(first.json(), second.json())
-        mock_get.assert_called_once()
-
-
-class FormatQuizDataTest(TestCase):
-    def test_format_quiz_data_1_maps_questions_and_answers(self):
-        raw = {
-            "data": {
-                "display_dialect_name": "泰雅語",
-                "part1": {
-                    "title": "t", "intro": "i",
-                    "questions": [{"question_ab": "cyux", "question_ch": "高興", "audio": "a.mp3", "image": None}],
-                    "answers": [True],
-                },
-            }
-        }
-        result = format_quiz_data_1(raw)
-        self.assertEqual(result['chapter_name'], '泰雅語')
-        self.assertEqual(result['parts'][0]['type'], 'true_false')
-        self.assertEqual(result['parts'][0]['questions'][0]['answer'], True)
-
-    def test_format_quiz_data_2_handles_missing_part2(self):
-        raw = {"data": {"display_dialect_name": "泰雅語"}}
-        result = format_quiz_data_2(raw)
-        self.assertEqual(result['parts'], [])
-
-    def test_format_quiz_data_2_maps_choice_questions(self):
-        raw = {
-            "data": {
-                "display_dialect_name": "泰雅語",
-                "part2": {
-                    "questions": [{
-                        "question_ab": "balay", "question_ch": "真的", "audio": "",
-                        "imageA": "a.png", "imageB": "b.png", "imageC": "c.png",
-                    }],
-                    "answers": ["A"],
-                },
-            }
-        }
-        result = format_quiz_data_2(raw)
-        self.assertEqual(result['parts'][0]['type'], 'choice')
-        self.assertEqual(result['parts'][0]['questions'][0]['answer'], 'A')
+        self.assertEqual(response.status_code, 200)
+        questions = [q['question_ab'] for q in response.json()['parts'][0]['questions']]
+        self.assertIn('nyux qutux huzil maku.', questions)
+        self.assertNotIn('cyux bbiru nha.', questions)
 
 
 class GetTayalImformationTest(TestCase):

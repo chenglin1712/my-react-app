@@ -1,4 +1,5 @@
 import logging
+import random
 import re
 from datetime import datetime
 from urllib.parse import urljoin
@@ -7,25 +8,18 @@ from django.core.cache import cache
 from django.http import JsonResponse
 from django_ratelimit.core import is_ratelimited
 from bs4 import BeautifulSoup
-from . import tayal_bank
-from . import amis_bank
-from . import bunun_bank
-from . import kavalan_bank
-from . import paiwan_bank
 from config.firebase_auth import verify_firebase_token
-from adminapi.models import ExamScheduleCrawlStatus, ExamScheduleOverride
+from config.tribes import TRIBE_IDS, TRIBE_MAP
+from adminapi.models import (
+    ExamScheduleCrawlStatus, ExamScheduleOverride, QuizChoiceItem, QuizClozePassage,
+    QuizTrueFalseItem, QuizVocabItem,
+)
 
 logger = logging.getLogger(__name__)
 
 # 外部 API 呼叫的逾時秒數（get_quiz_data 原本完全沒設，一個掛住的上游請求
 # 會佔用 worker 到系統預設逾時甚至永遠不回應）。
 _EXTERNAL_TIMEOUT = 10
-
-# get_quiz_data 第 1/2 級題目原本每次都重打第三方 API（get_tayal_imformation
-# 的新聞已有 15 分鐘快取，這裡原本沒有）。同一 tribe+level 組合對應同一份固定
-# 題庫（start_exam 只依 dialect_id/level 決定內容，非個人化、非隨機），快取
-# 可以直接降低對第三方站的請求量，也降低被當成打第三方 API 的放大器的風險。
-_QUIZ_DATA_CACHE_TTL = 900
 
 
 def _rate_limited_response(request, key, group, rate, method):
@@ -38,42 +32,172 @@ def _rate_limited_response(request, key, group, rate, method):
         return JsonResponse({"detail": "請求過於頻繁，請稍後再試"}, status=429)
     return None
 
-# 各族語對應的官方練習介面 dialect_id、顯示名稱、以及中高級/高級本地題庫的
-# 選題公式進入點。要新增族語時只需在這裡多加一個 key，不用動 get_quiz_data 邏輯。
-TRIBE_CONFIG = {
-    "tayal": {
-        "dialect_id": 6,
-        "display_name": "泰雅語 - 賽考利克泰雅語",
-        "matching_test": tayal_bank.build_matching_test,
-        "cloze_test": tayal_bank.build_cloze_test,
-    },
-    "amis": {
-        "dialect_id": 2,
-        "display_name": "阿美語 - 秀姑巒阿美語",
-        "matching_test": amis_bank.build_matching_test,
-        "cloze_test": amis_bank.build_cloze_test,
-    },
-    "bunun": {
-        "dialect_id": 22,
-        "display_name": "布農語 - 郡群布農語",
-        "matching_test": bunun_bank.build_matching_test,
-        "cloze_test": bunun_bank.build_cloze_test,
-    },
-    "kavalan": {
-        "dialect_id": 34,
-        "display_name": "噶瑪蘭語 - 噶瑪蘭語",
-        "matching_test": kavalan_bank.build_matching_test,
-        "cloze_test": kavalan_bank.build_cloze_test,
-    },
-    "paiwan": {
-        "dialect_id": 25,
-        "display_name": "排灣語 - 中排灣語",
-        "matching_test": paiwan_bank.build_matching_test,
-        "cloze_test": paiwan_bank.build_cloze_test,
-    },
+# 中高級（level 3）配合題選題公式的配額——原本分散寫死在五個 *_bank.py
+# 各自的 CATEGORY_QUOTA，內容完全一致（見 P2 題庫管理調查結論），集中成
+# 一份常數。BOARD_COUNT * PAIRS_PER_BOARD 必須等於配額總和，才能均分到
+# 每個題組裡。
+MATCHING_CATEGORY_QUOTA = {
+    "noun": 8,       # 40%：延續初中級具象詞彙
+    "verb": 5,       # 25%：中高級新增動詞
+    "time": 3,       # 15%：中高級新增時間詞
+    "function": 2,   # 10%：抽象代詞/功能詞
+    "kin": 2,        # 10%：親屬與人物稱謂
 }
+MATCHING_BOARD_COUNT = 5
+MATCHING_PAIRS_PER_BOARD = 4
 
-#爬取線上測驗題目(初級/中級)，中高級/高級改用本地題庫（見下方說明）
+# 高級（level 4）閱讀填空每次測驗抽幾篇短文——隨題庫擴充，抽樣篇數也會是
+# min(CLOZE_PASSAGE_COUNT, 該族語目前已啟用的篇數)，不是每次都全部出。
+CLOZE_PASSAGE_COUNT = 3
+
+
+def _pick_matching_vocab_from_db(tribe):
+    """依 MATCHING_CATEGORY_QUOTA 對每個類別做不放回抽樣，只從 status=published
+    （已通過族語老師審定）的 QuizVocabItem 抽——草稿／待審核／已退件的內容
+    不能被學生抽到，這是這次把題庫搬進資料庫、接上審定流程的核心目的。"""
+    picked = []
+    for category, quota in MATCHING_CATEGORY_QUOTA.items():
+        pool = list(QuizVocabItem.objects.filter(
+            tribe=tribe, category=category, status=QuizVocabItem.STATUS_PUBLISHED,
+        ))
+        quota = min(quota, len(pool))
+        picked.extend(random.sample(pool, quota))
+    random.shuffle(picked)
+    return picked
+
+
+def build_matching_test_from_db(tribe):
+    """組出中高級「配合題」的 part 資料，改讀資料庫（取代原本各族語
+    *_bank.py 的 build_matching_test()），選題演算法完全比照原本邏輯不變。"""
+    picked = _pick_matching_vocab_from_db(tribe)
+    tribe_full_name = TRIBE_MAP.get(tribe, tribe)
+
+    questions = []
+    for i in range(MATCHING_BOARD_COUNT):
+        chunk = picked[i * MATCHING_PAIRS_PER_BOARD: (i + 1) * MATCHING_PAIRS_PER_BOARD]
+        questions.append({
+            "pairs": [
+                {"cn": item.chinese_gloss, "word": {"word": item.foreign_word, "audio": item.audio_file_id}}
+                for item in chunk
+            ],
+            # 配合題採「全對/有錯」二元計分，比照初級是非題的 1/2 編碼。
+            "answer": 1,
+        })
+
+    return {
+        "type": "matching",
+        "title": "第一部分：配合題",
+        "intro": (
+            f"本部分共5題，每題會出現4組{tribe_full_name}詞彙與中文意思，"
+            "請將左右兩側配對正確；配對全部正確即為答對，"
+            "配對錯誤任何一組即為答錯。"
+        ),
+        "questions": questions,
+    }
+
+
+def build_cloze_test_from_db(tribe):
+    """組出高級「閱讀填空」的 part 資料，改讀資料庫（取代原本各族語
+    *_bank.py 的 build_cloze_test()），只從 status=published 的
+    QuizClozePassage 抽，選題演算法完全比照原本邏輯不變。"""
+    passages = list(QuizClozePassage.objects.filter(tribe=tribe, status=QuizClozePassage.STATUS_PUBLISHED))
+    k = min(CLOZE_PASSAGE_COUNT, len(passages))
+    picked_passages = random.sample(passages, k)
+
+    questions = []
+    for passage in picked_passages:
+        for blank_key, blank in passage.blanks.items():
+            options = blank["options"][:]
+            answer_word = options[blank["answer"] - 1]
+
+            # 選項順序也要打散，避免每次正解都固定在同一個位置
+            shuffled = options[:]
+            random.shuffle(shuffled)
+            new_answer_index = shuffled.index(answer_word) + 1
+
+            display_passage = passage.passage_foreign.replace(f"{{{blank_key}}}", "＿＿＿")
+            for other_key, other_blank in passage.blanks.items():
+                if other_key != blank_key:
+                    other_correct = other_blank["options"][other_blank["answer"] - 1]
+                    display_passage = display_passage.replace(f"{{{other_key}}}", other_correct)
+
+            questions.append({
+                "passage_ab": display_passage,
+                "passage_ch": passage.passage_chinese,
+                "options": shuffled,
+                "answer": new_answer_index,
+            })
+
+    return {
+        "type": "cloze",
+        "title": "第一部分：閱讀填空",
+        "intro": (
+            "本部分為短文克漏字，請依文意選出最適合填入空格「＿＿＿」的詞彙，"
+            "每題4個選項，僅有1個最適合。"
+        ),
+        "questions": questions,
+    }
+
+
+# 初級（是非題）/中級（三選一圖片選擇題）每次測驗抽幾題——對照對方官方
+# 介面原本「本部份共5題」的既有題量，遷移後維持相同體驗。
+LEVEL1_QUESTION_COUNT = 5
+LEVEL2_QUESTION_COUNT = 5
+
+
+def build_true_false_test_from_db(tribe):
+    """組出初級「是非題」的 part 資料，改讀資料庫（取代原本 get_quiz_data
+    對 level=1 即時代理外部 API 的做法），只從 status=published 的
+    QuizTrueFalseItem 抽。"""
+    pool = list(QuizTrueFalseItem.objects.filter(tribe=tribe, status=QuizTrueFalseItem.STATUS_PUBLISHED))
+    k = min(LEVEL1_QUESTION_COUNT, len(pool))
+    picked = random.sample(pool, k)
+
+    return {
+        "type": "true_false",
+        "title": "第一部分：是非題",
+        "intro": (
+            "本部份共5題，每題都有一個圖片，請聆聽播放的族語句子，"
+            "若與該圖片所描述的內容符合，請選「O」；若不符合，請選「X」。"
+        ),
+        "questions": [
+            {
+                "question_ab": item.question_ab, "question_ch": item.question_ch,
+                "audio": item.audio_url, "image": item.image_url, "answer": item.answer,
+            }
+            for item in picked
+        ],
+    }
+
+
+def build_choice_test_from_db(tribe):
+    """組出中級「三選一圖片選擇題」的 part 資料，改讀資料庫（取代原本
+    get_quiz_data 對 level=2 即時代理外部 API 的做法），只從
+    status=published 的 QuizChoiceItem 抽。"""
+    pool = list(QuizChoiceItem.objects.filter(tribe=tribe, status=QuizChoiceItem.STATUS_PUBLISHED))
+    k = min(LEVEL2_QUESTION_COUNT, len(pool))
+    picked = random.sample(pool, k)
+
+    return {
+        "type": "choice",
+        "title": "第二部分：選擇題(一)",
+        "intro": (
+            "本部份共5題，每題有三個圖片，請依族語句子的語意，"
+            "選一個與句子語意最相符的圖片。"
+        ),
+        "questions": [
+            {
+                "question_ab": item.question_ab, "question_ch": item.question_ch,
+                "imageA": item.image_a_url, "imageB": item.image_b_url, "imageC": item.image_c_url,
+                "answer": item.answer,
+            }
+            for item in picked
+        ],
+    }
+
+
+#爬取線上測驗題目——四個等級皆已改用本地題庫（見上方 build_*_from_db 函式），
+#不再即時代理外部 API
 def get_quiz_data(request):
     # 會對外打第三方 API（無逾時風險）且完全沒有認證/限流保護，可被匿名重複呼叫，
     # 故加上登入 + 限流，與 CrosswordPuzzle.generate_crossword 同標準。
@@ -90,110 +214,26 @@ def get_quiz_data(request):
     tribe = request.GET.get("tribe", "tayal")
     level = request.GET.get("level", "1")
 
-    config = TRIBE_CONFIG.get(tribe)
-    if not config:
+    if tribe not in TRIBE_IDS:
         return JsonResponse({"detail": f"不支援的族語: {tribe}"}, status=400)
-
-    # 中高級(3)、高級(4)：官方練習介面 start_exam 對這兩個等級一律回傳
-    # part1~part4 = null（實測過阿美語 dialect_id 1~5、泰雅語 dialect_id 1~10
-    # 皆同），代表該 demo API 根本沒有開放這兩級的題目資料，因此不打外部API，
-    # 改走本地題庫的選題公式（tayal_bank.py／amis_bank.py 內有完整命題邏輯說明）。
-    if level == "3":
-        format_data = {"chapter_name": config["display_name"], "parts": [config["matching_test"]()]}
-        return JsonResponse(format_data, safe=False)
-    elif level == "4":
-        format_data = {"chapter_name": config["display_name"], "parts": [config["cloze_test"]()]}
-        return JsonResponse(format_data, safe=False)
-    elif level not in ("1", "2"):
+    if level not in ("1", "2", "3", "4"):
         return JsonResponse({"detail": f"不支援的等級: {level}"}, status=400)
 
-    cache_key = f"crawler_quiz_data:{tribe}:{level}"
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return JsonResponse(cached, safe=False)
-
-    url = f"https://api.lokahsu.org.tw/api/front_end/start_exam?dialect_id={config['dialect_id']}&level={level}"
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
-        "Accept": "application/json"
+    # 四個等級都已經改讀本地題庫（QuizTrueFalseItem／QuizChoiceItem／
+    # QuizVocabItem／QuizClozePassage，見 adminapi/quizbank_views.py），
+    # 不再即時代理外部 API（P2.5 遷移，見規劃文件）：中高級/高級是因為對方
+    # API 對這兩級一律回傳 null；初級/中級則是因為對方是隨機出題、且長期
+    # 依賴第三方網址有穩定性風險，兩種情況都改成「族語老師審定過的內容才
+    # 會被抽到」。
+    display_name = TRIBE_MAP.get(tribe, tribe)
+    level_builders = {
+        "1": build_true_false_test_from_db,
+        "2": build_choice_test_from_db,
+        "3": build_matching_test_from_db,
+        "4": build_cloze_test_from_db,
     }
-
-    try:
-        response = requests.get(url, headers=headers, timeout=_EXTERNAL_TIMEOUT)
-    except requests.RequestException as e:
-        logger.error("get_quiz_data 上游請求失敗: %s", e)
-        return JsonResponse({"detail": "讀取資料失敗，請稍後再試"}, status=502)
-
-    if response.status_code == 200:
-        data = response.json()
-
-        if level == "1":
-            format_data = format_quiz_data_1(data)
-        else:
-            format_data = format_quiz_data_2(data)
-        cache.set(cache_key, format_data, _QUIZ_DATA_CACHE_TTL)
-        return JsonResponse(format_data, safe=False)
-    else:
-        return JsonResponse({"detail": "讀取資料失敗"}, status=500)
-
-#把爬的資料用成我要的格式(第一部分)
-def format_quiz_data_1(data):
-    format_data = {
-        "chapter_name":data["data"]["display_dialect_name"],
-        "parts":[]
-    }
-    part1 = data["data"]["part1"]
-    format_part1 = {
-        "type": "true_false",
-        "title": part1["title"],
-        "intro": part1["intro"],
-        "questions":[
-            {
-                "question_ab" : question["question_ab"],
-                "question_ch": question["question_ch"],
-                "audio" : question["audio"],
-                "image": question["image"],
-                "answer": part1["answers"][index]
-            }
-            for index, question in enumerate(part1["questions"])
-        ]
-    }
-    format_data["parts"].append(format_part1)
-    return format_data
-
-def format_quiz_data_2(data):
-    format_data = {
-        "chapter_name": data["data"]["display_dialect_name"],
-        "parts": []
-    }
-
-    part2 = data["data"].get("part2")
-    if not part2:
-        return format_data
-
-    questions_raw = part2.get("questions", [])
-    answers_raw = part2.get("answers", [])
-
-    format_part2 = {
-        "type": "choice",
-        "title": part2.get("title", "第二部分：選擇題"),
-        "intro": part2.get("intro", ""),
-        "questions": [
-            {
-                "question_ab": q.get("question_ab", ""),
-                "question_ch": q.get("question_ch", ""),
-                "audio": q.get("audio", ""),
-                "imageA": q.get("imageA") or q.get("image_a", ""),
-                "imageB": q.get("imageB") or q.get("image_b", ""),
-                "imageC": q.get("imageC") or q.get("image_c", ""),
-                "answer": answers_raw[i] if i < len(answers_raw) else "",
-            }
-            for i, q in enumerate(questions_raw)
-        ]
-    }
-    format_data["parts"].append(format_part2)
-    return format_data
+    format_data = {"chapter_name": display_name, "parts": [level_builders[level](tribe)]}
+    return JsonResponse(format_data, safe=False)
 
 # get_tayal_imformation（族語認證最新公告區塊）跟 get_exam_schedule（完整時程）
 # 都需要解析 exam.sce.ntnu.edu.tw/abst/ 這同一個頁面，原本各自獨立 requests.get，

@@ -2,6 +2,7 @@ import asyncio
 import math
 import random
 import threading
+import time
 import shutil
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional
@@ -116,8 +117,11 @@ router = APIRouter()
 
 
 # ----------------------------
-# 超參數
+# 超參數（可由後台 adminapi 的 IrtConfig 調整，見下方 _refresh_irt_config_if_stale）
 # ----------------------------
+# 這裡的預設值是「後台從未設定過、或後台暫時連不上時」的退回值，刻意跟
+# IrtConfig model 的欄位預設值完全一致——確保後台功能還沒接上或掛掉時，
+# 算分行為維持原本這幾行數字寫死時的樣子，不會突然跳成別的數字。
 ALPHA0 = 1.0
 BETA0 = 1.0
 DEFAULT_GUESS = 0.25
@@ -137,6 +141,71 @@ BETA3 = 0.2
 BETA4 = 0.2
 BETA5 = 0.2
 TOTAL_QUESTIONS = 10
+
+# Django adminapi 的公開唯讀端點（見 backend/adminapi/quizbank_views.py 的
+# public_irt_config），本機開發兩個服務都跑在同一台機器上，預設值可以
+# 直接指到 Django 的本機 port；正式環境兩個服務網址不同，用環境變數覆寫。
+_IRT_CONFIG_URL = os.getenv("DJANGO_INTERNAL_BASE_URL", "http://127.0.0.1:8000") + "/adminapi/public/irt-config/"
+# 5 分鐘——調整 IRT 參數不是秒等的即時性需求，不需要每個請求都打一次 Django；
+# 跟 crawler/views.py 的 NEWS_CACHE_TTL 這類「外部資料，容忍幾分鐘內的舊值」
+# 是同一種取捨。
+_IRT_CONFIG_TTL_SECONDS = 300
+_irt_config_last_fetch = 0.0
+_irt_config_lock = threading.Lock()
+
+
+def _refresh_irt_config_if_stale() -> None:
+    """從 Django 讀目前的 IRT 參數，更新這個模組的全域變數。TTL 內重複呼叫
+    是no-op（快速的時間比較，不會每次都真的發請求）。Django 端讀取失敗
+    （服務還沒啟動、網路問題等）時記一筆警告並保留目前的值不變——可能是
+    上次成功抓到的值，也可能是上面寫死的預設值，不讓 quiz 功能因為 Django
+    暫時連不上就整個壞掉，這跟 crawler 那邊「外部來源掛了就降級」是同一種
+    設計精神。
+
+    這兩個函式都是同步 def（FastAPI 會丟到 thread pool 執行，不是掛在事件
+    迴圈上），這裡直接用 requests 這種同步呼叫沒有阻塞事件迴圈的疑慮。
+    """
+    global ALPHA0, BETA0, DEFAULT_GUESS, TYPE_AQ, LEARNING_RATE
+    global DQ_ALPHA, DQ_BETA, DQ_GAMMA, BETA1, BETA2, BETA3, BETA4, BETA5, TOTAL_QUESTIONS
+    global _irt_config_last_fetch
+
+    if time.monotonic() - _irt_config_last_fetch < _IRT_CONFIG_TTL_SECONDS:
+        return
+
+    with _irt_config_lock:
+        # 雙重檢查鎖定：等鎖的期間可能已經有另一個請求刷新過了。
+        if time.monotonic() - _irt_config_last_fetch < _IRT_CONFIG_TTL_SECONDS:
+            return
+        try:
+            resp = requests.get(_IRT_CONFIG_URL, timeout=5)
+            resp.raise_for_status()
+            data = resp.json()
+
+            ALPHA0 = data["alpha0"]
+            BETA0 = data["beta0"]
+            DEFAULT_GUESS = data["default_guess"]
+            TYPE_AQ = {
+                "word-translate": data["type_aq_word_translate"],
+                "word-match": data["type_aq_word_match"],
+                "sentence-fill": data["type_aq_sentence_fill"],
+                "sentence-order": data["type_aq_sentence_order"],
+            }
+            LEARNING_RATE = data["learning_rate"]
+            DQ_ALPHA = data["dq_alpha"]
+            DQ_BETA = data["dq_beta"]
+            DQ_GAMMA = data["dq_gamma"]
+            BETA1 = data["beta1"]
+            BETA2 = data["beta2"]
+            BETA3 = data["beta3"]
+            BETA4 = data["beta4"]
+            BETA5 = data["beta5"]
+            TOTAL_QUESTIONS = data["total_questions"]
+        except Exception:
+            _logging.warning("[quiz] 無法從後台讀取 IRT 參數，沿用目前值", exc_info=True)
+        finally:
+            # 失敗也更新時間戳記，避免 Django 持續連不上時，每一個請求都
+            # 重新嘗試連線並等待逾時——跟成功時一樣進入下一個 TTL 週期再試。
+            _irt_config_last_fetch = time.monotonic()
 
 # ----------------------------
 # Pydantic Schemas
@@ -536,6 +605,7 @@ def generate_quiz_frontend(
     tribe: str = Query(default="tayal"),
     db: Session = Depends(get_db),
 ):
+    _refresh_irt_config_if_stale()
     try:
         tribe_id = TRIBE_IDS.get(tribe)
         if not tribe_id:
@@ -582,6 +652,7 @@ def submit_answer_frontend(
     tribe: str = Query(default="tayal"),
     db: Session = Depends(get_db),
 ):
+    _refresh_irt_config_if_stale()
     try:
         tribe_id = TRIBE_IDS.get(tribe)
         if not tribe_id:

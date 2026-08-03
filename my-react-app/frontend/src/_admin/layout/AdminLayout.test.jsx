@@ -43,6 +43,14 @@ describe('AdminLayout', () => {
     expect(within(plannedItem).getByText('規劃中')).toBeInTheDocument();
   });
 
+  test('題庫群組的四個項目（中高級／高級、外部題源、情境題、IRT 參數）都是真的連結', () => {
+    renderLayout();
+    expect(screen.getByRole('link', { name: /中高級／高級/ })).toHaveAttribute('href', '/admin/quiz-bank/vocab');
+    expect(screen.getByRole('link', { name: /外部題源/ })).toHaveAttribute('href', '/admin/quiz-bank/sources');
+    expect(screen.getByRole('link', { name: /情境題/ })).toHaveAttribute('href', '/admin/quiz-bank/situations');
+    expect(screen.getByRole('link', { name: /IRT 參數/ })).toHaveAttribute('href', '/admin/quiz-bank/irt-config');
+  });
+
   test('待審數量 > 0 時公告管理旁邊顯示徽章，數量是 0 或未提供時不顯示', () => {
     const { unmount } = renderLayout({ pendingAnnouncementCount: 3 });
     expect(screen.getByText('3')).toBeInTheDocument();

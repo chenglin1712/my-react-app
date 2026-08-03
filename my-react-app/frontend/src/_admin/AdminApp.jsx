@@ -7,6 +7,12 @@ import AnnouncementList from './content/AnnouncementList';
 import AnnouncementEditor from './content/AnnouncementEditor';
 import ExamSchedule from './content/ExamSchedule';
 import HomepageConfig from './content/HomepageConfig';
+import QuizBank from './content/QuizBank';
+import QuizSourceConfig from './content/QuizSourceConfig';
+import QuizSituations from './content/QuizSituations';
+import IrtConfig from './content/IrtConfig';
+import QuizTrueFalse from './content/QuizTrueFalse';
+import QuizChoice from './content/QuizChoice';
 
 const AdminApp = () => {
     const [pendingAnnouncementCount, setPendingAnnouncementCount] = useState();
@@ -31,6 +37,15 @@ const AdminApp = () => {
                 <Route path="content/announcements/:id" element={<AnnouncementEditor />} />
                 <Route path="content/exam-schedule" element={<ExamSchedule />} />
                 <Route path="content/homepage" element={<HomepageConfig />} />
+                {/* vocab／cloze 是同一個頁面內的兩個分頁（見 QuizBank.jsx），
+                    導覽列只連到 vocab，cloze 分頁在頁面裡面切換，不需要
+                    自己的路由。 */}
+                <Route path="quiz-bank/true-false" element={<QuizTrueFalse />} />
+                <Route path="quiz-bank/choice" element={<QuizChoice />} />
+                <Route path="quiz-bank/vocab" element={<QuizBank />} />
+                <Route path="quiz-bank/sources" element={<QuizSourceConfig />} />
+                <Route path="quiz-bank/situations" element={<QuizSituations />} />
+                <Route path="quiz-bank/irt-config" element={<IrtConfig />} />
             </Route>
         </Routes>
     );
