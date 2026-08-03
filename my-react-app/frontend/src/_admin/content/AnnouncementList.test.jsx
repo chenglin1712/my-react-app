@@ -23,6 +23,11 @@ const pendingItem = {
   id: 2, title: '待審公告', category: 'exam', tribes: ['tayal'], status: 'pending_review',
   is_pinned: true, pin_until: '2026-09-01', created_by: 'editor-uid', updated_at: '2026-08-01T00:00:00Z',
 };
+const publishedItem = {
+  id: 3, title: '已發布公告', category: 'activity', tribes: [], status: 'published',
+  is_pinned: false, pin_until: null, created_by: 'editor-uid', updated_at: '2026-08-02T00:00:00Z',
+  has_pending_revision: false,
+};
 
 function renderList(initialEntries = ['/']) {
   return render(
@@ -38,7 +43,12 @@ describe('AnnouncementList', () => {
     apiGet.mockReset();
     apiPost.mockReset();
     apiDelete.mockReset();
-    apiGet.mockResolvedValue({ results: [draftItem, pendingItem], count: 2, page: 1, page_size: 10 });
+    apiGet.mockResolvedValue({
+      results: [draftItem, pendingItem],
+      count: 2,
+      page: 1,
+      page_size: 10,
+    });
     vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
@@ -110,6 +120,125 @@ describe('AnnouncementList', () => {
     expect(within(row).queryByRole('button', { name: /刪除/ })).not.toBeInTheDocument();
   });
 
+  test('published 狀態下 CONTENT_EDITORS 看得到編輯連結', async () => {
+    mockRole = 'editor';
+    apiGet.mockResolvedValue({
+      results: [publishedItem],
+      count: 1,
+      page: 1,
+      page_size: 10,
+    });
+
+    renderList();
+
+    const row = await screen.findByText('已發布公告').then((el) => el.closest('tr'));
+    const editLink = within(row).getByRole('button', { name: /編輯/ });
+
+    expect(editLink).toBeInTheDocument();
+    expect(editLink).toHaveAttribute(
+      'href',
+      '/admin/content/announcements/3',
+    );
+    expect(within(row).queryByRole('button', { name: /下架/ })).not.toBeInTheDocument();
+  });
+
+  test('published 狀態下編輯與下架按鈕可同時顯示，且下架仍為 PUBLISHERS 專屬', async () => {
+    apiGet.mockResolvedValue({
+      results: [publishedItem],
+      count: 1,
+      page: 1,
+      page_size: 10,
+    });
+
+    renderList();
+
+    const row = await screen.findByText('已發布公告').then((el) => el.closest('tr'));
+    expect(within(row).getByRole('button', { name: /編輯/ })).toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: /下架/ })).toBeInTheDocument();
+  });
+
+  test('has_pending_revision 為 true 時顯示提示、核准修改與退件修改按鈕，並呼叫各自端點', async () => {
+    const itemWithRevision = {
+      ...publishedItem,
+      has_pending_revision: true,
+    };
+
+    apiGet.mockResolvedValue({
+      results: [itemWithRevision],
+      count: 1,
+      page: 1,
+      page_size: 10,
+    });
+    apiPost.mockResolvedValue({});
+
+    renderList();
+
+    let row = await screen.findByText('已發布公告').then((el) => el.closest('tr'));
+    expect(within(row).getByText('有待審修改')).toBeInTheDocument();
+
+    const approveButton = within(row).getByRole('button', { name: /核准修改/ });
+    const rejectButton = within(row).getByRole('button', { name: /退件修改/ });
+
+    expect(approveButton).toBeInTheDocument();
+    expect(rejectButton).toBeInTheDocument();
+
+    fireEvent.click(approveButton);
+
+    await waitFor(() => {
+      expect(apiPost).toHaveBeenCalledWith(
+        '/adminapi/announcements/3/pending-revision/approve/',
+        { review_comment: '' },
+      );
+    });
+
+    // 核准後元件會重新載入列表；等操作狀態解除後，再測試退件修改流程。
+    await waitFor(() => {
+      row = screen.getByText('已發布公告').closest('tr');
+      expect(
+        within(row).getByRole('button', { name: /退件修改/ }),
+      ).not.toBeDisabled();
+    });
+
+    fireEvent.click(within(row).getByRole('button', { name: /退件修改/ }));
+
+    expect(await screen.findByText('退件修改原因')).toBeInTheDocument();
+    const confirmButton = screen.getByRole('button', { name: '確認退件' });
+    expect(confirmButton).toBeDisabled();
+
+    fireEvent.change(
+      screen.getByLabelText('請說明需要修改的內容'),
+      { target: { value: '新內容的用字需要調整' } },
+    );
+    expect(confirmButton).not.toBeDisabled();
+
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => {
+      expect(apiPost).toHaveBeenCalledWith(
+        '/adminapi/announcements/3/pending-revision/reject/',
+        { review_comment: '新內容的用字需要調整' },
+      );
+    });
+  });
+
+  test('editor 看得到待審修改提示與編輯，但看不到 PUBLISHERS 專屬的核准修改／退件修改', async () => {
+    mockRole = 'editor';
+    apiGet.mockResolvedValue({
+      results: [{ ...publishedItem, has_pending_revision: true }],
+      count: 1,
+      page: 1,
+      page_size: 10,
+    });
+
+    renderList();
+
+    const row = await screen.findByText('已發布公告').then((el) => el.closest('tr'));
+    expect(within(row).getByText('有待審修改')).toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: /編輯/ })).toBeInTheDocument();
+    expect(within(row).queryByRole('button', { name: /核准修改/ })).not.toBeInTheDocument();
+    expect(within(row).queryByRole('button', { name: /退件修改/ })).not.toBeInTheDocument();
+  });
+
   test('reviewer 看不到「新增公告」入口，owner 看得到', async () => {
     mockRole = 'reviewer';
     const { unmount } = renderList();
@@ -144,12 +273,18 @@ describe('AnnouncementList', () => {
     const confirmBtn = await screen.findByRole('button', { name: '確認退件' });
     expect(confirmBtn).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText('請說明需要修改的內容'), { target: { value: '用字需要再確認' } });
+    fireEvent.change(
+      screen.getByLabelText('請說明需要修改的內容'),
+      { target: { value: '用字需要再確認' } },
+    );
     expect(confirmBtn).not.toBeDisabled();
 
     fireEvent.click(confirmBtn);
     await waitFor(() => {
-      expect(apiPost).toHaveBeenCalledWith('/adminapi/announcements/2/reject/', { review_comment: '用字需要再確認' });
+      expect(apiPost).toHaveBeenCalledWith(
+        '/adminapi/announcements/2/reject/',
+        { review_comment: '用字需要再確認' },
+      );
     });
   });
 
@@ -176,8 +311,12 @@ describe('AnnouncementList', () => {
 describe('AnnouncementList · 爬蟲同步', () => {
   const syncStatusResponse = {
     status: {
-      last_success_at: '2026-08-02T15:46:40Z', last_failure_at: null, last_failure_reason: '',
-      consecutive_failures: 0, last_imported_count: 6, last_skipped_count: 0,
+      last_success_at: '2026-08-02T15:46:40Z',
+      last_failure_at: null,
+      last_failure_reason: '',
+      consecutive_failures: 0,
+      last_imported_count: 6,
+      last_skipped_count: 0,
     },
   };
 
@@ -190,7 +329,12 @@ describe('AnnouncementList · 爬蟲同步', () => {
     // 其他測試那樣直接 mockResolvedValue 同一個形狀給所有呼叫。
     apiGet.mockImplementation((url) => {
       if (url.includes('sync-crawler')) return Promise.resolve(syncStatusResponse);
-      return Promise.resolve({ results: [draftItem, pendingItem], count: 2, page: 1, page_size: 10 });
+      return Promise.resolve({
+        results: [draftItem, pendingItem],
+        count: 2,
+        page: 1,
+        page_size: 10,
+      });
     });
   });
 
@@ -213,9 +357,19 @@ describe('AnnouncementList · 爬蟲同步', () => {
   test('從未同步過時顯示「尚未同步過」', async () => {
     apiGet.mockImplementation((url) => {
       if (url.includes('sync-crawler')) {
-        return Promise.resolve({ status: { last_success_at: null, consecutive_failures: 0 } });
+        return Promise.resolve({
+          status: {
+            last_success_at: null,
+            consecutive_failures: 0,
+          },
+        });
       }
-      return Promise.resolve({ results: [], count: 0, page: 1, page_size: 10 });
+      return Promise.resolve({
+        results: [],
+        count: 0,
+        page: 1,
+        page_size: 10,
+      });
     });
     renderList();
     expect(await screen.findByText(/尚未同步過/)).toBeInTheDocument();
@@ -224,9 +378,19 @@ describe('AnnouncementList · 爬蟲同步', () => {
   test('連續失敗 3 次以上顯示警告', async () => {
     apiGet.mockImplementation((url) => {
       if (url.includes('sync-crawler')) {
-        return Promise.resolve({ status: { last_success_at: null, consecutive_failures: 4 } });
+        return Promise.resolve({
+          status: {
+            last_success_at: null,
+            consecutive_failures: 4,
+          },
+        });
       }
-      return Promise.resolve({ results: [], count: 0, page: 1, page_size: 10 });
+      return Promise.resolve({
+        results: [],
+        count: 0,
+        page: 1,
+        page_size: 10,
+      });
     });
     renderList();
     expect(await screen.findByText(/爬蟲同步已連續失敗 4 次/)).toBeInTheDocument();
@@ -234,12 +398,21 @@ describe('AnnouncementList · 爬蟲同步', () => {
 
   test('點擊同步按鈕會呼叫 POST 端點、重新載入列表並顯示筆數訊息', async () => {
     apiPost.mockResolvedValue({
-      available: true, imported: 3, skipped_existing: 1, skipped_invalid: 0, failed: 0,
-      status: { ...syncStatusResponse.status, last_imported_count: 3, last_skipped_count: 1 },
+      available: true,
+      imported: 3,
+      skipped_existing: 1,
+      skipped_invalid: 0,
+      failed: 0,
+      status: {
+        ...syncStatusResponse.status,
+        last_imported_count: 3,
+        last_skipped_count: 1,
+      },
     });
     renderList();
     const button = await screen.findByRole('button', { name: /同步爬蟲活動/ });
-    const listCallsBefore = apiGet.mock.calls.filter(([url]) => !url.includes('sync-crawler')).length;
+    const listCallsBefore = apiGet.mock.calls
+      .filter(([url]) => !url.includes('sync-crawler')).length;
 
     fireEvent.click(button);
 
@@ -248,7 +421,8 @@ describe('AnnouncementList · 爬蟲同步', () => {
     });
     expect(await screen.findByText('已同步：新增 3 筆、略過 1 筆')).toBeInTheDocument();
     await waitFor(() => {
-      const listCallsAfter = apiGet.mock.calls.filter(([url]) => !url.includes('sync-crawler')).length;
+      const listCallsAfter = apiGet.mock.calls
+        .filter(([url]) => !url.includes('sync-crawler')).length;
       expect(listCallsAfter).toBeGreaterThan(listCallsBefore);
     });
   });
@@ -256,11 +430,16 @@ describe('AnnouncementList · 爬蟲同步', () => {
   test('來源篩選送出後，查詢字串帶上 source 參數', async () => {
     renderList();
     await screen.findByText('草稿公告');
-    fireEvent.change(screen.getByLabelText('來源'), { target: { value: 'crawler' } });
+    fireEvent.change(
+      screen.getByLabelText('來源'),
+      { target: { value: 'crawler' } },
+    );
     fireEvent.click(screen.getByRole('button', { name: '搜尋' }));
 
     await waitFor(() => {
-      const [url] = apiGet.mock.calls.filter(([callUrl]) => !callUrl.includes('sync-crawler')).at(-1);
+      const [url] = apiGet.mock.calls
+        .filter(([callUrl]) => !callUrl.includes('sync-crawler'))
+        .at(-1);
       expect(url).toContain('source=crawler');
     });
   });
@@ -273,7 +452,9 @@ describe('AnnouncementList · 爬蟲同步', () => {
           { ...draftItem, source: 'admin' },
           { ...pendingItem, source: 'crawler' },
         ],
-        count: 2, page: 1, page_size: 10,
+        count: 2,
+        page: 1,
+        page_size: 10,
       });
     });
     renderList();

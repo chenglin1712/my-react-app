@@ -14,6 +14,11 @@ def _content_urls(prefix, content_views):
         path(f'{prefix}/<int:pk>/approve/', content_views["approve"]),
         path(f'{prefix}/<int:pk>/reject/', content_views["reject"]),
         path(f'{prefix}/<int:pk>/unpublish/', content_views["unpublish"]),
+        # 編輯已發布/已啟用內容用（見 revisions.py）：不動正在生效的那一列，
+        # 提案的新內容先存在 PendingRevision，核准後才套用回去。
+        path(f'{prefix}/<int:pk>/pending-revision/', content_views["pending_revision"]),
+        path(f'{prefix}/<int:pk>/pending-revision/approve/', content_views["approve_revision"]),
+        path(f'{prefix}/<int:pk>/pending-revision/reject/', content_views["reject_revision"]),
     ]
 
 
@@ -26,6 +31,9 @@ urlpatterns = [
     path('announcements/<int:pk>/reject/', views.announcement_reject),
     path('announcements/<int:pk>/unpublish/', views.announcement_unpublish),
     path('announcements/<int:pk>/republish/', views.announcement_republish),
+    path('announcements/<int:pk>/pending-revision/', views.announcement_pending_revision),
+    path('announcements/<int:pk>/pending-revision/approve/', views.announcement_revision_approve),
+    path('announcements/<int:pk>/pending-revision/reject/', views.announcement_revision_reject),
     path('announcements/sync-crawler/', views.announcement_sync_crawler),
     path('audit-log/', views.audit_log_list),
     path('public/announcements/', views.public_announcement_list),

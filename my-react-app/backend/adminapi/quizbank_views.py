@@ -22,19 +22,23 @@ from django.views.decorators.csrf import csrf_exempt
 from config.firebase_auth import require_role
 from config.roles import CONTENT_APPROVERS, CONTENT_EDITORS, PUBLISHERS, STAFF_ROLES
 
+from ._shared import (
+    invalid_transition as _invalid_transition,
+    ip_rate_limited_response as _ip_rate_limited_response,
+    parse_json_body as _parse_json_body,
+    rate_limited_response as _rate_limited_response,
+    write_audit_log as _write_audit_log,
+)
 from .models import (
     IrtConfig, QuizChoiceItem, QuizClozePassage, QuizSituationItem, QuizSourceConfig,
     QuizTrueFalseItem, QuizVocabItem,
 )
+from .revisions import make_revision_views, pending_revision_target_ids
 from .serializers import (
     ApproveSerializer, IrtConfigSerializer, PublicIrtConfigSerializer,
     QuizChoiceItemSerializer, QuizClozePassageSerializer, QuizSituationItemSerializer,
     QuizSourceConfigSerializer, QuizTrueFalseItemSerializer, QuizVocabItemSerializer,
     RejectSerializer,
-)
-from .views import (
-    _ip_rate_limited_response, _invalid_transition, _parse_json_body,
-    _rate_limited_response, _write_audit_log,
 )
 
 # ---------------------------------------------------------------------------
@@ -46,7 +50,7 @@ def _locked_content(model, pk):
     return get_object_or_404(model.objects.select_for_update(), pk=pk)
 
 
-def _list_content(request, model, serializer_class, extra_filter_fields=()):
+def _list_content(request, model, serializer_class, target_type, extra_filter_fields=()):
     decoded, err_resp = require_role(request, STAFF_ROLES)
     if err_resp:
         return err_resp
@@ -76,8 +80,15 @@ def _list_content(request, model, serializer_class, extra_filter_fields=()):
     start = (page - 1) * page_size
     items = list(qs[start:start + page_size])
 
+    # has_pending_revision：這一列是否有一筆待審核的「編輯已發布內容」提案
+    # （見 revisions.py）。一次查詢這一頁全部 id，不要每列各自查一次。
+    pending_ids = pending_revision_target_ids(target_type, [item.pk for item in items])
+    results = serializer_class(items, many=True).data
+    for result, item in zip(results, items):
+        result["has_pending_revision"] = item.pk in pending_ids
+
     return JsonResponse({
-        "results": serializer_class(items, many=True).data,
+        "results": results,
         "count": total, "page": page, "page_size": page_size,
     })
 
@@ -105,12 +116,14 @@ def _create_content(request, model, serializer_class, target_type):
     return JsonResponse(serializer_class(obj).data, status=201)
 
 
-def _get_content(request, pk, model, serializer_class):
+def _get_content(request, pk, model, serializer_class, target_type):
     decoded, err_resp = require_role(request, STAFF_ROLES)
     if err_resp:
         return err_resp
     obj = get_object_or_404(model, pk=pk)
-    return JsonResponse(serializer_class(obj).data)
+    data = serializer_class(obj).data
+    data["has_pending_revision"] = bool(pending_revision_target_ids(target_type, [obj.pk]))
+    return JsonResponse(data)
 
 
 def _update_content(request, pk, model, serializer_class, target_type):
@@ -330,7 +343,7 @@ def _make_content_views(model, serializer_class, target_type, extra_filter_field
     @csrf_exempt
     def list_view(request):
         if request.method == "GET":
-            return _list_content(request, model, serializer_class, extra_filter_fields)
+            return _list_content(request, model, serializer_class, target_type, extra_filter_fields)
         if request.method == "POST":
             return _create_content(request, model, serializer_class, target_type)
         return JsonResponse({"detail": "Method not allowed"}, status=405)
@@ -338,7 +351,7 @@ def _make_content_views(model, serializer_class, target_type, extra_filter_field
     @csrf_exempt
     def detail_view(request, pk):
         if request.method == "GET":
-            return _get_content(request, pk, model, serializer_class)
+            return _get_content(request, pk, model, serializer_class, target_type)
         if request.method == "PATCH":
             return _update_content(request, pk, model, serializer_class, target_type)
         if request.method == "DELETE":
@@ -365,10 +378,15 @@ def _make_content_views(model, serializer_class, target_type, extra_filter_field
     def unpublish_view(request, pk):
         return _content_unpublish(request, pk, model, serializer_class, target_type)
 
+    revision_views = make_revision_views(model, serializer_class, target_type, CONTENT_APPROVERS)
+
     return {
         "list": list_view, "detail": detail_view, "submit": submit_view,
         "withdraw": withdraw_view, "approve": approve_view,
         "reject": reject_view, "unpublish": unpublish_view,
+        "pending_revision": revision_views["pending_revision"],
+        "approve_revision": revision_views["approve"],
+        "reject_revision": revision_views["reject"],
     }
 
 

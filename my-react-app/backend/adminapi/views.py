@@ -20,7 +20,6 @@ select_for_update() 鎖住該筆再讀狀態、檢查、寫入，讀狀態與寫
 的寫入也在同一個交易內，狀態變更與稽核紀錄要嘛一起成功、要嘛一起回滾，
 不會出現「資料已經變了但稽核紀錄沒寫到」的情況。
 """
-import json
 import logging
 
 from django.db import transaction
@@ -29,17 +28,24 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from django_ratelimit.core import is_ratelimited
 
 from config.firebase_auth import require_role
 from config.roles import ACCOUNT_MANAGERS, CONTENT_EDITORS, PUBLISHERS, STAFF_ROLES
 from crawler.views import apply_exam_schedule_overrides, get_exam_schedule_data
 
+from ._shared import (
+    invalid_transition as _invalid_transition,
+    ip_rate_limited_response as _ip_rate_limited_response,
+    parse_json_body as _parse_json_body,
+    rate_limited_response as _rate_limited_response,
+    write_audit_log as _write_audit_log,
+)
 from .crawler_sync import sync_crawler_announcements
 from .models import (
     Announcement, AnnouncementSyncStatus, AuditLog, ExamScheduleCrawlStatus,
-    ExamScheduleOverride, HomepageConfig,
+    ExamScheduleOverride, HomepageConfig, PendingRevision,
 )
+from .revisions import make_revision_views, pending_revision_target_ids
 from .serializers import (
     AnnouncementSerializer, ApproveSerializer, AuditLogSerializer,
     ExamScheduleOverrideSerializer, HomepageConfigSerializer, PublicAnnouncementSerializer,
@@ -48,67 +54,11 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 
-
-def _rate_limited_response(request, decoded, group, rate="60/m", method="POST"):
-    """依已登入使用者的 uid 限速，邏輯與 AIModel/views.py、CrosswordPuzzle/views.py 一致。"""
-    uid = decoded.get("uid", "anon")
-    limited = is_ratelimited(
-        request, group=group, key=lambda g, r: uid,
-        rate=rate, method=method, increment=True,
-    )
-    if limited:
-        return JsonResponse({"detail": "請求過於頻繁，請稍後再試"}, status=429)
-    return None
-
-
-def _ip_rate_limited_response(request, group, rate="60/m", method="GET"):
-    """給匿名公開端點用（沒有登入者 uid 可綁），依 IP 限速。跟
-    crawler/views.py 的 _rate_limited_response 用同一套 key 取法。"""
-    client_ip = request.META.get("REMOTE_ADDR", "unknown")
-    limited = is_ratelimited(
-        request, group=group, key=lambda g, r: client_ip,
-        rate=rate, method=method, increment=True,
-    )
-    if limited:
-        return JsonResponse({"detail": "請求過於頻繁，請稍後再試"}, status=429)
-    return None
-
-
-def _parse_json_body(request):
-    """回傳 (data, error_response)；格式錯誤回 400 而不是讓 JSONDecodeError
-    一路往外拋變成 Django 預設的 500 HTML 頁（跟全站其他端點的慣例一致）。"""
-    if not request.body:
-        return {}, None
-    try:
-        return json.loads(request.body), None
-    except json.JSONDecodeError:
-        return None, JsonResponse({"detail": "請求格式錯誤"}, status=400)
-
-
-def _write_audit_log(request, decoded, action, target, before=None, after=None, target_type="announcement"):
-    """target_type 預設 "announcement" 是為了不動到既有呼叫點——這個函式
-    最早只給 Announcement 用，後來加入的資源（考試時程覆寫、首頁版位設定）
-    呼叫時要記得自己帶對應的 target_type，不然會被誤記成公告的稽核紀錄。"""
-    AuditLog.objects.create(
-        actor_uid=decoded.get("uid", "anon"),
-        actor_role=decoded.get("role"),
-        action=action,
-        target_type=target_type,
-        target_id=str(target.pk),
-        before=before,
-        after=after,
-        ip_address=request.META.get("REMOTE_ADDR"),
-        # User-Agent 沒有長度上限，理論上可以塞任意長字串進來，截斷避免異常
-        # 輸入撐爆這個欄位（TextField 本身沒有長度限制，但沒必要真的存整段）。
-        user_agent=(request.META.get("HTTP_USER_AGENT", "")[:1000] or None),
-    )
-
-
-def _invalid_transition(current_status, action):
-    return JsonResponse(
-        {"detail": f"目前狀態「{current_status}」無法執行「{action}」"},
-        status=409,
-    )
+# _rate_limited_response／_ip_rate_limited_response／_parse_json_body／
+# _write_audit_log／_invalid_transition 的實作已經搬到 _shared.py（見該檔案
+# 開頭說明：revisions.py 需要同一批工具，但這裡之後會 import revisions.py，
+# 兩邊互相 import 會循環），這裡用上面的 import ... as ... 保留原本名稱，
+# 這個檔案裡其餘程式碼完全不用改呼叫方式。
 
 
 def _locked(pk):
@@ -196,8 +146,13 @@ def _list_announcements(request):
         start = (page - 1) * page_size
         items = list(qs[start:start + page_size])
 
+    pending_ids = pending_revision_target_ids("announcement", [item.pk for item in items])
+    results = AnnouncementSerializer(items, many=True).data
+    for result, item in zip(results, items):
+        result["has_pending_revision"] = item.pk in pending_ids
+
     return JsonResponse({
-        "results": AnnouncementSerializer(items, many=True).data,
+        "results": results,
         "count": total,
         "page": page,
         "page_size": page_size,
@@ -284,7 +239,9 @@ def _get_announcement(request, pk):
     if err_resp:
         return err_resp
     announcement = get_object_or_404(Announcement, pk=pk)
-    return JsonResponse(AnnouncementSerializer(announcement).data)
+    data = AnnouncementSerializer(announcement).data
+    data["has_pending_revision"] = bool(pending_revision_target_ids("announcement", [announcement.pk]))
+    return JsonResponse(data)
 
 
 def _update_announcement(request, pk):
@@ -547,6 +504,17 @@ def announcement_republish(request, pk):
             before=before, after=AnnouncementSerializer(announcement).data,
         )
         return JsonResponse(AnnouncementSerializer(announcement).data)
+
+
+# 編輯已發布公告用（見 revisions.py）：不動正在生效的那一列，提案的新內容
+# 先存在 PendingRevision，核准後才套用回去——公告已經有 unpublished 狀態
+# 可以編輯，但那條路徑會讓公告從首頁消失，這裡補上「不下架也能編輯」的路徑。
+# 核准／退件角色用 PUBLISHERS，跟公告本身的 approve/reject/unpublish 一致
+# （不是題庫類內容用的 CONTENT_APPROVERS）。
+_announcement_revision_views = make_revision_views(Announcement, AnnouncementSerializer, "announcement", PUBLISHERS)
+announcement_pending_revision = _announcement_revision_views["pending_revision"]
+announcement_revision_approve = _announcement_revision_views["approve"]
+announcement_revision_reject = _announcement_revision_views["reject"]
 
 
 def _sync_status_payload(status):

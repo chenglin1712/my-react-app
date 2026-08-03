@@ -37,6 +37,18 @@ const EMPTY_FORM = {
   answer: 1,
 };
 
+function formFrom(item) {
+  return {
+    tribe: item.tribe,
+    question_ab: item.question_ab ?? '',
+    question_ch: item.question_ch ?? '',
+    image_a_url: item.image_a_url ?? '',
+    image_b_url: item.image_b_url ?? '',
+    image_c_url: item.image_c_url ?? '',
+    answer: Number(item.answer) || 1,
+  };
+}
+
 export default function QuizChoice() {
   const { userData } = useAuth();
   const role = userData?.role;
@@ -55,6 +67,7 @@ export default function QuizChoice() {
   const [error, setError] = useState('');
   const [rejectTarget, setRejectTarget] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [rejectingRevision, setRejectingRevision] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [uploadingField, setUploadingField] = useState('');
@@ -68,12 +81,15 @@ export default function QuizChoice() {
         page: String(page),
         page_size: '20',
       });
+
       Object.entries(query).forEach(([key, value]) => {
         if (value) params.set(key, value);
       });
 
       setData(
-        await apiGet(`/adminapi/quiz-bank/choice/?${params.toString()}`),
+        await apiGet(
+          `/adminapi/quiz-bank/choice/?${params.toString()}`,
+        ),
       );
     } catch (err) {
       setError(err.message);
@@ -106,6 +122,7 @@ export default function QuizChoice() {
           body,
         );
       }
+
       await load();
     } catch (err) {
       setError(err.message);
@@ -114,14 +131,27 @@ export default function QuizChoice() {
     }
   };
 
-  const submitReject = async () => {
-    if (!rejectReason.trim()) return;
-
-    await runAction(rejectTarget, 'reject', {
-      review_comment: rejectReason.trim(),
-    });
-    setRejectTarget(null);
+  const openReject = (item, revision = false) => {
+    setRejectTarget(item);
+    setRejectingRevision(revision);
     setRejectReason('');
+  };
+
+  const closeReject = () => {
+    setRejectTarget(null);
+    setRejectingRevision(false);
+    setRejectReason('');
+  };
+
+  const submitReject = async () => {
+    if (!rejectReason.trim() || !rejectTarget) return;
+
+    await runAction(
+      rejectTarget,
+      rejectingRevision ? 'pending-revision/reject' : 'reject',
+      { review_comment: rejectReason.trim() },
+    );
+    closeReject();
   };
 
   const openNew = () => {
@@ -130,18 +160,31 @@ export default function QuizChoice() {
     setError('');
   };
 
-  const openEdit = (item) => {
-    setForm({
-      tribe: item.tribe,
-      question_ab: item.question_ab ?? '',
-      question_ch: item.question_ch ?? '',
-      image_a_url: item.image_a_url ?? '',
-      image_b_url: item.image_b_url ?? '',
-      image_c_url: item.image_c_url ?? '',
-      answer: Number(item.answer) || 1,
-    });
-    setEditTarget(item);
+  const openEdit = async (item) => {
+    setActionId(item.id);
     setError('');
+
+    try {
+      let values = item;
+
+      if (item.status === 'published') {
+        try {
+          const revision = await apiGet(
+            `/adminapi/quiz-bank/choice/${item.id}/pending-revision/`,
+          );
+          values = { ...item, ...(revision.payload || {}) };
+        } catch (err) {
+          if (err.status !== 404) throw err;
+        }
+      }
+
+      setForm(formFrom(values));
+      setEditTarget(item);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionId(null);
+    }
   };
 
   const uploadImage = async (file, field) => {
@@ -196,11 +239,11 @@ export default function QuizChoice() {
     };
 
     if (
-      !payload.question_ab ||
-      !payload.question_ch ||
-      !payload.image_a_url ||
-      !payload.image_b_url ||
-      !payload.image_c_url
+      !payload.question_ab
+      || !payload.question_ch
+      || !payload.image_a_url
+      || !payload.image_b_url
+      || !payload.image_c_url
     ) {
       setError('族語句子、中文句意與三張選項圖片皆為必填');
       return;
@@ -216,10 +259,17 @@ export default function QuizChoice() {
 
     try {
       if (editTarget.id) {
-        await apiPatch(
-          `/adminapi/quiz-bank/choice/${editTarget.id}/`,
-          payload,
-        );
+        if (editTarget.status === 'published') {
+          await apiPost(
+            `/adminapi/quiz-bank/choice/${editTarget.id}/pending-revision/`,
+            payload,
+          );
+        } else {
+          await apiPatch(
+            `/adminapi/quiz-bank/choice/${editTarget.id}/`,
+            payload,
+          );
+        }
       } else {
         await apiPost('/adminapi/quiz-bank/choice/', payload);
       }
@@ -236,11 +286,12 @@ export default function QuizChoice() {
   const actionsFor = (item) => {
     const busy = actionId === item.id;
     const buttons = [];
+    const editable = (
+      EDITABLE_STATUSES.includes(item.status)
+      || item.status === 'published'
+    );
 
-    if (
-      EDITABLE_STATUSES.includes(item.status) &&
-      CONTENT_EDITORS.includes(role)
-    ) {
+    if (editable && CONTENT_EDITORS.includes(role)) {
       buttons.push(
         <Button
           key="edit"
@@ -252,6 +303,12 @@ export default function QuizChoice() {
           <Edit3 size={14} /> 編輯
         </Button>,
       );
+    }
+
+    if (
+      EDITABLE_STATUSES.includes(item.status)
+      && CONTENT_EDITORS.includes(role)
+    ) {
       buttons.push(
         <Button
           key="submit"
@@ -280,8 +337,8 @@ export default function QuizChoice() {
     }
 
     if (
-      item.status === 'pending_review' &&
-      CONTENT_EDITORS.includes(role)
+      item.status === 'pending_review'
+      && CONTENT_EDITORS.includes(role)
     ) {
       buttons.push(
         <Button
@@ -297,8 +354,8 @@ export default function QuizChoice() {
     }
 
     if (
-      item.status === 'pending_review' &&
-      CONTENT_APPROVERS.includes(role)
+      item.status === 'pending_review'
+      && CONTENT_APPROVERS.includes(role)
     ) {
       buttons.push(
         <Button
@@ -306,9 +363,11 @@ export default function QuizChoice() {
           size="sm"
           variant="outline-success"
           disabled={busy}
-          onClick={() =>
-            runAction(item, 'approve', { review_comment: '' })
-          }
+          onClick={() => runAction(
+            item,
+            'approve',
+            { review_comment: '' },
+          )}
         >
           <Check size={14} /> 核准
         </Button>,
@@ -319,10 +378,7 @@ export default function QuizChoice() {
           size="sm"
           variant="outline-danger"
           disabled={busy}
-          onClick={() => {
-            setRejectTarget(item);
-            setRejectReason('');
-          }}
+          onClick={() => openReject(item)}
         >
           <X size={14} /> 退件
         </Button>,
@@ -330,8 +386,41 @@ export default function QuizChoice() {
     }
 
     if (
-      item.status === 'published' &&
-      CONTENT_APPROVERS.includes(role)
+      item.status === 'published'
+      && item.has_pending_revision
+      && CONTENT_APPROVERS.includes(role)
+    ) {
+      buttons.push(
+        <Button
+          key="approve-revision"
+          size="sm"
+          variant="outline-success"
+          disabled={busy}
+          onClick={() => runAction(
+            item,
+            'pending-revision/approve',
+            { review_comment: '' },
+          )}
+        >
+          <Check size={14} /> 核准修改
+        </Button>,
+      );
+      buttons.push(
+        <Button
+          key="reject-revision"
+          size="sm"
+          variant="outline-danger"
+          disabled={busy}
+          onClick={() => openReject(item, true)}
+        >
+          <X size={14} /> 退件修改
+        </Button>,
+      );
+    }
+
+    if (
+      item.status === 'published'
+      && CONTENT_APPROVERS.includes(role)
     ) {
       buttons.push(
         <Button
@@ -349,13 +438,14 @@ export default function QuizChoice() {
     return buttons;
   };
 
-  const canSave =
-    Boolean(form.question_ab.trim()) &&
-    Boolean(form.question_ch.trim()) &&
-    Boolean(form.image_a_url.trim()) &&
-    Boolean(form.image_b_url.trim()) &&
-    Boolean(form.image_c_url.trim()) &&
-    !uploadingField;
+  const canSave = (
+    Boolean(form.question_ab.trim())
+    && Boolean(form.question_ch.trim())
+    && Boolean(form.image_a_url.trim())
+    && Boolean(form.image_b_url.trim())
+    && Boolean(form.image_c_url.trim())
+    && !uploadingField
+  );
 
   const hasNext = data.page * data.page_size < data.count;
 
@@ -374,9 +464,10 @@ export default function QuizChoice() {
         <Form.Select
           aria-label="族語"
           value={filters.tribe}
-          onChange={(event) =>
-            setFilters({ ...filters, tribe: event.target.value })
-          }
+          onChange={(event) => setFilters({
+            ...filters,
+            tribe: event.target.value,
+          })}
         >
           <option value="">全部族語</option>
           {Object.entries(TRIBES).map(([value, label]) => (
@@ -389,9 +480,10 @@ export default function QuizChoice() {
         <Form.Select
           aria-label="狀態"
           value={filters.status}
-          onChange={(event) =>
-            setFilters({ ...filters, status: event.target.value })
-          }
+          onChange={(event) => setFilters({
+            ...filters,
+            status: event.target.value,
+          })}
         >
           <option value="">全部狀態</option>
           {Object.entries(STATUSES).map(([value, meta]) => (
@@ -438,11 +530,23 @@ export default function QuizChoice() {
                     <td className="quiz-bank-truncate-cell">
                       {item.question_ab}
                     </td>
-                    <td>{OPTION_LABELS[Number(item.answer) - 1] ?? '—'}</td>
                     <td>
-                      <Badge bg={STATUSES[item.status]?.bg ?? 'secondary'}>
-                        {STATUSES[item.status]?.label ?? item.status}
-                      </Badge>
+                      {OPTION_LABELS[Number(item.answer) - 1] ?? '—'}
+                    </td>
+                    <td>
+                      <div className="d-flex flex-wrap align-items-center gap-1">
+                        <Badge
+                          bg={STATUSES[item.status]?.bg ?? 'secondary'}
+                        >
+                          {STATUSES[item.status]?.label ?? item.status}
+                        </Badge>
+                        {item.status === 'published'
+                          && item.has_pending_revision && (
+                          <Badge bg="warning" text="dark">
+                            有待審修改
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     <td>{item.created_by || '—'}</td>
                     <td>
@@ -494,7 +598,9 @@ export default function QuizChoice() {
         <Form onSubmit={saveForm}>
           <Modal.Header closeButton>
             <Modal.Title>
-              {editTarget?.id ? '編輯中級選擇題' : '新增中級選擇題'}
+              {editTarget?.id
+                ? '編輯中級選擇題'
+                : '新增中級選擇題'}
             </Modal.Title>
           </Modal.Header>
 
@@ -506,9 +612,10 @@ export default function QuizChoice() {
               <Form.Label>族語</Form.Label>
               <Form.Select
                 value={form.tribe}
-                onChange={(event) =>
-                  setForm({ ...form, tribe: event.target.value })
-                }
+                onChange={(event) => setForm({
+                  ...form,
+                  tribe: event.target.value,
+                })}
               >
                 {Object.entries(TRIBES).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -530,9 +637,10 @@ export default function QuizChoice() {
                 rows={3}
                 required
                 value={form.question_ab}
-                onChange={(event) =>
-                  setForm({ ...form, question_ab: event.target.value })
-                }
+                onChange={(event) => setForm({
+                  ...form,
+                  question_ab: event.target.value,
+                })}
               />
             </Form.Group>
 
@@ -548,9 +656,10 @@ export default function QuizChoice() {
                 rows={3}
                 required
                 value={form.question_ch}
-                onChange={(event) =>
-                  setForm({ ...form, question_ch: event.target.value })
-                }
+                onChange={(event) => setForm({
+                  ...form,
+                  question_ch: event.target.value,
+                })}
               />
             </Form.Group>
 
@@ -582,9 +691,10 @@ export default function QuizChoice() {
                       name="quiz-choice-answer"
                       label={`選項 ${label}（設為正解）`}
                       checked={Number(form.answer) === index + 1}
-                      onChange={() =>
-                        setForm({ ...form, answer: index + 1 })
-                      }
+                      onChange={() => setForm({
+                        ...form,
+                        answer: index + 1,
+                      })}
                     />
 
                     <Form.Group
@@ -599,9 +709,10 @@ export default function QuizChoice() {
                         type="file"
                         accept="image/*"
                         disabled={Boolean(uploadingField)}
-                        onChange={(event) =>
-                          uploadImage(event.target.files?.[0], field)
-                        }
+                        onChange={(event) => uploadImage(
+                          event.target.files?.[0],
+                          field,
+                        )}
                       />
                     </Form.Group>
 
@@ -652,11 +763,13 @@ export default function QuizChoice() {
 
       <Modal
         show={Boolean(rejectTarget)}
-        onHide={() => setRejectTarget(null)}
+        onHide={closeReject}
         centered
       >
         <Modal.Header closeButton>
-          <Modal.Title>退件原因</Modal.Title>
+          <Modal.Title>
+            {rejectingRevision ? '退件修改原因' : '退件原因'}
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form.Group controlId="quiz-choice-reject-reason">
@@ -667,7 +780,10 @@ export default function QuizChoice() {
               required
               value={rejectReason}
               onChange={(event) => setRejectReason(event.target.value)}
-              isInvalid={Boolean(rejectTarget) && !rejectReason.trim()}
+              isInvalid={
+                Boolean(rejectTarget)
+                && !rejectReason.trim()
+              }
             />
             <Form.Control.Feedback type="invalid">
               退件理由為必填
@@ -675,20 +791,18 @@ export default function QuizChoice() {
           </Form.Group>
         </Modal.Body>
         <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => setRejectTarget(null)}
-          >
+          <Button variant="secondary" onClick={closeReject}>
             取消
           </Button>
           <Button
             variant="danger"
             disabled={
-              !rejectReason.trim() || actionId === rejectTarget?.id
+              !rejectReason.trim()
+              || actionId === rejectTarget?.id
             }
             onClick={submitReject}
           >
-            確認退件
+            {rejectingRevision ? '確認退件修改' : '確認退件'}
           </Button>
         </Modal.Footer>
       </Modal>

@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils import timezone
 
@@ -293,6 +294,63 @@ class AuditLog(models.Model):
             f"{self.created_at} {self.actor_uid} {self.action} "
             f"{self.target_type}:{self.target_id}"
         )
+
+
+class PendingRevision(models.Model):
+    """已發布/已啟用內容的「編輯中修改」。
+
+    使用者發現「所有內容發布過後，畫面上只有下架這個選項」——要修改一篇
+    已發布的公告或一筆已啟用的題庫內容，原本得先下架（讓內容從對外查詢
+    消失）才能編輯，中間會有一段空窗期。這張表讓「編輯已發布內容」完全
+    不碰正在生效的那一列：提案的新內容先存在這裡，核准後才套用到原本的
+    列上（狀態不變，仍是 published/已啟用，全程沒有下架、沒有空窗期）；
+    退件則整筆捨棄，原本內容完全不受影響，繼續照舊資料顯示。
+
+    target_type/target_id 是多型參照（跟 AuditLog 同一種設計，不建實際
+    FK），因為要涵蓋 Announcement 與 5 種題庫內容型別共 6 種不同 model，
+    不值得為了一個共用功能各自加一個 revision 表。
+
+    payload 只存「這個內容型別可編輯的欄位」——跟一般 create/update 用的
+    同一份 serializer 驗證過，只是驗證完不寫回原本的列，改存進這裡；
+    encoder=DjangoJSONEncoder 是因為 Announcement 的 pin_until／publish_at
+    這類日期時間欄位驗證後會是 Python date/datetime 物件，預設的 JSON
+    encoder 無法序列化。
+
+    同一個 target 同時間只能有一筆「待審核」的修改（見 Meta.constraints）
+    ——重複編輯只會更新同一筆待審修改，不會疊出兩筆互相衝突的提案。
+    """
+    STATUS_PENDING_REVIEW = 'pending_review'
+    STATUS_APPROVED = 'approved'
+    STATUS_REJECTED = 'rejected'
+    STATUS_CHOICES = [
+        (STATUS_PENDING_REVIEW, '待審核'),
+        (STATUS_APPROVED, '已核准'),
+        (STATUS_REJECTED, '已退件'),
+    ]
+
+    target_type = models.CharField(max_length=64)
+    target_id = models.PositiveIntegerField()
+    payload = models.JSONField(encoder=DjangoJSONEncoder)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING_REVIEW)
+    submitted_by = models.CharField(max_length=128)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    reviewed_by = models.CharField(max_length=128, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_comment = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-submitted_at', '-pk']
+        indexes = [models.Index(fields=['target_type', 'target_id', 'status'])]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['target_type', 'target_id'],
+                condition=models.Q(status='pending_review'),
+                name='unique_pending_revision_per_target',
+            ),
+        ]
+
+    def __str__(self):
+        return f"[{self.get_status_display()}] {self.target_type}:{self.target_id} 待審修改"
 
 
 class ReviewableContent(models.Model):

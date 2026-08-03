@@ -34,6 +34,17 @@ const EMPTY_FORM = {
   answer: 1,
 };
 
+function formFrom(item) {
+  return {
+    tribe: item.tribe,
+    question_ab: item.question_ab ?? '',
+    question_ch: item.question_ch ?? '',
+    audio_url: item.audio_url ?? '',
+    image_url: item.image_url ?? '',
+    answer: Number(item.answer) || 1,
+  };
+}
+
 export default function QuizTrueFalse() {
   const { userData } = useAuth();
   const role = userData?.role;
@@ -52,6 +63,7 @@ export default function QuizTrueFalse() {
   const [error, setError] = useState('');
   const [rejectTarget, setRejectTarget] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [rejectingRevision, setRejectingRevision] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [uploadingAudio, setUploadingAudio] = useState(false);
@@ -66,6 +78,7 @@ export default function QuizTrueFalse() {
         page: String(page),
         page_size: '20',
       });
+
       Object.entries(query).forEach(([key, value]) => {
         if (value) params.set(key, value);
       });
@@ -106,6 +119,7 @@ export default function QuizTrueFalse() {
           body,
         );
       }
+
       await load();
     } catch (err) {
       setError(err.message);
@@ -114,14 +128,27 @@ export default function QuizTrueFalse() {
     }
   };
 
-  const submitReject = async () => {
-    if (!rejectReason.trim()) return;
-
-    await runAction(rejectTarget, 'reject', {
-      review_comment: rejectReason.trim(),
-    });
-    setRejectTarget(null);
+  const openReject = (item, revision = false) => {
+    setRejectTarget(item);
+    setRejectingRevision(revision);
     setRejectReason('');
+  };
+
+  const closeReject = () => {
+    setRejectTarget(null);
+    setRejectingRevision(false);
+    setRejectReason('');
+  };
+
+  const submitReject = async () => {
+    if (!rejectReason.trim() || !rejectTarget) return;
+
+    await runAction(
+      rejectTarget,
+      rejectingRevision ? 'pending-revision/reject' : 'reject',
+      { review_comment: rejectReason.trim() },
+    );
+    closeReject();
   };
 
   const openNew = () => {
@@ -130,17 +157,31 @@ export default function QuizTrueFalse() {
     setError('');
   };
 
-  const openEdit = (item) => {
-    setForm({
-      tribe: item.tribe,
-      question_ab: item.question_ab ?? '',
-      question_ch: item.question_ch ?? '',
-      audio_url: item.audio_url ?? '',
-      image_url: item.image_url ?? '',
-      answer: Number(item.answer) || 1,
-    });
-    setEditTarget(item);
+  const openEdit = async (item) => {
+    setActionId(item.id);
     setError('');
+
+    try {
+      let values = item;
+
+      if (item.status === 'published') {
+        try {
+          const revision = await apiGet(
+            `/adminapi/quiz-bank/true-false/${item.id}/pending-revision/`,
+          );
+          values = { ...item, ...(revision.payload || {}) };
+        } catch (err) {
+          if (err.status !== 404) throw err;
+        }
+      }
+
+      setForm(formFrom(values));
+      setEditTarget(item);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionId(null);
+    }
   };
 
   const uploadFile = async (file, resourceType, field, setUploading) => {
@@ -160,10 +201,9 @@ export default function QuizTrueFalse() {
       import.meta.env.VITE_CLOUDINARY_CLOUD_NAME,
     );
 
-    const suffix =
-      resourceType === 'image'
-        ? 'image/upload/f_auto,q_auto'
-        : 'video/upload';
+    const suffix = resourceType === 'image'
+      ? 'image/upload/f_auto,q_auto'
+      : 'video/upload';
 
     try {
       const response = await fetch(
@@ -179,7 +219,10 @@ export default function QuizTrueFalse() {
         [field]: result.secure_url,
       }));
     } catch (err) {
-      console.error(`${resourceType === 'image' ? '圖片' : '音檔'}上傳失敗`, err);
+      console.error(
+        `${resourceType === 'image' ? '圖片' : '音檔'}上傳失敗`,
+        err,
+      );
       setError(`${resourceType === 'image' ? '圖片' : '音檔'}上傳失敗`);
     } finally {
       setUploading(false);
@@ -199,10 +242,10 @@ export default function QuizTrueFalse() {
     };
 
     if (
-      !payload.question_ab ||
-      !payload.question_ch ||
-      !payload.audio_url ||
-      !payload.image_url
+      !payload.question_ab
+      || !payload.question_ch
+      || !payload.audio_url
+      || !payload.image_url
     ) {
       setError('族語句子、中文句意、音檔與圖片皆為必填');
       return;
@@ -218,10 +261,17 @@ export default function QuizTrueFalse() {
 
     try {
       if (editTarget.id) {
-        await apiPatch(
-          `/adminapi/quiz-bank/true-false/${editTarget.id}/`,
-          payload,
-        );
+        if (editTarget.status === 'published') {
+          await apiPost(
+            `/adminapi/quiz-bank/true-false/${editTarget.id}/pending-revision/`,
+            payload,
+          );
+        } else {
+          await apiPatch(
+            `/adminapi/quiz-bank/true-false/${editTarget.id}/`,
+            payload,
+          );
+        }
       } else {
         await apiPost('/adminapi/quiz-bank/true-false/', payload);
       }
@@ -238,11 +288,12 @@ export default function QuizTrueFalse() {
   const actionsFor = (item) => {
     const busy = actionId === item.id;
     const buttons = [];
+    const editable = (
+      EDITABLE_STATUSES.includes(item.status)
+      || item.status === 'published'
+    );
 
-    if (
-      EDITABLE_STATUSES.includes(item.status) &&
-      CONTENT_EDITORS.includes(role)
-    ) {
+    if (editable && CONTENT_EDITORS.includes(role)) {
       buttons.push(
         <Button
           key="edit"
@@ -254,6 +305,12 @@ export default function QuizTrueFalse() {
           <Edit3 size={14} /> 編輯
         </Button>,
       );
+    }
+
+    if (
+      EDITABLE_STATUSES.includes(item.status)
+      && CONTENT_EDITORS.includes(role)
+    ) {
       buttons.push(
         <Button
           key="submit"
@@ -282,8 +339,8 @@ export default function QuizTrueFalse() {
     }
 
     if (
-      item.status === 'pending_review' &&
-      CONTENT_EDITORS.includes(role)
+      item.status === 'pending_review'
+      && CONTENT_EDITORS.includes(role)
     ) {
       buttons.push(
         <Button
@@ -299,8 +356,8 @@ export default function QuizTrueFalse() {
     }
 
     if (
-      item.status === 'pending_review' &&
-      CONTENT_APPROVERS.includes(role)
+      item.status === 'pending_review'
+      && CONTENT_APPROVERS.includes(role)
     ) {
       buttons.push(
         <Button
@@ -308,9 +365,11 @@ export default function QuizTrueFalse() {
           size="sm"
           variant="outline-success"
           disabled={busy}
-          onClick={() =>
-            runAction(item, 'approve', { review_comment: '' })
-          }
+          onClick={() => runAction(
+            item,
+            'approve',
+            { review_comment: '' },
+          )}
         >
           <Check size={14} /> 核准
         </Button>,
@@ -321,10 +380,7 @@ export default function QuizTrueFalse() {
           size="sm"
           variant="outline-danger"
           disabled={busy}
-          onClick={() => {
-            setRejectTarget(item);
-            setRejectReason('');
-          }}
+          onClick={() => openReject(item)}
         >
           <X size={14} /> 退件
         </Button>,
@@ -332,8 +388,41 @@ export default function QuizTrueFalse() {
     }
 
     if (
-      item.status === 'published' &&
-      CONTENT_APPROVERS.includes(role)
+      item.status === 'published'
+      && item.has_pending_revision
+      && CONTENT_APPROVERS.includes(role)
+    ) {
+      buttons.push(
+        <Button
+          key="approve-revision"
+          size="sm"
+          variant="outline-success"
+          disabled={busy}
+          onClick={() => runAction(
+            item,
+            'pending-revision/approve',
+            { review_comment: '' },
+          )}
+        >
+          <Check size={14} /> 核准修改
+        </Button>,
+      );
+      buttons.push(
+        <Button
+          key="reject-revision"
+          size="sm"
+          variant="outline-danger"
+          disabled={busy}
+          onClick={() => openReject(item, true)}
+        >
+          <X size={14} /> 退件修改
+        </Button>,
+      );
+    }
+
+    if (
+      item.status === 'published'
+      && CONTENT_APPROVERS.includes(role)
     ) {
       buttons.push(
         <Button
@@ -351,13 +440,14 @@ export default function QuizTrueFalse() {
     return buttons;
   };
 
-  const canSave =
-    Boolean(form.question_ab.trim()) &&
-    Boolean(form.question_ch.trim()) &&
-    Boolean(form.audio_url.trim()) &&
-    Boolean(form.image_url.trim()) &&
-    !uploadingAudio &&
-    !uploadingImage;
+  const canSave = (
+    Boolean(form.question_ab.trim())
+    && Boolean(form.question_ch.trim())
+    && Boolean(form.audio_url.trim())
+    && Boolean(form.image_url.trim())
+    && !uploadingAudio
+    && !uploadingImage
+  );
 
   const hasNext = data.page * data.page_size < data.count;
 
@@ -376,9 +466,10 @@ export default function QuizTrueFalse() {
         <Form.Select
           aria-label="族語"
           value={filters.tribe}
-          onChange={(event) =>
-            setFilters({ ...filters, tribe: event.target.value })
-          }
+          onChange={(event) => setFilters({
+            ...filters,
+            tribe: event.target.value,
+          })}
         >
           <option value="">全部族語</option>
           {Object.entries(TRIBES).map(([value, label]) => (
@@ -391,9 +482,10 @@ export default function QuizTrueFalse() {
         <Form.Select
           aria-label="狀態"
           value={filters.status}
-          onChange={(event) =>
-            setFilters({ ...filters, status: event.target.value })
-          }
+          onChange={(event) => setFilters({
+            ...filters,
+            status: event.target.value,
+          })}
         >
           <option value="">全部狀態</option>
           {Object.entries(STATUSES).map(([value, meta]) => (
@@ -440,11 +532,25 @@ export default function QuizTrueFalse() {
                     <td className="quiz-bank-truncate-cell">
                       {item.question_ab}
                     </td>
-                    <td>{Number(item.answer) === 1 ? 'O 符合' : 'X 不符合'}</td>
                     <td>
-                      <Badge bg={STATUSES[item.status]?.bg ?? 'secondary'}>
-                        {STATUSES[item.status]?.label ?? item.status}
-                      </Badge>
+                      {Number(item.answer) === 1
+                        ? 'O 符合'
+                        : 'X 不符合'}
+                    </td>
+                    <td>
+                      <div className="d-flex flex-wrap align-items-center gap-1">
+                        <Badge
+                          bg={STATUSES[item.status]?.bg ?? 'secondary'}
+                        >
+                          {STATUSES[item.status]?.label ?? item.status}
+                        </Badge>
+                        {item.status === 'published'
+                          && item.has_pending_revision && (
+                          <Badge bg="warning" text="dark">
+                            有待審修改
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     <td>{item.created_by || '—'}</td>
                     <td>
@@ -496,7 +602,9 @@ export default function QuizTrueFalse() {
         <Form onSubmit={saveForm}>
           <Modal.Header closeButton>
             <Modal.Title>
-              {editTarget?.id ? '編輯初級是非題' : '新增初級是非題'}
+              {editTarget?.id
+                ? '編輯初級是非題'
+                : '新增初級是非題'}
             </Modal.Title>
           </Modal.Header>
 
@@ -508,9 +616,10 @@ export default function QuizTrueFalse() {
               <Form.Label>族語</Form.Label>
               <Form.Select
                 value={form.tribe}
-                onChange={(event) =>
-                  setForm({ ...form, tribe: event.target.value })
-                }
+                onChange={(event) => setForm({
+                  ...form,
+                  tribe: event.target.value,
+                })}
               >
                 {Object.entries(TRIBES).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -532,9 +641,10 @@ export default function QuizTrueFalse() {
                 rows={3}
                 required
                 value={form.question_ab}
-                onChange={(event) =>
-                  setForm({ ...form, question_ab: event.target.value })
-                }
+                onChange={(event) => setForm({
+                  ...form,
+                  question_ab: event.target.value,
+                })}
               />
             </Form.Group>
 
@@ -550,9 +660,10 @@ export default function QuizTrueFalse() {
                 rows={3}
                 required
                 value={form.question_ch}
-                onChange={(event) =>
-                  setForm({ ...form, question_ch: event.target.value })
-                }
+                onChange={(event) => setForm({
+                  ...form,
+                  question_ch: event.target.value,
+                })}
               />
             </Form.Group>
 
@@ -567,14 +678,12 @@ export default function QuizTrueFalse() {
                 type="file"
                 accept="audio/mpeg,.mp3"
                 disabled={uploadingAudio}
-                onChange={(event) =>
-                  uploadFile(
-                    event.target.files?.[0],
-                    'video',
-                    'audio_url',
-                    setUploadingAudio,
-                  )
-                }
+                onChange={(event) => uploadFile(
+                  event.target.files?.[0],
+                  'video',
+                  'audio_url',
+                  setUploadingAudio,
+                )}
               />
               {uploadingAudio && (
                 <Form.Text>
@@ -604,14 +713,12 @@ export default function QuizTrueFalse() {
                 type="file"
                 accept="image/*"
                 disabled={uploadingImage}
-                onChange={(event) =>
-                  uploadFile(
-                    event.target.files?.[0],
-                    'image',
-                    'image_url',
-                    setUploadingImage,
-                  )
-                }
+                onChange={(event) => uploadFile(
+                  event.target.files?.[0],
+                  'image',
+                  'image_url',
+                  setUploadingImage,
+                )}
               />
               {uploadingImage && (
                 <Form.Text>
@@ -679,11 +786,13 @@ export default function QuizTrueFalse() {
 
       <Modal
         show={Boolean(rejectTarget)}
-        onHide={() => setRejectTarget(null)}
+        onHide={closeReject}
         centered
       >
         <Modal.Header closeButton>
-          <Modal.Title>退件原因</Modal.Title>
+          <Modal.Title>
+            {rejectingRevision ? '退件修改原因' : '退件原因'}
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form.Group controlId="quiz-true-false-reject-reason">
@@ -694,7 +803,10 @@ export default function QuizTrueFalse() {
               required
               value={rejectReason}
               onChange={(event) => setRejectReason(event.target.value)}
-              isInvalid={Boolean(rejectTarget) && !rejectReason.trim()}
+              isInvalid={
+                Boolean(rejectTarget)
+                && !rejectReason.trim()
+              }
             />
             <Form.Control.Feedback type="invalid">
               退件理由為必填
@@ -702,20 +814,18 @@ export default function QuizTrueFalse() {
           </Form.Group>
         </Modal.Body>
         <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => setRejectTarget(null)}
-          >
+          <Button variant="secondary" onClick={closeReject}>
             取消
           </Button>
           <Button
             variant="danger"
             disabled={
-              !rejectReason.trim() || actionId === rejectTarget?.id
+              !rejectReason.trim()
+              || actionId === rejectTarget?.id
             }
             onClick={submitReject}
           >
-            確認退件
+            {rejectingRevision ? '確認退件修改' : '確認退件'}
           </Button>
         </Modal.Footer>
       </Modal>
