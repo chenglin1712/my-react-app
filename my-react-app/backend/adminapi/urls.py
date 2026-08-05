@@ -55,6 +55,8 @@ urlpatterns = [
     path('users/', user_views.user_list),
     path('users/<str:uid>/', user_views.user_detail),
     path('users/<str:uid>/role/', user_views.user_role),
+    path('users/<str:uid>/profile/', user_views.user_profile),
+    path('users/<str:uid>/password/', user_views.user_password),
     path('users/<str:uid>/suspend/', user_views.user_suspend),
     path('users/<str:uid>/unsuspend/', user_views.user_unsuspend),
     path('users/<str:uid>/force-logout/', user_views.user_force_logout),

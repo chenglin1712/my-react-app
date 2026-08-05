@@ -9,6 +9,8 @@ Firestore `users/{uid}` 文件，唯一落地在 Django ORM 的只有 AuditLog�
 Python 記憶體裡做，跟 Announcement.tribes 篩選同一種務實選擇。
 """
 import logging
+from datetime import datetime
+from datetime import timezone as dt_timezone
 
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -60,8 +62,14 @@ def _merge_user(user_record, firestore_data):
 
 @csrf_exempt
 def user_list(request):
-    if request.method != "GET":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
+    if request.method == "GET":
+        return _list_users(request)
+    if request.method == "POST":
+        return _create_user(request)
+    return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+
+def _list_users(request):
     decoded, err_resp = require_role(request, STAFF_ROLES)
     if err_resp:
         return err_resp
@@ -120,6 +128,101 @@ def user_list(request):
         "page": page,
         "page_size": page_size,
     })
+
+
+def _default_firestore_user_doc(email, name, identity, avatar_url):
+    """新帳號的 Firestore users/{uid} 文件初始形狀，逐欄位比照前台
+    userServive.jsx 的 registerWithImg()——後台建立的帳號跟前台註冊出來的
+    帳號要長得一模一樣，不能讓某些欄位（例如 favorites／user_errors）
+    缺漏，否則這個使用者第一次用某些前台功能時會因為欄位不存在而出錯
+    （initUserFields 雖然會補欄位，但那是要等使用者登入後才會跑一次，
+    後台建立當下就該是完整的）。"""
+    return {
+        "name": name,
+        "email": email,
+        "identity": identity,
+        "favorites": [
+            {"id": 1, "title": "基礎詞彙", "content": []},
+            {"id": 2, "title": "日常對話", "content": []},
+            {"id": 3, "title": "旅遊用語", "content": []},
+        ],
+        "user_errors": {},
+        "joinDate": datetime.now(dt_timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+        "avatarUrl": avatar_url or "",
+    }
+
+
+def _create_user(request):
+    """後台直接建立使用者帳號——不一定要透過前台 /register 走一次公開
+    註冊流程（P3.8 的既有決策）。ACCOUNT_MANAGERS 就能建立一般帳號，但
+    建立當下要順便指派角色（role 欄位非 null）時，額外要求呼叫者是
+    owner——跟獨立的角色指派端點（user_role）同一道防線，不能因為走的是
+    建立帳號這條路就繞過「只有 owner 能指派角色」。"""
+    decoded, err_resp = require_role(request, ACCOUNT_MANAGERS)
+    if err_resp:
+        return err_resp
+    limited_resp = _rate_limited_response(request, decoded, group="user_create", rate="10/m")
+    if limited_resp:
+        return limited_resp
+
+    data, err_resp = _parse_json_body(request)
+    if err_resp:
+        return err_resp
+
+    email = (data.get("email") or "").strip()
+    password = data.get("password") or ""
+    name = (data.get("name") or "").strip()
+    identity = (data.get("identity") or "學生").strip()
+    avatar_url = (data.get("avatar_url") or "").strip()
+    role = data.get("role")
+
+    if not email or not name:
+        return JsonResponse({"detail": "email 與姓名為必填"}, status=400)
+    if len(password) < 6:
+        return JsonResponse({"detail": "密碼至少需要 6 個字元"}, status=400)
+    if role is not None and role not in STAFF_ROLES:
+        return JsonResponse({"detail": "無效的角色"}, status=400)
+    if role is not None and decoded.get("role") != OWNER:
+        return JsonResponse({"detail": "只有 owner 可以在建立帳號時指派角色"}, status=403)
+
+    from firebase_admin import auth as firebase_auth
+    try:
+        user_record = firebase_ops.create_firebase_user(email, password, display_name=name)
+    except firebase_auth.EmailAlreadyExistsError:
+        return JsonResponse({"detail": "這個 email 已經被使用"}, status=400)
+    except (ValueError, firebase_auth.FirebaseError) as e:
+        # ValueError 是 Admin SDK 對 email 格式等參數做用戶端驗證失敗時丟出；
+        # FirebaseError 涵蓋其餘伺服器端拒絕的情況。訊息本身是英文但已經
+        # 夠明確，直接透出比自己重新設計一份錯誤訊息更不容易漏掉 SDK
+        # 版本更新後新增的檢查項目。
+        return JsonResponse({"detail": str(e)}, status=400)
+
+    client = firebase_ops.get_firestore_client()
+    try:
+        client.collection("users").document(user_record.uid).set(
+            _default_firestore_user_doc(email, name, identity, avatar_url)
+        )
+    except Exception:
+        # Firestore 文件沒建成功的帳號能登入、但前台幾乎每個功能都會因為
+        # users/{uid} 不存在而出錯——這種「半殘帳號」比完全沒建立更糟，
+        # 寧可把剛剛建立的 Auth 帳號刪掉、讓整個操作乾淨失敗，也不要留著。
+        logger.exception("建立使用者 %s 的 Firestore 文件失敗，嘗試 rollback Auth 帳號", email)
+        try:
+            firebase_ops.delete_firebase_user(user_record.uid)
+        except Exception:
+            logger.exception("rollback 建立失敗的 Auth 帳號 %s 也失敗，需人工複查", user_record.uid)
+        return JsonResponse({"detail": "建立使用者失敗，請稍後再試"}, status=500)
+
+    if role is not None:
+        firebase_ops.set_user_role(user_record.uid, role)
+
+    _safe_write_audit_log(
+        request, decoded, "create_user", user_record.uid, target_type="user",
+        after={"email": email, "name": name, "identity": identity, "role": role},
+    )
+
+    payload = _merge_user(user_record, {"name": name, "identity": identity, "avatarUrl": avatar_url})
+    return JsonResponse(payload, status=201)
 
 
 @csrf_exempt
@@ -191,6 +294,126 @@ def user_role(request, uid):
         before={"role": old_role}, after={"role": role},
     )
     return JsonResponse({"uid": uid, "role": role})
+
+
+@csrf_exempt
+def user_profile(request, uid):
+    """編輯使用者基本資料——name／identity／avatar_url 是 Firestore
+    users/{uid} 文件的欄位，email 選填、有帶才同步更新 Firebase Auth
+    （前台註冊時兩邊各存一份，見 userServive.jsx 的 registerWithImg，
+    這裡改了 Auth 這邊也要跟著改，不然兩邊會不一致）。partial update：
+    body 裡沒帶到的欄位維持原值不動。"""
+    if request.method != "PATCH":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+    decoded, err_resp = require_role(request, ACCOUNT_MANAGERS)
+    if err_resp:
+        return err_resp
+    limited_resp = _rate_limited_response(request, decoded, group="user_profile", rate="30/m")
+    if limited_resp:
+        return limited_resp
+
+    data, err_resp = _parse_json_body(request)
+    if err_resp:
+        return err_resp
+
+    from firebase_admin import auth as firebase_auth
+    try:
+        user_record = firebase_ops.get_firebase_user(uid)
+    except firebase_auth.UserNotFoundError:
+        return JsonResponse({"detail": "找不到這個使用者"}, status=404)
+    forbidden_resp = _forbidden_if_target_outranks(decoded, user_record)
+    if forbidden_resp:
+        return forbidden_resp
+
+    client = firebase_ops.get_firestore_client()
+    doc_ref = client.collection("users").document(uid)
+    before_snapshot = doc_ref.get()
+    before_data = before_snapshot.to_dict() if before_snapshot.exists else {}
+
+    firestore_updates = {}
+    if "name" in data:
+        name = (data.get("name") or "").strip()
+        if not name:
+            return JsonResponse({"detail": "姓名不可為空"}, status=400)
+        firestore_updates["name"] = name
+    if "identity" in data:
+        firestore_updates["identity"] = (data.get("identity") or "").strip()
+    if "avatar_url" in data:
+        firestore_updates["avatarUrl"] = (data.get("avatar_url") or "").strip()
+
+    new_email = data.get("email")
+    if new_email is not None:
+        new_email = new_email.strip()
+        if not new_email:
+            return JsonResponse({"detail": "email 不可為空"}, status=400)
+        if new_email != user_record.email:
+            try:
+                firebase_ops.set_user_email(uid, new_email)
+            except firebase_auth.EmailAlreadyExistsError:
+                return JsonResponse({"detail": "這個 email 已經被使用"}, status=400)
+            except (ValueError, firebase_auth.FirebaseError) as e:
+                return JsonResponse({"detail": str(e)}, status=400)
+            firestore_updates["email"] = new_email
+
+    if firestore_updates:
+        doc_ref.set(firestore_updates, merge=True)
+
+    _safe_write_audit_log(
+        request, decoded, "update_profile", uid, target_type="user",
+        before=before_data, after={**before_data, **firestore_updates},
+    )
+
+    updated_record = firebase_ops.get_firebase_user(uid)
+    updated_doc = doc_ref.get()
+    payload = _merge_user(updated_record, updated_doc.to_dict() if updated_doc.exists else {})
+    return JsonResponse(payload)
+
+
+@csrf_exempt
+def user_password(request, uid):
+    """管理員代使用者變更密碼——比停權/刪除更敏感（等於能無聲完整接管
+    帳號登入身分），比照刪除帳號的確認強度，要求輸入目標帳號 email 逐字
+    相符才會執行；成功後強制 revoke_sessions，被改密碼的人手上所有舊
+    登入立刻失效（也是在提示使用者「有異常」的唯一訊號，因為我們不會
+    寄信通知）。稽核紀錄故意不存新密碼本身，只記錄「密碼已變更」這個
+    事實，避免明文密碼留在 AuditLog 裡。"""
+    if request.method != "POST":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+    decoded, err_resp = require_role(request, ACCOUNT_MANAGERS)
+    if err_resp:
+        return err_resp
+    limited_resp = _rate_limited_response(request, decoded, group="user_password", rate="10/m")
+    if limited_resp:
+        return limited_resp
+
+    data, err_resp = _parse_json_body(request)
+    if err_resp:
+        return err_resp
+
+    new_password = data.get("new_password") or ""
+    if len(new_password) < 6:
+        return JsonResponse({"detail": "密碼至少需要 6 個字元"}, status=400)
+
+    from firebase_admin import auth as firebase_auth
+    try:
+        user_record = firebase_ops.get_firebase_user(uid)
+    except firebase_auth.UserNotFoundError:
+        return JsonResponse({"detail": "找不到這個使用者"}, status=404)
+    forbidden_resp = _forbidden_if_target_outranks(decoded, user_record)
+    if forbidden_resp:
+        return forbidden_resp
+
+    confirm_email = (data.get("confirm_email") or "").strip()
+    if not confirm_email or confirm_email != user_record.email:
+        return JsonResponse({"detail": "輸入的 email 與目標帳號不符"}, status=400)
+
+    firebase_ops.set_user_password(uid, new_password)
+    firebase_ops.revoke_sessions(uid)
+    _safe_write_audit_log(
+        request, decoded, "change_password", uid, target_type="user",
+        after={"password_changed": True},
+    )
+    return JsonResponse({"uid": uid, "password_changed": True})
 
 
 @csrf_exempt

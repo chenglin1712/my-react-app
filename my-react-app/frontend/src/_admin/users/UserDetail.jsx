@@ -13,6 +13,9 @@ import {
   Ban,
   CheckCircle2,
   Download,
+  Edit3,
+  ImagePlus,
+  KeyRound,
   LogOut,
   Shield,
   Trash2,
@@ -21,7 +24,11 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
-import { apiGet, apiPost } from '../../../utils/apiClient';
+import {
+  apiGet,
+  apiPatch,
+  apiPost,
+} from '../../../utils/apiClient';
 import '../../../static/css/_admin/users.css';
 
 const STAFF_ROLES = ['owner', 'admin', 'editor', 'reviewer', 'analyst'];
@@ -46,6 +53,19 @@ const DELETE_RESULT_LABELS = {
   pronunciations: '發音錄音',
   firestore_user_document: 'Firestore 使用者文件',
   firebase_auth: 'Firebase Auth 帳號',
+};
+
+const EMPTY_PROFILE_FORM = {
+  name: '',
+  identity: '',
+  avatar_url: '',
+  email: '',
+};
+
+const EMPTY_PASSWORD_FORM = {
+  newPassword: '',
+  confirmPassword: '',
+  confirmEmail: '',
 };
 
 const formatDateTime = (value) => (
@@ -114,6 +134,14 @@ export default function UserDetail() {
   const [action, setAction] = useState('');
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileForm, setProfileForm] = useState(EMPTY_PROFILE_FORM);
+  const [avatarPreview, setAvatarPreview] = useState('');
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordForm, setPasswordForm] = useState(EMPTY_PASSWORD_FORM);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState('');
@@ -233,6 +261,155 @@ export default function UserDetail() {
 
       URL.revokeObjectURL(url);
       setSuccessMessage('個資匯出檔已開始下載。');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAction('');
+    }
+  };
+
+  const openProfileModal = () => {
+    setProfileForm({
+      name: user.name ?? '',
+      identity: user.identity ?? '',
+      avatar_url: user.avatar_url ?? '',
+      email: user.email ?? '',
+    });
+    setAvatarPreview(user.avatar_url ?? '');
+    setError('');
+    setShowProfileModal(true);
+  };
+
+  const closeProfileModal = () => {
+    if (action === 'profile' || avatarUploading) return;
+
+    setShowProfileModal(false);
+    setProfileForm(EMPTY_PROFILE_FORM);
+    setAvatarPreview('');
+  };
+
+  const updateProfileForm = (field, value) => {
+    setProfileForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const handleAvatarFileChange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError('圖片不得超過 5 MB，請重新選擇。');
+      return;
+    }
+
+    setError('');
+    setAvatarPreview(URL.createObjectURL(file));
+    setAvatarUploading(true);
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
+    formData.append('cloud_name', import.meta.env.VITE_CLOUDINARY_CLOUD_NAME);
+
+    try {
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/f_auto,q_auto`,
+        { method: 'POST', body: formData },
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const result = await response.json();
+      updateProfileForm('avatar_url', result.secure_url);
+      setAvatarPreview(result.secure_url);
+    } catch (err) {
+      console.error('頭像上傳失敗', err);
+      setError('頭像上傳失敗，請重新選擇圖片。');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const saveProfile = async (event) => {
+    event.preventDefault();
+
+    if (avatarUploading) {
+      setError('請等待頭像上傳完成');
+      return;
+    }
+
+    setAction('profile');
+    setError('');
+    setSuccessMessage('');
+
+    try {
+      await apiPatch(
+        `/adminapi/users/${uid}/profile/`,
+        {
+          name: profileForm.name,
+          identity: profileForm.identity,
+          avatar_url: profileForm.avatar_url,
+          email: profileForm.email,
+        },
+      );
+
+      setShowProfileModal(false);
+      setProfileForm(EMPTY_PROFILE_FORM);
+      setSuccessMessage('使用者資料已更新。');
+      await loadUser();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAction('');
+    }
+  };
+
+  const openPasswordModal = () => {
+    setPasswordForm(EMPTY_PASSWORD_FORM);
+    setError('');
+    setShowPasswordModal(true);
+  };
+
+  const closePasswordModal = () => {
+    if (action === 'password') return;
+
+    setShowPasswordModal(false);
+    setPasswordForm(EMPTY_PASSWORD_FORM);
+  };
+
+  const updatePasswordForm = (field, value) => {
+    setPasswordForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const passwordCanSubmit = (
+    passwordForm.newPassword.length >= 6
+    && passwordForm.confirmPassword === passwordForm.newPassword
+    && passwordForm.confirmEmail === user?.email
+  );
+
+  const changePassword = async (event) => {
+    event.preventDefault();
+
+    if (!passwordCanSubmit) return;
+
+    setAction('password');
+    setError('');
+    setSuccessMessage('');
+
+    try {
+      await apiPost(
+        `/adminapi/users/${uid}/password/`,
+        {
+          new_password: passwordForm.newPassword,
+          confirm_email: passwordForm.confirmEmail,
+        },
+      );
+
+      setShowPasswordModal(false);
+      setPasswordForm(EMPTY_PASSWORD_FORM);
+      setSuccessMessage('密碼已變更，並已撤銷此帳號現有的登入狀態。');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -367,6 +544,11 @@ export default function UserDetail() {
       </main>
     );
   }
+
+  const canManageTarget = (
+    canManageAccount
+    && (user.role !== 'owner' || role === 'owner')
+  );
 
   return (
     <main className="user-admin-page user-detail-page">
@@ -555,6 +737,48 @@ export default function UserDetail() {
 
           {canManageAccount && (
             <>
+              {canManageTarget && (
+                <>
+                  <div className="user-action-section">
+                    <div>
+                      <h3>
+                        <Edit3 size={18} />
+                        編輯資料
+                      </h3>
+                      <p>更新姓名、身分、頭像網址或 Email。</p>
+                    </div>
+
+                    <Button
+                      variant="outline-primary"
+                      disabled={Boolean(action)}
+                      onClick={openProfileModal}
+                    >
+                      <Edit3 size={16} />
+                      編輯
+                    </Button>
+                  </div>
+
+                  <div className="user-action-section">
+                    <div>
+                      <h3>
+                        <KeyRound size={18} />
+                        變更密碼
+                      </h3>
+                      <p>此操作會立即撤銷此帳號現有的登入狀態。</p>
+                    </div>
+
+                    <Button
+                      variant="outline-danger"
+                      disabled={Boolean(action)}
+                      onClick={openPasswordModal}
+                    >
+                      <KeyRound size={16} />
+                      變更密碼
+                    </Button>
+                  </div>
+                </>
+              )}
+
               <div className="user-action-section">
                 <div>
                   <h3>
@@ -656,6 +880,212 @@ export default function UserDetail() {
           )}
         </section>
       )}
+
+      <Modal
+        show={showProfileModal}
+        onHide={closeProfileModal}
+        centered
+        backdrop={action === 'profile' || avatarUploading ? 'static' : true}
+        keyboard={action !== 'profile' && !avatarUploading}
+      >
+        <Form onSubmit={saveProfile}>
+          <Modal.Header closeButton={action !== 'profile' && !avatarUploading}>
+            <Modal.Title>編輯使用者資料</Modal.Title>
+          </Modal.Header>
+
+          <Modal.Body>
+            <Form.Group className="mb-3" controlId="profile-name">
+              <Form.Label>姓名</Form.Label>
+              <Form.Control
+                required
+                disabled={action === 'profile'}
+                value={profileForm.name}
+                onChange={(event) => updateProfileForm(
+                  'name',
+                  event.target.value,
+                )}
+              />
+            </Form.Group>
+
+            <Form.Group className="mb-3" controlId="profile-identity">
+              <Form.Label>身分</Form.Label>
+              <Form.Control
+                disabled={action === 'profile'}
+                value={profileForm.identity}
+                onChange={(event) => updateProfileForm(
+                  'identity',
+                  event.target.value,
+                )}
+              />
+            </Form.Group>
+
+            <Form.Group className="mb-3" controlId="profile-avatar-url">
+              <Form.Label>頭像</Form.Label>
+              <div className="user-avatar-uploader">
+                {avatarPreview ? (
+                  <img
+                    className="user-avatar-uploader-preview"
+                    src={avatarPreview}
+                    alt="頭像預覽"
+                  />
+                ) : (
+                  <div className="user-avatar-uploader-placeholder">
+                    <ImagePlus size={24} aria-hidden="true" />
+                  </div>
+                )}
+
+                <div>
+                  <Form.Control
+                    type="file"
+                    accept="image/jpeg,image/png"
+                    disabled={action === 'profile' || avatarUploading}
+                    onChange={handleAvatarFileChange}
+                  />
+                  <Form.Text>僅接受 JPG／PNG，檔案大小不得超過 5 MB。</Form.Text>
+                  {avatarUploading && (
+                    <span className="user-upload-status">
+                      <Spinner animation="border" size="sm" />
+                      頭像上傳中……
+                    </span>
+                  )}
+                </div>
+              </div>
+            </Form.Group>
+
+            <Form.Group controlId="profile-email">
+              <Form.Label>Email</Form.Label>
+              <Form.Control
+                type="email"
+                required
+                disabled={action === 'profile'}
+                value={profileForm.email}
+                onChange={(event) => updateProfileForm(
+                  'email',
+                  event.target.value,
+                )}
+              />
+            </Form.Group>
+          </Modal.Body>
+
+          <Modal.Footer>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={action === 'profile' || avatarUploading}
+              onClick={closeProfileModal}
+            >
+              取消
+            </Button>
+
+            <Button type="submit" disabled={action === 'profile' || avatarUploading}>
+              {action === 'profile' ? (
+                <Spinner animation="border" size="sm" />
+              ) : (
+                <Edit3 size={16} />
+              )}
+              儲存
+            </Button>
+          </Modal.Footer>
+        </Form>
+      </Modal>
+
+      <Modal
+        show={showPasswordModal}
+        onHide={closePasswordModal}
+        centered
+        backdrop={action === 'password' ? 'static' : true}
+        keyboard={action !== 'password'}
+      >
+        <Form onSubmit={changePassword}>
+          <Modal.Header closeButton={action !== 'password'}>
+            <Modal.Title>變更密碼</Modal.Title>
+          </Modal.Header>
+
+          <Modal.Body>
+            <Alert variant="danger">
+              此操作無法復原，請輸入該帳號的 email（{user.email}）以確認變更密碼。
+            </Alert>
+
+            <Form.Group className="mb-3" controlId="password-new">
+              <Form.Label>新密碼</Form.Label>
+              <Form.Control
+                type="password"
+                minLength={6}
+                required
+                autoComplete="new-password"
+                disabled={action === 'password'}
+                value={passwordForm.newPassword}
+                onChange={(event) => updatePasswordForm(
+                  'newPassword',
+                  event.target.value,
+                )}
+              />
+              <Form.Text>密碼至少需要 6 個字元。</Form.Text>
+            </Form.Group>
+
+            <Form.Group className="mb-3" controlId="password-confirm">
+              <Form.Label>確認新密碼</Form.Label>
+              <Form.Control
+                type="password"
+                minLength={6}
+                required
+                autoComplete="new-password"
+                disabled={action === 'password'}
+                value={passwordForm.confirmPassword}
+                isInvalid={
+                  Boolean(passwordForm.confirmPassword)
+                  && passwordForm.confirmPassword !== passwordForm.newPassword
+                }
+                onChange={(event) => updatePasswordForm(
+                  'confirmPassword',
+                  event.target.value,
+                )}
+              />
+              <Form.Control.Feedback type="invalid">
+                兩次輸入的密碼不相同。
+              </Form.Control.Feedback>
+            </Form.Group>
+
+            <Form.Group controlId="password-confirm-email">
+              <Form.Label>帳號 Email</Form.Label>
+              <Form.Control
+                aria-label="輸入帳號 Email 以確認變更密碼"
+                autoComplete="off"
+                disabled={action === 'password'}
+                value={passwordForm.confirmEmail}
+                onChange={(event) => updatePasswordForm(
+                  'confirmEmail',
+                  event.target.value,
+                )}
+              />
+            </Form.Group>
+          </Modal.Body>
+
+          <Modal.Footer>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={action === 'password'}
+              onClick={closePasswordModal}
+            >
+              取消
+            </Button>
+
+            <Button
+              type="submit"
+              variant="danger"
+              disabled={action === 'password' || !passwordCanSubmit}
+            >
+              {action === 'password' ? (
+                <Spinner animation="border" size="sm" />
+              ) : (
+                <KeyRound size={16} />
+              )}
+              確認變更密碼
+            </Button>
+          </Modal.Footer>
+        </Form>
+      </Modal>
 
       <Modal
         show={showDeleteModal}

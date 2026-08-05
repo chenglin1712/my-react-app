@@ -14,6 +14,7 @@ import IrtConfig from './content/IrtConfig';
 import QuizTrueFalse from './content/QuizTrueFalse';
 import QuizChoice from './content/QuizChoice';
 import UserList from './users/UserList';
+import UserCreate from './users/UserCreate';
 import UserDetail from './users/UserDetail';
 import SharedNotesModeration from './moderation/SharedNotesModeration';
 import RecordingsModeration from './moderation/RecordingsModeration';
@@ -53,6 +54,7 @@ const AdminApp = () => {
                 <Route path="quiz-bank/situations" element={<QuizSituations />} />
                 <Route path="quiz-bank/irt-config" element={<IrtConfig />} />
                 <Route path="users" element={<UserList />} />
+                <Route path="users/new" element={<UserCreate />} />
                 <Route path="users/:uid" element={<UserDetail />} />
                 <Route path="review" element={<ReviewQueue />} />
                 <Route path="moderation/notes" element={<SharedNotesModeration />} />

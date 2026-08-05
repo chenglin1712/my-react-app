@@ -441,3 +441,51 @@
     gap: 4px;
   }
 }
+
+/* 新增使用者／編輯資料表單的必填欄位星號（UserCreate.jsx） */
+.required-mark {
+  color: var(--yy-red, #9e1b24);
+}
+
+/* 新增使用者／編輯資料表單的頭像上傳（UserCreate.jsx／UserDetail.jsx），
+   比照 AnnouncementEditor.jsx 的封面圖上傳樣式，改成圓形預覽。 */
+.user-avatar-uploader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px;
+  border: 1px dashed #adb5bd;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.user-avatar-uploader-preview,
+.user-avatar-uploader-placeholder {
+  flex: 0 0 auto;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #e9ecef;
+}
+
+.user-avatar-uploader-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6c757d;
+}
+
+.user-avatar-uploader > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-upload-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 8px;
+  color: var(--yy-text-muted, #6b5a47);
+  font-size: 14px;
+}

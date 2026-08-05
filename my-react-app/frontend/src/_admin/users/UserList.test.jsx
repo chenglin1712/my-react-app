@@ -108,6 +108,34 @@ describe('UserList', () => {
     ).toHaveAttribute('href', '/admin/users/abc123');
   });
 
+  test.each(['owner', 'admin'])(
+    '%s 可以看到新增使用者按鈕',
+    async (role) => {
+      mockRole = role;
+
+      renderPage();
+      await screen.findByText('王小明');
+
+      expect(
+        screen.getByRole('button', { name: /新增使用者/ }),
+      ).toHaveAttribute('href', '/admin/users/new');
+    },
+  );
+
+  test.each(['editor', 'reviewer', 'analyst'])(
+    '%s 看不到新增使用者按鈕',
+    async (role) => {
+      mockRole = role;
+
+      renderPage();
+      await screen.findByText('王小明');
+
+      expect(
+        screen.queryByRole('button', { name: /新增使用者/ }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
   test('送出篩選後以完整條件重新查詢', async () => {
     renderPage();
     await screen.findByText('王小明');
@@ -164,7 +192,7 @@ describe('UserList', () => {
     });
   });
 
-  test('非 STAFF_ROLES 不呼叫 API 並顯示權限訊息', async () => {
+  test('非 STAFF_ROLES 不呼叫 API 並顯示權限訊息', () => {
     mockRole = null;
 
     renderPage();

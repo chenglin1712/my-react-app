@@ -125,3 +125,33 @@ def delete_firebase_user(uid):
     ensure_firebase_initialized()
     from firebase_admin import auth as firebase_auth
     firebase_auth.delete_user(uid)
+
+
+def create_firebase_user(email, password, display_name=None):
+    """後台直接建立帳號用（P3.8）——跟前台 /register 的
+    createUserWithEmailAndPassword 是同一個 Firebase 專案、同一種帳號，
+    差別只在這裡是管理員代替使用者建立，不需要使用者自己在前台走一次
+    註冊流程。email 重複時讓 firebase_admin.auth.EmailAlreadyExistsError
+    原樣往外拋，呼叫端自行 catch 轉成 400。"""
+    ensure_firebase_initialized()
+    from firebase_admin import auth as firebase_auth
+    return firebase_auth.create_user(email=email, password=password, display_name=display_name)
+
+
+def set_user_password(uid, new_password):
+    """管理員代使用者設定新密碼——比停權/刪除更敏感（等於能無聲完整接管
+    帳號），呼叫端要求輸入目標帳號 email 確認、且動作後一定要
+    revoke_sessions，讓被改密碼的人手上的舊登入立刻失效。"""
+    ensure_firebase_initialized()
+    from firebase_admin import auth as firebase_auth
+    firebase_auth.update_user(uid, password=new_password)
+
+
+def set_user_email(uid, new_email):
+    """更新 Firebase Auth 的 email——呼叫端要記得同步更新 Firestore
+    users/{uid} 文件的 email 欄位（前台註冊時兩邊各存一份，見
+    userServive.jsx 的 registerWithImg），不然兩邊會不一致。email 重複時
+    讓 EmailAlreadyExistsError 原樣往外拋，呼叫端自行 catch 轉成 400。"""
+    ensure_firebase_initialized()
+    from firebase_admin import auth as firebase_auth
+    firebase_auth.update_user(uid, email=new_email)

@@ -10,6 +10,7 @@ import {
 } from 'react-bootstrap';
 import {
   Eye,
+  Plus,
   Search,
   User,
 } from 'lucide-react';
@@ -17,6 +18,7 @@ import { useAuth } from '../../userServives/authContext';
 import { apiGet } from '../../../utils/apiClient';
 import '../../../static/css/_admin/users.css';
 
+const ACCOUNT_MANAGERS = ['owner', 'admin'];
 const STAFF_ROLES = ['owner', 'admin', 'editor', 'reviewer', 'analyst'];
 
 const ROLE_LABELS = {
@@ -40,6 +42,7 @@ export default function UserList() {
   const { userData } = useAuth();
   const role = userData?.role;
   const canViewUsers = STAFF_ROLES.includes(role);
+  const canCreateUser = ACCOUNT_MANAGERS.includes(role);
 
   const [filters, setFilters] = useState({
     keyword: '',
@@ -116,6 +119,13 @@ export default function UserList() {
           <h1>使用者管理</h1>
           <p>搜尋使用者並檢視帳號、身分與後台角色狀態</p>
         </div>
+
+        {canCreateUser && (
+          <Button as={Link} to="/admin/users/new">
+            <Plus size={18} />
+            新增使用者
+          </Button>
+        )}
       </div>
 
       {error && <Alert variant="danger">{error}</Alert>}

@@ -29,6 +29,10 @@ def _post_json(client, url, headers, payload=None):
     return client.post(url, data=json.dumps(payload or {}), content_type="application/json", **headers)
 
 
+def _patch_json(client, url, headers, payload=None):
+    return client.patch(url, data=json.dumps(payload or {}), content_type="application/json", **headers)
+
+
 def _fake_user_record(uid, email="user@example.com", disabled=False, role=None,
                        verified=True, created=1700000000000, last_sign_in=1700000001000):
     return SimpleNamespace(
@@ -144,6 +148,99 @@ class UserListTest(TestCase):
         self.assertEqual(data["results"][0]["uid"], "uid1")
 
 
+class UserCreateTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+    def test_requires_account_manager(self):
+        with _as_role(EDITOR) as headers:
+            resp = _post_json(self.client, '/adminapi/users/', headers, {
+                "email": "new@example.com", "password": "secret1", "name": "New User",
+            })
+        self.assertEqual(resp.status_code, 403)
+
+    def test_password_too_short_rejected(self):
+        with _as_role(ADMIN) as headers:
+            resp = _post_json(self.client, '/adminapi/users/', headers, {
+                "email": "new@example.com", "password": "abc", "name": "New User",
+            })
+        self.assertEqual(resp.status_code, 400)
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.create_firebase_user")
+    def test_creates_auth_account_and_firestore_doc(self, mock_create, mock_client_fn):
+        mock_create.return_value = _fake_user_record("new-uid", email="new@example.com")
+        mock_client, users_doc_ref = _build_client_router(users_doc=None, notes=[], recordings=[])
+        mock_client_fn.return_value = mock_client
+
+        with _as_role(ADMIN) as headers:
+            resp = _post_json(self.client, '/adminapi/users/', headers, {
+                "email": "new@example.com", "password": "secret1",
+                "name": "New User", "identity": "老師",
+            })
+        self.assertEqual(resp.status_code, 201)
+        mock_create.assert_called_once_with("new@example.com", "secret1", display_name="New User")
+        users_doc_ref.set.assert_called_once()
+        firestore_doc = users_doc_ref.set.call_args[0][0]
+        self.assertEqual(firestore_doc["name"], "New User")
+        self.assertEqual(firestore_doc["identity"], "老師")
+        self.assertEqual(firestore_doc["email"], "new@example.com")
+        self.assertEqual(firestore_doc["favorites"][0]["title"], "基礎詞彙")
+        self.assertEqual(firestore_doc["user_errors"], {})
+        self.assertIn("joinDate", firestore_doc)
+        self.assertEqual(AuditLog.objects.filter(action="create_user").count(), 1)
+
+    @patch("adminapi.firebase_ops.create_firebase_user")
+    def test_duplicate_email_rejected(self, mock_create):
+        from firebase_admin.auth import EmailAlreadyExistsError
+        mock_create.side_effect = EmailAlreadyExistsError("dup", cause=None, http_response=None)
+        with _as_role(ADMIN) as headers:
+            resp = _post_json(self.client, '/adminapi/users/', headers, {
+                "email": "dup@example.com", "password": "secret1", "name": "Dup",
+            })
+        self.assertEqual(resp.status_code, 400)
+
+    def test_non_owner_cannot_assign_role_at_creation(self):
+        with _as_role(ADMIN) as headers:
+            resp = _post_json(self.client, '/adminapi/users/', headers, {
+                "email": "new@example.com", "password": "secret1", "name": "New User", "role": "editor",
+            })
+        self.assertEqual(resp.status_code, 403)
+
+    @patch("adminapi.firebase_ops.set_user_role")
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.create_firebase_user")
+    def test_owner_can_assign_role_at_creation(self, mock_create, mock_client_fn, mock_set_role):
+        mock_create.return_value = _fake_user_record("new-uid", email="new@example.com")
+        mock_client, _ = _build_client_router(users_doc=None, notes=[], recordings=[])
+        mock_client_fn.return_value = mock_client
+
+        with _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/users/', headers, {
+                "email": "new@example.com", "password": "secret1", "name": "New User", "role": "editor",
+            })
+        self.assertEqual(resp.status_code, 201)
+        mock_set_role.assert_called_once_with("new-uid", "editor")
+
+    @patch("adminapi.firebase_ops.delete_firebase_user")
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.create_firebase_user")
+    def test_rolls_back_auth_account_when_firestore_write_fails(self, mock_create, mock_client_fn, mock_delete):
+        """Firestore 文件建立失敗時，剛建立的 Auth 帳號要被刪掉，不留下
+        「能登入但沒有 users 文件」的半殘帳號。"""
+        mock_create.return_value = _fake_user_record("new-uid", email="new@example.com")
+        mock_client = MagicMock()
+        mock_client.collection.return_value.document.return_value.set.side_effect = Exception("firestore down")
+        mock_client_fn.return_value = mock_client
+
+        with _as_role(ADMIN) as headers:
+            resp = _post_json(self.client, '/adminapi/users/', headers, {
+                "email": "new@example.com", "password": "secret1", "name": "New User",
+            })
+        self.assertEqual(resp.status_code, 500)
+        mock_delete.assert_called_once_with("new-uid")
+
+
 class UserDetailTest(TestCase):
     def setUp(self):
         self.client = Client()
@@ -217,6 +314,145 @@ class UserRoleTest(TestCase):
             resp = _post_json(self.client, '/adminapi/users/uid1/role/', headers, {"role": None})
         self.assertEqual(resp.status_code, 200)
         mock_set_role.assert_called_once_with("uid1", None)
+
+
+class UserProfileTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_requires_account_manager(self, mock_get_user, mock_client_fn):
+        mock_get_user.return_value = _fake_user_record("uid1")
+        with _as_role(EDITOR) as headers:
+            resp = _patch_json(self.client, '/adminapi/users/uid1/profile/', headers, {"name": "New Name"})
+        self.assertEqual(resp.status_code, 403)
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_updates_name_identity_avatar(self, mock_get_user, mock_client_fn):
+        mock_get_user.return_value = _fake_user_record("uid1", email="alice@example.com")
+        before_doc = _fake_snapshot("uid1", {"name": "Old Name", "identity": "學生", "avatarUrl": ""})
+        after_doc = _fake_snapshot("uid1", {"name": "New Name", "identity": "老師", "avatarUrl": "https://x/a.png"})
+        mock_client, users_doc_ref = _build_client_router(users_doc=before_doc, notes=[], recordings=[])
+        users_doc_ref.get.side_effect = [before_doc, after_doc]
+        mock_client_fn.return_value = mock_client
+
+        with _as_role(ADMIN) as headers:
+            resp = _patch_json(self.client, '/adminapi/users/uid1/profile/', headers, {
+                "name": "New Name", "identity": "老師", "avatar_url": "https://x/a.png",
+            })
+        self.assertEqual(resp.status_code, 200)
+        users_doc_ref.set.assert_called_once_with(
+            {"name": "New Name", "identity": "老師", "avatarUrl": "https://x/a.png"}, merge=True,
+        )
+        self.assertEqual(AuditLog.objects.filter(action="update_profile").count(), 1)
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_empty_name_rejected(self, mock_get_user, mock_client_fn):
+        mock_get_user.return_value = _fake_user_record("uid1")
+        with _as_role(ADMIN) as headers:
+            resp = _patch_json(self.client, '/adminapi/users/uid1/profile/', headers, {"name": "   "})
+        self.assertEqual(resp.status_code, 400)
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_admin_cannot_edit_owner_profile(self, mock_get_user, mock_client_fn):
+        mock_get_user.return_value = _fake_user_record("owner-uid", role=OWNER)
+        with _as_role(ADMIN) as headers:
+            resp = _patch_json(self.client, '/adminapi/users/owner-uid/profile/', headers, {"name": "New Name"})
+        self.assertEqual(resp.status_code, 403)
+
+    @patch("adminapi.firebase_ops.set_user_email")
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_change_email_syncs_auth_and_firestore(self, mock_get_user, mock_client_fn, mock_set_email):
+        mock_get_user.return_value = _fake_user_record("uid1", email="old@example.com")
+        before_doc = _fake_snapshot("uid1", {"name": "Alice", "email": "old@example.com"})
+        mock_client, users_doc_ref = _build_client_router(users_doc=before_doc, notes=[], recordings=[])
+        users_doc_ref.get.side_effect = [before_doc, before_doc]
+        mock_client_fn.return_value = mock_client
+
+        with _as_role(ADMIN) as headers:
+            resp = _patch_json(self.client, '/adminapi/users/uid1/profile/', headers, {"email": "new@example.com"})
+        self.assertEqual(resp.status_code, 200)
+        mock_set_email.assert_called_once_with("uid1", "new@example.com")
+        users_doc_ref.set.assert_called_once_with({"email": "new@example.com"}, merge=True)
+
+    @patch("adminapi.firebase_ops.set_user_email")
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_duplicate_email_on_change_rejected(self, mock_get_user, mock_client_fn, mock_set_email):
+        from firebase_admin.auth import EmailAlreadyExistsError
+        mock_get_user.return_value = _fake_user_record("uid1", email="old@example.com")
+        mock_set_email.side_effect = EmailAlreadyExistsError("dup", cause=None, http_response=None)
+        mock_client, _ = _build_client_router(users_doc=_fake_snapshot("uid1", {}), notes=[], recordings=[])
+        mock_client_fn.return_value = mock_client
+
+        with _as_role(ADMIN) as headers:
+            resp = _patch_json(self.client, '/adminapi/users/uid1/profile/', headers, {"email": "taken@example.com"})
+        self.assertEqual(resp.status_code, 400)
+
+
+class UserPasswordTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_requires_account_manager(self, mock_get_user):
+        mock_get_user.return_value = _fake_user_record("uid1", email="alice@example.com")
+        with _as_role(EDITOR) as headers:
+            resp = _post_json(self.client, '/adminapi/users/uid1/password/', headers, {
+                "new_password": "newpass1", "confirm_email": "alice@example.com",
+            })
+        self.assertEqual(resp.status_code, 403)
+
+    def test_password_too_short_rejected_before_lookup(self):
+        with _as_role(ADMIN) as headers:
+            resp = _post_json(self.client, '/adminapi/users/uid1/password/', headers, {
+                "new_password": "abc", "confirm_email": "alice@example.com",
+            })
+        self.assertEqual(resp.status_code, 400)
+
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_confirm_email_mismatch_rejected(self, mock_get_user):
+        mock_get_user.return_value = _fake_user_record("uid1", email="alice@example.com")
+        with _as_role(ADMIN) as headers:
+            resp = _post_json(self.client, '/adminapi/users/uid1/password/', headers, {
+                "new_password": "newpass1", "confirm_email": "wrong@example.com",
+            })
+        self.assertEqual(resp.status_code, 400)
+
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_admin_cannot_change_owner_password(self, mock_get_user):
+        mock_get_user.return_value = _fake_user_record("owner-uid", email="owner@example.com", role=OWNER)
+        with _as_role(ADMIN) as headers:
+            resp = _post_json(self.client, '/adminapi/users/owner-uid/password/', headers, {
+                "new_password": "newpass1", "confirm_email": "owner@example.com",
+            })
+        self.assertEqual(resp.status_code, 403)
+
+    @patch("adminapi.firebase_ops.revoke_sessions")
+    @patch("adminapi.firebase_ops.set_user_password")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_successful_change_revokes_sessions_and_logs_without_plaintext(
+        self, mock_get_user, mock_set_password, mock_revoke,
+    ):
+        mock_get_user.return_value = _fake_user_record("uid1", email="alice@example.com")
+        with _as_role(ADMIN) as headers:
+            resp = _post_json(self.client, '/adminapi/users/uid1/password/', headers, {
+                "new_password": "supersecret1", "confirm_email": "alice@example.com",
+            })
+        self.assertEqual(resp.status_code, 200)
+        mock_set_password.assert_called_once_with("uid1", "supersecret1")
+        mock_revoke.assert_called_once_with("uid1")
+
+        log = AuditLog.objects.get(action="change_password")
+        # 稽核紀錄不得含明文密碼——不管是 before／after 都只能有一個布林標記。
+        log_blob = json.dumps({"before": log.before, "after": log.after}, ensure_ascii=False)
+        self.assertNotIn("supersecret1", log_blob)
+        self.assertEqual(log.after, {"password_changed": True})
 
 
 class UserSuspendTest(TestCase):
