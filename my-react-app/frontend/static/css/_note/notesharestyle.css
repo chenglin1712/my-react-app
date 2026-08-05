@@ -145,6 +145,23 @@
 .ns-btn.danger{ background:#e54545; color:#fff; }
 .ns-btn.danger:hover{ background:#cc3c3c; }
 
+/* 檢舉表單（NoteModal 內嵌，點「檢舉」展開） */
+.ns-report-form{
+  border-top:1px solid #eee; margin-top:.75rem; padding-top:.75rem;
+}
+.ns-report-title{ font-size:.9rem; font-weight:600; margin-bottom:.5rem; color:#333; }
+.ns-report-option{
+  display:flex; align-items:center; gap:.4rem; font-size:.9rem;
+  padding:.3rem 0; cursor:pointer;
+}
+.ns-report-text{
+  width:100%; margin-top:.5rem; padding:.5rem; border:1px solid #ccc;
+  border-radius:.5rem; font:inherit; resize:vertical; box-sizing:border-box;
+}
+.ns-report-actions{
+  display:flex; justify-content:flex-end; gap:.5rem; margin-top:.6rem;
+}
+
 /* ── Toast（未登入提示等） ─────────────────── */
 .ns-toast{
   position: fixed;

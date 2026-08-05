@@ -143,6 +143,45 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 
+    // 檢舉：任何登入使用者可對 note／recording 建立自己名下的檢舉（targetTribe
+    // 對 note 是空字串，recording 必填，因為錄音存在 pronunciations/{tribe}/
+    // recordings/{id} 子集合，只有 targetId 定位不到文件，見規劃文件 P3.6）；
+    // 只有 staff 可讀（檢舉人自己也看不到檢舉列表，避免報復性騷擾）；
+    // staff 核結/駁回只能動狀態相關欄位，不能竄改原始檢舉內容本身。
+    match /reports/{reportId} {
+      allow read: if isStaff();
+      allow create: if request.auth != null
+        && request.resource.data.reporterUid == request.auth.uid
+        // hasOnly（不是 hasAll）：不能夾帶這 8 個欄位以外的任何東西進來，
+        // 避免有心人塞一堆大型垃圾欄位增加 Firestore 儲存/讀取成本。
+        && request.resource.data.keys().hasOnly(
+          ['targetType', 'targetId', 'targetTribe', 'reporterUid', 'reason', 'reasonText', 'status', 'createdAt']
+        )
+        && request.resource.data.targetType in ['note', 'recording']
+        && request.resource.data.targetId is string && request.resource.data.targetId.size() > 0
+        // targetTribe 依 targetType 硬性規定：note 一定是空字串、recording
+        // 一定要落在真實族語清單內——否則後台永遠定位不到那筆 recording
+        // 文件（見 pronunciations/{tribe}/recordings/{id} 的路徑結構），
+        // 這筆檢舉就會卡在「內容已不存在」永遠沒辦法處理。
+        && (
+          (request.resource.data.targetType == 'note' && request.resource.data.targetTribe == '')
+          || (
+            request.resource.data.targetType == 'recording'
+            && request.resource.data.targetTribe in ['tayal', 'amis', 'bunun', 'kavalan', 'paiwan']
+          )
+        )
+        && request.resource.data.reason in ['inappropriate', 'wrong_content', 'spam', 'other']
+        && request.resource.data.reasonText is string && request.resource.data.reasonText.size() <= 500
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time;
+      allow update: if isStaff()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['status', 'resolvedBy', 'resolvedAt', 'resolutionNote']
+        )
+        && request.resource.data.status in ['resolved', 'dismissed'];
+      allow delete: if false;
+    }
+
     // 其他所有文件：預設拒絕，避免未知集合被誤開放
     match /{document=**} {
       allow read, write: if false;

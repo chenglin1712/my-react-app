@@ -65,6 +65,27 @@
   transform: translateY(-2px);
 }
 
+/* 社群示範發音的入口連結——跟 .pron-btn-secondary 同一套配色，但 <Link>
+   渲染成 <a>（inline 元素），需要額外的 display 才能讓 margin-top 生效，
+   故意不直接改 .pron-btn-secondary（那個 class 已經在 ResultScreen.jsx
+   套在真正的 <button> 上）。 */
+.pron-community-entry-link {
+  display: inline-block;
+  margin-top: 1rem;
+  padding: 0.5rem 1.4rem;
+  color: #9B1B30;
+  text-decoration: none;
+  border: 2px solid #9B1B30;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  transition: background 0.18s, transform 0.15s;
+}
+.pron-community-entry-link:hover {
+  background: #fdf5f5;
+  transform: translateY(-2px);
+}
+
 .pron-btn-outline {
   padding: 0.5rem 1.2rem;
   background: #fff;

@@ -127,7 +127,7 @@ function PronunciationGame({ tribe = "tayal" }) {
   }, [current, stopRefAudio]);
 
   if (status === "intro") {
-    return <IntroScreen config={config} error={error} loading={loading} onStart={handleStart} />;
+    return <IntroScreen config={config} error={error} loading={loading} onStart={handleStart} tribe={tribe} />;
   }
 
   if (status === "playing") {

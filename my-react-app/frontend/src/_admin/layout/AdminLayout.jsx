@@ -19,8 +19,15 @@ const NAV_GROUPS = [
             { label: 'IRT 參數', to: '/admin/quiz-bank/irt-config' },
         ],
     },
-    { label: '審核', icon: ClipboardCheck, items: [{ label: '送審佇列' }, { label: '分享筆記' }] },
-    { label: '使用者', icon: Users, items: [{ label: '使用者管理' }] },
+    {
+        label: '審核', icon: ClipboardCheck, items: [
+            { label: '送審佇列', to: '/admin/review' },
+            { label: '分享筆記', to: '/admin/moderation/notes' },
+            { label: '發音錄音', to: '/admin/moderation/recordings' },
+            { label: '檢舉佇列', to: '/admin/moderation/reports' },
+        ],
+    },
+    { label: '使用者', icon: Users, items: [{ label: '使用者管理', to: '/admin/users' }] },
     { label: '分析', icon: BarChart3, items: [{ label: '學習數據' }] },
     { label: '系統', icon: Settings, items: [{ label: '系統維運' }] },
 ];
@@ -41,6 +48,12 @@ const getBreadcrumb = (pathname) => {
     if (pathname === '/admin/quiz-bank/situations') return ['題庫', '情境題'];
     if (pathname.startsWith('/admin/quiz-bank/situations/')) return ['題庫', '情境題', '編輯'];
     if (pathname === '/admin/quiz-bank/irt-config') return ['題庫', 'IRT 參數'];
+    if (pathname === '/admin/review') return ['審核', '送審佇列'];
+    if (pathname === '/admin/moderation/notes') return ['審核', '分享筆記'];
+    if (pathname === '/admin/moderation/recordings') return ['審核', '發音錄音'];
+    if (pathname === '/admin/moderation/reports') return ['審核', '檢舉佇列'];
+    if (pathname === '/admin/users') return ['使用者', '使用者管理'];
+    if (pathname.startsWith('/admin/users/')) return ['使用者', '使用者管理', '詳情'];
     return [decodeURIComponent(pathname.split('/').filter(Boolean).at(-1) || '總覽')];
 };
 

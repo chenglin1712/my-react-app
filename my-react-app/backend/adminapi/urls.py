@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import quizbank_views, views
+from . import moderation_views, quizbank_views, review_queue_views, user_views, views
 
 
 def _content_urls(prefix, content_views):
@@ -50,4 +50,25 @@ urlpatterns = [
     path('quiz-bank/sources/<str:tribe>/', quizbank_views.quiz_source_config_detail),
     path('irt-config/', quizbank_views.irt_config_admin),
     path('public/irt-config/', quizbank_views.public_irt_config),
+
+    # P3 使用者與審核
+    path('users/', user_views.user_list),
+    path('users/<str:uid>/', user_views.user_detail),
+    path('users/<str:uid>/role/', user_views.user_role),
+    path('users/<str:uid>/suspend/', user_views.user_suspend),
+    path('users/<str:uid>/unsuspend/', user_views.user_unsuspend),
+    path('users/<str:uid>/force-logout/', user_views.user_force_logout),
+    path('users/<str:uid>/export/', user_views.user_export),
+    path('users/<str:uid>/delete/', user_views.user_delete),
+
+    path('moderation/notes/', moderation_views.note_list),
+    path('moderation/notes/<str:note_id>/toggle-deleted/', moderation_views.note_toggle_deleted),
+    path('moderation/recordings/', moderation_views.recording_list),
+    path('moderation/recordings/<str:tribe>/<str:recording_id>/', moderation_views.recording_delete),
+
+    path('reports/', moderation_views.report_list),
+    path('reports/<str:report_id>/resolve/', moderation_views.report_resolve),
+    path('reports/<str:report_id>/dismiss/', moderation_views.report_dismiss),
+
+    path('review-queue/', review_queue_views.review_queue_list),
 ]

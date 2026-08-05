@@ -11,11 +11,14 @@ views.py 保留原本的名稱重新 export，外部既有的 `from .views impor
 不用改。
 """
 import json
+import logging
 
 from django.http import JsonResponse
 from django_ratelimit.core import is_ratelimited
 
 from .models import AuditLog
+
+logger = logging.getLogger(__name__)
 
 
 def rate_limited_response(request, decoded, group, rate="60/m", method="POST"):
@@ -56,18 +59,41 @@ def parse_json_body(request):
 def write_audit_log(request, decoded, action, target, before=None, after=None, target_type="announcement"):
     """target_type 預設 "announcement" 是為了不動到既有呼叫點——這個函式
     最早只給 Announcement 用，後來加入的資源呼叫時要記得自己帶對應的
-    target_type，不然會被誤記成公告的稽核紀錄。"""
+    target_type，不然會被誤記成公告的稽核紀錄。
+
+    target 通常是 Django model 實例（用 .pk 當 target_id），但 P3 的使用者
+    管理／Firestore 內容審核動作沒有對應的 Django model——target_id 是
+    Firebase uid 或 Firestore 文件 ID 這類字串。這裡改成沒有 .pk 屬性時
+    直接把 target 本身當成 target_id，讓呼叫端可以傳一個 model 實例，
+    也可以直接傳一個字串，不用為了寫稽核紀錄硬包一個假的 model 物件。"""
+    target_id = target.pk if hasattr(target, "pk") else target
     AuditLog.objects.create(
         actor_uid=decoded.get("uid", "anon"),
         actor_role=decoded.get("role"),
         action=action,
         target_type=target_type,
-        target_id=str(target.pk),
+        target_id=str(target_id),
         before=before,
         after=after,
         ip_address=request.META.get("REMOTE_ADDR"),
         user_agent=(request.META.get("HTTP_USER_AGENT", "")[:1000] or None),
     )
+
+
+def safe_write_audit_log(*args, **kwargs):
+    """給 P3 這種「主要動作是呼叫 Firebase Admin SDK／Firestore，不是 Django
+    ORM 寫入」的呼叫端用：Announcement／quizbank 那批端點把 write_audit_log
+    包在 transaction.atomic() 裡，稽核紀錄寫入失敗時連同主要動作一起回滾，
+    兩者要嘛一起成功要嘛一起失敗；但 Firebase 端的動作（停權、刪除帳號、
+    刪除 Firestore 文件…）沒辦法參與 Django 的 transaction，一旦執行就是真的
+    發生了，沒有回滾機制。這裡用同名但吞例外的版本：稽核紀錄寫入失敗只記錄
+    下來讓 Sentry 能告警，不會讓「Firebase 動作已經成功」被回報成 500，
+    誤導呼叫端以為操作完全沒有生效。刻意不修改 write_audit_log 本身——
+    Announcement／quizbank 那邊依賴它會拋例外才能觸發交易回滾，不能改掉。"""
+    try:
+        write_audit_log(*args, **kwargs)
+    except Exception:
+        logger.exception("P3 稽核紀錄寫入失敗（主要操作已完成，不影響呼叫端回應結果）")
 
 
 def invalid_transition(current_status, action):

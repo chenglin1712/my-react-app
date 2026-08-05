@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../src/userServives/authContext";
 import { fetchSharedNoteById, setNoteLikeState, softDeleteNote } from "../userServives/noteService";
+import { submitReport } from "../userServives/reportService";
 import { useSharedNotesPager } from "./hooks/useSharedNotesPager";
 import { useToast } from "./hooks/useToast";
 import NoteCard from "./components/NoteCard";
@@ -109,6 +110,23 @@ export default function NoteShare() {
       updateCurrentPageCache((notes) => notes.map((n) => (n.id === note.id ? note : n)));
       setModalNote((prev) => (prev && prev.id === note.id ? { ...note } : prev));
       showToast("操作失敗，請稍後再試");
+    }
+  };
+
+  // 檢舉（含未登入導向，跟 toggleLike 同一套「先讓看得到、點了才擋」的處理）
+  const handleReportNote = async (note, reason, reasonText) => {
+    if (!userData) {
+      showToast("請先登入後再檢舉");
+      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+      redirectTimerRef.current = setTimeout(() => navigate("/login"), 1000);
+      return;
+    }
+    try {
+      await submitReport({ targetType: "note", targetId: note.id, reason, reasonText });
+      showToast("已送出檢舉，感謝你協助維護社群品質");
+    } catch (e) {
+      console.error("Report note error:", e);
+      showToast("檢舉送出失敗，請稍後再試");
     }
   };
 
@@ -255,6 +273,7 @@ export default function NoteShare() {
           onToggleLike={toggleLike}
           onDelete={handleModalDelete}
           onClose={closeModal}
+          onReport={handleReportNote}
         />
       )}
 

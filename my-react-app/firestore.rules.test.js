@@ -53,6 +53,18 @@ const validSharedNote = (uid) => ({
   deleted: false,
 });
 
+const validReport = (reporterUid, overrides = {}) => ({
+  targetType: 'note',
+  targetId: 'note123',
+  targetTribe: '',
+  reporterUid,
+  reason: 'inappropriate',
+  reasonText: '',
+  status: 'pending',
+  createdAt: serverTimestamp(),
+  ...overrides,
+});
+
 describe('quizs create 規則', () => {
   test('已登入、內容完整合法時可以建立', async () => {
     const alice = testEnv.authenticatedContext('alice');
@@ -326,5 +338,200 @@ describe('pronunciations 規則（staff 審核）', () => {
     const alice = testEnv.authenticatedContext('alice');
     const { deleteDoc } = await import('firebase/firestore');
     await assertFails(deleteDoc(doc(alice.firestore(), 'pronunciations/tayal/recordings/r1')));
+  });
+});
+
+// P3.6 檢舉：reports 集合的「建立」是前端直寫 Firestore（見
+// frontend/src/userServives/reportService.jsx），沒有後端端點把關，這條規則
+// 本身就是唯一的信任邊界，這裡要驗證跟 sharedNotes/quizs 同一種嚴謹程度。
+describe('reports create 規則', () => {
+  test('已登入、reporterUid 是本人、內容完整合法時可以建立', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(setDoc(doc(alice.firestore(), 'reports/r1'), validReport('alice')));
+  });
+
+  test('recording 類型帶 targetTribe 也可以建立', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(
+      setDoc(
+        doc(alice.firestore(), 'reports/r1'),
+        validReport('alice', { targetType: 'recording', targetId: 'rec1', targetTribe: 'tayal' }),
+      )
+    );
+  });
+
+  test('未登入不能建立', async () => {
+    const anon = testEnv.unauthenticatedContext();
+    await assertFails(setDoc(doc(anon.firestore(), 'reports/r1'), validReport('anyone')));
+  });
+
+  test('reporterUid 冒充別人會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(setDoc(doc(alice.firestore(), 'reports/r1'), validReport('bob')));
+  });
+
+  test('缺少必填欄位（reason）會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    const { reason: _drop, ...incomplete } = validReport('alice');
+    await assertFails(setDoc(doc(alice.firestore(), 'reports/r1'), incomplete));
+  });
+
+  test('targetType 不在白名單內會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(setDoc(doc(alice.firestore(), 'reports/r1'), validReport('alice', { targetType: 'user' })));
+  });
+
+  test('reason 不在白名單內會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(setDoc(doc(alice.firestore(), 'reports/r1'), validReport('alice', { reason: 'because' })));
+  });
+
+  test('建立時 status 不是 pending 會被拒絕（不能一開始就自己標成已核結）', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(setDoc(doc(alice.firestore(), 'reports/r1'), validReport('alice', { status: 'resolved' })));
+  });
+
+  test('createdAt 不是真正的伺服器時間會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'reports/r1'), validReport('alice', { createdAt: new Date() }))
+    );
+  });
+
+  test('夾帶額外欄位會被拒絕（hasOnly，不是 hasAll）', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'reports/r1'), { ...validReport('alice'), extraField: '塞垃圾' })
+    );
+  });
+
+  test('note 類型的 targetTribe 不是空字串會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'reports/r1'), validReport('alice', { targetTribe: 'tayal' }))
+    );
+  });
+
+  test('recording 類型缺少 targetTribe（空字串）會被拒絕——不然後台永遠定位不到那筆錄音', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(
+        doc(alice.firestore(), 'reports/r1'),
+        validReport('alice', { targetType: 'recording', targetId: 'rec1', targetTribe: '' }),
+      )
+    );
+  });
+
+  test('recording 類型的 targetTribe 不在族語白名單內會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(
+        doc(alice.firestore(), 'reports/r1'),
+        validReport('alice', { targetType: 'recording', targetId: 'rec1', targetTribe: 'klingon' }),
+      )
+    );
+  });
+});
+
+describe('reports read 規則', () => {
+  const seedReport = async (id, overrides = {}) => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `reports/${id}`), validReport('alice', overrides));
+    });
+  };
+
+  test('staff 可以讀取檢舉列表', async () => {
+    await seedReport('r1');
+    const staffBob = testEnv.authenticatedContext('bob', { role: 'admin' });
+    const { getDoc } = await import('firebase/firestore');
+    await assertSucceeds(getDoc(doc(staffBob.firestore(), 'reports/r1')));
+  });
+
+  test('檢舉人自己也讀不到（避免報復性騷擾，見規則註解）', async () => {
+    await seedReport('r1');
+    const alice = testEnv.authenticatedContext('alice');
+    const { getDoc } = await import('firebase/firestore');
+    await assertFails(getDoc(doc(alice.firestore(), 'reports/r1')));
+  });
+
+  test('沒有 staff 角色的一般使用者讀不到別人的檢舉', async () => {
+    await seedReport('r1');
+    const bob = testEnv.authenticatedContext('bob');
+    const { getDoc } = await import('firebase/firestore');
+    await assertFails(getDoc(doc(bob.firestore(), 'reports/r1')));
+  });
+});
+
+describe('reports update 規則（staff 核結/駁回）', () => {
+  const seedReport = async (id, overrides = {}) => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `reports/${id}`), validReport('alice', overrides));
+    });
+  };
+
+  test('staff 可以核結，只改動狀態相關欄位', async () => {
+    await seedReport('r1');
+    const staffBob = testEnv.authenticatedContext('bob', { role: 'admin' });
+    const { updateDoc } = await import('firebase/firestore');
+    await assertSucceeds(
+      updateDoc(doc(staffBob.firestore(), 'reports/r1'), {
+        status: 'resolved', resolvedBy: 'bob', resolvedAt: serverTimestamp(), resolutionNote: '已處理',
+      })
+    );
+  });
+
+  test('staff 可以駁回', async () => {
+    await seedReport('r1');
+    const staffBob = testEnv.authenticatedContext('bob', { role: 'admin' });
+    const { updateDoc } = await import('firebase/firestore');
+    await assertSucceeds(
+      updateDoc(doc(staffBob.firestore(), 'reports/r1'), {
+        status: 'dismissed', resolvedBy: 'bob', resolvedAt: serverTimestamp(), resolutionNote: '',
+      })
+    );
+  });
+
+  test('staff 更新時把狀態改回 pending 會被拒絕（只能核結或駁回）', async () => {
+    await seedReport('r1');
+    const staffBob = testEnv.authenticatedContext('bob', { role: 'admin' });
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(staffBob.firestore(), 'reports/r1'), {
+        status: 'pending', resolvedBy: 'bob', resolvedAt: serverTimestamp(), resolutionNote: '',
+      })
+    );
+  });
+
+  test('staff 不能夾帶改動檢舉原始內容（例如 reasonText）', async () => {
+    await seedReport('r1');
+    const staffBob = testEnv.authenticatedContext('bob', { role: 'admin' });
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(staffBob.firestore(), 'reports/r1'), {
+        status: 'resolved', resolvedBy: 'bob', resolvedAt: serverTimestamp(), resolutionNote: '', reasonText: '被改過',
+      })
+    );
+  });
+
+  test('沒有 staff 角色的一般使用者不能核結/駁回', async () => {
+    await seedReport('r1');
+    const bob = testEnv.authenticatedContext('bob');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(bob.firestore(), 'reports/r1'), {
+        status: 'resolved', resolvedBy: 'bob', resolvedAt: serverTimestamp(), resolutionNote: '',
+      })
+    );
+  });
+});
+
+describe('reports delete 規則', () => {
+  test('任何人都不能刪除檢舉紀錄（含 staff），保留完整稽核軌跡', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'reports/r1'), validReport('alice'));
+    });
+    const staffBob = testEnv.authenticatedContext('bob', { role: 'owner' });
+    const { deleteDoc } = await import('firebase/firestore');
+    await assertFails(deleteDoc(doc(staffBob.firestore(), 'reports/r1')));
   });
 });

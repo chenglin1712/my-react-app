@@ -26,6 +26,7 @@ const ListeningPage = lazy(() => import('./_game/listening'));
 const TribeListeningGame = lazy(() => import('./_game/tribeListeningGame'));
 const PronunciationPage = lazy(() => import('./_game/pronunciation'));
 const TribePronunciationGame = lazy(() => import('./_game/tribePronunciationGame'));
+const TribePronunciationCommunity = lazy(() => import('./_game/pronunciationCommunity'));
 const SentencePage = lazy(() => import('./_game/sentence'));
 const TribeSentenceGame = lazy(() => import('./_game/tribeSentenceGame'));
 //測驗
@@ -85,6 +86,7 @@ const App = () => {
           <Route path="/game/listening/:tribe" element={<ProtectedRoute><TribeListeningGame /></ProtectedRoute>} />
           <Route path="/game/pronunciation" element={<ProtectedRoute><PronunciationPage /></ProtectedRoute>} />
           <Route path="/game/pronunciation/:tribe" element={<ProtectedRoute><TribePronunciationGame /></ProtectedRoute>} />
+          <Route path="/game/pronunciation/:tribe/community" element={<ProtectedRoute><TribePronunciationCommunity /></ProtectedRoute>} />
           <Route path="/game/sentence" element={<ProtectedRoute><SentencePage /></ProtectedRoute>} />
           <Route path="/game/sentence/:tribe" element={<ProtectedRoute><TribeSentenceGame /></ProtectedRoute>} />
           <Route path="/quiz/select" element={<ProtectedRoute><QuizTribeSelect /></ProtectedRoute>} />
