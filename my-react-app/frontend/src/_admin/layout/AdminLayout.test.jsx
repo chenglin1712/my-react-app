@@ -31,14 +31,22 @@ describe('AdminLayout', () => {
     expect(screen.getByText('DASHBOARD_CONTENT')).toBeInTheDocument();
   });
 
-  test('公告管理／考試時程／首頁版位是真的連結，其餘未上線模組顯示「規劃中」且不是可點的連結', () => {
+  test('公告管理／考試時程／首頁版位／詞條／主檔／語法／批次匯入是真的連結，其餘未上線模組顯示「規劃中」且不是可點的連結', () => {
     renderLayout();
     expect(screen.getByRole('link', { name: /公告管理/ })).toHaveAttribute('href', '/admin/content/announcements');
     expect(screen.getByRole('link', { name: /考試時程/ })).toHaveAttribute('href', '/admin/content/exam-schedule');
     expect(screen.getByRole('link', { name: /首頁版位/ })).toHaveAttribute('href', '/admin/content/homepage');
-    // 「規劃中」的項目（例如詞條）不應該渲染成 <a>，避免使用者點了
-    // 卻導到一個根本不存在內容的頁面。
-    const plannedItem = screen.getByText('詞條').closest('li');
+    // P4.1 詞條 CRUD 上線後，「詞條」已經是真的連結——不再是規劃中佔位項目。
+    expect(screen.getByRole('link', { name: /詞條/ })).toHaveAttribute('href', '/admin/dictionary/words');
+    // P4.2 主檔管理上線後，「主檔」也是真的連結。
+    expect(screen.getByRole('link', { name: /主檔/ })).toHaveAttribute('href', '/admin/dictionary/taxonomies');
+    // P4.3 語法管理上線後，「語法」也是真的連結。
+    expect(screen.getByRole('link', { name: /語法/ })).toHaveAttribute('href', '/admin/dictionary/grammar');
+    // P4.4 批次匯入／匯出精靈上線後，這一項也是真的連結。
+    expect(screen.getByRole('link', { name: /批次匯入／匯出/ })).toHaveAttribute('href', '/admin/dictionary/import');
+    // 「規劃中」的項目（學習數據，P5 才會做）不應該渲染成 <a>，避免
+    // 使用者點了卻導到一個根本不存在內容的頁面。
+    const plannedItem = screen.getByText('學習數據').closest('li');
     expect(within(plannedItem).queryByRole('link')).not.toBeInTheDocument();
     expect(within(plannedItem).getByText('規劃中')).toBeInTheDocument();
   });

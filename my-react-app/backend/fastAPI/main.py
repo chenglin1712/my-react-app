@@ -4,7 +4,7 @@ import threading
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
-from .routes import crawler, vision, dictionary, quiz, listening, sentence, auth
+from .routes import crawler, vision, dictionary, quiz, listening, sentence, auth, internal
 from dictionary_db.connect import SessionLocal
 from .rate_limit import limiter
 from fastapi.middleware.cors import CORSMiddleware
@@ -93,6 +93,12 @@ app.include_router(dictionary.router, prefix="/api/v1/dictionary", dependencies=
 app.include_router(quiz.router, prefix="/api/v1/quiz", dependencies=_require_login)
 app.include_router(listening.router, prefix="/api/v1/listening", dependencies=_require_login)
 app.include_router(sentence.router, prefix="/api/v1/sentence", dependencies=_require_login)
+
+# 服務對服務的內部端點（目前只有辭典快取失效通知）：刻意不掛 _require_login
+# ——Django 呼叫端沒有使用者 Firebase token 可以附，改用共用密鑰驗證（見
+# routes/internal.py 的 _check_internal_secret），也刻意掛在 /internal 而不是
+# /api/v1，避免看起來像公開 API。
+app.include_router(internal.router, prefix="/internal")
 
 
 @app.get("/health")

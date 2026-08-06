@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import QueuePool
@@ -76,5 +78,36 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    finally:
+        db.close()
+
+
+@contextmanager
+def dictionary_write_session():
+    """後台管理系統（P4 辭典管理）寫入辭典 DB 用的 session。
+
+    在這之前，這個模組唯一的消費模式是唯讀（FastAPI 的 get_db() 依賴注入、
+    AIModel/views.py 與 CrosswordPuzzle/views.py 手動 open/close），沒有任何
+    一處呼叫過 db.commit()。P4 是第一個寫入者，這裡確立寫入慣例：成功才
+    commit，任何例外一律先 rollback 再往外拋，最後一定 close——刻意維持
+    跟既有唯讀消費者「db = SessionLocal() / try / finally: db.close()」相同的
+    外觀（只是多了 commit/rollback），讓看過既有讀取寫法的人能立刻認出來。
+
+    不用 `with SessionLocal() as db, db.begin():`：Session.begin() 在同一個
+    session 已經隱含開始交易時會丟 InvalidRequestError，這個陷阱不該出現在
+    唯一會修改一張 21 萬列資料表的程式路徑裡。
+
+    呼叫端要做列鎖（例如更新/刪除一筆詞條前）可在拿到 db 後自行
+    `.with_for_update()`——SQLite（本機開發/測試）會靜默忽略、不是真的鎖列，
+    正式環境的 Postgres 才會是真正的列鎖，這個差異在呼叫端加註解說明，
+    不在這裡假裝兩者行為一致。
+    """
+    db = SessionLocal()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

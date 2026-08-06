@@ -99,3 +99,79 @@ def test_different_keys_do_not_block_each_other():
     release_tayal.set()
     tayal_thread.join(timeout=2)
     assert cache.get("tayal") == "tayal-value"
+
+
+# ── P4 辭典管理新增：invalidate／clear／keys（給 /internal/cache/invalidate 用）──
+
+def test_invalidate_removes_value_and_returns_true():
+    cache = KeyedCache()
+    cache.get_or_compute("tayal", lambda: "value")
+
+    assert cache.invalidate("tayal") is True
+    assert "tayal" not in cache
+    assert cache.get("tayal") is None
+
+
+def test_invalidate_missing_key_returns_false():
+    cache = KeyedCache()
+    assert cache.invalidate("missing") is False
+
+
+def test_invalidated_key_recomputes_on_next_call():
+    cache = KeyedCache()
+    calls = []
+
+    def compute():
+        calls.append(1)
+        return f"value-{len(calls)}"
+
+    assert cache.get_or_compute("tayal", compute) == "value-1"
+    cache.invalidate("tayal")
+    assert cache.get_or_compute("tayal", compute) == "value-2"
+    assert len(calls) == 2
+
+
+def test_invalidate_does_not_break_double_checked_locking_for_other_keys():
+    # invalidate() 刻意不刪除 _locks[key]；這裡確認清除一個 key 之後，
+    # 其他 key 的雙重檢查鎖定（同一個 key 併發只算一次）依然正常運作。
+    cache = KeyedCache()
+    cache.get_or_compute("tayal", lambda: "tayal-value")
+    cache.invalidate("tayal")
+
+    calls = []
+    start_barrier = threading.Barrier(5)
+
+    def compute():
+        calls.append(1)
+        time.sleep(0.05)
+        return "amis-value"
+
+    def worker():
+        start_barrier.wait()
+        cache.get_or_compute("amis", compute)
+
+    threads = [threading.Thread(target=worker) for _ in range(5)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(calls) == 1
+
+
+def test_clear_removes_all_values_and_returns_count():
+    cache = KeyedCache()
+    cache.get_or_compute("tayal", lambda: "A")
+    cache.get_or_compute("amis", lambda: "B")
+
+    assert cache.clear() == 2
+    assert "tayal" not in cache
+    assert "amis" not in cache
+
+
+def test_keys_lists_currently_cached_keys():
+    cache = KeyedCache()
+    cache.get_or_compute("tayal", lambda: "A")
+    cache.get_or_compute("amis", lambda: "B")
+
+    assert set(cache.keys()) == {"tayal", "amis"}

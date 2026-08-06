@@ -7,6 +7,7 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
 from dictionary_db.connect import get_db
+from config.grammar_affixes import VALID_AFFIX_TYPES as _VALID_AFFIX_TYPES
 from config.tribes import resolve_tribe_name
 from fastAPI.rate_limit import limiter
 
@@ -32,11 +33,9 @@ _grammar_quiz_cache: KeyedCache[str, dict] = KeyedCache()
 # get_grammar_affixes 的 affix_type 原本是完全沒有白名單限制的自由字串，
 # 直接拿來當 _grammar_affixes_cache 的 key 一部分：KeyedCache 沒有
 # eviction／TTL，任何已登入使用者只要每次帶不同字串發請求，就能讓伺服器
-# 記憶體無上限成長。這裡收斂成固定的已知詞綴類型（同函式原本 docstring
-# 就列出的值），額外帶來的好處是不支援的值會直接 400，而不是靜默回傳空清單。
-_VALID_AFFIX_TYPES = frozenset({
-    "prefix", "suffix", "infix", "circumfix", "reduplication", "auxiliary",
-})
+# 記憶體無上限成長。改成收斂到 config/grammar_affixes.py 的固定白名單
+# （P4.2 後台新增詞綴的表單也要驗證同一份清單，兩邊共用同一個資料來源），
+# 額外帶來的好處是不支援的值會直接 400，而不是靜默回傳空清單。
 
 
 # _load_grammar 原本查詢與組裝混在同一個函式：4 層巢狀迴圈裡，每撈一批 row
@@ -80,7 +79,24 @@ def _fetch_rule_examples(db: Session, rule_id) -> list:
     ).fetchall()
 
 
-def _format_rule(rule_row, affix_map: Dict[int, list], examples: list) -> dict:
+def _fetch_example_word_map(db: Session, example_ids: list) -> Dict[int, list]:
+    """例句連結的詞彙（grammar_example_word，P4.3 後台編輯器才會真的寫入
+    這張表）——這裡原本一直是寫死的空陣列（見下方 _format_rule 呼叫端的
+    修正前歷史），後台辛苦連結的詞彙關聯，學生端一直看不到；補上跟
+    _fetch_rule_affix_map 同一種「批次查、per-rule 一次」的寫法。"""
+    word_map: Dict[int, list] = {eid: [] for eid in example_ids}
+    if example_ids:
+        rows = db.execute(
+            text("SELECT example_id, word_id FROM grammar_example_word WHERE example_id IN :example_ids")
+            .bindparams(bindparam("example_ids", expanding=True)),
+            {"example_ids": example_ids}
+        ).fetchall()
+        for e_id, w_id in rows:
+            word_map[e_id].append(w_id)
+    return word_map
+
+
+def _format_rule(rule_row, affix_map: Dict[int, list], examples: list, word_map: Dict[int, list]) -> dict:
     r_id, r_order, r_key, r_title, r_struct, r_func, r_notes = rule_row
     return {
         "id": r_id,
@@ -97,7 +113,7 @@ def _format_rule(rule_row, affix_map: Dict[int, list], examples: list) -> dict:
                 "tribe_text": ex[2],
                 "chinese_text": ex[3],
                 "analysis": ex[4],
-                "linked_word_ids": [],
+                "linked_word_ids": word_map.get(ex[0], []),
             }
             for ex in examples
         ],
@@ -126,10 +142,11 @@ def _load_grammar(db: Session, tribe_name: str) -> Optional[dict]:
         for sec in sections:
             rules = _fetch_section_rules(db, sec[0])
             affix_map = _fetch_rule_affix_map(db, [r[0] for r in rules])
-            rules_out = [
-                _format_rule(rule, affix_map, _fetch_rule_examples(db, rule[0]))
-                for rule in rules
-            ]
+            rules_out = []
+            for rule in rules:
+                examples = _fetch_rule_examples(db, rule[0])
+                word_map = _fetch_example_word_map(db, [ex[0] for ex in examples])
+                rules_out.append(_format_rule(rule, affix_map, examples, word_map))
             result.append(_format_section(sec, rules_out))
 
         return {"tribe": tribe_name, "sections": result}

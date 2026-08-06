@@ -8,7 +8,7 @@ const ROLE_LABELS = { owner: '擁有者', admin: '管理員', editor: '內容編
 const NAV_GROUPS = [
     { label: '總覽', icon: LayoutDashboard, items: [{ label: '儀表板', to: '/admin', end: true }] },
     { label: '內容', icon: Megaphone, items: [{ label: '公告管理', to: '/admin/content/announcements', pending: true }, { label: '考試時程', to: '/admin/content/exam-schedule' }, { label: '首頁版位', to: '/admin/content/homepage' }] },
-    { label: '辭典', icon: BookOpen, items: [{ label: '詞條' }, { label: '語法' }, { label: '主檔' }] },
+    { label: '辭典', icon: BookOpen, items: [{ label: '詞條', to: '/admin/dictionary/words' }, { label: '語法', to: '/admin/dictionary/grammar' }, { label: '主檔', to: '/admin/dictionary/taxonomies' }, { label: '批次匯入／匯出', to: '/admin/dictionary/import' }] },
     {
         label: '題庫', icon: FileQuestion, items: [
             { label: '初級是非題', to: '/admin/quiz-bank/true-false' },

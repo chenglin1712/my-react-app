@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 from fastAPI.routes.dictionary import grammar as grammar_module
 from fastAPI.routes.dictionary.grammar import (
+    _fetch_example_word_map,
     _fetch_rule_affix_map,
     _format_rule,
     _format_section,
@@ -22,19 +23,28 @@ class TestFormatRule:
         rule_row = (1, 1, "rule-1", "標題", "結構", "功能", "備註")
         affix_map = {1: ["ma-", "-en"]}
         examples = [(10, 1, "tribe text", "中文", "分析")]
+        word_map = {10: ["word-1", "word-2"]}
 
-        result = _format_rule(rule_row, affix_map, examples)
+        result = _format_rule(rule_row, affix_map, examples, word_map)
 
         assert result["id"] == 1
         assert result["affix_tags"] == ["ma-", "-en"]
         assert result["examples"] == [{
             "id": 10, "tribe_text": "tribe text", "chinese_text": "中文",
-            "analysis": "分析", "linked_word_ids": [],
+            "analysis": "分析", "linked_word_ids": ["word-1", "word-2"],
         }]
+
+    def test_example_with_no_linked_words_gets_empty_list(self):
+        rule_row = (1, 1, "rule-1", "標題", "結構", "功能", "備註")
+        examples = [(10, 1, "tribe text", "中文", "分析")]
+
+        result = _format_rule(rule_row, affix_map={}, examples=examples, word_map={})
+
+        assert result["examples"][0]["linked_word_ids"] == []
 
     def test_rule_with_no_affixes_gets_empty_list(self):
         rule_row = (2, 1, "rule-2", "標題", "結構", "功能", "備註")
-        result = _format_rule(rule_row, affix_map={}, examples=[])
+        result = _format_rule(rule_row, affix_map={}, examples=[], word_map={})
         assert result["affix_tags"] == []
         assert result["examples"] == []
 
@@ -64,6 +74,23 @@ class TestFetchRuleAffixMap:
         assert result == {1: ["ma-", "-en"], 2: ["pa-"], 3: []}
 
 
+class TestFetchExampleWordMap:
+    """P4.3 補上——原本 _format_rule 一直寫死 linked_word_ids: []，這裡跟
+    _fetch_rule_affix_map 是同一種批次查詢/依 id 分組的形狀。"""
+
+    def test_empty_example_ids_skips_query(self):
+        db = MagicMock()
+        result = _fetch_example_word_map(db, [])
+        assert result == {}
+        db.execute.assert_not_called()
+
+    def test_groups_word_ids_by_example_id(self):
+        db = MagicMock()
+        db.execute.return_value.fetchall.return_value = [(10, "word-1"), (10, "word-2"), (20, "word-3")]
+        result = _fetch_example_word_map(db, [10, 20, 30])
+        assert result == {10: ["word-1", "word-2"], 20: ["word-3"], 30: []}
+
+
 class TestLoadGrammarOrchestration:
     """驗證 _load_grammar 呼叫 _fetch_* 的次數/順序跟原本混在一起時一致：
     詞綴查詢仍是「每個 section 各查一次、只查該 section 內的 rule_ids」。
@@ -89,14 +116,17 @@ class TestLoadGrammarOrchestration:
         rule_row = (200, 1, "rule-1", "規則標題", "結構", "功能", "備註")
         example_row = (300, 1, "tribe text", "中文翻譯", "分析說明")
         affix_rows = [(200, "ma-")]
+        word_rows = [(300, "word-1")]
 
         # 依照 _load_grammar 的呼叫順序回傳對應結果：
-        # 1) sections  2) section 的 rules  3) 該 section 的 affix_map  4) 該 rule 的 examples
+        # 1) sections  2) section 的 rules  3) 該 section 的 affix_map
+        # 4) 該 rule 的 examples  5) 該 rule 例句的 word_map
         db.execute.return_value.fetchall.side_effect = [
             [section_row],
             [rule_row],
             affix_rows,
             [example_row],
+            word_rows,
         ]
 
         payload = _load_grammar(db, "泰雅語")
@@ -111,7 +141,7 @@ class TestLoadGrammarOrchestration:
         assert rule["affix_tags"] == ["ma-"]
         assert rule["examples"] == [{
             "id": 300, "tribe_text": "tribe text", "chinese_text": "中文翻譯",
-            "analysis": "分析說明", "linked_word_ids": [],
+            "analysis": "分析說明", "linked_word_ids": ["word-1"],
         }]
 
     def test_second_call_hits_cache_not_db(self):

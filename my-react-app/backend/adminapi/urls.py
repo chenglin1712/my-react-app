@@ -1,6 +1,9 @@
 from django.urls import path
 
-from . import moderation_views, quizbank_views, review_queue_views, user_views, views
+from . import (
+    dictionary_grammar_views, dictionary_import_views, dictionary_taxonomy_views, dictionary_views,
+    moderation_views, quizbank_views, review_queue_views, user_views, views,
+)
 
 
 def _content_urls(prefix, content_views):
@@ -73,4 +76,50 @@ urlpatterns = [
     path('reports/<str:report_id>/dismiss/', moderation_views.report_dismiss),
 
     path('review-queue/', review_queue_views.review_queue_list),
+
+    # P4 辭典管理——詞條 CRUD（見 dictionary_write.py 的「整個詞條當一個
+    # 聚合單位讀寫」設計；送審流程走 DictionaryRevision，不是 PendingRevision，
+    # 見 dictionary_views.py 開頭說明）
+    path('dictionary/words/', dictionary_views.word_list),
+    path('dictionary/words/<str:word_id>/', dictionary_views.word_detail),
+    path('dictionary/words/<str:word_id>/propose/', dictionary_views.word_propose),
+    path('dictionary/words/<str:word_id>/delete-proposal/', dictionary_views.word_delete_proposal),
+    path('dictionary/words/<str:word_id>/references/', dictionary_views.word_references),
+    path('dictionary/revisions/<int:pk>/', dictionary_views.dictionary_revision_detail),
+    path('dictionary/revisions/<int:pk>/submit/', dictionary_views.dictionary_revision_submit),
+    path('dictionary/revisions/<int:pk>/withdraw/', dictionary_views.dictionary_revision_withdraw),
+    path('dictionary/revisions/<int:pk>/approve/', dictionary_views.dictionary_revision_approve),
+    path('dictionary/revisions/<int:pk>/reject/', dictionary_views.dictionary_revision_reject),
+    path('dictionary/taxonomies/', dictionary_taxonomy_views.taxonomy_list),
+    path('dictionary/taxonomies/<str:kind>/', dictionary_taxonomy_views.taxonomy_item_list),
+    path('dictionary/taxonomies/<str:kind>/<int:pk>/', dictionary_taxonomy_views.taxonomy_item_detail),
+    path('dictionary/taxonomies/<str:kind>/<int:pk>/merge/', dictionary_taxonomy_views.taxonomy_item_merge),
+
+    # P4.3 語法管理——章節聚合讀寫，送審流程沿用 dictionary_views.py 的
+    # dictionary_revision_*（target_kind='grammar_section'，見該檔案的
+    # _APPLIERS/_TREE_GETTERS/_CACHE_SCOPES）。
+    path('dictionary/grammar/sections/', dictionary_grammar_views.grammar_section_list),
+    path('dictionary/grammar/sections/reorder/', dictionary_grammar_views.grammar_section_reorder),
+    path('dictionary/grammar/sections/<int:section_id>/', dictionary_grammar_views.grammar_section_detail),
+    path('dictionary/grammar/sections/<int:section_id>/propose/', dictionary_grammar_views.grammar_section_propose),
+    path(
+        'dictionary/grammar/sections/<int:section_id>/delete-proposal/',
+        dictionary_grammar_views.grammar_section_delete_proposal,
+    ),
+
+    # P4.4 批次匯入／匯出精靈——DictionaryImportJob 走自己的狀態機
+    # （見 dictionary_import_views.py 開頭說明），不是每筆詞條各自建一筆
+    # DictionaryRevision。
+    path('dictionary/import/', dictionary_import_views.import_job_list),
+    path('dictionary/import/<int:pk>/', dictionary_import_views.import_job_detail),
+    path('dictionary/import/<int:pk>/preflight/', dictionary_import_views.import_job_preflight),
+    path(
+        'dictionary/import/<int:pk>/auto-create-taxonomies/',
+        dictionary_import_views.import_job_auto_create_taxonomies,
+    ),
+    path('dictionary/import/<int:pk>/submit/', dictionary_import_views.import_job_submit),
+    path('dictionary/import/<int:pk>/withdraw/', dictionary_import_views.import_job_withdraw),
+    path('dictionary/import/<int:pk>/approve/', dictionary_import_views.import_job_approve),
+    path('dictionary/import/<int:pk>/reject/', dictionary_import_views.import_job_reject),
+    path('dictionary/export/', dictionary_import_views.dictionary_export),
 ]

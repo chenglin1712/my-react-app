@@ -15,9 +15,14 @@ from config.roles import STAFF_ROLES
 
 from . import firebase_ops
 from .models import (
-    Announcement, PendingRevision, QuizChoiceItem, QuizClozePassage,
+    Announcement, DictionaryRevision, PendingRevision, QuizChoiceItem, QuizClozePassage,
     QuizSituationItem, QuizTrueFalseItem, QuizVocabItem,
 )
+
+_DICTIONARY_LINKS = {
+    DictionaryRevision.TARGET_WORD: "/admin/dictionary/words",
+    DictionaryRevision.TARGET_GRAMMAR_SECTION: "/admin/dictionary/grammar",
+}
 
 REVIEW_TYPE_CHOICES = ("submission", "revision", "report")
 
@@ -99,6 +104,27 @@ def _collect_revisions():
     return items
 
 
+def _collect_dictionary_revisions():
+    """DictionaryRevision 不是走 PendingRevision（見 dictionary_views.py
+    開頭說明：辭典資料是 SQLAlchemy 直連，Django 沒有對應的 model 可以
+    setattr()／full_clean()），所以是獨立的第三種「revision」資料源，
+    跟 _collect_revisions() 分開查詢，但呈現形狀跟前端合併顯示的方式
+    完全一致（type 一樣是 "revision"）。"""
+    items = []
+    for rev in DictionaryRevision.objects.filter(status=DictionaryRevision.STATUS_PENDING_REVIEW):
+        title = rev.title_cache or f"{rev.target_kind}#{rev.target_id or '(新建)'}"
+        items.append({
+            "type": "revision",
+            "content_type": f"dictionary_{rev.target_kind}",
+            "id": rev.pk,
+            "title": f"[{rev.get_operation_display()}] {title}",
+            "submitted_by": rev.submitted_by,
+            "submitted_at": _iso(rev.submitted_at),
+            "link": _DICTIONARY_LINKS.get(rev.target_kind, "/admin/dictionary/words"),
+        })
+    return items
+
+
 def _collect_reports():
     client = firebase_ops.get_firestore_client()
     items = []
@@ -124,7 +150,10 @@ def review_queue_list(request):
     if err_resp:
         return err_resp
 
-    items = _collect_submissions() + _collect_revisions() + _collect_reports()
+    items = (
+        _collect_submissions() + _collect_revisions()
+        + _collect_dictionary_revisions() + _collect_reports()
+    )
 
     type_param = request.GET.get("type")
     if type_param in REVIEW_TYPE_CHOICES:

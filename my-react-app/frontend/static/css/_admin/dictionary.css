@@ -1,0 +1,568 @@
+/* P4 辭典管理（詞條/語法/主檔/批次匯入）共用樣式。比照 users.css／
+   quiz-bank.css 的既有風格：class 前綴用功能命名，不用 CSS-in-JS。 */
+
+.dictionary-admin-page {
+  min-height: 100vh;
+  padding: 32px;
+  color: var(--yy-ink, #221812);
+  background: #f5f6f8;
+  font-family: var(--yy-font-body, sans-serif);
+}
+
+.dictionary-admin-page > .alert {
+  max-width: 1440px;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.dictionary-page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  max-width: 1440px;
+  margin: 0 auto 24px;
+}
+
+.dictionary-page-heading h1 {
+  margin: 0 0 4px;
+  color: var(--yy-blue, #1f3a5c);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.dictionary-page-heading p {
+  margin: 0;
+  color: var(--yy-text-muted, #6b5a47);
+}
+
+.dictionary-page-heading .btn,
+.dictionary-row-actions .btn,
+.dictionary-back-link,
+.dictionary-filter-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.dictionary-filter-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(160px, 1fr)) auto auto;
+  align-items: end;
+  gap: 12px;
+  max-width: 1440px;
+  margin: 0 auto 20px;
+  padding: 18px;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(31, 58, 92, 0.06);
+}
+
+.dictionary-pending-filter {
+  display: flex;
+  align-items: center;
+  padding-bottom: 8px;
+}
+
+.dictionary-filter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dictionary-table-card {
+  max-width: 1440px;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(31, 58, 92, 0.07);
+  overflow: hidden;
+}
+
+.dictionary-table {
+  margin: 0;
+  vertical-align: middle;
+  font-size: 14px;
+}
+
+.dictionary-table th {
+  padding: 14px 12px;
+  color: var(--yy-blue, #1f3a5c);
+  background: #f1f3f5;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.dictionary-table td {
+  padding: 13px 12px;
+}
+
+.dictionary-word-name {
+  font-weight: 650;
+}
+
+.dictionary-empty {
+  padding: 48px !important;
+  color: var(--yy-text-muted, #6b5a47) !important;
+  text-align: center;
+}
+
+.dictionary-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 240px;
+  color: var(--yy-text-muted, #6b5a47);
+}
+
+.dictionary-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  color: var(--yy-text-muted, #6b5a47);
+  border-top: 1px solid #e9ecef;
+}
+
+.dictionary-pagination > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ── 整頁編輯器（WordEditor.jsx）── */
+
+.dictionary-editor-page {
+  padding-bottom: 64px;
+}
+
+.dictionary-editor-page > .alert,
+.dictionary-editor-page > .dictionary-back-link,
+.dictionary-editor-page .dictionary-page-heading,
+.dictionary-editor-card {
+  max-width: 1040px;
+}
+
+.dictionary-back-link {
+  margin: 0 auto 18px;
+  color: var(--yy-blue, #1f3a5c);
+  text-decoration: none;
+}
+
+.dictionary-editor-card {
+  margin: 0 auto 20px;
+  padding: 26px;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(31, 58, 92, 0.07);
+}
+
+.dictionary-editor-card h2 {
+  margin: 0 0 20px;
+  color: var(--yy-blue, #1f3a5c);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.dictionary-page-heading h2 {
+  margin: 0 0 4px;
+  color: var(--yy-blue, #1f3a5c);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.dictionary-nested-card {
+  padding: 18px;
+  margin-bottom: 16px;
+  background: #fafafa;
+  border: 1px solid #e2e6ea;
+  border-radius: 9px;
+}
+
+.dictionary-nested-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.dictionary-nested-heading h3,
+.dictionary-nested-heading h4 {
+  margin: 0;
+  color: var(--yy-blue, #1f3a5c);
+  font-size: 16px;
+  font-weight: 650;
+}
+
+/* ── 表單欄位／巢狀子區塊共用排版（WordEditor* 系列／GrammarNodePanel.jsx 共用）── */
+
+.dictionary-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.dictionary-field .form-label {
+  color: var(--yy-blue, #1f3a5c);
+  font-weight: 600;
+}
+
+.required-mark {
+  color: #b02a37;
+}
+
+.dictionary-child-section {
+  padding-top: 16px;
+  margin-top: 16px;
+  border-top: 1px solid #e9ecef;
+}
+
+.dictionary-child-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.dictionary-child-heading h2,
+.dictionary-child-heading h3,
+.dictionary-child-heading h4,
+.dictionary-child-heading h5 {
+  margin: 0;
+  color: var(--yy-blue, #1f3a5c);
+}
+
+.dictionary-empty-note {
+  margin: 0 0 12px;
+  color: var(--yy-text-muted, #6b5a47);
+  font-size: 14px;
+}
+
+.dictionary-muted {
+  color: var(--yy-text-muted, #6b5a47);
+  font-size: 13px;
+}
+
+.dictionary-taxonomy-field {
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border: 1px solid #e2e6ea;
+  border-radius: 8px;
+}
+
+.dictionary-taxonomy-field legend {
+  width: auto;
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--yy-blue, #1f3a5c);
+}
+
+.dictionary-checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 6px 12px;
+}
+
+.dictionary-media-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.dictionary-anaphora-card {
+  padding: 12px;
+  margin-bottom: 10px;
+  background: #fff;
+  border: 1px solid #e2e6ea;
+  border-radius: 8px;
+}
+
+.dictionary-anaphora-item {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.dictionary-anaphora-item .dictionary-word-picker {
+  flex: 1;
+}
+
+.dictionary-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.dictionary-review-card,
+.dictionary-danger-card {
+  max-width: 1040px;
+  margin: 20px auto 0;
+  padding: 22px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(31, 58, 92, 0.07);
+}
+
+.dictionary-review-card {
+  border: 1px solid #dee2e6;
+}
+
+.dictionary-danger-card {
+  border: 1px solid #f1b0b7;
+}
+
+.dictionary-review-card h3,
+.dictionary-danger-card h3 {
+  margin: 0 0 12px;
+  color: var(--yy-blue, #1f3a5c);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.dictionary-danger-card p {
+  color: var(--yy-text-muted, #6b5a47);
+}
+
+/* ── 媒體上傳（MediaUploadField.jsx）── */
+
+.dictionary-media-field {
+  padding: 14px;
+  border: 1px dashed #adb5bd;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.dictionary-image-preview img {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 7px;
+  object-fit: cover;
+}
+
+.dictionary-audio-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dictionary-media-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 20px;
+  color: #6c757d;
+}
+
+.dictionary-media-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.dictionary-upload-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  color: var(--yy-text-muted, #6b5a47);
+  font-size: 14px;
+}
+
+.dictionary-upload-error {
+  margin-top: 10px;
+}
+
+/* ── 詞條連結挑選器（WordPicker.jsx）── */
+
+.dictionary-word-picker {
+  position: relative;
+}
+
+.dictionary-word-picker-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #fff;
+  border: 1px solid #ced4da;
+  border-radius: 7px;
+}
+
+.dictionary-word-picker-input .form-control {
+  border: none;
+  padding: 4px 0;
+}
+
+.dictionary-word-picker-input .form-control:focus {
+  box-shadow: none;
+}
+
+.dictionary-word-picker-selection {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--yy-blue, #1f3a5c);
+  font-size: 13px;
+}
+
+.dictionary-word-picker-error {
+  margin-top: 6px;
+  color: #b02a37;
+  font-size: 13px;
+}
+
+.dictionary-word-picker-results {
+  position: absolute;
+  z-index: 20;
+  width: 100%;
+  max-height: 220px;
+  margin-top: 4px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.dictionary-word-picker-option {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid #f1f3f5;
+  cursor: pointer;
+}
+
+.dictionary-word-picker-option:hover,
+.dictionary-word-picker-option[aria-selected="true"] {
+  background: #f1f3f5;
+}
+
+.dictionary-word-picker-option small,
+.dictionary-word-picker-option span {
+  color: var(--yy-text-muted, #6b5a47);
+  font-size: 12px;
+}
+
+.dictionary-word-picker-empty {
+  padding: 12px;
+  color: var(--yy-text-muted, #6b5a47);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* ── 主檔管理（TaxonomyManager.jsx／MergeDialog.jsx）── */
+
+.dictionary-taxonomy-tabs {
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.dictionary-taxonomy-card {
+  margin-top: -1px; /* 跟上方 Nav.Item 的 tabs 邊框無縫接起來 */
+  border-top-left-radius: 0;
+}
+
+.dictionary-taxonomy-create-form {
+  padding: 18px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.dictionary-taxonomy-create-row {
+  display: flex;
+  gap: 10px;
+}
+
+.dictionary-taxonomy-create-row .form-control {
+  max-width: 320px;
+}
+
+.dictionary-taxonomy-affix-form-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr)) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+/* ── 文法管理（GrammarTree.jsx／GrammarNodePanel.jsx）── */
+
+.dictionary-grammar-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 2fr);
+  gap: 20px;
+  max-width: 1440px;
+  margin: 20px auto 0;
+  align-items: start;
+}
+
+.dictionary-grammar-section-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+.dictionary-grammar-section-link {
+  padding: 0;
+  color: var(--yy-ink, #221812);
+  text-align: left;
+  text-decoration: none;
+}
+
+.dictionary-grammar-section-link:hover,
+.dictionary-grammar-section-link:focus {
+  color: var(--yy-blue, #1f3a5c);
+}
+
+@media (max-width: 900px) {
+  .dictionary-admin-page {
+    padding: 20px;
+  }
+
+  .dictionary-filter-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dictionary-taxonomy-affix-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dictionary-grammar-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .dictionary-page-heading,
+  .dictionary-pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dictionary-filter-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .dictionary-editor-card {
+    padding: 20px;
+  }
+}

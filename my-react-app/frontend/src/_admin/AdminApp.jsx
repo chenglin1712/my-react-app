@@ -20,6 +20,11 @@ import SharedNotesModeration from './moderation/SharedNotesModeration';
 import RecordingsModeration from './moderation/RecordingsModeration';
 import ReportsQueue from './moderation/ReportsQueue';
 import ReviewQueue from './review/ReviewQueue';
+import WordList from './dictionary/WordList';
+import WordEditor from './dictionary/WordEditor';
+import TaxonomyManager from './dictionary/TaxonomyManager';
+import GrammarTree from './dictionary/GrammarTree';
+import ImportWizard from './dictionary/ImportWizard';
 
 const AdminApp = () => {
     const [pendingAnnouncementCount, setPendingAnnouncementCount] = useState();
@@ -60,6 +65,13 @@ const AdminApp = () => {
                 <Route path="moderation/notes" element={<SharedNotesModeration />} />
                 <Route path="moderation/recordings" element={<RecordingsModeration />} />
                 <Route path="moderation/reports" element={<ReportsQueue />} />
+                <Route path="dictionary/words" element={<WordList />} />
+                <Route path="dictionary/words/new" element={<WordEditor />} />
+                <Route path="dictionary/words/:id" element={<WordEditor />} />
+                <Route path="dictionary/taxonomies" element={<TaxonomyManager />} />
+                <Route path="dictionary/grammar" element={<GrammarTree />} />
+                <Route path="dictionary/import" element={<ImportWizard />} />
+                <Route path="dictionary/import/:id" element={<ImportWizard />} />
             </Route>
         </Routes>
     );

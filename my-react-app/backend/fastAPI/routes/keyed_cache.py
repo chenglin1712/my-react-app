@@ -52,3 +52,30 @@ class KeyedCache(Generic[K, V]):
             if value is not None:
                 self._values[key] = value
             return value
+
+    def keys(self) -> list:
+        """目前有值的全部 key（給 (tribe, affix_type) 這種複合 key 的批次
+        失效用——呼叫端知道 tribe 但不見得知道底下實際存了哪些 affix_type
+        組合）。"""
+        return list(self._values.keys())
+
+    def invalidate(self, key: K) -> bool:
+        """P4 辭典管理新增：後台寫入辭典 DB 後，讓 FastAPI 這邊已經算過的
+        快取失效，下一次請求會重新 compute()。回傳這個 key 之前是否真的
+        有快取值（給呼叫端統計「實際清了幾個 key」用）。
+
+        刻意不順便刪除 self._locks[key] 對應的鎖物件：如果此刻正有請求在
+        get_or_compute() 裡持著這把鎖執行 compute()，把鎖物件從字典拿掉會讓
+        「稍後用新建鎖進來的另一個請求」跟「正持有舊鎖的請求」同時進入
+        compute()，雙重檢查鎖定的保護就失效了。鎖的數量上限等於 key 空間
+        大小（族語×affix_type 這種組合本來就是收斂過的有限集合），留著不會
+        無限增長，不需要靠刪除鎖來省記憶體。"""
+        with self._lock_for(key):
+            return self._values.pop(key, None) is not None
+
+    def clear(self) -> int:
+        """清空全部已快取的值，回傳清掉的筆數。同理不清 self._locks。"""
+        with self._meta_lock:
+            count = len(self._values)
+            self._values.clear()
+            return count
