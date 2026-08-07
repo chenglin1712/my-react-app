@@ -8,7 +8,7 @@ from django.test.utils import override_settings
 from crawler.dictionary_source import fetch_words_by_glosses
 from adminapi.models import (
     ExamScheduleCrawlStatus, ExamScheduleOverride, QuizChoiceItem, QuizClozePassage,
-    QuizTrueFalseItem, QuizVocabItem,
+    QuizSituationItem, QuizTrueFalseItem, QuizVocabItem,
 )
 
 
@@ -157,6 +157,124 @@ class GetQuizDataTest(TestCase):
         questions = [q['question_ab'] for q in response.json()['parts'][0]['questions']]
         self.assertIn('nyux qutux huzil maku.', questions)
         self.assertNotIn('cyux bbiru nha.', questions)
+
+    def test_level_1_questions_carry_item_id(self):
+        # P5.3 題目品質分析地基：出題端點要帶回資料庫 pk，前端才能在作答時
+        # 回報「答的是哪一題」，見 views.py build_true_false_test_from_db 的說明。
+        item = QuizTrueFalseItem.objects.create(
+            tribe='tayal', question_ab='qani ga, huzil.', question_ch='這是狗。',
+            audio_url='https://res.cloudinary.com/demo/video/upload/a.mp3',
+            image_url='https://res.cloudinary.com/demo/image/upload/a.png',
+            answer=QuizTrueFalseItem.ANSWER_TRUE,
+            status=QuizTrueFalseItem.STATUS_PUBLISHED, created_by='tester',
+        )
+        response = self.client.get('/crawler/?tribe=tayal&level=1')
+        questions = response.json()['parts'][0]['questions']
+        self.assertEqual(questions[0]['item_id'], item.id)
+
+    def test_level_2_questions_carry_item_id(self):
+        item = QuizChoiceItem.objects.create(
+            tribe='tayal', question_ab='nyux qutux huzil maku.', question_ch='我有一隻狗。',
+            image_a_url='https://res.cloudinary.com/demo/image/upload/a.png',
+            image_b_url='https://res.cloudinary.com/demo/image/upload/b.png',
+            image_c_url='https://res.cloudinary.com/demo/image/upload/c.png',
+            answer=1, status=QuizChoiceItem.STATUS_PUBLISHED, created_by='tester',
+        )
+        response = self.client.get('/crawler/?tribe=tayal&level=2')
+        questions = response.json()['parts'][0]['questions']
+        self.assertEqual(questions[0]['item_id'], item.id)
+
+    def test_level_3_pairs_carry_item_id(self):
+        # 配合題一「題」是好幾個 QuizVocabItem 的組合，item_id 放在每個 pair
+        # 上（不是題目層級），見 views.py build_matching_test_from_db 的說明。
+        item = QuizVocabItem.objects.create(
+            tribe='tayal', category='noun', foreign_word='huzil', chinese_gloss='狗',
+            status=QuizVocabItem.STATUS_PUBLISHED, created_by='tester',
+        )
+        response = self.client.get('/crawler/?tribe=tayal&level=3')
+        all_pairs = [
+            pair
+            for question in response.json()['parts'][0]['questions']
+            for pair in question['pairs']
+        ]
+        huzil_pair = next(p for p in all_pairs if p['word']['word'] == 'huzil')
+        self.assertEqual(huzil_pair['item_id'], item.id)
+
+    def test_level_4_questions_carry_composite_item_id(self):
+        # 克漏字一「題」是一個空格，不是一整篇短文，item_id 是
+        # "{passage.id}:{blank_key}" 複合字串，見 views.py
+        # build_cloze_test_from_db 的說明。
+        passage = QuizClozePassage.objects.create(
+            tribe='tayal', passage_foreign='Lokah! {blank1}', passage_chinese='你好！',
+            blanks={'blank1': {'options': ['a', 'b', 'c', 'd'], 'answer': 1}},
+            status=QuizClozePassage.STATUS_PUBLISHED, created_by='tester',
+        )
+        response = self.client.get('/crawler/?tribe=tayal&level=4')
+        questions = response.json()['parts'][0]['questions']
+        self.assertEqual(questions[0]['item_id'], f'{passage.id}:blank1')
+
+
+class GetSituationQuizDataTest(TestCase):
+    """情境題的獨立出題端點——P5.3 第一次真的把 QuizSituationItem 接上
+    學生端（P2 上線後只有後台管理，沒有任何學生端出題路徑）。"""
+
+    def setUp(self):
+        self.client = Client()
+        cache.clear()
+
+    @override_settings(AUTH_DEV_BYPASS=False)
+    def test_requires_login_when_bypass_disabled(self):
+        response = self.client.get('/crawler/situation-quiz/?tribe=tayal')
+        self.assertEqual(response.status_code, 401)
+
+    @patch('crawler.views.is_ratelimited', return_value=True)
+    def test_rate_limited_returns_429(self, _mock_limited):
+        response = self.client.get('/crawler/situation-quiz/?tribe=tayal')
+        self.assertEqual(response.status_code, 429)
+
+    def test_unsupported_tribe_returns_400(self):
+        response = self.client.get('/crawler/situation-quiz/?tribe=not_a_tribe')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('不支援的族語', response.json()['detail'])
+
+    def test_only_serves_published_items_and_carries_item_id(self):
+        published = QuizSituationItem.objects.create(
+            tribe='tayal', scenario_chinese='長輩遞給你食物，你要怎麼用族語回應？',
+            options=[
+                {'foreign': 'Mhway su balay.', 'chinese': '非常謝謝你。'},
+                {'foreign': 'Lokah su?', 'chinese': '你好嗎？'},
+                {'foreign': 'Musa su inu?', 'chinese': '你要去哪裡？'},
+                {'foreign': 'Baq su balay.', 'chinese': '你很棒。'},
+            ],
+            answer=1, status=QuizSituationItem.STATUS_PUBLISHED, created_by='tester',
+        )
+        QuizSituationItem.objects.create(
+            tribe='tayal', scenario_chinese='草稿題目，不應該被抽到。',
+            options=[
+                {'foreign': 'a', 'chinese': 'a'}, {'foreign': 'b', 'chinese': 'b'},
+                {'foreign': 'c', 'chinese': 'c'}, {'foreign': 'd', 'chinese': 'd'},
+            ],
+            answer=1, status=QuizSituationItem.STATUS_DRAFT, created_by='tester',
+        )
+
+        response = self.client.get('/crawler/situation-quiz/?tribe=tayal')
+
+        self.assertEqual(response.status_code, 200)
+        questions = response.json()['parts'][0]['questions']
+        self.assertEqual(len(questions), 1)
+        self.assertEqual(questions[0]['item_id'], published.id)
+        self.assertEqual(questions[0]['scenario_ch'], '長輩遞給你食物，你要怎麼用族語回應？')
+        self.assertEqual(len(questions[0]['options']), 4)
+
+    def test_response_shape_matches_get_quiz_data_envelope(self):
+        # 前端沿用既有 quiz_panel.jsx 的資料流程，回應信封（chapter_name／
+        # parts[0].type/title/intro/questions）要跟 get_quiz_data 一致。
+        response = self.client.get('/crawler/situation-quiz/?tribe=tayal')
+        data = response.json()
+        self.assertIn('chapter_name', data)
+        self.assertEqual(data['parts'][0]['type'], 'situation')
+        self.assertIn('title', data['parts'][0])
+        self.assertIn('intro', data['parts'][0])
 
 
 class GetTayalImformationTest(TestCase):

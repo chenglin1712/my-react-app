@@ -117,3 +117,14 @@ export async function apiDelete(url, options = {}) {
     normalizeError(err);
   }
 }
+
+/** P5 數據分析用的輕量事件回報（頁面瀏覽、測驗開始/作答等）。
+ *
+ * 刻意不重用 apiPost——那個函式的錯誤處理是「解析成 ApiError 往外拋」，
+ * 分析事件遺漏不該讓呼叫端多包一層 try/catch，也不該讓使用者看到任何
+ * 提示：這裡直接吞掉所有失敗（網路離線、後端 429、任何例外），永遠不
+ * reject，呼叫端可以放心地在任何地方直接呼叫 `trackEvent(...)` 而不用
+ * await、不用 catch。tribe/payload 皆為選填。 */
+export function trackEvent(eventType, { tribe, payload } = {}) {
+  return apiPost('/adminapi/public/events/', { event_type: eventType, tribe, payload }).catch(() => {});
+}

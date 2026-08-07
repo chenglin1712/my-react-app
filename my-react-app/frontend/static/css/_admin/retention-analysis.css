@@ -1,0 +1,262 @@
+.retention-analysis-page {
+    min-height: calc(100vh - 68px);
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 32px;
+    color: var(--yy-ink, #221812);
+}
+
+.retention-analysis-heading {
+    margin-bottom: 24px;
+}
+
+.retention-analysis-heading h1 {
+    margin: 0 0 4px;
+    color: var(--yy-blue, #1f3a5c);
+    font-size: 28px;
+    font-weight: 700;
+}
+
+.retention-analysis-heading p {
+    margin: 0;
+    color: var(--yy-text-muted, #6b5a47);
+}
+
+.retention-analysis-error {
+    margin-bottom: 20px;
+    font-size: 13px;
+}
+
+.retention-analysis-panel {
+    min-width: 0;
+    margin-bottom: 20px;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(31, 58, 92, 0.06);
+}
+
+.retention-analysis-panel-heading {
+    padding: 22px 22px 17px;
+}
+
+.retention-analysis-panel-heading h2 {
+    margin: 0 0 4px;
+    color: var(--yy-blue, #1f3a5c);
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.retention-analysis-panel-heading p {
+    margin: 0;
+    color: var(--yy-text-muted, #6b5a47);
+    font-size: 12px;
+}
+
+.retention-analysis-loading,
+.retention-analysis-empty {
+    display: flex;
+    min-height: 260px;
+    align-items: center;
+    justify-content: center;
+    color: var(--yy-text-muted, #6b5a47);
+}
+
+.retention-analysis-loading {
+    gap: 8px;
+    font-size: 13px;
+}
+
+.retention-analysis-empty {
+    flex-direction: column;
+    color: #adb5bd;
+    text-align: center;
+}
+
+.retention-analysis-empty p {
+    margin: 11px 0 0;
+    color: var(--yy-text-muted, #6b5a47);
+    font-size: 13px;
+}
+
+.retention-analysis-table-scroll {
+    width: 100%;
+    padding: 0 18px 8px;
+    overflow-x: auto;
+    scrollbar-gutter: stable;
+}
+
+.retention-analysis-table-scroll:focus-visible {
+    outline: 2px solid rgba(31, 58, 92, 0.45);
+    outline-offset: -2px;
+}
+
+.retention-analysis-table {
+    width: max-content;
+    min-width: 100%;
+    border-spacing: 4px;
+    border-collapse: separate;
+}
+
+.retention-analysis-table th,
+.retention-analysis-table td {
+    border: 0;
+}
+
+.retention-analysis-table thead th {
+    padding: 8px 7px;
+    color: var(--yy-text-muted, #6b5a47);
+    font-size: 12px;
+    font-weight: 650;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.retention-analysis-cohort-heading,
+.retention-analysis-cohort-label {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    min-width: 190px;
+    background: #fff;
+}
+
+.retention-analysis-cohort-heading {
+    z-index: 3;
+    text-align: left !important;
+}
+
+.retention-analysis-cohort-label {
+    padding: 10px 12px;
+    color: var(--yy-ink, #221812);
+    box-shadow: 6px 0 8px -8px rgba(31, 58, 92, 0.45);
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.retention-analysis-week-heading {
+    min-width: 72px;
+}
+
+.retention-analysis-cell {
+    min-width: 72px;
+    height: 48px;
+    padding: 8px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    text-align: center;
+    transition:
+        box-shadow 0.12s ease,
+        transform 0.12s ease;
+}
+
+.retention-analysis-cell-measured:hover {
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.65);
+    transform: translateY(-1px);
+}
+
+.retention-analysis-cell-pending {
+    color: #929ba3;
+    background:
+        repeating-linear-gradient(
+            -45deg,
+            #f1f3f5,
+            #f1f3f5 5px,
+            #e9ecef 5px,
+            #e9ecef 10px
+        );
+    font-weight: 500;
+}
+
+.retention-analysis-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 18px;
+    padding: 12px 22px 20px;
+    color: var(--yy-text-muted, #6b5a47);
+    font-size: 11px;
+}
+
+.retention-analysis-legend-scale,
+.retention-analysis-legend-pending {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.retention-analysis-legend-swatch {
+    width: 22px;
+    height: 16px;
+    background: #e9ecef;
+    border: 1px solid rgba(31, 58, 92, 0.1);
+    border-radius: 3px;
+}
+
+.retention-analysis-legend-low {
+    background: rgba(31, 58, 92, 0.2);
+}
+
+.retention-analysis-legend-medium {
+    background: rgba(31, 58, 92, 0.52);
+}
+
+.retention-analysis-legend-high {
+    background: rgba(31, 58, 92, 0.9);
+}
+
+.retention-analysis-legend-pending .retention-analysis-legend-swatch {
+    background:
+        repeating-linear-gradient(
+            -45deg,
+            #f1f3f5,
+            #f1f3f5 4px,
+            #e9ecef 4px,
+            #e9ecef 8px
+        );
+}
+
+@media (max-width: 900px) {
+    .retention-analysis-page {
+        padding: 20px;
+    }
+
+    .retention-analysis-table-scroll {
+        padding-right: 14px;
+        padding-left: 14px;
+    }
+}
+
+@media (max-width: 560px) {
+    .retention-analysis-page {
+        padding: 16px;
+    }
+
+    .retention-analysis-panel-heading {
+        padding-right: 18px;
+        padding-left: 18px;
+    }
+
+    .retention-analysis-cohort-heading,
+    .retention-analysis-cohort-label {
+        min-width: 170px;
+    }
+
+    .retention-analysis-week-heading,
+    .retention-analysis-cell {
+        min-width: 66px;
+    }
+
+    .retention-analysis-legend {
+        align-items: flex-start;
+        justify-content: flex-start;
+        padding-right: 18px;
+        padding-left: 18px;
+    }
+}

@@ -6,6 +6,7 @@ import {
 } from 'react';
 import {
     Link,
+    useLocation,
     useParams,
 } from 'react-router-dom';
 import {
@@ -219,9 +220,14 @@ function revisionFromSave(result, fallback) {
 
 export default function WordEditor() {
     const { id } = useParams();
+    const location = useLocation();
     const { userData } = useAuth();
     const role = userData?.role;
     const isNew = !id;
+    // P5.2 搜尋分析的「建立詞條草稿」按鈕從查無結果的查詢字串導過來，帶
+    // 這個 state 預填詞形——只在新建當下讀一次（見下面 reset(EMPTY_WORD) 的
+    // 呼叫點），不是持續綁定，使用者可以照常修改/清空這個欄位。
+    const prefillName = location.state?.prefillName ?? '';
 
     const {
         tree,
@@ -281,7 +287,7 @@ export default function WordEditor() {
                 });
 
                 if (isNew) {
-                    reset(EMPTY_WORD);
+                    reset(prefillName ? { ...EMPTY_WORD, name: prefillName } : EMPTY_WORD);
                     return;
                 }
 
@@ -318,7 +324,7 @@ export default function WordEditor() {
         return () => {
             active = false;
         };
-    }, [id, isNew, reset]);
+    }, [id, isNew, reset, prefillName]);
 
     const statusLabel = useMemo(() => {
         if (revisionStatus) {

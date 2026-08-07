@@ -3,6 +3,9 @@ import { Routes, Route } from 'react-router-dom';
 import { apiGet } from '../../utils/apiClient';
 import AdminLayout from './layout/AdminLayout';
 import Dashboard from './dashboard/Dashboard';
+import SearchAnalytics from './analytics/SearchAnalytics';
+import QuizQualityAnalysis from './analytics/QuizQualityAnalysis';
+import RetentionAnalysis from './analytics/RetentionAnalysis';
 import AnnouncementList from './content/AnnouncementList';
 import AnnouncementEditor from './content/AnnouncementEditor';
 import ExamSchedule from './content/ExamSchedule';
@@ -44,6 +47,9 @@ const AdminApp = () => {
         <Routes>
             <Route element={<AdminLayout pendingAnnouncementCount={pendingAnnouncementCount} />}>
                 <Route index element={<Dashboard />} />
+                <Route path="analytics/search" element={<SearchAnalytics />} />
+                <Route path="analytics/quiz-quality" element={<QuizQualityAnalysis />} />
+                <Route path="analytics/retention" element={<RetentionAnalysis />} />
                 <Route path="content/announcements" element={<AnnouncementList />} />
                 <Route path="content/announcements/new" element={<AnnouncementEditor />} />
                 <Route path="content/announcements/:id" element={<AnnouncementEditor />} />

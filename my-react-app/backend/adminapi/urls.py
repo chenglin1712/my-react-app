@@ -1,8 +1,8 @@
 from django.urls import path
 
 from . import (
-    dictionary_grammar_views, dictionary_import_views, dictionary_taxonomy_views, dictionary_views,
-    moderation_views, quizbank_views, review_queue_views, user_views, views,
+    analytics_views, dictionary_grammar_views, dictionary_import_views, dictionary_taxonomy_views,
+    dictionary_views, moderation_views, quizbank_views, review_queue_views, user_views, views,
 )
 
 
@@ -122,4 +122,11 @@ urlpatterns = [
     path('dictionary/import/<int:pk>/approve/', dictionary_import_views.import_job_approve),
     path('dictionary/import/<int:pk>/reject/', dictionary_import_views.import_job_reject),
     path('dictionary/export/', dictionary_import_views.dictionary_export),
+
+    # P5 數據分析
+    path('public/events/', analytics_views.usage_event_create),
+    path('analytics/dashboard/', analytics_views.dashboard_analytics),
+    path('analytics/search/', analytics_views.search_analytics),
+    path('analytics/quiz-quality/', analytics_views.quiz_quality_analytics),
+    path('analytics/retention/', analytics_views.retention_analytics),
 ]

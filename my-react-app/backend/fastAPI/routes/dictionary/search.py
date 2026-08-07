@@ -15,8 +15,9 @@ from dictionary_db.word_data import (
     load_explanation_items_for_words,
     load_sources_for_words,
 )
-from config.tribes import TRIBE_MAP, resolve_tribe_name
+from config.tribes import TRIBES, TRIBE_MAP, resolve_tribe_name
 from fastAPI.rate_limit import limiter
+from fastAPI.usage_events import record_event
 
 from ..keyed_cache import KeyedCache
 from .schemas import (
@@ -31,6 +32,11 @@ from .schemas import (
 router = APIRouter()
 
 logger = logging.getLogger(__name__)
+
+# UsageEvent.tribe 存 slug（跟 Django 端 dictionary_views.py 的
+# _tribe_slug_for() 同一個慣例），這裡的 tribe_name 是 resolve_tribe_name()
+# 解出來的中文全名，需要反查一次。
+_TRIBE_SLUG_BY_NAME = {t.full_name: t.slug for t in TRIBES}
 
 
 # ------------------------- Utilities -------------------------
@@ -377,6 +383,21 @@ async def allsearch_tayal_dictionary(request: Request, body: KeywordRequest, db:
         # 冷快取時是同步的全表掃描＋JSON parse，丟到執行緒池執行，
         # 避免卡住 event loop（見 /keys/ 同樣的說明）。
         exact, fuzzy = await asyncio.to_thread(_search_single_keyword, db, keyword, tribe_name)
+
+        # 記錄查詢事件（P5 搜尋分析用）——刻意放在算完命中數「之後」才記錄，
+        # 讓「零結果」判定精確；record_event() 是 fire-and-forget，任何失敗
+        # 都不影響這裡的回應。fuzzy 是 {分類: [結果,...]} 的巢狀 dict，命中數
+        # 用攤平後的長度計算。
+        fuzzy_hit_count = sum(len(v) for v in fuzzy.values())
+        record_event(
+            "dictionary_search",
+            tribe=_TRIBE_SLUG_BY_NAME.get(tribe_name, ""),
+            payload={
+                "query": keyword,
+                "exact_hit_count": len(exact),
+                "fuzzy_hit_count": fuzzy_hit_count,
+            },
+        )
 
         return JSONResponse(
             {

@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import axios from 'axios';
-import { apiPost, apiPatch, apiPut, apiDelete, ApiError } from './apiClient';
+import { apiPost, apiPatch, apiPut, apiDelete, trackEvent, ApiError } from './apiClient';
 
 vi.mock('axios');
 
@@ -135,5 +135,43 @@ describe('apiPatch／apiPut／apiDelete（後台管理系統用，跟 apiGet/api
   test('apiPatch 失敗時一樣包成 ApiError', async () => {
     axios.patch.mockRejectedValueOnce({ response: { status: 409, data: { detail: '目前狀態無法編輯' } } });
     await expect(apiPatch('/x', {})).rejects.toMatchObject({ message: '目前狀態無法編輯', status: 409 });
+  });
+});
+
+describe('trackEvent（P5 數據分析：輕量事件回報，任何失敗都不該讓呼叫端需要處理例外）', () => {
+  beforeEach(() => {
+    mockCurrentUser = null;
+    axios.post.mockReset();
+    axios.isCancel.mockReturnValue(false);
+  });
+
+  test('送出正確的 event_type／tribe／payload', async () => {
+    axios.post.mockResolvedValueOnce({ data: { detail: '已記錄' } });
+    await trackEvent('page_view', { tribe: 'tayal', payload: { path: '/dictionary' } });
+    expect(axios.post).toHaveBeenCalledWith(
+      '/adminapi/public/events/',
+      { event_type: 'page_view', tribe: 'tayal', payload: { path: '/dictionary' } },
+      expect.anything(),
+    );
+  });
+
+  test('不帶 tribe/payload 也能呼叫', async () => {
+    axios.post.mockResolvedValueOnce({ data: { detail: '已記錄' } });
+    await trackEvent('quiz_session');
+    expect(axios.post).toHaveBeenCalledWith(
+      '/adminapi/public/events/',
+      { event_type: 'quiz_session', tribe: undefined, payload: undefined },
+      expect.anything(),
+    );
+  });
+
+  test('後端回應失敗時不會 reject，呼叫端不需要 catch', async () => {
+    axios.post.mockRejectedValueOnce({ response: { status: 429, data: { detail: '請求過於頻繁，請稍後再試' } } });
+    await expect(trackEvent('page_view')).resolves.toBeUndefined();
+  });
+
+  test('網路完全失敗時也不會 reject', async () => {
+    axios.post.mockRejectedValueOnce(new Error('Network Error'));
+    await expect(trackEvent('page_view')).resolves.toBeUndefined();
   });
 });

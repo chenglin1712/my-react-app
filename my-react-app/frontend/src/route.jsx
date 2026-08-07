@@ -40,6 +40,7 @@ const Comp_quiz_recommon_result = lazy(() => import('../components/_quiz/quiz_re
 const Comp_quiz_recommon_start = lazy(() => import('../components/_quiz/quiz_recommon_start'));
 const Comp_quiz_recommon_question = lazy(() => import('../components/_quiz/quiz_recommon_question'));
 const Comp_quiz_recommon = lazy(() => import('../components/_quiz/quiz_recommon'));
+const ScenarioQuiz = lazy(() => import('../components/_quiz/ScenarioQuiz'));
 const Comp_situation = lazy(() => import('../components/_quiz/situation'));
 const Comp_review = lazy(() => import('../components/_quiz/review'));
 const Comp_bot = lazy(() => import('../components/_quiz/bot'));
@@ -99,6 +100,7 @@ const App = () => {
             {TRIBES.map((t) => (
               <Route key={t.slug} path={t.slug === 'tayal' ? '' : t.slug} element={<Comp_quiz tribe={t.slug} />} >
                 <Route index element={<Comp_quiz_start tribe={t.slug} />} />
+                <Route path="scenario" element={<ScenarioQuiz tribe={t.slug} />} />
                 <Route path=":level" element={<Comp_quiz_panel tribe={t.slug} />} />
                 <Route path=":level/submit" element={<Comp_quiz_submit tribe={t.slug} />} />
               </Route>

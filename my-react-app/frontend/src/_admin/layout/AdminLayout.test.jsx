@@ -15,6 +15,9 @@ function renderLayout({ initialEntries = ['/admin'], pendingAnnouncementCount } 
         <Route path="/admin" element={<AdminLayout pendingAnnouncementCount={pendingAnnouncementCount} />}>
           <Route index element={<div>DASHBOARD_CONTENT</div>} />
           <Route path="content/announcements" element={<div>ANNOUNCEMENTS_CONTENT</div>} />
+          <Route path="analytics/search" element={<div>SEARCH_ANALYTICS_CONTENT</div>} />
+          <Route path="analytics/quiz-quality" element={<div>QUIZ_QUALITY_CONTENT</div>} />
+          <Route path="analytics/retention" element={<div>RETENTION_CONTENT</div>} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -44,11 +47,15 @@ describe('AdminLayout', () => {
     expect(screen.getByRole('link', { name: /語法/ })).toHaveAttribute('href', '/admin/dictionary/grammar');
     // P4.4 批次匯入／匯出精靈上線後，這一項也是真的連結。
     expect(screen.getByRole('link', { name: /批次匯入／匯出/ })).toHaveAttribute('href', '/admin/dictionary/import');
-    // 「規劃中」的項目（學習數據，P5 才會做）不應該渲染成 <a>，避免
-    // 使用者點了卻導到一個根本不存在內容的頁面。
-    const plannedItem = screen.getByText('學習數據').closest('li');
-    expect(within(plannedItem).queryByRole('link')).not.toBeInTheDocument();
-    expect(within(plannedItem).getByText('規劃中')).toBeInTheDocument();
+    // P5.2 搜尋分析上線後，「分析」群組裡這一項也是真的連結。
+    expect(screen.getByRole('link', { name: /搜尋分析/ })).toHaveAttribute('href', '/admin/analytics/search');
+    // P5.3 題目品質分析上線後，「分析」群組原本規劃中的「學習數據」佔位
+    // 換成這一項真的連結。
+    expect(screen.getByRole('link', { name: /題目品質分析/ })).toHaveAttribute('href', '/admin/analytics/quiz-quality');
+    // P5.4 留存分析上線後，「分析」群組新增這一項真的連結（P5 數據分析
+    // 到此四個子頁面全部上線）。
+    expect(screen.getByRole('link', { name: /留存分析/ })).toHaveAttribute('href', '/admin/analytics/retention');
+    expect(screen.queryByText('學習數據')).not.toBeInTheDocument();
   });
 
   test('題庫群組的四個項目（中高級／高級、外部題源、情境題、IRT 參數）都是真的連結', () => {
@@ -78,5 +85,32 @@ describe('AdminLayout', () => {
     renderLayout({ initialEntries: ['/admin/content/announcements'] });
     expect(screen.getByText('ANNOUNCEMENTS_CONTENT')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /公告管理/ })).toHaveClass('active');
+  });
+
+  test('搜尋分析路由顯示對應內容、導覽列標記 active，且麵包屑正確', () => {
+    renderLayout({ initialEntries: ['/admin/analytics/search'] });
+    expect(screen.getByText('SEARCH_ANALYTICS_CONTENT')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /搜尋分析/ })).toHaveClass('active');
+    const breadcrumb = screen.getByLabelText('麵包屑');
+    expect(within(breadcrumb).getByText('分析')).toBeInTheDocument();
+    expect(within(breadcrumb).getByText('搜尋分析')).toBeInTheDocument();
+  });
+
+  test('題目品質分析路由顯示內容、導覽列標記 active，且麵包屑正確', () => {
+    renderLayout({ initialEntries: ['/admin/analytics/quiz-quality'] });
+    expect(screen.getByText('QUIZ_QUALITY_CONTENT')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /題目品質分析/ })).toHaveClass('active');
+    const breadcrumb = screen.getByLabelText('麵包屑');
+    expect(within(breadcrumb).getByText('分析')).toBeInTheDocument();
+    expect(within(breadcrumb).getByText('題目品質分析')).toBeInTheDocument();
+  });
+
+  test('留存分析路由顯示內容、導覽列標記 active，且麵包屑正確', () => {
+    renderLayout({ initialEntries: ['/admin/analytics/retention'] });
+    expect(screen.getByText('RETENTION_CONTENT')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /留存分析/ })).toHaveClass('active');
+    const breadcrumb = screen.getByLabelText('麵包屑');
+    expect(within(breadcrumb).getByText('分析')).toBeInTheDocument();
+    expect(within(breadcrumb).getByText('留存分析')).toBeInTheDocument();
   });
 });

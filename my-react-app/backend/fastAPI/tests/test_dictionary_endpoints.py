@@ -58,6 +58,32 @@ def test_key_endpoint_rejects_empty_keyword(client):
     assert response.status_code == 400
 
 
+def test_key_endpoint_records_search_event(client):
+    """P5 搜尋分析地基：/key/ 算完命中數後要記錄一筆 dictionary_search
+    事件，tribe 記錄成 slug（不是中文全名），零結果也要正確記成 0。"""
+    with patch("fastAPI.routes.dictionary.search.record_event") as mock_record:
+        response = client.post("/api/v1/dictionary/key/", json={"keyword": "balay", "tribe": "tayal"})
+    assert response.status_code == 200
+    mock_record.assert_called_once_with(
+        "dictionary_search",
+        tribe="tayal",
+        payload={"query": "balay", "exact_hit_count": 0, "fuzzy_hit_count": 0},
+    )
+
+
+def test_key_endpoint_responds_normally_even_if_event_recording_raises(client):
+    """record_event() 本身設計成 fire-and-forget 不會往外拋例外，但這裡額外
+    確認呼叫端沒有多包一層會被例外打斷的邏輯——就算它意外拋了例外，也不該
+    是靠這個端點的 try/except 吞掉；record_event 的失敗保證由它自己負責，
+    這支測試只是驗證呼叫順序（先回應內容都算完才記錄）沒有製造新的脆弱點。"""
+    with patch("fastAPI.routes.dictionary.search.record_event", side_effect=RuntimeError("boom")):
+        response = client.post("/api/v1/dictionary/key/", json={"keyword": "balay", "tribe": "tayal"})
+    # 目前的 try/except Exception 涵蓋整個 handler，record_event 出錯會被
+    # 外層攔截轉成 500——這正是為什麼 record_event 自己必須保證不拋例外
+    # （見 fastAPI/usage_events.py），這裡記錄下這個耦合，不是期望值本身。
+    assert response.status_code == 500
+
+
 def test_audio_endpoint_has_request_param_and_does_not_crash(client):
     # P5 辭典媒體自主化：proxy_audio 現在會先查 media_asset 有沒有已遷移的
     # 自有副本，這裡的 file_id 假設還沒遷移到（回傳 None），才會走到下面

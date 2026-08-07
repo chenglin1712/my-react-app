@@ -61,6 +61,24 @@ const Panel_Start = ({ tribe = "tayal" }) => {
                         </div>
                     ))}
                 </div>
+
+                <div className="scenario-entry">
+                    <div>
+                        <span className="scenario-entry-badge">非官方分級練習</span>
+                        <h3>生活情境對話</h3>
+                        <p>
+                            閱讀生活情境，從四個族語對話選項中選出最合適的回應，
+                            每題作答後立即查看答案。
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        className="scenario-entry-btn"
+                        onClick={() => navigate(`${basePath}/scenario`)}
+                    >
+                        開始情境練習
+                    </button>
+                </div>
             </div>
 
         </div>

@@ -28,12 +28,15 @@ const NAV_GROUPS = [
         ],
     },
     { label: '使用者', icon: Users, items: [{ label: '使用者管理', to: '/admin/users' }] },
-    { label: '分析', icon: BarChart3, items: [{ label: '學習數據' }] },
+    { label: '分析', icon: BarChart3, items: [{ label: '搜尋分析', to: '/admin/analytics/search' }, { label: '題目品質分析', to: '/admin/analytics/quiz-quality' }, { label: '留存分析', to: '/admin/analytics/retention' }] },
     { label: '系統', icon: Settings, items: [{ label: '系統維運' }] },
 ];
 
 const getBreadcrumb = (pathname) => {
     if (pathname === '/admin' || pathname === '/admin/') return ['總覽', '儀表板'];
+    if (pathname === '/admin/analytics/search') return ['分析', '搜尋分析'];
+    if (pathname === '/admin/analytics/quiz-quality') return ['分析', '題目品質分析'];
+    if (pathname === '/admin/analytics/retention') return ['分析', '留存分析'];
     if (pathname === '/admin/content/announcements') return ['內容', '公告管理'];
     if (pathname.startsWith('/admin/content/announcements/')) return ['內容', '公告管理', '編輯'];
     if (pathname === '/admin/content/exam-schedule') return ['內容', '考試時程'];

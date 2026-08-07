@@ -11,6 +11,8 @@ import loadingAnimation from "../../src/animations/loading.json"
 import { Star, CircleHelp } from "lucide-react";
 import { uploadSituationDB } from "../../src/userServives/uploadDb"
 import { useQuizPanelData } from "./useQuizPanelData"
+import { trackEvent } from "../../utils/apiClient"
+import { buildQuizAnswerEvents } from "./quizAnswerTracking"
 
 const Panel = ({ tribe = "tayal" }) => {
     const levels = ["初級", "中級", "中高級", "高級"];
@@ -69,6 +71,13 @@ const Panel = ({ tribe = "tayal" }) => {
         return situationId;
     };
 
+    // trackEvent 本身是 fire-and-forget，失敗不影響繳交流程，故意不 await。
+    const trackQuizAnswers = () => {
+        buildQuizAnswerEvents(data, quizInfo, userAnswers, tribe, level).forEach(
+            (event) => trackEvent(event.eventType, { tribe: event.tribe, payload: event.payload }),
+        );
+    };
+
     //點擊提交
     const handleSubmmit = async () => {
         if (userAnswers.some(a => a === null)) {
@@ -77,6 +86,7 @@ const Panel = ({ tribe = "tayal" }) => {
                 return;
             }
         }
+        trackQuizAnswers();
         const situationID = await handleUploadSituation();
         const fallbackData = {
             title: level_ch,

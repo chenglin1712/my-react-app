@@ -125,9 +125,74 @@
     cursor: not-allowed;
 }
 
+.scenario-entry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    max-width: 980px;
+    margin: 28px auto 0;
+    padding: 20px 24px;
+    background: #faf6f5;
+    border: 1px solid #dfcfcb;
+    border-left: 5px solid #9e1b24;
+    border-radius: 10px;
+}
+
+.scenario-entry h3 {
+    margin: 7px 0 5px;
+    color: #4a3531;
+    font-size: 19px;
+    font-weight: 700;
+}
+
+.scenario-entry p {
+    max-width: 680px;
+    margin: 0;
+    color: #6f625f;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.scenario-entry-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    color: #7f1627;
+    background: #f4dfdc;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.scenario-entry-btn {
+    flex: 0 0 auto;
+    padding: 9px 16px;
+    color: #fff;
+    background: #9e1b24;
+    border: 1px solid #9e1b24;
+    border-radius: 7px;
+    font-weight: 650;
+}
+
+.scenario-entry-btn:hover {
+    color: #fff;
+    background: #7f1627;
+    border-color: #7f1627;
+}
+
 @media (max-width: 768px) {
     .panel-start-container {
         flex-direction: column;
         text-align: center;
+    }
+
+    .scenario-entry {
+        align-items: stretch;
+        flex-direction: column;
+        text-align: left;
+    }
+
+    .scenario-entry-btn {
+        width: 100%;
     }
 }

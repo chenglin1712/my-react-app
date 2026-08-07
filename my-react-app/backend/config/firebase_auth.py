@@ -77,6 +77,36 @@ def verify_firebase_token(request):
         return None, JsonResponse({"detail": "身份驗證失敗，請重新登入"}, status=401)
 
 
+def try_verify_firebase_token(request):
+    """盡力解出 uid，不阻擋請求——給允許匿名的公開端點（例如 P5 的使用事件
+    記錄 POST /adminapi/public/events/）用。跟 verify_firebase_token 的差異：
+    沒帶 token、token 過期/無效、Firebase 尚未設定，一律回傳 None 而不是
+    401/503——呼叫端本身就允許匿名，未登入訪客的行為也是分析目標，不能
+    因為沒登入就整個請求被擋下來。
+
+    回傳 uid 字串，解不出來時回傳 None。
+    """
+    if django_settings.AUTH_DEV_BYPASS:
+        return "dev-user"
+
+    auth_header = request.META.get("HTTP_AUTHORIZATION", "")
+    if not auth_header.startswith("Bearer "):
+        return None
+    token = auth_header[7:]
+
+    try:
+        ensure_firebase_initialized()
+    except Exception:
+        return None
+
+    from firebase_admin import auth as firebase_auth
+    try:
+        decoded = firebase_auth.verify_id_token(token)
+        return decoded.get("uid")
+    except Exception:
+        return None
+
+
 def require_role(request, allowed_roles):
     """驗證 Firebase ID Token，並檢查角色是否在 allowed_roles 內（後台管理系統用）。
 

@@ -134,8 +134,8 @@ const effectiveWord = {
     },
 };
 
-const renderEditor = (path = '/admin/dictionary/words/new') => render(
-    <MemoryRouter initialEntries={[path]}>
+const renderEditor = (path = '/admin/dictionary/words/new', state = undefined) => render(
+    <MemoryRouter initialEntries={[{ pathname: path, state }]}>
         <Routes>
             <Route
                 path="/admin/dictionary/words/new"
@@ -228,6 +228,14 @@ describe('WordEditor', () => {
         expect(screen.getByRole('button', {
             name: '送審',
         })).toBeInTheDocument();
+    });
+
+    test('從搜尋分析「建立詞條草稿」導過來時，詞形欄位用 location.state.prefillName 預填', async () => {
+        renderEditor('/admin/dictionary/words/new', { prefillName: 'balay123' });
+
+        await screen.findByText('尚未儲存');
+
+        expect(screen.getByLabelText(/詞形/)).toHaveValue('balay123');
     });
 
     test('已建立的新詞條草稿再次儲存會 PUT 同一筆 revision', async () => {

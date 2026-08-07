@@ -12,7 +12,7 @@ from config.firebase_auth import verify_firebase_token
 from config.tribes import TRIBE_IDS, TRIBE_MAP
 from adminapi.models import (
     ExamScheduleCrawlStatus, ExamScheduleOverride, QuizChoiceItem, QuizClozePassage,
-    QuizTrueFalseItem, QuizVocabItem,
+    QuizSituationItem, QuizTrueFalseItem, QuizVocabItem,
 )
 
 logger = logging.getLogger(__name__)
@@ -77,7 +77,18 @@ def build_matching_test_from_db(tribe):
         chunk = picked[i * MATCHING_PAIRS_PER_BOARD: (i + 1) * MATCHING_PAIRS_PER_BOARD]
         questions.append({
             "pairs": [
-                {"cn": item.chinese_gloss, "word": {"word": item.foreign_word, "audio": item.audio_file_id}}
+                {
+                    "cn": item.chinese_gloss, "word": {"word": item.foreign_word, "audio": item.audio_file_id},
+                    # P5.3 題目品質分析用——配合題一「題」（一個題組）其實是
+                    # MATCHING_PAIRS_PER_BOARD 個不同 QuizVocabItem 的組合，
+                    # 沒有單一 pk 可以代表整題；item_id 放在每個 pair 上，
+                    # 前端送出作答追蹤事件時逐 pair 各記一筆，用整個題組的
+                    # 對錯（見下方 answer 說明）當作每個 pair 的近似結果——
+                    # 不是完美的逐詞歸因，但同一個詞會在多次測驗、多個不同
+                    # 題組組合裡重複出現，統計上仍能反映出「這個詞經常出現在
+                    # 答錯的題組裡」，比完全沒有 id 可追蹤好。
+                    "item_id": item.id,
+                }
                 for item in chunk
             ],
             # 配合題採「全對/有錯」二元計分，比照初級是非題的 1/2 編碼。
@@ -126,6 +137,10 @@ def build_cloze_test_from_db(tribe):
                 "passage_ch": passage.passage_chinese,
                 "options": shuffled,
                 "answer": new_answer_index,
+                # P5.3 題目品質分析用——克漏字一「題」是一個空格，不是一整篇
+                # 短文，複合字串鍵（passage pk + blank 標記）才能唯一代表它，
+                # 跟 P4.4 匯入精靈處理 {blankN} 標記時同一種複合鍵慣例。
+                "item_id": f"{passage.id}:{blank_key}",
             })
 
     return {
@@ -164,6 +179,7 @@ def build_true_false_test_from_db(tribe):
             {
                 "question_ab": item.question_ab, "question_ch": item.question_ch,
                 "audio": item.audio_url, "image": item.image_url, "answer": item.answer,
+                "item_id": item.id,  # P5.3 題目品質分析用
             }
             for item in picked
         ],
@@ -190,10 +206,66 @@ def build_choice_test_from_db(tribe):
                 "question_ab": item.question_ab, "question_ch": item.question_ch,
                 "imageA": item.image_a_url, "imageB": item.image_b_url, "imageC": item.image_c_url,
                 "answer": item.answer,
+                "item_id": item.id,  # P5.3 題目品質分析用
             }
             for item in picked
         ],
     }
+
+
+# 情境題每次抽幾題——跟 LEVEL1/LEVEL2_QUESTION_COUNT 同一種「對照官方介面
+# 既有題量」精神抽個合理值，這是全新題型沒有既有介面可以對照，先跟初級/
+# 中級一樣抽 5 題。
+SITUATION_QUESTION_COUNT = 5
+
+
+def build_situation_test_from_db(tribe):
+    """組出「情境題」的 part 資料——P2 新增的 QuizSituationItem 到 P5.3 之前
+    完全沒有學生端出題路徑（只有後台內容管理），這是第一次真的把它接上
+    學生端。情境題不對應官方認證的 1-4 等級（見規劃文件 P5 §4(a)），故意
+    不掛進 get_quiz_data 的 level_builders，用獨立的 get_situation_quiz_data
+    端點供應，呼應「獨立練習入口、不掛在 level 1-4 系統裡」的既有決策。"""
+    pool = list(QuizSituationItem.objects.filter(tribe=tribe, status=QuizSituationItem.STATUS_PUBLISHED))
+    k = min(SITUATION_QUESTION_COUNT, len(pool))
+    picked = random.sample(pool, k)
+
+    return {
+        "type": "situation",
+        "title": "情境對話練習",
+        "intro": "本部份會描述一個生活情境，請從 4 個族語對話選項中選出最適合回應的一個。",
+        "questions": [
+            {
+                "scenario_ch": item.scenario_chinese,
+                "options": item.options,
+                "answer": item.answer,
+                "item_id": item.id,
+            }
+            for item in picked
+        ],
+    }
+
+
+def get_situation_quiz_data(request):
+    """情境題的獨立出題端點——跟 get_quiz_data 同一套認證/限流標準，
+    但刻意不共用同一個 URL/函式：情境題沒有 level 概念，混進
+    get_quiz_data 的 level 白名單檢查會讓語意變得混亂（level="5" 看起來
+    像是官方認證的第五級，但情境題根本不是那個系統的一部分）。"""
+    decoded, err_resp = verify_firebase_token(request)
+    if err_resp:
+        return err_resp
+    limited_resp = _rate_limited_response(
+        request, decoded.get("uid", "anon"), group="get_situation_quiz_data", rate="30/m", method="GET"
+    )
+    if limited_resp:
+        return limited_resp
+
+    tribe = request.GET.get("tribe", "tayal")
+    if tribe not in TRIBE_IDS:
+        return JsonResponse({"detail": f"不支援的族語: {tribe}"}, status=400)
+
+    display_name = TRIBE_MAP.get(tribe, tribe)
+    format_data = {"chapter_name": display_name, "parts": [build_situation_test_from_db(tribe)]}
+    return JsonResponse(format_data, safe=False)
 
 
 #爬取線上測驗題目——四個等級皆已改用本地題庫（見上方 build_*_from_db 函式），
