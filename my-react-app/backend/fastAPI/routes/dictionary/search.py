@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from dictionary_db.connect import get_db
-from dictionary_db.model import Tribe, Word
+from dictionary_db.model import MediaAsset, Tribe, Word
 from dictionary_db.word_data import (
     load_audio_items_for_words,
     load_explanation_items_for_words,
@@ -54,6 +54,22 @@ def _tribe_id_subquery(tribe_name: str):
 _tribe_words_cache: KeyedCache[str, List[WordResult]] = KeyedCache()
 
 
+def _load_word_img_map(db: Session, words: List[Word]) -> Dict[str, str]:
+    """P5 辭典媒體自主化：words.word_img 沒有 FK 欄位（words 表不能加欄位，
+    理由見 alembic/versions/bd80bf38fb2d_... 檔頭），改用一次批次查詢對照
+    這批字的 word_img 網址有沒有對應的已驗證自有 Storage 副本，回傳
+    {原始 word_img 網址: 自家 public_url}，查無代表還沒遷移到。"""
+    locators = {w.word_img for w in words if w.word_img}
+    if not locators:
+        return {}
+    rows = db.query(MediaAsset.source_locator, MediaAsset.public_url).filter(
+        MediaAsset.source_kind == "word_img",
+        MediaAsset.status == "verified",
+        MediaAsset.source_locator.in_(locators),
+    ).all()
+    return {locator: public_url for locator, public_url in rows}
+
+
 def _load_tribe_words(db: Session, tribe: str) -> List[WordResult]:
     def _compute():
         words = db.query(Word).filter(Word.tribe_id == _tribe_id_subquery(tribe)).all()
@@ -61,6 +77,7 @@ def _load_tribe_words(db: Session, tribe: str) -> List[WordResult]:
         sources_map = load_sources_for_words(db, tribe_id)
         audio_map = load_audio_items_for_words(db, tribe_id)
         explanation_map = load_explanation_items_for_words(db, tribe_id)
+        word_img_map = _load_word_img_map(db, words)
 
         return [
             WordResult(
@@ -79,7 +96,7 @@ def _load_tribe_words(db: Session, tribe: str) -> List[WordResult]:
                 sources=sources_map.get(word.id, []),
                 explanationItems=parse_explanations(explanation_map.get(word.id, [])),
                 audioItems=parse_audios(audio_map.get(word.id, [])),
-                word_img=word.word_img,
+                word_img=word_img_map.get(word.word_img, word.word_img),
                 isDerivativeRoot=word.is_derivative_root,
                 isImage=word.is_image,
                 isZuzucidian=word.is_zuzucidian,

@@ -10,11 +10,12 @@ from fastapi import APIRouter, Body, HTTPException, Depends, File, UploadFile, F
 from pydantic import BaseModel, Field
 
 from sqlalchemy.orm import Session
-from dictionary_db.connect import get_db
-from dictionary_db.model import Word
+from dictionary_db.connect import get_db, SessionLocal
+from dictionary_db.model import MediaAsset, Word
 from dictionary_db.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS
 from config.audio_source import get_ilrdf_audio_api
+from config.media_source import get_media_source_mode
 from fastAPI.rate_limit import limiter
 from fastAPI.url_safety import UnsafeConnectionError, assert_response_from_safe_peer, is_safe_redirect_target
 from .keyed_cache import KeyedCache
@@ -721,7 +722,40 @@ def make_error(step: str, msg: str):
 
 
 # 1. 下載語音
+def _lookup_verified_audio_url(audio_id: str):
+    """P5 辭典媒體自主化：查這個 file_id 是否已經有遷移完成的自有 Storage
+    副本，有的話回傳 public_url，沒有回傳 None。這支函式本身是同步函式、被
+    asyncio.to_thread 呼叫，不是 FastAPI request-scoped，沒有 Depends(get_db)
+    可用，比照 crawler/dictionary_source.py 既有的「db = SessionLocal();
+    try/finally: db.close()」慣例（跟 audio_proxy.py 的 kind 命名一致，見
+    該檔案的 _AUDIO_MEDIA_KIND 說明——word_audio／sentence_audio 共用同一個
+    "ilrdf_audio" kind）。"""
+    db = SessionLocal()
+    try:
+        asset = db.query(MediaAsset).filter_by(
+            source_provider="ilrdf", source_kind="ilrdf_audio", source_locator=audio_id, status="verified",
+        ).first()
+        return asset.public_url if asset else None
+    finally:
+        db.close()
+
+
 def fetch_audio_from_id(audio_id: str):
+    # P5 辭典媒體自主化：發音比對功能每次使用者錄音都要抓一次官方音檔，使用
+    # 頻率遠高於單純播放——優先用自己 Storage 的已驗證副本，不用每次都跟
+    # ILRDF 要一次。
+    public_url = _lookup_verified_audio_url(audio_id)
+    if public_url:
+        with httpx.Client(timeout=15) as client:
+            resp = client.get(public_url)
+        if resp.status_code != 200:
+            raise Exception(f"下載音檔失敗 (HTTP {resp.status_code})")
+        return resp.content
+
+    if get_media_source_mode() == "storage_only":
+        raise Exception("音檔尚未遷移完成，暫時無法比對")
+
+    # hybrid 模式（預設）：還沒遷移到的詞條，照舊即時代理 ILRDF，行為完全不變。
     # 網址單一資料來源見 config/audio_source.py：原本這裡跟 dictionary/
     # audio_proxy.py 的 debug_audio 各自讀環境變數，audio_proxy.py 的正式路徑
     # （proxy_audio，全站辭典發音實際在走的路徑）卻是另一個寫死的 Python 常數，

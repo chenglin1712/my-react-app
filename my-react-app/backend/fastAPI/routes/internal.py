@@ -24,12 +24,21 @@ from sqlalchemy.orm import Session
 from config.tribes import TRIBES, resolve_tribe_name
 from dictionary_db.connect import SessionLocal
 
+from . import listening, quiz, sentence
 from .dictionary import grammar, search
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 _VALID_SCOPES = frozenset({"words", "grammar", "grammar_affixes", "grammar_quiz", "all"})
+
+# listening._valid_words_cache／sentence._unique_sentences_cache／
+# quiz._words_cache 這三個模組級快取原本完全不受這支端點管轄，寫入辭典資料
+# 後只清了 search._tribe_words_cache，這三個要等 FastAPI 重啟才會反映新內容
+# （P5 辭典媒體自主化：遷移腳本跑完後這三個端點的音檔連結也要跟著更新，
+# 才會一起補上）。這三個快取都是用 tribe_id（UUID）當 key，不是 tribe_name，
+# 這裡建一份對照表做轉換。
+_TRIBE_ID_BY_NAME = {t.full_name: t.id for t in TRIBES}
 
 
 class InvalidateRequest(BaseModel):
@@ -79,6 +88,22 @@ def _rewarm(tribe_names: list[str]) -> None:
                 search._load_tribe_words(db, tribe_name)
             except Exception:
                 logger.exception("辭典快取重新預熱失敗：%s", tribe_name)
+
+            tribe_id = _TRIBE_ID_BY_NAME.get(tribe_name)
+            if not tribe_id:
+                continue
+            try:
+                listening._load_valid_words(db, tribe_id)
+            except Exception:
+                logger.exception("listening 快取重新預熱失敗：%s", tribe_name)
+            try:
+                sentence._load_unique_sentences(db, tribe_id)
+            except Exception:
+                logger.exception("sentence 快取重新預熱失敗：%s", tribe_name)
+            try:
+                quiz.load_all_words(db, tribe_id)
+            except Exception:
+                logger.exception("quiz 快取重新預熱失敗：%s", tribe_name)
     finally:
         db.close()
 
@@ -106,6 +131,19 @@ def invalidate_cache(
         for name in tribe_names:
             if search._tribe_words_cache.invalidate(name):
                 invalidated["words"] += 1
+
+            tribe_id = _TRIBE_ID_BY_NAME.get(name)
+            if tribe_id:
+                listening._valid_words_cache.invalidate(tribe_id)
+                sentence._unique_sentences_cache.invalidate(tribe_id)
+                quiz._words_cache.invalidate(tribe_id)
+
+        # _word_explanations_cache／_word_audios_cache 是用 word_id 當 key 的
+        # 全域字典，不是照族語分開存，沒辦法只清特定族語的部分——乾脆整個清掉，
+        # 下次 quiz.load_all_words() 被呼叫（含上面的背景重新預熱）時會自然
+        # 重新填值，成本遠低於讓內容改完之後繼續回傳舊音檔連結。
+        quiz._word_explanations_cache.clear()
+        quiz._word_audios_cache.clear()
 
     if "grammar" in scopes:
         for name in tribe_names:

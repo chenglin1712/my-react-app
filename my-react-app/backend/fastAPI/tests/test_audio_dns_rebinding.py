@@ -39,6 +39,10 @@ class TestFetchAudioFromIdRebindingProtection:
         # is_safe_redirect_target 檢查當下「通過」（模擬第一次 DNS 解析回傳
         # 合法公開 IP），但實際連線（第二次 DNS 解析，這裡直接控制 httpx 回應
         # 的 network_stream）卻連到了內網位址——這正是 DNS rebinding 的情境。
+        # P5 辭典媒體自主化：fetch_audio_from_id 現在會先查有沒有自己 Storage
+        # 的已驗證副本，這裡假設還沒遷移到（回傳 None），才會走到下面這支測試
+        # 原本要測的 ILRDF fallback 路徑。
+        monkeypatch.setattr("fastAPI.routes.quiz._lookup_verified_audio_url", lambda audio_id: None)
         monkeypatch.setattr("fastAPI.routes.quiz.requests.get", lambda *a, **k: _fake_first_hop("https://cdn.example.com/audio.mp3"))
         monkeypatch.setattr("fastAPI.routes.quiz.is_safe_redirect_target", lambda url: True)
 
@@ -47,6 +51,7 @@ class TestFetchAudioFromIdRebindingProtection:
                 fetch_audio_from_id("word123")
 
     def test_allows_when_actual_connection_peer_is_public(self, monkeypatch):
+        monkeypatch.setattr("fastAPI.routes.quiz._lookup_verified_audio_url", lambda audio_id: None)
         monkeypatch.setattr("fastAPI.routes.quiz.requests.get", lambda *a, **k: _fake_first_hop("https://cdn.example.com/audio.mp3"))
         monkeypatch.setattr("fastAPI.routes.quiz.is_safe_redirect_target", lambda url: True)
 
@@ -82,10 +87,14 @@ class TestProxyAudioRebindingProtection:
 
         second_hop.extensions = {"network_stream": MagicMock(get_extra_info=MagicMock(return_value=("10.0.0.5", 443)))}
 
-        with patch("fastAPI.routes.dictionary.audio_proxy.is_safe_redirect_target", return_value=True):
-            with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-                mock_get.side_effect = [first_hop, second_hop]
-                response = client.get("/api/v1/dictionary/audio/some-file-id")
+        # P5 辭典媒體自主化：先假設這個 file_id 還沒遷移到自己的 Storage
+        # （回傳 None），才會走到下面原本要測的 ILRDF fallback 路徑；client
+        # fixture 的 _fake_get_db 回傳 None，不是真正能查詢的 Session。
+        with patch("fastAPI.routes.dictionary.audio_proxy._lookup_verified_audio_asset", return_value=None):
+            with patch("fastAPI.routes.dictionary.audio_proxy.is_safe_redirect_target", return_value=True):
+                with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+                    mock_get.side_effect = [first_hop, second_hop]
+                    response = client.get("/api/v1/dictionary/audio/some-file-id")
 
         assert response.status_code == 502
         assert response.text == "Audio URL not allowed"
@@ -95,10 +104,11 @@ class TestProxyAudioRebindingProtection:
         second_hop = httpx.Response(200, content=b"fake-audio-bytes", request=httpx.Request("GET", "http://x"))
         second_hop.extensions = {"network_stream": MagicMock(get_extra_info=MagicMock(return_value=("93.184.216.34", 443)))}
 
-        with patch("fastAPI.routes.dictionary.audio_proxy.is_safe_redirect_target", return_value=True):
-            with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-                mock_get.side_effect = [first_hop, second_hop]
-                response = client.get("/api/v1/dictionary/audio/some-file-id")
+        with patch("fastAPI.routes.dictionary.audio_proxy._lookup_verified_audio_asset", return_value=None):
+            with patch("fastAPI.routes.dictionary.audio_proxy.is_safe_redirect_target", return_value=True):
+                with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+                    mock_get.side_effect = [first_hop, second_hop]
+                    response = client.get("/api/v1/dictionary/audio/some-file-id")
 
         assert response.status_code == 200
         assert response.content == b"fake-audio-bytes"

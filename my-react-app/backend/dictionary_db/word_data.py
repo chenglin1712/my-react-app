@@ -29,6 +29,7 @@ from dictionary_db.model import (
     WordExplanationSentenceAudio,
     WordExplanationAnaphora,
     WordExplanationAnaphoraItem,
+    MediaAsset,
 )
 
 
@@ -139,9 +140,17 @@ def load_explanation_items_for_words(
         if explanation_id in exp_by_id:
             exp_by_id[explanation_id]["focus"].append(name)
 
-    for img in _base_query(WordExplanationImage).order_by(WordExplanationImage.sort_order).all():
+    # P5 辭典媒體自主化：outerjoin MediaAsset，media_asset_id 有值時一定是
+    # verified（migrate_dictionary_media.py 的設計就是只在驗證通過後才回填
+    # 這個 FK，見該檔案 _claim_or_link_asset 的說明），可以直接信任、不用
+    # 再檢查一次 status。查無 media_asset（還沒遷移到）就照舊回傳原始
+    # image_url（ILRDF／承包商官方網址），前端完全不用改。
+    img_query = _base_query(WordExplanationImage).outerjoin(
+        MediaAsset, MediaAsset.id == WordExplanationImage.media_asset_id
+    ).with_entities(WordExplanationImage, MediaAsset.public_url)
+    for img, public_url in img_query.order_by(WordExplanationImage.sort_order).all():
         if img.explanation_id in exp_by_id:
-            exp_by_id[img.explanation_id]["imageUrl"].append(img.image_url)
+            exp_by_id[img.explanation_id]["imageUrl"].append(public_url or img.image_url)
 
     # ---- sentences ----
     sent_query = db.query(WordExplanationSentence)

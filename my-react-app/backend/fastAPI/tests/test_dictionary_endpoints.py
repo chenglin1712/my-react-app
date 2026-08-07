@@ -59,9 +59,14 @@ def test_key_endpoint_rejects_empty_keyword(client):
 
 
 def test_audio_endpoint_has_request_param_and_does_not_crash(client):
-    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-        mock_get.return_value = httpx.Response(status_code=404, request=httpx.Request("GET", "http://x"))
-        response = client.get("/api/v1/dictionary/audio/some-file-id")
+    # P5 辭典媒體自主化：proxy_audio 現在會先查 media_asset 有沒有已遷移的
+    # 自有副本，這裡的 file_id 假設還沒遷移到（回傳 None），才會走到下面
+    # 這支測試原本要測的 ILRDF fallback 路徑；client fixture 的 _fake_get_db
+    # 回傳 None，不是真正能查詢的 Session，所以要 patch 掉這次查詢本身。
+    with patch("fastAPI.routes.dictionary.audio_proxy._lookup_verified_audio_asset", return_value=None):
+        with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = httpx.Response(status_code=404, request=httpx.Request("GET", "http://x"))
+            response = client.get("/api/v1/dictionary/audio/some-file-id")
     assert response.status_code == 404
 
 

@@ -61,6 +61,39 @@ def get_storage_bucket():
     return _storage_bucket
 
 
+def upload_media_object(data, object_path, content_type):
+    """把記憶體裡的 bytes 上傳到 Storage 的 object_path，設成公開可讀並回傳公開網址。
+
+    給 migrate_dictionary_media 這支批次遷移指令用（P5 辭典媒體自主化）：呼叫端
+    已經把來源檔案下載到記憶體、驗證過 SHA-256／大小／MIME 之後才呼叫這裡，這裡
+    只負責上傳，不做任何內容驗證。吃 bytes 而不是本地檔案路徑是刻意的——這批
+    檔案單檔上限抓 15MB（實測音檔 20~115KB、圖片約 1.2MB，遠低於上限），下載時
+    反正整份都已經在記憶體（httpx 的 res.content），沒有必要多一趟寫暫存檔／
+    讀回來，也少一個程式中斷時暫存檔沒清乾淨的失敗點。object_path 慣例上是
+    內容的 SHA-256（呼叫端決定），內容本身不會變，所以 Cache-Control 可以放心
+    設一年 + immutable，讓 Google 的 CDN 與瀏覽器長期快取，不用每次播放/顯示
+    都回源。
+
+    這是這個模組第一個「上傳」操作——之前只有 delete_storage_file_by_download_url
+    這種「刪除」先例，上傳沿用同樣的延遲 import + ensure_firebase_initialized()
+    慣例。跟前端既有的 Cloudinary 上傳（MediaUploadField.jsx）不同來源，這裡用
+    Admin SDK 直接寫，不經任何免簽章 preset。
+
+    刻意不呼叫 blob.make_public()：Firebase Console 新建的 bucket 預設開啟
+    Uniform bucket-level access，這個模式下逐物件 ACL（make_public 的底層機制）
+    會直接丟例外，公開讀取必須在 bucket 層級用 IAM 設一次（例如
+    `gsutil iam ch allUsers:objectViewer gs://<bucket>`，Phase 0 設定時做，
+    不是每次上傳都做）。這裡只管上傳，回傳的網址是否真的公開可讀，取決於那次
+    bucket 層級設定有沒有做好。
+    """
+    ensure_firebase_initialized()
+    bucket = get_storage_bucket()
+    blob = bucket.blob(object_path)
+    blob.cache_control = "public, max-age=31536000, immutable"
+    blob.upload_from_string(data, content_type=content_type)
+    return blob.public_url
+
+
 def delete_storage_file_by_download_url(url):
     """從 getDownloadURL() 回傳的下載網址反解出 Storage 物件路徑並刪除。
 

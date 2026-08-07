@@ -29,6 +29,7 @@ EXPECTED_TABLES = {
     "focus", "word_explanation_focus", "word_explanation_image",
     "word_explanation_sentence", "word_explanation_sentence_audio",
     "word_explanation_anaphora", "word_explanation_anaphora_item",
+    "media_asset",
 }
 
 
@@ -68,7 +69,9 @@ def test_upgrade_head_from_empty_db_creates_full_schema(alembic_config):
 
     with engine.connect() as conn:
         version = conn.exec_driver_sql("SELECT version_num FROM alembic_version").scalar()
-    assert version == "90bc362710d9"
+    # P5 辭典媒體自主化新增 bd80bf38fb2d，是目前的 head（見該檔案 down_revision
+    # 接在 90bc362710d9 之後）。
+    assert version == "bd80bf38fb2d"
 
 
 def test_upgrade_head_is_idempotent(alembic_config):

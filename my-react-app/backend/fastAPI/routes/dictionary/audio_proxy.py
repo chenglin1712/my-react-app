@@ -4,15 +4,16 @@ import re
 
 import httpx
 from fastapi import APIRouter, Depends, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from dictionary_db.connect import get_db
-from dictionary_db.model import Word
+from dictionary_db.model import MediaAsset, Word
 from dictionary_db.word_data import load_audio_items_for_words
 from config.tribes import resolve_tribe_name
 from config.debug_flag import is_debug
 from config.audio_source import get_ilrdf_audio_api
+from config.media_source import get_media_source_mode
 from fastAPI.rate_limit import limiter
 from fastAPI.url_safety import UnsafeConnectionError, assert_response_from_safe_peer, is_safe_redirect_target
 
@@ -23,9 +24,43 @@ router = APIRouter()
 
 logger = logging.getLogger(__name__)
 
+# P5 辭典媒體自主化：word_audio／sentence_audio 的 file_id 在 media_asset 共用
+# 同一個 kind（見 migrate_dictionary_media.py 檔頭說明——實測有 8 個 file_id
+# 同時出現在兩張來源表，這個端點只收得到 file_id、並不知道原本是從哪張表來
+# 的，統一成一個 kind 才能只憑 file_id 查到）。
+_AUDIO_SOURCE_PROVIDER = "ilrdf"
+_AUDIO_MEDIA_KIND = "ilrdf_audio"
+
+
+def _lookup_verified_audio_asset(db: Session, file_id: str):
+    """查這個 file_id 是否已經有遷移完成的自有 Storage 副本。"""
+    return (
+        db.query(MediaAsset)
+        .filter_by(source_provider=_AUDIO_SOURCE_PROVIDER, source_kind=_AUDIO_MEDIA_KIND, source_locator=file_id, status="verified")
+        .first()
+    )
+
+
 @router.get("/audio/{file_id:path}")
 @limiter.limit("60/minute")  # 原本沒有限流，見同檔案其他端點的說明
-async def proxy_audio(request: Request, file_id: str):
+async def proxy_audio(request: Request, file_id: str, db: Session = Depends(get_db)):
+    # P5 辭典媒體自主化：有自己 Storage 的已驗證副本就直接 302 過去，讓
+    # Google 的 CDN 送檔，這個端點自己不用再扛流量，也不再依賴 ILRDF 存活。
+    # 這是單一、有索引的查詢（media_asset 的 unique index 就是
+    # (source_provider, source_kind, source_locator)），跟 search.py 既有
+    # 「直接同步呼叫 db.query()，不特地丟 to_thread」的作法一致，不像
+    # /sentence-audio/ 那種迴圈查詢才需要丟執行緒池。
+    asset = _lookup_verified_audio_asset(db, file_id)
+    if asset is not None and asset.public_url:
+        return RedirectResponse(url=asset.public_url, status_code=302)
+
+    if get_media_source_mode() == "storage_only":
+        # 全量遷移驗證完成、正式切斷 ILRDF 依賴後才會用這個模式：沒有自己的
+        # 副本就直接回錯誤，不再嘗試連線 ILRDF（這正是「不再依賴外部 API」
+        # 這個目標唯一算數的狀態，見 config/media_source.py 的說明）。
+        return Response(content="音檔尚未遷移完成，請稍後再試", media_type="text/plain", status_code=404)
+
+    # hybrid 模式（預設）：還沒遷移到的詞條，照舊即時代理 ILRDF，行為完全不變。
     try:
         first_url = get_ilrdf_audio_api() + file_id
 

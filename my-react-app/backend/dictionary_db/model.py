@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Index, func
 from sqlalchemy.orm import relationship
 from dictionary_db.connect import Base
 
@@ -11,6 +11,55 @@ class Tribe(Base):
     id = Column(String, primary_key=True)
     name = Column(String, nullable=False, unique=True, index=True)   # 中文全名，例如「泰雅語」
     slug = Column(String, nullable=False, unique=True, index=True)   # 英文代稱，例如「tayal」
+
+
+class MediaAsset(Base):
+    """P5 辭典媒體自主化：音檔／圖片自有 Storage 副本的登記表。
+
+    一張共用表而不是在 WordAudio／WordExplanationSentenceAudio／
+    WordExplanationImage 各自加十個重複欄位——下載/上傳/驗證狀態、checksum
+    這些欄位語意完全相同，獨立一張表也讓「同一個外部物件被多筆資料引用」時
+    能自然去重（見 alembic/versions/bd80bf38fb2d_...）。
+
+    (source_provider, source_kind, source_locator) 三欄唯一，是這張表的自然鍵：
+    source_locator 對 ILRDF 音檔是 file_id（GUID），對圖片／word_img 是完整
+    URL——兩者語意不同，不能只用 source_locator 單獨判斷唯一性。
+
+    words.word_img 沒有對應的 FK 欄位（words 表本身不能加欄位，理由見
+    migration 檔頭註解），要用 (source_provider='bing_or_thirdparty',
+    source_kind='word_img', source_locator=word.word_img) 反查這張表。
+
+    status 狀態機：pending → downloading → downloaded → uploading → uploaded
+    → verified，失敗時進 failed_retryable／failed_terminal（見
+    migrate_dictionary_media 這支批次遷移指令）。
+    """
+    __tablename__ = "media_asset"
+    # 名稱要跟 alembic/versions/bd80bf38fb2d_... 手寫的 op.create_index 完全一致，
+    # 否則 `alembic revision --autogenerate` 會誤判成「model 沒宣告這個索引」
+    # 而產生一支想砍掉它的多餘 migration。
+    __table_args__ = (
+        Index("ix_media_asset_source", "source_provider", "source_kind", "source_locator", unique=True),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source_provider = Column(String, nullable=False)   # 'ilrdf' / 'bing_or_thirdparty'
+    source_kind = Column(String, nullable=False)        # 'word_audio' / 'sentence_audio' / 'explanation_image' / 'word_img'
+    source_locator = Column(Text, nullable=False)        # file_id 或完整 URL
+    storage_provider = Column(String)
+    storage_bucket = Column(String)
+    storage_path = Column(Text)
+    public_url = Column(Text)
+    status = Column(String, nullable=False, default="pending", index=True)
+    content_type = Column(String)
+    byte_size = Column(Integer)
+    sha256 = Column(String)
+    attempt_count = Column(Integer, nullable=False, default=0)
+    last_error = Column(Text)
+    next_retry_at = Column(DateTime)
+    migrated_at = Column(DateTime)
+    verified_at = Column(DateTime)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime)
 
 
 class Word(Base):
@@ -136,12 +185,16 @@ class WordAudio(Base):
     """單字本身的發音音檔（words.audio_items 拆出來的）"""
     __tablename__ = "word_audio"
 
-    id          = Column(Integer, primary_key=True, autoincrement=True)
-    word_id     = Column(String, ForeignKey("words.id", ondelete="CASCADE"), nullable=False, index=True)
-    external_id = Column(String)   # 原本 JSON 裡的 id，僅供追蹤，不保證唯一
-    file_id     = Column(String)
-    audio_class = Column(String)
-    sort_order  = Column(Integer)
+    id             = Column(Integer, primary_key=True, autoincrement=True)
+    word_id        = Column(String, ForeignKey("words.id", ondelete="CASCADE"), nullable=False, index=True)
+    external_id    = Column(String)   # 原本 JSON 裡的 id，僅供追蹤，不保證唯一
+    file_id        = Column(String)
+    audio_class    = Column(String)
+    sort_order     = Column(Integer)
+    # P5 辭典媒體自主化：指向已驗證完成的自有 Storage 副本（media_asset.status
+    # = verified）。nullable 是刻意的——遷移尚未跑到、或這筆本來就沒有音檔的
+    # 情況都合法；file_id 完全不動，繼續當 ILRDF 的 provenance／過渡期 fallback。
+    media_asset_id = Column(Integer, ForeignKey("media_asset.id"), index=True)
 
 
 class WordExplanation(Base):
@@ -215,6 +268,8 @@ class WordExplanationImage(Base):
     explanation_id = Column(Integer, ForeignKey("word_explanation.id", ondelete="CASCADE"), nullable=False, index=True)
     image_url      = Column(Text)
     sort_order     = Column(Integer)
+    # P5 辭典媒體自主化，語意同 WordAudio.media_asset_id
+    media_asset_id = Column(Integer, ForeignKey("media_asset.id"), index=True)
 
 
 class WordExplanationSentence(Base):
@@ -234,12 +289,14 @@ class WordExplanationSentenceAudio(Base):
     """例句自己的音檔（sentenceItems[].audioItems 拆出來的，跟單字本身的 word_audio 分開存）"""
     __tablename__ = "word_explanation_sentence_audio"
 
-    id          = Column(Integer, primary_key=True, autoincrement=True)
-    sentence_id = Column(Integer, ForeignKey("word_explanation_sentence.id", ondelete="CASCADE"), nullable=False, index=True)
-    external_id = Column(String)
-    file_id     = Column(String)
-    audio_class = Column(String)
-    sort_order  = Column(Integer)
+    id             = Column(Integer, primary_key=True, autoincrement=True)
+    sentence_id    = Column(Integer, ForeignKey("word_explanation_sentence.id", ondelete="CASCADE"), nullable=False, index=True)
+    external_id    = Column(String)
+    file_id        = Column(String)
+    audio_class    = Column(String)
+    sort_order     = Column(Integer)
+    # P5 辭典媒體自主化，語意同 WordAudio.media_asset_id
+    media_asset_id = Column(Integer, ForeignKey("media_asset.id"), index=True)
 
 
 class WordExplanationAnaphora(Base):
