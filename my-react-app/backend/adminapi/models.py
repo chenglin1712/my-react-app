@@ -1,3 +1,5 @@
+import re
+
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
@@ -452,9 +454,32 @@ class QuizClozePassage(ReviewableContent):
         # 不讓錯誤資料進資料庫。
         if not isinstance(self.blanks, dict) or not self.blanks:
             raise ValidationError({'blanks': '至少需要一個空格'})
+
+        # 標記檢查要雙向：原本只確認 blanks 的每個 key 都出現在
+        # passage_foreign 裡，沒有反向確認 passage_foreign 裡的每個標記都
+        # 對應到 blanks——多寫或拼錯的標記（例如 {blnak2}）會通過驗證，
+        # 出題時原封不動洩漏給學生（獨立審查找到的問題）。用 regex 抓出
+        # 短文裡實際出現的全部標記，跟 blanks 的 key 集合做雙向比對；同時
+        # 檢查有沒有重複標記（同一格出現兩次，畫面會顯示兩個空格但只有
+        # 一組答案）。
+        markers = re.findall(r'\{([^{}]+)\}', self.passage_foreign or '')
+        marker_set = set(markers)
+        blank_keys = set(self.blanks.keys())
+
+        missing_in_passage = sorted(blank_keys - marker_set)
+        if missing_in_passage:
+            raise ValidationError({'passage_foreign': f'短文內容缺少對應的 {{{missing_in_passage[0]}}} 標記'})
+
+        unknown_markers = sorted(marker_set - blank_keys)
+        if unknown_markers:
+            raise ValidationError({'passage_foreign': f'短文內容出現不在 blanks 裡的標記 {{{unknown_markers[0]}}}'})
+
+        if len(markers) != len(marker_set):
+            seen = set()
+            duplicated = next(m for m in markers if m in seen or seen.add(m))
+            raise ValidationError({'passage_foreign': f'標記 {{{duplicated}}} 在短文中重複出現'})
+
         for key, blank in self.blanks.items():
-            if f'{{{key}}}' not in self.passage_foreign:
-                raise ValidationError({'passage_foreign': f'短文內容缺少對應的 {{{key}}} 標記'})
             if not isinstance(blank, dict):
                 raise ValidationError({'blanks': f'{key} 格式錯誤'})
             options = blank.get('options')

@@ -86,9 +86,29 @@ service cloud.firestore {
     // （內容審核「移除」動作，見規劃文件 §3.7.2）——本人原本就不能刪自己的
     // 錄音（沒有這條規則以前 delete 完全沒開放），這裡刻意只開放給 staff，
     // 不順便放開自我刪除，維持原本行為不變。
+    // create 原本只驗證 uid 是本人，storageUrl 完全沒有限制——後端刪除
+    // 錄音（審核下架／帳號刪除）時會直接依 storageUrl 去刪 Storage 物件，
+    // 沒有限制的話，惡意使用者可以建立一筆帶偽造 storageUrl（指向同一個
+    // bucket 裡任何其他物件）的錄音，誘使之後的刪除流程刪掉不相關的檔案。
+    // 這裡強制 storageUrl 必須是真正的 Firebase Storage 下載網址，且物件
+    // 路徑落在跟這筆文件所屬 tribe 一致的 `pronunciations/{tribe}/` 底下
+    // （跟後端 delete_storage_file_by_download_url() 的 expected_path_prefix
+    // 檢查是同一道防線的兩端）；其餘欄位型別也一併驗證，比照 quizs 集合的
+    // 既有慣例。
     match /pronunciations/{tribe}/recordings/{recordingId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && tribe in ['tayal', 'amis', 'bunun', 'kavalan', 'paiwan']
+        && request.resource.data.tribe == tribe
+        && request.resource.data.word is string
+        && request.resource.data.word.size() > 0 && request.resource.data.word.size() <= 100
+        && request.resource.data.score is int
+        && request.resource.data.score >= 0 && request.resource.data.score <= 100
+        && request.resource.data.storageUrl is string
+        && request.resource.data.storageUrl
+          .matches('https://firebasestorage\\.googleapis\\.com/v0/b/[^/]+/o/pronunciations%2F' + tribe + '%2F.*')
+        && request.resource.data.createdAt == request.time;
       allow delete: if isStaff();
     }
 

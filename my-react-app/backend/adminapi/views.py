@@ -45,7 +45,7 @@ from .models import (
     Announcement, AnnouncementSyncStatus, AuditLog, ExamScheduleCrawlStatus,
     ExamScheduleOverride, HomepageConfig, PendingRevision,
 )
-from .revisions import make_revision_views, pending_revision_target_ids
+from .revisions import cancel_stale_pending_revision, make_revision_views, pending_revision_target_ids
 from .serializers import (
     AnnouncementSerializer, ApproveSerializer, AuditLogSerializer,
     ExamScheduleOverrideSerializer, HomepageConfigSerializer, PublicAnnouncementSerializer,
@@ -59,6 +59,16 @@ logger = logging.getLogger(__name__)
 # 開頭說明：revisions.py 需要同一批工具，但這裡之後會 import revisions.py，
 # 兩邊互相 import 會循環），這裡用上面的 import ... as ... 保留原本名稱，
 # 這個檔案裡其餘程式碼完全不用改呼叫方式。
+
+
+def _announcement_source_priority():
+    """後台自建內容永遠排在爬蟲匯入內容前面（規劃文件 §3.2.1 的既定要求）
+    ——admin=0 排前面，crawler=1 排後面。抽成共用函式讓後台列表
+    （_list_announcements）跟公開列表（public_announcement_list）用同一份
+    規則，不要各自維護一份容易漂移（獨立審查找到的問題：原本只有公開
+    列表有這個排序鍵，後台列表完全沒有，近期整批匯入的爬蟲資料會把後台
+    自建公告推到後面的分頁，管理者反而找不到自己剛寫的公告）。"""
+    return Case(When(source=Announcement.SOURCE_ADMIN, then=0), default=1)
 
 
 def _locked(pk):
@@ -97,7 +107,7 @@ def _list_announcements(request):
     if err_resp:
         return err_resp
 
-    qs = Announcement.objects.all()
+    qs = Announcement.objects.order_by(_announcement_source_priority(), '-created_at', '-pk')
 
     status_param = request.GET.get("status")
     if status_param:
@@ -199,18 +209,26 @@ def public_announcement_list(request):
         return limited_resp
 
     now = timezone.now()
+    today = timezone.localdate()
+    # 「有效置頂」——只有 is_pinned=True 且 pin_until 還沒過期才算置頂；
+    # 原本只看 is_pinned 欄位，不會檢查是否已過期，導致 pin_until 這個
+    # 「避免永久置頂被遺忘」的設計形同虛設（獨立審查找到的問題）。
+    effectively_pinned = Case(
+        When(is_pinned=True, pin_until__gte=today, then=0),
+        default=1,
+    )
     qs = Announcement.objects.filter(status=Announcement.STATUS_PUBLISHED).filter(
         Q(publish_at__isnull=True) | Q(publish_at__lte=now)
     ).filter(
         Q(unpublish_at__isnull=True) | Q(unpublish_at__gt=now)
     ).order_by(
-        '-is_pinned',
-        # 後台自建內容永遠排在爬蟲匯入內容前面（規劃文件 §3.2.1 的既有要求）。
-        # 爬蟲同步是整批寫入，每次同步的 created_at 都是「現在」，如果沿用
-        # model 預設的 -created_at 排序，一次同步匯入的活動會把所有後台自建
-        # 公告擠到看不見的地方——這裡改成先比對 source（admin=0 排前面，
-        # crawler=1 排後面），同一個 source 內部才用 -created_at 決定順序。
-        Case(When(source=Announcement.SOURCE_ADMIN, then=0), default=1),
+        # 後台自建內容永遠排在爬蟲匯入內容前面（規劃文件 §3.2.1 的既有
+        # 要求），不因為置頂與否而改變——這個排序鍵要放在置頂之前：原本
+        # -is_pinned 是第一排序鍵，一筆被人工設成置頂的爬蟲公告會排到
+        # 未置頂的自建公告前面，違反「自建一律優先」（獨立審查找到的
+        # 問題）。同一個 source 內部才依置頂／時間排序。
+        _announcement_source_priority(),
+        effectively_pinned,
         '-created_at', '-pk',
     )
 
@@ -471,6 +489,10 @@ def announcement_unpublish(request, pk):
         before = AnnouncementSerializer(announcement).data
         announcement.status = Announcement.STATUS_UNPUBLISHED
         announcement.save(update_fields=["status", "updated_at"])
+        # 下架後這篇公告不再是「已發布」，任何殘留的待審修改都對不上現狀
+        # 了——主動取消，避免核准時悄悄套用到已下架內容（見
+        # revisions.cancel_stale_pending_revision 的完整說明）。
+        cancel_stale_pending_revision("announcement", announcement.pk, decoded.get("uid", "anon"))
 
         _write_audit_log(
             request, decoded, "unpublish", announcement,

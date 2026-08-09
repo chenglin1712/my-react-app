@@ -211,6 +211,47 @@ class QuizVocabRevisionTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["payload"]["chinese_gloss"], "狗修改版")
 
+    def test_unpublish_auto_cancels_pending_revision(self):
+        """codex 獨立審查找到的問題：下架後殘留的待審修改應該自動失效，
+        不能留著等被誤核准套用到已下架內容。"""
+        with _as_role(EDITOR) as headers:
+            _post_json(
+                self.client, f'/adminapi/quiz-bank/vocab/{self.item.pk}/pending-revision/', headers,
+                {"chinese_gloss": "狗修改版"},
+            )
+        with _as_role(REVIEWER) as headers:
+            unpublish_resp = _post_json(
+                self.client, f'/adminapi/quiz-bank/vocab/{self.item.pk}/unpublish/', headers,
+            )
+        self.assertEqual(unpublish_resp.status_code, 200)
+
+        revision = PendingRevision.objects.get(target_type="quiz_vocab_item", target_id=self.item.pk)
+        self.assertEqual(revision.status, PendingRevision.STATUS_REJECTED)
+
+    def test_approve_rejects_with_409_if_target_no_longer_published(self):
+        """就算 unpublish 那條路徑漏了（或有別的路徑把狀態改離 published），
+        approve 本身也要重新確認狀態，不能盲目套用陳舊的提案內容。"""
+        with _as_role(EDITOR) as headers:
+            _post_json(
+                self.client, f'/adminapi/quiz-bank/vocab/{self.item.pk}/pending-revision/', headers,
+                {"chinese_gloss": "狗修改版"},
+            )
+        # 繞過 unpublish 端點本身（那條路徑已經會主動取消），直接改狀態
+        # 模擬「revision 提出之後、核准之前，狀態被別的路徑改變」的時序。
+        self.item.status = QuizVocabItem.STATUS_DRAFT
+        self.item.save(update_fields=["status"])
+
+        with _as_role(REVIEWER) as headers:
+            response = _post_json(
+                self.client, f'/adminapi/quiz-bank/vocab/{self.item.pk}/pending-revision/approve/', headers,
+            )
+        self.assertEqual(response.status_code, 409)
+
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.chinese_gloss, "狗原始")
+        revision = PendingRevision.objects.get(target_type="quiz_vocab_item", target_id=self.item.pk)
+        self.assertEqual(revision.status, PendingRevision.STATUS_REJECTED)
+
 
 class AnnouncementRevisionTest(TestCase):
     """Announcement 的編輯已發布內容——核准角色刻意用 PUBLISHERS，不是題庫
@@ -314,3 +355,45 @@ class AnnouncementRevisionTest(TestCase):
 
         self.announcement.refresh_from_db()
         self.assertEqual(self.announcement.title, "原始標題")
+
+    def test_unpublish_auto_cancels_pending_revision(self):
+        """codex 獨立審查找到的問題：公告下架後，殘留的待審修改應該自動
+        失效，不能留著等被誤核准套用到已下架公告。"""
+        with _as_role(EDITOR) as headers:
+            _post_json(
+                self.client, f'/adminapi/announcements/{self.announcement.pk}/pending-revision/', headers,
+                {"title": "修改後標題"},
+            )
+        with _as_role(ADMIN) as headers:
+            unpublish_resp = _post_json(
+                self.client, f'/adminapi/announcements/{self.announcement.pk}/unpublish/', headers,
+            )
+        self.assertEqual(unpublish_resp.status_code, 200)
+
+        revision = PendingRevision.objects.get(target_type="announcement", target_id=self.announcement.pk)
+        self.assertEqual(revision.status, PendingRevision.STATUS_REJECTED)
+
+    def test_approve_rejects_with_409_if_announcement_no_longer_published(self):
+        """就算 unpublish 那條路徑漏了，approve 本身也要重新確認狀態，
+        不能盲目套用陳舊的提案內容到已經不是 published 的公告。"""
+        with _as_role(EDITOR) as headers:
+            _post_json(
+                self.client, f'/adminapi/announcements/{self.announcement.pk}/pending-revision/', headers,
+                {"title": "修改後標題"},
+            )
+        # 繞過 unpublish 端點本身（那條路徑已經會主動取消），直接改狀態
+        # 模擬「revision 提出之後、核准之前，狀態被別的路徑改變」的時序。
+        self.announcement.status = Announcement.STATUS_UNPUBLISHED
+        self.announcement.save(update_fields=["status"])
+
+        with _as_role(ADMIN) as headers:
+            response = _post_json(
+                self.client, f'/adminapi/announcements/{self.announcement.pk}/pending-revision/approve/', headers,
+                {"review_comment": ""},
+            )
+        self.assertEqual(response.status_code, 409)
+
+        self.announcement.refresh_from_db()
+        self.assertEqual(self.announcement.title, "原始標題")
+        revision = PendingRevision.objects.get(target_type="announcement", target_id=self.announcement.pk)
+        self.assertEqual(revision.status, PendingRevision.STATUS_REJECTED)

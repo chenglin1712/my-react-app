@@ -94,7 +94,7 @@ def upload_media_object(data, object_path, content_type):
     return blob.public_url
 
 
-def delete_storage_file_by_download_url(url):
+def delete_storage_file_by_download_url(url, expected_path_prefix=None):
     """從 getDownloadURL() 回傳的下載網址反解出 Storage 物件路徑並刪除。
 
     前端存進 Firestore 的是下載網址（例如 pronunciationRecordingService.js
@@ -102,18 +102,46 @@ def delete_storage_file_by_download_url(url):
     需要的是 `pronunciations/{tribe}/{word}/{filename}` 這種物件路徑，要從
     網址的 `/o/<url-encoded 路徑>` 片段解碼取出。
 
+    這個網址欄位是使用者可控的（Firestore 的 recordings.create 規則只驗證
+    uid 是本人，沒有限制 storageUrl 的內容）——如果不驗證就直接刪，惡意
+    使用者可以建立一筆帶偽造 storageUrl 的錄音文件（指向同一個 bucket 裡
+    任何其他物件），誘使之後的審核下架或帳號刪除流程刪掉不相關的檔案。
+    這裡強制要求：(1) 網址主機必須是真正的 Firebase Storage 網域，
+    (2) 網址裡的 bucket 名稱要跟目前設定的 bucket 完全一致，
+    (3) 呼叫端可傳入 expected_path_prefix（例如 "pronunciations/tayal/"，
+    用真正的路徑區段組出來，不是信任文件內部欄位），物件路徑必須落在這個
+    prefix 底下才會真的執行刪除——任何一項檢查沒過就直接回 False，視同
+    「刪不掉」，不會讓呼叫端誤以為刪除成功。
+
     回傳 True/False 而不是讓例外往外拋：呼叫端（帳號刪除、錄音下架）都是
     「盡量刪、刪不掉也要讓其他步驟繼續」的語意，網址格式不符預期或物件
     已經不存在都不該讓整個操作中斷在這一步。
     """
     from urllib.parse import unquote, urlparse
+
     try:
-        path = urlparse(url).path
-        object_path = unquote(path.split("/o/", 1)[1])
-    except IndexError:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+
+    if parsed.scheme != "https" or parsed.netloc != "firebasestorage.googleapis.com":
+        return False
+
+    try:
+        # 路徑形如 /v0/b/<bucket>/o/<url-encoded 物件路徑>
+        before_object, encoded_object_path = parsed.path.split("/o/", 1)
+        bucket_name = before_object.split("/b/", 1)[1]
+        object_path = unquote(encoded_object_path)
+    except (IndexError, ValueError):
         return False
 
     bucket = get_storage_bucket()
+    if bucket_name != bucket.name:
+        return False
+
+    if expected_path_prefix is not None and not object_path.startswith(expected_path_prefix):
+        return False
+
     try:
         bucket.blob(object_path).delete()
     except Exception:

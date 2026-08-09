@@ -56,19 +56,29 @@ def _origin_key_from_url(url):
     return basename.rsplit(".", 1)[0][:100]
 
 
-def _cloudinary_upload(remote_url, resource_type, folder, cloud_name, upload_preset):
+def _cloudinary_upload(remote_url, resource_type, folder, cloud_name, upload_preset, public_id=None):
     """把第三方網址的檔案透過免簽章 preset 重新上傳到本專案 Cloudinary，
     回傳新的 secure_url。resource_type 是 "image" 或 "video"（Cloudinary
     把音訊檔歸類在 video 資源類型底下）。Cloudinary 這端要先自己從
     remote_url 抓檔案再存進自己的空間，比一般 API 呼叫慢，偶發逾時重試一次
     再放棄（呼叫端已經有更外層的「跳過這一題」保護，這裡只處理最常見的
-    單次逾時，不是要做到完全不失敗）。"""
+    單次逾時，不是要做到完全不失敗）。
+
+    public_id 帶入以 origin_key 為基礎的固定值（呼叫端組出），不用
+    Cloudinary 預設的隨機檔名——上傳成功但 DB 建立失敗、下次重跑會重新
+    上傳同一題時，固定 public_id 讓新的上傳落在同一個位置（多數免簽章
+    preset 預設允許覆蓋，即使某個 preset 設定成一定要唯一檔名，固定的
+    命名規則至少讓孤兒資產能靠 public_id 規律搜尋/比對出來，不會完全找
+    不到——比每次都是隨機檔名好稽核（獨立審查找到的問題）。"""
     last_exc = None
     for attempt in range(2):
         try:
+            data = {"upload_preset": upload_preset, "file": remote_url, "folder": folder}
+            if public_id:
+                data["public_id"] = public_id
             resp = requests.post(
                 f"https://api.cloudinary.com/v1_1/{cloud_name}/{resource_type}/upload",
-                data={"upload_preset": upload_preset, "file": remote_url, "folder": folder},
+                data=data,
                 timeout=60,
             )
             resp.raise_for_status()
@@ -198,8 +208,32 @@ class Command(BaseCommand):
             return None
 
     def _import_true_false_item(self, tribe, question, answer, origin_key, cloud_name, upload_preset):
-        audio_url = _cloudinary_upload(question["audio"], "video", f"quizbank/{tribe}/true_false", cloud_name, upload_preset)
-        image_url = _cloudinary_upload(question["image"], "image", f"quizbank/{tribe}/true_false", cloud_name, upload_preset)
+        folder = f"quizbank/{tribe}/true_false"
+        uploaded = []
+        try:
+            audio_url = _cloudinary_upload(
+                question["audio"], "video", folder, cloud_name, upload_preset,
+                public_id=f"{origin_key}-audio",
+            )
+            uploaded.append(audio_url)
+            image_url = _cloudinary_upload(
+                question["image"], "image", folder, cloud_name, upload_preset,
+                public_id=f"{origin_key}-image",
+            )
+            uploaded.append(image_url)
+        except requests.RequestException:
+            # 這一題的媒體檔案上傳到一半失敗——前面已經成功上傳的檔案
+            # （例如音檔成功、圖片失敗）不會被用到（這一題整題跳過，見
+            # 呼叫端的例外處理），但已經真的存在 Cloudinary 上，成了孤兒
+            # 資產。deterministic public_id 讓它至少能靠這裡印出來的網址
+            # 規律搜尋到，不是完全無跡可循（獨立審查找到的問題）。
+            if uploaded:
+                self.stderr.write(self.style.WARNING(
+                    f"  {tribe}: 是非題 {origin_key} 部分媒體已上傳但整題失敗，"
+                    f"可能留下孤兒資產：{uploaded}"
+                ))
+            raise
+
         QuizTrueFalseItem.objects.create(
             tribe=tribe, origin_key=origin_key,
             question_ab=question.get("question_ab", ""), question_ch=question.get("question_ch", ""),
@@ -211,9 +245,32 @@ class Command(BaseCommand):
         )
 
     def _import_choice_item(self, tribe, question, answer, origin_key, cloud_name, upload_preset):
-        image_a = _cloudinary_upload(question["imageA"], "image", f"quizbank/{tribe}/choice", cloud_name, upload_preset)
-        image_b = _cloudinary_upload(question["imageB"], "image", f"quizbank/{tribe}/choice", cloud_name, upload_preset)
-        image_c = _cloudinary_upload(question["imageC"], "image", f"quizbank/{tribe}/choice", cloud_name, upload_preset)
+        folder = f"quizbank/{tribe}/choice"
+        uploaded = []
+        try:
+            image_a = _cloudinary_upload(
+                question["imageA"], "image", folder, cloud_name, upload_preset,
+                public_id=f"{origin_key}-a",
+            )
+            uploaded.append(image_a)
+            image_b = _cloudinary_upload(
+                question["imageB"], "image", folder, cloud_name, upload_preset,
+                public_id=f"{origin_key}-b",
+            )
+            uploaded.append(image_b)
+            image_c = _cloudinary_upload(
+                question["imageC"], "image", folder, cloud_name, upload_preset,
+                public_id=f"{origin_key}-c",
+            )
+            uploaded.append(image_c)
+        except requests.RequestException:
+            if uploaded:
+                self.stderr.write(self.style.WARNING(
+                    f"  {tribe}: 選擇題 {origin_key} 部分媒體已上傳但整題失敗，"
+                    f"可能留下孤兒資產：{uploaded}"
+                ))
+            raise
+
         QuizChoiceItem.objects.create(
             tribe=tribe, origin_key=origin_key,
             question_ab=question.get("question_ab", ""), question_ch=question.get("question_ch", ""),

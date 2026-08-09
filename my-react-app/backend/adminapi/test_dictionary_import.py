@@ -421,6 +421,32 @@ class ImportApproveTest(DictionaryDbTestCase):
         finally:
             db.close()
 
+    def test_unexpected_exception_during_resolve_reverts_to_pending_review(self):
+        """獨立審查找到的問題：核准流程認領後會重新呼叫 resolve_import_bundle()
+        比對雜湊，這段原本用 try/finally（只保證 read_db.close()，沒有
+        except）包住——如果 resolve_import_bundle() 拋出雜湊不符以外的
+        非預期例外，工作會永久卡在「已認領但未套用」的死狀態。這裡直接
+        mock 一個非預期例外，確認新的 except Exception 分支會正確退回
+        pending_review 並回傳 500。"""
+        job_id = self._upload_and_preflight([{"name": "詞Z"}])
+
+        with patch(
+            "adminapi.dictionary_import_views.resolve_import_bundle",
+            side_effect=RuntimeError("模擬重新解析時的非預期錯誤"),
+        ):
+            with _as_role(REVIEWER) as headers:
+                resp = _post_json(self.client, f'/adminapi/dictionary/import/{job_id}/approve/', headers)
+        self.assertEqual(resp.status_code, 500)
+
+        job = DictionaryImportJob.objects.get(pk=job_id)
+        self.assertEqual(job.status, DictionaryImportJob.STATUS_PENDING_REVIEW)
+
+        db = connect_module.SessionLocal()
+        try:
+            self.assertIsNone(db.query(m.Word).filter(m.Word.name == "詞Z").first())
+        finally:
+            db.close()
+
     def test_cannot_approve_before_submit(self):
         bundle = _minimal_bundle([{"name": "詞Y"}])
         with _as_role(EDITOR) as headers:
@@ -624,3 +650,57 @@ class ExportTest(DictionaryDbTestCase):
         self.assertEqual(linked_item["word_name"], "kolong")
         unlinked_item = tree["explanations"][0]["sentences"][0]["anaphoras"][1]["items"][0]
         self.assertIsNone(unlinked_item["word_name"])
+
+    def test_bulk_and_single_query_agree_on_tie_break_order_when_sort_order_ties(self):
+        """獨立審查找到的問題：sort_order 相同（或該子表根本沒有
+        sort_order 欄位，例如 category/pos/focus junction 表）時，原本沒有
+        次要排序鍵，資料庫不保證順序——單筆查詢跟批次查詢可能因為執行
+        計畫不同排出不同順序，導致同一棵樹在兩個查詢路徑算出不同的
+        content_hash。這裡刻意讓兩筆解釋的 sort_order 相同、同一筆解釋
+        掛兩筆分類（沒有 sort_order 可用），驗證兩個查詢路徑都穩定依 id
+        遞增排序、彼此完全一致。"""
+        db = connect_module.SessionLocal()
+        try:
+            word = m.Word(id="tie-break-word-1", tribe_id=self.tribe_id, name="tie")
+            db.add(word)
+            db.flush()
+
+            # 兩筆解釋 sort_order 刻意設成相同值——沒有 .id 這個次要排序鍵
+            # 的話，資料庫不保證這兩筆的相對順序。
+            exp_a = m.WordExplanation(word_id=word.id, chinese_explanation="A", sort_order=0)
+            exp_b = m.WordExplanation(word_id=word.id, chinese_explanation="B", sort_order=0)
+            db.add_all([exp_a, exp_b])
+            db.flush()
+            exp_a_id, exp_b_id = exp_a.id, exp_b.id
+
+            # category junction 表本身沒有 sort_order 欄位，原本兩個查詢
+            # 路徑都完全沒有 ORDER BY，只能靠這次新加的 .id 次要排序鍵
+            # 決定順序。
+            category2 = m.Category(name="分類二")
+            db.add(category2)
+            db.flush()
+            db.add(m.WordExplanationCategory(explanation_id=exp_a_id, category_id=self.category_id))
+            db.add(m.WordExplanationCategory(explanation_id=exp_a_id, category_id=category2.id))
+            db.commit()
+            category2_id = category2.id
+        finally:
+            db.close()
+
+        from . import dictionary_write as dw
+        db = connect_module.SessionLocal()
+        try:
+            bulk = dw.get_word_trees_for_tribe(db, self.tribe_id)
+            single = dw.get_word_tree(db, "tie-break-word-1")
+        finally:
+            db.close()
+
+        tree = bulk["tie-break-word-1"]
+        self.assertEqual(
+            json.dumps(tree, sort_keys=True, default=str),
+            json.dumps(single, sort_keys=True, default=str),
+        )
+        # sort_order 相同時，依 id 遞增排序（先建立的 exp_a 排在前面）。
+        self.assertEqual([e["id"] for e in tree["explanations"]], [exp_a_id, exp_b_id])
+        # 完全沒有 sort_order 可用的 category_ids，依 id 遞增排序（插入順序）。
+        exp_a_tree = next(e for e in tree["explanations"] if e["id"] == exp_a_id)
+        self.assertEqual(exp_a_tree["category_ids"], [self.category_id, category2_id])

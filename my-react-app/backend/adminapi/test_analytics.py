@@ -7,7 +7,7 @@
 """
 import json
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone as dt_timezone
+from datetime import date, datetime, timedelta, timezone as dt_timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -17,6 +17,8 @@ from django.test.utils import override_settings
 from django.utils import timezone
 
 from config.roles import ANALYST, EDITOR
+
+from .analytics_views import _join_date_to_local_date
 
 from .models import (
     QuizChoiceItem, QuizClozePassage, QuizSituationItem, QuizTrueFalseItem, QuizVocabItem, UsageEvent,
@@ -144,6 +146,80 @@ class UsageEventCreateTest(TestCase):
             resp = _post_json(self.client, '/adminapi/public/events/', {"event_type": "page_view"})
         self.assertEqual(resp.status_code, 429)
 
+    def test_dictionary_search_rejected_on_public_endpoint(self):
+        """獨立審查找到的問題：dictionary_search 已經有 FastAPI 端的可信
+        寫入路徑（見 backend/fastAPI/usage_events.py），公開端點不該再開放
+        建立這個類型，否則任何人都能偽造查詢字串/命中數污染搜尋分析報表。"""
+        with override_settings(AUTH_DEV_BYPASS=False):
+            resp = _post_json(self.client, '/adminapi/public/events/', {
+                "event_type": "dictionary_search",
+                "payload": {"query": "偽造熱門詞", "exact_hit_count": 999, "fuzzy_hit_count": 0},
+            })
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(UsageEvent.objects.count(), 0)
+
+    def _post_quiz_answer(self, payload):
+        with override_settings(AUTH_DEV_BYPASS=False):
+            return _post_json(self.client, '/adminapi/public/events/', {
+                "event_type": "quiz_answer", "payload": payload,
+            })
+
+    def test_valid_quiz_answer_payload_accepted(self):
+        resp = self._post_quiz_answer({"item_kind": "true_false", "item_id": 1, "correct": True})
+        self.assertEqual(resp.status_code, 201)
+
+    def test_valid_cloze_composite_item_id_accepted(self):
+        resp = self._post_quiz_answer({"item_kind": "cloze", "item_id": "42:blank1", "correct": False})
+        self.assertEqual(resp.status_code, 201)
+
+    def test_quiz_answer_unknown_item_kind_rejected(self):
+        resp = self._post_quiz_answer({"item_kind": "not-a-real-kind", "item_id": 1, "correct": True})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(UsageEvent.objects.count(), 0)
+
+    def test_quiz_answer_list_item_kind_rejected(self):
+        """畸形 item_kind（list）修正前會讓 quiz_quality_analytics() 因為
+        拿 list 當雜湊 key 直接 500——寫入端就該擋下來。"""
+        resp = self._post_quiz_answer({"item_kind": ["true_false"], "item_id": 1, "correct": True})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_quiz_answer_dict_item_id_rejected(self):
+        resp = self._post_quiz_answer({"item_kind": "true_false", "item_id": {"id": 1}, "correct": True})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_quiz_answer_non_cloze_item_id_must_be_positive_int(self):
+        resp = self._post_quiz_answer({"item_kind": "true_false", "item_id": "1", "correct": True})
+        self.assertEqual(resp.status_code, 400)
+        resp = self._post_quiz_answer({"item_kind": "true_false", "item_id": 0, "correct": True})
+        self.assertEqual(resp.status_code, 400)
+        resp = self._post_quiz_answer({"item_kind": "true_false", "item_id": -1, "correct": True})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_quiz_answer_cloze_item_id_must_match_composite_format(self):
+        resp = self._post_quiz_answer({"item_kind": "cloze", "item_id": 42, "correct": True})
+        self.assertEqual(resp.status_code, 400)
+        resp = self._post_quiz_answer({"item_kind": "cloze", "item_id": "not-composite", "correct": True})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_quiz_answer_string_correct_rejected(self):
+        """核心案例：Python 的 bool("false") 會是 True，如果不嚴格檢查
+        型別，這筆會被誤判成「答對」，靜默扭曲答對率統計。"""
+        resp = self._post_quiz_answer({"item_kind": "true_false", "item_id": 1, "correct": "false"})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(UsageEvent.objects.count(), 0)
+
+    def test_quiz_answer_int_correct_rejected(self):
+        resp = self._post_quiz_answer({"item_kind": "true_false", "item_id": 1, "correct": 1})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_quiz_answer_level_optional_but_must_be_string_if_present(self):
+        # situation 情境題不帶 level（見 ScenarioQuiz.jsx），這裡確認完全
+        # 省略時仍然合法。
+        resp = self._post_quiz_answer({"item_kind": "situation", "item_id": 1, "correct": True})
+        self.assertEqual(resp.status_code, 201)
+        resp = self._post_quiz_answer({"item_kind": "true_false", "item_id": 1, "correct": True, "level": 1})
+        self.assertEqual(resp.status_code, 400)
+
 
 def _make_event(event_type, days_ago, uid="", tribe="", payload=None):
     """建一筆 UsageEvent，created_at 覆寫成指定的「幾天前」——auto_now_add
@@ -206,6 +282,24 @@ class DashboardAnalyticsTest(TestCase):
         with _as_role(EDITOR) as headers:
             resp = self._get('?date_range=custom&date_from=2026-08-10&date_to=2026-08-01', headers)
         self.assertEqual(resp.status_code, 400)
+
+    def test_custom_range_over_90_days_rejected(self):
+        """獨立審查找到的問題：custom 日期沒有跨度上限時，具 staff 角色的
+        client 可以要求例如 0001-01-01 到 9999-12-31，即使資料庫沒資料，
+        _fill_date_series() 仍會建立數百萬個補零項目，dashboard 還會對
+        Firebase 執行全量掃描，可能讓 worker 長時間占用 CPU/記憶體。"""
+        with _as_role(EDITOR) as headers:
+            resp = self._get('?date_range=custom&date_from=2026-01-01&date_to=2026-12-31', headers)
+        self.assertEqual(resp.status_code, 400)
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.list_all_firebase_users")
+    def test_custom_range_exactly_90_days_accepted(self, mock_users, mock_client_fn):
+        mock_users.return_value = []
+        mock_client_fn.return_value = MagicMock(get_all=MagicMock(return_value=[]))
+        with _as_role(EDITOR) as headers:
+            resp = self._get('?date_range=custom&date_from=2026-01-01&date_to=2026-03-31', headers)
+        self.assertEqual(resp.status_code, 200)
 
     def test_unknown_tribe_rejected(self):
         with _as_role(EDITOR) as headers:
@@ -471,6 +565,33 @@ class QuizQualityAnalyticsTest(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["items"], [])
 
+    def test_unhashable_item_kind_or_id_skipped_without_500(self):
+        """讀取端的防禦性檢查——寫入端已經擋掉這類畸形資料，但這裡直接用
+        ORM 繞過寫入端驗證模擬「這次修正之前寫入的歷史資料」，確認即使
+        item_kind/item_id 是 list/dict 這種不可雜湊型別，聚合端點也不會
+        500（獨立審查找到的問題：原本直接拿去當 dict key 會直接
+        TypeError: unhashable type）。"""
+        _make_event("quiz_answer", days_ago=0, uid="u1", payload={"item_kind": ["true_false"], "item_id": 1, "correct": True})
+        _make_event("quiz_answer", days_ago=0, uid="u1", payload={"item_kind": "true_false", "item_id": {"id": 1}, "correct": True})
+        with _as_role(EDITOR) as headers:
+            resp = self._get('', headers)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["items"], [])
+
+    def test_string_correct_value_does_not_get_coerced_to_true(self):
+        """核心案例：修正前用 bool(correct) 強制轉換，字串 "false" 會變成
+        True，靜默把答錯算成答對。這裡確認這種歷史髒資料的事件被整筆跳過
+        （不計入答對率），而不是被誤判成答對。"""
+        _make_quiz_answer_event("u1", "true_false", 1, correct=True)
+        _make_event("quiz_answer", days_ago=0, uid="u2", payload={"item_kind": "true_false", "item_id": 1, "correct": "false"})
+        with _as_role(EDITOR) as headers:
+            resp = self._get('', headers)
+        item = resp.json()["items"][0]
+        # 只有 u1 的合法事件被計入；u2 的字串 correct 整筆被跳過，不會被
+        # bool("false")==True 誤判成答對而讓 attempt_count 變成 2。
+        self.assertEqual(item["attempt_count"], 1)
+        self.assertEqual(item["accuracy_rate"], 1.0)
+
     def test_accuracy_rate_and_attempt_count(self):
         for i in range(3):
             _make_quiz_answer_event(f"u{i}", "true_false", 1, correct=True)
@@ -690,7 +811,8 @@ class RetentionAnalyticsTest(TestCase):
     def test_users_grouped_by_join_week_and_retention_counts_any_event_type(self, mock_users, mock_client_fn):
         today = timezone.localdate()
         this_monday = _monday_of(today)
-        last_monday = this_monday - timedelta(days=7)
+        one_week_ago_monday = this_monday - timedelta(days=7)
+        two_weeks_ago_monday = this_monday - timedelta(days=14)
 
         mock_users.return_value = [
             _fake_user_record("uidA", created=1700000000000),
@@ -699,8 +821,8 @@ class RetentionAnalyticsTest(TestCase):
         ]
         mock_client = MagicMock()
         mock_client.get_all.return_value = [
-            _fake_snapshot("uidA", {"joinDate": self._iso(last_monday)}),
-            _fake_snapshot("uidB", {"joinDate": self._iso(last_monday + timedelta(days=2))}),  # 跟 uidA 同一週世代
+            _fake_snapshot("uidA", {"joinDate": self._iso(two_weeks_ago_monday)}),
+            _fake_snapshot("uidB", {"joinDate": self._iso(two_weeks_ago_monday + timedelta(days=2))}),  # 跟 uidA 同一週世代
             _fake_snapshot("uidC", {"joinDate": self._iso(this_monday)}),  # 本週才加入的獨立世代
         ]
         mock_client_fn.return_value = mock_client
@@ -708,21 +830,30 @@ class RetentionAnalyticsTest(TestCase):
         def _days_ago(day):
             return (today - day).days
 
-        # uidA：世代週（last_monday 那週）跟下一週（this_monday 那週）都有活動。
-        _make_event("page_view", days_ago=_days_ago(last_monday), uid="uidA")
-        _make_event("quiz_answer", days_ago=_days_ago(this_monday), uid="uidA")  # 事件類型不限，任何類型都算活躍
+        # uidA：世代週（two_weeks_ago_monday 那週，已完整結束）跟下一週
+        # （one_week_ago_monday 那週，也已完整結束）都有活動。
+        _make_event("page_view", days_ago=_days_ago(two_weeks_ago_monday), uid="uidA")
+        _make_event("quiz_answer", days_ago=_days_ago(one_week_ago_monday), uid="uidA")  # 事件類型不限，任何類型都算活躍
         # uidB：只有世代週（同一週但不同天）有活動。
-        _make_event("dictionary_search", days_ago=_days_ago(last_monday + timedelta(days=2)), uid="uidB")
+        _make_event("dictionary_search", days_ago=_days_ago(two_weeks_ago_monday + timedelta(days=2)), uid="uidB")
         # uidC：世代週（this_monday 那週，也就是本週）有活動。
         _make_event("page_view", days_ago=_days_ago(today), uid="uidC")
+        # uidA 在本週（this_monday，還在進行中）也有活動——這是這次修正的
+        # 核心案例：對 two_weeks_ago_monday 這個世代來說，本週是
+        # week_offset=2，還沒完整結束，不該出現在回應裡，即使真的有活動
+        # 資料存在也一樣（那是「還沒發生」不是「量測到偏低留存」）。
+        _make_event("page_view", days_ago=_days_ago(today), uid="uidA")
 
         with _as_role(EDITOR) as headers:
             resp = self._get(headers=headers)
         cohorts = {c["cohort_start"]: c for c in resp.json()["cohorts"]}
 
-        last_cohort = cohorts[last_monday.isoformat()]
-        self.assertEqual(last_cohort["cohort_size"], 2)
-        retention_by_offset = {r["week_offset"]: r for r in last_cohort["retention"]}
+        old_cohort = cohorts[two_weeks_ago_monday.isoformat()]
+        self.assertEqual(old_cohort["cohort_size"], 2)
+        retention_by_offset = {r["week_offset"]: r for r in old_cohort["retention"]}
+        # 只有已經完整結束的週次會出現：0（世代週本身）跟 1（已完整結束），
+        # 2（本週，還在進行中）不該出現——這正是這次修正的核心斷言。
+        self.assertEqual(sorted(retention_by_offset.keys()), [0, 1])
         self.assertEqual(retention_by_offset[0]["active_count"], 2)
         self.assertEqual(retention_by_offset[0]["rate"], 1.0)
         self.assertEqual(retention_by_offset[1]["active_count"], 1)
@@ -751,3 +882,42 @@ class RetentionAnalyticsTest(TestCase):
         cohort = resp.json()["cohorts"][0]
         self.assertEqual(len(cohort["retention"]), 12)
         self.assertEqual([r["week_offset"] for r in cohort["retention"]], list(range(12)))
+
+
+class JoinDateToLocalDateTest(TestCase):
+    """獨立審查找到的問題：_daily_new_registrations()／retention_analytics()
+    原本直接對 joinDate 的 UTC datetime 呼叫 .date()，沒有先轉成專案目前
+    時區——如果 TIME_ZONE 設定不是 UTC，當地時間已經跨日、UTC 還沒跨日的
+    時間點會被歸到錯的一天/一週，跟 UsageEvent（用 timezone.localtime()
+    分日/分週）的依據不一致。這裡直接測 _join_date_to_local_date()
+    本身，不透過 HTTP——這個專案目前的 TIME_ZONE 就是 UTC，轉換在正式
+    環境暫時是 no-op，沒辦法透過現有 API 回應觀察到差異，只能直接測
+    函式在不同 TIME_ZONE 設定下的行為。"""
+
+    def test_utc_time_that_has_already_rolled_over_locally_uses_local_date(self):
+        # UTC 16:30（8/9）在 UTC+8（Asia/Taipei）已經是隔天 00:30（8/10）。
+        with override_settings(TIME_ZONE="Asia/Taipei"):
+            local_date = _join_date_to_local_date("2026-08-09T16:30:00Z")
+        self.assertEqual(local_date, date(2026, 8, 10))
+
+    def test_under_utc_setting_conversion_is_a_no_op(self):
+        # 這個專案目前的 TIME_ZONE 就是 UTC，驗證這個情況下轉換前後日期
+        # 相同，不會意外改變既有行為。
+        with override_settings(TIME_ZONE="UTC"):
+            local_date = _join_date_to_local_date("2026-08-09T16:30:00Z")
+        self.assertEqual(local_date, date(2026, 8, 9))
+
+    def test_invalid_string_returns_none(self):
+        self.assertIsNone(_join_date_to_local_date("not-a-date"))
+
+    def test_none_input_returns_none(self):
+        self.assertIsNone(_join_date_to_local_date(None))
+
+    def test_naive_datetime_string_does_not_crash(self):
+        """正式環境的真實資料裡有些 joinDate 字串沒有時區資訊（沒有 "Z"
+        也沒有 offset）——timezone.localtime() 要求輸入必須是 aware
+        datetime，這種值原本會直接讓整個報表端點 500（透過真實 Firebase
+        資料跑 test_custom_range_exactly_90_days_accepted 時意外發現的
+        真實 bug，不是憑空想像的邊角案例）。"""
+        local_date = _join_date_to_local_date("2026-08-09T16:30:00")
+        self.assertEqual(local_date, date(2026, 8, 9))

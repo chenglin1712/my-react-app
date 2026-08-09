@@ -15,6 +15,7 @@ chinese_gloss) 判斷是否已存在，QuizClozePassage 用 (tribe, passage_fore
 QuizSourceConfig 直接 update_or_create（每次執行都會把值同步成 TRIBE_CONFIG
 目前的內容）。
 """
+from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand
 
 from adminapi.models import QuizClozePassage, QuizSourceConfig, QuizVocabItem
@@ -47,31 +48,53 @@ class Command(BaseCommand):
     help = "把 crawler/*_bank.py 五個族語的題庫內容搬進資料庫（狀態為待審核）"
 
     def handle(self, *args, **options):
-        vocab_created, vocab_skipped = self._migrate_vocab()
-        cloze_created, cloze_skipped = self._migrate_cloze()
+        vocab_created, vocab_skipped, vocab_invalid = self._migrate_vocab()
+        cloze_created, cloze_skipped, cloze_invalid = self._migrate_cloze()
         source_count = self._migrate_source_config()
 
         self.stdout.write(self.style.SUCCESS(
-            f"配合題詞彙：新增 {vocab_created} 筆、略過已存在 {vocab_skipped} 筆\n"
-            f"克漏字短文：新增 {cloze_created} 筆、略過已存在 {cloze_skipped} 筆\n"
+            f"配合題詞彙：新增 {vocab_created} 筆、略過已存在 {vocab_skipped} 筆、驗證失敗略過 {vocab_invalid} 筆\n"
+            f"克漏字短文：新增 {cloze_created} 筆、略過已存在 {cloze_skipped} 筆、驗證失敗略過 {cloze_invalid} 筆\n"
             f"外部題源設定：{source_count} 筆（tribe/dialect_id/display_name 皆同步為最新值）"
         ))
 
+    def _create_if_valid(self, model, lookup, defaults):
+        """比照 get_or_create() 的語意（lookup 存在就跳過、不存在才新增），
+        但改成手動建構未儲存的 instance、呼叫 full_clean() 通過才 save()——
+        get_or_create() 不會呼叫 full_clean()，畸形資料會直接繞過驗證進 DB
+        （獨立審查找到的問題，QuizClozePassage.clean() 尤其重要，因為裡面
+        有標記一致性檢查）。回傳 (was_created, was_invalid)；驗證失敗時不
+        中斷整批遷移，只跳過這一筆並印出原因，讓管理者能單獨處理。"""
+        if model.objects.filter(**lookup).exists():
+            return False, False
+
+        obj = model(**lookup, **defaults)
+        try:
+            obj.full_clean()
+        except ValidationError as exc:
+            self.stderr.write(self.style.WARNING(f"略過驗證失敗的 {model.__name__}（{lookup}）：{exc}"))
+            return False, True
+
+        obj.save()
+        return True, False
+
     def _migrate_vocab(self):
-        created = skipped = 0
+        created = skipped = invalid = 0
 
         # tayal：VOCAB_BANK 本身就是完整的 {tayal, chinese, category} 清單，直接搬。
         for item in tayal_bank.VOCAB_BANK:
-            _, was_created = QuizVocabItem.objects.get_or_create(
-                tribe="tayal", foreign_word=item["tayal"], chinese_gloss=item["chinese"],
-                defaults={
+            was_created, was_invalid = self._create_if_valid(
+                QuizVocabItem,
+                {"tribe": "tayal", "foreign_word": item["tayal"], "chinese_gloss": item["chinese"]},
+                {
                     "category": item["category"],
                     "status": QuizVocabItem.STATUS_PENDING_REVIEW,
                     "created_by": MIGRATED_BY,
                 },
             )
             created += was_created
-            skipped += not was_created
+            invalid += was_invalid
+            skipped += not (was_created or was_invalid)
 
         # amis/bunun/kavalan/paiwan：CATEGORY_TARGETS 只有中文詞義清單，
         # 逐類別呼叫 fetch_words_by_glosses 把「這一類要考哪些詞義」全部
@@ -82,28 +105,31 @@ class Command(BaseCommand):
             for category, glosses in bank_module.CATEGORY_TARGETS.items():
                 resolved = dictionary_source.fetch_words_by_glosses(tribe, glosses)
                 for gloss, entry in resolved.items():
-                    _, was_created = QuizVocabItem.objects.get_or_create(
-                        tribe=tribe, foreign_word=entry["word"], chinese_gloss=gloss,
-                        defaults={
+                    was_created, was_invalid = self._create_if_valid(
+                        QuizVocabItem,
+                        {"tribe": tribe, "foreign_word": entry["word"], "chinese_gloss": gloss},
+                        {
                             "category": category,
                             "status": QuizVocabItem.STATUS_PENDING_REVIEW,
                             "created_by": MIGRATED_BY,
                         },
                     )
                     created += was_created
-                    skipped += not was_created
+                    invalid += was_invalid
+                    skipped += not (was_created or was_invalid)
 
-        return created, skipped
+        return created, skipped, invalid
 
     def _migrate_cloze(self):
-        created = skipped = 0
+        created = skipped = invalid = 0
         all_banks = {"tayal": tayal_bank, **_DB_BACKED_BANKS}
 
         for tribe, bank_module in all_banks.items():
             for passage in bank_module.CLOZE_PASSAGES:
-                _, was_created = QuizClozePassage.objects.get_or_create(
-                    tribe=tribe, passage_foreign=passage["passage_ab"],
-                    defaults={
+                was_created, was_invalid = self._create_if_valid(
+                    QuizClozePassage,
+                    {"tribe": tribe, "passage_foreign": passage["passage_ab"]},
+                    {
                         "passage_chinese": passage["passage_ch"],
                         "blanks": passage["blanks"],
                         "status": QuizClozePassage.STATUS_PENDING_REVIEW,
@@ -111,9 +137,10 @@ class Command(BaseCommand):
                     },
                 )
                 created += was_created
-                skipped += not was_created
+                invalid += was_invalid
+                skipped += not (was_created or was_invalid)
 
-        return created, skipped
+        return created, skipped, invalid
 
     def _migrate_source_config(self):
         count = 0

@@ -220,7 +220,9 @@ class RecordingDeleteTest(TestCase):
         self.assertTrue(data["deleted"])
         self.assertTrue(data["storage_deleted"])
         rec_ref.delete.assert_called_once()
-        mock_delete_storage.assert_called_once_with("https://x/o/path?alt=media")
+        mock_delete_storage.assert_called_once_with(
+            "https://x/o/path?alt=media", expected_path_prefix="pronunciations/tayal/",
+        )
         self.assertEqual(AuditLog.objects.filter(action="delete_recording").count(), 1)
 
     @patch("adminapi.firebase_ops.get_firestore_client")
@@ -230,6 +232,47 @@ class RecordingDeleteTest(TestCase):
         with _as_role(OWNER) as headers:
             resp = self.client.delete('/adminapi/moderation/recordings/tayal/missing/', **headers)
         self.assertEqual(resp.status_code, 404)
+
+    @patch("adminapi.firebase_ops.delete_storage_file_by_download_url")
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_storage_deletion_failure_preserves_firestore_doc(self, mock_client_fn, mock_delete_storage):
+        """獨立審查找到的問題：原本不管 Storage 刪除成不成功都會接著刪
+        Firestore 文件，"deleted": true 會讓管理者誤以為已經清乾淨，實際
+        上留下一個永遠定位不到的孤兒音檔。現在 Storage 刪除失敗時要保留
+        Firestore 文件（讓管理者能安全重試），並回傳 502 而不是 200。"""
+        recordings_col = FakeCollection()
+        rec_ref = recordings_col.set_document("rec1", {"word": "abas", "storageUrl": "https://x/o/path?alt=media"})
+        tribe_ref = FakeDocRef()
+        tribe_ref._subcollections["recordings"] = recordings_col
+        pronunciations = FakeCollection()
+        pronunciations._doc_refs["tayal"] = tribe_ref
+        mock_client_fn.return_value = _build_client(collections={"pronunciations": pronunciations})
+        mock_delete_storage.return_value = False
+
+        with _as_role(OWNER) as headers:
+            resp = self.client.delete('/adminapi/moderation/recordings/tayal/rec1/', **headers)
+        self.assertEqual(resp.status_code, 502)
+        rec_ref.delete.assert_not_called()
+        self.assertEqual(AuditLog.objects.filter(action="delete_recording").count(), 0)
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_missing_storage_url_still_deletes_firestore_doc(self, mock_client_fn):
+        """沒有 storageUrl 代表本來就沒有東西要清，不是「清理失敗」——這
+        種錄音文件（例如歷史髒資料）刪除應該正常進行，不該被新加的檢查
+        意外擋下來。"""
+        recordings_col = FakeCollection()
+        rec_ref = recordings_col.set_document("rec1", {"word": "abas"})
+        tribe_ref = FakeDocRef()
+        tribe_ref._subcollections["recordings"] = recordings_col
+        pronunciations = FakeCollection()
+        pronunciations._doc_refs["tayal"] = tribe_ref
+        mock_client_fn.return_value = _build_client(collections={"pronunciations": pronunciations})
+
+        with _as_role(OWNER) as headers:
+            resp = self.client.delete('/adminapi/moderation/recordings/tayal/rec1/', **headers)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["storage_deleted"])
+        rec_ref.delete.assert_called_once()
 
 
 class ReportListTest(TestCase):
@@ -302,3 +345,48 @@ class ReportResolveDismissTest(TestCase):
             resp = _post_json(self.client, '/adminapi/reports/rep1/dismiss/', headers)
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["status"], "dismissed")
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_resolve_already_resolved_report_rejected_with_409(self, mock_client_fn):
+        """獨立審查找到的問題：原本沒有前置狀態檢查，任何狀態的檢舉都能
+        被重複核結。這裡驗證已經是 resolved 的檢舉不能再次核結，且完全
+        不會呼叫 update()（不只是回應碼對，寫入本身也不該發生）。"""
+        reports = FakeCollection()
+        doc_ref = reports.set_document("rep1", {"status": "resolved"})
+        mock_client_fn.return_value = _build_client(collections={"reports": reports})
+
+        with _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/reports/rep1/resolve/', headers)
+        self.assertEqual(resp.status_code, 409)
+        doc_ref.update.assert_not_called()
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_dismiss_already_dismissed_report_rejected_with_409(self, mock_client_fn):
+        reports = FakeCollection()
+        doc_ref = reports.set_document("rep1", {"status": "dismissed"})
+        mock_client_fn.return_value = _build_client(collections={"reports": reports})
+
+        with _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/reports/rep1/dismiss/', headers)
+        self.assertEqual(resp.status_code, 409)
+        doc_ref.update.assert_not_called()
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_concurrent_resolve_rejected_with_409_via_precondition_failure(self, mock_client_fn):
+        """獨立審查找到的問題：兩位管理員幾乎同時核結同一筆檢舉時，都會
+        讀到 pending、都會通過前置狀態檢查——真正的正確性保證要靠
+        Firestore 伺服器端的 LastUpdateOption precondition，不是應用層的
+        前置檢查（那個只能擋「已經處理過」，擋不住「同時處理中」）。這裡
+        直接 mock update() 拋出 FailedPrecondition，模擬「寫入當下才發現
+        文件已經被別人動過」的真實情境。"""
+        from google.api_core import exceptions as gcloud_exceptions
+        reports = FakeCollection()
+        doc_ref = reports.set_document("rep1", {"status": "pending"})
+        doc_ref.update.side_effect = gcloud_exceptions.FailedPrecondition("document has been modified")
+        mock_client_fn.return_value = _build_client(collections={"reports": reports})
+
+        with _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/reports/rep1/resolve/', headers)
+        self.assertEqual(resp.status_code, 409)
+        self.assertIn("其他管理員", resp.json()["detail"])
+        self.assertEqual(AuditLog.objects.filter(action="report_resolved").count(), 0)

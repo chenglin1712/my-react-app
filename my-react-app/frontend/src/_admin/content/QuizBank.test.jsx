@@ -655,6 +655,59 @@ describe('QuizBank', () => {
     });
   });
 
+  test('刪除中間空格後再新增，不會覆蓋掉其他空格的內容（key 碰撞回歸測試）', async () => {
+    // 獨立審查找到的問題：addBlank() 原本用 Object.keys(...).length + 1
+    // 推導新 key——刪除中間一個空格後（例如剩下 blank1、blank3），用數量
+    // 推導出來的下一個 key 會撞到既有的 blank3，新增空格會直接覆蓋掉它
+    // 原本的選項內容。這裡重現這個確切情境，驗證修正後不會再發生。
+    mockRole = 'editor';
+    renderPage();
+
+    await screen.findByText('huzil');
+    fireEvent.click(
+      screen.getByRole('tab', { name: '克漏字短文' }),
+    );
+    await screen.findByText(/Lokah!/);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /新增短文/ }),
+    );
+    const modal = await screen.findByRole('dialog');
+
+    // 初始只有 blank1，新增兩次湊出 blank1/blank2/blank3。
+    const addButton = within(modal).getByRole('button', { name: /新增空格/ });
+    fireEvent.click(addButton);
+    fireEvent.click(addButton);
+    expect(within(modal).getByText('blank3')).toBeInTheDocument();
+
+    // 移除 blank2（中間那個），剩下 blank1、blank3。
+    const blank2Heading = within(modal).getByText('blank2');
+    const blank2Card = blank2Heading.closest('.quiz-bank-blank-card');
+    fireEvent.click(
+      within(blank2Card).getByRole('button', { name: /移除空格/ }),
+    );
+    expect(within(modal).queryByText('blank2')).not.toBeInTheDocument();
+
+    // 在 blank3 填入可辨識的值，準備驗證它不會被下一次「新增空格」蓋掉。
+    const blank3Heading = within(modal).getByText('blank3');
+    const blank3Card = blank3Heading.closest('.quiz-bank-blank-card');
+    const blank3FirstOption = within(blank3Card).getByPlaceholderText('選項 1');
+    fireEvent.change(blank3FirstOption, { target: { value: 'keep-me' } });
+    expect(blank3FirstOption).toHaveValue('keep-me');
+
+    // 再次新增空格——修正前這裡會產生第二個 blank3（撞到既有的 key），
+    // 把剛剛填的 keep-me 洗掉；修正後應該產生全新的 blank4。
+    fireEvent.click(addButton);
+
+    expect(within(modal).getByText('blank4')).toBeInTheDocument();
+    expect(within(modal).queryAllByText('blank3')).toHaveLength(1);
+    // blank3 的內容完全沒被動過。
+    const blank3CardAfter = within(modal).getByText('blank3').closest('.quiz-bank-blank-card');
+    expect(
+      within(blank3CardAfter).getByPlaceholderText('選項 1'),
+    ).toHaveValue('keep-me');
+  });
+
   test('點擊 published 克漏字編輯會先 GET revision，儲存時 POST revision', async () => {
     mockRole = 'editor';
     mockApiGet({

@@ -399,7 +399,7 @@ export default function UserDetail() {
     setSuccessMessage('');
 
     try {
-      await apiPost(
+      const result = await apiPost(
         `/adminapi/users/${uid}/password/`,
         {
           new_password: passwordForm.newPassword,
@@ -409,7 +409,14 @@ export default function UserDetail() {
 
       setShowPasswordModal(false);
       setPasswordForm(EMPTY_PASSWORD_FORM);
-      setSuccessMessage('密碼已變更，並已撤銷此帳號現有的登入狀態。');
+      // 密碼變更本身一定成功才會走到這裡；sessions_revoked 是否為 false
+      // 由後端誠實回報（見 user_password() 的說明），不能一律顯示「已撤銷」
+      // 誤導管理者以為舊登入狀態已經失效。
+      setSuccessMessage(
+        result.sessions_revoked
+          ? '密碼已變更，並已撤銷此帳號現有的登入狀態。'
+          : '密碼已變更，但撤銷登入狀態失敗，此帳號的舊登入可能仍然有效，請稍後重新嘗試或聯繫系統管理員。',
+      );
     } catch (err) {
       setError(err.message);
     } finally {

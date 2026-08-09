@@ -853,7 +853,15 @@ function ClozePanel({ role }) {
     };
 
     const addBlank = () => {
-        const nextIndex = Object.keys(form.blanks).length + 1;
+        // 用「目前存在的 blankN 最大序號 + 1」推導新 key，不能用
+        // Object.keys(...).length + 1——刪除中間一個空格後（例如剩下
+        // blank1、blank3），用數量推導出來的下一個 key 會撞到既有的
+        // blank3，新增空格會直接覆蓋掉它原本的選項/答案/備註，使用者的
+        // 資料在畫面上就這樣悄悄不見了（獨立審查找到的問題）。
+        const existingIndexes = Object.keys(form.blanks)
+            .map((key) => parseInt(key.replace('blank', ''), 10))
+            .filter((n) => !Number.isNaN(n));
+        const nextIndex = existingIndexes.length > 0 ? Math.max(...existingIndexes) + 1 : 1;
         setForm({
             ...form,
             blanks: {

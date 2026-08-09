@@ -203,7 +203,26 @@ def recording_delete(request, tribe, recording_id):
 
     data = snapshot.to_dict()
     storage_url = data.get("storageUrl")
-    storage_deleted = firebase_ops.delete_storage_file_by_download_url(storage_url) if storage_url else False
+    if storage_url:
+        # 用 URL 路徑上真正的 tribe 區段組出預期前綴（不是信任文件內部
+        # 欄位），避免偽造的 storageUrl 誘使刪除同 bucket 裡不相關的物件。
+        storage_deleted = firebase_ops.delete_storage_file_by_download_url(
+            storage_url, expected_path_prefix=f"pronunciations/{tribe}/",
+        )
+        if not storage_deleted:
+            # Storage 刪除失敗時不能接著刪 Firestore 文件——這份文件是
+            # 唯一記錄這個物件在 Storage 位置的地方，刪掉之後這個音檔就
+            # 成了永遠定位不到的孤兒檔案，只能靠人工掃描整個 bucket 才找
+            # 得回來。保留 Firestore 文件讓管理者能安全重試（獨立審查
+            # 找到的問題：原本這裡不管刪 Storage 成不成功都會接著刪
+            # Firestore 文件，"deleted": true 會讓管理者誤以為已經清乾淨）。
+            return JsonResponse({
+                "detail": "刪除 Storage 音檔失敗，為避免留下孤兒檔案，Firestore 紀錄予以保留，請稍後再試",
+            }, status=502)
+    else:
+        # 沒有 storageUrl 代表本來就沒有東西要清，不是「清理失敗」。
+        storage_deleted = True
+
     doc_ref.delete()
 
     _safe_write_audit_log(
@@ -315,6 +334,7 @@ def _resolve_report(request, report_id, new_status):
         return err_resp
 
     from firebase_admin import firestore
+    from google.api_core import exceptions as gcloud_exceptions
     client = firebase_ops.get_firestore_client()
     doc_ref = client.collection("reports").document(report_id)
     snapshot = doc_ref.get()
@@ -322,13 +342,36 @@ def _resolve_report(request, report_id, new_status):
         return JsonResponse({"detail": "找不到這筆檢舉"}, status=404)
 
     before_status = snapshot.to_dict().get("status")
+    if before_status != "pending":
+        # 已經核結/駁回過的檢舉不能再處理一次——原本沒有這個前置狀態
+        # 檢查，任何狀態的檢舉都能被重複核結，稽核紀錄跟實際結果會對不上
+        # （獨立審查找到的問題）。
+        return JsonResponse({"detail": f"這筆檢舉目前狀態是「{before_status}」，無法核結"}, status=409)
+
     resolution_note = (data.get("resolution_note") or "").strip()
-    doc_ref.update({
-        "status": new_status,
-        "resolvedBy": decoded.get("uid", "anon"),
-        "resolvedAt": firestore.SERVER_TIMESTAMP,
-        "resolutionNote": resolution_note,
-    })
+    try:
+        # 用 update_time 當樂觀併發控制的 precondition，不是單純的
+        # get() 後再 update()——原本兩者是獨立呼叫，兩位管理員幾乎同時
+        # 核結/駁回同一筆檢舉時，都會讀到 pending、都會覆蓋寫入成功，
+        # 最終狀態由後寫的那個決定，但兩邊都會收到成功、都各留一筆聲稱
+        # 成功的稽核紀錄。LastUpdateOption 讓 Firestore 伺服器端在真正
+        # 寫入前檢查文件的 update_time 是否還等於我們讀到快照當下的值，
+        # 不等就代表文件在這之間被別人動過，寫入完全不會生效，直接拋
+        # FailedPrecondition（獨立審查找到的問題）。
+        doc_ref.update(
+            {
+                "status": new_status,
+                "resolvedBy": decoded.get("uid", "anon"),
+                "resolvedAt": firestore.SERVER_TIMESTAMP,
+                "resolutionNote": resolution_note,
+            },
+            option=firestore.LastUpdateOption(last_update_time=snapshot.update_time),
+        )
+    except gcloud_exceptions.FailedPrecondition:
+        return JsonResponse({
+            "detail": "這筆檢舉在你操作的期間已經被其他管理員處理，請重新整理後再試一次",
+        }, status=409)
+
     _safe_write_audit_log(
         request, decoded, f"report_{new_status}", report_id, target_type="report",
         before={"status": before_status}, after={"status": new_status, "resolution_note": resolution_note},

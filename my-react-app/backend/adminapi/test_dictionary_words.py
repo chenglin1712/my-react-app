@@ -352,6 +352,44 @@ class WordUpdateFlowTest(DictionaryDbTestCase):
         finally:
             db.close()
 
+    def test_unexpected_exception_during_apply_reverts_to_pending_review(self):
+        """獨立審查找到的問題：核准流程原本只捕捉 ConcurrentModificationError
+        跟 DictionaryWriteError 這兩種預期例外，revision 在交易裡已經先
+        認領成 approved——如果套用時拋出其他非預期例外（例如底層
+        SQLAlchemy/DBAPI 錯誤），沒有 except Exception 兜底的話，revision
+        會永久卡在「已核准但未套用」的死狀態。這裡直接 mock 一個不是
+        DictionaryWriteError 子類別的例外，確認新的 except Exception 分支
+        會正確退回 pending_review 並回傳 500（不是讓例外一路往外拋變成
+        Django 的 500 錯誤頁）。"""
+        with _as_role(EDITOR) as headers:
+            propose_resp = _post_json(
+                self.client, f'/adminapi/dictionary/words/{self.word_id}/propose/', headers,
+                {**_MINIMAL_WORD_PAYLOAD, "name": "should-not-apply-either"},
+            )
+        revision_id = propose_resp.json()["revision_id"]
+        with _as_role(EDITOR) as headers:
+            _post_json(self.client, f'/adminapi/dictionary/revisions/{revision_id}/submit/', headers)
+
+        with patch(
+            "adminapi.dictionary_views.dw.apply_word_tree",
+            side_effect=RuntimeError("模擬非預期的底層錯誤"),
+        ):
+            with _as_role(REVIEWER) as headers:
+                approve_resp = _post_json(
+                    self.client, f'/adminapi/dictionary/revisions/{revision_id}/approve/', headers,
+                )
+        self.assertEqual(approve_resp.status_code, 500)
+
+        revision = DictionaryRevision.objects.get(pk=revision_id)
+        self.assertEqual(revision.status, DictionaryRevision.STATUS_PENDING_REVIEW)
+        self.assertTrue(revision.apply_error)
+
+        db = connect_module.SessionLocal()
+        try:
+            self.assertIsNone(db.query(m.Word).filter(m.Word.name == "should-not-apply-either").first())
+        finally:
+            db.close()
+
     def test_cross_tribe_anaphora_link_rejected(self):
         other_tribe = self.seed_tribe(tribe_id="tribe-amis", name="阿美語", slug="amis")
         other_word = self.seed_word(word_id="word-amis-1", tribe_id=other_tribe, name="kolong")

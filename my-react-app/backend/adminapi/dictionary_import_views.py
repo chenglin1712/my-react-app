@@ -350,12 +350,22 @@ def import_job_approve(request, pk):
         job.review_comment = review_comment
         job.save(update_fields=["status", "reviewed_by", "reviewed_at", "review_comment"])
 
+    # 工作在上面那個交易裡已經認領成 applied——這裡重新解析 bundle 如果
+    # 拋出非預期例外（不只是雜湊不符），沒有 except Exception 兜底的話，
+    # 工作會永久卡在「已認領但未套用」的死狀態，且完全沒有回報（獨立審查
+    # 找到的問題，跟 dictionary_views.dictionary_revision_approve() 是
+    # 同一種缺口）。
     tribe_id = _TRIBE_SLUG_TO_ID[job.tribe]
-    read_db = SessionLocal()
     try:
-        fresh_report = resolve_import_bundle(read_db, tribe_id, job.payload.get("words", []))
-    finally:
-        read_db.close()
+        read_db = SessionLocal()
+        try:
+            fresh_report = resolve_import_bundle(read_db, tribe_id, job.payload.get("words", []))
+        finally:
+            read_db.close()
+    except Exception:
+        logger.exception("匯入工作 #%s 核准時重新解析 bundle 發生未預期例外", pk)
+        _revert_import_job_to_pending_review(pk)
+        return JsonResponse({"detail": "重新驗證失敗，已退回待審狀態，請稍後再試"}, status=500)
 
     if import_report_hash(fresh_report) != job.preflight_hash:
         _revert_import_job_to_pending_review(pk)

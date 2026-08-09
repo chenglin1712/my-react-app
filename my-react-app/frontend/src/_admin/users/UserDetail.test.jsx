@@ -327,6 +327,7 @@ describe('UserDetail', () => {
     apiPost.mockResolvedValueOnce({
       uid: 'abc123',
       password_changed: true,
+      sessions_revoked: true,
     });
 
     renderPage();
@@ -399,6 +400,48 @@ describe('UserDetail', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
+  });
+
+  test('變更密碼成功但撤銷登入狀態失敗時顯示對應提示', async () => {
+    // 後端誠實回報 sessions_revoked: false（見 user_password() 的說明）——
+    // 前端不能一律顯示「已撤銷」，那樣會誤導管理者以為舊登入狀態已經
+    // 失效，實際上密碼雖然改了但舊 session 可能還能用。
+    apiPost.mockResolvedValueOnce({
+      uid: 'abc123',
+      password_changed: true,
+      sessions_revoked: false,
+    });
+
+    renderPage();
+    await screen.findByText('王小明');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '變更密碼' }),
+    );
+
+    const modal = await screen.findByRole('dialog');
+    fireEvent.change(
+      within(modal).getByLabelText('新密碼'),
+      { target: { value: 'secret123' } },
+    );
+    fireEvent.change(
+      within(modal).getByLabelText('確認新密碼'),
+      { target: { value: 'secret123' } },
+    );
+    fireEvent.change(
+      within(modal).getByLabelText('輸入帳號 Email 以確認變更密碼'),
+      { target: { value: 'user@example.com' } },
+    );
+
+    fireEvent.click(
+      within(modal).getByRole('button', { name: '確認變更密碼' }),
+    );
+
+    expect(
+      await screen.findByText(
+        '密碼已變更，但撤銷登入狀態失敗，此帳號的舊登入可能仍然有效，請稍後重新嘗試或聯繫系統管理員。',
+      ),
+    ).toBeInTheDocument();
   });
 
   test('變更密碼 Email 不符時確認按鈕維持停用', async () => {

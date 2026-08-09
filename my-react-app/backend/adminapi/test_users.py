@@ -1,7 +1,7 @@
 import json
 from contextlib import contextmanager
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 from django.test import Client, TestCase
 from django.test.utils import override_settings
@@ -46,13 +46,18 @@ def _fake_user_record(uid, email="user@example.com", disabled=False, role=None,
     )
 
 
-def _fake_snapshot(doc_id, data, path=None):
+def _fake_snapshot(doc_id, data, path=None, tribe=None):
     snap = MagicMock()
     snap.id = doc_id
     snap.exists = data is not None
     snap.to_dict.return_value = data
     snap.reference = MagicMock()
     snap.reference.path = path or doc_id
+    if tribe is not None:
+        # pronunciations/{tribe}/recordings/{recordingId} 的真實路徑區段——
+        # 給需要驗證 delete_storage_file_by_download_url() 拿到正確
+        # expected_path_prefix 的測試用（見 test_account_deletion_scopes_storage_deletion_to_recordings_real_tribe_path）。
+        snap.reference.parent.parent.id = tribe
     return snap
 
 
@@ -221,6 +226,34 @@ class UserCreateTest(TestCase):
             })
         self.assertEqual(resp.status_code, 201)
         mock_set_role.assert_called_once_with("new-uid", "editor")
+        self.assertTrue(resp.json()["role_assigned"])
+
+    @patch("adminapi.firebase_ops.set_user_role")
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.create_firebase_user")
+    def test_role_assignment_failure_still_returns_201_with_created_account(
+        self, mock_create, mock_client_fn, mock_set_role,
+    ):
+        """獨立審查找到的問題：Auth 帳號＋Firestore 文件都已經成功建立，
+        角色指派這一步失敗不該讓整個建立操作回報成失敗——帳號本身完整
+        可用，只是還沒有角色，屬於可以事後到使用者詳情頁補指派的溫和
+        缺陷，不需要走破壞性更大的 rollback（刪掉整個帳號）。但也不能
+        靜默吞掉，回應要帶 role_assigned: false 讓前端知道要提醒管理者。"""
+        mock_create.return_value = _fake_user_record("new-uid", email="new@example.com")
+        mock_client, _ = _build_client_router(users_doc=None, notes=[], recordings=[])
+        mock_client_fn.return_value = mock_client
+        mock_set_role.side_effect = Exception("role assignment failed")
+
+        with _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/users/', headers, {
+                "email": "new@example.com", "password": "secret1", "name": "New User", "role": "editor",
+            })
+        self.assertEqual(resp.status_code, 201)
+        self.assertFalse(resp.json()["role_assigned"])
+        self.assertEqual(resp.json()["uid"], "new-uid")
+
+        log = AuditLog.objects.get(action="create_user")
+        self.assertIsNone(log.after["role"])
 
     @patch("adminapi.firebase_ops.delete_firebase_user")
     @patch("adminapi.firebase_ops.get_firestore_client")
@@ -239,6 +272,34 @@ class UserCreateTest(TestCase):
             })
         self.assertEqual(resp.status_code, 500)
         mock_delete.assert_called_once_with("new-uid")
+        self.assertNotIn("cleanup_required", resp.json())
+
+    @patch("adminapi.firebase_ops.delete_firebase_user")
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.create_firebase_user")
+    def test_rollback_failure_reports_half_broken_account_needs_manual_cleanup(
+        self, mock_create, mock_client_fn, mock_delete,
+    ):
+        """獨立審查找到的問題：Firestore 寫入失敗、連 rollback（刪除剛建立
+        的 Auth 帳號）也失敗時，不能只寫 log 就回一句籠統的失敗訊息——
+        管理者完全不知道這個 uid 還留著、需要人工清理。回應要明確帶
+        uid／auth_created／firestore_created／cleanup_required，不是猜。"""
+        mock_create.return_value = _fake_user_record("new-uid", email="new@example.com")
+        mock_client = MagicMock()
+        mock_client.collection.return_value.document.return_value.set.side_effect = Exception("firestore down")
+        mock_client_fn.return_value = mock_client
+        mock_delete.side_effect = Exception("rollback also failed")
+
+        with _as_role(ADMIN) as headers:
+            resp = _post_json(self.client, '/adminapi/users/', headers, {
+                "email": "new@example.com", "password": "secret1", "name": "New User",
+            })
+        self.assertEqual(resp.status_code, 500)
+        data = resp.json()
+        self.assertEqual(data["uid"], "new-uid")
+        self.assertTrue(data["auth_created"])
+        self.assertFalse(data["firestore_created"])
+        self.assertTrue(data["cleanup_required"])
 
 
 class UserDetailTest(TestCase):
@@ -394,6 +455,71 @@ class UserProfileTest(TestCase):
             resp = _patch_json(self.client, '/adminapi/users/uid1/profile/', headers, {"email": "taken@example.com"})
         self.assertEqual(resp.status_code, 400)
 
+    @patch("adminapi.firebase_ops.set_user_email")
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_firestore_email_write_failure_rolls_back_auth_email(
+        self, mock_get_user, mock_client_fn, mock_set_email,
+    ):
+        """獨立審查找到的問題：Auth email 已經改成功後，Firestore 那一步
+        如果失敗，兩邊會永久不一致，且下次重試時因為 Auth 已經是新值，
+        不會再嘗試修正 Firestore。這裡驗證失敗時會嘗試把 Auth email 回復
+        成原值，讓兩邊至少維持一致（都是舊值），並回傳 500 而不是讓例外
+        一路往外拋。"""
+        mock_get_user.return_value = _fake_user_record("uid1", email="old@example.com")
+        before_doc = _fake_snapshot("uid1", {"name": "Alice", "email": "old@example.com"})
+        mock_client, users_doc_ref = _build_client_router(users_doc=before_doc, notes=[], recordings=[])
+        users_doc_ref.set.side_effect = Exception("firestore down")
+        mock_client_fn.return_value = mock_client
+
+        with _as_role(ADMIN) as headers:
+            resp = _patch_json(self.client, '/adminapi/users/uid1/profile/', headers, {"email": "new@example.com"})
+        self.assertEqual(resp.status_code, 500)
+        # 第一次呼叫把 email 改成新值，第二次呼叫（回復）把 email 改回舊值。
+        mock_set_email.assert_has_calls([
+            call("uid1", "new@example.com"),
+            call("uid1", "old@example.com"),
+        ])
+
+    @patch("adminapi.firebase_ops.set_user_email")
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_firestore_email_write_failure_and_rollback_also_fails_reports_inconsistency(
+        self, mock_get_user, mock_client_fn, mock_set_email,
+    ):
+        """Firestore 寫入失敗、連 Auth email 回復也失敗時，不能只寫 log
+        就回一句籠統的錯誤——回應要明確告知兩邊已經不一致，需要人工複查。"""
+        mock_get_user.return_value = _fake_user_record("uid1", email="old@example.com")
+        before_doc = _fake_snapshot("uid1", {"name": "Alice", "email": "old@example.com"})
+        mock_client, users_doc_ref = _build_client_router(users_doc=before_doc, notes=[], recordings=[])
+        users_doc_ref.set.side_effect = Exception("firestore down")
+        mock_client_fn.return_value = mock_client
+        mock_set_email.side_effect = [None, Exception("auth rollback also failed")]
+
+        with _as_role(ADMIN) as headers:
+            resp = _patch_json(self.client, '/adminapi/users/uid1/profile/', headers, {"email": "new@example.com"})
+        self.assertEqual(resp.status_code, 500)
+        self.assertIn("不一致", resp.json()["detail"])
+        self.assertEqual(resp.json()["uid"], "uid1")
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_firestore_write_failure_without_email_change_does_not_touch_auth(
+        self, mock_get_user, mock_client_fn,
+    ):
+        """只改 name（沒有 email）時 Firestore 寫入失敗，不該嘗試任何 Auth
+        email 回復邏輯（一開始就沒有動過 Auth），單純回報失敗即可。"""
+        mock_get_user.return_value = _fake_user_record("uid1", email="alice@example.com")
+        before_doc = _fake_snapshot("uid1", {"name": "Old Name"})
+        mock_client, users_doc_ref = _build_client_router(users_doc=before_doc, notes=[], recordings=[])
+        users_doc_ref.set.side_effect = Exception("firestore down")
+        mock_client_fn.return_value = mock_client
+
+        with _as_role(ADMIN) as headers:
+            resp = _patch_json(self.client, '/adminapi/users/uid1/profile/', headers, {"name": "New Name"})
+        self.assertEqual(resp.status_code, 500)
+        self.assertNotIn("不一致", resp.json()["detail"])
+
 
 class UserPasswordTest(TestCase):
     def setUp(self):
@@ -452,7 +578,33 @@ class UserPasswordTest(TestCase):
         # 稽核紀錄不得含明文密碼——不管是 before／after 都只能有一個布林標記。
         log_blob = json.dumps({"before": log.before, "after": log.after}, ensure_ascii=False)
         self.assertNotIn("supersecret1", log_blob)
-        self.assertEqual(log.after, {"password_changed": True})
+        self.assertEqual(log.after, {"password_changed": True, "sessions_revoked": True})
+        self.assertTrue(resp.json()["sessions_revoked"])
+
+    @patch("adminapi.firebase_ops.revoke_sessions")
+    @patch("adminapi.firebase_ops.set_user_password")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_revoke_sessions_failure_does_not_500_and_reports_honestly(
+        self, mock_get_user, mock_set_password, mock_revoke,
+    ):
+        """獨立審查找到的問題：密碼本身已經改成功是不可逆的既成事實，
+        revoke_sessions 失敗不該讓整個請求變成誤導人的 500——那樣管理者
+        會誤以為密碼沒改成功，但實際上新密碼已經生效，舊 session 卻還沒
+        撤銷。改成誠實回報 sessions_revoked: false，仍然是 200。"""
+        mock_get_user.return_value = _fake_user_record("uid1", email="alice@example.com")
+        mock_revoke.side_effect = Exception("revoke failed")
+
+        with _as_role(ADMIN) as headers:
+            resp = _post_json(self.client, '/adminapi/users/uid1/password/', headers, {
+                "new_password": "supersecret1", "confirm_email": "alice@example.com",
+            })
+        self.assertEqual(resp.status_code, 200)
+        mock_set_password.assert_called_once_with("uid1", "supersecret1")
+        self.assertTrue(resp.json()["password_changed"])
+        self.assertFalse(resp.json()["sessions_revoked"])
+
+        log = AuditLog.objects.get(action="change_password")
+        self.assertEqual(log.after, {"password_changed": True, "sessions_revoked": False})
 
 
 class UserSuspendTest(TestCase):
@@ -612,6 +764,34 @@ class UserDeleteTest(TestCase):
         users_doc_ref.delete.assert_called_once()
         mock_delete_auth.assert_called_once_with("uid1")
         self.assertEqual(AuditLog.objects.filter(action="delete_account").count(), 1)
+
+    @patch("adminapi.firebase_ops.delete_storage_file_by_download_url")
+    @patch("adminapi.firebase_ops.delete_firebase_user")
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_account_deletion_scopes_storage_deletion_to_recordings_real_tribe_path(
+        self, mock_get_user, mock_client_fn, mock_delete_auth, mock_delete_storage,
+    ):
+        """expected_path_prefix 必須用文件真正的路徑區段（collection_group
+        查詢結果的 reference.parent.parent.id）組出來，不是信任文件內部
+        欄位——這是修正「偽造 storageUrl 誘使刪除任意物件」漏洞的一半（另
+        一半在 firestore.rules 限制 create 時的 storageUrl 格式）。"""
+        mock_get_user.return_value = _fake_user_record("uid1", email="alice@example.com")
+        rec_snap = _fake_snapshot(
+            "rec1", {"uid": "uid1", "storageUrl": "https://x/o/path?alt=media"}, tribe="tayal",
+        )
+        users_doc = _fake_snapshot("uid1", {"name": "Alice"})
+        mock_client, _ = _build_client_router(users_doc=users_doc, notes=[], recordings=[rec_snap])
+        mock_client_fn.return_value = mock_client
+        mock_delete_storage.return_value = True
+
+        with _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/users/uid1/delete/', headers, {"confirm_email": "alice@example.com"})
+
+        self.assertEqual(resp.status_code, 200)
+        mock_delete_storage.assert_called_once_with(
+            "https://x/o/path?alt=media", expected_path_prefix="pronunciations/tayal/",
+        )
 
     @patch("adminapi.firebase_ops.delete_storage_file_by_download_url")
     @patch("adminapi.firebase_ops.delete_firebase_user")

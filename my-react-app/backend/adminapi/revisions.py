@@ -46,6 +46,35 @@ def _locked_target(model, pk):
     return get_object_or_404(model.objects.select_for_update(), pk=pk)
 
 
+def cancel_stale_pending_revision(target_type, target_id, actor_uid):
+    """內容不再是已發布狀態時（下架／或任何其他把狀態改離 published 的路徑）
+    呼叫，把這個 target 現有的待審修改自動標成退件。
+
+    PendingRevision 的存在前提是「內容目前是已發布狀態」
+    （_create_or_update_pending_revision 建立時就檢查過這一點）；內容一旦
+    被下架，殘留的待審修改就是對不上現狀的孤兒資料——放著不處理，輕則讓
+    「有待審修改」徽章／送審佇列永遠卡著一筆審不動的項目，重則被核准時
+    悄悄套用到已下架的內容上（見下方 _approve_pending_revision 的核准前
+    重新確認狀態，這裡是主動清理，那裡是最後一道防線，兩者互補）。
+
+    呼叫端必須在自己已經鎖定 target model 那一列之後才呼叫這裡（維持
+    「先鎖 target、再鎖 revision」的一致鎖定順序，跟 _approve_pending_revision／
+    _reject_pending_revision 一致，避免死鎖）。回傳被取消的 revision（沒有
+    待審修改就回傳 None）。
+    """
+    revision = PendingRevision.objects.select_for_update().filter(
+        target_type=target_type, target_id=target_id, status=PendingRevision.STATUS_PENDING_REVIEW,
+    ).first()
+    if not revision:
+        return None
+    revision.status = PendingRevision.STATUS_REJECTED
+    revision.reviewed_by = actor_uid
+    revision.reviewed_at = timezone.now()
+    revision.review_comment = "內容已下架，待審修改自動失效"
+    revision.save(update_fields=["status", "reviewed_by", "reviewed_at", "review_comment"])
+    return revision
+
+
 def _get_pending_revision(request, pk, model, target_type):
     """回傳這個 target 目前的待審修改（沒有就回 404），給編輯表單重新
     打開時預先帶入「上次提案但還沒審過的內容」，而不是目前生效中的舊內容。"""
@@ -139,6 +168,22 @@ def _approve_pending_revision(request, pk, model, serializer_class, target_type,
         ).first()
         if not revision:
             return invalid_transition("(無待審修改)", "approve_revision")
+
+        # 提案送出之後、核准之前，這段時間內容有可能被別的路徑下架（見
+        # cancel_stale_pending_revision 的說明）——正常情況下架時就會主動
+        # 取消待審修改，這裡是防止任何遺漏路徑或極端時序下仍然核准套用到
+        # 已下架內容的最後一道防線。
+        if obj.status != model.STATUS_PUBLISHED:
+            revision.status = PendingRevision.STATUS_REJECTED
+            revision.reviewed_by = decoded.get("uid", "anon")
+            revision.reviewed_at = timezone.now()
+            revision.review_comment = "內容已不是已發布狀態，待審修改自動失效"
+            revision.save(update_fields=["status", "reviewed_by", "reviewed_at", "review_comment"])
+            write_audit_log(
+                request, decoded, "auto_reject_stale_revision", obj,
+                after={"reason": "target no longer published"}, target_type=target_type,
+            )
+            return JsonResponse({"detail": "此內容已不是已發布狀態，待審修改已自動失效"}, status=409)
 
         before = serializer_class(obj).data
         for field, value in revision.payload.items():

@@ -72,8 +72,15 @@ def build_matching_test_from_db(tribe):
     picked = _pick_matching_vocab_from_db(tribe)
     tribe_full_name = TRIBE_MAP.get(tribe, tribe)
 
+    # 只組出「完整」的題組（每組固定 MATCHING_PAIRS_PER_BOARD 筆）——原本
+    # 固定跑 MATCHING_BOARD_COUNT 次，題庫不足時最後一組會拿到不滿 4 筆
+    # 甚至完全空的 chunk，產生學生看到但完全無法作答的空題（獨立審查找到
+    # 的問題）。跟 build_cloze_test_from_db() 的 min(quota, len(pool)) 降級
+    # 同一種精神：題庫不足時題數就是變少，不製造殘缺的題目。
+    board_count = min(MATCHING_BOARD_COUNT, len(picked) // MATCHING_PAIRS_PER_BOARD)
+
     questions = []
-    for i in range(MATCHING_BOARD_COUNT):
+    for i in range(board_count):
         chunk = picked[i * MATCHING_PAIRS_PER_BOARD: (i + 1) * MATCHING_PAIRS_PER_BOARD]
         questions.append({
             "pairs": [
@@ -99,7 +106,7 @@ def build_matching_test_from_db(tribe):
         "type": "matching",
         "title": "第一部分：配合題",
         "intro": (
-            f"本部分共5題，每題會出現4組{tribe_full_name}詞彙與中文意思，"
+            f"本部分共{board_count}題，每題會出現4組{tribe_full_name}詞彙與中文意思，"
             "請將左右兩側配對正確；配對全部正確即為答對，"
             "配對錯誤任何一組即為答錯。"
         ),
@@ -393,24 +400,31 @@ def _scrape_news(force_refresh=False):
             headers=headers,
             timeout=_EXTERNAL_TIMEOUT
         )
-        if res.status_code == 200:
-            result = res.json()
-            for item in result.get("data", []):
-                import json as _json
-                raw_images = item.get("images", [])
-                images = _json.loads(raw_images) if isinstance(raw_images, str) else raw_images
-                img_url = images[0].get("url") if isinstance(images, list) and images and isinstance(images[0], dict) else None
-                item_id = item.get("id")
-                data.append({
-                    "title": item.get("title"),
-                    "detail": _safe_external_url(f"https://www.tacp.gov.tw/news/{item.get('category_id')}/{item_id}"),
-                    "image": _safe_external_url(img_url),
-                    "start_date": item.get("start_date") or item.get("published_at"),
-                    "end_date": item.get("end_date"),
-                    "tag": item.get("category", {}).get("title") if isinstance(item.get("category"), dict) else None,
-                    "isExam": "F",
-                    "source_key": f"tacp:{item_id}" if item_id is not None else None,
-                })
+        # 原本用 if res.status_code == 200 判斷要不要解析內容，但 tacp_ok = True
+        # 寫在 if 區塊外面，不管狀態碼是不是 200 都會執行到——TACP 回傳
+        # 500/403 等非 200 時不會進到解析區塊、data 完全沒有新增，但
+        # tacp_ok 仍然被設成 True，等於「上游全面故障」被誤判成「正常但
+        # 沒有新資料」，連續失敗告警與同步狀態頁都會失真（獨立審查找到的
+        # 問題）。改用 raise_for_status()，非 2xx 直接丟例外，交給下面的
+        # except 處理，tacp_ok 只在真正解析成功後才會是 True。
+        res.raise_for_status()
+        result = res.json()
+        for item in result.get("data", []):
+            import json as _json
+            raw_images = item.get("images", [])
+            images = _json.loads(raw_images) if isinstance(raw_images, str) else raw_images
+            img_url = images[0].get("url") if isinstance(images, list) and images and isinstance(images[0], dict) else None
+            item_id = item.get("id")
+            data.append({
+                "title": item.get("title"),
+                "detail": _safe_external_url(f"https://www.tacp.gov.tw/news/{item.get('category_id')}/{item_id}"),
+                "image": _safe_external_url(img_url),
+                "start_date": item.get("start_date") or item.get("published_at"),
+                "end_date": item.get("end_date"),
+                "tag": item.get("category", {}).get("title") if isinstance(item.get("category"), dict) else None,
+                "isExam": "F",
+                "source_key": f"tacp:{item_id}" if item_id is not None else None,
+            })
         tacp_ok = True
     except Exception as e:
         logger.error("tacp API error: %s", e)

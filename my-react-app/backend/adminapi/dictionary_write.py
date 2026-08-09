@@ -153,41 +153,51 @@ def get_word_tree(db: Session, word_id: str) -> dict:
     if word is None:
         raise WordNotFoundError(f"詞條不存在：{word_id}")
 
+    # 以下每個 .order_by() 都在 sort_order 之後加上 .id 當次要排序鍵——
+    # sort_order 相同或為 NULL 時，資料庫不保證原本的順序，單筆查詢跟批次
+    # 查詢（get_word_trees_for_tribe）可能因為執行計畫不同而排出不同順序，
+    # 導致同一棵樹在兩個查詢路徑算出不同的 content_hash（獨立審查找到的
+    # 問題）。.id 是遞增主鍵，順序穩定且跟兩個函式共用同一份排序規則。
     source_ids = [
         row.source_id for row in
-        db.query(m.WordSource).filter(m.WordSource.word_id == word_id).order_by(m.WordSource.sort_order).all()
+        db.query(m.WordSource).filter(m.WordSource.word_id == word_id)
+        .order_by(m.WordSource.sort_order, m.WordSource.id).all()
     ]
     audios = [
         {"id": a.id, "external_id": a.external_id, "file_id": a.file_id, "audio_class": a.audio_class}
-        for a in db.query(m.WordAudio).filter(m.WordAudio.word_id == word_id).order_by(m.WordAudio.sort_order).all()
+        for a in db.query(m.WordAudio).filter(m.WordAudio.word_id == word_id)
+        .order_by(m.WordAudio.sort_order, m.WordAudio.id).all()
     ]
 
     explanations = []
     explanation_rows = (
         db.query(m.WordExplanation)
         .filter(m.WordExplanation.word_id == word_id)
-        .order_by(m.WordExplanation.sort_order)
+        .order_by(m.WordExplanation.sort_order, m.WordExplanation.id)
         .all()
     )
     for exp in explanation_rows:
         category_ids = [r.category_id for r in db.query(m.WordExplanationCategory)
-                         .filter(m.WordExplanationCategory.explanation_id == exp.id).all()]
+                         .filter(m.WordExplanationCategory.explanation_id == exp.id)
+                         .order_by(m.WordExplanationCategory.id).all()]
         pos_ids = [r.pos_id for r in db.query(m.WordExplanationPos)
-                   .filter(m.WordExplanationPos.explanation_id == exp.id).all()]
+                   .filter(m.WordExplanationPos.explanation_id == exp.id)
+                   .order_by(m.WordExplanationPos.id).all()]
         focus_ids = [r.focus_id for r in db.query(m.WordExplanationFocus)
-                     .filter(m.WordExplanationFocus.explanation_id == exp.id).all()]
+                     .filter(m.WordExplanationFocus.explanation_id == exp.id)
+                     .order_by(m.WordExplanationFocus.id).all()]
         images = [
             {"id": img.id, "image_url": img.image_url}
             for img in db.query(m.WordExplanationImage)
             .filter(m.WordExplanationImage.explanation_id == exp.id)
-            .order_by(m.WordExplanationImage.sort_order).all()
+            .order_by(m.WordExplanationImage.sort_order, m.WordExplanationImage.id).all()
         ]
 
         sentences = []
         sentence_rows = (
             db.query(m.WordExplanationSentence)
             .filter(m.WordExplanationSentence.explanation_id == exp.id)
-            .order_by(m.WordExplanationSentence.sort_order)
+            .order_by(m.WordExplanationSentence.sort_order, m.WordExplanationSentence.id)
             .all()
         )
         for sent in sentence_rows:
@@ -195,21 +205,21 @@ def get_word_tree(db: Session, word_id: str) -> dict:
                 {"id": a.id, "external_id": a.external_id, "file_id": a.file_id, "audio_class": a.audio_class}
                 for a in db.query(m.WordExplanationSentenceAudio)
                 .filter(m.WordExplanationSentenceAudio.sentence_id == sent.id)
-                .order_by(m.WordExplanationSentenceAudio.sort_order).all()
+                .order_by(m.WordExplanationSentenceAudio.sort_order, m.WordExplanationSentenceAudio.id).all()
             ]
 
             anaphoras = []
             anaphora_rows = (
                 db.query(m.WordExplanationAnaphora)
                 .filter(m.WordExplanationAnaphora.sentence_id == sent.id)
-                .order_by(m.WordExplanationAnaphora.sort_order)
+                .order_by(m.WordExplanationAnaphora.sort_order, m.WordExplanationAnaphora.id)
                 .all()
             )
             for ana in anaphora_rows:
                 item_rows = (
                     db.query(m.WordExplanationAnaphoraItem)
                     .filter(m.WordExplanationAnaphoraItem.anaphora_id == ana.id)
-                    .order_by(m.WordExplanationAnaphoraItem.sort_order)
+                    .order_by(m.WordExplanationAnaphoraItem.sort_order, m.WordExplanationAnaphoraItem.id)
                     .all()
                 )
                 linked_ids = [i.word_id for i in item_rows if i.word_id]
@@ -291,17 +301,19 @@ def get_word_trees_for_tribe(db: Session, tribe_id: str) -> dict:
     if not word_ids:
         return {}
 
+    # 跟 get_word_tree()（單筆版本）用同一份「sort_order 之後加 .id」排序
+    # 規則——理由見該函式對應段落的說明。
     source_ids_by_word = {}
     for row in (
         db.query(m.WordSource).filter(m.WordSource.word_id.in_(word_ids))
-        .order_by(m.WordSource.word_id, m.WordSource.sort_order).all()
+        .order_by(m.WordSource.word_id, m.WordSource.sort_order, m.WordSource.id).all()
     ):
         source_ids_by_word.setdefault(row.word_id, []).append(row.source_id)
 
     audios_by_word = {}
     for a in (
         db.query(m.WordAudio).filter(m.WordAudio.word_id.in_(word_ids))
-        .order_by(m.WordAudio.word_id, m.WordAudio.sort_order).all()
+        .order_by(m.WordAudio.word_id, m.WordAudio.sort_order, m.WordAudio.id).all()
     ):
         audios_by_word.setdefault(a.word_id, []).append(
             {"id": a.id, "external_id": a.external_id, "file_id": a.file_id, "audio_class": a.audio_class}
@@ -309,7 +321,7 @@ def get_word_trees_for_tribe(db: Session, tribe_id: str) -> dict:
 
     explanation_rows = (
         db.query(m.WordExplanation).filter(m.WordExplanation.word_id.in_(word_ids))
-        .order_by(m.WordExplanation.word_id, m.WordExplanation.sort_order).all()
+        .order_by(m.WordExplanation.word_id, m.WordExplanation.sort_order, m.WordExplanation.id).all()
     )
     exp_ids = [e.id for e in explanation_rows]
     exp_payload_by_id = {}
@@ -324,21 +336,30 @@ def get_word_trees_for_tribe(db: Session, tribe_id: str) -> dict:
 
     sentence_rows = []
     if exp_ids:
-        for row in db.query(m.WordExplanationCategory).filter(m.WordExplanationCategory.explanation_id.in_(exp_ids)).all():
+        for row in (
+            db.query(m.WordExplanationCategory).filter(m.WordExplanationCategory.explanation_id.in_(exp_ids))
+            .order_by(m.WordExplanationCategory.explanation_id, m.WordExplanationCategory.id).all()
+        ):
             exp_payload_by_id[row.explanation_id]["category_ids"].append(row.category_id)
-        for row in db.query(m.WordExplanationPos).filter(m.WordExplanationPos.explanation_id.in_(exp_ids)).all():
+        for row in (
+            db.query(m.WordExplanationPos).filter(m.WordExplanationPos.explanation_id.in_(exp_ids))
+            .order_by(m.WordExplanationPos.explanation_id, m.WordExplanationPos.id).all()
+        ):
             exp_payload_by_id[row.explanation_id]["pos_ids"].append(row.pos_id)
-        for row in db.query(m.WordExplanationFocus).filter(m.WordExplanationFocus.explanation_id.in_(exp_ids)).all():
+        for row in (
+            db.query(m.WordExplanationFocus).filter(m.WordExplanationFocus.explanation_id.in_(exp_ids))
+            .order_by(m.WordExplanationFocus.explanation_id, m.WordExplanationFocus.id).all()
+        ):
             exp_payload_by_id[row.explanation_id]["focus_ids"].append(row.focus_id)
         for img in (
             db.query(m.WordExplanationImage).filter(m.WordExplanationImage.explanation_id.in_(exp_ids))
-            .order_by(m.WordExplanationImage.explanation_id, m.WordExplanationImage.sort_order).all()
+            .order_by(m.WordExplanationImage.explanation_id, m.WordExplanationImage.sort_order, m.WordExplanationImage.id).all()
         ):
             exp_payload_by_id[img.explanation_id]["images"].append({"id": img.id, "image_url": img.image_url})
 
         sentence_rows = (
             db.query(m.WordExplanationSentence).filter(m.WordExplanationSentence.explanation_id.in_(exp_ids))
-            .order_by(m.WordExplanationSentence.explanation_id, m.WordExplanationSentence.sort_order).all()
+            .order_by(m.WordExplanationSentence.explanation_id, m.WordExplanationSentence.sort_order, m.WordExplanationSentence.id).all()
         )
 
     sent_ids = [s.id for s in sentence_rows]
@@ -357,7 +378,11 @@ def get_word_trees_for_tribe(db: Session, tribe_id: str) -> dict:
     if sent_ids:
         for a in (
             db.query(m.WordExplanationSentenceAudio).filter(m.WordExplanationSentenceAudio.sentence_id.in_(sent_ids))
-            .order_by(m.WordExplanationSentenceAudio.sentence_id, m.WordExplanationSentenceAudio.sort_order).all()
+            .order_by(
+                m.WordExplanationSentenceAudio.sentence_id,
+                m.WordExplanationSentenceAudio.sort_order,
+                m.WordExplanationSentenceAudio.id,
+            ).all()
         ):
             sent_payload_by_id[a.sentence_id]["audios"].append(
                 {"id": a.id, "external_id": a.external_id, "file_id": a.file_id, "audio_class": a.audio_class}
@@ -365,7 +390,11 @@ def get_word_trees_for_tribe(db: Session, tribe_id: str) -> dict:
 
         anaphora_rows = (
             db.query(m.WordExplanationAnaphora).filter(m.WordExplanationAnaphora.sentence_id.in_(sent_ids))
-            .order_by(m.WordExplanationAnaphora.sentence_id, m.WordExplanationAnaphora.sort_order).all()
+            .order_by(
+                m.WordExplanationAnaphora.sentence_id,
+                m.WordExplanationAnaphora.sort_order,
+                m.WordExplanationAnaphora.id,
+            ).all()
         )
 
     ana_ids = [a.id for a in anaphora_rows]
@@ -382,7 +411,11 @@ def get_word_trees_for_tribe(db: Session, tribe_id: str) -> dict:
     if ana_ids:
         item_rows = (
             db.query(m.WordExplanationAnaphoraItem).filter(m.WordExplanationAnaphoraItem.anaphora_id.in_(ana_ids))
-            .order_by(m.WordExplanationAnaphoraItem.anaphora_id, m.WordExplanationAnaphoraItem.sort_order).all()
+            .order_by(
+                m.WordExplanationAnaphoraItem.anaphora_id,
+                m.WordExplanationAnaphoraItem.sort_order,
+                m.WordExplanationAnaphoraItem.id,
+            ).all()
         )
 
     linked_word_ids = list({i.word_id for i in item_rows if i.word_id})

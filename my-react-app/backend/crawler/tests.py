@@ -54,11 +54,20 @@ class GetQuizDataTest(TestCase):
 
     def test_level_3_only_serves_published_vocab_items(self):
         # 草稿／待審核／已退件的詞彙不能被學生抽到——這是把題庫搬進資料庫、
-        # 接上族語老師審定流程的核心目的，不是可有可無的細節。
+        # 接上族語老師審定流程的核心目的，不是可有可無的細節。額外建 3 筆
+        # 填充用已核准詞彙湊滿一組（MATCHING_PAIRS_PER_BOARD=4），否則題庫
+        # 不足只有 1 筆已核准詞彙時，build_matching_test_from_db 現在會
+        # 直接不產生任何題組（見同一輪修正），這支測試的重點是「草稿不會
+        # 被抽到」，不是題庫不足的行為。
         QuizVocabItem.objects.create(
             tribe='tayal', category='noun', foreign_word='huzil', chinese_gloss='狗',
             status=QuizVocabItem.STATUS_PUBLISHED, created_by='tester',
         )
+        for i in range(3):
+            QuizVocabItem.objects.create(
+                tribe='tayal', category='noun', foreign_word=f'filler{i}', chinese_gloss=f'填充詞{i}',
+                status=QuizVocabItem.STATUS_PUBLISHED, created_by='tester',
+            )
         QuizVocabItem.objects.create(
             tribe='tayal', category='noun', foreign_word='bzyok', chinese_gloss='豬',
             status=QuizVocabItem.STATUS_DRAFT, created_by='tester',
@@ -187,10 +196,19 @@ class GetQuizDataTest(TestCase):
     def test_level_3_pairs_carry_item_id(self):
         # 配合題一「題」是好幾個 QuizVocabItem 的組合，item_id 放在每個 pair
         # 上（不是題目層級），見 views.py build_matching_test_from_db 的說明。
+        # 這裡建 4 筆（MATCHING_PAIRS_PER_BOARD）才能湊出一個「完整」題組——
+        # 少於 4 筆的話，build_matching_test_from_db 現在會直接不產生任何
+        # 題組（見同一輪修正的 test_insufficient_vocab_pool_produces_no_incomplete_board），
+        # 這支測試只在乎 item_id 有沒有正確帶出來，不是題庫不足的行為。
         item = QuizVocabItem.objects.create(
             tribe='tayal', category='noun', foreign_word='huzil', chinese_gloss='狗',
             status=QuizVocabItem.STATUS_PUBLISHED, created_by='tester',
         )
+        for i in range(3):
+            QuizVocabItem.objects.create(
+                tribe='tayal', category='noun', foreign_word=f'filler{i}', chinese_gloss=f'填充詞{i}',
+                status=QuizVocabItem.STATUS_PUBLISHED, created_by='tester',
+            )
         response = self.client.get('/crawler/?tribe=tayal&level=3')
         all_pairs = [
             pair
@@ -199,6 +217,32 @@ class GetQuizDataTest(TestCase):
         ]
         huzil_pair = next(p for p in all_pairs if p['word']['word'] == 'huzil')
         self.assertEqual(huzil_pair['item_id'], item.id)
+
+    def test_insufficient_vocab_pool_produces_no_incomplete_board(self):
+        """獨立審查找到的問題：題庫不足時，原本仍固定產生 5 題，最後幾組
+        會是不滿 4 配對甚至完全空的殘缺題組，學生看到卻無法作答。現在只
+        會產生「完整」的題組（每組固定 4 配對），題庫不足時題數就是變少，
+        不製造殘缺的題目——這裡只建 5 筆（湊 1 組滿的還多 1 筆），驗證只
+        產生 1 題、且那 1 題確實有滿滿 4 個配對，多出來的 1 筆不會被拿去
+        湊一個不完整的第 2 題。"""
+        for i in range(5):
+            QuizVocabItem.objects.create(
+                tribe='tayal', category='noun', foreign_word=f'word{i}', chinese_gloss=f'詞{i}',
+                status=QuizVocabItem.STATUS_PUBLISHED, created_by='tester',
+            )
+        response = self.client.get('/crawler/?tribe=tayal&level=3')
+        part = response.json()['parts'][0]
+        self.assertEqual(len(part['questions']), 1)
+        self.assertEqual(len(part['questions'][0]['pairs']), 4)
+        self.assertIn('本部分共1題', part['intro'])
+
+    def test_empty_vocab_pool_produces_zero_questions_not_error(self):
+        """完全沒有已核准詞彙時（picked 總數 0），比照 build_cloze_test_from_db
+        遇到題庫全空時的既有降級行為——回傳空題目陣列，不是報錯或整個
+        端點崩潰。"""
+        response = self.client.get('/crawler/?tribe=tayal&level=3')
+        part = response.json()['parts'][0]
+        self.assertEqual(part['questions'], [])
 
     def test_level_4_questions_carry_composite_item_id(self):
         # 克漏字一「題」是一個空格，不是一整篇短文，item_id 是

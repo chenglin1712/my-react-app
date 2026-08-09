@@ -210,18 +210,41 @@ def _create_user(request):
         try:
             firebase_ops.delete_firebase_user(user_record.uid)
         except Exception:
+            # rollback 也失敗——這個 uid 現在是「Auth 帳號存在、Firestore
+            # 文件不存在」的半殘狀態，不能只寫 log 就回一句籠統的失敗訊息，
+            # 不然管理者完全不知道這個 uid 還留著、需要人工清理（獨立審查
+            # 找到的問題）。
             logger.exception("rollback 建立失敗的 Auth 帳號 %s 也失敗，需人工複查", user_record.uid)
+            return JsonResponse({
+                "detail": "建立使用者失敗，且清理未完成的帳號也失敗，這個帳號需要人工複查",
+                "uid": user_record.uid, "auth_created": True, "firestore_created": False,
+                "cleanup_required": True,
+            }, status=500)
         return JsonResponse({"detail": "建立使用者失敗，請稍後再試"}, status=500)
 
+    # 帳號＋Firestore 文件都建立成功後才指派角色——這一步失敗不該讓整個
+    # 建立操作回報成失敗（帳號本身是完整可用的，只是還沒有角色，屬於
+    # 「事後到使用者詳情頁重新指派」就能修好的溫和缺陷，不需要走破壞性
+    # 更大的 rollback）；但也不能靜默吞掉，前端要能看到 role_assigned
+    # 才知道需要提醒管理者手動補指派（獨立審查找到的問題）。
+    role_assigned = True
     if role is not None:
-        firebase_ops.set_user_role(user_record.uid, role)
+        try:
+            firebase_ops.set_user_role(user_record.uid, role)
+        except Exception:
+            role_assigned = False
+            logger.exception(
+                "建立使用者 %s 後指派角色 %s 失敗，帳號已建立但角色未設定，需至使用者詳情頁重新指派",
+                user_record.uid, role,
+            )
 
     _safe_write_audit_log(
         request, decoded, "create_user", user_record.uid, target_type="user",
-        after={"email": email, "name": name, "identity": identity, "role": role},
+        after={"email": email, "name": name, "identity": identity, "role": role if role_assigned else None},
     )
 
     payload = _merge_user(user_record, {"name": name, "identity": identity, "avatarUrl": avatar_url})
+    payload["role_assigned"] = role_assigned
     return JsonResponse(payload, status=201)
 
 
@@ -341,6 +364,8 @@ def user_profile(request, uid):
     if "avatar_url" in data:
         firestore_updates["avatarUrl"] = (data.get("avatar_url") or "").strip()
 
+    email_changed = False
+    original_email = user_record.email
     new_email = data.get("email")
     if new_email is not None:
         new_email = new_email.strip()
@@ -353,10 +378,33 @@ def user_profile(request, uid):
                 return JsonResponse({"detail": "這個 email 已經被使用"}, status=400)
             except (ValueError, firebase_auth.FirebaseError) as e:
                 return JsonResponse({"detail": str(e)}, status=400)
+            email_changed = True
             firestore_updates["email"] = new_email
 
     if firestore_updates:
-        doc_ref.set(firestore_updates, merge=True)
+        try:
+            doc_ref.set(firestore_updates, merge=True)
+        except Exception:
+            logger.exception("更新使用者 %s 的 Firestore 資料失敗", uid)
+            if not email_changed:
+                return JsonResponse({"detail": "更新使用者資料失敗，請稍後再試"}, status=500)
+            # email 兩邊各存一份（Firebase Auth／Firestore users/{uid}），
+            # Auth 已經改成功了——這裡的 Firestore 寫入如果失敗，兩邊會
+            # 永久不一致，且下次重試時因為 Auth 那邊的 email 已經是新值，
+            # `new_email != user_record.email` 會判斷成不需要再改，
+            # Firestore 的舊 email 永遠沒有機會自動修正。失敗時嘗試把
+            # Auth email 回復成原值，讓兩邊至少維持一致（都是舊值），而
+            # 不是留下一個只有這裡才知道、事後也修不回去的不一致狀態
+            # （獨立審查找到的問題）。
+            try:
+                firebase_ops.set_user_email(uid, original_email)
+            except Exception:
+                logger.exception("回復使用者 %s 的 Auth email 也失敗，Auth 與資料庫已經不一致，需人工複查", uid)
+                return JsonResponse({
+                    "detail": "更新 email 失敗，且 Auth 與資料庫的 email 可能已經不一致，需要人工複查",
+                    "uid": uid,
+                }, status=500)
+            return JsonResponse({"detail": "更新 email 失敗，請稍後再試"}, status=500)
 
     _safe_write_audit_log(
         request, decoded, "update_profile", uid, target_type="user",
@@ -408,12 +456,23 @@ def user_password(request, uid):
         return JsonResponse({"detail": "輸入的 email 與目標帳號不符"}, status=400)
 
     firebase_ops.set_user_password(uid, new_password)
-    firebase_ops.revoke_sessions(uid)
+    # 密碼本身已經改成功——這是不可逆的既成事實，接下來的 revoke_sessions
+    # 失敗不該讓整個請求變成一個誤導人的 500（管理者會以為密碼沒改成功，
+    # 但實際上新密碼已經生效，舊 session 卻還沒撤銷，這在「帳號疑似被
+    # 接管」的情境下尤其危險：越以為沒生效，越不會意識到需要進一步處理）。
+    # 誠實回報 sessions_revoked，不要用 bare except 吞掉也不要讓它一路
+    # 往外拋（獨立審查找到的問題）。
+    sessions_revoked = True
+    try:
+        firebase_ops.revoke_sessions(uid)
+    except Exception:
+        sessions_revoked = False
+        logger.exception("使用者 %s 密碼已變更，但撤銷登入狀態失敗，舊登入可能仍然有效，需人工複查", uid)
     _safe_write_audit_log(
         request, decoded, "change_password", uid, target_type="user",
-        after={"password_changed": True},
+        after={"password_changed": True, "sessions_revoked": sessions_revoked},
     )
-    return JsonResponse({"uid": uid, "password_changed": True})
+    return JsonResponse({"uid": uid, "password_changed": True, "sessions_revoked": sessions_revoked})
 
 
 @csrf_exempt
@@ -599,11 +658,17 @@ def user_delete(request, uid):
         for rec in recordings:
             rec_data = rec.to_dict()
             storage_url = rec_data.get("storageUrl")
+            # 用文件真正的路徑區段（pronunciations/{tribe}/recordings/{id}）
+            # 組出預期前綴，不是信任文件內部欄位——避免偽造的 storageUrl
+            # 誘使刪除同 bucket 裡不相關的物件。
+            rec_tribe = rec.reference.parent.parent.id
             # Storage 音檔刪除失敗時（例如物件已不存在、網址格式不符預期）不能
             # 悄悄略過——這裡仍然刪掉 Firestore 文件（審核者的意圖是整筆錄音都
             # 不該再留），但把失敗筆數回報出來，讓管理者知道有孤兒音檔需要
             # 人工到 Storage 主控台複查，而不是被 "deleted" 數字誤導成全部乾淨。
-            if storage_url and not firebase_ops.delete_storage_file_by_download_url(storage_url):
+            if storage_url and not firebase_ops.delete_storage_file_by_download_url(
+                storage_url, expected_path_prefix=f"pronunciations/{rec_tribe}/",
+            ):
                 storage_failed += 1
                 logger.warning("刪除帳號 %s 的錄音 %s 時，Storage 音檔清除失敗：%s", uid, rec.id, storage_url)
             rec.reference.delete()

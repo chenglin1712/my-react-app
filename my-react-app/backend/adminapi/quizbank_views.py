@@ -33,7 +33,7 @@ from .models import (
     IrtConfig, QuizChoiceItem, QuizClozePassage, QuizSituationItem, QuizSourceConfig,
     QuizTrueFalseItem, QuizVocabItem,
 )
-from .revisions import make_revision_views, pending_revision_target_ids
+from .revisions import cancel_stale_pending_revision, make_revision_views, pending_revision_target_ids
 from .serializers import (
     ApproveSerializer, IrtConfigSerializer, PublicIrtConfigSerializer,
     QuizChoiceItemSerializer, QuizClozePassageSerializer, QuizSituationItemSerializer,
@@ -327,6 +327,10 @@ def _content_unpublish(request, pk, model, serializer_class, target_type):
         before = serializer_class(obj).data
         obj.status = model.STATUS_DRAFT
         obj.save(update_fields=["status", "updated_at"])
+        # 下架後這筆內容不再是「已發布」，任何殘留的待審修改都對不上現狀
+        # 了——主動取消，避免核准時悄悄套用到已下架內容（見
+        # revisions.cancel_stale_pending_revision 的完整說明）。
+        cancel_stale_pending_revision(target_type, obj.pk, decoded.get("uid", "anon"))
 
         _write_audit_log(
             request, decoded, "unpublish", obj,

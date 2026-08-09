@@ -341,6 +341,99 @@ describe('pronunciations 規則（staff 審核）', () => {
   });
 });
 
+// storageUrl 原本完全沒有驗證，惡意使用者可以建立一筆帶偽造 storageUrl
+// （指向同一個 bucket 裡任何其他物件）的錄音文件，誘使之後的審核下架／
+// 帳號刪除流程刪掉不相關的檔案（見 backend/adminapi/firebase_ops.py 的
+// delete_storage_file_by_download_url() 同一輪修正）。這裡直接測 create
+// 規則本身，之前的測試都用 withSecurityRulesDisabled 繞過規則造測試資料，
+// 從未真正驗證過這條 create 規則。
+describe('pronunciations recordings create 規則', () => {
+  const validRecordingUrl = (tribe, word = 'huzil', filename = '123_alice.webm') => (
+    `https://firebasestorage.googleapis.com/v0/b/yuanyu-app.appspot.com/o/`
+    + `pronunciations%2F${tribe}%2F${word}%2F${filename}?alt=media&token=abc`
+  );
+
+  const validRecording = (tribe, overrides = {}) => ({
+    uid: 'alice',
+    tribe,
+    word: 'huzil',
+    score: 88,
+    storageUrl: validRecordingUrl(tribe),
+    createdAt: serverTimestamp(),
+    ...overrides,
+  });
+
+  test('本人建立形狀合法、storageUrl 落在對應族語底下時可以成功', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(
+      setDoc(doc(alice.firestore(), 'pronunciations/tayal/recordings/r1'), validRecording('tayal'))
+    );
+  });
+
+  test('uid 不是本人時被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'pronunciations/tayal/recordings/r1'), validRecording('tayal', { uid: 'bob' }))
+    );
+  });
+
+  test('storageUrl 指向別的族語資料夾時被拒絕（核心安全修正案例）', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(
+        doc(alice.firestore(), 'pronunciations/tayal/recordings/r1'),
+        validRecording('tayal', { storageUrl: validRecordingUrl('amis') })
+      )
+    );
+  });
+
+  test('storageUrl 指向完全不相干的物件（例如辭典媒體）時被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    const unrelatedUrl = 'https://firebasestorage.googleapis.com/v0/b/yuanyu-app.appspot.com/o/'
+      + 'dictionary_media%2Fimportant_word_audio.mp3?alt=media';
+    await assertFails(
+      setDoc(
+        doc(alice.firestore(), 'pronunciations/tayal/recordings/r1'),
+        validRecording('tayal', { storageUrl: unrelatedUrl })
+      )
+    );
+  });
+
+  test('文件內的 tribe 欄位跟路徑上的 tribe 不一致時被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'pronunciations/tayal/recordings/r1'), validRecording('amis'))
+    );
+  });
+
+  test('路徑上的族語不在白名單內時被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(
+        doc(alice.firestore(), 'pronunciations/klingon/recordings/r1'),
+        { ...validRecording('klingon'), storageUrl: validRecordingUrl('klingon') }
+      )
+    );
+  });
+
+  test('createdAt 不是伺服器時間戳記時被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'pronunciations/tayal/recordings/r1'), validRecording('tayal', { createdAt: new Date() }))
+    );
+  });
+
+  test('score 型別或範圍不合法時被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'pronunciations/tayal/recordings/r1'), validRecording('tayal', { score: 150 }))
+    );
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'pronunciations/tayal/recordings/r2'), validRecording('tayal', { score: '88' }))
+    );
+  });
+});
+
 // P3.6 檢舉：reports 集合的「建立」是前端直寫 Firestore（見
 // frontend/src/userServives/reportService.jsx），沒有後端端點把關，這條規則
 // 本身就是唯一的信任邊界，這裡要驗證跟 sharedNotes/quizs 同一種嚴謹程度。

@@ -13,6 +13,7 @@ dictionary_db，兩個資料庫之間沒有共用交易，套用 P3 已經驗證
 動作（辭典寫入）先完成，Django 端記帳／稽核／快取通知在後」精神。
 """
 import json
+import logging
 
 from django.db import transaction
 from django.http import JsonResponse
@@ -40,6 +41,8 @@ from .dictionary_serializers import (
 )
 from .models import DictionaryRevision
 from .serializers import RejectSerializer
+
+logger = logging.getLogger(__name__)
 
 _TRIBE_ID_TO_SLUG = {t.id: t.slug for t in TRIBES}
 
@@ -627,28 +630,35 @@ def dictionary_revision_approve(request, pk):
             "status", "reviewed_by", "reviewed_at", "review_comment", "apply_error", "updated_at",
         ])
 
-    # base_hash 快速路徑檢查：只在「這個提案有一個明確的既有目標」時做
-    # （更新/刪除），新建（target_id 空字串）沒有「目前狀態」可比對。開草稿
-    # 當下若沒有帶 base_hash，直接略過檢查——這個欄位是併發保護的加分項，
-    # 不是必要條件；真正的正確性保證在套用函式拿到列鎖之後的重新比對。
-    if revision.operation != DictionaryRevision.OPERATION_CREATE and revision.target_id and revision.base_hash:
-        tree_getter = _TREE_GETTERS.get(revision.target_kind)
-        read_db = SessionLocal()
-        try:
-            try:
-                current_tree = tree_getter(read_db, revision.target_id)
-                current_hash = current_tree["content_hash"]
-            except dw.DictionaryWriteError:
-                current_hash = None
-        finally:
-            read_db.close()
-        if current_hash != revision.base_hash:
-            _revert_revision_to_pending_review(pk, "base_hash 快速路徑檢查失敗：內容已被其他人變更")
-            return JsonResponse({
-                "detail": "這筆內容在你編輯的期間已經被其他人變更，請重新整理後再試一次",
-            }, status=409)
-
+    # 從這裡開始到套用成功之前，任何例外（不只是預期中的
+    # ConcurrentModificationError／DictionaryWriteError）都必須讓提案退回
+    # pending_review——revision 在上面那個交易裡已經認領成 approved，如果
+    # 這段拋出沒被特別處理的例外（例如 tree_getter／applier 內部的非預期
+    # SQLAlchemy 錯誤），沒有這層 except Exception 的話，提案會永久卡在
+    # 「已核准但未套用」的死狀態，且完全沒有回報（獨立審查找到的問題）。
     try:
+        # base_hash 快速路徑檢查：只在「這個提案有一個明確的既有目標」時做
+        # （更新/刪除），新建（target_id 空字串）沒有「目前狀態」可比對。開
+        # 草稿當下若沒有帶 base_hash，直接略過檢查——這個欄位是併發保護的
+        # 加分項，不是必要條件；真正的正確性保證在套用函式拿到列鎖之後的
+        # 重新比對。
+        if revision.operation != DictionaryRevision.OPERATION_CREATE and revision.target_id and revision.base_hash:
+            tree_getter = _TREE_GETTERS.get(revision.target_kind)
+            read_db = SessionLocal()
+            try:
+                try:
+                    current_tree = tree_getter(read_db, revision.target_id)
+                    current_hash = current_tree["content_hash"]
+                except dw.DictionaryWriteError:
+                    current_hash = None
+            finally:
+                read_db.close()
+            if current_hash != revision.base_hash:
+                _revert_revision_to_pending_review(pk, "base_hash 快速路徑檢查失敗：內容已被其他人變更")
+                return JsonResponse({
+                    "detail": "這筆內容在你編輯的期間已經被其他人變更，請重新整理後再試一次",
+                }, status=409)
+
         with dictionary_write_session() as write_db:
             result_id, result_payload = applier(write_db, revision)
     except dw.ConcurrentModificationError:
@@ -659,6 +669,10 @@ def dictionary_revision_approve(request, pk):
     except dw.DictionaryWriteError as exc:
         _revert_revision_to_pending_review(pk, str(exc))
         return JsonResponse({"detail": str(exc)}, status=400)
+    except Exception:
+        logger.exception("辭典提案 #%s 核准套用時發生未預期例外", pk)
+        _revert_revision_to_pending_review(pk, "套用時發生未預期錯誤")
+        return JsonResponse({"detail": "套用失敗，已退回待審狀態，請稍後再試"}, status=500)
 
     with transaction.atomic():
         revision = DictionaryRevision.objects.select_for_update().get(pk=pk)

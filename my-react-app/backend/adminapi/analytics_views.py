@@ -4,14 +4,18 @@ P5.0：使用事件的寫入端點（POST /adminapi/public/events/）——給�
 操作（頁面瀏覽、測驗開始/作答等）回報用。FastAPI 端的事件（辭典搜尋查詢
 字串跟命中數）**不**走這個端點，是直接用輕量 SQLAlchemy engine 寫進同一張
 `UsageEvent` 表，見 backend/fastAPI/usage_events.py 的說明——避免在搜尋
-這種熱路徑上多一個跨服務 HTTP 往返。
+這種熱路徑上多一個跨服務 HTTP 往返。dictionary_search 因此刻意不在這個
+公開端點的 VALID_EVENT_TYPES 白名單裡：如果開放，任何人都能偽造查詢字串
+與命中數直接灌進搜尋分析報表，而這個事件類型本來就已經有可信的伺服器端
+寫入路徑，公開端點沒有必要（也不應該）重複開放（獨立審查找到的問題）。
 
 之後 P5.1-P5.4 的聚合報表端點（儀表板／搜尋分析／題目品質分析／留存分析）
 陸續加進這個檔案。
 """
 import json
+import re
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 
 from django.db.models import Count
 from django.db.models.fields.json import KeyTextTransform
@@ -30,10 +34,11 @@ from .models import (
     QuizChoiceItem, QuizClozePassage, QuizSituationItem, QuizTrueFalseItem, QuizVocabItem, UsageEvent,
 )
 
-# 功能使用熱度的中文標籤對照——只列目前真的會被寫入的 event_type（見
-# VALID_EVENT_TYPES）；遊戲／筆記／AI 等其餘功能尚未接上 trackEvent()，
-# 不在這裡預先列出空白項目，避免圖表出現「一直是 0」但看起來像是真的
-# 量測過的類別，誤導使用者以為那個功能真的沒人用。
+# 功能使用熱度的中文標籤對照——涵蓋全部 event_type，包含只能由可信伺服器端
+# 路徑寫入、不開放公開端點建立的 dictionary_search（見 VALID_EVENT_TYPES
+# 的說明）；遊戲／筆記／AI 等其餘功能尚未接上任何寫入路徑，不在這裡預先
+# 列出空白項目，避免圖表出現「一直是 0」但看起來像是真的量測過的類別，
+# 誤導使用者以為那個功能真的沒人用。
 EVENT_TYPE_LABELS = {
     "dictionary_search": "辭典搜尋",
     "quiz_answer": "測驗作答",
@@ -41,16 +46,59 @@ EVENT_TYPE_LABELS = {
     "page_view": "頁面瀏覽",
 }
 
-# 白名單——避免任意字串灌進 event_type；之後 P5.1-P5.4 的聚合查詢／前端
-# 標籤對照表都假設這份清單是封閉的。新增事件類型時記得同步這裡。
+# 公開端點（usage_event_create）允許建立的事件類型白名單——刻意不含
+# dictionary_search，那個類型只能由 FastAPI 端的可信路徑寫入（見上方模組
+# docstring）。新增可從前端直接回報的事件類型時記得同步這裡。
 VALID_EVENT_TYPES = frozenset({
-    "dictionary_search",  # FastAPI 端寫入，見 backend/fastAPI/usage_events.py
     "quiz_answer",
     "quiz_session",
     "page_view",
 })
 
 _MAX_PAYLOAD_JSON_LENGTH = 4096
+
+# quiz_answer 的 payload 有嚴格型別要求，不像其他事件類型只檢查 payload
+# 是不是 dict 就好——item_kind/item_id 型別不對會讓 quiz_quality_analytics()
+# 因為拿 list/dict 當 (item_kind, item_id) 的雜湊 key 直接 500
+# （unhashable type）；correct 如果不是嚴格的布林值，Python 的
+# bool("false") 會是 True，靜默把「答錯」算成「答對」，永久扭曲答對率跟
+# 鑑別度（獨立審查找到的問題）。
+_QUIZ_ANSWER_ITEM_KINDS = frozenset({"true_false", "choice", "matching", "cloze", "situation"})
+# 克漏字的 item_id 是 "passageId:blankKey" 複合字串（見 crawler/views.py
+# build_cloze_test_from_db 的說明），blank_key 本身允許任意非大括號字元
+# （見 QuizClozePassage.clean() 的標記解析），這裡只要求格式是「數字＋冒號
+# ＋至少一個字元」，不過度限制 blank_key 的字元集合。
+_CLOZE_ITEM_ID_PATTERN = re.compile(r"^\d+:.+$")
+
+
+def _validate_quiz_answer_payload(payload):
+    """回傳錯誤訊息字串；合法時回傳 None。"""
+    item_kind = payload.get("item_kind")
+    # 先確認是字串才能安全做 frozenset 成員檢查——item_kind 是 list/dict
+    # 這種不可雜湊型別時，`in` 本身就會直接拋 TypeError，這裡要在那之前
+    # 攔下來，不能讓驗證函式自己也被畸形輸入弄壞。
+    if not isinstance(item_kind, str) or item_kind not in _QUIZ_ANSWER_ITEM_KINDS:
+        return "item_kind 不支援"
+
+    item_id = payload.get("item_id")
+    if item_kind == "cloze":
+        if not isinstance(item_id, str) or not _CLOZE_ITEM_ID_PATTERN.match(item_id):
+            return "item_id 格式錯誤"
+    else:
+        # bool 是 int 的子類別，isinstance(True, int) 會是 True——先排除
+        # bool 才不會讓 correct=True/False 這種畸形輸入被誤判成合法 item_id。
+        if isinstance(item_id, bool) or not isinstance(item_id, int) or item_id <= 0:
+            return "item_id 格式錯誤"
+
+    correct = payload.get("correct")
+    if type(correct) is not bool:
+        return "correct 必須是布林值"
+
+    level = payload.get("level")
+    if level is not None and not isinstance(level, str):
+        return "level 格式錯誤"
+
+    return None
 
 
 @csrf_exempt
@@ -89,6 +137,11 @@ def usage_event_create(request):
     if len(json.dumps(payload, ensure_ascii=False)) > _MAX_PAYLOAD_JSON_LENGTH:
         return JsonResponse({"detail": "payload 過大"}, status=400)
 
+    if event_type == "quiz_answer":
+        error = _validate_quiz_answer_payload(payload)
+        if error:
+            return JsonResponse({"detail": error}, status=400)
+
     uid = try_verify_firebase_token(request) or ""
 
     UsageEvent.objects.create(event_type=event_type, uid=uid, tribe=tribe, payload=payload)
@@ -101,6 +154,9 @@ def usage_event_create(request):
 
 class _DateRangeError(Exception):
     pass
+
+
+_MAX_CUSTOM_DATE_RANGE_DAYS = 90
 
 
 def _parse_date_range(request):
@@ -123,6 +179,15 @@ def _parse_date_range(request):
             raise _DateRangeError("date_from/date_to 格式錯誤，需為 YYYY-MM-DD")
         if end < start:
             raise _DateRangeError("date_to 不能早於 date_from")
+        # 沒有跨度上限的話，具 staff 角色的 client 可以要求例如
+        # 0001-01-01 到 9999-12-31——即使資料庫沒資料，_fill_date_series()
+        # 仍會建立數百萬個補零項目，dashboard 還會對 Firebase 執行全量
+        # 掃描，可能讓 worker 長時間占用 CPU/記憶體、產生極大 JSON 回應
+        # （獨立審查找到的問題）。跟 today／7d／30d 這幾個固定選項比對，
+        # 90 天是這幾個既有選項裡最大的 30d 的 3 倍，足夠涵蓋一季的分析
+        # 需求，不需要無上限。
+        if (end - start).days + 1 > _MAX_CUSTOM_DATE_RANGE_DAYS:
+            raise _DateRangeError(f"自訂日期區間不能超過 {_MAX_CUSTOM_DATE_RANGE_DAYS} 天")
         return start, end
     raise _DateRangeError(f"不支援的 date_range：{date_range}")
 
@@ -137,6 +202,32 @@ def _fill_date_series(counts_by_date, start_date, end_date):
         series.append({"date": day.isoformat(), "count": counts_by_date.get(day, 0)})
         day += timedelta(days=1)
     return series
+
+
+def _join_date_to_local_date(raw):
+    """把 Firestore joinDate（前端用 new Date().toISOString() 寫入的 UTC
+    ISO 字串）轉成專案目前時區下的日期，跟 UsageEvent.created_at 用
+    timezone.localtime(created_at).date() 是同一套轉換規則。原本
+    _daily_new_registrations()／retention_analytics() 都直接對 UTC
+    datetime 呼叫 .date()，沒有先轉成目前時區——如果 TIME_ZONE 設定不是
+    UTC，會跟事件表的分日/分週依據不一致（例如當地時間週一凌晨註冊，
+    joinDate 的 UTC 日期還是上一週，但同一時間的使用事件轉成當地日期後
+    已經算本週，兩者的世代分組會錯開一週）。TIME_ZONE 目前是 UTC，這個
+    轉換在正式環境暫時是 no-op，但寫對比較保險（獨立審查找到的問題）。
+    解析失敗回傳 None，呼叫端自行決定要不要略過。"""
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return None
+    if timezone.is_naive(dt):
+        # 正式環境的真實資料裡有些 joinDate 字串沒有時區資訊（沒有 "Z"
+        # 也沒有 offset）——原本的寫法對這種值直接呼叫 .date()，naive
+        # datetime 也能用；但 timezone.localtime() 要求輸入必須是 aware
+        # datetime，naive 值會直接丟 ValueError。這裡假設沒有時區資訊的
+        # 值本來就是 UTC（呼應前端寫入時一律用 UTC ISO 字串的慣例），
+        # 補上時區後才轉換，不能讓這批既有的髒資料讓整個報表端點 500。
+        dt = timezone.make_aware(dt, dt_timezone.utc)
+    return timezone.localtime(dt).date()
 
 
 def _daily_new_registrations(start_date, end_date):
@@ -157,9 +248,8 @@ def _daily_new_registrations(start_date, end_date):
         raw = join_dates_by_uid.get(user.uid)
         if not raw:
             continue
-        try:
-            day = datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
-        except (ValueError, AttributeError):
+        day = _join_date_to_local_date(raw)
+        if day is None:
             continue
         if start_date <= day <= end_date:
             counts[day] = counts.get(day, 0) + 1
@@ -395,9 +485,16 @@ def quiz_quality_analytics(request):
         item_kind = payload.get("item_kind")
         item_id = payload.get("item_id")
         correct = payload.get("correct")
-        if item_kind is None or item_id is None or correct is None:
+        # 讀取端也做一次防禦性檢查，不只依賴寫入端的驗證——歷史資料可能是
+        # 這次修正之前寫入的：型別不對的 item_kind/item_id（例如 list/dict）
+        # 會讓底下當 (item_kind, item_id) 雜湊 key 直接 500（unhashable
+        # type）；correct 不是嚴格布林值也不該用 bool() 強制轉換，那樣字串
+        # "false" 會變成 True，靜默扭曲答對率。
+        if not isinstance(item_kind, str) or isinstance(item_id, bool) or not isinstance(item_id, (int, str)):
             continue
-        records.append((uid, item_kind, item_id, bool(correct)))
+        if type(correct) is not bool:
+            continue
+        records.append((uid, item_kind, item_id, correct))
 
     user_totals = defaultdict(lambda: [0, 0])  # uid -> [correct_count, total_count]
     for uid, _kind, _id, correct in records:
@@ -509,9 +606,8 @@ def retention_analytics(request):
             raw = doc.to_dict().get("joinDate")
             if not raw:
                 continue
-            try:
-                join_date = datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
-            except (ValueError, AttributeError):
+            join_date = _join_date_to_local_date(raw)
+            if join_date is None:
                 continue
             cohort_start_by_uid[doc.id] = _week_start(join_date)
 
@@ -536,8 +632,16 @@ def retention_analytics(request):
     for cohort_start in sorted(cohort_uids):
         uids = cohort_uids[cohort_start]
         weeks_elapsed = (today_week_start - cohort_start).days // 7
+        # 只回傳「已經過完」的週次：week_offset=0（世代自己的加入週）永遠
+        # 回傳，即使還在進行中也一樣（世代分析的慣例基準點）；week_offset
+        # >= 1 只有在那一週已經完整結束後才回傳。原本直接用 weeks_elapsed
+        # 當上界，會多算進目前還在進行中的那一週——例如世代是上週
+        # （weeks_elapsed=1），range 卻跑到 week_offset=1，那正好是本週，
+        # 還沒結束，會把「還沒發生」的資料當成「量測到偏低留存」顯示出來，
+        # 跟這支函式自己的說明矛盾（獨立審查找到的問題）。
+        included_weeks = min(max(1, weeks_elapsed), _RETENTION_MAX_WEEKS)
         retention = []
-        for week_offset in range(min(weeks_elapsed, _RETENTION_MAX_WEEKS - 1) + 1):
+        for week_offset in range(included_weeks):
             target_week = cohort_start + timedelta(weeks=week_offset)
             active_count = sum(1 for uid in uids if target_week in active_weeks_by_uid.get(uid, ()))
             retention.append({

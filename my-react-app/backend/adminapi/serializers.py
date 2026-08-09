@@ -5,6 +5,8 @@ serializers.Serializer）：這個資源欄位數量多、CRUD 語意單純，�
 跟 model 定義幾乎一模一樣的欄位清單只會增加兩邊漂移的風險，ModelSerializer
 直接從 model 反推欄位定義，這裡只需要額外收斂寫入時的驗證規則。
 """
+import re
+
 from rest_framework import serializers
 
 from config.tribes import TRIBE_IDS
@@ -134,7 +136,14 @@ class HomepageConfigSerializer(serializers.ModelSerializer):
         # 同一個理由）或 http(s) 網址，擋掉 javascript: 之類的危險 scheme。
         if not value:
             return value
-        if value.startswith('/') and not value.startswith('//'):
+        # 瀏覽器的 WHATWG URL 解析對 http(s) 這類 special scheme 會把反斜線
+        # 視同斜線——"/\evil.example/path" 這種字串用純字串比對看起來是
+        # 「以單一 / 開頭、不是 //」的合法內部路徑，瀏覽器卻可能解讀成
+        # protocol-relative 的外部網址，等於防護被繞過（獨立審查找到的
+        # 問題，跟這個專案登入頁 next 參數先前修過的同一類漏洞）。判斷前
+        # 先把反斜線正規化成正斜線再檢查，貼近瀏覽器實際的解析行為。
+        normalized = value.replace('\\', '/')
+        if normalized.startswith('/') and not normalized.startswith('//'):
             return value
         if value.startswith('http://') or value.startswith('https://'):
             return value
@@ -217,14 +226,33 @@ class QuizClozePassageSerializer(serializers.ModelSerializer):
         # model.clean() 也有一份一樣的檢查（見 models.py 的說明：確保未來
         # 就算繞過 serializer 直接用 ORM 操作也擋得住）；這裡在 API 層先擋一次，
         # 讓錯誤能回傳成一般的 400 + 欄位訊息，而不是 model.clean() 丟出的
-        # ValidationError 一路往外拋變成 500。
+        # ValidationError 一路往外拋變成 500。標記檢查邏輯（雙向比對＋重複
+        # 標記偵測）要跟 models.py 的 QuizClozePassage.clean() 保持一致，
+        # 不然兩邊會漂移（獨立審查找到的問題就是原本這裡跟 model 各自只做
+        # 單向檢查）。
         passage_foreign = data.get('passage_foreign', getattr(self.instance, 'passage_foreign', ''))
         blanks = data.get('blanks', getattr(self.instance, 'blanks', None))
         if not isinstance(blanks, dict) or not blanks:
             raise serializers.ValidationError({'blanks': '至少需要一個空格'})
+
+        markers = re.findall(r'\{([^{}]+)\}', passage_foreign or '')
+        marker_set = set(markers)
+        blank_keys = set(blanks.keys())
+
+        missing_in_passage = sorted(blank_keys - marker_set)
+        if missing_in_passage:
+            raise serializers.ValidationError({'passage_foreign': f'短文內容缺少對應的 {{{missing_in_passage[0]}}} 標記'})
+
+        unknown_markers = sorted(marker_set - blank_keys)
+        if unknown_markers:
+            raise serializers.ValidationError({'passage_foreign': f'短文內容出現不在 blanks 裡的標記 {{{unknown_markers[0]}}}'})
+
+        if len(markers) != len(marker_set):
+            seen = set()
+            duplicated = next(m for m in markers if m in seen or seen.add(m))
+            raise serializers.ValidationError({'passage_foreign': f'標記 {{{duplicated}}} 在短文中重複出現'})
+
         for key, blank in blanks.items():
-            if f'{{{key}}}' not in passage_foreign:
-                raise serializers.ValidationError({'passage_foreign': f'短文內容缺少對應的 {{{key}}} 標記'})
             if not isinstance(blank, dict):
                 raise serializers.ValidationError({'blanks': f'{key} 格式錯誤'})
             options = blank.get('options')

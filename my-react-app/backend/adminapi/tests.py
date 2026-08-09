@@ -2,12 +2,13 @@ import json
 from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
+import requests
 from django.core.cache import cache
 from django.test import Client, TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from config.roles import ADMIN, ANALYST, EDITOR, OWNER, REVIEWER
 
@@ -650,6 +651,26 @@ class HomepageConfigAdminTest(TestCase):
             )
         self.assertEqual(response.status_code, 400)
 
+    def test_hero_link_rejects_backslash_protocol_relative_bypass(self):
+        """獨立審查找到的問題：瀏覽器的 WHATWG URL 解析對 http(s) 這類
+        special scheme 會把反斜線視同斜線，"/\\evil.com" 這種字串用純字串
+        比對看起來是合法的單一 / 開頭內部路徑，瀏覽器卻可能解讀成
+        protocol-relative 的外部網址——跟 "//evil.com" 是同一類漏洞，只是
+        換了一種字元繞過純字串檢查。"""
+        with _as_role(OWNER) as headers:
+            response = _patch_json(
+                self.client, '/adminapi/homepage-config/', headers,
+                {"hero_link_url": "/\\evil.com"},
+            )
+        self.assertEqual(response.status_code, 400)
+
+        with _as_role(OWNER) as headers:
+            response = _patch_json(
+                self.client, '/adminapi/homepage-config/', headers,
+                {"hero_link_url": "\\\\evil.com"},
+            )
+        self.assertEqual(response.status_code, 400)
+
     def test_hero_link_accepts_internal_path(self):
         with _as_role(OWNER) as headers:
             response = _patch_json(
@@ -849,3 +870,143 @@ class AnnouncementCrawlerSyncTest(TestCase):
 
         self.assertEqual(crawler_only.json()["count"], 1)
         self.assertEqual(admin_only.json()["count"], 1)
+
+    @patch('crawler.views.requests.get')
+    def test_admin_list_orders_admin_content_before_crawler_content(self, mock_get):
+        """獨立審查找到的問題：後台列表（_list_announcements）原本完全沒有
+        套用「自建優先」排序，只用 model 預設的 -is_pinned/-created_at/-pk
+        ——近期整批匯入的爬蟲資料會排在較舊的自建公告前面。這裡驗證後台
+        列表本身（不是公開列表）的排序也正確。"""
+        self._mock_one_tacp_item(mock_get, item_id=30)
+        with _as_role(EDITOR) as headers:
+            _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+            _post_json(
+                self.client, '/adminapi/announcements/', headers,
+                {"title": "後台自建公告", "body": "x"},
+            )
+            listing = self.client.get('/adminapi/announcements/', **headers)
+        titles = [item["title"] for item in listing.json()["results"]]
+        self.assertEqual(titles[0], "後台自建公告")
+
+    @patch('crawler.views.requests.get')
+    def test_pinned_crawler_item_does_not_outrank_unpinned_admin_item(self, mock_get):
+        """獨立審查找到的問題：原本 -is_pinned 是第一排序鍵，一筆被人工
+        設成置頂的爬蟲公告會排到未置頂的自建公告前面，違反「自建一律
+        優先」的既定規則。"""
+        self._mock_one_tacp_item(mock_get, item_id=31)
+        with _as_role(EDITOR) as headers:
+            _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+            create_resp = _post_json(
+                self.client, '/adminapi/announcements/', headers,
+                {"title": "後台自建公告", "body": "x"},
+            )
+        admin_pk = create_resp.json()["id"]
+        with _as_role(OWNER) as headers:
+            _post_json(self.client, f'/adminapi/announcements/{admin_pk}/submit/', headers)
+            _post_json(self.client, f'/adminapi/announcements/{admin_pk}/approve/', headers)
+
+        crawler_announcement = Announcement.objects.get(external_id="tacp:31")
+        crawler_announcement.is_pinned = True
+        crawler_announcement.pin_until = timezone.localdate() + timedelta(days=7)
+        crawler_announcement.save(update_fields=["is_pinned", "pin_until"])
+
+        response = self.client.get('/adminapi/public/announcements/')
+        titles = [item["title"] for item in response.json()["results"]]
+        self.assertEqual(titles[0], "後台自建公告")
+
+    @patch('crawler.views.requests.get')
+    def test_expired_pin_until_no_longer_sorts_as_pinned(self, mock_get):
+        """獨立審查找到的問題：原本排序只看 is_pinned 欄位，不檢查
+        pin_until 是否已過期，導致 pin_until 這個「避免永久置頂被遺忘」
+        的設計形同虛設。這裡驗證過期的置頂公告不會再排到未過期、未置頂
+        但比較新的公告前面。"""
+        self._mock_one_tacp_item(mock_get, item_id=32, title="過期置頂活動")
+        with _as_role(EDITOR) as headers:
+            _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+
+        expired = Announcement.objects.get(external_id="tacp:32")
+        expired.is_pinned = True
+        expired.pin_until = timezone.localdate() - timedelta(days=1)  # 已過期
+        expired.save(update_fields=["is_pinned", "pin_until"])
+
+        with _as_role(EDITOR) as headers:
+            create_resp = _post_json(
+                self.client, '/adminapi/announcements/', headers,
+                {"title": "較新的一般公告", "body": "x"},
+            )
+        newer_pk = create_resp.json()["id"]
+        with _as_role(OWNER) as headers:
+            _post_json(self.client, f'/adminapi/announcements/{newer_pk}/submit/', headers)
+            _post_json(self.client, f'/adminapi/announcements/{newer_pk}/approve/', headers)
+
+        response = self.client.get('/adminapi/public/announcements/')
+        titles = [item["title"] for item in response.json()["results"]]
+        # 兩者都不是自建優先的比較對象（一個爬蟲、一個自建），這裡驗證的
+        # 是自建的「較新的一般公告」排在過期置頂的爬蟲活動前面——如果
+        # pin_until 過期判斷沒生效，過期置頂的爬蟲活動會因為 is_pinned=True
+        # 排到自建內容前面，違反「自建一律優先」。
+        self.assertEqual(titles[0], "較新的一般公告")
+
+    @patch('crawler.views.requests.get')
+    def test_pure_date_end_date_stays_visible_through_that_whole_day(self, mock_get):
+        """獨立審查找到的問題：純日期字串（沒有時間部分）的 end_date 原本
+        被解析成當天 00:00——如果同步發生在結束日當天的白天，unpublish_at
+        會因為已經是過去而被設成 None，永遠不會自動下架。這裡驗證
+        end_date 是「今天」時，同步後 unpublish_at 不是 None，而是明天
+        00:00（正確涵蓋今天整天），且此時公開列表仍然看得到。"""
+        today = timezone.localdate()
+        self._mock_one_tacp_item(mock_get, item_id=33, end_date=today.isoformat())
+        with _as_role(EDITOR) as headers:
+            _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+
+        announcement = Announcement.objects.get(external_id="tacp:33")
+        self.assertIsNotNone(announcement.unpublish_at)
+        self.assertGreater(announcement.unpublish_at, timezone.now())
+        expected_next_day = timezone.make_aware(
+            datetime.combine(today + timedelta(days=1), datetime.min.time()),
+        )
+        self.assertEqual(announcement.unpublish_at, expected_next_day)
+
+        public_resp = self.client.get('/adminapi/public/announcements/')
+        titles = [item["title"] for item in public_resp.json()["results"]]
+        self.assertIn("測試活動", titles)
+
+    @patch('crawler.views.requests.get')
+    def test_future_pure_date_end_date_unpublishes_at_start_of_following_day(self, mock_get):
+        """end_date 是未來日期時，unpublish_at 應該是「隔天 00:00」，讓
+        公告顯示到結束日當天結束，不是結束日一早就消失。"""
+        future_date = timezone.localdate() + timedelta(days=5)
+        self._mock_one_tacp_item(mock_get, item_id=34, end_date=future_date.isoformat())
+        with _as_role(EDITOR) as headers:
+            _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+
+        announcement = Announcement.objects.get(external_id="tacp:34")
+        expected_next_day = timezone.make_aware(
+            datetime.combine(future_date + timedelta(days=1), datetime.min.time()),
+        )
+        self.assertEqual(announcement.unpublish_at, expected_next_day)
+
+    @patch('crawler.views.requests.get')
+    def test_tacp_non_200_response_not_treated_as_success(self, mock_get):
+        """獨立審查找到的問題：原本 tacp_ok = True 寫在 if status_code==200
+        區塊外面，TACP 回傳 500/403 等非 200 時不會進到解析區塊、完全沒有
+        新增資料，但 tacp_ok 仍然被誤判成 True。這裡驗證 TACP 回傳 500
+        時，如果族語認證來源也失敗，整個同步要回報「無法取得資料」，不能
+        誤報成功。"""
+        def fake_get(url, headers=None, timeout=None):
+            resp = MagicMock()
+            if "tacp.gov.tw" in url:
+                resp.status_code = 500
+                resp.raise_for_status.side_effect = requests.HTTPError("500 error")
+            else:
+                resp.status_code = 500
+                resp.raise_for_status.side_effect = requests.HTTPError("500 error")
+                resp.text = ""
+            return resp
+        mock_get.side_effect = fake_get
+
+        with _as_role(EDITOR) as headers:
+            response = _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["available"])
+        self.assertEqual(response.json()["imported"], 0)

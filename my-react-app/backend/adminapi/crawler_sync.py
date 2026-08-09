@@ -5,8 +5,9 @@
 之後接排程用，見該檔案說明）——management command 直接 import views.py 裡的
 一堆角色檢查/限流/HTTP 相關的東西並不合適，這裡只放不依賴 request 的純邏輯。
 """
+import hashlib
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
@@ -16,6 +17,24 @@ from crawler.views import get_news_data
 from .models import Announcement, AnnouncementSyncStatus
 
 logger = logging.getLogger(__name__)
+
+_EXTERNAL_ID_MAX_LENGTH = 255
+
+
+def _safe_external_id(source_key):
+    """external_id 欄位上限 255 字元——tacp 的 source_key 是短 id，通常
+    沒問題，但 ntnu-abst 的 source_key 內嵌完整 URL，理論上可能超過上限。
+    Postgres 正式環境對超長字串直接寫入會丟 DataError，例外目前被逐筆
+    捕捉，導致這篇公告每次同步都被算進失敗、永遠無法匯入（獨立審查找到
+    的問題）。超過長度上限時改用「來源前綴 + 內容雜湊」的固定長度替代
+    鍵，不直接截斷——直接截斷可能讓兩個不同的超長 key 被截斷成同一個
+    前綴而互相碰撞，雜湊則是決定性的（同一個超長 source_key 永遠雜湊出
+    同一個值，不影響既有的去重/冪等語意）。"""
+    if len(source_key) <= _EXTERNAL_ID_MAX_LENGTH:
+        return source_key
+    prefix = source_key.split(":", 1)[0]
+    digest = hashlib.sha256(source_key.encode("utf-8")).hexdigest()
+    return f"{prefix}:sha256:{digest}"
 
 
 def _parse_aware_datetime(value):
@@ -31,6 +50,40 @@ def _parse_aware_datetime(value):
         if d is None:
             return None
         dt = datetime.combine(d, datetime.min.time())
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.get_default_timezone())
+    return dt
+
+
+def _parse_unpublish_at(value):
+    """把 end_date 原始字串解析成「這篇公告應該在什麼時間點下架」的
+    aware datetime——跟 _parse_aware_datetime() 的差異在於純日期字串
+    （沒有時間部分，tacp 的 end_date 幾乎都是這種格式）的解讀方式：純
+    日期代表「當天都還算有效」，下架時間點該是隔天 00:00，不是當天
+    00:00。原本兩種用途共用 _parse_aware_datetime()，純日期字串當天
+    00:00 就會被判定成「已下架」，導致活動在結束日當天一早就從首頁
+    消失；且如果同步發生在結束日當天的白天（此時當天 00:00 已經是
+    過去），unpublish_at 又會因為 build_announcement_defaults() 的
+    `end_dt > now` 檢查而被設成 None，變成永遠不會自動下架——兩種情況
+    都是獨立審查找到的問題。帶真正時間部分的字串（parse_datetime 解析
+    得出來）維持原樣，不套用「+1 天」的調整。"""
+    if not value or not isinstance(value, str):
+        return None
+    # 要先試 parse_date 再試 parse_datetime，順序不能反過來——Django 的
+    # parse_datetime() 其實也接受純日期字串（例如 "2026-08-14"，這是
+    # 實測發現的行為，不是文件明講的），如果先呼叫 parse_datetime()，
+    # 純日期字串會直接在這一步成功回傳「當天 00:00」，永遠不會走到下面
+    # 「隔天 00:00」的調整，等於這支函式的存在意義完全沒有生效。
+    # parse_date() 的 regex 是整串完整匹配（^...$），只有純日期字串會
+    # 成功，帶時間部分的完整 ISO 字串一定會匹配失敗、正確落到下面的
+    # parse_datetime() 分支，不會誤判。
+    d = parse_date(value)
+    if d is not None:
+        next_day_start = datetime.combine(d + timedelta(days=1), datetime.min.time())
+        return timezone.make_aware(next_day_start, timezone.get_default_timezone())
+    dt = parse_datetime(value)
+    if dt is None:
+        return None
     if timezone.is_naive(dt):
         dt = timezone.make_aware(dt, timezone.get_default_timezone())
     return dt
@@ -88,7 +141,7 @@ def build_announcement_defaults(item):
     category = Announcement.CATEGORY_EXAM if is_exam else Announcement.CATEGORY_ACTIVITY
 
     now = timezone.now()
-    end_dt = _parse_aware_datetime(item.get("end_date"))
+    end_dt = _parse_unpublish_at(item.get("end_date"))
     unpublish_at = end_dt if (end_dt and end_dt > now) else None
 
     return {
@@ -144,7 +197,7 @@ def sync_crawler_announcements(force_refresh=True):
             continue
         try:
             _, created = Announcement.objects.get_or_create(
-                external_id=source_key,
+                external_id=_safe_external_id(source_key),
                 defaults=build_announcement_defaults(item),
             )
             if created:
