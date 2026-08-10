@@ -5,6 +5,7 @@ from dictionary_db.connect import get_db
 from dictionary_db.model import Word
 from dictionary_db.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS
+from fastAPI import game_config
 from .keyed_cache import KeyedCache
 
 router = APIRouter()
@@ -52,12 +53,17 @@ def warm_cache(db: Session) -> None:
 @router.get("/questions")
 def get_listening_questions(
     tribe: str = 'tayal',
-    count: int = Query(default=10, ge=1, le=50),
+    count: int | None = Query(default=None, ge=1, le=50),
     db: Session = Depends(get_db)
 ):
+    game_config.refresh_game_config_if_stale()
+
     tribe_id = TRIBE_IDS.get(tribe)
     if not tribe_id:
         raise HTTPException(status_code=400, detail=f"不支援的族語：{tribe}")
+
+    if count is None:
+        count = game_config.LISTENING_QUESTIONS_PER_ROUND
 
     valid_words = _load_valid_words(db, tribe_id)
 
@@ -68,11 +74,12 @@ def get_listening_questions(
     selected = random.sample(valid_words, min(count, len(valid_words)))
     all_meanings = list({w['meaning'] for w in valid_words})
 
+    distractor_count = max(0, game_config.LISTENING_OPTIONS_PER_QUESTION - 1)
     questions = []
     for item in selected:
         distractors = random.sample(
             [m for m in all_meanings if m != item['meaning']],
-            min(3, len(all_meanings) - 1)
+            min(distractor_count, len(all_meanings) - 1)
         )
         options = [item['meaning']] + distractors
         random.shuffle(options)

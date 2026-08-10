@@ -70,14 +70,26 @@ def test_words_at_cap_is_allowed(client):
 
 
 def test_exceeding_rate_limit_returns_429(client):
+    # rate_limit_config.get_configured_rate() 固定回傳呼叫端傳入的預設值——
+    # 這支測試驗證的是「限流機制本身有生效」，不是動態可調這件事（那個
+    # 由 fastAPI/tests/test_rate_limit_config_refresh.py 專門覆蓋）。沒有
+    # 這層隔離，測試會真的對 127.0.0.1:8000 發 HTTP 請求（見
+    # rate_limit_config._refresh_if_stale），本機若剛好有開發用的 Django
+    # server 在跑、且這個 key 的 RateLimitRule 被後台改過非預設值，會讓
+    # 測試變得環境相依、間歇性失敗——這個坑在 test_grammar_endpoints.py
+    # 已經真實發生過一次。
     from fastAPI.rate_limit import limiter
     limiter.reset()
     try:
-        with patch("fastAPI.routes.crawler.query", return_value={}):
-            for _ in range(10):
+        with patch(
+            "fastAPI.rate_limit_config.get_configured_rate",
+            side_effect=lambda key, default: default,
+        ):
+            with patch("fastAPI.routes.crawler.query", return_value={}):
+                for _ in range(10):
+                    response = client.post("/api/v1/crawler/dictionary/", json={"words": ["balay"]})
+                    assert response.status_code == 200
                 response = client.post("/api/v1/crawler/dictionary/", json={"words": ["balay"]})
-                assert response.status_code == 200
-            response = client.post("/api/v1/crawler/dictionary/", json={"words": ["balay"]})
         assert response.status_code == 429
     finally:
         limiter.reset()

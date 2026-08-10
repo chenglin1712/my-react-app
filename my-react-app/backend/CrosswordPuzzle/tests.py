@@ -5,16 +5,29 @@ from django.core.cache import cache
 from django.test import TestCase, Client
 from django.test.utils import override_settings
 
+from adminapi.models import CrosswordTayalWord
 from CrosswordPuzzle.views import _get_words_from_db
+
+
+# 泰雅語填字遊戲改讀 CrosswordTayalWord（見規劃文件「並行項目」章節），這裡
+# 種幾筆長度落在預設詞長範圍（4-10）內的詞，讓依賴「泰雅語能正常出題」的
+# 測試不必逐一各自建資料。
+_SAMPLE_TAYAL_WORDS = [
+    ("apah", "糯米飯"), ("bahat", "西瓜"), ("banan", "高粱"), ("bazing", "蛋"),
+    ("kagang", "螃蟹"), ("llyung", "河流"), ("khelang", "客家人"),
+]
 
 
 class GenerateCrosswordTest(TestCase):
     """generate_crossword 現在要求登入 + 限流（見 views.py 的稽核修正），
-    這裡驗證這兩層防護，以及 tayal（走內建 word_list，不查資料庫）能正常出題。"""
+    這裡驗證這兩層防護，以及 tayal（讀 CrosswordTayalWord，不查辭典資料庫）
+    能正常出題。"""
 
     def setUp(self):
         self.client = Client()
         cache.clear()
+        for index, (word, meaning) in enumerate(_SAMPLE_TAYAL_WORDS):
+            CrosswordTayalWord.objects.create(word=word, meaning=meaning, sort_order=index)
 
     @override_settings(AUTH_DEV_BYPASS=False)
     def test_requires_login_when_bypass_disabled(self):
@@ -26,7 +39,7 @@ class GenerateCrosswordTest(TestCase):
         response = self.client.get('/CrosswordPuzzle/generate/?tribe=tayal')
         self.assertEqual(response.status_code, 429)
 
-    def test_generates_grid_for_tayal_fallback_word_list(self):
+    def test_generates_grid_for_tayal_from_db_word_list(self):
         response = self.client.get('/CrosswordPuzzle/generate/?tribe=tayal')
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -37,16 +50,25 @@ class GenerateCrosswordTest(TestCase):
         # debug_loops 是內部運算迴圈次數，純除錯用，正式環境 API 不該外露。
         self.assertNotIn('debug_loops', data['info'])
 
+    def test_tayal_word_list_too_small_returns_500(self):
+        # 只留 2 筆（低於 generate_crossword 要求的最少 5 筆），確認改讀資料庫
+        # 之後，詞庫不足的降級行為跟其餘族語（_get_words_from_db 分支）一致，
+        # 不是靜默生成殘缺的填字遊戲。
+        CrosswordTayalWord.objects.exclude(word__in=["apah", "bahat"]).delete()
+        response = self.client.get('/CrosswordPuzzle/generate/?tribe=tayal')
+        self.assertEqual(response.status_code, 500)
+
     def test_unsupported_tribe_returns_400_instead_of_silent_tayal_fallback(self):
         # 回歸測試：修正前，任何不在 _ALL_TRIBE_IDS 裡的族語值都會落到跟 tayal
-        # 一模一樣的 else 分支（沿用內建 word_list），靜默回傳泰雅語填字遊戲而非
-        # 報錯——使用者以為自己玩的是別的族語，實際上悄悄拿到錯部落的題目。
+        # 一模一樣的 else 分支，靜默回傳泰雅語填字遊戲而非報錯——使用者以為
+        # 自己玩的是別的族語，實際上悄悄拿到錯部落的題目。
         response = self.client.get('/CrosswordPuzzle/generate/?tribe=not-a-real-tribe')
         self.assertEqual(response.status_code, 400)
 
 
 class GetWordsFromDbTest(TestCase):
-    """_get_words_from_db 的過濾邏輯：只留純英文字母、長度 4-10、有中文解釋的詞。"""
+    """_get_words_from_db 的過濾邏輯：只留純英文字母、長度落在指定範圍、
+    有中文解釋的詞。"""
 
     def test_filters_non_alpha_short_and_unexplained_words(self):
         mock_db = MagicMock()
@@ -57,7 +79,7 @@ class GetWordsFromDbTest(TestCase):
             ("balay", None),      # 沒有解釋，過濾
         ]
         with patch('CrosswordPuzzle.views.SessionLocal', return_value=mock_db):
-            results, err = _get_words_from_db("some-tribe-id")
+            results, err = _get_words_from_db("some-tribe-id", min_length=4, max_length=10, limit=30)
 
         self.assertIsNone(err)
         self.assertEqual(results, [["cyux", "高興"]])
@@ -69,10 +91,21 @@ class GetWordsFromDbTest(TestCase):
         mock_db = MagicMock()
         mock_db.execute.side_effect = Exception("db is locked")
         with patch('CrosswordPuzzle.views.SessionLocal', return_value=mock_db):
-            results, err = _get_words_from_db("some-tribe-id")
+            results, err = _get_words_from_db("some-tribe-id", min_length=4, max_length=10, limit=30)
 
         self.assertEqual(results, [])
         self.assertTrue(err)
+
+    def test_respects_configurable_length_bounds(self):
+        mock_db = MagicMock()
+        mock_db.execute.return_value.fetchall.return_value = [
+            ("cyux", "高興"), ("balay", "真的"), ("qutuxbaga", "一個東西"),
+        ]
+        with patch('CrosswordPuzzle.views.SessionLocal', return_value=mock_db):
+            results, err = _get_words_from_db("some-tribe-id", min_length=5, max_length=6, limit=30)
+
+        self.assertIsNone(err)
+        self.assertEqual(results, [["balay", "真的"]])
 
 
 class SubmitAnsTest(TestCase):

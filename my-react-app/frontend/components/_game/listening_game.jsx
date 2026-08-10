@@ -70,7 +70,11 @@ function ListeningGame({ tribe = "tayal" }) {
   const {
     status, questions, current, answers, setAnswers, loading, error,
     start, restart, goToNext, progressPct,
-  } = useGameSession({ endpoint: import.meta.env.VITE_API_LISTENING_QUESTIONS_URL, tribe, count: 10 });
+    // count 不在這裡寫死——省略時後端用 GameConfig.listening_questions_per_round
+    // 當預設值（後台可調），跟 pronunciation_game.jsx 刻意固定傳 count=5 不同：
+    // 那邊是借用同一個出題端點的詞彙池，但發音練習每輪題數是獨立的遊戲設計，
+    // 不該被「聽力遊戲每輪題數」這個設定連動改變。
+  } = useGameSession({ endpoint: import.meta.env.VITE_API_LISTENING_QUESTIONS_URL, tribe });
   const { isPlaying, play: playAudio, stop: stopAudio } = useGameAudioPlayer(audioBaseUrl);
 
   const [selected, setSelected] = useState(null);   // 使用者選的答案

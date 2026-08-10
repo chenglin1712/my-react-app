@@ -28,6 +28,10 @@ import WordEditor from './dictionary/WordEditor';
 import TaxonomyManager from './dictionary/TaxonomyManager';
 import GrammarTree from './dictionary/GrammarTree';
 import ImportWizard from './dictionary/ImportWizard';
+import GameSettings from './games/GameSettings';
+import RateLimitSettings from './system/RateLimitSettings';
+import FeatureFlags from './system/FeatureFlags';
+import CacheManagement from './system/CacheManagement';
 
 const AdminApp = () => {
     const [pendingAnnouncementCount, setPendingAnnouncementCount] = useState();
@@ -78,6 +82,10 @@ const AdminApp = () => {
                 <Route path="dictionary/grammar" element={<GrammarTree />} />
                 <Route path="dictionary/import" element={<ImportWizard />} />
                 <Route path="dictionary/import/:id" element={<ImportWizard />} />
+                <Route path="games/settings" element={<GameSettings />} />
+                <Route path="system/cache" element={<CacheManagement />} />
+                <Route path="system/rate-limits" element={<RateLimitSettings />} />
+                <Route path="system/feature-flags" element={<FeatureFlags />} />
             </Route>
         </Routes>
     );

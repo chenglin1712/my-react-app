@@ -16,6 +16,7 @@ from fastapi import APIRouter,Request
 from fastapi.responses import JSONResponse
 from bs4 import BeautifulSoup
 
+from fastAPI import rate_limit_config
 from fastAPI.rate_limit import limiter
 
 router = APIRouter()
@@ -146,7 +147,7 @@ def query(keyword):
     return None
 
 @router.post("/dictionary/")
-@limiter.limit("10/minute")  # 對外部網站的放大請求，比照 vision.py 呼叫外部 API 的保守限流
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("crawler_search_tayal_dictionary", "10/minute"))  # 對外部網站的放大請求，比照 vision.py 呼叫外部 API 的保守限流
 async def search_tayal_dictionary(request: Request):
     """ 查詢 Tayal 字典 API """
     try:

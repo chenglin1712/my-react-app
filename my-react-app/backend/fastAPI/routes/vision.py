@@ -9,6 +9,7 @@ import os
 import time
 from deep_translator import GoogleTranslator
 
+from fastAPI import rate_limit_config
 from fastAPI.rate_limit import limiter
 
 load_dotenv()
@@ -56,7 +57,7 @@ def translate_with_retry(text: str, retries=3, delay=1) -> str | None:
     return None
 
 @router.post("/analyze_image/")
-@limiter.limit("10/minute")  # 呼叫付費 Google Cloud Vision API，每用戶每分鐘最多 10 次
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("vision_analyze_image", "10/minute"))  # 呼叫付費 Google Cloud Vision API，每用戶每分鐘最多 10 次（後台可調，見 rate_limit_config.py）
 async def analyze_image(request: Request):
     try:
         form = await request.form()

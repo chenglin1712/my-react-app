@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { BarChart3, BookOpen, ClipboardCheck, FileQuestion, LayoutDashboard, Megaphone, Settings, Users } from 'lucide-react';
+import { BarChart3, BookOpen, ClipboardCheck, FileQuestion, Gamepad2, LayoutDashboard, Megaphone, Settings, Users } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import '../../../static/css/_admin/layout.css';
 
@@ -29,7 +29,14 @@ const NAV_GROUPS = [
     },
     { label: '使用者', icon: Users, items: [{ label: '使用者管理', to: '/admin/users' }] },
     { label: '分析', icon: BarChart3, items: [{ label: '搜尋分析', to: '/admin/analytics/search' }, { label: '題目品質分析', to: '/admin/analytics/quiz-quality' }, { label: '留存分析', to: '/admin/analytics/retention' }] },
-    { label: '系統', icon: Settings, items: [{ label: '系統維運' }] },
+    { label: '遊戲', icon: Gamepad2, items: [{ label: '遊戲參數設定', to: '/admin/games/settings' }] },
+    {
+        label: '系統', icon: Settings, items: [
+            { label: '快取管理', to: '/admin/system/cache' },
+            { label: '限流設定', to: '/admin/system/rate-limits' },
+            { label: '功能開關', to: '/admin/system/feature-flags' },
+        ],
+    },
 ];
 
 const getBreadcrumb = (pathname) => {
@@ -57,6 +64,10 @@ const getBreadcrumb = (pathname) => {
     if (pathname === '/admin/moderation/reports') return ['審核', '檢舉佇列'];
     if (pathname === '/admin/users') return ['使用者', '使用者管理'];
     if (pathname.startsWith('/admin/users/')) return ['使用者', '使用者管理', '詳情'];
+    if (pathname === '/admin/games/settings') return ['遊戲', '遊戲參數設定'];
+    if (pathname === '/admin/system/cache') return ['系統', '快取管理'];
+    if (pathname === '/admin/system/rate-limits') return ['系統', '限流設定'];
+    if (pathname === '/admin/system/feature-flags') return ['系統', '功能開關'];
     return [decodeURIComponent(pathname.split('/').filter(Boolean).at(-1) || '總覽')];
 };
 

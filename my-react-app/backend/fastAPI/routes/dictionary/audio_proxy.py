@@ -14,6 +14,7 @@ from config.tribes import resolve_tribe_name
 from config.debug_flag import is_debug
 from config.audio_source import get_ilrdf_audio_api
 from config.media_source import get_media_source_mode
+from fastAPI import rate_limit_config
 from fastAPI.rate_limit import limiter
 from fastAPI.url_safety import UnsafeConnectionError, assert_response_from_safe_peer, is_safe_redirect_target
 
@@ -42,7 +43,7 @@ def _lookup_verified_audio_asset(db: Session, file_id: str):
 
 
 @router.get("/audio/{file_id:path}")
-@limiter.limit("60/minute")  # 原本沒有限流，見同檔案其他端點的說明
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_audio_proxy_proxy_audio", "60/minute"))  # 原本沒有限流，見同檔案其他端點的說明
 async def proxy_audio(request: Request, file_id: str, db: Session = Depends(get_db)):
     # P5 辭典媒體自主化：有自己 Storage 的已驗證副本就直接 302 過去，讓
     # Google 的 CDN 送檔，這個端點自己不用再扛流量，也不再依賴 ILRDF 存活。
@@ -173,7 +174,7 @@ if is_debug():
 
 
 @router.post("/sentence-audio/")
-@limiter.limit("60/minute")  # 原本沒有限流，見同檔案其他端點的說明
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_audio_proxy_get_sentence_audio", "60/minute"))  # 原本沒有限流，見同檔案其他端點的說明
 async def get_sentence_audio(request: Request, body: SentenceAudioRequest, db: Session = Depends(get_db)):
     """
     將句子拆成詞，依序查詢各詞在字典中的音檔 fileId，

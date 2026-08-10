@@ -16,6 +16,7 @@ from dictionary_db.word_data import (
     load_sources_for_words,
 )
 from config.tribes import TRIBES, TRIBE_MAP, resolve_tribe_name
+from fastAPI import rate_limit_config
 from fastAPI.rate_limit import limiter
 from fastAPI.usage_events import record_event
 
@@ -293,7 +294,7 @@ def _search_multi_words(db: Session, words: List[str], tribe_name: str) -> Tuple
 
 
 @router.post("/keys/")
-@limiter.limit("60/minute")  # 全表掃描（走快取），每用戶每分鐘最多 60 次避免大量請求造成壓力
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_search_multiword", "60/minute"))  # 全表掃描（走快取），每用戶每分鐘最多 60 次避免大量請求造成壓力
 async def search_tayal_dictionary(request: Request, body: MultiWordSearchRequest, db: Session = Depends(get_db)):
     """多關鍵字搜尋"""
     try:
@@ -325,7 +326,7 @@ async def search_tayal_dictionary(request: Request, body: MultiWordSearchRequest
 
 
 @router.post("/all/")
-@limiter.limit("60/minute")  # 全表掃描（走快取），每用戶每分鐘最多 60 次避免 fetchAllWords 大量請求造成壓力
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_search_all_words", "60/minute"))  # 全表掃描（走快取），每用戶每分鐘最多 60 次避免 fetchAllWords 大量請求造成壓力
 async def all_tayal_dictionary(request: Request, body: AllWordsRequest, db: Session = Depends(get_db)):
     """查詢所有詞條。可選傳入 letter/frequency/category/favorites_only(+favorite_names)/
     sort_order 做篩選與排序，並用 limit/offset 做分頁；都不傳則維持原本回傳全部
@@ -368,7 +369,7 @@ def _search_single_keyword(db: Session, keyword: str, tribe_name: str):
 
 
 @router.post("/key/")
-@limiter.limit("60/minute")  # 原本沒有限流，見同檔案其他端點的說明
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_search_allsearch", "60/minute"))  # 原本沒有限流，見同檔案其他端點的說明
 async def allsearch_tayal_dictionary(request: Request, body: KeywordRequest, db: Session = Depends(get_db)):
     """單一字搜尋"""
     try:

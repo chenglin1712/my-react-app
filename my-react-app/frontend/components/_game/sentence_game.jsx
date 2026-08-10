@@ -70,7 +70,9 @@ function SentenceGame({ tribe = "tayal" }) {
   const {
     status, questions, current, answers, setAnswers, loading, error,
     start, restart, goToNext, progressPct,
-  } = useGameSession({ endpoint: import.meta.env.VITE_API_SENTENCE_QUESTIONS_URL, tribe, count: 5 });
+    // count 不在這裡寫死——省略時後端用 GameConfig.sentence_questions_per_round
+    // 當預設值（後台可調）。
+  } = useGameSession({ endpoint: import.meta.env.VITE_API_SENTENCE_QUESTIONS_URL, tribe });
   const { isPlaying, play: playAudio, stop: stopAudio } = useGameAudioPlayer(audioBaseUrl);
 
   const [selected, setSelected] = useState(null);

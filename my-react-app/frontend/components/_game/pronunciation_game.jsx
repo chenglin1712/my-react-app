@@ -12,10 +12,15 @@ import PlayingScreen from "./pronunciation/PlayingScreen";
 import ResultScreen from "./pronunciation/ResultScreen";
 import "../../static/css/_game/pronunciation.css";
 
-const RATING = (score) => {
-  if (score >= 80) return { label: "優秀", cls: "excellent" };
-  if (score >= 60) return { label: "不錯", cls: "good" };
-  if (score >= 40) return { label: "繼續加油", cls: "fair" };
+// 三個門檻值的預設值只在後端還沒回應過任何一次比對結果時當 fallback 用
+// （見下方 thresholds state）；一旦後端回過 rating_thresholds，就一律用
+// 後端當下的設定值，不再依賴這裡寫死的數字。
+const DEFAULT_RATING_THRESHOLDS = { excellent: 80, good: 60, fair: 40 };
+
+const RATING = (score, thresholds = DEFAULT_RATING_THRESHOLDS) => {
+  if (score >= thresholds.excellent) return { label: "優秀", cls: "excellent" };
+  if (score >= thresholds.good) return { label: "不錯", cls: "good" };
+  if (score >= thresholds.fair) return { label: "繼續加油", cls: "fair" };
   return { label: "再試試", cls: "poor" };
 };
 
@@ -38,6 +43,7 @@ function PronunciationGame({ tribe = "tayal" }) {
   const [score, setScore] = useState(null);
   const [officialScore, setOfficialScore] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [thresholds, setThresholds] = useState(DEFAULT_RATING_THRESHOLDS);
 
   const resetRecState = () => {
     resetRecording();
@@ -90,6 +96,9 @@ function PronunciationGame({ tribe = "tayal" }) {
       const finalScore = Math.round(data.score);
       setScore(finalScore);
       setOfficialScore(data.official_score != null ? Math.round(data.official_score) : null);
+      if (data.rating_thresholds) {
+        setThresholds(data.rating_thresholds);
+      }
       setRecState("submitted");
 
       // 3. 上傳錄音到 Firebase Storage（背景執行，不阻塞 UI）
@@ -133,7 +142,7 @@ function PronunciationGame({ tribe = "tayal" }) {
   if (status === "playing") {
     if (!questions.length) return null;
     const q = questions[current];
-    const rating = score !== null ? RATING(score) : null;
+    const rating = score !== null ? RATING(score, thresholds) : null;
 
     return (
       <PlayingScreen
@@ -162,14 +171,14 @@ function PronunciationGame({ tribe = "tayal" }) {
     const avg = answers.length
       ? Math.round(answers.reduce((s, a) => s + a.score, 0) / answers.length)
       : 0;
-    const avgRating = RATING(avg);
+    const avgRating = RATING(avg, thresholds);
 
     return (
       <ResultScreen
         avg={avg}
         avgRating={avgRating}
         answers={answers}
-        ratingOf={RATING}
+        ratingOf={(s) => RATING(s, thresholds)}
         onBack={() => navigate("/game/pronunciation")}
         onRestart={handleRestart}
       />

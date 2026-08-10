@@ -12,9 +12,10 @@ from rest_framework import serializers
 from config.tribes import TRIBE_IDS
 
 from .models import (
-    Announcement, AuditLog, ExamScheduleOverride, HomepageConfig, IrtConfig,
-    QuizChoiceItem, QuizClozePassage, QuizSituationItem, QuizSourceConfig,
-    QuizTrueFalseItem, QuizVocabItem,
+    Announcement, AuditLog, CrosswordTayalWord, ExamScheduleOverride, FeatureFlag,
+    GameConfig, HomepageConfig, IrtConfig, QuizChoiceItem, QuizClozePassage,
+    QuizSituationItem, QuizSourceConfig, QuizTrueFalseItem, QuizVocabItem,
+    RateLimitRule,
 )
 
 # 題庫類內容（QuizVocabItem／QuizClozePassage／QuizSituationItem）共用的
@@ -382,3 +383,111 @@ class PublicIrtConfigSerializer(serializers.ModelSerializer):
             'type_aq_word_translate', 'type_aq_word_match', 'type_aq_sentence_fill', 'type_aq_sentence_order',
             'beta1', 'beta2', 'beta3', 'beta4', 'beta5',
         ]
+
+
+_GAME_CONFIG_FIELDS = [
+    'listening_questions_per_round', 'listening_options_per_question',
+    'sentence_questions_per_round', 'sentence_options_per_question',
+    'pronunciation_max_audio_mb', 'pronunciation_excellent_threshold',
+    'pronunciation_good_threshold', 'pronunciation_fair_threshold',
+    'pronunciation_pass_threshold',
+    'crossword_grid_size', 'crossword_min_word_length', 'crossword_max_word_length',
+    'crossword_words_per_round', 'crossword_compute_time_limit_seconds',
+]
+
+
+class GameConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GameConfig
+        fields = _GAME_CONFIG_FIELDS + ['updated_by', 'updated_at']
+        read_only_fields = ['updated_by', 'updated_at']
+
+    def validate_listening_options_per_question(self, value):
+        if not (2 <= value <= 8):
+            raise serializers.ValidationError('聽力每題選項數必須介於 2 到 8 之間')
+        return value
+
+    def validate_sentence_options_per_question(self, value):
+        if not (2 <= value <= 8):
+            raise serializers.ValidationError('句型每題選項數必須介於 2 到 8 之間')
+        return value
+
+    def validate_crossword_grid_size(self, value):
+        if not (5 <= value <= 30):
+            raise serializers.ValidationError('填字網格大小必須介於 5 到 30 之間')
+        return value
+
+    def validate(self, data):
+        # partial update 時，還沒被這次請求觸及的欄位要 fallback 到目前 instance
+        # 上的值才能正確比較，不能只看這次請求帶了什麼（PATCH 常常只帶一兩個欄位）。
+        def _get(field):
+            return data.get(field, getattr(self.instance, field, None))
+
+        excellent = _get('pronunciation_excellent_threshold')
+        good = _get('pronunciation_good_threshold')
+        fair = _get('pronunciation_fair_threshold')
+        if None not in (excellent, good, fair) and not (excellent >= good >= fair):
+            raise serializers.ValidationError('發音評分門檻必須維持「優秀 ≥ 不錯 ≥ 繼續加油」的順序')
+
+        min_len = _get('crossword_min_word_length')
+        max_len = _get('crossword_max_word_length')
+        if None not in (min_len, max_len) and min_len > max_len:
+            raise serializers.ValidationError('填字詞長下限不能大於上限')
+
+        return data
+
+
+class PublicGameConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GameConfig
+        # 給 FastAPI 輪詢用（見 views.py 的 public_game_config，無需登入），
+        # 不含 updated_by／updated_at 這些後台維運資訊。
+        fields = _GAME_CONFIG_FIELDS
+
+
+class CrosswordTayalWordSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CrosswordTayalWord
+        fields = ['id', 'word', 'meaning', 'sort_order', 'created_by', 'updated_at']
+        read_only_fields = ['id', 'created_by', 'updated_at']
+
+    def validate_word(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError('單字不能空白')
+        return value
+
+    def validate_meaning(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError('中文提示不能空白')
+        return value
+
+
+class RateLimitRuleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RateLimitRule
+        fields = [
+            'id', 'key', 'backend', 'rate', 'default_rate', 'description',
+            'updated_by', 'updated_at',
+        ]
+        read_only_fields = ['id', 'key', 'backend', 'default_rate', 'description', 'updated_by', 'updated_at']
+
+    def validate_rate(self, value):
+        # Django django_ratelimit 格式（"30/m"）與 FastAPI limits 套件格式
+        # （"20/minute"）刻意都接受，兩邊呼叫端各自認得自己的格式（見
+        # RateLimitRule model 的說明），這裡只驗證「數字/單位」的形狀本身，
+        # 不驗證單位是否跟這筆規則的 backend 相符——那個粒度的錯誤，寫錯了
+        # 只會讓對應的限流套件在套用時忽略／出錯，不是資料完整性風險。
+        if not re.match(r'^\d+/(s|m|h|d|second|minute|hour|day)$', value.strip()):
+            raise serializers.ValidationError(
+                '格式不正確，範例："30/m"（Django）或 "20/minute"（FastAPI）'
+            )
+        return value.strip()
+
+
+class FeatureFlagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeatureFlag
+        fields = ['id', 'key', 'label', 'description', 'enabled', 'updated_by', 'updated_at']
+        read_only_fields = ['id', 'key', 'label', 'description', 'updated_by', 'updated_at']

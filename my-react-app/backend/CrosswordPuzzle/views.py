@@ -4,11 +4,13 @@ import re
 from django.http import HttpResponse, JsonResponse
 from django_ratelimit.core import is_ratelimited
 from sqlalchemy import text
-from .crossword import Crossword, Word as CrosswordWord, word_list
+from .crossword import Crossword, Word as CrosswordWord
 from django.views.decorators.csrf import csrf_exempt
 from config.tribes import TRIBE_IDS as _ALL_TRIBE_IDS
 from config.firebase_auth import verify_firebase_token
 from dictionary_db.connect import SessionLocal
+from adminapi.models import CrosswordTayalWord, GameConfig
+from adminapi.rate_limits import get_configured_rate
 from .serializers import SubmitAnsSerializer
 
 logger = logging.getLogger(__name__)
@@ -17,23 +19,26 @@ logger = logging.getLogger(__name__)
 def _rate_limited_response(request, decoded, group, rate, method):
     """依已登入使用者的 uid 限速，邏輯與 AIModel/views.py 一致。"""
     uid = decoded.get("uid", "anon")
+    effective_rate = get_configured_rate(group, rate)
     limited = is_ratelimited(
         request, group=group, key=lambda g, r: uid,
-        rate=rate, method=method, increment=True,
+        rate=effective_rate, method=method, increment=True,
     )
     if limited:
         return JsonResponse({"detail": "請求過於頻繁，請稍後再試"}, status=429)
     return None
 
 
-# 各族語對應的 tribe_id（UUID）。tayal 故意排除：泰雅語填字遊戲沿用內建
-# word_list（見 generate_crossword 的 fallback 分支），不查資料庫。
+# 各族語對應的 tribe_id（UUID）。tayal 故意排除：泰雅語填字遊戲改讀後台
+# 可編輯的 CrosswordTayalWord（見 generate_crossword 的 else 分支／
+# _get_tayal_words），不查 dictionary.db。
 _TRIBE_IDS = {slug: tid for slug, tid in _ALL_TRIBE_IDS.items() if slug != 'tayal'}
 
-def _get_words_from_db(tribe_id: str, limit: int = 30):
-    """從 dictionary.db 取出純英文字母、長度 4-10、有中文解釋的詞彙。
-    explanation_items 已經拆到 word_explanation 表，這裡改成 JOIN 取第一筆解釋
-    （sort_order = 0，對應原本 exp[0]），INNER JOIN 本身就篩掉沒有解釋的字。
+def _get_words_from_db(tribe_id: str, min_length: int, max_length: int, limit: int):
+    """從 dictionary.db 取出純英文字母、長度介於 min_length/max_length 之間、
+    有中文解釋的詞彙。explanation_items 已經拆到 word_explanation 表，這裡
+    改成 JOIN 取第一筆解釋（sort_order = 0，對應原本 exp[0]），INNER JOIN
+    本身就篩掉沒有解釋的字。
 
     走 dictionary_db.connect 共用的 SessionLocal（而非原生 sqlite3.connect），
     這樣才會走 SQLAlchemy 的 QueuePool，且連線時自動套用該 engine 的
@@ -60,7 +65,7 @@ def _get_words_from_db(tribe_id: str, limit: int = 30):
     for name, cn in rows:
         if not re.match(r'^[a-zA-Z]+$', name):
             continue
-        if not (4 <= len(name) <= 10):
+        if not (min_length <= len(name) <= max_length):
             continue
         if not cn:
             continue
@@ -69,6 +74,22 @@ def _get_words_from_db(tribe_id: str, limit: int = 30):
             break
 
     return results, None
+
+
+def _get_tayal_words(min_length: int, max_length: int, limit: int):
+    """泰雅語填字詞庫改讀 CrosswordTayalWord（後台可編輯），取代原本
+    crossword.py 寫死的 20 筆陣列。詞長篩選跟其餘族語（_get_words_from_db）
+    套用同一組 GameConfig 參數，維持行為一致——後台把詞長範圍改窄時，
+    泰雅語跟其他族語的候選詞應該同時受影響，不是只有一邊生效。"""
+    words = CrosswordTayalWord.objects.order_by('sort_order', 'id')
+    results = []
+    for w in words:
+        if not (min_length <= len(w.word) <= max_length):
+            continue
+        results.append([w.word.lower(), w.meaning])
+        if len(results) >= limit:
+            break
+    return results
 
 
 def generate_crossword(request):
@@ -90,15 +111,23 @@ def generate_crossword(request):
     if tribe not in _ALL_TRIBE_IDS:
         return JsonResponse({'detail': f'不支援的族語：{tribe}'}, status=400)
 
-    # 依族語選擇詞庫
+    game_config = GameConfig.load()
+    min_length = game_config.crossword_min_word_length
+    max_length = game_config.crossword_max_word_length
+    words_per_round = game_config.crossword_words_per_round
+
+    # 依族語選擇詞庫——泰雅語改讀後台可編輯的 CrosswordTayalWord（取代原本
+    # 寫死的 word_list），其餘族語沿用即時查辭典資料庫。
     if tribe in _TRIBE_IDS:
-        selected_words, err = _get_words_from_db(_TRIBE_IDS[tribe])
+        selected_words, err = _get_words_from_db(_TRIBE_IDS[tribe], min_length, max_length, words_per_round)
         if err:
             return JsonResponse({'detail': '資料庫讀取失敗，請稍後再試'}, status=500)
         if len(selected_words) < 5:
             return JsonResponse({'detail': f'詞庫不足，無法生成填字遊戲（僅找到 {len(selected_words)} 筆）'}, status=500)
     else:
-        selected_words = [[item[0], item[1]] for item in word_list]
+        selected_words = _get_tayal_words(min_length, max_length, words_per_round)
+        if len(selected_words) < 5:
+            return JsonResponse({'detail': f'詞庫不足，無法生成填字遊戲（僅找到 {len(selected_words)} 筆）'}, status=500)
 
     available_words_for_generator = []
     for item in selected_words:
@@ -106,13 +135,15 @@ def generate_crossword(request):
             CrosswordWord(item[0], item[1])   #[單字, 提示] 的列表
         )
 
-    #設定填字遊戲格子=13*13
-    grid_cols = 13
-    grid_rows = 13
+    #設定填字遊戲格子大小（後台可調，見 GameConfig.crossword_grid_size）
+    grid_cols = game_config.crossword_grid_size
+    grid_rows = game_config.crossword_grid_size
 
     #計算填字遊戲
-    crossword_generator = Crossword(grid_cols, grid_rows, empty='-', maxloops=5000, available_words=available_words_for_generator)
-    crossword_generator.compute_crossword(time_permitted=2) #2秒找填字遊戲
+    crossword_generator = Crossword(
+        grid_cols, grid_rows, empty='-', maxloops=5000, available_words=available_words_for_generator,
+    )
+    crossword_generator.compute_crossword(time_permitted=game_config.crossword_compute_time_limit_seconds)
 
     # 獲取生成的填字遊戲資料進行編號排序
     crossword_generator.order_number_words()

@@ -16,6 +16,7 @@ from dictionary_db.word_data import load_explanation_items_for_words, load_audio
 from config.tribes import TRIBE_IDS
 from config.audio_source import get_ilrdf_audio_api
 from config.media_source import get_media_source_mode
+from fastAPI import game_config, rate_limit_config
 from fastAPI.rate_limit import limiter
 from fastAPI.url_safety import UnsafeConnectionError, assert_response_from_safe_peer, is_safe_redirect_target
 from .keyed_cache import KeyedCache
@@ -858,7 +859,7 @@ def _score_from_bytes(model, user_emb, audio_bytes):
 
 
 @router.post("/compare_audio/")
-@limiter.limit("20/minute")  # CPU 密集的 wav2vec2 推論 + 對外下載，每用戶每分鐘最多 20 次
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("quiz_compare_audio", "20/minute"))  # CPU 密集的 wav2vec2 推論 + 對外下載，每用戶每分鐘最多 20 次（後台可調）
 async def compare_audio(
     request: Request,
     user_audio: UploadFile = File(...),
@@ -872,6 +873,9 @@ async def compare_audio(
     if not re.match(r'^[a-zA-Z0-9._-]+$', audio_id):
         return make_error("invalid_audio_id", "audio_id 格式不合法")
 
+    game_config.refresh_game_config_if_stale()
+    max_audio_bytes = game_config.PRONUNCIATION_MAX_AUDIO_MB * 1024 * 1024
+
     try:
         # Step A — 讀取使用者錄音
         try:
@@ -879,8 +883,8 @@ async def compare_audio(
         except Exception as e:
             return make_error("read_user_audio", str(e))
 
-        if len(user_bytes) > MAX_AUDIO_BYTES:
-            return make_error("file_too_large", "音檔不得超過 10 MB")
+        if len(user_bytes) > max_audio_bytes:
+            return make_error("file_too_large", f"音檔不得超過 {game_config.PRONUNCIATION_MAX_AUDIO_MB} MB")
 
         # Step B — 使用者錄音轉 WAV + 取得嵌入
         # 以下都是同步、CPU 密集或（下載官方音檔時）阻塞式 I/O，用 asyncio.to_thread
@@ -939,7 +943,14 @@ async def compare_audio(
             "score": final_score,
             "official_score": official_score,
             "ref_score": best_ref_score,
-            "passed": final_score >= 70,
+            "passed": final_score >= game_config.PRONUNCIATION_PASS_THRESHOLD,
+            # 優/良/待加強三級門檻——原本完全在前端寫死（pronunciation_game.jsx
+            # 的 RATING()），這裡隨分數一起回傳，前端改用這份值當顯示依據。
+            "rating_thresholds": {
+                "excellent": game_config.PRONUNCIATION_EXCELLENT_THRESHOLD,
+                "good": game_config.PRONUNCIATION_GOOD_THRESHOLD,
+                "fair": game_config.PRONUNCIATION_FAIR_THRESHOLD,
+            },
         }
 
     except Exception as e:

@@ -7,7 +7,7 @@ from django.test.utils import override_settings
 
 from crawler.dictionary_source import fetch_words_by_glosses
 from adminapi.models import (
-    ExamScheduleCrawlStatus, ExamScheduleOverride, QuizChoiceItem, QuizClozePassage,
+    ExamScheduleCrawlStatus, ExamScheduleOverride, FeatureFlag, QuizChoiceItem, QuizClozePassage,
     QuizSituationItem, QuizTrueFalseItem, QuizVocabItem,
 )
 
@@ -41,6 +41,31 @@ class GetQuizDataTest(TestCase):
         response = self.client.get('/crawler/?tribe=tayal&level=9')
         self.assertEqual(response.status_code, 400)
         self.assertIn('不支援的等級', response.json()['detail'])
+
+    def test_disabled_tribe_flag_returns_403_not_empty_list(self):
+        # 族語測驗總開關關閉時要明確回 403，不是靜默回空題目陣列——空陣列
+        # 會讓學生誤以為題庫剛好是空的，403 才能讓前端顯示「暫停開放」。
+        FeatureFlag.objects.create(key='quiz_enabled_tayal', label='泰雅語測驗', enabled=False)
+        response = self.client.get('/crawler/?tribe=tayal&level=1')
+        self.assertEqual(response.status_code, 403)
+
+    def test_disabled_flag_does_not_affect_other_tribes(self):
+        FeatureFlag.objects.create(key='quiz_enabled_tayal', label='泰雅語測驗', enabled=False)
+        with patch('crawler.views.requests.get') as mock_get:
+            mock_get.return_value = MagicMock(status_code=200, json=lambda: {})
+            response = self.client.get('/crawler/?tribe=amis&level=3')
+        self.assertNotEqual(response.status_code, 403)
+
+    def test_no_flag_record_defaults_to_enabled(self):
+        # seed_feature_flags 沒跑過、或這個族語從未被登錄過 FeatureFlag 時，
+        # 視為未關閉——維持現況行為，不強制每個族語都要先在資料庫登錄過。
+        response = self.client.get('/crawler/?tribe=tayal&level=3')
+        self.assertNotEqual(response.status_code, 403)
+
+    def test_enabled_true_flag_does_not_block(self):
+        FeatureFlag.objects.create(key='quiz_enabled_tayal', label='泰雅語測驗', enabled=True)
+        response = self.client.get('/crawler/?tribe=tayal&level=3')
+        self.assertNotEqual(response.status_code, 403)
 
     def test_level_3_uses_local_bank_not_external_api(self):
         # level 3/4 完全不碰 requests.get——資料來源是後台題庫（QuizVocabItem／
@@ -280,6 +305,11 @@ class GetSituationQuizDataTest(TestCase):
         response = self.client.get('/crawler/situation-quiz/?tribe=not_a_tribe')
         self.assertEqual(response.status_code, 400)
         self.assertIn('不支援的族語', response.json()['detail'])
+
+    def test_disabled_tribe_flag_returns_403(self):
+        FeatureFlag.objects.create(key='quiz_enabled_tayal', label='泰雅語測驗', enabled=False)
+        response = self.client.get('/crawler/situation-quiz/?tribe=tayal')
+        self.assertEqual(response.status_code, 403)
 
     def test_only_serves_published_items_and_carries_item_id(self):
         published = QuizSituationItem.objects.create(

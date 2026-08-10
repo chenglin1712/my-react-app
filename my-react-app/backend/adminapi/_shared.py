@@ -17,16 +17,22 @@ from django.http import JsonResponse
 from django_ratelimit.core import is_ratelimited
 
 from .models import AuditLog
+from .rate_limits import get_configured_rate
 
 logger = logging.getLogger(__name__)
 
 
 def rate_limited_response(request, decoded, group, rate="60/m", method="POST"):
-    """依已登入使用者的 uid 限速，邏輯與 AIModel/views.py、CrosswordPuzzle/views.py 一致。"""
+    """依已登入使用者的 uid 限速，邏輯與 AIModel/views.py、CrosswordPuzzle/views.py 一致。
+
+    rate 參數現在只是「資料庫裡沒有這個 group 對應的 RateLimitRule 時」的
+    退回值——見 rate_limits.get_configured_rate() 的說明，呼叫端不需要
+    因為這次改動修改任何一個既有呼叫點。"""
     uid = decoded.get("uid", "anon")
+    effective_rate = get_configured_rate(group, rate)
     limited = is_ratelimited(
         request, group=group, key=lambda g, r: uid,
-        rate=rate, method=method, increment=True,
+        rate=effective_rate, method=method, increment=True,
     )
     if limited:
         return JsonResponse({"detail": "請求過於頻繁，請稍後再試"}, status=429)
@@ -36,9 +42,10 @@ def rate_limited_response(request, decoded, group, rate="60/m", method="POST"):
 def ip_rate_limited_response(request, group, rate="60/m", method="GET"):
     """給匿名公開端點用（沒有登入者 uid 可綁），依 IP 限速。"""
     client_ip = request.META.get("REMOTE_ADDR", "unknown")
+    effective_rate = get_configured_rate(group, rate)
     limited = is_ratelimited(
         request, group=group, key=lambda g, r: client_ip,
-        rate=rate, method=method, increment=True,
+        rate=effective_rate, method=method, increment=True,
     )
     if limited:
         return JsonResponse({"detail": "請求過於頻繁，請稍後再試"}, status=429)

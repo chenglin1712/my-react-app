@@ -11,9 +11,10 @@ from bs4 import BeautifulSoup
 from config.firebase_auth import verify_firebase_token
 from config.tribes import TRIBE_IDS, TRIBE_MAP
 from adminapi.models import (
-    ExamScheduleCrawlStatus, ExamScheduleOverride, QuizChoiceItem, QuizClozePassage,
+    ExamScheduleCrawlStatus, ExamScheduleOverride, FeatureFlag, QuizChoiceItem, QuizClozePassage,
     QuizSituationItem, QuizTrueFalseItem, QuizVocabItem,
 )
+from adminapi.rate_limits import get_configured_rate
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +25,10 @@ _EXTERNAL_TIMEOUT = 10
 
 def _rate_limited_response(request, key, group, rate, method):
     """依 key（已登入使用者 uid 或 IP）限速，邏輯與 AIModel/views.py 一致。"""
+    effective_rate = get_configured_rate(group, rate)
     limited = is_ratelimited(
         request, group=group, key=lambda g, r: key,
-        rate=rate, method=method, increment=True,
+        rate=effective_rate, method=method, increment=True,
     )
     if limited:
         return JsonResponse({"detail": "請求過於頻繁，請稍後再試"}, status=429)
@@ -252,6 +254,20 @@ def build_situation_test_from_db(tribe):
     }
 
 
+def _quiz_disabled_response(tribe):
+    """族語測驗總開關（見 adminapi.models.FeatureFlag）——族語老師審定
+    未完成前，管理者可以先關閉該族語的測驗，get_quiz_data／
+    get_situation_quiz_data 共用同一份檢查。回 403 附清楚訊息，不是靜默
+    回傳空題目陣列：空陣列會讓學生以為「題庫剛好是空的」，403 才能讓
+    前端明確顯示「這個族語的測驗目前暫停開放」而不是誤導成系統故障。
+    找不到對應 FeatureFlag 紀錄時視為未關閉（維持現況行為，見
+    seed_feature_flags 管理指令的說明）。"""
+    flag = FeatureFlag.objects.filter(key=f"quiz_enabled_{tribe}").first()
+    if flag is not None and not flag.enabled:
+        return JsonResponse({"detail": "這個族語的測驗目前暫停開放，請稍後再試。"}, status=403)
+    return None
+
+
 def get_situation_quiz_data(request):
     """情境題的獨立出題端點——跟 get_quiz_data 同一套認證/限流標準，
     但刻意不共用同一個 URL/函式：情境題沒有 level 概念，混進
@@ -269,6 +285,10 @@ def get_situation_quiz_data(request):
     tribe = request.GET.get("tribe", "tayal")
     if tribe not in TRIBE_IDS:
         return JsonResponse({"detail": f"不支援的族語: {tribe}"}, status=400)
+
+    disabled_resp = _quiz_disabled_response(tribe)
+    if disabled_resp:
+        return disabled_resp
 
     display_name = TRIBE_MAP.get(tribe, tribe)
     format_data = {"chapter_name": display_name, "parts": [build_situation_test_from_db(tribe)]}
@@ -297,6 +317,10 @@ def get_quiz_data(request):
         return JsonResponse({"detail": f"不支援的族語: {tribe}"}, status=400)
     if level not in ("1", "2", "3", "4"):
         return JsonResponse({"detail": f"不支援的等級: {level}"}, status=400)
+
+    disabled_resp = _quiz_disabled_response(tribe)
+    if disabled_resp:
+        return disabled_resp
 
     # 四個等級都已經改讀本地題庫（QuizTrueFalseItem／QuizChoiceItem／
     # QuizVocabItem／QuizClozePassage，見 adminapi/quizbank_views.py），

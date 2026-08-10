@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from dictionary_db.connect import get_db
 from config.grammar_affixes import VALID_AFFIX_TYPES as _VALID_AFFIX_TYPES
 from config.tribes import resolve_tribe_name
+from fastAPI import rate_limit_config
 from fastAPI.rate_limit import limiter
 
 from ..keyed_cache import KeyedCache
@@ -155,7 +156,7 @@ def _load_grammar(db: Session, tribe_name: str) -> Optional[dict]:
 
 
 @router.get("/grammar/{tribe}")
-@limiter.limit("60/minute")  # 走 _grammar_cache（每個 tribe 第一次呼叫才真正查詢），比照 search.py 同樣是快取後端點的限流
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_grammar_get_grammar", "60/minute"))  # 走 _grammar_cache（每個 tribe 第一次呼叫才真正查詢），比照 search.py 同樣是快取後端點的限流
 def get_grammar(
     request: Request,
     tribe: str,
@@ -191,7 +192,7 @@ def get_grammar(
 
 
 @router.get("/grammar/{tribe}/search")
-@limiter.limit("20/minute")  # 沒有走快取，每次呼叫都是 3 次前導萬用字元 LIKE 全表掃描，比其他 3 支端點限制更嚴
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_grammar_search_grammar", "20/minute"))  # 沒有走快取，每次呼叫都是 3 次前導萬用字元 LIKE 全表掃描，比其他 3 支端點限制更嚴
 def search_grammar(request: Request, tribe: str, q: str, db: Session = Depends(get_db)):
     """搜尋文法規則或例句
     q: 關鍵字，可搜尋規則標題、功能說明、例句原文、中文翻譯
@@ -316,7 +317,7 @@ def _load_grammar_affixes(db: Session, tribe_name: str, affix_type: Optional[str
 
 
 @router.get("/grammar/{tribe}/affixes")
-@limiter.limit("60/minute")  # 走 _grammar_affixes_cache，比照 search.py 同樣是快取後端點的限流
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_grammar_get_grammar_affixes", "60/minute"))  # 走 _grammar_affixes_cache，比照 search.py 同樣是快取後端點的限流
 def get_grammar_affixes(
     request: Request,
     tribe: str,
@@ -430,7 +431,7 @@ def _load_grammar_quiz_material(db: Session, tribe_name: str, section_key: Optio
 
 
 @router.get("/grammar/{tribe}/quiz")
-@limiter.limit("60/minute")  # 不帶 section_key 時走 _grammar_quiz_cache，比照 search.py 同樣是快取後端點的限流
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_grammar_get_grammar_quiz_material", "60/minute"))  # 不帶 section_key 時走 _grammar_quiz_cache，比照 search.py 同樣是快取後端點的限流
 def get_grammar_quiz_material(
     request: Request,
     tribe: str,

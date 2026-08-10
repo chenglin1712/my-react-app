@@ -66,6 +66,15 @@ describe('AdminLayout', () => {
     expect(screen.getByRole('link', { name: /IRT 參數/ })).toHaveAttribute('href', '/admin/quiz-bank/irt-config');
   });
 
+  test('並行項目上線後，「遊戲」群組與「系統」群組的項目都是真的連結，不再是規劃中佔位', () => {
+    renderLayout();
+    expect(screen.getByRole('link', { name: /遊戲參數設定/ })).toHaveAttribute('href', '/admin/games/settings');
+    expect(screen.getByRole('link', { name: /快取管理/ })).toHaveAttribute('href', '/admin/system/cache');
+    expect(screen.getByRole('link', { name: /限流設定/ })).toHaveAttribute('href', '/admin/system/rate-limits');
+    expect(screen.getByRole('link', { name: /功能開關/ })).toHaveAttribute('href', '/admin/system/feature-flags');
+    expect(screen.queryByText('系統維運')).not.toBeInTheDocument();
+  });
+
   test('待審數量 > 0 時公告管理旁邊顯示徽章，數量是 0 或未提供時不顯示', () => {
     const { unmount } = renderLayout({ pendingAnnouncementCount: 3 });
     expect(screen.getByText('3')).toBeInTheDocument();

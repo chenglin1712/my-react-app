@@ -90,14 +90,29 @@ class TestAffixTypeWhitelist:
 
 
 class TestRateLimiting:
+    """這兩支測試驗證的是「@limiter.limit(...) 真的有生效」這個機制本身，
+    不是限流值動態可調這件事（那個由 test_rate_limit_config_refresh.py
+    專門覆蓋）——所以這裡把 rate_limit_config.get_configured_rate() 固定
+    成直接回傳呼叫端傳入的預設值，等同「Django 連不上，退回寫死值」的
+    情境。沒有這層隔離時，這兩支測試會真的對 127.0.0.1:8000 發 HTTP
+    請求（見 rate_limit_config._refresh_if_stale），如果本機剛好有一個
+    開發用的 Django server 在跑、且 RateLimitRule 表被後台改過非預設值
+    （例如手動驗證時把這個 key 的限流調嚴），測試會用到那個外部、非預期
+    的值而非文件裡寫的 20/minute，導致間歇性、環境相依的失敗——這是
+    實際發生過的真實案例，不是假設情境。"""
+
     def test_get_grammar_rate_limited_after_60_calls(self, client):
         from fastAPI.rate_limit import limiter
         limiter.reset()
         try:
-            for _ in range(60):
+            with patch(
+                "fastAPI.rate_limit_config.get_configured_rate",
+                side_effect=lambda key, default: default,
+            ):
+                for _ in range(60):
+                    response = client.get("/api/v1/dictionary/grammar/tayal")
+                    assert response.status_code == 200
                 response = client.get("/api/v1/dictionary/grammar/tayal")
-                assert response.status_code == 200
-            response = client.get("/api/v1/dictionary/grammar/tayal")
             assert response.status_code == 429
         finally:
             limiter.reset()
@@ -118,15 +133,19 @@ class TestRateLimiting:
         app.dependency_overrides[auth_module.verify_firebase_token] = _fake_auth
         limiter.reset()
         try:
-            with TestClient(app) as search_client:
-                for _ in range(20):
+            with patch(
+                "fastAPI.rate_limit_config.get_configured_rate",
+                side_effect=lambda key, default: default,
+            ):
+                with TestClient(app) as search_client:
+                    for _ in range(20):
+                        response = search_client.get(
+                            "/api/v1/dictionary/grammar/tayal/search", params={"q": "test"}
+                        )
+                        assert response.status_code == 200
                     response = search_client.get(
                         "/api/v1/dictionary/grammar/tayal/search", params={"q": "test"}
                     )
-                    assert response.status_code == 200
-                response = search_client.get(
-                    "/api/v1/dictionary/grammar/tayal/search", params={"q": "test"}
-                )
             assert response.status_code == 429
         finally:
             limiter.reset()

@@ -2,7 +2,8 @@ from django.urls import path
 
 from . import (
     analytics_views, dictionary_grammar_views, dictionary_import_views, dictionary_taxonomy_views,
-    dictionary_views, moderation_views, quizbank_views, review_queue_views, user_views, views,
+    dictionary_views, feature_flag_views, game_config_views, moderation_views, quizbank_views,
+    rate_limit_views, review_queue_views, system_cache_views, user_views, views,
 )
 
 
@@ -122,6 +123,26 @@ urlpatterns = [
     path('dictionary/import/<int:pk>/approve/', dictionary_import_views.import_job_approve),
     path('dictionary/import/<int:pk>/reject/', dictionary_import_views.import_job_reject),
     path('dictionary/export/', dictionary_import_views.dictionary_export),
+
+    # 並行項目：遊戲參數設定
+    path('game-config/', game_config_views.game_config_admin),
+    path('public/game-config/', game_config_views.public_game_config),
+    path('crossword-tayal-words/', game_config_views.crossword_tayal_word_list),
+    path('crossword-tayal-words/<int:pk>/', game_config_views.crossword_tayal_word_detail),
+
+    # 並行項目：限流設定
+    path('rate-limit-rules/', rate_limit_views.rate_limit_rule_list),
+    path('rate-limit-rules/<int:pk>/', rate_limit_views.rate_limit_rule_detail),
+    path('public/fastapi-rate-limit-rules/', rate_limit_views.public_fastapi_rate_limit_rules),
+
+    # 並行項目：功能開關
+    path('feature-flags/', feature_flag_views.feature_flag_list),
+    path('feature-flags/<int:pk>/', feature_flag_views.feature_flag_detail),
+
+    # 並行項目：快取管理
+    path('system/cache/', system_cache_views.system_cache_list),
+    path('system/cache/clear-django/', system_cache_views.system_cache_clear_django),
+    path('system/cache/clear-fastapi/', system_cache_views.system_cache_clear_fastapi),
 
     # P5 數據分析
     path('public/events/', analytics_views.usage_event_create),

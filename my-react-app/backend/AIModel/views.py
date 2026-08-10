@@ -13,6 +13,7 @@ from dictionary_db.model import Word
 from dictionary_db.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS, TRIBE_MAP
 from config.firebase_auth import verify_firebase_token
+from adminapi.rate_limits import get_configured_rate
 from .serializers import TayalChatSerializer, ReviewTayalChatSerializer
 from .services import run_tayal_chat, run_review_tayal_chat
 
@@ -53,9 +54,10 @@ def _rate_limited_response(request, decoded, group, rate="10/m"):
     設定：正式環境設定 REDIS_URL 後所有 gunicorn worker 共用同一份計數，門檻才會
     如實生效；未設定時退回 Django 預設的 LocMemCache，僅單一 process 內有效。"""
     uid = decoded.get("uid", "anon")
+    effective_rate = get_configured_rate(group, rate)
     limited = is_ratelimited(
         request, group=group, key=lambda g, r: uid,
-        rate=rate, method="POST", increment=True,
+        rate=effective_rate, method="POST", increment=True,
     )
     if limited:
         return JsonResponse({"detail": "請求過於頻繁，請稍後再試"}, status=429)
