@@ -893,26 +893,6 @@ class GameConfig(models.Model):
         return "遊戲參數設定"
 
 
-class CrosswordTayalWord(models.Model):
-    """填字遊戲泰雅語專屬詞庫，取代 CrosswordPuzzle/crossword.py 寫死的
-    20 筆 word_list 陣列——其餘四個族語的填字遊戲都是即時查辭典資料庫，
-    只有泰雅語從一開始就是獨立的內建清單（沿用既有設計，不是這次改成
-    查辭典，那是更大的行為變更，不在這次範圍內）。不經送審流程，直接
-    寫入即可——這是「設定」性質的清單，不是需要族語老師審定的辭典內容。
-    """
-    word = models.CharField(max_length=50)
-    meaning = models.CharField(max_length=100)
-    sort_order = models.PositiveIntegerField(default=0)
-    created_by = models.CharField(max_length=128, blank=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['sort_order', 'id']
-
-    def __str__(self):
-        return f"{self.word}／{self.meaning}"
-
-
 class RateLimitRule(models.Model):
     """限流設定的通用登錄表——key 對應 Django 端 adminapi/_shared.py／
     crawler/views.py 既有呼叫點傳入的 group 名稱，或 FastAPI 端新增的

@@ -233,7 +233,15 @@ def build_situation_test_from_db(tribe):
     完全沒有學生端出題路徑（只有後台內容管理），這是第一次真的把它接上
     學生端。情境題不對應官方認證的 1-4 等級（見規劃文件 P5 §4(a)），故意
     不掛進 get_quiz_data 的 level_builders，用獨立的 get_situation_quiz_data
-    端點供應，呼應「獨立練習入口、不掛在 level 1-4 系統裡」的既有決策。"""
+    端點供應，呼應「獨立練習入口、不掛在 level 1-4 系統裡」的既有決策。
+
+    題庫全空時回傳空題目陣列而不是報錯——跟 build_matching_test_from_db／
+    build_cloze_test_from_db 遇到題庫全空時的既有降級行為一致（見
+    test_empty_vocab_pool_produces_zero_questions_not_error），前端
+    ScenarioQuiz.jsx 已經有專屬的「目前沒有可練習的情境題」畫面接住這個
+    情況。跟 _quiz_disabled_response() 的 403 是不同性質：那是管理者
+    主動關閉，這裡是題庫本身還沒有內容，兩者不該用同一種「拒絕靜默」
+    邏輯處理。"""
     pool = list(QuizSituationItem.objects.filter(tribe=tribe, status=QuizSituationItem.STATUS_PUBLISHED))
     k = min(SITUATION_QUESTION_COUNT, len(pool))
     picked = random.sample(pool, k)

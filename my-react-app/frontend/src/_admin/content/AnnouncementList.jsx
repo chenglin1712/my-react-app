@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Badge, Button, Form, Modal, Spinner, Table, Alert } from 'react-bootstrap';
 import { Edit3, Eye, Plus, RefreshCw, Send, Trash2, Undo2, Check, X, Archive, Upload } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
+import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
 import { apiDelete, apiGet, apiPost } from '../../../utils/apiClient';
 import '../../../static/css/_admin/announcements.css';
 
@@ -13,9 +14,6 @@ const CATEGORIES = {
     announcement: '公告', activity: '活動', exam: '考試', maintenance: '系統維護',
 };
 const SOURCES = { admin: '後台建立', crawler: '爬蟲匯入' };
-const TRIBES = {
-    tayal: '泰雅語', amis: '阿美語', bunun: '布農語', kavalan: '噶瑪蘭語', paiwan: '排灣語',
-};
 const STATUSES = {
     draft: { label: '草稿', bg: 'secondary' },
     pending_review: { label: '送審中', bg: 'warning' },
@@ -423,7 +421,7 @@ export default function AnnouncementList() {
                     onChange={(e) => setFilters({ ...filters, tribe: e.target.value })}
                 >
                     <option value="">全部族語</option>
-                    {Object.entries(TRIBES).map(([value, label]) => (
+                    {Object.entries(TRIBE_FULL_NAME_BY_SLUG).map(([value, label]) => (
                         <option key={value} value={value}>{label}</option>
                     ))}
                 </Form.Select>
@@ -472,7 +470,7 @@ export default function AnnouncementList() {
                                     <td>{CATEGORIES[item.category] ?? item.category}</td>
                                     <td>
                                         {item.tribes?.length
-                                            ? item.tribes.map((tribe) => TRIBES[tribe] ?? tribe).join('、')
+                                            ? item.tribes.map((tribe) => TRIBE_FULL_NAME_BY_SLUG[tribe] ?? tribe).join('、')
                                             : '全部族語'}
                                     </td>
                                     <td>

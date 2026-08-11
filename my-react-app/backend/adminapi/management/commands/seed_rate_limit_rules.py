@@ -110,7 +110,6 @@ DJANGO_RULES = [
     ("get_exam_schedule", "60/m", "考試時程爬取"),
     ("game_config_update", "30/m", "遊戲參數設定更新"),
     ("public_game_config", "120/m", "公開遊戲參數（依 IP，供 FastAPI 輪詢）"),
-    ("crossword_tayal_word_write", "30/m", "填字遊戲泰雅語詞庫新增/編輯/刪除"),
     ("rate_limit_rule_update", "30/m", "限流規則更新"),
     ("public_fastapi_rate_limit_rules", "120/m", "公開 FastAPI 限流規則（依 IP，供 FastAPI 輪詢）"),
     ("feature_flag_update", "30/m", "功能開關切換"),

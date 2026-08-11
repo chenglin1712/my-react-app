@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Badge, Button, Form, Modal, Spinner, Table, Tab, Tabs } from 'react-bootstrap';
 import { Check, Edit3, Minus, Plus, Send, Trash2, Undo2, X, Archive } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
+import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../../utils/apiClient';
 import '../../../static/css/_admin/quiz-bank.css';
 
@@ -11,14 +12,6 @@ const CONTENT_EDITORS = ['owner', 'admin', 'editor'];
 // 流程存在的意義，不能照抄公告管理的角色門檻。
 const CONTENT_APPROVERS = ['owner', 'admin', 'reviewer'];
 const PUBLISHERS = ['owner', 'admin'];
-
-const TRIBES = {
-    tayal: '泰雅語',
-    amis: '阿美語',
-    bunun: '布農語',
-    kavalan: '噶瑪蘭語',
-    paiwan: '排灣語',
-};
 
 const CATEGORIES = {
     noun: '名詞',
@@ -426,7 +419,7 @@ function VocabPanel({ role }) {
                     })}
                 >
                     <option value="">全部族語</option>
-                    {Object.entries(TRIBES).map(([value, label]) => (
+                    {Object.entries(TRIBE_FULL_NAME_BY_SLUG).map(([value, label]) => (
                         <option key={value} value={value}>{label}</option>
                     ))}
                 </Form.Select>
@@ -492,7 +485,7 @@ function VocabPanel({ role }) {
                         <tbody>
                             {data.results.length ? data.results.map((item) => (
                                 <tr key={item.id}>
-                                    <td>{TRIBES[item.tribe] ?? item.tribe}</td>
+                                    <td>{TRIBE_FULL_NAME_BY_SLUG[item.tribe] ?? item.tribe}</td>
                                     <td>{CATEGORIES[item.category] ?? item.category}</td>
                                     <td>{item.foreign_word}</td>
                                     <td>{item.chinese_gloss}</td>
@@ -559,7 +552,7 @@ function VocabPanel({ role }) {
                                         tribe: event.target.value,
                                     })}
                                 >
-                                    {Object.entries(TRIBES).map(([value, label]) => (
+                                    {Object.entries(TRIBE_FULL_NAME_BY_SLUG).map(([value, label]) => (
                                         <option key={value} value={value}>{label}</option>
                                     ))}
                                 </Form.Select>
@@ -1113,7 +1106,7 @@ function ClozePanel({ role }) {
                     })}
                 >
                     <option value="">全部族語</option>
-                    {Object.entries(TRIBES).map(([value, label]) => (
+                    {Object.entries(TRIBE_FULL_NAME_BY_SLUG).map(([value, label]) => (
                         <option key={value} value={value}>{label}</option>
                     ))}
                 </Form.Select>
@@ -1164,7 +1157,7 @@ function ClozePanel({ role }) {
                         <tbody>
                             {data.results.length ? data.results.map((item) => (
                                 <tr key={item.id}>
-                                    <td>{TRIBES[item.tribe] ?? item.tribe}</td>
+                                    <td>{TRIBE_FULL_NAME_BY_SLUG[item.tribe] ?? item.tribe}</td>
                                     <td className="quiz-bank-truncate-cell">
                                         {item.passage_foreign}
                                     </td>
@@ -1235,7 +1228,7 @@ function ClozePanel({ role }) {
                                     tribe: event.target.value,
                                 })}
                             >
-                                {Object.entries(TRIBES).map(([value, label]) => (
+                                {Object.entries(TRIBE_FULL_NAME_BY_SLUG).map(([value, label]) => (
                                     <option key={value} value={value}>{label}</option>
                                 ))}
                             </Form.Select>

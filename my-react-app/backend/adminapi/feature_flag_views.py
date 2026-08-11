@@ -5,6 +5,7 @@ FeatureFlag 的列不是後台自由新增/刪除的東西（跟 RateLimitRule �
 目前全部開關」與「切換某一筆的 enabled」，key／label／description 都是
 唯讀（見 FeatureFlagSerializer 的 read_only_fields）。
 """
+from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
@@ -53,16 +54,17 @@ def feature_flag_detail(request, pk):
         if err_resp:
             return err_resp
 
-        obj = get_object_or_404(FeatureFlag, pk=pk)
-        before = FeatureFlagSerializer(obj).data
-        serializer = FeatureFlagSerializer(obj, data=data, partial=True)
-        if not serializer.is_valid():
-            return JsonResponse({"detail": "請求參數錯誤", "errors": serializer.errors}, status=400)
-        serializer.save(updated_by=decoded.get("uid", "anon"))
-        _write_audit_log(
-            request, decoded, "update", obj,
-            before=before, after=FeatureFlagSerializer(obj).data, target_type="feature_flag",
-        )
+        with transaction.atomic():
+            obj = get_object_or_404(FeatureFlag.objects.select_for_update(), pk=pk)
+            before = FeatureFlagSerializer(obj).data
+            serializer = FeatureFlagSerializer(obj, data=data, partial=True)
+            if not serializer.is_valid():
+                return JsonResponse({"detail": "請求參數錯誤", "errors": serializer.errors}, status=400)
+            serializer.save(updated_by=decoded.get("uid", "anon"))
+            _write_audit_log(
+                request, decoded, "update", obj,
+                before=before, after=FeatureFlagSerializer(obj).data, target_type="feature_flag",
+            )
         return JsonResponse(FeatureFlagSerializer(obj).data)
 
     return JsonResponse({"detail": "Method not allowed"}, status=405)

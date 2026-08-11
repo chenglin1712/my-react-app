@@ -4,15 +4,14 @@ import { Alert, Badge, Button, Form, Spinner } from 'react-bootstrap';
 import { ArrowLeft, ImagePlus, Save, Send } from 'lucide-react';
 import { apiGet, apiPatch, apiPost } from '../../../utils/apiClient';
 import { useAuth } from '../../userServives/authContext';
+import { TRIBES } from '../../constants/tribes';
 import '../../../static/css/_admin/announcements.css';
 
 const CONTENT_EDITORS = ['owner', 'admin', 'editor'];
 const CATEGORIES = [
     ['announcement', '公告'], ['activity', '活動'], ['exam', '考試'], ['maintenance', '系統維護'],
 ];
-const TRIBES = [
-    ['tayal', '泰雅語'], ['amis', '阿美語'], ['bunun', '布農語'], ['kavalan', '噶瑪蘭語'], ['paiwan', '排灣語'],
-];
+const TRIBE_OPTIONS = TRIBES.map((tribe) => [tribe.slug, tribe.fullName]);
 const STATUS_LABELS = {
     draft: '草稿',
     pending_review: '送審中',
@@ -386,7 +385,7 @@ export default function AnnouncementEditor() {
                             checked={form.tribes.length === 0}
                             onChange={() => update('tribes', [])}
                         />
-                        {TRIBES.map(([value, label]) => (
+                        {TRIBE_OPTIONS.map(([value, label]) => (
                             <Form.Check
                                 key={value}
                                 id={`announcement-tribe-${value}`}

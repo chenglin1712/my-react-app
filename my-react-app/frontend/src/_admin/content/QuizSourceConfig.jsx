@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { Alert, Button, Form, Spinner, Table } from 'react-bootstrap';
 import { Save } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
+import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
 import { apiGet, apiPatch } from '../../../utils/apiClient';
 import '../../../static/css/_admin/quiz-bank.css';
 
 const CONTENT_EDITORS = ['owner', 'admin', 'editor'];
-const TRIBES = { tayal: '泰雅語', amis: '阿美語', bunun: '布農語', kavalan: '噶瑪蘭語', paiwan: '排灣語' };
 
 export default function QuizSourceConfig() {
     const { userData } = useAuth();
@@ -47,7 +47,7 @@ export default function QuizSourceConfig() {
                 dialect_id: Number(draft.dialect_id), display_name: draft.display_name.trim(),
             });
             setItems((current) => current.map((item) => (item.tribe === tribe ? saved : item)));
-            setSuccess(`已更新「${TRIBES[tribe] ?? tribe}」的外部題源設定`);
+            setSuccess(`已更新「${TRIBE_FULL_NAME_BY_SLUG[tribe] ?? tribe}」的外部題源設定`);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -70,9 +70,9 @@ export default function QuizSourceConfig() {
                     <thead><tr><th>族語</th><th>dialect_id</th><th>顯示名稱</th><th>最後更新</th><th>操作</th></tr></thead>
                     <tbody>{items.map((item) => (
                         <tr key={item.tribe}>
-                            <td>{TRIBES[item.tribe] ?? item.tribe}</td>
-                            <td><Form.Control type="number" aria-label={`${TRIBES[item.tribe] ?? item.tribe} dialect_id`} disabled={!editable} value={drafts[item.tribe]?.dialect_id ?? ''} onChange={(e) => updateDraft(item.tribe, 'dialect_id', e.target.value)} /></td>
-                            <td><Form.Control aria-label={`${TRIBES[item.tribe] ?? item.tribe} 顯示名稱`} disabled={!editable} value={drafts[item.tribe]?.display_name ?? ''} onChange={(e) => updateDraft(item.tribe, 'display_name', e.target.value)} /></td>
+                            <td>{TRIBE_FULL_NAME_BY_SLUG[item.tribe] ?? item.tribe}</td>
+                            <td><Form.Control type="number" aria-label={`${TRIBE_FULL_NAME_BY_SLUG[item.tribe] ?? item.tribe} dialect_id`} disabled={!editable} value={drafts[item.tribe]?.dialect_id ?? ''} onChange={(e) => updateDraft(item.tribe, 'dialect_id', e.target.value)} /></td>
+                            <td><Form.Control aria-label={`${TRIBE_FULL_NAME_BY_SLUG[item.tribe] ?? item.tribe} 顯示名稱`} disabled={!editable} value={drafts[item.tribe]?.display_name ?? ''} onChange={(e) => updateDraft(item.tribe, 'display_name', e.target.value)} /></td>
                             <td>{item.updated_by ? `${item.updated_by}` : '—'}</td>
                             <td>{editable && <Button size="sm" disabled={savingTribe === item.tribe} onClick={() => save(item.tribe)}>{savingTribe === item.tribe ? <Spinner animation="border" size="sm" /> : <Save size={14} />} 儲存</Button>}</td>
                         </tr>

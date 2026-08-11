@@ -6,6 +6,7 @@ RateLimitRule 的列不是後台自由新增/刪除的東西——它們對應�
 rate 值」，key／backend／description／default_rate 都是唯讀（見
 RateLimitRuleSerializer 的 read_only_fields）。
 """
+from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
@@ -60,20 +61,21 @@ def rate_limit_rule_detail(request, pk):
         if err_resp:
             return err_resp
 
-        obj = get_object_or_404(RateLimitRule, pk=pk)
-        before = RateLimitRuleSerializer(obj).data
-        # 只有 rate 這個欄位是真的可寫（見 RateLimitRuleSerializer 的
-        # read_only_fields）——即使呼叫端多帶了 key/backend 之類的欄位，
-        # partial=True 的 ModelSerializer 對唯讀欄位一律忽略，不會報錯，
-        # 也不會意外被改動。
-        serializer = RateLimitRuleSerializer(obj, data=data, partial=True)
-        if not serializer.is_valid():
-            return JsonResponse({"detail": "請求參數錯誤", "errors": serializer.errors}, status=400)
-        serializer.save(updated_by=decoded.get("uid", "anon"))
-        _write_audit_log(
-            request, decoded, "update", obj,
-            before=before, after=RateLimitRuleSerializer(obj).data, target_type="rate_limit_rule",
-        )
+        with transaction.atomic():
+            obj = get_object_or_404(RateLimitRule.objects.select_for_update(), pk=pk)
+            before = RateLimitRuleSerializer(obj).data
+            # 只有 rate 這個欄位是真的可寫（見 RateLimitRuleSerializer 的
+            # read_only_fields）——即使呼叫端多帶了 key/backend 之類的欄位，
+            # partial=True 的 ModelSerializer 對唯讀欄位一律忽略，不會報錯，
+            # 也不會意外被改動。
+            serializer = RateLimitRuleSerializer(obj, data=data, partial=True)
+            if not serializer.is_valid():
+                return JsonResponse({"detail": "請求參數錯誤", "errors": serializer.errors}, status=400)
+            serializer.save(updated_by=decoded.get("uid", "anon"))
+            _write_audit_log(
+                request, decoded, "update", obj,
+                before=before, after=RateLimitRuleSerializer(obj).data, target_type="rate_limit_rule",
+            )
         return JsonResponse(RateLimitRuleSerializer(obj).data)
 
     return JsonResponse({"detail": "Method not allowed"}, status=405)

@@ -13,19 +13,12 @@ import {
     Trash2,
 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
+import { TRIBE_NAME_BY_SLUG } from '../../constants/tribes';
 import { apiDelete, apiGet } from '../../../utils/apiClient';
 import '../../../static/css/_admin/moderation.css';
 
 const STAFF_ROLES = ['owner', 'admin', 'editor', 'reviewer', 'analyst'];
 const ACCOUNT_MANAGERS = ['owner', 'admin'];
-
-const TRIBES = {
-    tayal: '泰雅',
-    amis: '阿美',
-    bunun: '布農',
-    kavalan: '噶瑪蘭',
-    paiwan: '排灣',
-};
 
 const PAGE_SIZE = 20;
 
@@ -171,7 +164,7 @@ export default function RecordingsModeration() {
                     })}
                 >
                     <option value="">全部族語</option>
-                    {Object.entries(TRIBES).map(([value, label]) => (
+                    {Object.entries(TRIBE_NAME_BY_SLUG).map(([value, label]) => (
                         <option key={value} value={value}>
                             {label}
                         </option>
@@ -240,7 +233,7 @@ export default function RecordingsModeration() {
                                                 </small>
                                             </td>
                                             <td>
-                                                {TRIBES[item.tribe]
+                                                {TRIBE_NAME_BY_SLUG[item.tribe]
                                                     ?? item.tribe
                                                     ?? '—'}
                                             </td>

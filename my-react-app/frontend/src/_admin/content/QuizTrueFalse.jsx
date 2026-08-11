@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Badge, Button, Form, Modal, Spinner, Table } from 'react-bootstrap';
 import { Archive, Check, Edit3, Plus, Send, Trash2, Undo2, X } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
+import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../../utils/apiClient';
 import '../../../static/css/_admin/quiz-bank.css';
 
@@ -9,14 +10,6 @@ const CONTENT_EDITORS = ['owner', 'admin', 'editor'];
 const CONTENT_APPROVERS = ['owner', 'admin', 'reviewer'];
 const PUBLISHERS = ['owner', 'admin'];
 const EDITABLE_STATUSES = ['draft', 'rejected'];
-
-const TRIBES = {
-  tayal: '泰雅語',
-  amis: '阿美語',
-  bunun: '布農語',
-  kavalan: '噶瑪蘭語',
-  paiwan: '排灣語',
-};
 
 const STATUSES = {
   draft: { label: '草稿', bg: 'secondary' },
@@ -472,7 +465,7 @@ export default function QuizTrueFalse() {
           })}
         >
           <option value="">全部族語</option>
-          {Object.entries(TRIBES).map(([value, label]) => (
+          {Object.entries(TRIBE_FULL_NAME_BY_SLUG).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
             </option>
@@ -528,7 +521,7 @@ export default function QuizTrueFalse() {
               {data.results.length ? (
                 data.results.map((item) => (
                   <tr key={item.id}>
-                    <td>{TRIBES[item.tribe] ?? item.tribe}</td>
+                    <td>{TRIBE_FULL_NAME_BY_SLUG[item.tribe] ?? item.tribe}</td>
                     <td className="quiz-bank-truncate-cell">
                       {item.question_ab}
                     </td>
@@ -621,7 +614,7 @@ export default function QuizTrueFalse() {
                   tribe: event.target.value,
                 })}
               >
-                {Object.entries(TRIBES).map(([value, label]) => (
+                {Object.entries(TRIBE_FULL_NAME_BY_SLUG).map(([value, label]) => (
                   <option key={value} value={value}>
                     {label}
                   </option>

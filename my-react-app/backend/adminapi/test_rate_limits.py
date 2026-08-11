@@ -105,6 +105,64 @@ class RateLimitRuleAdminTest(TestCase):
             )
         self.assertEqual(response.status_code, 400)
 
+    def test_absurdly_large_rate_rejected(self):
+        # "999999999999999999/m" 通過原本只驗證形狀的正則，但換算後仍然是
+        # 一個等同關閉限流的天文數字，必須被擋下。
+        with _as_role(OWNER) as headers:
+            response = _patch_json(
+                self.client, f'/adminapi/rate-limit-rules/{self.rule.pk}/', headers,
+                {"rate": "999999999999999999/m"},
+            )
+        self.assertEqual(response.status_code, 400)
+
+    def test_small_digit_but_effectively_unlimited_rate_rejected(self):
+        # 光幫數字設上限擋不住這種情況——"100000/s" 換算成每秒等效請求數
+        # 一樣是十萬次，數字本身不算「大」，但效果一樣是關閉限流。
+        with _as_role(OWNER) as headers:
+            response = _patch_json(
+                self.client, f'/adminapi/rate-limit-rules/{self.rule.pk}/', headers, {"rate": "100000/s"},
+            )
+        self.assertEqual(response.status_code, 400)
+
+    def test_zero_count_rate_rejected(self):
+        # "0/s" 通過形狀正則、換算後的每秒請求數（0）也不會超過上限，但
+        # django_ratelimit／limits 兩邊都會把「額度是 0」解讀成永遠超過
+        # 限制——不是關閉限流，是讓端點完全打不通，必須單獨擋下。
+        with _as_role(OWNER) as headers:
+            response = _patch_json(
+                self.client, f'/adminapi/rate-limit-rules/{self.rule.pk}/', headers, {"rate": "0/m"},
+            )
+        self.assertEqual(response.status_code, 400)
+
+    def test_reasonable_rate_within_ceiling_accepted(self):
+        with _as_role(OWNER) as headers:
+            response = _patch_json(
+                self.client, f'/adminapi/rate-limit-rules/{self.rule.pk}/', headers, {"rate": "40/m"},
+            )
+        self.assertEqual(response.status_code, 200)
+
+    def test_django_rule_rejects_fastapi_style_unit(self):
+        # self.rule 是 backend=django，"999/day" 是全稱格式的單位——形狀
+        # 本身合法（符合 "數字/單位" 的正則），但 django 規則只接受
+        # s/m/h/d 這種簡寫，必須被擋下，避免規則的 backend 跟 rate 格式
+        # 對不上。
+        with _as_role(OWNER) as headers:
+            response = _patch_json(
+                self.client, f'/adminapi/rate-limit-rules/{self.rule.pk}/', headers, {"rate": "999/day"},
+            )
+        self.assertEqual(response.status_code, 400)
+
+    def test_fastapi_rule_rejects_django_style_unit(self):
+        # self.fastapi_rule 是 backend=fastapi；"30/m" 是 Django 的簡寫格式，
+        # 餵給 FastAPI limits 套件的 parse() 會直接 ValueError（"m" 不是
+        # 合法的完整單位名稱），必須在後台這一層就擋下，不能讓壞資料流到
+        # FastAPI 端才炸。
+        with _as_role(OWNER) as headers:
+            response = _patch_json(
+                self.client, f'/adminapi/rate-limit-rules/{self.fastapi_rule.pk}/', headers, {"rate": "30/m"},
+            )
+        self.assertEqual(response.status_code, 400)
+
     def test_update_writes_audit_log(self):
         with _as_role(OWNER) as headers:
             _patch_json(self.client, f'/adminapi/rate-limit-rules/{self.rule.pk}/', headers, {"rate": "1/m"})

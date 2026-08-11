@@ -5,14 +5,13 @@ from django.core.cache import cache
 from django.test import TestCase, Client
 from django.test.utils import override_settings
 
-from adminapi.models import CrosswordTayalWord
 from CrosswordPuzzle.views import _get_words_from_db
 
-
-# 泰雅語填字遊戲改讀 CrosswordTayalWord（見規劃文件「並行項目」章節），這裡
-# 種幾筆長度落在預設詞長範圍（4-10）內的詞，讓依賴「泰雅語能正常出題」的
-# 測試不必逐一各自建資料。
-_SAMPLE_TAYAL_WORDS = [
+# 5 個族語統一即時查辭典資料庫選字（原本只有泰雅語走另一套 CrosswordTayalWord
+# 後台詞庫，使用者要求拿掉這個特例，見規劃文件「並行項目」章節）——這裡
+# mock SessionLocal 回傳的原始查詢結果，模擬 _get_words_from_db() 篩選前的
+# 資料庫列，讓 GenerateCrosswordTest 不必依賴真實 dictionary.db 內容。
+_MOCK_DB_ROWS = [
     ("apah", "糯米飯"), ("bahat", "西瓜"), ("banan", "高粱"), ("bazing", "蛋"),
     ("kagang", "螃蟹"), ("llyung", "河流"), ("khelang", "客家人"),
 ]
@@ -20,14 +19,17 @@ _SAMPLE_TAYAL_WORDS = [
 
 class GenerateCrosswordTest(TestCase):
     """generate_crossword 現在要求登入 + 限流（見 views.py 的稽核修正），
-    這裡驗證這兩層防護，以及 tayal（讀 CrosswordTayalWord，不查辭典資料庫）
-    能正常出題。"""
+    這裡驗證這兩層防護，以及 5 個族語（含泰雅語）統一走 _get_words_from_db
+    即時查辭典資料庫都能正常出題。"""
 
     def setUp(self):
         self.client = Client()
         cache.clear()
-        for index, (word, meaning) in enumerate(_SAMPLE_TAYAL_WORDS):
-            CrosswordTayalWord.objects.create(word=word, meaning=meaning, sort_order=index)
+
+    def _mock_db(self, rows):
+        mock_db = MagicMock()
+        mock_db.execute.return_value.fetchall.return_value = rows
+        return patch('CrosswordPuzzle.views.SessionLocal', return_value=mock_db)
 
     @override_settings(AUTH_DEV_BYPASS=False)
     def test_requires_login_when_bypass_disabled(self):
@@ -39,8 +41,11 @@ class GenerateCrosswordTest(TestCase):
         response = self.client.get('/CrosswordPuzzle/generate/?tribe=tayal')
         self.assertEqual(response.status_code, 429)
 
-    def test_generates_grid_for_tayal_from_db_word_list(self):
-        response = self.client.get('/CrosswordPuzzle/generate/?tribe=tayal')
+    def test_generates_grid_for_tayal_via_live_dictionary_query(self):
+        # 回歸測試：泰雅語不再是特例，跟其餘 4 個族語共用同一套
+        # _get_words_from_db 即時查辭典邏輯。
+        with self._mock_db(_MOCK_DB_ROWS):
+            response = self.client.get('/CrosswordPuzzle/generate/?tribe=tayal')
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertIn('grid_solution', data)
@@ -50,18 +55,20 @@ class GenerateCrosswordTest(TestCase):
         # debug_loops 是內部運算迴圈次數，純除錯用，正式環境 API 不該外露。
         self.assertNotIn('debug_loops', data['info'])
 
-    def test_tayal_word_list_too_small_returns_500(self):
-        # 只留 2 筆（低於 generate_crossword 要求的最少 5 筆），確認改讀資料庫
-        # 之後，詞庫不足的降級行為跟其餘族語（_get_words_from_db 分支）一致，
-        # 不是靜默生成殘缺的填字遊戲。
-        CrosswordTayalWord.objects.exclude(word__in=["apah", "bahat"]).delete()
-        response = self.client.get('/CrosswordPuzzle/generate/?tribe=tayal')
+    def test_generates_grid_for_other_tribes_via_live_dictionary_query(self):
+        with self._mock_db(_MOCK_DB_ROWS):
+            response = self.client.get('/CrosswordPuzzle/generate/?tribe=amis')
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(len(response.json()['word_bank']), 0)
+
+    def test_insufficient_word_pool_returns_500(self):
+        # 只留 2 筆（低於 generate_crossword 要求的最少 5 筆）——泰雅語跟其他
+        # 族語現在共用同一套「詞庫不足」降級行為，不是靜默生成殘缺的填字遊戲。
+        with self._mock_db(_MOCK_DB_ROWS[:2]):
+            response = self.client.get('/CrosswordPuzzle/generate/?tribe=tayal')
         self.assertEqual(response.status_code, 500)
 
-    def test_unsupported_tribe_returns_400_instead_of_silent_tayal_fallback(self):
-        # 回歸測試：修正前，任何不在 _ALL_TRIBE_IDS 裡的族語值都會落到跟 tayal
-        # 一模一樣的 else 分支，靜默回傳泰雅語填字遊戲而非報錯——使用者以為
-        # 自己玩的是別的族語，實際上悄悄拿到錯部落的題目。
+    def test_unsupported_tribe_returns_400(self):
         response = self.client.get('/CrosswordPuzzle/generate/?tribe=not-a-real-tribe')
         self.assertEqual(response.status_code, 400)
 
@@ -106,6 +113,66 @@ class GetWordsFromDbTest(TestCase):
 
         self.assertIsNone(err)
         self.assertEqual(results, [["balay", "真的"]])
+
+    def test_query_randomizes_and_bounds_the_candidate_pool(self):
+        # 回歸測試：原本完全沒有 ORDER BY／LIMIT，永遠固定拿到資料庫回傳
+        # 順序的前 limit 筆，每一局候選詞完全相同，且不管詞庫多大都整族語
+        # 掃過一遍——這裡驗證第一次查詢真的帶了 ORDER BY RANDOM() 與一個
+        # 用參數傳入（不是字串拼接）的上限。
+        mock_db = MagicMock()
+        mock_db.execute.return_value.fetchall.return_value = [
+            ("cyux", "高興"), ("balay", "真的"), ("mita", "看"),
+            ("kmal", "說"), ("pusa", "去"),
+        ]
+        with patch('CrosswordPuzzle.views.SessionLocal', return_value=mock_db):
+            results, err = _get_words_from_db("some-tribe-id", min_length=4, max_length=10, limit=3)
+
+        self.assertIsNone(err)
+        self.assertEqual(len(results), 3)
+        # 5 筆候選裡有 5 筆合格，遠超過 limit=3，第一次隨機批次就該夠用，
+        # 不需要退回全量查詢。
+        self.assertEqual(mock_db.execute.call_count, 1)
+        first_call_args, first_call_kwargs = mock_db.execute.call_args_list[0]
+        sql_text = first_call_args[0].text
+        self.assertIn("ORDER BY RANDOM()", sql_text)
+        self.assertIn("LIMIT :oversample", sql_text)
+        self.assertEqual(first_call_args[1]["oversample"], max(3 * 8, 200))
+
+    def test_falls_back_to_full_query_when_random_batch_has_too_few_eligible_words(self):
+        # 隨機批次（第一次查詢）刻意讓大部分候選都不合格（非純英文字母），
+        # 驗證「隨機批次篩完不夠」不會被誤判成「詞庫真的不夠」——退回全量
+        # 查詢後應該要能找滿 limit 筆，不是隨機批次沒抽好就少給。
+        oversample_batch = [("qutux1", "一"), ("qutux2", "二"), ("cyux", "高興")]
+        full_batch = [
+            ("cyux", "高興"), ("balay", "真的"), ("mita", "看"),
+            ("kmal", "說"), ("pusa", "去"),
+        ]
+        first_result = MagicMock()
+        first_result.fetchall.return_value = oversample_batch
+        second_result = MagicMock()
+        second_result.fetchall.return_value = full_batch
+        mock_db = MagicMock()
+        mock_db.execute.side_effect = [first_result, second_result]
+
+        with patch('CrosswordPuzzle.views.SessionLocal', return_value=mock_db):
+            results, err = _get_words_from_db("some-tribe-id", min_length=4, max_length=10, limit=5)
+
+        self.assertIsNone(err)
+        self.assertEqual(len(results), 5)
+        self.assertEqual(mock_db.execute.call_count, 2)
+        # 退回查詢不該再帶隨機排序／上限——這是「整族語掃過一遍」的保底查詢。
+        second_call_args = mock_db.execute.call_args_list[1][0]
+        self.assertNotIn("RANDOM()", second_call_args[0].text)
+
+    def test_tayal_and_other_tribes_use_the_same_query_path(self):
+        # 泰雅語不再有專屬詞庫，跟其他族語共用同一支函式、同一套 SQL——
+        # 只有傳入的 tribe_id 不同，驗證呼叫參數而非另外走一條路徑。
+        mock_db = MagicMock()
+        mock_db.execute.return_value.fetchall.return_value = [("cyux", "高興")]
+        with patch('CrosswordPuzzle.views.SessionLocal', return_value=mock_db):
+            _get_words_from_db("tayal-tribe-id", min_length=4, max_length=10, limit=3)
+        params = mock_db.execute.call_args_list[0][0][1]
+        self.assertEqual(params["tribe_id"], "tayal-tribe-id")
 
 
 class SubmitAnsTest(TestCase):

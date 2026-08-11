@@ -12,7 +12,7 @@ from rest_framework import serializers
 from config.tribes import TRIBE_IDS
 
 from .models import (
-    Announcement, AuditLog, CrosswordTayalWord, ExamScheduleOverride, FeatureFlag,
+    Announcement, AuditLog, ExamScheduleOverride, FeatureFlag,
     GameConfig, HomepageConfig, IrtConfig, QuizChoiceItem, QuizClozePassage,
     QuizSituationItem, QuizSourceConfig, QuizTrueFalseItem, QuizVocabItem,
     RateLimitRule,
@@ -417,6 +417,66 @@ class GameConfigSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('填字網格大小必須介於 5 到 30 之間')
         return value
 
+    def validate_listening_questions_per_round(self, value):
+        if not (1 <= value <= 50):
+            raise serializers.ValidationError('聽力每輪題數必須介於 1 到 50 之間')
+        return value
+
+    def validate_sentence_questions_per_round(self, value):
+        if not (1 <= value <= 50):
+            raise serializers.ValidationError('句型每輪題數必須介於 1 到 50 之間')
+        return value
+
+    def validate_pronunciation_max_audio_mb(self, value):
+        if not (1 <= value <= 50):
+            raise serializers.ValidationError('發音錄音檔案大小上限必須介於 1 到 50 MB 之間')
+        return value
+
+    def validate_pronunciation_excellent_threshold(self, value):
+        if not (0 <= value <= 100):
+            raise serializers.ValidationError('發音評分門檻必須介於 0 到 100 之間')
+        return value
+
+    def validate_pronunciation_good_threshold(self, value):
+        if not (0 <= value <= 100):
+            raise serializers.ValidationError('發音評分門檻必須介於 0 到 100 之間')
+        return value
+
+    def validate_pronunciation_fair_threshold(self, value):
+        if not (0 <= value <= 100):
+            raise serializers.ValidationError('發音評分門檻必須介於 0 到 100 之間')
+        return value
+
+    def validate_pronunciation_pass_threshold(self, value):
+        if not (0 <= value <= 100):
+            raise serializers.ValidationError('發音及格門檻必須介於 0 到 100 之間')
+        return value
+
+    def validate_crossword_min_word_length(self, value):
+        if not (2 <= value <= 20):
+            raise serializers.ValidationError('填字詞長下限必須介於 2 到 20 之間')
+        return value
+
+    def validate_crossword_max_word_length(self, value):
+        if not (2 <= value <= 20):
+            raise serializers.ValidationError('填字詞長上限必須介於 2 到 20 之間')
+        return value
+
+    def validate_crossword_words_per_round(self, value):
+        if not (5 <= value <= 200):
+            raise serializers.ValidationError('填字每局詞數必須介於 5 到 200 之間')
+        return value
+
+    def validate_crossword_compute_time_limit_seconds(self, value):
+        # 這個值直接餵給 crossword.py 一個同步、不會讓出的 CPU 忙等迴圈
+        # （compute_crossword 的 while 迴圈），值太大會讓一個請求佔用一個
+        # worker 極長時間——10 秒已經遠高於原本寫死的 2 秒，同時足以避免
+        # PositiveSmallIntegerField 上限（32767，將近 9 小時）被拿來當
+        # 有效值直接卡住 worker。
+        if not (1 <= value <= 10):
+            raise serializers.ValidationError('填字運算時限必須介於 1 到 10 秒之間')
+        return value
+
     def validate(self, data):
         # partial update 時，還沒被這次請求觸及的欄位要 fallback 到目前 instance
         # 上的值才能正確比較，不能只看這次請求帶了什麼（PATCH 常常只帶一兩個欄位）。
@@ -445,23 +505,21 @@ class PublicGameConfigSerializer(serializers.ModelSerializer):
         fields = _GAME_CONFIG_FIELDS
 
 
-class CrosswordTayalWordSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = CrosswordTayalWord
-        fields = ['id', 'word', 'meaning', 'sort_order', 'created_by', 'updated_at']
-        read_only_fields = ['id', 'created_by', 'updated_at']
-
-    def validate_word(self, value):
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError('單字不能空白')
-        return value
-
-    def validate_meaning(self, value):
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError('中文提示不能空白')
-        return value
+# 每種單位換算成秒數，用來把「數字/單位」正規化成「每秒等效請求數」——
+# 光幫數字本身設一個很大的上限（例如 100000）擋不住 "100000/s" 這種
+# 換算下來仍然是每秒十萬次請求、形同關閉限流的值；要擋的是「效果」不是
+# 「數字大小」，所以先換算成統一單位再比較。
+_RATE_UNIT_SECONDS = {
+    's': 1, 'second': 1,
+    'm': 60, 'minute': 60,
+    'h': 3600, 'hour': 3600,
+    'd': 86400, 'day': 86400,
+}
+# 目前實際種入的最高值是 "120/m"（每秒 2 次）；訂在每秒 50 次，遠高於
+# 現況任何一筆設定，但足以擋下會讓限流形同關閉的離譜數字。
+_MAX_EFFECTIVE_RATE_PER_SECOND = 50
+_DJANGO_RATE_UNITS = {'s', 'm', 'h', 'd'}
+_FASTAPI_RATE_UNITS = {'second', 'minute', 'hour', 'day'}
 
 
 class RateLimitRuleSerializer(serializers.ModelSerializer):
@@ -474,14 +532,37 @@ class RateLimitRuleSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'key', 'backend', 'default_rate', 'description', 'updated_by', 'updated_at']
 
     def validate_rate(self, value):
-        # Django django_ratelimit 格式（"30/m"）與 FastAPI limits 套件格式
-        # （"20/minute"）刻意都接受，兩邊呼叫端各自認得自己的格式（見
-        # RateLimitRule model 的說明），這裡只驗證「數字/單位」的形狀本身，
-        # 不驗證單位是否跟這筆規則的 backend 相符——那個粒度的錯誤，寫錯了
-        # 只會讓對應的限流套件在套用時忽略／出錯，不是資料完整性風險。
-        if not re.match(r'^\d+/(s|m|h|d|second|minute|hour|day)$', value.strip()):
+        # backend 是唯讀欄位，只能透過 PATCH 改動既有紀錄（RateLimitRule
+        # 不開放後台自由新增，見 read_only_fields 說明），self.instance
+        # 一定存在，可以放心用來判斷這筆規則屬於哪一邊。
+        match = re.match(r'^(\d+)/(s|m|h|d|second|minute|hour|day)$', value.strip())
+        if not match:
             raise serializers.ValidationError(
                 '格式不正確，範例："30/m"（Django）或 "20/minute"（FastAPI）'
+            )
+        count, unit = match.groups()
+        backend = self.instance.backend if self.instance else None
+        expected_units = (
+            _DJANGO_RATE_UNITS if backend == RateLimitRule.BACKEND_DJANGO
+            else _FASTAPI_RATE_UNITS if backend == RateLimitRule.BACKEND_FASTAPI
+            else None
+        )
+        if expected_units is not None and unit not in expected_units:
+            example = '"30/m"' if backend == RateLimitRule.BACKEND_DJANGO else '"20/minute"'
+            raise serializers.ValidationError(
+                f'這筆規則屬於 {backend}，單位格式不符，範例：{example}'
+            )
+        if int(count) < 1:
+            # "0/s" 這種值形狀合法、換算後的每秒請求數也不會超過上限
+            # （0 明明小於 50），但 django_ratelimit／limits 兩邊都會把它
+            # 解讀成「一律視為超過限制」——不是關閉限流，是讓端點直接打不通，
+            # 一樣是這個 API 不該讓管理者無意間點出來的狀態。
+            raise serializers.ValidationError('請求次數必須至少為 1，0 會讓端點完全無法使用')
+        effective_per_second = int(count) / _RATE_UNIT_SECONDS[unit]
+        if effective_per_second > _MAX_EFFECTIVE_RATE_PER_SECOND:
+            raise serializers.ValidationError(
+                f'換算後每秒 {effective_per_second:.1f} 次請求，超過上限（每秒 '
+                f'{_MAX_EFFECTIVE_RATE_PER_SECOND} 次），等同關閉限流保護'
             )
         return value.strip()
 

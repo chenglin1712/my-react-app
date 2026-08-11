@@ -127,8 +127,6 @@ urlpatterns = [
     # 並行項目：遊戲參數設定
     path('game-config/', game_config_views.game_config_admin),
     path('public/game-config/', game_config_views.public_game_config),
-    path('crossword-tayal-words/', game_config_views.crossword_tayal_word_list),
-    path('crossword-tayal-words/<int:pk>/', game_config_views.crossword_tayal_word_detail),
 
     # 並行項目：限流設定
     path('rate-limit-rules/', rate_limit_views.rate_limit_rule_list),

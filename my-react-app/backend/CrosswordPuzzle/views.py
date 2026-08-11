@@ -1,5 +1,6 @@
 import json
 import logging
+import random
 import re
 from django.http import HttpResponse, JsonResponse
 from django_ratelimit.core import is_ratelimited
@@ -9,7 +10,7 @@ from django.views.decorators.csrf import csrf_exempt
 from config.tribes import TRIBE_IDS as _ALL_TRIBE_IDS
 from config.firebase_auth import verify_firebase_token
 from dictionary_db.connect import SessionLocal
-from adminapi.models import CrosswordTayalWord, GameConfig
+from adminapi.models import GameConfig
 from adminapi.rate_limits import get_configured_rate
 from .serializers import SubmitAnsSerializer
 
@@ -29,38 +30,21 @@ def _rate_limited_response(request, decoded, group, rate, method):
     return None
 
 
-# 各族語對應的 tribe_id（UUID）。tayal 故意排除：泰雅語填字遊戲改讀後台
-# 可編輯的 CrosswordTayalWord（見 generate_crossword 的 else 分支／
-# _get_tayal_words），不查 dictionary.db。
-_TRIBE_IDS = {slug: tid for slug, tid in _ALL_TRIBE_IDS.items() if slug != 'tayal'}
-
-def _get_words_from_db(tribe_id: str, min_length: int, max_length: int, limit: int):
-    """從 dictionary.db 取出純英文字母、長度介於 min_length/max_length 之間、
-    有中文解釋的詞彙。explanation_items 已經拆到 word_explanation 表，這裡
-    改成 JOIN 取第一筆解釋（sort_order = 0，對應原本 exp[0]），INNER JOIN
-    本身就篩掉沒有解釋的字。
-
-    走 dictionary_db.connect 共用的 SessionLocal（而非原生 sqlite3.connect），
-    這樣才會走 SQLAlchemy 的 QueuePool，且連線時自動套用該 engine 的
-    connect event listener（PRAGMA foreign_keys / journal_mode = WAL），
-    避免高流量下和其他 SQLAlchemy 連線競爭 WAL 鎖。"""
-    db = SessionLocal()
-    try:
-        rows = db.execute(
-            text('''SELECT w.name, we.chinese_explanation
+# 長度篩選下推到 SQL 是效能考量（減少傳輸筆數），不是唯一的把關——
+# _eligible_words() 仍然會在 Python 端複查一次，見該函式的說明。
+_WORD_TREE_SQL = '''SELECT w.name, we.chinese_explanation
                     FROM words w
                     JOIN word_explanation we ON we.word_id = w.id AND we.sort_order = 0
-                    WHERE w.tribe_id = :tribe_id'''),
-            {"tribe_id": tribe_id}
-        ).fetchall()
-    except Exception as e:
-        # 原本把 str(e) 一路往上傳、直接回給前端，可能洩漏資料庫查詢細節。
-        # 錯誤只留在伺服器端的 log，呼叫端只拿到「有沒有失敗」這個布林資訊。
-        logger.error("[CrosswordPuzzle] 查詢詞庫失敗: %s", e)
-        return [], True
-    finally:
-        db.close()
+                    WHERE w.tribe_id = :tribe_id
+                      AND LENGTH(w.name) BETWEEN :min_length AND :max_length'''
 
+
+def _eligible_words(rows, min_length, max_length, limit):
+    """套用純英文字母、長度介於範圍內、有中文解釋三個條件，取前 limit 筆。
+    長度篩選同時也下推到 SQL（見 _WORD_TREE_SQL，減少傳輸筆數），這裡
+    保留一份是防禦性複查，不是信任呼叫端一定先過濾好——純英文字母／非空
+    解釋這兩個條件本來就無法可攜地下推到 SQL（SQLite／Postgres 語法不同），
+    留在 Python 端做，順手把長度也一起查一次成本很低。"""
     results = []
     for name, cn in rows:
         if not re.match(r'^[a-zA-Z]+$', name):
@@ -72,24 +56,54 @@ def _get_words_from_db(tribe_id: str, min_length: int, max_length: int, limit: i
         results.append([name.lower(), cn])
         if len(results) >= limit:
             break
+    return results
+
+
+def _get_words_from_db(tribe_id: str, min_length: int, max_length: int, limit: int):
+    """從 dictionary.db 取出純英文字母、長度介於 min_length/max_length 之間、
+    有中文解釋的詞彙。explanation_items 已經拆到 word_explanation 表，這裡
+    改成 JOIN 取第一筆解釋（sort_order = 0，對應原本 exp[0]），INNER JOIN
+    本身就篩掉沒有解釋的字。
+
+    候選詞先用 ORDER BY RANDOM() LIMIT 抓一批「遠多於 limit」的隨機樣本
+    （原本沒有 ORDER BY／LIMIT，永遠固定拿到資料庫回傳順序的前 limit 筆，
+    每一局的候選詞完全相同，且不管詞庫多大都會整族語掃過一遍）。抽樣批次
+    篩完不夠 limit 筆時（純英文字母／非空解釋這兩個條件是隨機批次抽到之後
+    才知道的，可能剛好篩掉太多），退回不限筆數查詢整個族語＋洗牌，保證
+    「詞庫真的不夠」時的降級行為跟原本一致，不會因為隨機批次沒抽好就誤判
+    詞庫不足。
+
+    走 dictionary_db.connect 共用的 SessionLocal（而非原生 sqlite3.connect），
+    這樣才會走 SQLAlchemy 的 QueuePool，且連線時自動套用該 engine 的
+    connect event listener（PRAGMA foreign_keys / journal_mode = WAL），
+    避免高流量下和其他 SQLAlchemy 連線競爭 WAL 鎖。"""
+    oversample = max(limit * 8, 200)
+    db = SessionLocal()
+    try:
+        rows = db.execute(
+            text(_WORD_TREE_SQL + ' ORDER BY RANDOM() LIMIT :oversample'),
+            {"tribe_id": tribe_id, "min_length": min_length, "max_length": max_length, "oversample": oversample}
+        ).fetchall()
+        results = _eligible_words(rows, min_length, max_length, limit)
+
+        if len(results) < limit:
+            # 隨機批次篩完不夠，退回族語全量查詢（不限筆數）保底，Python
+            # 端洗牌後再篩——確保「不夠」是詞庫真的不夠，不是隨機批次沒抽中。
+            all_rows = db.execute(text(_WORD_TREE_SQL), {
+                "tribe_id": tribe_id, "min_length": min_length, "max_length": max_length,
+            }).fetchall()
+            all_rows = list(all_rows)
+            random.shuffle(all_rows)
+            results = _eligible_words(all_rows, min_length, max_length, limit)
+    except Exception as e:
+        # 原本把 str(e) 一路往上傳、直接回給前端，可能洩漏資料庫查詢細節。
+        # 錯誤只留在伺服器端的 log，呼叫端只拿到「有沒有失敗」這個布林資訊。
+        logger.error("[CrosswordPuzzle] 查詢詞庫失敗: %s", e)
+        return [], True
+    finally:
+        db.close()
 
     return results, None
-
-
-def _get_tayal_words(min_length: int, max_length: int, limit: int):
-    """泰雅語填字詞庫改讀 CrosswordTayalWord（後台可編輯），取代原本
-    crossword.py 寫死的 20 筆陣列。詞長篩選跟其餘族語（_get_words_from_db）
-    套用同一組 GameConfig 參數，維持行為一致——後台把詞長範圍改窄時，
-    泰雅語跟其他族語的候選詞應該同時受影響，不是只有一邊生效。"""
-    words = CrosswordTayalWord.objects.order_by('sort_order', 'id')
-    results = []
-    for w in words:
-        if not (min_length <= len(w.word) <= max_length):
-            continue
-        results.append([w.word.lower(), w.meaning])
-        if len(results) >= limit:
-            break
-    return results
 
 
 def generate_crossword(request):
@@ -104,10 +118,9 @@ def generate_crossword(request):
 
     tribe = request.GET.get('tribe', 'tayal')
 
-    # 先前沒有驗證：不支援的族語值會落到下面的 else 分支，跟 tayal（故意排除、
-    # 沿用內建 word_list）拿到一模一樣的結果，靜默回傳泰雅語填字遊戲而非報錯。
-    # listening.py／sentence.py／quiz.py 對同一種情況會正確回傳 400，這裡補上
-    # 同樣的驗證，只是 tayal 本身仍要留在合法值裡（見上面 _TRIBE_IDS 的排除說明）。
+    # 先前沒有驗證：不支援的族語值會落到 else 分支，靜默回傳泰雅語填字遊戲
+    # 而非報錯。listening.py／sentence.py／quiz.py 對同一種情況會正確回傳
+    # 400，這裡補上同樣的驗證。
     if tribe not in _ALL_TRIBE_IDS:
         return JsonResponse({'detail': f'不支援的族語：{tribe}'}, status=400)
 
@@ -116,18 +129,17 @@ def generate_crossword(request):
     max_length = game_config.crossword_max_word_length
     words_per_round = game_config.crossword_words_per_round
 
-    # 依族語選擇詞庫——泰雅語改讀後台可編輯的 CrosswordTayalWord（取代原本
-    # 寫死的 word_list），其餘族語沿用即時查辭典資料庫。
-    if tribe in _TRIBE_IDS:
-        selected_words, err = _get_words_from_db(_TRIBE_IDS[tribe], min_length, max_length, words_per_round)
-        if err:
-            return JsonResponse({'detail': '資料庫讀取失敗，請稍後再試'}, status=500)
-        if len(selected_words) < 5:
-            return JsonResponse({'detail': f'詞庫不足，無法生成填字遊戲（僅找到 {len(selected_words)} 筆）'}, status=500)
-    else:
-        selected_words = _get_tayal_words(min_length, max_length, words_per_round)
-        if len(selected_words) < 5:
-            return JsonResponse({'detail': f'詞庫不足，無法生成填字遊戲（僅找到 {len(selected_words)} 筆）'}, status=500)
+    # 5 個族語統一即時查辭典資料庫選字——泰雅語原本有一份後台可編輯的
+    # 專屬詞庫（CrosswordTayalWord），這是唯一跟其他 4 個族語不同的地方；
+    # 使用者決定移除這個特例，統一成同一套邏輯，簡化維護、也讓「調整詞長
+    # 範圍」這類設定對 5 個族語一視同仁地生效（先前泰雅語如果詞庫筆數不夠
+    # 得手動回後台加詞，其他族語則是辭典本身收錄的詞不夠才會不足，兩種
+    # 「不足」原因不一樣，統一後只剩一種）。
+    selected_words, err = _get_words_from_db(_ALL_TRIBE_IDS[tribe], min_length, max_length, words_per_round)
+    if err:
+        return JsonResponse({'detail': '資料庫讀取失敗，請稍後再試'}, status=500)
+    if len(selected_words) < 5:
+        return JsonResponse({'detail': f'詞庫不足，無法生成填字遊戲（僅找到 {len(selected_words)} 筆）'}, status=500)
 
     available_words_for_generator = []
     for item in selected_words:

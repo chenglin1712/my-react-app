@@ -17,6 +17,7 @@ import {
     X,
 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
+import { TRIBE_NAME_BY_SLUG } from '../../constants/tribes';
 import { apiGet, apiPost } from '../../../utils/apiClient';
 import '../../../static/css/_admin/moderation.css';
 
@@ -39,14 +40,6 @@ const STATUSES = {
 const TARGET_TYPES = {
     note: { label: '分享筆記', bg: 'primary' },
     recording: { label: '發音錄音', bg: 'info' },
-};
-
-const TRIBES = {
-    tayal: '泰雅',
-    amis: '阿美',
-    bunun: '布農',
-    kavalan: '噶瑪蘭',
-    paiwan: '排灣',
 };
 
 const PAGE_SIZE = 20;
@@ -78,7 +71,7 @@ function TargetSummary({ report }) {
         <div className="moderation-summary">
             <strong>{summary.word || '—'}</strong>
             <small>
-                族語：{TRIBES[summary.tribe] ?? summary.tribe ?? '—'}
+                族語：{TRIBE_NAME_BY_SLUG[summary.tribe] ?? summary.tribe ?? '—'}
                 {' · '}
                 分數：{summary.score ?? '—'}
             </small>
