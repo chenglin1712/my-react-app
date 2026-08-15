@@ -26,7 +26,7 @@ psycopg2-binary==2.9.11
 firebase-admin==7.5.0
 
 # AI / ML
-openai==2.45.0
+anthropic==0.122.0
 # torch/torchaudio/torchvision must be installed together from pytorch.org with matching CUDA version.
 # Example (CPU): pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cpu
 torch==2.10.0

@@ -40,7 +40,7 @@ npm install
 pip install -r requirements.txt
 ```
 
-複製 `.env.example` 為 `.env`，依註解填入：Firebase 專案設定、GitHub Models API Token（AI 對話）、Google Cloud Vision API 金鑰（影像辨識）、Cloudinary（圖片上傳）等。`.env` 已加進 `.gitignore`，不會被提交。
+複製 `.env.example` 為 `.env`，依註解填入：Firebase 專案設定、Anthropic Claude API Key（AI 對話／翻譯）、Google Cloud Vision API 金鑰（影像辨識）、Cloudinary（圖片上傳）等。`.env` 已加進 `.gitignore`，不會被提交。
 
 ### 本機開發的兩個旗標
 

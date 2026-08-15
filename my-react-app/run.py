@@ -16,7 +16,7 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 # ── 啟動前環境變數檢查 ──────────────────────────────────────────
 REQUIRED_VARS = {
-    "GITHUB_TOKEN": "GitHub Models API Token（AI 對話功能）",
+    "ANTHROPIC_API_KEY": "Anthropic Claude API Key（AI 對話功能）",
     "DJANGO_SECRET_KEY": "Django 安全金鑰",
 }
 OPTIONAL_VARS = {
