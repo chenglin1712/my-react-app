@@ -1,0 +1,301 @@
+/* 族語翻譯頁——版面骨架沿用 theme-v2 的 .yy-page/.yy-hero/.yy-card/.yy-btn-*，
+   這裡只補頁面專屬的排版與 GroundedText/EvidencePanel 的標記樣式。 */
+
+.translate-title {
+    font-size: 34px;
+    margin: 10px 0 8px;
+    font-weight: 900;
+}
+
+.translate-desc {
+    max-width: 640px;
+    margin: 0 auto;
+    color: var(--yy-text-secondary);
+    font-size: 14.5px;
+}
+
+.translate-tribe-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 22px 0 10px;
+}
+
+.translate-capability-note {
+    font-size: 12.5px;
+    color: var(--yy-text-muted);
+}
+
+.translate-body {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 36px 24px 64px;
+}
+
+.translate-direction-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 22px;
+}
+
+.translate-direction-label {
+    font-family: var(--yy-font-pixel);
+    font-size: 13px;
+    color: var(--yy-text-secondary);
+    min-width: 88px;
+    text-align: center;
+}
+
+.translate-swap-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 3px solid var(--yy-ink);
+    background: #fff;
+    color: var(--yy-ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: var(--yy-shadow-sm);
+    transition: transform .15s ease;
+}
+.translate-swap-btn:hover {
+    transform: rotate(180deg);
+}
+
+.translate-alert {
+    max-width: 640px;
+    margin: 0 auto 18px;
+}
+
+.translate-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+@media (max-width: 860px) {
+    .translate-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.translate-pane {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    min-height: 280px;
+}
+
+.translate-pane-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--yy-text-secondary);
+    margin-bottom: 10px;
+}
+
+.translate-char-count {
+    font-weight: 400;
+    color: var(--yy-text-muted);
+    font-size: 12px;
+}
+
+.translate-textarea {
+    flex: 1;
+    min-height: 140px;
+    resize: vertical;
+    border: 2px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
+    padding: 12px;
+    font-family: var(--yy-font-body);
+    font-size: 15px;
+    outline: none;
+}
+.translate-textarea:focus {
+    border-color: var(--yy-red);
+}
+
+.translate-submit-btn {
+    margin-top: 14px;
+    align-self: flex-end;
+    min-width: 96px;
+}
+
+.translate-exact-badge {
+    background: var(--yy-gold);
+    width: auto;
+    height: 26px;
+    padding: 0 10px;
+    font-size: 11px;
+    transform: none;
+}
+.translate-exact-badge span {
+    transform: none;
+    font-family: var(--yy-font-pixel);
+}
+
+.translate-result-loading,
+.translate-placeholder {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--yy-text-muted);
+    font-size: 14px;
+}
+
+/* ---------- GroundedText ---------- */
+
+.yy-grounded-text {
+    font-size: 18px;
+    line-height: 2.1;
+    word-break: break-word;
+}
+
+.yy-gt-punct {
+    color: var(--yy-text-muted);
+}
+
+.yy-gt-token {
+    cursor: pointer;
+    padding: 1px 2px;
+    border-radius: 3px;
+    transition: background .15s ease;
+}
+.yy-gt-token:hover,
+.yy-gt-token.yy-gt-active {
+    background: var(--yy-cream-dim);
+}
+
+.yy-gt-headword {
+    border-bottom: 2px solid transparent;
+}
+.yy-gt-attested {
+    border-bottom: 2px solid var(--yy-blue-light);
+}
+.yy-gt-derived {
+    border-bottom: 2px dotted var(--yy-gold);
+}
+.yy-gt-unsupported {
+    text-decoration: underline wavy var(--yy-red);
+    text-decoration-thickness: 1.5px;
+    background: rgba(158, 27, 36, 0.08);
+    border-radius: 3px;
+}
+@supports not (text-decoration-style: wavy) {
+    .yy-gt-unsupported {
+        text-decoration: underline dotted var(--yy-red);
+    }
+}
+
+.translate-result-actions {
+    display: flex;
+    gap: 10px;
+    margin: 14px 0;
+}
+.translate-result-actions .yy-btn-outline {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    font-size: 12.5px;
+}
+
+.translate-coverage-summary {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--yy-text-secondary);
+    margin-bottom: 4px;
+}
+
+.translate-notes {
+    font-size: 12.5px;
+    color: var(--yy-text-muted);
+    font-style: italic;
+}
+
+/* ---------- EvidencePanel ---------- */
+
+.yy-evidence-panel {
+    margin-top: 12px;
+    padding: 14px;
+    background: var(--yy-cream);
+    border: 2px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
+}
+
+.yy-evidence-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+.yy-evidence-head strong {
+    font-size: 16px;
+}
+
+.yy-evidence-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: #fff;
+    border: 1.5px solid var(--yy-ink);
+}
+
+.yy-evidence-body,
+.yy-evidence-note {
+    font-size: 13.5px;
+    color: var(--yy-text-secondary);
+    margin: 4px 0;
+}
+
+.yy-evidence-lemma {
+    font-weight: 700;
+}
+
+.yy-evidence-audio-btn {
+    border: none;
+    background: none;
+    color: var(--yy-blue);
+    cursor: pointer;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+.yy-evidence-audio-btn:hover {
+    color: var(--yy-red);
+}
+
+/* ---------- 參考例句列表 ---------- */
+
+.translate-evidence-list {
+    margin-top: 16px;
+    border-top: 2px dashed var(--yy-text-muted);
+    padding-top: 12px;
+}
+.translate-evidence-list h3 {
+    font-size: 13px;
+    color: var(--yy-text-muted);
+    margin-bottom: 8px;
+}
+.translate-evidence-sentence {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 13px;
+    padding: 4px 0;
+}
+.translate-evidence-original {
+    font-weight: 700;
+}
+.translate-evidence-chinese {
+    color: var(--yy-text-muted);
+}

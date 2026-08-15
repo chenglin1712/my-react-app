@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Menu, X } from "lucide-react";
-import { House, TextSearch, Camera, Gamepad2, BookOpenCheck, NotebookPen, User, ChevronDown } from "lucide-react";
+import { House, TextSearch, Camera, Gamepad2, BookOpenCheck, NotebookPen, User, ChevronDown, Languages } from "lucide-react";
 import "../../static/css/navigation/Navbar.css"
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../src/userServives/authContext"
@@ -22,6 +22,7 @@ const Navbar = () => {
   const menuItem = [
     { id: 'home', label: '首頁', icon: <House size={20} />, route: '/' },
     { id: 'search', label: '單詞查詢', icon: <TextSearch size={20} />, route: '/search' },
+    { id: 'translate', label: '翻譯', icon: <Languages size={20} />, route: '/translate' },
     { id: 'camera', label: '影像辨識', icon: <Camera size={20} />, route: '/camera' },
     { id: 'game', label: '遊戲專區', icon: <Gamepad2 size={20} />, route: '/game' },
     { id: 'quiz', label: '測驗', icon: <BookOpenCheck size={20} />, route: '/quiz/select', activePrefix: '/quiz' }

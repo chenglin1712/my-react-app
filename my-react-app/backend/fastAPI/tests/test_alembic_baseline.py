@@ -29,7 +29,7 @@ EXPECTED_TABLES = {
     "focus", "word_explanation_focus", "word_explanation_image",
     "word_explanation_sentence", "word_explanation_sentence_audio",
     "word_explanation_anaphora", "word_explanation_anaphora_item",
-    "media_asset",
+    "media_asset", "translation_attested_form",
 }
 
 
@@ -69,9 +69,12 @@ def test_upgrade_head_from_empty_db_creates_full_schema(alembic_config):
 
     with engine.connect() as conn:
         version = conn.exec_driver_sql("SELECT version_num FROM alembic_version").scalar()
-    # P5 辭典媒體自主化新增 bd80bf38fb2d，是目前的 head（見該檔案 down_revision
-    # 接在 90bc362710d9 之後）。
-    assert version == "bd80bf38fb2d"
+    # 族語翻譯功能新增 86d389a704d0，是目前的 head（見該檔案 down_revision
+    # 接在 bd80bf38fb2d 之後）。這支 migration 在 SQLite 上只建
+    # translation_attested_form 這張 dialect 中立的表，pg_trgm 專屬的
+    # extension／運算式索引整段跳過（見該檔案 upgrade() 的 is_postgres 判斷），
+    # 這裡走的正是 SQLite 分支，用來驗證那個分支本身不會出錯。
+    assert version == "86d389a704d0"
 
 
 def test_upgrade_head_is_idempotent(alembic_config):

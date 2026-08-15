@@ -3,9 +3,6 @@ import logging
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django_ratelimit.core import is_ratelimited
-from openai import OpenAI
-import os
-from dotenv import load_dotenv
 import traceback
 
 from dictionary_db.connect import SessionLocal
@@ -13,38 +10,20 @@ from dictionary_db.model import Word
 from dictionary_db.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS, TRIBE_MAP
 from config.firebase_auth import verify_firebase_token
+from config.llm import get_llm_client
 from adminapi.rate_limits import get_configured_rate
 from .serializers import TayalChatSerializer, ReviewTayalChatSerializer
 from .services import run_tayal_chat, run_review_tayal_chat
 
 logger = logging.getLogger(__name__)
 
-load_dotenv()
-
-_client = None
-
 
 def _get_client():
-    """延遲初始化 OpenAI client，第一次真的呼叫 AI 對話功能時才檢查 GITHUB_TOKEN。
-
-    core/urls.py 一定會 import 到這個模組（掛載 AIModel.urls），若在模組載入當下就
-    檢查並拋錯，少一把金鑰會讓整個 Django process 啟動失敗，連跟 AI 功能無關的
-    其他端點都連帶壞掉。延後到實際呼叫時才檢查，缺金鑰只會讓這兩個 AI 端點回
-    503，其他功能不受影響。"""
-    global _client
-    if _client is not None:
-        return _client
-    github_token = os.getenv("GITHUB_TOKEN")
-    if not github_token:
-        raise EnvironmentError(
-            "[AIModel] 環境變數 GITHUB_TOKEN 未設定，AI 對話功能無法使用。"
-            "請在 .env 填入 GitHub Personal Access Token。"
-        )
-    _client = OpenAI(
-        api_key=github_token,
-        base_url="https://models.github.ai/inference"
-    )
-    return _client
+    """搬到 config/llm.py（族語翻譯功能在 FastAPI process 裡也需要同一個
+    client，見該檔案說明）。這裡保留同名函式當一行 delegate，行為完全不變，
+    AIModel/tests.py 既有的 `@patch("AIModel.views._get_client", ...)` 測試
+    路徑不用跟著改。"""
+    return get_llm_client()
 
 def _rate_limited_response(request, decoded, group, rate="10/m"):
     """依已登入使用者的 uid 限速（這兩個 view 都會呼叫付費的 GitHub Models API）。

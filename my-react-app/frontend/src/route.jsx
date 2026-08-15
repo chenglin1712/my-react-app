@@ -18,6 +18,8 @@ const ResetPage = lazy(() => import('../components/_auth/resetPassword'));
 const CameraPage = lazy(() => import('./_camera/index'));
 //辭典
 const SearchPage = lazy(() => import('./_search/index'));
+//翻譯
+const TranslatePage = lazy(() => import('./_translate/index'));
 //遊戲
 const GamePage = lazy(() => import('./_game/index'));
 const VocabularyPage = lazy(() => import('./_game/vocabulary'));
@@ -76,6 +78,7 @@ const App = () => {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/search" element={<SearchPage />} />
+          <Route path="/translate" element={<ProtectedRoute><TranslatePage /></ProtectedRoute>} />
           <Route path="/camera" element={<ProtectedRoute><CameraPage /></ProtectedRoute>} />
           <Route path="/camera/label" element={<Navigate to="/camera" replace />} />
           <Route path="/camera/result" element={<Navigate to="/camera" replace />} />

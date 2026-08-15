@@ -44,6 +44,7 @@ EVENT_TYPE_LABELS = {
     "quiz_answer": "測驗作答",
     "quiz_session": "測驗",
     "page_view": "頁面瀏覽",
+    "translation_request": "族語翻譯",
 }
 
 # 公開端點（usage_event_create）允許建立的事件類型白名單——刻意不含

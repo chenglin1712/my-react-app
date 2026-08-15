@@ -91,7 +91,7 @@ export default function FeatureFlags() {
             </div>
 
             <Alert variant="info">
-                目前唯一接上真實判斷的開關是族語測驗總開關——關閉後，該族語的官方等級測驗與情境題會回傳 403，不是靜默顯示空題目。
+目前真正接上判斷的開關有兩種：族語測驗總開關（關閉後，該族語的官方等級測驗與情境題會回傳 403，不是靜默顯示空題目）與族語翻譯總開關（關閉後，翻譯請求會回傳 403，不再呼叫 LLM）。
             </Alert>
             {!canView && (
                 <Alert variant="danger">你的角色沒有權限檢視功能開關。</Alert>

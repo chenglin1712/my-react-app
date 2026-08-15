@@ -321,3 +321,33 @@ class WordExplanationAnaphoraItem(Base):
     word_id     = Column(String, ForeignKey("words.id"), nullable=True, index=True)
     name        = Column(String)
     sort_order  = Column(Integer)
+
+
+class TranslationAttestedForm(Base):
+    """族語翻譯功能（backend/fastAPI/routes/translation/）佐證檢核 Tier B
+    "attested" 的資料來源：words.name 只收錄詞條原形，但例句裡用的常是詞綴
+    變化過的形式（這五個族語詞綴變化重），只拿 words.name 當驗證詞表在人工
+    正確句子上覆蓋率只有 69~91%（見該功能的設計討論記錄），漏掉的大部分就是
+    這裡收錄的「語料句子裡實際出現過、但字典詞條本身沒有」的詞形。
+
+    由 backend/adminapi/management/commands/rebuild_translation_attested_forms.py
+    整批重算寫入（掃描 word_explanation_sentence.original_sentence 斷詞），
+    不是即時維護的表——語料資料改動後要重跑那支指令，不會自動同步。
+
+    schema 由 alembic/versions/86d389a704d0_add_translation_support.py 建立，
+    這裡的欄位定義要跟那支 migration 完全一致（比照 media_asset 的既有慣例，
+    見該 model 的欄位註解）。"""
+    __tablename__ = "translation_attested_form"
+
+    id                 = Column(Integer, primary_key=True, autoincrement=True)
+    tribe_id           = Column(String, ForeignKey("tribe.id", ondelete="CASCADE"), nullable=False)
+    tribe_ref          = relationship("Tribe")
+    surface_form_norm  = Column(String, nullable=False)
+    # 這個詞形是從哪一句例句斷出來的，佐證檢核要能引用真正的例句給使用者看，
+    # 不能只回一個「有出現過」的布林值。
+    source_sentence_id = Column(Integer, ForeignKey("word_explanation_sentence.id", ondelete="SET NULL"), nullable=True)
+    created_at         = Column(DateTime, server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index("ix_translation_attested_form_tribe_surface", "tribe_id", "surface_form_norm", unique=True),
+    )

@@ -13,6 +13,8 @@ prompt 樣板、外部 API 呼叫、回應解析全部塞在同一個函式裡�
 import datetime
 import json
 
+from config.llm import DEFAULT_MODEL
+
 
 def build_chat_prompt(tribe_name: str, level, correct, incorrect, unanswered, common_errors, today, tomorrow) -> str:
     """tayal_chat 用的 system prompt：一般對話／學習狀況分析（預設）
@@ -100,7 +102,7 @@ def run_tayal_chat(client, tribe_name: str, user_message: str, user_stats: dict)
     prompt = build_chat_prompt(tribe_name, level, correct, incorrect, unanswered, common_errors, today, tomorrow)
 
     response = client.chat.completions.create(
-        model="openai/gpt-4o",
+        model=DEFAULT_MODEL,
         messages=[
             {"role": "system", "content": prompt},
             {"role": "user", "content": user_message}
@@ -155,7 +157,7 @@ def run_review_tayal_chat(client, tribe_name: str, user_message: str, relevant_w
     prompt = build_review_prompt(tribe_name, words_context)
 
     response = client.chat.completions.create(
-        model="openai/gpt-4o",
+        model=DEFAULT_MODEL,
         messages=[
             {"role": "system", "content": prompt},
             {"role": "user", "content": user_message}
