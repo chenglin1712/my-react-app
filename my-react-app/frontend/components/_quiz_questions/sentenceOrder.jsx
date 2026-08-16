@@ -234,7 +234,7 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
         <ArrowDownUp />&nbsp;例句排列
       </h5>
 
-            <h2 className="fw-bolder mb-4 " style={question.tayal.audio?{cursor: "pointer"}:""}onClick={() => {if(question.tayal.audio) playAudio(question.tayal.audio);}}>
+            <h2 className="fw-bolder mb-4 " style={question.tayal.audio ? { cursor: "pointer" } : undefined} onClick={() => {if(question.tayal.audio) playAudio(question.tayal.audio);}}>
                             {question.tayal.cn}
                             {question.tayal.audio && (
                               <span>

@@ -773,6 +773,7 @@ class DictionaryImportJob(models.Model):
     STATUS_UPLOADED = 'uploaded'
     STATUS_VALIDATED = 'validated'
     STATUS_PENDING_REVIEW = 'pending_review'
+    STATUS_APPLYING = 'applying'
     STATUS_APPLIED = 'applied'
     STATUS_APPLIED_WITH_ERRORS = 'applied_with_errors'
     STATUS_REJECTED = 'rejected'
@@ -780,6 +781,7 @@ class DictionaryImportJob(models.Model):
         (STATUS_UPLOADED, '已上傳'),
         (STATUS_VALIDATED, '已預檢'),
         (STATUS_PENDING_REVIEW, '待審核'),
+        (STATUS_APPLYING, '套用中'),
         (STATUS_APPLIED, '已套用'),
         (STATUS_APPLIED_WITH_ERRORS, '已套用（部分失敗）'),
         (STATUS_REJECTED, '已退件'),

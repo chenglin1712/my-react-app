@@ -14,6 +14,7 @@ dictionary_db，兩個資料庫之間沒有共用交易，套用 P3 已經驗證
 """
 import json
 import logging
+import time
 
 from django.db import transaction
 from django.http import JsonResponse
@@ -575,6 +576,60 @@ def _revert_revision_to_pending_review(pk, error_message):
         revision.save(update_fields=["status", "apply_error", "updated_at"])
 
 
+def _finalize_approved_revision(pk, result_id, result_payload, request, decoded):
+    """把「內容已經在 dictionary DB 生效」這件事記到 Django 端：寫
+    applied_at／target_id、寫稽核紀錄、通知快取失效。
+
+    寫成幂等函式，可以安全重複呼叫：revision 已經有 applied_at 就直接視為
+    完成、原樣回傳（no-op），不會重複寫入稽核紀錄或重複通知快取失效。這讓
+    dictionary_revision_approve() 可以在同一個 request 內做幾次短重試，
+    reconcile_stuck_dictionary_revisions 管理指令之後也能安全地再呼叫一次
+    補完成——不管呼叫幾次，結果都一樣。
+
+    唯一會拋例外往外傳的情況是 Django DB 寫入本身失敗（連線問題、鎖等待
+    逾時等）；這時 dictionary DB 那邊的內容已經生效，寫入失敗只代表「這次
+    記帳沒寫成功」，呼叫端不應該把 revision 退回 pending_review（那樣下次
+    核准會對同一個 target 重新套用一次，可能重複建立或跟已生效內容打架）。
+    """
+    with transaction.atomic():
+        revision = DictionaryRevision.objects.select_for_update().get(pk=pk)
+        if revision.applied_at is None:
+            revision.applied_at = timezone.now()
+            if revision.operation == DictionaryRevision.OPERATION_CREATE:
+                revision.target_id = result_id
+            revision.save(update_fields=["applied_at", "target_id", "updated_at"])
+            _safe_write_audit_log(
+                request, decoded, "approve_proposal", result_id or f"revision:{pk}",
+                after=json.loads(json.dumps(result_payload, default=str)),
+                target_type=_revision_target_type(revision),
+            )
+    # 快取失效通知一律再嘗試一次，就算上面判斷「已經完成過」也一樣——
+    # invalidate_dictionary_cache() 本身是 best-effort、不會拋例外，重複呼叫
+    # 也是安全的，這樣如果上一次唯獨這一步沒通知成功，這裡還有機會補上。
+    invalidate_dictionary_cache(
+        _CACHE_SCOPES.get(revision.target_kind, ["all"]),
+        tribes=[revision.tribe] if revision.tribe else None,
+    )
+    return revision
+
+
+def _finalize_approved_revision_with_retry(pk, result_id, result_payload, request, decoded,
+                                            retries=3, retry_delay_seconds=0.2):
+    """finalize 失敗通常是暫時性的 DB 問題（連線瞬斷、鎖等待逾時），值得在
+    同一個 request 內短暫重試幾次；不用長 backoff 卡住 worker——長時間故障
+    交給 reconcile_stuck_dictionary_revisions 管理指令事後處理，不該讓一個
+    HTTP request 硬撐到那種程度。"""
+    last_exc = None
+    for attempt in range(retries):
+        try:
+            return _finalize_approved_revision(pk, result_id, result_payload, request, decoded)
+        except Exception as exc:
+            last_exc = exc
+            if attempt < retries - 1:
+                time.sleep(retry_delay_seconds)
+    raise last_exc
+
+
 @csrf_exempt
 def dictionary_revision_approve(request, pk):
     """核准流程（見規劃文件 P4 §1 的跨系統一致性說明，加上 codex 獨立審查
@@ -674,21 +729,31 @@ def dictionary_revision_approve(request, pk):
         _revert_revision_to_pending_review(pk, "套用時發生未預期錯誤")
         return JsonResponse({"detail": "套用失敗，已退回待審狀態，請稍後再試"}, status=500)
 
-    with transaction.atomic():
-        revision = DictionaryRevision.objects.select_for_update().get(pk=pk)
-        revision.applied_at = timezone.now()
-        if revision.operation == DictionaryRevision.OPERATION_CREATE:
-            revision.target_id = result_id
-        revision.save(update_fields=["applied_at", "target_id", "updated_at"])
-        _safe_write_audit_log(
-            request, decoded, "approve_proposal", result_id or f"revision:{pk}",
-            after=json.loads(json.dumps(result_payload, default=str)),
-            target_type=_revision_target_type(revision),
+    # 到這裡，辭典 DB 的寫入已經真的 commit 了——內容已經生效。不管接下來
+    # 記帳這步發生什麼事，都不能再把 revision 退回 pending_review：那樣
+    # 下次核准會對同一個 target 重新套用一次，可能重複建立或跟已生效內容
+    # 打架。finalize 函式本身是幂等的，這裡先做幾次短重試。
+    try:
+        revision = _finalize_approved_revision_with_retry(pk, result_id, result_payload, request, decoded)
+    except Exception:
+        # 重試過仍失敗：記下完整資訊讓值班人員能手動處理，或之後執行
+        # reconcile_stuck_dictionary_revisions 管理指令補完成。狀態刻意
+        # 維持在 approved + applied_at=NULL、不動它——這個組合本身就是
+        # 「內容已生效但記帳沒寫完」的可掃描標記，管理指令靠它找出待補的
+        # revision。
+        logger.exception(
+            "辭典提案 #%s 內容已套用成功（target_id=%s），但最終狀態記錄重試 3 次後仍然失敗，"
+            "需要人工介入或執行 reconcile_stuck_dictionary_revisions 管理指令補完成。"
+            "result_payload=%s",
+            pk, result_id, json.dumps(result_payload, default=str, ensure_ascii=False),
         )
+        return JsonResponse({
+            "detail": "內容已套用成功，但後台狀態記錄發生問題，請稍後重新整理查看，不要重新核准；"
+                      "如果狀態一直沒有更新請聯繫工程人員",
+            "target_id": result_id,
+        }, status=502)
 
-    invalidate_dictionary_cache(_CACHE_SCOPES.get(revision.target_kind, ["all"]), tribes=[revision.tribe] if revision.tribe else None)
-
-    return JsonResponse({"id": revision.pk, "status": revision.status, "target_id": result_id})
+    return JsonResponse({"id": revision.pk, "status": revision.status, "target_id": revision.target_id})
 
 
 @csrf_exempt

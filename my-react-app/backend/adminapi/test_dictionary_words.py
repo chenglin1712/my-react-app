@@ -228,6 +228,67 @@ class WordCreateFlowTest(DictionaryDbTestCase):
         finally:
             db.close()
 
+    def test_finalize_retries_transient_failure_and_succeeds(self):
+        """BE-1 修正：finalize（寫 applied_at／稽核紀錄）失敗時，在同一個
+        request 內做幾次短重試——這裡直接測 retry wrapper 本身，前兩次
+        模擬暫時性失敗，第三次成功，確認總共呼叫 3 次且不會真的 sleep
+        （patch 掉，跑測試不用真的等）。"""
+        from . import dictionary_views as dv
+
+        calls = {"n": 0}
+
+        def _flaky(pk, result_id, result_payload, request, decoded):
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise RuntimeError("transient db hiccup")
+            return "ok"
+
+        with patch.object(dv, "_finalize_approved_revision", side_effect=_flaky), \
+             patch("adminapi.dictionary_views.time.sleep") as mock_sleep:
+            result = dv._finalize_approved_revision_with_retry(1, "word-1", {}, None, {"uid": "test"})
+
+        self.assertEqual(result, "ok")
+        self.assertEqual(calls["n"], 3)
+        self.assertEqual(mock_sleep.call_count, 2)
+
+    def test_approve_keeps_content_live_when_finalize_totally_fails(self):
+        """BE-1 修正的核心保證：dictionary DB 的寫入已經 commit 之後，就算
+        finalize 重試 3 次都失敗，也不能把 revision 退回 pending_review
+        （那樣下次核准會對同一個 target 重新套用一次）。這裡直接讓
+        finalize 一律失敗，確認：(1) API 回應是 502 而不是誤導使用者「已
+        退回待審」的訊息，(2) revision 狀態留在 approved、applied_at 仍是
+        None（可被 reconcile_stuck_dictionary_revisions 掃到），(3) 內容
+        真的已經寫進 dictionary DB——證明「內容已生效」這件事是真的，不是
+        測試在自欺欺人。"""
+        from . import dictionary_views as dv
+
+        with _as_role(EDITOR) as headers:
+            create_resp = _post_json(self.client, '/adminapi/dictionary/words/', headers, _MINIMAL_WORD_PAYLOAD)
+        revision_id = create_resp.json()["revision_id"]
+
+        with _as_role(EDITOR) as headers:
+            _post_json(self.client, f'/adminapi/dictionary/revisions/{revision_id}/submit/', headers)
+
+        with patch.object(dv, "_finalize_approved_revision_with_retry", side_effect=RuntimeError("db down")):
+            with _as_role(REVIEWER) as headers:
+                approve_resp = _post_json(
+                    self.client, f'/adminapi/dictionary/revisions/{revision_id}/approve/', headers,
+                )
+
+        self.assertEqual(approve_resp.status_code, 502)
+        self.assertIn("已套用成功", approve_resp.json()["detail"])
+
+        revision = DictionaryRevision.objects.get(pk=revision_id)
+        self.assertEqual(revision.status, DictionaryRevision.STATUS_APPROVED)
+        self.assertIsNone(revision.applied_at)
+
+        db = connect_module.SessionLocal()
+        try:
+            word = db.query(m.Word).filter(m.Word.name == "huzil").one_or_none()
+            self.assertIsNotNone(word, "dictionary DB 的內容應該已經真的 commit 了")
+        finally:
+            db.close()
+
 
 class WordUpdateFlowTest(DictionaryDbTestCase):
     def setUp(self):

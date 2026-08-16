@@ -9,6 +9,13 @@ Sentry 能告警即可，不影響已經成功的主要操作。
 更新（transaction.atomic()）→ (3) 這裡的快取失效通知，在前兩者都完成之後、
 交易區塊外。放在交易區塊內會在交易還可能回滾時就通知；在辭典 commit
 之前通知，背景重新預熱反而會抓到舊資料重新快取，比完全不通知還糟。
+
+這個通知機制只會清除「收到這次 HTTP request 的那一個 FastAPI process」裡的
+process-local 記憶體快取，因此目前的部署前提是全系統同一時間只有一個
+FastAPI process。不論是在單一容器內開啟多個 Uvicorn worker，或把 FastAPI 水平
+擴展成多個 container replica，都會使這次通知只命中其中一個 process，其餘
+process 可能無聲地持續回傳舊資料。水平擴展前必須先改用 Redis 等共享快取，
+或導入能廣播到每個 process 的快取失效機制；不能只複製現有容器就當作完成擴展。
 """
 import logging
 import os

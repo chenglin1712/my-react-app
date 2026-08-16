@@ -40,6 +40,49 @@ def _forbidden_if_target_outranks(decoded, target_user_record):
     return None
 
 
+def _forbidden_if_self_target(decoded, uid, action_label):
+    """降級／停權／刪除自己的帳號沒有任何正當使用情境，只有誤操作或誤點
+    一種可能，而且後果可能是永久鎖死（尤其唯一 owner 誤降級自己，之後
+    沒有人能再指派 owner）。直接擋在最前面，比後面的 last-owner 檢查更
+    根本——不管系統還有幾位 owner，都不該允許對自己動這幾個動作。"""
+    if uid == decoded.get("uid"):
+        return JsonResponse({"detail": f"不能對自己的帳號執行「{action_label}」，請由其他管理者協助"}, status=403)
+    return None
+
+
+def _count_active_owners(exclude_uid=None):
+    """目前有效（未停權）的 owner 人數。exclude_uid 用來回答「如果對這個人
+    動手之後，系統還剩幾位 owner」。
+
+    這是 read-then-write，不是資料庫交易——firebase_ops.list_all_firebase_users()
+    只是即時拉取 Firebase Auth 全量使用者（跟使用者列表頁同一種既有做法，
+    見本檔案開頭說明），沒有鎖，也沒有辦法鎖（Firebase Auth 不是我們自己的
+    資料庫）。兩位 owner 同時各自對另一位動手的極端競態理論上仍可能同時
+    通過檢查，這裡只做 best-effort 防呆，擋掉絕大多數的誤操作，不是強一致
+    保證。"""
+    count = 0
+    for u in firebase_ops.list_all_firebase_users():
+        if exclude_uid and u.uid == exclude_uid:
+            continue
+        if (u.custom_claims or {}).get("role") == OWNER and not u.disabled:
+            count += 1
+    return count
+
+
+def _forbidden_if_would_remove_last_owner(target_user_record, uid):
+    """只有「目標現在確實是有效 owner」才需要檢查；呼叫端負責先判斷這次
+    操作是否真的會讓對方失去 owner 身分（例如 user_role 只在把 owner 改成
+    別的角色時才呼叫這裡，改成同樣是 owner 或本來就不是 owner 都不需要）。"""
+    target_role = (target_user_record.custom_claims or {}).get("role")
+    if target_role != OWNER or target_user_record.disabled:
+        return None
+    if _count_active_owners(exclude_uid=uid) < 1:
+        return JsonResponse({
+            "detail": "系統目前只剩這一位 owner，無法對這個帳號執行此操作，請先指派另一位 owner 後再試",
+        }, status=409)
+    return None
+
+
 def _merge_user(user_record, firestore_data):
     claims = user_record.custom_claims or {}
     metadata = user_record.user_metadata
@@ -295,6 +338,10 @@ def user_role(request, uid):
     if limited_resp:
         return limited_resp
 
+    forbidden_resp = _forbidden_if_self_target(decoded, uid, "指派角色")
+    if forbidden_resp:
+        return forbidden_resp
+
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -310,6 +357,10 @@ def user_role(request, uid):
         return JsonResponse({"detail": "找不到這個使用者"}, status=404)
 
     old_role = (user_record.custom_claims or {}).get("role")
+    if old_role == OWNER and role != OWNER:
+        forbidden_resp = _forbidden_if_would_remove_last_owner(user_record, uid)
+        if forbidden_resp:
+            return forbidden_resp
     firebase_ops.set_user_role(uid, role)
     firebase_ops.revoke_sessions(uid)
     _safe_write_audit_log(
@@ -497,6 +548,11 @@ def _set_suspended(request, uid, disabled):
     if limited_resp:
         return limited_resp
 
+    if disabled:
+        forbidden_resp = _forbidden_if_self_target(decoded, uid, "停權")
+        if forbidden_resp:
+            return forbidden_resp
+
     from firebase_admin import auth as firebase_auth
     try:
         target_user = firebase_ops.get_firebase_user(uid)
@@ -505,6 +561,10 @@ def _set_suspended(request, uid, disabled):
     forbidden_resp = _forbidden_if_target_outranks(decoded, target_user)
     if forbidden_resp:
         return forbidden_resp
+    if disabled:
+        forbidden_resp = _forbidden_if_would_remove_last_owner(target_user, uid)
+        if forbidden_resp:
+            return forbidden_resp
 
     firebase_ops.set_user_disabled(uid, disabled)
     firebase_ops.revoke_sessions(uid)
@@ -611,6 +671,10 @@ def user_delete(request, uid):
     if limited_resp:
         return limited_resp
 
+    forbidden_resp = _forbidden_if_self_target(decoded, uid, "刪除帳號")
+    if forbidden_resp:
+        return forbidden_resp
+
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -621,6 +685,9 @@ def user_delete(request, uid):
     except firebase_auth.UserNotFoundError:
         return JsonResponse({"detail": "找不到這個使用者"}, status=404)
     forbidden_resp = _forbidden_if_target_outranks(decoded, user_record)
+    if forbidden_resp:
+        return forbidden_resp
+    forbidden_resp = _forbidden_if_would_remove_last_owner(user_record, uid)
     if forbidden_resp:
         return forbidden_resp
 

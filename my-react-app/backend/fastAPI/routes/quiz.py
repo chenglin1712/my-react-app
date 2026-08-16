@@ -372,8 +372,13 @@ def _build_word_translate_question(w, all_words_list, question_id, difficulty=No
     return {
         "id": question_id,
         "type": "word-translate",
+        # 欄位名一定要叫 answer，不能叫 cn：前端 wordTranslation.jsx 判分／
+        # 顯示正確答案都是讀 question.answer（quiz_recommon_question.jsx
+        # 攤平 payload 時直接展開成 question 的頂層欄位）。這裡原本叫 cn，
+        # 兩邊對不上，question.answer 永遠是 undefined，導致這個題型不管
+        # 選什麼都被判成答錯——是這次連帶抓到、獨立於題目本身邏輯的 bug。
         "payload": {"tayal": {"word": w.name, "audio": _get_audio(w)},
-                    "cn": correct_cn, "options": opts},
+                    "answer": correct_cn, "options": opts},
         "difficulty": difficulty,
         "meta": meta,
     }

@@ -88,6 +88,7 @@ alembic upgrade head
 - `DJANGO_DEBUG=False` 時 Swagger UI（`/docs/`）不會掛載（404），只在開發環境可用。
 - `DJANGO_DEBUG=False` 會自動啟用 `SECURE_SSL_REDIRECT`／`SESSION_COOKIE_SECURE`／`CSRF_COOKIE_SECURE`／HSTS；部署平台（Render、Cloud Run）需在反向代理層正確設定 `X-Forwarded-Proto`（兩者預設都會），Django 已透過 `SECURE_PROXY_SSL_HEADER` 讀取這個標頭判斷連線是否為 HTTPS。
 - `REDIS_URL`：gunicorn 若開多個 worker，務必設定，否則 AIModel/CrosswordPuzzle/crawler 的限流計數會退回單一 process 的 LocMemCache，門檻被 worker 數量乘倍放大。
+- **FastAPI 辭典快取目前僅支援單一 process**：Django 在辭典／文法資料寫入後，會透過一次 HTTP request 通知 FastAPI 清除 process-local 記憶體快取。這個通知只會命中其中一個 process；因此目前不可對 FastAPI 使用 `uvicorn --workers` 開多 worker，也不可在 Render、Cloud Run 或其他平台啟用多個水平 replica。水平擴展前，必須先把辭典快取改為 Redis 等共享快取，或導入可廣播到所有 FastAPI process 的失效機制，否則部分 instance 會無聲地持續回傳舊辭典／文法資料。
 - `SENTRY_DSN`：設定後 Django／FastAPI 的 ERROR 等級例外會送到 Sentry，容器重啟後仍查得到記錄，也能收到告警通知；不設定不影響現有行為。
 - 健康檢查端點：Django 為 `/health/`，FastAPI 為 `/health`，皆不需要登入，回傳 `{"status": "ok"}`。
 - `run.py`／`run_fastapi.py` 僅供本機開發（綁定 `127.0.0.1`），正式環境須直接用 gunicorn／uvicorn 啟動，例如：

@@ -10,6 +10,7 @@ APPLIED/APPLIED_WITH_ERRORS` 或 `REJECTED`），不是每筆詞條各自建一�
 """
 import json
 import logging
+import uuid
 
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
@@ -298,17 +299,30 @@ def _revert_import_job_to_pending_review(pk):
         job.save(update_fields=["status"])
 
 
+# 批次匯入新建列的 deterministic id 用固定命名空間推導，同一個
+# (job_id, row) 不管重跑幾次都會得到同一個 id——見 import_job_approve()
+# 逐列 checkpoint 的說明：這是「同一列重跑會對回同一筆詞條，而不是每次
+# 建一筆新的」這個保證的根本，沒有這個就無法安全續跑 create 列。
+_IMPORT_ROW_ID_NAMESPACE = uuid.UUID("f2e6b9d0-9b1a-4b7a-9f3a-6c2f6f9a7d31")
+
+
+def _deterministic_import_row_id(job_pk, row):
+    return str(uuid.uuid5(_IMPORT_ROW_ID_NAMESPACE, f"dictionary-import-job:{job_pk}:row:{row}"))
+
+
 @csrf_exempt
 def import_job_approve(request, pk):
-    """核准套用，分四步：
+    """核准套用，分五步（BE-2 修正：新增「先標記處理中、逐列 checkpoint」，
+    取代原本「先標終態、整個迴圈跑完才一次寫回」的做法——後者如果 process
+    在迴圈中途被中斷，Django 端會停在一個外表看起來「已套用」、實際上只
+    套用了一部分、而且無法透過這個端點重跑的死狀態）：
 
-    (1) 在鎖定的 Django 交易內立刻把工作狀態從 pending_review「認領」成
-        applied（樂觀先標，套用結果視實際情況調整或退回），關閉「兩個
-        審核者同時核准同一個匯入工作」的競態窗口——跟
-        dictionary_views.dictionary_revision_approve() 同一種手法：第二個
-        請求的 select_for_update() 會被第一個持有的鎖擋住，等第一個交易
-        提交後才能繼續，這時狀態已經不是 pending_review，直接被擋下，
-        不會真的重複套用整批。
+    (1) 在鎖定的 Django 交易內把工作狀態從 pending_review「認領」成
+        applying（不是直接標成終態）——關閉「兩個審核者同時核准同一個
+        匯入工作」的競態窗口，跟 dictionary_views.dictionary_revision_approve()
+        同一種手法：第二個請求的 select_for_update() 會被第一個持有的鎖
+        擋住，等第一個交易提交後才能繼續，這時狀態已經不是 pending_review，
+        直接被擋下，不會真的重複套用整批。
     (2) 重新呼叫 resolve_import_bundle() 並比對雜湊（見
         dictionary_import.import_report_hash 的說明）——這份雜湊現在也
         包含每個更新目標「當下」的內容雜湊，不是只比對這份 bundle 自己的
@@ -321,9 +335,25 @@ def import_job_approve(request, pk):
         回滾」的既有精神。除了 DictionaryWriteError（含 apply_word_tree
         在鎖定目標列之後重新比對 current_hash 失敗的 ConcurrentModificationError）
         之外，也攔截任何非預期例外（例如底層 SQLAlchemy/DBAPI 錯誤）避免
-        單一列的意外中斷整個迴圈、讓後面的列完全沒有機會套用。
-    (4) Django 端記帳（狀態/計數/稽核）在套用迴圈跑完之後才做——套用已經
-        是真的發生了，稽核寫入失敗不能讓已完成的操作誤報失敗。
+        單一列的意外中斷整個迴圈、讓後面的列完全沒有機會套用。每處理完
+        一列立刻把結果 checkpoint 回 Django（report／applied_count／
+        failed_count），不是等整個迴圈跑完才一次寫入——process 中途被
+        中斷，Django 端至少留著「處理到第幾筆」的真實記錄。新建列用
+        deterministic id（見 _deterministic_import_row_id()），同一列如果
+        需要重跑會對回同一筆詞條，不會重複建立。
+    (4) 迴圈跑完後才把 job 標成最終的 applied／applied_with_errors。
+    (5) 稽核紀錄在套用迴圈跑完之後才寫——套用已經是真的發生了，稽核寫入
+        失敗不能讓已完成的操作誤報失敗。
+
+    已知限制（這是縮小範圍後的版本，不是完整的分散式安全方案）：如果
+    process 剛好死在「某一列的 dictionary DB 已經 commit、但這一列的
+    checkpoint 還沒寫回 Django」這個窄窗口內，job 會卡在 status=applying、
+    且這一列在 report 裡沒有記錄。這個端點本身**不會**自動續跑卡住的
+    工作（狀態不是 pending_review 一律擋下，避免兩個請求同時續跑同一個
+    job 的併發風險）——需要用
+    `python manage.py resume_stuck_dictionary_import <job_id>` 這支管理
+    指令由人工確認後手動續跑；它會先用 dictionary DB 的實際內容核對每一
+    列是否真的已經套用，不是盲目相信 report 裡記錄的內容。
     """
     if request.method != "POST":
         return JsonResponse({"detail": "Method not allowed"}, status=405)
@@ -342,15 +372,20 @@ def import_job_approve(request, pk):
     with transaction.atomic():
         job = get_object_or_404(DictionaryImportJob.objects.select_for_update(), pk=pk)
         if job.status != DictionaryImportJob.STATUS_PENDING_REVIEW:
+            if job.status == DictionaryImportJob.STATUS_APPLYING:
+                return JsonResponse({
+                    "detail": "這個匯入工作目前是「套用中」狀態，可能仍在處理或先前已中斷；"
+                              "請聯繫工程人員確認，必要時用復原指令手動續跑，不要重複點核准",
+                }, status=409)
             return JsonResponse({"detail": f"目前狀態「{job.status}」無法核准"}, status=409)
 
-        job.status = DictionaryImportJob.STATUS_APPLIED
+        job.status = DictionaryImportJob.STATUS_APPLYING
         job.reviewed_by = decoded.get("uid", "anon")
         job.reviewed_at = timezone.now()
         job.review_comment = review_comment
         job.save(update_fields=["status", "reviewed_by", "reviewed_at", "review_comment"])
 
-    # 工作在上面那個交易裡已經認領成 applied——這裡重新解析 bundle 如果
+    # 工作在上面那個交易裡已經認領成 applying——這裡重新解析 bundle 如果
     # 拋出非預期例外（不只是雜湊不符），沒有 except Exception 兜底的話，
     # 工作會永久卡在「已認領但未套用」的死狀態，且完全沒有回報（獨立審查
     # 找到的問題，跟 dictionary_views.dictionary_revision_approve() 是
@@ -378,44 +413,49 @@ def import_job_approve(request, pk):
     failed_count = 0
     outcomes = []
     for item in fresh_report["items"]:
+        row = item["row"]
         if item["action"] == "error":
-            outcomes.append({"row": item["row"], "name": item["name"], "outcome": "skipped", "detail": item["errors"]})
-            continue
-        try:
-            with dictionary_write_session() as write_db:
-                result_id = dw.apply_word_tree(
-                    write_db, item["payload"], word_id=item["word_id"], expected_hash=item.get("current_hash"),
-                )
-            applied_count += 1
-            outcomes.append({"row": item["row"], "name": item["name"], "outcome": "applied", "word_id": result_id})
-        except dw.DictionaryWriteError as exc:
-            failed_count += 1
-            outcomes.append({"row": item["row"], "name": item["name"], "outcome": "failed", "detail": str(exc)})
-        except Exception:
-            # 不是我們自己定義的 DictionaryWriteError——例如底層 SQLAlchemy/
-            # DBAPI 例外。dictionary_write_session() 已經對這一筆的交易做了
-            # rollback，不影響其他列；這裡只是不讓單一列的非預期例外中斷
-            # 整個迴圈，也不把可能含內部細節的原始例外文字暴露出去。
-            logger.exception("匯入套用第 %s 列時發生非預期例外", item["row"])
-            failed_count += 1
-            outcomes.append({
-                "row": item["row"], "name": item["name"], "outcome": "failed",
-                "detail": "套用時發生非預期錯誤，請查看伺服器日誌",
-            })
+            outcome = {"row": row, "name": item["name"], "outcome": "skipped", "detail": item["errors"]}
+        else:
+            try:
+                with dictionary_write_session() as write_db:
+                    result_id = dw.apply_word_tree(
+                        write_db, item["payload"], word_id=item["word_id"], expected_hash=item.get("current_hash"),
+                        create_id=_deterministic_import_row_id(pk, row) if not item["word_id"] else None,
+                    )
+                applied_count += 1
+                outcome = {"row": row, "name": item["name"], "outcome": "applied", "word_id": result_id}
+            except dw.DictionaryWriteError as exc:
+                failed_count += 1
+                outcome = {"row": row, "name": item["name"], "outcome": "failed", "detail": str(exc)}
+            except Exception:
+                # 不是我們自己定義的 DictionaryWriteError——例如底層 SQLAlchemy/
+                # DBAPI 例外。dictionary_write_session() 已經對這一筆的交易做了
+                # rollback，不影響其他列；這裡只是不讓單一列的非預期例外中斷
+                # 整個迴圈，也不把可能含內部細節的原始例外文字暴露出去。
+                logger.exception("匯入套用第 %s 列時發生非預期例外", row)
+                failed_count += 1
+                outcome = {
+                    "row": row, "name": item["name"], "outcome": "failed",
+                    "detail": "套用時發生非預期錯誤，請查看伺服器日誌",
+                }
+
+        outcomes.append(outcome)
+        # 逐列 checkpoint：每處理完一筆就立刻寫回 Django，而不是等整個
+        # 迴圈跑完才一次寫入——見本函式 docstring 的說明。
+        job.report = {**fresh_report, "outcomes": outcomes}
+        job.applied_count = applied_count
+        job.failed_count = failed_count
+        job.save(update_fields=["report", "applied_count", "failed_count"])
 
     job.status = (
         DictionaryImportJob.STATUS_APPLIED
         if failed_count == 0 and fresh_report["error_count"] == 0
         else DictionaryImportJob.STATUS_APPLIED_WITH_ERRORS
     )
-    job.report = {**fresh_report, "outcomes": outcomes}
-    job.applied_count = applied_count
-    job.failed_count = failed_count
     job.applied_by = decoded.get("uid", "anon")
     job.applied_at = timezone.now()
-    job.save(update_fields=[
-        "status", "report", "applied_count", "failed_count", "applied_by", "applied_at",
-    ])
+    job.save(update_fields=["status", "applied_by", "applied_at"])
 
     _safe_write_audit_log(
         request, decoded, "approve_import_job", str(job.pk),

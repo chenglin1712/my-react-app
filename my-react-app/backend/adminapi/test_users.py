@@ -376,6 +376,45 @@ class UserRoleTest(TestCase):
         self.assertEqual(resp.status_code, 200)
         mock_set_role.assert_called_once_with("uid1", None)
 
+    @patch("adminapi.firebase_ops.revoke_sessions")
+    @patch("adminapi.firebase_ops.set_user_role")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_owner_cannot_change_own_role(self, mock_get_user, mock_set_role, mock_revoke):
+        """就算目標是自己這個 owner 帳號，也不能透過這個端點改自己的角色
+        （包含降級或整個拿掉）——一次誤操作就可能永久失去 owner 身分。"""
+        with _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/users/test-uid/role/', headers, {"role": None})
+        self.assertEqual(resp.status_code, 403)
+        mock_get_user.assert_not_called()
+        mock_set_role.assert_not_called()
+
+    @patch("adminapi.firebase_ops.list_all_firebase_users")
+    @patch("adminapi.firebase_ops.revoke_sessions")
+    @patch("adminapi.firebase_ops.set_user_role")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_cannot_demote_last_remaining_owner(self, mock_get_user, mock_set_role, mock_revoke, mock_list_users):
+        mock_get_user.return_value = _fake_user_record("owner-uid", role=OWNER)
+        mock_list_users.return_value = [_fake_user_record("owner-uid", role=OWNER)]
+        with _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/users/owner-uid/role/', headers, {"role": "admin"})
+        self.assertEqual(resp.status_code, 409)
+        mock_set_role.assert_not_called()
+
+    @patch("adminapi.firebase_ops.list_all_firebase_users")
+    @patch("adminapi.firebase_ops.revoke_sessions")
+    @patch("adminapi.firebase_ops.set_user_role")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_can_demote_owner_when_another_owner_remains(self, mock_get_user, mock_set_role, mock_revoke, mock_list_users):
+        mock_get_user.return_value = _fake_user_record("owner-uid", role=OWNER)
+        mock_list_users.return_value = [
+            _fake_user_record("test-uid", role=OWNER),
+            _fake_user_record("owner-uid", role=OWNER),
+        ]
+        with _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/users/owner-uid/role/', headers, {"role": "admin"})
+        self.assertEqual(resp.status_code, 200)
+        mock_set_role.assert_called_once_with("owner-uid", "admin")
+
 
 class UserProfileTest(TestCase):
     def setUp(self):
@@ -651,15 +690,46 @@ class UserSuspendTest(TestCase):
         self.assertEqual(resp.status_code, 403)
         mock_set_disabled.assert_not_called()
 
+    @patch("adminapi.firebase_ops.list_all_firebase_users")
     @patch("adminapi.firebase_ops.revoke_sessions")
     @patch("adminapi.firebase_ops.set_user_disabled")
     @patch("adminapi.firebase_ops.get_firebase_user")
-    def test_owner_can_suspend_owner(self, mock_get_user, mock_set_disabled, mock_revoke):
+    def test_owner_can_suspend_owner(self, mock_get_user, mock_set_disabled, mock_revoke, mock_list_users):
         mock_get_user.return_value = _fake_user_record("owner-uid", role=OWNER)
+        # 系統還有 test-uid（呼叫者自己）跟 owner-uid 兩位有效 owner，停權
+        # owner-uid 之後還剩 test-uid 一位，last-owner 檢查應該放行。
+        mock_list_users.return_value = [
+            _fake_user_record("test-uid", role=OWNER),
+            _fake_user_record("owner-uid", role=OWNER),
+        ]
         with _as_role(OWNER) as headers:
             resp = _post_json(self.client, '/adminapi/users/owner-uid/suspend/', headers)
         self.assertEqual(resp.status_code, 200)
         mock_set_disabled.assert_called_once_with("owner-uid", True)
+
+    @patch("adminapi.firebase_ops.revoke_sessions")
+    @patch("adminapi.firebase_ops.set_user_disabled")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_cannot_suspend_self(self, mock_get_user, mock_set_disabled, mock_revoke):
+        with _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/users/test-uid/suspend/', headers)
+        self.assertEqual(resp.status_code, 403)
+        mock_get_user.assert_not_called()
+        mock_set_disabled.assert_not_called()
+
+    @patch("adminapi.firebase_ops.list_all_firebase_users")
+    @patch("adminapi.firebase_ops.revoke_sessions")
+    @patch("adminapi.firebase_ops.set_user_disabled")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_cannot_suspend_last_remaining_owner(self, mock_get_user, mock_set_disabled, mock_revoke, mock_list_users):
+        mock_get_user.return_value = _fake_user_record("owner-uid", role=OWNER)
+        # 全系統只有 owner-uid 這一位有效 owner（呼叫者 test-uid 沒有 role，
+        # 例如剛好角色被清空但 token 還沒過期），停權後系統會剩下 0 位 owner。
+        mock_list_users.return_value = [_fake_user_record("owner-uid", role=OWNER)]
+        with _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/users/owner-uid/suspend/', headers)
+        self.assertEqual(resp.status_code, 409)
+        mock_set_disabled.assert_not_called()
 
 
 class UserForceLogoutTest(TestCase):
@@ -733,6 +803,32 @@ class UserDeleteTest(TestCase):
                 {"confirm_email": "owner@example.com"},
             )
         self.assertEqual(resp.status_code, 403)
+        mock_delete_auth.assert_not_called()
+
+    @patch("adminapi.firebase_ops.delete_firebase_user")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_cannot_delete_self(self, mock_get_user, mock_delete_auth):
+        with _as_role(OWNER) as headers:
+            resp = _post_json(
+                self.client, '/adminapi/users/test-uid/delete/', headers,
+                {"confirm_email": "whatever@example.com"},
+            )
+        self.assertEqual(resp.status_code, 403)
+        mock_get_user.assert_not_called()
+        mock_delete_auth.assert_not_called()
+
+    @patch("adminapi.firebase_ops.list_all_firebase_users")
+    @patch("adminapi.firebase_ops.delete_firebase_user")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_cannot_delete_last_remaining_owner(self, mock_get_user, mock_delete_auth, mock_list_users):
+        mock_get_user.return_value = _fake_user_record("owner-uid", email="owner@example.com", role=OWNER)
+        mock_list_users.return_value = [_fake_user_record("owner-uid", role=OWNER)]
+        with _as_role(OWNER) as headers:
+            resp = _post_json(
+                self.client, '/adminapi/users/owner-uid/delete/', headers,
+                {"confirm_email": "owner@example.com"},
+            )
+        self.assertEqual(resp.status_code, 409)
         mock_delete_auth.assert_not_called()
 
     @patch("adminapi.firebase_ops.delete_storage_file_by_download_url")

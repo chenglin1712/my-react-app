@@ -530,9 +530,10 @@ def _validate_same_tribe_affix_ids(db: Session, tribe_id, affix_ids):
         raise CrossTribeReferenceError(f"詞綴跨族語連結：{sorted(wrong_tribe)}", wrong_tribe)
 
 
-def apply_word_tree(db: Session, payload: dict, word_id: str | None = None, expected_hash: str | None = None) -> str:
+def apply_word_tree(db: Session, payload: dict, word_id: str | None = None, expected_hash: str | None = None,
+                     create_id: str | None = None) -> str:
     """建立或更新一整棵詞條樹。word_id=None 代表新建（忽略 payload 裡任何
-    id 值，一律指派新 UUID）；否則對既有詞條做對帳式更新。呼叫端負責交易
+    id 值，一律指派新 id）；否則對既有詞條做對帳式更新。呼叫端負責交易
     邊界（見 dictionary_write_session()）——這個函式只呼叫 db.add/flush/
     delete，不 commit。
 
@@ -544,6 +545,12 @@ def apply_word_tree(db: Session, payload: dict, word_id: str | None = None, expe
     獨立審查發現的併發缺口）。呼叫端在交易外的比對只是「省一次不必要的
     鎖定寫入」的快速路徑，這裡拿到鎖之後的重新比對才是真正的正確性保證。
 
+    create_id：新建時預先指定 id，取代預設的隨機 UUID。給批次匯入的逐列
+    checkpoint／續跑用（見 dictionary_import_views.py）——同一列如果需要
+    重跑，每次都用同一個由 (job_id, row) 推導出的 deterministic id，重跑
+    才能對回同一筆詞條而不是每次都建一筆新的。單筆提案（dictionary_views.py）
+    不需要這個保證，不傳就維持原本的隨機 UUID 行為。
+
     回傳套用後的 word_id，讓呼叫端（尤其是核准新建提案時）知道剛剛寫入的
     是哪一筆。
     """
@@ -554,7 +561,7 @@ def apply_word_tree(db: Session, payload: dict, word_id: str | None = None, expe
         raise DictionaryWriteError(f"族語不存在：{tribe_id}")
 
     if word_id is None:
-        word = m.Word(id=str(uuid.uuid4()), tribe_id=tribe_id)
+        word = m.Word(id=create_id or str(uuid.uuid4()), tribe_id=tribe_id)
         db.add(word)
     else:
         word = db.query(m.Word).filter(m.Word.id == word_id).with_for_update().one_or_none()

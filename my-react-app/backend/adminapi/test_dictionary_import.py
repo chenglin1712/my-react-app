@@ -347,11 +347,11 @@ class ImportApproveTest(DictionaryDbTestCase):
         real_apply_word_tree = dw.apply_word_tree
         call_count = {"n": 0}
 
-        def flaky_apply_word_tree(db, payload, word_id=None, expected_hash=None):
+        def flaky_apply_word_tree(db, payload, word_id=None, expected_hash=None, create_id=None):
             call_count["n"] += 1
             if call_count["n"] == 2:
                 raise dw.DictionaryWriteError("模擬第 2 筆套用失敗")
-            return real_apply_word_tree(db, payload, word_id=word_id, expected_hash=expected_hash)
+            return real_apply_word_tree(db, payload, word_id=word_id, expected_hash=expected_hash, create_id=create_id)
 
         with patch("adminapi.dictionary_import_views.dw.apply_word_tree", side_effect=flaky_apply_word_tree):
             with _as_role(REVIEWER) as headers:
@@ -362,11 +362,72 @@ class ImportApproveTest(DictionaryDbTestCase):
         self.assertEqual(body["failed_count"], 1)
         self.assertEqual(body["status"], "applied_with_errors")
 
+    def test_process_interrupted_mid_loop_can_be_resumed(self):
+        """BE-2 修正的核心保證。用 patch DictionaryImportJob.save() 在第 3
+        次呼叫（= 第 2 列的 checkpoint）時拋例外，模擬 process 在這個時間點
+        被中斷：第 1 列的 checkpoint（第 2 次 save）已經正常寫入，第 2 列
+        的 dictionary DB 寫入本身也已經在 apply_word_tree() 裡 commit 過了
+        （寫在 checkpoint save 之前），只是這次的 checkpoint 沒機會寫回
+        Django——job 應該卡在 status=applying，report 只看得到第 1 列。
+
+        之後用 resume_stuck_dictionary_import --apply 續跑：第 2 列雖然在
+        report 裡看不到，但 resolve_import_bundle() 重新解析時會發現「詞B」
+        這個名字已經存在（就是剛剛意外 commit 的那筆），自動轉成 update
+        對帳而不是重複 create——證明 deterministic id／名稱比對這兩層防線
+        真的能擋住重複資料。"""
+        bundle = _minimal_bundle([{"name": "詞A"}, {"name": "詞B"}, {"name": "詞C"}])
+        with _as_role(EDITOR) as headers:
+            resp = _post_json(self.client, '/adminapi/dictionary/import/', headers,
+                               {"filename": "test.json", "bundle": bundle})
+            job_id = resp.json()["id"]
+            _post_json(self.client, f'/adminapi/dictionary/import/{job_id}/preflight/', headers)
+            _post_json(self.client, f'/adminapi/dictionary/import/{job_id}/submit/', headers)
+
+        real_save = DictionaryImportJob.save
+        save_calls = {"n": 0}
+
+        def flaky_save(self_job, *args, **kwargs):
+            save_calls["n"] += 1
+            if save_calls["n"] == 3:
+                raise RuntimeError("模擬 process 在這裡被中斷")
+            return real_save(self_job, *args, **kwargs)
+
+        with patch.object(DictionaryImportJob, "save", flaky_save):
+            with _as_role(REVIEWER) as headers:
+                with self.assertRaises(RuntimeError):
+                    _post_json(self.client, f'/adminapi/dictionary/import/{job_id}/approve/', headers)
+
+        job = DictionaryImportJob.objects.get(pk=job_id)
+        self.assertEqual(job.status, DictionaryImportJob.STATUS_APPLYING)
+        self.assertEqual(len(job.report.get("outcomes", [])), 1)
+        self.assertEqual(job.report["outcomes"][0]["name"], "詞A")
+
         db = connect_module.SessionLocal()
         try:
-            self.assertIsNotNone(db.query(m.Word).filter(m.Word.name == "詞一").first())
-            self.assertIsNone(db.query(m.Word).filter(m.Word.name == "詞二").first())
-            self.assertIsNotNone(db.query(m.Word).filter(m.Word.name == "詞三").first())
+            # 第 2 列的 dictionary DB 寫入其實已經意外 commit 成功了，只是
+            # Django 這邊的 checkpoint 沒寫到——這正是這個測試要重現的窄窗口。
+            self.assertIsNotNone(db.query(m.Word).filter(m.Word.name == "詞B").first())
+            self.assertIsNone(db.query(m.Word).filter(m.Word.name == "詞C").first())
+        finally:
+            db.close()
+
+        # 正常呼叫核准端點會因為狀態不是 pending_review 被擋下。
+        with _as_role(REVIEWER) as headers:
+            blocked_resp = _post_json(self.client, f'/adminapi/dictionary/import/{job_id}/approve/', headers)
+        self.assertEqual(blocked_resp.status_code, 409)
+
+        from django.core.management import call_command
+        call_command("resume_stuck_dictionary_import", str(job_id), "--apply")
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, DictionaryImportJob.STATUS_APPLIED)
+        self.assertEqual(job.applied_count, 3)
+
+        db = connect_module.SessionLocal()
+        try:
+            words = db.query(m.Word).filter(m.Word.tribe_id == self.tribe_id).all()
+            names = sorted(w.name for w in words)
+            self.assertEqual(names, ["詞A", "詞B", "詞C"])  # 沒有重複
         finally:
             db.close()
 
