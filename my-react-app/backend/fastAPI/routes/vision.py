@@ -1,6 +1,7 @@
 from fastapi import APIRouter, UploadFile, HTTPException, Request
 import asyncio
 import base64
+import io
 import logging
 import httpx
 import threading
@@ -8,6 +9,7 @@ from dotenv import load_dotenv
 import os
 import time
 from deep_translator import GoogleTranslator
+from PIL import Image, UnidentifiedImageError
 
 from fastAPI import rate_limit_config
 from fastAPI.rate_limit import limiter
@@ -71,6 +73,37 @@ async def analyze_image(request: Request):
         if len(contents) > MAX_IMAGE_BYTES:
             raise HTTPException(status_code=413, detail="圖片不得超過 5 MB")
 
+        if len(contents) == 0:
+            _logger.warning(
+                "[vision] 收到空的圖片內容 filename=%r content_type=%r",
+                getattr(file, "filename", None), getattr(file, "content_type", None),
+            )
+            raise HTTPException(status_code=400, detail="圖片內容是空的，請重新選擇圖片再試一次")
+
+        # 已查明「Bad image data.」的實際根因：本機素材庫（Z:\Desktop\win\
+        # <族語>\<分類>\images\）裡有大量檔案雖然副檔名是 .jpg/.png，內容其實
+        # 是 RIFF/WAVE 音檔（推測是製作素材時的匯出腳本把音檔跟圖檔的副檔名
+        # 對錯）——抽查布農/排灣/阿美三個族語的 images 資料夾，約 40~48% 的
+        # 檔案都是這種「假圖片」。前端 accept="image/*" 跟 Windows 選檔對話框
+        # 都只看副檔名，不會擋下這些檔案，使用者選到就一定會在這裡被 Google
+        # Vision 拒絕（Google 的解碼器是對的，錯的是素材本身）。
+        #
+        # 与其把「Bad image data.」這種語意不明的 Google 錯誤原樣丟給前端、
+        # 還多花一次付費 API 呼叫，這裡改成呼叫 Google 之前先用 Pillow 本地
+        # 驗證能不能解成圖片，解不開就直接擋下來、給使用者看得懂的訊息。
+        try:
+            Image.open(io.BytesIO(contents)).verify()
+        except UnidentifiedImageError:
+            _logger.warning(
+                "[vision] 檔案內容不是可辨識的圖片格式 filename=%r content_type=%r bytes=%d 開頭=%s",
+                getattr(file, "filename", None), getattr(file, "content_type", None),
+                len(contents), contents[:12].hex(),
+            )
+            raise HTTPException(
+                status_code=400,
+                detail="這個檔案看起來不是有效的圖片（可能副檔名跟實際內容不符），請重新選擇圖片再試一次",
+            )
+
         image_base64 = base64.b64encode(contents).decode("utf-8")
 
         if not CLOUD_API_URL or not CLOUD_API_KEY:
@@ -94,6 +127,10 @@ async def analyze_image(request: Request):
             raise HTTPException(status_code=500, detail="Google API 回傳格式錯誤（缺少 responses）")
 
         if "error" in result["responses"][0]:
+            _logger.warning(
+                "[vision] Google 回傳 error，收到的圖片 bytes=%d filename=%r：%s",
+                len(contents), getattr(file, "filename", None), result["responses"][0]["error"]["message"],
+            )
             raise HTTPException(status_code=500, detail=result["responses"][0]["error"]["message"])
 
         labels = result["responses"][0].get("labelAnnotations", [])
