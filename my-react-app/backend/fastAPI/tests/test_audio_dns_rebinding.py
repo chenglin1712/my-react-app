@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from fastAPI.main import app
 from fastAPI.routes import auth as auth_module
-from fastAPI.routes.quiz import fetch_audio_from_id
+from fastAPI.routes.pronunciation.audio_fetch import fetch_audio_from_id
 from dictionary_db.connect import get_db
 
 
@@ -42,18 +42,18 @@ class TestFetchAudioFromIdRebindingProtection:
         # P5 辭典媒體自主化：fetch_audio_from_id 現在會先查有沒有自己 Storage
         # 的已驗證副本，這裡假設還沒遷移到（回傳 None），才會走到下面這支測試
         # 原本要測的 ILRDF fallback 路徑。
-        monkeypatch.setattr("fastAPI.routes.quiz._lookup_verified_audio_url", lambda audio_id: None)
-        monkeypatch.setattr("fastAPI.routes.quiz.requests.get", lambda *a, **k: _fake_first_hop("https://cdn.example.com/audio.mp3"))
-        monkeypatch.setattr("fastAPI.routes.quiz.is_safe_redirect_target", lambda url: True)
+        monkeypatch.setattr("fastAPI.routes.pronunciation.audio_fetch._lookup_verified_audio_url", lambda audio_id: None)
+        monkeypatch.setattr("fastAPI.routes.pronunciation.audio_fetch.requests.get", lambda *a, **k: _fake_first_hop("https://cdn.example.com/audio.mp3"))
+        monkeypatch.setattr("fastAPI.routes.pronunciation.audio_fetch.is_safe_redirect_target", lambda url: True)
 
         with patch("httpx.Client.get", return_value=_fake_second_hop("10.0.0.5")):
             with pytest.raises(Exception, match="音檔 URL 指向不允許的位址"):
                 fetch_audio_from_id("word123")
 
     def test_allows_when_actual_connection_peer_is_public(self, monkeypatch):
-        monkeypatch.setattr("fastAPI.routes.quiz._lookup_verified_audio_url", lambda audio_id: None)
-        monkeypatch.setattr("fastAPI.routes.quiz.requests.get", lambda *a, **k: _fake_first_hop("https://cdn.example.com/audio.mp3"))
-        monkeypatch.setattr("fastAPI.routes.quiz.is_safe_redirect_target", lambda url: True)
+        monkeypatch.setattr("fastAPI.routes.pronunciation.audio_fetch._lookup_verified_audio_url", lambda audio_id: None)
+        monkeypatch.setattr("fastAPI.routes.pronunciation.audio_fetch.requests.get", lambda *a, **k: _fake_first_hop("https://cdn.example.com/audio.mp3"))
+        monkeypatch.setattr("fastAPI.routes.pronunciation.audio_fetch.is_safe_redirect_target", lambda url: True)
 
         with patch("httpx.Client.get", return_value=_fake_second_hop("93.184.216.34")):
             content = fetch_audio_from_id("word123")

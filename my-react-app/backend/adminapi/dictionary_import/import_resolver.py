@@ -1,14 +1,12 @@
-"""P4.4 批次匯入／匯出精靈：一次處理一個族語的多筆詞條，JSON 格式
-（schema: "dictionary_word_bundle"，見 dictionary_serializers.validate_import_bundle_structure
-的說明），跟 dictionary_write.py 的詞條樹 API 形狀幾乎一致，差異只有
-分類主檔（source/category/part_of_speech/focus）用名稱、標註連結用
-word_name——這裡的核心工作就是「把這些名稱解析成 id，組出
-dictionary_write.apply_word_tree() 已經認得的 payload」，解析完之後
-完全交給既有函式寫入，不重新發明一套寫入邏輯。
+"""P4.4 批次匯入精靈：把一份 bundle（schema: "dictionary_word_bundle"，見
+dictionary_serializers.validate_import_bundle_structure 的說明）解析成
+dictionary_write.apply_word_tree() 已經認得的 payload——分類主檔用名稱、
+標註連結用 word_name，這裡的核心工作就是「把這些名稱解析成 id」，解析完
+之後完全交給既有函式寫入，不重新發明一套寫入邏輯。
 
-這個檔案裡的函式全部是唯讀查詢（`resolve_import_bundle`／`export_tribe_bundle`）
-或單純的 dict 轉換（`import_report_hash`），只有 `create_missing_taxonomies`
-會寫入，且刻意獨立成一個函式，讓呼叫端自己決定要不要在套用之前先跑一次
+這個檔案裡的函式全部是唯讀查詢（`resolve_import_bundle`）或單純的 dict
+轉換（`import_report_hash`），只有 `create_missing_taxonomies` 會寫入，
+且刻意獨立成一個函式，讓呼叫端自己決定要不要在套用之前先跑一次
 （owner-only 選項，見規劃文件 P4 §5）。
 """
 import hashlib
@@ -18,9 +16,7 @@ from sqlalchemy.orm import Session
 
 from dictionary_db import model as m
 
-_TAXONOMY_MODEL_BY_KIND = {
-    "source": m.Source, "category": m.Category, "part_of_speech": m.PartOfSpeech, "focus": m.Focus,
-}
+from .bundle_schema import _TAXONOMY_MODEL_BY_KIND
 
 
 def _collect_bundle_names(words):
@@ -296,7 +292,7 @@ def _attach_current_hashes(db: Session, items: list) -> None:
     的另一列）改過」的關鍵，不能只比對這份 bundle 自己的內容有沒有變
     （見 import_report_hash 的說明——bundle 內容本來就沒變，是資料庫端的
     現況變了）。"""
-    from . import dictionary_write as dw
+    from .. import dictionary_write as dw
 
     for item in items:
         if item["action"] == "update" and item["word_id"]:
@@ -327,79 +323,3 @@ def import_report_hash(report: dict) -> str:
     ]
     canonical = json.dumps(slim, sort_keys=True, ensure_ascii=True, separators=(",", ":"), default=str)
     return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
-def _tree_to_bundle_entry(tree: dict, name_by_id: dict) -> dict:
-    return {
-        "id": tree["id"], "dialect": tree["dialect"], "name": tree["name"], "pinyin": tree["pinyin"],
-        "variant": tree["variant"], "formation_word": tree["formation_word"],
-        "derivative_root": tree["derivative_root"], "frequency": tree["frequency"],
-        "dictionary_note": tree["dictionary_note"], "word_img": tree["word_img"],
-        "is_derivative_root": tree["is_derivative_root"], "is_image": tree["is_image"],
-        "is_zuzucidian": tree["is_zuzucidian"], "is_other_dialect": tree["is_other_dialect"],
-        "source_names": [name_by_id["source"].get(sid, "") for sid in tree["source_ids"]],
-        "audios": [
-            {"id": a["id"], "external_id": a["external_id"], "file_id": a["file_id"], "audio_class": a["audio_class"]}
-            for a in tree["audios"]
-        ],
-        "explanations": [
-            {
-                "id": exp["id"], "external_id": exp["external_id"],
-                "chinese_explanation": exp["chinese_explanation"], "english_explanation": exp["english_explanation"],
-                "category_names": [name_by_id["category"].get(cid, "") for cid in exp["category_ids"]],
-                "pos_names": [name_by_id["part_of_speech"].get(pid, "") for pid in exp["pos_ids"]],
-                "focus_names": [name_by_id["focus"].get(fid, "") for fid in exp["focus_ids"]],
-                "images": [{"id": img["id"], "image_url": img["image_url"]} for img in exp["images"]],
-                "sentences": [
-                    {
-                        "id": sent["id"], "external_id": sent["external_id"],
-                        "original_sentence": sent["original_sentence"],
-                        "chinese_sentence": sent["chinese_sentence"], "english_sentence": sent["english_sentence"],
-                        "audios": [
-                            {
-                                "id": a["id"], "external_id": a["external_id"],
-                                "file_id": a["file_id"], "audio_class": a["audio_class"],
-                            }
-                            for a in sent["audios"]
-                        ],
-                        "anaphoras": [
-                            {
-                                "id": ana["id"], "is_highlight": ana["is_highlight"], "is_symbol": ana["is_symbol"],
-                                "items": [
-                                    {
-                                        "id": item["id"], "word_name": item["word_name"] or "",
-                                        "name": item["name"] or "",
-                                    }
-                                    for item in ana["items"]
-                                ],
-                            }
-                            for ana in sent["anaphoras"]
-                        ],
-                    }
-                    for sent in exp["sentences"]
-                ],
-            }
-            for exp in tree["explanations"]
-        ],
-    }
-
-
-def export_tribe_bundle(db: Session, tribe_id: str, tribe_slug: str) -> dict:
-    """匯出一個族語目前全部詞條，格式跟匯入完全同一份 schema——「匯出 →
-    手動編輯 → 重新匯入」可以互相驗證，也是測試資料的來源（見規劃文件
-    P4 §5）。用 dictionary_write.get_word_trees_for_tribe() 整批組裝、
-    再把 id 陣列轉回名稱陣列——原本逐筆呼叫 get_word_tree() 對一個大族語
-    （例如泰雅語 6,204 筆）實測需要 20 分鐘以上，改成整批查詢後降到數秒。
-    """
-    from . import dictionary_write as dw
-
-    word_ids = [row.id for row in db.query(m.Word.id).filter(m.Word.tribe_id == tribe_id).order_by(m.Word.name).all()]
-
-    name_by_id = {}
-    for kind, model in _TAXONOMY_MODEL_BY_KIND.items():
-        name_by_id[kind] = {row.id: row.name for row in db.query(model.id, model.name).all()}
-
-    trees_by_id = dw.get_word_trees_for_tribe(db, tribe_id)
-    words = [_tree_to_bundle_entry(trees_by_id[word_id], name_by_id) for word_id in word_ids]
-
-    return {"schema": "dictionary_word_bundle", "version": 1, "tribe": tribe_slug, "words": words}

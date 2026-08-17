@@ -3,12 +3,12 @@ import logging
 import re
 from typing import Dict, List, Optional, Tuple
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from dictionary_db.connect import get_db
+from dictionary_db.connect import SessionLocal
 from dictionary_db.model import MediaAsset, Tribe, Word
 from dictionary_db.word_data import (
     load_audio_items_for_words,
@@ -272,6 +272,31 @@ def search_all(
 
 
 # ------------------------- API 路由 -------------------------
+def _call_with_own_session(fn, *args, **kwargs):
+    """在目前所在的 thread 裡自己建立、自己關閉 SQLAlchemy Session，執行 fn
+    後回傳結果（P4 review BE-20）。
+
+    這三個端點原本用 FastAPI 的 `db: Session = Depends(get_db)` 拿一個在
+    另一個 context 建立的 Session，再把它傳進 `asyncio.to_thread()` 丟到
+    worker thread 執行——Session 不是 thread-safe，這代表同一個 Session
+    物件的建立（依賴注入解析時）、實際查詢（worker thread）、關閉
+    （依賴的 `finally: db.close()`，又是另一次依賴解析）可能落在三個不同
+    的 thread 上。目前能動是因為這三個端點的 await 期間沒有其他程式碼會
+    同時碰這個 Session，但這只是巧合、不是保證——未來如果同一個 request
+    多加一個並行操作，或 middleware 改動了時序，就可能在毫無警訊的情況下
+    出現資料錯亂或例外。
+
+    改成每次呼叫都在真正執行查詢的 thread 裡自己開一個新 Session、执行完
+    自己關掉，Session 的生命週期完全侷限在單一 thread 內，不再跨 thread
+    傳遞。三個端點因此不再需要 `Depends(get_db)`，也就不會為了這幾個
+    唯讀查詢多開一個從來沒在對的 thread 上用過的 Session。"""
+    db = SessionLocal()
+    try:
+        return fn(db, *args, **kwargs)
+    finally:
+        db.close()
+
+
 def _search_multi_words(db: Session, words: List[str], tribe_name: str) -> Tuple[dict, dict]:
     exact_match_results = {}
     fuzzy_match_results = {}
@@ -295,7 +320,7 @@ def _search_multi_words(db: Session, words: List[str], tribe_name: str) -> Tuple
 
 @router.post("/keys/")
 @limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_search_multiword", "60/minute"))  # 全表掃描（走快取），每用戶每分鐘最多 60 次避免大量請求造成壓力
-async def search_tayal_dictionary(request: Request, body: MultiWordSearchRequest, db: Session = Depends(get_db)):
+async def search_tayal_dictionary(request: Request, body: MultiWordSearchRequest):
     """多關鍵字搜尋"""
     try:
         words = body.words
@@ -309,8 +334,10 @@ async def search_tayal_dictionary(request: Request, body: MultiWordSearchRequest
         # 冷快取時 _load_tribe_words 是同步的全表掃描＋JSON parse，直接呼叫會卡住
         # 整個 event loop（同一 worker 上的其他請求，包含 /health，都會被一起卡住）。
         # 丟到執行緒池執行，跟同一支檔案已修好的 compare_audio／analyze_image 同一套作法。
+        # Session 在 worker thread 內自己建立/關閉（見 _call_with_own_session
+        # 的說明），不用 FastAPI 依賴注入的 Session。
         exact_match_results, fuzzy_match_results = await asyncio.to_thread(
-            _search_multi_words, db, words, tribe_name
+            _call_with_own_session, _search_multi_words, words, tribe_name
         )
 
         return JSONResponse(
@@ -327,7 +354,7 @@ async def search_tayal_dictionary(request: Request, body: MultiWordSearchRequest
 
 @router.post("/all/")
 @limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_search_all_words", "60/minute"))  # 全表掃描（走快取），每用戶每分鐘最多 60 次避免 fetchAllWords 大量請求造成壓力
-async def all_tayal_dictionary(request: Request, body: AllWordsRequest, db: Session = Depends(get_db)):
+async def all_tayal_dictionary(request: Request, body: AllWordsRequest):
     """查詢所有詞條。可選傳入 letter/frequency/category/favorites_only(+favorite_names)/
     sort_order 做篩選與排序，並用 limit/offset 做分頁；都不傳則維持原本回傳全部
     （未篩選、未分頁）的行為，供 frontend/src/_favorite/index.jsx 沿用舊行為。"""
@@ -337,9 +364,10 @@ async def all_tayal_dictionary(request: Request, body: AllWordsRequest, db: Sess
         except ValueError as e:
             return JSONResponse({"detail": str(e)}, status_code=400)
         # 冷快取時 search_all -> _load_tribe_words 是同步的全表掃描＋JSON parse，
-        # 丟到執行緒池執行，避免卡住 event loop（見 /keys/ 同樣的說明）。
+        # 丟到執行緒池執行，避免卡住 event loop（見 /keys/ 同樣的說明）。Session
+        # 在 worker thread 內自己建立/關閉（見 _call_with_own_session 的說明）。
         results, total = await asyncio.to_thread(
-            search_all, db, tribe=tribe_name, limit=body.limit, offset=body.offset,
+            _call_with_own_session, search_all, tribe=tribe_name, limit=body.limit, offset=body.offset,
             letter=body.letter, frequency=body.frequency, category=body.category,
             favorites_only=body.favorites_only, favorite_names=body.favorite_names,
             sort_order=body.sort_order,
@@ -370,7 +398,7 @@ def _search_single_keyword(db: Session, keyword: str, tribe_name: str):
 
 @router.post("/key/")
 @limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_search_allsearch", "60/minute"))  # 原本沒有限流，見同檔案其他端點的說明
-async def allsearch_tayal_dictionary(request: Request, body: KeywordRequest, db: Session = Depends(get_db)):
+async def allsearch_tayal_dictionary(request: Request, body: KeywordRequest):
     """單一字搜尋"""
     try:
         keyword = body.keyword.strip().replace("　", "")
@@ -382,8 +410,9 @@ async def allsearch_tayal_dictionary(request: Request, body: KeywordRequest, db:
             return JSONResponse({"detail": str(e)}, status_code=400)
 
         # 冷快取時是同步的全表掃描＋JSON parse，丟到執行緒池執行，
-        # 避免卡住 event loop（見 /keys/ 同樣的說明）。
-        exact, fuzzy = await asyncio.to_thread(_search_single_keyword, db, keyword, tribe_name)
+        # 避免卡住 event loop（見 /keys/ 同樣的說明）。Session 在 worker
+        # thread 內自己建立/關閉（見 _call_with_own_session 的說明）。
+        exact, fuzzy = await asyncio.to_thread(_call_with_own_session, _search_single_keyword, keyword, tribe_name)
 
         # 記錄查詢事件（P5 搜尋分析用）——刻意放在算完命中數「之後」才記錄，
         # 讓「零結果」判定精確；record_event() 是 fire-and-forget，任何失敗

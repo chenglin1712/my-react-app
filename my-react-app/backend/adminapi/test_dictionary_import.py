@@ -353,7 +353,7 @@ class ImportApproveTest(DictionaryDbTestCase):
                 raise dw.DictionaryWriteError("模擬第 2 筆套用失敗")
             return real_apply_word_tree(db, payload, word_id=word_id, expected_hash=expected_hash, create_id=create_id)
 
-        with patch("adminapi.dictionary_import_views.dw.apply_word_tree", side_effect=flaky_apply_word_tree):
+        with patch("adminapi.dictionary_import.import_apply.dw.apply_word_tree", side_effect=flaky_apply_word_tree):
             with _as_role(REVIEWER) as headers:
                 resp = _post_json(self.client, f'/adminapi/dictionary/import/{job_id}/approve/', headers)
 

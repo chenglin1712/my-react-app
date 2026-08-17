@@ -1,4 +1,8 @@
-"""adminapi 的公告管理端點。
+"""adminapi 的公告管理端點（含通用的稽核日誌唯讀清單）。
+
+考試時程後台管理搬到 exam_schedule_admin_views.py、首頁版位設定搬到
+homepage_config_views.py（P4 review BE-16：原本這個檔案把 Announcement／
+考試時程／首頁版位三種不相關的資源焊在同一個 791 行的 views.py 裡）。
 
 所有端點都要求 staff 角色（見 config.roles.STAFF_ROLES），寫入類動作再收斂到
 更小的角色群組（config.roles.CONTENT_EDITORS／PUBLISHERS）。每個會改資料的
@@ -31,7 +35,6 @@ from django.views.decorators.csrf import csrf_exempt
 
 from core.firebase_auth import require_role
 from config.roles import ACCOUNT_MANAGERS, CONTENT_EDITORS, PUBLISHERS, STAFF_ROLES
-from crawler.views import apply_exam_schedule_overrides, get_exam_schedule_data
 
 from ._shared import (
     invalid_transition as _invalid_transition,
@@ -41,15 +44,11 @@ from ._shared import (
     write_audit_log as _write_audit_log,
 )
 from .crawler_sync import sync_crawler_announcements
-from .models import (
-    Announcement, AnnouncementSyncStatus, AuditLog, ExamScheduleCrawlStatus,
-    ExamScheduleOverride, HomepageConfig, PendingRevision,
-)
+from .models import Announcement, AnnouncementSyncStatus, AuditLog
 from .revisions import cancel_stale_pending_revision, make_revision_views, pending_revision_target_ids
 from .serializers import (
     AnnouncementSerializer, ApproveSerializer, AuditLogSerializer,
-    ExamScheduleOverrideSerializer, HomepageConfigSerializer, PublicAnnouncementSerializer,
-    PublicHomepageConfigSerializer, RejectSerializer,
+    PublicAnnouncementSerializer, RejectSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -605,187 +604,3 @@ def audit_log_list(request):
 
     logs = AuditLog.objects.all()[:limit]
     return JsonResponse({"results": AuditLogSerializer(logs, many=True).data})
-
-
-@csrf_exempt
-def exam_schedule_admin(request):
-    if request.method == "GET":
-        return _exam_schedule_overview(request)
-    if request.method == "POST":
-        return _exam_schedule_refresh(request)
-    return JsonResponse({"detail": "Method not allowed"}, status=405)
-
-
-def _exam_schedule_overview(request):
-    """左側「爬蟲抓到的原始結果」／右側「後台生效值」的比對資料，外加爬蟲
-    執行狀態——三塊資料合在一支端點回，前端不用分開打三次。"""
-    decoded, err_resp = require_role(request, STAFF_ROLES)
-    if err_resp:
-        return err_resp
-
-    data = get_exam_schedule_data()
-    crawled_phases = data["phases"] if data else []
-    status = ExamScheduleCrawlStatus.load()
-
-    return JsonResponse({
-        "crawled": {
-            "available": data is not None,
-            "session": data["session"] if data else None,
-            "phases": crawled_phases,
-        },
-        "effective_phases": apply_exam_schedule_overrides(crawled_phases),
-        "overrides": ExamScheduleOverrideSerializer(ExamScheduleOverride.objects.all(), many=True).data,
-        "status": {
-            "last_success_at": status.last_success_at,
-            "last_failure_at": status.last_failure_at,
-            "last_failure_reason": status.last_failure_reason,
-            "consecutive_failures": status.consecutive_failures,
-        },
-    })
-
-
-def _exam_schedule_refresh(request):
-    """手動觸發重爬——略過 15 分鐘快取，強制重新打一次官網。CONTENT_EDITORS
-    即可（跟公告的「編輯／送審」同一層級，不是需要 PUBLISHERS 的發布動作），
-    限流比一般查詢端點嚴格，避免被拿來當成打外部網站的放大器。"""
-    decoded, err_resp = require_role(request, CONTENT_EDITORS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="exam_schedule_refresh", rate="10/m")
-    if limited_resp:
-        return limited_resp
-
-    data = get_exam_schedule_data(force_refresh=True)
-    status = ExamScheduleCrawlStatus.load()
-    _write_audit_log(
-        request, decoded, "refresh", status, target_type="exam_schedule",
-        after={"success": data is not None, "consecutive_failures": status.consecutive_failures},
-    )
-
-    return JsonResponse({
-        "crawled": {
-            "available": data is not None,
-            "session": data["session"] if data else None,
-            "phases": data["phases"] if data else [],
-        },
-        "status": {
-            "last_success_at": status.last_success_at,
-            "last_failure_at": status.last_failure_at,
-            "last_failure_reason": status.last_failure_reason,
-            "consecutive_failures": status.consecutive_failures,
-        },
-    })
-
-
-@csrf_exempt
-def exam_schedule_override_detail(request, phase):
-    if request.method == "PUT":
-        return _upsert_exam_schedule_override(request, phase)
-    if request.method == "DELETE":
-        return _delete_exam_schedule_override(request, phase)
-    return JsonResponse({"detail": "Method not allowed"}, status=405)
-
-
-def _upsert_exam_schedule_override(request, phase):
-    decoded, err_resp = require_role(request, CONTENT_EDITORS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="exam_schedule_override_write", rate="30/m")
-    if limited_resp:
-        return limited_resp
-
-    data, err_resp = _parse_json_body(request)
-    if err_resp:
-        return err_resp
-    data = {**data, "phase": phase}
-
-    with transaction.atomic():
-        # phase 是覆寫表的 natural key（URL 帶的就是它，不是自動遞增 id），
-        # 用 select_for_update() 鎖現有列；新建的情況下沒有列可鎖，這裡
-        # 犧牲掉的是「兩個人同時新建同一個全新 phase」這個極窄的競爭窗口，
-        # 對這種低流量的後台維運頁面不值得為此再多引入額外機制。
-        instance = ExamScheduleOverride.objects.select_for_update().filter(phase=phase).first()
-        before = ExamScheduleOverrideSerializer(instance).data if instance else None
-        serializer = ExamScheduleOverrideSerializer(instance, data=data)
-        if not serializer.is_valid():
-            return JsonResponse({"detail": "請求參數錯誤", "errors": serializer.errors}, status=400)
-        override = serializer.save(updated_by=decoded.get("uid", "anon"))
-
-        _write_audit_log(
-            request, decoded, "upsert", override, target_type="exam_schedule_override",
-            before=before, after=ExamScheduleOverrideSerializer(override).data,
-        )
-    return JsonResponse(ExamScheduleOverrideSerializer(override).data)
-
-
-def _delete_exam_schedule_override(request, phase):
-    decoded, err_resp = require_role(request, CONTENT_EDITORS)
-    if err_resp:
-        return err_resp
-
-    with transaction.atomic():
-        override = get_object_or_404(ExamScheduleOverride.objects.select_for_update(), phase=phase)
-        before = ExamScheduleOverrideSerializer(override).data
-        _write_audit_log(request, decoded, "delete", override, target_type="exam_schedule_override", before=before)
-        override.delete()
-
-    return JsonResponse({"detail": "已清除覆寫"})
-
-
-@csrf_exempt
-def homepage_config_admin(request):
-    if request.method == "GET":
-        return _get_homepage_config(request)
-    if request.method == "PATCH":
-        return _update_homepage_config(request)
-    return JsonResponse({"detail": "Method not allowed"}, status=405)
-
-
-def _get_homepage_config(request):
-    decoded, err_resp = require_role(request, STAFF_ROLES)
-    if err_resp:
-        return err_resp
-    config = HomepageConfig.load()
-    return JsonResponse(HomepageConfigSerializer(config).data)
-
-
-def _update_homepage_config(request):
-    # PUBLISHERS：這個設定直接影響公開首頁的實際顯示內容，視同「發布」動作，
-    # 跟 Announcement 的核准/發布同一層級（owner／admin），不開放給 editor
-    # 自己就能改公開首頁看起來的樣子。
-    decoded, err_resp = require_role(request, PUBLISHERS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="homepage_config_update", rate="30/m")
-    if limited_resp:
-        return limited_resp
-
-    data, err_resp = _parse_json_body(request)
-    if err_resp:
-        return err_resp
-
-    HomepageConfig.load()  # 確保單例那筆存在，鎖之前才有列可鎖
-    with transaction.atomic():
-        config = HomepageConfig.objects.select_for_update().get(pk=1)
-        before = HomepageConfigSerializer(config).data
-        serializer = HomepageConfigSerializer(config, data=data, partial=True)
-        if not serializer.is_valid():
-            return JsonResponse({"detail": "請求參數錯誤", "errors": serializer.errors}, status=400)
-        config = serializer.save(updated_by=decoded.get("uid", "anon"))
-
-        _write_audit_log(
-            request, decoded, "update", config, target_type="homepage_config",
-            before=before, after=HomepageConfigSerializer(config).data,
-        )
-    return JsonResponse(HomepageConfigSerializer(config).data)
-
-
-def public_homepage_config(request):
-    """公開首頁讀取用，不需要登入。"""
-    if request.method != "GET":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    limited_resp = _ip_rate_limited_response(request, group="public_homepage_config", rate="120/m")
-    if limited_resp:
-        return limited_resp
-    config = HomepageConfig.load()
-    return JsonResponse(PublicHomepageConfigSerializer(config).data)

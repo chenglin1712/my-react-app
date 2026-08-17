@@ -4,10 +4,12 @@
 而且完全沒有記 log。跟同一輪稽核的 search.py／grammar.py／audio_proxy.py
 同一套做法：只記 log，回給前端的是通用訊息。
 """
+import io
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from fastAPI.main import app
 from fastAPI.routes import auth as auth_module
@@ -16,6 +18,17 @@ from fastAPI.routes import vision as vision_module
 
 async def _fake_auth():
     return {"uid": "test-user"}
+
+
+def _fake_png_bytes() -> bytes:
+    """analyze_image 在打 Google Vision 之前會先用 Pillow 本地驗證檔案內容
+    是不是可解碼的圖片（見 vision.py 的說明），單純的假 bytes 會在打到
+    httpx mock 之前就被這一關擋成 400，讓下面測的 500 遮罩行為根本沒被
+    執行到。這裡改成真的組一張最小的 1x1 PNG，先通過本地驗證，才能繼續
+    往下走到 httpx.AsyncClient.post 這一步。"""
+    buf = io.BytesIO()
+    Image.new("RGB", (1, 1)).save(buf, format="PNG")
+    return buf.getvalue()
 
 
 @pytest.fixture
@@ -38,7 +51,7 @@ def test_analyze_image_masks_internal_exception_and_logs(client, monkeypatch):
 
         response = client.post(
             "/api/v1/vision/analyze_image/",
-            files={"file": ("test.png", b"fake-image-bytes", "image/png")},
+            files={"file": ("test.png", _fake_png_bytes(), "image/png")},
         )
 
     assert response.status_code == 500

@@ -233,7 +233,7 @@ class WordCreateFlowTest(DictionaryDbTestCase):
         request 內做幾次短重試——這裡直接測 retry wrapper 本身，前兩次
         模擬暫時性失敗，第三次成功，確認總共呼叫 3 次且不會真的 sleep
         （patch 掉，跑測試不用真的等）。"""
-        from . import dictionary_views as dv
+        from . import dictionary_revision_service as dv
 
         calls = {"n": 0}
 
@@ -244,7 +244,7 @@ class WordCreateFlowTest(DictionaryDbTestCase):
             return "ok"
 
         with patch.object(dv, "_finalize_approved_revision", side_effect=_flaky), \
-             patch("adminapi.dictionary_views.time.sleep") as mock_sleep:
+             patch("adminapi.dictionary_revision_service.time.sleep") as mock_sleep:
             result = dv._finalize_approved_revision_with_retry(1, "word-1", {}, None, {"uid": "test"})
 
         self.assertEqual(result, "ok")

@@ -10,7 +10,6 @@ APPLIED/APPLIED_WITH_ERRORS` 或 `REJECTED`），不是每筆詞條各自建一�
 """
 import json
 import logging
-import uuid
 
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
@@ -24,7 +23,6 @@ from config.roles import CONTENT_APPROVERS, CONTENT_EDITORS, OWNER, STAFF_ROLES
 from config.tribes import TRIBES
 from dictionary_db.connect import SessionLocal, dictionary_write_session
 
-from . import dictionary_write as dw
 from ._shared import (
     parse_json_body as _parse_json_body,
     rate_limited_response as _rate_limited_response,
@@ -33,7 +31,12 @@ from ._shared import (
 )
 from .dictionary_cache import invalidate_dictionary_cache
 from .dictionary_import import (
-    create_missing_taxonomies, export_tribe_bundle, import_report_hash, resolve_import_bundle,
+    _deterministic_import_row_id,
+    apply_import_job_rows,
+    create_missing_taxonomies,
+    export_tribe_bundle,
+    import_report_hash,
+    resolve_import_bundle,
 )
 from .dictionary_serializers import validate_import_bundle_structure
 from .models import DictionaryImportJob
@@ -299,17 +302,6 @@ def _revert_import_job_to_pending_review(pk):
         job.save(update_fields=["status"])
 
 
-# 批次匯入新建列的 deterministic id 用固定命名空間推導，同一個
-# (job_id, row) 不管重跑幾次都會得到同一個 id——見 import_job_approve()
-# 逐列 checkpoint 的說明：這是「同一列重跑會對回同一筆詞條，而不是每次
-# 建一筆新的」這個保證的根本，沒有這個就無法安全續跑 create 列。
-_IMPORT_ROW_ID_NAMESPACE = uuid.UUID("f2e6b9d0-9b1a-4b7a-9f3a-6c2f6f9a7d31")
-
-
-def _deterministic_import_row_id(job_pk, row):
-    return str(uuid.uuid5(_IMPORT_ROW_ID_NAMESPACE, f"dictionary-import-job:{job_pk}:row:{row}"))
-
-
 @csrf_exempt
 def import_job_approve(request, pk):
     """核准套用，分五步（BE-2 修正：新增「先標記處理中、逐列 checkpoint」，
@@ -327,20 +319,13 @@ def import_job_approve(request, pk):
         dictionary_import.import_report_hash 的說明）——這份雜湊現在也
         包含每個更新目標「當下」的內容雜湊，不是只比對這份 bundle 自己的
         內容有沒有變；比對失敗就退回 pending_review。
-    (3) 每一筆詞條各自開一個 dictionary_write_session()（見規劃文件 P4 §5
-        「一筆詞條一個交易」）——Postgres 交易裡一旦有一筆出錯，同一個交易
-        後續每一筆都會變成 current transaction is aborted，整批一個交易會
-        導致「查出 3 個錯誤，0 筆成功套用，還得全部重跑」；逐筆交易讓錯誤
-        互相隔離，呼應 crawler_sync.py「不應該讓已經成功匯入的其他筆全部
-        回滾」的既有精神。除了 DictionaryWriteError（含 apply_word_tree
-        在鎖定目標列之後重新比對 current_hash 失敗的 ConcurrentModificationError）
-        之外，也攔截任何非預期例外（例如底層 SQLAlchemy/DBAPI 錯誤）避免
-        單一列的意外中斷整個迴圈、讓後面的列完全沒有機會套用。每處理完
-        一列立刻把結果 checkpoint 回 Django（report／applied_count／
-        failed_count），不是等整個迴圈跑完才一次寫入——process 中途被
-        中斷，Django 端至少留著「處理到第幾筆」的真實記錄。新建列用
-        deterministic id（見 _deterministic_import_row_id()），同一列如果
-        需要重跑會對回同一筆詞條，不會重複建立。
+    (3) 每一筆詞條各自開一個 dictionary_write_session()、逐列 checkpoint
+        （實際迴圈見 dictionary_import.import_apply.apply_import_job_rows()
+        的說明）——Postgres 交易裡一旦有一筆出錯，同一個交易後續每一筆都
+        會變成 current transaction is aborted，整批一個交易會導致「查出
+        3 個錯誤，0 筆成功套用，還得全部重跑」；逐筆交易讓錯誤互相隔離，
+        呼應 crawler_sync.py「不應該讓已經成功匯入的其他筆全部回滾」的
+        既有精神。
     (4) 迴圈跑完後才把 job 標成最終的 applied／applied_with_errors。
     (5) 稽核紀錄在套用迴圈跑完之後才寫——套用已經是真的發生了，稽核寫入
         失敗不能讓已完成的操作誤報失敗。
@@ -409,44 +394,7 @@ def import_job_approve(request, pk):
                       "或目標詞條的內容被其他人異動），請重新預檢後再核准",
         }, status=409)
 
-    applied_count = 0
-    failed_count = 0
-    outcomes = []
-    for item in fresh_report["items"]:
-        row = item["row"]
-        if item["action"] == "error":
-            outcome = {"row": row, "name": item["name"], "outcome": "skipped", "detail": item["errors"]}
-        else:
-            try:
-                with dictionary_write_session() as write_db:
-                    result_id = dw.apply_word_tree(
-                        write_db, item["payload"], word_id=item["word_id"], expected_hash=item.get("current_hash"),
-                        create_id=_deterministic_import_row_id(pk, row) if not item["word_id"] else None,
-                    )
-                applied_count += 1
-                outcome = {"row": row, "name": item["name"], "outcome": "applied", "word_id": result_id}
-            except dw.DictionaryWriteError as exc:
-                failed_count += 1
-                outcome = {"row": row, "name": item["name"], "outcome": "failed", "detail": str(exc)}
-            except Exception:
-                # 不是我們自己定義的 DictionaryWriteError——例如底層 SQLAlchemy/
-                # DBAPI 例外。dictionary_write_session() 已經對這一筆的交易做了
-                # rollback，不影響其他列；這裡只是不讓單一列的非預期例外中斷
-                # 整個迴圈，也不把可能含內部細節的原始例外文字暴露出去。
-                logger.exception("匯入套用第 %s 列時發生非預期例外", row)
-                failed_count += 1
-                outcome = {
-                    "row": row, "name": item["name"], "outcome": "failed",
-                    "detail": "套用時發生非預期錯誤，請查看伺服器日誌",
-                }
-
-        outcomes.append(outcome)
-        # 逐列 checkpoint：每處理完一筆就立刻寫回 Django，而不是等整個
-        # 迴圈跑完才一次寫入——見本函式 docstring 的說明。
-        job.report = {**fresh_report, "outcomes": outcomes}
-        job.applied_count = applied_count
-        job.failed_count = failed_count
-        job.save(update_fields=["report", "applied_count", "failed_count"])
+    applied_count, failed_count, _outcomes = apply_import_job_rows(job, fresh_report)
 
     job.status = (
         DictionaryImportJob.STATUS_APPLIED

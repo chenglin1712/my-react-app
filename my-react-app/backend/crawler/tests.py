@@ -51,7 +51,7 @@ class GetQuizDataTest(TestCase):
 
     def test_disabled_flag_does_not_affect_other_tribes(self):
         FeatureFlag.objects.create(key='quiz_enabled_tayal', label='泰雅語測驗', enabled=False)
-        with patch('crawler.views.requests.get') as mock_get:
+        with patch('crawler.exam_site.requests.get') as mock_get:
             mock_get.return_value = MagicMock(status_code=200, json=lambda: {})
             response = self.client.get('/crawler/?tribe=amis&level=3')
         self.assertNotEqual(response.status_code, 403)
@@ -70,7 +70,7 @@ class GetQuizDataTest(TestCase):
     def test_level_3_uses_local_bank_not_external_api(self):
         # level 3/4 完全不碰 requests.get——資料來源是後台題庫（QuizVocabItem／
         # QuizClozePassage），不是外部 API，也不是寫死在 *_bank.py 的常數。
-        with patch('crawler.views.requests.get') as mock_get:
+        with patch('crawler.exam_site.requests.get') as mock_get:
             response = self.client.get('/crawler/?tribe=tayal&level=3')
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -131,7 +131,7 @@ class GetQuizDataTest(TestCase):
     def test_level_1_uses_local_bank_not_external_api(self):
         # level 1/2 也已經改讀本地題庫（QuizTrueFalseItem／QuizChoiceItem），
         # 完全不碰 requests.get（P2.5 遷移，取代原本即時代理外部 API 的做法）。
-        with patch('crawler.views.requests.get') as mock_get:
+        with patch('crawler.exam_site.requests.get') as mock_get:
             response = self.client.get('/crawler/?tribe=tayal&level=1')
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -162,7 +162,7 @@ class GetQuizDataTest(TestCase):
         self.assertNotIn('qani ga, bzyok.', questions)
 
     def test_level_2_uses_local_bank_not_external_api(self):
-        with patch('crawler.views.requests.get') as mock_get:
+        with patch('crawler.exam_site.requests.get') as mock_get:
             response = self.client.get('/crawler/?tribe=tayal&level=2')
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -365,7 +365,7 @@ class GetTayalImformationTest(TestCase):
 
     def test_does_not_require_login(self):
         with override_settings(AUTH_DEV_BYPASS=False):
-            with patch('crawler.views.requests.get') as mock_get:
+            with patch('crawler.exam_site.requests.get') as mock_get:
                 mock_response = MagicMock()
                 mock_response.status_code = 200
                 mock_response.json.return_value = {"data": []}
@@ -374,8 +374,8 @@ class GetTayalImformationTest(TestCase):
                 response = self.client.get('/crawler/news/')
         self.assertEqual(response.status_code, 200)
 
-    @patch('crawler.views.BeautifulSoup')
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.BeautifulSoup')
+    @patch('crawler.exam_site.requests.get')
     def test_both_sources_failing_returns_502_not_cached_empty_200(self, mock_get, mock_soup):
         # 原本兩個來源都用 bare except 吞掉例外、只記 log，最後一律回 200，呼叫端
         # 沒辦法分辨「今天真的沒新聞」跟「爬蟲已經壞掉」。兩個來源都真的丟例外時
@@ -389,7 +389,7 @@ class GetTayalImformationTest(TestCase):
         from django.core.cache import cache as django_cache
         self.assertIsNone(django_cache.get('crawler_news_data'))
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_partial_success_still_returns_200(self, mock_get):
         # tacp 來源成功、exam 來源（BeautifulSoup 解析）就算沒抓到任何項目也不算
         # 「失敗」，只要有一個來源正常跑完，就仍視為部分成功。
@@ -409,7 +409,7 @@ class GetTayalImformationTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_source_key_present_for_tacp_and_ntnu_items(self, mock_get):
         # source_key 是 adminapi/crawler_sync.py 拿來去重的鍵，格式要能區分
         # 兩個資料來源（tacp:<id> / ntnu-abst:<url>），不能兩邊撞在一起。
@@ -438,7 +438,7 @@ class GetTayalImformationTest(TestCase):
         self.assertEqual(tacp_item['source_key'], 'tacp:999')
         self.assertEqual(exam_item['source_key'], 'ntnu-abst:https://exam.sce.ntnu.edu.tw/abst/x.html')
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_javascript_href_in_exam_news_is_rejected(self, mock_get):
         # 上游 HTML 若被竄改成危險 scheme 的 href，detail/source_key 都必須
         # 是 None，不能把 javascript: 網址存進任何後續會被渲染成 <a href>
@@ -465,7 +465,7 @@ class GetTayalImformationTest(TestCase):
         self.assertIsNone(exam_item['detail'])
         self.assertIsNone(exam_item['source_key'])
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_force_refresh_bypasses_both_cache_layers(self, mock_get):
         # get_news_data 底下疊了兩層快取（自己的 NEWS_CACHE_KEY，以及跟考試
         # 時程共用的 EXAM_SITE_HTML_CACHE_KEY）；force_refresh 必須連共用的
@@ -534,7 +534,7 @@ class GetExamScheduleTest(TestCase):
 
     def test_does_not_require_login(self):
         with override_settings(AUTH_DEV_BYPASS=False):
-            with patch('crawler.views.requests.get') as mock_get:
+            with patch('crawler.exam_site.requests.get') as mock_get:
                 mock_response = MagicMock()
                 mock_response.status_code = 200
                 mock_response.text = FAKE_EXAM_SCHEDULE_HTML
@@ -542,7 +542,7 @@ class GetExamScheduleTest(TestCase):
                 response = self.client.get('/crawler/exam_schedule/')
         self.assertEqual(response.status_code, 200)
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_upstream_request_failure_returns_502(self, mock_get):
         import requests
         mock_get.side_effect = requests.exceptions.ConnectTimeout("upstream timed out")
@@ -551,7 +551,7 @@ class GetExamScheduleTest(TestCase):
 
         self.assertEqual(response.status_code, 502)
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_no_phases_parsed_returns_502_not_cached(self, mock_get):
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -564,7 +564,7 @@ class GetExamScheduleTest(TestCase):
         from django.core.cache import cache as django_cache
         self.assertIsNone(django_cache.get('crawler_exam_schedule_data'))
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_parses_session_name_and_phases_with_dates(self, mock_get):
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -589,7 +589,7 @@ class GetExamScheduleTest(TestCase):
         # 起訖同一天時 end_date 應為 None，不是重複同一天的日期字串
         self.assertIsNone(exam_date['end_date'])
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_response_is_cached_across_requests(self, mock_get):
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -613,7 +613,7 @@ class ExamScheduleOverrideTest(TestCase):
         self.client = Client()
         cache.clear()
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_active_override_replaces_matching_phase(self, mock_get):
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -631,7 +631,7 @@ class ExamScheduleOverrideTest(TestCase):
         self.assertEqual(phases['報名']['start_date'], '2026-01-25')
         self.assertEqual(phases['測驗']['start_date'], '2026-04-18')  # 沒被覆寫的維持爬蟲原值
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_inactive_override_does_not_apply(self, mock_get):
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -645,7 +645,7 @@ class ExamScheduleOverrideTest(TestCase):
         phases = {p['phase']: p for p in response.json()['phases']}
         self.assertEqual(phases['報名']['start_date'], '2026-01-21')  # 停用的覆寫不生效
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_override_for_phase_not_scraped_is_appended(self, mock_get):
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -658,7 +658,7 @@ class ExamScheduleOverrideTest(TestCase):
         self.assertEqual(len(response.json()['phases']), 3)
         self.assertEqual(phases['證書']['start_date'], '2026-06-01')
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_crawl_failure_falls_back_to_override_only_instead_of_502(self, mock_get):
         import requests
         mock_get.side_effect = requests.exceptions.ConnectTimeout("upstream timed out")
@@ -670,7 +670,7 @@ class ExamScheduleOverrideTest(TestCase):
         self.assertEqual(len(response.json()['phases']), 1)
         self.assertEqual(response.json()['phases'][0]['phase'], '報名')
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_crawl_failure_without_any_override_still_502s(self, mock_get):
         import requests
         mock_get.side_effect = requests.exceptions.ConnectTimeout("upstream timed out")
@@ -678,7 +678,7 @@ class ExamScheduleOverrideTest(TestCase):
         response = self.client.get('/crawler/exam_schedule/')
         self.assertEqual(response.status_code, 502)
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_successful_crawl_records_status(self, mock_get):
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -691,7 +691,7 @@ class ExamScheduleOverrideTest(TestCase):
         self.assertIsNotNone(status.last_success_at)
         self.assertEqual(status.consecutive_failures, 0)
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_failed_crawl_increments_consecutive_failures(self, mock_get):
         import requests
         mock_get.side_effect = requests.exceptions.ConnectTimeout("upstream timed out")
@@ -703,7 +703,7 @@ class ExamScheduleOverrideTest(TestCase):
         self.assertEqual(status.consecutive_failures, 2)
         self.assertIn('上游請求失敗', status.last_failure_reason)
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_cache_hit_does_not_touch_crawl_status(self, mock_get):
         mock_response = MagicMock()
         mock_response.status_code = 200

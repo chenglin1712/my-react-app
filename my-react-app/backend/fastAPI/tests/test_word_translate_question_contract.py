@@ -6,8 +6,9 @@ question.answer（quiz_recommon_question.jsx 把 payload 直接攤平成 questio
 題型不管使用者選什麼都被判成答錯，而且完全沒有測試蓋到這個 payload 形狀
 才會沒被抓到。這裡直接鎖住欄位名稱，之後要改動也會在這裡先炸開。
 """
-from fastAPI.routes import quiz as quiz_module
-from fastAPI.routes.quiz import WordDTO, _build_word_translate_question
+from fastAPI.routes.quiz import repository as quiz_module
+from fastAPI.routes.quiz.generator import _build_word_translate_question
+from fastAPI.routes.quiz.schemas import WordDTO
 
 
 def test_word_translate_question_payload_uses_answer_not_cn(monkeypatch):

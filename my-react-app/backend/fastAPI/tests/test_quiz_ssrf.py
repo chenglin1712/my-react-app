@@ -1,5 +1,5 @@
 """測試 compare_audio 的 reference_urls SSRF 白名單（第 2 項稽核修正）。"""
-from fastAPI.routes.quiz import _is_allowed_reference_url
+from fastAPI.routes.pronunciation.audio_fetch import _is_allowed_reference_url
 
 
 def test_allows_firebase_storage_https_url():

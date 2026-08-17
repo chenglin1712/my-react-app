@@ -2,7 +2,8 @@ from django.urls import path
 
 from . import (
     analytics_views, dictionary_grammar_views, dictionary_import_views, dictionary_taxonomy_views,
-    dictionary_views, feature_flag_views, game_config_views, moderation_views, quizbank_views,
+    dictionary_views, exam_schedule_admin_views, feature_flag_views, game_config_views,
+    homepage_config_views, moderation_views, quizbank_views,
     rate_limit_views, review_queue_views, system_cache_views, user_views, views,
 )
 
@@ -41,10 +42,10 @@ urlpatterns = [
     path('announcements/sync-crawler/', views.announcement_sync_crawler),
     path('audit-log/', views.audit_log_list),
     path('public/announcements/', views.public_announcement_list),
-    path('exam-schedule/', views.exam_schedule_admin),
-    path('exam-schedule/overrides/<str:phase>/', views.exam_schedule_override_detail),
-    path('homepage-config/', views.homepage_config_admin),
-    path('public/homepage-config/', views.public_homepage_config),
+    path('exam-schedule/', exam_schedule_admin_views.exam_schedule_admin),
+    path('exam-schedule/overrides/<str:phase>/', exam_schedule_admin_views.exam_schedule_override_detail),
+    path('homepage-config/', homepage_config_views.homepage_config_admin),
+    path('public/homepage-config/', homepage_config_views.public_homepage_config),
     *_content_urls('quiz-bank/vocab', quizbank_views.quiz_vocab_views),
     *_content_urls('quiz-bank/cloze', quizbank_views.quiz_cloze_views),
     *_content_urls('quiz-bank/situations', quizbank_views.quiz_situation_views),

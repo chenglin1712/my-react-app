@@ -42,9 +42,15 @@ _grammar_quiz_cache: KeyedCache[str, dict] = KeyedCache()
 # _load_grammar 原本查詢與組裝混在同一個函式：4 層巢狀迴圈裡，每撈一批 row
 # 就地組進回應 dict，想確認「這條 SQL 對不對」或「這欄位怎麼組出來的」都得
 # 整個函式一起讀。拆成 _fetch_*（只呼叫 db.execute，回傳原始 row，不組任何
-# dict）與 _format_*（純資料轉換，不碰 db）兩類函式，查詢的次數/順序/範圍
-# 跟原本完全一致（例如詞綴仍是「每個 section 各查一次、只查該 section 內
-# 的 rule_ids」，不是合併成一次全 tribe 查詢）。
+# dict）與 _format_*（純資料轉換，不碰 db）兩類函式。
+#
+# 這批 _fetch_* 原本是「逐 section 查 rule、逐 rule 查 example」，查詢次數
+# 隨章節數/規則數線性成長，是典型的 N+1（P4 review BE-19：資料量還小時被
+# _grammar_cache 蓋過去，但冷啟動／快取失效那一次仍要真的付出這個成本）。
+# 現在改成批次查詢：sections、rules_for_sections、affix_map、
+# examples_for_rules、word_map 固定 5 次查詢，不論這個族語有幾個章節/
+# 規則/例句都不會再變多，在 Python 記憶體裡用 dict 分組後組回原本的樹狀
+# 結構，回應形狀與 _format_rule()／_format_section() 的介面完全不變。
 
 def _fetch_grammar_sections(db: Session, tribe_name: str):
     return db.execute(
@@ -53,11 +59,27 @@ def _fetch_grammar_sections(db: Session, tribe_name: str):
     ).fetchall()
 
 
-def _fetch_section_rules(db: Session, section_id) -> list:
-    return db.execute(
-        text("SELECT id, rule_order, rule_key, title, structure, function, notes FROM grammar_rule WHERE section_id = :sid ORDER BY rule_order"),
-        {"sid": section_id}
-    ).fetchall()
+def _fetch_rules_for_sections(db: Session, section_ids: list) -> Dict[int, list]:
+    """批次載入多個 section 底下的全部 rule，一次查詢、依 section_id 分組
+    （P4 review BE-19）。取代原本 _load_grammar() 逐個 section 各查一次
+    rule 的寫法——族語資料量成長後，章節數就是查詢次數，是典型的 N+1。
+    分組後每個 section 底下的 rule row 形狀（id, rule_order, rule_key,
+    title, structure, function, notes）跟原本單一 section 查詢完全一致
+    （這裡多查的 section_id 只用來分組，回傳前會去掉），呼叫端
+    _format_rule() 不用跟著改 unpacking。"""
+    rules_by_section: Dict[int, list] = {sid: [] for sid in section_ids}
+    if section_ids:
+        rows = db.execute(
+            text(
+                "SELECT section_id, id, rule_order, rule_key, title, structure, function, notes "
+                "FROM grammar_rule WHERE section_id IN :section_ids ORDER BY section_id, rule_order"
+            ).bindparams(bindparam("section_ids", expanding=True)),
+            {"section_ids": section_ids}
+        ).fetchall()
+        for row in rows:
+            row = tuple(row)
+            rules_by_section[row[0]].append(row[1:])
+    return rules_by_section
 
 
 def _fetch_rule_affix_map(db: Session, rule_ids: list) -> Dict[int, list]:
@@ -73,11 +95,26 @@ def _fetch_rule_affix_map(db: Session, rule_ids: list) -> Dict[int, list]:
     return affix_map
 
 
-def _fetch_rule_examples(db: Session, rule_id) -> list:
-    return db.execute(
-        text("SELECT id, example_order, tribe_text, chinese_text, analysis FROM grammar_example WHERE rule_id = :rid ORDER BY example_order"),
-        {"rid": rule_id}
-    ).fetchall()
+def _fetch_examples_for_rules(db: Session, rule_ids: list) -> Dict[int, list]:
+    """批次載入多個 rule 底下的全部 example，一次查詢、依 rule_id 分組
+    （P4 review BE-19）。取代原本 _load_grammar() 逐個 rule 各查一次
+    example 的寫法——這是巢狀在「逐 section 查 rule」裡面的第二層 N+1，
+    章節數 x 每章節規則數才是原本的查詢次數。分組後每個 rule 底下的
+    example row 形狀（id, example_order, tribe_text, chinese_text,
+    analysis）跟原本單一 rule 查詢完全一致，_format_rule() 不用跟著改。"""
+    examples_by_rule: Dict[int, list] = {rid: [] for rid in rule_ids}
+    if rule_ids:
+        rows = db.execute(
+            text(
+                "SELECT rule_id, id, example_order, tribe_text, chinese_text, analysis "
+                "FROM grammar_example WHERE rule_id IN :rule_ids ORDER BY rule_id, example_order"
+            ).bindparams(bindparam("rule_ids", expanding=True)),
+            {"rule_ids": rule_ids}
+        ).fetchall()
+        for row in rows:
+            row = tuple(row)
+            examples_by_rule[row[0]].append(row[1:])
+    return examples_by_rule
 
 
 def _fetch_example_word_map(db: Session, example_ids: list) -> Dict[int, list]:
@@ -139,15 +176,22 @@ def _load_grammar(db: Session, tribe_name: str) -> Optional[dict]:
         if not sections:
             return None
 
+        section_ids = [sec[0] for sec in sections]
+        rules_by_section = _fetch_rules_for_sections(db, section_ids)
+
+        all_rule_ids = [rule[0] for rules in rules_by_section.values() for rule in rules]
+        affix_map = _fetch_rule_affix_map(db, all_rule_ids)
+        examples_by_rule = _fetch_examples_for_rules(db, all_rule_ids)
+
+        all_example_ids = [ex[0] for examples in examples_by_rule.values() for ex in examples]
+        word_map = _fetch_example_word_map(db, all_example_ids)
+
         result = []
         for sec in sections:
-            rules = _fetch_section_rules(db, sec[0])
-            affix_map = _fetch_rule_affix_map(db, [r[0] for r in rules])
-            rules_out = []
-            for rule in rules:
-                examples = _fetch_rule_examples(db, rule[0])
-                word_map = _fetch_example_word_map(db, [ex[0] for ex in examples])
-                rules_out.append(_format_rule(rule, affix_map, examples, word_map))
+            rules_out = [
+                _format_rule(rule, affix_map, examples_by_rule.get(rule[0], []), word_map)
+                for rule in rules_by_section.get(sec[0], [])
+            ]
             result.append(_format_section(sec, rules_out))
 
         return {"tribe": tribe_name, "sections": result}

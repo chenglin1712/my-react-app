@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from fastAPI.main import app
 from fastAPI.routes import auth as auth_module
-from fastAPI.routes.quiz import SubmitAnswerFrontendReq, UserModelReq, WordDTO
+from fastAPI.routes.quiz.schemas import SubmitAnswerFrontendReq, UserModelReq, WordDTO
 from dictionary_db.connect import get_db
 
 
@@ -122,7 +122,7 @@ def test_generate_quiz_accepts_empty_body_with_defaults(client):
         WordDTO(id="w1", name="balay", frequency=10),
         WordDTO(id="w2", name="cyux", frequency=5),
     ]
-    with patch("fastAPI.routes.quiz.load_all_words", return_value=fake_words):
+    with patch("fastAPI.routes.quiz.api.load_all_words", return_value=fake_words):
         response = client.post(
             "/api/v1/quiz/generate_quiz_frontend", params={"tribe": "tayal"}, json={}
         )
@@ -133,8 +133,8 @@ def test_generate_quiz_accepts_empty_body_with_defaults(client):
 # ------------------------- 內部例外：只回通用訊息，不外洩例外內容 -------------------------
 def test_generate_quiz_masks_internal_exception(client):
     fake_words = [WordDTO(id="w1", name="balay", frequency=10)]
-    with patch("fastAPI.routes.quiz.load_all_words", return_value=fake_words), \
-         patch("fastAPI.routes.quiz._score_candidates", side_effect=RuntimeError("internal db path leaked")):
+    with patch("fastAPI.routes.quiz.api.load_all_words", return_value=fake_words), \
+         patch("fastAPI.routes.quiz.api._score_candidates", side_effect=RuntimeError("internal db path leaked")):
         response = client.post(
             "/api/v1/quiz/generate_quiz_frontend", params={"tribe": "tayal"}, json={}
         )

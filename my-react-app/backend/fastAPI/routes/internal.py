@@ -24,8 +24,9 @@ from sqlalchemy.orm import Session
 from config.tribes import TRIBES, resolve_tribe_name
 from dictionary_db.connect import SessionLocal
 
-from . import listening, quiz, sentence
+from . import listening, sentence
 from .dictionary import grammar, search
+from .quiz import repository as quiz
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fastAPI.routes import quiz
+from fastAPI.routes.quiz import irt as quiz
 
 
 @pytest.fixture(autouse=True)
@@ -42,7 +42,7 @@ def test_successful_fetch_updates_globals():
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = _fake_config_payload(total_questions=20, dq_alpha=0.9)
-    with patch("fastAPI.routes.quiz.requests.get", return_value=mock_response) as mock_get:
+    with patch("fastAPI.routes.quiz.irt.requests.get", return_value=mock_response) as mock_get:
         quiz._refresh_irt_config_if_stale()
 
     mock_get.assert_called_once()
@@ -54,7 +54,7 @@ def test_type_aq_dict_rebuilt_from_flat_fields():
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = _fake_config_payload(type_aq_word_match=3.5)
-    with patch("fastAPI.routes.quiz.requests.get", return_value=mock_response):
+    with patch("fastAPI.routes.quiz.irt.requests.get", return_value=mock_response):
         quiz._refresh_irt_config_if_stale()
 
     assert quiz.TYPE_AQ["word-match"] == 3.5
@@ -64,7 +64,7 @@ def test_within_ttl_does_not_refetch():
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = _fake_config_payload(total_questions=20)
-    with patch("fastAPI.routes.quiz.requests.get", return_value=mock_response) as mock_get:
+    with patch("fastAPI.routes.quiz.irt.requests.get", return_value=mock_response) as mock_get:
         quiz._refresh_irt_config_if_stale()
         quiz._refresh_irt_config_if_stale()
         quiz._refresh_irt_config_if_stale()
@@ -74,7 +74,7 @@ def test_within_ttl_does_not_refetch():
 
 def test_django_unreachable_keeps_current_values_not_crash():
     import requests as requests_module
-    with patch("fastAPI.routes.quiz.requests.get", side_effect=requests_module.exceptions.ConnectionError("boom")):
+    with patch("fastAPI.routes.quiz.irt.requests.get", side_effect=requests_module.exceptions.ConnectionError("boom")):
         quiz._refresh_irt_config_if_stale()  # 不應該丟例外
 
     # Django 連不上時保留目前值（這裡是 fixture 重置後的原始預設值）不變。
@@ -85,7 +85,7 @@ def test_http_error_status_keeps_current_values_not_crash():
     mock_response = MagicMock()
     mock_response.status_code = 500
     mock_response.raise_for_status.side_effect = Exception("500 error")
-    with patch("fastAPI.routes.quiz.requests.get", return_value=mock_response):
+    with patch("fastAPI.routes.quiz.irt.requests.get", return_value=mock_response):
         quiz._refresh_irt_config_if_stale()  # 不應該丟例外
 
     assert quiz.TOTAL_QUESTIONS == 10
@@ -102,7 +102,7 @@ def test_response_missing_field_leaves_all_globals_untouched():
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = payload
-    with patch("fastAPI.routes.quiz.requests.get", return_value=mock_response):
+    with patch("fastAPI.routes.quiz.irt.requests.get", return_value=mock_response):
         quiz._refresh_irt_config_if_stale()  # 不應該丟例外
 
     # total_questions 在 dataclass 欄位順序裡排在 beta5 之前，如果是逐欄位
@@ -117,7 +117,7 @@ def test_response_wrong_type_leaves_all_globals_untouched():
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = payload
-    with patch("fastAPI.routes.quiz.requests.get", return_value=mock_response):
+    with patch("fastAPI.routes.quiz.irt.requests.get", return_value=mock_response):
         quiz._refresh_irt_config_if_stale()  # 不應該丟例外
 
     assert quiz.ALPHA0 == 1.0
@@ -126,7 +126,7 @@ def test_response_wrong_type_leaves_all_globals_untouched():
 def test_failed_fetch_still_updates_last_fetch_timestamp_to_avoid_hammering():
     # 失敗也要進入下一個 TTL 週期再試，不能讓每個請求都重新嘗試連線並等待逾時。
     import requests as requests_module
-    with patch("fastAPI.routes.quiz.requests.get", side_effect=requests_module.exceptions.ConnectionError("boom")) as mock_get:
+    with patch("fastAPI.routes.quiz.irt.requests.get", side_effect=requests_module.exceptions.ConnectionError("boom")) as mock_get:
         quiz._refresh_irt_config_if_stale()
         quiz._refresh_irt_config_if_stale()
 

@@ -485,7 +485,7 @@ class ExamScheduleAdminTest(TestCase):
             response = self.client.get('/adminapi/exam-schedule/', **headers)
         self.assertEqual(response.status_code, 403)
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_analyst_can_view_overview(self, mock_get):
         # 只是查詢比對，STAFF_ROLES 都能看，跟公告列表的角色門檻一致。
         self._mock_scrape_ok(mock_get)
@@ -496,7 +496,7 @@ class ExamScheduleAdminTest(TestCase):
         self.assertTrue(data["crawled"]["available"])
         self.assertEqual(len(data["crawled"]["phases"]), 1)
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_overview_includes_effective_phases_with_override_applied(self, mock_get):
         self._mock_scrape_ok(mock_get)
         ExamScheduleOverride.objects.create(phase='報名', start_date='2026-02-01')
@@ -508,14 +508,14 @@ class ExamScheduleAdminTest(TestCase):
         crawled = {p["phase"]: p for p in response.json()["crawled"]["phases"]}
         self.assertEqual(crawled['報名']['start_date'], '2026-01-21')
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_analyst_cannot_trigger_refresh(self, mock_get):
         self._mock_scrape_ok(mock_get)
         with _as_role(ANALYST) as headers:
             response = _post_json(self.client, '/adminapi/exam-schedule/', headers)
         self.assertEqual(response.status_code, 403)
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_editor_can_trigger_refresh_and_it_writes_audit_log(self, mock_get):
         self._mock_scrape_ok(mock_get)
         with _as_role(EDITOR) as headers:
@@ -526,7 +526,7 @@ class ExamScheduleAdminTest(TestCase):
         self.assertIsNotNone(log)
         self.assertEqual(log.actor_role, EDITOR)
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_refresh_bypasses_cache(self, mock_get):
         self._mock_scrape_ok(mock_get)
         with _as_role(OWNER) as headers:
@@ -745,7 +745,7 @@ class AnnouncementCrawlerSyncTest(TestCase):
             response = _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
         self.assertEqual(response.status_code, 403)
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_editor_can_trigger_sync(self, mock_get):
         self._mock_one_tacp_item(mock_get)
         with _as_role(EDITOR) as headers:
@@ -753,14 +753,14 @@ class AnnouncementCrawlerSyncTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["imported"], 1)
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_get_returns_status_without_triggering_a_crawl(self, mock_get):
         with _as_role(OWNER) as headers:
             response = self.client.get('/adminapi/announcements/sync-crawler/', **headers)
         self.assertEqual(response.status_code, 200)
         mock_get.assert_not_called()
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_imported_row_is_published_and_tagged_as_crawler_source(self, mock_get):
         self._mock_one_tacp_item(mock_get, item_id=42, title="泰雅文化節")
         with _as_role(EDITOR) as headers:
@@ -772,7 +772,7 @@ class AnnouncementCrawlerSyncTest(TestCase):
         self.assertEqual(announcement.category, Announcement.CATEGORY_ACTIVITY)
         self.assertEqual(announcement.title, "泰雅文化節")
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_running_twice_does_not_duplicate(self, mock_get):
         self._mock_one_tacp_item(mock_get, item_id=7)
         with _as_role(EDITOR) as headers:
@@ -784,7 +784,7 @@ class AnnouncementCrawlerSyncTest(TestCase):
         self.assertEqual(second.json()["skipped_existing"], 1)
         self.assertEqual(Announcement.objects.filter(external_id="tacp:7").count(), 1)
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_overlong_title_is_truncated_not_rejected(self, mock_get):
         long_title = "很長的標題" * 30  # 遠超過 title 的 100 字上限
         self._mock_one_tacp_item(mock_get, item_id=8, title=long_title)
@@ -797,7 +797,7 @@ class AnnouncementCrawlerSyncTest(TestCase):
         self.assertLessEqual(len(announcement.title), 100)
         self.assertTrue(announcement.title.endswith("…"))
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_missing_image_does_not_raise(self, mock_get):
         # tacp 沒有圖片的項目 image 是 None，不能讓 NOT NULL 欄位炸掉。
         self._mock_one_tacp_item(mock_get, item_id=9)
@@ -807,7 +807,7 @@ class AnnouncementCrawlerSyncTest(TestCase):
         self.assertEqual(response.json()["imported"], 1)
         self.assertEqual(Announcement.objects.get(external_id="tacp:9").cover_image_url, "")
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_unpublished_imported_row_is_not_resurrected_by_resync(self, mock_get):
         # 下架一筆爬蟲匯入的項目之後，重新同步不應該讓它復活——因為同步只
         # 做「這個 external_id 存在嗎」的判斷，不會覆蓋既有資料，這正是
@@ -830,7 +830,7 @@ class AnnouncementCrawlerSyncTest(TestCase):
         announcement.refresh_from_db()
         self.assertEqual(announcement.status, Announcement.STATUS_UNPUBLISHED)
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_sync_writes_audit_log_with_correct_target_type(self, mock_get):
         self._mock_one_tacp_item(mock_get, item_id=11)
         with _as_role(EDITOR) as headers:
@@ -840,7 +840,7 @@ class AnnouncementCrawlerSyncTest(TestCase):
         self.assertIsNotNone(log)
         self.assertEqual(log.target_id, str(AnnouncementSyncStatus.load().pk))
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_public_list_orders_admin_content_before_crawler_content(self, mock_get):
         self._mock_one_tacp_item(mock_get, item_id=12)
         with _as_role(EDITOR) as headers:
@@ -858,7 +858,7 @@ class AnnouncementCrawlerSyncTest(TestCase):
         titles = [item["title"] for item in response.json()["results"]]
         self.assertEqual(titles[0], "後台自建公告")  # 即使爬蟲那筆先建立、created_at 更早
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_source_filter_in_admin_list(self, mock_get):
         self._mock_one_tacp_item(mock_get, item_id=13)
         with _as_role(EDITOR) as headers:
@@ -871,7 +871,7 @@ class AnnouncementCrawlerSyncTest(TestCase):
         self.assertEqual(crawler_only.json()["count"], 1)
         self.assertEqual(admin_only.json()["count"], 1)
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_admin_list_orders_admin_content_before_crawler_content(self, mock_get):
         """獨立審查找到的問題：後台列表（_list_announcements）原本完全沒有
         套用「自建優先」排序，只用 model 預設的 -is_pinned/-created_at/-pk
@@ -888,7 +888,7 @@ class AnnouncementCrawlerSyncTest(TestCase):
         titles = [item["title"] for item in listing.json()["results"]]
         self.assertEqual(titles[0], "後台自建公告")
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_pinned_crawler_item_does_not_outrank_unpinned_admin_item(self, mock_get):
         """獨立審查找到的問題：原本 -is_pinned 是第一排序鍵，一筆被人工
         設成置頂的爬蟲公告會排到未置頂的自建公告前面，違反「自建一律
@@ -914,7 +914,7 @@ class AnnouncementCrawlerSyncTest(TestCase):
         titles = [item["title"] for item in response.json()["results"]]
         self.assertEqual(titles[0], "後台自建公告")
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_expired_pin_until_no_longer_sorts_as_pinned(self, mock_get):
         """獨立審查找到的問題：原本排序只看 is_pinned 欄位，不檢查
         pin_until 是否已過期，導致 pin_until 這個「避免永久置頂被遺忘」
@@ -947,7 +947,7 @@ class AnnouncementCrawlerSyncTest(TestCase):
         # 排到自建內容前面，違反「自建一律優先」。
         self.assertEqual(titles[0], "較新的一般公告")
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_pure_date_end_date_stays_visible_through_that_whole_day(self, mock_get):
         """獨立審查找到的問題：純日期字串（沒有時間部分）的 end_date 原本
         被解析成當天 00:00——如果同步發生在結束日當天的白天，unpublish_at
@@ -971,7 +971,7 @@ class AnnouncementCrawlerSyncTest(TestCase):
         titles = [item["title"] for item in public_resp.json()["results"]]
         self.assertIn("測試活動", titles)
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_future_pure_date_end_date_unpublishes_at_start_of_following_day(self, mock_get):
         """end_date 是未來日期時，unpublish_at 應該是「隔天 00:00」，讓
         公告顯示到結束日當天結束，不是結束日一早就消失。"""
@@ -986,7 +986,7 @@ class AnnouncementCrawlerSyncTest(TestCase):
         )
         self.assertEqual(announcement.unpublish_at, expected_next_day)
 
-    @patch('crawler.views.requests.get')
+    @patch('crawler.exam_site.requests.get')
     def test_tacp_non_200_response_not_treated_as_success(self, mock_get):
         """獨立審查找到的問題：原本 tacp_ok = True 寫在 if status_code==200
         區塊外面，TACP 回傳 500/403 等非 200 時不會進到解析區塊、完全沒有

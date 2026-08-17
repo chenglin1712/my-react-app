@@ -6,10 +6,11 @@ SQLAlchemy ORM 物件：原本快取直接存 db.query(Word).all() 的結果，�
 """
 from unittest.mock import MagicMock
 
-from fastAPI.routes import quiz as quiz_module
+from fastAPI.routes.quiz import repository as quiz_module
 from fastAPI.routes.keyed_cache import KeyedCache
 from dictionary_db.model import Word
-from fastAPI.routes.quiz import WordDTO, load_all_words
+from fastAPI.routes.quiz.schemas import WordDTO
+from fastAPI.routes.quiz.repository import load_all_words
 
 
 def _make_fake_word(word_id, name, frequency):
