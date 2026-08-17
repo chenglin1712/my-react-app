@@ -87,7 +87,7 @@ from dictionary_db.model import (
     WordExplanationSentence,
     WordExplanationSentenceAudio,
 )
-from fastAPI.url_safety import UnsafeConnectionError, assert_response_from_safe_peer, is_safe_redirect_target
+from config.url_safety import UnsafeConnectionError, assert_response_from_safe_peer, is_safe_redirect_target
 
 _OWNING_TABLE = {
     "word_audio": WordAudio,

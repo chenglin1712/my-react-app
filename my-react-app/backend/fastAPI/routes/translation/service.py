@@ -15,7 +15,7 @@ from config.llm import get_llm_client, DEFAULT_MODEL
 from config.tribes import TRIBE_IDS, TRIBE_MAP
 from dictionary_db.model import GrammarAffix
 
-from . import lexicon
+from config import translation_lexicon as lexicon
 from . import prompts
 from . import retrieve as R
 

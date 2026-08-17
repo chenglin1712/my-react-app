@@ -8,10 +8,12 @@
 過的 10% 上實測得出）。
 
 掃描每個族語全部 word_explanation_sentence.original_sentence，用
-fastAPI.routes.translation.lexicon 的 tokenize()／normalize_token() 切詞、
-正規化（這兩個函式也是翻譯功能本身處理使用者輸入/LLM 輸出時用的同一套，
-兩邊用同一套正規化規則，查表才會一致），排除掉本來就是字典詞條本身的詞形
-（那些已經被 Tier A 覆蓋，不需要在這張表重複一份）。
+config.translation_lexicon 的 tokenize()／normalize_token() 切詞、正規化
+（這兩個函式也是翻譯功能本身處理使用者輸入/LLM 輸出時用的同一套，兩邊用
+同一套正規化規則，查表才會一致——這個模組原本放在 FastAPI 的 route 層底下，
+搬到 backend/config 共用層之前，這支 Django command 得反過來 import FastAPI
+的內部模組），排除掉本來就是字典詞條本身的詞形（那些已經被 Tier A 覆蓋，
+不需要在這張表重複一份）。
 
 用法：
     python manage.py rebuild_translation_attested_forms [--tribe SLUG]
@@ -27,7 +29,7 @@ from django.core.management.base import BaseCommand, CommandError
 from config.tribes import TRIBES
 from dictionary_db.connect import dictionary_write_session
 from dictionary_db.model import Word, WordExplanation, WordExplanationSentence, TranslationAttestedForm
-from fastAPI.routes.translation.lexicon import normalize_token, tokenize
+from config.translation_lexicon import normalize_token, tokenize
 
 
 class Command(BaseCommand):

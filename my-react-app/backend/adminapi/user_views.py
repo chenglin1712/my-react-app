@@ -15,7 +15,7 @@ from datetime import timezone as dt_timezone
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
-from config.firebase_auth import require_role
+from core.firebase_auth import require_role
 from config.roles import ACCOUNT_MANAGERS, OWNER, ROLE_ASSIGNERS, STAFF_ROLES
 
 from . import firebase_ops

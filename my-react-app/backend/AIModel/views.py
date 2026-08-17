@@ -9,7 +9,7 @@ from dictionary_db.connect import SessionLocal
 from dictionary_db.model import Word
 from dictionary_db.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS, TRIBE_MAP
-from config.firebase_auth import verify_firebase_token
+from core.firebase_auth import verify_firebase_token
 from config.llm import get_llm_client
 from adminapi.rate_limits import get_configured_rate
 from .serializers import TayalChatSerializer, ReviewTayalChatSerializer

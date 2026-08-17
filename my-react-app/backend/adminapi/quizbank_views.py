@@ -19,7 +19,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
-from config.firebase_auth import require_role
+from core.firebase_auth import require_role
 from config.roles import CONTENT_APPROVERS, CONTENT_EDITORS, PUBLISHERS, STAFF_ROLES
 
 from ._shared import (
@@ -509,7 +509,16 @@ def _update_irt_config(request):
 def public_irt_config(request):
     """給 FastAPI quiz.py 讀取用，無需登入——比照 public_homepage_config 的
     公開唯讀模式。IP 限流防止被打穿當放大器用（雖然只是讀本地資料庫，但
-    仍是對外開放、無需驗證的端點，不能完全不設防）。"""
+    仍是對外開放、無需驗證的端點，不能完全不設防）。
+
+    命名／路徑上的「public」跟語意有落差（P4 review BE-10）：這個端點唯一
+    預期的消費者是同機或內網的 FastAPI process（見 fastAPI/routes/quiz.py
+    的 _IRT_CONFIG_URL），不是給一般使用者或前端直接打的公開 API，只是因為
+    目前沒有 service-to-service 認證機制（跟 internal.py 的快取失效通知用
+    INTERNAL_API_SECRET 不同套），才沿用 public_homepage_config 那種「掛在
+    /public/ 底下、靠 IP rate limit 擋濫用」的既有模式。IRT 參數本身不是
+    敏感資料，這不是資安漏洞，但如果之後要收緊，應該改成跟 internal.py
+    一致的 service secret 驗證，而不是繼續放在看起來對外公開的路徑下。"""
     if request.method != "GET":
         return JsonResponse({"detail": "Method not allowed"}, status=405)
     limited_resp = _ip_rate_limited_response(request, group="public_irt_config", rate="120/m")

@@ -8,9 +8,9 @@ from sqlalchemy import text
 from .crossword import Crossword, Word as CrosswordWord
 from django.views.decorators.csrf import csrf_exempt
 from config.tribes import TRIBE_IDS as _ALL_TRIBE_IDS
-from config.firebase_auth import verify_firebase_token
+from core.firebase_auth import verify_firebase_token
 from dictionary_db.connect import SessionLocal
-from adminapi.models import GameConfig
+from adminapi.game_config_service import get_crossword_config
 from adminapi.rate_limits import get_configured_rate
 from .serializers import SubmitAnsSerializer
 
@@ -124,10 +124,10 @@ def generate_crossword(request):
     if tribe not in _ALL_TRIBE_IDS:
         return JsonResponse({'detail': f'不支援的族語：{tribe}'}, status=400)
 
-    game_config = GameConfig.load()
-    min_length = game_config.crossword_min_word_length
-    max_length = game_config.crossword_max_word_length
-    words_per_round = game_config.crossword_words_per_round
+    game_config = get_crossword_config()
+    min_length = game_config.min_word_length
+    max_length = game_config.max_word_length
+    words_per_round = game_config.words_per_round
 
     # 5 個族語統一即時查辭典資料庫選字——泰雅語原本有一份後台可編輯的
     # 專屬詞庫（CrosswordTayalWord），這是唯一跟其他 4 個族語不同的地方；
@@ -148,14 +148,14 @@ def generate_crossword(request):
         )
 
     #設定填字遊戲格子大小（後台可調，見 GameConfig.crossword_grid_size）
-    grid_cols = game_config.crossword_grid_size
-    grid_rows = game_config.crossword_grid_size
+    grid_cols = game_config.grid_size
+    grid_rows = game_config.grid_size
 
     #計算填字遊戲
     crossword_generator = Crossword(
         grid_cols, grid_rows, empty='-', maxloops=5000, available_words=available_words_for_generator,
     )
-    crossword_generator.compute_crossword(time_permitted=game_config.crossword_compute_time_limit_seconds)
+    crossword_generator.compute_crossword(time_permitted=game_config.compute_time_limit_seconds)
 
     # 獲取生成的填字遊戲資料進行編號排序
     crossword_generator.order_number_words()

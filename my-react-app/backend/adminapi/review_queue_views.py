@@ -10,7 +10,7 @@ Firestore 的待處理檢舉）合併成一個依時間排序的清單，每筆�
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
-from config.firebase_auth import require_role
+from core.firebase_auth import require_role
 from config.roles import STAFF_ROLES
 
 from . import firebase_ops

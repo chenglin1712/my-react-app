@@ -17,7 +17,7 @@ from sqlalchemy import func
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
-from config.firebase_auth import require_role
+from core.firebase_auth import require_role
 from config.roles import ACCOUNT_MANAGERS, CONTENT_EDITORS, STAFF_ROLES
 from config.tribes import TRIBES
 from dictionary_db.connect import SessionLocal, dictionary_write_session

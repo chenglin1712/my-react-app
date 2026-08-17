@@ -91,6 +91,38 @@ def test_http_error_status_keeps_current_values_not_crash():
     assert quiz.TOTAL_QUESTIONS == 10
 
 
+def test_response_missing_field_leaves_all_globals_untouched():
+    """P4 review BE-10：原本逐欄位 `GLOBAL = data["key"]`，回應中途缺一個
+    欄位時，前面已經賦值的 global 會停在新值、後面的停在舊值，變成一份
+    「半新半舊」的設定。這裡驗證修正後是全有或全無：缺欄位時完全不套用，
+    連同一個回應裡「排在缺欄位之前」的欄位（total_questions）也不能被
+    套用。"""
+    payload = _fake_config_payload(total_questions=999, dq_alpha=0.99)
+    del payload["beta5"]  # 模擬 Django 端漏填/欄位交接期缺欄位
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = payload
+    with patch("fastAPI.routes.quiz.requests.get", return_value=mock_response):
+        quiz._refresh_irt_config_if_stale()  # 不應該丟例外
+
+    # total_questions 在 dataclass 欄位順序裡排在 beta5 之前，如果是逐欄位
+    # 賦值就會先套用成功，這裡要確認完全沒有套用，維持 fixture 重置後的
+    # 原始預設值。
+    assert quiz.TOTAL_QUESTIONS == 10
+    assert quiz.DQ_ALPHA == 0.45
+
+
+def test_response_wrong_type_leaves_all_globals_untouched():
+    payload = _fake_config_payload(alpha0="not-a-number")
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = payload
+    with patch("fastAPI.routes.quiz.requests.get", return_value=mock_response):
+        quiz._refresh_irt_config_if_stale()  # 不應該丟例外
+
+    assert quiz.ALPHA0 == 1.0
+
+
 def test_failed_fetch_still_updates_last_fetch_timestamp_to_avoid_hammering():
     # 失敗也要進入下一個 TTL 週期再試，不能讓每個請求都重新嘗試連線並等待逾時。
     import requests as requests_module

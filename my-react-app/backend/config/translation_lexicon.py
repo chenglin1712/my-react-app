@@ -1,5 +1,15 @@
 """族語翻譯功能的正規化／切詞／詞綴規則——純函式，不碰 DB、不碰 HTTP。
 
+原本放在 backend/fastAPI/routes/translation/，但整支檔案零框架依賴（只用
+re／unicodedata／dataclasses／typing），Django 端的
+adminapi/management/commands/rebuild_translation_attested_forms.py 也要用
+tokenize()／normalize_token()，原本得反過來 import FastAPI 的 route 層模組
+（見 P4 review BE-6）。搬到 backend/config 這個 Django/FastAPI 共用層，兩邊
+都改成從這裡 import，不再有服務互相依賴 route 層的問題。FastAPI 那邊
+（fastAPI/routes/translation/service.py／retrieve.py）用
+`from config import translation_lexicon as lexicon` 保留原本 `lexicon.xxx()`
+的呼叫寫法，這次搬移不改動任何函式簽名或行為。
+
 這個模組是整個翻譯功能「佐證檢核」機制的地基：LLM 對這五族語幾乎沒有可靠的
 內建知識，所以每一個它輸出的族語詞形都要能對回辭典資料查證。查證分兩邊：
 - SQL 端：backend/fastAPI/alembic/versions/86d389a704d0_add_translation_support.py

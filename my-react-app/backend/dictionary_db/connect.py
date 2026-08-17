@@ -3,9 +3,12 @@ from contextlib import contextmanager
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import QueuePool
+import logging
 import os
 
 from config.debug_flag import is_debug
+
+logger = logging.getLogger(__name__)
 
 # 替換為實際路徑，這裡假設在同一資料夾中
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -21,7 +24,32 @@ _DEBUG = is_debug()
 # 或分開 schema）；沒設定時退回沿用 Django 的 DATABASE_URL（兩者共用同一個
 # Postgres 執行個體是最簡單的起始拓樸）；兩者都沒設定才維持原本的 SQLite 檔案，
 # 本機開發、既有測試完全不受影響。
-_database_url = os.getenv("DICTIONARY_DATABASE_URL") or os.getenv("DATABASE_URL")
+_dictionary_database_url = os.getenv("DICTIONARY_DATABASE_URL")
+_django_database_url = os.getenv("DATABASE_URL")
+
+# REQUIRE_DICTIONARY_DATABASE_URL：選擇性的嚴格模式，只有明確開啟時才會在
+# 沒設定 DICTIONARY_DATABASE_URL 時直接 fail fast（P4 review BE-11）。預設
+# 不開，維持既有部署／既有測試的相容行為——沒有把握現在是否已經有正式環境
+# 依賴這組 fallback 共用同一個 Postgres，強制要求會讓那種部署直接啟動失敗；
+# 新部署或想收緊政策的環境可以自行開啟這個旗標。
+if not _dictionary_database_url and _django_database_url:
+    if os.getenv("REQUIRE_DICTIONARY_DATABASE_URL", "").lower() in ("1", "true", "yes"):
+        raise EnvironmentError(
+            "[dictionary_db.connect] REQUIRE_DICTIONARY_DATABASE_URL 已開啟，"
+            "但 DICTIONARY_DATABASE_URL 未設定。請明確設定這個環境變數指向辭典"
+            "資料庫的連線字串（可以跟 DATABASE_URL 指向同一個 Postgres 執行個體，"
+            "重點是要明確設定，不要依賴 fallback）。"
+        )
+    # 不記錄實際的 URL 內容（含帳密），只記錄「目前是哪種拓樸」這件事本身。
+    logger.warning(
+        "[dictionary_db.connect] DICTIONARY_DATABASE_URL 未設定，辭典資料庫目前"
+        "沿用 DATABASE_URL。這是支援的單資料庫拓樸，不是錯誤；但正式環境若需要"
+        "辭典資料庫有獨立的生命週期、權限或容量管理，請明確設定"
+        "DICTIONARY_DATABASE_URL。設定 REQUIRE_DICTIONARY_DATABASE_URL=true"
+        "可以讓這個狀況在啟動時直接失敗而不是只留一條 log。"
+    )
+
+_database_url = _dictionary_database_url or _django_database_url
 
 # Render/Heroku 這類平台慣例給的是 postgres://（不是 postgresql://）。
 # core/settings.py 那邊用 dj_database_url.parse() 讀，那個套件會自動把

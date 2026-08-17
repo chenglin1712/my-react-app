@@ -13,6 +13,13 @@ compare_audio.reference_urls 已經修好、有白名單＋禁止 redirect 的�
 網域白名單容易誤擋合法回應。改成只擋「明顯是內部/私有位址」這一類（RFC1918
 私有網段、loopback、link-local，含雲端環境常見的 metadata endpoint
 169.254.169.254），不限制網域本身，兩者互補而非取代彼此的用途。
+
+原本放在 backend/fastAPI/ 底下，但整支檔案零框架依賴（只用 ipaddress／
+socket／urllib.parse，assert_response_from_safe_peer() 是用 duck typing 吃一個
+有 .extensions 屬性的物件，沒有真的 import httpx），Django 端的
+adminapi/management/commands/migrate_dictionary_media.py 也要用這幾個函式，
+原本得反過來 import FastAPI 的內部模組（見 P4 review BE-7）。搬到
+backend/config 這個 Django/FastAPI 共用層，兩邊都改成從這裡 import。
 """
 import ipaddress
 import socket

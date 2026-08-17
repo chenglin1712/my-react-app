@@ -1,4 +1,4 @@
-"""測試 config/auth_flags.py 與 config/firebase_auth.py：這波稽核指出 DEBUG／
+"""測試 config/auth_flags.py 與 core/firebase_auth.py：這波稽核指出 DEBUG／
 AUTH_DEV_BYPASS 互鎖邏輯是全站認證最關鍵的一段判斷，卻沒有專屬測試檔案，只靠
 其他 app 的測試間接覆蓋到（等於「有沒有真的鎖住」從來沒被直接驗證過）。
 """
@@ -8,7 +8,7 @@ from django.http import JsonResponse
 from django.test import TestCase, override_settings
 
 from config.auth_flags import auth_dev_bypass
-from config.firebase_auth import require_role, verify_firebase_token
+from core.firebase_auth import require_role, verify_firebase_token
 from config.roles import ADMIN, EDITOR, OWNER, STAFF_ROLES
 from config.tribes import resolve_tribe_name
 
@@ -87,7 +87,7 @@ class _FakeRequest:
 
 
 class VerifyFirebaseTokenTest(TestCase):
-    """config/firebase_auth.py 的 verify_firebase_token：Django 端消費
+    """core/firebase_auth.py 的 verify_firebase_token：Django 端消費
     auth_dev_bypass() 之後的實際行為（django_settings.AUTH_DEV_BYPASS 是
     settings.py 載入當下就算好的值，用 override_settings 直接覆蓋來測）。
     """
@@ -116,7 +116,7 @@ class VerifyFirebaseTokenTest(TestCase):
 
     @override_settings(AUTH_DEV_BYPASS=False)
     def test_valid_token_returns_decoded_claims(self):
-        with patch("config.firebase_auth.ensure_firebase_initialized"):
+        with patch("core.firebase_auth.ensure_firebase_initialized"):
             with patch("firebase_admin.auth.verify_id_token", return_value={"uid": "real-user"}):
                 decoded, error = verify_firebase_token(_FakeRequest(auth_header="Bearer sometoken"))
         self.assertEqual(decoded, {"uid": "real-user"})
@@ -127,9 +127,9 @@ class VerifyFirebaseTokenTest(TestCase):
         # 單一使用者 token 過期／被撤銷是正常流量，不應該被記成 error log。
         import firebase_admin.auth as fa
 
-        with patch("config.firebase_auth.ensure_firebase_initialized"):
+        with patch("core.firebase_auth.ensure_firebase_initialized"):
             with patch("firebase_admin.auth.verify_id_token", side_effect=fa.ExpiredIdTokenError("expired", cause=None)):
-                with patch("config.firebase_auth.logger") as mock_logger:
+                with patch("core.firebase_auth.logger") as mock_logger:
                     decoded, error = verify_firebase_token(_FakeRequest(auth_header="Bearer badtoken"))
         self.assertIsNone(decoded)
         self.assertEqual(error.status_code, 401)
@@ -139,9 +139,9 @@ class VerifyFirebaseTokenTest(TestCase):
     def test_unexpected_exception_returns_401_and_logs(self):
         # 這是本輪修正的重點：非 InvalidIdTokenError 的例外（憑證抓取失敗等）
         # 代表驗證機制本身可能整個掛掉，必須被記錄下來才能讓 Sentry 告警。
-        with patch("config.firebase_auth.ensure_firebase_initialized"):
+        with patch("core.firebase_auth.ensure_firebase_initialized"):
             with patch("firebase_admin.auth.verify_id_token", side_effect=RuntimeError("boom")):
-                with patch("config.firebase_auth.logger") as mock_logger:
+                with patch("core.firebase_auth.logger") as mock_logger:
                     decoded, error = verify_firebase_token(_FakeRequest(auth_header="Bearer sometoken"))
         self.assertIsNone(decoded)
         self.assertEqual(error.status_code, 401)
@@ -150,10 +150,10 @@ class VerifyFirebaseTokenTest(TestCase):
     @override_settings(AUTH_DEV_BYPASS=False)
     def test_missing_service_account_returns_503_and_logs(self):
         with patch(
-            "config.firebase_auth.ensure_firebase_initialized",
+            "core.firebase_auth.ensure_firebase_initialized",
             side_effect=EnvironmentError("FIREBASE_SERVICE_ACCOUNT_PATH 未設定"),
         ):
-            with patch("config.firebase_auth.logger") as mock_logger:
+            with patch("core.firebase_auth.logger") as mock_logger:
                 decoded, error = verify_firebase_token(_FakeRequest(auth_header="Bearer sometoken"))
         self.assertIsNone(decoded)
         self.assertEqual(error.status_code, 503)
@@ -167,10 +167,10 @@ class VerifyFirebaseTokenTest(TestCase):
         # 這個子句時，因為 firebase_auth 這個名字（本該在 try 區塊內 import）根本還沒被
         # 賦值,直接讓 UnboundLocalError 往外拋，不會被任何 except 接住。
         with patch(
-            "config.firebase_auth.ensure_firebase_initialized",
+            "core.firebase_auth.ensure_firebase_initialized",
             side_effect=ValueError("Invalid certificate"),
         ):
-            with patch("config.firebase_auth.logger") as mock_logger:
+            with patch("core.firebase_auth.logger") as mock_logger:
                 decoded, error = verify_firebase_token(_FakeRequest(auth_header="Bearer sometoken"))
         self.assertIsNone(decoded)
         self.assertEqual(error.status_code, 503)
@@ -178,7 +178,7 @@ class VerifyFirebaseTokenTest(TestCase):
 
 
 class RequireRoleTest(TestCase):
-    """config/firebase_auth.py 的 require_role：後台管理系統每一支 API 都要靠
+    """core/firebase_auth.py 的 require_role：後台管理系統每一支 API 都要靠
     這個函式擋權限，所以特別驗證「沒登入」「登入但角色不夠」「角色剛好在清單內」
     「dev bypass 也一樣要吃角色限制」這四種情況分別回什麼。
     """
@@ -193,7 +193,7 @@ class RequireRoleTest(TestCase):
 
     @override_settings(AUTH_DEV_BYPASS=False)
     def test_role_in_allowed_list_passes_through_decoded_token(self):
-        with patch("config.firebase_auth.ensure_firebase_initialized"):
+        with patch("core.firebase_auth.ensure_firebase_initialized"):
             with patch("firebase_admin.auth.verify_id_token", return_value={"uid": "u1", "role": ADMIN}):
                 decoded, error = require_role(_FakeRequest(auth_header="Bearer t"), (OWNER, ADMIN))
         self.assertEqual(decoded, {"uid": "u1", "role": ADMIN})
@@ -201,7 +201,7 @@ class RequireRoleTest(TestCase):
 
     @override_settings(AUTH_DEV_BYPASS=False)
     def test_role_not_in_allowed_list_returns_403(self):
-        with patch("config.firebase_auth.ensure_firebase_initialized"):
+        with patch("core.firebase_auth.ensure_firebase_initialized"):
             with patch("firebase_admin.auth.verify_id_token", return_value={"uid": "u1", "role": EDITOR}):
                 decoded, error = require_role(_FakeRequest(auth_header="Bearer t"), (OWNER, ADMIN))
         self.assertIsNone(decoded)
@@ -212,7 +212,7 @@ class RequireRoleTest(TestCase):
         # 一般學習者帳號沒有 role claim，decoded.get("role") 會是 None，
         # 必須被擋在任何非空的 allowed_roles 清單外，不能因為「沒有這個 key」
         # 就意外通過 in 判斷。
-        with patch("config.firebase_auth.ensure_firebase_initialized"):
+        with patch("core.firebase_auth.ensure_firebase_initialized"):
             with patch("firebase_admin.auth.verify_id_token", return_value={"uid": "learner-1"}):
                 decoded, error = require_role(_FakeRequest(auth_header="Bearer t"), STAFF_ROLES)
         self.assertIsNone(decoded)

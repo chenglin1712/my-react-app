@@ -1,6 +1,6 @@
 """後台管理系統的角色定義。
 
-集中放在這裡讓 Django 端（config/firebase_auth.py）與未來的 FastAPI 端共用
+集中放在這裡讓 Django 端（core/firebase_auth.py）與未來的 FastAPI 端共用
 同一份角色字串，避免兩邊各自寫死一份、拼字或清單對不上時權限判斷悄悄失效。
 角色本身透過 Firebase custom claims 寫入 ID token（見規劃文件 §1.1），這裡
 只定義角色名稱常數與幾個常用的角色群組，不含任何驗證邏輯。

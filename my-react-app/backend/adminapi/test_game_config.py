@@ -14,7 +14,7 @@ from .models import AuditLog, GameConfig
 def _as_role(role):
     """跟 test_quizbank.py 的 _as_role 完全一樣。"""
     with override_settings(AUTH_DEV_BYPASS=False):
-        with patch("config.firebase_auth.ensure_firebase_initialized"):
+        with patch("core.firebase_auth.ensure_firebase_initialized"):
             decoded = {"uid": "test-uid"}
             if role is not None:
                 decoded["role"] = role

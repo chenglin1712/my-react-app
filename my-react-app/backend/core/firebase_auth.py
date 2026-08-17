@@ -8,6 +8,15 @@ _ensure_firebase/verify_firebase_token，crawler app 完全沒有這層防護。
 FastAPI 版本介面不同（Header 依賴注入），獨立實作於 backend/fastAPI/routes/auth.py，
 但 SDK 初始化本身（ensure_firebase_initialized）已經抽到 config/firebase_init.py
 共用，兩邊只有各自把「金鑰沒設定」的例外轉成自己框架慣用的錯誤回應這段不同。
+
+原本放在 backend/config/ 底下，但這支檔案從頭到尾都是 Django-only（用
+django.conf.settings／django.http.JsonResponse／request.META），跟
+config/firebase_init.py 那層真正框架無關的 SDK 初始化性質不同——config/
+定位是 Django/FastAPI 共用層，這支檔案放在那裡容易讓人誤以為兩邊都能用
+（見 P4 review BE-9）。搬到 backend/core/（Django 專案層，AIModel／
+CrosswordPuzzle／crawler／adminapi 這些 Django app 本來就已經依賴 core 的
+其他東西，不會像搬進 adminapi/ 那樣製造出新的、跟 BE-8 同一類的隱性耦合）。
+這次搬移沒有拆分任何邏輯，函式簽名與行為完全不變。
 """
 import logging
 import os

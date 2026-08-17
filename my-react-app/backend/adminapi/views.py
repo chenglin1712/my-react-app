@@ -29,7 +29,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
-from config.firebase_auth import require_role
+from core.firebase_auth import require_role
 from config.roles import ACCOUNT_MANAGERS, CONTENT_EDITORS, PUBLISHERS, STAFF_ROLES
 from crawler.views import apply_exam_schedule_overrides, get_exam_schedule_data
 
@@ -88,7 +88,7 @@ def _locked(pk):
 
 # csrf_exempt 在這裡不是「豁免掉一項保護」，而是「這項保護原本就不適用」，
 # 永久生效，不隨 DEBUG 變動：這是無狀態的 Bearer-token JSON API（見
-# config/firebase_auth.py 的 require_role），前端從不帶 CSRF cookie，CSRF
+# core/firebase_auth.py 的 require_role），前端從不帶 CSRF cookie，CSRF
 # 保護針對的是瀏覽器自動夾帶 session cookie 的情境，跟這裡的認證機制無關
 # （比照 AIModel/views.py、CrosswordPuzzle/views.py 同樣的 Bearer-token 端點）。
 

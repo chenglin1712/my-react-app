@@ -30,7 +30,7 @@ _AMIS = TRIBES[1]
 @contextmanager
 def _as_role(role):
     with override_settings(AUTH_DEV_BYPASS=False):
-        with patch("config.firebase_auth.ensure_firebase_initialized"):
+        with patch("core.firebase_auth.ensure_firebase_initialized"):
             decoded = {"uid": "test-uid"}
             if role is not None:
                 decoded["role"] = role

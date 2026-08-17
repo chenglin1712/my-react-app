@@ -16,7 +16,7 @@ from config.audio_source import get_ilrdf_audio_api
 from config.media_source import get_media_source_mode
 from fastAPI import rate_limit_config
 from fastAPI.rate_limit import limiter
-from fastAPI.url_safety import UnsafeConnectionError, assert_response_from_safe_peer, is_safe_redirect_target
+from config.url_safety import UnsafeConnectionError, assert_response_from_safe_peer, is_safe_redirect_target
 
 from .schemas import SentenceAudioRequest
 from .search import _tribe_id_subquery

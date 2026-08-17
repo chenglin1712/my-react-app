@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from . import lexicon
+from config import translation_lexicon as lexicon
 
 # 跟 alembic migration 裡 _normalize_expr() 產生的字串逐字相同——SQL 端用來
 # 建運算式索引，這裡用同一個運算式當查詢條件，Planner 才可能用上索引；

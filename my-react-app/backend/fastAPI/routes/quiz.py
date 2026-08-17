@@ -18,7 +18,7 @@ from config.audio_source import get_ilrdf_audio_api
 from config.media_source import get_media_source_mode
 from fastAPI import game_config, rate_limit_config
 from fastAPI.rate_limit import limiter
-from fastAPI.url_safety import UnsafeConnectionError, assert_response_from_safe_peer, is_safe_redirect_target
+from config.url_safety import UnsafeConnectionError, assert_response_from_safe_peer, is_safe_redirect_target
 from .keyed_cache import KeyedCache
 
 
@@ -156,13 +156,66 @@ _irt_config_last_fetch = 0.0
 _irt_config_lock = threading.Lock()
 
 
+@dataclass(frozen=True)
+class _IrtConfigSnapshot:
+    """驗證過型別、欄位齊全的 IRT 設定快照（P4 review BE-10）。原本直接對
+    module global 逐欄位 `GLOBAL = data["key"]`：Django 回應如果中途缺一個
+    欄位（例如後台漏填、部署時新舊欄位交接期），KeyError 只會中斷賦值序列
+    ——前幾個 global 已經套用新值，後面幾個還停在舊值，變成一份「半新半舊」
+    拼裝出來的設定，且外層 except Exception 只記 log、完全看不出這個更細微
+    的部分失敗狀態。改成先解析成這個 immutable dataclass，任何欄位缺漏或
+    型別轉換失敗都在這裡整包拋例外，呼叫端要嘛拿到完整可用的新設定、要嘛
+    拿到例外，不會有第三種狀態。"""
+    alpha0: float
+    beta0: float
+    default_guess: float
+    type_aq_word_translate: float
+    type_aq_word_match: float
+    type_aq_sentence_fill: float
+    type_aq_sentence_order: float
+    learning_rate: float
+    dq_alpha: float
+    dq_beta: float
+    dq_gamma: float
+    beta1: float
+    beta2: float
+    beta3: float
+    beta4: float
+    beta5: float
+    total_questions: int
+
+
+def _parse_irt_config_snapshot(data: dict) -> _IrtConfigSnapshot:
+    return _IrtConfigSnapshot(
+        alpha0=float(data["alpha0"]),
+        beta0=float(data["beta0"]),
+        default_guess=float(data["default_guess"]),
+        type_aq_word_translate=float(data["type_aq_word_translate"]),
+        type_aq_word_match=float(data["type_aq_word_match"]),
+        type_aq_sentence_fill=float(data["type_aq_sentence_fill"]),
+        type_aq_sentence_order=float(data["type_aq_sentence_order"]),
+        learning_rate=float(data["learning_rate"]),
+        dq_alpha=float(data["dq_alpha"]),
+        dq_beta=float(data["dq_beta"]),
+        dq_gamma=float(data["dq_gamma"]),
+        beta1=float(data["beta1"]),
+        beta2=float(data["beta2"]),
+        beta3=float(data["beta3"]),
+        beta4=float(data["beta4"]),
+        beta5=float(data["beta5"]),
+        total_questions=int(data["total_questions"]),
+    )
+
+
 def _refresh_irt_config_if_stale() -> None:
     """從 Django 讀目前的 IRT 參數，更新這個模組的全域變數。TTL 內重複呼叫
     是no-op（快速的時間比較，不會每次都真的發請求）。Django 端讀取失敗
-    （服務還沒啟動、網路問題等）時記一筆警告並保留目前的值不變——可能是
-    上次成功抓到的值，也可能是上面寫死的預設值，不讓 quiz 功能因為 Django
-    暫時連不上就整個壞掉，這跟 crawler 那邊「外部來源掛了就降級」是同一種
-    設計精神。
+    （服務還沒啟動、網路問題、回應缺欄位或型別不對等）時記一筆警告並保留
+    目前的值完全不變——可能是上次成功抓到的值，也可能是上面寫死的預設值，
+    不讓 quiz 功能因為 Django 暫時連不上就整個壞掉，這跟 crawler 那邊
+    「外部來源掛了就降級」是同一種設計精神。「完全不變」是重點：解析與
+    套用分成兩步，只有整份回應都成功解析成 _IrtConfigSnapshot 之後才會
+    真的寫回 module global，避免部分欄位新、部分欄位舊的中間狀態。
 
     這兩個函式都是同步 def（FastAPI 會丟到 thread pool 執行，不是掛在事件
     迴圈上），這裡直接用 requests 這種同步呼叫沒有阻塞事件迴圈的疑慮。
@@ -181,29 +234,31 @@ def _refresh_irt_config_if_stale() -> None:
         try:
             resp = requests.get(_IRT_CONFIG_URL, timeout=5)
             resp.raise_for_status()
-            data = resp.json()
-
-            ALPHA0 = data["alpha0"]
-            BETA0 = data["beta0"]
-            DEFAULT_GUESS = data["default_guess"]
-            TYPE_AQ = {
-                "word-translate": data["type_aq_word_translate"],
-                "word-match": data["type_aq_word_match"],
-                "sentence-fill": data["type_aq_sentence_fill"],
-                "sentence-order": data["type_aq_sentence_order"],
-            }
-            LEARNING_RATE = data["learning_rate"]
-            DQ_ALPHA = data["dq_alpha"]
-            DQ_BETA = data["dq_beta"]
-            DQ_GAMMA = data["dq_gamma"]
-            BETA1 = data["beta1"]
-            BETA2 = data["beta2"]
-            BETA3 = data["beta3"]
-            BETA4 = data["beta4"]
-            BETA5 = data["beta5"]
-            TOTAL_QUESTIONS = data["total_questions"]
+            snapshot = _parse_irt_config_snapshot(resp.json())
         except Exception:
             _logging.warning("[quiz] 無法從後台讀取 IRT 參數，沿用目前值", exc_info=True)
+        else:
+            # 走到這裡代表整份回應已經完整解析、驗證過型別——一次性套用，
+            # 不會有套用到一半的中間狀態。
+            ALPHA0 = snapshot.alpha0
+            BETA0 = snapshot.beta0
+            DEFAULT_GUESS = snapshot.default_guess
+            TYPE_AQ = {
+                "word-translate": snapshot.type_aq_word_translate,
+                "word-match": snapshot.type_aq_word_match,
+                "sentence-fill": snapshot.type_aq_sentence_fill,
+                "sentence-order": snapshot.type_aq_sentence_order,
+            }
+            LEARNING_RATE = snapshot.learning_rate
+            DQ_ALPHA = snapshot.dq_alpha
+            DQ_BETA = snapshot.dq_beta
+            DQ_GAMMA = snapshot.dq_gamma
+            BETA1 = snapshot.beta1
+            BETA2 = snapshot.beta2
+            BETA3 = snapshot.beta3
+            BETA4 = snapshot.beta4
+            BETA5 = snapshot.beta5
+            TOTAL_QUESTIONS = snapshot.total_questions
         finally:
             # 失敗也更新時間戳記，避免 Django 持續連不上時，每一個請求都
             # 重新嘗試連線並等待逾時——跟成功時一樣進入下一個 TTL 週期再試。

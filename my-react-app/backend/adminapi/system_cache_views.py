@@ -3,7 +3,7 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
-from config.firebase_auth import require_role
+from core.firebase_auth import require_role
 from config.roles import PUBLISHERS, STAFF_ROLES
 
 from ._shared import rate_limited_response as _rate_limited_response, write_audit_log as _write_audit_log

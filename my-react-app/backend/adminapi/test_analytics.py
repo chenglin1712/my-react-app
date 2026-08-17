@@ -32,7 +32,7 @@ def _with_uid(uid):
     因為 try_verify_firebase_token 不檢查角色，只要 token 有效就回傳 uid）。
     """
     with override_settings(AUTH_DEV_BYPASS=False):
-        with patch("config.firebase_auth.ensure_firebase_initialized"):
+        with patch("core.firebase_auth.ensure_firebase_initialized"):
             with patch("firebase_admin.auth.verify_id_token", return_value={"uid": uid}):
                 yield {"HTTP_AUTHORIZATION": "Bearer test-token"}
 
@@ -40,7 +40,7 @@ def _with_uid(uid):
 @contextmanager
 def _as_role(role):
     with override_settings(AUTH_DEV_BYPASS=False):
-        with patch("config.firebase_auth.ensure_firebase_initialized"):
+        with patch("core.firebase_auth.ensure_firebase_initialized"):
             decoded = {"uid": "test-uid"}
             if role is not None:
                 decoded["role"] = role

@@ -8,11 +8,14 @@ from django.core.cache import cache
 from django.http import JsonResponse
 from django_ratelimit.core import is_ratelimited
 from bs4 import BeautifulSoup
-from config.firebase_auth import verify_firebase_token
+from core.firebase_auth import verify_firebase_token
 from config.tribes import TRIBE_IDS, TRIBE_MAP
-from adminapi.models import (
-    ExamScheduleCrawlStatus, ExamScheduleOverride, FeatureFlag, QuizChoiceItem, QuizClozePassage,
-    QuizSituationItem, QuizTrueFalseItem, QuizVocabItem,
+from adminapi.exam_schedule_service import (
+    get_active_schedule_overrides, record_crawl_failure, record_crawl_success,
+)
+from adminapi.quizbank_service import (
+    get_published_choice_items, get_published_cloze_passages, get_published_situation_items,
+    get_published_true_false_items, get_published_vocab_items, is_quiz_enabled,
 )
 from adminapi.rate_limits import get_configured_rate
 
@@ -59,9 +62,7 @@ def _pick_matching_vocab_from_db(tribe):
     不能被學生抽到，這是這次把題庫搬進資料庫、接上審定流程的核心目的。"""
     picked = []
     for category, quota in MATCHING_CATEGORY_QUOTA.items():
-        pool = list(QuizVocabItem.objects.filter(
-            tribe=tribe, category=category, status=QuizVocabItem.STATUS_PUBLISHED,
-        ))
+        pool = get_published_vocab_items(tribe, category)
         quota = min(quota, len(pool))
         picked.extend(random.sample(pool, quota))
     random.shuffle(picked)
@@ -120,7 +121,7 @@ def build_cloze_test_from_db(tribe):
     """組出高級「閱讀填空」的 part 資料，改讀資料庫（取代原本各族語
     *_bank.py 的 build_cloze_test()），只從 status=published 的
     QuizClozePassage 抽，選題演算法完全比照原本邏輯不變。"""
-    passages = list(QuizClozePassage.objects.filter(tribe=tribe, status=QuizClozePassage.STATUS_PUBLISHED))
+    passages = get_published_cloze_passages(tribe)
     k = min(CLOZE_PASSAGE_COUNT, len(passages))
     picked_passages = random.sample(passages, k)
 
@@ -173,7 +174,7 @@ def build_true_false_test_from_db(tribe):
     """組出初級「是非題」的 part 資料，改讀資料庫（取代原本 get_quiz_data
     對 level=1 即時代理外部 API 的做法），只從 status=published 的
     QuizTrueFalseItem 抽。"""
-    pool = list(QuizTrueFalseItem.objects.filter(tribe=tribe, status=QuizTrueFalseItem.STATUS_PUBLISHED))
+    pool = get_published_true_false_items(tribe)
     k = min(LEVEL1_QUESTION_COUNT, len(pool))
     picked = random.sample(pool, k)
 
@@ -199,7 +200,7 @@ def build_choice_test_from_db(tribe):
     """組出中級「三選一圖片選擇題」的 part 資料，改讀資料庫（取代原本
     get_quiz_data 對 level=2 即時代理外部 API 的做法），只從
     status=published 的 QuizChoiceItem 抽。"""
-    pool = list(QuizChoiceItem.objects.filter(tribe=tribe, status=QuizChoiceItem.STATUS_PUBLISHED))
+    pool = get_published_choice_items(tribe)
     k = min(LEVEL2_QUESTION_COUNT, len(pool))
     picked = random.sample(pool, k)
 
@@ -242,7 +243,7 @@ def build_situation_test_from_db(tribe):
     情況。跟 _quiz_disabled_response() 的 403 是不同性質：那是管理者
     主動關閉，這裡是題庫本身還沒有內容，兩者不該用同一種「拒絕靜默」
     邏輯處理。"""
-    pool = list(QuizSituationItem.objects.filter(tribe=tribe, status=QuizSituationItem.STATUS_PUBLISHED))
+    pool = get_published_situation_items(tribe)
     k = min(SITUATION_QUESTION_COUNT, len(pool))
     picked = random.sample(pool, k)
 
@@ -270,8 +271,7 @@ def _quiz_disabled_response(tribe):
     前端明確顯示「這個族語的測驗目前暫停開放」而不是誤導成系統故障。
     找不到對應 FeatureFlag 紀錄時視為未關閉（維持現況行為，見
     seed_feature_flags 管理指令的說明）。"""
-    flag = FeatureFlag.objects.filter(key=f"quiz_enabled_{tribe}").first()
-    if flag is not None and not flag.enabled:
+    if not is_quiz_enabled(tribe):
         return JsonResponse({"detail": "這個族語的測驗目前暫停開放，請稍後再試。"}, status=403)
     return None
 
@@ -628,13 +628,12 @@ def get_exam_schedule_data(force_refresh=False):
             return cached
 
     data, error = _scrape_exam_schedule(force_refresh=force_refresh)
-    status = ExamScheduleCrawlStatus.load()
     if data is None:
         logger.error("get_exam_schedule 爬取失敗: %s", error)
-        status.record_failure(error)
+        record_crawl_failure(error)
         return None
 
-    status.record_success()
+    record_crawl_success()
     cache.set(EXAM_SCHEDULE_CACHE_KEY, data, EXAM_SCHEDULE_CACHE_TTL)
     return data
 
@@ -646,7 +645,7 @@ def apply_exam_schedule_overrides(phases):
     """
     merged = list(phases)
     index_by_phase = {p["phase"]: i for i, p in enumerate(merged)}
-    for override in ExamScheduleOverride.objects.filter(is_active=True):
+    for override in get_active_schedule_overrides():
         entry = {
             "phase": override.phase,
             "label": override.label or override.phase,

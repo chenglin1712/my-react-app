@@ -8,7 +8,7 @@ from django.db import transaction
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
-from config.firebase_auth import require_role
+from core.firebase_auth import require_role
 from config.roles import PUBLISHERS, STAFF_ROLES
 
 from ._shared import (

@@ -9,7 +9,8 @@ Tier A/B/C/D。不需要真的連 PostgreSQL，CI 環境沒有 pg_trgm 也能跑
 """
 from unittest.mock import patch
 
-from fastAPI.routes.translation import lexicon, retrieve as R
+from config import translation_lexicon as lexicon
+from fastAPI.routes.translation import retrieve as R
 
 _TRIBE_ID = "fake-tribe-id"
 

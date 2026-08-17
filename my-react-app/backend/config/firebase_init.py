@@ -1,6 +1,6 @@
 """Firebase Admin SDK 初始化，Django 與 FastAPI 共用。
 
-原本 config/firebase_auth.py（Django）與 fastAPI/routes/auth.py（FastAPI）
+原本 core/firebase_auth.py（Django）與 fastAPI/routes/auth.py（FastAPI）
 各自維護一份幾乎相同的 _ensure_firebase，唯一差異是服務帳戶金鑰沒設定時
 拋出的例外型別（Django 版拋 EnvironmentError、FastAPI 版拋 HTTPException）——
 實際初始化 firebase_admin SDK 的邏輯完全一樣。這裡統一成一份，只拋最原始、

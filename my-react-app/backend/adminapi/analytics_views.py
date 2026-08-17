@@ -24,7 +24,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
-from config.firebase_auth import require_role, try_verify_firebase_token
+from core.firebase_auth import require_role, try_verify_firebase_token
 from config.roles import STAFF_ROLES
 from config.tribes import TRIBE_IDS, TRIBE_MAP
 

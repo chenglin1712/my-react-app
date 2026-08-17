@@ -19,7 +19,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
-from config.firebase_auth import require_role
+from core.firebase_auth import require_role
 from config.roles import CONTENT_EDITORS, STAFF_ROLES
 
 from ._shared import (

@@ -2,7 +2,7 @@
 的 tayal_chat／review_tayal_chat 兩個 AI 對話端點在用），族語翻譯功能
 (backend/fastAPI/routes/translation/) 需要在 FastAPI process 裡呼叫同一個
 LLM，於是把它搬到這個兩邊都能 import 的共用套件（比照 config/tribes.py／
-config/firebase_auth.py 的既有模式)。
+core/firebase_auth.py 的既有模式)。
 
 AIModel/views.py 保留同名的 _get_client()，內容改成呼叫這裡的
 get_llm_client()，行為完全不變——這樣 AIModel/tests.py 既有的

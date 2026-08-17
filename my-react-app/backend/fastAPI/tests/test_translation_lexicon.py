@@ -1,12 +1,16 @@
-"""fastAPI.routes.translation.lexicon 的純函式測試——正規化、切詞、詞綴規則
+"""config.translation_lexicon 的純函式測試——正規化、切詞、詞綴規則
 過濾、剝除候選、四層分類。這個模組不碰 DB，所有測試都不需要任何 fixture。
+模組原本放在 fastAPI/routes/translation/ 底下，因為零框架依賴且 Django 端
+（rebuild_translation_attested_forms 指令）也要用，已搬到 backend/config
+共用層（見 P4 review BE-6），測試檔案留在這裡沒有跟著搬，因為測的仍然是
+翻譯功能會用到的行為。
 
 正規化規則（normalize_token 統一 ʼ/ʾ 兩種變音符號撇號為 ASCII '、移除 ^）
 已用全庫 30,684 筆 words.name 對照 SQL 端運算式索引做過交叉驗證（0 筆不
 一致，見 alembic/versions/86d389a704d0_add_translation_support.py），這裡
 只測代表性案例與邊界情況，不重複那個全量驗證。
 """
-from fastAPI.routes.translation import lexicon
+from config import translation_lexicon as lexicon
 
 
 class TestNormalizeToken:
