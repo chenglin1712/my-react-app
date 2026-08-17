@@ -10,11 +10,14 @@ views.py／quizbank_views.py／revisions.py 三邊都改成從這裡 import，
 views.py 保留原本的名稱重新 export，外部既有的 `from .views import X`
 不用改。
 """
+import functools
 import json
 import logging
 
 from django.http import JsonResponse
 from django_ratelimit.core import is_ratelimited
+
+from core.firebase_auth import require_role
 
 from .models import AuditLog
 from .rate_limits import get_configured_rate
@@ -101,6 +104,54 @@ def safe_write_audit_log(*args, **kwargs):
         write_audit_log(*args, **kwargs)
     except Exception:
         logger.exception("P3 稽核紀錄寫入失敗（主要操作已完成，不影響呼叫端回應結果）")
+
+
+def guarded_action(method, role, rate_limit=None):
+    """view function 開頭幾乎每次都重複的「method 檢查 → require_role →
+    （可選）限流」三件事，抽成一個 decorator（P4 review BE-27：原本
+    views.py／dictionary_views.py／quizbank_views.py／user_views.py／
+    dictionary_import_views.py 每支單一動作的 view 都各自手寫這三行）。
+
+    刻意只抽這三件完全機械化、逐字重複的檢查，不動 JSON 解析／serializer
+    驗證／狀態轉移這些真正因內容型別而異的邏輯——那些留在各自的 view
+    body 裡，不同內容類型的工作流程細節（哪些欄位可以改、狀態機轉換規則）
+    本來就不該被一個通用框架吃掉（見 codex 對這個 BE-27 修正的建議：先做
+    「這三件事」這種純粹重複的原子操作，不要一次跳到「approve/reject/
+    withdraw 通用框架」那種更大的抽象——各內容類型在交易邊界/併發保護上
+    的細節往往不一樣，勉強套同一個框架反而會抹平這些必要的差異）。
+
+    method：這個 view 只接受的單一 HTTP method（多 method 分派的 view，
+    例如 GET 走列表、POST 走建立，繼續維持原本「外層 dispatcher 函式 if
+    request.method == ... 各自呼叫對應內層函式」的寫法，只在內層單一
+    method 的函式套用這個 decorator）。
+    role：傳給 require_role() 的角色集合。
+    rate_limit：None 表示這個 view 不需要限流；否則傳
+    (group, rate) 或 (group, rate, method) tuple，對應
+    rate_limited_response() 的參數（method 預設 "POST"，GET 端點需要的話
+    要自己傳 "GET"）。
+
+    包好之後的 view 收到的第二個參數固定是 require_role() 解出來的
+    decoded token（不是原本各自在函式內部才呼叫 require_role() 拿到的那個
+    區域變數），其餘位置參數（例如 pk／uid／phase 這些 URL 帶的值）原封
+    不動照樣傳進去。
+    """
+    def decorator(view_func):
+        @functools.wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            if request.method != method:
+                return JsonResponse({"detail": "Method not allowed"}, status=405)
+            decoded, err_resp = require_role(request, role)
+            if err_resp:
+                return err_resp
+            if rate_limit is not None:
+                group, rate, *rest = rate_limit
+                limit_method = rest[0] if rest else "POST"
+                limited_resp = rate_limited_response(request, decoded, group=group, rate=rate, method=limit_method)
+                if limited_resp:
+                    return limited_resp
+            return view_func(request, decoded, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 def invalid_transition(current_status, action):

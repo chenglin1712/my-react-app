@@ -12,6 +12,16 @@ Announcement 專屬寫死的流程改寫成可以傳入 model／serializer 的�
 Announcement 用的 PUBLISHERS（owner/admin）——這正是 config/roles.py 定義
 CONTENT_APPROVERS 這個角色群組的目的：reviewer（族語老師）能核准辭典／
 題庫這類「限內容」的審定，但不能核准公告這類一般內容。
+
+_shared.guarded_action() decorator（P4 review BE-27）在這個檔案裡刻意
+只用在 quiz_source_config_*／_update_irt_config 這幾支參數固定的獨立
+view——_list_content／_create_content 等給 _make_content_views() 用的
+通用函式，rate-limit 的 group 名稱是 f"{target_type}_create" 這種依呼叫端
+target_type 動態組出來的字串，decorator 目前的設計是在「定義當下」就固定
+method/role/rate_limit，沒辦法接受要等到呼叫當下才知道的動態值；而且這幾支
+函式本來就已經透過 _make_content_views() 這個工廠函式，讓 5 種內容類型
+共用同一份 method／角色／限流／狀態轉移邏輯，不是各自重複一份——工廠函式
+本身就是 BE-27 想要的效果，不需要再疊一層 decorator。
 """
 from django.db import transaction
 from django.http import JsonResponse
@@ -23,6 +33,7 @@ from core.firebase_auth import require_role
 from config.roles import CONTENT_APPROVERS, CONTENT_EDITORS, PUBLISHERS, STAFF_ROLES
 
 from ._shared import (
+    guarded_action,
     invalid_transition as _invalid_transition,
     ip_rate_limited_response as _ip_rate_limited_response,
     parse_json_body as _parse_json_body,
@@ -416,30 +427,18 @@ quiz_choice_views = _make_content_views(
 # ---------------------------------------------------------------------------
 
 @csrf_exempt
-def quiz_source_config_list(request):
+@guarded_action(method="GET", role=STAFF_ROLES)
+def quiz_source_config_list(request, decoded):
     """5 個族語的外部題源設定一次全部回傳，沒有 create/delete——族語清單
     本身由 config/tribes.py 固定，不是後台可以新增/刪除的東西，只能改
     dialect_id／display_name（見 quiz_source_config_detail）。"""
-    if request.method != "GET":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, STAFF_ROLES)
-    if err_resp:
-        return err_resp
     items = QuizSourceConfig.objects.all()
     return JsonResponse({"results": QuizSourceConfigSerializer(items, many=True).data})
 
 
 @csrf_exempt
-def quiz_source_config_detail(request, tribe):
-    if request.method != "PATCH":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, CONTENT_EDITORS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="quiz_source_config_update", rate="30/m")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="PATCH", role=CONTENT_EDITORS, rate_limit=("quiz_source_config_update", "30/m"))
+def quiz_source_config_detail(request, decoded, tribe):
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -475,17 +474,11 @@ def irt_config_admin(request):
     return JsonResponse({"detail": "Method not allowed"}, status=405)
 
 
-def _update_irt_config(request):
+@guarded_action(method="PATCH", role=PUBLISHERS, rate_limit=("irt_config_update", "30/m"))
+def _update_irt_config(request, decoded):
     """IRT 參數會直接影響 FastAPI 端即時算分行為（見 models.py 的 IrtConfig
     說明），比照 HomepageConfig 的 PATCH 限定 PUBLISHERS（owner/admin）——
     這是系統調校層級的變更，不是一般內容編輯，reviewer 不需要能動這裡。"""
-    decoded, err_resp = require_role(request, PUBLISHERS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="irt_config_update", rate="30/m")
-    if limited_resp:
-        return limited_resp
-
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp

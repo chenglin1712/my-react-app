@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Index, func
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Index, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 from dictionary_db.connect import Base
 
@@ -150,11 +150,21 @@ class GrammarRuleAffix(Base):
 
 
 class GrammarExampleWord(Base):
-    """grammar_example ↔ words 多對多 junction table"""
+    """grammar_example ↔ words 多對多 junction table。word_id 是複合主鍵的
+    一部分（本來就不可為 NULL），刻意不設 ondelete=CASCADE——
+    adminapi/dictionary_write/word_service.py 的 delete_word_tree() 早就會
+    在 unlink_references=True 時明確刪除引用它的列、或還有引用又沒有
+    unlink_references 時直接拒絕刪除（見該函式），這裡的 FK 只是把這個
+    既有的應用層不變量也做成資料庫層的硬保證（P4 review BE-22），不是新增
+    行為（見 9e468bdaf95e migration 的完整說明）。"""
     __tablename__ = "grammar_example_word"
 
     example_id = Column(Integer, ForeignKey("grammar_example.id", ondelete="CASCADE"), primary_key=True)
-    word_id    = Column(String, primary_key=True)  # 對應 words.id（TEXT）
+    word_id    = Column(
+        String,
+        ForeignKey("words.id", name="fk_grammar_example_word_word_id_words"),
+        primary_key=True,
+    )
 
 
 # ----------------------------------------------------------------------------
@@ -172,8 +182,15 @@ class Source(Base):
 
 
 class WordSource(Base):
-    """words ↔ source 多對多 junction table"""
+    """words ↔ source 多對多 junction table。(word_id, source_id) 加 unique
+    constraint（P4 review BE-21）：應用層的 _sync_id_junction()（見
+    dictionary_write/tree_reconcile.py）本來就會去重，這裡把這個不變量也
+    做成資料庫層的硬保證，避免並行寫入、批次匯入或未經該 service 的腳本
+    悄悄留下重複配對（見 9e468bdaf95e migration 的完整說明）。"""
     __tablename__ = "word_source"
+    __table_args__ = (
+        UniqueConstraint("word_id", "source_id", name="uq_word_source_word_id_source_id"),
+    )
 
     id         = Column(Integer, primary_key=True, autoincrement=True)
     word_id    = Column(String, ForeignKey("words.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -218,8 +235,16 @@ class Category(Base):
 
 
 class WordExplanationCategory(Base):
-    """word_explanation ↔ category 多對多 junction table"""
+    """word_explanation ↔ category 多對多 junction table。(explanation_id,
+    category_id) 加 unique constraint，理由同 WordSource（見 P4 review
+    BE-21）。"""
     __tablename__ = "word_explanation_category"
+    __table_args__ = (
+        UniqueConstraint(
+            "explanation_id", "category_id",
+            name="uq_word_explanation_category_explanation_id_category_id",
+        ),
+    )
 
     id             = Column(Integer, primary_key=True, autoincrement=True)
     explanation_id = Column(Integer, ForeignKey("word_explanation.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -235,8 +260,16 @@ class PartOfSpeech(Base):
 
 
 class WordExplanationPos(Base):
-    """word_explanation ↔ part_of_speech 多對多 junction table"""
+    """word_explanation ↔ part_of_speech 多對多 junction table。
+    (explanation_id, pos_id) 加 unique constraint，理由同 WordSource
+    （見 P4 review BE-21）。"""
     __tablename__ = "word_explanation_pos"
+    __table_args__ = (
+        UniqueConstraint(
+            "explanation_id", "pos_id",
+            name="uq_word_explanation_pos_explanation_id_pos_id",
+        ),
+    )
 
     id             = Column(Integer, primary_key=True, autoincrement=True)
     explanation_id = Column(Integer, ForeignKey("word_explanation.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -252,8 +285,16 @@ class Focus(Base):
 
 
 class WordExplanationFocus(Base):
-    """word_explanation ↔ focus 多對多 junction table"""
+    """word_explanation ↔ focus 多對多 junction table。(explanation_id,
+    focus_id) 加 unique constraint，理由同 WordSource（見 P4 review
+    BE-21）。"""
     __tablename__ = "word_explanation_focus"
+    __table_args__ = (
+        UniqueConstraint(
+            "explanation_id", "focus_id",
+            name="uq_word_explanation_focus_explanation_id_focus_id",
+        ),
+    )
 
     id             = Column(Integer, primary_key=True, autoincrement=True)
     explanation_id = Column(Integer, ForeignKey("word_explanation.id", ondelete="CASCADE"), nullable=False, index=True)

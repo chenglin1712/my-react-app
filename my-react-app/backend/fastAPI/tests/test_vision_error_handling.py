@@ -1,8 +1,15 @@
-"""測試 fastAPI/routes/vision.py 的 analyze_image 例外處理（稽核修正第 2 項）：
-原本結尾的 except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+"""測試 fastAPI/routes/vision.py 的 analyze_image 例外處理（稽核修正第 2 項，
+P4 review BE-28 之後更新）：原本結尾的
+`except Exception as e: raise HTTPException(status_code=500, detail=str(e))`
 把原始例外訊息直接回給前端（可能洩漏 Google Vision 回應內容／內部細節），
-而且完全沒有記 log。跟同一輪稽核的 search.py／grammar.py／audio_proxy.py
-同一套做法：只記 log，回給前端的是通用訊息。
+而且完全沒有記 log。
+
+BE-28 把這段「log + 回通用訊息」的收尾從 vision.py 本身搬到 main.py 註冊的
+全域 Exception handler（見 main.py 的 `_unhandled_exception_handler`）——
+analyze_image 現在不再自己攔截這個例外，讓它往外傳到全域 handler。這裡改
+用 `raise_server_exceptions=False` 的 TestClient（否則 Starlette 的
+ServerErrorMiddleware 送出回應後還是會把原始例外往外重新拋出，讓測試本身
+炸掉而不是能對回應內容斷言），並改為監看 main.py 的 `logger.exception`。
 """
 import io
 from unittest.mock import AsyncMock, patch
@@ -11,9 +18,9 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
+from fastAPI import main as main_module
 from fastAPI.main import app
 from fastAPI.routes import auth as auth_module
-from fastAPI.routes import vision as vision_module
 
 
 async def _fake_auth():
@@ -35,18 +42,20 @@ def _fake_png_bytes() -> bytes:
 def client():
     app.dependency_overrides[auth_module.verify_firebase_token] = _fake_auth
     try:
-        with TestClient(app) as test_client:
+        with TestClient(app, raise_server_exceptions=False) as test_client:
             yield test_client
     finally:
         app.dependency_overrides.clear()
 
 
 def test_analyze_image_masks_internal_exception_and_logs(client, monkeypatch):
+    from fastAPI.routes import vision as vision_module
+
     monkeypatch.setattr(vision_module, "CLOUD_API_URL", "https://vision.example.com/?key=")
     monkeypatch.setattr(vision_module, "CLOUD_API_KEY", "dummy-key")
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post, \
-         patch.object(vision_module._logger, "exception") as mock_log:
+         patch.object(main_module, "logger") as mock_logger:
         mock_post.side_effect = RuntimeError("internal detail: /secret/path leaked from google")
 
         response = client.post(
@@ -58,5 +67,5 @@ def test_analyze_image_masks_internal_exception_and_logs(client, monkeypatch):
     assert response.json()["detail"] == "伺服器發生錯誤，請稍後再試"
     assert "internal detail" not in response.text
     assert "/secret/path" not in response.text
-    # 原本這個 except 區塊完全沒有記 log；確認例外現在確實有被記錄下來。
-    mock_log.assert_called_once()
+    # 原本這個 except 區塊完全沒有記 log；確認例外現在確實有被全域 handler 記錄下來。
+    mock_logger.exception.assert_called_once()

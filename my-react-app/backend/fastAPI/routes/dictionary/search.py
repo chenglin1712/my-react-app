@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import re
 from typing import Dict, List, Optional, Tuple
 
@@ -31,8 +30,6 @@ from .schemas import (
 )
 
 router = APIRouter()
-
-logger = logging.getLogger(__name__)
 
 # UsageEvent.tribe 存 slug（跟 Django 端 dictionary_views.py 的
 # _tribe_slug_for() 同一個慣例），這裡的 tribe_name 是 resolve_tribe_name()
@@ -321,35 +318,31 @@ def _search_multi_words(db: Session, words: List[str], tribe_name: str) -> Tuple
 @router.post("/keys/")
 @limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_search_multiword", "60/minute"))  # 全表掃描（走快取），每用戶每分鐘最多 60 次避免大量請求造成壓力
 async def search_tayal_dictionary(request: Request, body: MultiWordSearchRequest):
-    """多關鍵字搜尋"""
+    """多關鍵字搜尋
+
+    沒被下面明確攔截的例外交給 main.py 的全域 Exception handler 處理
+    （P4 review BE-28，說明見 vision.py analyze_image()）。"""
+    words = body.words
     try:
-        words = body.words
-        try:
-            tribe_name = resolve_tribe_name(body.tribe)
-        except ValueError as e:
-            return JSONResponse({"detail": str(e)}, status_code=400)
-        if not words:
-            return JSONResponse({"detail": "查詢字詞不可為空"}, status_code=400)
+        tribe_name = resolve_tribe_name(body.tribe)
+    except ValueError as e:
+        return JSONResponse({"detail": str(e)}, status_code=400)
+    if not words:
+        return JSONResponse({"detail": "查詢字詞不可為空"}, status_code=400)
 
-        # 冷快取時 _load_tribe_words 是同步的全表掃描＋JSON parse，直接呼叫會卡住
-        # 整個 event loop（同一 worker 上的其他請求，包含 /health，都會被一起卡住）。
-        # 丟到執行緒池執行，跟同一支檔案已修好的 compare_audio／analyze_image 同一套作法。
-        # Session 在 worker thread 內自己建立/關閉（見 _call_with_own_session
-        # 的說明），不用 FastAPI 依賴注入的 Session。
-        exact_match_results, fuzzy_match_results = await asyncio.to_thread(
-            _call_with_own_session, _search_multi_words, words, tribe_name
-        )
+    # 冷快取時 _load_tribe_words 是同步的全表掃描＋JSON parse，直接呼叫會卡住
+    # 整個 event loop（同一 worker 上的其他請求，包含 /health，都會被一起卡住）。
+    # 丟到執行緒池執行，跟同一支檔案已修好的 compare_audio／analyze_image 同一套作法。
+    # Session 在 worker thread 內自己建立/關閉（見 _call_with_own_session
+    # 的說明），不用 FastAPI 依賴注入的 Session。
+    exact_match_results, fuzzy_match_results = await asyncio.to_thread(
+        _call_with_own_session, _search_multi_words, words, tribe_name
+    )
 
-        return JSONResponse(
-            {"exact_match_results": exact_match_results, "fuzzy_match_results": fuzzy_match_results},
-            status_code=200
-        )
-
-    except Exception as e:
-        # 原始例外訊息只記 log，不回給 client——可能包含內部路徑、SQL、其他
-        # 實作細節，Django 端「不外洩內部錯誤」的修正原本沒有搬過來這邊。
-        logger.exception(e)
-        return JSONResponse({"detail": "伺服器發生錯誤，請稍後再試"}, status_code=500)
+    return JSONResponse(
+        {"exact_match_results": exact_match_results, "fuzzy_match_results": fuzzy_match_results},
+        status_code=200
+    )
 
 
 @router.post("/all/")
@@ -357,33 +350,30 @@ async def search_tayal_dictionary(request: Request, body: MultiWordSearchRequest
 async def all_tayal_dictionary(request: Request, body: AllWordsRequest):
     """查詢所有詞條。可選傳入 letter/frequency/category/favorites_only(+favorite_names)/
     sort_order 做篩選與排序，並用 limit/offset 做分頁；都不傳則維持原本回傳全部
-    （未篩選、未分頁）的行為，供 frontend/src/_favorite/index.jsx 沿用舊行為。"""
+    （未篩選、未分頁）的行為，供 frontend/src/_favorite/index.jsx 沿用舊行為。
+
+    沒被下面明確攔截的例外交給 main.py 的全域 Exception handler 處理
+    （P4 review BE-28，說明見 vision.py analyze_image()）。"""
     try:
-        try:
-            tribe_name = resolve_tribe_name(body.tribe)
-        except ValueError as e:
-            return JSONResponse({"detail": str(e)}, status_code=400)
-        # 冷快取時 search_all -> _load_tribe_words 是同步的全表掃描＋JSON parse，
-        # 丟到執行緒池執行，避免卡住 event loop（見 /keys/ 同樣的說明）。Session
-        # 在 worker thread 內自己建立/關閉（見 _call_with_own_session 的說明）。
-        results, total = await asyncio.to_thread(
-            _call_with_own_session, search_all, tribe=tribe_name, limit=body.limit, offset=body.offset,
-            letter=body.letter, frequency=body.frequency, category=body.category,
-            favorites_only=body.favorites_only, favorite_names=body.favorite_names,
-            sort_order=body.sort_order,
-        )
-        return JSONResponse(
-            {
-                "all_results": {k: [r.dict() for r in v] for k, v in results.items()},
-                "total": total,
-            },
-            status_code=200
-        )
-    except Exception as e:
-        # 原始例外訊息只記 log，不回給 client——可能包含內部路徑、SQL、其他
-        # 實作細節，Django 端「不外洩內部錯誤」的修正原本沒有搬過來這邊。
-        logger.exception(e)
-        return JSONResponse({"detail": "伺服器發生錯誤，請稍後再試"}, status_code=500)
+        tribe_name = resolve_tribe_name(body.tribe)
+    except ValueError as e:
+        return JSONResponse({"detail": str(e)}, status_code=400)
+    # 冷快取時 search_all -> _load_tribe_words 是同步的全表掃描＋JSON parse，
+    # 丟到執行緒池執行，避免卡住 event loop（見 /keys/ 同樣的說明）。Session
+    # 在 worker thread 內自己建立/關閉（見 _call_with_own_session 的說明）。
+    results, total = await asyncio.to_thread(
+        _call_with_own_session, search_all, tribe=tribe_name, limit=body.limit, offset=body.offset,
+        letter=body.letter, frequency=body.frequency, category=body.category,
+        favorites_only=body.favorites_only, favorite_names=body.favorite_names,
+        sort_order=body.sort_order,
+    )
+    return JSONResponse(
+        {
+            "all_results": {k: [r.dict() for r in v] for k, v in results.items()},
+            "total": total,
+        },
+        status_code=200
+    )
 
 
 def _search_single_keyword(db: Session, keyword: str, tribe_name: str):
@@ -399,46 +389,42 @@ def _search_single_keyword(db: Session, keyword: str, tribe_name: str):
 @router.post("/key/")
 @limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_search_allsearch", "60/minute"))  # 原本沒有限流，見同檔案其他端點的說明
 async def allsearch_tayal_dictionary(request: Request, body: KeywordRequest):
-    """單一字搜尋"""
+    """單一字搜尋
+
+    沒被下面明確攔截的例外交給 main.py 的全域 Exception handler 處理
+    （P4 review BE-28，說明見 vision.py analyze_image()）。"""
+    keyword = body.keyword.strip().replace("　", "")
+    if not keyword:
+        return JSONResponse({"detail": "查詢字詞不可為空"}, status_code=400)
     try:
-        keyword = body.keyword.strip().replace("　", "")
-        if not keyword:
-            return JSONResponse({"detail": "查詢字詞不可為空"}, status_code=400)
-        try:
-            tribe_name = resolve_tribe_name(body.tribe or '泰雅')
-        except ValueError as e:
-            return JSONResponse({"detail": str(e)}, status_code=400)
+        tribe_name = resolve_tribe_name(body.tribe or '泰雅')
+    except ValueError as e:
+        return JSONResponse({"detail": str(e)}, status_code=400)
 
-        # 冷快取時是同步的全表掃描＋JSON parse，丟到執行緒池執行，
-        # 避免卡住 event loop（見 /keys/ 同樣的說明）。Session 在 worker
-        # thread 內自己建立/關閉（見 _call_with_own_session 的說明）。
-        exact, fuzzy = await asyncio.to_thread(_call_with_own_session, _search_single_keyword, keyword, tribe_name)
+    # 冷快取時是同步的全表掃描＋JSON parse，丟到執行緒池執行，
+    # 避免卡住 event loop（見 /keys/ 同樣的說明）。Session 在 worker
+    # thread 內自己建立/關閉（見 _call_with_own_session 的說明）。
+    exact, fuzzy = await asyncio.to_thread(_call_with_own_session, _search_single_keyword, keyword, tribe_name)
 
-        # 記錄查詢事件（P5 搜尋分析用）——刻意放在算完命中數「之後」才記錄，
-        # 讓「零結果」判定精確；record_event() 是 fire-and-forget，任何失敗
-        # 都不影響這裡的回應。fuzzy 是 {分類: [結果,...]} 的巢狀 dict，命中數
-        # 用攤平後的長度計算。
-        fuzzy_hit_count = sum(len(v) for v in fuzzy.values())
-        record_event(
-            "dictionary_search",
-            tribe=_TRIBE_SLUG_BY_NAME.get(tribe_name, ""),
-            payload={
-                "query": keyword,
-                "exact_hit_count": len(exact),
-                "fuzzy_hit_count": fuzzy_hit_count,
-            },
-        )
+    # 記錄查詢事件（P5 搜尋分析用）——刻意放在算完命中數「之後」才記錄，
+    # 讓「零結果」判定精確；record_event() 是 fire-and-forget，任何失敗
+    # 都不影響這裡的回應。fuzzy 是 {分類: [結果,...]} 的巢狀 dict，命中數
+    # 用攤平後的長度計算。
+    fuzzy_hit_count = sum(len(v) for v in fuzzy.values())
+    record_event(
+        "dictionary_search",
+        tribe=_TRIBE_SLUG_BY_NAME.get(tribe_name, ""),
+        payload={
+            "query": keyword,
+            "exact_hit_count": len(exact),
+            "fuzzy_hit_count": fuzzy_hit_count,
+        },
+    )
 
-        return JSONResponse(
-            {
-                "exact_match_results": {keyword: [r.dict() for r in exact]},
-                "fuzzy_match_results": {keyword: {k: [r.dict() for r in v] for k, v in fuzzy.items()}},
-            },
-            status_code=200
-        )
-
-    except Exception as e:
-        # 原始例外訊息只記 log，不回給 client——可能包含內部路徑、SQL、其他
-        # 實作細節，Django 端「不外洩內部錯誤」的修正原本沒有搬過來這邊。
-        logger.exception(e)
-        return JSONResponse({"detail": "伺服器發生錯誤，請稍後再試"}, status_code=500)
+    return JSONResponse(
+        {
+            "exact_match_results": {keyword: [r.dict() for r in exact]},
+            "fuzzy_match_results": {keyword: {k: [r.dict() for r in v] for k, v in fuzzy.items()}},
+        },
+        status_code=200
+    )

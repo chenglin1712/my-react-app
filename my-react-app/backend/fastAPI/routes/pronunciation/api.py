@@ -1,6 +1,7 @@
 """發音比對端點——薄薄一層路由組裝，實際邏輯都在 audio_fetch.py（音檔
 下載）跟 model.py（音檔轉向量、相似度計算）。"""
 import asyncio
+import logging
 import re
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
@@ -15,6 +16,7 @@ from .model import bytes_to_tensor, convert_to_wav, get_wav2vec2, _get_embedding
 import httpx
 
 router = APIRouter()
+_logger = logging.getLogger(__name__)
 
 
 def make_error(step: str, msg: str):
@@ -44,12 +46,24 @@ async def compare_audio(
     game_config.refresh_game_config_if_stale()
     max_audio_bytes = game_config.PRONUNCIATION_MAX_AUDIO_MB * 1024 * 1024
 
+    # 底下每個步驟各自 try/except、用 make_error() 回傳「HTTP 200 + success:false」
+    # 而不是拋 HTTPException，是刻意保留的既有 app 層失敗慣例（前端
+    # frontend/components/_quiz_questions/sentenceSpeak.jsx 的 submitSpeaking()
+    # 明確依賴這個約定：只檢查 body 的 success 欄位，不是 HTTP 狀態碼）——
+    # 不屬於 P4 review BE-28 要統一的 HTTP 層錯誤格式問題，這裡不動。
+    #
+    # 但原本每個 except 都把 str(e) 原封不動放進回給前端的 error 欄位，
+    # 可能洩漏檔案路徑、底層函式庫例外訊息等內部細節，跟同一輪稽核的
+    # vision.py／dictionary/search.py「只記 log，回前端通用訊息」的原則
+    # 不一致（獨立審查找到的問題）。改成這裡先用 _logger.exception() 記下
+    # 真正的例外，回給前端的訊息換成跟步驟對應、但不含例外內容的固定文字。
     try:
         # Step A — 讀取使用者錄音
         try:
             user_bytes = await user_audio.read()
-        except Exception as e:
-            return make_error("read_user_audio", str(e))
+        except Exception:
+            _logger.exception("[pronunciation] 讀取使用者錄音失敗 audio_id=%r", audio_id)
+            return make_error("read_user_audio", "讀取錄音內容失敗，請重新錄音再試一次")
 
         if len(user_bytes) > max_audio_bytes:
             return make_error("file_too_large", f"音檔不得超過 {game_config.PRONUNCIATION_MAX_AUDIO_MB} MB")
@@ -60,25 +74,29 @@ async def compare_audio(
         try:
             user_wav = await asyncio.to_thread(convert_to_wav, user_bytes)
             user_wave, _ = await asyncio.to_thread(bytes_to_tensor, user_wav)
-        except Exception as e:
-            return make_error("convert_user_to_wav", str(e))
+        except Exception:
+            _logger.exception("[pronunciation] 使用者錄音轉換 WAV 失敗 audio_id=%r", audio_id)
+            return make_error("convert_user_to_wav", "錄音格式轉換失敗，請重新錄音再試一次")
 
         try:
             wav2vec2_model = await asyncio.to_thread(get_wav2vec2)
             user_emb = await asyncio.to_thread(_get_embedding, wav2vec2_model, user_wave)
-        except Exception as e:
-            return make_error("user_embedding", str(e))
+        except Exception:
+            _logger.exception("[pronunciation] 使用者錄音特徵擷取失敗 audio_id=%r", audio_id)
+            return make_error("user_embedding", "語音特徵擷取失敗，請稍後再試")
 
         # Step C — 官方音檔比對
         try:
             target_bytes = await asyncio.to_thread(fetch_audio_from_id, audio_id)
-        except Exception as e:
-            return make_error("download_target", str(e))
+        except Exception:
+            _logger.exception("[pronunciation] 下載官方音檔失敗 audio_id=%r", audio_id)
+            return make_error("download_target", "官方音檔下載失敗，請稍後再試")
 
         try:
             official_score = await asyncio.to_thread(_score_from_bytes, wav2vec2_model, user_emb, target_bytes)
-        except Exception as e:
-            return make_error("official_similarity", str(e))
+        except Exception:
+            _logger.exception("[pronunciation] 官方音檔相似度計算失敗 audio_id=%r", audio_id)
+            return make_error("official_similarity", "語音比對計算失敗，請稍後再試")
 
         # Step D — 真人參考音檔比對（Firebase Storage 公開 URL，用 httpx 非同步抓取）
         best_ref_score = None
@@ -121,5 +139,6 @@ async def compare_audio(
             },
         }
 
-    except Exception as e:
-        return make_error("unknown_error", str(e))
+    except Exception:
+        _logger.exception("[pronunciation] compare_audio 發生未預期的例外 audio_id=%r", audio_id)
+        return make_error("unknown_error", "評分過程發生未預期的錯誤，請稍後再試")

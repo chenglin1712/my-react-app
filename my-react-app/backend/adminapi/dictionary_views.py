@@ -17,7 +17,10 @@ dictionary_db，兩個資料庫之間沒有共用交易，套用 P3 已經驗證
 god view 裡風險最集中的一個，排在最後才拆，且刻意只搬移原本就已經是
 獨立函式的部分，不重新設計 dictionary_revision_approve() 本身的例外處理
 流程）。這裡只保留 HTTP 邊界的事：method 檢查、角色檢查、限流、request
-參數解析、JsonResponse 包裝。
+參數解析、JsonResponse 包裝——這幾件事現在改用 _shared.guarded_action()
+decorator（P4 review BE-27），dictionary_revision_approve() 這支風險最
+集中的端點例外：它的核准流程本身（交易邊界、套用、重試、退回）維持完全
+不動，只有最外層的 method／角色／限流檢查改用 decorator。
 """
 import json
 import logging
@@ -28,16 +31,15 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
-from core.firebase_auth import require_role
 from config.roles import CONTENT_APPROVERS, CONTENT_EDITORS, STAFF_ROLES
 from config.tribes import TRIBES
 from dictionary_db.connect import SessionLocal, dictionary_write_session
 
 from . import dictionary_write as dw
 from ._shared import (
+    guarded_action,
     invalid_transition as _invalid_transition,
     parse_json_body as _parse_json_body,
-    rate_limited_response as _rate_limited_response,
     write_audit_log as _write_audit_log,
 )
 from .dictionary_revision_service import (
@@ -98,14 +100,11 @@ def word_list(request):
     return JsonResponse({"detail": "Method not allowed"}, status=405)
 
 
-def _word_list(request):
+@guarded_action(method="GET", role=STAFF_ROLES)
+def _word_list(request, decoded):
     """扁平、伺服器端分頁的列表——本機約 3 萬筆詞條不可能一次全部載入
     （跟題庫類內容的小表不同），比照 word_data.py 的既有紀律：批次查詢，
     不要每列各自查一次。"""
-    decoded, err_resp = require_role(request, STAFF_ROLES)
-    if err_resp:
-        return err_resp
-
     tribe_id = request.GET.get("tribe_id", "")
     keyword = request.GET.get("keyword", "").strip()
     has_pending = request.GET.get("has_pending", "").lower() in ("1", "true")
@@ -203,16 +202,10 @@ def _word_list(request):
     return JsonResponse({"results": results, "count": total, "page": page, "page_size": page_size})
 
 
-def _word_create_proposal(request):
+@guarded_action(method="POST", role=CONTENT_EDITORS, rate_limit=("dictionary_word_create", "30/m"))
+def _word_create_proposal(request, decoded):
     """新建詞條：不直接寫 dictionary_db，先建立一筆 operation=create 的
     草稿提案（target_id=''，核准時才指派真正的 UUID）。"""
-    decoded, err_resp = require_role(request, CONTENT_EDITORS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="dictionary_word_create", rate="30/m")
-    if limited_resp:
-        return limited_resp
-
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -237,13 +230,8 @@ def _word_create_proposal(request):
 
 
 @csrf_exempt
-def word_detail(request, word_id):
-    if request.method != "GET":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, STAFF_ROLES)
-    if err_resp:
-        return err_resp
-
+@guarded_action(method="GET", role=STAFF_ROLES)
+def word_detail(request, decoded, word_id):
     db = SessionLocal()
     try:
         try:
@@ -260,18 +248,10 @@ def word_detail(request, word_id):
 
 
 @csrf_exempt
-def word_propose(request, word_id):
+@guarded_action(method="POST", role=CONTENT_EDITORS, rate_limit=("dictionary_word_propose", "60/m"))
+def word_propose(request, decoded, word_id):
     """對既有詞條建立/更新草稿提案——不動正在生效的辭典資料，比照
     PendingRevision 的既有精神。"""
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, CONTENT_EDITORS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="dictionary_word_propose", rate="60/m")
-    if limited_resp:
-        return limited_resp
-
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -324,16 +304,8 @@ def word_propose(request, word_id):
 
 
 @csrf_exempt
-def word_delete_proposal(request, word_id):
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, CONTENT_EDITORS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="dictionary_word_delete_proposal", rate="30/m")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="POST", role=CONTENT_EDITORS, rate_limit=("dictionary_word_delete_proposal", "30/m"))
+def word_delete_proposal(request, decoded, word_id):
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -391,19 +363,13 @@ def dictionary_revision_detail(request, pk):
     return JsonResponse({"detail": "Method not allowed"}, status=405)
 
 
-def _revision_update_payload(request, pk):
+@guarded_action(method="PUT", role=CONTENT_EDITORS, rate_limit=("dictionary_revision_update", "60/m"))
+def _revision_update_payload(request, decoded, pk):
     """更新一筆草稿提案的內容——給「新建詞條」這種沒有既有 word_id 可以掛
     word_propose 的情境用（word_propose 是 /words/{word_id}/propose/，
     新建當下根本還沒有 word_id）。只能更新 draft 狀態的提案，跟
     word_propose／_revision_discard 一樣的限制：送審中的要先撤回才能改。
     """
-    decoded, err_resp = require_role(request, CONTENT_EDITORS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="dictionary_revision_update", rate="60/m")
-    if limited_resp:
-        return limited_resp
-
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -440,10 +406,8 @@ def _revision_update_payload(request, pk):
     return JsonResponse({"id": revision.pk, "payload": revision.payload})
 
 
-def _revision_get(request, pk):
-    decoded, err_resp = require_role(request, STAFF_ROLES)
-    if err_resp:
-        return err_resp
+@guarded_action(method="GET", role=STAFF_ROLES)
+def _revision_get(request, decoded, pk):
     revision = get_object_or_404(DictionaryRevision, pk=pk)
     return JsonResponse({
         "id": revision.pk, "target_kind": revision.target_kind, "target_id": revision.target_id,
@@ -454,11 +418,9 @@ def _revision_get(request, pk):
     })
 
 
-def _revision_discard(request, pk):
+@guarded_action(method="DELETE", role=CONTENT_EDITORS)
+def _revision_discard(request, decoded, pk):
     """丟棄一筆草稿提案——只能丟棄還沒送審的（draft），送審中的要先撤回。"""
-    decoded, err_resp = require_role(request, CONTENT_EDITORS)
-    if err_resp:
-        return err_resp
     with transaction.atomic():
         revision = get_object_or_404(DictionaryRevision.objects.select_for_update(), pk=pk)
         if revision.status != DictionaryRevision.STATUS_DRAFT:
@@ -472,16 +434,8 @@ def _revision_discard(request, pk):
 
 
 @csrf_exempt
-def dictionary_revision_submit(request, pk):
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, CONTENT_EDITORS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="dictionary_revision_submit")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="POST", role=CONTENT_EDITORS, rate_limit=("dictionary_revision_submit", "60/m"))
+def dictionary_revision_submit(request, decoded, pk):
     with transaction.atomic():
         revision = get_object_or_404(DictionaryRevision.objects.select_for_update(), pk=pk)
         if revision.status != DictionaryRevision.STATUS_DRAFT:
@@ -498,16 +452,8 @@ def dictionary_revision_submit(request, pk):
 
 
 @csrf_exempt
-def dictionary_revision_withdraw(request, pk):
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, CONTENT_EDITORS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="dictionary_revision_withdraw")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="POST", role=CONTENT_EDITORS, rate_limit=("dictionary_revision_withdraw", "60/m"))
+def dictionary_revision_withdraw(request, decoded, pk):
     with transaction.atomic():
         revision = get_object_or_404(DictionaryRevision.objects.select_for_update(), pk=pk)
         if revision.status != DictionaryRevision.STATUS_PENDING_REVIEW:
@@ -522,7 +468,8 @@ def dictionary_revision_withdraw(request, pk):
 
 
 @csrf_exempt
-def dictionary_revision_approve(request, pk):
+@guarded_action(method="POST", role=CONTENT_APPROVERS, rate_limit=("dictionary_revision_approve", "60/m"))
+def dictionary_revision_approve(request, decoded, pk):
     """核准流程（見規劃文件 P4 §1 的跨系統一致性說明，加上 codex 獨立審查
     抓到的併發缺口修正）：
 
@@ -542,15 +489,6 @@ def dictionary_revision_approve(request, pk):
     (4) 套用成功才寫最終結果（target_id／applied_at）＋稽核紀錄＋快取失效
         通知，快取失效通知在交易區塊外（順序原因見規劃文件 P4 §1）。
     """
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, CONTENT_APPROVERS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="dictionary_revision_approve")
-    if limited_resp:
-        return limited_resp
-
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -648,16 +586,8 @@ def dictionary_revision_approve(request, pk):
 
 
 @csrf_exempt
-def dictionary_revision_reject(request, pk):
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, CONTENT_APPROVERS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="dictionary_revision_reject")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="POST", role=CONTENT_APPROVERS, rate_limit=("dictionary_revision_reject", "60/m"))
+def dictionary_revision_reject(request, decoded, pk):
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -686,13 +616,8 @@ def dictionary_revision_reject(request, pk):
 # ---------------------------------------------------------------------------
 
 @csrf_exempt
-def word_references(request, word_id):
-    if request.method != "GET":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, STAFF_ROLES)
-    if err_resp:
-        return err_resp
-
+@guarded_action(method="GET", role=STAFF_ROLES)
+def word_references(request, decoded, word_id):
     db = SessionLocal()
     try:
         counts = dw.count_word_references(db, word_id)

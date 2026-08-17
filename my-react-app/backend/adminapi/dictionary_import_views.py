@@ -18,14 +18,13 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
-from core.firebase_auth import require_role
 from config.roles import CONTENT_APPROVERS, CONTENT_EDITORS, OWNER, STAFF_ROLES
 from config.tribes import TRIBES
 from dictionary_db.connect import SessionLocal, dictionary_write_session
 
 from ._shared import (
+    guarded_action,
     parse_json_body as _parse_json_body,
-    rate_limited_response as _rate_limited_response,
     safe_write_audit_log as _safe_write_audit_log,
     write_audit_log as _write_audit_log,
 )
@@ -77,11 +76,8 @@ def import_job_list(request):
     return JsonResponse({"detail": "Method not allowed"}, status=405)
 
 
-def _import_job_list(request):
-    decoded, err_resp = require_role(request, STAFF_ROLES)
-    if err_resp:
-        return err_resp
-
+@guarded_action(method="GET", role=STAFF_ROLES)
+def _import_job_list(request, decoded):
     tribe = request.GET.get("tribe", "")
     qs = DictionaryImportJob.objects.all()
     if tribe:
@@ -101,17 +97,11 @@ def _import_job_list(request):
     })
 
 
-def _import_job_upload(request):
+@guarded_action(method="POST", role=CONTENT_EDITORS, rate_limit=("dictionary_import_upload", "10/m"))
+def _import_job_upload(request, decoded):
     """步驟一「上傳」：只做結構檢查（schema/version/tribe/words 外層形狀 +
     逐筆詞條結構），不查資料庫——詞條層級的結構錯誤不會擋掉上傳本身，讓
     使用者在「檢視解析結果」步驟就能看到哪幾列有問題，不用重新上傳。"""
-    decoded, err_resp = require_role(request, CONTENT_EDITORS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="dictionary_import_upload", rate="10/m")
-    if limited_resp:
-        return limited_resp
-
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -142,12 +132,8 @@ def _import_job_upload(request):
 
 
 @csrf_exempt
-def import_job_detail(request, pk):
-    if request.method != "GET":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, STAFF_ROLES)
-    if err_resp:
-        return err_resp
+@guarded_action(method="GET", role=STAFF_ROLES)
+def import_job_detail(request, decoded, pk):
     job = get_object_or_404(DictionaryImportJob, pk=pk)
     return JsonResponse(_job_detail(job))
 
@@ -157,19 +143,11 @@ def import_job_detail(request, pk):
 # ---------------------------------------------------------------------------
 
 @csrf_exempt
-def import_job_preflight(request, pk):
+@guarded_action(method="POST", role=CONTENT_EDITORS, rate_limit=("dictionary_import_preflight", "20/m"))
+def import_job_preflight(request, decoded, pk):
     """步驟三「預檢報告」：真的查資料庫解析名稱、判斷新建/更新，結果存回
     job.report／preflight_hash，狀態轉成 VALIDATED。UPLOADED 或已經
     VALIDATED 過的工作都可以重新預檢（例如自動建立缺漏主檔之後）。"""
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, CONTENT_EDITORS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="dictionary_import_preflight", rate="20/m")
-    if limited_resp:
-        return limited_resp
-
     job = get_object_or_404(DictionaryImportJob, pk=pk)
     if job.status not in (DictionaryImportJob.STATUS_UPLOADED, DictionaryImportJob.STATUS_VALIDATED):
         return JsonResponse({"detail": f"目前狀態「{job.status}」無法預檢"}, status=409)
@@ -198,19 +176,11 @@ def import_job_preflight(request, pk):
 
 
 @csrf_exempt
-def import_job_auto_create_taxonomies(request, pk):
+@guarded_action(method="POST", role=(OWNER,), rate_limit=("dictionary_import_autocreate", "10/m"))
+def import_job_auto_create_taxonomies(request, decoded, pk):
     """owner-only：把這份 bundle 用到、但資料庫裡還沒有的分類/詞類/焦點/
     來源名稱建起來，然後立刻重新預檢一次（避免使用者忘記重新預檢、看到
     一份還是「找不到」的舊報告）。"""
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, (OWNER,))
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="dictionary_import_autocreate", rate="10/m")
-    if limited_resp:
-        return limited_resp
-
     job = get_object_or_404(DictionaryImportJob, pk=pk)
     if job.status not in (DictionaryImportJob.STATUS_UPLOADED, DictionaryImportJob.STATUS_VALIDATED):
         return JsonResponse({"detail": f"目前狀態「{job.status}」無法自動建立主檔"}, status=409)
@@ -249,16 +219,8 @@ def import_job_auto_create_taxonomies(request, pk):
 # ---------------------------------------------------------------------------
 
 @csrf_exempt
-def import_job_submit(request, pk):
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, CONTENT_EDITORS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="dictionary_import_submit")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="POST", role=CONTENT_EDITORS, rate_limit=("dictionary_import_submit", "60/m"))
+def import_job_submit(request, decoded, pk):
     job = get_object_or_404(DictionaryImportJob, pk=pk)
     if job.status != DictionaryImportJob.STATUS_VALIDATED:
         return JsonResponse({"detail": f"目前狀態「{job.status}」無法送審，請先完成預檢"}, status=409)
@@ -271,16 +233,8 @@ def import_job_submit(request, pk):
 
 
 @csrf_exempt
-def import_job_withdraw(request, pk):
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, CONTENT_EDITORS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="dictionary_import_withdraw")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="POST", role=CONTENT_EDITORS, rate_limit=("dictionary_import_withdraw", "60/m"))
+def import_job_withdraw(request, decoded, pk):
     job = get_object_or_404(DictionaryImportJob, pk=pk)
     if job.status != DictionaryImportJob.STATUS_PENDING_REVIEW:
         return JsonResponse({"detail": f"目前狀態「{job.status}」無法撤回"}, status=409)
@@ -303,7 +257,8 @@ def _revert_import_job_to_pending_review(pk):
 
 
 @csrf_exempt
-def import_job_approve(request, pk):
+@guarded_action(method="POST", role=CONTENT_APPROVERS, rate_limit=("dictionary_import_approve", "10/m"))
+def import_job_approve(request, decoded, pk):
     """核准套用，分五步（BE-2 修正：新增「先標記處理中、逐列 checkpoint」，
     取代原本「先標終態、整個迴圈跑完才一次寫回」的做法——後者如果 process
     在迴圈中途被中斷，Django 端會停在一個外表看起來「已套用」、實際上只
@@ -340,15 +295,6 @@ def import_job_approve(request, pk):
     指令由人工確認後手動續跑；它會先用 dictionary DB 的實際內容核對每一
     列是否真的已經套用，不是盲目相信 report 裡記錄的內容。
     """
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, CONTENT_APPROVERS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="dictionary_import_approve", rate="10/m")
-    if limited_resp:
-        return limited_resp
-
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -418,16 +364,8 @@ def import_job_approve(request, pk):
 
 
 @csrf_exempt
-def import_job_reject(request, pk):
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, CONTENT_APPROVERS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="dictionary_import_reject")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="POST", role=CONTENT_APPROVERS, rate_limit=("dictionary_import_reject", "60/m"))
+def import_job_reject(request, decoded, pk):
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -454,16 +392,8 @@ def import_job_reject(request, pk):
 # ---------------------------------------------------------------------------
 
 @csrf_exempt
-def dictionary_export(request):
-    if request.method != "GET":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, STAFF_ROLES)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="dictionary_export", rate="10/m", method="GET")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="GET", role=STAFF_ROLES, rate_limit=("dictionary_export", "10/m", "GET"))
+def dictionary_export(request, decoded):
     tribe_slug = request.GET.get("tribe", "")
     if tribe_slug not in _TRIBE_SLUG_TO_ID:
         return JsonResponse({"detail": f"不支援的族語：{tribe_slug}"}, status=400)

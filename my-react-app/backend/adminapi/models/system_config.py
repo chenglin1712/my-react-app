@@ -1,11 +1,17 @@
 from django.db import models
 
+from config import irt_defaults
 
-class IrtConfig(models.Model):
+from ._singleton import SingletonModel
+
+
+class IrtConfig(SingletonModel):
     """FastAPI Recommon 適性測驗（backend/fastAPI/routes/quiz.py）的超參數，
     單例（永遠只有一筆，pk 固定用 1，見 load()）。這裡只是把原本模組頂部
-    寫死的數字外部化成可調參數，不改動 IRT 計算公式本身——預設值原樣照抄
-    quiz.py 現有的硬編碼值，確保新增這張表當下，實際算分行為完全不變。
+    寫死的數字外部化成可調參數，不改動 IRT 計算公式本身——預設值從
+    config.irt_defaults 匯入，跟 quiz/irt.py 的模組全域退回值共用同一份
+    數字來源（P4 review BE-29），確保新增這張表當下、以及日後兩邊各自
+    修改時，實際算分行為都不會因為兩份手寫數字對不上而悄悄跑掉。
 
     FastAPI 沒有直接連到這張表所在的資料庫——辭典 DB（dictionary_db）是
     另一個獨立的 Postgres database（見 backend/dictionary_db/connect.py），
@@ -14,40 +20,35 @@ class IrtConfig(models.Model):
     做短 TTL 快取（不是即時 push）——調整 IRT 參數不是秒等的即時性需求，
     跟 REDIS_URL 共用限流計數是完全不同等級的即時性要求。
     """
-    total_questions = models.PositiveSmallIntegerField(default=10)
-    alpha0 = models.FloatField(default=1.0)
-    beta0 = models.FloatField(default=1.0)
-    default_guess = models.FloatField(default=0.25)
-    learning_rate = models.FloatField(default=0.08)
-    dq_alpha = models.FloatField(default=0.45)
-    dq_beta = models.FloatField(default=0.35)
-    dq_gamma = models.FloatField(default=0.20)
-    type_aq_word_translate = models.FloatField(default=1.2)
-    type_aq_word_match = models.FloatField(default=1.0)
-    type_aq_sentence_fill = models.FloatField(default=0.9)
-    type_aq_sentence_order = models.FloatField(default=1.1)
+    total_questions = models.PositiveSmallIntegerField(default=irt_defaults.TOTAL_QUESTIONS)
+    alpha0 = models.FloatField(default=irt_defaults.ALPHA0)
+    beta0 = models.FloatField(default=irt_defaults.BETA0)
+    default_guess = models.FloatField(default=irt_defaults.DEFAULT_GUESS)
+    learning_rate = models.FloatField(default=irt_defaults.LEARNING_RATE)
+    dq_alpha = models.FloatField(default=irt_defaults.DQ_ALPHA)
+    dq_beta = models.FloatField(default=irt_defaults.DQ_BETA)
+    dq_gamma = models.FloatField(default=irt_defaults.DQ_GAMMA)
+    type_aq_word_translate = models.FloatField(default=irt_defaults.TYPE_AQ_WORD_TRANSLATE)
+    type_aq_word_match = models.FloatField(default=irt_defaults.TYPE_AQ_WORD_MATCH)
+    type_aq_sentence_fill = models.FloatField(default=irt_defaults.TYPE_AQ_SENTENCE_FILL)
+    type_aq_sentence_order = models.FloatField(default=irt_defaults.TYPE_AQ_SENTENCE_ORDER)
     # BETA1/BETA2 對應的 F_w（收藏數）／R_w（探索數）目前前端從未回填這兩個
     # 欄位（quiz.py 的 UserModelReq.favorites/explorations 一直是預設值），
     # 調整這兩個參數在正式接上該資料前不會有實際效果——保留欄位是為了未來
     # 一旦補上該資料就能直接生效，不需要再改 schema。
-    beta1 = models.FloatField(default=0.2)
-    beta2 = models.FloatField(default=0.2)
-    beta3 = models.FloatField(default=0.2)
-    beta4 = models.FloatField(default=0.2)
-    beta5 = models.FloatField(default=0.2)
+    beta1 = models.FloatField(default=irt_defaults.BETA1)
+    beta2 = models.FloatField(default=irt_defaults.BETA2)
+    beta3 = models.FloatField(default=irt_defaults.BETA3)
+    beta4 = models.FloatField(default=irt_defaults.BETA4)
+    beta5 = models.FloatField(default=irt_defaults.BETA5)
     updated_by = models.CharField(max_length=128, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
-
-    @classmethod
-    def load(cls):
-        obj, _ = cls.objects.get_or_create(pk=1)
-        return obj
 
     def __str__(self):
         return f"IRT 參數設定（每次測驗 {self.total_questions} 題）"
 
 
-class GameConfig(models.Model):
+class GameConfig(SingletonModel):
     """四個遊戲（聽力/句型/發音/填字）的可調參數，單例（永遠只有一筆，
     pk 固定用 1，見 load()）——比照 IrtConfig 的既有模式：把原本各自模組
     頂部寫死的數字外部化成可調參數，不新增這幾個遊戲原本沒有的選題/篩選
@@ -80,11 +81,6 @@ class GameConfig(models.Model):
     crossword_compute_time_limit_seconds = models.PositiveSmallIntegerField(default=2)
     updated_by = models.CharField(max_length=128, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
-
-    @classmethod
-    def load(cls):
-        obj, _ = cls.objects.get_or_create(pk=1)
-        return obj
 
     def __str__(self):
         return "遊戲參數設定"

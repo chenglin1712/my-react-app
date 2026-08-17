@@ -21,33 +21,36 @@ import requests
 
 import logging as _logging
 
+from config import irt_defaults
+
 from .schemas import WordDTO
 
 # ----------------------------
 # 超參數（可由後台 adminapi 的 IrtConfig 調整，見下方 _refresh_irt_config_if_stale）
 # ----------------------------
-# 這裡的預設值是「後台從未設定過、或後台暫時連不上時」的退回值，刻意跟
-# IrtConfig model 的欄位預設值完全一致——確保後台功能還沒接上或掛掉時，
-# 算分行為維持原本這幾行數字寫死時的樣子，不會突然跳成別的數字。
-ALPHA0 = 1.0
-BETA0 = 1.0
-DEFAULT_GUESS = 0.25
+# 這裡的預設值是「後台從未設定過、或後台暫時連不上時」的退回值，從
+# config.irt_defaults 匯入——跟 IrtConfig model 的欄位預設值共用同一份
+# 數字來源（P4 review BE-29），確保後台功能還沒接上或掛掉時，算分行為
+# 維持原本這幾行數字寫死時的樣子，不會突然跳成別的數字。
+ALPHA0 = irt_defaults.ALPHA0
+BETA0 = irt_defaults.BETA0
+DEFAULT_GUESS = irt_defaults.DEFAULT_GUESS
 TYPE_AQ = {
-    "word-translate": 1.2,
-    "word-match": 1.0,
-    "sentence-fill": 0.9,
-    "sentence-order": 1.1,
+    "word-translate": irt_defaults.TYPE_AQ_WORD_TRANSLATE,
+    "word-match": irt_defaults.TYPE_AQ_WORD_MATCH,
+    "sentence-fill": irt_defaults.TYPE_AQ_SENTENCE_FILL,
+    "sentence-order": irt_defaults.TYPE_AQ_SENTENCE_ORDER,
 }
-LEARNING_RATE = 0.08
-DQ_ALPHA = 0.45
-DQ_BETA  = 0.35
-DQ_GAMMA = 0.20
-BETA1 = 0.2
-BETA2 = 0.2
-BETA3 = 0.2
-BETA4 = 0.2
-BETA5 = 0.2
-TOTAL_QUESTIONS = 10
+LEARNING_RATE = irt_defaults.LEARNING_RATE
+DQ_ALPHA = irt_defaults.DQ_ALPHA
+DQ_BETA  = irt_defaults.DQ_BETA
+DQ_GAMMA = irt_defaults.DQ_GAMMA
+BETA1 = irt_defaults.BETA1
+BETA2 = irt_defaults.BETA2
+BETA3 = irt_defaults.BETA3
+BETA4 = irt_defaults.BETA4
+BETA5 = irt_defaults.BETA5
+TOTAL_QUESTIONS = irt_defaults.TOTAL_QUESTIONS
 
 # Django adminapi 的公開唯讀端點（見 backend/adminapi/quizbank_views.py 的
 # public_irt_config），本機開發兩個服務都跑在同一台機器上，預設值可以

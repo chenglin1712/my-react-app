@@ -3,6 +3,8 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils import timezone
 
+from ._singleton import SingletonModel
+
 
 class Announcement(models.Model):
     """後台公告——取代目前首頁 100% 依賴外部網站爬蟲的狀態（見規劃文件 §3.2.1）。
@@ -155,7 +157,7 @@ class ExamScheduleOverride(models.Model):
         return f"{self.phase}（{'生效中' if self.is_active else '已停用'}）"
 
 
-class ExamScheduleCrawlStatus(models.Model):
+class ExamScheduleCrawlStatus(SingletonModel):
     """考試時程爬蟲的執行狀態，單例（永遠只有一筆，pk 固定用 1，見 load()）。
     給後台「上次成功時間／上次失敗原因／連續失敗幾次」用。只有真的觸發一次
     爬取（公開端點快取沒命中，或後台手動重爬）才會更新，不是每次公開端點
@@ -166,11 +168,6 @@ class ExamScheduleCrawlStatus(models.Model):
     last_failure_at = models.DateTimeField(null=True, blank=True)
     last_failure_reason = models.TextField(blank=True)
     consecutive_failures = models.PositiveIntegerField(default=0)
-
-    @classmethod
-    def load(cls):
-        obj, _ = cls.objects.get_or_create(pk=1)
-        return obj
 
     def record_success(self):
         self.last_success_at = timezone.now()
@@ -187,7 +184,7 @@ class ExamScheduleCrawlStatus(models.Model):
         return f"考試時程爬蟲狀態（連續失敗 {self.consecutive_failures} 次）"
 
 
-class AnnouncementSyncStatus(models.Model):
+class AnnouncementSyncStatus(SingletonModel):
     """公告爬蟲同步的執行狀態，單例（永遠只有一筆，pk 固定用 1，見 load()）。
     跟 ExamScheduleCrawlStatus 是同一種用途、同一套形狀：給後台「上次同步
     時間／上次失敗原因／連續失敗幾次／上次匯入與略過筆數」顯示用，也順便
@@ -200,11 +197,6 @@ class AnnouncementSyncStatus(models.Model):
     consecutive_failures = models.PositiveIntegerField(default=0)
     last_imported_count = models.PositiveIntegerField(default=0)
     last_skipped_count = models.PositiveIntegerField(default=0)
-
-    @classmethod
-    def load(cls):
-        obj, _ = cls.objects.get_or_create(pk=1)
-        return obj
 
     def record_success(self, imported_count, skipped_count):
         self.last_success_at = timezone.now()
@@ -226,7 +218,7 @@ class AnnouncementSyncStatus(models.Model):
         return f"公告爬蟲同步狀態（連續失敗 {self.consecutive_failures} 次）"
 
 
-class HomepageConfig(models.Model):
+class HomepageConfig(SingletonModel):
     """首頁版位設定，單例（永遠只有一筆，pk 固定用 1，見 load()）。
 
     首頁目前是完全客製化的 V2 視覺設計（見規劃文件重新確認過的現況），不是
@@ -252,11 +244,6 @@ class HomepageConfig(models.Model):
     button3_enabled = models.BooleanField(default=True)
     updated_by = models.CharField(max_length=128, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
-
-    @classmethod
-    def load(cls):
-        obj, _ = cls.objects.get_or_create(pk=1)
-        return obj
 
     def __str__(self):
         return "首頁版位設定"

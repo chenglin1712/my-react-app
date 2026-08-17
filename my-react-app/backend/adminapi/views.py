@@ -10,6 +10,13 @@ homepage_config_views.py（P4 review BE-16：原本這個檔案把 Announcement�
 動作就等於那個動作永遠查不到是誰做的，所以刻意抽成 _write_audit_log 統一
 呼叫，不讓每個 view 各自決定要不要寫。
 
+單一 method 的 view 開頭「method 檢查 → require_role → 限流」這三件事改用
+_shared.guarded_action() decorator（P4 review BE-27：原本這三行在每一支
+單一動作的 view 裡逐字重複，quizbank_views.py／dictionary_views.py／
+user_views.py／dictionary_import_views.py 也是同一份重複——見該 decorator
+的完整說明）；真正因內容型別而異的 JSON 解析／serializer 驗證／狀態轉移
+邏輯仍然留在各自的 view body 裡，不勉強套進一個通用框架。
+
 狀態機（見 models.Announcement 開頭的說明）：
   draft ──submit──> pending_review ──approve──> published ──unpublish──> unpublished
     ^                     │                                        │         │
@@ -37,6 +44,7 @@ from core.firebase_auth import require_role
 from config.roles import ACCOUNT_MANAGERS, CONTENT_EDITORS, PUBLISHERS, STAFF_ROLES
 
 from ._shared import (
+    guarded_action,
     invalid_transition as _invalid_transition,
     ip_rate_limited_response as _ip_rate_limited_response,
     parse_json_body as _parse_json_body,
@@ -52,12 +60,6 @@ from .serializers import (
 )
 
 logger = logging.getLogger(__name__)
-
-# _rate_limited_response／_ip_rate_limited_response／_parse_json_body／
-# _write_audit_log／_invalid_transition 的實作已經搬到 _shared.py（見該檔案
-# 開頭說明：revisions.py 需要同一批工具，但這裡之後會 import revisions.py，
-# 兩邊互相 import 會循環），這裡用上面的 import ... as ... 保留原本名稱，
-# 這個檔案裡其餘程式碼完全不用改呼叫方式。
 
 
 def _announcement_source_priority():
@@ -101,11 +103,8 @@ def announcement_list(request):
     return JsonResponse({"detail": "Method not allowed"}, status=405)
 
 
-def _list_announcements(request):
-    decoded, err_resp = require_role(request, STAFF_ROLES)
-    if err_resp:
-        return err_resp
-
+@guarded_action(method="GET", role=STAFF_ROLES)
+def _list_announcements(request, decoded):
     qs = Announcement.objects.order_by(_announcement_source_priority(), '-created_at', '-pk')
 
     status_param = request.GET.get("status")
@@ -168,14 +167,8 @@ def _list_announcements(request):
     })
 
 
-def _create_announcement(request):
-    decoded, err_resp = require_role(request, CONTENT_EDITORS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="announcement_create", rate="30/m")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="POST", role=CONTENT_EDITORS, rate_limit=("announcement_create", "30/m"))
+def _create_announcement(request, decoded):
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -251,24 +244,16 @@ def announcement_detail(request, pk):
     return JsonResponse({"detail": "Method not allowed"}, status=405)
 
 
-def _get_announcement(request, pk):
-    decoded, err_resp = require_role(request, STAFF_ROLES)
-    if err_resp:
-        return err_resp
+@guarded_action(method="GET", role=STAFF_ROLES)
+def _get_announcement(request, decoded, pk):
     announcement = get_object_or_404(Announcement, pk=pk)
     data = AnnouncementSerializer(announcement).data
     data["has_pending_revision"] = bool(pending_revision_target_ids("announcement", [announcement.pk]))
     return JsonResponse(data)
 
 
-def _update_announcement(request, pk):
-    decoded, err_resp = require_role(request, CONTENT_EDITORS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="announcement_update", rate="60/m")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="PATCH", role=CONTENT_EDITORS, rate_limit=("announcement_update", "60/m"))
+def _update_announcement(request, decoded, pk):
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -304,14 +289,8 @@ def _update_announcement(request, pk):
         return JsonResponse(AnnouncementSerializer(announcement).data)
 
 
-def _delete_announcement(request, pk):
-    decoded, err_resp = require_role(request, PUBLISHERS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="announcement_delete", rate="30/m", method="DELETE")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="DELETE", role=PUBLISHERS, rate_limit=("announcement_delete", "30/m", "DELETE"))
+def _delete_announcement(request, decoded, pk):
     with transaction.atomic():
         announcement = _locked(pk)
         # 只允許刪還沒進過審核流程的草稿——曾經送審／發布過的內容一律走「下架」
@@ -327,16 +306,8 @@ def _delete_announcement(request, pk):
 
 
 @csrf_exempt
-def announcement_submit(request, pk):
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, CONTENT_EDITORS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="announcement_submit")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="POST", role=CONTENT_EDITORS, rate_limit=("announcement_submit", "60/m"))
+def announcement_submit(request, decoded, pk):
     with transaction.atomic():
         announcement = _locked(pk)
         if announcement.status not in (Announcement.STATUS_DRAFT, Announcement.STATUS_REJECTED):
@@ -356,16 +327,8 @@ def announcement_submit(request, pk):
 
 
 @csrf_exempt
-def announcement_withdraw(request, pk):
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, CONTENT_EDITORS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="announcement_withdraw")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="POST", role=CONTENT_EDITORS, rate_limit=("announcement_withdraw", "60/m"))
+def announcement_withdraw(request, decoded, pk):
     with transaction.atomic():
         announcement = _locked(pk)
         if announcement.status != Announcement.STATUS_PENDING_REVIEW:
@@ -383,16 +346,8 @@ def announcement_withdraw(request, pk):
 
 
 @csrf_exempt
-def announcement_approve(request, pk):
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, PUBLISHERS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="announcement_approve")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="POST", role=PUBLISHERS, rate_limit=("announcement_approve", "60/m"))
+def announcement_approve(request, decoded, pk):
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -433,16 +388,8 @@ def announcement_approve(request, pk):
 
 
 @csrf_exempt
-def announcement_reject(request, pk):
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, PUBLISHERS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="announcement_reject")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="POST", role=PUBLISHERS, rate_limit=("announcement_reject", "60/m"))
+def announcement_reject(request, decoded, pk):
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -470,16 +417,8 @@ def announcement_reject(request, pk):
 
 
 @csrf_exempt
-def announcement_unpublish(request, pk):
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, PUBLISHERS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="announcement_unpublish")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="POST", role=PUBLISHERS, rate_limit=("announcement_unpublish", "60/m"))
+def announcement_unpublish(request, decoded, pk):
     with transaction.atomic():
         announcement = _locked(pk)
         if announcement.status != Announcement.STATUS_PUBLISHED:
@@ -501,16 +440,8 @@ def announcement_unpublish(request, pk):
 
 
 @csrf_exempt
-def announcement_republish(request, pk):
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, PUBLISHERS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="announcement_republish")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="POST", role=PUBLISHERS, rate_limit=("announcement_republish", "60/m"))
+def announcement_republish(request, decoded, pk):
     with transaction.atomic():
         announcement = _locked(pk)
         if announcement.status != Announcement.STATUS_UNPUBLISHED:
@@ -556,7 +487,12 @@ def announcement_sync_crawler(request):
     後台公告」（見 adminapi/crawler_sync.py 的完整說明），跟考試時程的
     手動重爬（_exam_schedule_refresh）同一層級的 CONTENT_EDITORS 權限；
     限流比重爬更嚴（5/m，考試時程重爬是 10/m），因為這支同步一次會強制
-    重新爬兩個外部來源，且會實際寫入資料庫。"""
+    重新爬兩個外部來源，且會實際寫入資料庫。
+
+    GET／POST 共用同一個角色、但只有 POST 需要限流，形狀跟 guarded_action
+    設計的「單一 method」情境不同，這裡繼續手寫（見 _shared.guarded_action
+    的說明：刻意不強行套用不適合的案例）。
+    """
     decoded, err_resp = require_role(request, CONTENT_EDITORS)
     if err_resp:
         return err_resp
@@ -582,7 +518,8 @@ def announcement_sync_crawler(request):
 
 
 @csrf_exempt
-def audit_log_list(request):
+@guarded_action(method="GET", role=ACCOUNT_MANAGERS)
+def audit_log_list(request, decoded):
     """稽核日誌唯讀清單，給後台儀表板的「最近操作」面板用。
 
     限縮在 ACCOUNT_MANAGERS（owner／admin）——稽核紀錄的 before/after 會夾帶
@@ -591,12 +528,6 @@ def audit_log_list(request):
     這裡只提供讀取，寫入完全由 _write_audit_log 內部呼叫，這支端點不開放
     任何寫入方法。
     """
-    if request.method != "GET":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, ACCOUNT_MANAGERS)
-    if err_resp:
-        return err_resp
-
     try:
         limit = min(50, max(1, int(request.GET.get("limit", 10))))
     except ValueError:

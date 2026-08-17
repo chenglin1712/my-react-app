@@ -36,7 +36,13 @@ def client():
     app.dependency_overrides[auth_module.verify_firebase_token] = _fake_auth
     try:
         with patch("fastAPI.routes.dictionary.search._load_tribe_words", return_value=[]):
-            with TestClient(app) as test_client:
+            # raise_server_exceptions=False：search.py 這幾支端點不再自己
+            # 包一層 except Exception（P4 review BE-28，見 search.py 的
+            # 說明），未攔截的例外交給 main.py 的全域 handler 處理；預設
+            # 的 TestClient 在回應送出後仍會把原始例外重新拋出給測試本身，
+            # 關掉這個行為才能對 test_key_endpoint_responds_normally_
+            # even_if_event_recording_raises 的回應內容斷言。
+            with TestClient(app, raise_server_exceptions=False) as test_client:
                 yield test_client
     finally:
         app.dependency_overrides.clear()
@@ -78,9 +84,10 @@ def test_key_endpoint_responds_normally_even_if_event_recording_raises(client):
     這支測試只是驗證呼叫順序（先回應內容都算完才記錄）沒有製造新的脆弱點。"""
     with patch("fastAPI.routes.dictionary.search.record_event", side_effect=RuntimeError("boom")):
         response = client.post("/api/v1/dictionary/key/", json={"keyword": "balay", "tribe": "tayal"})
-    # 目前的 try/except Exception 涵蓋整個 handler，record_event 出錯會被
-    # 外層攔截轉成 500——這正是為什麼 record_event 自己必須保證不拋例外
-    # （見 fastAPI/usage_events.py），這裡記錄下這個耦合，不是期望值本身。
+    # allsearch_tayal_dictionary 本身不再攔截這個例外（P4 review BE-28），
+    # record_event 出錯會往外傳到 main.py 的全域 handler 被轉成 500——這正是
+    # 為什麼 record_event 自己必須保證不拋例外（見 fastAPI/usage_events.py），
+    # 這裡記錄下這個耦合，不是期望值本身。
     assert response.status_code == 500
 
 

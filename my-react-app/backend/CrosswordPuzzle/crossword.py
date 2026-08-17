@@ -3,17 +3,25 @@
 import random
 import re
 import time
-import string
-from copy import copy as duplicate
+
+from CrosswordPuzzle import crossword_display
 
 
 class Crossword(object):
-    def __init__(self, cols, rows, empty='-', maxloops=2000, available_words=[]):
+    def __init__(self, cols, rows, empty='-', maxloops=2000, available_words=None, rng=None):
+        """rng：排字演算法（randomize_word_list／sort_coordlist／fit_and_add
+        用到的 random.shuffle／random.randrange）要用的亂數來源，預設是
+        random 模組本身（跟原本沒有這個參數時的行為完全一樣——都是共用
+        process 全域的亂數狀態）。傳入 random.Random(seed) 這種獨立實例可以
+        讓同一組候選字在同一顆種子下每次都排出同一個結果，方便幫排字演算法
+        寫可重現的測試（P4 review BE-26），不需要真的固定 process 全域的
+        random 狀態去影響到程式裡其他無關的地方。"""
         self.cols = cols
         self.rows = rows
         self.empty = empty
         self.maxloops = maxloops
-        self.available_words = available_words
+        self.available_words = list(available_words) if available_words else []
+        self._rng = rng if rng is not None else random
         self.randomize_word_list()
         self.current_word_list = []
         self.clear_grid()
@@ -37,14 +45,14 @@ class Crossword(object):
             else:
                 temp_list.append(Word(word[0], word[1]))
         # randomize word list
-        random.shuffle(temp_list)
+        self._rng.shuffle(temp_list)
         # sort by length
         temp_list.sort(key=lambda i: len(i.word), reverse=True)
         self.available_words = temp_list
 
     def compute_crossword(self, time_permitted=1.00, spins=2):
         copy = Crossword(self.cols, self.rows, self.empty,
-                         self.maxloops, self.available_words)
+                         self.maxloops, self.available_words, rng=self._rng)
 
         count = 0
         time_permitted = float(time_permitted)
@@ -130,7 +138,7 @@ class Crossword(object):
             if coord[4]:
                 new_coordlist.append(coord)
         # randomize coord list; why not?
-        random.shuffle(new_coordlist)
+        self._rng.shuffle(new_coordlist)
         # put the best scores first
         new_coordlist.sort(key=lambda i: i[4], reverse=True)
         return new_coordlist
@@ -147,7 +155,7 @@ class Crossword(object):
             # this is the first word: the seed
             if len(self.current_word_list) == 0:
                 # top left seed of longest word yields best results (maybe override)
-                vertical, col, row = random.randrange(0, 2), 1, 1
+                vertical, col, row = self._rng.randrange(0, 2), 1, 1
 
                 """
                 # optional center seed method, slower and less keyword placement
@@ -282,24 +290,11 @@ class Crossword(object):
 
     def solution(self):
         """Return solution grid."""
-        outStr = ""
-        for r in range(self.rows):
-            for c in self.grid[r]:
-                outStr += '%s ' % c
-            outStr += '\n'
-        return outStr
+        return crossword_display.solution(self)
 
     def word_find(self):
         """Return solution grid."""
-        outStr = ""
-        for r in range(self.rows):
-            for c in self.grid[r]:
-                if c == self.empty:
-                    outStr += '%s ' % string.ascii_lowercase[random.randint(0,len(string.ascii_lowercase)-1)]
-                else:
-                    outStr += '%s ' % c
-            outStr += '\n'
-        return outStr
+        return crossword_display.word_find(self)
 
     def order_number_words(self):
         """Orders words and applies numbering system to them."""
@@ -316,49 +311,14 @@ class Crossword(object):
 
     def display(self, order=True):
         """返回顯示用的網格，將字母替換為空格並標上數字。"""
-        if order:
-            self.order_number_words()
+        return crossword_display.display(self, order=order)
 
-        # 建立一個新的網格，用來顯示數字和空格
-        # 從現有的網格複製，但只保留數字和 '-'
-        display_grid = [
-            [' ' if cell not in ('-') else '-' for cell in row]
-            for row in self.grid
-        ]
-
-        for word in self.current_word_list:
-            number_str = str(word.number)
-            start_col = word.col
-            start_row = word.row
-            
-            # 確保座標在網格範圍內
-            if 0 <= start_row - 1 < self.rows and 0 <= start_col - 1 < self.cols:
-                # 取得起始格的現有內容
-                current_cell_content = display_grid[start_row - 1][start_col - 1]
-                
-                # 如果該格不是黑格，將其設定為數字字串
-                if current_cell_content != '-':
-                    display_grid[start_row - 1][start_col - 1] = number_str
-        
-        # 將網格轉換為字串列表
-        out_list = [''.join(row) for row in display_grid]
-        return out_list
-    
     def word_bank(self):
-        outStr = ''
-        temp_list = duplicate(self.current_word_list)
-        # randomize word list
-        random.shuffle(temp_list)
-        for word in temp_list:
-            outStr += '%s\n' % word.word
-        return outStr
+        return crossword_display.word_bank(self)
 
     def legend(self):
         """Must order first."""
-        outStr = ''
-        for word in self.current_word_list:
-            outStr += '%d. (%d,%d) %s: %s\n' % (word.number, word.col, word.row, word.down_across(), word.clue)
-        return outStr
+        return crossword_display.legend(self)
 
 
 class Word(object):

@@ -5,16 +5,18 @@ from rest_framework import serializers
 from ..models import FeatureFlag, GameConfig, IrtConfig, RateLimitRule
 
 
+_IRT_CONFIG_FIELDS = [
+    'total_questions', 'alpha0', 'beta0', 'default_guess', 'learning_rate',
+    'dq_alpha', 'dq_beta', 'dq_gamma',
+    'type_aq_word_translate', 'type_aq_word_match', 'type_aq_sentence_fill', 'type_aq_sentence_order',
+    'beta1', 'beta2', 'beta3', 'beta4', 'beta5',
+]
+
+
 class IrtConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model = IrtConfig
-        fields = [
-            'total_questions', 'alpha0', 'beta0', 'default_guess', 'learning_rate',
-            'dq_alpha', 'dq_beta', 'dq_gamma',
-            'type_aq_word_translate', 'type_aq_word_match', 'type_aq_sentence_fill', 'type_aq_sentence_order',
-            'beta1', 'beta2', 'beta3', 'beta4', 'beta5',
-            'updated_by', 'updated_at',
-        ]
+        fields = _IRT_CONFIG_FIELDS + ['updated_by', 'updated_at']
         read_only_fields = ['updated_by', 'updated_at']
 
     def validate_total_questions(self, value):
@@ -33,12 +35,7 @@ class PublicIrtConfigSerializer(serializers.ModelSerializer):
         model = IrtConfig
         # 給 FastAPI 讀取用（見 views.py 的 public_irt_config，無需登入），
         # 不含 updated_by／updated_at 這些後台維運資訊。
-        fields = [
-            'total_questions', 'alpha0', 'beta0', 'default_guess', 'learning_rate',
-            'dq_alpha', 'dq_beta', 'dq_gamma',
-            'type_aq_word_translate', 'type_aq_word_match', 'type_aq_sentence_fill', 'type_aq_sentence_order',
-            'beta1', 'beta2', 'beta3', 'beta4', 'beta5',
-        ]
+        fields = _IRT_CONFIG_FIELDS
 
 
 _GAME_CONFIG_FIELDS = [

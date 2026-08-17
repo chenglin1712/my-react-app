@@ -47,16 +47,27 @@ def _require_int_id_list(value, field, errors):
             errors[f'{field}[{index}]'] = '必須是整數'
 
 
-def _validate_anaphora_item(item, index, errors_prefix, errors):
+def _validate_word_id_ref(item, errors_prefix, errors):
+    """一般詞條樹的標註項目參照：word_id，字串或 null（指到既有詞條的 pk）。"""
+    if 'word_id' in item and item['word_id'] is not None and not isinstance(item['word_id'], str):
+        errors[f'{errors_prefix}.word_id'] = '必須是字串或 null'
+
+
+def _validate_word_name_ref(item, errors_prefix, errors):
+    """批次匯入的標註項目參照：word_name，字串、允許空白、選填（人工編輯
+    檔案時用詞形比對，見本檔案批次匯入區塊開頭的說明）。"""
+    _require_str(item.get('word_name'), f'{errors_prefix}.word_name', errors, allow_blank=True, required=False)
+
+
+def _validate_anaphora_item(item, index, errors_prefix, errors, *, validate_ref):
     if not isinstance(item, dict):
         errors[f'{errors_prefix}[{index}]'] = '格式錯誤'
         return
-    if 'word_id' in item and item['word_id'] is not None and not isinstance(item['word_id'], str):
-        errors[f'{errors_prefix}[{index}].word_id'] = '必須是字串或 null'
+    validate_ref(item, f'{errors_prefix}[{index}]', errors)
     _require_str(item.get('name'), f'{errors_prefix}[{index}].name', errors, allow_blank=True, required=False)
 
 
-def _validate_anaphora(item, index, errors_prefix, errors):
+def _validate_anaphora(item, index, errors_prefix, errors, *, validate_ref):
     if not isinstance(item, dict):
         errors[f'{errors_prefix}[{index}]'] = '格式錯誤'
         return
@@ -64,10 +75,10 @@ def _validate_anaphora(item, index, errors_prefix, errors):
     if not _require_list(items, f'{errors_prefix}[{index}].items', errors):
         return
     for i, sub in enumerate(items):
-        _validate_anaphora_item(sub, i, f'{errors_prefix}[{index}].items', errors)
+        _validate_anaphora_item(sub, i, f'{errors_prefix}[{index}].items', errors, validate_ref=validate_ref)
 
 
-def _validate_sentence(item, index, errors_prefix, errors):
+def _validate_sentence(item, index, errors_prefix, errors, *, validate_ref):
     if not isinstance(item, dict):
         errors[f'{errors_prefix}[{index}]'] = '格式錯誤'
         return
@@ -81,18 +92,18 @@ def _validate_sentence(item, index, errors_prefix, errors):
     anaphoras = item.get('anaphoras', [])
     if _require_list(anaphoras, f'{errors_prefix}[{index}].anaphoras', errors):
         for i, ana in enumerate(anaphoras):
-            _validate_anaphora(ana, i, f'{errors_prefix}[{index}].anaphoras', errors)
+            _validate_anaphora(ana, i, f'{errors_prefix}[{index}].anaphoras', errors, validate_ref=validate_ref)
 
 
-def _validate_explanation(item, index, errors):
+def _validate_explanation(item, index, errors, *, validate_ref, taxonomy_fields):
     prefix = f'explanations[{index}]'
     if not isinstance(item, dict):
         errors[prefix] = '格式錯誤'
         return
     _require_str(item.get('chinese_explanation'), f'{prefix}.chinese_explanation',
                   errors, allow_blank=True, required=False)
-    for field in ('category_ids', 'pos_ids', 'focus_ids'):
-        _require_int_id_list(item.get(field, []), f'{prefix}.{field}', errors)
+    for field, validate_field in taxonomy_fields:
+        validate_field(item.get(field, []), f'{prefix}.{field}', errors)
     images = item.get('images', [])
     if _require_list(images, f'{prefix}.images', errors):
         for i, img in enumerate(images):
@@ -101,7 +112,86 @@ def _validate_explanation(item, index, errors):
     sentences = item.get('sentences', [])
     if _require_list(sentences, f'{prefix}.sentences', errors):
         for i, sent in enumerate(sentences):
-            _validate_sentence(sent, i, f'{prefix}.sentences', errors)
+            _validate_sentence(sent, i, f'{prefix}.sentences', errors, validate_ref=validate_ref)
+
+
+# explanations[].category_ids／pos_ids／focus_ids（一般詞條樹）跟
+# category_names／pos_names／focus_names（批次匯入）是這份驗證邏輯裡
+# 「分類參照」這件事的兩種不同表示法：前者是主檔 id，逐元素檢查型別
+# （_require_int_id_list）；後者是人工編輯檔案時填的名稱，目前只檢查
+# 整體是不是陣列、不檢查每個元素的型別（_require_list）——這個較寬鬆的
+# 既有行為刻意保留，交給 resolve_import_bundle() 之後用名稱比對，不是
+# 這次重構（P4 review BE-30：合併兩份幾乎相同的遞迴驗證）要收緊的範圍。
+_TAXONOMY_ID_FIELDS = [
+    ('category_ids', _require_int_id_list),
+    ('pos_ids', _require_int_id_list),
+    ('focus_ids', _require_int_id_list),
+]
+_TAXONOMY_NAME_FIELDS = [
+    ('category_names', _require_list),
+    ('pos_names', _require_list),
+    ('focus_names', _require_list),
+]
+
+
+def _validate_word_payload(payload, *, mode):
+    """validate_word_tree_payload／validate_word_bundle_entry 共用的遞迴
+    驗證主體（P4 review BE-30）。原本這兩支函式各自手寫一份幾乎一模一樣
+    的四層遞迴（explanation → sentence → anaphora → anaphora item），
+    唯一的差異只在三處「mode-dependent」欄位：頂層必填/選填的識別欄位、
+    分類參照的表示法、標註項目參照的表示法——見
+    _TAXONOMY_ID_FIELDS/_TAXONOMY_NAME_FIELDS 與
+    _validate_word_id_ref/_validate_word_name_ref 的說明。其餘結構性
+    檢查（字串/整數/布林型別、陣列形狀、格式錯誤訊息）完全共用同一份邏輯，
+    不會因為 mode 不同而分岔。
+    """
+    errors = {}
+    if not isinstance(payload, dict):
+        return None, {'detail': '請求格式錯誤' if mode == 'tree' else '格式錯誤'}
+
+    if mode == 'tree':
+        _require_str(payload.get('tribe_id'), 'tribe_id', errors)
+        validate_ref = _validate_word_id_ref
+        taxonomy_fields = _TAXONOMY_ID_FIELDS
+    else:
+        if 'id' in payload and payload['id'] is not None and not isinstance(payload['id'], str):
+            errors['id'] = '必須是字串或 null'
+        validate_ref = _validate_word_name_ref
+        taxonomy_fields = _TAXONOMY_NAME_FIELDS
+
+    _require_str(payload.get('name'), 'name', errors)
+
+    for field in ('dialect', 'pinyin', 'variant', 'formation_word', 'derivative_root',
+                  'dictionary_note', 'word_img'):
+        if field in payload and payload[field] is not None and not isinstance(payload[field], str):
+            errors[field] = '必須是字串'
+
+    if 'frequency' in payload and payload['frequency'] is not None and not isinstance(payload['frequency'], int):
+        errors['frequency'] = '必須是整數'
+
+    for field in ('is_derivative_root', 'is_image', 'is_zuzucidian', 'is_other_dialect'):
+        if field in payload and payload[field] is not None and not isinstance(payload[field], bool):
+            errors[field] = '必須是布林值'
+
+    if mode == 'tree':
+        _require_int_id_list(payload.get('source_ids', []), 'source_ids', errors)
+    else:
+        _require_list(payload.get('source_names', []), 'source_names', errors)
+
+    audios = payload.get('audios', [])
+    if _require_list(audios, 'audios', errors):
+        for i, audio in enumerate(audios):
+            if not isinstance(audio, dict):
+                errors[f'audios[{i}]'] = '格式錯誤'
+
+    explanations = payload.get('explanations', [])
+    if _require_list(explanations, 'explanations', errors):
+        for i, exp in enumerate(explanations):
+            _validate_explanation(exp, i, errors, validate_ref=validate_ref, taxonomy_fields=taxonomy_fields)
+
+    if errors:
+        return None, errors
+    return payload, {}
 
 
 def validate_word_tree_payload(payload):
@@ -112,47 +202,13 @@ def validate_word_tree_payload(payload):
     也更難維護（跟 QuizClozePassageSerializer.blanks 選擇手動驗證的理由
     一致）。
     """
-    errors = {}
-    if not isinstance(payload, dict):
-        return None, {'detail': '請求格式錯誤'}
-
-    _require_str(payload.get('tribe_id'), 'tribe_id', errors)
-    _require_str(payload.get('name'), 'name', errors)
-
-    for field in ('dialect', 'pinyin', 'variant', 'formation_word', 'derivative_root',
-                  'dictionary_note', 'word_img'):
-        if field in payload and payload[field] is not None and not isinstance(payload[field], str):
-            errors[field] = '必須是字串'
-
-    if 'frequency' in payload and payload['frequency'] is not None and not isinstance(payload['frequency'], int):
-        errors['frequency'] = '必須是整數'
-
-    for field in ('is_derivative_root', 'is_image', 'is_zuzucidian', 'is_other_dialect'):
-        if field in payload and payload[field] is not None and not isinstance(payload[field], bool):
-            errors[field] = '必須是布林值'
-
-    _require_int_id_list(payload.get('source_ids', []), 'source_ids', errors)
-
-    audios = payload.get('audios', [])
-    if _require_list(audios, 'audios', errors):
-        for i, audio in enumerate(audios):
-            if not isinstance(audio, dict):
-                errors[f'audios[{i}]'] = '格式錯誤'
-
-    explanations = payload.get('explanations', [])
-    if _require_list(explanations, 'explanations', errors):
-        for i, exp in enumerate(explanations):
-            _validate_explanation(exp, i, errors)
-
-    if errors:
-        return None, errors
-    return payload, {}
+    return _validate_word_payload(payload, mode='tree')
 
 
 # ---------------------------------------------------------------------------
-# 批次匯入（P4.4）：跟 validate_word_tree_payload 幾乎同一份形狀，差異只有
-# 三處——(1) 頂層多一個選填的 `id`（有帶代表精準指定要更新哪一筆既有詞條，
-# 不帶則由 dictionary_import.py 依詞形在同族語內比對）；(2) 分類主檔用
+# 批次匯入（P4.4）：跟 validate_word_tree_payload 共用 _validate_word_payload，
+# 差異只有三處——(1) 頂層多一個選填的 `id`（有帶代表精準指定要更新哪一筆既有
+# 詞條，不帶則由 dictionary_import.py 依詞形在同族語內比對）；(2) 分類主檔用
 # `source_names`／`category_names`／`pos_names`／`focus_names`（人工編輯
 # 檔案時不可能記得 category.id=7 是「植物」）；(3) 標註項目用 `word_name`
 # 取代 `word_id`。其餘欄位（含每一層的巢狀 `id`）跟一般詞條樹 payload
@@ -160,106 +216,10 @@ def validate_word_tree_payload(payload):
 # 讓「匯出 → 手動編輯 → 重新匯入」不會每次都churn 掉全部子節點的 id。
 # ---------------------------------------------------------------------------
 
-def _validate_bundle_anaphora_item(item, index, errors_prefix, errors):
-    if not isinstance(item, dict):
-        errors[f'{errors_prefix}[{index}]'] = '格式錯誤'
-        return
-    _require_str(item.get('word_name'), f'{errors_prefix}[{index}].word_name', errors,
-                  allow_blank=True, required=False)
-    _require_str(item.get('name'), f'{errors_prefix}[{index}].name', errors, allow_blank=True, required=False)
-
-
-def _validate_bundle_anaphora(item, index, errors_prefix, errors):
-    if not isinstance(item, dict):
-        errors[f'{errors_prefix}[{index}]'] = '格式錯誤'
-        return
-    items = item.get('items', [])
-    if not _require_list(items, f'{errors_prefix}[{index}].items', errors):
-        return
-    for i, sub in enumerate(items):
-        _validate_bundle_anaphora_item(sub, i, f'{errors_prefix}[{index}].items', errors)
-
-
-def _validate_bundle_sentence(item, index, errors_prefix, errors):
-    if not isinstance(item, dict):
-        errors[f'{errors_prefix}[{index}]'] = '格式錯誤'
-        return
-    _require_str(item.get('original_sentence'), f'{errors_prefix}[{index}].original_sentence',
-                  errors, allow_blank=True, required=False)
-    audios = item.get('audios', [])
-    if _require_list(audios, f'{errors_prefix}[{index}].audios', errors):
-        for i, audio in enumerate(audios):
-            if not isinstance(audio, dict):
-                errors[f'{errors_prefix}[{index}].audios[{i}]'] = '格式錯誤'
-    anaphoras = item.get('anaphoras', [])
-    if _require_list(anaphoras, f'{errors_prefix}[{index}].anaphoras', errors):
-        for i, ana in enumerate(anaphoras):
-            _validate_bundle_anaphora(ana, i, f'{errors_prefix}[{index}].anaphoras', errors)
-
-
-def _validate_bundle_explanation(item, index, errors):
-    prefix = f'explanations[{index}]'
-    if not isinstance(item, dict):
-        errors[prefix] = '格式錯誤'
-        return
-    _require_str(item.get('chinese_explanation'), f'{prefix}.chinese_explanation',
-                  errors, allow_blank=True, required=False)
-    for field in ('category_names', 'pos_names', 'focus_names'):
-        value = item.get(field, [])
-        if value is not None and not isinstance(value, list):
-            errors[f'{prefix}.{field}'] = '必須是陣列'
-    images = item.get('images', [])
-    if _require_list(images, f'{prefix}.images', errors):
-        for i, img in enumerate(images):
-            if not isinstance(img, dict):
-                errors[f'{prefix}.images[{i}]'] = '格式錯誤'
-    sentences = item.get('sentences', [])
-    if _require_list(sentences, f'{prefix}.sentences', errors):
-        for i, sent in enumerate(sentences):
-            _validate_bundle_sentence(sent, i, f'{prefix}.sentences', errors)
-
-
 def validate_word_bundle_entry(payload):
     """回傳 (cleaned_payload, errors)，形狀比照 validate_word_tree_payload
     的說明，差異見本節開頭註解。"""
-    errors = {}
-    if not isinstance(payload, dict):
-        return None, {'detail': '格式錯誤'}
-
-    if 'id' in payload and payload['id'] is not None and not isinstance(payload['id'], str):
-        errors['id'] = '必須是字串或 null'
-    _require_str(payload.get('name'), 'name', errors)
-
-    for field in ('dialect', 'pinyin', 'variant', 'formation_word', 'derivative_root',
-                  'dictionary_note', 'word_img'):
-        if field in payload and payload[field] is not None and not isinstance(payload[field], str):
-            errors[field] = '必須是字串'
-
-    if 'frequency' in payload and payload['frequency'] is not None and not isinstance(payload['frequency'], int):
-        errors['frequency'] = '必須是整數'
-
-    for field in ('is_derivative_root', 'is_image', 'is_zuzucidian', 'is_other_dialect'):
-        if field in payload and payload[field] is not None and not isinstance(payload[field], bool):
-            errors[field] = '必須是布林值'
-
-    source_names = payload.get('source_names', [])
-    if source_names is not None and not isinstance(source_names, list):
-        errors['source_names'] = '必須是陣列'
-
-    audios = payload.get('audios', [])
-    if _require_list(audios, 'audios', errors):
-        for i, audio in enumerate(audios):
-            if not isinstance(audio, dict):
-                errors[f'audios[{i}]'] = '格式錯誤'
-
-    explanations = payload.get('explanations', [])
-    if _require_list(explanations, 'explanations', errors):
-        for i, exp in enumerate(explanations):
-            _validate_bundle_explanation(exp, i, errors)
-
-    if errors:
-        return None, errors
-    return payload, {}
+    return _validate_word_payload(payload, mode='bundle')
 
 
 def validate_import_bundle_structure(data):

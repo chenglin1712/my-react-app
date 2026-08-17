@@ -69,12 +69,13 @@ def test_upgrade_head_from_empty_db_creates_full_schema(alembic_config):
 
     with engine.connect() as conn:
         version = conn.exec_driver_sql("SELECT version_num FROM alembic_version").scalar()
-    # 族語翻譯功能新增 86d389a704d0，是目前的 head（見該檔案 down_revision
-    # 接在 bd80bf38fb2d 之後）。這支 migration 在 SQLite 上只建
-    # translation_attested_form 這張 dialect 中立的表，pg_trgm 專屬的
-    # extension／運算式索引整段跳過（見該檔案 upgrade() 的 is_postgres 判斷），
-    # 這裡走的正是 SQLite 分支，用來驗證那個分支本身不會出錯。
-    assert version == "86d389a704d0"
+    # P4 review BE-21／BE-22 新增 9e468bdaf95e，是目前的 head（見該檔案
+    # down_revision 接在 86d389a704d0 之後）：四張 junction table 補
+    # composite unique constraint、grammar_example_word.word_id 補 FK。
+    # 這支 migration 全部用 op.batch_alter_table()，SQLite／Postgres
+    # 用同一份定義即可（SQLite 不支援直接 ALTER TABLE ADD CONSTRAINT，
+    # batch 模式在 SQLite 上會自動改用建臨時表搬資料的方式達成同樣效果）。
+    assert version == "9e468bdaf95e"
 
 
 def test_upgrade_head_is_idempotent(alembic_config):

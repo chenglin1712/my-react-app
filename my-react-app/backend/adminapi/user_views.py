@@ -17,13 +17,12 @@ import logging
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
-from core.firebase_auth import require_role
 from config.roles import ACCOUNT_MANAGERS, OWNER, ROLE_ASSIGNERS, STAFF_ROLES
 
 from . import firebase_ops
 from ._shared import (
+    guarded_action,
     parse_json_body as _parse_json_body,
-    rate_limited_response as _rate_limited_response,
     safe_write_audit_log as _safe_write_audit_log,
 )
 from .user_service import (
@@ -46,11 +45,8 @@ def user_list(request):
     return JsonResponse({"detail": "Method not allowed"}, status=405)
 
 
-def _list_users(request):
-    decoded, err_resp = require_role(request, STAFF_ROLES)
-    if err_resp:
-        return err_resp
-
+@guarded_action(method="GET", role=STAFF_ROLES)
+def _list_users(request, decoded):
     users = firebase_ops.list_all_firebase_users()
 
     client = firebase_ops.get_firestore_client()
@@ -107,19 +103,13 @@ def _list_users(request):
     })
 
 
-def _create_user(request):
+@guarded_action(method="POST", role=ACCOUNT_MANAGERS, rate_limit=("user_create", "10/m"))
+def _create_user(request, decoded):
     """後台直接建立使用者帳號——不一定要透過前台 /register 走一次公開
     註冊流程（P3.8 的既有決策）。ACCOUNT_MANAGERS 就能建立一般帳號，但
     建立當下要順便指派角色（role 欄位非 null）時，額外要求呼叫者是
     owner——跟獨立的角色指派端點（user_role）同一道防線，不能因為走的是
     建立帳號這條路就繞過「只有 owner 能指派角色」。"""
-    decoded, err_resp = require_role(request, ACCOUNT_MANAGERS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="user_create", rate="10/m")
-    if limited_resp:
-        return limited_resp
-
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -204,13 +194,8 @@ def _create_user(request):
 
 
 @csrf_exempt
-def user_detail(request, uid):
-    if request.method != "GET":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, STAFF_ROLES)
-    if err_resp:
-        return err_resp
-
+@guarded_action(method="GET", role=STAFF_ROLES)
+def user_detail(request, decoded, uid):
     from firebase_admin import auth as firebase_auth
     try:
         user_record = firebase_ops.get_firebase_user(uid)
@@ -239,17 +224,9 @@ def user_detail(request, uid):
 
 
 @csrf_exempt
-def user_role(request, uid):
+@guarded_action(method="POST", role=ROLE_ASSIGNERS, rate_limit=("user_role", "30/m"))
+def user_role(request, decoded, uid):
     """僅 owner 可指派/收回角色（ROLE_ASSIGNERS 目前唯一的使用場景）。"""
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, ROLE_ASSIGNERS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="user_role", rate="30/m")
-    if limited_resp:
-        return limited_resp
-
     forbidden_resp = _forbidden_if_self_target(decoded, uid, "指派角色")
     if forbidden_resp:
         return forbidden_resp
@@ -283,21 +260,13 @@ def user_role(request, uid):
 
 
 @csrf_exempt
-def user_profile(request, uid):
+@guarded_action(method="PATCH", role=ACCOUNT_MANAGERS, rate_limit=("user_profile", "30/m"))
+def user_profile(request, decoded, uid):
     """編輯使用者基本資料——name／identity／avatar_url 是 Firestore
     users/{uid} 文件的欄位，email 選填、有帶才同步更新 Firebase Auth
     （前台註冊時兩邊各存一份，見 userServive.jsx 的 registerWithImg，
     這裡改了 Auth 這邊也要跟著改，不然兩邊會不一致）。partial update：
     body 裡沒帶到的欄位維持原值不動。"""
-    if request.method != "PATCH":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, ACCOUNT_MANAGERS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="user_profile", rate="30/m")
-    if limited_resp:
-        return limited_resp
-
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -381,22 +350,14 @@ def user_profile(request, uid):
 
 
 @csrf_exempt
-def user_password(request, uid):
+@guarded_action(method="POST", role=ACCOUNT_MANAGERS, rate_limit=("user_password", "10/m"))
+def user_password(request, decoded, uid):
     """管理員代使用者變更密碼——比停權/刪除更敏感（等於能無聲完整接管
     帳號登入身分），比照刪除帳號的確認強度，要求輸入目標帳號 email 逐字
     相符才會執行；成功後強制 revoke_sessions，被改密碼的人手上所有舊
     登入立刻失效（也是在提示使用者「有異常」的唯一訊號，因為我們不會
     寄信通知）。稽核紀錄故意不存新密碼本身，只記錄「密碼已變更」這個
     事實，避免明文密碼留在 AuditLog 裡。"""
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, ACCOUNT_MANAGERS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="user_password", rate="10/m")
-    if limited_resp:
-        return limited_resp
-
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -440,26 +401,16 @@ def user_password(request, uid):
 
 @csrf_exempt
 def user_suspend(request, uid):
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
     return _set_suspended(request, uid, True)
 
 
 @csrf_exempt
 def user_unsuspend(request, uid):
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
     return _set_suspended(request, uid, False)
 
 
-def _set_suspended(request, uid, disabled):
-    decoded, err_resp = require_role(request, ACCOUNT_MANAGERS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="user_suspend", rate="30/m")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="POST", role=ACCOUNT_MANAGERS, rate_limit=("user_suspend", "30/m"))
+def _set_suspended(request, decoded, uid, disabled):
     if disabled:
         forbidden_resp = _forbidden_if_self_target(decoded, uid, "停權")
         if forbidden_resp:
@@ -489,16 +440,8 @@ def _set_suspended(request, uid, disabled):
 
 
 @csrf_exempt
-def user_force_logout(request, uid):
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, ACCOUNT_MANAGERS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="user_force_logout", rate="30/m")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="POST", role=ACCOUNT_MANAGERS, rate_limit=("user_force_logout", "30/m"))
+def user_force_logout(request, decoded, uid):
     from firebase_admin import auth as firebase_auth
     try:
         target_user = firebase_ops.get_firebase_user(uid)
@@ -514,19 +457,11 @@ def user_force_logout(request, uid):
 
 
 @csrf_exempt
-def user_export(request, uid):
+@guarded_action(method="GET", role=ACCOUNT_MANAGERS, rate_limit=("user_export", "10/m", "GET"))
+def user_export(request, decoded, uid):
     """個資匯出——把 Firebase Auth 記錄 + Firestore 使用者文件 + 該 uid 名下
     sharedNotes/pronunciations 全部文件包成一個 JSON 檔下載。匯出本身也是
     敏感動作，要寫稽核紀錄。"""
-    if request.method != "GET":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, ACCOUNT_MANAGERS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="user_export", rate="10/m", method="GET")
-    if limited_resp:
-        return limited_resp
-
     from firebase_admin import auth as firebase_auth
     try:
         user_record = firebase_ops.get_firebase_user(uid)
@@ -567,22 +502,14 @@ def user_export(request, uid):
 
 
 @csrf_exempt
-def user_delete(request, uid):
+@guarded_action(method="POST", role=ACCOUNT_MANAGERS, rate_limit=("user_delete", "10/m"))
+def user_delete(request, decoded, uid):
     """刪除帳號——body 必填 confirm_email，逐字比對目標帳號真實 email 才會
     真的執行（P3 規劃的既有決策：後台必須輸入該帳號 email 才能刪）。
 
     Firestore／Storage／Firebase Auth 之間沒有跨系統交易，每一步各自
     try/except，回傳每一步的成功/失敗，讓管理者知道哪個環節沒刪乾淨需要
     人工複查，不假設「要嘛全成功要嘛全失敗」。"""
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, ACCOUNT_MANAGERS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="user_delete", rate="10/m")
-    if limited_resp:
-        return limited_resp
-
     forbidden_resp = _forbidden_if_self_target(decoded, uid, "刪除帳號")
     if forbidden_resp:
         return forbidden_resp

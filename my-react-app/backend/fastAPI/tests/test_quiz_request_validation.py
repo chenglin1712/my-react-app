@@ -28,7 +28,13 @@ def client():
     app.dependency_overrides[get_db] = _fake_get_db
     app.dependency_overrides[auth_module.verify_firebase_token] = _fake_auth
     try:
-        with TestClient(app) as test_client:
+        # raise_server_exceptions=False：generate_quiz_frontend／
+        # submit_answer_frontend 不再自己包 except Exception（P4 review
+        # BE-28，見 quiz/api.py 的說明），未攔截的例外交給 main.py 的全域
+        # handler 處理；預設的 TestClient 在回應送出後仍會把原始例外重新
+        # 拋出給測試本身，關掉這個行為才能對 test_generate_quiz_masks_
+        # internal_exception 的回應內容斷言。
+        with TestClient(app, raise_server_exceptions=False) as test_client:
             yield test_client
     finally:
         app.dependency_overrides.clear()
