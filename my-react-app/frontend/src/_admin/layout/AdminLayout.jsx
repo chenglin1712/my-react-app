@@ -1,9 +1,10 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { BarChart3, BookOpen, ClipboardCheck, FileQuestion, Gamepad2, LayoutDashboard, Megaphone, Settings, Users } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
+import ErrorBoundary from '../../errorBoundary';
+import { ROLE_LABELS } from '../constants/roles';
 import '../../../static/css/_admin/layout.css';
 
-const ROLE_LABELS = { owner: '擁有者', admin: '管理員', editor: '內容編輯', reviewer: '審核者', analyst: '數據觀察者' };
 
 const NAV_GROUPS = [
     { label: '總覽', icon: LayoutDashboard, items: [{ label: '儀表板', to: '/admin', end: true }] },
@@ -104,7 +105,29 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
                     <div className="admin-breadcrumb" aria-label="麵包屑">{breadcrumb.map((part, index) => <span key={`${part}-${index}`}>{index > 0 && <i>›</i>}{part}</span>)}</div>
                     <div className="admin-topbar-user"><span className="admin-user-avatar">{ROLE_LABELS[userData?.role]?.charAt(0) ?? '管'}</span><div><strong>{ROLE_LABELS[userData?.role] ?? '後台人員'}</strong><small>{userData?.role ?? ''}</small></div></div>
                 </header>
-                <div className="admin-route-content"><Outlet /></div>
+                {/* FE-4：後台是全站最複雜的區塊，但原本完全沒有自己的
+                    error boundary——任何一個管理頁面丟出例外，都會一路
+                    炸到 route.jsx 最外層那一個，連側邊欄與麵包屑都一起
+                    消失，使用者只能整頁重載。這裡包一層 scoped boundary，
+                    讓錯誤侷限在內容區、導覽仍然可用。
+                    resetKeys 傳入 pathname：換到另一個管理頁面時自動
+                    復原，不會黏在前一頁的錯誤畫面（見 errorBoundary.jsx）。 */}
+                <div className="admin-route-content">
+                    <ErrorBoundary
+                        resetKeys={[pathname]}
+                        fallback={({ reset }) => (
+                            <div className="admin-route-error" role="alert">
+                                <h2>這個管理頁面發生錯誤</h2>
+                                <p>可以重試一次，或從左側選單切換到其他頁面繼續操作。</p>
+                                <button type="button" className="btn btn-danger" onClick={reset}>
+                                    重新載入這個頁面
+                                </button>
+                            </div>
+                        )}
+                    >
+                        <Outlet />
+                    </ErrorBoundary>
+                </div>
             </div>
         </div>
     );

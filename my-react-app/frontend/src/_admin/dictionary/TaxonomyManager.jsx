@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useState } from 'react';
 import {
     Alert, Badge, Button, Form, Nav, Spinner, Table,
 } from 'react-bootstrap';
@@ -6,9 +5,7 @@ import {
     GitMerge, Pencil, Plus, Trash2, X,
 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
-import {
-    createTaxonomyTerm, deleteTaxonomyTerm, listTaxonomies, updateTaxonomyTerm,
-} from './dictionaryApi';
+import { useTaxonomyManager } from './useTaxonomyManager';
 import MergeDialog from './MergeDialog';
 import '../../../static/css/_admin/dictionary.css';
 
@@ -38,136 +35,23 @@ const AFFIX_TYPES = [
     { value: 'auxiliary', label: '助詞' },
 ];
 
-const emptyAffixDraft = () => ({
-    tribe_id: '', affix: '', affix_type: 'prefix', function: '', example_form: '',
-});
-
 export default function TaxonomyManager() {
     const { userData } = useAuth();
     const role = userData?.role;
     const canEdit = CONTENT_EDITORS.includes(role);
     const canMerge = ACCOUNT_MANAGERS.includes(role);
 
-    const [activeKind, setActiveKind] = useState('source');
-    const [taxonomies, setTaxonomies] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const {
+        activeKind, isAffix, rows, taxonomies, tribeNames,
+        loading, error, setError, reload: load, selectKind,
+        create, edit, removeRow, deletingId, merge,
+    } = useTaxonomyManager();
 
-    const [newName, setNewName] = useState('');
-    const [newAffix, setNewAffix] = useState(emptyAffixDraft());
-    const [creating, setCreating] = useState(false);
-
-    const [editingId, setEditingId] = useState(null);
-    const [editDraft, setEditDraft] = useState(null);
-    const [savingEdit, setSavingEdit] = useState(false);
-
-    const [deletingId, setDeletingId] = useState(null);
-    const [mergeSource, setMergeSource] = useState(null);
-
-    const load = async () => {
-        setLoading(true);
-        setError('');
-        try {
-            setTaxonomies(await listTaxonomies());
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        load();
-    }, []);
-
-    const tribeNames = useMemo(() => new Map(
-        (taxonomies?.tribes ?? []).map((tribe) => [String(tribe.id), tribe.name]),
-    ), [taxonomies]);
+    const { newName, setNewName, newAffix, setNewAffix, creating, submit: submitCreate } = create;
+    const { editingId, editDraft, setEditDraft, savingEdit, start: startEdit, cancel: cancelEdit, save: saveEdit } = edit;
+    const { source: mergeSource, setSource: setMergeSource, options: mergeOptions } = merge;
 
     const activeKindMeta = KINDS.find((kind) => kind.key === activeKind);
-    const isAffix = activeKind === 'grammar_affix';
-    const rows = taxonomies?.[activeKind] ?? [];
-
-    const selectKind = (key) => {
-        setActiveKind(key);
-        setEditingId(null);
-        setEditDraft(null);
-        setNewName('');
-        setNewAffix(emptyAffixDraft());
-        setError('');
-    };
-
-    const submitCreate = async (event) => {
-        event.preventDefault();
-        setCreating(true);
-        setError('');
-        try {
-            if (isAffix) {
-                await createTaxonomyTerm('grammar_affix', newAffix);
-                setNewAffix(emptyAffixDraft());
-            } else {
-                await createTaxonomyTerm(activeKind, { name: newName.trim() });
-                setNewName('');
-            }
-            await load();
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setCreating(false);
-        }
-    };
-
-    const startEdit = (row) => {
-        setEditingId(row.id);
-        setEditDraft(isAffix
-            ? {
-                affix: row.affix, affix_type: row.affix_type,
-                function: row.function, example_form: row.example_form,
-            }
-            : { name: row.name });
-    };
-
-    const cancelEdit = () => {
-        setEditingId(null);
-        setEditDraft(null);
-    };
-
-    const saveEdit = async (row) => {
-        setSavingEdit(true);
-        setError('');
-        try {
-            await updateTaxonomyTerm(activeKind, row.id, editDraft);
-            cancelEdit();
-            await load();
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setSavingEdit(false);
-        }
-    };
-
-    const removeRow = async (row) => {
-        const label = isAffix ? row.affix : row.name;
-        if (!window.confirm(`確定要刪除「${label}」嗎？此操作無法復原。`)) return;
-
-        setDeletingId(row.id);
-        setError('');
-        try {
-            await deleteTaxonomyTerm(activeKind, row.id);
-            await load();
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setDeletingId(null);
-        }
-    };
-
-    const mergeOptions = mergeSource
-        ? rows.filter((row) => (
-            row.id !== mergeSource.id
-            && (!isAffix || row.tribe_id === mergeSource.tribe_id)
-        ))
-        : [];
 
     return (
         <main className="dictionary-admin-page">

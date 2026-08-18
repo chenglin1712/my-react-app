@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
     Alert,
     Badge,
@@ -14,7 +14,8 @@ import {
     Search,
 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
-import { apiGet, apiPost } from '../../../utils/apiClient';
+import { apiPost } from '../../../utils/apiClient';
+import { useAdminListQuery } from '../hooks/useAdminListQuery';
 import '../../../static/css/_admin/moderation.css';
 
 const STAFF_ROLES = ['owner', 'admin', 'editor', 'reviewer', 'analyst'];
@@ -34,70 +35,27 @@ export default function SharedNotesModeration() {
     const canRead = STAFF_ROLES.includes(role);
     const canManage = ACCOUNT_MANAGERS.includes(role);
 
-    const [filters, setFilters] = useState({
-        keyword: '',
-        deleted: '',
-        has_reports: false,
+    const {
+        items, data, loading, error, setError, page, setPage, hasNext,
+        filters, setFilters, search, reload: loadNotes,
+    } = useAdminListQuery({
+        endpoint: '/adminapi/moderation/notes/',
+        initialFilters: { keyword: '', deleted: '', has_reports: false },
+        pageSize: PAGE_SIZE,
+        enabled: canRead,
+        // 這一頁的參數不是「非空就原名帶上」：keyword 要 trim、deleted 允許
+        // 帶 'false' 這種字串值（不能被當成空值濾掉）、has_reports 是布林要
+        // 轉成 'true'。
+        buildParams: (params, query) => {
+            if (query.keyword.trim()) params.set('keyword', query.keyword.trim());
+            if (query.deleted !== '') params.set('deleted', query.deleted);
+            if (query.has_reports) params.set('has_reports', 'true');
+        },
     });
-    const [query, setQuery] = useState(filters);
-    const [data, setData] = useState({
-        results: [],
-        count: 0,
-        page: 1,
-        page_size: PAGE_SIZE,
-    });
-    const [page, setPage] = useState(1);
-    const [loading, setLoading] = useState(canRead);
+
     const [actionId, setActionId] = useState(null);
-    const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
 
-    const loadNotes = useCallback(async () => {
-        if (!canRead) {
-            setLoading(false);
-            return;
-        }
-
-        setLoading(true);
-        setError('');
-
-        try {
-            const params = new URLSearchParams({
-                page: String(page),
-                page_size: String(PAGE_SIZE),
-            });
-
-            if (query.keyword.trim()) {
-                params.set('keyword', query.keyword.trim());
-            }
-            if (query.deleted !== '') {
-                params.set('deleted', query.deleted);
-            }
-            if (query.has_reports) {
-                params.set('has_reports', 'true');
-            }
-
-            setData(
-                await apiGet(
-                    `/adminapi/moderation/notes/?${params.toString()}`,
-                ),
-            );
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    }, [canRead, page, query]);
-
-    useEffect(() => {
-        loadNotes();
-    }, [loadNotes]);
-
-    const search = (event) => {
-        event.preventDefault();
-        setPage(1);
-        setQuery(filters);
-    };
 
     const toggleDeleted = async (item) => {
         const actionLabel = item.deleted ? '恢復' : '下架';
@@ -125,7 +83,6 @@ export default function SharedNotesModeration() {
         }
     };
 
-    const hasNext = data.page * data.page_size < data.count;
 
     if (!canRead) {
         return (
@@ -228,7 +185,7 @@ export default function SharedNotesModeration() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {data.results.map((item) => (
+                                    {items.map((item) => (
                                         <tr key={item.id}>
                                             <td>
                                                 <div className="moderation-note-cell">
@@ -318,7 +275,7 @@ export default function SharedNotesModeration() {
                                         </tr>
                                     ))}
 
-                                    {!data.results.length && (
+                                    {!items.length && (
                                         <tr>
                                             <td
                                                 className="moderation-empty"

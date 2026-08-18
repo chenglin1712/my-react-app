@@ -1,0 +1,19 @@
+{
+  "//": "編輯器／IDE 的路徑解析設定，必須跟 vite.config.js 的 resolve.alias 保持一致（見該處說明）。Vite 與 Vitest 實際解析路徑時只看 vite.config.js，這個檔案純粹是讓 VS Code 等編輯器的「跳到定義」與自動補完認得 @/ 這些別名，兩邊改動時要一起改。",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["frontend/src/*"],
+      "@components/*": ["frontend/components/*"],
+      "@hooks/*": ["frontend/hooks/*"],
+      "@utils/*": ["frontend/utils/*"]
+    },
+    "checkJs": false,
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ESNext"
+  },
+  "include": ["frontend/**/*.js", "frontend/**/*.jsx"],
+  "exclude": ["node_modules", "dist"]
+}

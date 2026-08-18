@@ -15,18 +15,10 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { apiPost } from '../../../utils/apiClient';
+import { uploadToCloudinary } from '@utils/uploadToCloudinary';
 import '../../../static/css/_admin/users.css';
+import { ACCOUNT_MANAGERS, ROLE_LABELS, STAFF_ROLES } from '../constants/roles';
 
-const ACCOUNT_MANAGERS = ['owner', 'admin'];
-const STAFF_ROLES = ['owner', 'admin', 'editor', 'reviewer', 'analyst'];
-
-const ROLE_LABELS = {
-  owner: '擁有者',
-  admin: '管理員',
-  editor: '內容編輯',
-  reviewer: '審核者',
-  analyst: '數據觀察者',
-};
 
 const INITIAL_FORM = {
   email: '',
@@ -70,20 +62,10 @@ export default function UserCreate() {
     setAvatarPreview(URL.createObjectURL(file));
     setAvatarUploading(true);
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
-    formData.append('cloud_name', import.meta.env.VITE_CLOUDINARY_CLOUD_NAME);
-
     try {
-      const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/f_auto,q_auto`,
-        { method: 'POST', body: formData },
-      );
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const result = await response.json();
-      update('avatar_url', result.secure_url);
-      setAvatarPreview(result.secure_url);
+      const secureUrl = await uploadToCloudinary(file);
+      update('avatar_url', secureUrl);
+      setAvatarPreview(secureUrl);
     } catch (err) {
       console.error('頭像上傳失敗', err);
       setError('頭像上傳失敗，請重新選擇圖片。');

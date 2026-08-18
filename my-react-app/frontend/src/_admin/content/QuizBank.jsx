@@ -1,17 +1,22 @@
-import { useCallback, useEffect, useState } from 'react';
 import { Alert, Badge, Button, Form, Modal, Spinner, Table, Tab, Tabs } from 'react-bootstrap';
-import { Check, Edit3, Minus, Plus, Send, Trash2, Undo2, X, Archive } from 'lucide-react';
+import { Minus, Plus } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
-import { apiDelete, apiGet, apiPatch, apiPost } from '../../../utils/apiClient';
+import RejectReasonModal from '../reviewWorkflow/RejectReasonModal';
+import ReviewActions from '../reviewWorkflow/ReviewActions';
+import ReviewPagination from '../reviewWorkflow/ReviewPagination';
+import { useReviewableContentCrud } from '../reviewWorkflow/useReviewableContentCrud';
 import '../../../static/css/_admin/quiz-bank.css';
 
 const CONTENT_EDITORS = ['owner', 'admin', 'editor'];
-// 核准／退件／下架用 CONTENT_APPROVERS（含 reviewer），而不是 AnnouncementList
-// 用的 PUBLISHERS——族語老師（reviewer）必須能核准題庫內容，這是整個審定
+// 核准／退件／下架用 approvers（含 reviewer），而不是 AnnouncementList
+// 用的 publishers——族語老師（reviewer）必須能核准題庫內容，這是整個審定
 // 流程存在的意義，不能照抄公告管理的角色門檻。
-const CONTENT_APPROVERS = ['owner', 'admin', 'reviewer'];
-const PUBLISHERS = ['owner', 'admin'];
+const QUIZ_BANK_ROLES = {
+    editors: CONTENT_EDITORS,
+    approvers: ['owner', 'admin', 'reviewer'],
+    publishers: ['owner', 'admin'],
+};
 
 const CATEGORIES = {
     noun: '名詞',
@@ -27,10 +32,6 @@ const STATUSES = {
     rejected: { label: '已退件', bg: 'danger' },
     published: { label: '已啟用', bg: 'success' },
 };
-
-// 沒有 Announcement 的 unpublished 中介狀態，已啟用的內容要停用直接呼叫
-// unpublish 退回 draft（見 models.py 的 ReviewableContent 說明）。
-const EDITABLE_STATUSES = ['draft', 'rejected'];
 
 function StatusCell({ item }) {
     return (
@@ -92,318 +93,19 @@ function vocabFormFrom(item) {
 }
 
 function VocabPanel({ role }) {
-    const [filters, setFilters] = useState({ tribe: '', category: '', status: '' });
-    const [query, setQuery] = useState(filters);
-    const [data, setData] = useState({
-        results: [],
-        count: 0,
-        page: 1,
-        page_size: 20,
+    const {
+        items, data, loading, error, hasNext, page, setPage,
+        filters, setFilters, search,
+        actionId, handleAction, reject, editor,
+    } = useReviewableContentCrud({
+        endpoint: '/adminapi/quiz-bank/vocab/',
+        initialFilters: { tribe: '', category: '', status: '' },
+        emptyForm: EMPTY_VOCAB_FORM,
+        formFrom: vocabFormFrom,
+        deleteConfirmMessage: (item) => `確定要刪除「${item.foreign_word}」嗎？`,
     });
-    const [page, setPage] = useState(1);
-    const [loading, setLoading] = useState(true);
-    const [actionId, setActionId] = useState(null);
-    const [error, setError] = useState('');
-    const [rejectTarget, setRejectTarget] = useState(null);
-    const [rejectReason, setRejectReason] = useState('');
-    const [rejectingRevision, setRejectingRevision] = useState(false);
-    const [editTarget, setEditTarget] = useState(null);
-    const [form, setForm] = useState(EMPTY_VOCAB_FORM);
 
-    const load = useCallback(async () => {
-        setLoading(true);
-        setError('');
-
-        try {
-            const params = new URLSearchParams({
-                page: String(page),
-                page_size: '20',
-            });
-            Object.entries(query).forEach(([key, value]) => {
-                if (value) params.set(key, value);
-            });
-            setData(await apiGet(`/adminapi/quiz-bank/vocab/?${params.toString()}`));
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    }, [page, query]);
-
-    useEffect(() => {
-        load();
-    }, [load]);
-
-    const search = (event) => {
-        event.preventDefault();
-        setPage(1);
-        setQuery(filters);
-    };
-
-    const runAction = async (item, action, body) => {
-        setActionId(item.id);
-        setError('');
-
-        try {
-            if (action === 'delete') {
-                if (!window.confirm(`確定要刪除「${item.foreign_word}」嗎？`)) return;
-                await apiDelete(`/adminapi/quiz-bank/vocab/${item.id}/`);
-            } else {
-                await apiPost(
-                    `/adminapi/quiz-bank/vocab/${item.id}/${action}/`,
-                    body,
-                );
-            }
-            await load();
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setActionId(null);
-        }
-    };
-
-    const openReject = (item, revision = false) => {
-        setRejectTarget(item);
-        setRejectingRevision(revision);
-        setRejectReason('');
-    };
-
-    const closeReject = () => {
-        setRejectTarget(null);
-        setRejectingRevision(false);
-        setRejectReason('');
-    };
-
-    const submitReject = async () => {
-        if (!rejectReason.trim() || !rejectTarget) return;
-
-        await runAction(
-            rejectTarget,
-            rejectingRevision ? 'pending-revision/reject' : 'reject',
-            { review_comment: rejectReason.trim() },
-        );
-        closeReject();
-    };
-
-    const openNew = () => {
-        setForm(EMPTY_VOCAB_FORM);
-        setEditTarget({});
-    };
-
-    const openEdit = async (item) => {
-        setActionId(item.id);
-        setError('');
-
-        try {
-            let values = item;
-
-            if (item.status === 'published') {
-                try {
-                    const revision = await apiGet(
-                        `/adminapi/quiz-bank/vocab/${item.id}/pending-revision/`,
-                    );
-                    values = { ...item, ...(revision.payload || {}) };
-                } catch (err) {
-                    if (err.status !== 404) throw err;
-                }
-            }
-
-            setForm(vocabFormFrom(values));
-            setEditTarget(item);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setActionId(null);
-        }
-    };
-
-    const saveForm = async (event) => {
-        event.preventDefault();
-        setActionId('form');
-        setError('');
-
-        try {
-            if (editTarget.id) {
-                if (editTarget.status === 'published') {
-                    await apiPost(
-                        `/adminapi/quiz-bank/vocab/${editTarget.id}/pending-revision/`,
-                        form,
-                    );
-                } else {
-                    await apiPatch(
-                        `/adminapi/quiz-bank/vocab/${editTarget.id}/`,
-                        form,
-                    );
-                }
-            } else {
-                await apiPost('/adminapi/quiz-bank/vocab/', form);
-            }
-
-            setEditTarget(null);
-            await load();
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setActionId(null);
-        }
-    };
-
-    const actionsFor = (item) => {
-        const busy = actionId === item.id;
-        const buttons = [];
-        const editable = (
-            EDITABLE_STATUSES.includes(item.status)
-            || item.status === 'published'
-        );
-
-        if (editable && CONTENT_EDITORS.includes(role)) {
-            buttons.push(
-                <Button
-                    key="edit"
-                    size="sm"
-                    variant="outline-primary"
-                    disabled={busy}
-                    onClick={() => openEdit(item)}
-                >
-                    <Edit3 size={14} /> 編輯
-                </Button>,
-            );
-        }
-
-        if (
-            EDITABLE_STATUSES.includes(item.status)
-            && CONTENT_EDITORS.includes(role)
-        ) {
-            buttons.push(
-                <Button
-                    key="submit"
-                    size="sm"
-                    variant="outline-success"
-                    disabled={busy}
-                    onClick={() => runAction(item, 'submit')}
-                >
-                    <Send size={14} /> 送審
-                </Button>,
-            );
-        }
-
-        if (item.status === 'draft' && PUBLISHERS.includes(role)) {
-            buttons.push(
-                <Button
-                    key="delete"
-                    size="sm"
-                    variant="outline-danger"
-                    disabled={busy}
-                    onClick={() => runAction(item, 'delete')}
-                >
-                    <Trash2 size={14} /> 刪除
-                </Button>,
-            );
-        }
-
-        if (
-            item.status === 'pending_review'
-            && CONTENT_EDITORS.includes(role)
-        ) {
-            buttons.push(
-                <Button
-                    key="withdraw"
-                    size="sm"
-                    variant="outline-secondary"
-                    disabled={busy}
-                    onClick={() => runAction(item, 'withdraw')}
-                >
-                    <Undo2 size={14} /> 撤回
-                </Button>,
-            );
-        }
-
-        if (
-            item.status === 'pending_review'
-            && CONTENT_APPROVERS.includes(role)
-        ) {
-            buttons.push(
-                <Button
-                    key="approve"
-                    size="sm"
-                    variant="outline-success"
-                    disabled={busy}
-                    onClick={() => runAction(
-                        item,
-                        'approve',
-                        { review_comment: '' },
-                    )}
-                >
-                    <Check size={14} /> 核准
-                </Button>,
-            );
-            buttons.push(
-                <Button
-                    key="reject"
-                    size="sm"
-                    variant="outline-danger"
-                    disabled={busy}
-                    onClick={() => openReject(item)}
-                >
-                    <X size={14} /> 退件
-                </Button>,
-            );
-        }
-
-        if (
-            item.status === 'published'
-            && item.has_pending_revision
-            && CONTENT_APPROVERS.includes(role)
-        ) {
-            buttons.push(
-                <Button
-                    key="approve-revision"
-                    size="sm"
-                    variant="outline-success"
-                    disabled={busy}
-                    onClick={() => runAction(
-                        item,
-                        'pending-revision/approve',
-                        { review_comment: '' },
-                    )}
-                >
-                    <Check size={14} /> 核准修改
-                </Button>,
-            );
-            buttons.push(
-                <Button
-                    key="reject-revision"
-                    size="sm"
-                    variant="outline-danger"
-                    disabled={busy}
-                    onClick={() => openReject(item, true)}
-                >
-                    <X size={14} /> 退件修改
-                </Button>,
-            );
-        }
-
-        if (
-            item.status === 'published'
-            && CONTENT_APPROVERS.includes(role)
-        ) {
-            buttons.push(
-                <Button
-                    key="unpublish"
-                    size="sm"
-                    variant="outline-secondary"
-                    disabled={busy}
-                    onClick={() => runAction(item, 'unpublish')}
-                >
-                    <Archive size={14} /> 下架
-                </Button>,
-            );
-        }
-
-        return buttons;
-    };
-
-    const hasNext = data.page * data.page_size < data.count;
+    const { target: editTarget, form, setForm } = editor;
 
     return (
         <div className="quiz-bank-panel">
@@ -457,7 +159,7 @@ function VocabPanel({ role }) {
 
             {CONTENT_EDITORS.includes(role) && (
                 <div className="quiz-bank-heading-actions">
-                    <Button onClick={openNew}>
+                    <Button onClick={editor.openNew}>
                         <Plus size={18} /> 新增詞彙
                     </Button>
                 </div>
@@ -483,7 +185,7 @@ function VocabPanel({ role }) {
                             </tr>
                         </thead>
                         <tbody>
-                            {data.results.length ? data.results.map((item) => (
+                            {items.length ? items.map((item) => (
                                 <tr key={item.id}>
                                     <td>{TRIBE_FULL_NAME_BY_SLUG[item.tribe] ?? item.tribe}</td>
                                     <td>{CATEGORIES[item.category] ?? item.category}</td>
@@ -493,7 +195,13 @@ function VocabPanel({ role }) {
                                     <td>{item.created_by || '—'}</td>
                                     <td>
                                         <div className="quiz-bank-row-actions">
-                                            {actionsFor(item)}
+                                            <ReviewActions
+                                                item={item}
+                                                role={role}
+                                                roles={QUIZ_BANK_ROLES}
+                                                busy={actionId === item.id}
+                                                onAction={handleAction}
+                                            />
                                         </div>
                                     </td>
                                 </tr>
@@ -508,34 +216,21 @@ function VocabPanel({ role }) {
                     </Table>
                 )}
 
-                <div className="quiz-bank-pagination">
-                    <span>共 {data.count} 筆</span>
-                    <div>
-                        <Button
-                            variant="outline-secondary"
-                            disabled={loading || page <= 1}
-                            onClick={() => setPage((value) => value - 1)}
-                        >
-                            上一頁
-                        </Button>
-                        <span>第 {data.page} 頁</span>
-                        <Button
-                            variant="outline-secondary"
-                            disabled={loading || !hasNext}
-                            onClick={() => setPage((value) => value + 1)}
-                        >
-                            下一頁
-                        </Button>
-                    </div>
-                </div>
+                <ReviewPagination
+                    data={data}
+                    page={page}
+                    setPage={setPage}
+                    loading={loading}
+                    hasNext={hasNext}
+                />
             </div>
 
             <Modal
                 show={Boolean(editTarget)}
-                onHide={() => setEditTarget(null)}
+                onHide={editor.close}
                 centered
             >
-                <Form onSubmit={saveForm}>
+                <Form onSubmit={editor.save}>
                     <Modal.Header closeButton>
                         <Modal.Title>
                             {editTarget?.id ? '編輯詞彙' : '新增詞彙'}
@@ -623,10 +318,7 @@ function VocabPanel({ role }) {
                         </Form.Group>
                     </Modal.Body>
                     <Modal.Footer>
-                        <Button
-                            variant="secondary"
-                            onClick={() => setEditTarget(null)}
-                        >
+                        <Button variant="secondary" onClick={editor.close}>
                             取消
                         </Button>
                         <Button
@@ -646,48 +338,11 @@ function VocabPanel({ role }) {
                 </Form>
             </Modal>
 
-            <Modal
-                show={Boolean(rejectTarget)}
-                onHide={closeReject}
-                centered
-            >
-                <Modal.Header closeButton>
-                    <Modal.Title>
-                        {rejectingRevision ? '退件修改原因' : '退件原因'}
-                    </Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <Form.Group controlId="quiz-vocab-reject-reason">
-                        <Form.Label>請說明需要修改的內容</Form.Label>
-                        <Form.Control
-                            as="textarea"
-                            rows={4}
-                            required
-                            value={rejectReason}
-                            onChange={(event) => setRejectReason(event.target.value)}
-                            isInvalid={Boolean(rejectTarget) && !rejectReason.trim()}
-                        />
-                        <Form.Control.Feedback type="invalid">
-                            退件理由為必填
-                        </Form.Control.Feedback>
-                    </Form.Group>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={closeReject}>
-                        取消
-                    </Button>
-                    <Button
-                        variant="danger"
-                        disabled={
-                            !rejectReason.trim()
-                            || actionId === rejectTarget?.id
-                        }
-                        onClick={submitReject}
-                    >
-                        {rejectingRevision ? '確認退件修改' : '確認退件'}
-                    </Button>
-                </Modal.Footer>
-            </Modal>
+            <RejectReasonModal
+                reject={reject}
+                actionId={actionId}
+                controlId="quiz-vocab-reject-reason"
+            />
         </div>
     );
 }
@@ -720,130 +375,19 @@ function clozeFormFrom(item) {
 }
 
 function ClozePanel({ role }) {
-    const [filters, setFilters] = useState({ tribe: '', status: '' });
-    const [query, setQuery] = useState(filters);
-    const [data, setData] = useState({
-        results: [],
-        count: 0,
-        page: 1,
-        page_size: 20,
+    const {
+        items, data, loading, error, hasNext, page, setPage,
+        filters, setFilters, search,
+        actionId, handleAction, reject, editor,
+    } = useReviewableContentCrud({
+        endpoint: '/adminapi/quiz-bank/cloze/',
+        initialFilters: { tribe: '', status: '' },
+        emptyForm: EMPTY_CLOZE_FORM,
+        formFrom: clozeFormFrom,
+        deleteConfirmMessage: () => '確定要刪除這篇短文嗎？',
     });
-    const [page, setPage] = useState(1);
-    const [loading, setLoading] = useState(true);
-    const [actionId, setActionId] = useState(null);
-    const [error, setError] = useState('');
-    const [rejectTarget, setRejectTarget] = useState(null);
-    const [rejectReason, setRejectReason] = useState('');
-    const [rejectingRevision, setRejectingRevision] = useState(false);
-    const [editTarget, setEditTarget] = useState(null);
-    const [form, setForm] = useState(EMPTY_CLOZE_FORM);
 
-    const load = useCallback(async () => {
-        setLoading(true);
-        setError('');
-
-        try {
-            const params = new URLSearchParams({
-                page: String(page),
-                page_size: '20',
-            });
-            Object.entries(query).forEach(([key, value]) => {
-                if (value) params.set(key, value);
-            });
-            setData(await apiGet(`/adminapi/quiz-bank/cloze/?${params.toString()}`));
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    }, [page, query]);
-
-    useEffect(() => {
-        load();
-    }, [load]);
-
-    const search = (event) => {
-        event.preventDefault();
-        setPage(1);
-        setQuery(filters);
-    };
-
-    const runAction = async (item, action, body) => {
-        setActionId(item.id);
-        setError('');
-
-        try {
-            if (action === 'delete') {
-                if (!window.confirm('確定要刪除這篇短文嗎？')) return;
-                await apiDelete(`/adminapi/quiz-bank/cloze/${item.id}/`);
-            } else {
-                await apiPost(
-                    `/adminapi/quiz-bank/cloze/${item.id}/${action}/`,
-                    body,
-                );
-            }
-            await load();
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setActionId(null);
-        }
-    };
-
-    const openReject = (item, revision = false) => {
-        setRejectTarget(item);
-        setRejectingRevision(revision);
-        setRejectReason('');
-    };
-
-    const closeReject = () => {
-        setRejectTarget(null);
-        setRejectingRevision(false);
-        setRejectReason('');
-    };
-
-    const submitReject = async () => {
-        if (!rejectReason.trim() || !rejectTarget) return;
-
-        await runAction(
-            rejectTarget,
-            rejectingRevision ? 'pending-revision/reject' : 'reject',
-            { review_comment: rejectReason.trim() },
-        );
-        closeReject();
-    };
-
-    const openNew = () => {
-        setForm(EMPTY_CLOZE_FORM);
-        setEditTarget({});
-    };
-
-    const openEdit = async (item) => {
-        setActionId(item.id);
-        setError('');
-
-        try {
-            let values = item;
-
-            if (item.status === 'published') {
-                try {
-                    const revision = await apiGet(
-                        `/adminapi/quiz-bank/cloze/${item.id}/pending-revision/`,
-                    );
-                    values = { ...item, ...(revision.payload || {}) };
-                } catch (err) {
-                    if (err.status !== 404) throw err;
-                }
-            }
-
-            setForm(clozeFormFrom(values));
-            setEditTarget(item);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setActionId(null);
-        }
-    };
+    const { target: editTarget, form, setForm } = editor;
 
     const addBlank = () => {
         // 用「目前存在的 blankN 最大序號 + 1」推導新 key，不能用
@@ -897,193 +441,7 @@ function ClozePanel({ role }) {
         });
     };
 
-    const saveForm = async (event) => {
-        event.preventDefault();
-        setActionId('form');
-        setError('');
 
-        try {
-            if (editTarget.id) {
-                if (editTarget.status === 'published') {
-                    await apiPost(
-                        `/adminapi/quiz-bank/cloze/${editTarget.id}/pending-revision/`,
-                        form,
-                    );
-                } else {
-                    await apiPatch(
-                        `/adminapi/quiz-bank/cloze/${editTarget.id}/`,
-                        form,
-                    );
-                }
-            } else {
-                await apiPost('/adminapi/quiz-bank/cloze/', form);
-            }
-
-            setEditTarget(null);
-            await load();
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setActionId(null);
-        }
-    };
-
-    const actionsFor = (item) => {
-        const busy = actionId === item.id;
-        const buttons = [];
-        const editable = (
-            EDITABLE_STATUSES.includes(item.status)
-            || item.status === 'published'
-        );
-
-        if (editable && CONTENT_EDITORS.includes(role)) {
-            buttons.push(
-                <Button
-                    key="edit"
-                    size="sm"
-                    variant="outline-primary"
-                    disabled={busy}
-                    onClick={() => openEdit(item)}
-                >
-                    <Edit3 size={14} /> 編輯
-                </Button>,
-            );
-        }
-
-        if (
-            EDITABLE_STATUSES.includes(item.status)
-            && CONTENT_EDITORS.includes(role)
-        ) {
-            buttons.push(
-                <Button
-                    key="submit"
-                    size="sm"
-                    variant="outline-success"
-                    disabled={busy}
-                    onClick={() => runAction(item, 'submit')}
-                >
-                    <Send size={14} /> 送審
-                </Button>,
-            );
-        }
-
-        if (item.status === 'draft' && PUBLISHERS.includes(role)) {
-            buttons.push(
-                <Button
-                    key="delete"
-                    size="sm"
-                    variant="outline-danger"
-                    disabled={busy}
-                    onClick={() => runAction(item, 'delete')}
-                >
-                    <Trash2 size={14} /> 刪除
-                </Button>,
-            );
-        }
-
-        if (
-            item.status === 'pending_review'
-            && CONTENT_EDITORS.includes(role)
-        ) {
-            buttons.push(
-                <Button
-                    key="withdraw"
-                    size="sm"
-                    variant="outline-secondary"
-                    disabled={busy}
-                    onClick={() => runAction(item, 'withdraw')}
-                >
-                    <Undo2 size={14} /> 撤回
-                </Button>,
-            );
-        }
-
-        if (
-            item.status === 'pending_review'
-            && CONTENT_APPROVERS.includes(role)
-        ) {
-            buttons.push(
-                <Button
-                    key="approve"
-                    size="sm"
-                    variant="outline-success"
-                    disabled={busy}
-                    onClick={() => runAction(
-                        item,
-                        'approve',
-                        { review_comment: '' },
-                    )}
-                >
-                    <Check size={14} /> 核准
-                </Button>,
-            );
-            buttons.push(
-                <Button
-                    key="reject"
-                    size="sm"
-                    variant="outline-danger"
-                    disabled={busy}
-                    onClick={() => openReject(item)}
-                >
-                    <X size={14} /> 退件
-                </Button>,
-            );
-        }
-
-        if (
-            item.status === 'published'
-            && item.has_pending_revision
-            && CONTENT_APPROVERS.includes(role)
-        ) {
-            buttons.push(
-                <Button
-                    key="approve-revision"
-                    size="sm"
-                    variant="outline-success"
-                    disabled={busy}
-                    onClick={() => runAction(
-                        item,
-                        'pending-revision/approve',
-                        { review_comment: '' },
-                    )}
-                >
-                    <Check size={14} /> 核准修改
-                </Button>,
-            );
-            buttons.push(
-                <Button
-                    key="reject-revision"
-                    size="sm"
-                    variant="outline-danger"
-                    disabled={busy}
-                    onClick={() => openReject(item, true)}
-                >
-                    <X size={14} /> 退件修改
-                </Button>,
-            );
-        }
-
-        if (
-            item.status === 'published'
-            && CONTENT_APPROVERS.includes(role)
-        ) {
-            buttons.push(
-                <Button
-                    key="unpublish"
-                    size="sm"
-                    variant="outline-secondary"
-                    disabled={busy}
-                    onClick={() => runAction(item, 'unpublish')}
-                >
-                    <Archive size={14} /> 下架
-                </Button>,
-            );
-        }
-
-        return buttons;
-    };
-
-    const hasNext = data.page * data.page_size < data.count;
     const canSaveCloze = (
         form.passage_foreign.trim()
         && form.passage_chinese.trim()
@@ -1130,7 +488,7 @@ function ClozePanel({ role }) {
 
             {CONTENT_EDITORS.includes(role) && (
                 <div className="quiz-bank-heading-actions">
-                    <Button onClick={openNew}>
+                    <Button onClick={editor.openNew}>
                         <Plus size={18} /> 新增短文
                     </Button>
                 </div>
@@ -1155,7 +513,7 @@ function ClozePanel({ role }) {
                             </tr>
                         </thead>
                         <tbody>
-                            {data.results.length ? data.results.map((item) => (
+                            {items.length ? items.map((item) => (
                                 <tr key={item.id}>
                                     <td>{TRIBE_FULL_NAME_BY_SLUG[item.tribe] ?? item.tribe}</td>
                                     <td className="quiz-bank-truncate-cell">
@@ -1166,7 +524,13 @@ function ClozePanel({ role }) {
                                     <td>{item.created_by || '—'}</td>
                                     <td>
                                         <div className="quiz-bank-row-actions">
-                                            {actionsFor(item)}
+                                            <ReviewActions
+                                                item={item}
+                                                role={role}
+                                                roles={QUIZ_BANK_ROLES}
+                                                busy={actionId === item.id}
+                                                onAction={handleAction}
+                                            />
                                         </div>
                                     </td>
                                 </tr>
@@ -1181,35 +545,22 @@ function ClozePanel({ role }) {
                     </Table>
                 )}
 
-                <div className="quiz-bank-pagination">
-                    <span>共 {data.count} 筆</span>
-                    <div>
-                        <Button
-                            variant="outline-secondary"
-                            disabled={loading || page <= 1}
-                            onClick={() => setPage((value) => value - 1)}
-                        >
-                            上一頁
-                        </Button>
-                        <span>第 {data.page} 頁</span>
-                        <Button
-                            variant="outline-secondary"
-                            disabled={loading || !hasNext}
-                            onClick={() => setPage((value) => value + 1)}
-                        >
-                            下一頁
-                        </Button>
-                    </div>
-                </div>
+                <ReviewPagination
+                    data={data}
+                    page={page}
+                    setPage={setPage}
+                    loading={loading}
+                    hasNext={hasNext}
+                />
             </div>
 
             <Modal
                 show={Boolean(editTarget)}
-                onHide={() => setEditTarget(null)}
+                onHide={editor.close}
                 centered
                 size="lg"
             >
-                <Form onSubmit={saveForm}>
+                <Form onSubmit={editor.save}>
                     <Modal.Header closeButton>
                         <Modal.Title>
                             {editTarget?.id ? '編輯短文' : '新增短文'}
@@ -1337,10 +688,7 @@ function ClozePanel({ role }) {
                         </Button>
                     </Modal.Body>
                     <Modal.Footer>
-                        <Button
-                            variant="secondary"
-                            onClick={() => setEditTarget(null)}
-                        >
+                        <Button variant="secondary" onClick={editor.close}>
                             取消
                         </Button>
                         <Button
@@ -1356,48 +704,11 @@ function ClozePanel({ role }) {
                 </Form>
             </Modal>
 
-            <Modal
-                show={Boolean(rejectTarget)}
-                onHide={closeReject}
-                centered
-            >
-                <Modal.Header closeButton>
-                    <Modal.Title>
-                        {rejectingRevision ? '退件修改原因' : '退件原因'}
-                    </Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <Form.Group controlId="quiz-cloze-reject-reason">
-                        <Form.Label>請說明需要修改的內容</Form.Label>
-                        <Form.Control
-                            as="textarea"
-                            rows={4}
-                            required
-                            value={rejectReason}
-                            onChange={(event) => setRejectReason(event.target.value)}
-                            isInvalid={Boolean(rejectTarget) && !rejectReason.trim()}
-                        />
-                        <Form.Control.Feedback type="invalid">
-                            退件理由為必填
-                        </Form.Control.Feedback>
-                    </Form.Group>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={closeReject}>
-                        取消
-                    </Button>
-                    <Button
-                        variant="danger"
-                        disabled={
-                            !rejectReason.trim()
-                            || actionId === rejectTarget?.id
-                        }
-                        onClick={submitReject}
-                    >
-                        {rejectingRevision ? '確認退件修改' : '確認退件'}
-                    </Button>
-                </Modal.Footer>
-            </Modal>
+            <RejectReasonModal
+                reject={reject}
+                actionId={actionId}
+                controlId="quiz-cloze-reject-reason"
+            />
         </div>
     );
 }

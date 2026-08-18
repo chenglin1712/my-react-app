@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Alert,
@@ -10,7 +9,7 @@ import {
 import { BarChart3, FilePlus2 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBES } from '../../constants/tribes';
-import { apiGet } from '../../../utils/apiClient';
+import { useAnalyticsQuery } from '../hooks/useAnalyticsQuery';
 import '../../../static/css/_admin/analytics.css';
 
 const DATE_RANGE_OPTIONS = [
@@ -99,67 +98,14 @@ export default function SearchAnalytics() {
     const navigate = useNavigate();
     const canCreateDraft = CONTENT_EDITOR_ROLES.includes(userData?.role);
 
-    const [dateRange, setDateRange] = useState('7d');
-    const [dateFrom, setDateFrom] = useState('');
-    const [dateTo, setDateTo] = useState('');
-    const [tribe, setTribe] = useState('');
+    const { data, loading, error, filters } = useAnalyticsQuery({
+        endpoint: '/adminapi/analytics/search/',
+    });
 
-    const [data, setData] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-
-    const customDatesIncomplete = (
-        dateRange === 'custom' && (!dateFrom || !dateTo)
-    );
-
-    useEffect(() => {
-        if (customDatesIncomplete) {
-            setData(null);
-            setLoading(false);
-            setError('');
-            return undefined;
-        }
-
-        let active = true;
-        setLoading(true);
-        setError('');
-
-        const params = new URLSearchParams({ date_range: dateRange });
-
-        if (dateRange === 'custom') {
-            params.set('date_from', dateFrom);
-            params.set('date_to', dateTo);
-        }
-
-        if (tribe) params.set('tribe', tribe);
-
-        (async () => {
-            try {
-                const result = await apiGet(
-                    `/adminapi/analytics/search/?${params.toString()}`,
-                );
-
-                if (active) setData(result);
-            } catch (err) {
-                if (active) {
-                    setData(null);
-                    setError(err.message);
-                }
-            } finally {
-                if (active) setLoading(false);
-            }
-        })();
-
-        return () => {
-            active = false;
-        };
-    }, [
-        customDatesIncomplete,
-        dateRange,
-        dateFrom,
-        dateTo,
-        tribe,
-    ]);
+    const {
+        dateRange, setDateRange, dateFrom, setDateFrom,
+        dateTo, setDateTo, tribe, setTribe, customDatesIncomplete,
+    } = filters;
 
     const createDraft = (query) => {
         navigate('/admin/dictionary/words/new', {

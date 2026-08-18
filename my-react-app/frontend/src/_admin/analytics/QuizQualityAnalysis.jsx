@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Alert,
@@ -22,7 +22,7 @@ import {
     ZAxis,
 } from 'recharts';
 import { TRIBES } from '../../constants/tribes';
-import { apiGet } from '../../../utils/apiClient';
+import { useAnalyticsQuery } from '../hooks/useAnalyticsQuery';
 import '../../../static/css/_admin/quiz-quality-analysis.css';
 
 const DATE_RANGE_OPTIONS = [
@@ -109,67 +109,14 @@ function QualityDot({
 export default function QuizQualityAnalysis() {
     const navigate = useNavigate();
 
-    const [dateRange, setDateRange] = useState('7d');
-    const [dateFrom, setDateFrom] = useState('');
-    const [dateTo, setDateTo] = useState('');
-    const [tribe, setTribe] = useState('');
+    const { data, loading, error, filters } = useAnalyticsQuery({
+        endpoint: '/adminapi/analytics/quiz-quality/',
+    });
 
-    const [data, setData] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-
-    const customDatesIncomplete = (
-        dateRange === 'custom' && (!dateFrom || !dateTo)
-    );
-
-    useEffect(() => {
-        if (customDatesIncomplete) {
-            setData(null);
-            setLoading(false);
-            setError('');
-            return undefined;
-        }
-
-        let active = true;
-        setLoading(true);
-        setError('');
-
-        const params = new URLSearchParams({ date_range: dateRange });
-
-        if (dateRange === 'custom') {
-            params.set('date_from', dateFrom);
-            params.set('date_to', dateTo);
-        }
-
-        if (tribe) params.set('tribe', tribe);
-
-        (async () => {
-            try {
-                const result = await apiGet(
-                    `/adminapi/analytics/quiz-quality/?${params.toString()}`,
-                );
-
-                if (active) setData(result);
-            } catch (err) {
-                if (active) {
-                    setData(null);
-                    setError(err.message);
-                }
-            } finally {
-                if (active) setLoading(false);
-            }
-        })();
-
-        return () => {
-            active = false;
-        };
-    }, [
-        customDatesIncomplete,
-        dateRange,
-        dateFrom,
-        dateTo,
-        tribe,
-    ]);
+    const {
+        dateRange, setDateRange, dateFrom, setDateFrom,
+        dateTo, setDateTo, tribe, setTribe, customDatesIncomplete,
+    } = filters;
 
     const chartItems = useMemo(
         () => (data?.items ?? []).filter(

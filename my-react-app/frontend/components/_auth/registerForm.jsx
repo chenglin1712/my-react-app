@@ -8,6 +8,7 @@ import { registerWithImg } from "../../src/userServives/userServive"
 import lottie from 'lottie-web';
 import successAnimation from "../../src/animations/success.json"
 import SuccessModal from "../ui/SuccessModal";
+import { uploadToCloudinary } from "@utils/uploadToCloudinary";
 
 const RegisterForm = ({ onSwitchToLogin }) => {
     const [name, setName] = useState("");
@@ -70,19 +71,8 @@ const RegisterForm = ({ onSwitchToLogin }) => {
         setPreview(URL.createObjectURL(file));
         setIsUploading(true);
 
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("upload_preset", import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
-        formData.append("cloud_name", import.meta.env.VITE_CLOUDINARY_CLOUD_NAME);
-
         try {
-            const res = await fetch(`https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/f_auto,q_auto`, {
-                method: "POST",
-                body: formData
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            setAvatarUrl(data.secure_url);
+            setAvatarUrl(await uploadToCloudinary(file));
         } catch (error) {
             console.error("圖片上傳失敗", error);
             setErrorMsg("圖片上傳失敗");

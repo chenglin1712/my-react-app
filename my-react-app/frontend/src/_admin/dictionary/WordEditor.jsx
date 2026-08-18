@@ -1,9 +1,4 @@
-import {
-    useCallback,
-    useEffect,
-    useMemo,
-    useState,
-} from 'react';
+import { useMemo, useState } from 'react';
 import {
     Link,
     useLocation,
@@ -28,23 +23,14 @@ import {
     X,
 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
-import {
-    createWordProposal,
-    getRevision,
-    getWord,
-    getWordReferences,
-    listTaxonomies,
-    proposeWordDelete,
-    proposeWordUpdate,
-    updateRevisionPayload,
-} from './dictionaryApi';
 import { useNestedForm } from './useNestedForm';
+import { useWordEditorData } from './useWordEditorData';
 import {
     canApproveDictionaryChanges,
     canProposeDictionaryChanges,
-    useRevisionActions,
 } from './useRevisionActions';
 import MediaUploadField from './MediaUploadField';
+import WordBasicFields from './WordBasicFields';
 import WordEditorExplanation, {
     emptySentence,
 } from './WordEditorExplanation';
@@ -239,18 +225,24 @@ export default function WordEditor() {
         toPayload,
     } = useNestedForm(EMPTY_WORD);
 
-    const [taxonomies, setTaxonomies] = useState(EMPTY_TAXONOMIES);
-    const [revision, setRevision] = useState(null);
-    const [baseHash, setBaseHash] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [pageError, setPageError] = useState('');
-    const [success, setSuccess] = useState('');
+    const {
+        taxonomies, revision, baseHash, loading, saving,
+        pageError, setPageError, success, setSuccess,
+        revisionActions, saveDraft: saveDraftWithPayload, runRevisionAction,
+        deletion,
+    } = useWordEditorData({
+        id,
+        isNew,
+        prefillName,
+        reset,
+        emptyWord: EMPTY_WORD,
+        emptyTaxonomies: EMPTY_TAXONOMIES,
+        normalizeWord,
+        revisionFromSave,
+    });
+
+    // 退件意見只在這一頁的核准區塊用到，是純粹的表單欄位，留在元件裡。
     const [reviewComment, setReviewComment] = useState('');
-    const [references, setReferences] = useState(null);
-    const [loadingReferences, setLoadingReferences] = useState(false);
-    const [showDeletePanel, setShowDeletePanel] = useState(false);
-    const [unlinkReferences, setUnlinkReferences] = useState(false);
 
     const revisionStatus = revision?.status ?? null;
     const canEditRole = canProposeDictionaryChanges(role);
@@ -259,72 +251,6 @@ export default function WordEditor() {
         (!revision && (isNew || Boolean(id)))
         || revisionStatus === 'draft'
     );
-
-    const handleRevisionChanged = useCallback((result) => {
-        setPageError('');
-        setSuccess('提案狀態已更新');
-        setRevision((current) => revisionFromSave(result, current));
-    }, []);
-
-    const revisionActions = useRevisionActions(
-        revision?.id ?? null,
-        { onChanged: handleRevisionChanged },
-    );
-
-    useEffect(() => {
-        let active = true;
-
-        (async () => {
-            setLoading(true);
-            setPageError('');
-
-            try {
-                const taxonomyResult = await listTaxonomies();
-                if (!active) return;
-                setTaxonomies({
-                    ...EMPTY_TAXONOMIES,
-                    ...taxonomyResult,
-                });
-
-                if (isNew) {
-                    reset(prefillName ? { ...EMPTY_WORD, name: prefillName } : EMPTY_WORD);
-                    return;
-                }
-
-                const word = await getWord(id);
-                if (!active) return;
-
-                setBaseHash(word.content_hash ?? '');
-
-                const pending = word.meta?.pending_revision;
-
-                if (pending) {
-                    const loadedRevision = await getRevision(pending.id);
-                    if (!active) return;
-
-                    setRevision({
-                        ...pending,
-                        ...loadedRevision,
-                        id: loadedRevision.id ?? pending.id,
-                    });
-                    reset(normalizeWord(
-                        loadedRevision.payload ?? word,
-                    ));
-                } else {
-                    setRevision(null);
-                    reset(normalizeWord(word));
-                }
-            } catch (err) {
-                if (active) setPageError(err.message);
-            } finally {
-                if (active) setLoading(false);
-            }
-        })();
-
-        return () => {
-            active = false;
-        };
-    }, [id, isNew, reset, prefillName]);
 
     const statusLabel = useMemo(() => {
         if (revisionStatus) {
@@ -363,6 +289,8 @@ export default function WordEditor() {
         };
     };
 
+    // 必填檢查留在元件這一層：它問的是「這份表單填好了沒」，屬於表單的事，
+    // 不是遠端流程的事（useWordEditorData 只負責送出與錯誤處理）。
     const saveDraft = async () => {
         setPageError('');
         setSuccess('');
@@ -377,109 +305,15 @@ export default function WordEditor() {
             return null;
         }
 
-        setSaving(true);
-
-        try {
-            const payload = buildPayload();
-            let result;
-
-            if (revision?.id) {
-                if (revision.status !== 'draft') {
-                    throw new Error('只有草稿提案可以修改內容');
-                }
-
-                result = await updateRevisionPayload(
-                    revision.id,
-                    payload,
-                );
-            } else if (isNew) {
-                result = await createWordProposal(payload);
-            } else {
-                result = await proposeWordUpdate(id, {
-                    ...payload,
-                    base_hash: baseHash,
-                });
-            }
-
-            const nextRevision = revisionFromSave(result, {
-                ...revision,
-                operation: isNew ? 'create' : 'update',
-                status: 'draft',
-                payload,
-            });
-
-            setRevision(nextRevision);
-            setSuccess('草稿已儲存');
-
-            return nextRevision;
-        } catch (err) {
-            if (err.status === 409) {
-                setPageError(
-                    `${err.message} 詞條在編輯期間已被其他人修改，`
-                    + '請重新整理頁面取得最新內容後再建立提案。',
-                );
-            } else {
-                setPageError(err.message);
-            }
-            return null;
-        } finally {
-            setSaving(false);
-        }
+        return saveDraftWithPayload(buildPayload);
     };
 
-    const runRevisionAction = async (action) => {
-        setPageError('');
-        setSuccess('');
+    const {
+        references, loadingReferences, showDeletePanel, setShowDeletePanel,
+        unlinkReferences, setUnlinkReferences, hasReferences,
+        open: openDeletePanel, create: createDeleteProposal,
+    } = deletion;
 
-        try {
-            await action();
-        } catch {
-            // useRevisionActions 已保存 err.message，畫面統一顯示。
-        }
-    };
-
-    const openDeletePanel = async () => {
-        setPageError('');
-        setShowDeletePanel(true);
-        setLoadingReferences(true);
-
-        try {
-            setReferences(await getWordReferences(id));
-        } catch (err) {
-            setPageError(err.message);
-        } finally {
-            setLoadingReferences(false);
-        }
-    };
-
-    const createDeleteProposal = async () => {
-        setSaving(true);
-        setPageError('');
-        setSuccess('');
-
-        try {
-            const result = await proposeWordDelete(
-                id,
-                unlinkReferences,
-            );
-            setRevision(revisionFromSave(result, {
-                status: 'draft',
-                operation: 'delete',
-                payload: null,
-            }));
-            setShowDeletePanel(false);
-            setSuccess('刪除提案草稿已建立');
-        } catch (err) {
-            setPageError(err.message);
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const hasReferences = (
-        (references?.counts?.anaphora_items ?? 0)
-        + (references?.counts?.grammar_example_words ?? 0)
-    ) > 0;
 
     if (loading) {
         return (
@@ -549,238 +383,13 @@ export default function WordEditor() {
                     saveDraft();
                 }}
             >
-                <div className="dictionary-form-grid">
-                    <Form.Group
-                        className="dictionary-field"
-                        controlId="dictionary-word-tribe"
-                    >
-                        <Form.Label>
-                            族語 <span className="required-mark">*</span>
-                        </Form.Label>
-                        <Form.Select
-                            required
-                            disabled={!editable}
-                            value={tree.tribe_id}
-                            onChange={(event) => updateRoot(
-                                'tribe_id',
-                                event.target.value,
-                            )}
-                        >
-                            <option value="">請選擇族語</option>
-                            {taxonomies.tribes.map((tribe) => (
-                                <option key={tribe.id} value={tribe.id}>
-                                    {tribe.name}
-                                </option>
-                            ))}
-                        </Form.Select>
-                    </Form.Group>
-
-                    <Form.Group
-                        className="dictionary-field"
-                        controlId="dictionary-word-name"
-                    >
-                        <Form.Label>
-                            詞形 <span className="required-mark">*</span>
-                        </Form.Label>
-                        <Form.Control
-                            required
-                            disabled={!editable}
-                            value={tree.name}
-                            onChange={(event) => updateRoot(
-                                'name',
-                                event.target.value,
-                            )}
-                        />
-                    </Form.Group>
-
-                    <Form.Group
-                        className="dictionary-field"
-                        controlId="dictionary-word-dialect"
-                    >
-                        <Form.Label>方言別</Form.Label>
-                        <Form.Control
-                            disabled={!editable}
-                            value={tree.dialect}
-                            onChange={(event) => updateRoot(
-                                'dialect',
-                                event.target.value,
-                            )}
-                        />
-                    </Form.Group>
-
-                    <Form.Group
-                        className="dictionary-field"
-                        controlId="dictionary-word-pinyin"
-                    >
-                        <Form.Label>拼音</Form.Label>
-                        <Form.Control
-                            disabled={!editable}
-                            value={tree.pinyin}
-                            onChange={(event) => updateRoot(
-                                'pinyin',
-                                event.target.value,
-                            )}
-                        />
-                    </Form.Group>
-
-                    <Form.Group
-                        className="dictionary-field"
-                        controlId="dictionary-word-variant"
-                    >
-                        <Form.Label>變體</Form.Label>
-                        <Form.Control
-                            disabled={!editable}
-                            value={tree.variant}
-                            onChange={(event) => updateRoot(
-                                'variant',
-                                event.target.value,
-                            )}
-                        />
-                    </Form.Group>
-
-                    <Form.Group
-                        className="dictionary-field"
-                        controlId="dictionary-word-formation"
-                    >
-                        <Form.Label>構詞</Form.Label>
-                        <Form.Control
-                            disabled={!editable}
-                            value={tree.formation_word}
-                            onChange={(event) => updateRoot(
-                                'formation_word',
-                                event.target.value,
-                            )}
-                        />
-                    </Form.Group>
-
-                    <Form.Group
-                        className="dictionary-field"
-                        controlId="dictionary-word-derivative-root"
-                    >
-                        <Form.Label>衍生詞根</Form.Label>
-                        <Form.Control
-                            disabled={!editable}
-                            value={tree.derivative_root}
-                            onChange={(event) => updateRoot(
-                                'derivative_root',
-                                event.target.value,
-                            )}
-                        />
-                    </Form.Group>
-
-                    <Form.Group
-                        className="dictionary-field"
-                        controlId="dictionary-word-frequency"
-                    >
-                        <Form.Label>詞頻</Form.Label>
-                        <Form.Control
-                            type="number"
-                            min="0"
-                            disabled={!editable}
-                            value={tree.frequency}
-                            onChange={(event) => updateRoot(
-                                'frequency',
-                                event.target.value,
-                            )}
-                        />
-                    </Form.Group>
-                </div>
-
-                <Form.Group
-                    className="dictionary-field"
-                    controlId="dictionary-word-note"
-                >
-                    <Form.Label>辭典備註</Form.Label>
-                    <Form.Control
-                        as="textarea"
-                        rows={4}
-                        disabled={!editable}
-                        value={tree.dictionary_note}
-                        onChange={(event) => updateRoot(
-                            'dictionary_note',
-                            event.target.value,
-                        )}
-                    />
-                </Form.Group>
-
-                <MediaUploadField
-                    kind="image"
-                    label="詞條圖片"
-                    value={tree.word_img}
-                    disabled={!editable}
-                    onChange={(wordImg) => updateRoot(
-                        'word_img',
-                        wordImg,
-                    )}
+                <WordBasicFields
+                    tree={tree}
+                    updateRoot={updateRoot}
+                    editable={editable}
+                    taxonomies={taxonomies}
+                    toggleSource={toggleSource}
                 />
-
-                <fieldset
-                    className="dictionary-field"
-                    disabled={!editable}
-                >
-                    <legend>詞條屬性</legend>
-                    <div className="dictionary-inline-checks">
-                        <Form.Check
-                            id="dictionary-is-derivative-root"
-                            type="checkbox"
-                            label="衍生詞根"
-                            checked={tree.is_derivative_root}
-                            onChange={(event) => updateRoot(
-                                'is_derivative_root',
-                                event.target.checked,
-                            )}
-                        />
-                        <Form.Check
-                            id="dictionary-is-image"
-                            type="checkbox"
-                            label="圖像詞條"
-                            checked={tree.is_image}
-                            onChange={(event) => updateRoot(
-                                'is_image',
-                                event.target.checked,
-                            )}
-                        />
-                        <Form.Check
-                            id="dictionary-is-zuzucidian"
-                            type="checkbox"
-                            label="族語辭典詞條"
-                            checked={tree.is_zuzucidian}
-                            onChange={(event) => updateRoot(
-                                'is_zuzucidian',
-                                event.target.checked,
-                            )}
-                        />
-                        <Form.Check
-                            id="dictionary-is-other-dialect"
-                            type="checkbox"
-                            label="其他方言"
-                            checked={tree.is_other_dialect}
-                            onChange={(event) => updateRoot(
-                                'is_other_dialect',
-                                event.target.checked,
-                            )}
-                        />
-                    </div>
-                </fieldset>
-
-                <fieldset
-                    className="dictionary-taxonomy-field"
-                    disabled={!editable}
-                >
-                    <legend>資料來源</legend>
-                    <div className="dictionary-checkbox-grid">
-                        {taxonomies.source.map((source) => (
-                            <Form.Check
-                                key={source.id}
-                                id={`dictionary-source-${source.id}`}
-                                type="checkbox"
-                                label={source.name}
-                                checked={tree.source_ids.includes(source.id)}
-                                onChange={() => toggleSource(source.id)}
-                            />
-                        ))}
-                    </div>
-                </fieldset>
 
                 <div className="dictionary-child-section">
                     <div className="dictionary-child-heading">

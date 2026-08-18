@@ -17,17 +17,8 @@ import {
 import { useAuth } from '../../userServives/authContext';
 import { apiGet } from '../../../utils/apiClient';
 import '../../../static/css/_admin/users.css';
+import { ACCOUNT_MANAGERS, ROLE_LABELS, STAFF_ROLES } from '../constants/roles';
 
-const ACCOUNT_MANAGERS = ['owner', 'admin'];
-const STAFF_ROLES = ['owner', 'admin', 'editor', 'reviewer', 'analyst'];
-
-const ROLE_LABELS = {
-  owner: '擁有者',
-  admin: '管理員',
-  editor: '內容編輯',
-  reviewer: '審核者',
-  analyst: '數據觀察者',
-};
 
 const formatDateTime = (value) => (
   value

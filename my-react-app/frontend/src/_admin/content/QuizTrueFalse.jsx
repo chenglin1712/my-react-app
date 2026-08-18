@@ -1,15 +1,21 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Badge, Button, Form, Modal, Spinner, Table } from 'react-bootstrap';
-import { Archive, Check, Edit3, Plus, Send, Trash2, Undo2, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
-import { apiDelete, apiGet, apiPatch, apiPost } from '../../../utils/apiClient';
+import { uploadToCloudinary } from '@utils/uploadToCloudinary';
+import RejectReasonModal from '../reviewWorkflow/RejectReasonModal';
+import ReviewActions from '../reviewWorkflow/ReviewActions';
+import ReviewPagination from '../reviewWorkflow/ReviewPagination';
+import { useReviewableContentCrud } from '../reviewWorkflow/useReviewableContentCrud';
 import '../../../static/css/_admin/quiz-bank.css';
 
 const CONTENT_EDITORS = ['owner', 'admin', 'editor'];
-const CONTENT_APPROVERS = ['owner', 'admin', 'reviewer'];
-const PUBLISHERS = ['owner', 'admin'];
-const EDITABLE_STATUSES = ['draft', 'rejected'];
+const QUIZ_BANK_ROLES = {
+  editors: CONTENT_EDITORS,
+  approvers: ['owner', 'admin', 'reviewer'],
+  publishers: ['owner', 'admin'],
+};
 
 const STATUSES = {
   draft: { label: '草稿', bg: 'secondary' },
@@ -42,140 +48,21 @@ export default function QuizTrueFalse() {
   const { userData } = useAuth();
   const role = userData?.role;
 
-  const [filters, setFilters] = useState({ tribe: '', status: '' });
-  const [query, setQuery] = useState(filters);
-  const [data, setData] = useState({
-    results: [],
-    count: 0,
-    page: 1,
-    page_size: 20,
+  const {
+    items, data, loading, error, setError, hasNext, page, setPage,
+    filters, setFilters, search,
+    actionId, handleAction, reject, editor,
+  } = useReviewableContentCrud({
+    endpoint: '/adminapi/quiz-bank/true-false/',
+    initialFilters: { tribe: '', status: '' },
+    emptyForm: { ...EMPTY_FORM },
+    formFrom,
+    deleteConfirmMessage: () => '確定要刪除這則初級是非題嗎？',
   });
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [actionId, setActionId] = useState(null);
-  const [error, setError] = useState('');
-  const [rejectTarget, setRejectTarget] = useState(null);
-  const [rejectReason, setRejectReason] = useState('');
-  const [rejectingRevision, setRejectingRevision] = useState(false);
-  const [editTarget, setEditTarget] = useState(null);
-  const [form, setForm] = useState({ ...EMPTY_FORM });
+
+  const { target: editTarget, form, setForm } = editor;
   const [uploadingAudio, setUploadingAudio] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        page_size: '20',
-      });
-
-      Object.entries(query).forEach(([key, value]) => {
-        if (value) params.set(key, value);
-      });
-
-      setData(
-        await apiGet(
-          `/adminapi/quiz-bank/true-false/?${params.toString()}`,
-        ),
-      );
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, query]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const search = (event) => {
-    event.preventDefault();
-    setPage(1);
-    setQuery(filters);
-  };
-
-  const runAction = async (item, action, body) => {
-    setActionId(item.id);
-    setError('');
-
-    try {
-      if (action === 'delete') {
-        if (!window.confirm('確定要刪除這則初級是非題嗎？')) return;
-        await apiDelete(`/adminapi/quiz-bank/true-false/${item.id}/`);
-      } else {
-        await apiPost(
-          `/adminapi/quiz-bank/true-false/${item.id}/${action}/`,
-          body,
-        );
-      }
-
-      await load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setActionId(null);
-    }
-  };
-
-  const openReject = (item, revision = false) => {
-    setRejectTarget(item);
-    setRejectingRevision(revision);
-    setRejectReason('');
-  };
-
-  const closeReject = () => {
-    setRejectTarget(null);
-    setRejectingRevision(false);
-    setRejectReason('');
-  };
-
-  const submitReject = async () => {
-    if (!rejectReason.trim() || !rejectTarget) return;
-
-    await runAction(
-      rejectTarget,
-      rejectingRevision ? 'pending-revision/reject' : 'reject',
-      { review_comment: rejectReason.trim() },
-    );
-    closeReject();
-  };
-
-  const openNew = () => {
-    setForm({ ...EMPTY_FORM });
-    setEditTarget({});
-    setError('');
-  };
-
-  const openEdit = async (item) => {
-    setActionId(item.id);
-    setError('');
-
-    try {
-      let values = item;
-
-      if (item.status === 'published') {
-        try {
-          const revision = await apiGet(
-            `/adminapi/quiz-bank/true-false/${item.id}/pending-revision/`,
-          );
-          values = { ...item, ...(revision.payload || {}) };
-        } catch (err) {
-          if (err.status !== 404) throw err;
-        }
-      }
-
-      setForm(formFrom(values));
-      setEditTarget(item);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setActionId(null);
-    }
-  };
 
   const uploadFile = async (file, resourceType, field, setUploading) => {
     if (!file) return;
@@ -183,33 +70,14 @@ export default function QuizTrueFalse() {
     setError('');
     setUploading(true);
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append(
-      'upload_preset',
-      import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET,
-    );
-    formData.append(
-      'cloud_name',
-      import.meta.env.VITE_CLOUDINARY_CLOUD_NAME,
-    );
-
-    const suffix = resourceType === 'image'
-      ? 'image/upload/f_auto,q_auto'
-      : 'video/upload';
-
     try {
-      const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/${suffix}`,
-        { method: 'POST', body: formData },
-      );
-
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-      const result = await response.json();
+      // resourceType 是 'image' 或 'video'；uploadToCloudinary 的 transform
+      // 預設就跟著 resourceType 走（圖片加 f_auto,q_auto、影音不加），跟這裡
+      // 原本手寫 suffix 的行為一致，不需要另外指定。
+      const secureUrl = await uploadToCloudinary(file, { resourceType });
       setForm((current) => ({
         ...current,
-        [field]: result.secure_url,
+        [field]: secureUrl,
       }));
     } catch (err) {
       console.error(
@@ -249,189 +117,11 @@ export default function QuizTrueFalse() {
       return;
     }
 
-    setActionId('form');
-    setError('');
-
-    try {
-      if (editTarget.id) {
-        if (editTarget.status === 'published') {
-          await apiPost(
-            `/adminapi/quiz-bank/true-false/${editTarget.id}/pending-revision/`,
-            payload,
-          );
-        } else {
-          await apiPatch(
-            `/adminapi/quiz-bank/true-false/${editTarget.id}/`,
-            payload,
-          );
-        }
-      } else {
-        await apiPost('/adminapi/quiz-bank/true-false/', payload);
-      }
-
-      setEditTarget(null);
-      await load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setActionId(null);
-    }
+    // 欄位整理與必填檢查是是非題特有的，留在這裡；送出流程共用
+    // useReviewableContentCrud 的 save（FE-2）。
+    await editor.save(null, payload);
   };
 
-  const actionsFor = (item) => {
-    const busy = actionId === item.id;
-    const buttons = [];
-    const editable = (
-      EDITABLE_STATUSES.includes(item.status)
-      || item.status === 'published'
-    );
-
-    if (editable && CONTENT_EDITORS.includes(role)) {
-      buttons.push(
-        <Button
-          key="edit"
-          size="sm"
-          variant="outline-primary"
-          disabled={busy}
-          onClick={() => openEdit(item)}
-        >
-          <Edit3 size={14} /> 編輯
-        </Button>,
-      );
-    }
-
-    if (
-      EDITABLE_STATUSES.includes(item.status)
-      && CONTENT_EDITORS.includes(role)
-    ) {
-      buttons.push(
-        <Button
-          key="submit"
-          size="sm"
-          variant="outline-success"
-          disabled={busy}
-          onClick={() => runAction(item, 'submit')}
-        >
-          <Send size={14} /> 送審
-        </Button>,
-      );
-    }
-
-    if (item.status === 'draft' && PUBLISHERS.includes(role)) {
-      buttons.push(
-        <Button
-          key="delete"
-          size="sm"
-          variant="outline-danger"
-          disabled={busy}
-          onClick={() => runAction(item, 'delete')}
-        >
-          <Trash2 size={14} /> 刪除
-        </Button>,
-      );
-    }
-
-    if (
-      item.status === 'pending_review'
-      && CONTENT_EDITORS.includes(role)
-    ) {
-      buttons.push(
-        <Button
-          key="withdraw"
-          size="sm"
-          variant="outline-secondary"
-          disabled={busy}
-          onClick={() => runAction(item, 'withdraw')}
-        >
-          <Undo2 size={14} /> 撤回
-        </Button>,
-      );
-    }
-
-    if (
-      item.status === 'pending_review'
-      && CONTENT_APPROVERS.includes(role)
-    ) {
-      buttons.push(
-        <Button
-          key="approve"
-          size="sm"
-          variant="outline-success"
-          disabled={busy}
-          onClick={() => runAction(
-            item,
-            'approve',
-            { review_comment: '' },
-          )}
-        >
-          <Check size={14} /> 核准
-        </Button>,
-      );
-      buttons.push(
-        <Button
-          key="reject"
-          size="sm"
-          variant="outline-danger"
-          disabled={busy}
-          onClick={() => openReject(item)}
-        >
-          <X size={14} /> 退件
-        </Button>,
-      );
-    }
-
-    if (
-      item.status === 'published'
-      && item.has_pending_revision
-      && CONTENT_APPROVERS.includes(role)
-    ) {
-      buttons.push(
-        <Button
-          key="approve-revision"
-          size="sm"
-          variant="outline-success"
-          disabled={busy}
-          onClick={() => runAction(
-            item,
-            'pending-revision/approve',
-            { review_comment: '' },
-          )}
-        >
-          <Check size={14} /> 核准修改
-        </Button>,
-      );
-      buttons.push(
-        <Button
-          key="reject-revision"
-          size="sm"
-          variant="outline-danger"
-          disabled={busy}
-          onClick={() => openReject(item, true)}
-        >
-          <X size={14} /> 退件修改
-        </Button>,
-      );
-    }
-
-    if (
-      item.status === 'published'
-      && CONTENT_APPROVERS.includes(role)
-    ) {
-      buttons.push(
-        <Button
-          key="unpublish"
-          size="sm"
-          variant="outline-secondary"
-          disabled={busy}
-          onClick={() => runAction(item, 'unpublish')}
-        >
-          <Archive size={14} /> 下架
-        </Button>,
-      );
-    }
-
-    return buttons;
-  };
 
   const canSave = (
     Boolean(form.question_ab.trim())
@@ -442,7 +132,6 @@ export default function QuizTrueFalse() {
     && !uploadingImage
   );
 
-  const hasNext = data.page * data.page_size < data.count;
 
   return (
     <main className="quiz-bank-admin-page">
@@ -493,7 +182,7 @@ export default function QuizTrueFalse() {
 
       {CONTENT_EDITORS.includes(role) && (
         <div className="quiz-bank-heading-actions">
-          <Button onClick={openNew}>
+          <Button onClick={editor.openNew}>
             <Plus size={18} /> 新增初級是非題
           </Button>
         </div>
@@ -518,8 +207,8 @@ export default function QuizTrueFalse() {
               </tr>
             </thead>
             <tbody>
-              {data.results.length ? (
-                data.results.map((item) => (
+              {items.length ? (
+                items.map((item) => (
                   <tr key={item.id}>
                     <td>{TRIBE_FULL_NAME_BY_SLUG[item.tribe] ?? item.tribe}</td>
                     <td className="quiz-bank-truncate-cell">
@@ -548,7 +237,13 @@ export default function QuizTrueFalse() {
                     <td>{item.created_by || '—'}</td>
                     <td>
                       <div className="quiz-bank-row-actions">
-                        {actionsFor(item)}
+                        <ReviewActions
+                          item={item}
+                          role={role}
+                          roles={QUIZ_BANK_ROLES}
+                          busy={actionId === item.id}
+                          onAction={handleAction}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -564,31 +259,18 @@ export default function QuizTrueFalse() {
           </Table>
         )}
 
-        <div className="quiz-bank-pagination">
-          <span>共 {data.count} 筆</span>
-          <div>
-            <Button
-              variant="outline-secondary"
-              disabled={loading || page <= 1}
-              onClick={() => setPage((value) => value - 1)}
-            >
-              上一頁
-            </Button>
-            <span>第 {data.page} 頁</span>
-            <Button
-              variant="outline-secondary"
-              disabled={loading || !hasNext}
-              onClick={() => setPage((value) => value + 1)}
-            >
-              下一頁
-            </Button>
-          </div>
-        </div>
+        <ReviewPagination
+          data={data}
+          page={page}
+          setPage={setPage}
+          loading={loading}
+          hasNext={hasNext}
+        />
       </div>
 
       <Modal
         show={Boolean(editTarget)}
-        onHide={() => setEditTarget(null)}
+        onHide={editor.close}
         centered
         size="lg"
       >
@@ -760,7 +442,7 @@ export default function QuizTrueFalse() {
           <Modal.Footer>
             <Button
               variant="secondary"
-              onClick={() => setEditTarget(null)}
+              onClick={editor.close}
             >
               取消
             </Button>
@@ -777,51 +459,11 @@ export default function QuizTrueFalse() {
         </Form>
       </Modal>
 
-      <Modal
-        show={Boolean(rejectTarget)}
-        onHide={closeReject}
-        centered
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>
-            {rejectingRevision ? '退件修改原因' : '退件原因'}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form.Group controlId="quiz-true-false-reject-reason">
-            <Form.Label>請說明需要修改的內容</Form.Label>
-            <Form.Control
-              as="textarea"
-              rows={4}
-              required
-              value={rejectReason}
-              onChange={(event) => setRejectReason(event.target.value)}
-              isInvalid={
-                Boolean(rejectTarget)
-                && !rejectReason.trim()
-              }
-            />
-            <Form.Control.Feedback type="invalid">
-              退件理由為必填
-            </Form.Control.Feedback>
-          </Form.Group>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={closeReject}>
-            取消
-          </Button>
-          <Button
-            variant="danger"
-            disabled={
-              !rejectReason.trim()
-              || actionId === rejectTarget?.id
-            }
-            onClick={submitReject}
-          >
-            {rejectingRevision ? '確認退件修改' : '確認退件'}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <RejectReasonModal
+        reject={reject}
+        actionId={actionId}
+        controlId="quiz-true-false-reject-reason"
+      />
     </main>
   );
 }

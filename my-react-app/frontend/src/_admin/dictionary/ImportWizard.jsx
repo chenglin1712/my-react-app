@@ -1,13 +1,6 @@
 import {
-    useCallback,
-    useEffect,
-    useMemo,
-    useState,
-} from 'react';
-import {
     Link,
     useLocation,
-    useNavigate,
     useParams,
 } from 'react-router-dom';
 import {
@@ -22,16 +15,12 @@ import { useAuth } from '../../userServives/authContext';
 import {
     approveImportJob,
     autoCreateImportTaxonomies,
-    exportDictionary,
-    getImportJob,
-    listImportJobs,
-    listTaxonomies,
     preflightImportJob,
     rejectImportJob,
     submitImportJob,
-    uploadImportJob,
     withdrawImportJob,
 } from './dictionaryApi';
+import { useImportWizard } from './useImportWizard';
 import ImportPreflightReport from './ImportPreflightReport';
 import '../../../static/css/_admin/dictionary.css';
 
@@ -55,10 +44,6 @@ const OUTCOME_STATUSES = {
 
 const TAXONOMY_LABELS = {
     source: '來源', category: '分類', part_of_speech: '詞性', focus: '焦點',
-};
-
-const EMPTY_JOBS = {
-    results: [], count: 0, page: 1, page_size: 20,
 };
 
 function StatusBadge({ status }) {
@@ -88,165 +73,25 @@ function formatCreatedTaxonomies(created = {}) {
 
 export default function ImportWizard() {
     const { id } = useParams();
-    const navigate = useNavigate();
     const location = useLocation();
     const { userData } = useAuth();
     const role = userData?.role;
 
-    const [taxonomies, setTaxonomies] = useState({ tribes: [] });
-    const [selectedTribe, setSelectedTribe] = useState('');
-    const [jobs, setJobs] = useState(EMPTY_JOBS);
-    const [job, setJob] = useState(null);
+    const {
+        taxonomies, tribeNames, selectedTribe, setSelectedTribe,
+        jobs, job, selectedFile, parsedBundle,
+        reviewComment, setReviewComment,
+        loading, pendingAction, error, setError, successMessage, setSuccessMessage,
+        runJobAction, handleFileChange, upload, exportBundle,
+    } = useImportWizard({ id });
+
     // 只在剛上傳完、從 upload() 導頁過來時才會有值，純粹是「上傳當下就偵測到
     // 的結構問題」的一次性顯示提示，不需要 setter——之後每次重新整理或
     // 直接進到這個網址都不會有 location.state，回退成沒有提示即可。
     const rowErrors = location.state?.rowErrors ?? {};
 
-    const [selectedFile, setSelectedFile] = useState(null);
-    const [parsedBundle, setParsedBundle] = useState(null);
-    const [reviewComment, setReviewComment] = useState('');
-
-    const [loading, setLoading] = useState(true);
-    const [pendingAction, setPendingAction] = useState('');
-    const [error, setError] = useState('');
-    const [successMessage, setSuccessMessage] = useState('');
-
     const canEdit = CONTENT_EDITORS.includes(role);
     const canApprove = CONTENT_APPROVERS.includes(role);
-
-    const loadJobs = useCallback(async () => {
-        const result = await listImportJobs();
-        setJobs({ ...EMPTY_JOBS, ...result, results: result.results ?? [] });
-    }, []);
-
-    useEffect(() => {
-        let active = true;
-
-        (async () => {
-            setLoading(true);
-            setError('');
-
-            try {
-                const requests = [listTaxonomies(), listImportJobs()];
-                if (id) requests.push(getImportJob(id));
-
-                const [taxonomyResult, jobsResult, jobResult] = await Promise.all(requests);
-                if (!active) return;
-
-                setTaxonomies({ tribes: taxonomyResult.tribes ?? [] });
-                setSelectedTribe((current) => current || taxonomyResult.tribes?.[0]?.slug || '');
-                setJobs({ ...EMPTY_JOBS, ...jobsResult, results: jobsResult.results ?? [] });
-                setJob(jobResult ?? null);
-                setReviewComment(jobResult?.review_comment ?? '');
-            } catch (err) {
-                if (active) setError(err.message);
-            } finally {
-                if (active) setLoading(false);
-            }
-        })();
-
-        return () => { active = false; };
-    }, [id]);
-
-    const tribeNames = useMemo(() => new Map(
-        taxonomies.tribes.flatMap((tribe) => [
-            [String(tribe.id), tribe.name],
-            [String(tribe.slug), tribe.name],
-        ]),
-    ), [taxonomies.tribes]);
-
-    const replaceJob = async (result, message = '') => {
-        setJob(result);
-        if (message) setSuccessMessage(message);
-        await loadJobs();
-    };
-
-    const runJobAction = async (action, callback, message = '') => {
-        setPendingAction(action);
-        setError('');
-        setSuccessMessage('');
-
-        try {
-            const result = await callback();
-            await replaceJob(result, message);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setPendingAction('');
-        }
-    };
-
-    const handleFileChange = (event) => {
-        const file = event.target.files?.[0];
-
-        setSelectedFile(file ?? null);
-        setParsedBundle(null);
-        setError('');
-        setSuccessMessage('');
-
-        if (!file) return;
-
-        const reader = new FileReader();
-
-        reader.onload = () => {
-            try {
-                setParsedBundle(JSON.parse(reader.result));
-            } catch {
-                setError('檔案不是有效的 JSON');
-            }
-        };
-
-        reader.onerror = () => {
-            setError('無法讀取檔案');
-        };
-
-        reader.readAsText(file);
-    };
-
-    const upload = async () => {
-        if (!selectedFile || !parsedBundle) return;
-
-        setPendingAction('upload');
-        setError('');
-        setSuccessMessage('');
-
-        try {
-            const result = await uploadImportJob(selectedFile.name, parsedBundle);
-            navigate(`/admin/dictionary/import/${result.id}`, {
-                state: { rowErrors: result.row_errors ?? {} },
-            });
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setPendingAction('');
-        }
-    };
-
-    const exportBundle = async () => {
-        if (!selectedTribe) return;
-
-        setPendingAction('export');
-        setError('');
-        setSuccessMessage('');
-
-        try {
-            const data = await exportDictionary(selectedTribe);
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const anchor = document.createElement('a');
-
-            anchor.href = url;
-            anchor.download = `dictionary_${selectedTribe}.json`;
-            anchor.click();
-
-            URL.revokeObjectURL(url);
-            setSuccessMessage('辭典匯出檔已開始下載。');
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setPendingAction('');
-        }
-    };
 
     const renderSummary = () => (
         <Alert variant={job.error_count > 0 ? 'warning' : 'info'}>

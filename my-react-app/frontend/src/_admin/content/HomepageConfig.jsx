@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Button, Form, Spinner } from 'react-bootstrap';
 import { ImagePlus, Save } from 'lucide-react';
 import { apiGet, apiPatch } from '../../../utils/apiClient';
+import { uploadToCloudinary } from '@utils/uploadToCloudinary';
 import { useAuth } from '../../userServives/authContext';
 import '../../../static/css/_admin/homepage-config.css';
 
@@ -63,16 +64,10 @@ export default function HomepageConfig() {
         setError('');
         setPreview(URL.createObjectURL(file));
         setUploading(true);
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
-        formData.append('cloud_name', import.meta.env.VITE_CLOUDINARY_CLOUD_NAME);
         try {
-            const response = await fetch(`https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/f_auto,q_auto`, { method: 'POST', body: formData });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const result = await response.json();
-            update('hero_image_url', result.secure_url);
-            setPreview(result.secure_url);
+            const secureUrl = await uploadToCloudinary(file);
+            update('hero_image_url', secureUrl);
+            setPreview(secureUrl);
         } catch (err) {
             console.error('圖片上傳失敗', err);
             setError('圖片上傳失敗');

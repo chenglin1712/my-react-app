@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
     Alert,
@@ -18,7 +18,9 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBE_NAME_BY_SLUG } from '../../constants/tribes';
-import { apiGet, apiPost } from '../../../utils/apiClient';
+import { apiPost } from '../../../utils/apiClient';
+import { useAdminListQuery } from '../hooks/useAdminListQuery';
+import ReviewPagination from '../reviewWorkflow/ReviewPagination';
 import '../../../static/css/_admin/moderation.css';
 
 const STAFF_ROLES = ['owner', 'admin', 'editor', 'reviewer', 'analyst'];
@@ -85,66 +87,20 @@ export default function ReportsQueue() {
     const canRead = STAFF_ROLES.includes(role);
     const canManage = ACCOUNT_MANAGERS.includes(role);
 
-    const [filters, setFilters] = useState({
-        status: 'pending',
-        target_type: '',
+    const {
+        items, data, loading, error, setError, page, setPage, hasNext,
+        filters, setFilters, search, reload: loadReports,
+    } = useAdminListQuery({
+        endpoint: '/adminapi/reports/',
+        initialFilters: { status: 'pending', target_type: '' },
+        pageSize: PAGE_SIZE,
+        enabled: canRead,
     });
-    const [query, setQuery] = useState(filters);
-    const [data, setData] = useState({
-        results: [],
-        count: 0,
-        page: 1,
-        page_size: PAGE_SIZE,
-    });
-    const [page, setPage] = useState(1);
-    const [loading, setLoading] = useState(canRead);
-    const [error, setError] = useState('');
+
     const [success, setSuccess] = useState('');
     const [actionTarget, setActionTarget] = useState(null);
     const [resolutionNote, setResolutionNote] = useState('');
     const [submitting, setSubmitting] = useState(false);
-
-    const loadReports = useCallback(async () => {
-        if (!canRead) {
-            setLoading(false);
-            return;
-        }
-
-        setLoading(true);
-        setError('');
-
-        try {
-            const params = new URLSearchParams({
-                page: String(page),
-                page_size: String(PAGE_SIZE),
-            });
-
-            if (query.status) {
-                params.set('status', query.status);
-            }
-            if (query.target_type) {
-                params.set('target_type', query.target_type);
-            }
-
-            setData(
-                await apiGet(`/adminapi/reports/?${params.toString()}`),
-            );
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    }, [canRead, page, query]);
-
-    useEffect(() => {
-        loadReports();
-    }, [loadReports]);
-
-    const search = (event) => {
-        event.preventDefault();
-        setPage(1);
-        setQuery(filters);
-    };
 
     const openActionModal = (report, action) => {
         setActionTarget({ report, action });
@@ -188,7 +144,6 @@ export default function ReportsQueue() {
         }
     };
 
-    const hasNext = data.page * data.page_size < data.count;
     const modalIsResolve = actionTarget?.action === 'resolve';
 
     if (!canRead) {
@@ -290,7 +245,7 @@ export default function ReportsQueue() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {data.results.map((report) => {
+                                    {items.map((report) => {
                                         const typeMeta = TARGET_TYPES[
                                             report.target_type
                                         ] ?? {
@@ -400,7 +355,7 @@ export default function ReportsQueue() {
                                         );
                                     })}
 
-                                    {!data.results.length && (
+                                    {!items.length && (
                                         <tr>
                                             <td
                                                 className="moderation-empty"
@@ -414,28 +369,14 @@ export default function ReportsQueue() {
                             </Table>
                         </div>
 
-                        <div className="moderation-pagination">
-                            <span>共 {data.count} 筆</span>
-                            <div>
-                                <Button
-                                    size="sm"
-                                    variant="outline-secondary"
-                                    disabled={page <= 1}
-                                    onClick={() => setPage((value) => value - 1)}
-                                >
-                                    上一頁
-                                </Button>
-                                <span>第 {data.page} 頁</span>
-                                <Button
-                                    size="sm"
-                                    variant="outline-secondary"
-                                    disabled={!hasNext}
-                                    onClick={() => setPage((value) => value + 1)}
-                                >
-                                    下一頁
-                                </Button>
-                            </div>
-                        </div>
+                        <ReviewPagination
+                            data={data}
+                            page={page}
+                            setPage={setPage}
+                            loading={loading}
+                            hasNext={hasNext}
+                            className="moderation-pagination"
+                        />
                     </>
                 )}
             </section>

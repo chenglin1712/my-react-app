@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   Alert,
   Badge,
   Button,
   Form,
-  Modal,
   Spinner,
 } from 'react-bootstrap';
 import {
@@ -14,7 +13,6 @@ import {
   CheckCircle2,
   Download,
   Edit3,
-  ImagePlus,
   KeyRound,
   LogOut,
   Shield,
@@ -25,23 +23,16 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import {
-  apiGet,
-  apiPatch,
-  apiPost,
-} from '../../../utils/apiClient';
+  ACCOUNT_MANAGERS,
+  ROLE_ASSIGNERS,
+  ROLE_LABELS,
+  STAFF_ROLES,
+} from '../constants/roles';
+import DeleteAccountModal from './DeleteAccountModal';
+import PasswordChangeModal from './PasswordChangeModal';
+import ProfileEditModal from './ProfileEditModal';
+import { useUserDetail } from './useUserDetail';
 import '../../../static/css/_admin/users.css';
-
-const STAFF_ROLES = ['owner', 'admin', 'editor', 'reviewer', 'analyst'];
-const ROLE_ASSIGNERS = ['owner'];
-const ACCOUNT_MANAGERS = ['owner', 'admin'];
-
-const ROLE_LABELS = {
-  owner: '擁有者',
-  admin: '管理員',
-  editor: '內容編輯',
-  reviewer: '審核者',
-  analyst: '數據觀察者',
-};
 
 const CONTENT_COUNT_LABELS = {
   shared_notes: '分享筆記',
@@ -53,19 +44,6 @@ const DELETE_RESULT_LABELS = {
   pronunciations: '發音錄音',
   firestore_user_document: 'Firestore 使用者文件',
   firebase_auth: 'Firebase Auth 帳號',
-};
-
-const EMPTY_PROFILE_FORM = {
-  name: '',
-  identity: '',
-  avatar_url: '',
-  email: '',
-};
-
-const EMPTY_PASSWORD_FORM = {
-  newPassword: '',
-  confirmPassword: '',
-  confirmEmail: '',
 };
 
 const formatDateTime = (value) => (
@@ -128,337 +106,38 @@ export default function UserDetail() {
   const canAssignRole = ROLE_ASSIGNERS.includes(role);
   const canManageAccount = ACCOUNT_MANAGERS.includes(role);
 
-  const [user, setUser] = useState(null);
-  const [selectedRole, setSelectedRole] = useState('');
-  const [loading, setLoading] = useState(canViewUser);
-  const [action, setAction] = useState('');
-  const [error, setError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+  const {
+    user, loading, error, setError, successMessage, setSuccessMessage,
+    action, selectedRole, setSelectedRole,
+    deleteResults, setDeleteResults,
+    loadUser, assignRole, toggleSuspension, forceLogout, exportUser,
+  } = useUserDetail({ uid, canViewUser });
 
+  // 三個對話框各自持有自己的表單狀態（見各元件說明），這裡只留「開/關」。
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [profileForm, setProfileForm] = useState(EMPTY_PROFILE_FORM);
-  const [avatarPreview, setAvatarPreview] = useState('');
-  const [avatarUploading, setAvatarUploading] = useState(false);
-
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [passwordForm, setPasswordForm] = useState(EMPTY_PASSWORD_FORM);
-
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [confirmEmail, setConfirmEmail] = useState('');
-  const [deleteResults, setDeleteResults] = useState(null);
 
-  const loadUser = useCallback(async () => {
-    if (!canViewUser || deleteResults) {
-      setLoading(false);
-      return;
-    }
+  const openProfileModal = () => { setError(''); setShowProfileModal(true); };
+  const openPasswordModal = () => { setError(''); setShowPasswordModal(true); };
+  const openDeleteModal = () => { setError(''); setShowDeleteModal(true); };
 
-    setLoading(true);
-    setError('');
-
-    try {
-      const result = await apiGet(`/adminapi/users/${uid}/`);
-      setUser(result);
-      setSelectedRole(result.role ?? '');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [canViewUser, deleteResults, uid]);
-
-  useEffect(() => {
-    loadUser();
-  }, [loadUser]);
-
-  const runAccountAction = async (actionName, endpoint, message) => {
-    setAction(actionName);
-    setError('');
-    setSuccessMessage('');
-
-    try {
-      await apiPost(`/adminapi/users/${uid}/${endpoint}/`);
-      if (message) setSuccessMessage(message);
-      await loadUser();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setAction('');
-    }
-  };
-
-  const assignRole = async () => {
-    const roleLabel = selectedRole
-      ? ROLE_LABELS[selectedRole]
-      : '一般使用者';
-
-    if (!window.confirm(`確定要將此帳號的角色設為「${roleLabel}」嗎？`)) {
-      return;
-    }
-
-    setAction('role');
-    setError('');
-    setSuccessMessage('');
-
-    try {
-      await apiPost(
-        `/adminapi/users/${uid}/role/`,
-        { role: selectedRole || null },
-      );
-      setSuccessMessage('角色已更新。');
-      await loadUser();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setAction('');
-    }
-  };
-
-  const toggleSuspension = async () => {
-    const endpoint = user.disabled ? 'unsuspend' : 'suspend';
-    const verb = user.disabled ? '解除停權' : '停權';
-
-    if (!window.confirm(`確定要${verb}帳號 ${user.email} 嗎？`)) {
-      return;
-    }
-
-    await runAccountAction(
-      endpoint,
-      endpoint,
-      user.disabled ? '帳號已解除停權。' : '帳號已停權。',
-    );
-  };
-
-  const forceLogout = async () => {
-    if (!window.confirm(`確定要強制登出帳號 ${user.email} 嗎？`)) {
-      return;
-    }
-
-    await runAccountAction(
-      'force-logout',
-      'force-logout',
-      '已撤銷使用者的登入憑證。',
-    );
-  };
-
-  const exportUser = async () => {
-    setAction('export');
-    setError('');
-    setSuccessMessage('');
-
-    try {
-      const data = await apiGet(`/adminapi/users/${uid}/export/`);
-      const blob = new Blob(
-        [JSON.stringify(data, null, 2)],
-        { type: 'application/json' },
-      );
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-
-      anchor.href = url;
-      anchor.download = `user_export_${uid}.json`;
-      anchor.click();
-
-      URL.revokeObjectURL(url);
-      setSuccessMessage('個資匯出檔已開始下載。');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setAction('');
-    }
-  };
-
-  const openProfileModal = () => {
-    setProfileForm({
-      name: user.name ?? '',
-      identity: user.identity ?? '',
-      avatar_url: user.avatar_url ?? '',
-      email: user.email ?? '',
-    });
-    setAvatarPreview(user.avatar_url ?? '');
-    setError('');
-    setShowProfileModal(true);
-  };
-
-  const closeProfileModal = () => {
-    if (action === 'profile' || avatarUploading) return;
-
+  const handleProfileSaved = async (message) => {
     setShowProfileModal(false);
-    setProfileForm(EMPTY_PROFILE_FORM);
-    setAvatarPreview('');
+    setSuccessMessage(message);
+    await loadUser();
   };
 
-  const updateProfileForm = (field, value) => {
-    setProfileForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
-  };
-
-  const handleAvatarFileChange = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      setError('圖片不得超過 5 MB，請重新選擇。');
-      return;
-    }
-
-    setError('');
-    setAvatarPreview(URL.createObjectURL(file));
-    setAvatarUploading(true);
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
-    formData.append('cloud_name', import.meta.env.VITE_CLOUDINARY_CLOUD_NAME);
-
-    try {
-      const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/f_auto,q_auto`,
-        { method: 'POST', body: formData },
-      );
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const result = await response.json();
-      updateProfileForm('avatar_url', result.secure_url);
-      setAvatarPreview(result.secure_url);
-    } catch (err) {
-      console.error('頭像上傳失敗', err);
-      setError('頭像上傳失敗，請重新選擇圖片。');
-    } finally {
-      setAvatarUploading(false);
-    }
-  };
-
-  const saveProfile = async (event) => {
-    event.preventDefault();
-
-    if (avatarUploading) {
-      setError('請等待頭像上傳完成');
-      return;
-    }
-
-    setAction('profile');
-    setError('');
-    setSuccessMessage('');
-
-    try {
-      await apiPatch(
-        `/adminapi/users/${uid}/profile/`,
-        {
-          name: profileForm.name,
-          identity: profileForm.identity,
-          avatar_url: profileForm.avatar_url,
-          email: profileForm.email,
-        },
-      );
-
-      setShowProfileModal(false);
-      setProfileForm(EMPTY_PROFILE_FORM);
-      setSuccessMessage('使用者資料已更新。');
-      await loadUser();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setAction('');
-    }
-  };
-
-  const openPasswordModal = () => {
-    setPasswordForm(EMPTY_PASSWORD_FORM);
-    setError('');
-    setShowPasswordModal(true);
-  };
-
-  const closePasswordModal = () => {
-    if (action === 'password') return;
-
+  const handlePasswordSaved = (message) => {
     setShowPasswordModal(false);
-    setPasswordForm(EMPTY_PASSWORD_FORM);
+    setSuccessMessage(message);
   };
 
-  const updatePasswordForm = (field, value) => {
-    setPasswordForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
-  };
-
-  const passwordCanSubmit = (
-    passwordForm.newPassword.length >= 6
-    && passwordForm.confirmPassword === passwordForm.newPassword
-    && passwordForm.confirmEmail === user?.email
-  );
-
-  const changePassword = async (event) => {
-    event.preventDefault();
-
-    if (!passwordCanSubmit) return;
-
-    setAction('password');
-    setError('');
-    setSuccessMessage('');
-
-    try {
-      const result = await apiPost(
-        `/adminapi/users/${uid}/password/`,
-        {
-          new_password: passwordForm.newPassword,
-          confirm_email: passwordForm.confirmEmail,
-        },
-      );
-
-      setShowPasswordModal(false);
-      setPasswordForm(EMPTY_PASSWORD_FORM);
-      // 密碼變更本身一定成功才會走到這裡；sessions_revoked 是否為 false
-      // 由後端誠實回報（見 user_password() 的說明），不能一律顯示「已撤銷」
-      // 誤導管理者以為舊登入狀態已經失效。
-      setSuccessMessage(
-        result.sessions_revoked
-          ? '密碼已變更，並已撤銷此帳號現有的登入狀態。'
-          : '密碼已變更，但撤銷登入狀態失敗，此帳號的舊登入可能仍然有效，請稍後重新嘗試或聯繫系統管理員。',
-      );
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setAction('');
-    }
-  };
-
-  const openDeleteModal = () => {
-    setConfirmEmail('');
-    setError('');
-    setShowDeleteModal(true);
-  };
-
-  const closeDeleteModal = () => {
-    if (action === 'delete') return;
-
+  const handleAccountDeleted = (results) => {
     setShowDeleteModal(false);
-    setConfirmEmail('');
+    setDeleteResults(results);
   };
 
-  const deleteAccount = async () => {
-    if (!user || confirmEmail !== user.email) return;
-
-    setAction('delete');
-    setError('');
-    setSuccessMessage('');
-
-    try {
-      const result = await apiPost(
-        `/adminapi/users/${uid}/delete/`,
-        { confirm_email: confirmEmail },
-      );
-
-      setDeleteResults(result.results);
-      setShowDeleteModal(false);
-      setConfirmEmail('');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setAction('');
-    }
-  };
 
   if (!canViewUser) {
     return (
@@ -888,266 +567,39 @@ export default function UserDetail() {
         </section>
       )}
 
-      <Modal
-        show={showProfileModal}
-        onHide={closeProfileModal}
-        centered
-        backdrop={action === 'profile' || avatarUploading ? 'static' : true}
-        keyboard={action !== 'profile' && !avatarUploading}
-      >
-        <Form onSubmit={saveProfile}>
-          <Modal.Header closeButton={action !== 'profile' && !avatarUploading}>
-            <Modal.Title>編輯使用者資料</Modal.Title>
-          </Modal.Header>
+      {showProfileModal && (
+        <ProfileEditModal
+          show={showProfileModal}
+          user={user}
+          uid={uid}
+          onClose={() => setShowProfileModal(false)}
+          onSaved={handleProfileSaved}
+          onError={setError}
+        />
+      )}
 
-          <Modal.Body>
-            <Form.Group className="mb-3" controlId="profile-name">
-              <Form.Label>姓名</Form.Label>
-              <Form.Control
-                required
-                disabled={action === 'profile'}
-                value={profileForm.name}
-                onChange={(event) => updateProfileForm(
-                  'name',
-                  event.target.value,
-                )}
-              />
-            </Form.Group>
+      {showPasswordModal && (
+        <PasswordChangeModal
+          show={showPasswordModal}
+          user={user}
+          uid={uid}
+          onClose={() => setShowPasswordModal(false)}
+          onSaved={handlePasswordSaved}
+          onError={setError}
+        />
+      )}
 
-            <Form.Group className="mb-3" controlId="profile-identity">
-              <Form.Label>身分</Form.Label>
-              <Form.Control
-                disabled={action === 'profile'}
-                value={profileForm.identity}
-                onChange={(event) => updateProfileForm(
-                  'identity',
-                  event.target.value,
-                )}
-              />
-            </Form.Group>
+      {showDeleteModal && (
+        <DeleteAccountModal
+          show={showDeleteModal}
+          user={user}
+          uid={uid}
+          onClose={() => setShowDeleteModal(false)}
+          onDeleted={handleAccountDeleted}
+          onError={setError}
+        />
+      )}
 
-            <Form.Group className="mb-3" controlId="profile-avatar-url">
-              <Form.Label>頭像</Form.Label>
-              <div className="user-avatar-uploader">
-                {avatarPreview ? (
-                  <img
-                    className="user-avatar-uploader-preview"
-                    src={avatarPreview}
-                    alt="頭像預覽"
-                  />
-                ) : (
-                  <div className="user-avatar-uploader-placeholder">
-                    <ImagePlus size={24} aria-hidden="true" />
-                  </div>
-                )}
-
-                <div>
-                  <Form.Control
-                    type="file"
-                    accept="image/jpeg,image/png"
-                    disabled={action === 'profile' || avatarUploading}
-                    onChange={handleAvatarFileChange}
-                  />
-                  <Form.Text>僅接受 JPG／PNG，檔案大小不得超過 5 MB。</Form.Text>
-                  {avatarUploading && (
-                    <span className="user-upload-status">
-                      <Spinner animation="border" size="sm" />
-                      頭像上傳中……
-                    </span>
-                  )}
-                </div>
-              </div>
-            </Form.Group>
-
-            <Form.Group controlId="profile-email">
-              <Form.Label>Email</Form.Label>
-              <Form.Control
-                type="email"
-                required
-                disabled={action === 'profile'}
-                value={profileForm.email}
-                onChange={(event) => updateProfileForm(
-                  'email',
-                  event.target.value,
-                )}
-              />
-            </Form.Group>
-          </Modal.Body>
-
-          <Modal.Footer>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={action === 'profile' || avatarUploading}
-              onClick={closeProfileModal}
-            >
-              取消
-            </Button>
-
-            <Button type="submit" disabled={action === 'profile' || avatarUploading}>
-              {action === 'profile' ? (
-                <Spinner animation="border" size="sm" />
-              ) : (
-                <Edit3 size={16} />
-              )}
-              儲存
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
-
-      <Modal
-        show={showPasswordModal}
-        onHide={closePasswordModal}
-        centered
-        backdrop={action === 'password' ? 'static' : true}
-        keyboard={action !== 'password'}
-      >
-        <Form onSubmit={changePassword}>
-          <Modal.Header closeButton={action !== 'password'}>
-            <Modal.Title>變更密碼</Modal.Title>
-          </Modal.Header>
-
-          <Modal.Body>
-            <Alert variant="danger">
-              此操作無法復原，請輸入該帳號的 email（{user.email}）以確認變更密碼。
-            </Alert>
-
-            <Form.Group className="mb-3" controlId="password-new">
-              <Form.Label>新密碼</Form.Label>
-              <Form.Control
-                type="password"
-                minLength={6}
-                required
-                autoComplete="new-password"
-                disabled={action === 'password'}
-                value={passwordForm.newPassword}
-                onChange={(event) => updatePasswordForm(
-                  'newPassword',
-                  event.target.value,
-                )}
-              />
-              <Form.Text>密碼至少需要 6 個字元。</Form.Text>
-            </Form.Group>
-
-            <Form.Group className="mb-3" controlId="password-confirm">
-              <Form.Label>確認新密碼</Form.Label>
-              <Form.Control
-                type="password"
-                minLength={6}
-                required
-                autoComplete="new-password"
-                disabled={action === 'password'}
-                value={passwordForm.confirmPassword}
-                isInvalid={
-                  Boolean(passwordForm.confirmPassword)
-                  && passwordForm.confirmPassword !== passwordForm.newPassword
-                }
-                onChange={(event) => updatePasswordForm(
-                  'confirmPassword',
-                  event.target.value,
-                )}
-              />
-              <Form.Control.Feedback type="invalid">
-                兩次輸入的密碼不相同。
-              </Form.Control.Feedback>
-            </Form.Group>
-
-            <Form.Group controlId="password-confirm-email">
-              <Form.Label>帳號 Email</Form.Label>
-              <Form.Control
-                aria-label="輸入帳號 Email 以確認變更密碼"
-                autoComplete="off"
-                disabled={action === 'password'}
-                value={passwordForm.confirmEmail}
-                onChange={(event) => updatePasswordForm(
-                  'confirmEmail',
-                  event.target.value,
-                )}
-              />
-            </Form.Group>
-          </Modal.Body>
-
-          <Modal.Footer>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={action === 'password'}
-              onClick={closePasswordModal}
-            >
-              取消
-            </Button>
-
-            <Button
-              type="submit"
-              variant="danger"
-              disabled={action === 'password' || !passwordCanSubmit}
-            >
-              {action === 'password' ? (
-                <Spinner animation="border" size="sm" />
-              ) : (
-                <KeyRound size={16} />
-              )}
-              確認變更密碼
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
-
-      <Modal
-        show={showDeleteModal}
-        onHide={closeDeleteModal}
-        centered
-        backdrop={action === 'delete' ? 'static' : true}
-        keyboard={action !== 'delete'}
-      >
-        <Modal.Header closeButton={action !== 'delete'}>
-          <Modal.Title>確認刪除帳號</Modal.Title>
-        </Modal.Header>
-
-        <Modal.Body>
-          <Alert variant="danger">
-            此操作無法復原，請輸入該帳號的 email（{user.email}）以確認刪除。
-          </Alert>
-
-          <Form.Group controlId="delete-confirm-email">
-            <Form.Label>帳號 Email</Form.Label>
-            <Form.Control
-              aria-label="輸入帳號 Email 以確認刪除"
-              autoComplete="off"
-              value={confirmEmail}
-              disabled={action === 'delete'}
-              onChange={(event) => setConfirmEmail(event.target.value)}
-            />
-          </Form.Group>
-        </Modal.Body>
-
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            disabled={action === 'delete'}
-            onClick={closeDeleteModal}
-          >
-            取消
-          </Button>
-
-          <Button
-            variant="danger"
-            disabled={
-              action === 'delete'
-              || confirmEmail !== user.email
-            }
-            onClick={deleteAccount}
-          >
-            {action === 'delete' ? (
-              <Spinner animation="border" size="sm" />
-            ) : (
-              <Trash2 size={16} />
-            )}
-            確認刪除
-          </Button>
-        </Modal.Footer>
-      </Modal>
     </main>
   );
 }

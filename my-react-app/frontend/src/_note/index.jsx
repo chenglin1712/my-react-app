@@ -14,6 +14,7 @@ import { useNotePages } from "./hooks/useNotePages";
 import EditorToolbar from "./components/EditorToolbar";
 import PageSidebar from "./components/PageSidebar";
 import { buildPreview, SHARE_MAX_PAGES } from "../../utils/notePreview";
+import { uploadToCloudinary } from "@utils/uploadToCloudinary";
 
 function NotePage() {
   const navigate = useNavigate();
@@ -67,18 +68,11 @@ function NotePage() {
     try {
       let uploadedImageUrl = "";
       if (selectedImageFile) {
-        const formData = new FormData();
-        formData.append("file", selectedImageFile);
-        formData.append("upload_preset", import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
-        formData.append("folder", "tayal_note");
-
-        const res = await fetch(
-          `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
-          { method: "POST", body: formData }
-        );
-        if (!res.ok) throw new Error(`圖片上傳失敗 (HTTP ${res.status})`);
-        const data = await res.json();
-        uploadedImageUrl = data.secure_url;
+        // transform: false 維持原本純 image/upload、不加 f_auto,q_auto 的行為
+        uploadedImageUrl = await uploadToCloudinary(selectedImageFile, {
+          folder: "tayal_note",
+          transform: false,
+        });
       }
 
       const sanitizedPages = pagesToShare.map(p => ({

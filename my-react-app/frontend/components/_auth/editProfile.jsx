@@ -7,6 +7,7 @@ import AvatarImg from "../../static/assets/_auth/avatar.webp"
 import { useNavigate } from "react-router-dom";
 import { updateProfile } from "../../src/userServives/userServive"
 import { useAuth } from "../../src/userServives/authContext"
+import { uploadToCloudinary } from "@utils/uploadToCloudinary"
 
 const Edit = () => {
     const navigate = useNavigate();
@@ -43,19 +44,11 @@ const Edit = () => {
         setPreviewUrl(URL.createObjectURL(file));
         setIsUploading(true);
 
-        const data = new FormData();
-        data.append("file", file);
-        data.append("upload_preset", import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
-        data.append("cloud_name", import.meta.env.VITE_CLOUDINARY_CLOUD_NAME);
-
-        //上傳圖片到cloudinary
+        //上傳圖片到cloudinary（transform: false 維持原本純 image/upload、
+        //不加 f_auto,q_auto 的行為）
         try {
-            const res = await fetch(`https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`, {
-                method: "POST",
-                body: data
-            });
-            const result = await res.json();
-            setFormData(prev => ({ ...prev, avatarUrl: result.secure_url }));
+            const secureUrl = await uploadToCloudinary(file, { transform: false });
+            setFormData(prev => ({ ...prev, avatarUrl: secureUrl }));
         } catch (err) {
             console.error("圖片上傳失敗", err);
             setErrorMsg("圖片上傳失敗");

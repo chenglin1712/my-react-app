@@ -1,3 +1,5 @@
+import { fileURLToPath, URL } from 'node:url'
+
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -5,6 +7,27 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // frontend/ 底下有 src/、components/、hooks/、utils/ 四個平行的頂層目錄
+  // （FE-1），彼此之間只能用 `../../components/ui/...` 這種相對路徑互相
+  // 引用——路徑深度隨檔案位置變動，看不出被引用的東西到底屬於哪一層，也
+  // 讓「把檔案搬到別的資料夾」這件事必須連帶改掉一整批引用。
+  //
+  // 先把別名接起來（不搬任何檔案、不動任何既有 import），之後要逐步收斂
+  // 目錄結構時，搬動的檔案只需要改自己的 import，不會波及引用它的人。
+  // 既有的 486 條相對 import 刻意不一次全部機械式改寫——那會製造一次
+  // 巨大、無法審閱、且跟真正的重構混在一起的變更；改成「新寫的程式碼一律
+  // 用別名，既有檔案在因為別的原因被動到時順手換掉」。
+  //
+  // vitest 的設定就寫在這個檔案的 `test` 區塊（同一份 resolve 設定），
+  // 所以測試環境會自動沿用這裡的別名，不需要另外再設一份。
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./frontend/src', import.meta.url)),
+      '@components': fileURLToPath(new URL('./frontend/components', import.meta.url)),
+      '@hooks': fileURLToPath(new URL('./frontend/hooks', import.meta.url)),
+      '@utils': fileURLToPath(new URL('./frontend/utils', import.meta.url)),
+    },
+  },
   optimizeDeps: {
     entries: ['index.html'],
   },

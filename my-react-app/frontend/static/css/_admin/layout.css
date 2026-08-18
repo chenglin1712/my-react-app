@@ -30,4 +30,19 @@
 .admin-topbar-user small { margin-top: 2px; color: var(--yy-text-muted, #6b5a47); font-size: 10px; }
 .admin-user-avatar { display: grid; width: 34px; height: 34px; place-items: center; color: #fff; background: var(--yy-blue, #1f3a5c); border-radius: 50%; font-size: 13px; font-weight: 700; }
 .admin-route-content { min-width: 0; }
+/* FE-4：後台內容區的 scoped error boundary fallback（見 AdminLayout.jsx）。
+   刻意做得比整頁錯誤畫面收斂——側邊欄與麵包屑都還在，使用者可以直接切到
+   其他管理頁面，不需要整頁重載。 */
+.admin-route-error {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .75rem;
+    padding: 2rem;
+    border: 1px solid #f0d0d0;
+    border-radius: .75rem;
+    background: #fff8f8;
+}
+.admin-route-error h2 { font-size: 1.125rem; font-weight: 700; margin: 0; }
+.admin-route-error p { margin: 0; color: #6b5b5b; }
 @media (max-width: 1024px) { .admin-sidebar { width: 220px; } .admin-main-column { margin-left: 220px; } .admin-topbar { padding: 0 20px; } }

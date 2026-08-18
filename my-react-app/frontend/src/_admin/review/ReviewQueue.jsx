@@ -1,4 +1,3 @@
-import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Alert,
@@ -15,7 +14,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
-import { apiGet } from '../../../utils/apiClient';
+import { useAdminListQuery } from '../hooks/useAdminListQuery';
 import '../../../static/css/_admin/review-queue.css';
 
 const STAFF_ROLES = ['owner', 'admin', 'editor', 'reviewer', 'analyst'];
@@ -84,58 +83,24 @@ export default function ReviewQueue() {
   const role = userData?.role;
   const canView = STAFF_ROLES.includes(role);
 
-  const [typeFilter, setTypeFilter] = useState('');
-  const [page, setPage] = useState(1);
-  const [data, setData] = useState({
-    results: [],
-    count: 0,
-    page: 1,
-    page_size: PAGE_SIZE,
+  const {
+    data, loading, error, page, setPage, hasNext,
+    filters, applyFilters, reload: loadQueue,
+  } = useAdminListQuery({
+    endpoint: '/adminapi/review-queue/',
+    initialFilters: { type: '' },
+    pageSize: PAGE_SIZE,
+    enabled: canView,
   });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
-  const loadQueue = useCallback(async () => {
-    if (!canView) {
-      setLoading(false);
-      return;
-    }
+  const typeFilter = filters.type;
 
-    setLoading(true);
-    setError('');
-
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        page_size: String(PAGE_SIZE),
-      });
-
-      if (typeFilter) {
-        params.set('type', typeFilter);
-      }
-
-      const result = await apiGet(
-        `/adminapi/review-queue/?${params.toString()}`,
-      );
-      setData(result);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [canView, page, typeFilter]);
-
-  useEffect(() => {
-    loadQueue();
-  }, [loadQueue]);
-
+  // 這一頁沒有「搜尋」按鈕，改下拉選單就立刻重新查詢。
   const changeTypeFilter = (event) => {
-    setTypeFilter(event.target.value);
-    setPage(1);
+    applyFilters({ type: event.target.value });
   };
 
   const hasPrevious = data.page > 1;
-  const hasNext = data.page * data.page_size < data.count;
   const firstItem = data.count === 0
     ? 0
     : (data.page - 1) * data.page_size + 1;

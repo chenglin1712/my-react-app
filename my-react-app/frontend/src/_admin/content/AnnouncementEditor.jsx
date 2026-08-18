@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Alert, Badge, Button, Form, Spinner } from 'react-bootstrap';
 import { ArrowLeft, ImagePlus, Save, Send } from 'lucide-react';
 import { apiGet, apiPatch, apiPost } from '../../../utils/apiClient';
+import { uploadToCloudinary } from '@utils/uploadToCloudinary';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBES } from '../../constants/tribes';
 import '../../../static/css/_admin/announcements.css';
@@ -161,20 +162,10 @@ export default function AnnouncementEditor() {
         setPreview(URL.createObjectURL(file));
         setUploading(true);
 
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
-        formData.append('cloud_name', import.meta.env.VITE_CLOUDINARY_CLOUD_NAME);
-
         try {
-            const response = await fetch(
-                `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/f_auto,q_auto`,
-                { method: 'POST', body: formData },
-            );
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const result = await response.json();
-            update('cover_image_url', result.secure_url);
-            setPreview(result.secure_url);
+            const secureUrl = await uploadToCloudinary(file);
+            update('cover_image_url', secureUrl);
+            setPreview(secureUrl);
         } catch (err) {
             console.error('圖片上傳失敗', err);
             setError('圖片上傳失敗');

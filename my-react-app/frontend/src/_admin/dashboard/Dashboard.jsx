@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Alert, Badge, Form, Spinner } from 'react-bootstrap';
 import {
@@ -23,6 +23,8 @@ import {
 } from 'recharts';
 import { useAuth } from '../../userServives/authContext';
 import { apiGet } from '../../../utils/apiClient';
+import { useAnalyticsQuery } from '../hooks/useAnalyticsQuery';
+import { useAsyncValue } from '../hooks/useAsyncValue';
 import { TRIBES } from '../../constants/tribes';
 import '../../../static/css/_admin/dashboard.css';
 
@@ -134,132 +136,62 @@ export default function Dashboard() {
     const { userData } = useAuth();
     const canViewAudit = ['owner', 'admin'].includes(userData?.role);
 
-    const [pendingCount, setPendingCount] = useState(null);
-    const [pendingLoading, setPendingLoading] = useState(true);
-    const [pendingError, setPendingError] = useState('');
+    // 四個彼此獨立的小區塊各自取自己的值（FE-9：原本每個都手寫一次
+    // value/loading/error + active 旗標的 useEffect）。
+    const pending = useAsyncValue(
+        async () => (await apiGet('/adminapi/announcements/?status=pending_review&page_size=1')).count,
+    );
 
-    const [todayActiveCount, setTodayActiveCount] = useState(null);
-    const [todayActiveLoading, setTodayActiveLoading] = useState(true);
-    const [todayActiveError, setTodayActiveError] = useState('');
+    const todayActive = useAsyncValue(
+        async () => {
+            const data = await apiGet('/adminapi/analytics/dashboard/?date_range=today');
+            return data.daily_active_users?.[0]?.count ?? 0;
+        },
+    );
 
-    const [weeklyRegistrationCount, setWeeklyRegistrationCount] = useState(null);
-    const [weeklyRegistrationLoading, setWeeklyRegistrationLoading] = useState(true);
-    const [weeklyRegistrationError, setWeeklyRegistrationError] = useState('');
+    const weeklyRegistration = useAsyncValue(
+        async () => {
+            const data = await apiGet('/adminapi/analytics/dashboard/?date_range=7d');
+            return (data.daily_new_registrations ?? [])
+                .reduce((sum, item) => sum + item.count, 0);
+        },
+    );
 
-    const [dateRange, setDateRange] = useState('7d');
-    const [dateFrom, setDateFrom] = useState('');
-    const [dateTo, setDateTo] = useState('');
-    const [tribe, setTribe] = useState('');
-    const [analytics, setAnalytics] = useState(null);
-    const [analyticsLoading, setAnalyticsLoading] = useState(true);
-    const [analyticsError, setAnalyticsError] = useState('');
+    const audit = useAsyncValue(
+        async () => (await apiGet('/adminapi/audit-log/?limit=8')).results ?? [],
+        { enabled: canViewAudit, initialValue: [], deps: [canViewAudit] },
+    );
 
-    const [auditItems, setAuditItems] = useState([]);
-    const [auditLoading, setAuditLoading] = useState(canViewAudit);
-    const [auditError, setAuditError] = useState('');
+    // 主要的活動分析區塊有日期區間／族語篩選，跟 SearchAnalytics／
+    // QuizQualityAnalysis 共用同一個 hook。
+    const {
+        data: analytics,
+        loading: analyticsLoading,
+        error: analyticsError,
+        filters,
+    } = useAnalyticsQuery({ endpoint: '/adminapi/analytics/dashboard/' });
 
-    useEffect(() => {
-        let active = true;
-        (async () => {
-            try {
-                const data = await apiGet('/adminapi/announcements/?status=pending_review&page_size=1');
-                if (active) setPendingCount(data.count);
-            } catch (err) {
-                if (active) setPendingError(err.message);
-            } finally {
-                if (active) setPendingLoading(false);
-            }
-        })();
-        return () => { active = false; };
-    }, []);
+    const {
+        dateRange, setDateRange, dateFrom, setDateFrom,
+        dateTo, setDateTo, tribe, setTribe,
+    } = filters;
 
-    useEffect(() => {
-        let active = true;
-        (async () => {
-            try {
-                const data = await apiGet('/adminapi/analytics/dashboard/?date_range=today');
-                if (active) {
-                    setTodayActiveCount(data.daily_active_users?.[0]?.count ?? 0);
-                }
-            } catch (err) {
-                if (active) setTodayActiveError(err.message);
-            } finally {
-                if (active) setTodayActiveLoading(false);
-            }
-        })();
-        return () => { active = false; };
-    }, []);
+    const pendingCount = pending.value;
+    const pendingLoading = pending.loading;
+    const pendingError = pending.error;
 
-    useEffect(() => {
-        let active = true;
-        (async () => {
-            try {
-                const data = await apiGet('/adminapi/analytics/dashboard/?date_range=7d');
-                const total = (data.daily_new_registrations ?? [])
-                    .reduce((sum, item) => sum + item.count, 0);
-                if (active) setWeeklyRegistrationCount(total);
-            } catch (err) {
-                if (active) setWeeklyRegistrationError(err.message);
-            } finally {
-                if (active) setWeeklyRegistrationLoading(false);
-            }
-        })();
-        return () => { active = false; };
-    }, []);
+    const todayActiveCount = todayActive.value;
+    const todayActiveLoading = todayActive.loading;
+    const todayActiveError = todayActive.error;
 
-    useEffect(() => {
-        if (dateRange === 'custom' && (!dateFrom || !dateTo)) {
-            setAnalyticsLoading(false);
-            setAnalyticsError('');
-            return undefined;
-        }
+    const weeklyRegistrationCount = weeklyRegistration.value;
+    const weeklyRegistrationLoading = weeklyRegistration.loading;
+    const weeklyRegistrationError = weeklyRegistration.error;
 
-        let active = true;
-        setAnalyticsLoading(true);
-        setAnalyticsError('');
+    const auditItems = audit.value;
+    const auditLoading = audit.loading;
+    const auditError = audit.error;
 
-        const params = new URLSearchParams({ date_range: dateRange });
-        if (dateRange === 'custom') {
-            params.set('date_from', dateFrom);
-            params.set('date_to', dateTo);
-        }
-        if (tribe) params.set('tribe', tribe);
-
-        (async () => {
-            try {
-                const data = await apiGet(`/adminapi/analytics/dashboard/?${params.toString()}`);
-                if (active) setAnalytics(data);
-            } catch (err) {
-                if (active) {
-                    setAnalytics(null);
-                    setAnalyticsError(err.message);
-                }
-            } finally {
-                if (active) setAnalyticsLoading(false);
-            }
-        })();
-
-        return () => { active = false; };
-    }, [dateRange, dateFrom, dateTo, tribe]);
-
-    useEffect(() => {
-        if (!canViewAudit) return undefined;
-
-        let active = true;
-        setAuditLoading(true);
-        (async () => {
-            try {
-                const data = await apiGet('/adminapi/audit-log/?limit=8');
-                if (active) setAuditItems(data.results ?? []);
-            } catch (err) {
-                if (active) setAuditError(err.message);
-            } finally {
-                if (active) setAuditLoading(false);
-            }
-        })();
-
-        return () => { active = false; };
-    }, [canViewAudit]);
 
     const activityChartData = useMemo(() => {
         const registrationByDate = new Map(

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
     Alert,
     Badge,
@@ -14,7 +14,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBE_NAME_BY_SLUG } from '../../constants/tribes';
-import { apiDelete, apiGet } from '../../../utils/apiClient';
+import { apiDelete } from '../../../utils/apiClient';
+import { useAdminListQuery } from '../hooks/useAdminListQuery';
 import '../../../static/css/_admin/moderation.css';
 
 const STAFF_ROLES = ['owner', 'admin', 'editor', 'reviewer', 'analyst'];
@@ -28,66 +29,24 @@ export default function RecordingsModeration() {
     const canRead = STAFF_ROLES.includes(role);
     const canManage = ACCOUNT_MANAGERS.includes(role);
 
-    const [filters, setFilters] = useState({
-        tribe: '',
-        has_reports: false,
+    const {
+        items, data, loading, error, setError, page, setPage, hasNext,
+        filters, setFilters, search, reload: loadRecordings,
+    } = useAdminListQuery({
+        endpoint: '/adminapi/moderation/recordings/',
+        initialFilters: { tribe: '', has_reports: false },
+        pageSize: PAGE_SIZE,
+        enabled: canRead,
+        // has_reports 是布林，要轉成字串 'true' 才送出。
+        buildParams: (params, query) => {
+            if (query.tribe) params.set('tribe', query.tribe);
+            if (query.has_reports) params.set('has_reports', 'true');
+        },
     });
-    const [query, setQuery] = useState(filters);
-    const [data, setData] = useState({
-        results: [],
-        count: 0,
-        page: 1,
-        page_size: PAGE_SIZE,
-    });
-    const [page, setPage] = useState(1);
-    const [loading, setLoading] = useState(canRead);
+
     const [actionId, setActionId] = useState(null);
-    const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
 
-    const loadRecordings = useCallback(async () => {
-        if (!canRead) {
-            setLoading(false);
-            return;
-        }
-
-        setLoading(true);
-        setError('');
-
-        try {
-            const params = new URLSearchParams({
-                page: String(page),
-                page_size: String(PAGE_SIZE),
-            });
-
-            if (query.tribe) {
-                params.set('tribe', query.tribe);
-            }
-            if (query.has_reports) {
-                params.set('has_reports', 'true');
-            }
-
-            setData(
-                await apiGet(
-                    `/adminapi/moderation/recordings/?${params.toString()}`,
-                ),
-            );
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    }, [canRead, page, query]);
-
-    useEffect(() => {
-        loadRecordings();
-    }, [loadRecordings]);
-
-    const search = (event) => {
-        event.preventDefault();
-        setPage(1);
-        setQuery(filters);
-    };
 
     const deleteRecording = async (item) => {
         const confirmed = window.confirm(
@@ -117,7 +76,6 @@ export default function RecordingsModeration() {
         }
     };
 
-    const hasNext = data.page * data.page_size < data.count;
 
     if (!canRead) {
         return (
@@ -214,7 +172,7 @@ export default function RecordingsModeration() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {data.results.map((item) => (
+                                    {items.map((item) => (
                                         <tr key={`${item.tribe}-${item.id}`}>
                                             <td>
                                                 <audio
@@ -277,7 +235,7 @@ export default function RecordingsModeration() {
                                         </tr>
                                     ))}
 
-                                    {!data.results.length && (
+                                    {!items.length && (
                                         <tr>
                                             <td
                                                 className="moderation-empty"

@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Spinner } from 'react-bootstrap';
 import { useAuth } from './userServives/authContext';
 import PermissionProtect from './userServives/permissionProtect';
@@ -60,9 +60,20 @@ const AdminRoute = lazy(() => import('./_admin/AdminRoute'));
 
 const ProtectedRoute = ({ children }) => {
   const { userData, loading } = useAuth();
+  const { pathname } = useLocation();
   if (loading) return null;
   if (!userData) return <PermissionProtect />;
-  return children;
+  // FE-4：登入後的功能頁（測驗、遊戲、筆記、收藏、影像辨識、翻譯）原本
+  // 只有最外層那一個 boundary 接著。因為那個 boundary 沒有任何復原路徑，
+  // 一旦某一頁出錯，使用者就算點導覽列切到別的頁面，看到的仍是同一張錯誤
+  // 畫面，只能整頁重載——實際上比「這一頁壞了」更嚴重。
+  // 這裡以 pathname 當 resetKeys 再包一層：錯誤畫面本身不變（仍是頁面
+  // 等級的預設畫面，對整個路由來說是正確的呈現），但換頁就會自動復原。
+  return (
+    <ErrorBoundary resetKeys={[pathname]}>
+      {children}
+    </ErrorBoundary>
+  );
 };
 
 const RouteLoadingFallback = () => (

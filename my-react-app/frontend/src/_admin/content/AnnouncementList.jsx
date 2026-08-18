@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Badge, Button, Form, Modal, Spinner, Table, Alert } from 'react-bootstrap';
-import { Edit3, Eye, Plus, RefreshCw, Send, Trash2, Undo2, Check, X, Archive, Upload } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
 import { apiDelete, apiGet, apiPost } from '../../../utils/apiClient';
+import ReviewActions from '../reviewWorkflow/ReviewActions';
+import ReviewPagination from '../reviewWorkflow/ReviewPagination';
+import { REVIEW_ACTION_META } from '../reviewWorkflow/reviewActionPolicy';
 import '../../../static/css/_admin/announcements.css';
 
 const CONTENT_EDITORS = ['owner', 'admin', 'editor'];
@@ -153,199 +156,31 @@ export default function AnnouncementList() {
         closeRejectModal();
     };
 
-    const actionsFor = (item) => {
-        const busy = actionId === item.id;
-        const buttons = [];
-
-        if (CONTENT_EDITORS.includes(role) && ['draft', 'rejected'].includes(item.status)) {
-            buttons.push(
-                <Button
-                    key="edit"
-                    as={Link}
-                    to={`/admin/content/announcements/${item.id}`}
-                    size="sm"
-                    variant="outline-primary"
-                >
-                    <Edit3 size={14} /> 編輯
-                </Button>,
-            );
-            buttons.push(
-                <Button
-                    key="submit"
-                    size="sm"
-                    variant="outline-success"
-                    disabled={busy}
-                    onClick={() => runAction(item, 'submit')}
-                >
-                    <Send size={14} /> 送審
-                </Button>,
-            );
-        }
-
-        // 已下架的內容也能編輯（後端視同重新起草，儲存後退回 draft）。
-        if (item.status === 'unpublished' && CONTENT_EDITORS.includes(role)) {
-            buttons.push(
-                <Button
-                    key="edit"
-                    as={Link}
-                    to={`/admin/content/announcements/${item.id}`}
-                    size="sm"
-                    variant="outline-primary"
-                >
-                    <Edit3 size={14} /> 編輯
-                </Button>,
-            );
-        }
-
-        // 已發布內容可直接建立待審修改，不必先下架。所有內容編輯角色都能進入
-        // 編輯頁；原內容會持續生效，直到 PUBLISHERS 核准修改為止。
-        if (item.status === 'published' && CONTENT_EDITORS.includes(role)) {
-            buttons.push(
-                <Button
-                    key="edit"
-                    as={Link}
-                    to={`/admin/content/announcements/${item.id}`}
-                    size="sm"
-                    variant="outline-primary"
-                >
-                    <Edit3 size={14} /> 編輯
-                </Button>,
-            );
-        }
-
-        // 刪除固定是 PUBLISHERS 專屬——跟後端 _delete_announcement 的
-        // require_role(PUBLISHERS) 對齊，不能讓 editor 在畫面上看到一顆
-        // 點下去一定 403 的按鈕。
-        if (item.status === 'draft' && PUBLISHERS.includes(role)) {
-            buttons.push(
-                <Button
-                    key="delete"
-                    size="sm"
-                    variant="outline-danger"
-                    disabled={busy}
-                    onClick={() => runAction(item, 'delete')}
-                >
-                    <Trash2 size={14} /> 刪除
-                </Button>,
-            );
-        }
-
-        // 後端 announcement_withdraw 用 require_role(CONTENT_EDITORS)，owner／
-        // admin 跟 editor 一樣能撤回任何一筆待審公告（沒有限定只能撤回自己
-        // 送的），畫面上不能只給 editor 看到這顆按鈕。
-        if (item.status === 'pending_review' && CONTENT_EDITORS.includes(role)) {
-            buttons.push(
-                <Button
-                    key="withdraw"
-                    size="sm"
-                    variant="outline-secondary"
-                    disabled={busy}
-                    onClick={() => runAction(item, 'withdraw')}
-                >
-                    <Undo2 size={14} /> 撤回
-                </Button>,
-            );
-        }
-
-        if (item.status === 'pending_review' && PUBLISHERS.includes(role)) {
-            buttons.push(
-                <Button
-                    key="approve"
-                    size="sm"
-                    variant="outline-success"
-                    disabled={busy}
-                    onClick={() => runAction(item, 'approve', { review_comment: '' })}
-                >
-                    <Check size={14} /> 核准
-                </Button>,
-            );
-            buttons.push(
-                <Button
-                    key="reject"
-                    size="sm"
-                    variant="outline-danger"
-                    disabled={busy}
-                    onClick={() => openRejectModal(item, 'announcement')}
-                >
-                    <X size={14} /> 退件
-                </Button>,
-            );
-        }
-
-        if (item.status === 'published' && item.has_pending_revision && PUBLISHERS.includes(role)) {
-            buttons.push(
-                <Button
-                    key="approve-revision"
-                    size="sm"
-                    variant="outline-success"
-                    disabled={busy}
-                    onClick={() => runAction(
-                        item,
-                        'pending-revision/approve',
-                        { review_comment: '' },
-                    )}
-                >
-                    <Check size={14} /> 核准修改
-                </Button>,
-            );
-            buttons.push(
-                <Button
-                    key="reject-revision"
-                    size="sm"
-                    variant="outline-danger"
-                    disabled={busy}
-                    onClick={() => openRejectModal(item, 'pending-revision')}
-                >
-                    <X size={14} /> 退件修改
-                </Button>,
-            );
-        }
-
-        if (item.status === 'published' && PUBLISHERS.includes(role)) {
-            buttons.push(
-                <Button
-                    key="unpublish"
-                    size="sm"
-                    variant="outline-secondary"
-                    disabled={busy}
-                    onClick={() => runAction(item, 'unpublish')}
-                >
-                    <Archive size={14} /> 下架
-                </Button>,
-            );
-        }
-
-        if (item.status === 'unpublished' && PUBLISHERS.includes(role)) {
-            buttons.push(
-                <Button
-                    key="republish"
-                    size="sm"
-                    variant="outline-success"
-                    disabled={busy}
-                    onClick={() => runAction(item, 'republish')}
-                >
-                    <Upload size={14} /> 重新發布
-                </Button>,
-            );
-        }
-
-        // 沒有狀態操作權限時仍提供檢視入口，避免審核及分析角色無法查看內容。
-        if (!buttons.length) {
-            buttons.push(
-                <Button
-                    key="view"
-                    as={Link}
-                    to={`/admin/content/announcements/${item.id}`}
-                    size="sm"
-                    variant="outline-secondary"
-                >
-                    <Eye size={14} /> 檢視
-                </Button>,
-            );
-        }
-
-        return buttons;
+    // FE-2：這一整段原本是 ~180 行、跟題庫那幾支面板同一種形狀的手寫規則。
+    // 公告跟題庫有三個真實差異（多一個 unpublished 中介狀態與「重新發布」、
+    // 核准門檻是 publishers 不含 reviewer、編輯/檢視是連到另一個路由頁面而
+    // 不是開對話框），這些差異都用參數表達，不需要自己再寫一份規則。
+    const ANNOUNCEMENT_ROLES = {
+        editors: CONTENT_EDITORS,
+        approvers: PUBLISHERS,
+        publishers: PUBLISHERS,
     };
+
+    // 編輯與檢視要保留成真正的連結（可以在新分頁開啟），不是 onClick 後才導頁。
+    const hrefFor = (actionKey, item) => (
+        actionKey === 'edit' || actionKey === 'view'
+            ? `/admin/content/announcements/${item.id}`
+            : ''
+    );
+
+    const handleAction = (actionKey, item) => {
+        if (actionKey === 'reject') return openRejectModal(item, 'reject');
+        if (actionKey === 'rejectRevision') return openRejectModal(item, 'pending-revision');
+        const { endpointAction } = REVIEW_ACTION_META[actionKey];
+        const body = endpointAction?.endsWith('approve') ? { review_comment: '' } : undefined;
+        return runAction(item, endpointAction, body);
+    };
+
 
     const hasNext = data.page * data.page_size < data.count;
 
@@ -497,7 +332,16 @@ export default function AnnouncementList() {
                                     <td>{formatDateTime(item.updated_at)}</td>
                                     <td>
                                         <div className="announcement-row-actions">
-                                            {actionsFor(item)}
+                                            <ReviewActions
+                                                item={item}
+                                                role={role}
+                                                roles={ANNOUNCEMENT_ROLES}
+                                                busy={actionId === item.id}
+                                                supportsUnpublishedState
+                                                viewFallback
+                                                hrefFor={hrefFor}
+                                                onAction={handleAction}
+                                            />
                                         </div>
                                     </td>
                                 </tr>
@@ -512,26 +356,14 @@ export default function AnnouncementList() {
                     </Table>
                 )}
 
-                <div className="announcement-pagination">
-                    <span>共 {data.count} 筆</span>
-                    <div>
-                        <Button
-                            variant="outline-secondary"
-                            disabled={loading || page <= 1}
-                            onClick={() => setPage((value) => value - 1)}
-                        >
-                            上一頁
-                        </Button>
-                        <span>第 {data.page} 頁</span>
-                        <Button
-                            variant="outline-secondary"
-                            disabled={loading || !hasNext}
-                            onClick={() => setPage((value) => value + 1)}
-                        >
-                            下一頁
-                        </Button>
-                    </div>
-                </div>
+                <ReviewPagination
+                    data={data}
+                    page={page}
+                    setPage={setPage}
+                    loading={loading}
+                    hasNext={hasNext}
+                    className="announcement-pagination"
+                />
             </div>
 
             <Modal show={Boolean(rejectTarget)} onHide={closeRejectModal} centered>

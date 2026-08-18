@@ -12,18 +12,25 @@ import {
     Upload,
 } from 'lucide-react';
 
+import { uploadToCloudinary } from '@utils/uploadToCloudinary';
+
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
+// resourceType 是 Cloudinary 的資源類型，不是完整端點——原本這裡存的是
+// 'image/upload/f_auto,q_auto' 這種拼好的端點字串，等於讓每個呼叫點都能
+// 自由決定端點形狀，正是 FE-3 要消除的那種不一致。改成只描述「這是圖片
+// 還是影音」，端點與轉換參數統一由 uploadToCloudinary 決定
+// （音檔在 Cloudinary 走 video 資源類型，這是它的既有慣例）。
 const KIND_META = {
     image: {
         noun: '圖片',
         accept: 'image/*',
-        endpoint: 'image/upload/f_auto,q_auto',
+        resourceType: 'image',
     },
     audio: {
         noun: '音檔',
         accept: 'audio/*',
-        endpoint: 'video/upload',
+        resourceType: 'video',
     },
 };
 
@@ -59,39 +66,8 @@ export default function MediaUploadField({
         setError('');
         setUploading(true);
 
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append(
-            'upload_preset',
-            import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET,
-        );
-        formData.append(
-            'cloud_name',
-            import.meta.env.VITE_CLOUDINARY_CLOUD_NAME,
-        );
-
         try {
-            const response = await fetch(
-                `https://api.cloudinary.com/v1_1/`
-                + `${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/`
-                + meta.endpoint,
-                {
-                    method: 'POST',
-                    body: formData,
-                },
-            );
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-
-            const result = await response.json();
-
-            if (!result.secure_url) {
-                throw new Error('Cloudinary 回應缺少 secure_url');
-            }
-
-            onChange(result.secure_url);
+            onChange(await uploadToCloudinary(file, { resourceType: meta.resourceType }));
         } catch (err) {
             console.error(`${meta.noun}上傳失敗`, err);
             setError(`${meta.noun}上傳失敗`);
