@@ -15,7 +15,12 @@ import FontSize from "../fontSizeExtension";
 export function useNotePages(uid) {
   const [notes, setNotes] = useState([]);
   const [currentPage, setCurrentPage] = useState(0);
-  const [selectedPages, setSelectedPages] = useState([]);
+  // 分享選取記的是筆記 id，不是頁次（FE-11）。原本存的是陣列索引，而
+  // handleDelete 會從中間刪掉一頁又完全沒有調整選取內容——選了第 3 頁再刪掉
+  // 第 1 頁，選取的索引就會指到另一篇筆記，分享出去的是錯的內容；索引超出
+  // 範圍時 notes[i] 是 undefined，_note/index.jsx 接著讀 note.title 會直接
+  // 丟 TypeError 讓分享整個中斷。改用 id 之後，刪除／換頁都不會影響選取指向。
+  const [selectedPageIds, setSelectedPageIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isDirty, setIsDirty] = useState(false);
 
@@ -49,7 +54,19 @@ export function useNotePages(uid) {
   useEffect(() => {
     const stored = localStorage.getItem(LOCAL_KEY);
     if (stored) {
-      setNotes(JSON.parse(stored));
+      // 舊版存進 localStorage 的筆記可能沒有 id（換頁同步與分享選取都靠
+      // 它辨識），載入時補上，避免既有使用者的資料一進來就沒有身分可用。
+      const parsed = JSON.parse(stored);
+      let needsMigration = false;
+      const migrated = parsed.map((note, index) => {
+        if (note?.id != null) return note;
+        needsMigration = true;
+        return { ...note, id: `legacy-${Date.now()}-${index}` };
+      });
+      if (needsMigration) {
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(migrated));
+      }
+      setNotes(migrated);
     } else {
       const defaultNote = [
         { id: Date.now(), title: "", content: "" },
@@ -73,12 +90,33 @@ export function useNotePages(uid) {
     setIsDirty(false);
   }, [currentNoteId, editor]);
 
+  /**
+   * 把編輯器目前的內容寫回筆記，並「回傳」寫回之後的完整陣列。
+   *
+   * 原本這裡是 `const updatedNotes = [...notes]` 之後直接改
+   * `updatedNotes[currentPage].content`——淺拷貝的元素跟原陣列是同一個物件，
+   * 等於直接改動 React state。它剛好讓「先存檔再馬上讀 notes」拿得到最新
+   * 內容，但那是改壞東西之後的副作用，不是這段程式碼真的正確：一旦有人把
+   * 淺拷貝改成正確的不可變更新，所有「呼叫完 updateCurrentContent 之後又從
+   * 舊的 notes 閉包重新組陣列」的地方，就會安靜地把剛存的內容丟掉。
+   *
+   * 改成不可變更新，並用回傳值明確傳遞最新結果，讓呼叫端不必依賴
+   * setNotes 尚未套用的狀態（呼叫端見 handleAdd／handleSave 與
+   * _note/index.jsx 的 handleShare）。
+   */
   const updateCurrentContent = () => {
-    if (!editor) return;
-    const updatedNotes = [...notes];
-    updatedNotes[currentPage].content = DOMPurify.sanitize(editor.getHTML());
+    // 沒有編輯器可讀時沒有東西要寫回，但仍要回傳一個可用的陣列，
+    // 呼叫端才能無條件接著使用回傳值。
+    if (!editor) return notes;
+
+    const sanitized = DOMPurify.sanitize(editor.getHTML());
+    const updatedNotes = notes.map((note, index) => (
+      index === currentPage ? { ...note, content: sanitized } : note
+    ));
+
     setNotes(updatedNotes);
     localStorage.setItem(LOCAL_KEY, JSON.stringify(updatedNotes));
+    return updatedNotes;
   };
 
   const execStyle = (command, value = null) => {
@@ -106,9 +144,11 @@ export function useNotePages(uid) {
   };
 
   const handleAdd = () => {
-    updateCurrentContent();
+    // 一定要從 updateCurrentContent() 的回傳值往下接，不能再用外層的 notes：
+    // 那是這次 render 的舊值，會把剛剛寫回的當前頁內容整個蓋掉。
+    const savedNotes = updateCurrentContent();
     const newNote = { id: Date.now(), title: "未命名筆記", content: "<p></p>" };
-    const updatedNotes = [...notes, newNote];
+    const updatedNotes = [...savedNotes, newNote];
     setNotes(updatedNotes);
     setCurrentPage(updatedNotes.length - 1);
     localStorage.setItem(LOCAL_KEY, JSON.stringify(updatedNotes));
@@ -116,6 +156,7 @@ export function useNotePages(uid) {
 
   const handleDelete = () => {
     if (!window.confirm("確定要刪除這則筆記？")) return;
+    const deletedId = notes[currentPage]?.id;
     const newNotes = notes.filter((_, i) => i !== currentPage);
     const newPage = Math.max(currentPage - 1, 0);
 
@@ -125,12 +166,16 @@ export function useNotePages(uid) {
 
     setNotes(finalNotes);
     setCurrentPage(newNotes.length ? newPage : 0);
+    // 被刪掉的那一頁如果正在選取中，要一起從分享選取裡移除（FE-11）。
+    setSelectedPageIds((prev) => prev.filter((id) => id !== deletedId));
     localStorage.setItem(LOCAL_KEY, JSON.stringify(finalNotes));
   };
 
+  /** 回傳存檔後的最新陣列，讓呼叫端（例如分享）不必等 setNotes 生效。 */
   const handleSave = () => {
-    updateCurrentContent();
+    const savedNotes = updateCurrentContent();
     setIsDirty(false);
+    return savedNotes;
   };
 
   const handleChangePage = (offset) => {
@@ -139,24 +184,29 @@ export function useNotePages(uid) {
     setCurrentPage(newPage);
   };
 
-  const handleToggleSelect = (index) => {
-    setSelectedPages((prev) =>
-      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
+  const handleToggleSelect = (noteId) => {
+    setSelectedPageIds((prev) =>
+      prev.includes(noteId) ? prev.filter((id) => id !== noteId) : [...prev, noteId]
     );
   };
 
   const handleTitleChange = (e) => {
-    const updatedNotes = [...notes];
-    updatedNotes[currentPage].title = e.target.value;
+    // 同樣改成不可變更新（見 updateCurrentContent 的說明）。每次按鍵都會產生
+    // 新的物件與陣列，這是 React 正常的做法；換頁同步的 effect 依賴的是
+    // notes[currentPage]?.id，id 不變，所以改標題不會誤觸重新載入編輯器內容。
+    const title = e.target.value;
+    const updatedNotes = notes.map((note, index) => (
+      index === currentPage ? { ...note, title } : note
+    ));
     setNotes(updatedNotes);
     localStorage.setItem(LOCAL_KEY, JSON.stringify(updatedNotes));
   };
 
-  const handleSelectAll = () => setSelectedPages(notes.map((_, index) => index));
-  const handleClearSelect = () => setSelectedPages([]);
+  const handleSelectAll = () => setSelectedPageIds(notes.map((note) => note.id));
+  const handleClearSelect = () => setSelectedPageIds([]);
 
   return {
-    editor, notes, currentPage, selectedPages, loading, isDirty,
+    editor, notes, currentPage, selectedPageIds, loading, isDirty,
     execStyle, handleAdd, handleDelete, handleSave, handleChangePage,
     handleToggleSelect, handleTitleChange, handleSelectAll, handleClearSelect,
   };

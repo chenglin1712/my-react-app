@@ -25,7 +25,7 @@ function NotePage() {
   const [selectedImageFile, setSelectedImageFile] = useState(null);
 
   const {
-    editor, notes, currentPage, selectedPages, loading, isDirty,
+    editor, notes, currentPage, selectedPageIds, loading, isDirty,
     execStyle, handleAdd, handleDelete, handleSave, handleChangePage,
     handleToggleSelect, handleTitleChange, handleSelectAll, handleClearSelect,
   } = useNotePages(uid);
@@ -42,10 +42,19 @@ function NotePage() {
   };
 
   const handleShare = async () => {
-    handleSave();
+    // 用 handleSave() 的回傳值，不要用外層的 notes：setNotes 是非同步的，
+    // 這一輪 render 的 notes 還看不到剛存進去的當前頁內容（見
+    // useNotePages 的 updateCurrentContent 說明）。
+    const latestNotes = handleSave();
 
-    const pagesToShare =
-      selectedPages.length > 0 ? selectedPages.map((i) => notes[i]) : [];
+    // 依「選取的順序」把 id 換回筆記本身（FE-11）——順序沿用使用者勾選的
+    // 先後，維持 pagesToShare[0] 就是預覽圖來源的既有行為。filter(Boolean)
+    // 是額外的防線：handleDelete 已經會把刪掉的頁次移出選取，但 localStorage
+    // 被外部改動之類的情況不該讓分享直接丟例外。
+    const notesById = new Map(latestNotes.map((note) => [note.id, note]));
+    const pagesToShare = selectedPageIds
+      .map((id) => notesById.get(id))
+      .filter(Boolean);
 
     const hasEmptyTitle = pagesToShare.some((note) => !note.title?.trim());
 
@@ -157,7 +166,7 @@ function NotePage() {
             notes={notes}
             currentPage={currentPage}
             isDirty={isDirty}
-            selectedPages={selectedPages}
+            selectedPageIds={selectedPageIds}
             onToggleSelect={handleToggleSelect}
             onSelectAll={handleSelectAll}
             onClearSelect={handleClearSelect}
