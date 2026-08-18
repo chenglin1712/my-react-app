@@ -159,7 +159,7 @@ export default function Dashboard() {
 
     const audit = useAsyncValue(
         async () => (await apiGet('/adminapi/audit-log/?limit=8')).results ?? [],
-        { enabled: canViewAudit, initialValue: [], deps: [canViewAudit] },
+        { enabled: canViewAudit, initialValue: [] },
     );
 
     // 主要的活動分析區塊有日期區間／族語篩選，跟 SearchAnalytics／

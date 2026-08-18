@@ -24,7 +24,7 @@ const Panel = ({ tribe = "tayal" }) => {
     const animation = useRef(null);
 
     const {
-        data, dataLen, isLoading, quizInfo, savedQuestions,
+        data, dataLen, isLoading, quizInfo, savedQuestions, uploadFailed,
         userAnswers, userStars, currentQuestionIndex, setCurrentQuestionIndex,
         handleStar, handleAnswer, retry,
     } = useQuizPanelData(level, tribe, level_ch);
@@ -117,6 +117,17 @@ const Panel = ({ tribe = "tayal" }) => {
             return (
                 <div className="quiz-load-error text-center py-5">
                     <p>測驗資料加載失敗，請重試。</p>
+                    <button onClick={retry}>重新載入</button>
+                </div>
+            );
+        }
+
+        // 題目建立失敗時如果只是讓繳交靜默失效，使用者會以為按鈕壞了；
+        // 這裡明確擋在作答之前並給重試入口（見 useQuizPanelData 的 uploadFailed）。
+        if (uploadFailed) {
+            return (
+                <div className="quiz-load-error text-center py-5">
+                    <p>測驗建立失敗，作答結果將無法儲存，請重試。</p>
                     <button onClick={retry}>重新載入</button>
                 </div>
             );

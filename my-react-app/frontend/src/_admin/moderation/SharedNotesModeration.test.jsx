@@ -169,8 +169,10 @@ describe('SharedNotesModeration', () => {
         );
 
         await waitFor(() => {
+            // 帶上「我看到的狀態」讓後端比對，避免清單過期時操作方向相反
             expect(apiPost).toHaveBeenCalledWith(
                 '/adminapi/moderation/notes/note123/toggle-deleted/',
+                { expected_deleted: false },
             );
         });
 
@@ -201,6 +203,7 @@ describe('SharedNotesModeration', () => {
         await waitFor(() => {
             expect(apiPost).toHaveBeenCalledWith(
                 '/adminapi/moderation/notes/note456/toggle-deleted/',
+                { expected_deleted: true },
             );
         });
 

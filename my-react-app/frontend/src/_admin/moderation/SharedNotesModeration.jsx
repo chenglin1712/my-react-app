@@ -71,8 +71,11 @@ export default function SharedNotesModeration() {
         setSuccess('');
 
         try {
+            // 帶上「我看到的狀態」，後端不符就回 409——避免清單過期時按鈕文字
+            // 說的是「下架」、伺服器卻反轉成「恢復」（見後端 note_toggle_deleted）。
             await apiPost(
                 `/adminapi/moderation/notes/${item.id}/toggle-deleted/`,
+                { expected_deleted: Boolean(item.deleted) },
             );
             setSuccess(`分享筆記已${actionLabel}`);
             await loadNotes();

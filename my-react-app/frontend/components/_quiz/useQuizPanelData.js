@@ -64,6 +64,11 @@ export function useQuizPanelData(level, tribe, level_ch) {
     const [quizInfo, setQuizInfo] = useState(null);
     const [savedQuestions, setSavedQuestions] = useState([]);
     const [retryCount, setRetryCount] = useState(0);
+    // uploadQuizDB 失敗時是回傳 null（它自己 catch 掉例外），不會拋出來。
+    // 少了這個旗標，quizInfo 會停在 null，使用者按「繳交」時呼叫端的
+    // `if (!quizInfo) return;` 只是靜默不動作——畫面沒有任何提示，看起來
+    // 就像按鈕壞掉。這裡把失敗顯性化，讓畫面能給出錯誤與重試入口。
+    const [uploadFailed, setUploadFailed] = useState(false);
 
     const [userAnswers, setUserAnswers] = useState([]);
     const [userStars, setUserStars] = useState([]);
@@ -78,6 +83,7 @@ export function useQuizPanelData(level, tribe, level_ch) {
     useEffect(() => {
         setQuizInfo(null);
         setSavedQuestions([]);
+        setUploadFailed(false);
     }, [quizKey]);
 
     //取得後端初級測驗資料
@@ -144,6 +150,7 @@ export function useQuizPanelData(level, tribe, level_ch) {
         // 回來，把新的 quizInfo 蓋掉」，所以用一個屬於這次 effect 執行的旗標，
         // 在 data／測驗身分改變導致 effect 重跑時作廢掉上一次的結果。
         let cancelled = false;
+        setUploadFailed(false);
 
         const handleUploadQuiz = async () => {
             const type = data.parts[0].type;
@@ -152,6 +159,8 @@ export function useQuizPanelData(level, tribe, level_ch) {
             const quiz = await uploadQuizDB(level_ch, formatted, tribe);
             if (cancelled) return;
             setQuizInfo(quiz);
+            // uploadQuizDB 內部 catch 之後回傳 null，這裡是唯一能察覺失敗的地方。
+            setUploadFailed(!quiz);
         };
 
         handleUploadQuiz();
@@ -196,7 +205,7 @@ export function useQuizPanelData(level, tribe, level_ch) {
     };
 
     return {
-        data, dataLen, isLoading, quizInfo, savedQuestions,
+        data, dataLen, isLoading, quizInfo, savedQuestions, uploadFailed,
         userAnswers, userStars, currentQuestionIndex, setCurrentQuestionIndex,
         handleStar, handleAnswer,
         retry: () => setRetryCount((c) => c + 1),

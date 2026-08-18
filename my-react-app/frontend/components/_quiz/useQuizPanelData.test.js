@@ -222,3 +222,60 @@ describe('useQuizPanelData 的上傳競態（FE-10）', () => {
     expect(result.current.quizInfo).toEqual({ id: 'quiz-level-2', ans: [3] });
   });
 });
+
+/** uploadQuizDB 失敗時是回傳 null（它自己 catch 掉例外），不會拋出來。
+ * 少了顯性的失敗旗標，quizInfo 停在 null，使用者按繳交時呼叫端的
+ * `if (!quizInfo) return;` 只是靜默不動作——畫面零提示，看起來像按鈕壞了。 */
+describe('useQuizPanelData 的上傳失敗狀態', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    apiGet.mockReset();
+    uploadQuizDB.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test('上傳失敗（回傳 null）時 uploadFailed 為 true', async () => {
+    apiGet.mockResolvedValueOnce(makeResponse(2));
+    uploadQuizDB.mockResolvedValueOnce(null);
+
+    const { result } = renderHook(() => useQuizPanelData(1, 'tayal', '初級'));
+    await act(async () => { await Promise.resolve(); });
+
+    expect(result.current.uploadFailed).toBe(true);
+    expect(result.current.quizInfo).toBeNull();
+  });
+
+  test('上傳成功時 uploadFailed 維持 false', async () => {
+    apiGet.mockResolvedValueOnce(makeResponse(2));
+    uploadQuizDB.mockResolvedValueOnce({ id: 'quiz-1', ans: [1, 2] });
+
+    const { result } = renderHook(() => useQuizPanelData(1, 'tayal', '初級'));
+    await act(async () => { await Promise.resolve(); });
+
+    expect(result.current.uploadFailed).toBe(false);
+    expect(result.current.quizInfo).toEqual({ id: 'quiz-1', ans: [1, 2] });
+  });
+
+  test('切換測驗時失敗狀態會被清掉，不會沿用到下一份測驗', async () => {
+    apiGet.mockResolvedValueOnce(makeResponse(2));
+    uploadQuizDB.mockResolvedValueOnce(null);
+
+    const { result, rerender } = renderHook(
+      ({ level, levelCh }) => useQuizPanelData(level, 'tayal', levelCh),
+      { initialProps: { level: 1, levelCh: '初級' } },
+    );
+    await act(async () => { await Promise.resolve(); });
+    expect(result.current.uploadFailed).toBe(true);
+
+    apiGet.mockImplementationOnce(() => new Promise(() => {}));
+    await act(async () => {
+      rerender({ level: 2, levelCh: '中級' });
+      await Promise.resolve();
+    });
+
+    expect(result.current.uploadFailed).toBe(false);
+  });
+});

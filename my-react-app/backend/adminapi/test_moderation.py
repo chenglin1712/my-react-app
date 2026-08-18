@@ -166,6 +166,58 @@ class NoteToggleDeletedTest(TestCase):
         doc_ref.update.assert_called_once_with({"deleted": True})
         self.assertEqual(AuditLog.objects.filter(action="toggle_note_deleted").count(), 1)
 
+    # 這支端點是純粹的「反轉目前狀態」，但後台按鈕的文字（下架／恢復）是依
+    # 前端那份 deleted 決定的。清單資料過期或多人同時操作時，使用者按下
+    # 「下架」，伺服器卻可能執行「恢復」——方向剛好相反且毫無跡象。
+    # expected_deleted 讓呼叫端表明「我看到的狀態」，不符就擋下來。
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_expected_deleted_mismatch_is_rejected(self, mock_client_fn):
+        notes = FakeCollection()
+        doc_ref = notes.set_document("note1", {"deleted": True})
+        mock_client_fn.return_value = _build_client(collections={"sharedNotes": notes})
+
+        # 前端以為還沒下架（False），實際上已經是 True
+        with _as_role(OWNER) as headers:
+            resp = _post_json(
+                self.client, '/adminapi/moderation/notes/note1/toggle-deleted/',
+                headers, {"expected_deleted": False},
+            )
+
+        self.assertEqual(resp.status_code, 409)
+        self.assertTrue(resp.json()["deleted"])
+        doc_ref.update.assert_not_called()
+        self.assertEqual(AuditLog.objects.filter(action="toggle_note_deleted").count(), 0)
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_expected_deleted_match_proceeds(self, mock_client_fn):
+        notes = FakeCollection()
+        doc_ref = notes.set_document("note1", {"deleted": False})
+        mock_client_fn.return_value = _build_client(collections={"sharedNotes": notes})
+
+        with _as_role(OWNER) as headers:
+            resp = _post_json(
+                self.client, '/adminapi/moderation/notes/note1/toggle-deleted/',
+                headers, {"expected_deleted": False},
+            )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["deleted"])
+        doc_ref.update.assert_called_once_with({"deleted": True})
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_without_expected_deleted_keeps_original_toggle_behaviour(self, mock_client_fn):
+        """沒帶 expected_deleted 時維持原本的反轉行為，不影響既有呼叫端。"""
+        notes = FakeCollection()
+        doc_ref = notes.set_document("note1", {"deleted": True})
+        mock_client_fn.return_value = _build_client(collections={"sharedNotes": notes})
+
+        with _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/moderation/notes/note1/toggle-deleted/', headers)
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.json()["deleted"])
+        doc_ref.update.assert_called_once_with({"deleted": False})
+
 
 class RecordingListTest(TestCase):
     def setUp(self):

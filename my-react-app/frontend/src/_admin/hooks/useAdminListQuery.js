@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { apiGet } from '../../../utils/apiClient';
 
@@ -44,11 +44,28 @@ export function useAdminListQuery({
     const [loading, setLoading] = useState(enabled);
     const [error, setError] = useState('');
 
+    // 只有「目前最新的那一次查詢」可以寫回狀態。
+    //
+    // 使用者連續改篩選或翻頁時會有多個請求同時在路上，而回應順序不保證跟
+    // 送出順序一致：先送出的舊查詢如果較晚回來，原本會直接 setData 蓋掉新
+    // 結果，畫面就變成「清單是舊條件的內容、篩選器卻顯示新條件」，而且不會
+    // 有任何錯誤訊息。loading 也一樣——舊請求結束時會把新請求的載入中狀態
+    // 提早清掉。
+    //
+    // 這一層特別重要，因為十個後台頁面（以及建立在它之上的
+    // useReviewableContentCrud）都共用這個 hook；其中錄音審核與分享筆記
+    // 審核的操作並沒有後端狀態機把關，顯示過期清單的後果不只是看錯而已。
+    const latestRequestRef = useRef(0);
+
     const load = useCallback(async () => {
         if (!enabled) {
             setLoading(false);
             return;
         }
+
+        const requestId = latestRequestRef.current + 1;
+        latestRequestRef.current = requestId;
+        const isStale = () => latestRequestRef.current !== requestId;
 
         setLoading(true);
         setError('');
@@ -67,11 +84,15 @@ export function useAdminListQuery({
                 });
             }
 
-            setData(await apiGet(`${endpoint}?${params.toString()}`));
+            const result = await apiGet(`${endpoint}?${params.toString()}`);
+            if (isStale()) return;
+            setData(result);
         } catch (err) {
+            if (isStale()) return;
             setError(err.message);
         } finally {
-            setLoading(false);
+            // 舊請求結束時不能碰 loading——那是新請求的狀態。
+            if (!isStale()) setLoading(false);
         }
         // buildParams 是呼叫端每次 render 都會重建的 inline 函式，列進相依
         // 陣列會造成無限重載；它的行為只依賴 query，而 query 已經在陣列裡。

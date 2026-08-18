@@ -117,6 +117,10 @@ def note_toggle_deleted(request, note_id):
     if limited_resp:
         return limited_resp
 
+    data, err_resp = _parse_json_body(request)
+    if err_resp:
+        return err_resp
+
     client = firebase_ops.get_firestore_client()
     doc_ref = client.collection("sharedNotes").document(note_id)
     snapshot = doc_ref.get()
@@ -124,6 +128,22 @@ def note_toggle_deleted(request, note_id):
         return JsonResponse({"detail": "找不到這則分享筆記"}, status=404)
 
     current = snapshot.to_dict().get("deleted", False)
+
+    # 這支端點是純粹的「反轉目前狀態」，前端完全不帶目標值，但按鈕上的文字
+    # （「下架」還是「恢復」）是依前端那份 deleted 決定的。兩邊不一致時——
+    # 清單資料過期、或多個管理者同時操作——使用者按下「下架」，伺服器卻依
+    # 自己當下的狀態執行了「恢復」，方向剛好相反，而且沒有任何跡象。
+    #
+    # 呼叫端可以帶 expected_deleted 表明「我看到的狀態是這個」，不符就回 409
+    # 讓前端重新載入，跟其他端點用 invalid_transition 擋下過期操作同一種精神。
+    # 沒有帶的話維持原本的反轉行為，不影響既有呼叫端。
+    expected = (data or {}).get("expected_deleted")
+    if expected is not None and bool(expected) != bool(current):
+        return JsonResponse({
+            "detail": "這則分享筆記的狀態已經被其他人變更，請重新整理後再操作",
+            "deleted": current,
+        }, status=409)
+
     new_value = not current
     doc_ref.update({"deleted": new_value})
     _safe_write_audit_log(

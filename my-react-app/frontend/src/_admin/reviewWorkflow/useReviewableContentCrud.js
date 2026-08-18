@@ -53,20 +53,33 @@ export function useReviewableContentCrud({
     const [editTarget, setEditTarget] = useState(null);
     const [form, setForm] = useState(emptyForm);
 
+    /**
+     * 回傳「這次動作是否真的完成」——呼叫端需要據此決定要不要收掉 UI。
+     *
+     * 原本這個函式把錯誤吞掉只 setError，沒有任何回傳值，於是 submitReject
+     * 不管成功失敗都會接著 closeReject()：使用者打了一整段退件理由，遇到
+     * 暫時性錯誤時對話框直接關掉、理由整段消失，只在底下的頁面留一行錯誤
+     * 訊息。使用者輸入的內容不該因為一次失敗就被丟掉。
+     *
+     * 使用者在確認對話框按取消也回傳 false——什麼都沒發生，同樣不該讓呼叫端
+     * 把 UI 當成「已完成」收掉。
+     */
     const runAction = async (item, action, body) => {
         setActionId(item.id);
         setError('');
 
         try {
             if (action === 'delete') {
-                if (!window.confirm(deleteConfirmMessage(item))) return;
+                if (!window.confirm(deleteConfirmMessage(item))) return false;
                 await apiDelete(`${endpoint}${item.id}/`);
             } else {
                 await apiPost(`${endpoint}${item.id}/${action}/`, body);
             }
             await load();
+            return true;
         } catch (err) {
             setError(err.message);
+            return false;
         } finally {
             setActionId(null);
         }
@@ -87,12 +100,14 @@ export function useReviewableContentCrud({
     const submitReject = async () => {
         if (!rejectReason.trim() || !rejectTarget) return;
 
-        await runAction(
+        const succeeded = await runAction(
             rejectTarget,
             rejectingRevision ? 'pending-revision/reject' : 'reject',
             { review_comment: rejectReason.trim() },
         );
-        closeReject();
+        // 只有真的送出成功才收掉對話框；失敗時保留使用者打好的退件理由，
+        // 讓他可以直接重試，不用整段重打。
+        if (succeeded) closeReject();
     };
 
     const openNew = () => {
