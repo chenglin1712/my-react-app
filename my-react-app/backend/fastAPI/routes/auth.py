@@ -62,15 +62,23 @@ async def verify_firebase_token(request: Request, authorization: str = Header(de
         # （向 Google 重新抓憑證）。這個依賴掛在幾乎所有路由上，跟 dictionary.py
         # 冷快取那個問題同類但影響範圍更廣、單次影響更小——丟到執行緒池執行，
         # 避免卡住 event loop。
-        user = await asyncio.to_thread(firebase_auth.verify_id_token, token)
-    except firebase_auth.InvalidIdTokenError:
-        # 單一使用者 token 過期／被撤銷／格式不對，是每天都會發生的正常流量，
-        # 不記錄也不送 Sentry，避免把告警灌爆。
+        #
+        # check_revoked=True：跟 Django 端 core/firebase_auth.py 同一個修正、
+        # 同一個理由——預設的 verify_id_token() 不查 refresh token 撤銷時間或
+        # 帳號停權狀態，少了這個旗標，強制登出/停權/收回角色之後，對方手上
+        # 舊 token 在到期前仍能通過驗證（獨立審查找到的問題）。
+        user = await asyncio.to_thread(firebase_auth.verify_id_token, token, check_revoked=True)
+    except (firebase_auth.InvalidIdTokenError, firebase_auth.UserDisabledError):
+        # 單一使用者 token 過期／被撤銷／格式不對／帳號已被停權，是每天都會
+        # 發生的正常流量，不記錄也不送 Sentry，避免把告警灌爆。
+        # UserDisabledError 不是 InvalidIdTokenError 的子類別（各自獨立繼承自
+        # InvalidArgumentError），必須明確列出來，否則會落到下面被誤記成
+        # 非預期例外。
         raise HTTPException(status_code=401, detail="身份驗證失敗，請重新登入")
     except Exception:
-        # 落到這裡的是 InvalidIdTokenError 以外的例外（憑證抓取失敗、SDK 內部
-        # 錯誤等），代表驗證機制本身可能已經整個掛掉，記錄下來讓 Sentry 能告警——
-        # 原本這裡完全沒有 log，Firebase 驗證若整個掛掉，全站需登入端點會靜默
+        # 落到這裡的是上面兩種以外的例外（憑證抓取失敗、SDK 內部錯誤等），
+        # 代表驗證機制本身可能已經整個掛掉，記錄下來讓 Sentry 能告警——原本
+        # 這裡完全沒有 log，Firebase 驗證若整個掛掉，全站需登入端點會靜默
         # 401，看起來像是使用者沒登入，而不是系統故障。
         logger.exception("Firebase ID Token 驗證發生非預期例外")
         raise HTTPException(status_code=401, detail="身份驗證失敗，請重新登入")

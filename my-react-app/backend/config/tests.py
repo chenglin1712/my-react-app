@@ -123,6 +123,50 @@ class VerifyFirebaseTokenTest(TestCase):
         self.assertIsNone(error)
 
     @override_settings(AUTH_DEV_BYPASS=False)
+    def test_verifies_with_check_revoked_true(self):
+        # 獨立審查找到的問題：預設的 verify_id_token() 不查撤銷/停權狀態，
+        # 強制登出、停權、收回角色之後，舊 token 在到期前仍會通過驗證。
+        # 這裡鎖定「一定有帶 check_revoked=True」，不只是「回傳值對不對」，
+        # 避免這個旗標之後被意外改掉或漏帶而沒有任何測試發現。
+        with patch("core.firebase_auth.ensure_firebase_initialized"):
+            with patch("firebase_admin.auth.verify_id_token", return_value={"uid": "real-user"}) as mock_verify:
+                verify_firebase_token(_FakeRequest(auth_header="Bearer sometoken"))
+        mock_verify.assert_called_once_with("sometoken", check_revoked=True)
+
+    @override_settings(AUTH_DEV_BYPASS=False)
+    def test_disabled_user_token_returns_401_without_logging(self):
+        # UserDisabledError 不是 InvalidIdTokenError 的子類別（各自獨立繼承自
+        # InvalidArgumentError）——這是這次修正特別要接住的分支，帳號被停權後
+        # 的正常拒絕不該被誤記成非預期例外灌爆 Sentry。
+        import firebase_admin.auth as fa
+
+        with patch("core.firebase_auth.ensure_firebase_initialized"):
+            with patch(
+                "firebase_admin.auth.verify_id_token",
+                side_effect=fa.UserDisabledError("user disabled"),
+            ):
+                with patch("core.firebase_auth.logger") as mock_logger:
+                    decoded, error = verify_firebase_token(_FakeRequest(auth_header="Bearer sometoken"))
+        self.assertIsNone(decoded)
+        self.assertEqual(error.status_code, 401)
+        mock_logger.exception.assert_not_called()
+
+    @override_settings(AUTH_DEV_BYPASS=False)
+    def test_revoked_token_returns_401_without_logging(self):
+        import firebase_admin.auth as fa
+
+        with patch("core.firebase_auth.ensure_firebase_initialized"):
+            with patch(
+                "firebase_admin.auth.verify_id_token",
+                side_effect=fa.RevokedIdTokenError("token revoked"),
+            ):
+                with patch("core.firebase_auth.logger") as mock_logger:
+                    decoded, error = verify_firebase_token(_FakeRequest(auth_header="Bearer sometoken"))
+        self.assertIsNone(decoded)
+        self.assertEqual(error.status_code, 401)
+        mock_logger.exception.assert_not_called()
+
+    @override_settings(AUTH_DEV_BYPASS=False)
     def test_invalid_token_returns_401_without_logging(self):
         # 單一使用者 token 過期／被撤銷是正常流量，不應該被記成 error log。
         import firebase_admin.auth as fa

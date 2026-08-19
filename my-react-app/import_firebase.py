@@ -18,6 +18,12 @@ import sys
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
 
+# Windows 終端機預設不是 UTF-8（cp1252），這支腳本的輸出全是中文，不
+# reconfigure 會在印出中文字時直接丟 UnicodeEncodeError 中斷腳本——跟
+# run.py／run_fastapi.py／management commands 同一個既有問題與既有處理方式。
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 # ── 設定路徑 ──────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 KEY_FILE = os.path.join(BASE_DIR, "serviceAccountKey.json")
@@ -33,7 +39,14 @@ FIRESTORE_FILES = {
     "quizs":         os.path.join(BACKUP_DIR, "firestore", "quizs.json"),
     "sharedNotes":   os.path.join(BACKUP_DIR, "firestore", "sharedNotes.json"),
     "userSituation": os.path.join(BACKUP_DIR, "firestore", "userSituation.json"),
-    "situation":     os.path.join(BACKUP_DIR, "firestore", "situation.json"),
+    # collection 名稱是 "situations"（複數）——全站唯一實際讀寫這份資料的地方
+    # （firestore.rules 的 match /situations/{situationId}、
+    # frontend/src/userServives/uploadDb.jsx 的 collection(db, "situations")）
+    # 都是複數。這裡原本寫成單數 "situation"，會把備份資料匯入一個沒有任何
+    # 程式碼讀取的孤兒 collection，真正的 situations collection 從未被還原
+    # （獨立審查找到的問題）。備份檔案本身仍叫 situation.json，那是備份工具
+    # 當初的命名，不是 Firestore collection 名稱，不需要跟著改。
+    "situations":    os.path.join(BACKUP_DIR, "firestore", "situation.json"),
 }
 
 AUTH_FILE = os.path.join(BACKUP_DIR, "authentication", "auth.json")
@@ -48,6 +61,62 @@ cred = credentials.Certificate(KEY_FILE)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 print("✅ Firebase 連線成功\n")
+
+# ── 還原被 JSON 序列化壓扁的 Firestore 型別 ─────────────────
+# JSON 沒有 Timestamp 型別，備份檔案裡的時間戳記顯然是某個匯出流程用類似
+# `default=lambda o: {"_seconds": o.timestamp(), "_nanoseconds": ...}` 的
+# 方式序列化出來的——json.load() 讀回來之後，這些欄位只是長得像 Timestamp
+# 的普通 dict，不是真正的 Timestamp。原本這裡直接把整份 dict 原封不動
+# `.set()` 回 Firestore，寫進去的就真的是一個巢狀 map，不是 Timestamp
+# 型別，這正是正式資料裡 sharedNotes.createdAt 變成
+# `{"_seconds":…, "_nanoseconds":…}`、讀取端顯示「NaN 天前」、
+# `orderBy("createdAt")` 排序完全錯亂的根因（獨立審查找到的問題，見
+# frontend/src/_note/timeAgo.js 的對應修正）。
+#
+# 遞迴走訪每一筆文件資料，把「形狀恰好是 {_seconds, _nanoseconds}（且沒有
+# 其他 key）」的 dict 還原成 timezone-aware 的 datetime——Firestore Admin
+# SDK 的 Python client 看到 datetime.datetime 值會自動存成原生 Timestamp
+# 型別，不需要另外呼叫任何轉換函式。
+#
+# 型別檢查刻意比「isinstance(x, (int, float))」更嚴格（獨立審查覆核這批
+# 修正時找到的問題）：
+#   - bool 是 int 的子類別，isinstance(True, int) 會是 True，
+#     一個湊巧只有這兩個 key、值恰好是 True/False 的業務資料會被誤判成時間；
+#   - 只接受 int，不接受 float：真正的 Firestore Timestamp 序列化出來的
+#     _seconds/_nanoseconds 本來就是整數，float 代表這份資料的來源不是
+#     Timestamp 序列化，繼續轉換只會產生不必要的捨入誤差；
+#   - nanoseconds 限制在 [0, 1_000_000_000) 這個合法範圍內，超出範圍代表
+#     語意上不是真正的 Timestamp 分量。
+# 轉換本身也可能因為 seconds 数值超出 datetime 支援的範圍而丟
+# OverflowError／OSError／ValueError——這種情況代表這個 dict 終究不是一個
+# 合法的時間戳記，安全地當成一般資料原樣保留（遞迴進去逐 key 處理），不要
+# 讓一筆資料的異常值中斷整個匯入流程。
+def _is_timestamp_map(value):
+    if not isinstance(value, dict) or set(value.keys()) != {"_seconds", "_nanoseconds"}:
+        return False
+    seconds = value["_seconds"]
+    nanoseconds = value["_nanoseconds"]
+    if isinstance(seconds, bool) or isinstance(nanoseconds, bool):
+        return False
+    if not isinstance(seconds, int) or not isinstance(nanoseconds, int):
+        return False
+    return 0 <= nanoseconds < 1_000_000_000
+
+
+def _restore_timestamps(value):
+    if isinstance(value, dict):
+        if _is_timestamp_map(value):
+            try:
+                return datetime.datetime.fromtimestamp(
+                    value["_seconds"] + value["_nanoseconds"] / 1e9, tz=datetime.timezone.utc,
+                )
+            except (OverflowError, OSError, ValueError):
+                print(f"  ⚠️  {value} 長得像 timestamp map 但數值超出合理範圍，保留原始值")
+        return {key: _restore_timestamps(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_restore_timestamps(item) for item in value]
+    return value
+
 
 # ── 匯入 Firestore 資料 ───────────────────────────────────
 def import_collection(collection_name, json_path):
@@ -65,7 +134,7 @@ def import_collection(collection_name, json_path):
     col_ref = db.collection(collection_name)
     count = 0
     for doc_id, doc_data in data.items():
-        col_ref.document(doc_id).set(doc_data)
+        col_ref.document(doc_id).set(_restore_timestamps(doc_data))
         count += 1
 
     print(f"  ✅ {collection_name}：匯入 {count} 筆")

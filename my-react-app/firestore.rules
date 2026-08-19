@@ -7,14 +7,23 @@ service cloud.firestore {
     // 新增／移除呼叫者自己的 uid。任何登入使用者原本可以把 likes 設成任意
     // 數字、把別人的 uid 塞進 likedBy（偽造別人按讚）或清空別人的讚——
     // noteshare.jsx 的 toggleLike 在本地算好新值才寫入，但 Firestore 規則
-    // 才是真正的信任邊界。這裡驗證：(1) likes 必須等於 likedBy.size()，
-    // (2) 新舊 likedBy 唯一的差異只能是呼叫者自己的 uid（用對稱差集
+    // 才是真正的信任邊界。這裡驗證：(1) likes 必須等於 likedBy 的「不重複」
+    // 筆數，(2) 新舊 likedBy 唯一的差異只能是呼叫者自己的 uid（用對稱差集
     // toSet().difference()/union() 表示，同時涵蓋新增讚與取消讚兩種情況）。
+    //
+    // likes 對照 likedBy.size() 而不是 newSet.size()：toSet() 會把重複值
+    // 去重，但驗證 likes 這一步原本是拿「還沒去重的原始 list」的 .size() 來
+    // 比對——呼叫者可以把自己的 uid 在 likedBy 裡重複塞很多次（例如
+    // ['bob','bob']），changedUids 用 set 運算後只看到一個 bob（符合
+    // [uid].toSet()），但 likes 卻能對到未去重的筆數（2），一次 update 就把
+    // likes 灌成任意數字（獨立審查覆核這批修正時找到的問題）。加一條
+    // 「原始 list 長度必須等於去重後的 set 長度」，杜絕 likedBy 帶重複值。
     function isValidLikeToggle(oldData, newData, uid) {
       let oldSet = oldData.likedBy.toSet();
       let newSet = newData.likedBy.toSet();
       let changedUids = oldSet.difference(newSet).union(newSet.difference(oldSet));
       return newData.likedBy is list
+        && newData.likedBy.size() == newSet.size()
         && newData.likes is int
         && newData.likes == newData.likedBy.size()
         && changedUids == [uid].toSet();
@@ -113,9 +122,9 @@ service cloud.firestore {
     }
 
     // 共享筆記：任何人（含未登入）可讀，配合 /share/:id 這條公開分享連結路由
-    // （見 route.jsx，該路由沒有包 ProtectedRoute）；登入者可建立；作者可更新任何欄位
-    // （編輯筆記內容），非作者的登入者只能更新 likes/likedBy（按讚，見 noteshare.jsx
-    // toggleLike）；作者可刪除。
+    // （見 route.jsx，該路由沒有包 ProtectedRoute）；登入者可建立；作者只能更新
+    // pages/preview/image 這幾個內容欄位（見下方 update 規則），非作者的登入者
+    // 只能更新 likes/likedBy（按讚，見 noteshare.jsx toggleLike）；作者可刪除。
     // 刪除是軟刪除（noteshare.jsx 的 handleModalDelete 只是 updateDoc 把 deleted
     // 設成 true，文件並未真的移除），列表查詢都有帶 where("deleted","==",false)
     // 過濾，但原本這裡的 read 規則沒有擋，直接用文件 ID 讀取（/share/:id 分享連結）
@@ -146,18 +155,60 @@ service cloud.firestore {
         && request.resource.data.likes == 0
         && request.resource.data.likedBy is list && request.resource.data.likedBy.size() == 0
         && request.resource.data.deleted == false;
-      // staff 下架／恢復：只能動 deleted 這個欄位，不能連帶改內文、讚數這些
-      // 跟審核無關的欄位——把「作者能改什麼」跟「staff 能改什麼」的權限範圍
-      // 徹底分開，即使 staff 帳號被盜也頂多能下架/恢復內容，改不了內容本身。
+      // update 拆成三種互斥能力，各自只能動自己該動的欄位——原本作者分支是
+      // `resource.data.uid == request.auth.uid` 沒有任何 affectedKeys() 限制，
+      // 等於作者可以改任意欄位，包含把 staff 剛下架的 deleted:true 自己改回
+      // false（繞過整個審核機制）、把 likes 改成任意數字（排行造假）、把
+      // uid/username 改成別人（將違規內容歸屬轉嫁給無辜使用者）。也因為
+      // update 完全沒有重新套用 create 的欄位/長度驗證，一次 update 就能繞過
+      // pages.size()<=50、preview.size()<=5000 這些限制（獨立審查找到的問題）。
+      //
+      // 作者現在只能改 pages/preview/image 這幾個內容欄位，且改動後仍要符合
+      // create 當初的形狀驗證；uid/createdAt/username/likes/likedBy/deleted
+      // 對作者分支而言不在 hasOnly() 白名單內，任何一個被夾帶改動就會被擋下，
+      // 不需要另外重複比對「這些欄位沒有變」。
+      //
+      // 作者分支與按讚分支都額外要求「目前不是下架狀態」——下架代表內容被
+      // staff 凍結：作者不能在下架期間偷改內容（不然 staff 之後恢復時，
+      // 恢復的已經不是當初審核／下架當下看到的那份內容），其他登入者也不該
+      // 對一則已下架的筆記按讚（獨立審查覆核這批修正時找到的問題，跟原本
+      // 「作者不能把 deleted 改回 false」是同一種「下架=凍結」精神，只是這裡
+      // 補齊「凍結」也包含內容本身跟讚數，不是只擋 deleted 欄位）。
       allow update: if request.auth != null && (
-        resource.data.uid == request.auth.uid ||
         (
+          resource.data.uid == request.auth.uid &&
+          resource.data.get('deleted', false) == false &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pages', 'preview', 'image']) &&
+          request.resource.data.pages is list &&
+          request.resource.data.pages.size() > 0 && request.resource.data.pages.size() <= 50 &&
+          request.resource.data.preview is string &&
+          request.resource.data.preview.size() <= 5000 &&
+          // image 在 create 規則裡本來就是選填（noteService.jsx 的 shareNote()
+          // 一律寫入 image:''，但在這條規則加入之前建立的舊文件可能完全沒有
+          // 這個欄位）——用 .get(key, default) 而非直接存取，沒有這個欄位時
+          // 安全地當成空字串通過型別檢查，不會讓規則對缺欄位的舊資料直接噴
+          // evaluation error（獨立審查跑 emulator 測試時實際抓到的迴歸）。
+          request.resource.data.get('image', '') is string
+        ) ||
+        (
+          // 排除作者：noteshare.jsx 的 toggleLike 本來就禁止對自己的筆記按讚
+          // （isMine(note) return），這裡讓規則跟前端的實際用法一致，同時
+          // 也讓「作者能做什麼」與「其他登入者能做什麼」維持真正互斥、不重疊。
+          resource.data.uid != request.auth.uid &&
+          resource.data.get('deleted', false) == false &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy']) &&
           isValidLikeToggle(resource.data, request.resource.data, request.auth.uid)
         ) ||
         (
+          // staff 下架／恢復：只能動 deleted 這個欄位，且必須是布林值——不能
+          // 連帶改內文、讚數這些跟審核無關的欄位，也不能寫入非布林值（例如
+          // 字串／null／數字）意外讓 read 規則的 `deleted==false` 判斷失準，
+          // 使文件永久對一般使用者隱藏或污染後台查詢（獨立審查找到的問題）。
+          // 把「作者能改什麼」跟「staff 能改什麼」的權限範圍徹底分開，即使
+          // staff 帳號被盜也頂多能下架/恢復內容，改不了內容本身。
           isStaff() &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted'])
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted']) &&
+          request.resource.data.deleted is bool
         )
       );
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;

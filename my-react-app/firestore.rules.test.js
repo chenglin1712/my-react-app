@@ -197,12 +197,189 @@ describe('sharedNotes update 規則（按讚完整性）', () => {
     );
   });
 
-  test('作者本人更新仍不受按讚完整性限制（可編輯任何欄位）', async () => {
+  test('likedBy 帶重複的自己 uid 灌 likes 會被拒絕（獨立審查覆核找到的問題：'
+    + 'toSet() 去重後只看到一個 uid、但 likes 卻能對到未去重的原始筆數）', async () => {
+    await seedNote('n1');
+    const bob = testEnv.authenticatedContext('bob');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(bob.firestore(), 'sharedNotes/n1'), { likes: 2, likedBy: ['bob', 'bob'] })
+    );
+  });
+
+  test('已經有讚的筆記，再塞重複的新 uid 一樣會被拒絕', async () => {
+    await seedNote('n1', { likes: 1, likedBy: ['carol'] });
+    const bob = testEnv.authenticatedContext('bob');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(bob.firestore(), 'sharedNotes/n1'), { likes: 3, likedBy: ['carol', 'bob', 'bob'] })
+    );
+  });
+
+  test('作者不能對自己的筆記按讚（跟 noteshare.jsx 的 isMine 判斷一致）', async () => {
+    await seedNote('n1');
+    const alice = testEnv.authenticatedContext('alice');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(alice.firestore(), 'sharedNotes/n1'), { likes: 1, likedBy: ['alice'] })
+    );
+  });
+
+  test('已下架的筆記不能被按讚（下架＝凍結，等 staff 恢復前不開放任何互動）', async () => {
+    await seedNote('n1', { deleted: true });
+    const bob = testEnv.authenticatedContext('bob');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(bob.firestore(), 'sharedNotes/n1'), { likes: 1, likedBy: ['bob'] })
+    );
+  });
+
+  test('作者本人可以編輯 preview（內容欄位）', async () => {
     await seedNote('n1');
     const alice = testEnv.authenticatedContext('alice');
     const { updateDoc } = await import('firebase/firestore');
     await assertSucceeds(
       updateDoc(doc(alice.firestore(), 'sharedNotes/n1'), { preview: '<p>改過的內容</p>' })
+    );
+  });
+});
+
+// 這批測試涵蓋這輪修好的洞：作者分支原本沒有 affectedKeys() 限制，等於作者
+// 可以改任意欄位——包含自行把 staff 剛下架的 deleted:true 改回 false（繞過
+// 審核機制）、偽造 likes、把 uid/username 改成別人、繞過 create 當初的長度
+// 限制。這裡逐一驗證這些操作現在全部會被拒絕，只有 pages/preview/image
+// 仍然開放給作者編輯。
+describe('sharedNotes update 規則（作者只能改內容欄位）', () => {
+  const seedNote = async (noteId, overrides = {}) => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `sharedNotes/${noteId}`), {
+        ...validSharedNote('alice'),
+        ...overrides,
+      });
+    });
+  };
+
+  test('作者可以一次同時修改 pages、preview、image', async () => {
+    await seedNote('n1');
+    const alice = testEnv.authenticatedContext('alice');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertSucceeds(
+      updateDoc(doc(alice.firestore(), 'sharedNotes/n1'), {
+        pages: [{ title: '改過的標題', content: '<p>改過的內容</p>' }],
+        preview: '<p>改過的內容</p>',
+        image: 'https://res.cloudinary.com/demo/image/upload/new.jpg',
+      })
+    );
+  });
+
+  test('作者不能把已下架的筆記自行恢復（這波修好的核心洞）', async () => {
+    await seedNote('n1', { deleted: true });
+    const alice = testEnv.authenticatedContext('alice');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(alice.firestore(), 'sharedNotes/n1'), { deleted: false })
+    );
+  });
+
+  test('作者不能透過一般 update 把 likes 改成任意數字', async () => {
+    await seedNote('n1');
+    const alice = testEnv.authenticatedContext('alice');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(alice.firestore(), 'sharedNotes/n1'), { likes: 9999 })
+    );
+  });
+
+  test('作者不能把筆記的 uid 改成別人（轉嫁歸屬）', async () => {
+    await seedNote('n1');
+    const alice = testEnv.authenticatedContext('alice');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(alice.firestore(), 'sharedNotes/n1'), { uid: 'bob' })
+    );
+  });
+
+  test('作者不能改 username', async () => {
+    await seedNote('n1');
+    const alice = testEnv.authenticatedContext('alice');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(alice.firestore(), 'sharedNotes/n1'), { username: '換了一個名字' })
+    );
+  });
+
+  test('作者不能改 createdAt', async () => {
+    await seedNote('n1');
+    const alice = testEnv.authenticatedContext('alice');
+    const { updateDoc, serverTimestamp: freshTimestamp } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(alice.firestore(), 'sharedNotes/n1'), { createdAt: freshTimestamp() })
+    );
+  });
+
+  test('作者把 pages 清空會被拒絕（繞過 create 當初的長度限制）', async () => {
+    await seedNote('n1');
+    const alice = testEnv.authenticatedContext('alice');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(alice.firestore(), 'sharedNotes/n1'), { pages: [] })
+    );
+  });
+
+  test('作者把 preview 改到超過長度上限會被拒絕', async () => {
+    await seedNote('n1');
+    const alice = testEnv.authenticatedContext('alice');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(alice.firestore(), 'sharedNotes/n1'), { preview: 'x'.repeat(5001) })
+    );
+  });
+
+  test('非作者不能修改 pages/preview/image（作者限定，不是任何登入者都能編輯）', async () => {
+    await seedNote('n1');
+    const bob = testEnv.authenticatedContext('bob');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(bob.firestore(), 'sharedNotes/n1'), { preview: '<p>不是我的筆記</p>' })
+    );
+  });
+
+  test('已下架的筆記，作者也不能編輯內容（下架＝凍結，避免 staff 恢復時看到的'
+    + '不是當初下架當下的那份內容，獨立審查覆核找到的問題）', async () => {
+    await seedNote('n1', { deleted: true });
+    const alice = testEnv.authenticatedContext('alice');
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(alice.firestore(), 'sharedNotes/n1'), { preview: '<p>趁下架時偷改</p>' })
+    );
+  });
+});
+
+describe('sharedNotes update 規則（staff 寫入 deleted 的型別）', () => {
+  const seedNote = async (noteId, overrides = {}) => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `sharedNotes/${noteId}`), {
+        ...validSharedNote('alice'),
+        ...overrides,
+      });
+    });
+  };
+
+  test('staff 把 deleted 寫成字串會被拒絕（型別不對可能讓文件永久對外隱藏）', async () => {
+    await seedNote('n1');
+    const staffBob = testEnv.authenticatedContext('bob', { role: 'admin' });
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(staffBob.firestore(), 'sharedNotes/n1'), { deleted: 'true' })
+    );
+  });
+
+  test('staff 把 deleted 寫成 null 會被拒絕', async () => {
+    await seedNote('n1');
+    const staffBob = testEnv.authenticatedContext('bob', { role: 'admin' });
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(staffBob.firestore(), 'sharedNotes/n1'), { deleted: null })
     );
   });
 });

@@ -73,15 +73,27 @@ def verify_firebase_token(request):
 
     from firebase_admin import auth as firebase_auth
     try:
-        decoded = firebase_auth.verify_id_token(token)
+        # check_revoked=True：預設的 verify_id_token() 只驗簽章與效期，不查
+        # refresh token 是否已被撤銷、帳號是否已被停權。少了這個旗標，管理員
+        # 執行「強制登出」、停權帳號、或收回某人的 owner/admin 角色之後，對方
+        # 手上舊 token 在到期前（最長約 1 小時）仍會通過這裡的驗證，且 token
+        # 內殘留的舊 role claim 一樣能通過後面的 require_role() 檢查——等於
+        # 停權/收權完全沒有立即生效（獨立審查找到的問題）。多付出的成本是
+        # Admin SDK 每次驗證都要多查一次使用者的 tokensValidAfterTime/disabled
+        # 狀態，換來的是撤銷/停權即時生效，這條路徑掛在所有需登入端點上，
+        # 這個代價是值得付的。
+        decoded = firebase_auth.verify_id_token(token, check_revoked=True)
         return decoded, None
-    except firebase_auth.InvalidIdTokenError:
-        # 單一使用者 token 過期／被撤銷／格式不對，是每天都會發生的正常流量，
-        # 不記錄也不送 Sentry，避免把告警灌爆。
+    except (firebase_auth.InvalidIdTokenError, firebase_auth.UserDisabledError):
+        # 單一使用者 token 過期／被撤銷／格式不對／帳號已被停權，是每天都會
+        # 發生的正常流量，不記錄也不送 Sentry，避免把告警灌爆。
+        # UserDisabledError 不是 InvalidIdTokenError 的子類別（兩者是各自獨立
+        # 繼承自 InvalidArgumentError），必須明確列出來，否則帳號被停權後產生
+        # 的 401 會落到下面的 except Exception，被誤記成「非預期例外」。
         return None, JsonResponse({"detail": "身份驗證失敗，請重新登入"}, status=401)
     except Exception:
-        # 落到這裡的是 InvalidIdTokenError 以外的例外（憑證抓取失敗、SDK 內部
-        # 錯誤等），代表驗證機制本身可能已經整個掛掉，記錄下來讓 Sentry 能告警。
+        # 落到這裡的是上面兩種以外的例外（憑證抓取失敗、SDK 內部錯誤等），
+        # 代表驗證機制本身可能已經整個掛掉，記錄下來讓 Sentry 能告警。
         logger.exception("Firebase ID Token 驗證發生非預期例外")
         return None, JsonResponse({"detail": "身份驗證失敗，請重新登入"}, status=401)
 

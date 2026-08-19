@@ -88,6 +88,57 @@ def test_invalid_token_returns_401(monkeypatch):
     assert exc_info.value.status_code == 401
 
 
+def test_verifies_with_check_revoked_true(monkeypatch):
+    # 獨立審查找到的問題：預設的 verify_id_token() 不查撤銷/停權狀態，強制
+    # 登出、停權、收回角色之後，舊 token 在到期前仍會通過驗證。這裡鎖定
+    # 「一定有帶 check_revoked=True」，避免這個旗標之後被意外改掉或漏帶。
+    monkeypatch.setenv("DJANGO_DEBUG", "False")
+    monkeypatch.setenv("AUTH_DEV_BYPASS", "False")
+    request = _FakeRequest()
+
+    with patch.object(auth_module, "ensure_firebase_initialized"):
+        with patch("firebase_admin.auth.verify_id_token", return_value={"uid": "real-user"}) as mock_verify:
+            _run(auth_module.verify_firebase_token(request, authorization="Bearer sometoken"))
+
+    mock_verify.assert_called_once_with("sometoken", check_revoked=True)
+
+
+def test_disabled_user_token_returns_401(monkeypatch):
+    # UserDisabledError 不是 InvalidIdTokenError 的子類別（各自獨立繼承自
+    # InvalidArgumentError）——這是這次修正特別要接住的分支。
+    import firebase_admin.auth as fa
+
+    monkeypatch.setenv("DJANGO_DEBUG", "False")
+    monkeypatch.setenv("AUTH_DEV_BYPASS", "False")
+    request = _FakeRequest()
+
+    with patch.object(auth_module, "ensure_firebase_initialized"):
+        with patch(
+            "firebase_admin.auth.verify_id_token",
+            side_effect=fa.UserDisabledError("user disabled"),
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                _run(auth_module.verify_firebase_token(request, authorization="Bearer sometoken"))
+    assert exc_info.value.status_code == 401
+
+
+def test_revoked_token_returns_401(monkeypatch):
+    import firebase_admin.auth as fa
+
+    monkeypatch.setenv("DJANGO_DEBUG", "False")
+    monkeypatch.setenv("AUTH_DEV_BYPASS", "False")
+    request = _FakeRequest()
+
+    with patch.object(auth_module, "ensure_firebase_initialized"):
+        with patch(
+            "firebase_admin.auth.verify_id_token",
+            side_effect=fa.RevokedIdTokenError("token revoked"),
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                _run(auth_module.verify_firebase_token(request, authorization="Bearer sometoken"))
+    assert exc_info.value.status_code == 401
+
+
 def test_missing_service_account_returns_503(monkeypatch):
     # ensure_firebase_initialized（config/firebase_init.py 共用）沒設定服務帳戶金鑰
     # 時拋 EnvironmentError，這裡驗證 verify_firebase_token 有接住並轉成 503，
