@@ -288,6 +288,66 @@ describe('AnnouncementList', () => {
     });
   });
 
+  /** 回歸測試：runAction() 原本吞掉錯誤只設定 error state，沒有回傳值，
+   * submitReject() 不管成功失敗都會接著關閉 Modal——退件失敗時，使用者
+   * 剛打的理由整段消失，只在頁面上方留一行錯誤訊息，跟 useReviewableContentCrud
+   * 已經修過的同一類問題。 */
+  test('退件失敗時 Modal 不會關閉，理由文字保留讓使用者可以直接重試', async () => {
+    apiPost.mockRejectedValueOnce(new Error('伺服器暫時無法處理，請稍後再試'));
+    renderList();
+    await screen.findByText('待審公告');
+    const row = screen.getByText('待審公告').closest('tr');
+    fireEvent.click(within(row).getByRole('button', { name: /退件/ }));
+
+    fireEvent.change(
+      screen.getByLabelText('請說明需要修改的內容'),
+      { target: { value: '用字需要再確認' } },
+    );
+    fireEvent.click(screen.getByRole('button', { name: '確認退件' }));
+
+    expect(await screen.findByText('伺服器暫時無法處理，請稍後再試')).toBeInTheDocument();
+    expect(screen.getByText('退件原因')).toBeInTheDocument();
+    expect(screen.getByLabelText('請說明需要修改的內容')).toHaveValue('用字需要再確認');
+  });
+
+  /** 回歸測試：連續換頁或連續搜尋時，較舊的查詢若比較新的查詢晚回來，
+   * 不能覆蓋新查詢的結果（跟 WordList.jsx／GrammarTree.jsx 那類問題一樣）。 */
+  test('較舊的搜尋晚回來時，不會覆蓋掉後送出的新搜尋結果', async () => {
+    renderList();
+    await screen.findByText('草稿公告');
+
+    let resolveFirstSearch;
+    apiGet.mockImplementation((url) => {
+      if (url.includes('keyword=first')) {
+        return new Promise((resolve) => { resolveFirstSearch = resolve; });
+      }
+      return Promise.resolve({
+        results: [pendingItem],
+        count: 1,
+        page: 1,
+        page_size: 10,
+      });
+    });
+
+    fireEvent.change(screen.getByLabelText('關鍵字搜尋'), { target: { value: 'first' } });
+    fireEvent.click(screen.getByRole('button', { name: '搜尋' }));
+    await waitFor(() => expect(apiGet).toHaveBeenCalledWith(
+      expect.stringContaining('keyword=first'),
+    ));
+
+    fireEvent.change(screen.getByLabelText('關鍵字搜尋'), { target: { value: 'second' } });
+    fireEvent.click(screen.getByRole('button', { name: '搜尋' }));
+    expect(await screen.findByText('待審公告')).toBeInTheDocument();
+
+    resolveFirstSearch({
+      results: [draftItem], count: 1, page: 1, page_size: 10,
+    });
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+    expect(screen.getByText('待審公告')).toBeInTheDocument();
+    expect(screen.queryByText('草稿公告')).not.toBeInTheDocument();
+  });
+
   test('刪除草稿前會跳原生確認框，確認後呼叫 apiDelete', async () => {
     apiDelete.mockResolvedValue({});
     renderList();

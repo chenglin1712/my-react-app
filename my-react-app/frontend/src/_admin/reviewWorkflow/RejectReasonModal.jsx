@@ -9,9 +9,24 @@ import { Button, Form, Modal } from 'react-bootstrap';
  */
 export default function RejectReasonModal({ reject, actionId, controlId }) {
     const { target, reason, setReason, isRevision, close, submit } = reject;
+    const submitting = actionId === target?.id;
+
+    // 送出中不能被關掉——不然使用者按了確認、退件理由送出中途手滑點到背景／
+    // 按 Escape，會直接關掉對話框；失敗時 hook 那層特意保留的理由文字也就
+    // 沒有意義了（表單已經被收掉，使用者看不到）。
+    const handleHide = () => {
+        if (submitting) return;
+        close();
+    };
 
     return (
-        <Modal show={Boolean(target)} onHide={close} centered>
+        <Modal
+            show={Boolean(target)}
+            onHide={handleHide}
+            backdrop={submitting ? 'static' : true}
+            keyboard={!submitting}
+            centered
+        >
             <Modal.Header closeButton>
                 <Modal.Title>{isRevision ? '退件修改原因' : '退件原因'}</Modal.Title>
             </Modal.Header>
@@ -32,13 +47,16 @@ export default function RejectReasonModal({ reject, actionId, controlId }) {
                 </Form.Group>
             </Modal.Body>
             <Modal.Footer>
-                <Button variant="secondary" onClick={close}>取消</Button>
+                <Button type="button" variant="secondary" onClick={handleHide} disabled={submitting}>
+                    取消
+                </Button>
                 <Button
+                    type="button"
                     variant="danger"
-                    disabled={!reason.trim() || actionId === target?.id}
+                    disabled={!reason.trim() || submitting}
                     onClick={submit}
                 >
-                    {isRevision ? '確認退件修改' : '確認退件'}
+                    {submitting ? '送出中…' : (isRevision ? '確認退件修改' : '確認退件')}
                 </Button>
             </Modal.Footer>
         </Modal>

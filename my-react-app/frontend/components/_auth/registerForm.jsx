@@ -1,39 +1,41 @@
 import "../../static/css/_auth/registerForm.css"
 import { User, Mail, LockKeyhole, Footprints, CheckCircle } from "lucide-react"
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Alert } from "react-bootstrap";
 import avatarImage from '../../static/assets/_auth/avatar.webp';
 import { registerWithImg } from "../../src/userServives/userServive"
-import lottie from 'lottie-web';
 import successAnimation from "../../src/animations/success.json"
 import SuccessModal from "../ui/SuccessModal";
-import { uploadToCloudinary } from "@utils/uploadToCloudinary";
+import { useLottieAnimation } from "@hooks/useLottieAnimation";
+import { useAvatarUpload } from "@hooks/useAvatarUpload";
 
 const RegisterForm = ({ onSwitchToLogin }) => {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [isPasswordValid, setIsPasswordValid] = useState(false);
     const [identity, setIdentity] = useState("學生");
     const [errorMsg, setErrorMsg] = useState("");
+    const isPasswordValid = password.length >= 6;
 
-    const [preview, setPreview] = useState(null);
+    const { previewUrl, isUploading, uploadError, selectFile } = useAvatarUpload();
     const [avatarUrl, setAvatarUrl] = useState(null);
-    const [isUploading, setIsUploading] = useState(false);
 
     const [isRegistered, setIsRegistered] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
-    const animation = useRef(null);
+    const redirectTimeoutRef = useRef(null);
+    useEffect(() => () => clearTimeout(redirectTimeoutRef.current), []);
 
     //使用者註冊
     const handleRegister = async (e) => {
         e.preventDefault();
         setErrorMsg("");
+        setIsSubmitting(true);
         try {
             await registerWithImg(name, email, password, identity, avatarUrl);
             setIsRegistered(true);
-            setTimeout(() => {
+            redirectTimeoutRef.current = setTimeout(() => {
                 navigate("/login");
             }, 1500);
         } catch (error) {
@@ -43,57 +45,19 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                 setErrorMsg("註冊失敗");
             }
             setIsRegistered(false);
-        }
-    };
-
-    //確認密碼使否符合規定
-    const handlePasswordChange = (e) => {
-        const value = e.target.value;
-        setPassword(value);
-
-        if (value.length >= 6) {
-            setIsPasswordValid(true);
-        } else {
-            setIsPasswordValid(false);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     const handleFileChange = async (e) => {
         const file = e.target.files[0];
-        if (!file) return;
-
-        if (file.size > 5 * 1024 * 1024) {
-            setErrorMsg("圖片不得超過 5 MB，請重新選擇。");
-            return;
-        }
-        setErrorMsg("");
-
-        setPreview(URL.createObjectURL(file));
-        setIsUploading(true);
-
-        try {
-            setAvatarUrl(await uploadToCloudinary(file));
-        } catch (error) {
-            console.error("圖片上傳失敗", error);
-            setErrorMsg("圖片上傳失敗");
-        } finally {
-            setIsUploading(false);
-        }
+        const url = await selectFile(file);
+        if (url) setAvatarUrl(url);
     };
 
     //加載動畫
-    useEffect(() => {
-        if (isRegistered) {
-            const instance = lottie.loadAnimation({
-                container: animation.current,
-                renderer: 'svg',
-                loop: true,
-                autoplay: true,
-                animationData: successAnimation,
-            });
-            return () => instance.destroy();
-        }
-    }, [isRegistered]);
+    const animation = useLottieAnimation({ animationData: successAnimation, enabled: isRegistered });
 
     return (
         <div className="register-container">
@@ -104,10 +68,10 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                         <Footprints size={22} />訪客登入
                     </button>
                 </p>
-                {errorMsg && <Alert variant="danger" className="py-2">{errorMsg}</Alert>}
+                {(errorMsg || uploadError) && <Alert variant="danger" className="py-2">{errorMsg || uploadError}</Alert>}
                 <form action="#" className="registerForm" onSubmit={handleRegister}>
                     <div className="input-wrapper">
-                        <img src={preview || avatarImage} alt="使用者頭像預覽" style={{ height: "101px", padding: "inherit" }} />
+                        <img src={previewUrl || avatarImage} alt="使用者頭像預覽" style={{ height: "101px", padding: "inherit" }} />
                         <input
                             id="avatarInput"
                             type="file"
@@ -127,7 +91,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                     </div>
                     <div className="input-wrapper">
                         <LockKeyhole size={24} className="icon" />
-                        <input type="password" className="input-field" placeholder="密碼" aria-label="密碼" autoComplete="new-password" required onChange={handlePasswordChange} value={password} />
+                        <input type="password" className="input-field" placeholder="密碼" aria-label="密碼" autoComplete="new-password" required onChange={(e) => setPassword(e.target.value)} value={password} />
                     </div>
                     <div className="password-requirements">
                         <span className={`check-icon ${isPasswordValid ? 'valid' : 'invalid'}`} aria-hidden="true">
@@ -140,7 +104,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                             <option value="學生">學生</option>
                         </select>
                     </div>
-                    <button type="submit" className="register-button" disabled={isUploading}>
+                    <button type="submit" className="register-button" disabled={isUploading || isSubmitting}>
                         {isUploading ? "上傳頭像中..." : "註冊"}
                     </button>
                     <p>已經有帳戶了?

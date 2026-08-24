@@ -1,5 +1,5 @@
 import DOMPurify from "dompurify";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const REPORT_REASONS = [
   { value: "inappropriate", label: "不當內容" },
@@ -21,23 +21,64 @@ export default function NoteModal({ note, canLike, iLike, canDelete, onToggleLik
   const [reportText, setReportText] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
 
+  // 切到另一則筆記時（同一個 Modal 實例被重新指派 note），先前那則的檢舉表單
+  // 狀態不該留著跨到這一則筆記上。
+  useEffect(() => {
+    setShowReportForm(false);
+    setReportReason("inappropriate");
+    setReportText("");
+  }, [note.id]);
+
   const submitReport = async () => {
     if (reportReason === "other" && !reportText.trim()) return;
     setReportSubmitting(true);
     try {
       await onReport(note, reportReason, reportReason === "other" ? reportText.trim() : "");
+      // 只有 onReport 沒有丟例外（代表真的送出成功）才關閉/清空表單。
       setShowReportForm(false);
       setReportReason("inappropriate");
       setReportText("");
+    } catch {
+      // 失敗時 onReport 自己已經顯示過錯誤訊息（toast），這裡什麼都不做，
+      // 只是不要清空/關閉表單，讓使用者看得到表單還在、可以重試。
     } finally {
       setReportSubmitting(false);
     }
   };
 
+  const pages = Array.isArray(note.pages) ? note.pages.filter(Boolean) : [];
+  const modalTitleId = "note-modal-title";
+
+  const handleMaskClick = () => {
+    if (reportSubmitting) return; // 檢舉送出中先不讓背景點擊關閉，避免中斷送出結果的回饋
+    onClose();
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && !reportSubmitting) onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, reportSubmitting]);
+
+  const modalRef = useRef(null);
+  useEffect(() => {
+    modalRef.current?.focus();
+  }, []);
+
   return (
-    <div className="ns-modal-mask" onClick={onClose}>
-      <div className="ns-modal" onClick={(e) => e.stopPropagation()}>
-        <h2 className="ns-modal-title">{note.pages[0].title || "筆記內容"}</h2>
+    <div className="ns-modal-mask" onClick={handleMaskClick}>
+      <div
+        ref={modalRef}
+        className="ns-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={modalTitleId}
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id={modalTitleId} className="ns-modal-title">{pages[0]?.title || "筆記內容"}</h2>
         <p className="ns-modal-sub">
           分享者：{note.username || "匿名者"} ❤️ {note.likes || 0}
         </p>
@@ -45,34 +86,36 @@ export default function NoteModal({ note, canLike, iLike, canDelete, onToggleLik
         {canLike && (
           <div style={{ marginBottom: "0.75rem" }}>
             <button
+              type="button"
               className={`ns-like-btn ${iLike ? "is-liked" : ""}`}
               onClick={(e) => onToggleLike(e, note, "modal")}
+              aria-label={iLike ? "取消按讚" : "按讚"}
             >
               {iLike ? "收回讚" : "按讚"}
             </button>
           </div>
         )}
 
-        {(note.pages || []).map((pg, i) => (
+        {pages.map((pg, i) => (
           <div key={i} className="ns-modal-page">
             <div className="ns-page-label">第 {i + 1} 頁</div>
             <div
               className="ns-modal-content"
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(pg.content) }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(pg.content || "") }}
             />
           </div>
         ))}
 
         <div className="ns-modal-actions">
           {canDelete && (
-            <button className="ns-btn danger" onClick={onDelete}>
+            <button type="button" className="ns-btn danger" onClick={onDelete}>
               刪除筆記
             </button>
           )}
-          <button className="ns-btn" onClick={() => setShowReportForm((v) => !v)}>
+          <button type="button" className="ns-btn" onClick={() => setShowReportForm((v) => !v)}>
             檢舉
           </button>
-          <button className="ns-btn" onClick={onClose}>
+          <button type="button" className="ns-btn" onClick={onClose}>
             關閉
           </button>
         </div>
@@ -104,6 +147,7 @@ export default function NoteModal({ note, canLike, iLike, canDelete, onToggleLik
             )}
             <div className="ns-report-actions">
               <button
+                type="button"
                 className="ns-btn"
                 disabled={reportSubmitting}
                 onClick={() => setShowReportForm(false)}
@@ -111,6 +155,7 @@ export default function NoteModal({ note, canLike, iLike, canDelete, onToggleLik
                 取消
               </button>
               <button
+                type="button"
                 className="ns-btn danger"
                 disabled={reportSubmitting || (reportReason === "other" && !reportText.trim())}
                 onClick={submitReport}

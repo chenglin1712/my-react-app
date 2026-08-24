@@ -1,24 +1,13 @@
-import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import lottie from 'lottie-web';
 import permissionAnimation from "../animations/permission restriction.json"
 import "../../static/css/userServives/permissionProtect.css"
+import { useLottieAnimation } from "@hooks/useLottieAnimation";
 
 const PermissionProtect = () => {
     const navigate = useNavigate();
 
     //加載動畫
-    const animation = useRef(null);
-    useEffect(() => {
-        const instance = lottie.loadAnimation({
-            container: animation.current,
-            renderer: 'svg',
-            loop: true,
-            autoplay: true,
-            animationData: permissionAnimation,
-        });
-        return () => instance.destroy();
-    }, []);
+    const animation = useLottieAnimation({ animationData: permissionAnimation });
 
     return (
         <div className="permission-container">

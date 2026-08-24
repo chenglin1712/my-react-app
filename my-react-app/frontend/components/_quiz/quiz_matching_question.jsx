@@ -8,6 +8,16 @@ import { Link, CircleCheck, CircleX } from "lucide-react";
 //
 // 一旦本題已經作答過(answered=true)，切換題目再回來時就直接顯示解答總覽，
 // 不會讓使用者重新配對一次（配對是一次性的遊戲式互動，答案已確定就不重玩)。
+// 抽到 module scope（不是每次 render/effect 都在裡面重新定義），單獨可測試。
+function shuffle(arr) {
+    const newArr = [...arr];
+    for (let i = newArr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
+    }
+    return newArr;
+}
+
 const MatchingQuestion = ({ question, answered, resultValue, onAnswer }) => {
     const [leftList, setLeftList] = useState([]);
     const [rightList, setRightList] = useState([]);
@@ -17,14 +27,6 @@ const MatchingQuestion = ({ question, answered, resultValue, onAnswer }) => {
     const [isFinished, setIsFinished] = useState(false);
 
     useEffect(() => {
-        const shuffle = (arr) => {
-            const newArr = [...arr];
-            for (let i = newArr.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
-            }
-            return newArr;
-        };
         setLeftList(shuffle(question.pairs.map((p) => p.cn)));
         setRightList(shuffle(question.pairs.map((p) => p.word)));
         setSelectedWord(null);
@@ -102,6 +104,7 @@ const MatchingQuestion = ({ question, answered, resultValue, onAnswer }) => {
                     {leftList.map((cn) => (
                         <button
                             key={cn}
+                            type="button"
                             className={getButtonClass(cn, true)}
                             onClick={() => handleSelect(cn, true)}
                             disabled={isFinished}
@@ -114,6 +117,7 @@ const MatchingQuestion = ({ question, answered, resultValue, onAnswer }) => {
                     {rightList.map((wordItem) => (
                         <button
                             key={wordItem.word}
+                            type="button"
                             className={getButtonClass(wordItem.word, false)}
                             onClick={() => handleSelect(wordItem.word, false)}
                             disabled={isFinished}

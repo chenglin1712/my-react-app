@@ -438,4 +438,37 @@ describe('ReportsQueue', () => {
         ).toBeInTheDocument();
         expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
+
+    test('未知的 target_type 顯示安全的通用摘要，不套用其他類型的欄位或連結', async () => {
+        const unknownTypeReport = {
+            id: 'rep999',
+            target_type: 'comment',
+            target_id: 'comment123',
+            reporter_uid: 'reporter-u4',
+            reason: 'other',
+            reason_text: '',
+            status: 'pending',
+            created_at: { seconds: 888888 },
+            resolved_by: null,
+            resolved_at: null,
+            resolution_note: '',
+            target_summary: { word: '不應該被當成錄音顯示' },
+        };
+
+        apiGet.mockResolvedValue(mockReportsResponse({
+            results: [unknownTypeReport],
+            count: 1,
+        }));
+
+        renderPage();
+
+        const row = await screen
+            .findByText('未知的內容類型')
+            .then((element) => element.closest('tr'));
+
+        expect(within(row).queryByText(/不應該被當成錄音顯示/)).not.toBeInTheDocument();
+        expect(
+            within(row).queryByRole('button', { name: /查看內容/ }),
+        ).not.toBeInTheDocument();
+    });
 });

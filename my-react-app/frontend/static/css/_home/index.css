@@ -323,6 +323,16 @@
 }
 
 .home-tribe-row {
+    /* 原本是 div+role="button"，換成原生 <button> 之後才需要這些 reset——
+       瀏覽器預設的 button 外觀（邊框、背景、置中文字、不滿版寬）都要清掉，
+       display/padding/border-radius 等既有版面設定才不會被蓋掉。 */
+    width: 100%;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    appearance: none;
     display: flex;
     align-items: center;
     gap: 14px;

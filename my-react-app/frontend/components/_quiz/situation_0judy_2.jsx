@@ -15,9 +15,12 @@ import {
 import "../../static/css/_quiz/situation_0judy_2.css";
 
 const SituationLine = ({ data }) => {
-  // 計算使用者總平均
-  const userAvg =
-    data.reduce((sum, item) => sum + (item.correctRate || 0), 0) / data.length;
+  // 計算使用者總平均。data 是空陣列時（例如剛開始使用、還沒有月度資料）
+  // 除以 data.length 會是除以 0，得到 NaN，圓餅圖跟下面顯示的數字都會壞掉。
+  const validRates = data.map((item) => item.correctRate).filter(Number.isFinite);
+  const userAvg = validRates.length
+    ? validRates.reduce((sum, rate) => sum + rate, 0) / validRates.length
+    : 0;
 
   const pieData = [
     { name: "平均分數", value: userAvg },

@@ -1,27 +1,18 @@
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import "../../static/css/_game/zone.css";
 import { Container } from "react-bootstrap";
-import { TRIBES as TRIBE_LIST, TRIBE_COLOR_BY_SLUG } from "../constants/tribes";
+import { TRIBES, TRIBE_COLOR_BY_SLUG } from "../constants/tribes";
 import StepBar from "../../components/ui/StepBar";
 
 const QUIZ_STEPS = ["選擇族語", "選擇等級", "開始作答", "成績單"];
 
-// subtitle/emoji/available/route 是這個頁面自己的呈現用資料，跟名稱對照表分開放；
-// 名稱（name）跟英文代稱（id，沿用原本 tribe.id 這個欄位名）一律從共用的
-// TRIBE_LIST 取得，subtitle 就是 slug 首字大寫。
-const TRIBE_ROUTES = { tayal: "/quiz", amis: "/quiz/amis", bunun: "/quiz/bunun", kavalan: "/quiz/kavalan", paiwan: "/quiz/paiwan" };
-const TRIBES = TRIBE_LIST.map((t) => ({
-  id: t.slug,
-  name: t.name,
-  subtitle: t.slug.charAt(0).toUpperCase() + t.slug.slice(1),
-  emoji: "📝",
-  available: true,
-  route: TRIBE_ROUTES[t.slug],
-}));
+// route.jsx 對泰雅語的測驗路由用空字串（不是 "tayal"），其餘族語才用各自的
+// slug——跟 route.jsx 產生路由用的是同一條規則，不是這裡另外發明的。
+function quizPathForTribe(slug) {
+  return slug === "tayal" ? "/quiz" : `/quiz/${slug}`;
+}
 
 const QuizTribeSelect = () => {
-  const navigate = useNavigate();
-
   return (
     <div className="yy-page">
     <Container>
@@ -37,26 +28,26 @@ const QuizTribeSelect = () => {
 
         <div className="zone-grid">
           {TRIBES.map((tribe) => (
-            <div
-              key={tribe.id}
-              className={`zone-card ${tribe.available ? "available" : "disabled"}`}
-              style={tribe.available ? { borderColor: TRIBE_COLOR_BY_SLUG[tribe.id] } : {}}
-              onClick={() => tribe.available && navigate(tribe.route)}
+            <Link
+              key={tribe.slug}
+              to={quizPathForTribe(tribe.slug)}
+              className="zone-card available"
+              style={{ borderColor: TRIBE_COLOR_BY_SLUG[tribe.slug] }}
             >
-              <div className="zone-card-emoji">{tribe.emoji}</div>
+              <div className="zone-card-emoji">📝</div>
               <div className="zone-card-body">
                 <h2 className="zone-card-title">{tribe.name}族語</h2>
-                <p className="zone-card-subtitle" style={{ color: TRIBE_COLOR_BY_SLUG[tribe.id] }}>
-                  {tribe.subtitle}
+                <p className="zone-card-subtitle" style={{ color: TRIBE_COLOR_BY_SLUG[tribe.slug] }}>
+                  {tribe.roman}
                 </p>
               </div>
               <div
-                className={`zone-card-badge ${tribe.available ? "badge-open" : "badge-soon"}`}
-                style={tribe.available ? { background: TRIBE_COLOR_BY_SLUG[tribe.id] } : {}}
+                className="zone-card-badge badge-open"
+                style={{ background: TRIBE_COLOR_BY_SLUG[tribe.slug] }}
               >
-                {tribe.available ? "進入測驗" : "建置中，敬請期待"}
+                進入測驗
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </div>

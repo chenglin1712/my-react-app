@@ -17,6 +17,36 @@ const PHASE_ICONS = {
     證書: <Award className="w-4 h-4" />,
 };
 
+// phase -> 相關頁面網址，跟 PHASE_ICONS 同一種查表風格，取代原本的巢狀 ternary。
+const PHASE_ACTION_URLS = {
+    報名: 'https://exam.sce.ntnu.edu.tw/abst/signup/login.php',
+    成績: 'https://exam.sce.ntnu.edu.tw/abst/score_search.php',
+};
+
+// dismissedPhases 原本是一個扁平陣列，直接按 phase 名稱記錄「不再提醒」，
+// 沒有跟考試屆次（sessionName）綁定——這屆的「報名」勾了不再提醒後，明年的
+// 「報名」也會被永久跳過。改成用 sessionName 當 key 分開存，且原本
+// JSON.parse(localStorage.getItem(...)) 沒有 try/catch，localStorage 內容
+// 損毀（或存取被瀏覽器擋下）會讓整個首頁在 render 階段直接掛掉。
+const DISMISSED_PHASES_KEY = "dismissedExamPhasesBySession";
+
+function readDismissedPhasesBySession() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(DISMISSED_PHASES_KEY) ?? "{}");
+        return (parsed && typeof parsed === "object" && !Array.isArray(parsed)) ? parsed : {};
+    } catch {
+        return {};
+    }
+}
+
+function writeDismissedPhasesBySession(map) {
+    try {
+        localStorage.setItem(DISMISSED_PHASES_KEY, JSON.stringify(map));
+    } catch (err) {
+        console.error("儲存提醒偏好失敗：", err);
+    }
+}
+
 const DateReminder = () => {
     const [examSchedule, setExamSchedule] = useState([]);
     const [sessionName, setSessionName] = useState(null);
@@ -24,22 +54,21 @@ const DateReminder = () => {
     const [error, setError] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [toastList, setToastList] = useState([]);
-    const [dismissedPhases, setDismissedPhases] = useState(() => {
-        const stored = localStorage.getItem("dismissedPhases");
-        return stored ? JSON.parse(stored) : [];
-    });
+    const [dismissedPhasesBySession, setDismissedPhasesBySession] = useState(readDismissedPhasesBySession);
     const [doNotRemindMap, setDoNotRemindMap] = useState({});
     const notifiedRef = useRef({});
 
     // 考試時程改成向後端拿真實資料（爬官網日程表），取代原本寫死在前端、
     // 早就過期的假資料（見 backend/crawler/views.py 的 get_exam_schedule）。
     useEffect(() => {
+        let cancelled = false;
         fetch(`${import.meta.env.VITE_API_EXAM_SCHEDULE_URL}`)
             .then((res) => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return res.json();
             })
             .then((data) => {
+                if (cancelled) return;
                 const phases = (data.phases || []).map((p) => ({
                     phase: p.phase,
                     date: new Date(p.start_date),
@@ -50,10 +79,14 @@ const DateReminder = () => {
                 setSessionName(data.session || null);
             })
             .catch((err) => {
+                if (cancelled) return;
                 console.error("載入考試時程失敗：", err);
                 setError(true);
             })
-            .finally(() => setLoading(false));
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+        return () => { cancelled = true; };
     }, []);
 
     useEffect(() => {
@@ -63,31 +96,24 @@ const DateReminder = () => {
         return () => clearInterval(timer);
     }, []);
 
-    const isToday = (someDate) => {
-        const today = new Date();
-        return (
-            someDate.getFullYear() === today.getFullYear() &&
-            someDate.getMonth() === today.getMonth() &&
-            someDate.getDate() === today.getDate()
-        );
-    };
-
     useEffect(() => {
+        const isToday = (someDate) => (
+            someDate.getFullYear() === currentTime.getFullYear() &&
+            someDate.getMonth() === currentTime.getMonth() &&
+            someDate.getDate() === currentTime.getDate()
+        );
+        const dismissed = dismissedPhasesBySession[sessionName] || [];
         const newToasts = [];
 
         examSchedule.forEach(event => {
             if (
                 isToday(event.date) &&
                 !notifiedRef.current[event.phase] &&
-                !dismissedPhases.includes(event.phase)
+                !dismissed.includes(event.phase)
             ) {
                 newToasts.push({
                     phase: event.phase,
-                    url: event.phase === '報名'
-                        ? 'https://exam.sce.ntnu.edu.tw/abst/signup/login.php'
-                        : event.phase === '成績'
-                            ? 'https://exam.sce.ntnu.edu.tw/abst/score_search.php'
-                            : null
+                    url: PHASE_ACTION_URLS[event.phase] || null,
                 });
                 notifiedRef.current[event.phase] = true;
             }
@@ -96,7 +122,7 @@ const DateReminder = () => {
         if (newToasts.length > 0) {
             setToastList(prev => [...prev, ...newToasts]);
         }
-    }, [currentTime, dismissedPhases, examSchedule]);
+    }, [currentTime, dismissedPhasesBySession, sessionName, examSchedule]);
 
     const calculateDaysLeft = (targetDate) => {
         const difference = targetDate - currentTime;
@@ -114,9 +140,14 @@ const DateReminder = () => {
         setToastList(prev => prev.filter(toast => toast.phase !== phase));
 
         if (doNotRemindMap[phase]) {
-            const updated = [...dismissedPhases, phase];
-            setDismissedPhases(updated);
-            localStorage.setItem("dismissedPhases", JSON.stringify(updated));
+            setDismissedPhasesBySession(prev => {
+                const sessionDismissed = prev[sessionName] || [];
+                // 用 Set 去重：同一個 phase 的 toast 理論上只會關閉一次，但避免
+                // 意外重複 append 讓陣列越存越長。
+                const updated = { ...prev, [sessionName]: [...new Set([...sessionDismissed, phase])] };
+                writeDismissedPhasesBySession(updated);
+                return updated;
+            });
         }
 
         setDoNotRemindMap(prev => {
@@ -134,9 +165,9 @@ const DateReminder = () => {
     };
 
     const handleResetNotifications = () => {
-        localStorage.removeItem("dismissedPhases");
-        setDismissedPhases([]);
-        setToastList([]); 
+        localStorage.removeItem(DISMISSED_PHASES_KEY);
+        setDismissedPhasesBySession({});
+        setToastList([]);
         notifiedRef.current = {};
     };
 

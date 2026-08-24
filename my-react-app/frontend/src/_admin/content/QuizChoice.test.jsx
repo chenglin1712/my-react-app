@@ -124,6 +124,38 @@ describe('QuizChoice', () => {
     ).toBeInTheDocument();
   });
 
+  /** 回歸測試：useReviewableContentCrud 的 actionLockRef 是全域鎖，但
+   * ReviewActions 原本只用 busy={actionId === item.id} 判斷「這一列」要不要
+   * 顯示忙碌，其他列的按鈕看起來還能點，點下去卻被鎖靜默擋掉，使用者看不到
+   * 任何回饋。這裡驗證另一列的按鈕在鎖定期間真的會被 disabled。 */
+  test('某一列的操作進行中時，其他列的操作按鈕會被停用', async () => {
+    mockRole = 'reviewer';
+    const secondItem = {
+      ...choiceItem,
+      id: 22,
+      question_ab: '另一題',
+    };
+    mockApiGet({ results: [choiceItem, secondItem] });
+
+    let resolveApprove;
+    apiPost.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveApprove = resolve; }),
+    );
+
+    render(<QuizChoice />);
+
+    const firstRow = (await screen.findByText('O maan ko niyam?')).closest('tr');
+    const secondRow = screen.getByText('另一題').closest('tr');
+
+    fireEvent.click(within(firstRow).getByRole('button', { name: /^核准$/ }));
+
+    await waitFor(() => {
+      expect(within(secondRow).getByRole('button', { name: /^核准$/ })).toBeDisabled();
+    });
+
+    resolveApprove({});
+  });
+
   test('analyst 看不到任何操作按鈕', async () => {
     mockRole = 'analyst';
     render(<QuizChoice />);

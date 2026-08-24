@@ -1,6 +1,11 @@
 import "../../static/css/_game/game_result.css"
+import { useMemo } from "react";
 import { Alert } from "react-bootstrap";
 import { useFavorites } from "../../src/userServives/useFavorites";
+
+// 單字收藏統一存在 favorites 陣列裡 id === 1 的那個分類（跟 _search/index.jsx、
+// _camera/result.jsx 用的是同一個慣例，不是這裡另外發明的）。
+const WORD_FAVORITES_CATEGORY_ID = 1;
 
 const GameResultCard = ({ word, isCorrect, toggleFavorite, isFavorited }) => {
     return (
@@ -14,7 +19,7 @@ const GameResultCard = ({ word, isCorrect, toggleFavorite, isFavorited }) => {
                         <p className="user-answer">你的答案: {word.user_word || '無答案'}</p>
                         <p className="correct-answer">正確答案: {word.correct_word}</p>
                         <div className='result-likebtn'>
-                            <LikeButton isFavorited={isFavorited} onToggle={() => toggleFavorite(word.correct_word, 1)} />
+                            <LikeButton isFavorited={isFavorited} onToggle={() => toggleFavorite(word.correct_word, WORD_FAVORITES_CATEGORY_ID)} />
                         </div>
                     </div>
                 </div>
@@ -26,6 +31,7 @@ const GameResultCard = ({ word, isCorrect, toggleFavorite, isFavorited }) => {
 const LikeButton = ({ isFavorited, onToggle }) => {
     return (
         <button
+            type="button"
             onClick={onToggle}
             className='result-likebtn'
             aria-label={isFavorited ? "取消收藏" : "加入收藏"}
@@ -43,16 +49,19 @@ const LikeButton = ({ isFavorited, onToggle }) => {
 const Game_result = ({ results }) => {
     const { favorites, toggleFavorite, error: favoritesError } = useFavorites();
 
+    // word_details 來自後端，格式不如預期時用空陣列保底，不要讓整個結果頁掛掉。
+    const wordDetails = Array.isArray(results?.word_details) ? results.word_details : [];
+    const correctWords = wordDetails.filter(word => word.is_correct);
+    const incorrectWords = wordDetails.filter(word => !word.is_correct);
+
+    const favoritedWords = useMemo(() => {
+        const category = favorites.find(fav => fav.id === WORD_FAVORITES_CATEGORY_ID);
+        return new Set(category?.content || []);
+    }, [favorites]);
+
     if (!results) return null;
 
-    const { total_words, correct_words_count, word_details } = results;
-    const correctWords = word_details.filter(word => word.is_correct);
-    const incorrectWords = word_details.filter(word => !word.is_correct);
-
-    const getIsFavorited = (word) => {
-        const category1 = favorites.find(fav => fav.id === 1);
-        return category1 ? category1.content.includes(word) : false;
-    };
+    const { total_words, correct_words_count } = results;
 
     return (
         <div className='result-background'>
@@ -79,11 +88,11 @@ const Game_result = ({ results }) => {
                     {correctWords.length > 0 ? (
                         correctWords.map((word, index) => (
                             <GameResultCard
-                                key={index}
+                                key={`${word.correct_word}-${index}`}
                                 word={word}
                                 isCorrect={true}
                                 toggleFavorite={toggleFavorite}
-                                isFavorited={getIsFavorited(word.correct_word)}
+                                isFavorited={favoritedWords.has(word.correct_word)}
                             />
                         ))
                     ) : (
@@ -98,11 +107,11 @@ const Game_result = ({ results }) => {
                     {incorrectWords.length > 0 ? (
                         incorrectWords.map((word, index) => (
                             <GameResultCard
-                                key={index}
+                                key={`${word.correct_word}-${index}`}
                                 word={word}
                                 isCorrect={false}
                                 toggleFavorite={toggleFavorite}
-                                isFavorited={getIsFavorited(word.correct_word)}
+                                isFavorited={favoritedWords.has(word.correct_word)}
                             />
                         ))
                     ) : (

@@ -104,6 +104,34 @@ describe('useAdminListQuery 的最新請求優先', () => {
         expect(apiGet).not.toHaveBeenCalled();
     });
 
+    test('回歸測試：enabled 中途從 true 變成 false 時，還在跑的舊請求不能再把資料寫回來', async () => {
+        let resolveFirst;
+        apiGet.mockImplementationOnce(() => new Promise((r) => { resolveFirst = r; }));
+
+        const { result, rerender } = renderHook(
+            ({ enabled }) => useAdminListQuery({
+                endpoint: '/adminapi/things/',
+                initialFilters: {},
+                enabled,
+            }),
+            { initialProps: { enabled: true } },
+        );
+        await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(1));
+
+        // 權限被收回，enabled 變成 false——loading 應該立刻關掉
+        rerender({ enabled: false });
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        // 舊請求這時候才回來，不該再把 data 寫回去、也不該把 loading 打開
+        await act(async () => {
+            resolveFirst(page([{ id: 'STALE' }]));
+            await Promise.resolve();
+        });
+
+        expect(result.current.items).toEqual([]);
+        expect(result.current.loading).toBe(false);
+    });
+
     test('applyFilters 會立即套用條件並把頁碼歸 1', async () => {
         apiGet.mockResolvedValue(page([]));
         const { result } = renderHook(() => useAdminListQuery({

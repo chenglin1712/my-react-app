@@ -14,6 +14,10 @@ const TYPE_LABELS = {
   "word-match": "單字配對",
   "sentence-fill": "句子填空",
   "sentence-order": "句子排序",
+  // sentence-speak 目前沒有註冊在 QUESTION_COMPONENTS（後端也還不會產生這個
+  // 題型，見 quiz_recommon_question_renderer.jsx），這裡先補上標籤，避免
+  // 之後真的啟用時又漏掉。
+  "sentence-speak": "口說練習",
 };
 
 // 依這次測驗實際答對/答錯的題型分布，計算強項/弱項分析文字，
@@ -27,7 +31,7 @@ export function buildResultAnalysis(answers) {
   }
 
   const entries = Object.entries(stats).map(([type, { correct, total }]) => ({
-    label: TYPE_LABELS[type] || type,
+    label: TYPE_LABELS[type] || "其他題型",
     accuracy: total > 0 ? correct / total : 0,
   }));
 

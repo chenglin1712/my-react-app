@@ -12,6 +12,7 @@ const CameraLabelStep = lazy(() => import("./label"));
 const CameraResultStep = lazy(() => import("./result"));
 
 const STEP_LABELS = ["上傳圖片", "選擇單詞", "查詢結果"];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const StepLoading = () => (
     <div className="camera-step-loading d-flex justify-content-center py-5">
@@ -29,6 +30,9 @@ const CameraWizard = () => {
     const [errorMsg, setErrorMsg] = useState("");
     const [selectedWords, setSelectedWords] = useState([]);
     const fileInputRef = useRef(null);
+    // 快速選圖 A 再選圖 B、或選圖後立刻取消，A 的 FileReader 可能比較晚才讀完；
+    // 沒有這個 generation 的話，晚到的 onloadend 會把預覽蓋回已經不對的那張圖。
+    const fileReadGenerationRef = useRef(0);
 
     const handleImageChange = (event) => {
         const newFile = event.target.files.length > 0 ? event.target.files[0] : null;
@@ -36,19 +40,24 @@ const CameraWizard = () => {
             setFileName(file ? file.name : "請選擇圖片");
             return;
         }
-        if (newFile.size > 5 * 1024 * 1024) {
+        if (newFile.size > MAX_IMAGE_BYTES) {
             setErrorMsg("圖片不得超過 5 MB，請重新選擇。");
             return;
         }
         setErrorMsg("");
+        const myGeneration = ++fileReadGenerationRef.current;
         const reader = new FileReader();
-        reader.onloadend = () => setImage(reader.result);
+        reader.onloadend = () => {
+            if (myGeneration !== fileReadGenerationRef.current) return;
+            setImage(reader.result);
+        };
         reader.readAsDataURL(newFile);
         setFile(newFile);
         setFileName(newFile.name);
     };
 
     const handleCancel = () => {
+        fileReadGenerationRef.current += 1; // 還沒讀完的舊 FileReader 不再更新預覽
         setImage(null);
         setFile(null);
         setInputKey(Date.now());
@@ -88,13 +97,7 @@ const CameraWizard = () => {
             <section className="camera-body">
                 {step === 1 && (
                     <div className="yy-fade-up camera-step1">
-                        <div
-                            className="camera-dropzone"
-                            role="button"
-                            tabIndex={0}
-                            onClick={handlePreviewClick}
-                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handlePreviewClick(); } }}
-                        >
+                        <label htmlFor="camera-file-input" className="camera-dropzone">
                             {image ? (
                                 <img src={image} alt="預覽圖片" className="camera-dropzone-img" />
                             ) : (
@@ -103,7 +106,7 @@ const CameraWizard = () => {
                                     <span>點此選擇圖片</span>
                                 </div>
                             )}
-                        </div>
+                        </label>
 
                         <div className="camera-step1-panel">
                             <div className="yy-card camera-step1-card">
@@ -112,6 +115,7 @@ const CameraWizard = () => {
                                     <span className="camera-filename">{fileName}</span>
                                 </div>
                                 <input
+                                    id="camera-file-input"
                                     key={inputKey}
                                     type="file"
                                     accept="image/*"
@@ -122,7 +126,7 @@ const CameraWizard = () => {
                                     aria-label="選擇圖片檔案"
                                 />
                                 {errorMsg && <Alert variant="danger" className="py-2 mt-2 mb-0">{errorMsg}</Alert>}
-                                <p className="camera-hint">支援 JPG / PNG，檔案大小上限 5MB。</p>
+                                <p className="camera-hint">支援常見圖片格式，檔案大小上限 5MB。</p>
                             </div>
                             <div className="camera-step1-actions">
                                 <button type="button" className="yy-btn-primary" disabled={!image} onClick={() => setStep(2)}>提交辨識 ▸</button>

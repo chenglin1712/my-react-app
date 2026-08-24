@@ -1,4 +1,6 @@
-export default function ResultScreen({ avg, avgRating, answers, ratingOf, onBack, onRestart }) {
+import { Link } from "react-router-dom";
+
+export default function ResultScreen({ avg, avgRating, answers, thresholds, getRating, backTo, onRestart }) {
   return (
     <div className="pron-result">
       <h2 className="pron-result-title">發音練習結果</h2>
@@ -11,9 +13,9 @@ export default function ResultScreen({ avg, avgRating, answers, ratingOf, onBack
 
       <div className="pron-result-list">
         {answers.map((a, i) => {
-          const r = ratingOf(a.score);
+          const r = getRating(a.score, thresholds);
           return (
-            <div key={i} className={`pron-result-row ${r.cls}`}>
+            <div key={`${a.word}-${i}`} className={`pron-result-row ${r.cls}`}>
               <span className="pron-result-word">{a.word}</span>
               <span className="pron-result-meaning">{a.meaning}</span>
               <span className={`pron-result-tag ${r.cls}`}>
@@ -26,10 +28,10 @@ export default function ResultScreen({ avg, avgRating, answers, ratingOf, onBack
       <p className="pron-result-hint">✦ 表示有真人音檔參與比對</p>
 
       <div className="pron-result-actions">
-        <button className="pron-btn-secondary" onClick={onBack}>
+        <Link className="pron-btn-secondary" to={backTo}>
           ← 返回遊戲頁面
-        </button>
-        <button className="pron-btn-primary" onClick={onRestart}>
+        </Link>
+        <button type="button" className="pron-btn-primary" onClick={onRestart}>
           再練一次
         </button>
       </div>

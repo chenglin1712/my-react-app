@@ -1,61 +1,21 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { RectangleEllipsis, Volume2, Check, CircleCheck, CircleX } from "lucide-react";
 import { FaPlayCircle } from 'react-icons/fa';
-import lottie from "lottie-web";
 import successAnimation from "../../src/animations/success.json";
-import { createAuthorizedAudio } from "../../utils/authAudio";
+import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
+import { useLottieAnimation } from "../../hooks/useLottieAnimation";
 import { playCorrectSound } from "../../utils/correctSound";
 
 export default function SentenceFill({ question, selected, checked, onSelect, onConfirm }) {
   const [result, setResult] = useState("");
   const [showAnimation, setShowAnimation] = useState(false);
-  const animation = useRef(null);
-  const audioRef = useRef(null);
-
-  // ✅ 成功動畫設定
-  useEffect(() => {
-    if (result === "correct" && showAnimation) {
-      const instance = lottie.loadAnimation({
-        container: animation.current,
-        renderer: "svg",
-        loop: false, // ✅ 播一次
-        autoplay: true,
-        animationData: successAnimation,
-      });
-
-      // ✅ 動畫結束後自動隱藏
-      instance.addEventListener("complete", () => {
-        setShowAnimation(false);
-      });
-
-      return () => instance.destroy();
-    }
-  }, [result, showAnimation]);
-
-    const playAudio = async (fileId) => {
-    if (!fileId) return;
-
-
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      // pause() 不會觸發 authAudio.js 內建的 ended/error revoke，手動切換/
-      // 停止播放要自己呼叫，不然每切一次語音就洩漏一個 blob URL。
-      audioRef.current.revokeObjectUrl?.();
-    }
-
-
-    const proxyUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL + fileId;
-    let newAudio;
-    try {
-      newAudio = await createAuthorizedAudio(proxyUrl);
-    } catch {
-      return;
-    }
-
-    newAudio.play().catch(() => {});
-    audioRef.current = newAudio;
-  };
+  const { playAudio, stopAudio } = useAuthorizedAudioPlayback();
+  const animationRef = useLottieAnimation({
+    animationData: successAnimation,
+    enabled: showAnimation,
+    loop: false,
+    onComplete: () => setShowAnimation(false),
+  });
 
   const handleSelect = (word) => {
     const newSelection = selected === word ? null : word;
@@ -63,26 +23,21 @@ export default function SentenceFill({ question, selected, checked, onSelect, on
   };
 
   const handleConfirm = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current.revokeObjectUrl?.();
-    }
+    stopAudio();
     const isCorrect = selected === question.answer;
     setResult(isCorrect ? "correct" : "wrong");
     onSelect?.({
       result: isCorrect,
-      userAnswer: selected, 
-      correctAnswer:  question.answer, 
-      question: question.tayal.sentence, 
-      answer: question.options
-    })
-      onConfirm?.(true);
+      userAnswer: selected,
+      correctAnswer: question.answer,
+      question: question.tayal.sentence,
+      answer: question.options,
+    });
+    onConfirm?.(true);
     if (isCorrect) {
-    playCorrectSound();
-    setShowAnimation(true);
-  }
-  
+      playCorrectSound();
+      setShowAnimation(true);
+    }
   };
 
   const getOptionClass = (word) => {
@@ -94,47 +49,48 @@ export default function SentenceFill({ question, selected, checked, onSelect, on
 
   return (
     <div className="text-center" style={{ minHeight: "400px" }}>
-      <h5 className="fw-bolder mb-4" style={{ display: 'flex', alignItems: 'center', justifyContent: "center"  }}>
+      <h5 className="fw-bolder mb-4" style={{ display: 'flex', alignItems: 'center', justifyContent: "center" }}>
         <RectangleEllipsis />&nbsp; 句子填空
       </h5>
-      <h2 className="fw-bolder mb-4 " style={question.tayal.audio ? { cursor: "pointer" } : undefined} onClick={() => {if(question.tayal.audio) playAudio(question.tayal.audio);}}>
-                {question.tayal.sentence}
-                {question.tayal.audio && (
-                  <span>
-                  &nbsp; 
-                  <FaPlayCircle size={20} className="text-warning" />
-                  </span>
-                )} 
+      <h2 className="fw-bolder mb-4" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+        {question.tayal.sentence}
+        {question.tayal.audio && (
+          <button
+            type="button"
+            className="quiz-audio-btn"
+            onClick={() => playAudio(question.tayal.audio)}
+            aria-label="播放句子語音"
+          >
+            <FaPlayCircle size={20} className="text-warning" />
+          </button>
+        )}
       </h2>
-  
-      
 
       <div className="options-list">
         {question.options.map((opt) => (
           <button
+            type="button"
             key={opt.word}
-            onClick={(e) => {!checked && handleSelect(opt.word);
+            onClick={(e) => {
+              if (!checked) handleSelect(opt.word);
               e.stopPropagation();
-                  playAudio(opt.audio);
+              playAudio(opt.audio);
             }}
             className={`custom-btn ${getOptionClass(opt.word)}`}
           >
             {opt.word}
-            {opt.audio&&(
-            <span className="cursor-pointer text-sm">
-              &nbsp;
-              <Volume2
-                size={15}
-                className="inline ml-1"
-              />
-            </span>
+            {opt.audio && (
+              <span className="cursor-pointer text-sm">
+                &nbsp;
+                <Volume2 size={15} className="inline ml-1" />
+              </span>
             )}
           </button>
         ))}
       </div>
 
       {!checked ? (
-        <button onClick={handleConfirm} className="confirm-btn" disabled={!selected} >
+        <button type="button" onClick={handleConfirm} className="confirm-btn" disabled={!selected}>
           <Check />&nbsp;確認
         </button>
       ) : (
@@ -150,11 +106,11 @@ export default function SentenceFill({ question, selected, checked, onSelect, on
         </>
       )}
 
-      {/* ✅ 成功動畫 Overlay */}
+      {/* 成功動畫 Overlay */}
       {showAnimation && (
         <div className="overlay">
           <div className="animation-container">
-            <div ref={animation} />
+            <div ref={animationRef} />
             <p>答案正確！</p>
           </div>
         </div>

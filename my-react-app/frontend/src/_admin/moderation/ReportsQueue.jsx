@@ -20,11 +20,11 @@ import { useAuth } from '../../userServives/authContext';
 import { TRIBE_NAME_BY_SLUG } from '../../constants/tribes';
 import { apiPost } from '../../../utils/apiClient';
 import { useAdminListQuery } from '../hooks/useAdminListQuery';
+import { useActionLock } from '../hooks/useActionLock';
+import { ACCOUNT_MANAGERS, STAFF_ROLES } from '../constants/roles';
 import ReviewPagination from '../reviewWorkflow/ReviewPagination';
+import { stripHtml } from './notePreviewText';
 import '../../../static/css/_admin/moderation.css';
-
-const STAFF_ROLES = ['owner', 'admin', 'editor', 'reviewer', 'analyst'];
-const ACCOUNT_MANAGERS = ['owner', 'admin'];
 
 const REASONS = {
     inappropriate: '不當內容',
@@ -39,17 +39,15 @@ const STATUSES = {
     dismissed: { label: '已駁回', bg: 'secondary' },
 };
 
+// path：pending 檢舉的「查看內容」連結目的地。未知類型故意不給 path，
+// 呈現層看到沒有 path 就不顯示連結——比預設導去筆記頁面安全，新增第三種
+// target_type 時不會被誤導到錯的審核頁。
 const TARGET_TYPES = {
-    note: { label: '分享筆記', bg: 'primary' },
-    recording: { label: '發音錄音', bg: 'info' },
+    note: { label: '分享筆記', bg: 'primary', path: '/admin/moderation/notes' },
+    recording: { label: '發音錄音', bg: 'info', path: '/admin/moderation/recordings' },
 };
 
 const PAGE_SIZE = 20;
-
-// preview 是筆記內文的原始 HTML（見 noteService.jsx），跟 noteshare.jsx／
-// SharedNotesModeration.jsx 同一種處理方式：不用 dangerouslySetInnerHTML
-// 呈現，但也要把標籤拿掉才不會顯示一堆 <span style="...">。
-const stripHtml = (value) => (value || '').replace(/<[^>]+>/g, ' ').trim();
 
 function TargetSummary({ report }) {
     const summary = report.target_summary;
@@ -69,16 +67,22 @@ function TargetSummary({ report }) {
         );
     }
 
-    return (
-        <div className="moderation-summary">
-            <strong>{summary.word || '—'}</strong>
-            <small>
-                族語：{TRIBE_NAME_BY_SLUG[summary.tribe] ?? summary.tribe ?? '—'}
-                {' · '}
-                分數：{summary.score ?? '—'}
-            </small>
-        </div>
-    );
+    if (report.target_type === 'recording') {
+        return (
+            <div className="moderation-summary">
+                <strong>{summary.word || '—'}</strong>
+                <small>
+                    族語：{TRIBE_NAME_BY_SLUG[summary.tribe] ?? summary.tribe ?? '—'}
+                    {' · '}
+                    分數：{summary.score ?? '—'}
+                </small>
+            </div>
+        );
+    }
+
+    // 目前後端只會回 note／recording 兩種類型；未知類型不硬套其中一種的
+    // 欄位形狀（那樣會顯示錯誤或無意義的資料），改顯示安全的通用文字。
+    return <span className="moderation-missing-target">未知的內容類型</span>;
 }
 
 export default function ReportsQueue() {
@@ -100,7 +104,8 @@ export default function ReportsQueue() {
     const [success, setSuccess] = useState('');
     const [actionTarget, setActionTarget] = useState(null);
     const [resolutionNote, setResolutionNote] = useState('');
-    const [submitting, setSubmitting] = useState(false);
+    const submitLock = useActionLock();
+    const submitting = submitLock.isLocked;
 
     const openActionModal = (report, action) => {
         setActionTarget({ report, action });
@@ -114,34 +119,33 @@ export default function ReportsQueue() {
         setResolutionNote('');
     };
 
-    const submitAction = async () => {
+    const submitAction = () => {
         if (!actionTarget) return;
 
         const { report, action } = actionTarget;
 
-        setSubmitting(true);
-        setError('');
-        setSuccess('');
+        submitLock.runLocked('submit', async () => {
+            setError('');
+            setSuccess('');
 
-        try {
-            await apiPost(
-                `/adminapi/reports/${report.id}/${action}/`,
-                { resolution_note: resolutionNote.trim() },
-            );
+            try {
+                await apiPost(
+                    `/adminapi/reports/${report.id}/${action}/`,
+                    { resolution_note: resolutionNote.trim() },
+                );
 
-            setSuccess(
-                action === 'resolve'
-                    ? '檢舉已核結'
-                    : '檢舉已駁回',
-            );
-            setActionTarget(null);
-            setResolutionNote('');
-            await loadReports();
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setSubmitting(false);
-        }
+                setSuccess(
+                    action === 'resolve'
+                        ? '檢舉已核結'
+                        : '檢舉已駁回',
+                );
+                setActionTarget(null);
+                setResolutionNote('');
+                await loadReports();
+            } catch (err) {
+                setError(err.message);
+            }
+        });
     };
 
     const modalIsResolve = actionTarget?.action === 'resolve';
@@ -258,11 +262,7 @@ export default function ReportsQueue() {
                                             label: report.status,
                                             bg: 'secondary',
                                         };
-                                        const targetPath = (
-                                            report.target_type === 'recording'
-                                                ? '/admin/moderation/recordings'
-                                                : '/admin/moderation/notes'
-                                        );
+                                        const targetPath = TARGET_TYPES[report.target_type]?.path;
 
                                         return (
                                             <tr key={report.id}>
@@ -307,15 +307,17 @@ export default function ReportsQueue() {
                                                 </td>
                                                 <td>
                                                     <div className="moderation-row-actions">
-                                                        <Button
-                                                            as={Link}
-                                                            to={targetPath}
-                                                            size="sm"
-                                                            variant="outline-secondary"
-                                                        >
-                                                            <ExternalLink size={14} />
-                                                            查看內容
-                                                        </Button>
+                                                        {targetPath && (
+                                                            <Button
+                                                                as={Link}
+                                                                to={targetPath}
+                                                                size="sm"
+                                                                variant="outline-secondary"
+                                                            >
+                                                                <ExternalLink size={14} />
+                                                                查看內容
+                                                            </Button>
+                                                        )}
 
                                                         {canManage
                                                             && report.status
@@ -385,6 +387,8 @@ export default function ReportsQueue() {
                 show={Boolean(actionTarget)}
                 onHide={closeActionModal}
                 centered
+                backdrop={submitting ? 'static' : true}
+                keyboard={!submitting}
             >
                 <Modal.Header closeButton={!submitting}>
                     <Modal.Title>

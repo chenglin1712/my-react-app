@@ -18,6 +18,13 @@ function renderLayout({ initialEntries = ['/admin'], pendingAnnouncementCount } 
           <Route path="analytics/search" element={<div>SEARCH_ANALYTICS_CONTENT</div>} />
           <Route path="analytics/quiz-quality" element={<div>QUIZ_QUALITY_CONTENT</div>} />
           <Route path="analytics/retention" element={<div>RETENTION_CONTENT</div>} />
+          <Route path="dictionary/words" element={<div>WORDS_CONTENT</div>} />
+          <Route path="dictionary/words/new" element={<div>WORD_NEW_CONTENT</div>} />
+          <Route path="dictionary/grammar" element={<div>GRAMMAR_CONTENT</div>} />
+          <Route path="dictionary/taxonomies" element={<div>TAXONOMIES_CONTENT</div>} />
+          <Route path="dictionary/import" element={<div>IMPORT_CONTENT</div>} />
+          <Route path="users/new" element={<div>USER_NEW_CONTENT</div>} />
+          <Route path="users/:uid" element={<div>USER_DETAIL_CONTENT</div>} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -121,5 +128,47 @@ describe('AdminLayout', () => {
     const breadcrumb = screen.getByLabelText('麵包屑');
     expect(within(breadcrumb).getByText('分析')).toBeInTheDocument();
     expect(within(breadcrumb).getByText('留存分析')).toBeInTheDocument();
+  });
+
+  /** 回歸測試：辭典大類（詞條／語法／主檔／批次匯入）上線時，NAV_GROUPS
+   * 有更新但 getBreadcrumb() 自己另一份手動清單沒有跟著加，這幾頁的麵包屑
+   * 會直接退回顯示網址最後一段的英文（例如 words、grammar）。改成從
+   * NAV_GROUPS 動態算出來之後，這幾頁不用手動加也會自動正確。 */
+  describe('回歸測試：辭典大類的麵包屑（原本完全沒有對應規則）', () => {
+    test('詞條列表頁的麵包屑正確，不會退回顯示網址片段', () => {
+      renderLayout({ initialEntries: ['/admin/dictionary/words'] });
+      const breadcrumb = screen.getByLabelText('麵包屑');
+      expect(within(breadcrumb).getByText('辭典')).toBeInTheDocument();
+      expect(within(breadcrumb).getByText('詞條')).toBeInTheDocument();
+      expect(within(breadcrumb).queryByText('words')).not.toBeInTheDocument();
+    });
+
+    test('語法／主檔／批次匯入頁的麵包屑也都正確', () => {
+      const grammar = renderLayout({ initialEntries: ['/admin/dictionary/grammar'] });
+      expect(within(screen.getByLabelText('麵包屑')).getByText('語法')).toBeInTheDocument();
+      grammar.unmount();
+
+      const taxonomies = renderLayout({ initialEntries: ['/admin/dictionary/taxonomies'] });
+      expect(within(screen.getByLabelText('麵包屑')).getByText('主檔')).toBeInTheDocument();
+      taxonomies.unmount();
+
+      renderLayout({ initialEntries: ['/admin/dictionary/import'] });
+      expect(within(screen.getByLabelText('麵包屑')).getByText('批次匯入／匯出')).toBeInTheDocument();
+    });
+  });
+
+  /** 回歸測試：/admin/users/new 原本被 startsWith('/admin/users/') 誤判成
+   * 「詳情」，其實是新增使用者，跟 /admin/users/{uid} 應該顯示不同的麵包屑。 */
+  test('回歸測試：新增使用者頁的麵包屑顯示「新增」，不是「詳情」', () => {
+    renderLayout({ initialEntries: ['/admin/users/new'] });
+    const breadcrumb = screen.getByLabelText('麵包屑');
+    expect(within(breadcrumb).getByText('新增')).toBeInTheDocument();
+    expect(within(breadcrumb).queryByText('詳情')).not.toBeInTheDocument();
+  });
+
+  test('使用者詳情頁（真的 uid）的麵包屑仍然顯示「詳情」', () => {
+    renderLayout({ initialEntries: ['/admin/users/abc123'] });
+    const breadcrumb = screen.getByLabelText('麵包屑');
+    expect(within(breadcrumb).getByText('詳情')).toBeInTheDocument();
   });
 });

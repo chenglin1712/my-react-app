@@ -80,6 +80,12 @@ body {
   white-space: pre-wrap;
 }
 
+/* ---- 分享頁面選擇：已選/上限提示 ---- */
+.ns-select-hint {
+  font-size: .8rem;
+  color: #777;
+}
+
 /* ---- RWD ---- */
 @media (max-width: 768px) {
   .fullscreen-notebook {

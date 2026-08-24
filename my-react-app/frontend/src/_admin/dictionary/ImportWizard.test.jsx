@@ -6,6 +6,7 @@ import {
     vi,
 } from 'vitest';
 import {
+    act,
     fireEvent,
     render,
     screen,
@@ -150,6 +151,53 @@ describe('ImportWizard', () => {
         expect(await screen.findByText('檔案不是有效的 JSON')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '上傳' })).toBeDisabled();
         expect(uploadImportJob).not.toHaveBeenCalled();
+    });
+
+    test('回歸測試：快速換選兩個檔案時，較晚完成的 FileReader 不會蓋掉後選檔案的內容', async () => {
+        class FakeFileReader {
+            readAsText(file) {
+                this.file = file;
+                FakeFileReader.pending.push(this);
+            }
+
+            finish(content) {
+                this.result = content;
+                this.onload?.();
+            }
+        }
+        FakeFileReader.pending = [];
+
+        const OriginalFileReader = window.FileReader;
+        window.FileReader = FakeFileReader;
+
+        try {
+            uploadImportJob.mockResolvedValue({ id: 42, row_errors: {} });
+
+            renderWizard();
+            await screen.findByText('步驟一：上傳檔案');
+
+            const fileA = new File(['{"tribe":"a"}'], 'a.json', { type: 'application/json' });
+            const fileB = new File(['{"tribe":"b"}'], 'b.json', { type: 'application/json' });
+
+            const input = screen.getByLabelText('JSON 匯入檔案');
+            fireEvent.change(input, { target: { files: [fileA] } });
+            fireEvent.change(input, { target: { files: [fileB] } });
+
+            expect(FakeFileReader.pending).toHaveLength(2);
+            const [readerA, readerB] = FakeFileReader.pending;
+
+            // 後選的 B 先完成，先選、已經不是目前選取檔案的 A 比較晚完成。
+            await act(async () => { readerB.finish('{"tribe":"b"}'); });
+            await act(async () => { readerA.finish('{"tribe":"a"}'); });
+
+            fireEvent.click(screen.getByRole('button', { name: '上傳' }));
+
+            await waitFor(() => {
+                expect(uploadImportJob).toHaveBeenCalledWith('b.json', { tribe: 'b' });
+            });
+        } finally {
+            window.FileReader = OriginalFileReader;
+        }
     });
 
     test('有效 JSON 上傳時傳送解析後物件並導向工作頁', async () => {

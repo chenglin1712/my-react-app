@@ -106,18 +106,18 @@ export default function ScenarioQuiz({ tribe = 'tayal' }) {
 
     if (loading) {
         return (
-            <main className="scenario-quiz-page">
+            <div className="scenario-quiz-page">
                 <div className="scenario-quiz-loading">
                     <Spinner animation="border" variant="danger" />
                     <span>正在準備情境題…</span>
                 </div>
-            </main>
+            </div>
         );
     }
 
     if (error) {
         return (
-            <main className="scenario-quiz-page">
+            <div className="scenario-quiz-page">
                 <section className="scenario-quiz-state-card">
                     <Alert variant="danger">{error}</Alert>
                     <div className="scenario-quiz-state-actions">
@@ -131,13 +131,13 @@ export default function ScenarioQuiz({ tribe = 'tayal' }) {
                         </Button>
                     </div>
                 </section>
-            </main>
+            </div>
         );
     }
 
     if (questions.length === 0) {
         return (
-            <main className="scenario-quiz-page">
+            <div className="scenario-quiz-page">
                 <section className="scenario-quiz-state-card">
                     <h2>目前沒有可練習的情境題</h2>
                     <p>此族語尚未有審核通過的題目，請稍後再試。</p>
@@ -152,13 +152,13 @@ export default function ScenarioQuiz({ tribe = 'tayal' }) {
                         </Button>
                     </div>
                 </section>
-            </main>
+            </div>
         );
     }
 
     if (finished) {
         return (
-            <main className="scenario-quiz-page">
+            <div className="scenario-quiz-page">
                 <section className="scenario-quiz-summary">
                     <div className="scenario-quiz-summary-icon">
                         <CheckCircle2 size={42} aria-hidden="true" />
@@ -185,12 +185,12 @@ export default function ScenarioQuiz({ tribe = 'tayal' }) {
                         </Button>
                     </div>
                 </section>
-            </main>
+            </div>
         );
     }
 
     return (
-        <main className="scenario-quiz-page">
+        <div className="scenario-quiz-page">
             <div className="scenario-quiz-heading">
                 <div>
                     <p className="scenario-quiz-eyebrow">
@@ -331,6 +331,6 @@ export default function ScenarioQuiz({ tribe = 'tayal' }) {
                     </Button>
                 </div>
             </section>
-        </main>
+        </div>
     );
 }

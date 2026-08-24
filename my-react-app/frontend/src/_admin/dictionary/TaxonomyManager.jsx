@@ -271,6 +271,7 @@ export default function TaxonomyManager() {
                                                 {isEditing ? (
                                                     <>
                                                         <Button
+                                                            type="button"
                                                             size="sm"
                                                             variant="outline-primary"
                                                             disabled={savingEdit}
@@ -281,6 +282,7 @@ export default function TaxonomyManager() {
                                                                 : '儲存'}
                                                         </Button>
                                                         <Button
+                                                            type="button"
                                                             size="sm"
                                                             variant="outline-secondary"
                                                             disabled={savingEdit}
@@ -291,6 +293,7 @@ export default function TaxonomyManager() {
                                                     </>
                                                 ) : canEdit && (
                                                     <Button
+                                                        type="button"
                                                         size="sm"
                                                         variant="outline-secondary"
                                                         onClick={() => startEdit(row)}
@@ -302,6 +305,7 @@ export default function TaxonomyManager() {
 
                                                 {canMerge && (
                                                     <Button
+                                                        type="button"
                                                         size="sm"
                                                         variant="outline-primary"
                                                         onClick={() => setMergeSource(row)}
@@ -313,6 +317,7 @@ export default function TaxonomyManager() {
 
                                                 {canEdit && (
                                                     <Button
+                                                        type="button"
                                                         size="sm"
                                                         variant="outline-danger"
                                                         aria-label={`刪除${label}`}

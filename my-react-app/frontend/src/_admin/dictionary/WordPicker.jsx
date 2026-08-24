@@ -26,7 +26,19 @@ export default function WordPicker({
     const [error, setError] = useState('');
     const [open, setOpen] = useState(false);
 
+    // changeQuery() 在使用者修改已選詞條的顯示文字時，會呼叫
+    // onSelect({ word_id: null, ... }) 清掉上層的選取狀態——上層重新渲染
+    // 後 wordId/wordName 這兩個 prop 會變成 null，觸發下面這個「wordId/
+    // wordName 被外部改變時同步 query」的 effect，把使用者剛打的字直接
+    // 蓋掉。這個 ref 讓 changeQuery 觸發的那一次同步被跳過一次，只有真的
+    // 由外部（上層／其他元件）改變選取時才需要同步 query。
+    const suppressNextSyncRef = useRef(false);
+
     useEffect(() => {
+        if (suppressNextSyncRef.current) {
+            suppressNextSyncRef.current = false;
+            return;
+        }
         setQuery(wordName || '');
     }, [wordId, wordName]);
 
@@ -114,6 +126,7 @@ export default function WordPicker({
          * 留在 payload，否則畫面顯示 A、實際卻仍連到 B。
          */
         if (wordId) {
+            suppressNextSyncRef.current = true;
             onSelect({
                 word_id: null,
                 word_name: null,
@@ -186,13 +199,18 @@ export default function WordPicker({
                                 aria-selected={word.id === wordId}
                                 className="dictionary-word-picker-option"
                                 /*
-                                 * 用 onMouseDown 可在輸入框 blur 前完成選取，
-                                 * 避免候選清單先關閉而吞掉 click。
+                                 * mousedown 只 preventDefault，不在這裡選取：
+                                 * 目的是在輸入框 blur 前先擋掉預設的焦點轉移，
+                                 * 讓候選清單不會在 click 觸發前就被關掉。真正
+                                 * 的選取交給 onClick——這樣滑鼠點擊跟鍵盤
+                                 * Enter/Space 觸發的合成 click 都能選到詞條；
+                                 * 如果選取邏輯放在 onMouseDown 裡，滑鼠點擊會
+                                 * 因為 mousedown 後接著觸發的 click 而選取兩次，
+                                 * 鍵盤操作則完全選不到（鍵盤啟用按鈕不會先發出
+                                 * mousedown）。
                                  */
-                                onMouseDown={(event) => {
-                                    event.preventDefault();
-                                    chooseWord(word);
-                                }}
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => chooseWord(word)}
                             >
                                 <strong>{word.name}</strong>
                                 {word.dialect && <span>{word.dialect}</span>}

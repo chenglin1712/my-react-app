@@ -6,13 +6,14 @@ import {
   vi,
 } from 'vitest';
 import {
+  act,
   fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import UserDetail from './UserDetail';
 import {
   apiGet,
@@ -58,6 +59,23 @@ const user = {
   },
 };
 
+const secondUser = {
+  uid: 'xyz789',
+  email: 'second@example.com',
+  email_verified: true,
+  disabled: false,
+  role: null,
+  name: '第二位使用者',
+  identity: '教師',
+  avatar_url: null,
+  join_date: '2026-02-01T00:00:00.000Z',
+  created_at: 1700000200000,
+  last_sign_in_at: 1700000201000,
+  provider_ids: ['password'],
+  firestore: {},
+  content_counts: {},
+};
+
 let detailUser;
 
 function renderPage() {
@@ -73,10 +91,31 @@ function renderPage() {
   );
 }
 
+// 用來重現「同一個路由元件在兩個 uid 之間切換」的情境（React Router 不會
+// 因為 :uid 參數改變就重新掛載元件）——UserList.jsx 點「詳情」進到別的
+// 使用者，本質上就是同一種切換，這裡直接放兩個連結方便測試操控時機。
+function renderSwitchable() {
+  return render(
+    <MemoryRouter initialEntries={['/admin/users/abc123']}>
+      <Link to="/admin/users/xyz789">切到另一位使用者</Link>
+      <Routes>
+        <Route
+          path="/admin/users/:uid"
+          element={<UserDetail />}
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 function mockDetailApi() {
   apiGet.mockImplementation((url) => {
     if (url === '/adminapi/users/abc123/') {
       return Promise.resolve(detailUser);
+    }
+
+    if (url === '/adminapi/users/xyz789/') {
+      return Promise.resolve(secondUser);
     }
 
     if (url === '/adminapi/users/abc123/export/') {
@@ -288,7 +327,7 @@ describe('UserDetail', () => {
     );
 
     expect(
-      await screen.findByText('圖片不得超過 5 MB，請重新選擇。'),
+      await screen.findByText('檔案不得超過 5 MB，請重新選擇。'),
     ).toBeInTheDocument();
     expect(
       within(modal).queryByText('頭像上傳中……'),
@@ -758,5 +797,113 @@ describe('UserDetail', () => {
     expect(
       screen.queryByRole('button', { name: '刪除帳號' }),
     ).not.toBeInTheDocument();
+  });
+
+  test('切換到另一位使用者後，前一位晚到的載入結果不會蓋掉畫面', async () => {
+    let resolveFirst;
+    apiGet.mockImplementation((url) => {
+      if (url === '/adminapi/users/abc123/') {
+        return new Promise((resolve) => { resolveFirst = resolve; });
+      }
+      if (url === '/adminapi/users/xyz789/') {
+        return Promise.resolve(secondUser);
+      }
+      return Promise.reject(new Error(`unexpected url: ${url}`));
+    });
+
+    renderSwitchable();
+
+    // abc123 都還沒回來就切到 xyz789。
+    fireEvent.click(screen.getByText('切到另一位使用者'));
+
+    expect(await screen.findByText('第二位使用者')).toBeInTheDocument();
+
+    // abc123 這時候才姍姍來遲。
+    resolveFirst(detailUser);
+    await waitFor(() => {
+      expect(screen.getByText('第二位使用者')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('王小明')).not.toBeInTheDocument();
+  });
+
+  test('刪除帳號後切到另一位使用者，不會停在前一位的刪除結果畫面', async () => {
+    apiPost.mockResolvedValueOnce({
+      uid: 'abc123',
+      results: {
+        shared_notes: { deleted: 1 },
+        pronunciations: { deleted: 0 },
+        firestore_user_document: { deleted: true },
+        firebase_auth: { deleted: true },
+      },
+    });
+
+    renderSwitchable();
+    await screen.findByText('王小明');
+
+    fireEvent.click(screen.getByRole('button', { name: '刪除帳號' }));
+    const modal = await screen.findByRole('dialog');
+    fireEvent.change(
+      within(modal).getByLabelText('輸入帳號 Email 以確認刪除'),
+      { target: { value: 'user@example.com' } },
+    );
+    fireEvent.click(within(modal).getByRole('button', { name: '確認刪除' }));
+
+    expect(await screen.findByText('帳號刪除結果')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('切到另一位使用者'));
+
+    expect(await screen.findByText('第二位使用者')).toBeInTheDocument();
+    expect(screen.queryByText('帳號刪除結果')).not.toBeInTheDocument();
+  });
+
+  test('編輯資料 Modal 開著時切換使用者，Modal 會關閉且不送出 PATCH', async () => {
+    renderSwitchable();
+    await screen.findByText('王小明');
+
+    fireEvent.click(screen.getByRole('button', { name: '編輯' }));
+    await screen.findByRole('dialog');
+
+    fireEvent.click(screen.getByText('切到另一位使用者'));
+
+    expect(await screen.findByText('第二位使用者')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(apiPatch).not.toHaveBeenCalled();
+  });
+
+  test('儲存資料進行中就切換使用者，稍後才回來的結果不會覆蓋新使用者畫面', async () => {
+    let resolvePatch;
+    apiPatch.mockImplementation(() => new Promise((resolve) => { resolvePatch = resolve; }));
+
+    renderSwitchable();
+    await screen.findByText('王小明');
+
+    fireEvent.click(screen.getByRole('button', { name: '編輯' }));
+    const modal = await screen.findByRole('dialog');
+    fireEvent.click(within(modal).getByRole('button', { name: '儲存' }));
+
+    // PATCH 還沒回來就切換使用者：Modal 因此關閉，但送出去的請求仍在飛。
+    fireEvent.click(screen.getByText('切到另一位使用者'));
+    expect(await screen.findByText('第二位使用者')).toBeInTheDocument();
+
+    const callsBeforeResolve = apiGet.mock.calls.filter(
+      ([url]) => url === '/adminapi/users/abc123/',
+    ).length;
+
+    // abc123 的儲存這時候才回來——完整跑完儲存成功後接著重新載入的那條鏈。
+    await act(async () => {
+      resolvePatch({ ...user, name: '王小明（已修改）' });
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // 已經切換掉的使用者，儲存完成不該再幫它重新發出載入請求，畫面也要
+    // 還停在現在正在看的使用者身上。
+    const callsAfterResolve = apiGet.mock.calls.filter(
+      ([url]) => url === '/adminapi/users/abc123/',
+    ).length;
+    expect(callsAfterResolve).toBe(callsBeforeResolve);
+    expect(screen.getByText('第二位使用者')).toBeInTheDocument();
+    expect(screen.queryByText('王小明')).not.toBeInTheDocument();
   });
 });

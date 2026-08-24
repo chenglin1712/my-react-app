@@ -5,16 +5,19 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Alert } from "react-bootstrap";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../../firebase";
-import lottie from 'lottie-web';
 import successAnimation from "../../src/animations/success.json"
 import SuccessModal from "../ui/SuccessModal";
+import { useLottieAnimation } from "@hooks/useLottieAnimation";
 
 const LoginForm = ({ onSwitchToRegister }) => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [errorMsg, setErrorMsg] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
+    const redirectTimeoutRef = useRef(null);
+    useEffect(() => () => clearTimeout(redirectTimeoutRef.current), []);
 
     // 登入後預設回首頁；只有從「先被要求登入才能進去」的頁面過來（例如
     // AdminRoute 導去 /login?next=/admin）才會帶 next 參數，登入成功後導回
@@ -46,11 +49,12 @@ const LoginForm = ({ onSwitchToRegister }) => {
             setErrorMsg("請輸入電子郵件和密碼！");
             return;
         }
+        setIsSubmitting(true);
         try {
             await signInWithEmailAndPassword(auth, email, password);
             setIsLogin(true);
             const redirectTarget = getRedirectTarget();
-            setTimeout(() => {
+            redirectTimeoutRef.current = setTimeout(() => {
                 navigate(redirectTarget);
             }, 1800);
         } catch (error) {
@@ -62,24 +66,14 @@ const LoginForm = ({ onSwitchToRegister }) => {
             } else {
                 setErrorMsg("登入失敗: " + error.message);
             }
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     //加載動畫
-    const animation = useRef(null);
     const [isLogin, setIsLogin] = useState(false);
-    useEffect(() => {
-        if (isLogin) {
-            const instance = lottie.loadAnimation({
-                container: animation.current,
-                renderer: 'svg',
-                loop: true,
-                autoplay: true,
-                animationData: successAnimation,
-            });
-            return () => instance.destroy();
-        }
-    }, [isLogin]);
+    const animation = useLottieAnimation({ animationData: successAnimation, enabled: isLogin });
 
     return (
         <div className="login-box">
@@ -95,7 +89,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
                     <input type="password" className="input-field" placeholder="密碼" aria-label="密碼" autoComplete="current-password" required onChange={(e) => { setPassword(e.target.value) }} />
                 </div>
                 <a className="forgot-pass" href="/forgot" onClick={(e) => { e.preventDefault(); navigate("/forgot"); }}>忘記密碼?</a>
-                <button className="login-button" onClick={handleLogin}>登入</button>
+                <button className="login-button" onClick={handleLogin} disabled={isSubmitting}>登入</button>
             </form>
             <p>還沒有帳號?
                 {onSwitchToRegister ? (

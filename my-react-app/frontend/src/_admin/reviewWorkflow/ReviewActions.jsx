@@ -33,6 +33,11 @@ export default function ReviewActions({
     role,
     roles,
     busy = false,
+    // busy 是「這一列」在忙；disabled 是「別列（或整頁）有其他操作正在
+    // 進行中」。呼叫端的忙碌鎖大多是全域的（同一時間只能有一個操作在跑），
+    // 但 busy 只比對 actionId === item.id——沒有這個 prop 的話，其他列的
+    // 按鈕看起來還能點，點下去卻被鎖靜默擋掉，使用者看不出任何回饋。
+    disabled = false,
     supportsRevision = true,
     supportsUnpublishedState = false,
     viewFallback = false,
@@ -74,10 +79,11 @@ export default function ReviewActions({
 
         return (
             <Button
+                type="button"
                 key={actionKey}
                 size="sm"
                 variant={meta.variant}
-                disabled={busy}
+                disabled={busy || disabled}
                 onClick={() => onAction(actionKey, item)}
             >
                 <Icon size={14} /> {meta.label}

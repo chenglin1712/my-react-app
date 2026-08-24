@@ -2,6 +2,7 @@ import {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from 'react';
 import { Link } from 'react-router-dom';
@@ -111,7 +112,15 @@ export default function WordList() {
         };
     }, []);
 
+    // 只有「目前最新的那一次查詢」可以寫回狀態：連續翻頁或連續搜尋時，
+    // 較舊的查詢若比較新的查詢晚回來，不能覆蓋新查詢的結果與 loading 狀態。
+    const requestRef = useRef(0);
+
     const load = useCallback(async () => {
+        const requestId = requestRef.current + 1;
+        requestRef.current = requestId;
+        const isStale = () => requestRef.current !== requestId;
+
         setLoading(true);
         setError('');
 
@@ -124,11 +133,14 @@ export default function WordList() {
                 ...(query.has_pending ? { has_pending: true } : {}),
             };
 
-            setData(await listWords(params));
+            const result = await listWords(params);
+            if (isStale()) return;
+            setData(result);
         } catch (err) {
+            if (isStale()) return;
             setError(err.message);
         } finally {
-            setLoading(false);
+            if (!isStale()) setLoading(false);
         }
     }, [page, query]);
 

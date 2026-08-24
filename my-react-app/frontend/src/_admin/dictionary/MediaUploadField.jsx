@@ -1,4 +1,6 @@
-import { useId, useState } from 'react';
+import {
+    useEffect, useId, useRef, useState,
+} from 'react';
 import {
     Alert,
     Button,
@@ -45,6 +47,11 @@ export default function MediaUploadField({
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState('');
 
+    // 上傳中把這個媒體列刪掉（removeChild）或整份表單卸載時，Cloudinary
+    // 的回應還是會回來——這裡擋住 unmount 之後的 setState／onChange。
+    const mountedRef = useRef(true);
+    useEffect(() => () => { mountedRef.current = false; }, []);
+
     const meta = KIND_META[kind];
 
     if (!meta) {
@@ -67,13 +74,16 @@ export default function MediaUploadField({
         setUploading(true);
 
         try {
-            onChange(await uploadToCloudinary(file, { resourceType: meta.resourceType }));
+            const result = await uploadToCloudinary(file, { resourceType: meta.resourceType });
+            if (mountedRef.current) onChange(result);
         } catch (err) {
             console.error(`${meta.noun}上傳失敗`, err);
-            setError(`${meta.noun}上傳失敗`);
+            if (mountedRef.current) setError(`${meta.noun}上傳失敗`);
         } finally {
-            setUploading(false);
-            event.target.value = '';
+            if (mountedRef.current) {
+                setUploading(false);
+                event.target.value = '';
+            }
         }
     };
 

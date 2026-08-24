@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import {
@@ -8,6 +8,7 @@ import {
     listTaxonomies,
     uploadImportJob,
 } from './dictionaryApi';
+import { useActionLock } from '../hooks/useActionLock';
 
 const EMPTY_JOBS = { results: [], count: 0, page: 1, page_size: 20 };
 
@@ -38,12 +39,24 @@ export function useImportWizard({ id }) {
     const [reviewComment, setReviewComment] = useState('');
 
     const [loading, setLoading] = useState(true);
-    const [pendingAction, setPendingAction] = useState('');
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
 
+    // 預檢／送審／撤回／核准／退件／自動建立主檔／上傳／匯出彼此都應該
+    // 互斥，共用同一把鎖——而不是像原本那樣用一個 pendingAction state 當
+    // 忙碌旗標（那樣擋不住同一個 tick 內的重複觸發）。pendingAction 這個
+    // 名稱繼續沿用，值就是目前鎖住的動作名稱，呼叫端（ImportWizard.jsx）
+    // 不需要跟著改。
+    const lock = useActionLock();
+    const pendingAction = lock.pendingKey ?? '';
+
+    // 元件卸載後，還在飛的請求 resolve 時不能再 setState。
+    const mountedRef = useRef(true);
+    useEffect(() => () => { mountedRef.current = false; }, []);
+
     const loadJobs = useCallback(async () => {
         const result = await listImportJobs();
+        if (!mountedRef.current) return;
         setJobs({ ...EMPTY_JOBS, ...result, results: result.results ?? [] });
     }, []);
 
@@ -84,13 +97,13 @@ export function useImportWizard({ id }) {
     ), [taxonomies.tribes]);
 
     const replaceJob = async (result, message = '') => {
+        if (!mountedRef.current) return;
         setJob(result);
         if (message) setSuccessMessage(message);
         await loadJobs();
     };
 
-    const runJobAction = async (action, callback, message = '') => {
-        setPendingAction(action);
+    const runJobAction = (action, callback, message = '') => lock.runLocked(action, async () => {
         setError('');
         setSuccessMessage('');
 
@@ -98,14 +111,18 @@ export function useImportWizard({ id }) {
             const result = await callback();
             await replaceJob(result, message);
         } catch (err) {
-            setError(err.message);
-        } finally {
-            setPendingAction('');
+            if (mountedRef.current) setError(err.message);
         }
-    };
+    });
+
+    // 快速換選兩個檔案時，較晚完成的 reader.onload 不能覆蓋較新那次選檔
+    // 的 parsedBundle——不然會出現「檔名是後選的 B、內容卻是先選的 A」
+    // 一起送出去的情況。
+    const fileReadGenerationRef = useRef(0);
 
     const handleFileChange = (event) => {
         const file = event.target.files?.[0];
+        const generation = (fileReadGenerationRef.current += 1);
 
         setSelectedFile(file ?? null);
         setParsedBundle(null);
@@ -117,6 +134,8 @@ export function useImportWizard({ id }) {
         const reader = new FileReader();
 
         reader.onload = () => {
+            if (generation !== fileReadGenerationRef.current || !mountedRef.current) return;
+
             try {
                 setParsedBundle(JSON.parse(reader.result));
             } catch {
@@ -125,57 +144,56 @@ export function useImportWizard({ id }) {
         };
 
         reader.onerror = () => {
+            if (generation !== fileReadGenerationRef.current || !mountedRef.current) return;
             setError('無法讀取檔案');
         };
 
         reader.readAsText(file);
     };
 
-    const upload = async () => {
-        if (!selectedFile || !parsedBundle) return;
+    const upload = () => {
+        if (!selectedFile || !parsedBundle) return Promise.resolve();
 
-        setPendingAction('upload');
-        setError('');
-        setSuccessMessage('');
+        return lock.runLocked('upload', async () => {
+            setError('');
+            setSuccessMessage('');
 
-        try {
-            const result = await uploadImportJob(selectedFile.name, parsedBundle);
-            // rowErrors 只在剛上傳完這一次顯示，用 route state 帶過去（見
-            // ImportWizard.jsx 對 location.state 的說明）。
-            navigate(`/admin/dictionary/import/${result.id}`, {
-                state: { rowErrors: result.row_errors ?? {} },
-            });
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setPendingAction('');
-        }
+            try {
+                const result = await uploadImportJob(selectedFile.name, parsedBundle);
+                // rowErrors 只在剛上傳完這一次顯示，用 route state 帶過去
+                // （見 ImportWizard.jsx 對 location.state 的說明）。
+                navigate(`/admin/dictionary/import/${result.id}`, {
+                    state: { rowErrors: result.row_errors ?? {} },
+                });
+            } catch (err) {
+                if (mountedRef.current) setError(err.message);
+            }
+        });
     };
 
-    const exportBundle = async () => {
-        if (!selectedTribe) return;
+    const exportBundle = () => {
+        if (!selectedTribe) return Promise.resolve();
 
-        setPendingAction('export');
-        setError('');
-        setSuccessMessage('');
+        return lock.runLocked('export', async () => {
+            setError('');
+            setSuccessMessage('');
 
-        try {
-            const data = await exportDictionary(selectedTribe);
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const anchor = document.createElement('a');
+            try {
+                const data = await exportDictionary(selectedTribe);
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const anchor = document.createElement('a');
 
-            anchor.href = url;
-            anchor.download = `dictionary_${selectedTribe}.json`;
-            anchor.click();
+                anchor.href = url;
+                anchor.download = `dictionary_${selectedTribe}.json`;
+                anchor.click();
 
-            URL.revokeObjectURL(url);
-            setSuccessMessage('辭典匯出檔已開始下載。');
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setPendingAction('');
-        }
+                URL.revokeObjectURL(url);
+                if (mountedRef.current) setSuccessMessage('辭典匯出檔已開始下載。');
+            } catch (err) {
+                if (mountedRef.current) setError(err.message);
+            }
+        });
     };
 
     return {

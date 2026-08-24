@@ -1,8 +1,5 @@
-import { useParams } from "react-router-dom";
+import TribeGamePage from "./TribeGamePage";
 import Game_Start from "../../components/_game/game_start";
-import "../../static/css/_game/index.css";
-import { useAuth } from "../userServives/authContext";
-import PermissionProtect from "../userServives/permissionProtect";
 
 const TITLES = {
     tayal: "Tninun ATAYAL - 編織泰雅",
@@ -12,22 +9,8 @@ const TITLES = {
     paiwan: "Kasiaman Paiwan - 排灣的驕傲",
 };
 
-const TribeVocabularyGame = () => {
-    const { tribe } = useParams();
-    const { userData } = useAuth();
-
-    return (
-        <div className="background">
-            <h1 className="game-title">{TITLES[tribe] || TITLES.tayal}</h1>
-            {userData == null ? (
-                <PermissionProtect />
-            ) : (
-                <div className="game-background">
-                    <Game_Start tribe={tribe} />
-                </div>
-            )}
-        </div>
-    );
-};
+const TribeVocabularyGame = () => (
+    <TribeGamePage titles={TITLES} fallbackPath="/game/vocabulary" GameComponent={Game_Start} />
+);
 
 export default TribeVocabularyGame;

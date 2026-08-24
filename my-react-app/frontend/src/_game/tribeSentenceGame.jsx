@@ -1,8 +1,5 @@
-import { useParams } from "react-router-dom";
+import TribeGamePage from "./TribeGamePage";
 import SentenceGame from "../../components/_game/sentence_game";
-import "../../static/css/_game/index.css";
-import { useAuth } from "../userServives/authContext";
-import PermissionProtect from "../userServives/permissionProtect";
 
 const TITLES = {
     tayal: "Lmuhuw ATAYAL - 泰雅句型練習",
@@ -12,22 +9,8 @@ const TITLES = {
     paiwan: "Lmuhuw PAIWAN - 排灣句型練習",
 };
 
-const TribeSentenceGame = () => {
-    const { tribe } = useParams();
-    const { userData } = useAuth();
-
-    return (
-        <div className="background">
-            <h1 className="game-title">{TITLES[tribe] || TITLES.tayal}</h1>
-            {userData == null ? (
-                <PermissionProtect />
-            ) : (
-                <div className="game-background">
-                    <SentenceGame tribe={tribe} />
-                </div>
-            )}
-        </div>
-    );
-};
+const TribeSentenceGame = () => (
+    <TribeGamePage titles={TITLES} fallbackPath="/game/sentence" GameComponent={SentenceGame} />
+);
 
 export default TribeSentenceGame;

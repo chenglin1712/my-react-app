@@ -222,64 +222,8 @@
   margin: 0;
 }
 
-.category-bar {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 16px 22px;
-  cursor: pointer;
-  font-weight: 700;
-}
-
-.category-panel {
-  max-width: 720px;
-  margin: 14px auto 0;
-  padding: 20px 22px;
-}
-
-.subcategory-scroll {
-  display: flex;
-  overflow-x: auto;
-  gap: 12px;
-  padding: 8px;
-  scroll-behavior: smooth;
-}
-
-.subcategory-card {
-  flex: 0 0 auto;
-  width: 190px;
-  height: 190px;
-  text-align: center;
-  border-radius: var(--yy-radius-card);
-  padding: 6px;
-  background-color: #ffffff;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: 2px solid var(--yy-ink);
-}
-
-.subcategory-card img {
-  width: 150px;
-  height: 150px;
-  object-fit: contain;
-}
-
-.subcategory-card span {
-  display: block;
-  font-size: 13px;
-  margin-top: 4px;
-  color: #333;
-}
-
-.subcategory-card:hover {
-  border-color: var(--yy-gold);
-  box-shadow: var(--yy-shadow-sm);
-}
-
-.subcategory-card.active {
-  border-color: var(--yy-red);
-  background-color: var(--yy-cream);
-  box-shadow: var(--yy-shadow-sm);
-}
+/* .category-bar／.category-panel／.subcategory-* 已搬到共用的
+   components/ui/CategoryBar.jsx + static/css/ui/categoryBar.css。 */
 
 /* ── 查詢結果卡片 ──────────────────────────────── */
 .search-page .list-group-item {

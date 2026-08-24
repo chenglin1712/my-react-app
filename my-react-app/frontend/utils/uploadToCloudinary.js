@@ -19,6 +19,7 @@
  */
 
 const CLOUDINARY_TRANSFORM = 'f_auto,q_auto';
+const CLOUDINARY_RESOURCE_TYPES = ['image', 'video'];
 
 /** 上傳失敗時丟出的例外；`cause` 保留原始錯誤（網路層例外或 HTTP 狀態）供
  * 呼叫端記 log，但呼叫端顯示給使用者的訊息一律自己決定，不直接用這裡的
@@ -60,6 +61,13 @@ export async function uploadToCloudinary(file, options = {}) {
     throw new CloudinaryUploadError('Cloudinary 環境變數未設定（VITE_CLOUDINARY_CLOUD_NAME／VITE_CLOUDINARY_UPLOAD_PRESET）');
   }
 
+  if (!CLOUDINARY_RESOURCE_TYPES.includes(resourceType)) {
+    // resourceType 會直接組進上傳網址的路徑（.../${resourceType}/upload），
+    // 呼叫端傳錯字串時應該立刻報錯，而不是打出一個看起來像合法路徑、
+    // 實際上 Cloudinary 會回 4xx 的網址。
+    throw new CloudinaryUploadError(`不支援的 resourceType："${resourceType}"（僅支援 ${CLOUDINARY_RESOURCE_TYPES.join('／')}）`);
+  }
+
   const formData = new FormData();
   formData.append('file', file);
   formData.append('upload_preset', uploadPreset);
@@ -96,5 +104,3 @@ export async function uploadToCloudinary(file, options = {}) {
 
   return result.secure_url;
 }
-
-export default uploadToCloudinary;

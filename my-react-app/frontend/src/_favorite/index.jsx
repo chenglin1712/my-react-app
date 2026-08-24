@@ -1,58 +1,52 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Alert, Container, Button, Dropdown } from 'react-bootstrap';
 import { useLocation } from 'react-router-dom';
-import { useAuth } from "../../src/userServives/authContext";
 import { useFavorites } from "../../src/userServives/useFavorites";
-import PermissionProtect from "../userServives/permissionProtect";
 import ErrorBoundary from "../errorBoundary";
 import { TRIBE_NAMES as TRIBES } from "../constants/tribes";
 import { apiPost } from "../../utils/apiClient";
 import useAudioPlayback from "../../hooks/useAudioPlayback";
+import { useIsMobile } from "../../hooks/useIsMobile";
 import { useTabState } from "./hooks/useTabState";
-import { useFilterAndSort } from "./hooks/useFilterAndSort";
+import { filterFavoriteWords } from "./filterFavoriteWords";
 import WordCardWithImg from "./components/WordCardWithImg";
 import SearchAndFilterControls from "./components/SearchAndFilterControls";
 import "../../static/css/_favorite/index_judy.css"
 
 const PAGE_SIZE = 50;
+const EXCLUDED_LETTERS = ['d', 'f', 'j', 'v'];
+const ALPHABET = Array.from({ length: 26 }, (_, i) => String.fromCharCode(97 + i))
+  .concat("'")
+  .filter(l => !EXCLUDED_LETTERS.includes(l));
 
-const App = () => {
-  const { userData: user } = useAuth();
+const FavoritePage = () => {
+  // /favorite 已經在 route.jsx 的 <ProtectedLayout> 底下，未登入會由它統一導去
+  // PermissionProtect，這裡不需要再重複判斷一次登入狀態。
   const { favorites, toggleFavorite, error: favoritesError } = useFavorites();
   const [activeTab, setActiveTab] = useState(1);
   const [allWords, setAllWords] = useState([]);
   const [expandedWord, setExpandedWord] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const [delayedCheck, setDelayedCheck] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [selectedTribe, setSelectedTribe] = useState('泰雅');
   const toggleExpand = useCallback((key) => setExpandedWord(prev => (prev === key ? null : key)), []);
 
   const [tabStates, updateTabState] = useTabState(favorites);
-  const filterAndSort = useFilterAndSort(allWords);
-  const { playAudio } = useAudioPlayback(selectedTribe);
+  const { playAudio, failedAudio } = useAudioPlayback(selectedTribe);
 
   const location = useLocation();
 
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useIsMobile();
   const [showCategories, setShowCategories] = useState(false);
   const [activeTabcat, setActiveTabcat] = useState('語法與功能');
   const [selectedSubCategory, setSelectedSubCategory] = useState(null)
   const [showFilterPanel, setShowFilterPanel] = useState(false);
 
+  // 快速切換族語時，比較慢的舊查詢可能在新族語的結果顯示之後才回來，蓋掉
+  // 新族語已經顯示的單字。
+  const requestGenerationRef = useRef(0);
 
-  const excludedLetters = ['d', 'f', 'j', 'v'];
-  const alphabet = Array.from({ length: 26 }, (_, i) => String.fromCharCode(97 + i)).concat("'").filter(l => !excludedLetters.includes(l));
-
-  useEffect(() => {
-      const checkScreenSize = () => {
-        setIsMobile(window.innerWidth < 768);
-      };
-      checkScreenSize();
-      window.addEventListener('resize', checkScreenSize);
-      return () => window.removeEventListener('resize', checkScreenSize);
-    }, []);
   useEffect(() => {
     if (location.state?.tabId) {
       setActiveTab(location.state.tabId);
@@ -61,6 +55,7 @@ const App = () => {
 
   // 依目前選擇的族語重新查詢單字，避免一次載入不相關族語的全部資料
   useEffect(() => {
+    const myGeneration = ++requestGenerationRef.current;
     setLoading(true);
     setLoadError(false);
     // apiPost 內部一定會回傳 Promise（即使 auth.currentUser 是 null，token 只影響
@@ -68,32 +63,34 @@ const App = () => {
     // loading 卡住」的問題。
     apiPost(import.meta.env.VITE_API_SEARCH_ALL_URL, { tribe: selectedTribe })
       .then(data => {
-        setAllWords(Object.values(data.all_results).flat());
+        if (myGeneration !== requestGenerationRef.current) return;
+        setAllWords(Object.values(data.all_results || {}).flat());
         setLoading(false);
       })
       .catch(err => {
+        if (myGeneration !== requestGenerationRef.current) return;
         console.error("載入單字失敗：", err);
         setLoadError(true);
         setLoading(false);
       });
   }, [selectedTribe]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDelayedCheck(true), 1500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // 換分類、族語或篩選條件變動時，分頁顯示筆數重置回第一頁
-  const activeTabStateKey = JSON.stringify(tabStates[activeTab] || {});
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-  }, [activeTab, selectedTribe, selectedSubCategory, activeTabStateKey]);
-
-  if (!user && delayedCheck) return <PermissionProtect />;
-
   const currentTab = favorites.find(t => t.id === activeTab);
   const currentState = tabStates[activeTab] || {};
-  const filteredWords = currentTab ? filterAndSort(currentTab.content, currentState, selectedSubCategory) : [];
+
+  // 換分類、族語或篩選條件變動時，分頁顯示筆數重置回第一頁——只依賴真正會
+  // 影響結果的欄位，不要整包 state stringify（inputValue 每打一個字就變，
+  // 但真正套用的搜尋字是 activeQuery，不該打字就重置分頁）。
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [
+    activeTab, selectedTribe, selectedSubCategory,
+    currentState.activeQuery, currentState.sortOrder, currentState.filterLetter, currentState.frequencyFilter,
+  ]);
+
+  const filteredWords = currentTab
+    ? filterFavoriteWords(allWords, currentTab.content, currentState, selectedSubCategory)
+    : [];
 
   return (
     <Container className="p-2 word-library-container">
@@ -128,10 +125,9 @@ const App = () => {
 
         {currentTab && (
           <SearchAndFilterControls
-            tab={currentTab}
             state={currentState}
             onStateChange={(key, value) => updateTabState(activeTab, key, value)}
-            alphabet={alphabet}
+            alphabet={ALPHABET}
             isMobile={isMobile}
             activeTabcat={activeTabcat}
             setActiveTabcat={setActiveTabcat}
@@ -167,7 +163,6 @@ const App = () => {
                 <WordCardWithImg
                   keyName={wordData.name + idx}
                   word={wordData.explanationItems?.[0]?.chineseExplanation || wordData.chineseExplanation || ''}
-                  category={wordData.explanationItems?.[0]?.category || ''}
                   result={wordData}
                   isExpanded={expandedWord === wordData.name + idx}
                   toggleExpand={toggleExpand}
@@ -175,14 +170,15 @@ const App = () => {
                   wordName={wordData.name}
                   categoryId={currentTab.id}
                   playAudio={playAudio}
-                  isFavorited={currentTab?.content.includes(wordData.name)}
+                  failedAudio={failedAudio}
+                  isFavorited={currentTab.content.includes(wordData.name)}
                 />
               </ErrorBoundary>
             ))}
           </div>
           {visibleCount < filteredWords.length && (
             <div className="text-center my-3">
-              <Button variant="outline-danger" onClick={() => setVisibleCount(c => c + PAGE_SIZE)}>
+              <Button type="button" variant="outline-danger" onClick={() => setVisibleCount(c => c + PAGE_SIZE)}>
                 載入更多（剩 {filteredWords.length - visibleCount} 筆）
               </Button>
             </div>
@@ -193,4 +189,4 @@ const App = () => {
   );
 };
 
-export default App;
+export default FavoritePage;

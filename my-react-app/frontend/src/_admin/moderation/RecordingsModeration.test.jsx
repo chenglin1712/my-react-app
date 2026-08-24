@@ -295,4 +295,48 @@ describe('RecordingsModeration', () => {
             await screen.findByText('錄音刪除失敗'),
         ).toBeInTheDocument();
     });
+
+    test('同 id 不同族語的錄音，刪除其中一筆時另一筆只會被停用、不會誤顯示成處理中', async () => {
+        let resolveDelete;
+        apiDelete.mockImplementation(() => new Promise((resolve) => { resolveDelete = resolve; }));
+
+        const tayalRec = { ...recording, id: 'same-id', tribe: 'tayal', word: 'tayal-word' };
+        const amisRec = { ...cleanRecording, id: 'same-id', tribe: 'amis', word: 'amis-word' };
+        apiGet.mockResolvedValue(mockRecordingsResponse({ results: [tayalRec, amisRec] }));
+
+        renderPage();
+
+        const tayalRow = await screen
+            .findByText('tayal-word')
+            .then((element) => element.closest('tr'));
+        const amisRow = screen.getByText('amis-word').closest('tr');
+
+        fireEvent.click(
+            within(tayalRow).getByRole('button', { name: /刪除/ }),
+        );
+
+        await waitFor(() => {
+            expect(
+                within(tayalRow).getByRole('button', { name: /刪除/ }),
+            ).toBeDisabled();
+        });
+
+        // amis 那一列也會被停用（跨列鎖定是刻意的行為，任何一列在處理中時
+        // 其他列都不能點），但它不是真的正在被刪除，不該顯示成處理中。
+        expect(
+            within(amisRow).getByRole('button', { name: /刪除/ }),
+        ).toBeDisabled();
+        expect(amisRow.querySelector('.spinner-border')).not.toBeInTheDocument();
+        expect(tayalRow.querySelector('.spinner-border')).toBeInTheDocument();
+
+        resolveDelete({
+            tribe: 'tayal', id: 'same-id', deleted: true, storage_deleted: true,
+        });
+
+        await waitFor(() => {
+            expect(
+                within(amisRow).getByRole('button', { name: /刪除/ }),
+            ).not.toBeDisabled();
+        });
+    });
 });

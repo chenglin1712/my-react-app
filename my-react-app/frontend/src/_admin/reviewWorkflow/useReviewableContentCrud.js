@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../../utils/apiClient';
 import { useAdminListQuery } from '../hooks/useAdminListQuery';
@@ -53,6 +53,18 @@ export function useReviewableContentCrud({
     const [editTarget, setEditTarget] = useState(null);
     const [form, setForm] = useState(emptyForm);
 
+    // actionId（state）只負責畫面上顯示「哪一列現在忙碌」，擋不住同一個 tick
+    // 連點兩下，也擋不住不同列的操作互相踩到彼此（A 列的操作先結束，會把 B
+    // 列操作設定的 actionId 一起清掉，畫面顯示「沒有任何操作在跑」但 B 其實
+    // 還沒做完）。這個 hook 目前的 UI 模型本來就只假設同一時間只有一個操作
+    // 在跑，所以用一個同步的全域鎖擋掉「同時兩個以上」的情況，而不是把
+    // actionId 改成一個 Set 去追蹤多筆並行操作。
+    const actionLockRef = useRef(false);
+    // openEdit 讀「待審修改」內容是唯讀查詢，不佔用上面那個鎖：使用者點錯列
+    // 之後應該能立刻改點另一列，不需要等第一次查詢做完；改用 generation 只
+    // 接受最後一次點擊的回應。
+    const editRequestGenerationRef = useRef(0);
+
     /**
      * 回傳「這次動作是否真的完成」——呼叫端需要據此決定要不要收掉 UI。
      *
@@ -65,6 +77,8 @@ export function useReviewableContentCrud({
      * 把 UI 當成「已完成」收掉。
      */
     const runAction = async (item, action, body) => {
+        if (actionLockRef.current) return false;
+        actionLockRef.current = true;
         setActionId(item.id);
         setError('');
 
@@ -81,6 +95,7 @@ export function useReviewableContentCrud({
             setError(err.message);
             return false;
         } finally {
+            actionLockRef.current = false;
             setActionId(null);
         }
     };
@@ -116,6 +131,7 @@ export function useReviewableContentCrud({
     };
 
     const openEdit = async (item) => {
+        const myGeneration = ++editRequestGenerationRef.current;
         setActionId(item.id);
         setError('');
 
@@ -134,12 +150,16 @@ export function useReviewableContentCrud({
                 }
             }
 
+            // 快速點開 A 列再點開 B 列時，A 比較慢回來的查詢結果不該蓋掉
+            // 使用者現在正在看的 B 列編輯表單。
+            if (myGeneration !== editRequestGenerationRef.current) return;
             setForm(formFrom(values));
             setEditTarget(item);
         } catch (err) {
+            if (myGeneration !== editRequestGenerationRef.current) return;
             setError(err.message);
         } finally {
-            setActionId(null);
+            if (myGeneration === editRequestGenerationRef.current) setActionId(null);
         }
     };
 
@@ -147,6 +167,8 @@ export function useReviewableContentCrud({
 
     const save = async (event, payload = form) => {
         event?.preventDefault();
+        if (actionLockRef.current) return;
+        actionLockRef.current = true;
         setActionId('form');
         setError('');
 
@@ -166,6 +188,7 @@ export function useReviewableContentCrud({
         } catch (err) {
             setError(err.message);
         } finally {
+            actionLockRef.current = false;
             setActionId(null);
         }
     };

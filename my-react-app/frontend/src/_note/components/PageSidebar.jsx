@@ -1,13 +1,24 @@
 import { Button, Form } from "react-bootstrap";
 
 /** 右側「分享頁面選擇」清單：勾選要分享的頁面、全選/取消、送出分享。 */
-export default function PageSidebar({ notes, currentPage, isDirty, selectedPageIds, onToggleSelect, onSelectAll, onClearSelect, onShare }) {
+export default function PageSidebar({
+  notes, currentPage, isDirty, selectedPageIds, maxSelectable,
+  onToggleSelect, onSelectAll, onClearSelect, onShare, isSharing,
+}) {
+  const overLimit = maxSelectable != null && notes.length > maxSelectable;
+
   return (
     <>
       <h5 className="mt-2">分享頁面選擇</h5>
+      {maxSelectable != null && (
+        <div className="ns-select-hint mb-1">
+          已選 {selectedPageIds.length} / 上限 {maxSelectable} 頁
+          {overLimit && `（共 ${notes.length} 頁，全選只會勾選前 ${maxSelectable} 頁）`}
+        </div>
+      )}
       <div className="mb-2 d-flex gap-2">
-        <Button size="sm" className="btn-ghost" onClick={onSelectAll}>全選</Button>
-        <Button size="sm" className="btn-ghost" onClick={onClearSelect}>取消</Button>
+        <Button type="button" size="sm" className="btn-ghost" onClick={() => onSelectAll(maxSelectable)}>全選</Button>
+        <Button type="button" size="sm" className="btn-ghost" onClick={onClearSelect}>取消</Button>
       </div>
       <Form>
         {/* key 與選取狀態都用筆記 id，不用陣列索引（FE-11）：刪除中間某一頁
@@ -28,10 +39,12 @@ export default function PageSidebar({ notes, currentPage, isDirty, selectedPageI
 
       {selectedPageIds.length > 0 && (
         <Button
+          type="button"
           className="btn-primary mt-2 w-100"
           onClick={onShare}
+          disabled={isSharing}
         >
-          分享
+          {isSharing ? "分享中…" : "分享"}
         </Button>
       )}
     </>

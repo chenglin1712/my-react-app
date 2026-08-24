@@ -190,7 +190,7 @@ describe('UserCreate', () => {
     );
 
     expect(
-      screen.getByText('圖片不得超過 5 MB，請重新選擇。'),
+      screen.getByText('檔案不得超過 5 MB，請重新選擇。'),
     ).toBeInTheDocument();
     expect(
       screen.queryByText('頭像上傳中……'),

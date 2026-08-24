@@ -1,4 +1,5 @@
 import {
+    act,
     fireEvent,
     render,
     screen,
@@ -122,6 +123,38 @@ describe('GrammarTree', () => {
         expect(await screen.findByText('族語二章節')).toBeInTheDocument();
         expect(listGrammarSections).toHaveBeenCalledWith('2');
         expect(screen.getByText('從左側選擇章節，或新增章節')).toBeInTheDocument();
+    });
+
+    it('回歸測試：舊族語較晚回來的章節清單，不會覆蓋掉已經切換過去的新族語清單', async () => {
+        let resolveTribeOne;
+        listGrammarSections.mockImplementation((tribeId) => {
+            if (String(tribeId) === '1') {
+                return new Promise((resolve) => { resolveTribeOne = resolve; });
+            }
+            return Promise.resolve({
+                results: [{
+                    id: 30, tribe_id: 2, title: '族語二章節', section_order: 1,
+                    rule_count: 1, pending_revision: null,
+                }],
+            });
+        });
+
+        renderPage();
+        await waitFor(() => expect(listGrammarSections).toHaveBeenCalledWith('1'));
+
+        fireEvent.change(screen.getByLabelText(/^族語$/), { target: { value: '2' } });
+        expect(await screen.findByText('族語二章節')).toBeInTheDocument();
+
+        // 族語一（已經不是目前選取的族語）的查詢這時候才回來。
+        await act(async () => {
+            resolveTribeOne(tribeOneSections);
+            await Promise.resolve();
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+
+        expect(screen.getByText('族語二章節')).toBeInTheDocument();
+        expect(screen.queryByText('基礎句型')).not.toBeInTheDocument();
     });
 
     it('opens the new-section panel', async () => {

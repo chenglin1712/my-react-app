@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect  } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { ArrowDownUp, Volume2, Check, CircleCheck, CircleX } from "lucide-react";
 import { FaPlayCircle } from 'react-icons/fa';
 import {
@@ -16,11 +16,14 @@ import {
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import lottie from "lottie-web";
-import { createAuthorizedAudio } from "../../utils/authAudio";
+import successAnimation from "../../src/animations/success.json";
+import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
+import { useLottieAnimation } from "../../hooks/useLottieAnimation";
 import { playCorrectSound } from "../../utils/correctSound";
 
-import successAnimation from "../../src/animations/success.json";
+const LONG_PRESS_MS = 500;
+const CLICK_MOVE_THRESHOLD_PX = 5;
+const MOVE_ANIMATION_MS = 400;
 
 // 單個可排序單詞元件
 function SortableWord({ id, word, audio, onClickWord, onLongPress, isMoving }) {
@@ -41,32 +44,34 @@ function SortableWord({ id, word, audio, onClickWord, onLongPress, isMoving }) {
   const timerRef = useRef(null);
   const startPos = useRef({ x: 0, y: 0 });
 
-  
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
   const handleMouseDown = (e) => {
     startPos.current = { x: e.clientX, y: e.clientY };
     timerRef.current = setTimeout(() => {
       onLongPress(id); // 長按播放音檔
-    }, 500);
-    
+      timerRef.current = null;
+    }, LONG_PRESS_MS);
   };
 
   const handleMouseUp = (e) => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
+      timerRef.current = null;
       const dx = Math.abs(e.clientX - startPos.current.x);
       const dy = Math.abs(e.clientY - startPos.current.y);
       const distance = Math.sqrt(dx * dx + dy * dy);
 
-      if (distance < 5) {
+      if (distance < CLICK_MOVE_THRESHOLD_PX) {
         // 移動距離很小才算短按移動
         onClickWord(id);
       }
     }
   };
-  
 
   return (
     <button
+      type="button"
       ref={setNodeRef}
       style={style}
       {...attributes}
@@ -104,43 +109,37 @@ function DroppableArea({ id, children, label }) {
 
 // 主元件
 export default function SentenceOrder({ question, _selected, checked, onSelect, onConfirm }) {
-  const [bank, setBank] = useState(question.words.map((w) => w.word));
+  // 用「單字在句子裡的位置」當識別 id，而不是單字文字本身——原句可能有重複的字
+  // （例如「的」出現兩次），文字當 id 會讓 React key、dnd-kit 的拖曳識別、
+  // bank/zone 的篩選/查找全部衝突。
+  const tokens = useMemo(
+    () => question.words.map((w, i) => ({ id: String(i), word: w.word, audio: w.audio })),
+    [question],
+  );
+  const tokenById = useMemo(
+    () => Object.fromEntries(tokens.map((t) => [t.id, t])),
+    [tokens],
+  );
+
+  const [bank, setBank] = useState(() => tokens.map((t) => t.id));
   const [zone, setZone] = useState([]);
   const [movingWordId, setMovingWordId] = useState(null);
-  const audioRef = useRef(null);
+  const { playAudio, stopAudio } = useAuthorizedAudioPlayback();
 
   const sensors = useSensors(useSensor(PointerSensor));
 
   const [result, setResult] = useState("");
   const [showAnimation, setShowAnimation] = useState(false);
-  const animation = useRef(null);
-  
-
-  // ✅ 成功動畫設定
-  useEffect(() => {
-    if (result === "correct" && showAnimation) {
-      const instance = lottie.loadAnimation({
-        container: animation.current,
-        renderer: "svg",
-        loop: false, // ✅ 播一次
-        autoplay: true,
-        animationData: successAnimation,
-      });
-
-      // ✅ 動畫結束後自動隱藏
-      instance.addEventListener("complete", () => {
-        setShowAnimation(false);
-      });
-
-      return () => instance.destroy();
-    }
-  }, [result, showAnimation]);
-
-
-
+  const animationRef = useLottieAnimation({
+    animationData: successAnimation,
+    enabled: showAnimation,
+    loop: false,
+    onComplete: () => setShowAnimation(false),
+  });
 
   // 拖曳結束
   const handleDragEnd = (event) => {
+    if (checked) return;
     const { active, over } = event;
     if (!over) return;
 
@@ -151,114 +150,88 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
         return arrayMove(items, oldIndex, newIndex);
       });
     } else if (bank.includes(active.id) && over.id === "drop-zone") {
-      setBank(bank.filter((w) => w !== active.id));
-      setZone([...zone, active.id]);
+      setBank((items) => items.filter((id) => id !== active.id));
+      setZone((items) => [...items, active.id]);
     } else if (zone.includes(active.id) && over.id === "bank-zone") {
-      setZone(zone.filter((w) => w !== active.id));
-      setBank([...bank, active.id]);
+      setZone((items) => items.filter((id) => id !== active.id));
+      setBank((items) => [...items, active.id]);
     }
   };
 
   // 短按移動
   const handleClickWord = (id) => {
+    if (checked) return;
     setMovingWordId(id); // 標記動畫
-    setTimeout(() => setMovingWordId(null), 400); // 動畫結束清除
+    setTimeout(() => setMovingWordId(null), MOVE_ANIMATION_MS); // 動畫結束清除
 
     if (bank.includes(id)) {
-      setBank(bank.filter((w) => w !== id));
-      setZone([...zone, id]);
+      setBank((items) => items.filter((w) => w !== id));
+      setZone((items) => [...items, id]);
     } else if (zone.includes(id)) {
-      setZone(zone.filter((w) => w !== id));
-      setBank([...bank, id]);
+      setZone((items) => items.filter((w) => w !== id));
+      setBank((items) => [...items, id]);
     }
   };
 
   // 長按播放音檔
   const handleLongPress = (id) => {
-    const w = question.words.find((word) => word.word === id);
-    if (w?.audio) {
-      playAudio(w.audio);
+    const token = tokenById[id];
+    if (token?.audio) {
+      playAudio(token.audio);
     }
-  };
-
-  const playAudio = async (fileId) => {
-    if (!fileId) return;
-
-
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      // pause() 不會觸發 authAudio.js 內建的 ended/error revoke，手動切換/
-      // 停止播放要自己呼叫，不然每切一次語音就洩漏一個 blob URL。
-      audioRef.current.revokeObjectUrl?.();
-    }
-
-
-    const proxyUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL + fileId;
-    let newAudio;
-    try {
-      newAudio = await createAuthorizedAudio(proxyUrl);
-    } catch {
-      return;
-    }
-
-    newAudio.play().catch(() => {});
-    audioRef.current = newAudio;
   };
 
   const handleConfirm = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current.revokeObjectUrl?.();
-    }
-    const isCorrect = JSON.stringify(zone) === JSON.stringify(question.answer);
+    stopAudio();
+    const orderedWords = zone.map((id) => tokenById[id].word);
+    const isCorrect = JSON.stringify(orderedWords) === JSON.stringify(question.answer);
     setResult(isCorrect ? "correct" : "wrong");
     onSelect?.({
       result: isCorrect,
-      userAnswer: zone,    
-      correctAnswer:  question.answer,
-      question: question.tayal.sentence, 
-      answer: question.words
+      userAnswer: orderedWords,
+      correctAnswer: question.answer,
+      question: question.tayal.sentence,
+      answer: question.words,
     });
     onConfirm?.(true);
-     if (isCorrect) {
-            playCorrectSound();
-            setShowAnimation(true);
-          }
+    if (isCorrect) {
+      playCorrectSound();
+      setShowAnimation(true);
+    }
   };
 
   return (
     <div className="text-center" style={{ minHeight: "400px" }}>
-      <h5 className="fw-bolder mb-4" style={{ display: 'flex', alignItems: 'center',justifyContent: "center"  }}>
+      <h5 className="fw-bolder mb-4" style={{ display: 'flex', alignItems: 'center', justifyContent: "center" }}>
         <ArrowDownUp />&nbsp;例句排列
       </h5>
 
-            <h2 className="fw-bolder mb-4 " style={question.tayal.audio ? { cursor: "pointer" } : undefined} onClick={() => {if(question.tayal.audio) playAudio(question.tayal.audio);}}>
-                            {question.tayal.cn}
-                            {question.tayal.audio && (
-                              <span>
-                              &nbsp; 
-                              <FaPlayCircle size={20} className="text-warning" />
-                              </span>
-                            )} 
-                  </h2>
-              
-      
-      <h2 className="fw-bolder mb-4">{question.sentenceCn}</h2>
+      <h2 className="fw-bolder mb-4" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+        {question.tayal.cn}
+        {question.tayal.audio && (
+          <button
+            type="button"
+            className="quiz-audio-btn"
+            onClick={() => playAudio(question.tayal.audio)}
+            aria-label="播放句子語音"
+          >
+            <FaPlayCircle size={20} className="text-warning" />
+          </button>
+        )}
+      </h2>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         {/* 拖放區 */}
         <SortableContext items={zone} strategy={horizontalListSortingStrategy}>
           <DroppableArea id="drop-zone" label="拖曳單詞到這裡">
             {zone.map((id) => {
-              const w = question.words.find((word) => word.word === id);
+              const token = tokenById[id];
               return (
                 <SortableWord
                   key={id}
                   id={id}
-                  word={w.word}
-                  audio={w.audio}
+                  word={token.word}
+                  audio={token.audio}
                   onClickWord={handleClickWord}
                   onLongPress={handleLongPress}
                   isMoving={movingWordId === id}
@@ -274,13 +247,13 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
         <SortableContext items={bank} strategy={horizontalListSortingStrategy}>
           <DroppableArea id="bank-zone" label="單詞庫">
             {bank.map((id) => {
-              const w = question.words.find((word) => word.word === id);
+              const token = tokenById[id];
               return (
                 <SortableWord
                   key={id}
                   id={id}
-                  word={w.word}
-                  audio={w.audio}
+                  word={token.word}
+                  audio={token.audio}
                   onClickWord={handleClickWord}
                   onLongPress={handleLongPress}
                   isMoving={movingWordId === id}
@@ -294,6 +267,7 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
       {/* 確認按鈕 & 結果 */}
       {!checked ? (
         <button
+          type="button"
           onClick={handleConfirm}
           disabled={zone.length === 0}
           className="confirm-btn"
@@ -312,11 +286,11 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
           </h4>
         </>
       )}
-       {/* ✅ 成功動畫 Overlay */}
+       {/* 成功動畫 Overlay */}
       {showAnimation && (
         <div className="overlay">
           <div className="animation-container">
-            <div ref={animation} />
+            <div ref={animationRef} />
             <p>答案正確！</p>
           </div>
         </div>

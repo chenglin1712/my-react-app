@@ -1,69 +1,22 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import "../../static/css/_game/sentence.css";
 import { useGameSession } from "./useGameSession";
 import { useGameAudioPlayer } from "./useGameAudioPlayer";
+import { useTimedOptionSelect } from "./useTimedOptionSelect";
+import { TRIBE_INTRO } from "./sentenceIntro";
 
-const TRIBE_INTRO = {
-  tayal: {
-    hint: "這句泰雅語的意思是？",
-    lines: [
-      "歡迎來到《Lmuhuw ATAYAL - 泰雅句型練習》的世界！",
-      "泰雅族語中，句型是連接詞彙與文化表達的橋樑",
-      "每一道題目展示一個泰雅語例句，請選出正確的中文意思",
-      "學習常見句型，讓你更自然地理解並開口說族語",
-      "每次練習 5 個句型，由淺入深，循序漸進",
-      "準備好了嗎？跟著我們一起，感受泰雅語的句子之美！",
-    ],
-  },
-  amis: {
-    hint: "這句阿美語的意思是？",
-    lines: [
-      "歡迎來到《Lmuhuw AMIS - 阿美句型練習》的世界！",
-      "阿美族語是台灣原住民族中使用人口最多的語言",
-      "每一道題目展示一個阿美語例句，請選出正確的中文意思",
-      "學習常見句型，讓你更自然地理解並開口說族語",
-      "每次練習 5 個句型，由淺入深，循序漸進",
-      "準備好了嗎？跟著我們一起，感受阿美語的句子之美！",
-    ],
-  },
-  bunun: {
-    hint: "這句布農語的意思是？",
-    lines: [
-      "歡迎來到《Lmuhuw BUNUN - 布農句型練習》的世界！",
-      "布農族語以複雜的動詞焦點系統聞名於語言學界",
-      "每一道題目展示一個布農語例句，請選出正確的中文意思",
-      "學習常見句型，讓你更自然地理解並開口說族語",
-      "每次練習 5 個句型，由淺入深，循序漸進",
-      "準備好了嗎？跟著我們一起，感受布農語的句子之美！",
-    ],
-  },
-  kavalan: {
-    hint: "這句噶瑪蘭語的意思是？",
-    lines: [
-      "歡迎來到《Lmuhuw KAVALAN - 噶瑪蘭句型練習》的世界！",
-      "噶瑪蘭族語是台灣瀕危語言之一，值得我們共同守護",
-      "每一道題目展示一個噶瑪蘭語例句，請選出正確的中文意思",
-      "學習常見句型，讓你更自然地理解並開口說族語",
-      "每次練習 5 個句型，由淺入深，循序漸進",
-      "準備好了嗎？跟著我們一起，感受噶瑪蘭語的句子之美！",
-    ],
-  },
-  paiwan: {
-    hint: "這句排灣語的意思是？",
-    lines: [
-      "歡迎來到《Lmuhuw PAIWAN - 排灣句型練習》的世界！",
-      "排灣族語擁有豐富的敬語系統，反映族群獨特的階層文化",
-      "每一道題目展示一個排灣語例句，請選出正確的中文意思",
-      "學習常見句型，讓你更自然地理解並開口說族語",
-      "每次練習 5 個句型，由淺入深，循序漸進",
-      "準備好了嗎？跟著我們一起，感受排灣語的句子之美！",
-    ],
-  },
-};
+const RATING_THRESHOLDS = [
+  { min: 80, className: "excellent" },
+  { min: 60, className: "good" },
+  { min: 40, className: "fair" },
+];
+
+function getRatingClass(pct) {
+  return RATING_THRESHOLDS.find((r) => pct >= r.min)?.className ?? "poor";
+}
 
 function SentenceGame({ tribe = "tayal" }) {
-  const navigate = useNavigate();
   const config = TRIBE_INTRO[tribe] || TRIBE_INTRO.tayal;
   const audioBaseUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL;
 
@@ -75,43 +28,39 @@ function SentenceGame({ tribe = "tayal" }) {
   } = useGameSession({ endpoint: import.meta.env.VITE_API_SENTENCE_QUESTIONS_URL, tribe });
   const { isPlaying, play: playAudio, stop: stopAudio } = useGameAudioPlayer(audioBaseUrl);
 
-  const [selected, setSelected] = useState(null);
+  const q = questions[current];
 
-  const handleStart = async () => {
-    const ok = await start();
-    if (ok) setSelected(null);
+  const { selected, beginSelection } = useTimedOptionSelect({
+    delayMs: 1400,
+    onElapsed: () => { stopAudio(); goToNext(); },
+    resetKey: `${tribe}:${status}:${current}`,
+  });
+
+  const handleStart = () => {
+    start();
   };
 
   const handlePlay = () => {
-    const q = questions[current];
-    playAudio(q?.audio_id);
+    if (!q?.audio_id) return;
+    playAudio(q.audio_id);
   };
 
   const handleSelect = (option) => {
-    if (selected !== null) return;
-    setSelected(option);
-    const q = questions[current];
+    if (!q || !beginSelection(option)) return;
     const isCorrect = option === q.chinese;
     setAnswers((prev) => [
       ...prev,
       { tayal: q.tayal, chinese: q.chinese, userAnswer: option, isCorrect },
     ]);
-
-    setTimeout(() => {
-      setSelected(null);
-      stopAudio();
-      goToNext();
-    }, 1400);
   };
 
   const handleRestart = () => {
     restart();
-    setSelected(null);
   };
 
   useEffect(() => {
     stopAudio();
-  }, [current, stopAudio]);
+  }, [current, tribe, status, stopAudio]);
 
   // ── 介紹畫面 ─────────────────────────────────────
   if (status === "intro") {
@@ -120,8 +69,8 @@ function SentenceGame({ tribe = "tayal" }) {
         {config.lines.map((line, i) => (
           <p key={i} className="sent-intro-line">{line}</p>
         ))}
-        {error && <p className="sent-error">{error}</p>}
-        <button className="sent-btn-primary" onClick={handleStart} disabled={loading}>
+        {error && <p className="sent-error" role="alert">{error}</p>}
+        <button type="button" className="sent-btn-primary" onClick={handleStart} disabled={loading}>
           {loading ? "載入中..." : "開始"}
         </button>
       </div>
@@ -130,12 +79,18 @@ function SentenceGame({ tribe = "tayal" }) {
 
   // ── 遊戲畫面 ─────────────────────────────────────
   if (status === "playing") {
-    if (!questions.length) return null;
-    const q = questions[current];
+    if (!q || !Array.isArray(q.options)) return null;
 
     return (
       <div className="sent-game">
-        <div className="sent-progress">
+        <div
+          className="sent-progress"
+          role="progressbar"
+          aria-label="作答進度"
+          aria-valuemin="0"
+          aria-valuemax={questions.length}
+          aria-valuenow={current + 1}
+        >
           <div
             className="sent-progress-bar"
             style={{ width: `${progressPct}%` }}
@@ -147,6 +102,7 @@ function SentenceGame({ tribe = "tayal" }) {
           <p className="sent-sentence">{q.tayal}</p>
           {q.audio_id && (
             <button
+              type="button"
               className={`sent-play-btn ${isPlaying ? "playing" : ""}`}
               onClick={handlePlay}
             >
@@ -167,6 +123,7 @@ function SentenceGame({ tribe = "tayal" }) {
             }
             return (
               <button
+                type="button"
                 key={opt}
                 className={cls}
                 onClick={() => handleSelect(opt)}
@@ -179,7 +136,7 @@ function SentenceGame({ tribe = "tayal" }) {
         </div>
 
         {selected !== null && (
-          <p className={`sent-feedback ${selected === q.chinese ? "correct" : "wrong"}`}>
+          <p className={`sent-feedback ${selected === q.chinese ? "correct" : "wrong"}`} aria-live="polite">
             {selected === q.chinese
               ? "✅ 答對了！"
               : `❌ 正確答案：${q.chinese}`}
@@ -194,8 +151,7 @@ function SentenceGame({ tribe = "tayal" }) {
     const score = answers.filter((a) => a.isCorrect).length;
     const total = answers.length;
     const pct   = total > 0 ? Math.round((score / total) * 100) : 0;
-    const ratingCls =
-      pct >= 80 ? "excellent" : pct >= 60 ? "good" : pct >= 40 ? "fair" : "poor";
+    const ratingCls = getRatingClass(pct);
 
     return (
       <div className="sent-result">
@@ -209,7 +165,7 @@ function SentenceGame({ tribe = "tayal" }) {
 
         <div className="sent-result-list">
           {answers.map((a, i) => (
-            <div key={i} className={`sent-result-row ${a.isCorrect ? "correct" : "wrong"}`}>
+            <div key={`${a.tayal}-${i}`} className={`sent-result-row ${a.isCorrect ? "correct" : "wrong"}`}>
               <span className="sent-result-icon">{a.isCorrect ? "✅" : "❌"}</span>
               <div className="sent-result-content">
                 <span className="sent-result-tayal">{a.tayal}</span>
@@ -224,13 +180,10 @@ function SentenceGame({ tribe = "tayal" }) {
         </div>
 
         <div className="sent-result-actions">
-          <button
-            className="sent-btn-secondary"
-            onClick={() => navigate("/game/sentence")}
-          >
+          <Link className="sent-btn-secondary" to="/game/sentence">
             ← 返回遊戲頁面
-          </button>
-          <button className="sent-btn-primary" onClick={handleRestart}>
+          </Link>
+          <button type="button" className="sent-btn-primary" onClick={handleRestart}>
             再練一次
           </button>
         </div>

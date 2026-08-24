@@ -3,6 +3,7 @@ import { Alert, Button, Form, Modal, Spinner } from 'react-bootstrap';
 import { Trash2 } from 'lucide-react';
 
 import { apiPost } from '../../../utils/apiClient';
+import { useActionLock } from '../hooks/useActionLock';
 
 /**
  * 刪除帳號的確認對話框（FE-6，原本 inline 寫在 UserDetail.jsx 裡）。
@@ -13,7 +14,8 @@ import { apiPost } from '../../../utils/apiClient';
  */
 export default function DeleteAccountModal({ show, user, uid, onClose, onDeleted, onError }) {
     const [confirmEmail, setConfirmEmail] = useState('');
-    const [deleting, setDeleting] = useState(false);
+    const deleteLock = useActionLock();
+    const deleting = deleteLock.isLocked;
 
     const close = () => {
         if (deleting) return;
@@ -21,24 +23,23 @@ export default function DeleteAccountModal({ show, user, uid, onClose, onDeleted
         onClose();
     };
 
-    const deleteAccount = async () => {
+    const deleteAccount = () => {
         if (!user || confirmEmail !== user.email) return;
 
-        setDeleting(true);
-        onError('');
+        deleteLock.runLocked('delete', async () => {
+            onError('');
 
-        try {
-            const result = await apiPost(`/adminapi/users/${uid}/delete/`, {
-                confirm_email: confirmEmail,
-            });
+            try {
+                const result = await apiPost(`/adminapi/users/${uid}/delete/`, {
+                    confirm_email: confirmEmail,
+                });
 
-            setConfirmEmail('');
-            onDeleted(result.results);
-        } catch (err) {
-            onError(err.message);
-        } finally {
-            setDeleting(false);
-        }
+                setConfirmEmail('');
+                onDeleted(result.results);
+            } catch (err) {
+                onError(err.message);
+            }
+        });
     };
 
     return (

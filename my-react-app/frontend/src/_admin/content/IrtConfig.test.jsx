@@ -81,4 +81,17 @@ describe('IrtConfig', () => {
     render(<IrtConfig />);
     expect(await screen.findByText(/不是一般的內容設定/)).toBeInTheDocument();
   });
+
+  /** 回歸測試：數字欄位被清空時，parseInt('', 10) 是 NaN、Number('') 是
+   * 0——空白欄位被悄悄送成 0（合法的權重值）或 NaN（不該送到後端的值）
+   * 都不是使用者的本意，應該在送出前擋下來。 */
+  test('清空必要的數字欄位時擋下送出，不呼叫 API', async () => {
+    render(<IrtConfig />);
+    const totalQuestions = await screen.findByLabelText('每次測驗題數');
+    fireEvent.change(totalQuestions, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: /儲存設定/ }));
+
+    expect(await screen.findByText('所有參數都必須是有效數字，請確認每個欄位都有填寫。')).toBeInTheDocument();
+    expect(apiPatch).not.toHaveBeenCalled();
+  });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Badge, Button, Form, Modal, Spinner, Table, Alert } from 'react-bootstrap';
 import { Plus, RefreshCw } from 'lucide-react';
@@ -8,6 +8,7 @@ import { apiDelete, apiGet, apiPost } from '../../../utils/apiClient';
 import ReviewActions from '../reviewWorkflow/ReviewActions';
 import ReviewPagination from '../reviewWorkflow/ReviewPagination';
 import { REVIEW_ACTION_META } from '../reviewWorkflow/reviewActionPolicy';
+import { formatDateTime } from '../adminFormat';
 import '../../../static/css/_admin/announcements.css';
 
 const CONTENT_EDITORS = ['owner', 'admin', 'editor'];
@@ -25,9 +26,6 @@ const STATUSES = {
     unpublished: { label: '已下架', bg: 'dark' },
 };
 
-const formatDateTime = (value) => value
-    ? new Intl.DateTimeFormat('zh-TW', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
-    : '—';
 // pin_until 後端是純日期欄位（DateField，不帶時間，例如 "2026-09-01"）。
 // new Date("2026-09-01") 會被 ECMA-262 解讀成 UTC 午夜，再用瀏覽器本地
 // 時區格式化——在 UTC 負偏移地區（例如美洲）會被往前推一天，顯示的日期
@@ -53,6 +51,14 @@ export default function AnnouncementList() {
     const [loading, setLoading] = useState(true);
     const [actionId, setActionId] = useState(null);
     const [error, setError] = useState('');
+    // 逐列動作（核准/退件/撤回/刪除…）跟同步爬蟲共用同一把鎖：光靠
+    // actionId／syncing 這兩個 state 只能各自擋自己的重複觸發，擋不住
+    // 「核准 A 列的同時按下同步」這種跨操作的情況——這兩者都會呼叫
+    // loadAnnouncements() 重新整份清單，同時執行沒有意義。
+    const actionLockRef = useRef(false);
+    // 只有「目前最新的那一次清單查詢」可以寫回狀態：連續換頁或連續搜尋時，
+    // 較舊的查詢若比較新的查詢晚回來，不能覆蓋新查詢的結果與 loading 狀態。
+    const loadRequestRef = useRef(0);
     // type 用來區分一般公告送審的退件，以及已發布公告待審修改的退件。
     // 兩者共用同一個理由 Modal，但送出端點不同。
     const [rejectTarget, setRejectTarget] = useState(null);
@@ -62,16 +68,23 @@ export default function AnnouncementList() {
     const [syncMessage, setSyncMessage] = useState('');
 
     const loadAnnouncements = useCallback(async () => {
+        const requestId = loadRequestRef.current + 1;
+        loadRequestRef.current = requestId;
+        const isStale = () => loadRequestRef.current !== requestId;
+
         setLoading(true);
         setError('');
         try {
             const params = new URLSearchParams({ page: String(page), page_size: '10' });
             Object.entries(query).forEach(([key, value]) => value && params.set(key, value));
-            setData(await apiGet(`/adminapi/announcements/?${params.toString()}`));
+            const result = await apiGet(`/adminapi/announcements/?${params.toString()}`);
+            if (isStale()) return;
+            setData(result);
         } catch (err) {
+            if (isStale()) return;
             setError(err.message);
         } finally {
-            setLoading(false);
+            if (!isStale()) setLoading(false);
         }
     }, [page, query]);
 
@@ -92,6 +105,8 @@ export default function AnnouncementList() {
     }, [role]);
 
     const runSync = async () => {
+        if (actionLockRef.current) return;
+        actionLockRef.current = true;
         setSyncing(true);
         setError('');
         setSyncMessage('');
@@ -103,6 +118,7 @@ export default function AnnouncementList() {
         } catch (err) {
             setError(err.message);
         } finally {
+            actionLockRef.current = false;
             setSyncing(false);
         }
     };
@@ -113,20 +129,30 @@ export default function AnnouncementList() {
         setQuery(filters);
     };
 
+    // 回傳「這次動作是否真的完成」——呼叫端（submitReject）要靠這個決定
+    // 該不該收掉退件 Modal；原本沒有回傳值時，submitReject 不管成功失敗
+    // 都會接著關閉對話框，退件失敗時使用者剛打的理由就整段消失，只在
+    // 頁面上方留一行錯誤訊息（跟 useReviewableContentCrud.js 修過的同一類
+    // 問題）。
     const runAction = async (item, action, body) => {
+        if (actionLockRef.current) return false;
+        actionLockRef.current = true;
         setActionId(item.id);
         setError('');
         try {
             if (action === 'delete') {
-                if (!window.confirm(`確定要刪除「${item.title}」嗎？`)) return;
+                if (!window.confirm(`確定要刪除「${item.title}」嗎？`)) return false;
                 await apiDelete(`/adminapi/announcements/${item.id}/`);
             } else {
                 await apiPost(`/adminapi/announcements/${item.id}/${action}/`, body);
             }
             await loadAnnouncements();
+            return true;
         } catch (err) {
             setError(err.message);
+            return false;
         } finally {
+            actionLockRef.current = false;
             setActionId(null);
         }
     };
@@ -148,12 +174,14 @@ export default function AnnouncementList() {
             ? 'pending-revision/reject'
             : 'reject';
 
-        await runAction(
+        const succeeded = await runAction(
             rejectTarget.item,
             action,
             { review_comment: rejectReason.trim() },
         );
-        closeRejectModal();
+        // 只有真的送出成功才收掉對話框；失敗時保留使用者打好的退件理由，
+        // 讓他可以直接重試，不用整段重打。
+        if (succeeded) closeRejectModal();
     };
 
     // FE-2：這一整段原本是 ~180 行、跟題庫那幾支面板同一種形狀的手寫規則。
@@ -183,6 +211,7 @@ export default function AnnouncementList() {
 
 
     const hasNext = data.page * data.page_size < data.count;
+    const rejectSubmitting = Boolean(rejectTarget) && actionId === rejectTarget.item.id;
 
     return (
         <main className="announcement-admin-page">
@@ -196,7 +225,7 @@ export default function AnnouncementList() {
                         <Button as={Link} to="/admin/content/announcements/new">
                             <Plus size={18} /> 新增公告
                         </Button>
-                        <Button variant="outline-primary" disabled={syncing} onClick={runSync}>
+                        <Button variant="outline-primary" disabled={syncing || Boolean(actionId)} onClick={runSync}>
                             {syncing ? <Spinner animation="border" size="sm" /> : <RefreshCw size={18} />} 同步爬蟲活動
                         </Button>
                     </div>
@@ -337,6 +366,7 @@ export default function AnnouncementList() {
                                                 role={role}
                                                 roles={ANNOUNCEMENT_ROLES}
                                                 busy={actionId === item.id}
+                                                disabled={syncing || (Boolean(actionId) && actionId !== item.id)}
                                                 supportsUnpublishedState
                                                 viewFallback
                                                 hrefFor={hrefFor}
@@ -366,8 +396,14 @@ export default function AnnouncementList() {
                 />
             </div>
 
-            <Modal show={Boolean(rejectTarget)} onHide={closeRejectModal} centered>
-                <Modal.Header closeButton>
+            <Modal
+                show={Boolean(rejectTarget)}
+                onHide={rejectSubmitting ? undefined : closeRejectModal}
+                centered
+                backdrop={rejectSubmitting ? 'static' : true}
+                keyboard={!rejectSubmitting}
+            >
+                <Modal.Header closeButton={!rejectSubmitting}>
                     <Modal.Title>
                         {rejectTarget?.type === 'pending-revision' ? '退件修改原因' : '退件原因'}
                     </Modal.Title>
@@ -379,6 +415,7 @@ export default function AnnouncementList() {
                             as="textarea"
                             rows={4}
                             required
+                            disabled={rejectSubmitting}
                             value={rejectReason}
                             onChange={(e) => setRejectReason(e.target.value)}
                             isInvalid={Boolean(rejectTarget) && !rejectReason.trim()}
@@ -389,15 +426,15 @@ export default function AnnouncementList() {
                     </Form.Group>
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={closeRejectModal}>
+                    <Button variant="secondary" disabled={rejectSubmitting} onClick={closeRejectModal}>
                         取消
                     </Button>
                     <Button
                         variant="danger"
-                        disabled={!rejectReason.trim() || actionId === rejectTarget?.item.id}
+                        disabled={!rejectReason.trim() || rejectSubmitting}
                         onClick={submitReject}
                     >
-                        確認退件
+                        {rejectSubmitting ? '送出中…' : '確認退件'}
                     </Button>
                 </Modal.Footer>
             </Modal>

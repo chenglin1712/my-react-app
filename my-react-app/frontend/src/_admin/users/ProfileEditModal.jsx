@@ -1,24 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Form, Modal, Spinner } from 'react-bootstrap';
 import { Edit3, ImagePlus } from 'lucide-react';
 
 import { apiPatch } from '../../../utils/apiClient';
-import { uploadToCloudinary } from '@utils/uploadToCloudinary';
-
-const EMPTY_PROFILE_FORM = {
-    name: '',
-    identity: '',
-    avatar_url: '',
-    email: '',
-};
+import { useActionLock } from '../hooks/useActionLock';
+import { useMediaUpload } from '../hooks/useMediaUpload';
 
 /**
  * 編輯使用者基本資料的對話框（FE-6，原本 inline 寫在 UserDetail.jsx 裡）。
  *
  * 表單值、頭像預覽、上傳中旗標都是「這個對話框開著的期間」才有意義的狀態，
  * 所以留在這裡自己管理——父層只需要知道「要不要顯示」以及「存檔成功了」。
- * 對話框每次開啟時用 key 重新掛載（見 UserDetail.jsx），初始值直接從 user
- * 帶入，不需要父層再幫忙塞一次表單初始化。
+ * 這個 Modal 本身是條件渲染出來的（見 UserDetail.jsx），關閉就會卸載、
+ * 下次開啟是全新 instance，不需要父層再幫忙塞一次表單初始化。
  */
 export default function ProfileEditModal({ show, user, uid, onClose, onSaved, onError }) {
     const [form, setForm] = useState({
@@ -27,11 +21,20 @@ export default function ProfileEditModal({ show, user, uid, onClose, onSaved, on
         avatar_url: user?.avatar_url ?? '',
         email: user?.email ?? '',
     });
-    const [avatarPreview, setAvatarPreview] = useState(user?.avatar_url ?? '');
-    const [avatarUploading, setAvatarUploading] = useState(false);
-    const [saving, setSaving] = useState(false);
 
+    const media = useMediaUpload();
+    const saveLock = useActionLock();
+    const saving = saveLock.isLocked;
+    const avatarUploading = media.isUploading('avatar');
+    const avatarPreview = media.previews.avatar ?? user?.avatar_url ?? '';
     const busy = saving || avatarUploading;
+
+    // 這個對話框的其他錯誤（存檔失敗等）都是透過 onError 顯示在父層共用的
+    // Alert，上傳錯誤也走同一個管道，畫面上才不會出現兩種不同的錯誤呈現
+    // 方式。
+    useEffect(() => {
+        if (media.error) onError(media.error);
+    }, [media.error, onError]);
 
     const updateForm = (field, value) => {
         setForm((current) => ({ ...current, [field]: value }));
@@ -39,36 +42,20 @@ export default function ProfileEditModal({ show, user, uid, onClose, onSaved, on
 
     const close = () => {
         if (busy) return;
-        setForm(EMPTY_PROFILE_FORM);
-        setAvatarPreview('');
         onClose();
     };
 
-    const handleAvatarFileChange = async (event) => {
+    const handleAvatarFileChange = (event) => {
         const file = event.target.files[0];
         if (!file) return;
-        if (file.size > 5 * 1024 * 1024) {
-            onError('圖片不得超過 5 MB，請重新選擇。');
-            return;
-        }
 
-        onError('');
-        setAvatarPreview(URL.createObjectURL(file));
-        setAvatarUploading(true);
-
-        try {
-            const secureUrl = await uploadToCloudinary(file);
-            updateForm('avatar_url', secureUrl);
-            setAvatarPreview(secureUrl);
-        } catch (err) {
-            console.error('頭像上傳失敗', err);
-            onError('頭像上傳失敗，請重新選擇圖片。');
-        } finally {
-            setAvatarUploading(false);
-        }
+        media.upload(file, 'avatar', {
+            localPreview: true,
+            onUploaded: (secureUrl) => updateForm('avatar_url', secureUrl),
+        });
     };
 
-    const saveProfile = async (event) => {
+    const saveProfile = (event) => {
         event.preventDefault();
 
         if (avatarUploading) {
@@ -76,23 +63,22 @@ export default function ProfileEditModal({ show, user, uid, onClose, onSaved, on
             return;
         }
 
-        setSaving(true);
-        onError('');
+        saveLock.runLocked('save', async () => {
+            onError('');
 
-        try {
-            await apiPatch(`/adminapi/users/${uid}/profile/`, {
-                name: form.name,
-                identity: form.identity,
-                avatar_url: form.avatar_url,
-                email: form.email,
-            });
+            try {
+                await apiPatch(`/adminapi/users/${uid}/profile/`, {
+                    name: form.name,
+                    identity: form.identity,
+                    avatar_url: form.avatar_url,
+                    email: form.email,
+                });
 
-            onSaved('使用者資料已更新。');
-        } catch (err) {
-            onError(err.message);
-        } finally {
-            setSaving(false);
-        }
+                onSaved('使用者資料已更新。');
+            } catch (err) {
+                onError(err.message);
+            }
+        });
     };
 
     return (

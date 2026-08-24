@@ -19,7 +19,7 @@ const EvidencePanel = ({ token, onPlayAudio }) => {
             <div className="yy-evidence-head">
                 <strong>{token.surface}</strong>
                 <span className={`yy-evidence-badge yy-gt-${token.status}`}>
-                    {STATUS_TITLE[token.status] || token.status}
+                    {STATUS_TITLE[token.status] || "其他佐證狀態"}
                 </span>
             </div>
 
@@ -31,7 +31,7 @@ const EvidencePanel = ({ token, onPlayAudio }) => {
 
             {(token.status === "headword" || token.status === "derived") && token.gloss && (
                 <p className="yy-evidence-body">
-                    <span className="yy-evidence-lemma">{token.lemma}</span> ＝ {token.gloss}
+                    <span className="yy-evidence-lemma">{token.lemma || token.surface}</span> ＝ {token.gloss}
                     {token.audioFileId && (
                         <button
                             type="button"

@@ -4,9 +4,9 @@ import userEvent from '@testing-library/user-event';
 import WordTranslation from './wordTranslation';
 import { createAuthorizedAudio } from '../../utils/authAudio';
 
-/** wordTranslation.jsx 的 playAudio 是 5 個 _quiz_questions 元件各自複製的
- * 其中一份：換音檔／確認作答時停止播放只呼叫 pause()，沒有 revoke，
- * 每切換一次語音就洩漏一個 blob URL。 */
+/** wordTranslation.jsx 現在透過共用的 useAuthorizedAudioPlayback 播放語音
+ * （原本是 5 個 _quiz_questions 元件各自複製的一份，換音檔／確認作答時停止
+ * 播放只呼叫 pause()，沒有 revoke，每切換一次語音就洩漏一個 blob URL）。 */
 vi.mock('../../utils/authAudio', () => ({ createAuthorizedAudio: vi.fn() }));
 vi.mock('lottie-web', () => ({ default: { loadAnimation: () => ({ addEventListener: vi.fn(), destroy: vi.fn() }) } }));
 vi.mock('../../utils/correctSound', () => ({ playCorrectSound: vi.fn() }));
@@ -33,7 +33,7 @@ describe('WordTranslation 音檔播放', () => {
 
     render(<WordTranslation question={QUESTION} selected="好" checked={false} onSelect={vi.fn()} onConfirm={vi.fn()} />);
 
-    await user.click(screen.getByText(QUESTION.tayal.word));
+    await user.click(screen.getByRole('button', { name: '播放語音' }));
     expect(createAuthorizedAudio).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole('button', { name: '確認' }));

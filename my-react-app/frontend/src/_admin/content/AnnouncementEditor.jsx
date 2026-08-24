@@ -1,11 +1,18 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Alert, Badge, Button, Form, Spinner } from 'react-bootstrap';
-import { ArrowLeft, ImagePlus, Save, Send } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import {
+    Link, useNavigate, useParams,
+} from 'react-router-dom';
+import {
+    Alert, Badge, Button, Form, Spinner,
+} from 'react-bootstrap';
+import {
+    ArrowLeft, ImagePlus, Save, Send,
+} from 'lucide-react';
 import { apiGet, apiPatch, apiPost } from '../../../utils/apiClient';
-import { uploadToCloudinary } from '@utils/uploadToCloudinary';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBES } from '../../constants/tribes';
+import { useMediaUpload } from '../hooks/useMediaUpload';
+import { useActionLock } from '../hooks/useActionLock';
 import '../../../static/css/_admin/announcements.css';
 
 const CONTENT_EDITORS = ['owner', 'admin', 'editor'];
@@ -69,15 +76,34 @@ export default function AnnouncementEditor() {
     const role = userData?.role;
     const [form, setForm] = useState(EMPTY_FORM);
     const [status, setStatus] = useState('draft');
-    // 新增公告一定是後台自建（source='admin'），沒有 id 就不用另外打 API
+    // 新增公告一定是後台自建（source='admin')，沒有 id 就不用另外打 API
     // 確認——這個 state 只用來顯示「爬蟲匯入」提示，不參與任何送出的 payload。
     const [source, setSource] = useState('admin');
     const [loading, setLoading] = useState(Boolean(id));
-    const [saving, setSaving] = useState(false);
-    const [uploading, setUploading] = useState(false);
-    const [preview, setPreview] = useState('');
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+
+    // 「儲存」（type=submit）跟「儲存並送審」（onClick）兩顆不同按鈕都呼叫
+    // save()，共用同一把鎖——而不是像原本那樣只靠 saving state，那樣擋不住
+    // 這兩顆按鈕在同一個 tick 內各自被觸發一次。
+    const saveLock = useActionLock();
+    const saving = saveLock.isLocked;
+
+    // resetKey 用 id：同一個路由元件在 /new 與 /:id、或 /A 與 /B 之間切換
+    // 時都不會重新掛載，切換時前一筆殘留的上傳結果不能被誤寫進現在正在
+    // 編輯的這一筆（見 useMediaUpload 的說明）。
+    const media = useMediaUpload({ resetKey: id });
+    const uploading = Boolean(media.uploadingKey);
+    const preview = media.previews.cover ?? '';
+
+    // save() 建立新公告成功後會 navigate 到這篇公告自己的網址（見下方），
+    // 這會讓 id 改變、觸發下面的 [id] effect 重新載入——但這篇公告的資料
+    // 才剛建立、跟目前表單上顯示的一致，重新 fetch 是多餘的；更關鍵的是
+    // 這個 effect 開頭的 setSuccess('') 會跟 save() 自己接下來（送審
+    // 成功後）的 setSuccess('已儲存並送審') 互踩，兩者哪個後蓋過誰沒有
+    // 保證，可能讓送審成功的訊息被悄悄清掉。用這個 ref 標記「這個 id 是
+    // 我自己剛建立、剛 navigate 過去的」，effect 看到吻合就整個跳過。
+    const skipNextLoadRef = useRef(null);
 
     // 狀態允許編輯只是後端狀態機的一半條件，角色也要對得上——reviewer／
     // analyst 沒有 CONTENT_EDITORS 權限，就算內容是 draft，儲存也一定會被
@@ -90,11 +116,32 @@ export default function AnnouncementEditor() {
     const editable = statusEditable && CONTENT_EDITORS.includes(role);
 
     useEffect(() => {
-        if (!id) return;
+        if (id && skipNextLoadRef.current === id) {
+            skipNextLoadRef.current = null;
+            return undefined;
+        }
 
         let active = true;
 
         (async () => {
+            setLoading(true);
+            setError('');
+            setSuccess('');
+            // 同一個路由元件在 /new 跟 /:id、或 /A 跟 /B 之間切換時會被
+            // React Router 重用，不會重新掛載——上一筆公告殘留的表單內容
+            // 要先清掉，否則新公告載入失敗時，畫面會留著舊公告的可編輯
+            // 內容，看起來像是在對新公告操作。loading 為 true 時整頁只
+            // 顯示 Spinner，不會有閃爍。
+            setForm(EMPTY_FORM);
+            setStatus('draft');
+            setSource('admin');
+            media.setPreview('cover', '');
+
+            if (!id) {
+                setLoading(false);
+                return;
+            }
+
             try {
                 const item = await apiGet(`/adminapi/announcements/${id}/`);
                 if (!active) return;
@@ -124,7 +171,7 @@ export default function AnnouncementEditor() {
                 setStatus(item.status);
                 setSource(item.source ?? 'admin');
                 setForm(itemToForm(formSource));
-                setPreview(formSource.cover_image_url ?? '');
+                media.setPreview('cover', formSource.cover_image_url ?? '');
             } catch (err) {
                 if (active) setError(err.message);
             } finally {
@@ -135,6 +182,9 @@ export default function AnnouncementEditor() {
         return () => {
             active = false;
         };
+        // media 是每次 render 都會拿到新物件的 hook 回傳值，把它列進相依
+        // 陣列會造成無限重載；這個 effect 只依賴 id 本身。
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
 
     const update = (field, value) => {
@@ -150,28 +200,12 @@ export default function AnnouncementEditor() {
         );
     };
 
-    const handleFileChange = async (event) => {
+    const handleFileChange = (event) => {
         const file = event.target.files[0];
-        if (!file) return;
-        if (file.size > 5 * 1024 * 1024) {
-            setError('圖片不得超過 5 MB，請重新選擇。');
-            return;
-        }
-
-        setError('');
-        setPreview(URL.createObjectURL(file));
-        setUploading(true);
-
-        try {
-            const secureUrl = await uploadToCloudinary(file);
-            update('cover_image_url', secureUrl);
-            setPreview(secureUrl);
-        } catch (err) {
-            console.error('圖片上傳失敗', err);
-            setError('圖片上傳失敗');
-        } finally {
-            setUploading(false);
-        }
+        media.upload(file, 'cover', {
+            localPreview: true,
+            onUploaded: (secureUrl) => update('cover_image_url', secureUrl),
+        });
     };
 
     // <input type="datetime-local"> 的值是沒有時區資訊的「當地時間」字串
@@ -195,59 +229,63 @@ export default function AnnouncementEditor() {
         unpublish_at: toIsoOrNull(form.unpublish_at),
     });
 
-    const save = async (submitAfterSave) => {
+    const save = (submitAfterSave) => {
         setError('');
         setSuccess('');
 
         if (!form.title.trim()) {
             setError('標題為必填');
-            return;
+            return undefined;
         }
         if (form.is_pinned && !form.pin_until) {
             setError('開啟置頂時，置頂到期日為必填');
-            return;
+            return undefined;
         }
         if (uploading) {
             setError('請等待封面圖上傳完成');
-            return;
+            return undefined;
         }
 
-        setSaving(true);
+        return saveLock.runLocked('save', async () => {
+            try {
+                // published 的儲存不直接改公告本身，也不需要再呼叫 submit：
+                // 建立／更新 pending revision 本身就代表已提交等待審核。
+                if (id && status === 'published') {
+                    await apiPost(
+                        `/adminapi/announcements/${id}/pending-revision/`,
+                        buildPayload(),
+                    );
+                    setSuccess('已提交修改，待審核核准後生效');
+                    return;
+                }
 
-        try {
-            // published 的儲存不直接改公告本身，也不需要再呼叫 submit：
-            // 建立／更新 pending revision 本身就代表已提交等待審核。
-            if (id && status === 'published') {
-                await apiPost(
-                    `/adminapi/announcements/${id}/pending-revision/`,
-                    buildPayload(),
-                );
-                setSuccess('已提交修改，待審核核准後生效');
-                return;
+                const saved = id
+                    ? await apiPatch(`/adminapi/announcements/${id}/`, buildPayload())
+                    : await apiPost('/adminapi/announcements/', buildPayload());
+                const savedId = id || saved.id;
+
+                // 新公告建立成功後立刻換成這篇公告自己的網址，不等
+                // submitAfterSave 的第二支 API 也成功才換：如果先前那樣寫、
+                // 緊接著的 submit 呼叫失敗，畫面會留在 /new（沒有 id），
+                // 使用者以為儲存整個沒發生，再點一次「儲存並送審」會重新
+                // POST 建立，變成建立兩筆重複公告。
+                if (!id) {
+                    skipNextLoadRef.current = String(savedId);
+                    navigate(`/admin/content/announcements/${savedId}`, { replace: true });
+                }
+
+                if (submitAfterSave) {
+                    await apiPost(`/adminapi/announcements/${savedId}/submit/`);
+                    setStatus('pending_review');
+                    setSuccess('已儲存並送審');
+                } else {
+                    setStatus(saved.status ?? status);
+                    setSuccess('公告已儲存');
+                }
+            } catch (err) {
+                setError(err.message);
             }
-
-            const saved = id
-                ? await apiPatch(`/adminapi/announcements/${id}/`, buildPayload())
-                : await apiPost('/adminapi/announcements/', buildPayload());
-            const savedId = id || saved.id;
-
-            if (submitAfterSave) {
-                await apiPost(`/adminapi/announcements/${savedId}/submit/`);
-                setStatus('pending_review');
-                setSuccess('已儲存並送審');
-            } else {
-                setStatus(saved.status ?? status);
-                setSuccess('公告已儲存');
-            }
-
-            if (!id) {
-                navigate(`/admin/content/announcements/${savedId}`, { replace: true });
-            }
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setSaving(false);
-        }
+        });
     };
 
     if (loading) {
@@ -288,7 +326,7 @@ export default function AnnouncementEditor() {
                 </Alert>
             )}
 
-            {error && <Alert variant="danger">{error}</Alert>}
+            {(error || media.error) && <Alert variant="danger">{error || media.error}</Alert>}
             {success && <Alert variant="success">{success}</Alert>}
 
             <Form

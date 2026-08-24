@@ -56,6 +56,7 @@ export const authChanges = (callback) => {
             });
             initUserFields(user.uid);
         } else {
+            stopPresence();
             callback(null);
         }
     });
@@ -76,6 +77,17 @@ export const getCurrentUser = async (uid) => {
     }
 };
 
+// 新帳號的預設收藏分類。用 factory（而不是模組層常數陣列）是因為
+// registerWithImg／initUserFields 各自要寫進不同使用者的 Firestore 文件，
+// 若共用同一個陣列參照，其中一份文件的巢狀物件理論上可能被意外共用/修改。
+function createDefaultFavorites() {
+    return [
+        { id: 1, title: "基礎詞彙", content: [] },
+        { id: 2, title: "日常對話", content: [] },
+        { id: 3, title: "旅遊用語", content: [] },
+    ];
+}
+
 export const registerWithImg = async (name, email, password, identity, avatarUrl) => {
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -85,23 +97,7 @@ export const registerWithImg = async (name, email, password, identity, avatarUrl
             name: name,
             email: email,
             identity: identity,
-            favorites: [
-                {
-                    id: 1,
-                    title: "基礎詞彙",
-                    content: []
-                },
-                {
-                    id: 2,
-                    title: "日常對話",
-                    content: []
-                },
-                {
-                    id: 3,
-                    title: "旅遊用語",
-                    content: []
-                }
-            ],
+            favorites: createDefaultFavorites(),
             user_errors: {},
             joinDate: new Date().toISOString(),
             avatarUrl: avatarUrl
@@ -167,11 +163,7 @@ export const initUserFields = async (uid) => {
         const addedFields = [];
 
         if (!data.favorites) {
-            updateData.favorites = [
-                { id: 1, title: "基礎詞彙", content: [] },
-                { id: 2, title: "日常對話", content: [] },
-                { id: 3, title: "旅遊用語", content: [] }
-            ];
+            updateData.favorites = createDefaultFavorites();
             addedFields.push("favorites");
         }
 
@@ -257,15 +249,22 @@ export const signOut = async () => {
 // 每次要建立新的監聽前先把舊的取消掉。
 let _presenceUnsubscribe = null;
 
+// 登出時呼叫，取消目前的 presence 監聽。原本 authChanges 的登出分支只呼叫
+// callback(null)，沒有清掉這個 listener——要等下一次登入呼叫 setupPresence
+// 時才會被「順便」取消，這段期間一個已登出的分頁還在對 RTDB 寫入 presence 狀態。
+export const stopPresence = () => {
+    if (_presenceUnsubscribe) {
+        _presenceUnsubscribe();
+        _presenceUnsubscribe = null;
+    }
+};
+
 export const setupPresence = (uid) => {
     const db = getDatabase();
     const statusRef = ref(db, `/status/${uid}`);
     const connectedRef = ref(db, ".info/connected");
 
-    if (_presenceUnsubscribe) {
-        _presenceUnsubscribe();
-        _presenceUnsubscribe = null;
-    }
+    stopPresence();
 
     // 確認使用者是否連上 RTDB
     _presenceUnsubscribe = onValue(connectedRef, async (snap) => {

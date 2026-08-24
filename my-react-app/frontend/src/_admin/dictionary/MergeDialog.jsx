@@ -3,6 +3,7 @@ import {
     Alert, Button, Form, Modal, Spinner,
 } from 'react-bootstrap';
 import { mergeTaxonomyTerm } from './dictionaryApi';
+import { useActionLock } from '../hooks/useActionLock';
 
 /**
  * 合併不可逆——比照 UserDetail.jsx 刪除帳號的既有模式：使用者必須逐字
@@ -14,26 +15,27 @@ export default function MergeDialog({
 }) {
     const [targetId, setTargetId] = useState('');
     const [confirmText, setConfirmText] = useState('');
-    const [pending, setPending] = useState(false);
     const [error, setError] = useState('');
+    // 合併是不可逆操作，同一個 tick 內的重複送出（例如雙擊確認按鈕）不能
+    // 只靠 state 擋——runLocked 用 ref 做同步鎖，擋得住這一種情境。
+    const { isLocked: pending, runLocked } = useActionLock();
 
     const sourceLabel = isAffix ? source.affix : source.name;
     const canSubmit = targetId !== '' && confirmText === sourceLabel && !pending;
 
-    const submit = async (event) => {
+    const submit = (event) => {
         event.preventDefault();
-        if (!canSubmit) return;
+        if (!canSubmit) return undefined;
 
-        setPending(true);
-        setError('');
-        try {
-            const result = await mergeTaxonomyTerm(kind, source.id, Number(targetId));
-            onMerged(result);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setPending(false);
-        }
+        return runLocked('merge', async () => {
+            setError('');
+            try {
+                const result = await mergeTaxonomyTerm(kind, source.id, Number(targetId));
+                onMerged(result);
+            } catch (err) {
+                setError(err.message);
+            }
+        });
     };
 
     return (
@@ -92,6 +94,7 @@ export default function MergeDialog({
 
                 <Modal.Footer>
                     <Button
+                        type="button"
                         variant="secondary"
                         disabled={pending}
                         onClick={onClose}

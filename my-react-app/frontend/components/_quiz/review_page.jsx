@@ -1,6 +1,6 @@
 import "../../static/css/_quiz/review_page.css";
 
-const Page = ({ currentPage, totalPages, onPageChange }) => {
+const ReviewPagination = ({ currentPage, totalPages, onPageChange }) => {
     if (totalPages <= 1) return null;
 
     const handlePrev = () => {
@@ -13,7 +13,7 @@ const Page = ({ currentPage, totalPages, onPageChange }) => {
 
     return (
         <div className="pagination">
-            <button onClick={handlePrev} disabled={currentPage === 1}>
+            <button type="button" onClick={handlePrev} disabled={currentPage === 1}>
                 上一頁
             </button>
 
@@ -21,11 +21,11 @@ const Page = ({ currentPage, totalPages, onPageChange }) => {
                 {currentPage} / {totalPages}
             </span>
 
-            <button onClick={handleNext} disabled={currentPage === totalPages}>
+            <button type="button" onClick={handleNext} disabled={currentPage === totalPages}>
                 下一頁
             </button>
         </div>
     );
 };
 
-export default Page;
+export default ReviewPagination;

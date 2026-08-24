@@ -1,6 +1,6 @@
-import { Button, Dropdown, Offcanvas, Tabs, Tab } from 'react-bootstrap';
-import { FaChevronDown, FaChevronUp } from "react-icons/fa";
-import { categoryGroups } from "../../constants/categoryGroups";
+import { Button, Dropdown } from 'react-bootstrap';
+import CategoryBar from '../../../components/ui/CategoryBar';
+import MobileWordFilterOffcanvas from '../../../components/ui/MobileWordFilterOffcanvas';
 
 /** 影像辨識精靈第 3 步的排序／篩選／分類 UI，從 _camera/result.jsx 抽出來。 */
 export default function CameraFilterControls({
@@ -20,78 +20,31 @@ export default function CameraFilterControls({
     <>
       <div className="camera-step3-filters">
         {isMobile ? (
-          <>
-            <Button variant="outline-dark" className="mb-3" onClick={() => setShowFilterPanel(true)}>
-              篩選 / 排序
-            </Button>
-
-            <Offcanvas show={showFilterPanel} onHide={() => setShowFilterPanel(false)} placement="end">
-              <Offcanvas.Header closeButton>
-                <Offcanvas.Title>篩選 / 排序選項</Offcanvas.Title>
-              </Offcanvas.Header>
-              <Offcanvas.Body>
-                <div className="d-flex flex-column gap-3">
-                  <Button
-                    variant="outline-dark"
-                    onClick={() => {
-                      setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
-                      setShowFilterPanel(false);
-                    }}
-                  >
-                    排序： {sortOrder === 'asc' ? 'A→Z' : 'Z→A'}
-                  </Button>
-
-                  <Dropdown onSelect={val => {
-                    setFilterLetter(val);
-                    setShowFilterPanel(false);
-                  }}>
-                    <Dropdown.Toggle variant="outline-dark" className="btn">
-                      開頭： {filterLetter || '全部'}
-                    </Dropdown.Toggle>
-                    <Dropdown.Menu style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                      <Dropdown.Item eventKey="">全部</Dropdown.Item>
-                      {alphabet.map(l => (
-                        <Dropdown.Item key={l} eventKey={l}>{l}</Dropdown.Item>
-                      ))}
-                    </Dropdown.Menu>
-                  </Dropdown>
-
-                  <Dropdown onSelect={(val) => {
-                    setFrequencyFilter(val);
-                    setShowFilterPanel(false);
-                  }}>
-                    <Dropdown.Toggle variant="outline-dark">
-                      詞頻： {frequencyFilter ? `${frequencyFilter}★` : '全部'}
-                    </Dropdown.Toggle>
-                    <Dropdown.Menu>
-                      <Dropdown.Item eventKey="">全部</Dropdown.Item>
-                      {[5, 4, 3, 2, 1].map(n => (
-                        <Dropdown.Item key={n} eventKey={n}>{`${n}★`}</Dropdown.Item>
-                      ))}
-                    </Dropdown.Menu>
-                  </Dropdown>
-
-                  <Button
-                    variant={showOnlyFavorites ? "danger" : "outline-dark"}
-                    onClick={() => {
-                      setShowOnlyFavorites(prev => !prev);
-                      setShowFilterPanel(false);
-                    }}
-                  >
-                    {showOnlyFavorites ? '顯示全部' : '只顯示收藏'}
-                  </Button>
-
-                  <Button variant="outline-danger" onClick={onRestart}>
-                    {backIcon}
-                    &nbsp; 返回
-                  </Button>
-                </div>
-              </Offcanvas.Body>
-            </Offcanvas>
-          </>
+          <MobileWordFilterOffcanvas
+            show={showFilterPanel}
+            onOpen={() => setShowFilterPanel(true)}
+            onClose={() => setShowFilterPanel(false)}
+            sortOrder={sortOrder}
+            onSortOrderChange={setSortOrder}
+            filterLetter={filterLetter}
+            onFilterLetterChange={setFilterLetter}
+            alphabet={alphabet}
+            frequencyFilter={frequencyFilter}
+            onFrequencyFilterChange={setFrequencyFilter}
+            showFavoritesToggle
+            showOnlyFavorites={showOnlyFavorites}
+            onToggleFavorites={() => setShowOnlyFavorites(prev => !prev)}
+            footer={(
+              <Button type="button" variant="outline-danger" onClick={onRestart}>
+                {backIcon}
+                &nbsp; 返回
+              </Button>
+            )}
+          />
         ) : (
           <div className="d-flex mb-3 align-items-center flex-wrap gap-2">
             <Button
+              type="button"
               variant="outline-dark"
               className="me-3"
               onClick={() => setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'))}
@@ -124,6 +77,7 @@ export default function CameraFilterControls({
             </Dropdown>
 
             <Button
+              type="button"
               className="ms-3"
               variant={showOnlyFavorites ? "danger" : "outline-dark"}
               onClick={() => setShowOnlyFavorites(prev => !prev)}
@@ -131,7 +85,7 @@ export default function CameraFilterControls({
               {showOnlyFavorites ? '顯示全部' : '只顯示收藏'}
             </Button>
 
-            <Button className="ms-3" variant="outline-danger" onClick={onRestart}>
+            <Button type="button" className="ms-3" variant="outline-danger" onClick={onRestart}>
               {backIcon}
               &nbsp; 返回
             </Button>
@@ -139,57 +93,14 @@ export default function CameraFilterControls({
         )}
       </div>
 
-      {/* 📂 分類Bar */}
-      <div
-        className="category-bar yy-card d-flex justify-content-between align-items-center"
-        role="button"
-        tabIndex={0}
-        onClick={() => setShowCategories(!showCategories)}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowCategories(!showCategories); } }}
-      >
-        <span className="fw-bold">📂 單詞分類
-          {selectedSubCategory && (
-            <span style={{ marginLeft: "8px" }}>
-              - <span style={{ color: "var(--yy-red)" }}>{selectedSubCategory}</span>
-            </span>
-          )}</span>
-        {showCategories ? <FaChevronUp /> : <FaChevronDown />}
-      </div>
-
-      {/* 展開分類 Tabs */}
-      {showCategories && (
-        <div className="category-panel yy-card mt-2">
-          <Tabs
-            activeKey={activeTab}
-            onSelect={(k) => setActiveTab(k)}
-            className="mb-3"
-            justify
-          >
-            {Object.keys(categoryGroups).map((group) => (
-              <Tab eventKey={group} title={group} key={group}>
-                <div className="subcategory-scroll">
-                  {categoryGroups[group].map((sub) => (
-                    <div
-                      key={sub.name}
-                      className={`subcategory-card ${
-                        selectedSubCategory === sub.name ? 'active' : ''
-                      }`}
-                      onClick={() => {
-                        setSelectedSubCategory(
-                          selectedSubCategory === sub.name ? null : sub.name
-                        ); setShowCategories(!showCategories);
-                      }}
-                    >
-                      <img src={sub.image} alt={sub.name} loading="lazy" />
-                      <h5 className="fw-bold">{sub.name}</h5>
-                    </div>
-                  ))}
-                </div>
-              </Tab>
-            ))}
-          </Tabs>
-        </div>
-      )}
+      <CategoryBar
+        showCategories={showCategories}
+        setShowCategories={setShowCategories}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        selectedSubCategory={selectedSubCategory}
+        setSelectedSubCategory={setSelectedSubCategory}
+      />
     </>
   );
 }

@@ -1,7 +1,7 @@
 import { db } from "../../../firebase";
 import {
   addDoc, collection, doc, getCountFromServer, getDoc, getDocs,
-  limit, orderBy, query, serverTimestamp, startAfter, updateDoc, where,
+  limit, orderBy, query, runTransaction, serverTimestamp, startAfter, updateDoc, where,
 } from "firebase/firestore";
 
 /**
@@ -72,9 +72,30 @@ export async function fetchSharedNoteById(id) {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
-/** 寫回按讚狀態，呼叫端自行算好新的 likes／likedBy（樂觀更新、失敗回滾都在呼叫端處理）。 */
-export async function setNoteLikeState(noteId, { likes, likedBy }) {
-  return updateDoc(doc(db, SHARED_NOTES_COLLECTION, noteId), { likes, likedBy });
+/**
+ * 切換按讚狀態。在 transaction 內讀伺服器上最新的 likedBy 再決定新增/移除，
+ * 不是呼叫端自己拿舊的 note 物件算好絕對值再整包覆寫——不同分頁/裝置/使用者
+ * 同時按讚時，後者會互相蓋掉對方剛寫入的結果（見這批審查發現的按讚 race）。
+ * 回傳 transaction 內算出的最新 { likes, likedBy }，呼叫端用這個回傳值同步
+ * 本地畫面，不要自己再算一次。
+ */
+export async function toggleNoteLike(noteId, uid) {
+  const docRef = doc(db, SHARED_NOTES_COLLECTION, noteId);
+  return runTransaction(db, async (tx) => {
+    const snap = await tx.get(docRef);
+    if (!snap.exists()) {
+      throw new Error("這則筆記已經不存在了");
+    }
+    const data = snap.data();
+    const likedBy = Array.isArray(data.likedBy) ? data.likedBy : [];
+    const alreadyLiked = likedBy.includes(uid);
+    const newLikedBy = alreadyLiked
+      ? likedBy.filter((id) => id !== uid)
+      : [...likedBy, uid];
+    const newLikes = Math.max(0, newLikedBy.length);
+    tx.update(docRef, { likes: newLikes, likedBy: newLikedBy });
+    return { likes: newLikes, likedBy: newLikedBy };
+  });
 }
 
 /** 軟刪除（deleted: true），不是真的從 Firestore 移除文件。 */

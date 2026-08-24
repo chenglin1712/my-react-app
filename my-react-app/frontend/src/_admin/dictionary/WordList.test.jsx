@@ -6,6 +6,7 @@ import {
     vi,
 } from 'vitest';
 import {
+    act,
     fireEvent,
     render,
     screen,
@@ -175,6 +176,49 @@ describe('WordList', () => {
         expect(screen.getByRole('button', {
             name: /詳情/,
         })).toBeInTheDocument();
+    });
+
+    test('回歸測試：較舊的搜尋晚回來時，不會覆蓋掉後送出的新搜尋結果', async () => {
+        renderPage();
+        await screen.findByText('abas');
+
+        let resolveFirstSearch;
+        listWords.mockImplementation((params) => {
+            if (params.keyword === 'first') {
+                return new Promise((resolve) => { resolveFirstSearch = resolve; });
+            }
+            return Promise.resolve({
+                results: [{
+                    ...word, id: 'word-2', name: 'maku', pending_revision: null,
+                }],
+                count: 1,
+                page: 1,
+                page_size: 20,
+            });
+        });
+
+        fireEvent.change(screen.getByLabelText('關鍵字'), { target: { value: 'first' } });
+        fireEvent.click(screen.getByRole('button', { name: /搜尋/ }));
+        await waitFor(() => expect(listWords).toHaveBeenCalledWith(
+            expect.objectContaining({ keyword: 'first' }),
+        ));
+
+        fireEvent.change(screen.getByLabelText('關鍵字'), { target: { value: 'second' } });
+        fireEvent.click(screen.getByRole('button', { name: /搜尋/ }));
+        expect(await screen.findByText('maku')).toBeInTheDocument();
+
+        // 較舊的第一次搜尋（keyword: 'first'）這時候才回來。
+        await act(async () => {
+            resolveFirstSearch({
+                results: [word], count: 1, page: 1, page_size: 20,
+            });
+            await Promise.resolve();
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+
+        expect(screen.getByText('maku')).toBeInTheDocument();
+        expect(screen.queryByText('abas')).not.toBeInTheDocument();
     });
 
     test('下一頁會重新載入伺服器分頁資料', async () => {

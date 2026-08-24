@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
     createWordProposal,
@@ -11,6 +11,7 @@ import {
     updateRevisionPayload,
 } from './dictionaryApi';
 import { useRevisionActions } from './useRevisionActions';
+import { useActionLock } from '../hooks/useActionLock';
 
 /**
  * 詞條編輯頁的遠端資料與提案流程（FE-7）。
@@ -38,7 +39,6 @@ export function useWordEditorData({
     const [revision, setRevision] = useState(null);
     const [baseHash, setBaseHash] = useState('');
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
     const [pageError, setPageError] = useState('');
     const [success, setSuccess] = useState('');
 
@@ -47,15 +47,58 @@ export function useWordEditorData({
     const [showDeletePanel, setShowDeletePanel] = useState(false);
     const [unlinkReferences, setUnlinkReferences] = useState(false);
 
-    const handleRevisionChanged = useCallback((result) => {
+    // 儲存草稿、送審類動作（submit/withdraw/approve/reject/discard）、建立
+    // 刪除提案彼此都應該互斥，因此共用同一把鎖——而不是像原本那樣各自用一個
+    // state 當忙碌旗標。單純的 state 只能靠下一次 render 才反映到 disabled
+    // 屬性上，擋不住「儲存」跟「送審」在同一個 tick 內各自被觸發一次。
+    const lock = useActionLock();
+    const saving = lock.pendingKey === 'save' || lock.pendingKey === 'delete';
+
+    // 讀取詞條引用資料（用於刪除提案面板）是查詢，不是異動，不應該被上面
+    // 那把 mutation 鎖擋住；但它自己需要一個 generation guard，避免同一個
+    // tick 重複點開面板送出兩次請求，或是切換到另一筆詞條之後，上一筆的
+    // 回應才回來、寫進新詞條的刪除面板裡。
+    const referencesGenerationRef = useRef(0);
+
+    const handleRevisionChanged = useCallback(async (result, actionKey) => {
         setPageError('');
+
+        if (actionKey === 'discard') {
+            // discard 成功後後端只回 { detail: '已捨棄' }，沒有 id/status/
+            // payload。原本的寫法一律用 revisionFromSave(result, current)
+            // 合併，等於把舊 revision 的欄位整個從 current 補回來——後端
+            // 明明已經刪掉這筆 revision，畫面卻繼續顯示它存在，之後再操作
+            // 會打到一個已經不存在的 revision id。
+            //
+            // 這裡改成依原本的提案類型分開處理：
+            //   - create 草稿（詞條原本就不存在）：使用者選擇的行為是清空
+            //     表單，回到「尚未儲存」的空白狀態。
+            //   - update／delete 草稿（詞條本來就存在）：重新載入目前的
+            //     正式內容，不能留著已捨棄草稿的表單內容。
+            setSuccess('提案已捨棄');
+            setRevision(null);
+
+            if (isNew) {
+                reset(prefillName ? { ...emptyWord, name: prefillName } : emptyWord);
+            } else {
+                try {
+                    const word = await getWord(id);
+                    setBaseHash(word.content_hash ?? '');
+                    reset(normalizeWord(word));
+                } catch (err) {
+                    setPageError(err.message);
+                }
+            }
+            return;
+        }
+
         setSuccess('提案狀態已更新');
         setRevision((current) => revisionFromSave(result, current));
-    }, [revisionFromSave]);
+    }, [emptyWord, id, isNew, normalizeWord, prefillName, reset, revisionFromSave]);
 
     const revisionActions = useRevisionActions(
         revision?.id ?? null,
-        { onChanged: handleRevisionChanged },
+        { onChanged: handleRevisionChanged, lock },
     );
 
     useEffect(() => {
@@ -64,6 +107,22 @@ export function useWordEditorData({
         (async () => {
             setLoading(true);
             setPageError('');
+            // 同一個路由元件在 /words/A 跟 /words/B 之間切換時會被 React
+            // Router 重用，不會重新掛載。上一筆詞條殘留的刪除面板／引用
+            // 資料要先清掉，否則新詞條載入失敗時，畫面會留著舊詞條的刪除
+            // 面板內容，看起來像是在對新詞條操作。
+            setShowDeletePanel(false);
+            setUnlinkReferences(false);
+            setReferences(null);
+            referencesGenerationRef.current += 1;
+
+            // 表單也要先清空：舊詞條的表單內容不能在新詞條載入失敗時繼續
+            // 留在畫面上（那會讓使用者誤以為自己正在看新詞條的資料）。
+            // isNew 分支下面就會用 prefillName 重新 reset 一次，這裡不用
+            // 先清。loading 為 true 時整頁只顯示 Spinner，不會有閃爍。
+            if (!isNew) {
+                reset(emptyWord);
+            }
 
             try {
                 const taxonomyResult = await listTaxonomies();
@@ -72,6 +131,8 @@ export function useWordEditorData({
 
                 if (isNew) {
                     reset(prefillName ? { ...emptyWord, name: prefillName } : emptyWord);
+                    setRevision(null);
+                    setBaseHash('');
                     return;
                 }
 
@@ -111,10 +172,9 @@ export function useWordEditorData({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, isNew, reset, prefillName]);
 
-    const saveDraft = async (buildPayload) => {
+    const saveDraft = (buildPayload) => lock.runLocked('save', async () => {
         setPageError('');
         setSuccess('');
-        setSaving(true);
 
         try {
             const payload = buildPayload();
@@ -153,10 +213,8 @@ export function useWordEditorData({
                 setPageError(err.message);
             }
             return null;
-        } finally {
-            setSaving(false);
         }
-    };
+    });
 
     const runRevisionAction = async (action) => {
         setPageError('');
@@ -170,21 +228,27 @@ export function useWordEditorData({
     };
 
     const openDeletePanel = async () => {
+        const generation = (referencesGenerationRef.current += 1);
+
         setPageError('');
         setShowDeletePanel(true);
         setLoadingReferences(true);
 
         try {
-            setReferences(await getWordReferences(id));
+            const result = await getWordReferences(id);
+            if (generation !== referencesGenerationRef.current) return;
+            setReferences(result);
         } catch (err) {
+            if (generation !== referencesGenerationRef.current) return;
             setPageError(err.message);
         } finally {
-            setLoadingReferences(false);
+            if (generation === referencesGenerationRef.current) {
+                setLoadingReferences(false);
+            }
         }
     };
 
-    const createDeleteProposal = async () => {
-        setSaving(true);
+    const createDeleteProposal = () => lock.runLocked('delete', async () => {
         setPageError('');
         setSuccess('');
 
@@ -199,10 +263,8 @@ export function useWordEditorData({
             setSuccess('刪除提案草稿已建立');
         } catch (err) {
             setPageError(err.message);
-        } finally {
-            setSaving(false);
         }
-    };
+    });
 
     const hasReferences = (
         (references?.counts?.anaphora_items ?? 0)

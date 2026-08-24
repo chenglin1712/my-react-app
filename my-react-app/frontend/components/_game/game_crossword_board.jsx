@@ -3,7 +3,22 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { apiGet } from "../../utils/apiClient";
 import "../../static/css/_game/game_crossword_board.css";
 
-const Game_crossword_board = forwardRef(({ gameDataLoaded, tribe }, ref) => {
+function buildInitialAnswerGrid(gridSolution) {
+  return gridSolution.map((rowStr) => {
+    const cleanRow = rowStr.replace(/\s/g, ""); // 移除空格
+    return cleanRow.split("").map((cell) => (cell !== "-" ? "" : "-")); // 可填寫的格子為空字串，黑格為 '-'
+  });
+}
+
+function isValidCrosswordResponse(data) {
+  return (
+    Array.isArray(data?.grid_solution) &&
+    Array.isArray(data?.legend) &&
+    Array.isArray(data?.grid_display)
+  );
+}
+
+const Game_crossword_board = forwardRef(({ tribe, disabled, onReadyChange }, ref) => {
   const [crosswordData, setCrosswordData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -11,65 +26,68 @@ const Game_crossword_board = forwardRef(({ gameDataLoaded, tribe }, ref) => {
 
   const handleCellChange = (rowIndex, colIndex, event) => {
     const newValue = event.target.value.toLowerCase();
+    if (newValue.length > 1) return;
 
-    if (newValue.length > 1) {
-      return;
-    }
-
-    const newAnswersGrid = userAnswersGrid.map((row, rIdx) => {
-      if (rIdx === rowIndex) {
-        return row.map((cellValue, cIdx) => {
-          if (cIdx === colIndex) {
-            return newValue;
-          }
-          return cellValue;
-        });
-      }
-      return row;
-    });
-    setUserAnswersGrid(newAnswersGrid);
+    setUserAnswersGrid((prev) => prev.map((row, rIdx) => {
+      if (rIdx !== rowIndex) return row;
+      return row.map((cellValue, cIdx) => (cIdx === colIndex ? newValue : cellValue));
+    }));
   };
 
   useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    onReadyChange?.(false);
+
     const fetchCrossword = async () => {
       try {
         const data = await apiGet('/CrosswordPuzzle/generate/', { params: { tribe: tribe || 'tayal' } });
-        setCrosswordData(data);
-
-        // 根據解答網格初始化使用者答案網格
-        const initialAnswers = data.grid_solution.map((rowStr) => {
-          const cleanRow = rowStr.replace(/\s/g, ""); // 移除空格
-          return cleanRow.split("").map((cell) => {
-            return cell !== "-" ? "" : "-"; // 可填寫的格子為空字串，黑格為 '-'
-          });
-        });
-        setUserAnswersGrid(initialAnswers);
-
-        if (gameDataLoaded) {
-          gameDataLoaded(data, initialAnswers);
+        if (cancelled) return;
+        if (!isValidCrosswordResponse(data)) {
+          setError("題目載入失敗，請稍後再試。");
+          return;
         }
+
+        setCrosswordData(data);
+        setUserAnswersGrid(buildInitialAnswerGrid(data.grid_solution));
+        onReadyChange?.(true);
       } catch (err) {
-        setError("Failed to fetch crossword: " + err.message);
-        console.error("Error fetching crossword:", err);
+        if (cancelled) return;
+        console.error("填字遊戲題目載入失敗:", err.message);
+        setError("題目載入失敗，請稍後再試。");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchCrossword();
-  }, [gameDataLoaded, tribe]);
+
+    return () => {
+      cancelled = true;
+      onReadyChange?.(false);
+    };
+  }, [tribe, onReadyChange]);
 
   useImperativeHandle(ref, () => ({
-    getUserAnswers: () => userAnswersGrid,
-    getCurrentAnswers: () => crosswordData?.grid_solution,
-    getCrosswordLegend: () => crosswordData?.legend,
-    getCrosswordGridDisplay: () => crosswordData?.grid_display,
+    // 提交需要的四樣東西（使用者填的答案、正解、圖例、顯示用網格）永遠一起
+    // 出現、一起消失，包成一個方法，呼叫端不用個別檢查每一樣是否就緒，也不會
+    // 因為題目還沒載入完成／載入失敗而送出缺欄位的提交內容。
+    getSubmissionPayload: () => {
+      if (!crosswordData || userAnswersGrid.length === 0) return null;
+      return {
+        user_answers: userAnswersGrid,
+        crossword_solution: crosswordData.grid_solution,
+        crossword_legend: crosswordData.legend,
+        crossword_grid_display: crosswordData.grid_display,
+      };
+    },
   }));
 
   if (loading) {
     return <div className="area-loading">載入填字遊戲中</div>;
   }
   if (error) {
-    return <div className="area-loading">錯誤: {error}</div>;
+    return <div className="area-loading" role="alert">{error}</div>;
   }
   if (!crosswordData) {
     return <div className="area-loading">沒有產生填字遊戲</div>;
@@ -125,10 +143,10 @@ const Game_crossword_board = forwardRef(({ gameDataLoaded, tribe }, ref) => {
                     maxLength="1"
                     value={userAnswersGrid[rowIndex]?.[colIndex] || ""}
                     onChange={(e) => handleCellChange(rowIndex, colIndex, e)}
-                    readOnly={isNonInputCell}
+                    disabled={disabled}
                     aria-label={`填字方格，第 ${rowIndex + 1} 列第 ${colIndex + 1} 欄`}
                     style={{
-                      cursor: isNonInputCell ? "default" : "text",
+                      cursor: disabled ? "not-allowed" : "text",
                       textTransform: "lowercase",
                     }}
                   />
@@ -171,8 +189,9 @@ const Game_crossword_board = forwardRef(({ gameDataLoaded, tribe }, ref) => {
 Game_crossword_board.displayName = "Game_crossword_board";
 
 Game_crossword_board.propTypes = {
-  gameDataLoaded: PropTypes.func,
   tribe: PropTypes.string,
+  disabled: PropTypes.bool,
+  onReadyChange: PropTypes.func,
 };
 
 export default Game_crossword_board;

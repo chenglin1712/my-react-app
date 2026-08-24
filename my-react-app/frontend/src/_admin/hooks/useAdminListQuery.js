@@ -58,14 +58,18 @@ export function useAdminListQuery({
     const latestRequestRef = useRef(0);
 
     const load = useCallback(async () => {
+        // 先遞增 generation 再判斷 enabled：如果不這樣做，enabled 從 true 變成
+        // false 時（例如權限被收回）不會讓還在跑的舊請求失效，它的 generation
+        // 仍然是「最新」，回來後照樣可以把 data/error/loading 寫回去，跟這個
+        // hook 自己宣稱的「enabled=false 時不查詢」互相矛盾。
+        const requestId = latestRequestRef.current + 1;
+        latestRequestRef.current = requestId;
+        const isStale = () => latestRequestRef.current !== requestId;
+
         if (!enabled) {
             setLoading(false);
             return;
         }
-
-        const requestId = latestRequestRef.current + 1;
-        latestRequestRef.current = requestId;
-        const isStale = () => latestRequestRef.current !== requestId;
 
         setLoading(true);
         setError('');

@@ -1,0 +1,71 @@
+/* 「單詞分類」下拉/Tabs 面板：原本 _search/_camera/_favorite 各自維護一份幾乎
+   一樣的 CSS（且已經彼此走鐘——收藏版用寫死的 hex 色碼），這裡集中成單一
+   來源，跟隨 CategoryBar.jsx 元件本身共用。 */
+
+.category-bar {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px 22px;
+  cursor: pointer;
+  font-weight: 700;
+  border: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.category-panel {
+  max-width: 720px;
+  margin: 14px auto 0;
+  padding: 20px 22px;
+}
+
+.subcategory-scroll {
+  display: flex;
+  overflow-x: auto;
+  gap: 12px;
+  padding: 8px;
+  scroll-behavior: smooth;
+}
+
+.subcategory-card {
+  flex: 0 0 auto;
+  width: 190px;
+  height: 190px;
+  text-align: center;
+  border-radius: var(--yy-radius-card);
+  padding: 6px;
+  background-color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid var(--yy-ink);
+  font: inherit;
+  color: inherit;
+}
+
+.subcategory-card img {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+}
+
+/* 這條規則其實從三份原始檔案搬過來時就沒有真的套用到過——卡片上顯示分類
+   名稱的是 <h5>，不是 <span>，維持原樣不強改視覺，只留這個註記。 */
+.subcategory-card span {
+  display: block;
+  font-size: 13px;
+  margin-top: 4px;
+  color: #333;
+}
+
+.subcategory-card:hover {
+  border-color: var(--yy-gold);
+  box-shadow: var(--yy-shadow-sm);
+}
+
+.subcategory-card.active {
+  border-color: var(--yy-red);
+  background-color: var(--yy-cream);
+  box-shadow: var(--yy-shadow-sm);
+}

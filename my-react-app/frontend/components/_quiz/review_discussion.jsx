@@ -2,7 +2,12 @@ import "../../static/css/_quiz/review_discussion.css"
 import { useState } from "react";
 import { UserCircle, Send, MessageCircle, ThumbsUp, CornerDownRight } from "lucide-react";
 
-const Discussion = () => {
+// 目前整個討論區是純前端假資料（寫死的留言/頭像），送出留言、按讚都只
+// 改本地 state，沒有寫進任何後端，重新整理就會消失，其他使用者也看不到；
+// 「回覆」按鈕甚至沒有接事件。review.jsx 的 ReviewTabs 已經把這個分頁標成
+// 「即將推出」、擋掉導覽，這裡先不假裝功能完整，等真的要做留言/按讚/回覆
+// 的持久化與使用者身分時再實作。
+const ReviewDiscussion = () => {
     const [messages, setMessages] = useState([
         {
             id: 1,
@@ -121,4 +126,4 @@ const Discussion = () => {
         </div>
     );
 };
-export default Discussion;
+export default ReviewDiscussion;

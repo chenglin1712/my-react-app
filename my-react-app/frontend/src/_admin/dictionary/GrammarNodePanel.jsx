@@ -38,26 +38,8 @@ import {
     canProposeDictionaryChanges,
     useRevisionActions,
 } from './useRevisionActions';
-
-const STATUS_META = {
-    draft: {
-        label: '草稿',
-        bg: 'secondary',
-    },
-    pending_review: {
-        label: '送審中',
-        bg: 'warning',
-        text: 'dark',
-    },
-    approved: {
-        label: '已核准',
-        bg: 'success',
-    },
-    rejected: {
-        label: '已退件',
-        bg: 'danger',
-    },
-};
+import { REVISION_STATUS_META as STATUS_META, revisionFromSave } from './revisionMeta';
+import { useActionLock } from '../hooks/useActionLock';
 
 const emptySection = (tribeId = '') => ({
     tribe_id: tribeId,
@@ -117,19 +99,6 @@ function normalizeSection(source, fallbackTribeId) {
                 })),
             })),
         })),
-    };
-}
-
-function revisionFromSave(result, fallback) {
-    const revisionId = result?.revision_id ?? result?.id ?? fallback?.id;
-
-    return {
-        ...fallback,
-        ...result,
-        id: revisionId,
-        status: result?.status ?? fallback?.status ?? 'draft',
-        operation: result?.operation ?? fallback?.operation,
-        payload: result?.payload ?? fallback?.payload,
     };
 }
 
@@ -492,29 +461,63 @@ export default function GrammarNodePanel({
     const [revision, setRevision] = useState(null);
     const [baseHash, setBaseHash] = useState('');
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
     const [pageError, setPageError] = useState('');
     const [success, setSuccess] = useState('');
     const [reviewComment, setReviewComment] = useState('');
 
+    // 儲存草稿、送審類動作（submit/withdraw/approve/reject/discard）、建立
+    // 刪除提案彼此都應該互斥，共用同一把鎖——而不是像原本那樣各自用一個
+    // state 當忙碌旗標（那樣擋不住「儲存」跟「送審」在同一個 tick 內各自
+    // 被觸發一次）。
+    const lock = useActionLock();
+    const saving = lock.pendingKey === 'save' || lock.pendingKey === 'delete';
+
     const revisionStatus = revision?.status ?? null;
     const canEditRole = canProposeDictionaryChanges(role);
     const canApprove = canApproveDictionaryChanges(role);
-    const editable = canEditRole && (
+    // 刪除提案（operation === 'delete'）也是 draft 狀態，但它的內容是
+    // null——語意上是「要刪除這個章節」，不是可以繼續編輯的一般草稿。
+    const isDeleteProposal = revision?.operation === 'delete';
+    const editable = canEditRole && !isDeleteProposal && (
         (!revision && (isNew || Boolean(sectionId)))
         || revisionStatus === 'draft'
     );
 
-    const handleRevisionChanged = useCallback((result) => {
+    const handleRevisionChanged = useCallback(async (result, actionKey) => {
         setPageError('');
+
+        if (actionKey === 'discard') {
+            // discard 成功後後端只回 { detail: '已捨棄' }，沒有 id/status/
+            // payload；沿用 revisionFromSave(result, current) 合併會把舊
+            // revision 的欄位整個從 current 補回來，畫面就會繼續顯示一個
+            // 後端已經不存在的提案。
+            setSuccess('提案已捨棄');
+            setRevision(null);
+
+            if (isNew) {
+                reset(emptySection(tribeId));
+            } else {
+                try {
+                    const section = await getGrammarSection(sectionId);
+                    setBaseHash(section.content_hash ?? '');
+                    reset(normalizeSection(section, tribeId));
+                } catch (err) {
+                    setPageError(err.message);
+                }
+            }
+
+            await onSaved();
+            return;
+        }
+
         setSuccess('提案狀態已更新');
         setRevision((current) => revisionFromSave(result, current));
         onSaved();
-    }, [onSaved]);
+    }, [isNew, onSaved, reset, sectionId, tribeId]);
 
     const revisionActions = useRevisionActions(
         revision?.id ?? null,
-        { onChanged: handleRevisionChanged },
+        { onChanged: handleRevisionChanged, lock },
     );
 
     useEffect(() => {
@@ -589,65 +592,63 @@ export default function GrammarNodePanel({
         };
     };
 
-    const saveDraft = async () => {
+    const saveDraft = () => {
         setPageError('');
         setSuccess('');
 
         if (!tree.tribe_id) {
             setPageError('族語為必填');
-            return null;
+            return Promise.resolve(null);
         }
 
         if (!tree.title.trim()) {
             setPageError('章節名稱為必填');
-            return null;
+            return Promise.resolve(null);
         }
 
-        setSaving(true);
+        return lock.runLocked('save', async () => {
+            try {
+                const payload = buildPayload();
+                let result;
 
-        try {
-            const payload = buildPayload();
-            let result;
-
-            if (revision?.id) {
-                if (revision.status !== 'draft') {
-                    throw new Error('只有草稿提案可以修改內容');
+                if (revision?.id) {
+                    if (revision.status !== 'draft') {
+                        throw new Error('只有草稿提案可以修改內容');
+                    }
+                    result = await updateRevisionPayload(revision.id, payload);
+                } else if (isNew) {
+                    result = await createGrammarSectionProposal(payload);
+                } else {
+                    result = await proposeGrammarSectionUpdate(sectionId, {
+                        ...payload,
+                        base_hash: baseHash,
+                    });
                 }
-                result = await updateRevisionPayload(revision.id, payload);
-            } else if (isNew) {
-                result = await createGrammarSectionProposal(payload);
-            } else {
-                result = await proposeGrammarSectionUpdate(sectionId, {
-                    ...payload,
-                    base_hash: baseHash,
+
+                const nextRevision = revisionFromSave(result, {
+                    ...revision,
+                    operation: isNew ? 'create' : 'update',
+                    status: 'draft',
+                    payload,
                 });
+
+                setRevision(nextRevision);
+                setSuccess('草稿已儲存');
+                await onSaved();
+
+                return nextRevision;
+            } catch (err) {
+                if (err.status === 409) {
+                    setPageError(
+                        `${err.message} 文法章節在編輯期間已被其他人修改，`
+                        + '請重新載入最新內容後再建立提案。',
+                    );
+                } else {
+                    setPageError(err.message);
+                }
+                return null;
             }
-
-            const nextRevision = revisionFromSave(result, {
-                ...revision,
-                operation: isNew ? 'create' : 'update',
-                status: 'draft',
-                payload,
-            });
-
-            setRevision(nextRevision);
-            setSuccess('草稿已儲存');
-            await onSaved();
-
-            return nextRevision;
-        } catch (err) {
-            if (err.status === 409) {
-                setPageError(
-                    `${err.message} 文法章節在編輯期間已被其他人修改，`
-                    + '請重新載入最新內容後再建立提案。',
-                );
-            } else {
-                setPageError(err.message);
-            }
-            return null;
-        } finally {
-            setSaving(false);
-        }
+        });
     };
 
     const runRevisionAction = async (action) => {
@@ -661,31 +662,30 @@ export default function GrammarNodePanel({
         }
     };
 
-    const createDeleteProposal = async () => {
+    const createDeleteProposal = () => {
         if (!window.confirm('確定要刪除這個文法章節嗎？此操作無法復原。')) {
-            return;
+            return Promise.resolve();
         }
 
-        setSaving(true);
-        setPageError('');
-        setSuccess('');
+        return lock.runLocked('delete', async () => {
+            setPageError('');
+            setSuccess('');
 
-        try {
-            const result = await proposeGrammarSectionDelete(sectionId);
-            setRevision(revisionFromSave(result, {
-                status: 'draft',
-                operation: 'delete',
-                payload: null,
-            }));
-            setSuccess('刪除提案草稿已建立');
-            // 刪除提案建立後章節仍存在（要核准後才真的移除），這裡只刷新
-            // 父層清單讓 pending_revision 徽章更新，不清除目前的選取。
-            await onSaved();
-        } catch (err) {
-            setPageError(err.message);
-        } finally {
-            setSaving(false);
-        }
+            try {
+                const result = await proposeGrammarSectionDelete(sectionId);
+                setRevision(revisionFromSave(result, {
+                    status: 'draft',
+                    operation: 'delete',
+                    payload: null,
+                }));
+                setSuccess('刪除提案草稿已建立');
+                // 刪除提案建立後章節仍存在（要核准後才真的移除），這裡只刷新
+                // 父層清單讓 pending_revision 徽章更新，不清除目前的選取。
+                await onSaved();
+            } catch (err) {
+                setPageError(err.message);
+            }
+        });
     };
 
     if (loading) {
@@ -717,9 +717,10 @@ export default function GrammarNodePanel({
 
             {!editable && (
                 <Alert variant="warning">
-                    {revisionStatus === 'pending_review' && '此章節提案正在送審，欄位為唯讀；編輯者可先撤回提案再修改。'}
-                    {revisionStatus === 'approved' && '此章節提案已核准，內容為唯讀。'}
-                    {revisionStatus === 'rejected' && '此章節提案已退件，內容為唯讀。'}
+                    {isDeleteProposal && '此章節已建立刪除提案，內容為唯讀；可以送審或捨棄這個提案。'}
+                    {!isDeleteProposal && revisionStatus === 'pending_review' && '此章節提案正在送審，欄位為唯讀；編輯者可先撤回提案再修改。'}
+                    {!isDeleteProposal && revisionStatus === 'approved' && '此章節提案已核准，內容為唯讀。'}
+                    {!isDeleteProposal && revisionStatus === 'rejected' && '此章節提案已退件，內容為唯讀。'}
                     {!canEditRole && '目前角色沒有文法章節編輯權限。'}
                 </Alert>
             )}

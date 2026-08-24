@@ -68,6 +68,32 @@ describe('CameraResultStep', () => {
     );
   });
 
+  test('回歸測試：快速切換族語時，比較慢的舊族語回應不會蓋掉新族語已經顯示的結果', async () => {
+    let resolveTayal;
+    axios.post.mockImplementation((url, body) => {
+      if (body.tribe === 'tayal') {
+        return new Promise((resolve) => { resolveTayal = resolve; });
+      }
+      return Promise.resolve({
+        data: {
+          exact_match_results: { cyux: [{ name: 'cyux', explanationItems: [{ chineseExplanation: '看' }] }] },
+          fuzzy_match_results: {},
+        },
+      });
+    });
+
+    const { rerender } = render(<CameraResultStep selectedWords={['balay']} tribe="tayal" onRestart={vi.fn()} />);
+    rerender(<CameraResultStep selectedWords={['balay']} tribe="bunun" onRestart={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText('cyux')).toBeInTheDocument());
+
+    resolveTayal(FAKE_RESPONSE); // 過期的 tayal 回應這時候才回來
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(screen.queryByText('balay')).not.toBeInTheDocument();
+    expect(screen.getByText('cyux')).toBeInTheDocument();
+  });
+
   test('查詢失敗時顯示錯誤訊息並關閉 loading', async () => {
     axios.post.mockRejectedValueOnce({ message: 'Network Error' });
 

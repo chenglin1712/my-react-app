@@ -1,28 +1,19 @@
-import { useState } from 'react';
-import { Alert, Badge, Button, Form, Modal, Spinner, Table } from 'react-bootstrap';
+import { Alert, Button, Form, Modal, Spinner, Table } from 'react-bootstrap';
 import { Plus } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
-import { uploadToCloudinary } from '@utils/uploadToCloudinary';
 import RejectReasonModal from '../reviewWorkflow/RejectReasonModal';
 import ReviewActions from '../reviewWorkflow/ReviewActions';
 import ReviewPagination from '../reviewWorkflow/ReviewPagination';
 import { useReviewableContentCrud } from '../reviewWorkflow/useReviewableContentCrud';
+import { useMediaUpload } from '../hooks/useMediaUpload';
+import {
+  QUIZ_BANK_EDITORS as CONTENT_EDITORS,
+  QUIZ_BANK_ROLES,
+  QUIZ_BANK_STATUSES as STATUSES,
+  QuizStatusBadge,
+} from './quizBankReviewMeta';
 import '../../../static/css/_admin/quiz-bank.css';
-
-const CONTENT_EDITORS = ['owner', 'admin', 'editor'];
-const QUIZ_BANK_ROLES = {
-  editors: CONTENT_EDITORS,
-  approvers: ['owner', 'admin', 'reviewer'],
-  publishers: ['owner', 'admin'],
-};
-
-const STATUSES = {
-  draft: { label: '草稿', bg: 'secondary' },
-  pending_review: { label: '待審核', bg: 'warning' },
-  rejected: { label: '已退件', bg: 'danger' },
-  published: { label: '已啟用', bg: 'success' },
-};
 
 const EMPTY_FORM = {
   tribe: 'tayal',
@@ -61,34 +52,23 @@ export default function QuizTrueFalse() {
   });
 
   const { target: editTarget, form, setForm } = editor;
-  const [uploadingAudio, setUploadingAudio] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
+  // resetKey 用 editTarget 本身：openNew／openEdit 每次都會建立新的
+  // editTarget 物件，關閉 Modal 再開另一筆時，前一筆還在飛的上傳結果
+  // 不會被誤寫進現在正在編輯的這一筆（見 useMediaUpload 的說明）。
+  const media = useMediaUpload({ resetKey: editTarget });
+  const uploadingAudio = media.isUploading('audio_url');
+  const uploadingImage = media.isUploading('image_url');
 
-  const uploadFile = async (file, resourceType, field, setUploading) => {
-    if (!file) return;
-
-    setError('');
-    setUploading(true);
-
-    try {
-      // resourceType 是 'image' 或 'video'；uploadToCloudinary 的 transform
-      // 預設就跟著 resourceType 走（圖片加 f_auto,q_auto、影音不加），跟這裡
-      // 原本手寫 suffix 的行為一致，不需要另外指定。
-      const secureUrl = await uploadToCloudinary(file, { resourceType });
-      setForm((current) => ({
-        ...current,
-        [field]: secureUrl,
-      }));
-    } catch (err) {
-      console.error(
-        `${resourceType === 'image' ? '圖片' : '音檔'}上傳失敗`,
-        err,
-      );
-      setError(`${resourceType === 'image' ? '圖片' : '音檔'}上傳失敗`);
-    } finally {
-      setUploading(false);
-    }
-  };
+  // resourceType 是 'image' 或 'video'；uploadToCloudinary 的 transform
+  // 預設就跟著 resourceType 走（圖片加 f_auto,q_auto、影音不加），跟這裡
+  // 原本手寫 suffix 的行為一致，不需要另外指定。
+  const uploadFile = (file, resourceType, field) => media.upload(file, field, {
+    resourceType,
+    onUploaded: (secureUrl) => setForm((current) => ({
+      ...current,
+      [field]: secureUrl,
+    })),
+  });
 
   const saveForm = async (event) => {
     event.preventDefault();
@@ -131,6 +111,7 @@ export default function QuizTrueFalse() {
     && !uploadingAudio
     && !uploadingImage
   );
+  const formSubmitting = actionId === 'form';
 
 
   return (
@@ -142,7 +123,7 @@ export default function QuizTrueFalse() {
         </div>
       </div>
 
-      {error && <Alert variant="danger">{error}</Alert>}
+      {(error || media.error) && <Alert variant="danger">{error || media.error}</Alert>}
 
       <Form className="quiz-bank-filter-panel" onSubmit={search}>
         <Form.Select
@@ -220,19 +201,7 @@ export default function QuizTrueFalse() {
                         : 'X 不符合'}
                     </td>
                     <td>
-                      <div className="d-flex flex-wrap align-items-center gap-1">
-                        <Badge
-                          bg={STATUSES[item.status]?.bg ?? 'secondary'}
-                        >
-                          {STATUSES[item.status]?.label ?? item.status}
-                        </Badge>
-                        {item.status === 'published'
-                          && item.has_pending_revision && (
-                          <Badge bg="warning" text="dark">
-                            有待審修改
-                          </Badge>
-                        )}
-                      </div>
+                      <QuizStatusBadge item={item} />
                     </td>
                     <td>{item.created_by || '—'}</td>
                     <td>
@@ -242,6 +211,7 @@ export default function QuizTrueFalse() {
                           role={role}
                           roles={QUIZ_BANK_ROLES}
                           busy={actionId === item.id}
+                          disabled={Boolean(actionId) && actionId !== item.id}
                           onAction={handleAction}
                         />
                       </div>
@@ -270,12 +240,14 @@ export default function QuizTrueFalse() {
 
       <Modal
         show={Boolean(editTarget)}
-        onHide={editor.close}
+        onHide={formSubmitting ? undefined : editor.close}
         centered
         size="lg"
+        backdrop={formSubmitting ? 'static' : true}
+        keyboard={!formSubmitting}
       >
         <Form onSubmit={saveForm}>
-          <Modal.Header closeButton>
+          <Modal.Header closeButton={!formSubmitting}>
             <Modal.Title>
               {editTarget?.id
                 ? '編輯初級是非題'
@@ -357,7 +329,6 @@ export default function QuizTrueFalse() {
                   event.target.files?.[0],
                   'video',
                   'audio_url',
-                  setUploadingAudio,
                 )}
               />
               {uploadingAudio && (
@@ -392,7 +363,6 @@ export default function QuizTrueFalse() {
                   event.target.files?.[0],
                   'image',
                   'image_url',
-                  setUploadingImage,
                 )}
               />
               {uploadingImage && (
@@ -405,12 +375,7 @@ export default function QuizTrueFalse() {
                   <img
                     src={form.image_url}
                     alt="題目圖片預覽"
-                    style={{
-                      width: 180,
-                      height: 120,
-                      objectFit: 'cover',
-                      borderRadius: 8,
-                    }}
+                    className="quiz-bank-single-image-preview"
                   />
                 </div>
               )}
@@ -441,16 +406,18 @@ export default function QuizTrueFalse() {
 
           <Modal.Footer>
             <Button
+              type="button"
               variant="secondary"
+              disabled={formSubmitting}
               onClick={editor.close}
             >
               取消
             </Button>
             <Button
               type="submit"
-              disabled={!canSave || actionId === 'form'}
+              disabled={!canSave || formSubmitting}
             >
-              {actionId === 'form' && (
+              {formSubmitting && (
                 <Spinner animation="border" size="sm" />
               )}{' '}
               儲存

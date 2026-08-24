@@ -2,6 +2,20 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { apiPost } from "../../utils/apiClient";
 
+// vision.py 自己的註解就寫明「圖片辨識同一批 label 常常出現重複的英文單字
+// （例如同一物件被偵測到多次）」，回傳前沒有去重。同一段中文翻譯出現兩筆時
+// 只保留分數較高的那筆，避免畫面上出現兩列看起來一樣的候選詞。
+function mergeDuplicateLabels(labels) {
+    const bestByDescription = new Map();
+    for (const label of labels) {
+        const existing = bestByDescription.get(label.description);
+        if (!existing || label.score > existing.score) {
+            bestByDescription.set(label.description, label);
+        }
+    }
+    return Array.from(bestByDescription.values());
+}
+
 // 影像辨識精靈第 2 步：顯示 vision API 辨識出的候選單詞，讓使用者複選。
 // image/file/tribe 由 index.jsx（精靈容器）傳入，取代原本從路由 state 讀取。
 const CameraLabelStep = ({ image, file, onConfirm, onBack }) => {
@@ -30,7 +44,7 @@ const CameraLabelStep = ({ image, file, onConfirm, onBack }) => {
         // HTTPException／下面的 .catch，不需要另外檢查 response.data.error。
         analyze()
             .then((data) => {
-                setLabels(data.labels || []);
+                setLabels(mergeDuplicateLabels(data.labels || []));
             })
             .catch((err) => {
                 if (axios.isCancel(err)) return;
@@ -72,18 +86,17 @@ const CameraLabelStep = ({ image, file, onConfirm, onBack }) => {
                         {labels.map((label, index) => {
                             const active = selectedLabels.has(label.description);
                             return (
-                                <div
+                <button
+                                    type="button"
                                     key={index}
-                                    role="button"
-                                    tabIndex={0}
                                     className="camera-label-item"
+                                    aria-pressed={active}
                                     style={active ? { background: 'var(--yy-red)', color: 'var(--yy-cream)' } : undefined}
                                     onClick={() => toggleLabelSelection(label.description)}
-                                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleLabelSelection(label.description); } }}
                                 >
                                     <span className="camera-label-name">{label.description}</span>
                                     <span className="camera-label-score">{(label.score * 100).toFixed(0)}%</span>
-                                </div>
+                                </button>
                             );
                         })}
                     </div>

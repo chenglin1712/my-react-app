@@ -55,7 +55,8 @@ export const REVIEW_ACTION_META = {
  * @param {object} params.roles 這個內容類型採用的角色門檻
  * @param {string[]} params.roles.editors 可編輯／送審／撤回的角色
  * @param {string[]} params.roles.approvers 可核准／退件／下架的角色
- * @param {string[]} params.roles.publishers 可刪除草稿的角色
+ * @param {string[]} params.roles.publishers 可刪除草稿、以及在支援
+ *   unpublished 中介狀態時可重新發布（republish）的角色
  * @param {boolean} [params.supportsRevision=true] 這個內容類型是否有「已發布內容的待審修改」機制
  * @param {boolean} [params.supportsUnpublishedState=false] 這個內容類型是否有
  *   unpublished 這個中介狀態（目前只有公告有；題庫類內容下架就直接退回 draft）

@@ -1,5 +1,5 @@
-import { describe, test, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import CameraWizard from './index';
 
 // 精靈容器本身只負責 step 切換與圖片驗證，實際辨識/查詢邏輯在 label.jsx／result.jsx
@@ -27,6 +27,50 @@ const selectFile = (file) => {
   const input = screen.getByLabelText('選擇圖片檔案');
   fireEvent.change(input, { target: { files: [file] } });
 };
+
+describe('CameraWizard（回歸測試：FileReader race）', () => {
+  class FakeFileReader {
+    readAsDataURL(file) {
+      this.file = file;
+      FakeFileReader.instances.push(this);
+    }
+    triggerLoad(result) {
+      this.result = result;
+      this.onloadend?.();
+    }
+  }
+  FakeFileReader.instances = [];
+  let OriginalFileReader;
+
+  beforeEach(() => {
+    FakeFileReader.instances = [];
+    OriginalFileReader = window.FileReader;
+    window.FileReader = FakeFileReader;
+  });
+
+  afterEach(() => {
+    window.FileReader = OriginalFileReader;
+  });
+
+  test('快速選圖 A 再選圖 B，B 的 FileReader 先讀完、A 比較晚讀完時，畫面仍然顯示 B（不會被過期的 A 蓋回去）', () => {
+    render(<CameraWizard />);
+
+    const fileA = new File(['a'], 'a.png', { type: 'image/png' });
+    const fileB = new File(['b'], 'b.png', { type: 'image/png' });
+
+    selectFile(fileA);
+    selectFile(fileB);
+
+    expect(FakeFileReader.instances).toHaveLength(2);
+    const [readerA, readerB] = FakeFileReader.instances;
+
+    act(() => { readerB.triggerLoad('data:image/png;base64,B'); });
+    expect(document.querySelector('img[alt="預覽圖片"]').src).toContain('base64,B');
+
+    act(() => { readerA.triggerLoad('data:image/png;base64,A'); }); // 過期的 A 這時候才讀完
+    expect(document.querySelector('img[alt="預覽圖片"]').src).toContain('base64,B');
+  });
+});
 
 describe('CameraWizard', () => {
   test('第 1 步：選圖前，提交辨識按鈕是 disabled', () => {

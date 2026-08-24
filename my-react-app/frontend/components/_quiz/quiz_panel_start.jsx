@@ -2,21 +2,13 @@ import "../../static/css/_quiz/quiz_panel_start.css"
 import { useNavigate } from "react-router-dom";
 import RecommonImg from "../../static/assets/_quiz/recommon.png"
 import StepBar from "../ui/StepBar";
+import { QUIZ_LEVELS } from "./quizLevels";
 
 const QUIZ_STEPS = ["選擇族語", "選擇等級", "開始作答", "成績單"];
 
 const Panel_Start = ({ tribe = "tayal" }) => {
     const navigate = useNavigate();
     const basePath = tribe === "tayal" ? "/quiz" : `/quiz/${tribe}`;
-
-    const levels = [
-        { name: "初級", short: "初", time: "5 分鐘", type: "是非題", disabled: false },
-        { name: "中級", short: "中", time: "10 分鐘", type: "選擇題", disabled: false },
-        { name: "中高級", short: "中+", time: "10 分鐘", type: "配合題", disabled: false },
-        { name: "高級", short: "高", time: "20 分鐘", type: "閱讀填空", disabled: false }
-    ];
-
-    const recommendedLevelIndex = 1;
 
     return (
         <div className="panel-start-container">
@@ -28,13 +20,13 @@ const Panel_Start = ({ tribe = "tayal" }) => {
                 <p className="panel-subtitle">請選擇你的測驗等級</p>
 
                 <div className="level-selection">
-                    {levels.map((level, index) => (
+                    {QUIZ_LEVELS.map((level) => (
                         <div
-                            key={index}
-                            className={`level-card level-${index + 1} ${level.disabled ? "disabled" : ""}`}
+                            key={level.id}
+                            className={`level-card level-${level.id} ${level.disabled ? "disabled" : ""}`}
                         >
-                            {index === recommendedLevelIndex && (
-                                <img src={RecommonImg} className="level-recommend-img" />
+                            {level.recommended && (
+                                <img src={RecommonImg} alt="推薦等級" className="level-recommend-img" />
                             )}
 
                             <div className="level-card-icon">
@@ -44,17 +36,14 @@ const Panel_Start = ({ tribe = "tayal" }) => {
                             <div className="level-card-title">{level.name}</div>
 
                             <div className="level-card-info">
-                                <span style={{ color: "#8B0000", border: "1px solid #8B0000" }}>{level.type}</span>
-                                <span>預計時間：{level.time}</span>
+                                <span style={{ color: "#8B0000", border: "1px solid #8B0000" }}>{level.typeLabel}</span>
+                                <span>預計時間：{level.estimatedTime}</span>
                             </div>
 
                             <button
                                 className="level-card-btn"
-                                onClick={() => {
-                                    if (!level.disabled) {
-                                        navigate(`${basePath}/${index + 1}`);
-                                    }
-                                }}
+                                disabled={level.disabled}
+                                onClick={() => navigate(`${basePath}/${level.id}`)}
                             >
                                 {level.disabled ? "尚未開放" : "選擇"}
                             </button>

@@ -4,6 +4,8 @@ import RegisterForm from "../../components/_auth/registerForm"
 import TabSwitch from "../../components/ui/TabSwitch"
 import "../../static/css/_auth/authPage.css"
 
+const AUTH_TABS = [{ key: "login", label: "登入" }, { key: "register", label: "註冊" }];
+
 // 登入/註冊合併頁（YUAN・YU v2）：頂部 tab 切換登入／註冊，兩邊各自沿用
 // 既有的 LoginForm / RegisterForm（真實 Firebase 登入、Cloudinary 頭像上傳等）。
 // defaultView 讓 /login、/register 兩條既有路由分別預設開在對應的 tab 上，
@@ -22,7 +24,7 @@ function AuthPage({ defaultView = "login" }) {
                     </div>
                     <div className="auth-tabswitch-row">
                         <TabSwitch
-                            tabs={[{ key: "login", label: "登入" }, { key: "register", label: "註冊" }]}
+                            tabs={AUTH_TABS}
                             active={view}
                             onChange={setView}
                         />

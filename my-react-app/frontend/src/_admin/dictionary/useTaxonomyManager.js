@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
     createTaxonomyTerm,
@@ -6,6 +6,7 @@ import {
     listTaxonomies,
     updateTaxonomyTerm,
 } from './dictionaryApi';
+import { useActionLock } from '../hooks/useActionLock';
 
 const emptyAffixDraft = () => ({
     tribe_id: '',
@@ -34,34 +35,51 @@ export function useTaxonomyManager() {
 
     const [newName, setNewName] = useState('');
     const [newAffix, setNewAffix] = useState(emptyAffixDraft());
-    const [creating, setCreating] = useState(false);
 
     const [editingId, setEditingId] = useState(null);
     const [editDraft, setEditDraft] = useState(null);
-    const [savingEdit, setSavingEdit] = useState(false);
 
     const [deletingId, setDeletingId] = useState(null);
     const [mergeSource, setMergeSource] = useState(null);
 
+    // 建立／編輯／刪除彼此都應該互斥——用同一把鎖，而不是像原本那樣各自用
+    // 一個 state 當忙碌旗標（那樣不只擋不住同一個 tick 內的重複觸發，也讓
+    // 三種操作可以並行，最後完成的 load() 不一定對應使用者最後做的那個
+    // 操作）。
+    const lock = useActionLock();
+    const creating = lock.pendingKey === 'create';
+    const savingEdit = lock.pendingKey === 'edit';
+
     const isAffix = activeKind === 'grammar_affix';
     const rows = taxonomies?.[activeKind] ?? [];
 
+    // 只有「目前最新的那一次查詢」可以寫回狀態，同時避免元件卸載後
+    // setState。
+    const loadGenerationRef = useRef(0);
+
     const load = async () => {
+        const requestId = loadGenerationRef.current + 1;
+        loadGenerationRef.current = requestId;
+        const isStale = () => loadGenerationRef.current !== requestId;
+
         setLoading(true);
         setError('');
+
         try {
-            setTaxonomies(await listTaxonomies());
+            const result = await listTaxonomies();
+            if (isStale()) return;
+            setTaxonomies(result);
         } catch (err) {
+            if (isStale()) return;
             setError(err.message);
         } finally {
-            setLoading(false);
+            if (!isStale()) setLoading(false);
         }
     };
 
     useEffect(() => {
         load();
         // 只在掛載時載入一次；之後由各個異動操作自己呼叫 load()。
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const tribeNames = useMemo(() => new Map(
@@ -76,26 +94,28 @@ export function useTaxonomyManager() {
         setNewName('');
         setNewAffix(emptyAffixDraft());
         setError('');
+        setMergeSource(null);
+        setDeletingId(null);
     };
 
-    const submitCreate = async (event) => {
+    const submitCreate = (event) => {
         event.preventDefault();
-        setCreating(true);
-        setError('');
-        try {
-            if (isAffix) {
-                await createTaxonomyTerm('grammar_affix', newAffix);
-                setNewAffix(emptyAffixDraft());
-            } else {
-                await createTaxonomyTerm(activeKind, { name: newName.trim() });
-                setNewName('');
+
+        return lock.runLocked('create', async () => {
+            setError('');
+            try {
+                if (isAffix) {
+                    await createTaxonomyTerm('grammar_affix', newAffix);
+                    setNewAffix(emptyAffixDraft());
+                } else {
+                    await createTaxonomyTerm(activeKind, { name: newName.trim() });
+                    setNewName('');
+                }
+                await load();
+            } catch (err) {
+                setError(err.message);
             }
-            await load();
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setCreating(false);
-        }
+        });
     };
 
     const startEdit = (row) => {
@@ -113,8 +133,7 @@ export function useTaxonomyManager() {
         setEditDraft(null);
     };
 
-    const saveEdit = async (row) => {
-        setSavingEdit(true);
+    const saveEdit = (row) => lock.runLocked('edit', async () => {
         setError('');
         try {
             await updateTaxonomyTerm(activeKind, row.id, editDraft);
@@ -122,25 +141,25 @@ export function useTaxonomyManager() {
             await load();
         } catch (err) {
             setError(err.message);
-        } finally {
-            setSavingEdit(false);
         }
-    };
+    });
 
-    const removeRow = async (row) => {
+    const removeRow = (row) => {
         const label = isAffix ? row.affix : row.name;
-        if (!window.confirm(`確定要刪除「${label}」嗎？此操作無法復原。`)) return;
+        if (!window.confirm(`確定要刪除「${label}」嗎？此操作無法復原。`)) return Promise.resolve();
 
-        setDeletingId(row.id);
-        setError('');
-        try {
-            await deleteTaxonomyTerm(activeKind, row.id);
-            await load();
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setDeletingId(null);
-        }
+        return lock.runLocked('delete', async () => {
+            setDeletingId(row.id);
+            setError('');
+            try {
+                await deleteTaxonomyTerm(activeKind, row.id);
+                await load();
+            } catch (err) {
+                setError(err.message);
+            } finally {
+                setDeletingId(null);
+            }
+        });
     };
 
     // 合併目標只能是同一種主檔的其他列；詞綴還必須是同一個族語的。

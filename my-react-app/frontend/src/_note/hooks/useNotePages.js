@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useCallback, useRef, useState, useEffect } from "react";
 import DOMPurify from "dompurify";
 import { useEditor } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
@@ -6,6 +6,39 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import { Image as ImageExtension } from "@tiptap/extension-image";
 import FontSize from "../fontSizeExtension";
+
+function createEmptyNote(title = "") {
+  return { id: crypto.randomUUID(), title, content: "<p></p>" };
+}
+
+/**
+ * 把 localStorage 讀出來的原始值整理成可用的筆記陣列。輸入可能是任何形狀——
+ * 使用者/擴充功能直接改過 localStorage、舊版資料、或單純損毀的內容——這裡只
+ * 負責「不管收到什麼，都回傳一份每筆都有唯一 id 的陣列」，不在這裡判斷內容
+ * 好不好，那是編輯器層級的事。
+ */
+function normalizeStoredNotes(parsed) {
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    return { notes: [createEmptyNote()], changed: true };
+  }
+  let changed = false;
+  const seenIds = new Set();
+  const notes = parsed.map((note) => {
+    if (!note || typeof note !== "object" || Array.isArray(note)) {
+      changed = true;
+      return createEmptyNote();
+    }
+    if (note.id == null || seenIds.has(note.id)) {
+      changed = true;
+      const id = crypto.randomUUID();
+      seenIds.add(id);
+      return { ...note, id };
+    }
+    seenIds.add(note.id);
+    return note;
+  });
+  return { notes, changed };
+}
 
 /**
  * 本機（localStorage）多頁筆記狀態，跟負責顯示/編輯內容的 TipTap 編輯器緊密綁在
@@ -15,6 +48,7 @@ import FontSize from "../fontSizeExtension";
 export function useNotePages(uid) {
   const [notes, setNotes] = useState([]);
   const [currentPage, setCurrentPage] = useState(0);
+  const [storageError, setStorageError] = useState(null);
   // 分享選取記的是筆記 id，不是頁次（FE-11）。原本存的是陣列索引，而
   // handleDelete 會從中間刪掉一頁又完全沒有調整選取內容——選了第 3 頁再刪掉
   // 第 1 頁，選取的索引就會指到另一篇筆記，分享出去的是錯的內容；索引超出
@@ -25,6 +59,24 @@ export function useNotePages(uid) {
   const [isDirty, setIsDirty] = useState(false);
 
   const LOCAL_KEY = `userNotes_${uid}`;
+
+  /**
+   * 每個會改動筆記內容的地方都要做同一件事：更新 state、寫回 localStorage。
+   * 集中在這裡是因為 localStorage.setItem 可能因為裝置儲存空間不足、無痕模式
+   * 封鎖等原因丟例外（不只是讀取時的 JSON.parse 可能壞掉），沒有集中處理的話，
+   * 每個呼叫端都要各自補一份 try/catch。
+   */
+  const persistNotes = useCallback((updatedNotes) => {
+    setNotes(updatedNotes);
+    try {
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(updatedNotes));
+      setStorageError(null);
+    } catch (e) {
+      console.error("儲存筆記到本機失敗:", e);
+      setStorageError("筆記可能因為裝置儲存空間不足而沒有儲存成功，請清理瀏覽器儲存空間後再試一次。");
+    }
+    return updatedNotes;
+  }, [LOCAL_KEY]);
 
   // onUpdate 是在 useEditor 建立時就固定的閉包，用 ref 保存最新的 notes/currentPage，
   // 避免比對「是否有未儲存的更改」時讀到過期的值。
@@ -55,28 +107,28 @@ export function useNotePages(uid) {
     const stored = localStorage.getItem(LOCAL_KEY);
     if (stored) {
       // 舊版存進 localStorage 的筆記可能沒有 id（換頁同步與分享選取都靠
-      // 它辨識），載入時補上，避免既有使用者的資料一進來就沒有身分可用。
-      const parsed = JSON.parse(stored);
-      let needsMigration = false;
-      const migrated = parsed.map((note, index) => {
-        if (note?.id != null) return note;
-        needsMigration = true;
-        return { ...note, id: `legacy-${Date.now()}-${index}` };
-      });
-      if (needsMigration) {
-        localStorage.setItem(LOCAL_KEY, JSON.stringify(migrated));
+      // 它辨識），載入時補上，避免既有使用者的資料一進來就沒有身分可用；
+      // 資料本身也可能損毀（非合法 JSON、不是陣列、內含 null 元素、id 重複）——
+      // 這些都不該讓整頁卡在轉圈圈或被外層 ErrorBoundary 接住變成整頁錯誤，
+      // 而是退回一份可用的空白筆記。
+      try {
+        const parsed = JSON.parse(stored);
+        const { notes: normalized, changed } = normalizeStoredNotes(parsed);
+        if (changed) {
+          persistNotes(normalized);
+        } else {
+          setNotes(normalized);
+        }
+      } catch (e) {
+        console.error("讀取本機筆記失敗，改用一份空白筆記:", e);
+        persistNotes([createEmptyNote()]);
       }
-      setNotes(migrated);
     } else {
-      const defaultNote = [
-        { id: Date.now(), title: "", content: "" },
-      ];
-      localStorage.setItem(LOCAL_KEY, JSON.stringify(defaultNote));
-      setNotes(defaultNote);
+      persistNotes([createEmptyNote()]);
     }
     setCurrentPage(0);
     setLoading(false);
-  }, [LOCAL_KEY]);
+  }, [LOCAL_KEY, persistNotes]);
 
   // 換頁時把編輯器內容換成該頁筆記，用筆記 id 當依據，
   // 避免 currentPage 沒變但 notes 剛載入完成時漏掉初次同步。只想在「換到不同一篇
@@ -114,9 +166,7 @@ export function useNotePages(uid) {
       index === currentPage ? { ...note, content: sanitized } : note
     ));
 
-    setNotes(updatedNotes);
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(updatedNotes));
-    return updatedNotes;
+    return persistNotes(updatedNotes);
   };
 
   const execStyle = (command, value = null) => {
@@ -147,11 +197,9 @@ export function useNotePages(uid) {
     // 一定要從 updateCurrentContent() 的回傳值往下接，不能再用外層的 notes：
     // 那是這次 render 的舊值，會把剛剛寫回的當前頁內容整個蓋掉。
     const savedNotes = updateCurrentContent();
-    const newNote = { id: Date.now(), title: "未命名筆記", content: "<p></p>" };
-    const updatedNotes = [...savedNotes, newNote];
-    setNotes(updatedNotes);
+    const updatedNotes = [...savedNotes, createEmptyNote("未命名筆記")];
+    persistNotes(updatedNotes);
     setCurrentPage(updatedNotes.length - 1);
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(updatedNotes));
   };
 
   const handleDelete = () => {
@@ -160,15 +208,12 @@ export function useNotePages(uid) {
     const newNotes = notes.filter((_, i) => i !== currentPage);
     const newPage = Math.max(currentPage - 1, 0);
 
-    const finalNotes = newNotes.length
-      ? newNotes
-      : [{ id: Date.now(), title: "未命名筆記", content: "<p></p>" }];
+    const finalNotes = newNotes.length ? newNotes : [createEmptyNote("未命名筆記")];
 
-    setNotes(finalNotes);
+    persistNotes(finalNotes);
     setCurrentPage(newNotes.length ? newPage : 0);
     // 被刪掉的那一頁如果正在選取中，要一起從分享選取裡移除（FE-11）。
     setSelectedPageIds((prev) => prev.filter((id) => id !== deletedId));
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(finalNotes));
   };
 
   /** 回傳存檔後的最新陣列，讓呼叫端（例如分享）不必等 setNotes 生效。 */
@@ -198,15 +243,18 @@ export function useNotePages(uid) {
     const updatedNotes = notes.map((note, index) => (
       index === currentPage ? { ...note, title } : note
     ));
-    setNotes(updatedNotes);
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(updatedNotes));
+    persistNotes(updatedNotes);
   };
 
-  const handleSelectAll = () => setSelectedPageIds(notes.map((note) => note.id));
+  /** limit 存在時最多只勾前 limit 篇（分享頁數上限由呼叫端的頁面元件決定）。 */
+  const handleSelectAll = (limit) => {
+    const ids = notes.map((note) => note.id);
+    setSelectedPageIds(typeof limit === "number" ? ids.slice(0, limit) : ids);
+  };
   const handleClearSelect = () => setSelectedPageIds([]);
 
   return {
-    editor, notes, currentPage, selectedPageIds, loading, isDirty,
+    editor, notes, currentPage, selectedPageIds, loading, isDirty, storageError,
     execStyle, handleAdd, handleDelete, handleSave, handleChangePage,
     handleToggleSelect, handleTitleChange, handleSelectAll, handleClearSelect,
   };

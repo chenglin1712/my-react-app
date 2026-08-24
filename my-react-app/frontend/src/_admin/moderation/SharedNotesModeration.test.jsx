@@ -310,4 +310,36 @@ describe('SharedNotesModeration', () => {
             await screen.findByText('無法變更筆記狀態'),
         ).toBeInTheDocument();
     });
+
+    test('某一列處理中時，其他列的上下架按鈕會被停用', async () => {
+        let resolveToggle;
+        apiPost.mockImplementation(() => new Promise((resolve) => { resolveToggle = resolve; }));
+
+        renderPage();
+
+        const normalRow = await screen
+            .findByText('這是一段正常的分享筆記內容')
+            .then((element) => element.closest('tr'));
+        const deletedRow = screen
+            .getByText('已經下架的分享筆記')
+            .closest('tr');
+
+        fireEvent.click(
+            within(normalRow).getByRole('button', { name: /下架/ }),
+        );
+
+        await waitFor(() => {
+            expect(
+                within(deletedRow).getByRole('button', { name: /恢復/ }),
+            ).toBeDisabled();
+        });
+
+        resolveToggle({ id: 'note123', deleted: true });
+
+        await waitFor(() => {
+            expect(
+                within(deletedRow).getByRole('button', { name: /恢復/ }),
+            ).not.toBeDisabled();
+        });
+    });
 });

@@ -17,6 +17,10 @@
 }
 
 .avatar-uploader {
+    /* 改用 <label htmlFor> 關聯隱藏的檔案輸入框（鍵盤可操作）之後，這裡
+       從 <div> 換成 <label>；label 預設是 inline，explicit width/height
+       跟 margin:auto置中都不會生效，補上 display:block 維持原本版面。 */
+    display: block;
     width: 120px;
     height: 120px;
     margin: 0 auto 24px;

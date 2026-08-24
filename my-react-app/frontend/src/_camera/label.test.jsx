@@ -59,6 +59,27 @@ describe('CameraLabelStep', () => {
     await waitFor(() => expect(screen.getByText('辨識失敗')).toBeInTheDocument());
   });
 
+  test('回歸測試：翻譯後文字相同的重複候選詞會合併成一筆，取分數較高的那個', async () => {
+    axios.post.mockResolvedValueOnce({
+      data: {
+        labels: [
+          { description: 'balay', score: 0.6 },
+          { description: 'balay', score: 0.9 },
+          { description: 'cyux', score: 0.7 },
+        ],
+      },
+    });
+    const file = new File(['x'], 'test.png', { type: 'image/png' });
+
+    render(<CameraLabelStep image="x" file={file} onConfirm={vi.fn()} onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText('balay')).toBeInTheDocument());
+    // 只剩一列 balay（取分數較高的 90%），不會出現兩列一樣的候選詞
+    expect(screen.getAllByText('balay')).toHaveLength(1);
+    expect(screen.getByText('90%')).toBeInTheDocument();
+    expect(screen.queryByText('60%')).not.toBeInTheDocument();
+  });
+
   test('請求會帶上 AbortController 的 signal，卸載時中斷請求且不會噴例外', async () => {
     let resolvePost;
     axios.post.mockReturnValueOnce(new Promise((resolve) => { resolvePost = resolve; }));

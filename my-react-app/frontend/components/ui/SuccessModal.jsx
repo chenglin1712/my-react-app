@@ -26,7 +26,7 @@ const SuccessModal = ({ show, text, icon }) => {
         tabIndex={-1}
         ref={boxRef}
       >
-        {icon || <div className="yy-modal-icon" aria-hidden="true">✓</div>}
+        {icon ?? <div className="yy-modal-icon" aria-hidden="true">✓</div>}
         <p className="yy-modal-text" id={textId}>{text}</p>
       </div>
     </div>

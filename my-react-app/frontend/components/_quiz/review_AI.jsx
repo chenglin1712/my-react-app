@@ -4,7 +4,11 @@ import { Send, Bot, X } from "lucide-react";
 import { TRIBE_NAME_BY_SLUG as TRIBE_NAME } from "../../src/constants/tribes";
 import { apiPost } from "../../utils/apiClient";
 
-const Discussion = ({ tribe = "tayal" }) => {
+// review.jsx 的 ReviewTabs 目前把這個分頁標成「即將推出」並擋掉導覽——
+// 除了功能還沒做完，它現在也只收得到 tribe，收不到使用者選的是哪一題/
+// 答對還是答錯，沒辦法真的「針對這一題」解說，等有明確的資料傳遞設計
+// 後再開放。
+const ReviewAIAssistant = ({ tribe = "tayal" }) => {
     const tribeName = TRIBE_NAME[tribe] || "族語";
     const [messages, setMessages] = useState([
         {
@@ -42,7 +46,7 @@ const Discussion = ({ tribe = "tayal" }) => {
                 type: "translation",
                 original: data.original,
                 translation: data.translation,
-                words: data.words.map((w, i) => ({
+                words: (Array.isArray(data.words) ? data.words : []).map((w, i) => ({
                     word: w.tayal,
                     meaning: w.chinese,
                     color: `color${i + 1}`, // 可以依照索引上色
@@ -167,4 +171,4 @@ const Discussion = ({ tribe = "tayal" }) => {
         </div>
     );
 };
-export default Discussion;
+export default ReviewAIAssistant;

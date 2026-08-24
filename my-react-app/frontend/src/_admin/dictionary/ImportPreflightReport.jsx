@@ -49,8 +49,8 @@ export default function ImportPreflightReport({ report }) {
                                     {item.action === 'error' ? (
                                         item.errors?.length > 0 ? (
                                             <ul className="mb-0">
-                                                {item.errors.map((message) => (
-                                                    <li key={message}>
+                                                {item.errors.map((message, errorIndex) => (
+                                                    <li key={`${message}-${errorIndex}`}>
                                                         {message}
                                                     </li>
                                                 ))}

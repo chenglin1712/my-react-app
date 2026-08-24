@@ -1,7 +1,7 @@
 import { InputGroup, Form, Button } from 'react-bootstrap';
 import TribeSelector from './TribeSelector';
 import FilterPanel from './FilterPanel';
-import CategoryBar from './CategoryBar';
+import CategoryBar from '../../../components/ui/CategoryBar';
 
 // 搜尋頁最上方整個 sticky 區塊：標題、族語選擇器、搜尋框、篩選/排序面板、分類 Tabs。
 const SEARCH_INPUT_MAX_LENGTH = 100;
@@ -37,17 +37,18 @@ const SearchHeader = ({
         <Form.Control
           className="search-terminal-input"
           placeholder="請輸入查詢內容"
+          aria-label="查詢關鍵字"
           value={query}
           maxLength={SEARCH_INPUT_MAX_LENGTH}
           onChange={e => setQuery(e.target.value)}
           onKeyDown={e => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
               e.preventDefault();
               handleSearch();
             }
           }}
         />
-        <Button aria-label="搜尋" className="search-go-btn" onClick={() => handleSearch()} disabled={loading}>
+        <Button type="button" aria-label="搜尋" className="search-go-btn" onClick={() => handleSearch()} disabled={loading}>
           GO ▸
         </Button>
       </InputGroup>

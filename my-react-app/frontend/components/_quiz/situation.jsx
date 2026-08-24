@@ -1,44 +1,33 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
-import SituationJudy1 from "./situation_0judy_1.jsx";
-import SituationJudy2 from "./situation_0judy_2.jsx";
-import SituationJudy3 from "./situation_0judy_3.jsx";
-import Filter from "./situation_filter"; //篩選
+import SituationSummary from "./situation_0judy_1.jsx";
+import SituationLine from "./situation_0judy_2.jsx";
+import SituationDashboard from "./situation_0judy_3.jsx";
 import { getUserSituation } from "../../src/userServives/uploadDb"
-import { TRIBE_FULL_NAME_BY_SLUG } from "../../src/constants/tribes";
 import "../../static/css/_quiz/situation.css";
 
-const Situation = () => {
-  // quiz_panel_submit.jsx 導頁過來時會帶 tribe，但 Firestore 的 userSituation
-  // collection 目前是「每個使用者一筆彙總文件」，沒有依族語拆開存（見
-  // firestore.rules 的 userSituation 規則只檢查 userId，且該 collection
-  // 只由 repo 外的後端流程寫入），沒辦法在這裡加 query 條件做真正的分族語彙總
-  // ——加了只會查到空結果。這裡先把 tribe 用在畫面標題上，讓「已鋪墊」的資料
-  // 至少不是完全沒用到；真正要分族語彙總，需要先改寫入 userSituation 的後端邏輯。
-  const location = useLocation();
-  const tribe = location.state?.tribe;
-  const tribeFullName = tribe ? TRIBE_FULL_NAME_BY_SLUG[tribe] : null;
+// 篩選面板（situation_filter.jsx）目前完全沒有接到資料：getUserSituation()
+// 不吃任何篩選參數，這裡拿到的也是「已經算好的彙總資料」（等級/雷達圖/
+// 月平均正確率...），不是逐次作答紀錄，前端沒辦法在這裡對彙總結果做真正
+// 的日期/題型篩選。與其留著一個看起來能篩選、實際上什麼都不會變的面板，
+// 先整個拿掉；之後如果要做真正的篩選，需要後端提供對應的彙總查詢，不是
+// 這裡加幾行 .filter() 能解決的。
 
-  const [selectedTypes, setSelectedTypes] = useState("所有");
-  // Filter 元件內部無條件讀 selectedDate.start，原本這裡完全沒傳這個 prop 進去，
-  // 一定會噴 TypeError（Cannot read properties of undefined）讓整頁掛掉。
-  const [selectedDate, setSelectedDate] = useState({ start: "", end: "" });
+const Situation = () => {
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const [summaryData, setSummaryData] = useState(null);
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        setLoadError(false);
         const situationData = await getUserSituation();
-        if (situationData) {
-          setSummaryData(situationData);
-        } else {
-          setSummaryData(null);
-        }
+        setSummaryData(situationData);
       } catch (error) {
         console.error("載入資料發生錯誤:", error);
         setSummaryData(null);
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
@@ -48,38 +37,33 @@ const Situation = () => {
 
   return (
     <div className="situation-container">
-      <h2 className="situation-header">{tribeFullName ? `${tribeFullName}答題情形` : "答題情形"}</h2>
-
-      <div className="situation-filter-wrapper">
-        <Filter
-          selectedTypes={selectedTypes}
-          setSelectedTypes={setSelectedTypes}
-          selectedDate={selectedDate}
-          setSelectedDate={setSelectedDate}
-        />
-      </div>
+      {/* userSituation 是跨族語的單一彙總文件（見 getUserSituation），不是
+          分族語存的，這裡不顯示特定族語名稱，避免讓人誤以為這份資料只涵蓋
+          某一個族語。 */}
+      <h2 className="situation-header">答題情形</h2>
 
       {loading ? (
         <div className="loading-box">資料載入中...</div>
+      ) : loadError ? (
+        <div className="no-data-box">載入資料時發生錯誤，請稍後再試。</div>
       ) : summaryData ? (
         <div className="situation-line-wrapper">
-          <SituationJudy1
+          <SituationSummary
             summary={{
               level: summaryData.level,
-              difficulty: summaryData.level,
               speed: summaryData.speed,
               advice: summaryData.advice,
             }}
             radarData={summaryData.radarData}
           />
-          <SituationJudy2 data={summaryData.monthlyAccuracy} />
-          <SituationJudy3
+          <SituationLine data={summaryData.monthlyAccuracy} />
+          <SituationDashboard
             data={summaryData.accuracyByType}
             typeRatio={summaryData.questionTypeDistribution}
           />
         </div>
       ) : (
-        <div className="no-data-box">無符合條件的資料</div>
+        <div className="no-data-box">尚無答題紀錄</div>
       )}
     </div>
   );

@@ -1,7 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import App from './index';
+import HomePage from './index';
 
 // News/Calendar/FunctionBtn 各自有自己的相依（Swiper 輪播、useNavigate 等），
 // 這裡只關心 App 元件怎麼撈資料、怎麼依分類分流，不是這幾個子元件怎麼畫——
@@ -19,7 +19,7 @@ vi.mock('../../components/_home/functionBtn', () => ({
 function renderHome() {
   return render(
     <MemoryRouter>
-      <App />
+      <HomePage />
     </MemoryRouter>,
   );
 }
@@ -246,5 +246,42 @@ describe('首頁 · 版位設定（HomepageConfig）套用', () => {
     renderHome();
     expect(await screen.findByText('IMAGE PLACEHOLDER')).toBeInTheDocument();
     expect(screen.getByTestId('calendar-mock')).toBeInTheDocument();
+  });
+
+  test('版位設定端點回傳的資料缺欄位時，缺的那個欄位退回預設值，而不是變成 undefined', async () => {
+    // 回歸測試：原本 setHomepageConfig(data) 整包覆蓋、沒跟 DEFAULT_HOMEPAGE_CONFIG
+    // merge，後端漏帶某個欄位時那個欄位會直接變成 undefined。
+    mockFetchOk([], { show_news_section: false });
+    renderHome();
+
+    await waitFor(() => {
+      // show_news_section 明確被後端設為 false 時尊重後端值：News 不渲染。
+      expect(screen.queryByTestId('news-mock')).not.toBeInTheDocument();
+      // show_calendar_section 後端沒有回傳，應該退回預設值 true，而不是 undefined。
+      expect(screen.getByTestId('calendar-mock')).toBeInTheDocument();
+    });
+  });
+});
+
+describe('首頁 · 族語切換', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  test('族語列表是可鍵盤操作的按鈕，點擊後套用 aria-pressed 與族語羅馬拼音', async () => {
+    mockFetchOk([]);
+    renderHome();
+    await waitFor(() => expect(screen.getByTestId('news-mock')).toBeInTheDocument());
+
+    const tayalButton = screen.getByRole('button', { name: /泰雅/ });
+    expect(tayalButton).toHaveAttribute('aria-pressed', 'true');
+
+    const amisButton = screen.getByRole('button', { name: /阿美/ });
+    expect(amisButton).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(amisButton);
+
+    expect(amisButton).toHaveAttribute('aria-pressed', 'true');
+    expect(tayalButton).toHaveAttribute('aria-pressed', 'false');
   });
 });

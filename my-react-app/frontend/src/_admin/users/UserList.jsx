@@ -1,4 +1,3 @@
-import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Alert,
@@ -15,19 +14,11 @@ import {
   User,
 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
-import { apiGet } from '../../../utils/apiClient';
+import { useAdminListQuery } from '../hooks/useAdminListQuery';
+import ReviewPagination from '../reviewWorkflow/ReviewPagination';
 import '../../../static/css/_admin/users.css';
 import { ACCOUNT_MANAGERS, ROLE_LABELS, STAFF_ROLES } from '../constants/roles';
-
-
-const formatDateTime = (value) => (
-  value
-    ? new Intl.DateTimeFormat('zh-TW', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(new Date(value))
-    : '—'
-);
+import { formatDateTime } from '../adminFormat';
 
 export default function UserList() {
   const { userData } = useAuth();
@@ -35,63 +26,17 @@ export default function UserList() {
   const canViewUsers = STAFF_ROLES.includes(role);
   const canCreateUser = ACCOUNT_MANAGERS.includes(role);
 
-  const [filters, setFilters] = useState({
-    keyword: '',
-    role: '',
-    identity: '',
-    disabled: '',
+  const {
+    items, data, loading, error, page, setPage, hasNext,
+    filters, setFilters, search,
+  } = useAdminListQuery({
+    endpoint: '/adminapi/users/',
+    initialFilters: {
+      keyword: '', role: '', identity: '', disabled: '',
+    },
+    pageSize: 20,
+    enabled: canViewUsers,
   });
-  const [query, setQuery] = useState(filters);
-  const [data, setData] = useState({
-    results: [],
-    count: 0,
-    page: 1,
-    page_size: 20,
-  });
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(canViewUsers);
-  const [error, setError] = useState('');
-
-  const loadUsers = useCallback(async () => {
-    if (!canViewUsers) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        page_size: '20',
-      });
-
-      Object.entries(query).forEach(([key, value]) => {
-        if (value !== '') params.set(key, value);
-      });
-
-      setData(
-        await apiGet(`/adminapi/users/?${params.toString()}`),
-      );
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [canViewUsers, page, query]);
-
-  useEffect(() => {
-    loadUsers();
-  }, [loadUsers]);
-
-  const search = (event) => {
-    event.preventDefault();
-    setPage(1);
-    setQuery(filters);
-  };
-
-  const hasNext = data.page * data.page_size < data.count;
 
   if (!canViewUsers) {
     return (
@@ -199,13 +144,13 @@ export default function UserList() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.results.length === 0 ? (
+                  {items.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="user-empty">
                         找不到符合條件的使用者
                       </td>
                     </tr>
-                  ) : data.results.map((item) => (
+                  ) : items.map((item) => (
                     <tr key={item.uid}>
                       <td>
                         <div className="user-identity-cell">
@@ -274,30 +219,14 @@ export default function UserList() {
               </Table>
             </div>
 
-            <div className="user-pagination">
-              <span>共 {data.count} 筆</span>
-              <div>
-                <Button
-                  size="sm"
-                  variant="outline-secondary"
-                  disabled={data.page <= 1}
-                  onClick={() => setPage((current) => current - 1)}
-                >
-                  上一頁
-                </Button>
-
-                <span>第 {data.page} 頁</span>
-
-                <Button
-                  size="sm"
-                  variant="outline-secondary"
-                  disabled={!hasNext}
-                  onClick={() => setPage((current) => current + 1)}
-                >
-                  下一頁
-                </Button>
-              </div>
-            </div>
+            <ReviewPagination
+              data={data}
+              page={page}
+              setPage={setPage}
+              loading={loading}
+              hasNext={hasNext}
+              className="user-pagination"
+            />
           </>
         )}
       </section>

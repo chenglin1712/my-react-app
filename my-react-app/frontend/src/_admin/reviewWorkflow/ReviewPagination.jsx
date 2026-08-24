@@ -20,6 +20,7 @@ export default function ReviewPagination({
             <span>共 {data.count} 筆</span>
             <div>
                 <Button
+                    type="button"
                     variant="outline-secondary"
                     disabled={loading || page <= 1}
                     onClick={() => setPage((value) => value - 1)}
@@ -28,6 +29,7 @@ export default function ReviewPagination({
                 </Button>
                 <span>第 {data.page} 頁</span>
                 <Button
+                    type="button"
                     variant="outline-secondary"
                     disabled={loading || !hasNext}
                     onClick={() => setPage((value) => value + 1)}

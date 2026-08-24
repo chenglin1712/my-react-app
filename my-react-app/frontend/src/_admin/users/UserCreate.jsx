@@ -15,7 +15,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { apiPost } from '../../../utils/apiClient';
-import { uploadToCloudinary } from '@utils/uploadToCloudinary';
+import { useActionLock } from '../hooks/useActionLock';
+import { useMediaUpload } from '../hooks/useMediaUpload';
 import '../../../static/css/_admin/users.css';
 import { ACCOUNT_MANAGERS, ROLE_LABELS, STAFF_ROLES } from '../constants/roles';
 
@@ -38,10 +39,13 @@ export default function UserCreate() {
 
   const [form, setForm] = useState(INITIAL_FORM);
   const [showPassword, setShowPassword] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [avatarPreview, setAvatarPreview] = useState('');
-  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  const media = useMediaUpload();
+  const saveLock = useActionLock();
+  const saving = saveLock.isLocked;
+  const avatarUploading = media.isUploading('avatar');
+  const avatarPreview = media.previews.avatar ?? '';
 
   const update = (field, value) => {
     setForm((current) => ({
@@ -50,31 +54,17 @@ export default function UserCreate() {
     }));
   };
 
-  const handleAvatarFileChange = async (event) => {
+  const handleAvatarFileChange = (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      setError('圖片不得超過 5 MB，請重新選擇。');
-      return;
-    }
 
-    setError('');
-    setAvatarPreview(URL.createObjectURL(file));
-    setAvatarUploading(true);
-
-    try {
-      const secureUrl = await uploadToCloudinary(file);
-      update('avatar_url', secureUrl);
-      setAvatarPreview(secureUrl);
-    } catch (err) {
-      console.error('頭像上傳失敗', err);
-      setError('頭像上傳失敗，請重新選擇圖片。');
-    } finally {
-      setAvatarUploading(false);
-    }
+    media.upload(file, 'avatar', {
+      localPreview: true,
+      onUploaded: (secureUrl) => update('avatar_url', secureUrl),
+    });
   };
 
-  const createUser = async (event) => {
+  const createUser = (event) => {
     event.preventDefault();
 
     if (avatarUploading) {
@@ -82,25 +72,24 @@ export default function UserCreate() {
       return;
     }
 
-    setSaving(true);
-    setError('');
+    saveLock.runLocked('create-user', async () => {
+      setError('');
 
-    try {
-      const result = await apiPost('/adminapi/users/', {
-        email: form.email.trim(),
-        password: form.password,
-        name: form.name.trim(),
-        identity: form.identity.trim(),
-        avatar_url: form.avatar_url.trim(),
-        role: canAssignRole && form.role ? form.role : null,
-      });
+      try {
+        const result = await apiPost('/adminapi/users/', {
+          email: form.email.trim(),
+          password: form.password,
+          name: form.name.trim(),
+          identity: form.identity.trim(),
+          avatar_url: form.avatar_url.trim(),
+          role: canAssignRole && form.role ? form.role : null,
+        });
 
-      navigate(`/admin/users/${result.uid}`);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
+        navigate(`/admin/users/${result.uid}`);
+      } catch (err) {
+        setError(err.message);
+      }
+    });
   };
 
   if (!canCreateUser) {
@@ -132,7 +121,7 @@ export default function UserCreate() {
         </div>
       </div>
 
-      {error && <Alert variant="danger">{error}</Alert>}
+      {(error || media.error) && <Alert variant="danger">{error || media.error}</Alert>}
 
       <Form className="user-detail-card" onSubmit={createUser}>
         <Form.Group className="mb-3" controlId="user-create-email">

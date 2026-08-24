@@ -5,10 +5,10 @@ const TrueFalseQuestion = ({ question, selected, onSelect }) => (
     <>
         <img src={question.image} alt="Question" className="question-image" />
         <div className="answers">
-            <button className={selected === 1 ? 'selected' : ''} onClick={() => onSelect(1)}>
+            <button type="button" aria-pressed={selected === 1} className={selected === 1 ? 'selected' : ''} onClick={() => onSelect(1)}>
                 O (符合)
             </button>
-            <button className={selected === 2 ? 'selected' : ''} onClick={() => onSelect(2)}>
+            <button type="button" aria-pressed={selected === 2} className={selected === 2 ? 'selected' : ''} onClick={() => onSelect(2)}>
                 X (不符合)
             </button>
         </div>

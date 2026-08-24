@@ -11,7 +11,7 @@ const STATUS_LABEL = {
     unsupported: "語料庫查無此詞",
 };
 
-const GroundedText = ({ tokens, onTokenClick, activeIndex }) => (
+const GroundedText = ({ tokens = [], onTokenClick, activeIndex }) => (
     <p className="yy-grounded-text" lang="und">
         {tokens.map((t, i) => {
             if (t.status === "punct") {
@@ -25,6 +25,7 @@ const GroundedText = ({ tokens, onTokenClick, activeIndex }) => (
                     className={`yy-gt-token yy-gt-${t.status}${activeIndex === i ? " yy-gt-active" : ""}`}
                     role="button"
                     tabIndex={0}
+                    aria-pressed={activeIndex === i}
                     aria-label={t.status === "unsupported" ? `${t.surface}：${STATUS_LABEL.unsupported}` : undefined}
                     title={t.gloss || STATUS_LABEL[t.status] || undefined}
                     onClick={() => onTokenClick?.(i)}

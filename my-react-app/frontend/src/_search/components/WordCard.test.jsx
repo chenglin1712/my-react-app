@@ -70,7 +70,7 @@ describe('WordCard', () => {
     expect(toggleFavorite).toHaveBeenCalledWith('balay');
   });
 
-  test('沒有傳入 audioAvailable 時預設為 true（_camera 頁原本沒有這個 prop）', () => {
+  test('有原生音檔時就顯示播放鈕，不再需要另外傳入任何開關 prop', () => {
     const resultWithAudio = { ...baseResult, audioItems: [{ fileId: 'f1' }] };
     render(
       <WordCard
@@ -88,7 +88,7 @@ describe('WordCard', () => {
     expect(screen.getByLabelText('播放音訊')).toBeInTheDocument();
   });
 
-  test('沒有傳入 playSentence 時，布農/排灣語例句不會顯示 TTS 備用播放鈕（避免呼叫 undefined 函式）', () => {
+  test('沒有傳入 playSentence 時，例句不會顯示 TTS 備用播放鈕（避免呼叫 undefined 函式）', () => {
     const resultWithSentence = {
       ...baseResult,
       tribe: '布農語',
@@ -110,5 +110,52 @@ describe('WordCard', () => {
       />
     );
     expect(screen.queryByLabelText('播放音訊')).not.toBeInTheDocument();
+  });
+
+  describe('句子 TTS 備用播放鈕（回歸測試：原本寫死「布農語／排灣語」才顯示，改成問後端翻譯能力 API 的 hasSentenceAudio）', () => {
+    const resultWithSentence = {
+      ...baseResult,
+      explanationItems: [
+        { chineseExplanation: '義項', sentenceItems: [{ originalSentence: '例句', chineseSentence: '中文例句' }] },
+      ],
+    };
+
+    test('hasSentenceAudio 為 false（這個族語沒有整句真人原音）時才顯示 TTS 備用播放鈕', () => {
+      render(
+        <WordCard
+          word="真的"
+          result={resultWithSentence}
+          keyName="k1"
+          isExpanded
+          toggleExpand={vi.fn()}
+          toggleFavorite={vi.fn()}
+          wordName="balay"
+          playAudio={vi.fn()}
+          playSentence={vi.fn()}
+          hasSentenceAudio={false}
+          isFavorited={false}
+        />
+      );
+      expect(screen.getByLabelText('播放音訊')).toBeInTheDocument();
+    });
+
+    test('hasSentenceAudio 為 true 時不顯示 TTS 備用播放鈕（這個族語已經有整句真人原音）', () => {
+      render(
+        <WordCard
+          word="真的"
+          result={resultWithSentence}
+          keyName="k1"
+          isExpanded
+          toggleExpand={vi.fn()}
+          toggleFavorite={vi.fn()}
+          wordName="balay"
+          playAudio={vi.fn()}
+          playSentence={vi.fn()}
+          hasSentenceAudio
+          isFavorited={false}
+        />
+      );
+      expect(screen.queryByLabelText('播放音訊')).not.toBeInTheDocument();
+    });
   });
 });

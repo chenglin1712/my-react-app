@@ -22,6 +22,11 @@
 }
 
 .card {
+    /* 整張卡片從 div 換成 <Link>（渲染成 <a>）之後才需要這幾行：<a> 預設是
+       inline，width 不會生效；也要蓋掉瀏覽器對連結預設的底線/顏色。 */
+    display: block;
+    text-decoration: none;
+    color: inherit;
     background: #fff;
     border: 3px solid var(--yy-ink) !important;
     border-radius: var(--yy-radius-card) !important;
@@ -87,12 +92,9 @@
     margin-bottom: 18px;
 }
 
-.card-content button {
-    background: none;
+.card-cta {
+    display: inline-block;
     color: var(--yy-red);
-    border: none;
-    padding: 0;
     font-family: var(--yy-font-pixel);
     font-size: 13px;
-    cursor: pointer;
 }

@@ -63,4 +63,25 @@ describe('QuizSourceConfig', () => {
     render(<QuizSourceConfig />);
     expect(await screen.findByText('伺服器錯誤，請稍後再試')).toBeInTheDocument();
   });
+
+  /** 回歸測試：儲存後只更新了 items，沒有用伺服器回應回填 drafts——
+   * 輸入框讀的是 drafts，後端若正規化過 display_name，畫面會繼續顯示
+   * 送出前的字串，跟實際存的值不一致。 */
+  test('儲存後用伺服器回應回填輸入框，不是繼續顯示送出前的值', async () => {
+    apiPatch.mockResolvedValueOnce({
+      ...baseResults[0], display_name: '泰雅語（正規化後的名稱）',
+    });
+    mockRole = 'editor';
+    render(<QuizSourceConfig />);
+    const nameInput = await screen.findByDisplayValue('泰雅語 - 賽考利克泰雅語');
+    fireEvent.change(nameInput, { target: { value: '  泰雅語 - 賽考利克泰雅語  ' } });
+
+    const row = nameInput.closest('tr');
+    fireEvent.click(within(row).getByRole('button', { name: /儲存/ }));
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('泰雅語（正規化後的名稱）')).toBeInTheDocument();
+    });
+    expect(screen.queryByDisplayValue('泰雅語 - 賽考利克泰雅語')).not.toBeInTheDocument();
+  });
 });

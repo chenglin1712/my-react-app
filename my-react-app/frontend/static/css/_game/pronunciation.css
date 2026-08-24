@@ -26,6 +26,27 @@
   margin-top: 0.8rem;
 }
 
+.pron-intro-privacy-hint {
+  font-size: 0.8rem;
+  color: #888;
+  text-align: center;
+  margin: 0.6rem 0 0;
+}
+
+.pron-share-area {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pron-share-hint {
+  font-size: 0.8rem;
+  color: #888;
+  margin: 0;
+}
+
 /* ── 主要按鈕 ──────────────────────────────────── */
 .pron-btn-primary {
   margin-top: 1.8rem;
@@ -59,16 +80,19 @@
   font-weight: 700;
   cursor: pointer;
   transition: background 0.18s, transform 0.15s;
+  /* ResultScreen.jsx 的返回按鈕改成 <Link>（<a>）之後，需要重設掉底線跟
+     inline 元素預設的排版。 */
+  text-decoration: none;
+  display: inline-block;
 }
 .pron-btn-secondary:hover {
   background: #fdf5f5;
   transform: translateY(-2px);
 }
 
-/* 社群示範發音的入口連結——跟 .pron-btn-secondary 同一套配色，但 <Link>
-   渲染成 <a>（inline 元素），需要額外的 display 才能讓 margin-top 生效，
-   故意不直接改 .pron-btn-secondary（那個 class 已經在 ResultScreen.jsx
-   套在真正的 <button> 上）。 */
+/* 社群示範發音的入口連結——跟 .pron-btn-secondary 同一套配色，但字體/內距
+   刻意小一號，用在 IntroScreen.jsx 裡當次要的輔助連結，不是 ResultScreen.jsx
+   那種主要動作按鈕的份量。 */
 .pron-community-entry-link {
   display: inline-block;
   margin-top: 1rem;

@@ -30,6 +30,8 @@
 .admin-topbar-user small { margin-top: 2px; color: var(--yy-text-muted, #6b5a47); font-size: 10px; }
 .admin-user-avatar { display: grid; width: 34px; height: 34px; place-items: center; color: #fff; background: var(--yy-blue, #1f3a5c); border-radius: 50%; font-size: 13px; font-weight: 700; }
 .admin-route-content { min-width: 0; }
+/* 後台頁面元件改成 lazy load 後，換頁期間 Suspense fallback 顯示的載入中。 */
+.admin-route-loading { display: flex; justify-content: center; padding: 3rem 0; }
 /* FE-4：後台內容區的 scoped error boundary fallback（見 AdminLayout.jsx）。
    刻意做得比整頁錯誤畫面收斂——側邊欄與麵包屑都還在，使用者可以直接切到
    其他管理頁面，不需要整頁重載。 */

@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import AnnouncementEditor from './AnnouncementEditor';
 import { apiGet, apiPost, apiPatch } from '../../../utils/apiClient';
 
@@ -39,6 +39,27 @@ function renderEdit(id) {
         <Route
           path="/admin/content/announcements/:id"
           element={<AnnouncementEditor />}
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+// 同一個 <MemoryRouter> 底下切換兩個不同 id 的網址（不是分開兩次
+// render）：驗證同一個 AnnouncementEditor 元件實體從 A 切到 B 時，會不會
+// 殘留 A 的表單內容。
+function renderSwitchable(firstId) {
+  return render(
+    <MemoryRouter initialEntries={[`/admin/content/announcements/${firstId}`]}>
+      <Routes>
+        <Route
+          path="/admin/content/announcements/:id"
+          element={(
+            <>
+              <Link to="/admin/content/announcements/99">切到另一筆</Link>
+              <AnnouncementEditor />
+            </>
+          )}
         />
       </Routes>
     </MemoryRouter>,
@@ -147,6 +168,68 @@ describe('AnnouncementEditor · 新增模式', () => {
       );
     });
     expect(await screen.findByText('已儲存並送審')).toBeInTheDocument();
+    // 建立成功後 navigate 到 /42 會讓 id 改變；這篇公告才剛建立、資料
+    // 本來就是最新的，不該觸發 [id] effect 對它重新 fetch 一次——那個
+    // effect 開頭的 setSuccess('') 會跟上面剛驗證過的送審成功訊息互踩。
+    expect(apiGet).not.toHaveBeenCalled();
+  });
+
+  /** 回歸測試：建立成功、送審失敗時，畫面應該立刻換成該公告自己的網址，
+   * 不能停留在 /new——原本的寫法要等 submit 也成功才會 navigate，送審
+   * 失敗時畫面留在 /new（沒有 id），使用者以為儲存整個沒發生，再點一次
+   * 「儲存並送審」會重新 POST 建立，變成建立兩筆重複公告。 */
+  test('新公告建立成功、送審失敗時不會重複建立第二筆公告', async () => {
+    apiPost.mockImplementation((url) => {
+      if (url === '/adminapi/announcements/') {
+        return Promise.resolve({ id: 42, status: 'draft' });
+      }
+      if (url === '/adminapi/announcements/42/submit/') {
+        return Promise.reject(new Error('伺服器暫時無法處理，請稍後再試'));
+      }
+      return Promise.reject(new Error(`unexpected url: ${url}`));
+    });
+    apiGet.mockResolvedValue({
+      id: 42,
+      title: '要送審的公告',
+      body: '',
+      category: 'announcement',
+      tribes: [],
+      cover_image_url: '',
+      link_url: '',
+      is_pinned: false,
+      pin_until: null,
+      publish_at: null,
+      unpublish_at: null,
+      status: 'draft',
+    });
+    apiPatch.mockResolvedValueOnce({ status: 'draft' });
+
+    renderNew();
+    fireEvent.change(
+      screen.getByLabelText(/標題/),
+      { target: { value: '要送審的公告' } },
+    );
+    fireEvent.click(screen.getByRole('button', { name: /儲存並送審/ }));
+
+    expect(await screen.findByText('伺服器暫時無法處理，請稍後再試')).toBeInTheDocument();
+    // 畫面已經換成編輯模式（有 id），不再是「新增公告」。
+    expect(await screen.findByText('編輯公告')).toBeInTheDocument();
+    expect(apiPost).toHaveBeenCalledWith(
+      '/adminapi/announcements/',
+      expect.any(Object),
+    );
+    expect(apiPost).toHaveBeenCalledTimes(2);
+
+    // 再次點擊「儲存」應該走 PATCH（因為畫面現在已經有 id），不會再
+    // POST 建立第二筆公告。
+    fireEvent.click(screen.getByRole('button', { name: /^儲存$/ }));
+    await waitFor(() => {
+      expect(apiPatch).toHaveBeenCalledWith(
+        '/adminapi/announcements/42/',
+        expect.any(Object),
+      );
+    });
+    expect(apiPost).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -632,5 +715,42 @@ describe('AnnouncementEditor · 編輯模式', () => {
   test('新增公告模式不顯示「爬蟲匯入」提示（一定是後台自建）', () => {
     renderNew();
     expect(screen.queryByText('爬蟲匯入')).not.toBeInTheDocument();
+  });
+
+  /** 回歸測試：同一個路由元件在 /A 跟 /B 之間切換時會被 React Router
+   * 重用，不會重新掛載——切換到 B 時如果沒有先清空表單，B 載入失敗時
+   * 畫面會留著 A 的可編輯內容，看起來像是在對 B 操作。 */
+  test('切換到另一筆公告載入失敗時，不會殘留前一筆公告的表單內容', async () => {
+    apiGet.mockImplementation((url) => {
+      if (url === '/adminapi/announcements/20/') {
+        return Promise.resolve({
+          id: 20,
+          title: 'A 公告的標題',
+          body: 'A 公告的內文',
+          category: 'announcement',
+          tribes: [],
+          cover_image_url: '',
+          link_url: '',
+          is_pinned: false,
+          pin_until: null,
+          publish_at: null,
+          unpublish_at: null,
+          status: 'draft',
+        });
+      }
+      if (url === '/adminapi/announcements/99/') {
+        return Promise.reject(new Error('伺服器暫時無法處理，請稍後再試'));
+      }
+      return Promise.reject(new Error(`unexpected url: ${url}`));
+    });
+
+    renderSwitchable(20);
+    await screen.findByDisplayValue('A 公告的標題');
+
+    fireEvent.click(screen.getByRole('link', { name: '切到另一筆' }));
+
+    expect(await screen.findByText('伺服器暫時無法處理，請稍後再試')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('A 公告的標題')).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue('A 公告的內文')).not.toBeInTheDocument();
   });
 });

@@ -3,7 +3,9 @@ import WordCard from './WordCard';
 import ErrorBoundary from '../../errorBoundary';
 
 // 全部詞條／完全匹配／相關匹配三個結果區塊原本各自複製一份幾乎一樣的
-// 「篩選排序 -> 分頁顯示 -> 載入更多」邏輯，這裡抽成共用元件。
+// 「篩選排序 -> 分頁顯示 -> 載入更多」邏輯，這裡抽成共用元件。_camera/result.jsx
+// 原本自己也維護一份幾乎相同但沒有分頁的版本（MatchResultsList.jsx），現在靠
+// filterAndSortWords／visibleCount 的預設值（不篩選、顯示全部）合併進來。
 //
 // serverPaginated=true 時（目前用於「全部詞條」區塊）：篩選／排序／分頁都已經在
 // 後端做完，wordsFlat 就是目前已載入的頁面資料（累積），totalCount 是後端算出的
@@ -14,17 +16,17 @@ const WordResultsSection = ({
   titleColorClass,
   buttonVariant,
   wordsFlat,
-  visibleCount,
+  visibleCount = Infinity,
   onLoadMore,
-  filterAndSortWords,
+  filterAndSortWords = (words) => words,
   expandedWord,
   toggleExpand,
   toggleFavorite,
   playAudio,
   playSentence,
+  hasSentenceAudio,
   favoriteWords,
   failedAudio,
-  audioAvailable,
   serverPaginated = false,
   totalCount,
   loadingMore = false,
@@ -58,9 +60,9 @@ const WordResultsSection = ({
                 wordName={wordData.name}
                 playAudio={playAudio}
                 playSentence={playSentence}
+                hasSentenceAudio={hasSentenceAudio}
                 isFavorited={favoriteWords.has(wordData.name)}
                 failedAudio={failedAudio}
-                audioAvailable={audioAvailable}
               />
             </ErrorBoundary>
           );
@@ -68,7 +70,7 @@ const WordResultsSection = ({
       </ListGroup>
       {remaining > 0 && (
         <div className="text-center my-3">
-          <Button variant={buttonVariant} onClick={onLoadMore} disabled={loadingMore}>
+          <Button type="button" variant={buttonVariant} onClick={onLoadMore} disabled={loadingMore}>
             {loadingMore ? '載入中...' : `載入更多（剩 ${remaining} 筆）`}
           </Button>
         </div>

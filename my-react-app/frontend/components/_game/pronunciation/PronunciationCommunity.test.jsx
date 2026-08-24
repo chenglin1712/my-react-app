@@ -12,7 +12,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import {
   collection,
   getDocs,
@@ -79,15 +79,10 @@ const recordingDocs = [
   },
 ];
 
-function renderCommunity(path = '/game/pronunciation/tayal/community') {
+function renderCommunity(tribe = 'tayal') {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route
-          path="/game/pronunciation/:tribe/community"
-          element={<PronunciationCommunity />}
-        />
-      </Routes>
+    <MemoryRouter>
+      <PronunciationCommunity tribe={tribe} />
     </MemoryRouter>,
   );
 }
@@ -240,16 +235,16 @@ describe('PronunciationCommunity', () => {
     });
   });
 
-  test('Firestore 查詢失敗時顯示錯誤訊息', async () => {
+  test('Firestore 查詢失敗時顯示通用錯誤訊息，不會把原始例外訊息顯示給使用者', async () => {
     getDocs.mockRejectedValueOnce(new Error('錄音載入失敗'));
 
     renderCommunity();
 
-    expect(await screen.findByText('錄音載入失敗'))
+    expect(await screen.findByText('載入社群錄音失敗，請稍後再試。'))
       .toBeInTheDocument();
   });
 
-  test('submitReport 失敗時保留 Modal 並顯示錯誤', async () => {
+  test('submitReport 失敗時保留 Modal 並顯示通用錯誤（不是原始例外訊息）', async () => {
     submitReport.mockRejectedValueOnce(new Error('檢舉送出失敗'));
 
     renderCommunity();
@@ -262,7 +257,7 @@ describe('PronunciationCommunity', () => {
       screen.getByRole('button', { name: '送出檢舉' }),
     );
 
-    expect(await screen.findByText('檢舉送出失敗'))
+    expect(await screen.findByText('送出檢舉失敗，請稍後再試。'))
       .toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
@@ -274,5 +269,27 @@ describe('PronunciationCommunity', () => {
 
     expect(await screen.findByText('目前還沒有示範錄音'))
       .toBeInTheDocument();
+  });
+
+  test('切換族語時，前一次還沒回來的請求即使晚一步解析也不會覆蓋新族語的結果（回歸測試：原本沒有取消機制）', async () => {
+    let resolveFirst;
+    getDocs.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));
+    const { rerender } = renderCommunity('tayal');
+
+    getDocs.mockResolvedValueOnce({ docs: [recordingDocs[2]] });
+    rerender(
+      <MemoryRouter>
+        <PronunciationCommunity tribe="amis" />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('mhuway')).toBeInTheDocument();
+
+    resolveFirst({ docs: [recordingDocs[0]] });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // 泰雅語那次過期的請求現在才回來，不該再把畫面換回它的結果
+    expect(screen.queryByText('lokah')).not.toBeInTheDocument();
+    expect(screen.getByText('mhuway')).toBeInTheDocument();
   });
 });

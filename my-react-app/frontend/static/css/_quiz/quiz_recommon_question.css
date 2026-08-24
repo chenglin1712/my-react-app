@@ -1,3 +1,16 @@
+/* 句子/單字旁邊播放語音的圖示按鈕：原本是純文字內的 span+icon，改成真正的
+   <button> 以支援鍵盤操作後，要重設掉瀏覽器預設的按鈕外框/底色/內距。 */
+.quiz-audio-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  font: inherit;
+}
+
 /* ---------------- 通用按鈕樣式 ---------------- */
 .custom-btn, .custom0-btn, .confirm-btn {
   border-radius: 12px;

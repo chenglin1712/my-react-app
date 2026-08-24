@@ -3,80 +3,104 @@ import { useState, useEffect } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import { Trash2 } from "lucide-react";
-import { getCalendar } from "../../src/userServives/uploadDb"
+import { getCalendar, addCalendarEvent, deleteCalendarEvent } from "../../src/userServives/uploadDb"
 import { useNavigate } from "react-router-dom";
+
+// 本地日期 key（YYYY-MM-DD）。原本同時用 toLocaleDateString().split("/").join("-")
+// 和 toISOString().split("T")[0] 兩種方式產生日期 key：後者是 UTC，跟使用者
+// 操作的本地時間（UTC+8）不一致——每天凌晨 0~8 點之間，toISOString() 算出來的
+// 日期會是前一天，導致當天新增的事件在行事曆上跟圓點標記/選中狀態對不上。
+// 這裡統一用本地年月日組字串，兩邊都吃同一個結果。
+function toLocalDateKey(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
 
 const UserCalendar = () => {
     const navigate = useNavigate();
     const [date, setDate] = useState(new Date());
     const [newEvent, setNewEvent] = useState("");
     const [eventsByDate, setEventsByDate] = useState({});
+    const [isSaving, setIsSaving] = useState(false);
+    const [error, setError] = useState("");
 
-    const formattedDate = date.toLocaleDateString("zh-TW", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit"
-    }).split("/").join("-");
-    const [selectedDateKey, setSelectedDateKey] = useState(
-        new Date().toISOString().split("T")[0]
-    );
+    const dateKey = toLocalDateKey(date);
 
     useEffect(() => {
+        let cancelled = false;
         const fetchEvents = async () => {
-            const data = await getCalendar();
-            const grouped = {};
-            data.forEach(event => {
-                const dateKey = event.start.split("T")[0];
-                if (!grouped[dateKey]) grouped[dateKey] = [];
-                grouped[dateKey].push(event);
-            });
-            setEventsByDate(grouped);
+            try {
+                const data = await getCalendar();
+                if (cancelled) return;
+                const grouped = {};
+                (data || []).forEach(event => {
+                    const key = event.start.split("T")[0];
+                    if (!grouped[key]) grouped[key] = [];
+                    grouped[key].push(event);
+                });
+                setEventsByDate(grouped);
+            } catch (err) {
+                if (!cancelled) {
+                    console.error("載入行事曆失敗：", err);
+                    setError("載入行事曆失敗，請稍後再試。");
+                }
+            }
         };
         fetchEvents();
+        return () => { cancelled = true; };
     }, []);
 
-    const handleDateChange = (selectedDate) => {
-        setDate(selectedDate);
-        setSelectedDateKey(selectedDate.toISOString().split("T")[0]);
-    };
-
-    const handleAddEvent = () => {
+    const handleAddEvent = async (e) => {
+        e.preventDefault();
         if (!newEvent.trim()) return;
+        setError("");
+        setIsSaving(true);
 
         const newEventObj = {
-            summary: newEvent,
+            summary: newEvent.trim(),
             description: "",
-            start: `${formattedDate}T00:00:00+08:00`,
-            end: `${formattedDate}T00:30:00+08:00`
+            start: `${dateKey}T00:00:00+08:00`,
+            end: `${dateKey}T00:30:00+08:00`
         };
 
-        const updated = {
-            ...eventsByDate,
-            [formattedDate]: [...(eventsByDate[formattedDate] || []), newEventObj]
-        };
-
-        setEventsByDate(updated);
-        setNewEvent("");
-
-        // TODO: 可以呼叫寫入 Firebase 的 API
+        try {
+            const saved = await addCalendarEvent(newEventObj);
+            setEventsByDate(prev => ({
+                ...prev,
+                [dateKey]: [...(prev[dateKey] || []), saved],
+            }));
+            setNewEvent("");
+        } catch (err) {
+            console.error("新增行程失敗：", err);
+            setError("新增行程失敗，請稍後再試。");
+        } finally {
+            setIsSaving(false);
+        }
     };
 
-    const handleDelete = (index) => {
-        const updatedDateEvents = [...(eventsByDate[formattedDate] || [])];
-        updatedDateEvents.splice(index, 1);
-        const updated = { ...eventsByDate, [formattedDate]: updatedDateEvents };
-        setEventsByDate(updated);
-
-        // TODO: 可以呼叫刪除事件 API
+    const handleDelete = async (eventId) => {
+        setError("");
+        try {
+            await deleteCalendarEvent(eventId);
+            setEventsByDate(prev => ({
+                ...prev,
+                [dateKey]: (prev[dateKey] || []).filter(e => e.id !== eventId),
+            }));
+        } catch (err) {
+            console.error("刪除行程失敗：", err);
+            setError("刪除行程失敗，請稍後再試。");
+        }
     };
 
-    const eventsForDate = eventsByDate[formattedDate] || [];
+    const eventsForDate = eventsByDate[dateKey] || [];
 
     return (
         <div className="calendar-wrapper">
             <div className="calendar-left">
                 <Calendar
-                    onChange={handleDateChange}
+                    onChange={setDate}
                     value={date}
                     locale="zh-TW"
                     calendarType="gregory"
@@ -87,9 +111,9 @@ const UserCalendar = () => {
                             : null
                     }
                     tileContent={({ date, view }) => {
-                        const dateKey = date.toISOString().split("T")[0];
-                        const isSelected = dateKey === selectedDateKey;
-                        if (view === "month" && eventsByDate[dateKey]?.length > 0) {
+                        const key = toLocalDateKey(date);
+                        const isSelected = key === dateKey;
+                        if (view === "month" && eventsByDate[key]?.length > 0) {
                             return (
                                 <div
                                     className="dot-indicator"
@@ -102,23 +126,24 @@ const UserCalendar = () => {
                 />
             </div>
             <div className="calendar-right">
-                <h2>{formattedDate} 的行程</h2>
+                <h2>{dateKey} 的行程</h2>
+                {error && <p className="calendar-error-text" role="alert">{error}</p>}
                 <div className="event-list-scroll">
                     {eventsForDate.map((event, index) => (
-                        <div className="event-card" key={index}>
+                        <div className="event-card" key={event.id ?? `${dateKey}-${index}`}>
                             <h4>{event.summary}</h4>
                             <p>{event.description}</p>
                             <span>
                                 {new Date(event.start).toLocaleTimeString()} -{" "}
                                 {new Date(event.end).toLocaleTimeString()}
                             </span>
-                            <button onClick={() => handleDelete(index)} title="刪除" className="delete-btn" aria-label="刪除">
+                            <button onClick={() => handleDelete(event.id)} title="刪除" className="delete-btn" aria-label="刪除">
                                 <Trash2 size={16} />
                             </button>
-                            {/(測驗)/.test(event.summary + event.description) && (
+                            {/(測驗)/.test(`${event.summary}${event.description || ""}`) && (
                                 <button
                                     className="go-quiz-btn"
-                                    onClick={() => navigate('/quiz')}
+                                    onClick={() => navigate('/quiz/select')}
                                 >
                                     前往測驗
                                 </button>
@@ -128,19 +153,16 @@ const UserCalendar = () => {
                     {eventsForDate.length === 0 && <div className="no-event">尚無紀錄</div>}
                 </div>
 
-                <div className="event-input-bar">
+                <form className="event-input-bar" onSubmit={handleAddEvent}>
                     <input
                         type="text"
                         placeholder="新增事件..."
                         value={newEvent}
                         onChange={(e) => setNewEvent(e.target.value)}
-                        onKeyPress={(e) => {
-                            if (e.key === "Enter") handleAddEvent();
-                        }}
                         aria-label="新增事件"
                     />
-                    <button onClick={handleAddEvent}>新增</button>
-                </div>
+                    <button type="submit" disabled={isSaving}>{isSaving ? "新增中..." : "新增"}</button>
+                </form>
             </div>
         </div>
     );

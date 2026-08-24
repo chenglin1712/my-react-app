@@ -3,15 +3,18 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAuth, sendPasswordResetEmail } from "firebase/auth";
 
-const Forgot = () => {
+const ForgotPassword = () => {
     const navigate = useNavigate();
 
     const [email, setEmail] = useState("");
     const [message, setMessage] = useState("");
     const [isSuccess, setIsSuccess] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleReset = async () => {
+    const handleReset = async (e) => {
+        e.preventDefault();
         const auth = getAuth();
+        setIsSubmitting(true);
         try {
             await sendPasswordResetEmail(auth, email);
             setMessage("已寄送密碼重設信件，請至信箱確認。");
@@ -29,6 +32,8 @@ const Forgot = () => {
                     setMessage("寄送失敗");
             }
             setIsSuccess(false);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -37,18 +42,20 @@ const Forgot = () => {
             <h2>忘記密碼</h2>
             <p className="instruction">請輸入您的電子郵件，我們會寄送重設密碼的連結。</p>
 
-            <input
-                type="email"
-                placeholder="輸入您的 Email"
-                aria-label="電子郵件"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-            />
+            <form onSubmit={handleReset}>
+                <input
+                    type="email"
+                    placeholder="輸入您的 Email"
+                    aria-label="電子郵件"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                />
 
-            <div className="forgot-button">
-                <button className="forgot-cancel-btn" onClick={() => navigate(-1)}>取消</button>
-                <button className="forgot-submit-btn" onClick={handleReset}>重設密碼</button>
-            </div>
+                <div className="forgot-button">
+                    <button type="button" className="forgot-cancel-btn" onClick={() => navigate(-1)}>取消</button>
+                    <button type="submit" className="forgot-submit-btn" disabled={isSubmitting}>重設密碼</button>
+                </div>
+            </form>
 
             {message && (
                 <div className={`message ${isSuccess ? "success" : "error"}`}>
@@ -58,4 +65,4 @@ const Forgot = () => {
         </div>
     );
 };
-export default Forgot;
+export default ForgotPassword;

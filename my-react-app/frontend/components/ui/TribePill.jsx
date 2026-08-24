@@ -4,6 +4,7 @@ const TribePill = ({ tribe, active, onClick, children }) => (
     type="button"
     className={`yy-pill${active ? ' active' : ''}`}
     style={active ? { background: tribe.color } : undefined}
+    aria-pressed={active}
     onClick={onClick}
   >
     {children ?? `${tribe.name}族語`}

@@ -22,6 +22,8 @@ const ClozeQuestion = ({ question, selected, onSelect }) => {
                 {question.options.map((option, idx) => (
                     <button
                         key={idx}
+                        type="button"
+                        aria-pressed={selected === idx + 1}
                         className={`cloze-option-btn ${selected === idx + 1 ? "selected" : ""}`}
                         onClick={() => onSelect(idx + 1)}
                     >

@@ -207,6 +207,11 @@ audio {
 }
 
 .quiz-image-box {
+    /* 選項原本是 div，換成 <button> 之後才需要 padding/background reset——
+       原生 button 預設有內距跟背景色，圖片就不會貼齊這個容器的邊緣。 */
+    padding: 0;
+    background: none;
+    font: inherit;
     position: relative;
     cursor: pointer;
     border-radius: 12px;

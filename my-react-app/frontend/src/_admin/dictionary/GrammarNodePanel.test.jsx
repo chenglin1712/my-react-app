@@ -15,6 +15,7 @@ import {
 import GrammarNodePanel from './GrammarNodePanel';
 import {
     createGrammarSectionProposal,
+    discardRevision,
     getGrammarSection,
     getRevision,
     proposeGrammarSectionDelete,
@@ -286,5 +287,61 @@ describe('GrammarNodePanel', () => {
         expect(window.confirm).toHaveBeenCalledWith('確定要刪除這個文法章節嗎？此操作無法復原。');
         expect(onSaved).toHaveBeenCalled();
         expect(await screen.findByText('刪除提案草稿已建立')).toBeInTheDocument();
+    });
+
+    /** 回歸測試：discard 成功後後端只回 { detail: '已捨棄' }，
+     * handleRevisionChanged 原本一律用 revisionFromSave(result, current)
+     * 合併，把舊 revision 的欄位整個從 current 補回來——後端已經刪掉這筆
+     * revision，畫面卻繼續顯示它存在。 */
+    it('捨棄既有章節的草稿後，重新載入正式內容，不殘留舊草稿', async () => {
+        getGrammarSection.mockResolvedValue({
+            ...existingSection,
+            meta: { pending_revision: { id: 90, status: 'draft', operation: 'update' } },
+        });
+        getRevision.mockResolvedValue({
+            id: 90,
+            status: 'draft',
+            operation: 'update',
+            payload: { ...existingSection, title: '草稿中的章節' },
+        });
+        discardRevision.mockResolvedValue({ detail: '已捨棄' });
+
+        renderPanel({ sectionId: 10 });
+        expect(await screen.findByDisplayValue('草稿中的章節')).toBeInTheDocument();
+
+        getGrammarSection.mockResolvedValue(existingSection);
+
+        fireEvent.click(screen.getByRole('button', { name: /捨棄草稿/ }));
+
+        await waitFor(() => {
+            expect(discardRevision).toHaveBeenCalledWith(90);
+        });
+
+        expect(await screen.findByDisplayValue('基礎句型')).toBeInTheDocument();
+        expect(screen.queryByDisplayValue('草稿中的章節')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /捨棄草稿/ })).not.toBeInTheDocument();
+    });
+
+    /** 回歸測試：editable 原本沒有排除 operation === 'delete'，建立刪除
+     * 提案後整份表單仍然可以編輯，「儲存草稿」還會把一般內容 payload 寫進
+     * 這筆刪除提案裡。 */
+    it('建立刪除提案後表單變成唯讀，不再顯示儲存草稿', async () => {
+        vi.spyOn(window, 'confirm').mockReturnValue(true);
+        proposeGrammarSectionDelete.mockResolvedValue({
+            revision_id: 84, status: 'draft', operation: 'delete',
+        });
+
+        renderPanel({ sectionId: 10 });
+        await screen.findByDisplayValue('基礎句型');
+
+        fireEvent.click(screen.getByRole('button', { name: /建立刪除提案/ }));
+
+        await waitFor(() => {
+            expect(proposeGrammarSectionDelete).toHaveBeenCalledWith(10);
+        });
+
+        expect(await screen.findByText(/已建立刪除提案，內容為唯讀/)).toBeInTheDocument();
+        expect(screen.getByLabelText(/章節名稱/)).toBeDisabled();
+        expect(screen.queryByRole('button', { name: /儲存草稿/ })).not.toBeInTheDocument();
     });
 });

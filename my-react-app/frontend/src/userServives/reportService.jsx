@@ -25,13 +25,18 @@ export async function submitReport({
         throw new Error("請選擇檢舉原因");
     }
 
+    const trimmedReasonText = (reasonText || "").trim().slice(0, 500);
+    if (reason === "other" && !trimmedReasonText) {
+        throw new Error("請填寫檢舉原因說明");
+    }
+
     await addDoc(collection(db, "reports"), {
         targetType,
         targetId,
         targetTribe,
         reporterUid: auth.currentUser.uid,
         reason,
-        reasonText,
+        reasonText: trimmedReasonText,
         status: "pending",
         createdAt: serverTimestamp(),
     });

@@ -5,9 +5,11 @@ const LABELS = ["A", "B", "C"];
 const ChoiceQuestion = ({ question, selected, onSelect }) => (
     <div className="quiz-multi-images">
         {LABELS.map((label, idx) => (
-            <div
-                key={idx}
+            <button
+                key={label}
+                type="button"
                 className={`quiz-image-box ${selected === idx + 1 ? "selected" : ""}`}
+                aria-pressed={selected === idx + 1}
                 onClick={() => onSelect(idx + 1)}
             >
                 <span className="quiz-label">{label}</span>
@@ -15,7 +17,7 @@ const ChoiceQuestion = ({ question, selected, onSelect }) => (
                     src={question[`image${label}`]}
                     alt={`選項 ${label}`}
                 />
-            </div>
+            </button>
         ))}
     </div>
 );

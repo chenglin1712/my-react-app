@@ -2,6 +2,7 @@ import {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from 'react';
 import {
@@ -23,28 +24,10 @@ import {
     reorderGrammarSections,
 } from './dictionaryApi';
 import { canProposeDictionaryChanges } from './useRevisionActions';
+import { REVISION_STATUS_META as REVISION_STATUSES } from './revisionMeta';
+import { useActionLock } from '../hooks/useActionLock';
 import GrammarNodePanel from './GrammarNodePanel';
 import '../../../static/css/_admin/dictionary.css';
-
-const REVISION_STATUSES = {
-    draft: {
-        label: '草稿',
-        bg: 'secondary',
-    },
-    pending_review: {
-        label: '送審中',
-        bg: 'warning',
-        text: 'dark',
-    },
-    approved: {
-        label: '已核准',
-        bg: 'success',
-    },
-    rejected: {
-        label: '已退件',
-        bg: 'danger',
-    },
-};
 
 function RevisionBadge({ revision }) {
     if (!revision) return null;
@@ -76,8 +59,16 @@ export default function GrammarTree() {
     const [sections, setSections] = useState([]);
     const [loadingTaxonomies, setLoadingTaxonomies] = useState(true);
     const [loadingSections, setLoadingSections] = useState(false);
-    const [reordering, setReordering] = useState(false);
     const [error, setError] = useState('');
+    // 換章節排序是不是正在進行中，跟「切換族語」共用同一種同步鎖概念——
+    // 用 ref 而不是單純的 state，才能擋住同一個 tick 內的重複觸發（例如
+    // 雙擊上移/下移按鈕）。
+    const reorderLock = useActionLock();
+    const reordering = reorderLock.pendingKey === 'reorder';
+
+    // 只有「目前最新的那一次章節清單查詢」可以寫回狀態：快速切換族語時，
+    // 較舊的查詢若比較新的查詢晚回來，不能覆蓋新族語的清單。
+    const sectionsRequestRef = useRef(0);
 
     useEffect(() => {
         let active = true;
@@ -114,6 +105,10 @@ export default function GrammarTree() {
     }, []);
 
     const loadSections = useCallback(async () => {
+        const requestId = sectionsRequestRef.current + 1;
+        sectionsRequestRef.current = requestId;
+        const isStale = () => sectionsRequestRef.current !== requestId;
+
         if (!selectedTribeId) {
             setSections([]);
             return [];
@@ -124,6 +119,8 @@ export default function GrammarTree() {
 
         try {
             const result = await listGrammarSections(selectedTribeId);
+            if (isStale()) return [];
+
             const nextSections = [...(result.results ?? [])].sort(
                 (left, right) => (left.section_order ?? 0) - (right.section_order ?? 0),
             );
@@ -138,10 +135,11 @@ export default function GrammarTree() {
 
             return nextSections;
         } catch (err) {
+            if (isStale()) return [];
             setError(err.message);
             return [];
         } finally {
-            setLoadingSections(false);
+            if (!isStale()) setLoadingSections(false);
         }
     }, [selectedTribeId]);
 
@@ -155,27 +153,26 @@ export default function GrammarTree() {
         [sections],
     );
 
-    const moveSection = async (index, delta) => {
+    const moveSection = (index, delta) => {
         const nextIndex = index + delta;
-        if (nextIndex < 0 || nextIndex >= sections.length || hasPendingRevision || reordering) {
-            return;
+        if (nextIndex < 0 || nextIndex >= sections.length || hasPendingRevision) {
+            return Promise.resolve();
         }
 
-        const reordered = sections.slice();
-        const [section] = reordered.splice(index, 1);
-        reordered.splice(nextIndex, 0, section);
+        return reorderLock.runLocked('reorder', async () => {
+            const reordered = sections.slice();
+            const [section] = reordered.splice(index, 1);
+            reordered.splice(nextIndex, 0, section);
 
-        setReordering(true);
-        setError('');
+            setError('');
 
-        try {
-            await reorderGrammarSections(selectedTribeId, reordered.map((item) => item.id));
-            await loadSections();
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setReordering(false);
-        }
+            try {
+                await reorderGrammarSections(selectedTribeId, reordered.map((item) => item.id));
+                await loadSections();
+            } catch (err) {
+                setError(err.message);
+            }
+        });
     };
 
     const changeTribe = (event) => {

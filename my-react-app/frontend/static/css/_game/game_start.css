@@ -4,7 +4,7 @@
     }
 }
 
-.strat-button {
+.start-button {
     border-radius: 5px;
     background-color: #B7161B;
     color: white;
@@ -14,7 +14,7 @@
     margin-bottom: 15px;
 }
 
-.cubmit-button {
+.submit-button {
     border-radius: 5px;
     background-color: #B7161B;
     color: white;
@@ -23,7 +23,7 @@
     margin-bottom: 15px;
 }
 
-.cubmit {
+.submit-actions {
     display: flex;
     justify-content: center;
 }

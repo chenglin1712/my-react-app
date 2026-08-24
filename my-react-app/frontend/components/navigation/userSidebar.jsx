@@ -1,17 +1,15 @@
 import "../../static/css/navigation/userSidebar.css"
 import AvatarImg from "../../static/assets/_auth/avatar.webp"
 import { Heart, LogOut, Edit, ChevronDown, Bot, Calendar } from 'lucide-react';
-import { useState, lazy, Suspense } from "react";
+import { useState } from "react";
 import { signOut } from "../../src/userServives/userServive";
 import { useNavigate } from "react-router-dom";
-import { AnimatePresence } from "framer-motion";
 
-const OverlayAdvice = lazy(() => import("../_quiz/bot"));
-
-const UserSidebar = ({ userData, closeSidebar }) => {
+// AI 助手 overlay 的實際 render 交給 AppShell（見 AppShell.jsx）：這裡是導覽層
+// 的基礎元件，不該反過來 lazy import 功能模組 _quiz/bot 並自己管理開關狀態。
+const UserSidebar = ({ userData, closeSidebar, onOpenBot }) => {
 
     const navigate = useNavigate();
-    const [showBot, setShowBot] = useState(false);
     const [signOutError, setSignOutError] = useState("");
 
     const menuItems = [
@@ -30,7 +28,6 @@ const UserSidebar = ({ userData, closeSidebar }) => {
     };
 
     return (
-        <>
             <div className="sidebar-container">
                 {/* 頂部個人資料 */}
                 <div className="sidebar-profile">
@@ -68,19 +65,16 @@ const UserSidebar = ({ userData, closeSidebar }) => {
                         {menuItems.map(({ id, label, icon }) => (
                             <button
                                 key={id}
-                                className={`nav-button`}
+                                className="nav-button"
                                 onClick={() => {
-                                    if (id == "calendar") {
-                                        navigate("/" + id);
-                                    } else if (id == "bot") {
-                                        setShowBot(true);
-                                    } else if (id == "favorites") {
+                                    if (id === "favorites") {
                                         navigate('/favorite', { state: { tabId: 1 } });
-                                    } else if (id == "social") {
-                                        navigate('/social', { state: userData });
+                                    } else if (id === "calendar") {
+                                        navigate("/calendar");
+                                    } else if (id === "bot") {
+                                        onOpenBot();
                                     }
                                     closeSidebar();
-                                    // setActiveSection(id)
                                 }}
                             >
                                 <div className="nav-content">
@@ -98,13 +92,6 @@ const UserSidebar = ({ userData, closeSidebar }) => {
                     ⓘ 原住民族語學習平台
                 </div>
             </div>
-
-            <Suspense fallback={null}>
-                <AnimatePresence>
-                    {showBot && <OverlayAdvice onClose={() => setShowBot(false)} />}
-                </AnimatePresence>
-            </Suspense>
-        </>
     );
 };
 export default UserSidebar;

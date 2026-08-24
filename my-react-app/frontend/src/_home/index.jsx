@@ -1,7 +1,7 @@
 import News from "../../components/_home/news"
 import FunctionBtn from "../../components/_home/functionBtn"
 import "../../static/css/_home/index.css"
-import Calendar from "../../components/_home/calendar"
+import CertificationSection from "../../components/_home/calendar"
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { TRIBES } from "../constants/tribes";
@@ -31,29 +31,35 @@ const DEFAULT_HOMEPAGE_CONFIG = {
 //   的公告沒有 display_date_text，這時 publish_at 才是唯一能顯示的日期。
 // - tag 優先用 source_tag（爬蟲來源原始的分類文字，保留首頁卡片標籤顏色
 //   的多樣性），沒有的話才退回 4 個固定分類的中文標籤。
-const _formatPublishDate = (publishAt) => (
-    publishAt ? new Intl.DateTimeFormat('zh-TW', { dateStyle: 'medium' }).format(new Date(publishAt)) : ''
+// 每次 mapping 都重新 new Intl.DateTimeFormat(...) 沒有必要，formatter 本身
+// 不帶任何跟單筆公告相關的狀態，提到模組層重用同一個實例。
+const PUBLISH_DATE_FORMATTER = new Intl.DateTimeFormat('zh-TW', { dateStyle: 'medium' });
+const formatPublishDate = (publishAt) => (
+    publishAt ? PUBLISH_DATE_FORMATTER.format(new Date(publishAt)) : ''
 );
 
 const mapAnnouncementToNewsItem = (item) => ({
+    id: item.id,
     title: item.title,
     detail: item.link_url || '',
     image: item.cover_image_url || null,
-    start_date: item.display_date_text || _formatPublishDate(item.publish_at),
+    start_date: item.display_date_text || formatPublishDate(item.publish_at),
     end_date: null,
-    tag: item.source_tag || ANNOUNCEMENT_CATEGORY_LABELS[item.category] || item.category,
-    isExam: 'F',
+    // 三層退回都落空時（source_tag、分類標籤、category 本身皆缺）統一退回
+    // 「最新消息」，讓 News.jsx 不用再依「這批有沒有圖」自己決定不同的預設值。
+    tag: item.source_tag || ANNOUNCEMENT_CATEGORY_LABELS[item.category] || item.category || '最新消息',
 });
 
-// Calendar.jsx（族語認證最新公告）只需要 title/detail/start_date 三個欄位，
-// 跟 News.jsx 的形狀不同，不能共用同一個 map 函式。
+// CertificationSection.jsx（族語認證最新公告）只需要 title/detail/start_date
+// 三個欄位，跟 News.jsx 的形狀不同，不能共用同一個 map 函式。
 const mapAnnouncementToExamItem = (item) => ({
+    id: item.id,
     title: item.title,
     detail: item.link_url || '',
-    start_date: item.display_date_text || _formatPublishDate(item.publish_at),
+    start_date: item.display_date_text || formatPublishDate(item.publish_at),
 });
 
-const App = () => {
+const HomePage = () => {
     // 合併後、還沒依 news_display_count 裁切的完整清單——裁切邏輯放在
     // render 階段直接算（見下面的 newsWithImage/newsWithoutImage），不是
     // fetch 完就裁切存進 state：後台公告／爬蟲消息的 fetch 跟首頁設定的
@@ -63,36 +69,49 @@ const App = () => {
     const [rawNews, setRawNews] = useState([]);
     const [examInfo, setExamInfo] = useState([]);
     const [newsError, setNewsError] = useState(false);
-    const [tribe, setTribe] = useState(0);
+    // 存 slug 而不是 array index：TRIBES 的順序/內容以後如果調整，這裡的
+    // state 語意不會跟著漂移。
+    const [selectedTribeSlug, setSelectedTribeSlug] = useState(TRIBES[0].slug);
     const [homepageConfig, setHomepageConfig] = useState(DEFAULT_HOMEPAGE_CONFIG);
     const functionBtnRef = useRef(null);
-    const activeTribe = TRIBES[tribe];
+    const activeTribe = TRIBES.find((t) => t.slug === selectedTribeSlug) || TRIBES[0];
 
     useEffect(() => {
+        let cancelled = false;
         fetch('/adminapi/public/homepage-config/')
             .then((res) => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return res.json();
             })
-            .then(setHomepageConfig)
+            .then((data) => {
+                if (cancelled) return;
+                // 後端回傳整包直接覆蓋、沒跟預設值 merge 的話，未來後端漏帶
+                // 某個欄位時，那個欄位會變成 undefined 而不是退回預設值。
+                setHomepageConfig({ ...DEFAULT_HOMEPAGE_CONFIG, ...data });
+            })
             .catch((err) => {
+                if (cancelled) return;
                 // 抓不到就維持預設值——首頁不能因為這個設定端點掛掉就整頁壞掉，
                 // 預設值本身就是「後台從沒動過設定」時的正確畫面。
                 console.error("載入首頁版位設定失敗：", err);
             });
+        return () => { cancelled = true; };
     }, []);
 
     useEffect(() => {
+        let cancelled = false;
         fetch('/adminapi/public/announcements/')
             .then((res) => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return res.json();
             })
             .then((data) => {
+                if (cancelled) return;
                 const announcements = data.results ?? [];
-                // category='exam' 的公告（含爬蟲匯入的族語認證消息）進 Calendar
-                // 的「族語認證最新公告」區塊，其餘進 News 消息區塊——維持匯入
-                // 前「考試消息只出現在 Calendar、不會同時出現在 News」的行為。
+                // category='exam' 的公告（含爬蟲匯入的族語認證消息）進
+                // CertificationSection 的「族語認證最新公告」區塊，其餘進 News
+                // 消息區塊——維持匯入前「考試消息只出現在這個區塊、不會同時出現
+                // 在 News」的行為。
                 const examAnnouncements = announcements.filter((item) => item.category === 'exam');
                 const newsAnnouncements = announcements.filter((item) => item.category !== 'exam');
 
@@ -100,9 +119,11 @@ const App = () => {
                 setRawNews(newsAnnouncements.map(mapAnnouncementToNewsItem));
             })
             .catch((err) => {
+                if (cancelled) return;
                 console.error("載入最新消息失敗：", err);
                 setNewsError(true);
             });
+        return () => { cancelled = true; };
     }, []);
 
     // news_display_count 是後台「消息區塊顯示筆數」設定（規劃文件 §3.2.3），
@@ -188,20 +209,19 @@ const App = () => {
                 <div className="home-tribes-grid">
                     <div className="yy-card yy-fade-up home-tribe-list">
                         <div className="home-tribe-list-title">◆ 五族語言 »</div>
-                        {TRIBES.map((t, i) => (
-                            <div
+                        {TRIBES.map((t) => (
+                            <button
                                 key={t.slug}
-                                role="button"
-                                tabIndex={0}
+                                type="button"
                                 className="home-tribe-row"
-                                style={{ transform: `scale(${i === tribe ? 1.04 : 1})` }}
-                                onClick={() => setTribe(i)}
-                                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setTribe(i); } }}
+                                aria-pressed={t.slug === selectedTribeSlug}
+                                style={{ transform: `scale(${t.slug === selectedTribeSlug ? 1.04 : 1})` }}
+                                onClick={() => setSelectedTribeSlug(t.slug)}
                             >
                                 <span className="home-tribe-swatch" style={{ background: t.color }} />
                                 <span className="home-tribe-name">{t.name}</span>
                                 <span className="home-tribe-roman">{t.roman}</span>
-                            </div>
+                            </button>
                         ))}
                     </div>
 
@@ -233,7 +253,7 @@ const App = () => {
                     button3: homepageConfig.button3_enabled,
                 }} />
             </div>
-            {homepageConfig.show_calendar_section && <Calendar examInfo={examInfo} />}
+            {homepageConfig.show_calendar_section && <CertificationSection examInfo={examInfo} />}
             {homepageConfig.show_news_section && (
                 <>
                     {newsError && (
@@ -247,4 +267,4 @@ const App = () => {
         </div>
     );
 };
-export default App;
+export default HomePage;

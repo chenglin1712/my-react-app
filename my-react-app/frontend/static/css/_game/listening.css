@@ -246,6 +246,9 @@
   font-weight: 700;
   cursor: pointer;
   transition: background 0.18s, color 0.18s, transform 0.15s;
+  /* 現在渲染成 <Link>（<a>），重設掉瀏覽器預設的底線。 */
+  text-decoration: none;
+  display: inline-block;
 }
 .listening-btn-secondary:hover {
   background: #fdf5f5;

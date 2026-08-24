@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Form, Modal, Spinner, Table, Tab, Tabs } from 'react-bootstrap';
+import { Alert, Button, Form, Modal, Spinner, Table, Tab, Tabs } from 'react-bootstrap';
 import { Minus, Plus } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
@@ -6,17 +6,13 @@ import RejectReasonModal from '../reviewWorkflow/RejectReasonModal';
 import ReviewActions from '../reviewWorkflow/ReviewActions';
 import ReviewPagination from '../reviewWorkflow/ReviewPagination';
 import { useReviewableContentCrud } from '../reviewWorkflow/useReviewableContentCrud';
+import {
+    QUIZ_BANK_EDITORS as CONTENT_EDITORS,
+    QUIZ_BANK_ROLES,
+    QUIZ_BANK_STATUSES as STATUSES,
+    QuizStatusBadge as StatusCell,
+} from './quizBankReviewMeta';
 import '../../../static/css/_admin/quiz-bank.css';
-
-const CONTENT_EDITORS = ['owner', 'admin', 'editor'];
-// 核准／退件／下架用 approvers（含 reviewer），而不是 AnnouncementList
-// 用的 publishers——族語老師（reviewer）必須能核准題庫內容，這是整個審定
-// 流程存在的意義，不能照抄公告管理的角色門檻。
-const QUIZ_BANK_ROLES = {
-    editors: CONTENT_EDITORS,
-    approvers: ['owner', 'admin', 'reviewer'],
-    publishers: ['owner', 'admin'],
-};
 
 const CATEGORIES = {
     noun: '名詞',
@@ -25,26 +21,6 @@ const CATEGORIES = {
     function: '功能詞',
     kin: '親屬稱謂',
 };
-
-const STATUSES = {
-    draft: { label: '草稿', bg: 'secondary' },
-    pending_review: { label: '待審核', bg: 'warning' },
-    rejected: { label: '已退件', bg: 'danger' },
-    published: { label: '已啟用', bg: 'success' },
-};
-
-function StatusCell({ item }) {
-    return (
-        <div className="d-flex flex-wrap align-items-center gap-1">
-            <Badge bg={STATUSES[item.status]?.bg ?? 'secondary'}>
-                {STATUSES[item.status]?.label ?? item.status}
-            </Badge>
-            {item.status === 'published' && item.has_pending_revision && (
-                <Badge bg="warning" text="dark">有待審修改</Badge>
-            )}
-        </div>
-    );
-}
 
 export default function QuizBank() {
     const { userData } = useAuth();
@@ -106,6 +82,7 @@ function VocabPanel({ role }) {
     });
 
     const { target: editTarget, form, setForm } = editor;
+    const formSubmitting = actionId === 'form';
 
     return (
         <div className="quiz-bank-panel">
@@ -200,6 +177,7 @@ function VocabPanel({ role }) {
                                                 role={role}
                                                 roles={QUIZ_BANK_ROLES}
                                                 busy={actionId === item.id}
+                                                disabled={Boolean(actionId) && actionId !== item.id}
                                                 onAction={handleAction}
                                             />
                                         </div>
@@ -227,11 +205,13 @@ function VocabPanel({ role }) {
 
             <Modal
                 show={Boolean(editTarget)}
-                onHide={editor.close}
+                onHide={formSubmitting ? undefined : editor.close}
                 centered
+                backdrop={formSubmitting ? 'static' : true}
+                keyboard={!formSubmitting}
             >
                 <Form onSubmit={editor.save}>
-                    <Modal.Header closeButton>
+                    <Modal.Header closeButton={!formSubmitting}>
                         <Modal.Title>
                             {editTarget?.id ? '編輯詞彙' : '新增詞彙'}
                         </Modal.Title>
@@ -318,7 +298,7 @@ function VocabPanel({ role }) {
                         </Form.Group>
                     </Modal.Body>
                     <Modal.Footer>
-                        <Button variant="secondary" onClick={editor.close}>
+                        <Button type="button" variant="secondary" disabled={formSubmitting} onClick={editor.close}>
                             取消
                         </Button>
                         <Button
@@ -326,10 +306,10 @@ function VocabPanel({ role }) {
                             disabled={
                                 !form.foreign_word.trim()
                                 || !form.chinese_gloss.trim()
-                                || actionId === 'form'
+                                || formSubmitting
                             }
                         >
-                            {actionId === 'form' && (
+                            {formSubmitting && (
                                 <Spinner animation="border" size="sm" />
                             )}{' '}
                             儲存
@@ -449,6 +429,7 @@ function ClozePanel({ role }) {
             (blank) => blank.options.every((option) => option.trim()),
         )
     );
+    const formSubmitting = actionId === 'form';
 
     return (
         <div className="quiz-bank-panel">
@@ -529,6 +510,7 @@ function ClozePanel({ role }) {
                                                 role={role}
                                                 roles={QUIZ_BANK_ROLES}
                                                 busy={actionId === item.id}
+                                                disabled={Boolean(actionId) && actionId !== item.id}
                                                 onAction={handleAction}
                                             />
                                         </div>
@@ -556,12 +538,14 @@ function ClozePanel({ role }) {
 
             <Modal
                 show={Boolean(editTarget)}
-                onHide={editor.close}
+                onHide={formSubmitting ? undefined : editor.close}
                 centered
                 size="lg"
+                backdrop={formSubmitting ? 'static' : true}
+                keyboard={!formSubmitting}
             >
                 <Form onSubmit={editor.save}>
-                    <Modal.Header closeButton>
+                    <Modal.Header closeButton={!formSubmitting}>
                         <Modal.Title>
                             {editTarget?.id ? '編輯短文' : '新增短文'}
                         </Modal.Title>
@@ -688,14 +672,14 @@ function ClozePanel({ role }) {
                         </Button>
                     </Modal.Body>
                     <Modal.Footer>
-                        <Button variant="secondary" onClick={editor.close}>
+                        <Button type="button" variant="secondary" disabled={formSubmitting} onClick={editor.close}>
                             取消
                         </Button>
                         <Button
                             type="submit"
-                            disabled={!canSaveCloze || actionId === 'form'}
+                            disabled={!canSaveCloze || formSubmitting}
                         >
-                            {actionId === 'form' && (
+                            {formSubmitting && (
                                 <Spinner animation="border" size="sm" />
                             )}{' '}
                             儲存

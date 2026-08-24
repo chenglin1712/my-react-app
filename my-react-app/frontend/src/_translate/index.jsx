@@ -8,7 +8,8 @@ import TribePill from "../../components/ui/TribePill";
 import GroundedText from "../../components/_translate/GroundedText";
 import EvidencePanel from "../../components/_translate/EvidencePanel";
 import useAudioPlayback from "../../hooks/useAudioPlayback";
-import { apiGet, apiPost, trackEvent } from "../../utils/apiClient";
+import { useTranslateCapabilities } from "../../hooks/useTranslateCapabilities";
+import { apiPost, trackEvent } from "../../utils/apiClient";
 
 const MAX_LEN = 300;
 
@@ -25,22 +26,34 @@ const TranslatePage = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [activeTokenIndex, setActiveTokenIndex] = useState(null);
-    const [capabilities, setCapabilities] = useState(null);
+    const capabilities = useTranslateCapabilities();
 
+    // abortRef 是「目前這一次請求」的 controller；requestGenerationRef 每次取消/
+    // 重新發出請求都會遞增，讓被取消的那次請求即使晚一步才真的 reject/resolve，
+    // 也不會再去更新 result/error/loading（swap、切族語、unmount 都要能取消
+    // 目前這次翻譯，而不是只有重新送出翻譯才取消）。
     const abortRef = useRef(null);
+    const requestGenerationRef = useRef(0);
     const { playAudio, playSentence } = useAudioPlayback(tribe, setError);
 
+    const cancelTranslation = () => {
+        requestGenerationRef.current += 1;
+        abortRef.current?.abort();
+        abortRef.current = null;
+    };
+
+    // 切換族語：目前這一輪翻譯（不論是否還在等回應）不再適用於新族語，取消並
+    // 清空結果，避免舊族語的回應晚一步回來時被當成新族語的翻譯結果顯示。
     useEffect(() => {
-        let active = true;
-        (async () => {
-            try {
-                const data = await apiGet(import.meta.env.VITE_API_TRANSLATE_CAPABILITIES_URL);
-                if (active) setCapabilities(data.tribes ?? []);
-            } catch {
-                // 能力資訊只是輔助顯示（例句數、有無整句原音），拿不到不影響主要翻譯功能。
-            }
-        })();
-        return () => { active = false; };
+        cancelTranslation();
+        setLoading(false);
+        setResult(null);
+        setError("");
+        setActiveTokenIndex(null);
+    }, [tribe]);
+
+    useEffect(() => {
+        return () => { abortRef.current?.abort(); };
     }, []);
 
     const currentTribe = TRIBES.find((t) => t.slug === tribe);
@@ -51,7 +64,8 @@ const TranslatePage = () => {
         const text = sourceText.trim();
         if (!text || loading) return;
 
-        abortRef.current?.abort();
+        cancelTranslation();
+        const myGeneration = requestGenerationRef.current;
         const controller = new AbortController();
         abortRef.current = controller;
 
@@ -64,14 +78,15 @@ const TranslatePage = () => {
                 { text, tribe, direction },
                 { signal: controller.signal },
             );
+            if (myGeneration !== requestGenerationRef.current) return;
             setResult(data);
             trackEvent("translate_submit", { tribe, payload: { direction, len: text.length } });
         } catch (err) {
-            if (axios.isCancel(err)) return;
+            if (axios.isCancel(err) || myGeneration !== requestGenerationRef.current) return;
             setError(err.message || "翻譯失敗，請稍後再試");
             setResult(null);
         } finally {
-            setLoading(false);
+            if (myGeneration === requestGenerationRef.current) setLoading(false);
         }
     };
 
@@ -82,7 +97,11 @@ const TranslatePage = () => {
         }
     };
 
+    // 交換方向前先取消目前這一輪翻譯：不然中途交換方向，舊方向的回應晚一步
+    // 回來時仍會被顯示成「新方向」的翻譯結果（見上方 cancelTranslation 說明）。
     const handleSwap = () => {
+        cancelTranslation();
+        setLoading(false);
         const nextDirection = direction === "zh2tribe" ? "tribe2zh" : "zh2tribe";
         setDirection(nextDirection);
         setActiveTokenIndex(null);
@@ -92,17 +111,26 @@ const TranslatePage = () => {
         }
     };
 
+    const [copyStatus, setCopyStatus] = useState("idle"); // idle | copied | error
+    const copyStatusTimerRef = useRef(null);
     const handleCopy = () => {
         if (!result) return;
-        navigator.clipboard?.writeText(result.translation).catch(() => {});
+        navigator.clipboard?.writeText(result.translation)
+            .then(() => setCopyStatus("copied"))
+            .catch(() => setCopyStatus("error"));
+        if (copyStatusTimerRef.current) clearTimeout(copyStatusTimerRef.current);
+        copyStatusTimerRef.current = setTimeout(() => setCopyStatus("idle"), 1500);
     };
+    useEffect(() => {
+        return () => { if (copyStatusTimerRef.current) clearTimeout(copyStatusTimerRef.current); };
+    }, []);
 
     const handlePlayResult = () => {
         if (!result) return;
         playSentence(result.translation);
     };
 
-    const activeToken = activeTokenIndex != null ? result?.tokens[activeTokenIndex] : null;
+    const activeToken = activeTokenIndex != null ? result?.tokens?.[activeTokenIndex] : null;
 
     return (
         <div className="yy-page translate-page">
@@ -200,7 +228,7 @@ const TranslatePage = () => {
                                         <Volume2 size={15} /> 逐詞發音
                                     </button>
                                     <button type="button" className="yy-btn-outline" onClick={handleCopy}>
-                                        <Copy size={15} /> 複製
+                                        <Copy size={15} /> {copyStatus === "copied" ? "已複製 ✓" : copyStatus === "error" ? "複製失敗" : "複製"}
                                     </button>
                                 </div>
                                 <p className="translate-coverage-summary">

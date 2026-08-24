@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Container, Alert, Spinner, Button } from 'react-bootstrap';
 import { useFavorites } from "../../src/userServives/useFavorites";
-import { TRIBE_NAMES } from "../constants/tribes";
+import { TRIBE_NAMES, TRIBE_SLUG_BY_NAME } from "../constants/tribes";
 import { apiPost } from "../../utils/apiClient";
 import { filterAndSortWords as sortWords } from "../../utils/wordFilterSort";
+import { useTranslateCapabilities } from "../../hooks/useTranslateCapabilities";
+import { useIsMobile } from "../../hooks/useIsMobile";
 import "../../static/css/_search/index.css";
 
 import SearchHeader from './components/SearchHeader';
@@ -11,8 +13,13 @@ import WordResultsSection from './components/WordResultsSection';
 import useAudioPlayback from '../../hooks/useAudioPlayback';
 
 const PAGE_SIZE = 50;
+const WORD_FAVORITES_CATEGORY_ID = 1;
+const EXCLUDED_LETTERS = ['d', 'f', 'j', 'v'];
+const ALPHABET = Array.from({ length: 26 }, (_, i) => String.fromCharCode(97 + i))
+  .concat("'")
+  .filter(l => !EXCLUDED_LETTERS.includes(l));
 
-const App = () => {
+const SearchPage = () => {
   const [query, setQuery] = useState('');
   const [definitions, setDefinitions] = useState({ exact_match_results: {}, fuzzy_match_results: {} });
   // 「全部詞條」的篩選／排序／分頁現在都在後端做（見 search_all），
@@ -28,22 +35,29 @@ const App = () => {
   const [filterLetter, setFilterLetter] = useState('');
   const { favorites, toggleFavorite, error: favoritesError } = useFavorites();
   const favoriteWords = useMemo(
-    () => new Set(favorites.find(fav => fav.id === 1)?.content || []),
+    () => new Set(favorites.find(fav => fav.id === WORD_FAVORITES_CATEGORY_ID)?.content || []),
     [favorites]
   );
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const [frequencyFilter, setFrequencyFilter] = useState('');
   const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useIsMobile();
   const [visibleExactCount, setVisibleExactCount] = useState(PAGE_SIZE);
   const [visibleFuzzyCount, setVisibleFuzzyCount] = useState(PAGE_SIZE);
   const [showCategories, setShowCategories] = useState(false);
   const [activeTab, setActiveTab] = useState('語法與功能');
   const [selectedSubCategory, setSelectedSubCategory] = useState(null);
   const [selectedTribe, setSelectedTribe] = useState('泰雅');
-  const [audioAvailable] = useState(true);
 
   const { playAudio, playSentence, failedAudio } = useAudioPlayback(selectedTribe, setError);
+
+  // 句子 TTS 備用播放鈕只在這個族語沒有整句真人原音時才需要，跟 _translate
+  // 頁面用同一份後端能力資料判斷（見 WordCard.jsx），不再寫死「布農語／排灣語」。
+  const capabilities = useTranslateCapabilities();
+  const hasSentenceAudio = useMemo(() => {
+    const slug = TRIBE_SLUG_BY_NAME[selectedTribe];
+    return capabilities?.find(c => c.tribeSlug === slug)?.hasSentenceAudio ?? false;
+  }, [capabilities, selectedTribe]);
 
   const tribes = TRIBE_NAMES;
 
@@ -53,11 +67,17 @@ const App = () => {
   // 族語但辭典資料還沒建好，這裡可以改成 TRIBE_NAMES 的子集合。
   const TRIBES_WITH_DATA = TRIBE_NAMES;
 
+  // 快速切換族語/篩選條件時，比較慢的舊主查詢可能在新條件的結果顯示之後才回來；
+  // requestGenerationRef 讓過期的回應（包含過期的「載入更多」）不再更新畫面。
+  // loadingMoreLockRef 是另一件事——擋同一次主查詢底下「載入更多」被同時點兩下，
+  // 用 ref 而不是 state，兩次點擊在同一個 tick 內也擋得住。
+  const requestGenerationRef = useRef(0);
+  const loadingMoreLockRef = useRef(false);
+
   // 「全部詞條」瀏覽（沒有輸入關鍵字）：字母／詞頻／分類／收藏篩選與排序都交給後端做，
-  // 這裡只帶目前的篩選條件 + limit/offset 向 /dictionary/all/ 要一頁資料。
-  // append=true 時是「載入更多」，接在目前已載入的 allWords 後面；append=false 是重新查詢，取代整份清單。
-  const fetchAllWords = async (tribe, { append = false } = {}) => {
-    const offset = append ? allOffset : 0;
+  // 這裡只帶目前的篩選條件 + limit/offset 向 /dictionary/all/ 要一頁資料。純粹負責
+  // 查詢，不自己碰 state——generation 檢查與 setState 都交給呼叫端。
+  const fetchAllWordsPage = async (tribe, offset) => {
     const body = { tribe, limit: PAGE_SIZE, offset, sort_order: sortOrder };
     if (filterLetter) body.letter = filterLetter;
     if (frequencyFilter) body.frequency = parseInt(frequencyFilter, 10);
@@ -68,25 +88,33 @@ const App = () => {
     }
     const data = await apiPost(import.meta.env.VITE_API_SEARCH_ALL_URL, body);
     const pageWords = Object.values(data.all_results || {}).flat();
-    setAllWords(prev => (append ? [...prev, ...pageWords] : pageWords));
-    setAllTotal(data.total ?? pageWords.length);
-    setAllOffset(offset + pageWords.length);
+    return { pageWords, total: data.total ?? pageWords.length };
   };
 
   const handleLoadMoreAll = async () => {
-    if (loadingMoreAll) return;
+    if (loadingMoreLockRef.current) return;
+    loadingMoreLockRef.current = true;
     setLoadingMoreAll(true);
+    const myGeneration = requestGenerationRef.current;
     try {
-      await fetchAllWords(selectedTribe, { append: true });
+      const { pageWords, total } = await fetchAllWordsPage(selectedTribe, allOffset);
+      if (myGeneration !== requestGenerationRef.current) return; // 主查詢已經換過了，這批不算數
+      setAllWords(prev => [...prev, ...pageWords]);
+      setAllTotal(total);
+      setAllOffset(offset => offset + pageWords.length);
     } catch (e) {
-      setError('載入更多失敗: ' + e.message);
+      if (myGeneration !== requestGenerationRef.current) return;
+      console.error('載入更多失敗:', e);
+      setError('載入更多失敗，請稍後再試。');
     } finally {
+      loadingMoreLockRef.current = false;
       setLoadingMoreAll(false);
     }
   };
 
   const handleSearch = async (tribeOverride = null) => {
-    if (loading) return;
+    // 遞增 generation：任何還在跑的舊主查詢或它底下的「載入更多」都不再算數。
+    const myGeneration = ++requestGenerationRef.current;
     const tribe = tribeOverride ?? selectedTribe;
     if (!TRIBES_WITH_DATA.includes(tribe)) {
       setDefinitions({ exact_match_results: {}, fuzzy_match_results: {} });
@@ -97,10 +125,15 @@ const App = () => {
     setError('');
     try {
       if (query.trim() === '') {
-        await fetchAllWords(tribe, { append: false });
+        const { pageWords, total } = await fetchAllWordsPage(tribe, 0);
+        if (myGeneration !== requestGenerationRef.current) return;
+        setAllWords(pageWords);
+        setAllTotal(total);
+        setAllOffset(pageWords.length);
         setDefinitions({ exact_match_results: {}, fuzzy_match_results: {} });
       } else {
         const data = await apiPost(import.meta.env.VITE_API_SEARCH_KEY_URL, { keyword: query.trim(), tribe });
+        if (myGeneration !== requestGenerationRef.current) return;
         setDefinitions({
           exact_match_results: Array.isArray(data.exact_match_results) ? { [query.trim()]: data.exact_match_results } : data.exact_match_results,
           fuzzy_match_results: data.fuzzy_match_results || {},
@@ -108,9 +141,11 @@ const App = () => {
         setAllWords([]); setAllTotal(0); setAllOffset(0);
       }
     } catch (e) {
-      setError('查詢失敗: ' + e.message);
+      if (myGeneration !== requestGenerationRef.current) return;
+      console.error('查詢失敗:', e);
+      setError('查詢失敗，請稍後再試。');
     } finally {
-      setLoading(false);
+      if (myGeneration === requestGenerationRef.current) setLoading(false);
     }
   };
 
@@ -183,24 +218,12 @@ const App = () => {
   }, [favoriteWords]);
 
   useEffect(() => {
-    const checkScreenSize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
-    return () => window.removeEventListener('resize', checkScreenSize);
-  }, []);
-
-  useEffect(() => {
     handleSearchRef.current();
   }, []);
 
   const filterAndSortWords = (words) => sortWords(words, {
     filterLetter, frequencyFilter, showOnlyFavorites, favoriteWords, selectedSubCategory, sortOrder,
   });
-  const excludedLetters = ['d', 'f', 'j', 'v'];
-  const alphabet = Array.from({ length: 26 }, (_, i) => String.fromCharCode(97 + i)).concat("'").filter(l => !excludedLetters.includes(l));
-
 
   return (
     <div className="yy-page search-page">
@@ -215,7 +238,7 @@ const App = () => {
         filterLetter={filterLetter} setFilterLetter={setFilterLetter}
         frequencyFilter={frequencyFilter} setFrequencyFilter={setFrequencyFilter}
         showOnlyFavorites={showOnlyFavorites} setShowOnlyFavorites={setShowOnlyFavorites}
-        alphabet={alphabet}
+        alphabet={ALPHABET}
         showCategories={showCategories} setShowCategories={setShowCategories}
         activeTab={activeTab} setActiveTab={setActiveTab}
         selectedSubCategory={selectedSubCategory} setSelectedSubCategory={setSelectedSubCategory}
@@ -226,7 +249,7 @@ const App = () => {
       {error && (
         <Alert variant="danger" className="d-flex justify-content-between align-items-center">
           <span>{error}</span>
-          <Button variant="outline-danger" size="sm" onClick={() => handleSearch()} disabled={loading}>
+          <Button type="button" variant="outline-danger" size="sm" onClick={() => handleSearch()} disabled={loading}>
             重試
           </Button>
         </Alert>
@@ -263,7 +286,7 @@ const App = () => {
           playSentence={playSentence}
           favoriteWords={favoriteWords}
           failedAudio={failedAudio}
-          audioAvailable={audioAvailable}
+          hasSentenceAudio={hasSentenceAudio}
         />
       )}
 
@@ -283,7 +306,7 @@ const App = () => {
           playSentence={playSentence}
           favoriteWords={favoriteWords}
           failedAudio={failedAudio}
-          audioAvailable={audioAvailable}
+          hasSentenceAudio={hasSentenceAudio}
         />
       )}
       <br />
@@ -303,7 +326,7 @@ const App = () => {
           playSentence={playSentence}
           favoriteWords={favoriteWords}
           failedAudio={failedAudio}
-          audioAvailable={audioAvailable}
+          hasSentenceAudio={hasSentenceAudio}
         />
       )}
     </Container>
@@ -311,4 +334,4 @@ const App = () => {
   );
 };
 
-export default App;
+export default SearchPage;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   Alert,
@@ -32,6 +32,7 @@ import DeleteAccountModal from './DeleteAccountModal';
 import PasswordChangeModal from './PasswordChangeModal';
 import ProfileEditModal from './ProfileEditModal';
 import { useUserDetail } from './useUserDetail';
+import { formatDateTime } from '../adminFormat';
 import '../../../static/css/_admin/users.css';
 
 const CONTENT_COUNT_LABELS = {
@@ -45,15 +46,6 @@ const DELETE_RESULT_LABELS = {
   firestore_user_document: 'Firestore 使用者文件',
   firebase_auth: 'Firebase Auth 帳號',
 };
-
-const formatDateTime = (value) => (
-  value
-    ? new Intl.DateTimeFormat('zh-TW', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(new Date(value))
-    : '—'
-);
 
 const formatEpochTime = (value) => (
   value != null ? formatDateTime(Number(value)) : '—'
@@ -118,23 +110,46 @@ export default function UserDetail() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+  const uidRef = useRef(uid);
+
+  // uid 改變（同一個路由元件被重用，不會重新掛載）時：
+  // 1. 強制關閉三個 Modal——Modal 開著時换到別的使用者，裡面還留著前一位
+  //    使用者編輯到一半的表單，繼續送出會把前一位的資料寫進現在這個 uid。
+  //    條件渲染本身會讓 Modal 卸載，表單狀態自然歸零，不需要額外用 key
+  //    重掛載。
+  // 2. 更新 uidRef——關閉 Modal 只是卸載這個 React 元件，不會取消它裡面
+  //    已經送出、還在飛的請求，uid 切換前就已經在送出的儲存／刪除，結果
+  //    仍然會在切換後才回來。handleProfileSaved 等 callback 靠這個 ref
+  //    判斷「現在還是不是原本那個 uid」，不是才把結果寫回畫面；不然舊 uid
+  //    的回應（尤其是 handleProfileSaved 裡的 loadUser()）會把新 uid
+  //    畫面上的資料蓋掉。
+  useEffect(() => {
+    uidRef.current = uid;
+    setShowProfileModal(false);
+    setShowPasswordModal(false);
+    setShowDeleteModal(false);
+  }, [uid]);
+
   const openProfileModal = () => { setError(''); setShowProfileModal(true); };
   const openPasswordModal = () => { setError(''); setShowPasswordModal(true); };
   const openDeleteModal = () => { setError(''); setShowDeleteModal(true); };
 
   const handleProfileSaved = async (message) => {
     setShowProfileModal(false);
+    if (uidRef.current !== uid) return;
     setSuccessMessage(message);
     await loadUser();
   };
 
   const handlePasswordSaved = (message) => {
     setShowPasswordModal(false);
+    if (uidRef.current !== uid) return;
     setSuccessMessage(message);
   };
 
   const handleAccountDeleted = (results) => {
     setShowDeleteModal(false);
+    if (uidRef.current !== uid) return;
     setDeleteResults(results);
   };
 

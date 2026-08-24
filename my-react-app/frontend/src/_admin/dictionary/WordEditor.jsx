@@ -29,6 +29,7 @@ import {
     canApproveDictionaryChanges,
     canProposeDictionaryChanges,
 } from './useRevisionActions';
+import { REVISION_STATUS_META as STATUS_META, revisionFromSave } from './revisionMeta';
 import MediaUploadField from './MediaUploadField';
 import WordBasicFields from './WordBasicFields';
 import WordEditorExplanation, {
@@ -82,26 +83,6 @@ const EMPTY_WORD = {
     source_ids: [],
     audios: [],
     explanations: [],
-};
-
-const STATUS_META = {
-    draft: {
-        label: '草稿',
-        bg: 'secondary',
-    },
-    pending_review: {
-        label: '送審中',
-        bg: 'warning',
-        text: 'dark',
-    },
-    approved: {
-        label: '已核准',
-        bg: 'success',
-    },
-    rejected: {
-        label: '已退件',
-        bg: 'danger',
-    },
 };
 
 const WORD_FIELDS = Object.keys(EMPTY_WORD);
@@ -191,19 +172,6 @@ function normalizeWord(source = {}) {
     };
 }
 
-function revisionFromSave(result, fallback) {
-    const revisionId = result?.revision_id ?? result?.id ?? fallback?.id;
-
-    return {
-        ...fallback,
-        ...result,
-        id: revisionId,
-        status: result?.status ?? fallback?.status ?? 'draft',
-        operation: result?.operation ?? fallback?.operation,
-        payload: result?.payload ?? fallback?.payload,
-    };
-}
-
 export default function WordEditor() {
     const { id } = useParams();
     const location = useLocation();
@@ -247,7 +215,12 @@ export default function WordEditor() {
     const revisionStatus = revision?.status ?? null;
     const canEditRole = canProposeDictionaryChanges(role);
     const canApprove = canApproveDictionaryChanges(role);
-    const editable = canEditRole && (
+    // 刪除提案（operation === 'delete'）狀態雖然也是 draft，但它的內容
+    // payload 是 null——語意上是「要刪除這個詞條」，不是可以繼續編輯的一般
+    // 草稿。沒有排除的話，建立刪除提案後整份表單仍然可以編輯，「儲存草稿」
+    // 還會把一般內容 payload 寫進這筆刪除提案裡。
+    const isDeleteProposal = revision?.operation === 'delete';
+    const editable = canEditRole && !isDeleteProposal && (
         (!revision && (isNew || Boolean(id)))
         || revisionStatus === 'draft'
     );
@@ -357,11 +330,13 @@ export default function WordEditor() {
 
             {!editable && (
                 <Alert variant="warning">
-                    {revisionStatus === 'pending_review'
+                    {isDeleteProposal
+                        && '此詞條已建立刪除提案，內容為唯讀；可以送審或捨棄這個提案。'}
+                    {!isDeleteProposal && revisionStatus === 'pending_review'
                         && '此提案正在送審，欄位為唯讀；編輯者可先撤回提案再修改。'}
-                    {revisionStatus === 'approved'
+                    {!isDeleteProposal && revisionStatus === 'approved'
                         && '此提案已核准，內容為唯讀。'}
-                    {revisionStatus === 'rejected'
+                    {!isDeleteProposal && revisionStatus === 'rejected'
                         && '此提案已退件，內容為唯讀。'}
                     {!canEditRole
                         && '目前角色沒有詞條編輯權限。'}
@@ -736,7 +711,7 @@ export default function WordEditor() {
                                         <Button
                                             type="button"
                                             variant="danger"
-                                            disabled={saving}
+                                            disabled={saving || revisionActions.pending}
                                             onClick={createDeleteProposal}
                                         >
                                             確認建立刪除提案

@@ -1,7 +1,7 @@
 import "../../static/css/_home/calendar.css"
 import DateReminder from "./dateReminder"
 
-const Template = ({ examInfo }) => {
+const CertificationSection = ({ examInfo }) => {
     return (
         <div className="secWrap-half">
             <div className="secRow">
@@ -18,8 +18,8 @@ const Template = ({ examInfo }) => {
                         {examInfo.length === 0 ? (
                             <p>目前沒有任何公告。</p>
                         ) : (
-                            examInfo.map((item, index) => (
-                                <div className="exam-card" key={index}>
+                            examInfo.map((item) => (
+                                <div className="exam-card" key={item.id}>
                                     <div className="exam-card-header">
                                         <span className="exam-date">{item.start_date}</span>
                                     </div>
@@ -42,4 +42,4 @@ const Template = ({ examInfo }) => {
         </div>
     );
 };
-export default Template;
+export default CertificationSection;

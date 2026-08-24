@@ -1,74 +1,12 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import "../../static/css/_game/vocabulary.css";
-import { TRIBES as TRIBE_LIST, TRIBE_COLOR_BY_SLUG } from "../constants/tribes";
+import GameTribeSelectPage from "./GameTribeSelectPage";
 
-// 名稱與族語識別色一律從共用的 TRIBE_LIST／TRIBE_COLOR_BY_SLUG 取得，
-// 避免各頁面各自寫一份色票（同一族語在不同頁面顯示不同顏色）。
-const TRIBES = TRIBE_LIST.map((t) => ({
-  name: t.name,
-  color: TRIBE_COLOR_BY_SLUG[t.slug],
-  hasGame: true,
-  route: `/game/pronunciation/${t.slug}`,
-}));
-
-const PronunciationPage = () => {
-  const navigate = useNavigate();
-  const [selectedTribe, setSelectedTribe] = useState(null);
-
-  const handleTribeClick = (tribe) => {
-    if (tribe.hasGame && tribe.route) {
-      navigate(tribe.route);
-    } else {
-      setSelectedTribe(tribe.name === selectedTribe ? null : tribe.name);
-    }
-  };
-
-  return (
-    <div className="vocab-page">
-      <div className="vocab-header">
-        <button className="vocab-back-btn" onClick={() => navigate("/game")}>
-          ← 返回遊戲專區
-        </button>
-        <h1 className="vocab-title">發音練習</h1>
-        <p className="vocab-subtitle">選擇族語，開始練習</p>
-      </div>
-
-      <div className="vocab-tribe-grid">
-        {TRIBES.map((tribe) => (
-          <div
-            key={tribe.name}
-            className={`vocab-tribe-card ${selectedTribe === tribe.name ? "selected" : ""} ${!tribe.hasGame ? "coming-soon" : ""}`}
-            style={{ "--tribe-color": tribe.color }}
-            onClick={() => handleTribeClick(tribe)}
-          >
-            <div className="vocab-tribe-badge" style={{ background: tribe.color }}>
-              {tribe.name}
-            </div>
-            <div className="vocab-tribe-name">{tribe.name}族語</div>
-            {tribe.hasGame ? (
-              <div className="vocab-tribe-tag available">開始練習 →</div>
-            ) : (
-              <div className="vocab-tribe-tag building">遊戲建置中</div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {selectedTribe && (
-        <div className="vocab-coming-state">
-          <div
-            className="vocab-coming-badge"
-            style={{ background: TRIBES.find(t => t.name === selectedTribe)?.color }}
-          >
-            {selectedTribe}
-          </div>
-          <h3 className="vocab-coming-title">{selectedTribe}族語發音練習</h3>
-          <p className="vocab-coming-desc">遊戲建置中，敬請期待</p>
-        </div>
-      )}
-    </div>
-  );
-};
+const PronunciationPage = () => (
+  <GameTribeSelectPage
+    gameSlug="pronunciation"
+    title="發音練習"
+    subtitle="選擇族語，開始練習"
+    actionLabel="開始練習"
+  />
+);
 
 export default PronunciationPage;

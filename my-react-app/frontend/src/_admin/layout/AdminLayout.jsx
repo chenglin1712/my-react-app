@@ -1,4 +1,6 @@
+import { Suspense } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Spinner } from 'react-bootstrap';
 import { BarChart3, BookOpen, ClipboardCheck, FileQuestion, Gamepad2, LayoutDashboard, Megaphone, Settings, Users } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import ErrorBoundary from '../../errorBoundary';
@@ -40,36 +42,53 @@ const NAV_GROUPS = [
     },
 ];
 
+// 每個選單項目本身就是一組 [群組標籤, 項目標籤]，NAV_GROUPS 已經有了，直接
+// 從那裡算出精確比對的麵包屑，不再手動另外維護一份——原本這裡跟 NAV_GROUPS
+// 是兩份分開的清單，辭典大類（詞條／語法／主檔／批次匯入）上線時就只更新了
+// NAV_GROUPS，這裡沒有跟著加，這幾頁的麵包屑其實一直退回顯示網址最後一段
+// 的英文（例如 words、grammar）。
+const NAV_BREADCRUMB_BY_PATH = new Map();
+NAV_GROUPS.forEach(({ label: groupLabel, items }) => {
+    items.forEach((item) => {
+        if (item.to) NAV_BREADCRUMB_BY_PATH.set(item.to, [groupLabel, item.label]);
+    });
+});
+
+// 選單上沒有自己入口的「新增／編輯／詳情」子頁，NAV_GROUPS 沒有這些資訊，
+// 只能手動列出——但只列出 AdminApp.jsx 裡真的有對應路由的子頁。判斷順序
+// 由上到下，精確比對（例如 /admin/users/new）要排在對應的 startsWith
+// 之前，不然會被 startsWith 先吃掉。
+const DETAIL_BREADCRUMBS = [
+    { test: (p) => p === '/admin/users/new', parts: ['使用者', '使用者管理', '新增'] },
+    { test: (p) => p.startsWith('/admin/users/'), parts: ['使用者', '使用者管理', '詳情'] },
+    { test: (p) => p === '/admin/content/announcements/new', parts: ['內容', '公告管理', '新增'] },
+    { test: (p) => p.startsWith('/admin/content/announcements/'), parts: ['內容', '公告管理', '編輯'] },
+    { test: (p) => p === '/admin/dictionary/words/new', parts: ['辭典', '詞條', '新增'] },
+    { test: (p) => p.startsWith('/admin/dictionary/words/'), parts: ['辭典', '詞條', '編輯'] },
+    { test: (p) => p.startsWith('/admin/dictionary/import/'), parts: ['辭典', '批次匯入／匯出', '詳情'] },
+    // quiz-bank 的 vocab／situations／cloze 沒有子路由：vocab／situations 的
+    // 編輯是同頁彈窗，cloze 是同頁分頁切換（見 AdminApp.jsx 的路由清單與
+    // 註解），這裡故意不列，之前列的那幾條沒有任何路由會導到，是死碼。
+];
+
 const getBreadcrumb = (pathname) => {
     if (pathname === '/admin' || pathname === '/admin/') return ['總覽', '儀表板'];
-    if (pathname === '/admin/analytics/search') return ['分析', '搜尋分析'];
-    if (pathname === '/admin/analytics/quiz-quality') return ['分析', '題目品質分析'];
-    if (pathname === '/admin/analytics/retention') return ['分析', '留存分析'];
-    if (pathname === '/admin/content/announcements') return ['內容', '公告管理'];
-    if (pathname.startsWith('/admin/content/announcements/')) return ['內容', '公告管理', '編輯'];
-    if (pathname === '/admin/content/exam-schedule') return ['內容', '考試時程'];
-    if (pathname === '/admin/content/homepage') return ['內容', '首頁版位'];
-    if (pathname === '/admin/quiz-bank/true-false') return ['題庫', '初級是非題'];
-    if (pathname === '/admin/quiz-bank/choice') return ['題庫', '中級選擇題'];
-    if (pathname === '/admin/quiz-bank/vocab') return ['題庫', '中高級／高級'];
-    if (pathname.startsWith('/admin/quiz-bank/vocab/')) return ['題庫', '中高級／高級', '編輯'];
-    if (pathname === '/admin/quiz-bank/cloze') return ['題庫', '中高級／高級'];
-    if (pathname.startsWith('/admin/quiz-bank/cloze/')) return ['題庫', '中高級／高級', '編輯'];
-    if (pathname === '/admin/quiz-bank/sources') return ['題庫', '外部題源'];
-    if (pathname === '/admin/quiz-bank/situations') return ['題庫', '情境題'];
-    if (pathname.startsWith('/admin/quiz-bank/situations/')) return ['題庫', '情境題', '編輯'];
-    if (pathname === '/admin/quiz-bank/irt-config') return ['題庫', 'IRT 參數'];
-    if (pathname === '/admin/review') return ['審核', '送審佇列'];
-    if (pathname === '/admin/moderation/notes') return ['審核', '分享筆記'];
-    if (pathname === '/admin/moderation/recordings') return ['審核', '發音錄音'];
-    if (pathname === '/admin/moderation/reports') return ['審核', '檢舉佇列'];
-    if (pathname === '/admin/users') return ['使用者', '使用者管理'];
-    if (pathname.startsWith('/admin/users/')) return ['使用者', '使用者管理', '詳情'];
-    if (pathname === '/admin/games/settings') return ['遊戲', '遊戲參數設定'];
-    if (pathname === '/admin/system/cache') return ['系統', '快取管理'];
-    if (pathname === '/admin/system/rate-limits') return ['系統', '限流設定'];
-    if (pathname === '/admin/system/feature-flags') return ['系統', '功能開關'];
-    return [decodeURIComponent(pathname.split('/').filter(Boolean).at(-1) || '總覽')];
+
+    const exact = NAV_BREADCRUMB_BY_PATH.get(pathname);
+    if (exact) return exact;
+
+    const detail = DETAIL_BREADCRUMBS.find(({ test }) => test(pathname));
+    if (detail) return detail.parts;
+
+    const lastSegment = pathname.split('/').filter(Boolean).at(-1) || '總覽';
+    try {
+        return [decodeURIComponent(lastSegment)];
+    } catch {
+        // pathname 理論上都是 React Router 自己產生的合法 URL，不會有這個問題；
+        // 萬一真的遇到損毀的 percent-encoding，顯示原始字串，不要讓整個
+        // 後台版面（連側邊欄跟麵包屑）都因為這裡丟例外而整個垮掉。
+        return [lastSegment];
+    }
 };
 
 export default function AdminLayout({ pendingAnnouncementCount }) {
@@ -85,13 +104,29 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
                     {NAV_GROUPS.map(({ label, icon: Icon, items }) => (
                         <section className="admin-nav-group" key={label}>
                             <h2><Icon size={16} aria-hidden="true" />{label}</h2>
-                            <ul>{items.map((item) => (
-                                <li key={item.label}>{item.to ? (
-                                    <NavLink className={({ isActive }) => `admin-nav-link${isActive ? ' active' : ''}`} end={item.end} to={item.to}>
-                                        <span>{item.label}</span>{item.pending && pendingAnnouncementCount > 0 && <span className="admin-count-badge">{pendingAnnouncementCount}</span>}
-                                    </NavLink>
-                                ) : <div className="admin-nav-link admin-nav-disabled"><span>{item.label}</span><span className="admin-planned-badge">規劃中</span></div>}</li>
-                            ))}</ul>
+                            <ul>
+                                {items.map((item) => (
+                                    <li key={item.label}>
+                                        {item.to ? (
+                                            <NavLink
+                                                className={({ isActive }) => `admin-nav-link${isActive ? ' active' : ''}`}
+                                                end={item.end}
+                                                to={item.to}
+                                            >
+                                                <span>{item.label}</span>
+                                                {item.pending && pendingAnnouncementCount > 0 && (
+                                                    <span className="admin-count-badge">{pendingAnnouncementCount}</span>
+                                                )}
+                                            </NavLink>
+                                        ) : (
+                                            <div className="admin-nav-link admin-nav-disabled">
+                                                <span>{item.label}</span>
+                                                <span className="admin-planned-badge">規劃中</span>
+                                            </div>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
                         </section>
                     ))}
                 </nav>
@@ -102,8 +137,18 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
             </aside>
             <div className="admin-main-column">
                 <header className="admin-topbar">
-                    <div className="admin-breadcrumb" aria-label="麵包屑">{breadcrumb.map((part, index) => <span key={`${part}-${index}`}>{index > 0 && <i>›</i>}{part}</span>)}</div>
-                    <div className="admin-topbar-user"><span className="admin-user-avatar">{ROLE_LABELS[userData?.role]?.charAt(0) ?? '管'}</span><div><strong>{ROLE_LABELS[userData?.role] ?? '後台人員'}</strong><small>{userData?.role ?? ''}</small></div></div>
+                    <div className="admin-breadcrumb" aria-label="麵包屑">
+                        {breadcrumb.map((part, index) => (
+                            <span key={`${part}-${index}`}>{index > 0 && <i>›</i>}{part}</span>
+                        ))}
+                    </div>
+                    <div className="admin-topbar-user">
+                        <span className="admin-user-avatar">{ROLE_LABELS[userData?.role]?.charAt(0) ?? '管'}</span>
+                        <div>
+                            <strong>{ROLE_LABELS[userData?.role] ?? '後台人員'}</strong>
+                            <small>{userData?.role ?? ''}</small>
+                        </div>
+                    </div>
                 </header>
                 {/* FE-4：後台是全站最複雜的區塊，但原本完全沒有自己的
                     error boundary——任何一個管理頁面丟出例外，都會一路
@@ -125,7 +170,15 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
                             </div>
                         )}
                     >
-                        <Outlet />
+                        {/* 後台頁面元件都改成 lazy load 了（AdminApp.jsx）；換頁時只有
+                            這個內容區顯示載入中，側邊欄與麵包屑維持顯示不消失。 */}
+                        <Suspense fallback={(
+                            <div className="admin-route-loading">
+                                <Spinner animation="border" variant="primary" />
+                            </div>
+                        )}>
+                            <Outlet />
+                        </Suspense>
                     </ErrorBoundary>
                 </div>
             </div>

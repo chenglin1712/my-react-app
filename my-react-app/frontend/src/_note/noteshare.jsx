@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../src/userServives/authContext";
-import { fetchSharedNoteById, setNoteLikeState, softDeleteNote } from "../userServives/noteService";
+import { fetchSharedNoteById, softDeleteNote, toggleNoteLike } from "../userServives/noteService";
 import { submitReport } from "../userServives/reportService";
 import { useSharedNotesPager } from "./hooks/useSharedNotesPager";
 import { useToast } from "./hooks/useToast";
@@ -25,12 +25,18 @@ export default function NoteShare() {
 
   const {
     pageNotes, setPageNotes,
-    currentPage, hasMore, totalPages, loadingPage,
+    currentPage, hasMore, totalPages, loadingPage, pageError,
     goToPage, refresh, updateCurrentPageCache, decrementTotalCount,
   } = useSharedNotesPager(filter, myUid);
   const { toast, showToast } = useToast();
 
   const redirectTimerRef = useRef(null);
+  // 開 Modal（點卡片、或從 /note/share/:id 這種分享連結進來）可能重疊——
+  // 快速點開 A 又點開 B，A 比較慢的回應不該蓋掉 B 已經顯示的內容。
+  const modalGenerationRef = useRef(0);
+  // 同一則筆記還在等按讚的 Firestore transaction 回來時，先忽略同一則筆記的
+  // 下一次點擊，避免用同一份過期資料算兩次（同一分頁內的快速連點）。
+  const pendingLikesRef = useRef(new Set());
   useEffect(() => {
     return () => {
       if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
@@ -55,14 +61,18 @@ export default function NoteShare() {
     userData ? (note.likedBy || []).includes(userData.uid) : false;
 
   const openModal = async (note) => {
+    const myGeneration = ++modalGenerationRef.current;
     try {
       const full = await fetchSharedNoteById(note.id);
+      if (myGeneration !== modalGenerationRef.current) return; // 已經有更新的開啟請求，這次結果不算數
       if (full) {
         setModalNote(full);
         setShowModal(true);
       }
     } catch (e) {
+      if (myGeneration !== modalGenerationRef.current) return;
       console.error("Open modal error:", e);
+      showToast("開啟筆記失敗，請稍後再試");
     }
   };
 
@@ -82,44 +92,46 @@ export default function NoteShare() {
       return;
     }
     if (isMine(note)) return;
+    // 上一次按讚還在等 Firestore transaction 回來，先忽略同一則筆記的下一次點擊——
+    // 不然兩次點擊會用同一份過期的 note 算出同樣的樂觀結果，等於白按一次。
+    if (pendingLikesRef.current.has(note.id)) return;
+    pendingLikesRef.current.add(note.id);
+
+    const applyLikeState = (likes, likedBy) => {
+      setPageNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, likes, likedBy } : n)));
+      updateCurrentPageCache((notes) => notes.map((n) => (n.id === note.id ? { ...n, likes, likedBy } : n)));
+      setModalNote((prev) => (prev && prev.id === note.id ? { ...prev, likes, likedBy } : prev));
+    };
 
     const already = likedByMe(note);
-    const newLikedBy = already
+    const optimisticLikedBy = already
       ? (note.likedBy || []).filter((uid) => uid !== userData.uid)
       : [...(note.likedBy || []), userData.uid];
-    const newLikes = Math.max(0, (note.likes || 0) + (already ? -1 : 1));
-
-    // 列表
-    setPageNotes((prev) =>
-      prev.map((n) => (n.id === note.id ? { ...n, likes: newLikes, likedBy: newLikedBy } : n))
-    );
-    updateCurrentPageCache((notes) =>
-      notes.map((n) => (n.id === note.id ? { ...n, likes: newLikes, likedBy: newLikedBy } : n))
-    );
-    // Modal
-    setModalNote((prev) =>
-      prev && prev.id === note.id ? { ...prev, likes: newLikes, likedBy: newLikedBy } : prev
-    );
+    applyLikeState(Math.max(0, optimisticLikedBy.length), optimisticLikedBy);
 
     try {
-      await setNoteLikeState(note.id, { likes: newLikes, likedBy: newLikedBy });
+      // 用 transaction 讀伺服器上最新的 likedBy 再切換，不是自己算好絕對值整包
+      // 覆寫——不同分頁/裝置/使用者同時按讚才不會互相蓋掉對方剛寫入的結果。
+      const { likes, likedBy } = await toggleNoteLike(note.id, userData.uid);
+      applyLikeState(likes, likedBy);
     } catch (e) {
       console.error("toggleLike error:", e);
-      // 回滾
-      setPageNotes((prev) => prev.map((n) => (n.id === note.id ? note : n)));
-      updateCurrentPageCache((notes) => notes.map((n) => (n.id === note.id ? note : n)));
-      setModalNote((prev) => (prev && prev.id === note.id ? { ...note } : prev));
+      applyLikeState(note.likes || 0, note.likedBy || []); // 回滾成點擊前的狀態
       showToast("操作失敗，請稍後再試");
+    } finally {
+      pendingLikesRef.current.delete(note.id);
     }
   };
 
-  // 檢舉（含未登入導向，跟 toggleLike 同一套「先讓看得到、點了才擋」的處理）
+  // 檢舉（含未登入導向，跟 toggleLike 同一套「先讓看得到、點了才擋」的處理）。
+  // 失敗時要往上拋（不能吞掉），NoteModal 的檢舉表單靠這個判斷是否該關閉/清空——
+  // 不然 Modal 那邊看到 promise 正常 resolve 就會誤以為檢舉成功了。
   const handleReportNote = async (note, reason, reasonText) => {
     if (!userData) {
       showToast("請先登入後再檢舉");
       if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
       redirectTimerRef.current = setTimeout(() => navigate("/login"), 1000);
-      return;
+      throw new Error("請先登入後再檢舉");
     }
     try {
       await submitReport({ targetType: "note", targetId: note.id, reason, reasonText });
@@ -127,6 +139,7 @@ export default function NoteShare() {
     } catch (e) {
       console.error("Report note error:", e);
       showToast("檢舉送出失敗，請稍後再試");
+      throw e;
     }
   };
 
@@ -135,10 +148,17 @@ export default function NoteShare() {
     if (!window.confirm("確定要刪除這則筆記？")) return;
     try {
       await softDeleteNote(modalNote.id);
-      setPageNotes((prev) => prev.filter((n) => n.id !== modalNote.id));
+      // 刪掉的正好是這一頁唯一一筆、而且不是第一頁時，留在原地只會看到空白頁，
+      // 應該退回上一頁（見這批審查發現的分頁邊界情況）。
+      const wasOnlyNoteOnPage = pageNotes.length === 1 && pageNotes[0]?.id === modalNote.id;
       updateCurrentPageCache((notes) => notes.filter((n) => n.id !== modalNote.id));
       decrementTotalCount();
       closeModal();
+      if (wasOnlyNoteOnPage && currentPage > 1) {
+        goToPage(currentPage - 1);
+      } else {
+        setPageNotes((prev) => prev.filter((n) => n.id !== modalNote.id));
+      }
     } catch (e) {
       console.error("Delete error:", e);
       showToast("刪除失敗，請稍後再試");
@@ -149,14 +169,17 @@ export default function NoteShare() {
   // 直接用 id 去讀，涵蓋筆記在其他頁的情況
   useEffect(() => {
     if (!id) return;
+    const myGeneration = ++modalGenerationRef.current;
     (async () => {
       try {
         const full = await fetchSharedNoteById(id);
+        if (myGeneration !== modalGenerationRef.current) return;
         if (full) {
           setModalNote(full);
           setShowModal(true);
         }
       } catch (e) {
+        if (myGeneration !== modalGenerationRef.current) return;
         console.error("Open modal from URL error:", e);
       }
     })();
@@ -198,6 +221,7 @@ export default function NoteShare() {
           ].map((t) => (
             <button
               key={t.key}
+              type="button"
               onClick={() => setFilter(t.key)}
               className={`ns-tab ${filter === t.key ? "active" : ""}`}
             >
@@ -206,6 +230,7 @@ export default function NoteShare() {
           ))}
 
           <button
+            type="button"
             className="ns-refresh"
             title="重新整理"
             aria-label="重新整理"
@@ -218,7 +243,8 @@ export default function NoteShare() {
 
       {/* 未發布筆記狀態 */}
       {isMyTab && !myUid && <div className="ns-empty">請先登入以查看你曾發布的筆記。</div>}
-      {!loadingPage && filteredNotes.length === 0 && <div className="ns-empty">目前沒有可顯示的分享筆記。</div>}
+      {pageError && <div className="ns-empty">{pageError}</div>}
+      {!pageError && !loadingPage && filteredNotes.length === 0 && <div className="ns-empty">目前沒有可顯示的分享筆記。</div>}
 
       {/* 卡片 */}
       <div className="ns-grid">
@@ -242,6 +268,7 @@ export default function NoteShare() {
         <div className="ns-pager">
           <div className="ns-pager-btns">
             <button
+              type="button"
               className="ns-page-btn"
               disabled={currentPage === 1 || loadingPage}
               onClick={() => goToPage(currentPage - 1)}
@@ -249,6 +276,7 @@ export default function NoteShare() {
               上一頁
             </button>
             <button
+              type="button"
               className="ns-page-btn"
               disabled={!hasMore || loadingPage}
               onClick={() => goToPage(currentPage + 1)}
@@ -279,7 +307,7 @@ export default function NoteShare() {
 
       {/* Toast */}
       {toast.show && (
-        <div className="ns-toast">
+        <div className="ns-toast" role="status" aria-live="polite">
           {toast.text}
         </div>
       )}

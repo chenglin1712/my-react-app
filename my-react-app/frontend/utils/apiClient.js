@@ -54,7 +54,7 @@ function extractMessage(value) {
   return null;
 }
 
-function normalizeError(err) {
+function throwNormalizedError(err) {
   // 呼叫端可能仍用 axios.isCancel(err) 判斷主動中斷的請求（見 _camera/label.jsx），
   // 這種情況原樣往外丟，不包成 ApiError。
   if (axios.isCancel(err)) throw err;
@@ -64,58 +64,43 @@ function normalizeError(err) {
   throw new ApiError(message, { status, data: respData });
 }
 
-/** data 可以是一般物件（JSON body）或 FormData（axios 會自動判斷、自動設定對應的 Content-Type）。*/
-export async function apiPost(url, data, options = {}) {
+/** apiGet/apiPost/apiPut/apiPatch/apiDelete 的共用執行層：附加 token、呼叫、
+ * 解析錯誤。GET/DELETE 與 POST/PUT/PATCH 的 axios 參數形狀不同（後者多一個
+ * data 參數），刻意不用 method 字串工廠把這個差異藏起來——呼叫端傳入的
+ * `request` callback 自己決定要怎麼呼叫對應的 axios method，這裡只負責
+ * 「附一次 token、統一解析錯誤」這件跨 method 共用的事。 */
+async function executeApi(options, request) {
   const headers = await authHeaders();
   try {
-    const res = await axios.post(url, data, buildConfig(headers, options));
+    const res = await request(buildConfig(headers, options));
     return res.data;
   } catch (err) {
-    normalizeError(err);
+    throwNormalizedError(err);
   }
 }
 
-export async function apiGet(url, options = {}) {
-  const headers = await authHeaders();
-  try {
-    const res = await axios.get(url, buildConfig(headers, options));
-    return res.data;
-  } catch (err) {
-    normalizeError(err);
-  }
+/** data 可以是一般物件（JSON body）或 FormData（axios 會自動判斷、自動設定對應的 Content-Type）。*/
+export function apiPost(url, data, options = {}) {
+  return executeApi(options, (config) => axios.post(url, data, config));
+}
+
+export function apiGet(url, options = {}) {
+  return executeApi(options, (config) => axios.get(url, config));
 }
 
 /** 後台管理系統的端點才會用到 PATCH／PUT／DELETE（見 backend/adminapi/），
  * 既有前台呼叫點目前都只用 GET/POST，所以原本沒有這幾個函式——補上時沿用
  * 跟 apiGet/apiPost 完全一樣的 token 附加與錯誤處理方式，不要另外長出一套。 */
-export async function apiPatch(url, data, options = {}) {
-  const headers = await authHeaders();
-  try {
-    const res = await axios.patch(url, data, buildConfig(headers, options));
-    return res.data;
-  } catch (err) {
-    normalizeError(err);
-  }
+export function apiPatch(url, data, options = {}) {
+  return executeApi(options, (config) => axios.patch(url, data, config));
 }
 
-export async function apiPut(url, data, options = {}) {
-  const headers = await authHeaders();
-  try {
-    const res = await axios.put(url, data, buildConfig(headers, options));
-    return res.data;
-  } catch (err) {
-    normalizeError(err);
-  }
+export function apiPut(url, data, options = {}) {
+  return executeApi(options, (config) => axios.put(url, data, config));
 }
 
-export async function apiDelete(url, options = {}) {
-  const headers = await authHeaders();
-  try {
-    const res = await axios.delete(url, buildConfig(headers, options));
-    return res.data;
-  } catch (err) {
-    normalizeError(err);
-  }
+export function apiDelete(url, options = {}) {
+  return executeApi(options, (config) => axios.delete(url, config));
 }
 
 /** P5 數據分析用的輕量事件回報（頁面瀏覽、測驗開始/作答等）。

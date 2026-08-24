@@ -1,27 +1,26 @@
 import "../../static/css/_quiz/quiz_panel.css"
 import { useParams, useNavigate } from "react-router-dom";
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import AnswerBox from "./quiz_answerBox"
 import MatchingQuestion from "./quiz_matching_question"
 import ClozeQuestion from "./quiz_cloze_question"
 import TrueFalseQuestion from "./quiz_true_false_question"
 import ChoiceQuestion from "./quiz_choice_question"
-import lottie from 'lottie-web';
 import loadingAnimation from "../../src/animations/loading.json"
 import { Star, CircleHelp } from "lucide-react";
 import { uploadSituationDB } from "../../src/userServives/uploadDb"
 import { useQuizPanelData } from "./useQuizPanelData"
 import { trackEvent } from "../../utils/apiClient"
 import { buildQuizAnswerEvents } from "./quizAnswerTracking"
+import { useLottieAnimation } from "@hooks/useLottieAnimation";
+import { QUIZ_LEVEL_NAME_BY_ID } from "./quizLevels";
 
 const Panel = ({ tribe = "tayal" }) => {
-    const levels = ["初級", "中級", "中高級", "高級"];
     const { level } = useParams();
-    const level_ch = levels[parseInt(level) - 1];
+    const level_ch = QUIZ_LEVEL_NAME_BY_ID[parseInt(level, 10)];
     const basePath = tribe === "tayal" ? "/quiz" : `/quiz/${tribe}`;
 
     const navigate = useNavigate();
-    const animation = useRef(null);
 
     const {
         data, dataLen, isLoading, quizInfo, savedQuestions, uploadFailed,
@@ -30,19 +29,11 @@ const Panel = ({ tribe = "tayal" }) => {
     } = useQuizPanelData(level, tribe, level_ch);
 
     const [showIntro, setShowIntro] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState("");
 
     //加載loading動畫
-    useEffect(() => {
-        if (!animation.current) return;
-        const instance = lottie.loadAnimation({
-            container: animation.current,
-            renderer: 'svg',
-            loop: true,
-            autoplay: true,
-            animationData: loadingAnimation,
-        });
-        return () => instance.destroy();
-    }, [isLoading]);
+    const animation = useLottieAnimation({ animationData: loadingAnimation, enabled: isLoading });
 
     // 下一題
     const nextQuestion = () => {
@@ -60,15 +51,12 @@ const Panel = ({ tribe = "tayal" }) => {
 
     //答題情形傳至資料庫
     const handleUploadSituation = async () => {
-        if (!quizInfo) return;
+        if (!quizInfo) return null;
 
-        let situationId = null;
         if (userAnswers.length == 0) {
-            situationId = await uploadSituationDB(quizInfo.id, null, null, null);
-        } else {
-            situationId = await uploadSituationDB(quizInfo.id, quizInfo.ans, userAnswers, userStars);
+            return await uploadSituationDB(quizInfo.id, null, null, null);
         }
-        return situationId;
+        return await uploadSituationDB(quizInfo.id, quizInfo.ans, userAnswers, userStars);
     };
 
     // trackEvent 本身是 fire-and-forget，失敗不影響繳交流程，故意不 await。
@@ -78,16 +66,38 @@ const Panel = ({ tribe = "tayal" }) => {
         );
     };
 
-    //點擊提交
-    const handleSubmmit = async () => {
+    // 點擊提交——主畫面按鈕與側邊欄 AnswerBox 共用這一個函式（見 <AnswerBox
+    // onSubmit={handleSubmit}>）。原本 AnswerBox 自己有一份平行的、簡化過頭
+    // 的送出邏輯：只彈確認框、清計時器、直接 navigate，完全沒有呼叫
+    // uploadSituationDB／trackEvent，也沒有寫 sessionStorage fallback、沒有帶
+    // situationID——使用者點側邊欄那顆「繳交試卷」，作答結果會直接遺失。
+    const handleSubmit = async () => {
+        if (isSubmitting) return;
         if (userAnswers.some(a => a === null)) {
             const confirmSubmit = window.confirm("⚠️您尚未作答完成，確定要繳交嗎？");
             if (!confirmSubmit) {
                 return;
             }
         }
+
+        setIsSubmitting(true);
+        setSubmitError("");
         trackQuizAnswers();
-        const situationID = await handleUploadSituation();
+
+        let situationID = null;
+        try {
+            situationID = await handleUploadSituation();
+        } catch (err) {
+            console.error("儲存作答結果失敗：", err);
+        }
+        if (!situationID) {
+            // uploadSituationDB 失敗時回傳 undefined（它自己 catch 掉例外），
+            // 不擋下導頁——既有的 sessionStorage fallback 仍能讓使用者看到這次
+            // 的作答結果——但要讓使用者知道這次可能沒有真的存進資料庫，
+            // 而不是讓他們以為分數已經存好了。
+            setSubmitError("作答結果儲存失敗，這次的紀錄可能不會出現在「答題情形」裡。");
+        }
+
         const fallbackData = {
             title: level_ch,
             tribe,
@@ -95,7 +105,13 @@ const Panel = ({ tribe = "tayal" }) => {
             answers: userAnswers,
             correctAnswers: quizInfo?.ans ?? []
         };
-        sessionStorage.setItem('quizFallback', JSON.stringify(fallbackData));
+        try {
+            sessionStorage.setItem('quizFallback', JSON.stringify(fallbackData));
+        } catch (err) {
+            console.error("暫存作答結果失敗：", err);
+        }
+
+        setIsSubmitting(false);
         navigate(`${basePath}/${level}/submit`, {
             state: {
                 situationID,
@@ -226,13 +242,19 @@ const Panel = ({ tribe = "tayal" }) => {
                             </button>
                         </div>
                     </div>
-                    <button className="submit-button" onClick={handleSubmmit}>繳交試卷</button>
+                    {submitError && <p className="quiz-submit-error" role="alert" style={{ color: '#d32f2f', textAlign: 'center', marginTop: '8px' }}>{submitError}</p>}
+                    <button className="submit-button" onClick={handleSubmit} disabled={isSubmitting}>
+                        {isSubmitting ? "送出中..." : "繳交試卷"}
+                    </button>
                 </div>
                 <AnswerBox
                     dataLen={dataLen}
                     userAnswers={userAnswers}
                     userStars={userStars}
+                    currentQuestionIndex={currentQuestionIndex}
                     setCurrentQuestionIndex={setCurrentQuestionIndex}
+                    onSubmit={handleSubmit}
+                    isSubmitting={isSubmitting}
                 />
             </div>
         );

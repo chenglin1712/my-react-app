@@ -41,6 +41,10 @@
   text-align: center;
   transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
   position: relative;
+  /* src/_quiz/tribeSelect.jsx 把這個 class 用在 <Link>（渲染成 <a>）上，
+     重設掉瀏覽器預設的底線跟連結文字顏色。 */
+  text-decoration: none;
+  color: inherit;
 }
 
 .zone-card.available {

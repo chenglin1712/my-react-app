@@ -26,11 +26,27 @@
   letter-spacing: 0.14em;
 }
 
-.pron-community-heading h1 {
+/* PronunciationCommunity 現在掛在 TribeGamePage 底下，外層已經有一個 <h1>
+   （族語＋頁面標題），這裡改用 <h2> 避免同一頁出現兩個一級標題，視覺樣式
+   不變。 */
+.pron-community-heading h2 {
   margin: 0 0 0.55rem;
   color: #9b1b30;
   font-size: clamp(1.8rem, 4vw, 2.5rem);
   font-weight: 850;
+}
+
+.pron-community-back-link {
+  display: inline-block;
+  margin-bottom: 1rem;
+  color: #9b1b30;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.pron-community-back-link:hover {
+  text-decoration: underline;
 }
 
 .pron-community-heading p {

@@ -1,13 +1,13 @@
 import "../../static/css/_auth/editProfile.css"
 import { Edit2, User, Mail, Shield, Save, Calendar, Lock } from "lucide-react";
-import { useState, useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { Alert } from "react-bootstrap";
 import AvatarImg from "../../static/assets/_auth/avatar.webp"
 import { useNavigate } from "react-router-dom";
 import { updateProfile } from "../../src/userServives/userServive"
 import { useAuth } from "../../src/userServives/authContext"
-import { uploadToCloudinary } from "@utils/uploadToCloudinary"
+import { useAvatarUpload } from "@hooks/useAvatarUpload";
 
 const Edit = () => {
     const navigate = useNavigate();
@@ -22,53 +22,37 @@ const Edit = () => {
         avatarUrl: userData.firestoreData.avatarUrl ? userData.firestoreData.avatarUrl : AvatarImg
     });
 
-    const fileInputRef = useRef(null);
-    const [previewUrl, setPreviewUrl] = useState(formData.avatarUrl);
-    const [isUploading, setIsUploading] = useState(false);
     const [errorMsg, setErrorMsg] = useState("");
-
-    const handleImageClick = () => {
-        fileInputRef.current.click();
-    };
+    //上傳圖片到cloudinary（transform: false 維持原本純 image/upload、
+    //不加 f_auto,q_auto 的行為）
+    const { previewUrl, isUploading, uploadError, selectFile } = useAvatarUpload({
+        initialPreviewUrl: formData.avatarUrl,
+        uploadOptions: { transform: false },
+    });
 
     const handleChange = async (e) => {
         const file = e.target.files[0];
-        if (!file) return;
-
-        if (file.size > 5 * 1024 * 1024) {
-            setErrorMsg("圖片不得超過 5 MB，請重新選擇。");
-            return;
-        }
-        setErrorMsg("");
-
-        setPreviewUrl(URL.createObjectURL(file));
-        setIsUploading(true);
-
-        //上傳圖片到cloudinary（transform: false 維持原本純 image/upload、
-        //不加 f_auto,q_auto 的行為）
-        try {
-            const secureUrl = await uploadToCloudinary(file, { transform: false });
-            setFormData(prev => ({ ...prev, avatarUrl: secureUrl }));
-        } catch (err) {
-            console.error("圖片上傳失敗", err);
-            setErrorMsg("圖片上傳失敗");
-        } finally {
-            setIsUploading(false);
-        }
+        const secureUrl = await selectFile(file);
+        if (secureUrl) setFormData(prev => ({ ...prev, avatarUrl: secureUrl }));
     };
 
     const handleInputChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
 
-    const { updateUserData } = useAuth();
+    const { userData: authUser, updateUserData } = useAuth();
     const handleSave = async () => {
         setErrorMsg("");
         try {
             const result = await updateProfile(userData.uid, formData);
 
             if (result.success) {
-                updateUserData(result);
+                // 只換掉 firestoreData、保留 authUser 其他既有欄位（uid、role 等）。
+                // 原本直接把 updateProfile() 的回傳值整包丟給 updateUserData()，
+                // 但那個回傳值是 {success, firestoreData, uid}，沒有 role——
+                // AuthContext 是整包覆蓋而非合併，所以存檔後 role 會被清空，
+                // 直到下次登入／auth 狀態變化才會補回來。
+                updateUserData({ ...authUser, firestoreData: result.firestoreData });
                 navigate("/");
             } else {
                 setErrorMsg("失敗: " + result.message);
@@ -81,23 +65,23 @@ const Edit = () => {
     return (
         <div className="edit-container">
             <h2 className="edit-title">編輯個人資料</h2>
-            {errorMsg && <Alert variant="danger" className="py-2">{errorMsg}</Alert>}
+            {(errorMsg || uploadError) && <Alert variant="danger" className="py-2">{errorMsg || uploadError}</Alert>}
 
-            <div className="avatar-uploader" onClick={handleImageClick}>
+            <label className="avatar-uploader" htmlFor="edit-avatar-input">
                 <img src={previewUrl} alt="頭像" className="avatar-image" />
                 <div className="edit-overlay">
                     <Edit2 size={18} />
                     <span>{isUploading ? "上傳中..." : "變更圖片"}</span>
                 </div>
                 <input
+                    id="edit-avatar-input"
                     type="file"
                     accept="image/*"
-                    ref={fileInputRef}
                     onChange={handleChange}
                     aria-label="變更圖片"
-                    style={{ display: "none" }}
+                    className="visually-hidden"
                 />
-            </div>
+            </label>
 
             <div className="edit-form">
                 <div className="form-group">
@@ -155,7 +139,7 @@ const Edit = () => {
                         disabled
                         style={{ backgroundColor: "#f5f5f5", cursor: "not-allowed" }}
                     />
-                    <a className="forgot-pass" onClick={() => { navigate("/reset"); }}>變更密碼</a>
+                    <Link className="forgot-pass" to="/reset">變更密碼</Link>
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", marginTop: "24px" }}>

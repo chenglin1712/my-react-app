@@ -189,11 +189,14 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    width: 100%;
     padding: 12px 16px;
     border-radius: var(--yy-radius-btn);
     border: 3px solid var(--yy-ink);
     background: #fff;
     color: var(--yy-ink);
+    font: inherit;
+    text-align: inherit;
     cursor: pointer;
     box-shadow: var(--yy-shadow-sm);
 }

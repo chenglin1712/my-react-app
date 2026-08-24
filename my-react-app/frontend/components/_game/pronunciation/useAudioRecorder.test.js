@@ -20,6 +20,7 @@ class FakeMediaRecorder {
 describe('useAudioRecorder', () => {
   let fakeTracks;
   let fakeStream;
+  let revokeObjectURL;
 
   beforeEach(() => {
     fakeTracks = [{ stop: vi.fn() }, { stop: vi.fn() }];
@@ -29,6 +30,8 @@ describe('useAudioRecorder', () => {
     };
     window.MediaRecorder = FakeMediaRecorder;
     window.URL.createObjectURL = vi.fn(() => 'blob:fake-url');
+    revokeObjectURL = vi.fn();
+    window.URL.revokeObjectURL = revokeObjectURL;
   });
 
   afterEach(() => {
@@ -62,5 +65,74 @@ describe('useAudioRecorder', () => {
 
     expect(onError).toHaveBeenCalledWith('無法存取麥克風，請確認瀏覽器權限。');
     expect(result.current.recState).toBe('idle');
+  });
+
+  test('重新錄音時會 revoke 上一段錄音的 blob URL（回歸測試：原本 reset() 只是丟掉 state，從未 revoke）', async () => {
+    const { result } = renderHook(() => useAudioRecorder());
+
+    await act(async () => {
+      await result.current.start();
+    });
+    act(() => {
+      result.current.stop();
+    });
+    expect(result.current.recState).toBe('recorded');
+
+    act(() => {
+      result.current.reset();
+    });
+
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:fake-url');
+  });
+
+  test('unmount 時會釋放麥克風並 revoke 錄音的 blob URL', async () => {
+    const { result, unmount } = renderHook(() => useAudioRecorder());
+
+    await act(async () => {
+      await result.current.start();
+    });
+    act(() => {
+      result.current.stop();
+    });
+
+    unmount();
+
+    expect(fakeTracks[0].stop).toHaveBeenCalled();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:fake-url');
+  });
+
+  test('getUserMedia 還沒回來前連續呼叫兩次 start()，只會真的要求一次麥克風（回歸測試：原本沒有防止連續點擊）', async () => {
+    let resolveGetUserMedia;
+    window.navigator.mediaDevices.getUserMedia = vi.fn(() => new Promise((resolve) => { resolveGetUserMedia = resolve; }));
+    const { result } = renderHook(() => useAudioRecorder());
+
+    let firstStart, secondStart;
+    act(() => {
+      firstStart = result.current.start();
+      secondStart = result.current.start();
+    });
+
+    await act(async () => {
+      resolveGetUserMedia(fakeStream);
+      await firstStart;
+      await secondStart;
+    });
+
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);
+  });
+
+  test('markSubmitted 把狀態轉成 submitted，不會暴露原本可以轉去任何狀態的 setRecState', async () => {
+    const { result } = renderHook(() => useAudioRecorder());
+    expect(result.current.setRecState).toBeUndefined();
+
+    await act(async () => {
+      await result.current.start();
+    });
+    act(() => {
+      result.current.stop();
+      result.current.markSubmitted();
+    });
+
+    expect(result.current.recState).toBe('submitted');
   });
 });

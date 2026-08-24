@@ -35,6 +35,13 @@
 .quiz-bank-blank-card-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .quiz-bank-blank-options-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .quiz-bank-option-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+
+/* 選擇題的三張選項圖片：原本是 QuizChoice.jsx／QuizTrueFalse.jsx 內嵌的
+   style={{}}，跟這個檔案其他版面規則一樣是固定不變的，不是依資料動態算的。 */
+.quiz-bank-choice-images { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.quiz-bank-choice-option-card { border: 1px solid #dee2e6; border-radius: 8px; padding: 1rem; }
+.quiz-bank-option-image-preview { width: 100%; height: 140px; object-fit: cover; border-radius: 8px; }
+.quiz-bank-single-image-preview { width: 180px; height: 120px; object-fit: cover; border-radius: 8px; }
 .quiz-bank-option-row .form-control { flex: 1; }
 
 /* 外部題源設定：5 個族語一列一列直接編輯，不需要另開 Modal */

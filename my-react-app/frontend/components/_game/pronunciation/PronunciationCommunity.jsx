@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   collection,
   getDocs,
@@ -31,18 +31,23 @@ const formatCreatedAt = (timestamp) => {
   }).format(date);
 };
 
-export default function PronunciationCommunity() {
-  const { tribe } = useParams();
-
+export default function PronunciationCommunity({ tribe }) {
   const [recordings, setRecordings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
+  // 讀取錄音清單跟送出檢舉是兩件不相關的事，共用同一個 error state 的話，
+  // 開啟檢舉視窗會把「載入清單失敗」的錯誤一起清掉，檢舉本身的錯誤又會顯示
+  // 在整頁層級（視窗外面），分開放才不會互相干擾。
+  const [reportError, setReportError] = useState('');
+
   const [reportTarget, setReportTarget] = useState(null);
   const [reason, setReason] = useState('inappropriate');
   const [reasonText, setReasonText] = useState('');
   const [submittingReport, setSubmittingReport] = useState(false);
+
+  const loadGenerationRef = useRef(0);
 
   const loadRecordings = useCallback(async () => {
     if (!tribe) {
@@ -52,6 +57,7 @@ export default function PronunciationCommunity() {
       return;
     }
 
+    const myGeneration = ++loadGenerationRef.current;
     setLoading(true);
     setError('');
 
@@ -62,6 +68,7 @@ export default function PronunciationCommunity() {
         limit(200),
       );
       const snapshot = await getDocs(recordingsQuery);
+      if (myGeneration !== loadGenerationRef.current) return; // 已經過期（切換族語/重新整理）
 
       setRecordings(
         snapshot.docs
@@ -72,9 +79,11 @@ export default function PronunciationCommunity() {
           .filter((recording) => recording.word && recording.storageUrl),
       );
     } catch (err) {
-      setError(err.message);
+      if (myGeneration !== loadGenerationRef.current) return;
+      console.error('載入社群錄音失敗:', err.message);
+      setError('載入社群錄音失敗，請稍後再試。');
     } finally {
-      setLoading(false);
+      if (myGeneration === loadGenerationRef.current) setLoading(false);
     }
   }, [tribe]);
 
@@ -103,7 +112,7 @@ export default function PronunciationCommunity() {
     setReportTarget(recording);
     setReason('inappropriate');
     setReasonText('');
-    setError('');
+    setReportError('');
     setSuccessMessage('');
   };
 
@@ -124,7 +133,7 @@ export default function PronunciationCommunity() {
     if (reason === 'other' && !trimmedReasonText) return;
 
     setSubmittingReport(true);
-    setError('');
+    setReportError('');
     setSuccessMessage('');
 
     try {
@@ -141,18 +150,24 @@ export default function PronunciationCommunity() {
       setReasonText('');
       setSuccessMessage('已送出檢舉，感謝您協助維護社群品質');
     } catch (err) {
-      setError(err.message);
+      console.error('送出檢舉失敗:', err.message);
+      setReportError('送出檢舉失敗，請稍後再試。');
     } finally {
       setSubmittingReport(false);
     }
   };
 
   return (
-    <main className="pron-community-page">
+    <div className="pron-community-page">
+      <Link className="pron-community-back-link" to={`/game/pronunciation/${tribe}`}>
+        ← 返回發音練習
+      </Link>
       <header className="pron-community-heading">
         <div>
           <p className="pron-community-eyebrow">YUAN・YU COMMUNITY</p>
-          <h1>社群示範發音</h1>
+          {/* 這個元件掛在 TribeGamePage 底下，外層已經有一個 <h1>（族語+
+              頁面標題），這裡用 <h2> 避免同一頁出現兩個一級標題。 */}
+          <h2>社群示範發音</h2>
           <p>
             聆聽其他學習者分享的真人錄音，從不同聲音認識族語發音。
           </p>
@@ -177,6 +192,12 @@ export default function PronunciationCommunity() {
       {error && (
         <div className="pron-community-message error" role="alert">
           {error}
+        </div>
+      )}
+
+      {reportError && (
+        <div className="pron-community-message error" role="alert">
+          {reportError}
         </div>
       )}
 
@@ -330,6 +351,6 @@ export default function PronunciationCommunity() {
           </section>
         </div>
       )}
-    </main>
+    </div>
   );
 }

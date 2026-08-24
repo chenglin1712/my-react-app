@@ -10,14 +10,16 @@ import DOMPurify from "dompurify";
  * 的長度，最後用 DOMPurify 重新過一次——就算截斷把某個標籤切到一半，也會在這裡
  * 被修好或濾掉，不會產生殘缺的 HTML。
  */
-export const PREVIEW_MAX_LENGTH = 2000;
+// 注意：這是 sanitize 前、原始 HTML 的截斷預算，不是最終輸出字元數的保證——
+// DOMPurify 修掉殘缺標籤後，實際長度可能比這個數字略短。
+export const PREVIEW_SOURCE_TRUNCATION_LENGTH = 2000;
 export const SHARE_MAX_PAGES = 50;
 
 export function buildPreview(html) {
   const withoutImages = (html || "").replace(/<img\b[^>]*>/gi, "");
   const truncated =
-    withoutImages.length > PREVIEW_MAX_LENGTH
-      ? withoutImages.slice(0, PREVIEW_MAX_LENGTH)
+    withoutImages.length > PREVIEW_SOURCE_TRUNCATION_LENGTH
+      ? withoutImages.slice(0, PREVIEW_SOURCE_TRUNCATION_LENGTH)
       : withoutImages;
   return DOMPurify.sanitize(truncated || "<p></p>");
 }

@@ -5,7 +5,7 @@ import "swiper/css"
 import "swiper/css/effect-fade"
 import "swiper/css/navigation";
 
-const News = ({ withImage, withoutImage }) => {
+const News = ({ withImage = [], withoutImage = [] }) => {
     const allNews = [...withImage, ...withoutImage];
     const hasImages = withImage.length > 0;
 
@@ -32,8 +32,8 @@ const News = ({ withImage, withoutImage }) => {
                             autoplay={{ delay: 8000 }}
                             grabCursor={true}
                         >
-                            {withImage.map((event, index) => (
-                                <SwiperSlide key={index}>
+                            {withImage.map((event) => (
+                                <SwiperSlide key={event.id}>
                                     <div className="slide">
                                         <img src={event.image} alt={event.title} />
                                         <div className="slide-info">
@@ -51,12 +51,12 @@ const News = ({ withImage, withoutImage }) => {
 
                     <div className="event-right">
                         <ul className="text-list">
-                            {withoutImage.map((event, index) => (
-                                <li key={index}>
+                            {withoutImage.map((event) => (
+                                <li key={event.id}>
                                     <a href={event.detail} className="text-item" target="_blank" rel="noreferrer">
                                         <div className="text-item-date">{event.start_date}</div>
                                         <div className="text-item-content">
-                                            <span className="tag" data-tag={event.tag || '活動'}>{event.tag || '活動'}</span>
+                                            <span className="tag" data-tag={event.tag}>{event.tag}</span>
                                             <h4>{event.title}</h4>
                                         </div>
                                     </a>
@@ -68,16 +68,16 @@ const News = ({ withImage, withoutImage }) => {
             ) : (
                 /* 無圖版：卡片格狀排列 */
                 <div className="news-card-grid">
-                    {allNews.map((event, index) => (
+                    {allNews.map((event) => (
                         <a
-                            key={index}
+                            key={event.id}
                             href={event.detail}
                             className="news-card"
                             target="_blank"
                             rel="noreferrer"
                         >
                             <div className="news-card-top">
-                                <span className="tag" data-tag={event.tag || '最新消息'}>{event.tag || '最新消息'}</span>
+                                <span className="tag" data-tag={event.tag}>{event.tag}</span>
                                 <span className="news-card-date">{event.start_date}</span>
                             </div>
                             <h4 className="news-card-title">{event.title}</h4>

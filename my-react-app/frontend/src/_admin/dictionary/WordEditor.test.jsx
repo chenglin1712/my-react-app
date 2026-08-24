@@ -7,6 +7,7 @@ import {
     vi,
 } from 'vitest';
 import {
+    act,
     fireEvent,
     render,
     screen,
@@ -408,6 +409,137 @@ describe('WordEditor', () => {
         });
     });
 
+    /** useRevisionActions.js 原本沒有任何同步鎖：run() 只在動作開始時
+     * setPending(true)，沒有 if (pending) return 這種擋同一個 tick 內重複
+     * 觸發的檢查，完全依賴 disabled 屬性——但 state 要下一次 render 才會
+     * 反映到畫面上，擋不住「送審」跟「捨棄草稿」這兩個不同按鈕在同一個
+     * tick 內都被觸發。這裡驗證 useRevisionActions 內部所有動作共用的
+     * ref 鎖真的擋住了這種情況（跨 hook 的 saveDraft/createDeleteProposal
+     * 是否也共用同一把鎖，由 useWordEditorData.test.js 另外驗證）。 */
+    test('送審與捨棄草稿在同一個 tick 內都被觸發時，只有一個會真的送出', async () => {
+        getWord.mockResolvedValue({
+            ...effectiveWord,
+            meta: {
+                ...effectiveWord.meta,
+                pending_revision: { id: 31, status: 'draft', operation: 'update' },
+            },
+        });
+        getRevision.mockResolvedValue({
+            id: 31,
+            status: 'draft',
+            operation: 'update',
+            payload: effectiveWord,
+        });
+        submitRevision.mockResolvedValue({ id: 31, status: 'pending_review' });
+        discardRevision.mockResolvedValue({ detail: '已捨棄' });
+
+        renderEditor('/admin/dictionary/words/word-1');
+        await screen.findByDisplayValue('abas');
+
+        const submitButton = screen.getByRole('button', { name: /^送審/ });
+        const discardButton = screen.getByRole('button', { name: /捨棄草稿/ });
+
+        // 包在同一個 act() 裡，讓兩個按鈕的 click handler 在 React 重新
+        // render、更新 disabled 屬性之前就都執行——分開呼叫 fireEvent.click
+        // 時，RTL 會各自用 act() 包一次，兩次呼叫之間 React 已經重新
+        // render，第二顆按鈕在真正點擊前就已經被 disabled 擋下，測不出
+        // useActionLock 本身的保護，只測到 React 正常的重新渲染時序。
+        act(() => {
+            fireEvent.click(submitButton);
+            fireEvent.click(discardButton);
+        });
+
+        await waitFor(() => {
+            expect(submitRevision).toHaveBeenCalledTimes(1);
+        });
+        expect(discardRevision).not.toHaveBeenCalled();
+    });
+
+    /** 回歸測試：discard 成功後後端只回 { detail: '已捨棄' }，沒有 id/
+     * status/payload。handleRevisionChanged 原本一律用 revisionFromSave
+     * (result, current) 合併，等於把舊 revision 的欄位整個從 current 補
+     * 回來——後端已經刪掉這筆 revision，畫面卻繼續顯示它存在。 */
+    test('回歸測試：捨棄既有詞條的草稿後，重新載入正式內容，不殘留舊草稿', async () => {
+        mockRole = 'editor';
+        getWord.mockResolvedValue({
+            ...effectiveWord,
+            meta: {
+                ...effectiveWord.meta,
+                pending_revision: { id: 31, status: 'draft', operation: 'update' },
+            },
+        });
+        getRevision.mockResolvedValue({
+            id: 31,
+            status: 'draft',
+            operation: 'update',
+            payload: { ...effectiveWord, name: '草稿中的詞形' },
+        });
+        discardRevision.mockResolvedValue({ detail: '已捨棄' });
+
+        renderEditor('/admin/dictionary/words/word-1');
+        expect(await screen.findByDisplayValue('草稿中的詞形')).toBeInTheDocument();
+
+        // 捨棄之後 getWord 會被重新呼叫一次，回傳的是正式內容（'abas'）。
+        getWord.mockResolvedValue(effectiveWord);
+
+        fireEvent.click(screen.getByRole('button', { name: /捨棄草稿/ }));
+
+        await waitFor(() => {
+            expect(discardRevision).toHaveBeenCalledWith(31);
+        });
+
+        expect(await screen.findByDisplayValue('abas')).toBeInTheDocument();
+        expect(screen.queryByDisplayValue('草稿中的詞形')).not.toBeInTheDocument();
+        expect(screen.getByText('目前生效版本')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /捨棄草稿/ })).not.toBeInTheDocument();
+    });
+
+    test('回歸測試：捨棄新建詞條的草稿後，回到空白的「尚未儲存」表單', async () => {
+        createWordProposal.mockResolvedValue({ revision_id: 42, status: 'draft' });
+        discardRevision.mockResolvedValue({ detail: '已捨棄' });
+
+        renderEditor();
+        await screen.findByText('尚未儲存');
+
+        fireEvent.change(screen.getByLabelText(/^族語\s/), { target: { value: 'tribe-tayal' } });
+        fireEvent.change(screen.getByLabelText(/詞形/), { target: { value: 'lokah' } });
+        fireEvent.click(screen.getByRole('button', { name: /儲存草稿/ }));
+        await screen.findByText('草稿');
+
+        fireEvent.click(screen.getByRole('button', { name: /捨棄草稿/ }));
+
+        await waitFor(() => {
+            expect(discardRevision).toHaveBeenCalled();
+        });
+
+        expect(await screen.findByText('尚未儲存')).toBeInTheDocument();
+        expect(screen.getByLabelText(/詞形/)).toHaveValue('');
+    });
+
+    /** 回歸測試：editable 原本沒有排除 operation === 'delete'，建立刪除
+     * 提案後整份表單仍然可以編輯，「儲存草稿」還會把一般內容 payload 寫進
+     * 這筆刪除提案裡。 */
+    test('回歸測試：建立刪除提案後表單變成唯讀，不再顯示儲存草稿', async () => {
+        proposeWordDelete.mockResolvedValue({
+            revision_id: 91, status: 'draft', operation: 'delete',
+        });
+
+        renderEditor('/admin/dictionary/words/word-1');
+        await screen.findByDisplayValue('abas');
+
+        fireEvent.click(screen.getByRole('button', { name: /建立刪除提案/ }));
+        await screen.findByText(/標註引用/);
+        fireEvent.click(screen.getByRole('button', { name: /確認建立刪除提案/ }));
+
+        await waitFor(() => {
+            expect(proposeWordDelete).toHaveBeenCalled();
+        });
+
+        expect(await screen.findByText(/已建立刪除提案，內容為唯讀/)).toBeInTheDocument();
+        expect(screen.getByLabelText(/詞形/)).toBeDisabled();
+        expect(screen.queryByRole('button', { name: /儲存草稿/ })).not.toBeInTheDocument();
+    });
+
     test('reviewer 可核准或填寫意見後退件', async () => {
         mockRole = 'reviewer';
         getWord.mockResolvedValue({
@@ -517,7 +649,7 @@ describe('WordEditor', () => {
                 await screen.findByRole('option', { name: /na/ }),
             ).toBeInTheDocument();
 
-            fireEvent.mouseDown(screen.getByRole('option', {
+            fireEvent.click(screen.getByRole('option', {
                 name: /na/,
             }));
 

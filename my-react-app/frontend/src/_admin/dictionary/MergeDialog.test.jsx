@@ -6,7 +6,7 @@ import {
     vi,
 } from 'vitest';
 import {
-    fireEvent, render, screen, waitFor,
+    act, fireEvent, render, screen, waitFor,
 } from '@testing-library/react';
 import MergeDialog from './MergeDialog';
 import { mergeTaxonomyTerm } from './dictionaryApi';
@@ -100,6 +100,52 @@ describe('MergeDialog', () => {
         render(<MergeDialog {...baseProps} />);
         fireEvent.click(screen.getByRole('button', { name: '取消' }));
         expect(baseProps.onClose).toHaveBeenCalled();
+    });
+
+    /** react-bootstrap 的 <Button> 在沒有指定 as/href 時，本來就會把
+     * type 預設成 'button'（@restart/ui useButtonProps 裡的
+     * `type: type || 'button'`），不是原生 HTML button 的 type="submit"
+     * 預設值。這裡明確指定 type="button" 是跟其他檔案的既有慣例保持一致、
+     * 避免日後改成別的元件時失去這層保護，而不是修一個目前真的能被觸發的
+     * 錯誤送出——這則測試確認的是這個行為，不是回歸測試。 */
+    test('已填好合併條件時點取消，不會誤送出合併', () => {
+        render(<MergeDialog {...baseProps} />);
+
+        fireEvent.change(screen.getByLabelText(/合併目標/), { target: { value: '2' } });
+        fireEvent.change(screen.getByLabelText(/請輸入「動物」以確認合併/), {
+            target: { value: '動物' },
+        });
+        expect(screen.getByRole('button', { name: '確認合併' })).toBeEnabled();
+
+        fireEvent.click(screen.getByRole('button', { name: '取消' }));
+
+        expect(baseProps.onClose).toHaveBeenCalled();
+        expect(mergeTaxonomyTerm).not.toHaveBeenCalled();
+    });
+
+    test('同一個 tick 內雙擊確認按鈕，只送出一次合併請求', async () => {
+        let resolveMerge;
+        mergeTaxonomyTerm.mockImplementation(() => new Promise((resolve) => { resolveMerge = resolve; }));
+
+        render(<MergeDialog {...baseProps} />);
+
+        fireEvent.change(screen.getByLabelText(/合併目標/), { target: { value: '2' } });
+        fireEvent.change(screen.getByLabelText(/請輸入「動物」以確認合併/), {
+            target: { value: '動物' },
+        });
+
+        const confirmButton = screen.getByRole('button', { name: '確認合併' });
+        act(() => {
+            fireEvent.click(confirmButton);
+            fireEvent.click(confirmButton);
+        });
+
+        expect(mergeTaxonomyTerm).toHaveBeenCalledTimes(1);
+
+        resolveMerge({ target_id: 2, merged_references: 3 });
+        await waitFor(() => {
+            expect(baseProps.onMerged).toHaveBeenCalledTimes(1);
+        });
     });
 
     test('詞綴模式下選項顯示 affix 欄位', () => {

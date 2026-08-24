@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Form, Modal, Spinner, Table } from 'react-bootstrap';
+import { Alert, Button, Form, Modal, Spinner, Table } from 'react-bootstrap';
 import { Plus } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
@@ -6,23 +6,13 @@ import RejectReasonModal from '../reviewWorkflow/RejectReasonModal';
 import ReviewActions from '../reviewWorkflow/ReviewActions';
 import ReviewPagination from '../reviewWorkflow/ReviewPagination';
 import { useReviewableContentCrud } from '../reviewWorkflow/useReviewableContentCrud';
+import {
+    QUIZ_BANK_EDITORS as CONTENT_EDITORS,
+    QUIZ_BANK_ROLES,
+    QUIZ_BANK_STATUSES as STATUSES,
+    QuizStatusBadge,
+} from './quizBankReviewMeta';
 import '../../../static/css/_admin/quiz-bank.css';
-
-const CONTENT_EDITORS = ['owner', 'admin', 'editor'];
-// 跟 QuizBank.jsx 同一個理由：核准／退件／下架用 approvers（含 reviewer），
-// 不是公告管理用的 publishers。
-const QUIZ_BANK_ROLES = {
-    editors: CONTENT_EDITORS,
-    approvers: ['owner', 'admin', 'reviewer'],
-    publishers: ['owner', 'admin'],
-};
-
-const STATUSES = {
-    draft: { label: '草稿', bg: 'secondary' },
-    pending_review: { label: '待審核', bg: 'warning' },
-    rejected: { label: '已退件', bg: 'danger' },
-    published: { label: '已啟用', bg: 'success' },
-};
 
 const emptyOption = () => ({ foreign: '', chinese: '' });
 
@@ -85,6 +75,7 @@ export default function QuizSituations() {
         form.scenario_chinese.trim()
         && form.options.every((option) => option.foreign.trim())
     );
+    const formSubmitting = actionId === 'form';
 
     return (
         <main className="quiz-bank-admin-page">
@@ -162,22 +153,7 @@ export default function QuizSituations() {
                                         {item.scenario_chinese}
                                     </td>
                                     <td>
-                                        <div className="d-flex flex-wrap align-items-center gap-1">
-                                            <Badge
-                                                bg={
-                                                    STATUSES[item.status]?.bg
-                                                    ?? 'secondary'
-                                                }
-                                            >
-                                                {STATUSES[item.status]?.label ?? item.status}
-                                            </Badge>
-                                            {item.status === 'published'
-                                                && item.has_pending_revision && (
-                                                <Badge bg="warning" text="dark">
-                                                    有待審修改
-                                                </Badge>
-                                            )}
-                                        </div>
+                                        <QuizStatusBadge item={item} />
                                     </td>
                                     <td>{item.created_by || '—'}</td>
                                     <td>
@@ -187,6 +163,7 @@ export default function QuizSituations() {
                                                 role={role}
                                                 roles={QUIZ_BANK_ROLES}
                                                 busy={actionId === item.id}
+                                                disabled={Boolean(actionId) && actionId !== item.id}
                                                 onAction={handleAction}
                                             />
                                         </div>
@@ -214,12 +191,14 @@ export default function QuizSituations() {
 
             <Modal
                 show={Boolean(editTarget)}
-                onHide={editor.close}
+                onHide={formSubmitting ? undefined : editor.close}
                 centered
                 size="lg"
+                backdrop={formSubmitting ? 'static' : true}
+                keyboard={!formSubmitting}
             >
                 <Form onSubmit={saveForm}>
-                    <Modal.Header closeButton>
+                    <Modal.Header closeButton={!formSubmitting}>
                         <Modal.Title>
                             {editTarget?.id ? '編輯情境題' : '新增情境題'}
                         </Modal.Title>
@@ -306,16 +285,18 @@ export default function QuizSituations() {
                     </Modal.Body>
                     <Modal.Footer>
                         <Button
+                            type="button"
                             variant="secondary"
+                            disabled={formSubmitting}
                             onClick={editor.close}
                         >
                             取消
                         </Button>
                         <Button
                             type="submit"
-                            disabled={!canSave || actionId === 'form'}
+                            disabled={!canSave || formSubmitting}
                         >
-                            {actionId === 'form' && (
+                            {formSubmitting && (
                                 <Spinner animation="border" size="sm" />
                             )}{' '}
                             儲存

@@ -1,5 +1,5 @@
 import { db, auth } from "../../../firebase";
-import { collection, addDoc, serverTimestamp, query, where, doc, getDoc, getDocs, orderBy } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, where, doc, getDoc, getDocs, orderBy, setDoc, updateDoc } from "firebase/firestore";
 import { TRIBE_FULL_NAME_BY_SLUG as TRIBE_NAME } from "../constants/tribes";
 
 //測驗題目存至資料庫
@@ -86,6 +86,10 @@ export const countScore = (results) => {
     return Math.round(score);
 };
 //取得答題測驗ID
+// id 接受兩種形狀：字串（situation 文件 id 本身），或帶 situationID 欄位的
+// 物件（呼叫端有時把整個 situation 相關的物件直接傳進來，例如 quiz_panel_submit
+// 拿到的路由參數）。呼叫端目前傳的都是單一字串，保留物件分支是為了相容既有
+// 呼叫慣例，不是這個函式本身需要的邏輯。
 export const getQuizSubmitById = async (id) => {
     let situationDocId = null;
     if (typeof id === "string") {
@@ -127,6 +131,7 @@ export const getQuizSubmitById = async (id) => {
         }
     } catch (error) {
         console.error("取得提交的測驗失敗:", error);
+        return null;
     }
 };
 //取得最近的答題情形
@@ -197,6 +202,7 @@ export const getQuizById = async (id) => {
         }
     } catch (error) {
         console.error("從id取得測驗失敗:", error);
+        return null;
     }
 };
 //取得使用者答題情形
@@ -239,7 +245,9 @@ export const getUserSituation = async () => {
                 speed: data.speed || "N/A",
                 advice: data.advice || "",
                 radarData: data.radarData || [],
-                monthlyAccuracy: data.monthlyAccuracy || {},
+                // monthlyAccuracy 下面是用 .map() 處理的（跟 radarData/accuracyByType
+                // 一樣），缺欄位時要退回陣列而不是物件，不然 .map() 會直接拋錯。
+                monthlyAccuracy: data.monthlyAccuracy || [],
                 questionTypeDistribution: data.questionTypeDistribution || {},
                 accuracyByType: data.accuracyByType || [],
             };
@@ -261,7 +269,9 @@ export const getUserSituation = async () => {
 
             mergedAccuracyByType = userData.accuracyByType.map(item => ({
                 ...item,
-                averageAccuracy: averagesMap.get(item.type) || null,
+                // 用 ?? 而不是 ||：全站平均正確率剛好是 0（合法值）時，
+                // || 會把它跟「查無資料」的 undefined 一樣當成 null。
+                averageAccuracy: averagesMap.get(item.type) ?? null,
             }));
         }
 
@@ -273,17 +283,14 @@ export const getUserSituation = async () => {
 
             mergedAccuracyByMonth = userData.monthlyAccuracy.map(item => ({
                 ...item,
-                averageAccuracy: averagesMap.get(item.date) || null,
+                averageAccuracy: averagesMap.get(item.date) ?? null,
             }));
         }
 
-        const allData = { ...userData, accuracyByType: mergedAccuracyByType, monthlyAccuracy: mergedAccuracyByMonth };
-
-        if (Object.keys(allData).length === 0) {
-            // 無資料
-            return null;
-        }
-        return allData;
+        // 前面已經在 userQuerySnapshot.empty 時提前 return null，走到這裡
+        // userData 一定已經被賦值過（至少有 level/speed/advice 等欄位），
+        // 所以不會有「allData 是空物件」的情況，不需要再檢查一次。
+        return { ...userData, accuracyByType: mergedAccuracyByType, monthlyAccuracy: mergedAccuracyByMonth };
 
     } catch (error) {
         console.error("取得資料時發生錯誤: ", error);
@@ -313,4 +320,56 @@ export const getCalendar = async () => {
         console.error("取得行事曆失敗:", error);
         return [];
     }
+};
+
+// 新增一筆或多筆行事曆事件。calendar/{uid} 是單一文件、events 是它裡面的
+// 一個陣列欄位（不是各自獨立的 Firestore 文件），所以「新增」實際上是讀出
+// 整個陣列、在記憶體加上新項目、整包寫回——跟 userServive.jsx 的
+// toggleFavoriteWord／updateUserErrors 同一套 read-modify-write 慣例，不是
+// 這裡另外發明的模式；多分頁／多裝置同時編輯有遺失更新的風險，這點兩者一致，
+// 這裡不特別處理。
+//
+// 一次寫入多筆（addCalendarEvents）而不是讓呼叫端對每筆各自呼叫
+// addCalendarEvent 再用 Promise.all 平行送出：每次呼叫都是獨立的「整包讀出、
+// 整包寫回」，平行呼叫會全部讀到同一份舊資料，最後只有最晚寫回的那次生效，
+// 其餘會被覆蓋、悄悄遺失（bot_study_plan.jsx 的「全部加入」需要一次寫入好幾筆，
+// 就是為了避免這個問題才加這個函式）。
+//
+// event 補上 client-generated 的 id（陣列本身沒有 Firestore 文件 id 可用），
+// 讓刪除／React key 都能用穩定的 id，不必依賴陣列 index。
+export const addCalendarEvents = async (events) => {
+    const user = auth.currentUser;
+    if (!user) throw new Error("請先登入才能新增行程");
+
+    const docRef = doc(db, "calendar", user.uid);
+    const docSnap = await getDoc(docRef);
+    const existingEvents = docSnap.exists() ? (docSnap.data().events || []) : [];
+    const newEvents = events.map((event) => ({ ...event, id: crypto.randomUUID() }));
+    const updatedEvents = [...existingEvents, ...newEvents];
+
+    if (docSnap.exists()) {
+        await updateDoc(docRef, { events: updatedEvents });
+    } else {
+        await setDoc(docRef, { events: updatedEvents });
+    }
+    return newEvents;
+};
+
+export const addCalendarEvent = async (event) => {
+    const [savedEvent] = await addCalendarEvents([event]);
+    return savedEvent;
+};
+
+// 依 id 刪除一筆行事曆事件，同樣是整包讀出、過濾、寫回。
+export const deleteCalendarEvent = async (eventId) => {
+    const user = auth.currentUser;
+    if (!user) throw new Error("請先登入才能刪除行程");
+
+    const docRef = doc(db, "calendar", user.uid);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) return;
+
+    const existingEvents = docSnap.data().events || [];
+    const updatedEvents = existingEvents.filter((e) => e.id !== eventId);
+    await updateDoc(docRef, { events: updatedEvents });
 };

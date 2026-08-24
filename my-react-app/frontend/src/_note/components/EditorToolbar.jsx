@@ -1,10 +1,13 @@
+import { useRef } from "react";
 import { Row, Col, Button } from "react-bootstrap";
 import { Image as ImageIcon } from "lucide-react";
 
 const COLOR_LABELS = { red: "紅色", blue: "藍色", black: "黑色", orange: "橘色" };
 
 /** 筆記編輯器上方的工具列：字級、粗斜體、上傳圖片、文字顏色。 */
-export default function EditorToolbar({ execStyle, onImageFileSelected }) {
+export default function EditorToolbar({ execStyle, onImageFileSelected, isUploadingImage }) {
+  const imageInputRef = useRef(null);
+
   return (
     <Row className="editor-toolbar">
       <Col xs="auto" className="group">
@@ -16,26 +19,29 @@ export default function EditorToolbar({ execStyle, onImageFileSelected }) {
         </select>
       </Col>
       <Col xs="auto" className="group">
-        <Button className="btn-ghost" onClick={() => execStyle("bold")} aria-label="粗體">𝐁</Button>
-        <Button className="btn-ghost" onClick={() => execStyle("italic")} aria-label="斜體">𝑰</Button>
+        <Button type="button" className="btn-ghost" onClick={() => execStyle("bold")} aria-label="粗體">𝐁</Button>
+        <Button type="button" className="btn-ghost" onClick={() => execStyle("italic")} aria-label="斜體">𝑰</Button>
       </Col>
       <Col xs="auto" className="group">
         <input
+          ref={imageInputRef}
           type="file"
           accept="image/*"
-          id="image-upload"
           style={{ display: "none" }}
           aria-label="上傳圖片"
           onChange={(e) => {
             const file = e.target.files[0];
+            e.target.value = ""; // 清空，這樣連續選同一個檔案也會觸發 change
             if (file) onImageFileSelected(file);
           }}
         />
         <Button
+          type="button"
           className="btn-upload"
-          onClick={() => document.getElementById("image-upload").click()}
+          disabled={isUploadingImage}
+          onClick={() => imageInputRef.current?.click()}
         >
-          <ImageIcon size={20} />上傳圖片
+          <ImageIcon size={20} />{isUploadingImage ? "上傳中…" : "上傳圖片"}
         </Button>
       </Col>
       <Col xs="auto" className="group">

@@ -16,18 +16,13 @@ import {
 import { useAuth } from '../../userServives/authContext';
 import { apiPost } from '../../../utils/apiClient';
 import { useAdminListQuery } from '../hooks/useAdminListQuery';
+import { useActionLock } from '../hooks/useActionLock';
+import { ACCOUNT_MANAGERS, STAFF_ROLES } from '../constants/roles';
+import ReviewPagination from '../reviewWorkflow/ReviewPagination';
+import { stripHtml } from './notePreviewText';
 import '../../../static/css/_admin/moderation.css';
 
-const STAFF_ROLES = ['owner', 'admin', 'editor', 'reviewer', 'analyst'];
-const ACCOUNT_MANAGERS = ['owner', 'admin'];
-
 const PAGE_SIZE = 20;
-
-// preview 存的是筆記內文的原始 HTML（見 noteService.jsx 的 shareNote()），
-// 跟 noteshare.jsx 關鍵字搜尋時的處理方式一致：不用 dangerouslySetInnerHTML
-// 呈現（避免 XSS），但也不能把原始 HTML 標籤原封不動當純文字顯示，否則
-// 審核者看到的是一堆 <span style="..."> 而不是筆記內容本身。
-const stripHtml = (value) => (value || '').replace(/<[^>]+>/g, ' ').trim();
 
 export default function SharedNotesModeration() {
     const { userData } = useAuth();
@@ -53,11 +48,10 @@ export default function SharedNotesModeration() {
         },
     });
 
-    const [actionId, setActionId] = useState(null);
     const [success, setSuccess] = useState('');
+    const toggleLock = useActionLock();
 
-
-    const toggleDeleted = async (item) => {
+    const toggleDeleted = (item) => {
         const actionLabel = item.deleted ? '恢復' : '下架';
         const previewText = stripHtml(item.preview) || item.id;
         const confirmation = item.deleted
@@ -66,24 +60,24 @@ export default function SharedNotesModeration() {
 
         if (!window.confirm(confirmation)) return;
 
-        setActionId(item.id);
-        setError('');
-        setSuccess('');
+        toggleLock.runLocked(item.id, async () => {
+            setError('');
+            setSuccess('');
 
-        try {
-            // 帶上「我看到的狀態」，後端不符就回 409——避免清單過期時按鈕文字
-            // 說的是「下架」、伺服器卻反轉成「恢復」（見後端 note_toggle_deleted）。
-            await apiPost(
-                `/adminapi/moderation/notes/${item.id}/toggle-deleted/`,
-                { expected_deleted: Boolean(item.deleted) },
-            );
-            setSuccess(`分享筆記已${actionLabel}`);
-            await loadNotes();
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setActionId(null);
-        }
+            try {
+                // 帶上「我看到的狀態」，後端不符就回 409——避免清單過期時按鈕
+                // 文字說的是「下架」、伺服器卻反轉成「恢復」（見後端
+                // note_toggle_deleted）。
+                await apiPost(
+                    `/adminapi/moderation/notes/${item.id}/toggle-deleted/`,
+                    { expected_deleted: Boolean(item.deleted) },
+                );
+                setSuccess(`分享筆記已${actionLabel}`);
+                await loadNotes();
+            } catch (err) {
+                setError(err.message);
+            }
+        });
     };
 
 
@@ -188,95 +182,102 @@ export default function SharedNotesModeration() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {items.map((item) => (
-                                        <tr key={item.id}>
-                                            <td>
-                                                <div className="moderation-note-cell">
-                                                    {item.image && (
-                                                        <img
-                                                            src={item.image}
-                                                            alt=""
-                                                            loading="lazy"
-                                                        />
-                                                    )}
-                                                    <div>
-                                                        <span className="moderation-preview">
-                                                            {stripHtml(item.preview) || '（無文字內容）'}
-                                                        </span>
-                                                        <small>ID：{item.id}</small>
+                                    {items.map((item) => {
+                                        const busy = toggleLock.pendingKey === item.id;
+                                        const disabled = toggleLock.isLocked && !busy;
+
+                                        return (
+                                            <tr key={item.id}>
+                                                <td>
+                                                    <div className="moderation-note-cell">
+                                                        {item.image && (
+                                                            <img
+                                                                src={item.image}
+                                                                alt=""
+                                                                loading="lazy"
+                                                            />
+                                                        )}
+                                                        <div>
+                                                            <span className="moderation-preview">
+                                                                {stripHtml(item.preview) || '（無文字內容）'}
+                                                            </span>
+                                                            <small>ID：{item.id}</small>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <span>{item.username || '—'}</span>
-                                                <small className="moderation-cell-note">
-                                                    {item.uid}
-                                                </small>
-                                            </td>
-                                            <td>{item.likes ?? 0}</td>
-                                            <td>
-                                                {(item.report_count ?? 0) > 0 ? (
-                                                    <Badge bg="danger">
-                                                        {item.report_count}
-                                                    </Badge>
-                                                ) : (
-                                                    <span>0</span>
-                                                )}
-                                            </td>
-                                            <td>
-                                                <Badge
-                                                    bg={item.deleted
-                                                        ? 'dark'
-                                                        : 'success'}
-                                                >
-                                                    {item.deleted
-                                                        ? '已下架'
-                                                        : '正常'}
-                                                </Badge>
-                                            </td>
-                                            <td>
-                                                <div className="moderation-row-actions">
-                                                    {canManage ? (
-                                                        item.deleted ? (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline-success"
-                                                                disabled={
-                                                                    actionId
-                                                                    === item.id
-                                                                }
-                                                                onClick={() => (
-                                                                    toggleDeleted(item)
-                                                                )}
-                                                            >
-                                                                <RotateCcw size={14} />
-                                                                恢復
-                                                            </Button>
-                                                        ) : (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline-danger"
-                                                                disabled={
-                                                                    actionId
-                                                                    === item.id
-                                                                }
-                                                                onClick={() => (
-                                                                    toggleDeleted(item)
-                                                                )}
-                                                            >
-                                                                <Archive size={14} />
-                                                                下架
-                                                            </Button>
-                                                        )
+                                                </td>
+                                                <td>
+                                                    <span>{item.username || '—'}</span>
+                                                    <small className="moderation-cell-note">
+                                                        {item.uid}
+                                                    </small>
+                                                </td>
+                                                <td>{item.likes ?? 0}</td>
+                                                <td>
+                                                    {(item.report_count ?? 0) > 0 ? (
+                                                        <Badge bg="danger">
+                                                            {item.report_count}
+                                                        </Badge>
                                                     ) : (
-                                                        <span className="moderation-readonly">
-                                                            僅供檢視
-                                                        </span>
+                                                        <span>0</span>
                                                     )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                </td>
+                                                <td>
+                                                    <Badge
+                                                        bg={item.deleted
+                                                            ? 'dark'
+                                                            : 'success'}
+                                                    >
+                                                        {item.deleted
+                                                            ? '已下架'
+                                                            : '正常'}
+                                                    </Badge>
+                                                </td>
+                                                <td>
+                                                    <div className="moderation-row-actions">
+                                                        {canManage ? (
+                                                            item.deleted ? (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline-success"
+                                                                    disabled={busy || disabled}
+                                                                    onClick={() => (
+                                                                        toggleDeleted(item)
+                                                                    )}
+                                                                >
+                                                                    {busy ? (
+                                                                        <Spinner animation="border" size="sm" />
+                                                                    ) : (
+                                                                        <RotateCcw size={14} />
+                                                                    )}
+                                                                    恢復
+                                                                </Button>
+                                                            ) : (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline-danger"
+                                                                    disabled={busy || disabled}
+                                                                    onClick={() => (
+                                                                        toggleDeleted(item)
+                                                                    )}
+                                                                >
+                                                                    {busy ? (
+                                                                        <Spinner animation="border" size="sm" />
+                                                                    ) : (
+                                                                        <Archive size={14} />
+                                                                    )}
+                                                                    下架
+                                                                </Button>
+                                                            )
+                                                        ) : (
+                                                            <span className="moderation-readonly">
+                                                                僅供檢視
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
 
                                     {!items.length && (
                                         <tr>
@@ -292,28 +293,14 @@ export default function SharedNotesModeration() {
                             </Table>
                         </div>
 
-                        <div className="moderation-pagination">
-                            <span>共 {data.count} 筆</span>
-                            <div>
-                                <Button
-                                    size="sm"
-                                    variant="outline-secondary"
-                                    disabled={page <= 1}
-                                    onClick={() => setPage((value) => value - 1)}
-                                >
-                                    上一頁
-                                </Button>
-                                <span>第 {data.page} 頁</span>
-                                <Button
-                                    size="sm"
-                                    variant="outline-secondary"
-                                    disabled={!hasNext}
-                                    onClick={() => setPage((value) => value + 1)}
-                                >
-                                    下一頁
-                                </Button>
-                            </div>
-                        </div>
+                        <ReviewPagination
+                            data={data}
+                            page={page}
+                            setPage={setPage}
+                            loading={loading}
+                            hasNext={hasNext}
+                            className="moderation-pagination"
+                        />
                     </>
                 )}
             </section>

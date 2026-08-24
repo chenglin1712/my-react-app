@@ -3,6 +3,7 @@ import { Alert, Button, Form, Modal, Spinner } from 'react-bootstrap';
 import { KeyRound } from 'lucide-react';
 
 import { apiPost } from '../../../utils/apiClient';
+import { useActionLock } from '../hooks/useActionLock';
 
 const EMPTY_PASSWORD_FORM = {
     newPassword: '',
@@ -18,7 +19,8 @@ const EMPTY_PASSWORD_FORM = {
  */
 export default function PasswordChangeModal({ show, user, uid, onClose, onSaved, onError }) {
     const [form, setForm] = useState(EMPTY_PASSWORD_FORM);
-    const [saving, setSaving] = useState(false);
+    const saveLock = useActionLock();
+    const saving = saveLock.isLocked;
 
     const updateForm = (field, value) => {
         setForm((current) => ({ ...current, [field]: value }));
@@ -36,33 +38,32 @@ export default function PasswordChangeModal({ show, user, uid, onClose, onSaved,
         && form.confirmEmail === user?.email
     );
 
-    const changePassword = async (event) => {
+    const changePassword = (event) => {
         event.preventDefault();
         if (!canSubmit) return;
 
-        setSaving(true);
-        onError('');
+        saveLock.runLocked('change-password', async () => {
+            onError('');
 
-        try {
-            const result = await apiPost(`/adminapi/users/${uid}/password/`, {
-                new_password: form.newPassword,
-                confirm_email: form.confirmEmail,
-            });
+            try {
+                const result = await apiPost(`/adminapi/users/${uid}/password/`, {
+                    new_password: form.newPassword,
+                    confirm_email: form.confirmEmail,
+                });
 
-            setForm(EMPTY_PASSWORD_FORM);
-            // 密碼變更本身一定成功才會走到這裡；sessions_revoked 是否為 false
-            // 由後端誠實回報（見 user_password() 的說明），不能一律顯示「已撤銷」
-            // 誤導管理者以為舊登入狀態已經失效。
-            onSaved(
-                result.sessions_revoked
-                    ? '密碼已變更，並已撤銷此帳號現有的登入狀態。'
-                    : '密碼已變更，但撤銷登入狀態失敗，此帳號的舊登入可能仍然有效，請稍後重新嘗試或聯繫系統管理員。',
-            );
-        } catch (err) {
-            onError(err.message);
-        } finally {
-            setSaving(false);
-        }
+                setForm(EMPTY_PASSWORD_FORM);
+                // 密碼變更本身一定成功才會走到這裡；sessions_revoked 是否為 false
+                // 由後端誠實回報（見 user_password() 的說明），不能一律顯示「已撤銷」
+                // 誤導管理者以為舊登入狀態已經失效。
+                onSaved(
+                    result.sessions_revoked
+                        ? '密碼已變更，並已撤銷此帳號現有的登入狀態。'
+                        : '密碼已變更，但撤銷登入狀態失敗，此帳號的舊登入可能仍然有效，請稍後重新嘗試或聯繫系統管理員。',
+                );
+            } catch (err) {
+                onError(err.message);
+            }
+        });
     };
 
     return (

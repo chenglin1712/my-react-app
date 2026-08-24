@@ -1,29 +1,24 @@
 import "../../static/css/_quiz/review.css"
-import React, { useState, useEffect } from "react";
-import { CircleHelp, CheckCircle, XCircle, Play, Check } from "lucide-react";
-import { getCurrentSituation, countScore, getQuizById } from "../../src/userServives/uploadDb"
-import Comp_page from "./review_page"
+import { useState, useEffect } from "react";
+import { CircleHelp } from "lucide-react";
+import { getCurrentSituation, getQuizById } from "../../src/userServives/uploadDb"
+import { QUIZ_LEVEL_TYPE_BY_NAME } from "./quizLevels";
+import { buildReviewQuestions } from "./reviewQuestionModel";
+import ReviewTabs from "./ReviewTabs";
+import ReviewAttemptList from "./ReviewAttemptList";
+import ReviewAttemptDetail from "./ReviewAttemptDetail";
+import ReviewQuestionDetail from "./ReviewQuestionDetail";
 import Comp_discussion from "./review_discussion"
 import Comp_atayalAI from "./review_AI"
 
 const Review = () => {
     const [situations, setSituations] = useState([]);
     const [loading, setLoading] = useState(true);
-    const navs = ["測驗紀錄", "討論", "AI助手"];
     const [navIndex, setNavIndex] = useState(0);
     const [showIntro, setShowIntro] = useState(false);
 
     const [selectedQuiz, setSelectedQuiz] = useState(null);
-    const [selectedQuestion, setSelectedQuestion] = useState(null);
-
-    const [currentPage, setCurrentPage] = useState(1);
-    const pageSize = 5;
-
-    const totalPages = Math.ceil(situations.length / pageSize);
-    const startIndex = (currentPage - 1) * pageSize;
-    const paginatedSituations = situations.slice(startIndex, startIndex + pageSize);
-
-    const labels = ["A", "B", "C"];
+    const [selectedQuestionIdx, setSelectedQuestionIdx] = useState(null);
 
     useEffect(() => {
         const fetchSituations = async () => {
@@ -40,48 +35,46 @@ const Review = () => {
         fetchSituations();
     }, []);
 
-    const getScoreClass = (score) => {
-        if (score >= 70) return "score-good";
-        return "score-bad";
-    };
-
-    const viewQuiz = async (quizId, results, answers, correctAnswers) => {
-        const quizData = await getQuizById(quizId);
+    const viewAttempt = async (situation) => {
+        const quizData = await getQuizById(situation.quizId);
         if (quizData) {
-            const enrichedQuiz = {
+            setSelectedQuiz({
                 ...quizData,
-                results,
-                answers,
-                correctAnswers
-            };
-            setSelectedQuiz(enrichedQuiz);
-            setSelectedQuestion(null);
+                // 測驗題目本身的建立時間（createdAt）跟使用者這一次作答的時間
+                // （answeredAt）是兩件事，複習頁要顯示的是後者。
+                answeredAt: situation.answeredAt,
+                results: situation.results,
+                answers: situation.answers,
+                correctAnswers: situation.correctAnswers,
+            });
+            setSelectedQuestionIdx(null);
             setNavIndex(0);
         }
     };
 
-    const viewQuestion = async (q, idx) => {
-        if (q) {
-            // 正確答案不再存在 quizs 文件的 data[i].answer（見 uploadDb.jsx 的
-            // uploadQuizDB 說明），從本人專屬的 situations 文件
-            // （selectedQuiz.correctAnswers，見 viewQuiz）補回這個題目物件上，
-            // 下面的畫面渲染邏輯不用跟著改。
-            const enrichedQuestion = {
-                ...q,
-                answer: selectedQuiz.correctAnswers?.[idx],
-                userAnswer: selectedQuiz.answers[idx],
-                isCorrect: selectedQuiz.results[idx].isCorrect,
-                idx: idx
-            };
-            setSelectedQuestion(enrichedQuestion);
-        }
+    // 返回測驗紀錄列表時，右側題目詳情也要一併清掉，不然會殘留上一份測驗
+    // 的題目內容。
+    const closeAttempt = () => {
+        setSelectedQuiz(null);
+        setSelectedQuestionIdx(null);
     };
+
+    const reviewQuestions = selectedQuiz
+        ? buildReviewQuestions({
+            questions: selectedQuiz.data,
+            answers: selectedQuiz.answers,
+            correctAnswers: selectedQuiz.correctAnswers,
+            results: selectedQuiz.results,
+        })
+        : [];
+    const questionType = QUIZ_LEVEL_TYPE_BY_NAME[selectedQuiz?.title];
+    const selectedQuestion = selectedQuestionIdx != null ? reviewQuestions[selectedQuestionIdx] : null;
 
     return (
         <>
             <div className="review-header">
                 <h2 className="review-title">重點複習</h2>
-                <button className="review-intro-btn" onClick={() => { setShowIntro(!showIntro) }}>
+                <button type="button" className="review-intro-btn" onClick={() => { setShowIntro(!showIntro) }}>
                     <CircleHelp />說明
                 </button>
 
@@ -100,121 +93,29 @@ const Review = () => {
 
             <div className="review-container">
                 <div style={{ width: "50%" }}>
-                    <div className="review-nav">
-                        {navs.map((nav, index) => {
-                            //AI助手(index = 2) 功能尚未開放
-                            const isComingSoon = index == 2;
-                            const isDisabled = isComingSoon || (index > 0 && !selectedQuestion);
-
-                            return (
-                                <div
-                                    key={index}
-                                    className={`nav-item ${navIndex === index ? "active" : ""} ${isDisabled ? "disabled" : ""}`}
-                                    onClick={() => { if (!isDisabled) setNavIndex(index) }}
-                                >
-                                    {nav}
-                                    {isComingSoon && <span className="nav-item-badge">即將推出</span>}
-                                </div>
-                            );
-                        })}
-                    </div>
+                    <ReviewTabs
+                        activeIndex={navIndex}
+                        onChange={setNavIndex}
+                        hasSelectedQuestion={!!selectedQuestion}
+                    />
 
                     <div className="review-table-container">
-
                         {!selectedQuiz ? (
-                            <>
-                                <table className="review-table">
-                                    <thead>
-                                        <tr>
-                                            <th>測驗時間</th>
-                                            <th>類型</th>
-                                            <th>分數</th>
-                                            <th style={{ width: "124.67px" }} />
-                                        </tr>
-                                    </thead>
-
-                                    <tbody>
-                                        {loading ? (
-                                            <tr><td colSpan={4} style={{ textAlign: "center" }}>載入中...</td></tr>
-                                        ) : situations.length === 0 ? (
-                                            <tr><td colSpan={4} style={{ textAlign: "center" }}>尚無答題紀錄</td></tr>
-                                        ) : (
-                                            paginatedSituations.map((s) => {
-                                                let score = countScore(s.results);
-                                                return (
-                                                    <React.Fragment key={s.quizId}>
-                                                        <tr>
-                                                            <td>{s.answeredAt.toDate().toLocaleString().split(" ")[0]}</td>
-                                                            <td>{s.quizType}</td>
-                                                            <td>
-                                                                <span className={`${getScoreClass(score)}`}>
-                                                                    {score}
-                                                                </span></td>
-                                                            <td>
-                                                                <button className="view-btn" onClick={() => { viewQuiz(s.quizId, s.results, s.answers, s.correctAnswers) }} >查看測驗</button>
-                                                            </td>
-                                                        </tr>
-                                                    </React.Fragment>
-                                                );
-                                            })
-                                        )}
-                                    </tbody>
-                                </table>
-
-                                <Comp_page
-                                    currentPage={currentPage}
-                                    totalPages={totalPages}
-                                    onPageChange={setCurrentPage}
-                                />
-                            </>
+                            <ReviewAttemptList
+                                situations={situations}
+                                loading={loading}
+                                onViewAttempt={viewAttempt}
+                            />
                         ) : (
                             <div className="review-quiz-detail">
                                 {navIndex === 0 && (
-                                    <>
-                                        <div className="review-quiz-header">
-                                            <button className="back-btn" onClick={() => setSelectedQuiz(null)}>← 返回</button>
-                                            <h3>{selectedQuiz.title} {selectedQuiz.createdAt.toDate().toLocaleString().split(" ")[0]}</h3>
-                                        </div>
-
-                                        <div className="quiz-questions">
-                                            <table className="review-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th></th>
-                                                        <th>題目</th>
-                                                        <th></th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {selectedQuiz.data.map((q, idx) => {
-                                                        const result = selectedQuiz.results?.[idx];
-                                                        const isCorrect = result?.isCorrect;
-                                                        const questionLabel = q.question_ab || q.question_ch || `第 ${idx + 1} 題`;
-                                                        return (
-                                                            <tr key={idx}>
-                                                                <td>
-                                                                    {idx + 1}
-                                                                    {isCorrect === true && <CheckCircle size={16} color="#388e3c" />}
-                                                                    {isCorrect === false && <XCircle size={16} color="#d32f2f" />}
-                                                                </td>
-                                                                <td>{questionLabel}</td>
-                                                                <td>
-                                                                    <button
-                                                                        className="view-btn"
-                                                                        onClick={() => { viewQuestion(q, idx); }}
-                                                                    >
-                                                                        查看題目
-                                                                    </button>
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </>
+                                    <ReviewAttemptDetail
+                                        quiz={selectedQuiz}
+                                        reviewQuestions={reviewQuestions}
+                                        onBack={closeAttempt}
+                                        onViewQuestion={setSelectedQuestionIdx}
+                                    />
                                 )}
-
                                 {navIndex === 1 && (<Comp_discussion />)}
                                 {navIndex === 2 && (<Comp_atayalAI tribe={selectedQuiz?.tribe || "tayal"} />)}
                             </div>
@@ -223,80 +124,11 @@ const Review = () => {
                 </div>
 
                 <div className="quiz-question-detail">
-                    {selectedQuestion ? (
-                        <>
-                            <div className="review-q">
-                                <div className={`review-question-card`}>
-
-                                    <div className="review-question-header">
-                                        <h4>題目{selectedQuestion.idx + 1}</h4>
-                                        {selectedQuestion.isCorrect ? (
-                                            <CheckCircle className="icon-correct" size={26} />
-                                        ) : (
-                                            <XCircle className="icon-wrong" size={26} />
-                                        )}
-                                    </div>
-
-                                    <hr className="review-divider" />
-
-                                    <div className="review-question-body">
-                                        <div className="question-content">
-                                            <button
-                                                className="play-btn"
-                                                onClick={() => {
-                                                    if (selectedQuestion.audio) {
-                                                        new Audio(selectedQuestion.audio).play().catch(() => {});
-                                                    }
-                                                }}
-                                                aria-label="播放音訊"
-                                            >
-                                                <Play size={20} />
-                                            </button>
-                                            <div>
-                                                <p className="question-ab">{selectedQuestion.question_ab}</p>
-                                                <p className="question-ch">{selectedQuestion.question_ch}</p>
-                                            </div>
-                                        </div>
-                                        {selectedQuestion.images ? (
-                                        <div className="answer-row answer-images">
-                                            <div className="answer-block">
-                                                <span>我的答案</span>
-                                                <div className="answer-options">
-                                                    {labels.map((label, idx) => {
-                                                        const imgSrc = selectedQuestion.images[label];
-                                                        const isUserChoice = selectedQuestion.userAnswer === idx + 1;
-                                                        const isCorrect = selectedQuestion.answer === idx + 1;
-
-                                                        return (
-                                                            <div key={label}>
-                                                                <div className={`option-img-wrapper ${isUserChoice ? "user-choice" : ""}`}>
-                                                                    <img src={imgSrc} alt={`選項 ${label}`} className="option-img" />
-                                                                    <span className="option-label">{label}</span>
-                                                                </div>
-
-                                                                {isCorrect && <span className="correct-tip"><Check size={14} /> 正確答案</span>}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        ) : (
-                                        <div className="answer-row">
-                                            <p>你的答案：<strong>{selectedQuestion.userAnswer === 1 ? "O（符合）" : selectedQuestion.userAnswer === 2 ? "X（不符合）" : "未作答"}</strong></p>
-                                            <p>正確答案：<strong>{selectedQuestion.answer === 1 ? "O（符合）" : "X（不符合）"}</strong></p>
-                                        </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                            <button className="review-q-btn" onClick={() => { setSelectedQuestion(null); }}>取消</button>
-                        </>
-                    ) : (
-                        <div className="review-q">
-                            <div className="review-empty-container">尚未選擇題目</div>
-                        </div>
-                    )}
+                    <ReviewQuestionDetail
+                        questionType={questionType}
+                        question={selectedQuestion}
+                        onClose={() => setSelectedQuestionIdx(null)}
+                    />
                 </div>
             </div>
         </>

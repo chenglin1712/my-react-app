@@ -9,24 +9,46 @@ import { getUserSituation } from "../../src/userServives/uploadDb";
 import { TRIBES } from "../../src/constants/tribes";
 import { apiPost } from "../../utils/apiClient";
 
-const Advice = ({ onClose }) => {
+const SUGGESTIONS = [
+    "我想了解我的學習狀況",
+    "介紹這個族語的文化特色",
+    "幫我排一週讀書計畫"
+];
+
+const AIAssistantOverlay = ({ onClose }) => {
     const navigate = useNavigate();
-    const handleClose = onClose ?? (() => navigate(-1));
+    // 直接從網址進到 /bot（沒有帶 onClose）時用 navigate(-1) 可能把使用者導到
+    // 應用程式以外的頁面（例如瀏覽器歷史紀錄的上一頁是外部網站），改成固定
+    // 導回測驗首頁，行為可預期。
+    const handleClose = onClose ?? (() => navigate("/quiz"));
     const { userData } = useAuth();
     const [tribe, setTribe] = useState("tayal");
     const [messages, setMessages] = useState([
         { id: 1, text: "lokah su 你好！我是您的族語 AI 助手，有什麼我可以幫您的嗎？", role: "bot" }
     ]);
     const [input, setInput] = useState("");
-    const [isType, setIsType] = useState(false);
+    const [isPending, setIsPending] = useState(false);
     const messageEndRef = useRef(null);
+    const mountedRef = useRef(true);
+    const abortControllerRef = useRef(null);
     const [userStats, setUserStats] = useState({
         correct: 0, incorrect: 0, unanswered: 0, common_errors: [], level: "beginner"
     });
 
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+            // 對話框關掉/元件卸載時，還在進行中的請求就不用等了——中止它，
+            // 避免回應回來時對著已經卸載的元件呼叫 setMessages/setIsPending。
+            abortControllerRef.current?.abort();
+        };
+    }, []);
+
     // 在元件掛載後，從 Firebase 讀取使用者真實學習資料
     useEffect(() => {
         if (!userData) return;
+        let cancelled = false;
         const userErrors = userData?.firestoreData?.user_errors || {};
         const commonErrors = Object.entries(userErrors)
             .sort(([, a], [, b]) => b - a)
@@ -43,6 +65,7 @@ const Advice = ({ onClose }) => {
 
         getUserSituation()
             .then(sit => {
+                if (cancelled) return;
                 setUserStats({
                     correct: totalCorrect,
                     incorrect: totalErrors,
@@ -52,6 +75,7 @@ const Advice = ({ onClose }) => {
                 });
             })
             .catch(() => {
+                if (cancelled) return;
                 setUserStats({
                     correct: totalCorrect,
                     incorrect: totalErrors,
@@ -60,19 +84,14 @@ const Advice = ({ onClose }) => {
                     level: "beginner",
                 });
             });
+        return () => { cancelled = true; };
     }, [userData]);
 
     // 新訊息或「輸入中」指示器出現/消失時自動捲到底部，messageEndRef 原本宣告了
     // 卻從沒呼叫 scrollIntoView，訊息一多使用者得自己手動往下滑。
     useEffect(() => {
         messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, isType]);
-
-    const suggestions = [
-        "我想了解我的學習狀況",
-        "介紹這個族語的文化特色",
-        "幫我排一週讀書計畫"
-    ];
+    }, [messages, isPending]);
 
     const handleInputChange = (e) => {
         setInput(e.target.value);
@@ -80,40 +99,56 @@ const Advice = ({ onClose }) => {
 
     //傳送訊息
     const handleSend = async () => {
-        if (input.trim() === "") return;
+        if (input.trim() === "" || isPending) return;
 
         const userText = input;
-        const newUserMessage = { id: Date.now(), text: userText, role: "user" };
+        const newUserMessage = { id: crypto.randomUUID(), text: userText, role: "user" };
         setMessages(prev => [...prev, newUserMessage]);
         setInput("");
-        setIsType(true);
+        setIsPending(true);
+
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
 
         try {
-            const data = await apiPost(import.meta.env.VITE_API_AI_BOT_URL, { message: userText, user_stats: userStats, tribe });
+            const data = await apiPost(
+                import.meta.env.VITE_API_AI_BOT_URL,
+                { message: userText, user_stats: userStats, tribe },
+                { signal: controller.signal },
+            );
+            if (!mountedRef.current) return;
 
             const botResponse = {
-                id: Date.now() + 1,
-                text: data.message,
+                id: crypto.randomUUID(),
+                text: data?.message || "很抱歉，沒有取得有效的回應。",
                 role: "bot",
-                studyPlan: data.study_plan || null
+                studyPlan: data?.study_plan || null
             };
 
             setMessages(prev => [...prev, botResponse]);
         } catch (error) {
+            // 手動中止（關閉對話框/卸載）不是真正的失敗，不用再顯示錯誤訊息，
+            // 這時元件通常也已經卸載了。
+            if (controller.signal.aborted) return;
+            if (!mountedRef.current) return;
+
             const errorResponse = {
-                id: Date.now() + 1,
+                id: crypto.randomUUID(),
                 text: "很抱歉，無法取得回應，請稍後再試。",
                 role: "bot"
             };
             setMessages(prev => [...prev, errorResponse]);
             console.error("取得回應失敗:", error);
         } finally {
-            setIsType(false);
+            if (mountedRef.current) setIsPending(false);
         }
     };
 
     const handleKeyPress = (e) => {
-        if (e.key === "Enter") {
+        // 中文/日文注音等輸入法用 Enter 確認候選字時也會觸發 keydown 的
+        // Enter，這裡沒有排除的話，選字確認會被誤判成「送出訊息」，把還在
+        // 組字中的內容提前送出去。
+        if (e.key === "Enter" && !e.nativeEvent.isComposing) {
             handleSend();
         }
     };
@@ -126,6 +161,9 @@ const Advice = ({ onClose }) => {
         <div className="overlay">
             <motion.div
                 className="chat-container"
+                role="dialog"
+                aria-modal="true"
+                aria-label="族語 AI 助手"
                 initial={{ y: "100%", opacity: 0 }}
                 animate={{ y: "0%", opacity: 1 }}
                 exit={{ y: "100%", opacity: 0 }}
@@ -133,6 +171,7 @@ const Advice = ({ onClose }) => {
             >
                 <div className="chat-header">
                     <button
+                        type="button"
                         onClick={handleClose}
                         className="chat-return"
                         aria-label="返回"
@@ -149,6 +188,7 @@ const Advice = ({ onClose }) => {
                     <select
                         value={tribe}
                         onChange={(e) => setTribe(e.target.value)}
+                        disabled={isPending}
                         style={{ position: "relative", zIndex: 1, borderRadius: 6, border: "none", padding: "4px 6px" }}
                         aria-label="選擇族語"
                     >
@@ -174,7 +214,7 @@ const Advice = ({ onClose }) => {
                             </div>
                         </div>
                     ))}
-                    {isType && (
+                    {isPending && (
                         <div className="message bot">
                             <div className="avatar-small">
                                 <Bot />
@@ -195,11 +235,13 @@ const Advice = ({ onClose }) => {
                     <div className="suggestions-container">
                         <p className="suggestions-title">您可能想問：</p>
                         <div className="suggestion-pills">
-                            {suggestions.map((suggestion, index) => (
+                            {SUGGESTIONS.map((suggestion, index) => (
                                 <button
+                                    type="button"
                                     key={index}
                                     className="suggestion-pill"
                                     onClick={() => handleSuggestionClick(suggestion)}
+                                    disabled={isPending}
                                 >
                                     {suggestion}
                                 </button>
@@ -217,11 +259,13 @@ const Advice = ({ onClose }) => {
                         placeholder="輸入您的訊息..."
                         className="message-input"
                         aria-label="輸入訊息"
+                        disabled={isPending}
                     />
                     <button
+                        type="button"
                         className={`send-button ${input.trim() ? 'active' : ''}`}
                         onClick={handleSend}
-                        disabled={input.trim() === ""}
+                        disabled={input.trim() === "" || isPending}
                     >
                         發送
                     </button>
@@ -230,4 +274,4 @@ const Advice = ({ onClose }) => {
         </div >
     );
 };
-export default Advice;
+export default AIAssistantOverlay;

@@ -20,6 +20,10 @@ const typeMap = {
   matching: { name: '配合', color: '#C0394B' },
   fillInTheBlank: { name: '閱讀填空', color: '#9B1B30' }
 };
+// typeMap 這 4 個 key 是外部後端流程寫入 questionTypeDistribution 時用的彙總
+// 格式，這個 repo 沒有那份程式碼，沒辦法確認未來會不會再多別的 key——保底
+// 用「其他題型」呈現，不要讓沒對應到的 key 讓整頁掛掉。
+const FALLBACK_TYPE = { name: '其他題型', color: '#B0B0B0' };
 
 const getPerformance = (score) => {
   if (score >= 80) return "良好";
@@ -50,9 +54,9 @@ const SituationDashboard = ({ data, typeRatio }) => {
   }));
 
   const questionTypeData = Object.entries(typeRatio).map(([key, value]) => ({
-    name: typeMap[key].name,
+    name: (typeMap[key] ?? FALLBACK_TYPE).name,
     value,
-    color: typeMap[key].color
+    color: (typeMap[key] ?? FALLBACK_TYPE).color
   }));
 
   const getPerformanceColor = (performance) => {

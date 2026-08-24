@@ -3,10 +3,10 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Alert } from "react-bootstrap";
 import { getAuth, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
-import lottie from 'lottie-web';
 import successAnimation from "../../src/animations/success.json"
+import { useLottieAnimation } from "@hooks/useLottieAnimation";
 
-const Forgot = () => {
+const ResetPassword = () => {
     const auth = getAuth();
     const user = auth.currentUser;
     const navigate = useNavigate();
@@ -15,10 +15,15 @@ const Forgot = () => {
     const [newPassword, setNewPassword] = useState("");
     const [isSuccess, setIsSuccess] = useState(false);
     const [errorMsg, setErrorMsg] = useState("");
-    const animation = useRef(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const animation = useLottieAnimation({ animationData: successAnimation, enabled: isSuccess, loop: false });
+    const redirectTimeoutRef = useRef(null);
+    useEffect(() => () => clearTimeout(redirectTimeoutRef.current), []);
 
-    const handleChangePassword = async () => {
+    const handleChangePassword = async (e) => {
+        e.preventDefault();
         setErrorMsg("");
+        setIsSubmitting(true);
         try {
             // 驗證使用者
             const credential = EmailAuthProvider.credential(user.email, currentPassword);
@@ -28,7 +33,7 @@ const Forgot = () => {
             await updatePassword(user, newPassword);
             setIsSuccess(true);
 
-            setTimeout(() => {
+            redirectTimeoutRef.current = setTimeout(() => {
                 navigate(-1);
             }, 1500);
 
@@ -46,46 +51,36 @@ const Forgot = () => {
                 default:
                     setErrorMsg("密碼更新失敗");
             };
+        } finally {
+            setIsSubmitting(false);
         };
     };
-
-    useEffect(() => {
-        if (isSuccess && animation.current) {
-            const instance = lottie.loadAnimation({
-                container: animation.current,
-                renderer: "svg",
-                loop: false,
-                autoplay: true,
-                animationData: successAnimation
-            });
-
-            return () => instance.destroy();
-        }
-    }, [isSuccess]);
 
     return (
         <div className="reset-container">
             <h2>變更密碼</h2>
             {errorMsg && <Alert variant="danger" className="py-2">{errorMsg}</Alert>}
-            <input
-                type="password"
-                placeholder="目前密碼"
-                aria-label="目前密碼"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-            />
-            <input
-                type="password"
-                placeholder="新密碼"
-                aria-label="新密碼"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-            />
+            <form onSubmit={handleChangePassword}>
+                <input
+                    type="password"
+                    placeholder="目前密碼"
+                    aria-label="目前密碼"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                />
+                <input
+                    type="password"
+                    placeholder="新密碼"
+                    aria-label="新密碼"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                />
 
-            <div className="reset-button">
-                <button className="reset-cancel-btn" onClick={() => navigate(-1)}>取消</button>
-                <button className="reset-submit-btn" onClick={handleChangePassword}>變更密碼</button>
-            </div>
+                <div className="reset-button">
+                    <button type="button" className="reset-cancel-btn" onClick={() => navigate(-1)}>取消</button>
+                    <button type="submit" className="reset-submit-btn" disabled={isSubmitting}>變更密碼</button>
+                </div>
+            </form>
 
             {isSuccess && (
                 <div className="overlay">
@@ -98,4 +93,4 @@ const Forgot = () => {
         </div>
     );
 };
-export default Forgot;
+export default ResetPassword;
