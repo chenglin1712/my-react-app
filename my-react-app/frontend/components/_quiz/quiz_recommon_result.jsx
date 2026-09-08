@@ -14,7 +14,7 @@ function RecommendedQuizResult() {
       <h2 className="result-title"><ChartColumn /> 測驗結算</h2>
 
       {state.modelSaveFailed && (
-        <p role="alert" style={{ color: '#d32f2f', textAlign: 'center' }}>
+        <p className="result-model-warning" role="alert">
           這次測驗的學習模型儲存失敗，下次測驗可能不會延續這次的進度。
         </p>
       )}

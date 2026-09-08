@@ -36,7 +36,7 @@ const Panel_Start = ({ tribe = "tayal" }) => {
                             <div className="level-card-title">{level.name}</div>
 
                             <div className="level-card-info">
-                                <span style={{ color: "#8B0000", border: "1px solid #8B0000" }}>{level.typeLabel}</span>
+                                <span className="level-type-label">{level.typeLabel}</span>
                                 <span>預計時間：{level.estimatedTime}</span>
                             </div>
 

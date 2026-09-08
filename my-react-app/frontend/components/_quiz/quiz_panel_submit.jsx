@@ -173,8 +173,8 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
                                         <Star
                                             key={i}
                                             size={16}
-                                            color={i < difficulty ? "#FFD700" : "#ccc"}
-                                            fill={i < difficulty ? "#FFD700" : "#ccc"}
+                                            color={i < difficulty ? "#D9A227" : "#ccc"}
+                                            fill={i < difficulty ? "#D9A227" : "#ccc"}
                                         />
                                     ))}
                                 </span>
@@ -228,9 +228,9 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
                                         <span className="submit-question-num">第{idx + 1}題</span>
                                         <span>
                                             {isCorrect === true ? (
-                                                <CheckCircle color="#388e3c" size={20} />
+                                                <CheckCircle color="#4B6B3A" size={20} />
                                             ) : isCorrect === false ? (
-                                                <XCircle color="#d32f2f" size={20} />
+                                                <XCircle color="#9E1B24" size={20} />
                                             ) : null}
                                         </span>
                                     </div>

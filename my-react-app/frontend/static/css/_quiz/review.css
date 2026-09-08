@@ -3,39 +3,52 @@
     align-items: center;
     justify-content: space-between;
     border-radius: 8px;
-    color: white;
     margin-bottom: 16px;
     position: relative;
 }
 
 .review-title {
-    font-size: 24px;
-    font-weight: 700;
-    margin: 0px;
-    color: #000;
     display: inline-block;
-    padding: 4px 12px;
-    background-color: #F4C7C3;
-    border-radius: 16px;
+    margin: 0;
+    padding: 9px 16px;
+
+    font-family: var(--yy-font-pixel);
+    font-size: clamp(16px, 2vw, 22px);
+    font-weight: 700;
+    letter-spacing: .04em;
+    color: var(--yy-cream);
+
+    background: var(--yy-red);
+    border: 3px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
+    box-shadow: var(--yy-shadow-sm);
 }
 
 .review-intro-btn {
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
+    background: #fff;
+    border: 2px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
+    color: var(--yy-ink);
     padding: 6px 12px;
     display: flex;
     align-items: center;
     gap: 4px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.review-intro-btn:hover {
+    background: var(--yy-cream);
 }
 
 .review-intro-box {
     background: #fff;
-    color: #333;
-    border: 1px solid #ddd;
-    padding: 8px 14px;
-    border-radius: 6px;
+    color: var(--yy-ink);
+    border: 2px solid var(--yy-ink);
+    padding: 10px 14px;
+    border-radius: var(--yy-radius-btn);
     margin-top: 10px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--yy-shadow-sm);
     position: absolute;
     top: 80%;
     right: 0;
@@ -68,7 +81,7 @@
 
 .review-intro-box p {
     margin-top: 10px;
-    color: #666;
+    color: var(--yy-text-muted);
     font-style: italic;
 }
 
@@ -87,15 +100,15 @@
     display: flex;
     justify-content: center;
     gap: 20px;
-    border-bottom: 2px solid #e0e0e0;
+    border-bottom: 2px solid var(--yy-ink);
     padding-bottom: 5px;
-    color: black;
+    color: var(--yy-ink);
     font-weight: bold;
 }
 
 .nav-item {
     padding: 5px 10px;
-    border-radius: 5px;
+    border-radius: var(--yy-radius-btn);
     cursor: pointer;
     background: none;
     border: none;
@@ -104,11 +117,11 @@
 }
 
 .nav-item:hover {
-    background-color: #f0f0f0;
+    background-color: var(--yy-cream);
 }
 
 .nav-item.active {
-    background-color: #f0f0f0;
+    background-color: var(--yy-warning-bg);
 }
 
 .nav-item.disabled {
@@ -122,59 +135,65 @@
     padding: 1px 6px;
     border-radius: 8px;
     font-size: 10px;
-    background-color: #999;
+    background-color: var(--yy-blue);
     color: #fff;
     white-space: nowrap;
 }
 
 .review-table-container {
     margin: 10px;
-    font-family: Arial, sans-serif;
-    color: #333;
+    font-family: var(--yy-font-body);
+    color: var(--yy-ink);
 }
 
 .review-table {
     width: 100%;
     border-collapse: collapse;
     background-color: #fff;
+    border: 2px solid var(--yy-ink);
+    border-radius: var(--yy-radius-card);
+    overflow: hidden;
 }
 
 .review-table thead {
-    background-color: #f5f5f5;
+    background-color: var(--yy-cream-dim);
 }
 
 .review-table th,
 .review-table td {
-    border: 1px solid #ddd;
+    border: 1px solid #ddd0c4;
     padding: 8px;
     text-align: center;
 }
 
 .review-table th {
     font-weight: bold;
-    color: #555;
+    color: var(--yy-ink);
 }
 
 .view-btn {
     padding: 6px 12px;
-    border: 1px solid #333;
+    border: 2px solid var(--yy-ink);
     background: #fff;
-    color: #333;
-    border-radius: 4px;
+    color: var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
+    font-weight: 600;
+    cursor: pointer;
 }
 
 .view-btn:hover {
-    background: #333;
+    background: var(--yy-red);
+    border-color: var(--yy-ink);
     color: #fff;
 }
 
 .score-good {
-    color: #20c997;
+    color: var(--yy-success);
     font-weight: bold;
 }
 
 .score-bad {
-    color: #dc3545;
+    color: var(--yy-danger);
     font-weight: bold;
 }
 
@@ -193,19 +212,21 @@
 }
 
 .back-btn {
-    background: #f0f0f0;
-    border: none;
+    background: #fff;
+    border: 2px solid var(--yy-ink);
     padding: 6px 12px;
-    border-radius: 4px;
+    border-radius: var(--yy-radius-btn);
+    cursor: pointer;
 }
 
 .review-quiz-header h3 {
     margin: 0;
     font-size: 20px;
+    color: var(--yy-ink);
 }
 
 .back-btn:hover {
-    background: #ddd;
+    background: var(--yy-cream);
 }
 
 .quiz-questions {
@@ -214,36 +235,38 @@
 
 .quiz-question-detail {
     flex: 1.5;
-    border: 1px solid #ccc;
+    border: 3px solid var(--yy-ink);
     padding: 12px;
-    border-radius: 8px;
-    background: #fafafa;
+    border-radius: var(--yy-radius-card);
+    background: #fff;
+    box-shadow: var(--yy-shadow-sm);
 }
 
 .review-q {
     background: #fff;
-    border: 2px solid #ddd;
-    border-radius: 8px;
+    border: 2px solid var(--yy-ink);
+    border-radius: var(--yy-radius-card);
     padding: 16px 20px;
     height: 85%;
-    color: #333;
+    color: var(--yy-ink);
 }
 
 .review-q-btn {
     margin-top: 8px;
-    border: none;
-    border-radius: 6px;
-    background: #9e9e9e;
+    border: 2px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
+    background: var(--yy-red);
     color: #fff;
     font-weight: bold;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
     display: block;
     width: 100%;
     text-align: center;
+    cursor: pointer;
 }
 
 .review-q-btn:hover {
-    background: #757575;
+    background: var(--yy-red-dark);
 }
 
 .review-question-card {
@@ -257,14 +280,15 @@
     align-items: center;
     font-weight: bold;
     margin-bottom: 12px;
+    color: var(--yy-ink);
 }
 
 .icon-correct {
-    color: #388e3c;
+    color: var(--yy-success);
 }
 
 .icon-wrong {
-    color: #d32f2f;
+    color: var(--yy-danger);
 }
 
 .review-question-body .question-content {
@@ -274,19 +298,20 @@
 }
 
 .review-question-body .question-content .play-btn {
-    background: #fbc02d;
-    color: white;
-    border: none;
+    background: var(--yy-gold);
+    color: var(--yy-ink);
+    border: 2px solid var(--yy-ink);
     display: flex;
     align-items: center;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
     min-width: auto;
     border-radius: 50%;
     padding: 10px;
+    cursor: pointer;
 }
 
 .review-question-body .question-content .play-btn:hover {
-    background: #f9a825;
+    background: var(--yy-gold-light);
 }
 
 .review-question-body .question-content p {
@@ -296,7 +321,7 @@
 
 .review-question-body img {
     border-radius: 6px;
-    border: 1px solid #ccc;
+    border: 2px solid var(--yy-ink);
 }
 
 .answer-row {
@@ -317,7 +342,7 @@
 
 .review-divider {
     border: none;
-    border-top: 2px solid #e0e0e0;
+    border-top: 2px solid var(--yy-cream-dim);
     margin: 12px 0;
 }
 
@@ -341,7 +366,7 @@
 }
 
 .option-img-wrapper.user-choice {
-    border: 3px solid #fbc02d;
+    border: 3px solid var(--yy-gold);
 }
 
 .option-img {
@@ -354,7 +379,7 @@
     position: absolute;
     top: 4px;
     left: 4px;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(34, 24, 18, 0.75);
     color: #fff;
     font-size: 14px;
     padding: 1px 4px;
@@ -364,7 +389,7 @@
 .correct-tip {
     display: block;
     font-size: 16px;
-    color: #388e3c;
+    color: var(--yy-success);
     margin-top: 4px;
     font-weight: bold;
     text-align: center;

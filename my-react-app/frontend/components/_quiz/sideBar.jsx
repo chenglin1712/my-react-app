@@ -5,12 +5,12 @@ import { ClipboardList, ChartPie, Star, Play, X, Menu } from "lucide-react"
 import { TRIBES } from "../../src/constants/tribes";
 
 const ICONS = {
-    quiz: <ClipboardList size={24} fill="#A6E3A1" color="#28A745" />,
-    situation: <ChartPie size={24} color="#007BFF" />,
-    review: <Star size={24} fill="#FFECB3" color="#FFD700" />,
-    play: <Play size={22} fill="#8B0000" color="#8B0000" />,
-    menu: <Menu size={25} color="#8B0000" />,
-    close: <X size={24} color="#8B0000" />,
+    quiz: <ClipboardList size={24} fill="#E4E9E1" color="#4B6B3A" />,
+    situation: <ChartPie size={24} color="#2C6E7F" />,
+    review: <Star size={24} fill="#F9F1DF" color="#D9A227" />,
+    play: <Play size={22} fill="#9E1B24" color="#9E1B24" />,
+    menu: <Menu size={25} color="#9E1B24" />,
+    close: <X size={24} color="#9E1B24" />,
 };
 const MENU_ITEMS = [
     { key: "quiz", text: "開始測驗" },
@@ -79,7 +79,7 @@ const SideBar = () => {
 
                     <h2 className="bar-title">紀錄</h2>
                     <div className={`bar-item ${selectFunc === "situation" ? "active" : ""}`} onClick={() => { clickFunc("situation") }}>
-                        <div className="bar-item-chart" style={{ background: "#A7C7E7" }} >
+                        <div className="bar-item-chart" style={{ background: "#DFE9EC" }} >
                             {ICONS.situation}
                         </div>
                         <span>答題情形</span>

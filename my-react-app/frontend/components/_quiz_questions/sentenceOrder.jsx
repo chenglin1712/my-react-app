@@ -99,7 +99,7 @@ function DroppableArea({ id, children, label }) {
     <div
       ref={setNodeRef}
       className={`min-h-[60px] border-2 rounded-lg p-4 mb-6 flex flex-wrap justify-center items-center gap-2 transition ${
-        isOver ? "border-[#9B1B30] bg-pink-50 scale-105" : "border-gray-400 border-dashed"
+        isOver ? "border-[#9E1B24] bg-[#F9F1DF] scale-105" : "border-gray-400 border-dashed"
       }`}
     >
       {children && children.length > 0 ? children : <p className="text-gray-400">{label}</p>}

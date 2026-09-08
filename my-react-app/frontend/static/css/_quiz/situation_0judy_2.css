@@ -1,5 +1,11 @@
 .judy-situation-line-container {
-    font-family: "Noto Sans TC", sans-serif;
+    font-family: var(--yy-font-body);
+    background: #fff;
+    border: 3px solid var(--yy-ink);
+    border-radius: var(--yy-radius-card);
+    box-shadow: var(--yy-shadow-sm);
+    padding: 20px;
+    box-sizing: border-box;
 }
 
 .judy-situation-line-chart-wrapper {

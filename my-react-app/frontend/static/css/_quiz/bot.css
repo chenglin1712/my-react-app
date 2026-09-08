@@ -26,7 +26,7 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    background-color: #f7f3e9;
+    background-color: var(--yy-cream);
     animation: slide-up 0.35s ease-out;
 }
 
@@ -34,10 +34,10 @@
     display: flex;
     align-items: center;
     padding: 16px;
-    background: linear-gradient(135deg, #c83a3a, #982b2b);
+    background: linear-gradient(135deg, var(--yy-red), var(--yy-red-dark));
     background-size: 200% 200%;
     color: white;
-    border-bottom: 3px solid #222222;
+    border-bottom: 3px solid var(--yy-ink);
     position: relative;
     overflow: hidden;
 }
@@ -91,10 +91,10 @@
     display: inline-block;
     width: 8px;
     height: 8px;
-    background-color: #4caf50;
+    background-color: var(--yy-success);
     border-radius: 50%;
     margin-right: 5px;
-    box-shadow: 0 0 5px #4caf50;
+    box-shadow: 0 0 5px var(--yy-success);
 }
 
 .messages-container {
@@ -131,13 +131,13 @@
 }
 
 .bot .message-bubble {
-    background-color: #f1f1f1;
-    color: #333;
+    background-color: var(--yy-cream-dim);
+    color: var(--yy-ink);
     border-top-left-radius: 4px;
 }
 
 .user .message-bubble {
-    background: linear-gradient(135deg, #c83a3a, #982b2b);
+    background: linear-gradient(135deg, var(--yy-red), var(--yy-red-dark));
     border-top-right-radius: 4px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     position: relative;
@@ -172,7 +172,7 @@
 .suggestions-container {
     padding: 10px 16px;
     background-color: rgba(255, 255, 255, 0.7);
-    border-top: 1px solid rgba(200, 58, 58, 0.1);
+    border-top: 1px solid rgba(158, 27, 36, 0.15);
 }
 
 .suggestions-title {
@@ -191,8 +191,8 @@
 
 .suggestion-pill {
     background-color: white;
-    border: 1px solid #c83a3a;
-    color: #c83a3a;
+    border: 1px solid var(--yy-red);
+    color: var(--yy-red);
     padding: 8px 12px;
     border-radius: 16px;
     font-size: 13px;
@@ -205,7 +205,7 @@
 }
 
 .suggestion-pill:hover {
-    background-color: #c83a3a;
+    background-color: var(--yy-red);
     color: white;
 }
 
@@ -218,7 +218,7 @@
 .typing-indicator span {
     width: 8px;
     height: 8px;
-    background-color: #c83a3a;
+    background-color: var(--yy-red);
     border-radius: 50%;
     margin: 0 2px;
     animation: bounce 1.2s infinite;
@@ -237,7 +237,7 @@
     display: flex;
     padding: 16px;
     background: rgba(255, 255, 255, 0.8);
-    border-top: 3px solid #222222;
+    border-top: 3px solid var(--yy-ink);
     position: relative;
 }
 
@@ -249,17 +249,17 @@
     right: 0;
     height: 6px;
     background: repeating-linear-gradient(90deg,
-            #c83a3a,
-            #c83a3a 10px,
-            #222222 10px,
-            #222222 20px);
+            var(--yy-red),
+            var(--yy-red) 10px,
+            var(--yy-ink) 10px,
+            var(--yy-ink) 20px);
     transform: translateY(-100%);
 }
 
 .message-input {
     flex-grow: 1;
     padding: 12px 16px;
-    border: 1px solid rgba(200, 58, 58, 0.3);
+    border: 1px solid rgba(158, 27, 36, 0.35);
     border-radius: 24px;
     font-size: 15px;
     outline: none;
@@ -268,8 +268,8 @@
 }
 
 .message-input:focus {
-    border-color: #c83a3a;
-    box-shadow: 0 0 0 2px rgba(200, 58, 58, 0.1);
+    border-color: var(--yy-red);
+    box-shadow: 0 0 0 2px rgba(158, 27, 36, 0.15);
 }
 
 .send-button {
@@ -286,7 +286,7 @@
 }
 
 .send-button.active {
-    background: #c83a3a;
+    background: var(--yy-red);
     color: white;
 }
 
@@ -295,7 +295,7 @@
 }
 
 .send-button.active:hover {
-    background: #982b2b;
+    background: var(--yy-red-dark);
 }
 
 @keyframes bounce {

@@ -29,6 +29,19 @@
   --yy-shadow-sm: 3px 3px 0 var(--yy-ink);
   --yy-shadow-md: 5px 5px 0 var(--yy-ink);
   --yy-shadow-lg: 7px 7px 0 var(--yy-ink);
+
+  /* 語意狀態色（測驗答題對/錯/已選等）—— 沿用既有色相，只補淡色底供
+     文字色塊使用，不另外發明新色系。 */
+  --yy-success: var(--yy-green);
+  --yy-success-bg: #E4E9E1;
+  --yy-danger: var(--yy-red);
+  --yy-danger-bg: #F0DDDE;
+  --yy-warning-bg: #F9F1DF;
+  /* --yy-gold 本身在白色/米白底上文字對比不足（AA 檢測不過），文字場合
+     用這個加深版本，底色/邊框仍用 --yy-gold。 */
+  --yy-warning-text: #8A6816;
+  --yy-info: var(--yy-blue-light);
+  --yy-info-bg: #DFE9EC;
 }
 
 @keyframes yy-holo {

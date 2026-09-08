@@ -6,17 +6,20 @@
 
 .discussion-box {
     flex: 1;
-    border: 1px solid #ddd;
+    border: 3px solid var(--yy-ink);
+    border-radius: var(--yy-radius-card);
+    box-shadow: var(--yy-shadow-sm);
     background: #fff;
     display: flex;
     flex-direction: column;
     height: calc(100vh - 170px);
+    overflow: hidden;
 }
 
 .discussion-header {
     padding: 12px 16px;
-    border-bottom: 1px solid #eee;
-    background: #fafafa;
+    border-bottom: 3px solid var(--yy-ink);
+    background: var(--yy-blue);
     flex-shrink: 0;
 }
 
@@ -26,7 +29,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    color: #333;
+    color: var(--yy-cream);
 }
 
 .messages {
@@ -41,9 +44,9 @@
 .message-card {
     display: flex;
     padding: 10px;
-    border-radius: 8px;
-    background: #f9f9f9;
-    border: 1px solid #eee;
+    border-radius: var(--yy-radius-btn);
+    background: var(--yy-cream-dim);
+    border: 1px solid #ddd0c4;
     gap: 8px
 }
 
@@ -55,7 +58,7 @@
 
 .message-card .avatar {
     flex-shrink: 0;
-    color: #666;
+    color: var(--yy-text-muted);
 }
 
 .message-content {
@@ -68,7 +71,7 @@
     font-weight: bold;
     font-size: 14px;
     margin: 0;
-    color: #333;
+    color: var(--yy-ink);
 }
 
 
@@ -76,13 +79,13 @@
     font-weight: normal;
     font-size: 12px;
     margin-left: 6px;
-    color: #777;
+    color: var(--yy-text-muted);
 }
 
 .message-content .text {
     margin: 2px 0 0 0;
     font-size: 15px;
-    color: #444;
+    color: var(--yy-text-secondary);
 }
 
 .actions {
@@ -94,12 +97,13 @@
 .actions button {
     border: none;
     background: none;
-    color: #388e3c;
+    color: var(--yy-success);
     display: flex;
     align-items: center;
     gap: 4px;
     padding: 0;
     min-width: auto;
+    cursor: pointer;
 }
 
 .actions button:hover {
@@ -113,50 +117,51 @@
 .reply-card {
     display: flex;
     background: #fff;
-    border: 1px solid #eee;
-    border-radius: 6px;
+    border: 1px solid #ddd0c4;
+    border-radius: var(--yy-radius-btn);
     padding: 8px;
     gap: 8px
 }
 
 .reply-card .avatar {
     flex-shrink: 0;
-    color: #888;
+    color: var(--yy-text-muted);
 }
 
 .input-box {
     display: flex;
     gap: 8px;
-    border-top: 1px solid #ddd;
+    border-top: 2px solid var(--yy-ink);
     padding: 8px 12px;
-    background: #fafafa;
+    background: var(--yy-cream-dim);
     flex-shrink: 0;
 }
 
 .input-box input {
     flex: 1;
     padding: 10px 12px;
-    border: 1px solid #ccc;
+    border: 2px solid var(--yy-ink);
     border-radius: 20px;
     font-size: 14px;
     outline: none;
 }
 
 .input-box input:focus {
-    border-color: #388e3c;
+    border-color: var(--yy-gold);
 }
 
 .input-box button {
-    border: none;
+    border: 2px solid var(--yy-ink);
     min-width: auto;
-    background: #388e3c;
+    background: var(--yy-red);
     color: white;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
+    cursor: pointer;
 }
 
 .input-box button:hover {
-    background: #2e7d32;
+    background: var(--yy-red-dark);
 }

@@ -29,8 +29,8 @@ export default function ReviewAttemptDetail({ quiz, reviewQuestions, onBack, onV
               <tr key={idx}>
                 <td>
                   {idx + 1}
-                  {isCorrect === true && <CheckCircle size={16} color="#388e3c" />}
-                  {isCorrect === false && <XCircle size={16} color="#d32f2f" />}
+                  {isCorrect === true && <CheckCircle size={16} color="#4B6B3A" />}
+                  {isCorrect === false && <XCircle size={16} color="#9E1B24" />}
                 </td>
                 <td>{getReviewQuestionLabel(item, idx)}</td>
                 <td>

@@ -6,14 +6,17 @@
 
 .summary-card {
     flex: 1;
-    border-radius: 10px;
+    background: #fff;
+    border: 3px solid var(--yy-ink);
+    border-radius: var(--yy-radius-card);
+    box-shadow: var(--yy-shadow-sm);
     padding: 20px;
 }
 
 .summary-title {
     font-size: 20px;
     font-weight: bold;
-    color: #1f2937;
+    color: var(--yy-ink);
     margin-bottom: 15px;
     text-align: center;
 }
@@ -26,22 +29,22 @@
 }
 
 .summary-item .label {
-    color: #6b7280;
+    color: var(--yy-text-muted);
 }
 
 .summary-item .value {
     font-weight: bold;
-    color: #9B1B30;
+    color: var(--yy-red);
 }
 
 .summary-advice {
     margin-top: 20px;
     font-size: 14px;
     line-height: 1.5;
-    color: #333;
-    background: #fdf2f3;
+    color: var(--yy-text-secondary);
+    background: var(--yy-cream-dim);
     padding: 12px;
-    border-radius: 6px;
+    border-radius: var(--yy-radius-btn);
 }
 
 .summary-radar {
@@ -50,6 +53,6 @@
 }
 
 .radar-axis-tick {
-    fill: #4b5563;
+    fill: var(--yy-text-muted);
     font-size: 13px;
 }

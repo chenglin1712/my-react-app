@@ -14,33 +14,35 @@
   padding: 4px 12px;
   font-size: 13px;
   font-weight: bold;
-  border: 1px solid #ccc;
-  border-radius: 3px;
+  border: 2px solid var(--yy-ink);
+  border-radius: var(--yy-radius-btn);
   background-color: #fff;
+  color: var(--yy-ink);
   min-width: auto;
 }
 
 .filter-mode-btn:hover {
-  border-color: #666;
+  background-color: var(--yy-cream);
 }
 
 .filter-mode-btn.active {
-  background-color: #9B1B30;
+  background-color: var(--yy-red);
+  border-color: var(--yy-ink);
   color: #fff;
 }
 
 .filter-date-input {
   padding: 6px 10px;
   font-size: 14px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
+  border: 2px solid var(--yy-ink);
+  border-radius: var(--yy-radius-btn);
   background-color: #fff;
   transition: all 0.2s ease;
 }
 
 .filter-date-input:focus {
   outline: none;
-  border-color: #9B1B30;
+  border-color: var(--yy-gold);
 }
 
 .filter-date-input:disabled {
@@ -53,17 +55,17 @@
 .filter-select {
   padding: 6px 10px;
   font-size: 14px;
-  border: 1px solid #333;
-  border-radius: 3px;
+  border: 2px solid var(--yy-ink);
+  border-radius: var(--yy-radius-btn);
   background-color: #fff;
   cursor: pointer;
 }
 
 .filter-select:hover {
-  border-color: #666;
+  background-color: var(--yy-cream);
 }
 
 .filter-select:focus {
   outline: none;
-  border-color: #9B1B30;
+  border-color: var(--yy-gold);
 }

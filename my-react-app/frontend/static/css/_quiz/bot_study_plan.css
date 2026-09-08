@@ -44,7 +44,7 @@
     align-items: center;
     margin-bottom: 14px;
     padding-bottom: 10px;
-    border-bottom: 2px solid #e5e7eb;
+    border-bottom: 2px solid var(--yy-ink);
 }
 
 .header-buttons {
@@ -62,7 +62,7 @@
     margin: 0;
     font-size: 24px;
     font-weight: 700;
-    color: #1f2937;
+    color: var(--yy-ink);
 }
 
 .event-count {
@@ -78,20 +78,22 @@
     align-items: center;
     gap: 8px;
     padding: 10px 12px;
-    background-color: #c83a3a;
+    background-color: var(--yy-red);
     color: white;
-    border: none;
-    border-radius: 8px;
+    border: 2px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
+    box-shadow: var(--yy-shadow-sm);
     font-size: 14px;
     font-weight: 600;
+    cursor: pointer;
 }
 
 .add-all-btn:hover {
-    background-color: #b12f2f;
+    background-color: var(--yy-red-dark);
 }
 
 .add-all-btn:active {
-    background-color: #9a2626;
+    background-color: var(--yy-red-dark);
 }
 
 .view-calendar-btn {
@@ -100,15 +102,17 @@
     gap: 8px;
     padding: 10px 12px;
     background-color: white;
-    color: #c83a3a;
-    border: 1.5px solid #c83a3a;
-    border-radius: 8px;
+    color: var(--yy-red);
+    border: 2px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
+    box-shadow: var(--yy-shadow-sm);
     font-size: 14px;
     font-weight: 600;
+    cursor: pointer;
 }
 
 .view-calendar-btn:hover {
-    background-color: #c83a3a;
+    background-color: var(--yy-red);
     color: white;
 }
 
@@ -125,9 +129,10 @@
     justify-content: space-between;
     align-items: center;
     background: white;
-    border-radius: 12px;
+    border-radius: var(--yy-radius-card);
     padding: 16px 20px;
-    border: 1px solid #e5e7eb;
+    border: 2px solid var(--yy-ink);
+    box-shadow: var(--yy-shadow-sm);
 }
 
 .card-left {
@@ -144,12 +149,12 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #fef2f2;
-    color: #c83a3a;
-    border-radius: 8px;
+    background-color: var(--yy-danger-bg);
+    color: var(--yy-red);
+    border-radius: var(--yy-radius-btn);
     font-size: 18px;
     font-weight: 700;
-    border: 2px solid #fee2e2;
+    border: 2px solid var(--yy-ink);
 }
 
 /* 活動資訊 */
@@ -161,7 +166,7 @@
     margin: 0 0 8px 0;
     font-size: 18px;
     font-weight: 600;
-    color: #1f2937;
+    color: var(--yy-ink);
     line-height: 1.4;
     text-align: left;
 }
@@ -181,9 +186,9 @@
 
 .day-badge {
     padding: 4px 8px;
-    background-color: #fef2f2;
-    color: #c83a3a;
-    border-radius: 6px;
+    background-color: var(--yy-danger-bg);
+    color: var(--yy-red);
+    border-radius: var(--yy-radius-btn);
     font-size: 13px;
     font-weight: 600;
 }
@@ -200,22 +205,23 @@
     gap: 6px;
     padding: 6px 10px;
     background-color: white;
-    color: #c83a3a;
-    border: 1.5px solid #c83a3a;
-    border-radius: 8px;
+    color: var(--yy-red);
+    border: 2px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
     font-size: 14px;
     font-weight: 600;
     white-space: nowrap;
     min-width: auto;
+    cursor: pointer;
 }
 
 .add-to-calendar-btn:hover {
-    background-color: #c83a3a;
+    background-color: var(--yy-red);
     color: white;
 }
 
 .add-to-calendar-btn:active {
-    background-color: #b12f2f;
+    background-color: var(--yy-red-dark);
 }
 
 /* 圖示 */

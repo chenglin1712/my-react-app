@@ -8,7 +8,7 @@
 .submit-paper {
     padding: 10px;
     width: 100%;
-    font-family: 'Arial';
+    font-family: var(--yy-font-body);
 }
 
 .paper-header {
@@ -21,12 +21,14 @@
 .paper-info p {
     margin: 4px 0;
     font-size: 16px;
-    color: #333;
+    color: var(--yy-text-secondary);
 }
 
 .user-info {
-    border-bottom: 1px solid #333;
+    border-bottom: 2px solid var(--yy-ink);
     padding-bottom: 2px;
+    font-weight: 700;
+    color: var(--yy-ink);
 }
 
 .user-info-row {
@@ -44,17 +46,19 @@
 .paper-score .score-circle {
     display: inline-block;
     padding: 8px 16px;
-    border: 3px solid #d32f2f;
+    border: 3px solid var(--yy-ink);
     border-radius: 50%;
-    font-size: 36px;
+    font-size: 32px;
     font-weight: bold;
-    color: #d32f2f;
+    color: var(--yy-red);
+    background: #fff;
+    box-shadow: var(--yy-shadow-sm);
     transform: rotate(-2deg);
-    font-family: 'Comic Sans MS';
+    font-family: var(--yy-font-pixel);
 }
 
 .paper-body {
-    border-top: 1px solid #ddd;
+    border-top: 2px solid var(--yy-ink);
     padding-top: 16px;
     overflow-y: auto;
 }
@@ -62,11 +66,11 @@
 .submit-question-header-row {
     display: flex;
     justify-content: space-between;
-    background-color: #e3f2fd;
+    background-color: var(--yy-blue);
     padding: 8px 12px;
-    border-radius: 6px 6px 0 0;
-    font-weight: 600;
-    color: #0c5460;
+    border-radius: var(--yy-radius-btn) var(--yy-radius-btn) 0 0;
+    font-weight: 700;
+    color: var(--yy-cream);
     margin-bottom: 12px;
 }
 
@@ -95,6 +99,7 @@
 .submit-question-num {
     font-weight: bold;
     margin-right: 8px;
+    color: var(--yy-ink);
 }
 
 .submit-question-q {
@@ -110,7 +115,7 @@
 .submit-question-text {
     font-size: 15px;
     margin: 8px 0;
-    color: #555;
+    color: var(--yy-text-tertiary);
 }
 
 .quiz-user-answer {
@@ -121,21 +126,22 @@
 }
 
 .quiz-user-answer.correct {
-    color: #155724;
-    background-color: #d4edda;
-    border: 1px solid #c3e6cb;
+    color: var(--yy-success);
+    background-color: var(--yy-success-bg);
+    border: 1px solid var(--yy-success);
 }
 
 .quiz-user-answer.wrong {
-    color: #721c24;
-    background-color: #f8d7da;
-    border: 1px solid #f5c6cb;
+    color: var(--yy-danger);
+    background-color: var(--yy-danger-bg);
+    border: 1px solid var(--yy-danger);
 }
 
 .quiz-correct-answer {
     font-weight: 600;
     padding: 2px 6px;
     width: 24px;
+    color: var(--yy-ink);
 }
 
 .quiz-user-answer-text,
@@ -146,16 +152,20 @@
     white-space: nowrap;
 }
 
+.quiz-correct-answer-text {
+    color: var(--yy-ink);
+}
+
 .quiz-user-answer-text.correct {
-    color: #155724;
-    background-color: #d4edda;
-    border: 1px solid #c3e6cb;
+    color: var(--yy-success);
+    background-color: var(--yy-success-bg);
+    border: 1px solid var(--yy-success);
 }
 
 .quiz-user-answer-text.wrong {
-    color: #721c24;
-    background-color: #f8d7da;
-    border: 1px solid #f5c6cb;
+    color: var(--yy-danger);
+    background-color: var(--yy-danger-bg);
+    border: 1px solid var(--yy-danger);
 }
 
 .submit-question-q2 {
@@ -168,7 +178,7 @@
 }
 
 .submit-question-q2 button {
-    background: #1976d2;
+    background: var(--yy-blue);
     color: #fff;
     border: none;
     padding: 4px 8px;
@@ -193,15 +203,15 @@
 }
 
 .quiz-user-answer2.correct {
-    border-color: #4caf50;
+    border-color: var(--yy-success);
 }
 
 .quiz-user-answer2.wrong {
-    border-color: #f44336;
+    border-color: var(--yy-danger);
 }
 
 .quiz-correct-answer2 {
-    border-color: #2196f3;
+    border-color: var(--yy-blue-light);
 }
 
 .no-results {
@@ -218,21 +228,39 @@
 }
 
 .btn-primary {
-    background: #9E1B24;
-    color: #fff;
-    border: none;
+    background: var(--yy-red);
+    color: var(--yy-cream);
+    border: 3px solid var(--yy-ink);
     padding: 12px 20px;
-    border-radius: 8px;
+    border-radius: var(--yy-radius-btn);
+    box-shadow: var(--yy-shadow-sm);
     font-size: 16px;
-    transition: background 0.3s;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.btn-primary:hover {
+    background: var(--yy-red-dark);
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 var(--yy-ink);
 }
 
 .btn-secondary {
     background: #fff;
-    color: #9E1B24;
-    border: 2px solid #9E1B24;
+    color: var(--yy-red);
+    border: 3px solid var(--yy-ink);
     padding: 12px 20px;
-    border-radius: 8px;
+    border-radius: var(--yy-radius-btn);
+    box-shadow: var(--yy-shadow-sm);
     font-size: 16px;
-    transition: all 0.3s;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.btn-secondary:hover {
+    background: var(--yy-cream);
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 var(--yy-ink);
 }

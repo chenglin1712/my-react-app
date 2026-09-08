@@ -1,18 +1,20 @@
 .assistant-layout {
     display: flex;
     flex-direction: column;
-    border: 1px solid #ddd;
-    border-radius: 10px;
+    border: 3px solid var(--yy-ink);
+    border-radius: var(--yy-radius-card);
+    box-shadow: var(--yy-shadow-sm);
     background: #fff;
     height: calc(100vh - 170px);
     max-width: 700px;
     margin: auto;
+    overflow: hidden;
 }
 
 .assistant-header {
     padding: 10px 12px;
-    border-bottom: 1px solid #eee;
-    background: #fafafa;
+    border-bottom: 3px solid var(--yy-ink);
+    background: var(--yy-blue);
     flex-shrink: 0;
 }
 
@@ -22,6 +24,7 @@
     align-items: center;
     gap: 6px;
     margin: 0;
+    color: var(--yy-cream);
 }
 
 .assistant-messages {
@@ -45,7 +48,7 @@
 
 .chat-message .avatar {
     flex-shrink: 0;
-    color: #555;
+    color: var(--yy-text-muted);
 }
 
 .chat-message .bubble {
@@ -57,14 +60,14 @@
 }
 
 .chat-message.user .bubble {
-    background: #d1e7dd;
-    color: #1b4332;
+    background: var(--yy-red);
+    color: #fff;
     border-radius: 12px 12px 0 12px;
 }
 
 .chat-message.assistant .bubble {
-    background: #f1f1f1;
-    color: #333;
+    background: var(--yy-cream-dim);
+    color: var(--yy-ink);
     border-radius: 12px 12px 12px 0;
 }
 
@@ -73,55 +76,56 @@
 }
 
 .highlight {
-    background: #fff59d;
+    background: var(--yy-warning-bg);
     padding: 2px 4px;
     border-radius: 4px;
     font-weight: bold;
-    color: #444;
+    color: var(--yy-ink);
 }
 
 .reply-image {
     margin-top: 8px;
     max-width: 150px;
     border-radius: 6px;
-    border: 1px solid #ccc;
+    border: 2px solid var(--yy-ink);
 }
 
 .assistant-input {
     display: flex;
     gap: 8px;
-    border-top: 1px solid #ddd;
+    border-top: 2px solid var(--yy-ink);
     padding: 8px 12px;
-    background: #fafafa;
+    background: var(--yy-cream-dim);
     flex-shrink: 0;
 }
 
 .assistant-input input {
     flex: 1;
     padding: 10px 12px;
-    border: 1px solid #ccc;
+    border: 2px solid var(--yy-ink);
     border-radius: 20px;
     font-size: 14px;
     outline: none;
 }
 
 .assistant-input input:focus {
-    border-color: #388e3c;
+    border-color: var(--yy-gold);
 }
 
 .assistant-input button {
-    border: none;
-    background: #388e3c;
+    border: 2px solid var(--yy-ink);
+    background: var(--yy-red);
     color: white;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     min-width: auto;
+    cursor: pointer;
 }
 
 .assistant-input button:hover {
-    background: #2e7d32;
+    background: var(--yy-red-dark);
 }
 
 .translation-block {
@@ -133,13 +137,13 @@
 .translation-block .original {
     font-size: 16px;
     font-weight: bold;
-    color: #333;
+    color: var(--yy-ink);
     margin: 0;
 }
 
 .translation-block .translation {
     font-size: 15px;
-    color: #333;
+    color: var(--yy-text-secondary);
     border-radius: 6px;
     display: inline-block;
     margin: 0;
@@ -161,7 +165,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(34, 24, 18, 0.6);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -171,7 +175,9 @@
 .modal-content {
     background: #fff;
     padding: 20px;
-    border-radius: 12px;
+    border: 3px solid var(--yy-ink);
+    border-radius: var(--yy-radius-card);
+    box-shadow: var(--yy-shadow-lg);
     max-width: 80%;
     max-height: 80%;
     overflow-y: auto;
@@ -194,7 +200,7 @@
 
 .review-divider-AI {
     border: none;
-    border-top: 2px solid #333;
+    border-top: 2px solid var(--yy-ink);
     margin: 0;
 }
 
@@ -214,7 +220,7 @@
 .word {
     font-weight: bold;
     font-size: 18px;
-    color: #333;
+    color: var(--yy-ink);
     margin-bottom: 4px;
 }
 
@@ -226,7 +232,7 @@
     line-height: 1.4;
 }
 
-/* ===== 不同螢光筆標記 ===== */
+/* ===== 不同螢光筆標記（詞義標色是功能性標記，非品牌色階，維持原樣） ===== */
 .meaning.color1 {
     background: #fff59d;
     color: #333;
@@ -269,11 +275,11 @@
 }
 
 .bot .review-message-bubble {
-    background-color: #e8f5e9;
-    color: #333;
+    background-color: var(--yy-success-bg);
+    color: var(--yy-ink);
     border-top-left-radius: 4px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-    border-left: 3px solid #4caf50;
+    border-left: 3px solid var(--yy-success);
 }
 
 .review-typing-indicator {
@@ -285,7 +291,7 @@
 .review-typing-indicator span {
     width: 8px;
     height: 8px;
-    background-color: #4caf50;
+    background-color: var(--yy-success);
     border-radius: 50%;
     margin: 0 2px;
     animation: bounce 1.2s infinite;

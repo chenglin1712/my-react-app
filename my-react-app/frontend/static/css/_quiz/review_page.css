@@ -8,15 +8,16 @@
 
 .pagination button {
     padding: 6px 12px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    border: 2px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
     background: white;
+    color: var(--yy-ink);
     cursor: pointer;
     transition: background 0.2s;
 }
 
 .pagination button:hover:not(:disabled) {
-    background: #f0f0f0;
+    background: var(--yy-cream);
 }
 
 .pagination button:disabled {

@@ -242,7 +242,7 @@ const Panel = ({ tribe = "tayal" }) => {
                             </button>
                         </div>
                     </div>
-                    {submitError && <p className="quiz-submit-error" role="alert" style={{ color: '#d32f2f', textAlign: 'center', marginTop: '8px' }}>{submitError}</p>}
+                    {submitError && <p className="quiz-submit-error" role="alert">{submitError}</p>}
                     <button className="submit-button" onClick={handleSubmit} disabled={isSubmitting}>
                         {isSubmitting ? "送出中..." : "繳交試卷"}
                     </button>

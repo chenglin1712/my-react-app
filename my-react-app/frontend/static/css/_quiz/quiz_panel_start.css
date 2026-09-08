@@ -1,39 +1,58 @@
 .panel-start-container {
     display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 3%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 24px;
+    width: 100%;
 }
 
 .panel-start-card {
-    background: white;
     width: 100%;
-    margin-top: 5%;
-    margin-bottom: 5px;
+    margin: 0;
+    padding: clamp(20px, 3vw, 32px);
+    box-sizing: border-box;
+
+    background: var(--yy-cream-dim);
+    border: 3px solid var(--yy-ink);
+    border-radius: var(--yy-radius-card);
+    box-shadow: var(--yy-shadow-md);
 }
 
 .panel-subtitle {
-    font-size: 18px;
+    margin: 0 0 24px;
+    font-size: 20px;
+    font-weight: 900;
     text-align: center;
+    color: var(--yy-ink);
 }
 
 .level-selection {
     display: flex;
-    gap: 20px;
-    justify-content: center;
     flex-wrap: wrap;
+    justify-content: center;
+    gap: 18px;
 }
 
 .level-card {
     position: relative;
     overflow: visible;
-    width: 20%;
-    background-color: #fff;
-    border-radius: 12px;
-    border: 1px solid #333;
+    flex: 0 1 190px;
+    padding: 18px 12px 14px;
+
+    background: #fff;
+    border: 3px solid var(--yy-ink);
+    border-radius: var(--yy-radius-card);
+    box-shadow: var(--yy-shadow-sm);
+
     display: flex;
     flex-direction: column;
     align-items: center;
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.level-card:not(.disabled):hover {
+    transform: translate(-2px, -2px);
+    box-shadow: var(--yy-shadow-md);
 }
 
 .level-recommend-img {
@@ -45,84 +64,104 @@
 }
 
 .level-card-icon {
-    margin-top: 12px;
+    margin-top: 4px;
 }
 
 .level-icon-text {
-    width: 80px;
-    height: 80px;
+    width: 72px;
+    height: 72px;
     border-radius: 50%;
+    border: 3px solid var(--yy-ink);
+    box-shadow: 3px 3px 0 var(--yy-ink);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2rem;
+    font-family: var(--yy-font-pixel);
+    font-size: 1.6rem;
     font-weight: 700;
-    color: #fff;
+    color: var(--yy-cream);
 }
 
 .level-1 .level-icon-text {
-    background-color: #B98B82;
+    background-color: var(--yy-red);
 }
 
 .level-2 .level-icon-text {
-    background-color: #8FBC8F;
+    background-color: var(--yy-green);
 }
 
 .level-3 .level-icon-text {
-    background-color: #F4A460;
+    background-color: var(--yy-gold);
+    color: var(--yy-ink);
 }
 
 .level-4 .level-icon-text {
-    background-color: #4682B4;
+    background-color: var(--yy-blue);
 }
 
 .level-5 .level-icon-text {
-    background-color: #DA70D6;
+    background-color: var(--yy-blue-light);
 }
 
 .level-card-title {
+    margin: 14px 0 7px;
     font-size: 1.2rem;
-    font-weight: 700;
-    color: #333;
-    margin: 12px 0 6px 0;
+    font-weight: 900;
+    color: var(--yy-ink);
     text-align: center;
 }
 
 .level-card-info {
+    flex: 1;
     font-size: 0.85rem;
-    color: #666;
+    color: var(--yy-text-tertiary);
     text-align: center;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
+}
+
+.level-type-label {
+    display: inline-block;
+    padding: 2px 8px;
+    color: var(--yy-red);
+    border: 1px solid var(--yy-red);
+    border-radius: 3px;
+    font-weight: 700;
 }
 
 .level-card-btn {
-    background-color: white;
-    border: 1px solid #333;
-    color: #333;
-    padding: 4px 6px;
-    border-radius: 6px;
-    font-weight: 600;
-    margin-bottom: 12px;
+    width: calc(100% - 8px);
+    margin: 0 0 4px;
+    padding: 9px 10px;
+
+    color: var(--yy-cream);
+    background: var(--yy-red);
+    border: 3px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
+    box-shadow: var(--yy-shadow-sm);
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
 }
 
 .level-card-btn:hover {
-    background-color: #F4C7C3;
-    color: #9E1B24;
-    border: 1px solid #9E1B24;
+    color: var(--yy-cream);
+    background: var(--yy-red-dark);
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 var(--yy-ink);
 }
 
 .level-card.disabled {
-    opacity: 0.4;
+    opacity: .48;
     pointer-events: none;
+    filter: grayscale(.45);
 }
 
 .level-card.disabled .level-card-btn {
-    background-color: #ccc;
-    color: #666;
-    cursor: not-allowed;
+    color: var(--yy-text-muted);
+    background: var(--yy-cream-dim);
 }
 
 .scenario-entry {
@@ -130,60 +169,75 @@
     align-items: center;
     justify-content: space-between;
     gap: 24px;
-    max-width: 980px;
+    max-width: none;
     margin: 28px auto 0;
-    padding: 20px 24px;
-    background: #faf6f5;
-    border: 1px solid #dfcfcb;
-    border-left: 5px solid #9e1b24;
-    border-radius: 10px;
+    padding: 22px 24px;
+
+    background: var(--yy-blue);
+    border: 3px solid var(--yy-ink);
+    border-left: 10px solid var(--yy-gold);
+    border-radius: var(--yy-radius-card);
+    box-shadow: var(--yy-shadow-md);
 }
 
 .scenario-entry h3 {
-    margin: 7px 0 5px;
-    color: #4a3531;
+    margin: 8px 0 5px;
+    color: var(--yy-gold-light);
     font-size: 19px;
-    font-weight: 700;
+    font-weight: 900;
 }
 
 .scenario-entry p {
     max-width: 680px;
     margin: 0;
-    color: #6f625f;
+    color: var(--yy-cream);
     font-size: 13px;
-    line-height: 1.6;
+    line-height: 1.7;
 }
 
 .scenario-entry-badge {
     display: inline-block;
-    padding: 3px 8px;
-    color: #7f1627;
-    background: #f4dfdc;
-    border-radius: 999px;
-    font-size: 11px;
+    padding: 4px 9px;
+    color: var(--yy-ink);
+    background: var(--yy-gold);
+    border: 2px solid var(--yy-ink);
+    border-radius: 3px;
+    font-family: var(--yy-font-pixel);
+    font-size: 10px;
     font-weight: 700;
 }
 
 .scenario-entry-btn {
     flex: 0 0 auto;
-    padding: 9px 16px;
-    color: #fff;
-    background: #9e1b24;
-    border: 1px solid #9e1b24;
-    border-radius: 7px;
-    font-weight: 650;
+    padding: 11px 16px;
+    color: var(--yy-cream);
+    background: var(--yy-red);
+    border: 3px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
+    box-shadow: var(--yy-shadow-sm);
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
 }
 
 .scenario-entry-btn:hover {
-    color: #fff;
-    background: #7f1627;
-    border-color: #7f1627;
+    color: var(--yy-cream);
+    background: var(--yy-red-dark);
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 var(--yy-ink);
 }
 
 @media (max-width: 768px) {
-    .panel-start-container {
-        flex-direction: column;
-        text-align: center;
+    .panel-start-card {
+        padding: 18px 14px;
+    }
+
+    .level-selection {
+        gap: 14px;
+    }
+
+    .level-card {
+        flex-basis: calc(50% - 14px);
     }
 
     .scenario-entry {
@@ -194,5 +248,11 @@
 
     .scenario-entry-btn {
         width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .level-card {
+        flex-basis: 100%;
     }
 }

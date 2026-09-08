@@ -1,10 +1,16 @@
 .quiz-title {
-    font-size: 24px;
-    font-weight: 700;
-    margin: 0px;
-    color: #000;
     display: inline-block;
-    padding: 4px 12px;
-    background-color: #F4C7C3;
-    border-radius: 16px;
+    margin: 0 0 24px;
+    padding: 9px 16px;
+
+    font-family: var(--yy-font-pixel);
+    font-size: clamp(16px, 2vw, 22px);
+    font-weight: 700;
+    letter-spacing: .04em;
+    color: var(--yy-cream);
+
+    background: var(--yy-red);
+    border: 3px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
+    box-shadow: var(--yy-shadow-sm);
 }

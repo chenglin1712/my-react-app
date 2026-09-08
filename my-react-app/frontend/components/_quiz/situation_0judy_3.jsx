@@ -15,10 +15,10 @@ import {
 import '../../static/css/_quiz/situation_0judy_3.css';
 
 const typeMap = {
-  trueFalse: { name: '是非', color: '#F4C7C3' },
-  multipleChoice: { name: '選擇', color: '#E78A8C' },
-  matching: { name: '配合', color: '#C0394B' },
-  fillInTheBlank: { name: '閱讀填空', color: '#9B1B30' }
+  trueFalse: { name: '是非', color: '#9E1B24' },
+  multipleChoice: { name: '選擇', color: '#D9A227' },
+  matching: { name: '配合', color: '#1F3A5C' },
+  fillInTheBlank: { name: '閱讀填空', color: '#4B6B3A' }
 };
 // typeMap 這 4 個 key 是外部後端流程寫入 questionTypeDistribution 時用的彙總
 // 格式，這個 repo 沒有那份程式碼，沒辦法確認未來會不會再多別的 key——保底
@@ -61,9 +61,9 @@ const SituationDashboard = ({ data, typeRatio }) => {
 
   const getPerformanceColor = (performance) => {
     switch (performance) {
-      case '良好': return 'rgb(40, 167, 69)';
-      case '需加強': return '#FFB020';
-      case '不及格': return 'rgb(220, 53, 69)';
+      case '良好': return '#4B6B3A';
+      case '需加強': return '#D9A227';
+      case '不及格': return '#9E1B24';
       default: return '#6B7280';
     }
   };
@@ -131,21 +131,21 @@ const SituationDashboard = ({ data, typeRatio }) => {
                 data={performanceData}
                 margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="type" axisLine={{ stroke: '#e5e7eb' }} tick={{ fontSize: 12 }} />
-                <YAxis yAxisId="left" axisLine={{ stroke: '#e5e7eb' }} tick={{ fontSize: 12 }} label={{ value: '正確率 (%)', angle: -90, position: 'insideLeft' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#EFE1C4" />
+                <XAxis dataKey="type" axisLine={{ stroke: '#221812' }} tick={{ fontSize: 12 }} />
+                <YAxis yAxisId="left" axisLine={{ stroke: '#221812' }} tick={{ fontSize: 12 }} label={{ value: '正確率 (%)', angle: -90, position: 'insideLeft' }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend
                   layout="horizontal"
                   payload={[
-                    { value: '平均正確率', type: 'line', color: '#333' },
-                    { value: '良好', type: 'square', color: '#10B981' },
-                    { value: '需加強', type: 'square', color: '#F59E0B' },
-                    { value: '不及格', type: 'square', color: '#EF4444' },
+                    { value: '平均正確率', type: 'line', color: '#221812' },
+                    { value: '良好', type: 'square', color: '#4B6B3A' },
+                    { value: '需加強', type: 'square', color: '#D9A227' },
+                    { value: '不及格', type: 'square', color: '#9E1B24' },
                   ]}
                   iconSize={16}
                   wrapperStyle={{ display: 'flex', width: '-webkit-fill-available', justifyContent: 'center' }}
-                  formatter={(value) => <span style={{ fontSize: 14, color: "#333" }}>{value}</span>}
+                  formatter={(value) => <span style={{ fontSize: 14, color: "#221812" }}>{value}</span>}
                 />
 
                 <Bar
@@ -164,10 +164,10 @@ const SituationDashboard = ({ data, typeRatio }) => {
                   type="monotone"
                   dataKey="averageAccuracy"
                   name="平均正確率"
-                  stroke="#333"
+                  stroke="#221812"
                   strokeWidth={3}
                   dot={{ fill: 'white', strokeWidth: 2, r: 6 }}
-                  activeDot={{ r: 8, stroke: '#333', strokeWidth: 2 }}
+                  activeDot={{ r: 8, stroke: '#221812', strokeWidth: 2 }}
                 />
               </ComposedChart>
             </ResponsiveContainer>

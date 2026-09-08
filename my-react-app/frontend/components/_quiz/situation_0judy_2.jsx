@@ -26,7 +26,7 @@ const SituationLine = ({ data }) => {
     { name: "平均分數", value: userAvg },
     { name: "剩餘", value: 100 - userAvg },
   ];
-  const COLORS = ["#F4C7C3", "#E0E0E0"];
+  const COLORS = ["#9E1B24", "#EFE1C4"];
 
   return (
     <div className="judy-situation-line-container">
@@ -44,29 +44,29 @@ const SituationLine = ({ data }) => {
             >
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="#00000033"
+                stroke="#22181233"
               />
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 12, fill: "#374151" }}
-                axisLine={{ stroke: "#374151" }}
+                tick={{ fontSize: 12, fill: "#3E3226" }}
+                axisLine={{ stroke: "#3E3226" }}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 12, fill: "#374151" }}
-                axisLine={{ stroke: "#374151" }}
+                tick={{ fontSize: 12, fill: "#3E3226" }}
+                axisLine={{ stroke: "#3E3226" }}
                 tickLine={false}
               />
               <Tooltip
                 contentStyle={{
                   backgroundColor: "#ffffff",
                   borderRadius: 8,
-                  border: "1px solid #e5e7eb",
-                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+                  border: "2px solid #221812",
+                  boxShadow: "3px 3px 0 #221812",
                   fontSize: 13,
                 }}
-                labelStyle={{ color: "#1f2937", fontWeight: 600 }}
-                cursor={{ stroke: "#4b5563", strokeWidth: 2 }}
+                labelStyle={{ color: "#221812", fontWeight: 600 }}
+                cursor={{ stroke: "#221812", strokeWidth: 2 }}
               />
               <Legend
                 iconType="circle"
@@ -78,8 +78,8 @@ const SituationLine = ({ data }) => {
                 type="monotone"
                 dataKey="averageAccuracy"
                 name="同期平均"
-                fill="rgba(151, 151, 151, 0.5)"
-                stroke="rgba(0,0,0,0.5)"
+                fill="rgba(31, 58, 92, 0.25)"
+                stroke="#1F3A5C"
                 strokeWidth={2}
                 strokeDasharray="5 5"
               />
@@ -89,7 +89,7 @@ const SituationLine = ({ data }) => {
                 dataKey="correctRate"
                 name="正確率"
                 barSize={30}
-                fill="#9B1B30"
+                fill="#9E1B24"
                 radius={[4, 4, 0, 0]}
               />
             </ComposedChart>
@@ -107,7 +107,7 @@ const SituationLine = ({ data }) => {
             alignItems: "center",
           }}
         >
-          <div style={{ fontSize: 18, fontWeight: 600, color: "#1f2937" }}>
+          <div style={{ fontSize: 18, fontWeight: 600, color: "#221812" }}>
             平均分數
           </div>
           <ResponsiveContainer width="70%" height="60%">
@@ -129,7 +129,7 @@ const SituationLine = ({ data }) => {
                 y="50%"
                 textAnchor="middle"
                 dominantBaseline="middle"
-                style={{ fontSize: "30px", fontWeight: "bold", fill: "#9B1B30" }}
+                style={{ fontSize: "30px", fontWeight: "bold", fill: "#9E1B24" }}
               >
                 {userAvg.toFixed(1)}
               </text>

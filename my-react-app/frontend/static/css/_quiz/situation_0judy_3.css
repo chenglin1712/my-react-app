@@ -5,6 +5,7 @@
 .situation-dashboard-grid {
     display: grid;
     grid-template-columns: 1fr;
+    gap: 20px;
     align-items: end;
 }
 
@@ -20,12 +21,18 @@
     flex-direction: column;
     width: 100%;
     height: 100%;
+    box-sizing: border-box;
+    padding: 16px;
+    background: #fff;
+    border: 3px solid var(--yy-ink);
+    border-radius: var(--yy-radius-card);
+    box-shadow: var(--yy-shadow-sm);
 }
 
 .situation-card-title {
     font-size: 1.25rem;
-    font-weight: 600;
-    color: #1f2937;
+    font-weight: 700;
+    color: var(--yy-ink);
     text-align: center;
     margin: 0;
 }
@@ -44,20 +51,20 @@
 .situation-tooltip-box {
     background-color: #ffffff;
     padding: 12px;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 2px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
+    box-shadow: 3px 3px 0 var(--yy-ink);
 }
 
 .situation-tooltip-title {
     font-weight: 600;
-    color: #1f2937;
+    color: var(--yy-ink);
     margin-bottom: 4px;
 }
 
 .situation-tooltip-subtitle {
     font-size: 12px;
-    color: #4b5563;
+    color: var(--yy-text-muted);
     margin: 0;
 }
 
@@ -66,6 +73,7 @@
     display: flex;
     gap: 20px;
     justify-content: center;
+    flex-wrap: wrap;
 }
 
 .situation-legend-item {
@@ -77,9 +85,11 @@
     width: 16px;
     height: 16px;
     margin-right: 4px;
+    border: 1px solid var(--yy-ink);
+    border-radius: 3px;
 }
 
 .situation-legend-name {
     font-size: 0.875rem;
-    color: #374151;
+    color: var(--yy-text-secondary);
 }

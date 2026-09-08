@@ -197,10 +197,7 @@ export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
 
   if (loading) {
     return (
-      <div
-        className="w-full max-w-3xl bg-white shadow-xl rounded-2xl p-8 flex flex-col items-center justify-center"
-        style={{ minHeight: "calc(100vh - 110px)" }}
-      >
+      <div className="recommon-card" style={{ justifyContent: "center" }}>
         <p>題目載入中，請稍候...</p>
       </div>
     );
@@ -208,10 +205,7 @@ export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
 
   if (loadError || questionList.length === 0) {
     return (
-      <div
-        className="w-full max-w-3xl bg-white shadow-xl rounded-2xl p-8 flex flex-col items-center justify-center"
-        style={{ minHeight: "calc(100vh - 110px)" }}
-      >
+      <div className="recommon-card" style={{ justifyContent: "center" }}>
         <p>{loadError || "目前沒有可用的題目，請稍後再試。"}</p>
       </div>
     );
@@ -224,10 +218,7 @@ export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
   // 離開出口。是否應該改成「跳過這一題」由產品決定，這裡先不臆測。
   if (!QUESTION_COMPONENTS[currentQuestion.type]) {
     return (
-      <div
-        className="w-full max-w-3xl bg-white shadow-xl rounded-2xl p-8 flex flex-col items-center justify-center"
-        style={{ minHeight: "calc(100vh - 110px)" }}
-      >
+      <div className="recommon-card" style={{ justifyContent: "center" }}>
         <p>這一題的題型暫時無法顯示，請返回測驗選單重新開始。</p>
         <button type="button" className="custom-btn mt-3" onClick={() => navigate("..")}>
           返回測驗選單
@@ -237,13 +228,10 @@ export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
   }
 
   return (
-    <div
-      className="w-full max-w-3xl bg-white shadow-xl rounded-2xl p-8 flex flex-col items-center"
-      style={{ minHeight: "calc(100vh - 110px)" }}
-    >
+    <div className="recommon-card">
       {/* 進度條 */}
       <div
-        className="w-full self-stretch bg-gray-200 rounded-full h-3 mb-4 overflow-hidden"
+        className="recommon-progress"
         role="progressbar"
         aria-label="作答進度"
         aria-valuemin="0"
@@ -251,17 +239,17 @@ export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
         aria-valuenow={current + 1}
       >
         <div
-          className="bg-green-500 h-3 transition-[width] duration-500"
+          className="recommon-progress-fill"
           style={{ width: `${((current + 1) / questionList.length) * 100}%` }}
         />
       </div>
 
-      <h6 className="text-sm text-gray-600 mb-2 text-center">
+      <h6 className="recommon-step-label">
         第 {current + 1} / {questionList.length} 題
       </h6>
 
       {saveWarning && (
-        <p className="quiz-recommon-save-warning" role="alert" style={{ color: '#d32f2f', textAlign: 'center', marginBottom: '8px' }}>
+        <p className="quiz-recommon-save-warning" role="alert">
           {saveWarning}
         </p>
       )}

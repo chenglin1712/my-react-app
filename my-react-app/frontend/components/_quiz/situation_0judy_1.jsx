@@ -48,8 +48,8 @@ const SituationSummary = ({ summary, radarData }) => {
                 key={i}
                 size={18}
                 strokeWidth={2}
-                fill={i < difficultyLevel ? "#F4C430" : "none"}
-                color="#F4C430"
+                fill={i < difficultyLevel ? "#D9A227" : "none"}
+                color="#D9A227"
                 style={{ marginRight: "4px" }}
               />
             ))}
@@ -68,27 +68,27 @@ const SituationSummary = ({ summary, radarData }) => {
       <div className="summary-radar">
         <ResponsiveContainer width="100%" height={350}>
           <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
-            <PolarGrid stroke="#f4c7c3" />
+            <PolarGrid stroke="#EFE1C4" />
             <PolarAngleAxis
               dataKey="category"
-              tick={{ fill: "#1f2937", fontSize: 14 }}
+              tick={{ fill: "#221812", fontSize: 14 }}
             />
             <PolarRadiusAxis domain={[0, 100]} ticks={ticks} tick={renderRadiusTick} axisLine={false} />
             <Tooltip
               contentStyle={{
                 backgroundColor: "#ffffff",
                 borderRadius: 8,
-                border: "1px solid #e5e7eb",
+                border: "2px solid #221812",
                 fontSize: 14,
-                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+                boxShadow: "3px 3px 0 #221812",
               }}
-              labelStyle={{ color: "#1f2937", fontWeight: 600 }}
+              labelStyle={{ color: "#221812", fontWeight: 600 }}
             />
             <Radar
               name="分數"
               dataKey="score"
-              stroke="#9B1B30"
-              fill="#9B1B30"
+              stroke="#9E1B24"
+              fill="#9E1B24"
               fillOpacity={0.3}
               strokeWidth={2}
             />
