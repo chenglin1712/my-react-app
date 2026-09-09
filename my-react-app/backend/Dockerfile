@@ -41,9 +41,11 @@ WORKDIR /app
 # 直接 `pip install -r requirements.txt` 會嘗試從預設 PyPI index 抓，可能抓到
 # 不對的 build 或抓不到（requirements.txt 開頭也有同樣的註解）。
 COPY requirements.txt .
-RUN pip install --no-cache-dir \
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir \
         torch==2.10.0 torchaudio==2.10.0 torchvision==0.25.0 \
         --index-url https://download.pytorch.org/whl/cpu \
+        --extra-index-url https://pypi.org/simple \
     && pip install --no-cache-dir -r requirements.txt
 
 # 複製 backend/ 原始碼。Django 與 FastAPI 都是以 backend/ 當 Python root
