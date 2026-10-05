@@ -10,7 +10,7 @@ from fastAPI import game_config, rate_limit_config
 from fastAPI.rate_limit import limiter
 
 from . import model
-from .audio_fetch import _is_allowed_reference_url, fetch_audio_from_id
+from .audio_fetch import _is_allowed_reference_url, download_reference_audio, fetch_audio_from_id
 from .model import bytes_to_tensor, convert_to_wav, get_wav2vec2, _get_embedding, _score_from_bytes
 
 import httpx
@@ -29,7 +29,7 @@ def make_error(step: str, msg: str):
 
 
 @router.post("/compare_audio/")
-@limiter.limit(lambda: rate_limit_config.get_configured_rate("quiz_compare_audio", "20/minute"))  # CPU 密集的 wav2vec2 推論 + 對外下載，每用戶每分鐘最多 20 次（後台可調）
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("quiz_compare_audio", "20/minute"))  # CPU 密集的 wav2vec2 推論 + 對外下載，每位使用者每分鐘最多 20 次（後台可調）
 async def compare_audio(
     request: Request,
     user_audio: UploadFile = File(...),
@@ -110,10 +110,11 @@ async def compare_audio(
                     if not _is_allowed_reference_url(url):
                         continue
                     try:
-                        resp = await client.get(url)
-                        if resp.is_redirect:
+                        # 參考音檔大小上限比照使用者錄音（見 download_reference_audio 說明）
+                        ref_bytes = await download_reference_audio(client, url, max_audio_bytes)
+                        if ref_bytes is None:
                             continue
-                        ref_score = await asyncio.to_thread(_score_from_bytes, wav2vec2_model, user_emb, resp.content)
+                        ref_score = await asyncio.to_thread(_score_from_bytes, wav2vec2_model, user_emb, ref_bytes)
                         if best_ref_score is None or ref_score > best_ref_score:
                             best_ref_score = ref_score
                     except Exception:

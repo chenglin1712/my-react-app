@@ -48,6 +48,13 @@ RUN pip install --no-cache-dir --upgrade pip \
         --extra-index-url https://pypi.org/simple \
     && pip install --no-cache-dir -r requirements.txt
 
+# 發音比對的 wav2vec2 權重在 build 階段就下載進 image（TORCH_HOME 固定路徑，
+# 不隨執行身分改變）。原本是第一次請求才下載：第一位使用者要等很久，容器無外網或
+# 下載來源故障時，部署看起來成功、發音功能卻實際不可用。build 當下下載失敗會直接
+# 讓建置失敗，問題在部署前就曝光。
+ENV TORCH_HOME=/opt/torch
+RUN python -c "import torchaudio; torchaudio.pipelines.WAV2VEC2_BASE.get_model()"
+
 # 複製 backend/ 原始碼。Django 與 FastAPI 都是以 backend/ 當 Python root
 # （FastAPI 用 `from fastAPI.routes...`、`from config...` 這種絕對 import），
 # 所以 WORKDIR 要停在 backend/，跟 CI（`working-directory: backend`）、

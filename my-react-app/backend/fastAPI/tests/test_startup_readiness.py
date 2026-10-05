@@ -80,3 +80,45 @@ def test_shutdown_does_not_block_on_still_running_warm_thread():
             pass
         elapsed = time.monotonic() - start
     assert elapsed < 2
+
+
+def test_ready_requires_pronunciation_model_when_preload_enabled():
+    """PRELOAD_PRONUNCIATION_MODEL 開啟時，模型載入失敗要讓 /ready 維持 503
+    （原本模型是第一次請求才懶載入，下載失敗時 /ready 仍回 200）。"""
+    import time
+
+    for scenario, side_effect, expected_status in (("成功", None, 200), ("失敗", RuntimeError("download failed"), 503)):
+        with patch.object(main_module, "_WARM_CACHE_JITTER_MAX_SECONDS", 0), \
+             patch.object(main_module, "_PRELOAD_PRONUNCIATION_MODEL", True), \
+             patch.object(main_module.pronunciation_model, "get_wav2vec2", side_effect=side_effect), \
+             patch.object(main_module.listening, "warm_cache"), \
+             patch.object(main_module.sentence, "warm_cache"), \
+             patch.object(main_module.quiz, "warm_cache"), \
+             patch.object(main_module.dictionary, "warm_cache"):
+            with TestClient(main_module.app) as client:
+                for _ in range(100):
+                    if getattr(client.app.state, "caches_warm", False):
+                        break
+                    time.sleep(0.05)
+                response = client.get("/ready")
+        assert response.status_code == expected_status, scenario
+
+
+def test_ready_ignores_pronunciation_model_when_preload_disabled():
+    """預設（本機開發、測試）不預載模型，/ready 不受影響。"""
+    with patch.object(main_module, "_WARM_CACHE_JITTER_MAX_SECONDS", 0), \
+         patch.object(main_module, "_PRELOAD_PRONUNCIATION_MODEL", False), \
+         patch.object(main_module.pronunciation_model, "get_wav2vec2", side_effect=AssertionError("不該被呼叫")) as loader, \
+         patch.object(main_module.listening, "warm_cache"), \
+         patch.object(main_module.sentence, "warm_cache"), \
+         patch.object(main_module.quiz, "warm_cache"), \
+         patch.object(main_module.dictionary, "warm_cache"):
+        with TestClient(main_module.app) as client:
+            import time
+            for _ in range(100):
+                if getattr(client.app.state, "caches_warm", False):
+                    break
+                time.sleep(0.05)
+            response = client.get("/ready")
+    assert response.status_code == 200
+    loader.assert_not_called()

@@ -50,6 +50,30 @@ def _lookup_verified_audio_url(audio_id: str):
         db.close()
 
 
+async def download_reference_audio(client: httpx.AsyncClient, url: str, max_bytes: int):
+    """下載單一真人參考音檔，回傳 bytes；被重導向、HTTP 狀態非 200 或內容超過
+    max_bytes 時回傳 None（呼叫端把這份參考音檔略過即可）。
+
+    原本直接 `resp.content` 把整份回應讀進記憶體，10 MB 上限只套用在使用者上傳的
+    user_audio，參考音檔完全沒有大小限制：登入者能提供最多 5 個合法的 Firebase
+    Storage 網址指向超大物件，讓服務逐一下載、解碼，耗盡記憶體與 CPU。改成串流，
+    先看 Content-Length，再邊讀邊計數，超過上限就立刻中斷、不繼續下載。"""
+    async with client.stream("GET", url) as resp:
+        if resp.is_redirect or resp.status_code != 200:
+            return None
+        declared = resp.headers.get("content-length")
+        if declared and declared.isdigit() and int(declared) > max_bytes:
+            return None
+        chunks = []
+        total = 0
+        async for chunk in resp.aiter_bytes():
+            total += len(chunk)
+            if total > max_bytes:
+                return None
+            chunks.append(chunk)
+        return b"".join(chunks)
+
+
 def fetch_audio_from_id(audio_id: str):
     # P5 辭典媒體自主化：發音比對功能每次使用者錄音都要抓一次官方音檔，使用
     # 頻率遠高於單純播放——優先用自己 Storage 的已驗證副本，不用每次都跟

@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from .routes import crawler, vision, dictionary, quiz, listening, sentence, auth, internal, translation
+from .routes.pronunciation import model as pronunciation_model
 from dictionary_db.connect import SessionLocal
 from .rate_limit import limiter
 from fastapi.middleware.cors import CORSMiddleware
@@ -55,6 +56,13 @@ init_sentry(_fastapi_sentry_integrations)
 # 單一 process 時不需要）。
 _WARM_CACHE_JITTER_MAX_SECONDS = float(os.getenv("WARM_CACHE_JITTER_MAX_SECONDS", "5"))
 
+# 發音比對用的 wav2vec2 模型原本是第一次請求才懶載入（下載權重 + 初始化），第一位
+# 使用者要等很久，模型下載失敗時 /ready 也照樣回 200。PRELOAD_PRONUNCIATION_MODEL=true
+# 時改成啟動時在背景預熱就載入，並讓 /ready 把「模型載入成功」納入就緒條件。
+# 預設關閉：本機開發、測試不會因此去下載數百 MB 的權重；正式環境在
+# docker-compose.prod.yml 打開。
+_PRELOAD_PRONUNCIATION_MODEL = os.getenv("PRELOAD_PRONUNCIATION_MODEL", "false").lower() == "true"
+
 
 def _warm_caches(app: FastAPI):
     """listening/sentence/quiz/dictionary 都用「第一次請求時全表掃描一次、之後吃快取」的策略，
@@ -85,12 +93,21 @@ def _warm_caches(app: FastAPI):
                 logger.exception("%s 快取預熱失敗", name)
     finally:
         db.close()
+
+    if _PRELOAD_PRONUNCIATION_MODEL:
+        try:
+            pronunciation_model.get_wav2vec2()
+            app.state.pronunciation_model_ready = True
+        except Exception:
+            app.state.pronunciation_model_ready = False
+            logger.exception("發音比對模型預載失敗，/ready 會維持 503")
     app.state.caches_warm = True
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.caches_warm = False
+    app.state.pronunciation_model_ready = not _PRELOAD_PRONUNCIATION_MODEL
     warm_thread = threading.Thread(target=_warm_caches, args=(app,), daemon=True)
     warm_thread.start()
     try:
@@ -176,7 +193,7 @@ def readiness_check():
     balancer 可以選擇在「process 活著但還沒真正準備好」的這段期間暫緩導
     流量進來，不需要讓冷啟動當下最早幾個使用者請求承擔全表掃描的延遲
     （P4 review BE-24）。不需要登入，跟 /health 同一種公開探測端點性質。"""
-    ready = getattr(app.state, "caches_warm", False)
+    ready = getattr(app.state, "caches_warm", False) and getattr(app.state, "pronunciation_model_ready", True)
     return JSONResponse({"ready": ready}, status_code=200 if ready else 503)
 
 
