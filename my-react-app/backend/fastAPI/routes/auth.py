@@ -32,7 +32,7 @@ async def verify_firebase_token(request: Request, authorization: str = Header(de
     對整個 router 底下的所有端點生效，不需逐一修改每個函式簽名。
 
     順便把解出來的使用者資料存進 request.state.user，讓 slowapi 的
-    key_func（main.py 的 _rate_limit_key）可以依 uid 做每用戶速率限制，
+    key_func（main.py 的 _rate_limit_key）可以依 uid 做每位使用者速率限制，
     不必再解一次 token。
     """
     if _auth_dev_bypass():

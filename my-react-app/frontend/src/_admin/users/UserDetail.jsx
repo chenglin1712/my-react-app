@@ -113,7 +113,7 @@ export default function UserDetail() {
   const uidRef = useRef(uid);
 
   // uid 改變（同一個路由元件被重用，不會重新掛載）時：
-  // 1. 強制關閉三個 Modal——Modal 開著時换到別的使用者，裡面還留著前一位
+  // 1. 強制關閉三個 Modal——Modal 開著時換到別的使用者，裡面還留著前一位
   //    使用者編輯到一半的表單，繼續送出會把前一位的資料寫進現在這個 uid。
   //    條件渲染本身會讓 Modal 卸載，表單狀態自然歸零，不需要額外用 key
   //    重掛載。

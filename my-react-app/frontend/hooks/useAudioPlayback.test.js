@@ -83,7 +83,7 @@ describe('useAudioPlayback.playAudio 世代防呆', () => {
     await act(async () => {
       await result.current.playAudio('wordA');
     });
-    // A 的 play() 还卡著，模擬還在播放中
+    // A 的 play() 還卡著，模擬還在播放中
 
     await act(async () => {
       await result.current.playAudio('wordB');

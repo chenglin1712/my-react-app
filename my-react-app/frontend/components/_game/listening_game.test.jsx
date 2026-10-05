@@ -52,7 +52,7 @@ describe('ListeningGame（回歸測試：原本 1.4 秒的計時器沒有清理�
     await startGame(user);
 
     // fireEvent 在同一個 tick 內連續觸發，比 userEvent.click 更接近「同一批次
-    // 內两次呼叫」的情境
+    // 內兩次呼叫」的情境
     const { fireEvent } = await import('@testing-library/react');
     fireEvent.click(screen.getByRole('button', { name: '真的' }));
     fireEvent.click(screen.getByRole('button', { name: '假的' }));

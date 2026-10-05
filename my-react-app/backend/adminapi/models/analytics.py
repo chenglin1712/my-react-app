@@ -15,7 +15,7 @@ class UsageEvent(models.Model):
         寫入 Django migration 管理的 Postgres 表，跟既有 dictionary_db（Django
         的 adminapi 用原生 SQLAlchemy session 直接寫進一個不是它自己 migration
         管理的 Postgres 表）是同一種「兩個服務共用同一個 Postgres 執行個體、
-        各自用最適合自己框架的方式直接存取」精神，只是方向相反。**因此这张表
+        各自用最適合自己框架的方式直接存取」精神，只是方向相反。**因此這張表
         的欄位一旦異動，backend/fastAPI/usage_events.py 裡手動組的 INSERT 語句
         要記得同步更新**，兩邊沒有共用的 schema 定義來源。
 

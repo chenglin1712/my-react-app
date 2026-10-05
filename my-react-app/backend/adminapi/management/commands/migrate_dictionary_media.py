@@ -48,7 +48,7 @@ nullable media_asset_id FK），原始 file_id／image_url／word_img 完全不�
 的唯一鍵，重跑同一批只會跳過已經 verified 的項目。同一個 locator 被多筆
 來源列引用時（explanation_image 540 筆裡有 136 筆是重複 URL），同一次執行
 內只下載/上傳一次，完成後一次回填所有引用它的來源列（見 asset_repository.py
-的 _list_candidates 的 groupby）。程序中途被中斷（Ctrl+C／當機）留在
+的 _list_candidates 的 groupby）。程式中途被中斷（Ctrl+C／當機）留在
 downloading 狀態的項目，10 分鐘後視為卡住，下次執行會自動重新認領——這裡
 刻意不做 asyncio 訊號式的優雅關閉（Windows 的 ProactorEventLoop 對 SIGINT
 訊號處理本來就不可靠），改用這個 staleness recovery 達到「安全中斷、之後

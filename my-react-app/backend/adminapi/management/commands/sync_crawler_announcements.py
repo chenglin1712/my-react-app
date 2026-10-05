@@ -3,7 +3,7 @@
 用法：
     python manage.py sync_crawler_announcements
 
-這支指令存在的目的是當「排程觸發」的接口——目前專案沒有 Celery/cron 這類
+這支指令存在的目的是當「排程觸發」的介面——目前專案沒有 Celery/cron 這類
 排程基礎設施，部署平台也還沒定案（見 docker-compose.yml 的說明），與其現在
 就選一套排程方案，不如先把同步邏輯包成一個不依賴 HTTP request 的指令，之後
 不管是本機 Windows工作排程器、或正式環境的 Render/Cloud Run Cron Job，都只

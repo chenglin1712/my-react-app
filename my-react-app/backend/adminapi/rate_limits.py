@@ -38,7 +38,7 @@ def get_configured_rate(key: str, default: str) -> str:
         rate = RateLimitRule.objects.filter(key=key).values_list("rate", flat=True).first()
     except Exception:
         # 資料庫暫時連不上／migration 還沒跑到這張表時，不能讓限流檢查本身
-        # 变成 500——安全退回呼叫端原本寫死的值，不快取這次查詢失敗的結果
+        # 變成 500——安全退回呼叫端原本寫死的值，不快取這次查詢失敗的結果
         # （下次請求就有機會正常查到，不用等 TTL 過期）。
         return default
 

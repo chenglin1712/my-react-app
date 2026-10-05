@@ -59,7 +59,7 @@ rebuild_translation_attested_forms.py）在部署後手動執行填入。
 全新、空的 SQLite 檔案執行 alembic upgrade head」開發模式）不支援 pg_trgm，
 這裡用 bind.dialect.name 判斷，Postgres 專屬的 extension／運算式索引只在
 postgresql dialect 下建立；translation_attested_form 這張表的 schema 是
-dialect 中立的 DDL，兩邊都會建（表本身用得到，只是 SQLite 環境下沒有资料，
+dialect 中立的 DDL，兩邊都會建（表本身用得到，只是 SQLite 環境下沒有資料，
 因為填表的 management command 一樣要 Postgres 的模糊比對能力才有意義去跑）。
 翻譯功能本身在偵測到目前連線不是 Postgres 時，於第一次被呼叫時才回明確的
 錯誤（比照 AIModel/views.py::_get_client 缺 GITHUB_TOKEN 時的 lazy check

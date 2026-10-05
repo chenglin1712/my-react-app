@@ -102,8 +102,8 @@ handler500 = "core.error_views.json_500"
 
 class SentryInitTest(TestCase):
     """core/settings.py 的 Sentry 初始化本身沒有測試覆蓋。settings.py 是 process
-    啟動時只載入一次的模組，沒辦法在同一個測試進程裡乾淨地用不同的 SENTRY_DSN
-    重新載入，所以改用子進程跑 manage.py check 驗證：有無設定 SENTRY_DSN 都不能
+    啟動時只載入一次的模組，沒辦法在同一個測試行程裡乾淨地用不同的 SENTRY_DSN
+    重新載入，所以改用子行程跑 manage.py check 驗證：有無設定 SENTRY_DSN 都不能
     讓 Django 啟動失敗（見 Round 6 手動驗證過的行為，這裡把它變成自動化迴歸測試）。
     """
 
@@ -136,7 +136,7 @@ class CsrfTrustedOriginsBlankEnvTest(TestCase):
     生效——.env 裡寫 CSRF_TRUSTED_ORIGINS=（有這一行、值是空字串，.env.example
     就是留空當範本）一樣算「有出現」，會直接把內建的本機開發預設值蓋掉變成空
     清單。settings.py 是 process 啟動時才算一次的模組層級程式碼，沒辦法在同一個
-    測試進程裡乾淨地用不同的環境變數重新載入，改用子進程實際驗證這個情境。
+    測試行程裡乾淨地用不同的環境變數重新載入，改用子行程實際驗證這個情境。
     """
 
     def test_blank_csrf_trusted_origins_falls_back_to_default(self):

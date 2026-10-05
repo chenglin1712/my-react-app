@@ -18,7 +18,7 @@ class UserStatsSerializer(serializers.Serializer):
     correct = serializers.IntegerField(min_value=0, max_value=100000, default=0)
     incorrect = serializers.IntegerField(min_value=0, max_value=100000, default=0)
     unanswered = serializers.IntegerField(min_value=0, max_value=100000, default=0)
-    # 前端最多帶 3 筆最常錯的詞（見 bot.jsx），這裡放寬到 20 筆但设上限，避免
+    # 前端最多帶 3 筆最常錯的詞（見 bot.jsx），這裡放寬到 20 筆但設上限，避免
     # 惡意呼叫端塞入超大陣列。
     common_errors = serializers.ListField(
         child=serializers.CharField(max_length=100, allow_blank=True),

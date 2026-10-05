@@ -44,7 +44,7 @@
 }
 
 .area-inputgrid {
-    position: absolute; /* 設置為絕對定位 */
+    position: absolute; /* 設定為絕對定位 */
     width: 100%;
     height: 100%;
     text-align: center;

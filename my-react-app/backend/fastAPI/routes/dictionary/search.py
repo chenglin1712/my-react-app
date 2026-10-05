@@ -283,7 +283,7 @@ def _call_with_own_session(fn, *args, **kwargs):
     多加一個並行操作，或 middleware 改動了時序，就可能在毫無警訊的情況下
     出現資料錯亂或例外。
 
-    改成每次呼叫都在真正執行查詢的 thread 裡自己開一個新 Session、执行完
+    改成每次呼叫都在真正執行查詢的 thread 裡自己開一個新 Session、執行完
     自己關掉，Session 的生命週期完全侷限在單一 thread 內，不再跨 thread
     傳遞。三個端點因此不再需要 `Depends(get_db)`，也就不會為了這幾個
     唯讀查詢多開一個從來沒在對的 thread 上用過的 Session。"""
@@ -316,7 +316,7 @@ def _search_multi_words(db: Session, words: List[str], tribe_name: str) -> Tuple
 
 
 @router.post("/keys/")
-@limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_search_multiword", "60/minute"))  # 全表掃描（走快取），每用戶每分鐘最多 60 次避免大量請求造成壓力
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_search_multiword", "60/minute"))  # 全表掃描（走快取），每位使用者每分鐘最多 60 次避免大量請求造成壓力
 async def search_tayal_dictionary(request: Request, body: MultiWordSearchRequest):
     """多關鍵字搜尋
 
@@ -346,7 +346,7 @@ async def search_tayal_dictionary(request: Request, body: MultiWordSearchRequest
 
 
 @router.post("/all/")
-@limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_search_all_words", "60/minute"))  # 全表掃描（走快取），每用戶每分鐘最多 60 次避免 fetchAllWords 大量請求造成壓力
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_search_all_words", "60/minute"))  # 全表掃描（走快取），每位使用者每分鐘最多 60 次避免 fetchAllWords 大量請求造成壓力
 async def all_tayal_dictionary(request: Request, body: AllWordsRequest):
     """查詢所有詞條。可選傳入 letter/frequency/category/favorites_only(+favorite_names)/
     sort_order 做篩選與排序，並用 limit/offset 做分頁；都不傳則維持原本回傳全部

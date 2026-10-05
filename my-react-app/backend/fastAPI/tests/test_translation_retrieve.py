@@ -80,7 +80,7 @@ class TestCorroborateTokensMultiWord:
         assert spans[0].status == "unsupported"
 
     def test_window_respects_max_window_argument(self):
-        # max_window=1 时应该只比对单一 token，不该产生跨 2 词以上的候选片语。
+        # max_window=1 時應該只比對單一 token，不該產生跨 2 詞以上的候選片语。
         headwords = {"a b": _word("a b")}
         with patch.object(R, "lookup_headwords_batch", return_value={}) as mock_hw, \
              patch.object(R, "lookup_attested_batch", return_value={}):

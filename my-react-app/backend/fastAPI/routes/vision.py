@@ -121,7 +121,7 @@ def translate_labels(descriptions: list[str]) -> dict[str, str | None]:
 
 
 @router.post("/analyze_image/")
-@limiter.limit(lambda: rate_limit_config.get_configured_rate("vision_analyze_image", "10/minute"))  # 呼叫付費 Google Cloud Vision API，每用戶每分鐘最多 10 次（後台可調，見 rate_limit_config.py）
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("vision_analyze_image", "10/minute"))  # 呼叫付費 Google Cloud Vision API，每位使用者每分鐘最多 10 次（後台可調，見 rate_limit_config.py）
 async def analyze_image(request: Request):
     # 這裡不再自己包一層 `except Exception: log + raise HTTPException(500,...)`
     # 收尾（P4 review BE-28：這段樣板在 vision.py／quiz/api.py／

@@ -22,7 +22,7 @@ export function useSharedNotesPager(filter, myUid) {
 
   // 快速切換 tab／連續翻頁時，較慢的舊請求可能比新請求晚回來——generation
   // 讓每次呼叫記住「我是不是當下最新的那一次」，舊的回應到達時就直接丟棄，
-  // 不覆蓋畫面已經顯示的新結果（page 與 count 是兩條獨立的請求，各自记一個）。
+  // 不覆蓋畫面已經顯示的新結果（page 與 count 是兩條獨立的請求，各自記一個）。
   const pageGenerationRef = useRef(0);
   const countGenerationRef = useRef(0);
 
