@@ -1,24 +1,63 @@
+# 正式環境（單機、network_mode: host）。部署流程見 deploy.sh（含健康檢查與回滾）。
+#
+# image 名稱固定：deploy.sh 在重建前把目前的 image 標成 :prev，新版本沒通過健康檢查
+# 時用它切回上一版。沒有固定名稱的話，compose 每次重建都會讓舊 image 變成沒有標籤
+# 的懸空 image，隨即被 `docker image prune` 清掉，沒有東西可以回滾。
 services:
   django:
     build:
       context: .
       dockerfile: backend/Dockerfile
+    image: yuanyu-django:latest
     env_file: [.env]
+    environment:
+      # DATABASE_URL 漏設時啟動失敗，不要靜默退回容器內的 SQLite（見 core/settings.py）
+      REQUIRE_DATABASE_URL: "true"
     network_mode: host
     command: sh -c "python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn core.wsgi:application --workers 3 --bind 127.0.0.1:8000"
     volumes:
       - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
       - ./logs:/app/logs
+    # /health/ 會實際探測資料庫與 cache（見 backend/core/views.py）。X-Forwarded-Proto
+    # 讓 SECURE_SSL_REDIRECT 不要把這個本機 HTTP 探測轉成 301。回 503 時 urlopen 會丟
+    # 例外、指令以非 0 結束。
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8000/health/', headers={'X-Forwarded-Proto': 'https'}), timeout=4)"
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 90s
     restart: unless-stopped
 
   fastapi:
     build:
       context: .
       dockerfile: backend/Dockerfile
+    image: yuanyu-fastapi:latest
     env_file: [.env]
+    environment:
+      REQUIRE_DATABASE_URL: "true"
+      # 啟動時就載入發音比對模型，並讓 /ready 把它納入就緒條件（見 fastAPI/main.py）
+      PRELOAD_PRONUNCIATION_MODEL: "true"
     network_mode: host
     command: sh -c "cd fastAPI && alembic upgrade head && cd .. && uvicorn fastAPI.main:app --host 127.0.0.1 --port 8001"
     volumes:
       - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
       - ./logs:/app/logs
+    # 用 /ready 而不是 /health：快取與模型預熱完成前回 503，部署腳本等到「真的準備好」
+    # 才算成功。預熱需要全表掃描與載入模型，start_period 給得寬鬆。
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request as u; u.urlopen('http://127.0.0.1:8001/ready', timeout=4)"
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 180s
     restart: unless-stopped

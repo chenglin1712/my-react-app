@@ -61,3 +61,7 @@ imported_credentials_*.txt
 *.bat
 .env.bak-original
 .env.bak-*
+
+# 資料庫備份（deploy/backup.sh 產生，內含正式資料，不可進版控）
+backups/
+dist.prev/

@@ -1,0 +1,3 @@
+# 部署腳本一律用 LF：在 Windows 以 CRLF 簽出再複製到 Linux 伺服器時，
+# bash 會把行尾的 CR 當成指令的一部分而失敗。
+*.sh text eol=lf
