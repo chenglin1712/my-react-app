@@ -8,7 +8,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['firestore.rules.test.js'],
+    include: ['firestore.rules.test.js', 'storage.rules.test.js'],
     hookTimeout: 30000,
     testTimeout: 15000,
   },

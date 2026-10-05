@@ -1,0 +1,46 @@
+rules_version = '2';
+
+// Firebase Storage 安全規則【草案，尚未部署】。
+//
+// 狀態：這份檔案只供審閱與測試（storage.rules.test.js，經由 firebase.rules-test.json 在
+// 模擬器執行）。它沒有寫進 firebase.json，所以 `firebase deploy` 不會把它部署出去；
+// Firebase Console 上實際生效的 Storage 規則維持不變。要啟用時必須先確認現有規則沒有
+// 其他用途會被這份規則擋掉，再由人明確決定部署（見 deploy/README.md）。
+//
+// 專案裡唯一由「前端直接」寫入 Storage 的地方是發音遊戲的使用者錄音
+// （frontend/components/_game/pronunciation/pronunciationRecordingService.js 的
+// uploadRecording）：路徑為 pronunciations/{tribe}/{encodeURIComponent(word)}/
+// {uuid}_{uid}.webm、contentType 固定 audio/webm。在這份規則出現之前，repo 裡沒有
+// 任何版本化的 Storage 規則，實際權限完全取決於 Firebase Console 上看不到、也
+// 無法審核的狀態：寬鬆時任何人可寫入任意路徑與大小的檔案，收緊時錄音功能又會壞。
+//
+// 後端（Firebase Admin SDK）不受這份規則限制，審核下架／帳號刪除時刪除物件不需要
+// 在這裡開放 delete。前端取得的 getDownloadURL() 是帶 token 的網址，不經過 read
+// 規則；下面的 read 只管 SDK 直接讀取。
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    match /pronunciations/{tribe}/{word}/{file} {
+      allow read: if request.auth != null;
+
+      // 只能建立、不能覆寫或刪除（resource == null 明確要求物件尚不存在，不依賴
+      // create／update 的判定細節）：檔名結尾必須是本人 uid（uploadRecording 的命名
+      // 慣例），擋掉用別人的 uid 上傳；型別與大小上限比照後端 PRONUNCIATION_MAX_AUDIO_MB
+      // 的 10 MB。
+      allow create: if request.auth != null
+        && resource == null
+        && tribe in ['tayal', 'amis', 'bunun', 'kavalan', 'paiwan']
+        && file.matches('.+_' + request.auth.uid + '[.]webm')
+        && request.resource.contentType == 'audio/webm'
+        && request.resource.size > 0
+        && request.resource.size <= 10 * 1024 * 1024;
+
+      allow update, delete: if false;
+    }
+
+    // 其餘路徑一律拒絕（預設拒絕）。
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

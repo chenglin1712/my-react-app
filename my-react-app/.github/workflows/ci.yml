@@ -44,7 +44,22 @@ jobs:
       # 原本 CI 完全沒有涵蓋 firestore.rules，規則被不小心改壞（例如 sharedNotes
       # 的作者身份檢查被拿掉）語法上仍然合法，只有實際跑一次讀寫才抓得到。
       # emulators:exec 會自動啟動模擬器、跑完測試後關掉，不需要額外手動起停。
-      - run: npx firebase emulators:exec --only firestore "npm run test:rules"
+      - run: npx firebase emulators:exec --config firebase.rules-test.json --only firestore,storage --project yuanyu-app-rules-test "npm run test:rules"
+
+  deploy-scripts:
+    name: Deploy scripts (behavior tests / compose config)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # deploy.sh 與 deploy/backup.sh 是正式環境唯一的部署與備份入口，改壞了只有部署當下
+      # 才會發現。test_deploy.sh 用假的 docker／git／curl／pg_dump 跑過成功、自動回滾、
+      # .env 防呆、備份失敗中止、代理檢查等每條路徑，不需要真的 docker。
+      - run: bash -n deploy.sh && bash -n deploy/backup.sh
+      - run: bash deploy/test_deploy.sh
+
+      # compose 檔語法與變數替換是否正確。env_file 需要檔案存在，給空檔即可。
+      - run: touch .env serviceAccountKey.json && docker compose -f docker-compose.prod.yml config -q
 
   backend:
     name: Backend (Django + FastAPI tests)

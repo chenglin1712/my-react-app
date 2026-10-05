@@ -176,7 +176,7 @@ const DateReminder = () => {
             <div className="circle top-right"></div>
             <div className="circle bottom-left"></div>
 
-            <div className="content">
+            <div className="date-reminder-content">
                 <div className="reset-reminders">
                     <Button variant="outline-danger" onClick={handleResetNotifications}><Bell /> 開啟通知</Button>
                 </div>
