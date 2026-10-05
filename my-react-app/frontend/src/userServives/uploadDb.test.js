@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { addDoc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { addDoc, getDoc, setDoc, updateDoc, runTransaction } from 'firebase/firestore';
 import { uploadQuizDB, uploadSituationDB, addCalendarEvent, addCalendarEvents, deleteCalendarEvent } from './uploadDb';
 
 /** firestore.rules 的 quizs read 規則允許任何登入使用者讀取，原本每題的
@@ -18,6 +18,13 @@ vi.mock('firebase/firestore', async (importOriginal) => {
     getDoc: vi.fn(),
     setDoc: vi.fn(),
     updateDoc: vi.fn(),
+    // 行事曆的讀改寫改包在 transaction 裡。測試用的假 transaction 直接轉呼叫既有的
+    // getDoc／setDoc／updateDoc mock，這樣下面針對「讀到什麼、寫回什麼」的斷言不用改。
+    runTransaction: vi.fn((_db, fn) => fn({
+      get: (ref) => getDoc(ref),
+      set: (ref, data) => setDoc(ref, data),
+      update: (ref, data) => updateDoc(ref, data),
+    })),
   };
 });
 
@@ -104,6 +111,7 @@ describe('addCalendarEvent／deleteCalendarEvent（calendar/{uid} 單一文件�
     getDoc.mockReset();
     setDoc.mockReset();
     updateDoc.mockReset();
+    runTransaction.mockClear();
   });
 
   test('未登入時新增行程會丟出例外，不會呼叫 Firestore', async () => {
@@ -159,6 +167,15 @@ describe('addCalendarEvent／deleteCalendarEvent（calendar/{uid} 單一文件�
     expect(updatedEvents[0]).toEqual({ id: 'old-1', summary: '舊行程' });
     expect(updatedEvents[1]).toMatchObject({ summary: '行程一' });
     expect(updatedEvents[2]).toMatchObject({ summary: '行程二' });
+  });
+
+  test('新增與刪除都在 transaction 內執行（回歸測試：原本兩個分頁同時編輯時後寫者會蓋掉先寫者）', async () => {
+    getDoc.mockResolvedValue({ exists: () => true, data: () => ({ events: [{ id: 'a' }] }) });
+
+    await addCalendarEvent({ summary: 'x' });
+    await deleteCalendarEvent('a');
+
+    expect(runTransaction).toHaveBeenCalledTimes(2);
   });
 
   test('未登入時刪除行程會丟出例外', async () => {

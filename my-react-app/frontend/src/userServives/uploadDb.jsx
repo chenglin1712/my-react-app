@@ -1,5 +1,5 @@
 import { db, auth } from "../../../firebase";
-import { collection, addDoc, serverTimestamp, query, where, doc, getDoc, getDocs, orderBy, setDoc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, where, doc, getDoc, getDocs, orderBy, runTransaction } from "firebase/firestore";
 import { TRIBE_FULL_NAME_BY_SLUG as TRIBE_NAME } from "../constants/tribes";
 
 //測驗題目存至資料庫
@@ -324,10 +324,10 @@ export const getCalendar = async () => {
 
 // 新增一筆或多筆行事曆事件。calendar/{uid} 是單一文件、events 是它裡面的
 // 一個陣列欄位（不是各自獨立的 Firestore 文件），所以「新增」實際上是讀出
-// 整個陣列、在記憶體加上新項目、整包寫回——跟 userServive.jsx 的
-// toggleFavoriteWord／updateUserErrors 同一套 read-modify-write 慣例，不是
-// 這裡另外發明的模式；多分頁／多裝置同時編輯有遺失更新的風險，這點兩者一致，
-// 這裡不特別處理。
+// 整個陣列、在記憶體加上新項目、整包寫回。這個「讀、改、寫」包在
+// runTransaction 裡：多分頁／多裝置同時編輯時，Firestore 偵測到文件已被改過會
+// 自動重讀並重跑，不會再有後寫者蓋掉先寫者、悄悄遺失事件的問題（回呼內只做
+// 讀、算、寫，因為可能被重跑多次）。
 //
 // 一次寫入多筆（addCalendarEvents）而不是讓呼叫端對每筆各自呼叫
 // addCalendarEvent 再用 Promise.all 平行送出：每次呼叫都是獨立的「整包讀出、
@@ -342,16 +342,19 @@ export const addCalendarEvents = async (events) => {
     if (!user) throw new Error("請先登入才能新增行程");
 
     const docRef = doc(db, "calendar", user.uid);
-    const docSnap = await getDoc(docRef);
-    const existingEvents = docSnap.exists() ? (docSnap.data().events || []) : [];
     const newEvents = events.map((event) => ({ ...event, id: crypto.randomUUID() }));
-    const updatedEvents = [...existingEvents, ...newEvents];
 
-    if (docSnap.exists()) {
-        await updateDoc(docRef, { events: updatedEvents });
-    } else {
-        await setDoc(docRef, { events: updatedEvents });
-    }
+    await runTransaction(db, async (tx) => {
+        const docSnap = await tx.get(docRef);
+        const existingEvents = docSnap.exists() ? (docSnap.data().events || []) : [];
+        const updatedEvents = [...existingEvents, ...newEvents];
+
+        if (docSnap.exists()) {
+            tx.update(docRef, { events: updatedEvents });
+        } else {
+            tx.set(docRef, { events: updatedEvents });
+        }
+    });
     return newEvents;
 };
 
@@ -360,16 +363,17 @@ export const addCalendarEvent = async (event) => {
     return savedEvent;
 };
 
-// 依 id 刪除一筆行事曆事件，同樣是整包讀出、過濾、寫回。
+// 依 id 刪除一筆行事曆事件，同樣在 transaction 內讀出、過濾、寫回。
 export const deleteCalendarEvent = async (eventId) => {
     const user = auth.currentUser;
     if (!user) throw new Error("請先登入才能刪除行程");
 
     const docRef = doc(db, "calendar", user.uid);
-    const docSnap = await getDoc(docRef);
-    if (!docSnap.exists()) return;
+    await runTransaction(db, async (tx) => {
+        const docSnap = await tx.get(docRef);
+        if (!docSnap.exists()) return;
 
-    const existingEvents = docSnap.data().events || [];
-    const updatedEvents = existingEvents.filter((e) => e.id !== eventId);
-    await updateDoc(docRef, { events: updatedEvents });
+        const existingEvents = docSnap.data().events || [];
+        tx.update(docRef, { events: existingEvents.filter((e) => e.id !== eventId) });
+    });
 };

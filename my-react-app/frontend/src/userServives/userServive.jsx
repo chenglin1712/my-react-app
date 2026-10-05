@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, runTransaction, increment, FieldPath } from "firebase/firestore";
 import { getDatabase, ref, onDisconnect, set, onValue, serverTimestamp } from "firebase/database";
 import { db, auth } from "../../../firebase";
 import { onAuthStateChanged, createUserWithEmailAndPassword } from "firebase/auth";
@@ -186,46 +186,52 @@ export const initUserFields = async (uid) => {
 export const toggleFavoriteWord = async (uid, wordTayal, favId = 1) => {
     try {
         const userRef = doc(db, "users", uid);
-        const userSnap = await getDoc(userRef);
+        // 用 transaction 包住「讀出 favorites → 改 → 整包寫回」：原本兩個分頁／裝置
+        // 同時收藏時，各自讀到同一份舊陣列，後寫回的那次會把先寫回的那次整個蓋掉。
+        // transaction 在文件被別處改過時會自動重讀、重跑這段函式，不會遺失更新。
+        // 回呼內只能做「讀、算、寫」，不要放有副作用的事（可能被重跑多次）。
+        await runTransaction(db, async (tx) => {
+            const userSnap = await tx.get(userRef);
 
-        if (!userSnap.exists()) {
-            throw new Error("使用者資料不存在");
-        }
-
-        const userData = userSnap.data();
-        const favorites = userData.favorites || [];
-
-        const updatedFavorites = favorites.map(fav => {
-            if (fav.id === favId) {
-                const content = Array.isArray(fav.content) ? fav.content : [];
-                const exists = content.includes(wordTayal);
-                const newContent = exists
-                    ? content.filter(w => w !== wordTayal)
-                    : [...content, wordTayal];
-                return { ...fav, content: newContent };
+            if (!userSnap.exists()) {
+                throw new Error("使用者資料不存在");
             }
-            return fav;
-        });
 
-        await updateDoc(userRef, { favorites: updatedFavorites });
+            const userData = userSnap.data();
+            const favorites = userData.favorites || [];
+
+            const updatedFavorites = favorites.map(fav => {
+                if (fav.id === favId) {
+                    const content = Array.isArray(fav.content) ? fav.content : [];
+                    const exists = content.includes(wordTayal);
+                    const newContent = exists
+                        ? content.filter(w => w !== wordTayal)
+                        : [...content, wordTayal];
+                    return { ...fav, content: newContent };
+                }
+                return fav;
+            });
+
+            tx.update(userRef, { favorites: updatedFavorites });
+        });
     } catch (err) {
         console.error("X 收藏寫入失敗：", err.message);
         throw err;
     }
 };
 
-export const updateUserErrors = async (uid, wordTayal, increment = 1) => {
+// 答錯次數用 Firestore 伺服器端的原子 increment()，不再「讀出整個 user_errors
+// map → 加一 → 整包寫回」：原本兩個分頁同時答錯會互相覆蓋、次數被低估，而這份
+// 統計會餵給 AI 助手做個人化建議。FieldPath 把單字當成單一欄位名稱，單字裡就算
+// 含有「.」也不會被誤解成巢狀路徑。
+export const updateUserErrors = async (uid, wordTayal, incrementBy = 1) => {
+  if (!wordTayal) return;
   try {
     const userRef = doc(db, "users", uid);
-    const userSnap = await getDoc(userRef);
-    if (!userSnap.exists()) return;
-
-    const userData = userSnap.data();
-    const errors = { ...(userData.user_errors || {}) };
-    errors[wordTayal] = (errors[wordTayal] || 0) + increment;
-
-    await updateDoc(userRef, { user_errors: errors });
+    await updateDoc(userRef, new FieldPath("user_errors", wordTayal), increment(incrementBy));
   } catch (err) {
+    // 使用者文件不存在時沒有東西可累加，維持原本「靜默略過」的行為
+    if (err?.code === "not-found") return;
     console.error("X 更新答錯次數失敗：", err.message);
   }
 };
