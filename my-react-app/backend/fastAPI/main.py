@@ -63,6 +63,26 @@ _WARM_CACHE_JITTER_MAX_SECONDS = float(os.getenv("WARM_CACHE_JITTER_MAX_SECONDS"
 # docker-compose.prod.yml 打開。
 _PRELOAD_PRONUNCIATION_MODEL = os.getenv("PRELOAD_PRONUNCIATION_MODEL", "false").lower() == "true"
 
+# 預載失敗時的有限次數重試（退避：2、4 秒…）。暫時性的失敗（讀檔偶發錯誤、記憶體壓力）
+# 不該讓 /ready 永久回 503，否則部署會被判失敗並回滾；真的壞掉（權重檔損毀）重試幾次仍會
+# 失敗，/ready 維持 503，部署照樣會被擋下，這是我們要的。
+_PRELOAD_ATTEMPTS = 3
+_PRELOAD_BACKOFF_SECONDS = 2.0
+
+
+def _preload_pronunciation_model() -> bool:
+    """載入發音比對模型；成功回 True，重試用盡仍失敗回 False。"""
+    for attempt in range(1, _PRELOAD_ATTEMPTS + 1):
+        try:
+            pronunciation_model.get_wav2vec2()
+            return True
+        except Exception:
+            logger.exception("發音比對模型預載失敗（第 %d／%d 次）", attempt, _PRELOAD_ATTEMPTS)
+            if attempt < _PRELOAD_ATTEMPTS:
+                time.sleep(_PRELOAD_BACKOFF_SECONDS * attempt)
+    logger.error("發音比對模型預載重試用盡，/ready 會維持 503")
+    return False
+
 
 def _warm_caches(app: FastAPI):
     """listening/sentence/quiz/dictionary 都用「第一次請求時全表掃描一次、之後吃快取」的策略，
@@ -95,12 +115,7 @@ def _warm_caches(app: FastAPI):
         db.close()
 
     if _PRELOAD_PRONUNCIATION_MODEL:
-        try:
-            pronunciation_model.get_wav2vec2()
-            app.state.pronunciation_model_ready = True
-        except Exception:
-            app.state.pronunciation_model_ready = False
-            logger.exception("發音比對模型預載失敗，/ready 會維持 503")
+        app.state.pronunciation_model_ready = _preload_pronunciation_model()
     app.state.caches_warm = True
 
 

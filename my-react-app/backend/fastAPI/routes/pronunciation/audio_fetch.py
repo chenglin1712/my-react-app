@@ -58,8 +58,14 @@ async def download_reference_audio(client: httpx.AsyncClient, url: str, max_byte
     user_audio，參考音檔完全沒有大小限制：登入者能提供最多 5 個合法的 Firebase
     Storage 網址指向超大物件，讓服務逐一下載、解碼，耗盡記憶體與 CPU。改成串流，
     先看 Content-Length，再邊讀邊計數，超過上限就立刻中斷、不繼續下載。"""
-    async with client.stream("GET", url) as resp:
+    # 要求不壓縮，並拒絕任何有 Content-Encoding 的回應：httpx 的 aiter_bytes() 會先在記憶體
+    # 解壓縮再交給我們計數，高壓縮比的回應（壓縮炸彈）可能單一個 chunk 就解壓出遠大於上限的
+    # 資料，等我們發現超限時記憶體尖峰已經發生。Firebase Storage 的音檔本來就是原樣回傳，
+    # 不需要壓縮；改用 aiter_raw() 計數也不行，那樣只限制了「壓縮後」大小。
+    async with client.stream("GET", url, headers={"Accept-Encoding": "identity"}) as resp:
         if resp.is_redirect or resp.status_code != 200:
+            return None
+        if resp.headers.get("content-encoding", "identity").strip().lower() not in ("", "identity"):
             return None
         declared = resp.headers.get("content-length")
         if declared and declared.isdigit() and int(declared) > max_bytes:
