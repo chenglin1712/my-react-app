@@ -65,3 +65,4 @@ imported_credentials_*.txt
 # 資料庫備份（deploy/backup.sh 產生，內含正式資料，不可進版控）
 backups/
 dist.prev/
+.deploy-in-progress

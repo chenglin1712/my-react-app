@@ -11,22 +11,21 @@
 # 不含資料庫 schema：後端容器啟動時會自動 migrate，若新版 migration 與舊版程式不相容，
 # 切回舊 image 也救不了，這時要用部署前備份（deploy/backup.sh）還原。程式碼本身
 # （git）不會自動回退，失敗時會印出上一版的 commit，要回去請手動 git reset／checkout。
+#
+# 上一版的保護：部署開始時建立 .deploy-in-progress，部署成功（或回滾成功）才移除。
+# 若上一次部署被中斷（斷線、斷電、被 kill）而留下這個檔案，這次部署不會重新拍攝回滾點
+# （此時 :latest 與 dist 可能是未驗證的半成品），沿用上次留下的 dist.prev 與 :prev。
 set -euo pipefail
 cd "$(dirname "$0")"
+
+# shellcheck source=deploy/env.sh
+. deploy/env.sh
 
 FORCE="${1:-}"
 COMPOSE=(docker compose -f docker-compose.prod.yml)
 IMAGES=(yuanyu-django yuanyu-fastapi)
 PROXY_BASE="${PROXY_BASE:-https://127.0.0.1}"
-
-# 讀 .env 內某個變數的值（只取最後一次出現、去掉引號與行尾註解，不 source 整份檔案）
-env_value() {
-  local v
-  v=$(grep -E "^[[:space:]]*$1=" .env 2>/dev/null | tail -n1 | cut -d= -f2- | sed -E 's/[[:space:]]+#.*$//; s/^["'\'']//; s/["'\'']$//' || true)
-  printf '%s' "$v"
-}
-
-is_true() { case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in 1|true|yes) return 0 ;; *) return 1 ;; esac; }
+MARKER=.deploy-in-progress
 
 # ── 0. 正式環境防呆 ──────────────────────────────────────────────
 # DEBUG 與 AUTH_DEV_BYPASS 同時為 True 時，後端會略過 Firebase token 驗證（見
@@ -47,9 +46,14 @@ preflight() {
   if [ -z "$(env_value DJANGO_SECRET_KEY)" ]; then
     echo "!! .env 沒有 DJANGO_SECRET_KEY。部署中止。"; return 1
   fi
+  # 等待健康檢查與回滾都依賴 `up --wait --wait-timeout`，太舊的 Docker Compose 不支援，
+  # 部署到一半才失敗、連回滾也失敗最糟，所以先檢查。
+  if ! "${COMPOSE[@]}" up --help 2>&1 | grep -q -- '--wait-timeout'; then
+    echo "!! 這個版本的 Docker Compose 不支援 up --wait-timeout，請升級到 Compose v2.18 以上。部署中止。"; return 1
+  fi
 }
 
-echo "==> 檢查 .env"
+echo "==> 檢查 .env 與環境"
 preflight
 
 BEFORE=$(git rev-parse HEAD)
@@ -72,38 +76,57 @@ if [ "${SKIP_BACKUP:-}" != "1" ] && [ -f deploy/backup.sh ]; then
 fi
 
 # ── 2. 留下回滾點 ───────────────────────────────────────────────
-rm -rf dist.prev
-[ -d dist ] && cp -a dist dist.prev
-for img in "${IMAGES[@]}"; do
-  if docker image inspect "$img:latest" >/dev/null 2>&1; then
-    docker tag "$img:latest" "$img:prev"
-  fi
-done
+if [ -f "$MARKER" ]; then
+  echo "!! 偵測到上一次部署沒有完成（$MARKER 還在）。"
+  echo "   這次不重新拍攝回滾點，沿用上次留下的 dist.prev 與 :prev（它們才是最後一個確認健康的版本）。"
+else
+  rm -rf dist.prev
+  [ -d dist ] && cp -a dist dist.prev
+  for img in "${IMAGES[@]}"; do
+    if docker image inspect "$img:latest" >/dev/null 2>&1; then
+      docker tag "$img:latest" "$img:prev"
+    fi
+  done
+fi
+touch "$MARKER"
 
 rollback() {
   trap - ERR
   set +e
+  local ok=1
   echo "!! 部署失敗，回滾到上一版..."
+
   if [ -d dist.prev ]; then
-    rm -rf dist
-    mv dist.prev dist
+    rm -rf dist && mv dist.prev dist || { echo "!! 前端還原失敗"; ok=0; }
+  else
+    echo "!! 沒有 dist.prev，前端維持目前狀態"
   fi
-  local have_prev=1
+
+  # 兩個 image 都有 :prev 才回滾，避免只標回其中一個而形成 Django／FastAPI 新舊混合
+  local have_prev=1 img
   for img in "${IMAGES[@]}"; do
-    if docker image inspect "$img:prev" >/dev/null 2>&1; then
-      docker tag "$img:prev" "$img:latest"
-    else
-      have_prev=0
-    fi
+    docker image inspect "$img:prev" >/dev/null 2>&1 || have_prev=0
   done
   if [ "$have_prev" = "1" ]; then
-    "${COMPOSE[@]}" up -d --no-build --force-recreate --wait --wait-timeout 300 \
-      || echo "!! 上一版也沒有通過健康檢查，請手動檢查：docker compose -f docker-compose.prod.yml logs"
+    for img in "${IMAGES[@]}"; do
+      docker tag "$img:prev" "$img:latest" || { echo "!! 標回上一版 image 失敗：$img"; ok=0; }
+    done
+    if [ "$ok" = "1" ]; then
+      "${COMPOSE[@]}" up -d --no-build --force-recreate --wait --wait-timeout 300 \
+        || { echo "!! 上一版沒有通過健康檢查，請手動檢查：docker compose -f docker-compose.prod.yml logs"; ok=0; }
+    fi
   else
-    echo "!! 沒有上一版 image（第一次部署？），無法自動回滾。"
+    echo "!! 沒有完整的上一版 image（第一次部署？），無法自動回滾容器。"
+    ok=0
   fi
-  echo "!! 已回到上一版的前端與容器。程式碼仍在新 commit $(git rev-parse --short HEAD)；"
-  echo "   要讓 git 也回去：git reset --hard $BEFORE"
+
+  if [ "$ok" = "1" ]; then
+    rm -f "$MARKER"
+    echo "!! 已回到上一版的前端與容器。程式碼仍在新 commit $(git rev-parse --short HEAD)；"
+    echo "   要讓 git 也回去：git reset --hard $BEFORE"
+  else
+    echo "!! 回滾沒有完全成功，目前可能是新舊版本混合。請手動檢查，並保留 dist.prev 與 :prev 標籤，不要再次部署。"
+  fi
   exit 1
 }
 
@@ -124,14 +147,17 @@ echo "==> 重啟後端容器並等待健康檢查（django: /health/、fastapi: 
 echo "==> 修正擁有者"
 sudo chown -R "$USER:$USER" .
 
+# 到這裡新版容器已通過健康檢查，這次部署對回滾而言算成功：移除標記與舊的 dist 備份
+trap - ERR
+rm -f "$MARKER"
+rm -rf dist.prev
+
 # ── 5. 反向代理路由冒煙檢查 ─────────────────────────────────────
 # 到這裡容器都已經通過健康檢查，新版後端是好的；代理設定有問題時回滾容器沒有幫助，
-# 所以這一段只回報、不回滾（先關掉 ERR trap），讓人去修代理設定。
+# 所以這一段只回報、不回滾。
 # 容器健康不代表使用者看得到：代理沒有轉發 /AIModel、/api/v1 時，前端會只有部分功能
 # 404。這裡用「不帶 token 會被擋下的端點」確認請求真的到了後端——後端回 401／400／
 # 403／405 代表有轉到；404／502／連不上代表代理設定有問題。
-trap - ERR
-rm -rf dist.prev
 PROXY_OK=1
 
 check_route() {

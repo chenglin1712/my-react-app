@@ -7,6 +7,14 @@ rules_version = '2';
 // Firebase Console 上實際生效的 Storage 規則維持不變。要啟用時必須先確認現有規則沒有
 // 其他用途會被這份規則擋掉，再由人明確決定部署（見 deploy/README.md）。
 //
+// 已知限制（啟用前請知悉）：
+// 1. 規則用 file.matches() 把 request.auth.uid 串進正規表示式，沒有跳脫特殊字元。Firebase
+//    自動產生的 UID 只含英數字，不受影響；但若系統用 Admin SDK 建立「自訂 UID」，且其中含有
+//    . + * [ ] 這類正規表示式字元，該帳號就能上傳不以自己完整 UID 結尾的檔名。啟用前請確認
+//    沒有自訂 UID，或把路徑改成 .../{uid}/{uuid}.webm，直接比較路徑萬用字元與 request.auth.uid。
+// 2. contentType 只是上傳者宣告的 metadata，不能證明內容真的是 WebM。後端取用錄音時
+//    （fastAPI/routes/pronunciation）會經 ffmpeg 轉檔、解碼，這才是內容驗證的那一層。
+//
 // 專案裡唯一由「前端直接」寫入 Storage 的地方是發音遊戲的使用者錄音
 // （frontend/components/_game/pronunciation/pronunciationRecordingService.js 的
 // uploadRecording）：路徑為 pronunciations/{tribe}/{encodeURIComponent(word)}/

@@ -55,7 +55,7 @@ jobs:
       # deploy.sh 與 deploy/backup.sh 是正式環境唯一的部署與備份入口，改壞了只有部署當下
       # 才會發現。test_deploy.sh 用假的 docker／git／curl／pg_dump 跑過成功、自動回滾、
       # .env 防呆、備份失敗中止、代理檢查等每條路徑，不需要真的 docker。
-      - run: bash -n deploy.sh && bash -n deploy/backup.sh
+      - run: bash -n deploy.sh && bash -n deploy/backup.sh && bash -n deploy/env.sh
       - run: bash deploy/test_deploy.sh
 
       # compose 檔語法與變數替換是否正確。env_file 需要檔案存在，給空檔即可。
