@@ -7,8 +7,11 @@ import { getUserSituation } from '../../src/userServives/uploadDb';
 
 vi.mock('../../utils/apiClient', () => ({ apiPost: vi.fn() }));
 vi.mock('../../src/userServives/uploadDb', () => ({ getUserSituation: vi.fn() }));
+const authState = vi.hoisted(() => ({
+  userData: { firestoreData: { user_errors: {}, quiz_model: { type_stats: {} } } },
+}));
 vi.mock('../../src/userServives/authContext', () => ({
-  useAuth: () => ({ userData: { firestoreData: { user_errors: {}, quiz_model: { type_stats: {} } } } }),
+  useAuth: () => ({ userData: authState.userData }),
 }));
 vi.mock('./bot_study_plan', () => ({ default: () => null }));
 
@@ -22,6 +25,32 @@ describe('AIAssistantOverlay（回歸測試：注音/拼音輸入法選字時的
     getUserSituation.mockResolvedValue({ level: 'beginner' });
     // jsdom 沒有實作 scrollIntoView
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
+    authState.userData = { firestoreData: { user_errors: {}, quiz_model: { type_stats: {} } } };
+  });
+
+  test('Firestore 統計資料含 null／非數字項目時不會丟例外，仍能正常送出', async () => {
+    authState.userData = {
+      firestoreData: {
+        user_errors: { word1: 3, word2: null, word3: 'x' },
+        quiz_model: { type_stats: { choice: { n: 5, e: 2 }, broken: null } },
+      },
+    };
+    apiPost.mockResolvedValue({ message: 'ok' });
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), '嗨{Enter}');
+
+    expect(await screen.findByText('ok')).toBeInTheDocument();
+    const stats = apiPost.mock.calls[0][1].user_stats;
+    expect(stats.incorrect).toBe(3);
+    expect(stats.correct).toBe(3);
+  });
+
+  test('聊天室外層使用專屬 class，不再沿用會與 Navbar 衝突的 .overlay', () => {
+    const { container } = render(<AIAssistantOverlay onClose={vi.fn()} />);
+    expect(container.querySelector('.bot-overlay')).toBeInTheDocument();
+    expect(container.querySelector('.overlay')).not.toBeInTheDocument();
   });
 
   test('輸入法選字時按下的 Enter（isComposing）不會送出訊息', async () => {

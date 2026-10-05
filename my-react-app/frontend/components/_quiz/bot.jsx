@@ -49,18 +49,21 @@ const AIAssistantOverlay = ({ onClose }) => {
     useEffect(() => {
         if (!userData) return;
         let cancelled = false;
+        // Firestore 裡的舊資料／異常資料可能含 null 或非數字，這個 effect 在 overlay
+        // 一開啟就會跑，丟例外會讓整個助手（甚至整頁）掛掉，所以全部先正規化成數字。
+        const toCount = (n) => (Number.isFinite(n) ? n : 0);
         const userErrors = userData?.firestoreData?.user_errors || {};
         const commonErrors = Object.entries(userErrors)
-            .sort(([, a], [, b]) => b - a)
+            .sort(([, a], [, b]) => toCount(b) - toCount(a))
             .slice(0, 3)
-            .map(([word, cnt]) => `${word}（答錯${cnt}次）`);
-        const totalErrors = Object.values(userErrors).reduce((sum, n) => sum + n, 0);
+            .map(([word, cnt]) => `${word}（答錯${toCount(cnt)}次）`);
+        const totalErrors = Object.values(userErrors).reduce((sum, n) => sum + toCount(n), 0);
 
         // 薦讀測驗（IRT）累積的 type_stats 內含每種題型的作答次數(n)與錯誤次數(e)，
         // 答對數 = 總作答次數 - 總錯誤次數，取代原本永遠是 0 的寫死值
         const typeStats = userData?.firestoreData?.quiz_model?.type_stats || {};
-        const totalAttempts = Object.values(typeStats).reduce((sum, s) => sum + (s.n || 0), 0);
-        const totalTypeErrors = Object.values(typeStats).reduce((sum, s) => sum + (s.e || 0), 0);
+        const totalAttempts = Object.values(typeStats).reduce((sum, s) => sum + toCount(s?.n), 0);
+        const totalTypeErrors = Object.values(typeStats).reduce((sum, s) => sum + toCount(s?.e), 0);
         const totalCorrect = Math.max(totalAttempts - totalTypeErrors, 0);
 
         getUserSituation()
@@ -158,7 +161,7 @@ const AIAssistantOverlay = ({ onClose }) => {
     };
 
     return (
-        <div className="overlay">
+        <div className="bot-overlay">
             <motion.div
                 className="chat-container"
                 role="dialog"
@@ -178,12 +181,12 @@ const AIAssistantOverlay = ({ onClose }) => {
                     >
                         <ChevronLeft size={22} />
                     </button>
-                    <div className="avatar">
+                    <div className="bot-avatar">
                         <Bot />
                     </div>
                     <div className="header-info">
                         <h2>{TRIBES.find((t) => t.slug === tribe)?.name}智慧助手</h2>
-                        <p className="status online">在線</p>
+                        <p className="bot-status online">在線</p>
                     </div>
                     <select
                         value={tribe}
@@ -200,7 +203,7 @@ const AIAssistantOverlay = ({ onClose }) => {
 
                 <div className="messages-container">
                     {messages.map((message) => (
-                        <div key={message.id} className={`message ${message.role}`}>
+                        <div key={message.id} className={`bot-message ${message.role}`}>
                             {message.role === "bot" && (
                                 <div className="avatar-small">
                                     <Bot />
@@ -215,7 +218,7 @@ const AIAssistantOverlay = ({ onClose }) => {
                         </div>
                     ))}
                     {isPending && (
-                        <div className="message bot">
+                        <div className="bot-message bot">
                             <div className="avatar-small">
                                 <Bot />
                             </div>
