@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 import os
+from django.core.exceptions import ImproperlyConfigured
 from pathlib import Path
 from urllib.parse import urlparse
 from dotenv import load_dotenv
@@ -169,6 +170,16 @@ if _database_url:
         )
     }
 else:
+    # REQUIRE_DATABASE_URL：選擇性的嚴格模式（docker-compose.prod.yml 會開啟）。
+    # 正式環境是多個 gunicorn worker、容器檔案系統是暫時性的；DATABASE_URL 漏設時
+    # 若靜默退回 SQLite，會進入多 worker 寫入鎖競爭，而且資料只存在容器內，重建
+    # 容器就消失。開啟後直接啟動失敗，讓設定錯誤在部署當下就被發現。預設不開，
+    # 本機開發與 CI 維持零設定就能跑 SQLite 的行為。
+    if os.getenv("REQUIRE_DATABASE_URL", "").lower() in ("1", "true", "yes"):
+        raise ImproperlyConfigured(
+            "REQUIRE_DATABASE_URL 已開啟，但 DATABASE_URL 未設定。"
+            "請在 .env 填入 PostgreSQL 連線字串，否則會退回不會持久化的 SQLite。"
+        )
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",

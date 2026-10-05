@@ -27,6 +27,16 @@ _DEBUG = is_debug()
 _dictionary_database_url = os.getenv("DICTIONARY_DATABASE_URL")
 _django_database_url = os.getenv("DATABASE_URL")
 
+# REQUIRE_DATABASE_URL：與 core/settings.py 同一個旗標。兩個 URL 都沒設定時，辭典
+# 會退回容器內的 dictionary.db（不持久、多 worker 寫入鎖競爭），正式環境不該靜默走到
+# 這裡，開啟後直接啟動失敗。
+if not _dictionary_database_url and not _django_database_url:
+    if os.getenv("REQUIRE_DATABASE_URL", "").lower() in ("1", "true", "yes"):
+        raise EnvironmentError(
+            "[dictionary_db.connect] REQUIRE_DATABASE_URL 已開啟，但 DICTIONARY_DATABASE_URL "
+            "與 DATABASE_URL 都未設定，會退回不持久的 SQLite。請設定其中之一。"
+        )
+
 # REQUIRE_DICTIONARY_DATABASE_URL：選擇性的嚴格模式，只有明確開啟時才會在
 # 沒設定 DICTIONARY_DATABASE_URL 時直接 fail fast（P4 review BE-11）。預設
 # 不開，維持既有部署／既有測試的相容行為——沒有把握現在是否已經有正式環境
