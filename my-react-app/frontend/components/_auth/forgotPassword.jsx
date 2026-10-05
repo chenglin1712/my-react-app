@@ -58,7 +58,7 @@ const ForgotPassword = () => {
             </form>
 
             {message && (
-                <div className={`message ${isSuccess ? "success" : "error"}`}>
+                <div className={`forgot-message ${isSuccess ? "success" : "error"}`}>
                     {message}
                 </div>
             )}

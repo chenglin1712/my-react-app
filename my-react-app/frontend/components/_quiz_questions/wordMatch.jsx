@@ -205,8 +205,8 @@ export default function WordMatch({ question, _selected, _checked, onSelect, onC
 
       {/* 成功動畫 */}
       {showAnimation && (
-        <div className="overlay">
-          <div className="animation-container">
+        <div className="yy-success-overlay">
+          <div className="yy-success-card">
             <div ref={animationRef} />
             <p>答案正確！</p>
           </div>

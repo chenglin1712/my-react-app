@@ -99,8 +99,8 @@ export default function WordTranslation({ question, selected, checked, onSelect,
 
       {/* 成功動畫 Overlay */}
       {showAnimation && (
-        <div className="overlay">
-          <div className="animation-container">
+        <div className="yy-success-overlay">
+          <div className="yy-success-card">
             <div ref={animationRef} />
             <p>答案正確！</p>
           </div>

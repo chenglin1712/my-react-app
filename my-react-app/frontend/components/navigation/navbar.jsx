@@ -111,7 +111,7 @@ const Navbar = ({ onOpenBot }) => {
 
               {
                 isUserOpen && (
-                  <div className="overlay" onClick={() => setIsUserOpen(false)}></div>
+                  <div className="navbar-overlay" onClick={() => setIsUserOpen(false)}></div>
                 )
               }
               <div
@@ -162,7 +162,7 @@ const Navbar = ({ onOpenBot }) => {
 
             {
               isUserOpen && (
-                <div className="overlay" onClick={() => setIsUserOpen(false)}></div>
+                <div className="navbar-overlay" onClick={() => setIsUserOpen(false)}></div>
               )
             }
             <div

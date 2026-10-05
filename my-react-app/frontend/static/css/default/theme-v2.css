@@ -464,3 +464,42 @@
   color: var(--yy-ink);
   font-family: var(--yy-font-body);
 }
+
+/* 答對／成功動畫的全螢幕遮罩 + 卡片：原本以通用名稱 .overlay／.animation-container 寫在
+   registerForm.css，卻被 resetPassword 與 5 個測驗題型共用，要看註冊頁 CSS 有沒有被載入
+   才有樣式，且和 Navbar／bot 的 .overlay 互相覆蓋。移到全域主題檔並改專屬名稱。 */
+.yy-success-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(34, 24, 18, 0.55);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1050;
+}
+
+.yy-success-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: #fff;
+    border: 4px solid var(--yy-ink);
+    border-radius: 14px;
+    box-shadow: 8px 8px 0 var(--yy-ink);
+    padding: 30px 24px;
+    width: 260px;
+}
+
+.yy-success-card div {
+    width: 100%;
+}
+
+.yy-success-card p {
+    color: var(--yy-ink);
+    font-size: 15px;
+    font-weight: 800;
+    text-align: center;
+}

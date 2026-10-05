@@ -83,8 +83,8 @@ const ResetPassword = () => {
             </form>
 
             {isSuccess && (
-                <div className="overlay">
-                    <div className="animation-container">
+                <div className="yy-success-overlay">
+                    <div className="yy-success-card">
                         <div ref={animation} />
                         <p>密碼更新成功！將移至編輯資料頁面</p>
                     </div>
