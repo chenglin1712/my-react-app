@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from config.llm import classify_llm_error
 from config.tribes import TRIBES
 from dictionary_db.connect import get_db
 from fastAPI import feature_flags, rate_limit_config, usage_events
@@ -85,11 +86,13 @@ async def translate_endpoint(request: Request, body: TranslateRequest, db: Sessi
         # 缺 ANTHROPIC_API_KEY，比照 AIModel/views.py 的既有處理：只讓這個功能
         # 回 503，不影響其他不相關的端點。
         return JSONResponse({"detail": str(e)}, status_code=503)
-    except Exception:
+    except Exception as e:
         # 原始例外訊息（可能含 LLM API 回應細節、內部路徑）只記 log，不回給
         # client，比照 AIModel/views.py 對 tayal_chat 的既有處理。
+        # 逾時／限流／斷路器開啟時回對應的狀態碼（504／429／503），其餘維持 502。
         logger.error("[translation] 處理失敗\n%s", request.url, exc_info=True)
-        return JSONResponse({"detail": "翻譯服務暫時無法回應，請稍後再試"}, status_code=502)
+        status_code, _ = classify_llm_error(e)
+        return JSONResponse({"detail": "翻譯服務暫時無法回應，請稍後再試"}, status_code=status_code)
 
     usage_events.record_event(
         "translation_request", uid=uid, tribe=body.tribe,

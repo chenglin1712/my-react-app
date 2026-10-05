@@ -3,6 +3,7 @@ import logging
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django_ratelimit.core import is_ratelimited
+import sys
 import traceback
 
 from dictionary_db.connect import SessionLocal
@@ -10,7 +11,7 @@ from dictionary_db.model import Word
 from dictionary_db.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS, TRIBE_MAP
 from core.firebase_auth import verify_firebase_token
-from config.llm import get_llm_client
+from config.llm import get_llm_client, classify_llm_error
 from adminapi.rate_limits import get_configured_rate
 from .serializers import TayalChatSerializer, ReviewTayalChatSerializer
 from .services import run_tayal_chat, run_review_tayal_chat
@@ -92,7 +93,8 @@ def tayal_chat(request):
             # （可能包含 API 回應細節、內部路徑等），且完全沒有寫 log，出錯時
             # 伺服器端反而看不到記錄。改成記錄完整 traceback，只回通用訊息。
             logger.error("[tayal_chat] 處理失敗\n%s", traceback.format_exc())
-            return JsonResponse({"detail": "AI 服務暫時無法回應，請稍後再試"}, status=502)
+            status, detail = classify_llm_error(sys.exc_info()[1])
+            return JsonResponse({"detail": detail}, status=status)
 
     else:
         return JsonResponse({"detail": "只接受 POST 請求"}, status=405)
@@ -145,7 +147,8 @@ def review_tayal_chat(request):
             # 原本有記 log 但仍把 str(e) 回給前端；跟 tayal_chat 一樣，例外訊息
             # 只留在伺服器端的 log，回應改成通用訊息。
             logger.error("[review_tayal_chat] 處理失敗\n%s", traceback.format_exc())
-            return JsonResponse({"detail": "AI 服務暫時無法回應，請稍後再試"}, status=502)
+            status, detail = classify_llm_error(sys.exc_info()[1])
+            return JsonResponse({"detail": detail}, status=status)
     else:
         return JsonResponse({"detail": "只接受 POST 請求"}, status=405)
 

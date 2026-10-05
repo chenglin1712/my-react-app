@@ -16,7 +16,10 @@ get_llm_client()，行為完全不變——這樣 AIModel/tests.py 既有的
 好讓 AIModel/services.py 與 translation/service.py 兩處呼叫端完全不用改
 ——並不是另外起一個 OpenAI 協定相容的服務端點。
 """
+import logging
 import os
+import threading
+import time
 
 import anthropic
 from dotenv import load_dotenv
@@ -32,6 +35,81 @@ DEFAULT_MODEL = "claude-sonnet-5"
 _MAX_TOKENS = 4096
 
 _client = None
+
+logger = logging.getLogger(__name__)
+
+# 供應商變慢或限流時的保護：原本 Anthropic client 沒有明確的 timeout／重試策略，
+# 只能吃 SDK 預設值（單次請求可能等上十分鐘），延遲期間 Django worker／FastAPI
+# 執行緒會被一個個占住，最後連跟 AI 無關的請求也排不進來。
+#   LLM_TIMEOUT_SECONDS    單次請求逾時（預設 30 秒，對應短句翻譯／對話的實際耗時）
+#   LLM_MAX_RETRIES        SDK 內建的退避重試次數（預設 2）
+#   LLM_BREAKER_THRESHOLD  連續失敗幾次後暫停呼叫（預設 5）
+#   LLM_BREAKER_COOLDOWN_SECONDS  暫停多久後才再放行一次試探（預設 30 秒）
+_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "30"))
+_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
+_BREAKER_THRESHOLD = int(os.getenv("LLM_BREAKER_THRESHOLD", "5"))
+_BREAKER_COOLDOWN_SECONDS = float(os.getenv("LLM_BREAKER_COOLDOWN_SECONDS", "30"))
+
+# 屬於「供應商端暫時性問題」的例外：這類連續發生才值得暫停呼叫。請求本身有誤
+# （400/401/422 之類）重試或暫停都沒有意義，不計入。
+_TRANSIENT_ERRORS = (
+    anthropic.APITimeoutError,
+    anthropic.APIConnectionError,
+    anthropic.RateLimitError,
+    anthropic.InternalServerError,
+)
+
+
+class LLMUnavailableError(RuntimeError):
+    """斷路器開啟中：供應商連續失敗，這段冷卻期間直接拒絕，不再占用 worker 等逾時。"""
+
+
+class _CircuitBreaker:
+    def __init__(self, threshold: int, cooldown: float):
+        self._threshold = threshold
+        self._cooldown = cooldown
+        self._failures = 0
+        self._opened_at = None
+        self._lock = threading.Lock()
+
+    def before_call(self):
+        with self._lock:
+            if self._opened_at is None:
+                return
+            if time.monotonic() - self._opened_at >= self._cooldown:
+                # 冷卻結束：只放行一個試探請求（half-open）。重設時間戳讓其他並行
+                # 請求在試探結果出來前仍被擋住。
+                self._opened_at = time.monotonic()
+                return
+        raise LLMUnavailableError("[config.llm] LLM 服務連續失敗，暫時停止呼叫")
+
+    def record_success(self):
+        with self._lock:
+            self._failures = 0
+            self._opened_at = None
+
+    def record_failure(self):
+        with self._lock:
+            self._failures += 1
+            if self._failures >= self._threshold and self._opened_at is None:
+                self._opened_at = time.monotonic()
+                logger.error("[config.llm] LLM 連續失敗 %d 次，暫停呼叫 %.0f 秒", self._failures, self._cooldown)
+
+
+_breaker = _CircuitBreaker(_BREAKER_THRESHOLD, _BREAKER_COOLDOWN_SECONDS)
+
+
+def classify_llm_error(exc: BaseException) -> tuple[int, str]:
+    """把 LLM 呼叫失敗對應成 (HTTP 狀態碼, 給使用者看的訊息)。原本一律 502，
+    前端分不出「稍後再試有用」（逾時、限流、暫停中）與「真的壞了」。
+    內部例外訊息不外流，只回固定文字。"""
+    if isinstance(exc, LLMUnavailableError):
+        return 503, "AI 服務目前忙碌，請稍後再試"
+    if isinstance(exc, anthropic.APITimeoutError):
+        return 504, "AI 服務回應逾時，請稍後再試"
+    if isinstance(exc, anthropic.RateLimitError):
+        return 429, "AI 服務使用人數較多，請稍後再試"
+    return 502, "AI 服務暫時無法回應，請稍後再試"
 
 
 class _ShimMessage:
@@ -72,12 +150,18 @@ class _ChatCompletions:
             else:
                 claude_messages.append({"role": m["role"], "content": m["content"]})
 
-        response = self._client.messages.create(
-            model=model,
-            max_tokens=_MAX_TOKENS,
-            system=system,
-            messages=claude_messages,
-        )
+        _breaker.before_call()
+        try:
+            response = self._client.messages.create(
+                model=model,
+                max_tokens=_MAX_TOKENS,
+                system=system,
+                messages=claude_messages,
+            )
+        except _TRANSIENT_ERRORS:
+            _breaker.record_failure()
+            raise
+        _breaker.record_success()
 
         if response.stop_reason == "refusal":
             raise RuntimeError("[config.llm] Claude 拒絕回應此請求（refusal）")
@@ -114,5 +198,5 @@ def get_llm_client():
             "[config.llm] 環境變數 ANTHROPIC_API_KEY 未設定，AI 對話／翻譯功能無法使用。"
             "請在 .env 填入 Anthropic API key。"
         )
-    _client = _OpenAICompatClaudeClient(anthropic.Anthropic(api_key=api_key))
+    _client = _OpenAICompatClaudeClient(anthropic.Anthropic(api_key=api_key, timeout=_TIMEOUT_SECONDS, max_retries=_MAX_RETRIES))
     return _client
