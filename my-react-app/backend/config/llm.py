@@ -41,12 +41,18 @@ logger = logging.getLogger(__name__)
 # 供應商變慢或限流時的保護：原本 Anthropic client 沒有明確的 timeout／重試策略，
 # 只能吃 SDK 預設值（單次請求可能等上十分鐘），延遲期間 Django worker／FastAPI
 # 執行緒會被一個個占住，最後連跟 AI 無關的請求也排不進來。
-#   LLM_TIMEOUT_SECONDS    單次請求逾時（預設 30 秒，對應短句翻譯／對話的實際耗時）
-#   LLM_MAX_RETRIES        SDK 內建的退避重試次數（預設 2）
+#   LLM_TIMEOUT_SECONDS    單次請求逾時（預設 25 秒）
+#   LLM_MAX_RETRIES        SDK 內建的退避重試次數（預設 1）
 #   LLM_BREAKER_THRESHOLD  連續失敗幾次後暫停呼叫（預設 5）
 #   LLM_BREAKER_COOLDOWN_SECONDS  暫停多久後才再放行一次試探（預設 30 秒）
-_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "30"))
-_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
+#
+# 逾時預算必須「由內而外」逐層放大，否則內層的逾時處理來不及執行就被外層強制中斷：
+#   LLM 最長等待 = (重試次數 + 1) × 單次逾時 + 退避 ≈ 2 × 25 + 數秒 ≈ 55 秒
+#   < gunicorn --timeout（docker-compose.prod.yml，75 秒）
+#   < nginx proxy_read_timeout（deploy/nginx.conf，90 秒）
+# 調高這裡的任何一個數字，都要同步檢查另外兩個；test_llm_resilience.py 會檢查這個關係。
+_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "25"))
+_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "1"))
 _BREAKER_THRESHOLD = int(os.getenv("LLM_BREAKER_THRESHOLD", "5"))
 _BREAKER_COOLDOWN_SECONDS = float(os.getenv("LLM_BREAKER_COOLDOWN_SECONDS", "30"))
 
@@ -65,35 +71,68 @@ class LLMUnavailableError(RuntimeError):
 
 
 class _CircuitBreaker:
+    """三態斷路器：CLOSED（正常）→ OPEN（連續失敗後暫停）→ HALF_OPEN（冷卻結束，
+    只放行「一個」試探請求）→ 試探成功回 CLOSED，失敗回 OPEN 並從失敗當下重新計時。
+
+    重點是試探請求要有明確身分（before_call 的回傳值）：
+    - 同一時間只會有一個試探在進行，試探耗時超過冷卻時間也不會放行第二個
+    - 只有試探請求的結果能讓斷路器關閉或重新開啟；在斷路器開啟之前就送出、
+      之後才回來的普通請求，結果一律忽略，不能把狀態誤判成已恢復
+    """
+
+    CLOSED, OPEN, HALF_OPEN = "closed", "open", "half_open"
+
     def __init__(self, threshold: int, cooldown: float):
         self._threshold = threshold
         self._cooldown = cooldown
         self._failures = 0
-        self._opened_at = None
+        self._state = self.CLOSED
+        self._opened_at = 0.0
+        self._probe_in_flight = False
         self._lock = threading.Lock()
 
-    def before_call(self):
+    def before_call(self) -> bool:
+        """回傳這次呼叫是否為試探請求；斷路器不允許通過時丟出 LLMUnavailableError。"""
         with self._lock:
-            if self._opened_at is None:
-                return
-            if time.monotonic() - self._opened_at >= self._cooldown:
-                # 冷卻結束：只放行一個試探請求（half-open）。重設時間戳讓其他並行
-                # 請求在試探結果出來前仍被擋住。
-                self._opened_at = time.monotonic()
-                return
+            if self._state == self.CLOSED:
+                return False
+            if self._state == self.OPEN and time.monotonic() - self._opened_at >= self._cooldown:
+                self._state = self.HALF_OPEN
+                self._probe_in_flight = False
+            if self._state == self.HALF_OPEN and not self._probe_in_flight:
+                self._probe_in_flight = True
+                return True
         raise LLMUnavailableError("[config.llm] LLM 服務連續失敗，暫時停止呼叫")
 
-    def record_success(self):
+    def record_success(self, is_probe: bool):
         with self._lock:
-            self._failures = 0
-            self._opened_at = None
+            if is_probe:
+                self._state = self.CLOSED
+                self._failures = 0
+                self._probe_in_flight = False
+            elif self._state == self.CLOSED:
+                self._failures = 0
+            # 其餘情況（OPEN／HALF_OPEN 時回來的普通請求）忽略
 
-    def record_failure(self):
+    def record_failure(self, is_probe: bool):
         with self._lock:
-            self._failures += 1
-            if self._failures >= self._threshold and self._opened_at is None:
+            if is_probe:
+                self._state = self.OPEN
                 self._opened_at = time.monotonic()
-                logger.error("[config.llm] LLM 連續失敗 %d 次，暫停呼叫 %.0f 秒", self._failures, self._cooldown)
+                self._probe_in_flight = False
+                logger.error("[config.llm] LLM 試探請求失敗，再暫停呼叫 %.0f 秒", self._cooldown)
+            elif self._state == self.CLOSED:
+                self._failures += 1
+                if self._failures >= self._threshold:
+                    self._state = self.OPEN
+                    self._opened_at = time.monotonic()
+                    logger.error("[config.llm] LLM 連續失敗 %d 次，暫停呼叫 %.0f 秒", self._failures, self._cooldown)
+
+    def abort_probe(self):
+        """試探請求因「非供應商暫時性問題」的例外結束（例如請求本身有誤）：
+        不代表供應商恢復或仍壞，釋放試探權，讓下一個請求再試。"""
+        with self._lock:
+            self._probe_in_flight = False
 
 
 _breaker = _CircuitBreaker(_BREAKER_THRESHOLD, _BREAKER_COOLDOWN_SECONDS)
@@ -150,7 +189,7 @@ class _ChatCompletions:
             else:
                 claude_messages.append({"role": m["role"], "content": m["content"]})
 
-        _breaker.before_call()
+        is_probe = _breaker.before_call()
         try:
             response = self._client.messages.create(
                 model=model,
@@ -159,9 +198,13 @@ class _ChatCompletions:
                 messages=claude_messages,
             )
         except _TRANSIENT_ERRORS:
-            _breaker.record_failure()
+            _breaker.record_failure(is_probe)
             raise
-        _breaker.record_success()
+        except BaseException:
+            if is_probe:
+                _breaker.abort_probe()
+            raise
+        _breaker.record_success(is_probe)
 
         if response.stop_reason == "refusal":
             raise RuntimeError("[config.llm] Claude 拒絕回應此請求（refusal）")

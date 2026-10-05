@@ -14,7 +14,9 @@ services:
       # DATABASE_URL 漏設時啟動失敗，不要靜默退回容器內的 SQLite（見 core/settings.py）
       REQUIRE_DATABASE_URL: "true"
     network_mode: host
-    command: sh -c "python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn core.wsgi:application --workers 3 --bind 127.0.0.1:8000"
+    # --timeout 必須大於 LLM 最長等待（config/llm.py：約 55 秒），否則 gunicorn 會在 LLM
+    # 逾時處理執行前就強制殺掉 worker；同時要小於 nginx 的 proxy_read_timeout（90 秒）。
+    command: sh -c "python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn core.wsgi:application --workers 3 --timeout 75 --graceful-timeout 15 --bind 127.0.0.1:8000"
     volumes:
       - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
       - ./logs:/app/logs
