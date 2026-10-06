@@ -31,35 +31,14 @@ export default defineConfig({
   optimizeDeps: {
     entries: ['index.html'],
   },
-  build: {
-    rollupOptions: {
-      output: {
-        // situation-*.js（recharts 圖表）與 _note-*.js（tiptap 編輯器）兩個路由
-        // chunk 各約 440KB，絕大部分是這兩個第三方套件本身的體積，不是頁面程式碼。
-        // 拆成獨立、清楚命名的 vendor chunk：一方面讓建置輸出能直接看出是哪個套件
-        // 造成體積，另一方面套件版本沒變時瀏覽器能單獨快取，不會因為頁面邏輯小改動
-        // 就整包重新下載。這兩個套件只有各自的路由在用，其餘地方沒有直接 import。
-        manualChunks(id) {
-          if (!id.includes('node_modules')) return;
-          if (
-            id.includes('recharts') ||
-            id.includes('victory-vendor') ||
-            /[\\/]d3-/.test(id) ||
-            id.includes('@reduxjs') ||
-            id.includes('react-redux') ||
-            id.includes('immer') ||
-            id.includes('reselect') ||
-            id.includes('decimal.js-light')
-          ) {
-            return 'vendor-recharts';
-          }
-          if (id.includes('@tiptap') || /[\\/]prosemirror-/.test(id)) {
-            return 'vendor-tiptap';
-          }
-        },
-      },
-    },
-  },
+  // 這裡原本有一段 manualChunks，把 recharts（圖表）與 tiptap（筆記編輯器）強制拆成 vendor
+  // chunk。它們各約 440 KB，只有 /situation 與 /note 兩個路由會用到，本來就已經用 lazy()
+  // 切成路由 chunk。但手動指定 chunk 之後，Rollup 把兩個套件裡「被其他程式碼共用的小模組」
+  // 也放進 vendor chunk，入口 chunk 於是靜態 import 它們，dist/index.html 因此對
+  // vendor-recharts（467 KB）與 vendor-tiptap（433 KB）下 modulepreload：使用者打開首頁
+  // 就先下載約 900 KB 與首頁完全無關的程式碼。移除後交給 Rollup 依 dynamic import 自動切分，
+  // 這兩個套件只在進入對應路由時才會下載。若之後需要重新手動切分，請先確認
+  // dist/index.html 的 modulepreload 清單沒有跟著變長（bundlePreload.test.js 會檢查）。
   test: {
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.js'],
