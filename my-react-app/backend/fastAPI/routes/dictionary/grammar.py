@@ -316,46 +316,64 @@ def search_grammar(request: Request, tribe: str, q: str, db: Session = Depends(g
         return JSONResponse({"detail": "伺服器發生錯誤，請稍後再試"}, status_code=500)
 
 
+def _fetch_affixes(db: Session, tribe_name: str, affix_type: Optional[str]) -> list:
+    """詞綴本身的列：(id, affix, affix_type, function, example_form)。"""
+    sql = """
+        SELECT a.id, a.affix, a.affix_type, a.function, a.example_form
+        FROM grammar_affix a
+        WHERE a.tribe_id = (SELECT id FROM tribe WHERE name = :tribe)
+    """
+    params = {"tribe": tribe_name}
+    if affix_type:
+        sql += " AND a.affix_type = :at"
+        params["at"] = affix_type
+    sql += " ORDER BY a.affix_type, a.affix" if not affix_type else " ORDER BY a.affix"
+    return db.execute(text(sql), params).fetchall()
+
+
+def _fetch_affix_rule_ids(db: Session, tribe_name: str, affix_type: Optional[str]) -> Dict[int, list]:
+    """{詞綴 id: [規則 id, ...]}（規則 id 由小到大）。
+
+    原本用 GROUP_CONCAT 在 SQL 裡把規則 id 串成字串——那是 SQLite 專有的函式，
+    PostgreSQL 沒有，端點在正式資料庫上會直接 500（PostgreSQL 的對應函式是
+    string_agg，語法與型別都不同）。改成單純的批次查詢、在 Python 組裝，跟這個檔案
+    其他 _fetch_* 一樣，兩種資料庫用同一段程式，不需要依方言分支。
+    """
+    sql = """
+        SELECT ra.affix_id, ra.rule_id
+        FROM grammar_rule_affix ra
+        JOIN grammar_affix a ON a.id = ra.affix_id
+        WHERE a.tribe_id = (SELECT id FROM tribe WHERE name = :tribe)
+    """
+    params = {"tribe": tribe_name}
+    if affix_type:
+        sql += " AND a.affix_type = :at"
+        params["at"] = affix_type
+    sql += " ORDER BY ra.affix_id, ra.rule_id"
+    out: Dict[int, list] = {}
+    for affix_id, rule_id in db.execute(text(sql), params).fetchall():
+        out.setdefault(affix_id, []).append(rule_id)
+    return out
+
+
+def _format_affixes(tribe_name: str, rows: list, rule_ids_by_affix: Dict[int, list]) -> dict:
+    return {
+        "tribe": tribe_name,
+        "affixes": [
+            {"id": r[0], "affix": r[1], "affix_type": r[2],
+             "function": r[3], "example_form": r[4],
+             "rule_ids": list(rule_ids_by_affix.get(r[0], []))}
+            for r in rows
+        ],
+    }
+
+
 def _load_grammar_affixes(db: Session, tribe_name: str, affix_type: Optional[str]) -> dict:
     key = (tribe_name, affix_type or "")
 
     def _compute():
-        if affix_type:
-            rows = db.execute(
-                text("""
-                    SELECT a.id, a.affix, a.affix_type, a.function, a.example_form,
-                           GROUP_CONCAT(ra.rule_id) AS rule_ids
-                    FROM grammar_affix a
-                    LEFT JOIN grammar_rule_affix ra ON ra.affix_id = a.id
-                    WHERE a.tribe_id = (SELECT id FROM tribe WHERE name = :tribe) AND a.affix_type = :at
-                    GROUP BY a.id
-                    ORDER BY a.affix
-                """),
-                {"tribe": tribe_name, "at": affix_type}
-            ).fetchall()
-        else:
-            rows = db.execute(
-                text("""
-                    SELECT a.id, a.affix, a.affix_type, a.function, a.example_form,
-                           GROUP_CONCAT(ra.rule_id) AS rule_ids
-                    FROM grammar_affix a
-                    LEFT JOIN grammar_rule_affix ra ON ra.affix_id = a.id
-                    WHERE a.tribe_id = (SELECT id FROM tribe WHERE name = :tribe)
-                    GROUP BY a.id
-                    ORDER BY a.affix_type, a.affix
-                """),
-                {"tribe": tribe_name}
-            ).fetchall()
-
-        return {
-            "tribe": tribe_name,
-            "affixes": [
-                {"id": r[0], "affix": r[1], "affix_type": r[2],
-                 "function": r[3], "example_form": r[4],
-                 "rule_ids": [int(x) for x in r[5].split(",")] if r[5] else []}
-                for r in rows
-            ]
-        }
+        rows = _fetch_affixes(db, tribe_name, affix_type)
+        return _format_affixes(tribe_name, rows, _fetch_affix_rule_ids(db, tribe_name, affix_type))
 
     return _grammar_affixes_cache.get_or_compute(key, _compute)
 
