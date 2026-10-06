@@ -41,7 +41,20 @@ vi.mock('../_quiz_questions/sentenceFill', () => ({
 vi.mock('../_quiz_questions/sentenceSpeak', () => ({ default: () => null }));
 vi.mock('../_quiz_questions/sentenceOrder', () => ({ default: () => null }));
 vi.mock('../_quiz_questions/wordMatch', () => ({ default: () => null }));
-vi.mock('../_quiz_questions/wordTranslation', () => ({ default: () => null }));
+// 單字翻譯：用來驗證「不是句子填空的題型不會送出診斷用的欄位」
+vi.mock('../_quiz_questions/wordTranslation', () => ({
+  default: ({ onSelect, onConfirm }) => (
+    <button
+      type="button"
+      onClick={() => {
+        onSelect({ result: true, question: 'q', answer: 'a', userAnswer: 'x', correctAnswer: 'a' });
+        onConfirm();
+      }}
+    >
+      翻譯作答
+    </button>
+  ),
+}));
 
 function generateResponse(questions) {
   return { questions };
@@ -146,5 +159,105 @@ describe('RecommendedQuizQuestion（FR-4b）', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('這次的作答結果可能沒有真的存進學習模型');
     expect(screen.getByText('第 2 / 2 題')).toBeInTheDocument();
+  });
+
+  describe('詞素診斷（句子填空）', () => {
+    async function answerOnly(question, submitResponse) {
+      apiPost.mockResolvedValueOnce(generateResponse([question]));
+      apiPost.mockResolvedValueOnce(submitResponse);
+      render(<RecommendedQuizQuestion tribe="amis" />);
+      fireEvent.click(await screen.findByRole('button', { name: '作答' }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: '結束測驗' }));
+      });
+    }
+
+    const submitAnswerPayload = () => apiPost.mock.calls[1][1].answer;
+
+    test('句子填空會把所選選項與出題時的 token 一起送出', async () => {
+      await answerOnly(
+        { id: 'sf-1', type: 'sentence-fill', payload: { questionToken: 'signed-token' }, difficulty: 1, meta: {} },
+        { user_model: {} },
+      );
+      expect(submitAnswerPayload()).toMatchObject({ question_id: 'sf-1', question_type: 'sentence-fill', selected_option: 'a', question_token: 'signed-token' });
+    });
+
+    test('題目沒有 token（功能沒開）時仍送出所選選項，token 省略', async () => {
+      await answerOnly({ id: 'sf-1', type: 'sentence-fill', payload: {}, difficulty: 1, meta: {} }, { user_model: {} });
+      expect(submitAnswerPayload().selected_option).toBe('a');
+      expect(submitAnswerPayload().question_token).toBeUndefined();
+    });
+
+    test('測驗結束時，結果頁會拿到每題的診斷與族語', async () => {
+      const diagnosis = { status: 'classified', errorType: 'wrong_affix', targetRule: 'v1|amis|P|ma||0', selectedRule: 'v1|amis|P|pa||0' };
+      await answerOnly(
+        { id: 'sf-1', type: 'sentence-fill', payload: { questionToken: 't' }, difficulty: 1, meta: {} },
+        { user_model: {}, diagnosis, rule_update: { rule: 'v1|amis|P|ma||0', before: 0.35, after: 0.3, n: 1 } },
+      );
+      await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
+      const state = mockNavigate.mock.calls[0][1].state;
+      expect(state.tribe).toBe('amis');
+      expect(state.ruleFeedback).toEqual([{ id: 'sf-1', diagnosis, ruleUpdate: { rule: 'v1|amis|P|ma||0', before: 0.35, after: 0.3, n: 1 } }]);
+    });
+
+    test('後端沒有回診斷（功能關閉）時，結果頁的診斷清單是空的', async () => {
+      await answerOnly({ id: 'sf-1', type: 'sentence-fill', payload: {}, difficulty: 1, meta: {} }, { user_model: {}, diagnosis: null, rule_update: null });
+      await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
+      expect(mockNavigate.mock.calls[0][1].state.ruleFeedback).toEqual([]);
+    });
+
+    test('不是句子填空的題型不會送出所選選項與 token', async () => {
+      apiPost.mockResolvedValueOnce(generateResponse([
+        { id: 'wt-1', type: 'word-translate', payload: { questionToken: 'should-not-be-sent' }, difficulty: 1, meta: {} },
+      ]));
+      apiPost.mockResolvedValueOnce({ user_model: {} });
+      render(<RecommendedQuizQuestion tribe="amis" />);
+      fireEvent.click(await screen.findByRole('button', { name: '翻譯作答' }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: '結束測驗' }));
+      });
+      const answer = apiPost.mock.calls[1][1].answer;
+      expect(answer.question_type).toBe('word-translate');
+      expect(answer).not.toHaveProperty('selected_option');
+      expect(answer.question_token).toBeUndefined();
+    });
+
+    test('切換族語重新開始測驗時，上一份測驗的診斷不會帶進新測驗的結果', async () => {
+      const diagnosis = { status: 'classified', errorType: 'wrong_affix', targetRule: 'v1|amis|P|ma||0', selectedRule: 'v1|amis|P|pa||0' };
+      apiPost.mockResolvedValueOnce(generateResponse([
+        { id: 'old-1', type: 'sentence-fill', payload: {}, difficulty: 1, meta: {} },
+        { id: 'old-2', type: 'sentence-fill', payload: {}, difficulty: 1, meta: {} },
+      ]));
+      apiPost.mockResolvedValueOnce({ user_model: {}, diagnosis, rule_update: null });
+      const { rerender } = render(<RecommendedQuizQuestion tribe="amis" />);
+      fireEvent.click(await screen.findByRole('button', { name: '作答' }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: '下一題' }));
+      });
+      await waitFor(() => expect(screen.getByText('第 2 / 2 題')).toBeInTheDocument());
+
+      apiPost.mockResolvedValueOnce(generateResponse([{ id: 'new-1', type: 'sentence-fill', payload: {}, difficulty: 1, meta: {} }]));
+      apiPost.mockResolvedValueOnce({ user_model: {}, diagnosis: null, rule_update: null });
+      rerender(<RecommendedQuizQuestion tribe="kavalan" />);
+      await waitFor(() => expect(screen.getByText('第 1 / 1 題')).toBeInTheDocument());
+      fireEvent.click(screen.getByRole('button', { name: '作答' }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: '結束測驗' }));
+      });
+      await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
+      expect(mockNavigate.mock.calls[0][1].state.ruleFeedback).toEqual([]);
+    });
+
+    test('提交失敗時不會留下診斷，測驗照常結束', async () => {
+      apiPost.mockResolvedValueOnce(generateResponse([{ id: 'sf-1', type: 'sentence-fill', payload: {}, difficulty: 1, meta: {} }]));
+      apiPost.mockRejectedValueOnce(new Error('down'));
+      render(<RecommendedQuizQuestion tribe="amis" />);
+      fireEvent.click(await screen.findByRole('button', { name: '作答' }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: '結束測驗' }));
+      });
+      await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
+      expect(mockNavigate.mock.calls[0][1].state.ruleFeedback).toEqual([]);
+    });
   });
 });

@@ -1,10 +1,27 @@
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CheckCircle, XCircle, RefreshCw, BookOpen, Check, Timer, ChartColumn } from "lucide-react";
+import { apiGet } from "../../utils/apiClient";
+import ResearchConsentCard from "./ResearchConsentCard";
+import RuleFeedback from "./RuleFeedback";
 import "../../static/css/_quiz/quiz_recommon_result.css";
+
+const RULE_SUMMARY_URL = import.meta.env.VITE_API_RULE_SUMMARY_URL || "/api/v1/quiz/rule_summary";
 
 function RecommendedQuizResult() {
   const { state } = useLocation();
   const navigate = useNavigate();
+  // 後端依累積作答算出的待加強詞綴；功能沒開或讀取失敗就維持 null，頁面照常顯示其他內容。
+  const [ruleSummary, setRuleSummary] = useState(null);
+
+  useEffect(() => {
+    if (!state?.tribe) return undefined;
+    let cancelled = false;
+    apiGet(RULE_SUMMARY_URL, { params: { tribe: state.tribe } })
+      .then((data) => { if (!cancelled) setRuleSummary(data); })
+      .catch(() => { if (!cancelled) setRuleSummary(null); });
+    return () => { cancelled = true; };
+  }, [state?.tribe]);
 
   if (!state) {
     return <p>沒有測驗結果，請重新測驗。</p>;
@@ -43,6 +60,9 @@ function RecommendedQuizResult() {
         <h3 className="fw-bolder mb-4"><BookOpen className="icon" /> 學習建議</h3>
         <p>{state.suggestion}</p>
       </div>
+
+      <RuleFeedback entries={state.ruleFeedback || []} summary={ruleSummary} />
+      <ResearchConsentCard />
 
       {/* 動作按鈕 */}
       <div className="result-actions">

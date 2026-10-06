@@ -20,6 +20,8 @@ export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
   // 讓下一次測驗的出題難度延續這一次的結果。放在 ref 而非 state：
   // 這份資料只餵給後端 API，不影響畫面渲染，不需要觸發 re-render。
   const userModelRef = useRef({});
+  // 每題作答後後端回傳的詞素診斷（只有句子填空且功能開啟時才有），測驗結束時交給結果頁顯示。
+  const ruleFeedbackRef = useRef([]);
 
   const [current, setCurrent] = useState(0);
   const [checked, setChecked] = useState(false);
@@ -46,6 +48,7 @@ export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
     setQuestionTime(0);
     setSaveWarning("");
     userModelRef.current = {};
+    ruleFeedbackRef.current = [];
 
     const loadQuiz = async () => {
       if (!userData?.uid) return;
@@ -144,11 +147,18 @@ export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
               word_name: getWordNameForQuestion(currentQ),
               correct: !!isCorrect,
               time_spent: questionTime,
+              // 句子填空才有：所選的選項，以及出題時伺服器簽發的診斷 token（沒有就省略）。
+              ...(currentQ.type === "sentence-fill" && selected.userAnswer
+                ? { selected_option: selected.userAnswer, question_token: currentQ.questionToken || undefined }
+                : {}),
             },
           },
           { params: { tribe } }
         );
         userModelRef.current = data.user_model;
+        if (data.diagnosis) {
+          ruleFeedbackRef.current.push({ id: currentQ.id, diagnosis: data.diagnosis, ruleUpdate: data.rule_update || null });
+        }
       } catch (err) {
         // 原本這裡失敗只 console，畫面完全不會顯示——使用者以為這次的
         // 學習進度有存到，實際上適性出題的模型沒有更新到。不擋下作答流程
@@ -187,6 +197,8 @@ export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
             analysis,
             suggestion,
             modelSaveFailed,
+            tribe,
+            ruleFeedback: ruleFeedbackRef.current,
           },
         });
       }

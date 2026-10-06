@@ -134,3 +134,32 @@
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* 詞綴診斷（RuleFeedback）與選填的研究資料同意（ResearchConsentCard） */
+.result-rules, .result-consent {
+  text-align: left;
+  margin: 20px 0;
+  padding: 15px;
+  background: var(--yy-cream-dim);
+  border: 2px solid var(--yy-ink);
+  border-left: 6px solid var(--yy-blue);
+  border-radius: var(--yy-radius-card);
+}
+
+.result-rules h3 {
+  display: flex;
+  align-items: center;
+  font-size: 18px;
+  color: var(--yy-blue);
+}
+
+.result-rule-list {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+
+.result-rule-note {
+  font-size: 13px;
+  color: var(--yy-text-secondary);
+  margin: 8px 0 0;
+}
