@@ -37,11 +37,18 @@ class SubmitAnswerReq(BaseModel):
     word_name: Optional[str] = None
     correct: bool
     time_spent: float
+    # 句子填空題才會帶：學習者選的選項，以及出題時伺服器簽發的診斷 token（見 diagnosis.py）。
+    selected_option: Optional[str] = Field(default=None, max_length=200)
+    question_token: Optional[str] = Field(default=None, max_length=8192)
 
 class SubmitAnswerResp(BaseModel):
     new_theta: float
     updated_user_errors: Dict[str, Any]
     user_model: Dict[str, Any]
+    # 詞素診斷結果；旗標關閉、不是句子填空題、或診斷過程出錯時是 None。
+    diagnosis: Optional[Dict[str, Any]] = None
+    # 這次作答更新了哪一條規則的熟練度：{"rule": ID, "before": p, "after": p, "n": 次數}；沒更新是 None。
+    rule_update: Optional[Dict[str, Any]] = None
 
 
 # generate_quiz_frontend／submit_answer_frontend 原本都用 Body(...): dict 收

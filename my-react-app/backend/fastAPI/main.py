@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from .routes import crawler, vision, dictionary, quiz, listening, sentence, auth, internal, translation, morphology
 from .routes.pronunciation import model as pronunciation_model
+from .routes.quiz import deadline as quiz_deadline
 from dictionary_db.connect import SessionLocal
 from .rate_limit import limiter
 from fastapi.middleware.cors import CORSMiddleware
@@ -139,6 +140,8 @@ async def lifespan(app: FastAPI):
         # 不是根本沒預熱完就被關掉，不需要真的等它。
         if warm_thread.is_alive():
             logger.warning("服務關閉時快取預熱執行緒仍未完成，可能被中斷")
+        # 詞素學習的背景工作（Firestore／Postgres 寫入）：不等卡住的外部呼叫，免得拖住關閉
+        quiz_deadline.shutdown()
 
 
 app = FastAPI(lifespan=lifespan)

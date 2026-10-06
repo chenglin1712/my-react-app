@@ -1,10 +1,12 @@
 """候選字排序後，怎麼組成四種題型（配對、翻譯、填空、排序）的出題邏輯。
 依賴 repository.py 拿詞彙資料／快取好的釋義音檔，依賴 irt.py 算難度分數；
 本身不做任何 DB 存取或 HTTP 呼叫。"""
+import logging
 import random
+from dataclasses import dataclass, replace
 from typing import Dict, List
 
-from . import irt, repository
+from . import diagnosis, irt, repository, rule_selection
 from .irt import (
     compute_Bq,
     compute_Dq_and_bw,
@@ -16,6 +18,16 @@ from .irt import (
 )
 from .repository import _get_audio, _get_cn
 from .schemas import WordDTO
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class TokenOptions:
+    """出題時要不要替句子填空題附上診斷 token（見 diagnosis.py）。None＝不附。"""
+    tribe: str
+    uid: str = ""
+    policy: str = diagnosis.POLICY_BASELINE
 
 
 def _build_translate_options(w, all_words_list):
@@ -48,6 +60,12 @@ def _get_sentence_fill_payload(w, all_words_list, distractor_source=None):
 
     distractor_source（見 distractors.py）有給、而且造得出候選錯誤詞形時，干擾項優先用
     「同一個詞根換別的詞綴」造的詞形，不夠 3 個才用隨機別的詞補。"""
+    built = _build_sentence_fill(w, all_words_list, distractor_source)
+    return built[0] if built else None
+
+
+def _build_sentence_fill(w, all_words_list, distractor_source=None):
+    """同 _get_sentence_fill_payload，但多回傳引擎造的干擾項清單（診斷 token 需要）：(payload, engine)。"""
     items = repository._word_explanations_cache.get(w.id, [])
     for item in items:
         for sent in (item.get("sentenceItems") or []):
@@ -79,7 +97,7 @@ def _get_sentence_fill_payload(w, all_words_list, distractor_source=None):
             if engine:
                 # 作答後給使用者看的說明：這些是「候選」錯誤形，不是保證不存在的詞。
                 payload["distractorNotes"] = {d.word: d.note for d in engine}
-            return payload
+            return payload, engine
     return None
 
 def _get_sentence_order_payload(w, all_words_list):
@@ -112,6 +130,20 @@ class _CandidatePicker:
         self._candidates = candidates_sorted
         self._idx = 0
         self._used = set()
+
+    def peek(self, n: int) -> list:
+        """往後看最多 n 個「尚未用過」的候選字，不消耗任何一個（適性選題用，見 rule_selection.py）。"""
+        out = []
+        i = self._idx
+        while i < len(self._candidates) and len(out) < n:
+            if self._candidates[i]["word"].name not in self._used:
+                out.append(self._candidates[i])
+            i += 1
+        return out
+
+    def take(self, candidate) -> None:
+        """把指定的候選字標記為已用（不一定是排序最前面的那一個）。"""
+        self._used.add(candidate["word"].name)
 
     def next(self):
         while self._idx < len(self._candidates) and self._candidates[self._idx]["word"].name in self._used:
@@ -211,19 +243,47 @@ def _generate_word_match_questions(picker: _CandidatePicker, count: int) -> list
         })
     return generated
 
+def _attach_diagnosis_token(payload: dict, question_id: str, w, engine, distractor_source,
+                            token_options: "TokenOptions") -> None:
+    """替題目附上簽章 token；任何一步失敗都只記 log，題目照常出（沒有 token 就只是少了詞素診斷）。"""
+    try:
+        ctx = diagnosis.build_context(question_id, token_options.tribe, w.name,
+                                      [o["word"] for o in payload["options"]], engine,
+                                      distractor_source.kit, uid=token_options.uid, policy=token_options.policy)
+        token = diagnosis.encode_token(ctx)
+        if token:
+            payload["questionToken"] = token
+    except Exception:
+        logger.exception("diagnosis token generation failed for %r", getattr(w, "name", None))
+
+
 def _generate_sentence_fill_questions(picker: _CandidatePicker, all_words: List[WordDTO], count: int,
-                                      distractor_source=None) -> list:
+                                      distractor_source=None, token_options: "TokenOptions | None" = None,
+                                      rule_policy=None) -> list:
+    """rule_policy（見 rule_selection.py）有給時，目標詞改依規則熟練度挑；沒挑到合適的就照原本排序。"""
     generated = []
     fill_done = 0
     fallback = []
     while fill_done < count:
-        c = picker.next()
+        picked = rule_policy.pick(picker) if rule_policy is not None else None
+        if picked is not None:
+            c, rule, policy = picked
+        else:
+            c, rule = picker.next(), None
+            policy = rule_selection.POLICY_FALLBACK if rule_policy is not None else None
         if not c: break
         w = c["word"]
-        payload = _get_sentence_fill_payload(w, all_words, distractor_source)
-        if payload:
+        built = _build_sentence_fill(w, all_words, distractor_source)
+        if built:
+            payload, engine = built
+            question_id = f"sf-{w.id}-{fill_done}"
+            if rule_policy is not None:
+                rule_policy.commit(rule)
+            if token_options is not None and distractor_source is not None:
+                options = replace(token_options, policy=policy) if policy else token_options
+                _attach_diagnosis_token(payload, question_id, w, engine, distractor_source, options)
             generated.append({
-                "id": f"sf-{w.id}-{fill_done}",
+                "id": question_id,
                 "type": "sentence-fill",
                 "payload": payload,
                 "difficulty": None,
