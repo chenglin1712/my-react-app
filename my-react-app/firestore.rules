@@ -51,6 +51,15 @@ service cloud.firestore {
       allow write: if request.auth != null && request.auth.uid == userId;
     }
 
+    // 詞素學習的規則熟練度狀態（backend/fastAPI/routes/quiz/rule_state_store.py）：只有本人可讀，
+    // 前端完全不能寫。狀態由後端用 Admin SDK 在交易裡更新（Admin SDK 會繞過這份規則）；
+    // 不開放前端寫入，使用者才無法自己改熟練度、也不會因為多分頁互相覆蓋。
+    // 刻意不開放 staff 讀取：這是個人學習資料，後台沒有需要。
+    match /users/{userId}/quizRuleState/{tribe} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false;
+    }
+
     // 測驗題目：登入者可讀；登入者可建立，且限制內容形狀——原本只檢查有沒有
     // 登入，任何已登入使用者都能寫入任意垃圾文件。uploadDb.jsx 的
     // uploadQuizDB 固定寫入 title/tribe/createdAt/data 四個欄位，這裡驗證

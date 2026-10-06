@@ -450,6 +450,66 @@ describe('users 規則（staff 角色）', () => {
   });
 });
 
+describe('users/{uid}/quizRuleState 規則（規則熟練度狀態，只有後端能寫）', () => {
+  const path = 'users/alice/quizRuleState/amis';
+  const state = { skills: {}, confusions: {}, revision: 1, nonces: ['n1'] };
+  let getDoc;
+  let deleteDoc;
+
+  beforeAll(async () => {
+    ({ getDoc, deleteDoc } = await import('firebase/firestore'));
+  });
+
+  test('本人可以讀自己的狀態', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), path), state);
+    });
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(getDoc(doc(alice.firestore(), path)));
+  });
+
+  test('別人不能讀', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), path), state);
+    });
+    const bob = testEnv.authenticatedContext('bob');
+    await assertFails(getDoc(doc(bob.firestore(), path)));
+  });
+
+  test('未登入不能讀', async () => {
+    const anon = testEnv.unauthenticatedContext();
+    await assertFails(getDoc(doc(anon.firestore(), path)));
+  });
+
+  test('staff 也不能讀（這是個人學習資料，後台用不到）', async () => {
+    const staffBob = testEnv.authenticatedContext('bob', { role: 'admin' });
+    await assertFails(getDoc(doc(staffBob.firestore(), path)));
+  });
+
+  test('本人也不能寫（防止自己改熟練度或繞過 nonce 去重）', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(setDoc(doc(alice.firestore(), path), state));
+  });
+
+  test('本人也不能刪除', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), path), state);
+    });
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(deleteDoc(doc(alice.firestore(), path)));
+  });
+
+  test('staff 與別人都不能寫', async () => {
+    const staffBob = testEnv.authenticatedContext('bob', { role: 'admin' });
+    await assertFails(setDoc(doc(staffBob.firestore(), path), state));
+  });
+
+  test('users 主文件的規則不受影響：本人仍可寫自己的 users 文件', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(setDoc(doc(alice.firestore(), 'users/alice'), { name: 'Alice' }));
+  });
+});
+
 describe('sharedNotes 規則（staff 審核）', () => {
   const seedNote = async (noteId, overrides = {}) => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
