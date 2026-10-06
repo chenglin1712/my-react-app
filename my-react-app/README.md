@@ -78,6 +78,27 @@ alembic upgrade head
 
 對一個全新、空的 SQLite 檔案執行以上指令即可建出完整 schema（`ad283d8500e4` 這支起始 migration 會建出所有資料表）。實際辭典資料需另外匯入，不含在 migration 裡。
 
+## 族語詞形分析器（選用功能，預設關閉）
+
+從辭典的「衍生詞→詞根」對照自動歸納詞綴規則，讓翻譯的佐證檢核能認得更多合法的詞綴變化形（目前只涵蓋葛瑪蘭語與阿美語；泰雅語、布農語、排灣語因資料或把關標準不足而停用）。實作在 `backend/config/morphology.py`、`morphology_calibration.py` 與 `backend/fastAPI/routes/translation/morph.py`。
+
+**安全設計**：只用直接命中（不用模糊比對，實測模糊比對會讓六到九成亂造的詞被放行）；只放行經過校準的少數規則；所有「是否夠安全」的判斷都比 95% 信賴上界；載入失敗一律停用、不影響翻譯；旗標預設關閉。
+
+**維運流程**（辭典詞條或詞綴有異動後都要做）：
+
+```sh
+cd backend
+python manage.py build_morphology_rules           # 只印報告，檢查各族結果與閘門
+python manage.py build_morphology_rules --write   # 寫入 config/morphology_rules.json，連同報告一起提交
+python manage.py seed_feature_flags               # 第一次：建立兩個旗標（預設關閉）
+```
+
+- 放行檔綁定產生時的辭典內容（檔內有詞庫內容雜湊）。執行期載入時雜湊對不上，該族會整族停用——辭典改了就必須重跑指令，不要沿用舊檔。
+- 請用跟正式環境一致的資料庫產生；只拿本機 SQLite 副本的結果不能決定正式放行。
+- 上線建議流程：先在後台打開 `translation_morphology_shadow`（只在 log 記錄 `[morph-shadow]`「本來會把哪些詞升級成有佐證」，完全不改變輸出），用真實流量檢查後，再打開 `translation_morphology_analyzer`。出問題時關閉旗標即可恢復原本行為（最慢約 30 秒生效）。
+- 評估指令 `python manage.py evaluate_morphology_analyzer` 可重現各種做法的準確率與「亂造詞被錯放行」的比例。
+- 安全上限是政策選擇：預設各負例族群錯放行 ≤ 1%、被接受真詞的錯詞根比例 ≤ 10%（都是 95% 信賴上界）。可用 `--max-fa-upper`、`--max-wrong-root-upper` 調整；收緊到錯詞根 ≤ 5% 時，目前的資料量不足以證明安全，所有族語都會停用。
+
 ## 正式部署
 
 - `ALLOWED_HOSTS`：Render 會自動注入 `RENDER_EXTERNAL_HOSTNAME`；部署到其他平台時用 `DJANGO_ALLOWED_HOSTS`（逗號分隔）手動指定。

@@ -1,0 +1,273 @@
+/* 詞形分析（單詞查詢頁的詞形分析面板、翻譯依據面板裡的詞形分析）。
+   所有類別一律帶 yy-morph- 前綴（全站 CSS 都是全域的，見 cssNamespace.test.js）。 */
+
+/* ---------- 搜尋頁的面板外框 ---------- */
+
+.yy-morph-panel {
+    margin: 16px 0;
+    border: 3px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
+    background: #fff;
+    box-shadow: var(--yy-shadow-sm);
+}
+
+.yy-morph-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 16px;
+    border: none;
+    background: var(--yy-cream);
+    color: var(--yy-ink);
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    text-align: left;
+}
+.yy-morph-toggle:focus-visible {
+    outline: 3px solid var(--yy-blue);
+    outline-offset: -3px;
+}
+.yy-morph-toggle small {
+    font-weight: 400;
+    color: var(--yy-text-secondary);
+}
+
+.yy-morph-body {
+    padding: 14px 16px 16px;
+    border-top: 2px solid var(--yy-ink);
+}
+
+.yy-morph-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.yy-morph-input {
+    flex: 1 1 200px;
+    min-width: 0;
+    padding: 8px 12px;
+    border: 2px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
+    font-size: 15px;
+}
+.yy-morph-input:focus-visible {
+    outline: 3px solid var(--yy-blue);
+    outline-offset: 1px;
+}
+.yy-morph-go {
+    padding: 8px 18px;
+    border: 2px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
+    background: var(--yy-gold);
+    color: var(--yy-ink);
+    font-weight: 700;
+    cursor: pointer;
+}
+.yy-morph-go:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.yy-morph-hint {
+    margin: 8px 0 0;
+    font-size: 12.5px;
+    color: var(--yy-text-muted);
+}
+
+.yy-morph-error {
+    margin: 10px 0 0;
+    padding: 8px 12px;
+    border: 2px solid var(--yy-red);
+    border-radius: var(--yy-radius-btn);
+    background: #fdecec;
+    color: var(--yy-red);
+    font-size: 14px;
+}
+
+/* ---------- 結果 ---------- */
+
+.yy-morph-result {
+    margin-top: 14px;
+}
+
+.yy-morph-token {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    font-size: 16px;
+}
+
+.yy-morph-status {
+    padding: 2px 8px;
+    border: 1.5px solid var(--yy-ink);
+    border-radius: 4px;
+    background: #fff;
+    font-size: 11.5px;
+    font-weight: 700;
+}
+.yy-morph-status-headword { background: #e6f2e6; }
+.yy-morph-status-attested { background: #e8eef7; }
+.yy-morph-status-unknown { background: #f5ecec; }
+
+.yy-morph-token-gloss {
+    color: var(--yy-text-secondary);
+    font-size: 14px;
+}
+
+.yy-morph-candidates {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.yy-morph-candidate {
+    padding: 12px 14px;
+    border: 2px solid var(--yy-ink);
+    border-left-width: 6px;
+    border-radius: var(--yy-radius-btn);
+    background: var(--yy-cream);
+}
+.yy-morph-conf-dictionary { border-left-color: var(--yy-blue); }
+.yy-morph-conf-high { border-left-color: #3c7a3c; }
+.yy-morph-conf-medium { border-left-color: var(--yy-gold); }
+.yy-morph-conf-low {
+    border-left-color: var(--yy-text-muted);
+    border-style: dashed;
+    border-left-style: solid;
+    background: #faf7f2;
+}
+
+.yy-morph-candidate-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+}
+
+.yy-morph-badge {
+    padding: 2px 8px;
+    border: 1.5px solid var(--yy-ink);
+    border-radius: 4px;
+    background: #fff;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: help;
+}
+.yy-morph-badge-dictionary { background: #dfe8f6; }
+.yy-morph-badge-high { background: #dff0df; }
+.yy-morph-badge-medium { background: #fbf0c8; }
+.yy-morph-badge-low { background: #eee; color: var(--yy-text-secondary); }
+
+/* 詞綴切分：詞根、詞綴、重疊各用不同底色，並且都有文字標題（不只靠顏色區分） */
+.yy-morph-segments {
+    display: inline-flex;
+    flex-wrap: wrap;
+    margin: 10px 0 4px;
+    font-family: var(--yy-font-pixel, monospace);
+    font-size: 18px;
+}
+.yy-morph-seg {
+    padding: 2px 6px;
+    border: 2px solid var(--yy-ink);
+    margin-right: -2px;
+}
+.yy-morph-seg-root { background: #fff; }
+.yy-morph-seg-affix { background: var(--yy-gold); font-weight: 700; }
+.yy-morph-seg-redup {
+    background: #e7d7f3;
+    border-style: dashed;
+}
+
+.yy-morph-line {
+    margin: 4px 0;
+    font-size: 13.5px;
+    color: var(--yy-text-secondary);
+}
+.yy-morph-line code {
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #fff;
+    border: 1px solid var(--yy-text-muted);
+    color: var(--yy-ink);
+}
+
+.yy-morph-rule-function { margin-left: 10px; }
+
+.yy-morph-muted {
+    color: var(--yy-text-muted);
+    font-weight: 400;
+}
+
+.yy-morph-examples {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 8px 0 0;
+    border-top: 1px dashed var(--yy-text-muted);
+    font-size: 13.5px;
+}
+.yy-morph-examples li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 8px;
+    margin: 4px 0;
+}
+.yy-morph-example-original { font-weight: 700; }
+.yy-morph-example-chinese { color: var(--yy-text-secondary); }
+
+.yy-morph-attested {
+    margin-top: 8px;
+    font-size: 13.5px;
+}
+
+.yy-morph-audio-btn {
+    border: none;
+    background: none;
+    color: var(--yy-blue);
+    cursor: pointer;
+    padding: 0 2px;
+    vertical-align: middle;
+}
+.yy-morph-audio-btn:hover { color: var(--yy-red); }
+.yy-morph-audio-btn:focus-visible {
+    outline: 2px solid var(--yy-blue);
+    outline-offset: 2px;
+}
+
+.yy-morph-note {
+    margin: 10px 0 0;
+    font-size: 13px;
+    color: var(--yy-text-secondary);
+}
+.yy-morph-disclaimer {
+    margin: 12px 0 0;
+    font-size: 12px;
+    color: var(--yy-text-muted);
+}
+
+/* ---------- 翻譯依據面板裡的緊湊版 ---------- */
+
+.yy-morph-compact { margin-top: 10px; }
+.yy-morph-compact .yy-morph-candidate { padding: 8px 10px; }
+.yy-morph-compact .yy-morph-segments { font-size: 16px; }
+
+.yy-morph-inline-btn {
+    margin-top: 8px;
+    padding: 4px 12px;
+    border: 2px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
+    background: #fff;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.yy-morph-inline-btn:hover { background: var(--yy-gold); }
+.yy-morph-inline-btn:disabled { opacity: 0.55; cursor: wait; }

@@ -101,3 +101,47 @@ describe('SearchPage（回歸測試：全部詞條主查詢與載入更多的競
     expect(screen.getByText('cyux')).toBeInTheDocument();
   });
 });
+
+describe('SearchPage 的詞形分析面板', () => {
+  beforeEach(() => {
+    apiPost.mockReset();
+    apiPost.mockImplementation((url) => (
+      String(url).includes('/morphology/')
+        ? Promise.resolve({
+          tribe: '阿美語', tribeSlug: 'amis', input: 'mafiloo', normalized: 'mafiloo',
+          token: { status: 'unknown', wordIds: [] }, candidates: [], rulesAvailable: true, admittedRuleCount: 2,
+          notes: ['辭典裡沒有這個詞形，也找不到可信的分析結果。'],
+        })
+        : Promise.resolve({ all_results: {}, total: 0 })
+    ));
+  });
+
+  test('搜尋頁有詞形分析面板，預設收合', async () => {
+    render(<SearchPage />);
+    const toggle = await screen.findByRole('button', { name: /詞形分析/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('面板分析時用的是目前選的族語（slug），而不是搜尋用的中文簡稱', async () => {
+    render(<SearchPage />);
+    fireEvent.click(screen.getByText('阿美族語'));
+    fireEvent.click(await screen.findByRole('button', { name: /詞形分析/ }));
+    fireEvent.change(screen.getByLabelText('要分析的詞形'), { target: { value: 'mafiloo' } });
+    fireEvent.click(screen.getByRole('button', { name: '分析' }));
+
+    await waitFor(() => expect(screen.getByText('辭典查無此詞形')).toBeInTheDocument());
+    const call = apiPost.mock.calls.find(([url]) => String(url).includes('/morphology/'));
+    expect(call[1]).toEqual({ tribe: 'amis', word: 'mafiloo' });
+  });
+
+  test('切換族語會清掉上一個族語的分析結果', async () => {
+    render(<SearchPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /詞形分析/ }));
+    fireEvent.change(screen.getByLabelText('要分析的詞形'), { target: { value: 'mafiloo' } });
+    fireEvent.click(screen.getByRole('button', { name: '分析' }));
+    await screen.findByText('辭典查無此詞形');
+
+    fireEvent.click(screen.getByText('布農族語'));
+    await waitFor(() => expect(screen.queryByText('辭典查無此詞形')).not.toBeInTheDocument());
+  });
+});

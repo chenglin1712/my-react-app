@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Container, Alert, Spinner, Button } from 'react-bootstrap';
 import { useFavorites } from "../../src/userServives/useFavorites";
-import { TRIBE_NAMES, TRIBE_SLUG_BY_NAME } from "../constants/tribes";
+import { TRIBE_NAMES, TRIBE_SLUG_BY_NAME, TRIBE_FULL_NAME_BY_SLUG } from "../constants/tribes";
 import { apiPost } from "../../utils/apiClient";
 import { filterAndSortWords as sortWords } from "../../utils/wordFilterSort";
 import { useTranslateCapabilities } from "../../hooks/useTranslateCapabilities";
@@ -10,6 +10,7 @@ import "../../static/css/_search/index.css";
 
 import SearchHeader from './components/SearchHeader';
 import WordResultsSection from './components/WordResultsSection';
+import MorphologyPanel from './components/MorphologyPanel';
 import useAudioPlayback from '../../hooks/useAudioPlayback';
 
 const PAGE_SIZE = 50;
@@ -242,6 +243,12 @@ const SearchPage = () => {
         showCategories={showCategories} setShowCategories={setShowCategories}
         activeTab={activeTab} setActiveTab={setActiveTab}
         selectedSubCategory={selectedSubCategory} setSelectedSubCategory={setSelectedSubCategory}
+      />
+
+      <MorphologyPanel
+        tribeSlug={TRIBE_SLUG_BY_NAME[selectedTribe]}
+        tribeName={TRIBE_FULL_NAME_BY_SLUG[TRIBE_SLUG_BY_NAME[selectedTribe]]}
+        playAudio={playAudio}
       />
 
       <br />

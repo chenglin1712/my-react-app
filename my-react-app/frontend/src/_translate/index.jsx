@@ -236,7 +236,7 @@ const TranslatePage = () => {
                                 </p>
                                 {result.notes && <p className="translate-notes">{result.notes}</p>}
 
-                                <EvidencePanel token={activeToken} onPlayAudio={playAudio} />
+                                <EvidencePanel token={activeToken} onPlayAudio={playAudio} tribeSlug={result.tribeSlug} />
 
                                 {result.evidence.sentences.length > 0 && (
                                     <div className="translate-evidence-list">

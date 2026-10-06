@@ -72,3 +72,37 @@ describe('TranslatePage（回歸測試：swap/切族語都要能取消還在跑�
     await waitFor(() => expect(screen.getByText('你')).toBeInTheDocument());
   });
 });
+
+describe('TranslatePage 的依據面板：詞形分析', () => {
+  beforeEach(() => {
+    apiGet.mockReset();
+    apiPost.mockReset();
+    trackEvent.mockReset();
+    apiGet.mockResolvedValue({ tribes: [] });
+  });
+
+  test('點開一個詞的依據後，可以按「詞形分析」，且用的是這次翻譯的族語', async () => {
+    apiPost.mockImplementation((url) => (
+      String(url).includes('/morphology/')
+        ? Promise.resolve({
+          tribe: '泰雅語', tribeSlug: 'tayal', input: 'blaq', normalized: 'blaq',
+          token: { status: 'headword', gloss: '好', wordIds: ['w'] }, candidates: [], rulesAvailable: true,
+          admittedRuleCount: 0, notes: [],
+        })
+        : Promise.resolve({
+          tribeSlug: 'tayal', translation: 'blaq', coverage: { total: 1 }, evidence: { sentences: [] },
+          tokens: [{ surface: 'blaq', status: 'headword', lemma: 'blaq', gloss: '好' }],
+        })
+    ));
+
+    render(<TranslatePage />);
+    typeAndSubmit('好');
+    fireEvent.click(await screen.findByText('blaq'));
+
+    fireEvent.click(await screen.findByRole('button', { name: /詞形分析/ }));
+
+    await waitFor(() => expect(screen.getByText('辭典詞條', { selector: 'span.yy-morph-status' })).toBeInTheDocument());
+    const call = apiPost.mock.calls.find(([url]) => String(url).includes('/morphology/'));
+    expect(call[1]).toEqual({ tribe: 'tayal', word: 'blaq' });
+  });
+});
