@@ -123,6 +123,13 @@ good_env; printf '#!/usr/bin/env bash\nexit 1\n' > "$SB/repo/deploy/backup.sh"; 
 check "備份失敗：中止，且沒有進入建置" "$([ $rc != 0 ] && out_has '備份失敗' && ! log_has 'compose.* build'; echo $?)"
 cp "$ROOT/deploy/backup.sh" "$SB/repo/deploy/backup.sh"
 
+good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "沒有 SENTRY_DSN：只印警告，部署照常成功（非阻擋）" "$([ $rc = 0 ] && out_has 'SENTRY_DSN' && dist_is new; echo $?)"
+
+good_env; printf 'SENTRY_DSN=https://example@o0.ingest.sentry.io/1
+' >> "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "有設定 SENTRY_DSN：不印警告" "$([ $rc = 0 ] && ! out_has 'SENTRY_DSN'; echo $?)"
+
 echo "deploy.sh：.env 防呆"
 env_case() { # 名稱 內容(printf 格式) 預期輸出關鍵字
   good_env; printf "$2" > "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?

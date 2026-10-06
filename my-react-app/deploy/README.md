@@ -109,6 +109,7 @@ dropdb yuanyu_restore_test
 | `LLM_MAX_RETRIES` | LLM 重試次數，預設 1 |
 | `LLM_BREAKER_THRESHOLD` | 連續失敗幾次後暫停呼叫，預設 5 |
 | `LLM_BREAKER_COOLDOWN_SECONDS` | 暫停多久後再試探，預設 30 |
+| `SENTRY_DSN` | 建議設定。Django 與 FastAPI 都已接上 Sentry，沒設定就不會送出任何錯誤告警（`deploy.sh` 缺少時只印警告、不中止）。已關閉 `send_default_pii`，不會附帶使用者個資 |
 
 調整 LLM 逾時時，逾時預算要由內而外逐層放大：LLM 最長等待 `(重試+1) × 單次逾時 + 退避`（預設約 55 秒）
 < gunicorn `--timeout`（75 秒，`docker-compose.prod.yml`）< nginx `proxy_read_timeout`（90 秒，`deploy/nginx.conf`）。

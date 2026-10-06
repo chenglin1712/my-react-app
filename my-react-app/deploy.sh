@@ -56,6 +56,12 @@ preflight() {
 echo "==> 檢查 .env 與環境"
 preflight
 
+# 非阻擋警告：沒有設定 SENTRY_DSN 時，後端（Django 與 FastAPI 都已接上 Sentry）的錯誤不會送出，
+# 部署後出問題只能翻 log 檔才知道。這不是部署的必要條件，所以只提醒、不中止。
+if [ -z "$(env_value SENTRY_DSN)" ]; then
+  echo "!! 警告：.env 沒有設定 SENTRY_DSN，後端錯誤不會送出告警。部署會繼續。"
+fi
+
 BEFORE=$(git rev-parse HEAD)
 echo "==> 目前版本 $(git rev-parse --short HEAD)，拉取最新..."
 git pull --ff-only
