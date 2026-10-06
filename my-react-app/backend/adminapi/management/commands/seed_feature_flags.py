@@ -43,8 +43,25 @@ class Command(BaseCommand):
         )
         created_count += int(created)
 
-        total = len(TRIBES) + 1
+        # 詞形分析器的兩個旗標預設【關閉】（跟其他旗標預設啟用相反）：
+        # 這個功能會讓更多詞被判成有佐證，錯放行比漏判嚴重，必須明確打開才生效。
+        # 建議流程：先開 shadow（只記錄、不改輸出）觀察真實流量，再開 analyzer。
+        for key, label, description in (
+            ("translation_morphology_shadow", "翻譯詞形分析器（僅記錄）",
+             "開啟後，翻譯的佐證檢核會在背景記錄詞形分析器『本來會把哪些詞升級成有佐證』，"
+             "完全不改變任何翻譯輸出。用來在正式啟用前用真實流量驗證。"),
+            ("translation_morphology_analyzer", "翻譯詞形分析器（正式啟用）",
+             "開啟後，詞形分析器通過校準的規則會讓更多詞形被判成『由詞根衍生』。只使用直接命中、"
+             "只涵蓋放行檔啟用的族語。出問題時關閉即可恢復原本行為（最慢約 30 秒生效）。"),
+        ):
+            _, created = FeatureFlag.objects.get_or_create(
+                key=key, defaults={"label": label, "description": description, "enabled": False},
+            )
+            created_count += int(created)
+
+        total = len(TRIBES) + 3
         self.stdout.write(self.style.SUCCESS(
-            f"功能開關種子完成：共 {total} 筆（族語測驗開關 {len(TRIBES)} + 族語翻譯開關 1），"
+            f"功能開關種子完成：共 {total} 筆（族語測驗開關 {len(TRIBES)} + 族語翻譯開關 1 + 詞形分析器 2，"
+            f"後兩個預設關閉），"
             f"新增 {created_count} 筆，其餘已存在維持原值。"
         ))

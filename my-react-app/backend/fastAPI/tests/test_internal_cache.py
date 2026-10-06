@@ -206,3 +206,58 @@ def test_no_words_invalidated_skips_rewarm(client, monkeypatch):
     assert resp.status_code == 200
     assert resp.json()["rewarm"] == "skipped"
     mock_thread.assert_not_called()
+
+
+def test_words_scope_also_invalidates_the_morphology_analyzer_of_that_tribe_only(client, monkeypatch):
+    """詞形分析器的詞庫是從辭典詞條建的，詞條變了就得重建（重建時會重新驗證放行檔的詞庫
+    指紋）。只清有被通知的族語，其他族語的分析器不受影響。"""
+    from config.tribes import TRIBES
+    from fastAPI.routes.translation import morph
+
+    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret")
+    tayal = next(t for t in TRIBES if t.slug == "tayal")
+    amis = next(t for t in TRIBES if t.slug == "amis")
+    morph._CACHE = type(morph._CACHE)()
+    morph._CACHE.get_or_compute(tayal.id, lambda: morph._disabled("x", log=False))
+    morph._CACHE.get_or_compute(amis.id, lambda: morph._disabled("x", log=False))
+    search._tribe_words_cache.get_or_compute("泰雅語", lambda: ["fake-word"])
+
+    class _NoopThread:   # 不要真的啟動背景重新預熱（它會打真實的辭典資料庫）
+        def __init__(self, target, args=(), daemon=None):
+            pass
+
+        def start(self):
+            pass
+
+    with patch("fastAPI.routes.internal.threading.Thread", _NoopThread):
+        resp = client.post(
+            "/internal/cache/invalidate",
+            json={"scopes": ["words"], "tribes": ["tayal"]},
+            headers={"X-Internal-Secret": "correct-secret"},
+        )
+
+    assert resp.status_code == 200
+    assert tayal.id not in morph._CACHE and amis.id in morph._CACHE
+
+
+def test_grammar_affixes_scope_also_invalidates_the_morphology_analyzer_of_that_tribe_only(client, monkeypatch):
+    """詞形分析器的規則說明（note 裡的詞綴功能）是從詞綴表讀的、啟用後會一直快取，所以詞綴表
+    改了也要重建。只清有被通知的族語。"""
+    from config.tribes import TRIBES
+    from fastAPI.routes.translation import morph
+
+    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret")
+    tayal = next(t for t in TRIBES if t.slug == "tayal")
+    amis = next(t for t in TRIBES if t.slug == "amis")
+    morph._CACHE = type(morph._CACHE)()
+    morph._CACHE.get_or_compute(tayal.id, lambda: morph._disabled("x", log=False))
+    morph._CACHE.get_or_compute(amis.id, lambda: morph._disabled("x", log=False))
+
+    resp = client.post(
+        "/internal/cache/invalidate",
+        json={"scopes": ["grammar_affixes"], "tribes": ["tayal"]},
+        headers={"X-Internal-Secret": "correct-secret"},
+    )
+
+    assert resp.status_code == 200
+    assert tayal.id not in morph._CACHE and amis.id in morph._CACHE

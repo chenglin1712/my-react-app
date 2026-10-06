@@ -305,7 +305,8 @@ def fetch_sentence_by_id(db: Session, sentence_id: int) -> SentenceMatch | None:
 
 def corroborate_tokens(db: Session, tribe_id: str, raw_tokens: list[str],
                         strip_rules: lexicon.StripRules | None = None,
-                        max_window: int = MAX_HEADWORD_WINDOW) -> list[MatchedSpan]:
+                        max_window: int = MAX_HEADWORD_WINDOW, *,
+                        morph=None) -> list[MatchedSpan]:
     """對一串「已切好、彼此在原句中確實相鄰」的族語詞形 token，做多詞最長
     匹配 + 三層佐證判定，回傳依序、互不重疊的 MatchedSpan 清單。
 
@@ -314,6 +315,13 @@ def corroborate_tokens(db: Session, tribe_id: str, raw_tokens: list[str],
     確保「這個詞形算不算有佐證」在兩個方向判斷一致——呼叫端負責只把「原句
     中真正相鄰」的 token 序列傳進來（中間如果隔著標點或非拉丁字元，要切成
     多段分別呼叫，不能把不相鄰的詞硬湊成候選片語）。
+
+    morph（可選，見 morph.MorphProbe）：詞形分析器探針。只對 Phase 1 沒命中的單一
+    token 生效，它的候選【純追加】在 strip 候選之後——所以原本就能判成 derived 的
+    token，結果（lemma／note）完全不變；分析器只可能把原本 unsupported 的 token
+    升級成 derived，且仍要通過下面同一道詞庫／語料詞形查詢。morph.shadow=True 時
+    只記錄「本來會升級哪些 token」，不改任何輸出。morph=None 時行為與沒有這個
+    參數時逐位相同。
     """
     n = len(raw_tokens)
     window = min(max_window, n) if n else 0
@@ -352,13 +360,21 @@ def corroborate_tokens(db: Session, tribe_id: str, raw_tokens: list[str],
 
     # Phase 2：未命中的單一 token 批次查詞綴剝除候選。
     pending_indices = [idx for idx, p in enumerate(provisional) if p[2] is None]
-    candidates_by_idx: dict[int, list[lexicon.StripCandidate]] = {}
+    candidates_by_idx: dict[int, list] = {}
+    shadow_by_idx: dict[int, list] = {}
     all_residues: set[str] = set()
-    if strip_rules is not None:
+    if strip_rules is not None or morph is not None:
         for idx in pending_indices:
             token = provisional[idx][0]
             norm = lexicon.normalize_token(token)
-            cands = strip_rules.strip_candidates(norm)
+            cands = list(strip_rules.strip_candidates(norm)) if strip_rules is not None else []
+            if morph is not None:
+                extra = morph.candidates(norm)
+                if morph.shadow:
+                    shadow_by_idx[idx] = extra
+                    all_residues.update(c.residue for c in extra)
+                else:
+                    cands.extend(extra)   # 純追加：既有候選的順序與內容不變
             candidates_by_idx[idx] = cands
             all_residues.update(c.residue for c in cands)
 
@@ -388,6 +404,11 @@ def corroborate_tokens(db: Session, tribe_id: str, raw_tokens: list[str],
                 hit = MatchedSpan(surface=surface, token_count=1, status="derived", lemma=cand.residue,
                                    note=cand.note, sentence_ref=residue_attested_map[cand.residue])
                 break
+        if hit is None:
+            for cand in shadow_by_idx.get(idx, []):
+                if cand.residue in residue_headword_map or cand.residue in residue_attested_map:
+                    morph.record_shadow(surface, cand.residue, cand.note)
+                    break
         spans.append(hit or MatchedSpan(surface=surface, token_count=1, status="unsupported"))
 
     return spans
@@ -429,7 +450,8 @@ def get_all_capability_stats(db: Session) -> dict[str, dict]:
 
 
 def corroborate_full_sentence(db: Session, tribe_id: str, sentence: str,
-                               strip_rules: lexicon.StripRules | None = None) -> list[MatchedSpan]:
+                               strip_rules: lexicon.StripRules | None = None, *,
+                               morph=None) -> list[MatchedSpan]:
     """把一整句族語文字（可能含標點、可能夾雜非拉丁字元）展開成『每個顯示
     token 各一筆』的 MatchedSpan 序列，跟 lexicon.split_display_tokens() 切
     出來的片段一一對應：
@@ -465,7 +487,7 @@ def corroborate_full_sentence(db: Session, tribe_id: str, sentence: str,
         while j < len(display) and classes[j] == "word":
             j += 1
         run_tokens = display[i:j]
-        spans = corroborate_tokens(db, tribe_id, run_tokens, strip_rules=strip_rules)
+        spans = corroborate_tokens(db, tribe_id, run_tokens, strip_rules=strip_rules, morph=morph)
         pos = i
         for span in spans:
             for _ in range(span.token_count):
@@ -482,12 +504,12 @@ def corroborate_full_sentence(db: Session, tribe_id: str, sentence: str,
 
 
 def retrieve_for_tribe(db: Session, tribe_id: str, text_tribe: str, k_sentences: int = 8,
-                        strip_rules: lexicon.StripRules | None = None) -> TribeRetrieval:
+                        strip_rules: lexicon.StripRules | None = None, *, morph=None) -> TribeRetrieval:
     """族語 -> 中文方向的完整檢索：逐詞對照（含多詞詞條的最長匹配 + attested/
     derived 兩層——原本只查 headword，未命中直接算查無，會讓合法的詞綴變化
     形或語料才有的詞形在輸入側被誤判成查無釋義，見對話紀錄的獨立 code
     review）＋相近例句。"""
-    tokens = corroborate_full_sentence(db, tribe_id, text_tribe, strip_rules=strip_rules)
+    tokens = corroborate_full_sentence(db, tribe_id, text_tribe, strip_rules=strip_rules, morph=morph)
 
     norm_sentence = lexicon.normalize_sentence(text_tribe)
     sentences = retrieve_tribe_sentences(db, tribe_id, norm_sentence, k=k_sentences) if norm_sentence else []

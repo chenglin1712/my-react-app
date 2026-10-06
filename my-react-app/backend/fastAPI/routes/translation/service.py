@@ -6,6 +6,7 @@ run_tayal_chat／run_review_tayal_chat 角色分工：這裡只管「怎麼產�
 from __future__ import annotations
 
 import json
+import logging
 import time
 from dataclasses import dataclass
 
@@ -16,6 +17,9 @@ from config.tribes import TRIBE_IDS, TRIBE_MAP
 from dictionary_db.model import GrammarAffix
 
 from config import translation_lexicon as lexicon
+from fastAPI import feature_flags
+
+from . import morph as MORPH
 from . import prompts
 from . import retrieve as R
 
@@ -29,6 +33,9 @@ _EXACT_CORPUS_THRESHOLD = 0.85
 # 那套失效機制——詞綴表幾乎不會變動，真的改了，process 重啟後自然會拿到
 # 新值，不值得為此另外接一條快取失效路徑。
 _STRIP_RULES_CACHE: dict[str, lexicon.StripRules] = {}
+
+
+logger = logging.getLogger(__name__)
 
 
 class UnsupportedDirectionError(ValueError):
@@ -94,6 +101,21 @@ def _get_strip_rules(db: Session, tribe_id: str) -> lexicon.StripRules:
     return _STRIP_RULES_CACHE[tribe_id]
 
 
+def _resolve_morph(db: Session, tribe_id: str):
+    """詞形分析器探針（見 morph.py）。【每個請求只讀一次旗標】，之後整個請求都用同一個
+    結果，不會在請求中途因旗標切換而前後不一致。兩個旗標都預設 False（fail-closed）；
+    都關閉時連放行檔都不讀、不查資料庫。任何錯誤都只回傳 None，絕不影響翻譯本身。"""
+    apply_enabled = feature_flags.is_enabled(MORPH.FLAG_APPLY, default=False)
+    shadow_enabled = feature_flags.is_enabled(MORPH.FLAG_SHADOW, default=False)
+    if not (apply_enabled or shadow_enabled):
+        return None
+    try:
+        return MORPH.probe_for(db, tribe_id, apply_enabled=apply_enabled)
+    except Exception:
+        logger.exception("[morph] 取得詞形分析器探針失敗，本次請求不使用")
+        return None
+
+
 def _sentence_to_dict(s: R.SentenceMatch) -> dict:
     return {"id": s.id, "original": s.original, "chinese": s.chinese,
             "audioFileId": s.audio_file_id, "score": round(s.score, 3)}
@@ -143,7 +165,7 @@ def _spans_to_tokens_and_coverage(spans: list[R.MatchedSpan]) -> tuple[list[Toke
     return tokens, coverage
 
 
-def _corroborate_sentence(db: Session, tribe_id: str, sentence: str) -> tuple[list[TokenResult], Coverage]:
+def _corroborate_sentence(db: Session, tribe_id: str, sentence: str, morph=None) -> tuple[list[TokenResult], Coverage]:
     """對一句（通常是 LLM 產生的）族語句子，逐詞查證能不能對回辭典資料。
     分四層：headword（字典詞條原形）> attested（語料句子裡實際出現過的
     詞形）> derived（剝掉一層詞綴後命中前兩層）> unsupported，並把非拉丁
@@ -153,7 +175,7 @@ def _corroborate_sentence(db: Session, tribe_id: str, sentence: str) -> tuple[li
     corroborate_full_sentence()，族語→中文方向的輸入側顯示也共用同一套，
     確保兩個方向對「這個詞形算不算有佐證」判斷一致。"""
     strip_rules = _get_strip_rules(db, tribe_id)
-    spans = R.corroborate_full_sentence(db, tribe_id, sentence, strip_rules=strip_rules)
+    spans = R.corroborate_full_sentence(db, tribe_id, sentence, strip_rules=strip_rules, morph=morph)
     return _spans_to_tokens_and_coverage(spans)
 
 
@@ -202,7 +224,7 @@ def _call_llm(prompt: str, user_message: str) -> str:
 
 
 def _translate_zh2tribe(db: Session, tribe_id: str, tribe_slug: str, tribe_full_name: str,
-                         source_text: str) -> TranslationResult:
+                         source_text: str, *, morph=None) -> TranslationResult:
     retrieval = R.retrieve_for_zh(db, tribe_id, source_text)
 
     best = retrieval.sentences[0] if retrieval.sentences else None
@@ -212,7 +234,7 @@ def _translate_zh2tribe(db: Session, tribe_id: str, tribe_slug: str, tribe_full_
             lexicon.char_trigrams(lexicon.normalize_sentence(best.chinese)),
         )
         if sim >= _EXACT_CORPUS_THRESHOLD:
-            tokens, coverage = _corroborate_sentence(db, tribe_id, best.original)
+            tokens, coverage = _corroborate_sentence(db, tribe_id, best.original, morph=morph)
             return TranslationResult(
                 direction="zh2tribe", tribe_full_name=tribe_full_name, tribe_slug=tribe_slug,
                 source_text=source_text, translation=best.original, match_type="exact_corpus",
@@ -228,7 +250,7 @@ def _translate_zh2tribe(db: Session, tribe_id: str, tribe_slug: str, tribe_full_
     translation = (parsed.get("translation") if parsed else None) or raw.strip() or source_text
     notes = (parsed.get("note") if parsed else None) or ""
 
-    tokens, coverage = _corroborate_sentence(db, tribe_id, translation)
+    tokens, coverage = _corroborate_sentence(db, tribe_id, translation, morph=morph)
     supported_any = (coverage.headword + coverage.attested + coverage.derived) > 0
     match_type = "grounded" if supported_any else "generated"
 
@@ -244,12 +266,12 @@ def _translate_zh2tribe(db: Session, tribe_id: str, tribe_slug: str, tribe_full_
 
 
 def _translate_tribe2zh(db: Session, tribe_id: str, tribe_slug: str, tribe_full_name: str,
-                         source_text: str) -> TranslationResult:
+                         source_text: str, *, morph=None) -> TranslationResult:
     strip_rules = _get_strip_rules(db, tribe_id)
     # retrieve_for_tribe 現在會對輸入側也做多詞最長匹配 + attested/derived
     # 兩層（原本只查 headword，語料裡才有的詞形/詞綴變化形一律誤判成查無
     # 釋義，翻譯品質跟佐證顯示都會被拖累——見對話紀錄的獨立 code review）。
-    retrieval = R.retrieve_for_tribe(db, tribe_id, source_text, strip_rules=strip_rules)
+    retrieval = R.retrieve_for_tribe(db, tribe_id, source_text, strip_rules=strip_rules, morph=morph)
 
     best = retrieval.sentences[0] if retrieval.sentences else None
     if best is not None:
@@ -298,9 +320,11 @@ def translate(db: Session, tribe_slug: str, direction: str, text_in: str) -> Tra
 
     t0 = time.monotonic()
     if direction == "zh2tribe":
-        result = _translate_zh2tribe(db, tribe_id, tribe_slug, tribe_full_name, text_in)
+        result = _translate_zh2tribe(db, tribe_id, tribe_slug, tribe_full_name, text_in,
+                                      morph=_resolve_morph(db, tribe_id))
     elif direction == "tribe2zh":
-        result = _translate_tribe2zh(db, tribe_id, tribe_slug, tribe_full_name, text_in)
+        result = _translate_tribe2zh(db, tribe_id, tribe_slug, tribe_full_name, text_in,
+                                      morph=_resolve_morph(db, tribe_id))
     else:
         raise UnsupportedDirectionError(f"不支援的翻譯方向：{direction}")
     result.elapsed_ms = int((time.monotonic() - t0) * 1000)

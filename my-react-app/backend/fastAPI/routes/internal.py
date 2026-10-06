@@ -27,6 +27,7 @@ from dictionary_db.connect import SessionLocal
 from . import listening, sentence
 from .dictionary import grammar, search
 from .quiz import repository as quiz
+from .translation import morph
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -135,6 +136,9 @@ def invalidate_cache(
 
             tribe_id = _TRIBE_ID_BY_NAME.get(name)
             if tribe_id:
+                # 詞形分析器的詞庫是從辭典詞條建的，詞條變了就得重建（重建時會重新驗證
+                # 放行檔的詞庫指紋，不符會自動停用）。
+                morph.invalidate(tribe_id)
                 listening._valid_words_cache.invalidate(tribe_id)
                 sentence._unique_sentences_cache.invalidate(tribe_id)
                 quiz._words_cache.invalidate(tribe_id)
@@ -163,6 +167,11 @@ def invalidate_cache(
         # 的清單（那份清單得跟 grammar.py 的 _VALID_AFFIX_TYPES 手動同步，
         # 容易兩邊對不上）。
         target_tribes = set(tribe_names)
+        # 詞形分析器的規則說明（note 裡的詞綴功能）是從詞綴表讀的，詞綴表改了要重建。
+        for name in target_tribes:
+            tribe_id = _TRIBE_ID_BY_NAME.get(name)
+            if tribe_id:
+                morph.invalidate(tribe_id)
         for key in grammar._grammar_affixes_cache.keys():
             tribe_name, _affix_type = key
             if tribe_name in target_tribes and grammar._grammar_affixes_cache.invalidate(key):

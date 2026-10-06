@@ -1,0 +1,438 @@
+{
+  "generator": "morphology_calibration/2",
+  "schema": 1,
+  "tribes": {
+    "amis": {
+      "config": {
+        "folds": 5,
+        "ladder_step": 0,
+        "max_fa_rate": 0.0015,
+        "max_wrong_root_rate": 0.1,
+        "max_wrong_upper": 0.1,
+        "min_applicable": 10,
+        "min_root_len": 3,
+        "min_support": 10,
+        "seed": 20261006,
+        "union_targets": {
+          "indel1": 0.01,
+          "rand": 0.01,
+          "stem": 0.01,
+          "sub1": 0.01,
+          "sub2": 0.01
+        }
+      },
+      "cv_union": {
+        "accepted": 284,
+        "fa": {
+          "indel1": [
+            4,
+            4155
+          ],
+          "rand": [
+            0,
+            4166
+          ],
+          "stem": [
+            0,
+            3546
+          ],
+          "sub1": [
+            0,
+            4161
+          ],
+          "sub2": [
+            1,
+            4160
+          ]
+        },
+        "real": 3706,
+        "wrong_root": 13
+      },
+      "enabled": true,
+      "final_test": {
+        "accepted": 79,
+        "by_root_len": {
+          "4+": {
+            "accepted": 79,
+            "wrong": 1
+          }
+        },
+        "correct": 78,
+        "fa": {
+          "indel1": {
+            "accepted": 1,
+            "n": 1074,
+            "rate": 0.0009,
+            "upper": 0.0053
+          },
+          "rand": {
+            "accepted": 0,
+            "n": 1076,
+            "rate": 0.0,
+            "upper": 0.0036
+          },
+          "stem": {
+            "accepted": 0,
+            "n": 913,
+            "rate": 0.0,
+            "upper": 0.0042
+          },
+          "sub1": {
+            "accepted": 1,
+            "n": 1075,
+            "rate": 0.0009,
+            "upper": 0.0053
+          },
+          "sub2": {
+            "accepted": 0,
+            "n": 1076,
+            "rate": 0.0,
+            "upper": 0.0036
+          }
+        },
+        "failed_checks": [],
+        "incremental_over_existing": {
+          "accepted": 55,
+          "correct": 55
+        },
+        "passed": true,
+        "real_evaluated": 962,
+        "test_pairs": 1076,
+        "wrong_root": 1,
+        "wrong_root_upper": 0.0683
+      },
+      "fingerprint": {
+        "headwords_sha256": "26ed20d557fac415b2b33388383dd66f1f44657385e618658c393f73331e313c",
+        "n_headwords": 8680,
+        "n_pairs": 5242,
+        "pairs_sha256": "e8dfd3ac549cb4d6c96012cf85561455b820dcbca7174c7c279eb7e044fe4393"
+      },
+      "reason": "",
+      "rules": [
+        {
+          "a": "ci",
+          "b": "ay",
+          "fa_hard": 1,
+          "hits": 83,
+          "k": 0,
+          "kind": "C",
+          "reliability": 0.90239,
+          "support": 83,
+          "wrong": 3
+        },
+        {
+          "a": "ma",
+          "b": "ay",
+          "fa_hard": 3,
+          "hits": 188,
+          "k": 0,
+          "kind": "C",
+          "reliability": 0.903744,
+          "support": 188,
+          "wrong": 11
+        }
+      ],
+      "tribe_id": "e68273b9-1f2b-4c42-8d95-f52189ab24b7"
+    },
+    "bunun": {
+      "config": {
+        "folds": 5,
+        "ladder_step": null,
+        "max_fa_rate": 0.0015,
+        "max_wrong_root_rate": 0.1,
+        "max_wrong_upper": 0.1,
+        "min_applicable": 10,
+        "min_root_len": 3,
+        "min_support": 10,
+        "seed": 20261006,
+        "union_targets": {
+          "indel1": 0.01,
+          "rand": 0.01,
+          "stem": 0.01,
+          "sub1": 0.01,
+          "sub2": 0.01
+        }
+      },
+      "cv_union": {
+        "accepted": 0,
+        "fa": {
+          "indel1": [
+            0,
+            46
+          ],
+          "rand": [
+            0,
+            46
+          ],
+          "stem": [
+            0,
+            19
+          ],
+          "sub1": [
+            0,
+            46
+          ],
+          "sub2": [
+            0,
+            46
+          ]
+        },
+        "real": 27,
+        "wrong_root": 0
+      },
+      "enabled": false,
+      "final_test": null,
+      "fingerprint": {
+        "headwords_sha256": "601389acf80e4b333fa470ece7698a623252cc2cc5000c2307edaf8b7f774e6e",
+        "n_headwords": 4960,
+        "n_pairs": 60,
+        "pairs_sha256": "2f9d152144e4e60377a6145d0c5627f7c0827982c9273025cf21d7167034e0ee"
+      },
+      "reason": "沒有任何門檻能同時達到聯集目標，整族停用",
+      "rules": [],
+      "tribe_id": "865a96e3-3384-45b3-8bd0-e1f799b75515"
+    },
+    "kavalan": {
+      "config": {
+        "folds": 5,
+        "ladder_step": 0,
+        "max_fa_rate": 0.0015,
+        "max_wrong_root_rate": 0.1,
+        "max_wrong_upper": 0.1,
+        "min_applicable": 10,
+        "min_root_len": 3,
+        "min_support": 10,
+        "seed": 20261006,
+        "union_targets": {
+          "indel1": 0.01,
+          "rand": 0.01,
+          "stem": 0.01,
+          "sub1": 0.01,
+          "sub2": 0.01
+        }
+      },
+      "cv_union": {
+        "accepted": 412,
+        "fa": {
+          "indel1": [
+            9,
+            3672
+          ],
+          "rand": [
+            0,
+            3706
+          ],
+          "stem": [
+            0,
+            3082
+          ],
+          "sub1": [
+            2,
+            3698
+          ],
+          "sub2": [
+            2,
+            3697
+          ]
+        },
+        "real": 3274,
+        "wrong_root": 9
+      },
+      "enabled": true,
+      "final_test": {
+        "accepted": 100,
+        "by_root_len": {
+          "3": {
+            "accepted": 2,
+            "wrong": 0
+          },
+          "4+": {
+            "accepted": 98,
+            "wrong": 1
+          }
+        },
+        "correct": 99,
+        "fa": {
+          "indel1": {
+            "accepted": 0,
+            "n": 915,
+            "rate": 0.0,
+            "upper": 0.0042
+          },
+          "rand": {
+            "accepted": 0,
+            "n": 924,
+            "rate": 0.0,
+            "upper": 0.0041
+          },
+          "stem": {
+            "accepted": 0,
+            "n": 769,
+            "rate": 0.0,
+            "upper": 0.005
+          },
+          "sub1": {
+            "accepted": 0,
+            "n": 916,
+            "rate": 0.0,
+            "upper": 0.0042
+          },
+          "sub2": {
+            "accepted": 1,
+            "n": 921,
+            "rate": 0.0011,
+            "upper": 0.0061
+          }
+        },
+        "failed_checks": [],
+        "incremental_over_existing": {
+          "accepted": 100,
+          "correct": 99
+        },
+        "passed": true,
+        "real_evaluated": 807,
+        "test_pairs": 924,
+        "wrong_root": 1,
+        "wrong_root_upper": 0.0545
+      },
+      "fingerprint": {
+        "headwords_sha256": "02231540766d32797289c45d4073b132bdbf3f84309313c13f623ccb94aa9cea",
+        "n_headwords": 7288,
+        "n_pairs": 4630,
+        "pairs_sha256": "c6c71f17c59ca46ec0fd7411899216ee04aadf8551ac367ccbc7a7733de83f41"
+      },
+      "reason": "",
+      "rules": [
+        {
+          "a": "em",
+          "b": "",
+          "fa_hard": 0,
+          "hits": 95,
+          "k": 1,
+          "kind": "I",
+          "reliability": 0.900678,
+          "support": 96,
+          "wrong": 4
+        },
+        {
+          "a": "me",
+          "b": "",
+          "fa_hard": 5,
+          "hits": 196,
+          "k": 0,
+          "kind": "P",
+          "reliability": 0.930544,
+          "support": 198,
+          "wrong": 7
+        },
+        {
+          "a": "qay",
+          "b": "",
+          "fa_hard": 6,
+          "hits": 112,
+          "k": 0,
+          "kind": "P",
+          "reliability": 0.938281,
+          "support": 112,
+          "wrong": 2
+        }
+      ],
+      "tribe_id": "c5974f37-b49d-466a-ab24-6893ab4ef6a5"
+    },
+    "paiwan": {
+      "config": {
+        "folds": 5,
+        "ladder_step": null,
+        "max_fa_rate": 0.0015,
+        "max_wrong_root_rate": 0.1,
+        "max_wrong_upper": 0.1,
+        "min_applicable": 10,
+        "min_root_len": 3,
+        "min_support": 10,
+        "seed": 20261006,
+        "union_targets": {
+          "indel1": 0.01,
+          "rand": 0.01,
+          "stem": 0.01,
+          "sub1": 0.01,
+          "sub2": 0.01
+        }
+      },
+      "cv_union": {
+        "accepted": 0,
+        "fa": {},
+        "real": 0,
+        "wrong_root": 0
+      },
+      "enabled": false,
+      "final_test": null,
+      "fingerprint": {
+        "headwords_sha256": "2f88463944f815cb1e6af2590554051fd5fa5d9238f33a940bec21a90ce1ee5c",
+        "n_headwords": 3612,
+        "n_pairs": 96,
+        "pairs_sha256": "ad706ccc902dcd34db697cfd780189a74e38185483505f8bd2890627cf7cfd2a"
+      },
+      "reason": "資料不足：訓練資料歸納不出任何規則",
+      "rules": [],
+      "tribe_id": "19c77a3b-3a81-496f-b0f4-afe6d9155edd"
+    },
+    "tayal": {
+      "config": {
+        "folds": 5,
+        "ladder_step": null,
+        "max_fa_rate": 0.0015,
+        "max_wrong_root_rate": 0.1,
+        "max_wrong_upper": 0.1,
+        "min_applicable": 10,
+        "min_root_len": 3,
+        "min_support": 10,
+        "seed": 20261006,
+        "union_targets": {
+          "indel1": 0.01,
+          "rand": 0.01,
+          "stem": 0.01,
+          "sub1": 0.01,
+          "sub2": 0.01
+        }
+      },
+      "cv_union": {
+        "accepted": 0,
+        "fa": {
+          "indel1": [
+            0,
+            2831
+          ],
+          "rand": [
+            0,
+            2974
+          ],
+          "stem": [
+            0,
+            1376
+          ],
+          "sub1": [
+            0,
+            2943
+          ],
+          "sub2": [
+            0,
+            2953
+          ]
+        },
+        "real": 2406,
+        "wrong_root": 0
+      },
+      "enabled": false,
+      "final_test": null,
+      "fingerprint": {
+        "headwords_sha256": "87bec7dedbf1e42887e8205df1e6971eac5f70a818aaceb06b2ee983ae8da2de",
+        "n_headwords": 6488,
+        "n_pairs": 3740,
+        "pairs_sha256": "52ea7a904ff0d96ff82d2bb6c57e615bbb2fbc84aef075d23dd7d00819b3b807"
+      },
+      "reason": "沒有任何門檻能同時達到聯集目標，整族停用",
+      "rules": [],
+      "tribe_id": "fc76ed97-0dd8-4587-82ad-7a6dbe125001"
+    }
+  }
+}
