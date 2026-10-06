@@ -99,6 +99,48 @@ python manage.py seed_feature_flags               # 第一次：建立兩個旗�
 - 評估指令 `python manage.py evaluate_morphology_analyzer` 可重現各種做法的準確率與「亂造詞被錯放行」的比例。
 - 安全上限是政策選擇：預設各負例族群錯放行 ≤ 1%、被接受真詞的錯詞根比例 ≤ 10%（都是 95% 信賴上界）。可用 `--max-fa-upper`、`--max-wrong-root-upper` 調整；收緊到錯詞根 ≤ 5% 時，目前的資料量不足以證明安全，所有族語都會停用。
 
+## 詞素級學習者模型（選用功能，預設全部關閉）
+
+句子填空題的錯誤選項若是形態引擎造的（`quiz_morphology_distractors`），學習者答錯時就能判斷錯在哪裡：詞綴選錯（`wrong_affix`）、中綴位置錯（`wrong_position`），還是選到不同詞根的詞（`wrong_root`）；並依答題結果估計每位學習者在每條詞綴規則上的熟練度，回頭影響出題。實作在 `backend/config/rule_skill_model.py`（模型）與 `backend/fastAPI/routes/quiz/` 的 `diagnosis.py`、`answer_flow.py`、`rule_state_store.py`、`rule_selection.py`、`research_events.py`。
+
+**它是「熟練度估計」，不是已驗證的認知診斷**：模型是 BKT 與「整體答對率」的加權混合，參數是先驗、沒有用真人資料校準；規則歸屬有歧義的詞不更新、重疊（R）不支援。結果頁會明講這是估計。
+
+**四個旗標由上往下一層一層打開**（後台「功能開關」，程式端有相依檢查，查詢失敗視為關閉）：
+
+| 旗標 | 作用 |
+|---|---|
+| `quiz_morphology_diagnosis` | 出題附診斷 token，作答時診斷錯誤類型（只回傳診斷，不改任何資料）。需要先開 `quiz_morphology_distractors` 才有意義 |
+| `quiz_rule_skill_update` | 更新熟練度、混淆次數與整體表現（存在伺服器端） |
+| `quiz_rule_adaptive_selection` | 句子填空多挑熟練度低的規則出題（有 25% 探索比例、同規則每份測驗最多 2 題） |
+| `quiz_rule_event_logging` | 經使用者同意才記錄假名化研究事件 |
+
+**設計重點**
+
+- 診斷依據是出題當下的情況：題目附一個 Fernet 加密 token（綁定使用者、題目、族語、目標詞、2 小時有效），前端看不到內容也無法竄改；沒有 token 時只做高信心的重算，而且不更新任何東西。token 驗證通過時，答對與否以伺服器判斷的為準，覆蓋前端自報的值。
+- 規則熟練度由伺服器持有：Firestore `users/{uid}/quizRuleState/{族語}`，前端只能讀、不能寫（見 `firestore.rules`）；更新在 Firestore 交易裡進行，同一題的 token 重送只會更新一次（nonce 去重），兩個分頁同時作答不會互相覆蓋。刪除帳號時會一併清除這個子集合。
+- 研究事件預設不記錄，必須同時滿足：旗標開、設定 `QUIZ_RESEARCH_SALT`、使用者在結果頁按了「我同意」。事件只存假名（不是匿名：系統持有鹽，才能在撤回或刪帳時找到並刪除該使用者的事件）、規則 ID、診斷類別與模型預測值，不存 uid、詞形、句子，時間只到整點；撤回同意或刪除帳號會刪除該使用者的全部事件。同意文字的版本（`CONSENT_VERSION` 與前端 `CONSENT_TEXT_VERSION`）改動時要一起升版，舊版同意會失效。
+- 密鑰 `QUIZ_TOKEN_SECRET`（token）與 `QUIZ_RESEARCH_SALT`（假名）見 `.env.example`；沒設定或太弱時相關功能自動降級，不影響測驗本身。
+- **`QUIZ_RESEARCH_SALT` 是資料治理密鑰**：遺失或更換後，舊事件無法再逐人刪除（撤回、刪帳都找不到）。請納入密鑰備份；真的要輪替時，先用 `purge_quiz_research_data --older-than-days 1 --yes` 清掉全部舊事件，或保留舊鹽直到舊事件超過保存期限。
+- 一次性消費：同一題的 token 在到期前只會更新一次（nonce 連同 token 到期時間一起存，到期才清除；不是固定保留最近 N 筆）。
+- 作答回應不會被外部服務拖慢：Firestore 更新最多等 3 秒、研究事件寫入最多等 2 秒，超過就放棄等待（工作可能仍在背景完成），回應的 `rule_update` 會是 `{"unavailable": "timeout" | "busy" | "error"}`；背景同時執行的工作數有上限，滿了直接略過。
+- 撤回與事件寫入用資料庫列鎖序列化（同意檢查與寫入在同一個交易、`SELECT … FOR UPDATE`）；**這個鎖行為只在程式裡有測試語句，尚未在真正的 PostgreSQL 驗證**，打開研究事件旗標前必須先在測試用的 PostgreSQL 驗證撤回與寫入同時發生的情況。
+
+**評估與維運**
+
+```sh
+cd backend
+python manage.py seed_feature_flags                  # 建立旗標（預設關閉）
+python manage.py simulate_rule_skill_learners        # 模擬學習者：檢驗評估流程與模型敏感度（含負對照）
+python manage.py evaluate_rule_skill_events          # 用真實事件比較「規則熟練度」與「單一能力值」的預測（含信賴區間）
+python manage.py purge_quiz_research_data --uid <uid> --yes          # 依使用者清除事件（不加 --yes 只預覽）
+python manage.py purge_quiz_research_data --older-than-days 180 --yes # 依保存期限清除
+```
+
+- 模擬只能說明模型在「真實機制跟它不一樣」的世界裡的表現，以及評估流程沒有洩漏答案（負對照：只有一種整體能力時，規則熟練度模型不該贏）；**不是對真人有效的證據**。
+- `evaluate_rule_skill_events` 比較的是預測準確度，預測得準不代表適性出題讓人學得更好——那需要隨機對照或前後測。事件或使用者太少時只列描述性數字、不下結論。
+- 適性選題會把挑中的字從四種題型共用的候選池取走，所以後面題型（例如句子排序）拿到的字會跟關閉旗標時不同；一份測驗裡仍不會有兩題考同一個字。
+- Firestore 規則的行為測試：`firebase emulators:exec --only firestore "npx vitest run --config vitest.rules.config.js firestore.rules.test.js"`；伺服器端狀態的交易行為測試需要 emulator：`firebase emulators:exec --only firestore "python -m pytest backend/fastAPI/tests/test_rule_state_store_firestore.py"`（沒有 emulator 時該檔自動略過）。
+
 ## 正式部署
 
 - `ALLOWED_HOSTS`：Render 會自動注入 `RENDER_EXTERNAL_HOSTNAME`；部署到其他平台時用 `DJANGO_ALLOWED_HOSTS`（逗號分隔）手動指定。
