@@ -24,6 +24,8 @@ psycopg2-binary==2.9.11
 
 # Firebase
 firebase-admin==7.5.0
+# 詞素診斷 token 的驗證式加密（firebase-admin 也會帶入，這裡明確列出，不要依賴間接相依）
+cryptography==46.0.5
 
 # AI / ML
 anthropic==0.122.0

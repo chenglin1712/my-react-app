@@ -25,9 +25,10 @@
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Mapping
 
 from sqlalchemy.orm import Session
@@ -61,6 +62,11 @@ class Distractor:
     word: str
     kind: str
     note: str
+    # 以下三個欄位給詞素診斷（diagnosis.py）用：這個干擾項是用哪條規則造的、正確答案的規則是哪條、
+    # 詞根是什麼。舊的呼叫端只用前三個欄位，不受影響。
+    used_rule: M.MorphRule | None = None
+    target_rule: M.MorphRule | None = None
+    root: str = ""
 
 
 @dataclass(frozen=True)
@@ -71,6 +77,9 @@ class TribeKit:
     rules: Mapping[M.MorphRule, int]                 # 歸納出的常見詞綴規則 -> 出現次數
     # (正確詞綴, 替換詞綴) -> (造出的候選數, 其中本來就是真詞的數量)；撞詞率太高的組合不用
     pair_stats: Mapping[tuple[M.MorphRule, M.MorphRule], tuple[int, int]]
+    # 這份詞庫的指紋（規則、採用的詞綴組合、詞庫大小）；出題當下記進題目 token，之後才知道
+    # 一筆作答是依哪一版詞庫診斷的。測試手工組的 kit 可以不給。
+    version: str = ""
 
     def is_known(self, norm: str) -> bool:
         return norm in self.lexicon or norm in self.attested
@@ -120,7 +129,24 @@ def _build_kit(db: Session, tribe_id: str, tribe_full_name: str) -> TribeKit | N
     attested = {n for (n,) in db.query(TranslationAttestedForm.surface_form_norm)
                 .filter(TranslationAttestedForm.tribe_id == tribe_id).all()}
     kit = TribeKit(frozenset(lex), frozenset(attested), {p.derived: p.roots for p in pairs}, dict(rules), {})
-    return TribeKit(kit.lexicon, kit.attested, kit.roots_by_derived, kit.rules, _measure_pairs(kit))
+    measured = TribeKit(kit.lexicon, kit.attested, kit.roots_by_derived, kit.rules, _measure_pairs(kit))
+    return replace(measured, version=_kit_version(measured))
+
+
+def _kit_version(kit: TribeKit) -> str:
+    digest = hashlib.sha1()
+    for rule in sorted(kit.rules):
+        digest.update(f"{rule.kind}|{rule.a}|{rule.b}|{rule.k}|{kit.rules[rule]};".encode("utf-8"))
+    for rule0, rule in sorted(p for p in kit.pair_stats if kit.pair_allowed(*p)):
+        digest.update(f"{rule0.marker}>{rule.marker};".encode("utf-8"))
+    # 詞庫、語料詞形與衍生詞標註的【內容】都要進指紋，只看筆數的話，內容換了、筆數沒變就會誤以為同一版。
+    digest.update("\x00".join(sorted(kit.lexicon)).encode("utf-8"))
+    digest.update(b"\x01")
+    digest.update("\x00".join(sorted(kit.attested)).encode("utf-8"))
+    digest.update(b"\x01")
+    for derived in sorted(kit.roots_by_derived):
+        digest.update(f"{derived}={'/'.join(kit.roots_by_derived[derived])};".encode("utf-8"))
+    return digest.hexdigest()[:12]
 
 
 def _measure_pairs(kit: TribeKit) -> dict[tuple[M.MorphRule, M.MorphRule], tuple[int, int]]:
@@ -159,6 +185,28 @@ def _recover_rule(kit: TribeKit, norm: str) -> tuple[str, M.MorphRule] | None:
         if usable:
             return root, M.simplest_rule(usable)
     return None
+
+
+def recover_rule_detail(kit: TribeKit, norm: str) -> tuple[str, M.MorphRule, bool] | None:
+    """同 _recover_rule，另外回報這個詞的規則歸屬是否「有歧義」：同一對（衍生詞, 詞根）有不只一條
+    常見規則能解釋，或不同的辭典詞根各自指向不同規則。歧義時 simplest_rule 只是決定性的啟發式，
+    不是語言學上的真值，所以詞素診斷遇到歧義的詞不更新熟練度。"""
+    chosen: tuple[str, M.MorphRule] | None = None
+    ambiguous = False
+    for root in kit.roots_by_derived.get(norm, ()):
+        if len(root) < MIN_ROOT_LEN:
+            continue
+        usable = [r for r in M.derive_rules(norm, root, "PSIC") if r in kit.rules]
+        if not usable:
+            continue
+        rule = M.simplest_rule(usable)
+        if len(usable) > 1:
+            ambiguous = True
+        if chosen is None:
+            chosen = (root, rule)
+        elif (root, rule) != chosen:
+            ambiguous = True
+    return (chosen[0], chosen[1], ambiguous) if chosen else None
 
 
 def _swap_candidates(kit: TribeKit, root: str, rule0: M.MorphRule) -> list[tuple[str, M.MorphRule]]:
@@ -226,7 +274,7 @@ def distractors_for(kit: TribeKit, surface: str, count: int = 3, *, rng: random.
             if cand in seen:
                 continue
             seen.add(cand)
-            picked.append(Distractor(shape(cand), kind, note_for(rule)))
+            picked.append(Distractor(shape(cand), kind, note_for(rule), used_rule=rule, target_rule=rule0, root=root))
 
     # 先各取一個不同種類，再用換詞綴補滿；題目才不會三個選項都是同一種錯法。
     take(shifts[:1], KIND_SHIFT, lambda r: f"詞根「{root}」的中綴「-{r.a}-」應在第 {rule0.k} 個字母之後，這裡放在第 {r.k} 個之後")

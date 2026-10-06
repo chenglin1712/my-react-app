@@ -194,6 +194,65 @@ class TestDistractorsFor:
         assert [d.word for d in swaps] == ["pumsina"]
 
 
+class TestRecoverRuleDetail:
+    def test_unique_rule_is_not_ambiguous(self):
+        kit = _kit(lexicon={"mafilo"}, derived={"mafilo": ("filo",)})
+        assert D.recover_rule_detail(kit, "mafilo") == ("filo", MA, False)
+
+    def test_no_annotation_or_unknown_affix_is_none(self):
+        assert D.recover_rule_detail(_kit(derived={}), "mafilo") is None
+        assert D.recover_rule_detail(_kit(derived={"xyfilo": ("filo",)}), "xyfilo") is None
+        assert D.recover_rule_detail(_kit(derived={"maab": ("ab",)}), "maab") is None          # 詞根太短
+
+    def test_two_common_rules_for_the_same_pair_is_ambiguous(self):
+        ta, at = M.MorphRule("P", a="ta"), M.MorphRule("I", a="at", k=1)
+        kit = _kit(derived={"tatalo": ("talo",)}, rules={ta: 50, at: 40})
+        assert D.recover_rule_detail(kit, "tatalo") == ("talo", ta, True)
+
+    def test_two_dictionary_roots_that_point_to_different_rules_is_ambiguous(self):
+        # tatalo = ta- + talo，也 = tatal + -o：辭典標了兩個詞根，各自指向不同規則
+        ta, o = M.MorphRule("P", a="ta"), M.MorphRule("S", a="o")
+        kit = _kit(derived={"tatalo": ("talo", "tatal")}, rules={ta: 50, o: 40})
+        root, rule, ambiguous = D.recover_rule_detail(kit, "tatalo")
+        assert (root, rule) == ("talo", ta) and ambiguous is True
+
+    def test_two_dictionary_roots_that_agree_on_the_rule_are_not_ambiguous(self):
+        kit = _kit(derived={"mafilo": ("filo", "filo")}, rules={MA: 50})
+        assert D.recover_rule_detail(kit, "mafilo")[2] is False
+
+    def test_a_root_without_a_usable_rule_does_not_make_the_word_ambiguous(self):
+        kit = _kit(derived={"mafilo": ("zzz", "filo")})
+        assert D.recover_rule_detail(kit, "mafilo") == ("filo", MA, False)
+
+
+class TestKitVersion:
+    def _with(self, **kw):
+        base = dict(lexicon=frozenset({"a1", "b2"}), attested=frozenset({"c3"}), roots_by_derived={"d4": ("e5",)},
+                    rules={MA: 10}, pair_stats={})
+        base.update(kw)
+        return D.TribeKit(**base)
+
+    def test_same_content_gives_the_same_version(self):
+        assert D._kit_version(self._with()) == D._kit_version(self._with())
+
+    def test_changed_content_with_the_same_sizes_changes_the_version(self):
+        base = D._kit_version(self._with())
+        assert D._kit_version(self._with(lexicon=frozenset({"a1", "zz"}))) != base
+        assert D._kit_version(self._with(attested=frozenset({"zz"}))) != base
+        assert D._kit_version(self._with(roots_by_derived={"d4": ("zz",)})) != base
+        assert D._kit_version(self._with(rules={PA: 10})) != base
+        assert D._kit_version(self._with(rules={MA: 11})) != base
+
+    def test_the_gate_decision_is_part_of_the_version(self):
+        allowed = {(MA, PA): (100, 0)}
+        blocked = {(MA, PA): (100, 60)}
+        assert D._kit_version(self._with(rules={MA: 10, PA: 9}, pair_stats=allowed)) != \
+               D._kit_version(self._with(rules={MA: 10, PA: 9}, pair_stats=blocked))
+
+    def test_built_kits_carry_a_version(self, db):
+        assert len(D._build_kit(db, _TRIBE.id, _TRIBE.full_name).version) == 12
+
+
 class _FakeSource:
     def __init__(self, items):
         self.items = items
