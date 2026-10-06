@@ -780,6 +780,10 @@ class UserExportTest(TestCase):
 class UserDeleteTest(TestCase):
     def setUp(self):
         self.client = Client()
+        # 刪除帳號會先撤銷登入；這個類別的測試都不連真的 Firebase
+        patcher = patch("adminapi.firebase_ops.revoke_sessions")
+        self.mock_revoke = patcher.start()
+        self.addCleanup(patcher.stop)
 
     @patch("adminapi.firebase_ops.delete_firebase_user")
     @patch("adminapi.firebase_ops.get_firebase_user")

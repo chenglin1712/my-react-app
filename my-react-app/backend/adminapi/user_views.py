@@ -19,7 +19,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from config.roles import ACCOUNT_MANAGERS, OWNER, ROLE_ASSIGNERS, STAFF_ROLES
 
-from . import firebase_ops
+from . import firebase_ops, quiz_research_service
 from ._shared import (
     guarded_action,
     parse_json_body as _parse_json_body,
@@ -548,6 +548,15 @@ def user_delete(request, decoded, uid):
 
     results = {}
 
+    # 先撤銷這個帳號的所有登入（FastAPI 驗證 token 時有 check_revoked，之後的請求立刻失效），再清資料：
+    # 否則清除研究資料的同時，這個帳號仍可能重新同意、或補寫事件（尚無同意紀錄時資料庫沒有列可以鎖）。
+    try:
+        firebase_ops.revoke_sessions(uid)
+        results["sessions_revoked"] = {"revoked": True}
+    except Exception:
+        logger.exception("刪除帳號 %s 前撤銷登入失敗", uid)
+        results["sessions_revoked"] = {"revoked": False, "error": "撤銷登入失敗，需人工複查"}
+
     try:
         notes = list(client.collection("sharedNotes").where("uid", "==", uid).stream())
         for note in notes:
@@ -583,6 +592,23 @@ def user_delete(request, decoded, uid):
     except Exception:
         logger.exception("刪除帳號 %s 的 pronunciations 失敗", uid)
         results["pronunciations"] = {"deleted": 0, "error": "刪除失敗，需人工複查"}
+
+    try:
+        # 詞素學習的規則熟練度狀態存在 users/{uid}/quizRuleState 子集合；刪除 users 文件不會連帶刪除子集合。
+        states = list(doc_ref.collection("quizRuleState").stream())
+        for state in states:
+            state.reference.delete()
+        results["quiz_rule_state"] = {"deleted": len(states)}
+    except Exception:
+        logger.exception("刪除帳號 %s 的詞素學習狀態失敗", uid)
+        results["quiz_rule_state"] = {"deleted": 0, "error": "刪除失敗，需人工複查"}
+
+    try:
+        # 經同意記錄的假名化研究事件：刪除帳號時一併清除，並把同意紀錄標記為已撤回。
+        results["quiz_research"] = quiz_research_service.purge_user(uid)
+    except Exception:
+        logger.exception("刪除帳號 %s 的詞素學習研究事件失敗", uid)
+        results["quiz_research"] = {"error": "刪除失敗，需人工複查"}
 
     try:
         if firestore_snapshot.exists:

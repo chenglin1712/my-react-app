@@ -19,6 +19,7 @@ from .content import (
     PendingRevision,
 )
 from .dictionary_review import DictionaryImportJob, DictionaryRevision
+from .quiz_research import QuizResearchConsent, QuizSkillEvent
 from .quizbank import (
     QuizChoiceItem,
     QuizClozePassage,
@@ -48,6 +49,8 @@ __all__ = [
     'QuizSituationItem',
     'QuizSourceConfig',
     'QuizTrueFalseItem',
+    'QuizResearchConsent',
+    'QuizSkillEvent',
     'QuizVocabItem',
     'RateLimitRule',
     'ReviewableContent',

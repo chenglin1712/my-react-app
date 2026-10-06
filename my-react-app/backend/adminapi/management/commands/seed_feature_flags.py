@@ -71,9 +71,27 @@ class Command(BaseCommand):
         )
         created_count += int(created)
 
-        total = len(TRIBES) + 4
+        # 詞素級學習者模型（M4）的四個旗標，預設全部【關閉】，由上往下一層一層打開（程式端有相依檢查）：
+        # 診斷 → 熟練度更新 → 適性選題；研究事件另外需要使用者同意。見 fastAPI/routes/quiz/flags.py。
+        for key, label, description in (
+            ("quiz_morphology_diagnosis", "詞素診斷（句子填空）",
+             "開啟後，句子填空題會附診斷 token，作答時判斷錯在詞綴、中綴位置或詞根；只回傳診斷，不改任何學習資料。"
+             "需要先開啟測驗詞形干擾項才有意義。"),
+            ("quiz_rule_skill_update", "詞素熟練度更新",
+             "開啟後，診斷結果會更新每位學習者在每條詞綴規則上的熟練度估計（存在伺服器端）。需要先開啟詞素診斷。"),
+            ("quiz_rule_adaptive_selection", "詞素適性選題",
+             "開啟後，句子填空會多挑熟練度估計較低的詞綴規則出題（有探索比例與同規則題數上限）。需要先開啟熟練度更新。"),
+            ("quiz_rule_event_logging", "詞素學習研究事件",
+             "開啟後，經使用者同意才記錄假名化的作答事件（只存假名、規則與預測值），用來評估熟練度模型。需要先開啟詞素診斷。"),
+        ):
+            _, created = FeatureFlag.objects.get_or_create(
+                key=key, defaults={"label": label, "description": description, "enabled": False},
+            )
+            created_count += int(created)
+
+        total = len(TRIBES) + 8
         self.stdout.write(self.style.SUCCESS(
-            f"功能開關種子完成：共 {total} 筆（族語測驗開關 {len(TRIBES)} + 族語翻譯開關 1 + 詞形分析器 2 + 測驗詞形干擾項 1，"
-            f"後三個預設關閉），"
+            f"功能開關種子完成：共 {total} 筆（族語測驗開關 {len(TRIBES)} + 族語翻譯開關 1 + 詞形分析器 2 + 測驗詞形干擾項 1 "
+            f"+ 詞素學習 4，除了族語測驗與翻譯開關，其餘預設關閉），"
             f"新增 {created_count} 筆，其餘已存在維持原值。"
         ))

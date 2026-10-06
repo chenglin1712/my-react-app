@@ -81,7 +81,9 @@ class SeedFeatureFlagsTest(TestCase):
     """seed_feature_flags：詞形分析器的兩個旗標必須預設【關閉】（跟其他旗標預設啟用相反）——
     這個功能會讓更多詞被判成有佐證，錯放行比漏判嚴重，必須明確打開才生效。"""
 
-    MORPH_KEYS = ("translation_morphology_shadow", "translation_morphology_analyzer", "quiz_morphology_distractors")
+    MORPH_KEYS = ("translation_morphology_shadow", "translation_morphology_analyzer", "quiz_morphology_distractors",
+                  "quiz_morphology_diagnosis", "quiz_rule_skill_update", "quiz_rule_adaptive_selection",
+                  "quiz_rule_event_logging")
 
     def _seed(self):
         from io import StringIO
@@ -112,5 +114,23 @@ class SeedFeatureFlagsTest(TestCase):
 
     def test_keys_match_the_constants_the_translation_service_reads(self):
         from fastAPI.routes.translation import morph
-        from fastAPI.routes.quiz import distractors
-        self.assertEqual({morph.FLAG_SHADOW, morph.FLAG_APPLY, distractors.FLAG}, set(self.MORPH_KEYS))
+        from fastAPI.routes.quiz import distractors, flags
+        self.assertEqual({morph.FLAG_SHADOW, morph.FLAG_APPLY, distractors.FLAG, *flags.ALL_FLAGS}, set(self.MORPH_KEYS))
+
+    def test_the_quiz_rule_flags_are_seeded_disabled_with_a_readable_label(self):
+        from fastAPI.routes.quiz import flags
+        self._seed()
+        for key in flags.ALL_FLAGS:
+            flag = FeatureFlag.objects.get(key=key)
+            self.assertFalse(flag.enabled, key)
+            self.assertTrue(flag.label and flag.description, key)
+
+    def test_the_success_message_counts_every_seeded_flag(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+        from config.tribes import TRIBES
+        out = StringIO()
+        call_command("seed_feature_flags", stdout=out)
+        self.assertEqual(FeatureFlag.objects.count(), len(TRIBES) + 8)
+        self.assertIn(f"共 {len(TRIBES) + 8} 筆", out.getvalue())
