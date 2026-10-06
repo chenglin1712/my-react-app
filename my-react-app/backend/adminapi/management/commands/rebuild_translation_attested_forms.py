@@ -26,6 +26,7 @@ config.translation_lexicon 的 tokenize()／normalize_token() 切詞、正規化
 """
 from django.core.management.base import BaseCommand, CommandError
 
+from adminapi.dictionary_cache import invalidate_dictionary_cache
 from config.tribes import TRIBES
 from dictionary_db.connect import dictionary_write_session
 from dictionary_db.model import Word, WordExplanation, WordExplanationSentence, TranslationAttestedForm
@@ -54,6 +55,10 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(
                 f"{tribe.full_name}（{tribe.slug}）：寫入 {count} 筆語料詞形"
             ))
+
+        # 語料詞形表改了，FastAPI 端用它建的快取（翻譯詞形分析器、測驗詞形干擾項）要跟著重建；
+        # 沿用「詞條異動」的通知範圍，失效後下一次請求會重新查表。
+        invalidate_dictionary_cache(["words"], tribes=[t.slug for t in targets])
 
     def _rebuild_one(self, tribe_id: str, tribe_full_name: str) -> int:
         with dictionary_write_session() as db:

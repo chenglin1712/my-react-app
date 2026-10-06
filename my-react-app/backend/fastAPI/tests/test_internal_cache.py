@@ -261,3 +261,35 @@ def test_grammar_affixes_scope_also_invalidates_the_morphology_analyzer_of_that_
 
     assert resp.status_code == 200
     assert tayal.id not in morph._CACHE and amis.id in morph._CACHE
+
+
+def test_words_and_affix_scopes_also_invalidate_the_quiz_distractor_kit_of_that_tribe_only(client, monkeypatch):
+    """測驗的詞形干擾項（quiz/distractors.py）的詞庫、常見詞綴規則是從辭典詞條與詞綴表建的，
+    兩者任一改了都要重建。只清有被通知的族語。"""
+    from config.tribes import TRIBES
+    from fastAPI.routes.quiz import distractors
+
+    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret")
+    tayal = next(t for t in TRIBES if t.slug == "tayal")
+    amis = next(t for t in TRIBES if t.slug == "amis")
+
+    class _NoopThread:   # 不要真的啟動背景重新預熱（它會打真實的辭典資料庫）
+        def __init__(self, target, args=(), daemon=None):
+            pass
+
+        def start(self):
+            pass
+
+    for scope in ("words", "grammar_affixes"):
+        distractors._KITS._values[tayal.id] = "kit-tayal"
+        distractors._KITS._values[amis.id] = "kit-amis"
+        search._tribe_words_cache.get_or_compute("泰雅語", lambda: ["fake-word"])
+        with patch("fastAPI.routes.internal.threading.Thread", _NoopThread):
+            resp = client.post(
+                "/internal/cache/invalidate",
+                json={"scopes": [scope], "tribes": ["tayal"]},
+                headers={"X-Internal-Secret": "correct-secret"},
+            )
+        assert resp.status_code == 200, scope
+        assert tayal.id not in distractors._KITS and amis.id in distractors._KITS, scope
+    distractors.invalidate()

@@ -40,6 +40,10 @@ export default function SentenceFill({ question, selected, checked, onSelect, on
     }
   };
 
+  // 只顯示真的出現在選項裡的錯誤形說明（後端沒帶 distractorNotes 就是原本的隨機干擾項，什麼都不多顯示）。
+  const optionWords = new Set((question.options || []).map((opt) => opt.word));
+  const distractorNotes = Object.entries(question.distractorNotes || {}).filter(([word]) => optionWords.has(word));
+
   const getOptionClass = (word) => {
     if (!checked) return selected === word ? "selected" : "";
     if (word === question.answer) return "correct";
@@ -103,6 +107,20 @@ export default function SentenceFill({ question, selected, checked, onSelect, on
           <h4 className="fw-bolder mb-4 ">
             正確答案：{question.answer}
           </h4>
+          {distractorNotes.length > 0 && (
+            <div className="text-start mx-auto mb-4" style={{ maxWidth: "32rem" }}>
+              <p className="fw-bold mb-1">錯誤選項是怎麼造出來的</p>
+              <ul className="mb-1 ps-3">
+                {distractorNotes.map(([word, note]) => (
+                  <li key={word}><strong>{word}</strong>：{note}</li>
+                ))}
+              </ul>
+              <p className="text-muted small mb-0">
+                這些是依詞綴規則造出的「候選」錯誤形，辭典與例句中都找不到；
+                但辭典不可能收錄所有詞形，不代表它在族語裡一定不存在。
+              </p>
+            </div>
+          )}
         </>
       )}
 

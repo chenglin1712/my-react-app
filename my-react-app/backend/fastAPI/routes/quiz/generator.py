@@ -43,8 +43,11 @@ def _build_word_translate_question(w, all_words_list, question_id, difficulty=No
         "meta": meta,
     }
 
-def _get_sentence_fill_payload(w, all_words_list):
-    """嘗試從句子範例建立填空題；若無資料回傳 None"""
+def _get_sentence_fill_payload(w, all_words_list, distractor_source=None):
+    """嘗試從句子範例建立填空題；若無資料回傳 None。
+
+    distractor_source（見 distractors.py）有給、而且造得出候選錯誤詞形時，干擾項優先用
+    「同一個詞根換別的詞綴」造的詞形，不夠 3 個才用隨機別的詞補。"""
     items = repository._word_explanations_cache.get(w.id, [])
     for item in items:
         for sent in (item.get("sentenceItems") or []):
@@ -55,17 +58,28 @@ def _get_sentence_fill_payload(w, all_words_list):
             blank_sent = orig.replace(w.name, "___", 1)
             sent_audios = sent.get("audioItems") or []
             sent_audio = sent_audios[0].get("fileId") if sent_audios else None
-            pool = [o for o in all_words_list if o.name != w.name]
+            engine = distractor_source.for_word(w.name, 3) if distractor_source is not None else []
+            engine_words = {d.word for d in engine}
+            pool = [o for o in all_words_list if o.name != w.name and o.name not in engine_words]
             random.shuffle(pool)
-            distractors = [{"word": o.name, "audio": _get_audio(o)} for o in pool[:3]]
+            distractors = [{"word": d.word, "audio": None} for d in engine]
+            distractors += [{"word": o.name, "audio": _get_audio(o)} for o in pool[:3 - len(engine)]]
             options = [{"word": w.name, "audio": _get_audio(w)}] + distractors
+            if engine:
+                # 引擎造的詞形沒有音檔；只要有任何一個，整題都不附音檔，免得「有沒有喇叭圖示」洩漏答案。
+                for opt in options:
+                    opt["audio"] = None
             random.shuffle(options)
-            return {
+            payload = {
                 "tayal": {"word": w.name, "exsentence": orig, "sentence": blank_sent,
                           "cn": ch_sent, "audio": sent_audio},
                 "options": options,
                 "answer": w.name,
             }
+            if engine:
+                # 作答後給使用者看的說明：這些是「候選」錯誤形，不是保證不存在的詞。
+                payload["distractorNotes"] = {d.word: d.note for d in engine}
+            return payload
     return None
 
 def _get_sentence_order_payload(w, all_words_list):
@@ -197,7 +211,8 @@ def _generate_word_match_questions(picker: _CandidatePicker, count: int) -> list
         })
     return generated
 
-def _generate_sentence_fill_questions(picker: _CandidatePicker, all_words: List[WordDTO], count: int) -> list:
+def _generate_sentence_fill_questions(picker: _CandidatePicker, all_words: List[WordDTO], count: int,
+                                      distractor_source=None) -> list:
     generated = []
     fill_done = 0
     fallback = []
@@ -205,7 +220,7 @@ def _generate_sentence_fill_questions(picker: _CandidatePicker, all_words: List[
         c = picker.next()
         if not c: break
         w = c["word"]
-        payload = _get_sentence_fill_payload(w, all_words)
+        payload = _get_sentence_fill_payload(w, all_words, distractor_source)
         if payload:
             generated.append({
                 "id": f"sf-{w.id}-{fill_done}",

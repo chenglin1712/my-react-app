@@ -53,4 +53,42 @@ describe('SentenceFill', () => {
     await user.click(screen.getByRole('button', { name: '播放句子語音' }));
     expect(createAuthorizedAudio).toHaveBeenCalledTimes(1);
   });
+
+  describe('詞形干擾項的說明', () => {
+    const WITH_NOTES = {
+      ...QUESTION,
+      options: [{ word: 'mafilo' }, { word: 'pafilo' }, { word: 'kafilo' }],
+      answer: 'mafilo',
+      distractorNotes: {
+        pafilo: '詞根「filo」換成別的詞綴「pa-」（正確是「ma-」）',
+        kafilo: '詞根「filo」換成別的詞綴「ka-」（正確是「ma-」）',
+        notAnOption: '這個詞不在選項裡',
+      },
+    };
+
+    test('作答後列出每個錯誤選項是怎麼造出來的，並聲明它們只是候選、不保證不存在', () => {
+      render(<SentenceFill question={WITH_NOTES} selected="pafilo" checked onSelect={vi.fn()} onConfirm={vi.fn()} />);
+      expect(screen.getByText('錯誤選項是怎麼造出來的')).toBeInTheDocument();
+      expect(screen.getByText(/換成別的詞綴「pa-」/)).toBeInTheDocument();
+      expect(screen.getByText(/換成別的詞綴「ka-」/)).toBeInTheDocument();
+      expect(screen.getByText(/不代表它在族語裡一定不存在/)).toBeInTheDocument();
+    });
+
+    test('作答之前不顯示（說明會洩漏哪些是錯的）', () => {
+      render(<SentenceFill question={WITH_NOTES} selected={null} checked={false} onSelect={vi.fn()} onConfirm={vi.fn()} />);
+      expect(screen.queryByText('錯誤選項是怎麼造出來的')).not.toBeInTheDocument();
+      expect(screen.queryByText(/換成別的詞綴/)).not.toBeInTheDocument();
+    });
+
+    test('不在選項裡的說明不顯示', () => {
+      render(<SentenceFill question={WITH_NOTES} selected="mafilo" checked onSelect={vi.fn()} onConfirm={vi.fn()} />);
+      expect(screen.queryByText(/這個詞不在選項裡/)).not.toBeInTheDocument();
+    });
+
+    test('沒有 distractorNotes（原本的隨機干擾項）就什麼都不多顯示', () => {
+      render(<SentenceFill question={QUESTION} selected="好" checked onSelect={vi.fn()} onConfirm={vi.fn()} />);
+      expect(screen.getByText(/正確答案/)).toBeInTheDocument();
+      expect(screen.queryByText('錯誤選項是怎麼造出來的')).not.toBeInTheDocument();
+    });
+  });
 });

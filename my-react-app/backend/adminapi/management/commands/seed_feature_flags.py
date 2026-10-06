@@ -59,9 +59,21 @@ class Command(BaseCommand):
             )
             created_count += int(created)
 
-        total = len(TRIBES) + 3
+        # 測驗的詞形干擾項（句子填空題）：預設關閉，要人工抽樣檢查過再開。
+        _, created = FeatureFlag.objects.get_or_create(
+            key="quiz_morphology_distractors",
+            defaults={
+                "label": "測驗詞形干擾項",
+                "description": "開啟後，句子填空題的錯誤選項會優先用『同一個詞根換別的詞綴／中綴放錯位置』造出的詞形，"
+                               "而不是隨機別的詞。造出的只是辭典與語料都找不到的『候選』錯誤形；關閉即恢復隨機干擾項。",
+                "enabled": False,
+            },
+        )
+        created_count += int(created)
+
+        total = len(TRIBES) + 4
         self.stdout.write(self.style.SUCCESS(
-            f"功能開關種子完成：共 {total} 筆（族語測驗開關 {len(TRIBES)} + 族語翻譯開關 1 + 詞形分析器 2，"
-            f"後兩個預設關閉），"
+            f"功能開關種子完成：共 {total} 筆（族語測驗開關 {len(TRIBES)} + 族語翻譯開關 1 + 詞形分析器 2 + 測驗詞形干擾項 1，"
+            f"後三個預設關閉），"
             f"新增 {created_count} 筆，其餘已存在維持原值。"
         ))

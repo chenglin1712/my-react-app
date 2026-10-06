@@ -26,6 +26,7 @@ from dictionary_db.connect import SessionLocal
 
 from . import listening, sentence
 from .dictionary import grammar, search
+from .quiz import distractors as quiz_distractors
 from .quiz import repository as quiz
 from . import morphology
 from .translation import morph
@@ -140,6 +141,7 @@ def invalidate_cache(
                 # 詞形分析器的詞庫是從辭典詞條建的，詞條變了就得重建（重建時會重新驗證
                 # 放行檔的詞庫指紋，不符會自動停用）。
                 morph.invalidate(tribe_id)
+                quiz_distractors.invalidate(tribe_id)
                 morphology.service.invalidate(tribe_id)
                 listening._valid_words_cache.invalidate(tribe_id)
                 sentence._unique_sentences_cache.invalidate(tribe_id)
@@ -174,6 +176,7 @@ def invalidate_cache(
             tribe_id = _TRIBE_ID_BY_NAME.get(name)
             if tribe_id:
                 morph.invalidate(tribe_id)
+                quiz_distractors.invalidate(tribe_id)
                 morphology.service.invalidate(tribe_id)
         for key in grammar._grammar_affixes_cache.keys():
             tribe_name, _affix_type = key

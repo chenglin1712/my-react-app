@@ -7,11 +7,11 @@ import random
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from config.tribes import TRIBE_IDS
+from config.tribes import TRIBE_IDS, TRIBES
 from dictionary_db.connect import get_db
 
 from .. import pronunciation
-from . import irt
+from . import distractors, irt
 from .generator import (
     _CandidatePicker,
     _build_user_model,
@@ -41,6 +41,7 @@ from .schemas import (
 )
 
 router = APIRouter()
+_TRIBE_BY_SLUG = {t.slug: t for t in TRIBES}
 router.include_router(pronunciation.router)
 
 
@@ -75,7 +76,10 @@ def generate_quiz_frontend(
     generated = []
     generated += _generate_word_translate_questions(picker, all_words, theta, type_count["wordTranslate"])
     generated += _generate_word_match_questions(picker, type_count["wordMatch"])
-    generated += _generate_sentence_fill_questions(picker, all_words, type_count["sentenceFill"])
+    generated += _generate_sentence_fill_questions(
+        picker, all_words, type_count["sentenceFill"],
+        distractor_source=distractors.source_for(db, _TRIBE_BY_SLUG[tribe]),
+    )
     generated += _generate_sentence_order_questions(picker, all_words, type_count["sentenceOrder"])
 
     random.shuffle(generated)

@@ -81,7 +81,7 @@ class SeedFeatureFlagsTest(TestCase):
     """seed_feature_flags：詞形分析器的兩個旗標必須預設【關閉】（跟其他旗標預設啟用相反）——
     這個功能會讓更多詞被判成有佐證，錯放行比漏判嚴重，必須明確打開才生效。"""
 
-    MORPH_KEYS = ("translation_morphology_shadow", "translation_morphology_analyzer")
+    MORPH_KEYS = ("translation_morphology_shadow", "translation_morphology_analyzer", "quiz_morphology_distractors")
 
     def _seed(self):
         from io import StringIO
@@ -112,4 +112,5 @@ class SeedFeatureFlagsTest(TestCase):
 
     def test_keys_match_the_constants_the_translation_service_reads(self):
         from fastAPI.routes.translation import morph
-        self.assertEqual({morph.FLAG_SHADOW, morph.FLAG_APPLY}, set(self.MORPH_KEYS))
+        from fastAPI.routes.quiz import distractors
+        self.assertEqual({morph.FLAG_SHADOW, morph.FLAG_APPLY, distractors.FLAG}, set(self.MORPH_KEYS))
