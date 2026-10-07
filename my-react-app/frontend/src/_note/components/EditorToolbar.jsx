@@ -1,15 +1,18 @@
 import { useRef } from "react";
 import { Row, Col, Button } from "react-bootstrap";
 import { Image as ImageIcon } from "lucide-react";
+import { useNavbarOffset } from "../../hooks/useScrolledPast";
 
 const COLOR_LABELS = { red: "紅色", blue: "藍色", black: "黑色", orange: "橘色" };
 
 /** 筆記編輯器上方的工具列：字級、粗斜體、上傳圖片、文字顏色。 */
 export default function EditorToolbar({ execStyle, onImageFileSelected, isUploadingImage }) {
   const imageInputRef = useRef(null);
+  // 工具列是 sticky：要釘在全站導覽列「下面」。原本 top: 0 會被導覽列蓋住，捲動時整條工具列看不見。
+  const navbarOffset = useNavbarOffset();
 
   return (
-    <Row className="editor-toolbar">
+    <Row className="editor-toolbar" style={{ top: navbarOffset }}>
       <Col xs="auto" className="group">
         <label htmlFor="note-font-size-select" className="group-label">大小</label>
         <select id="note-font-size-select" onChange={(e) => execStyle("fontSize", e.target.value)} defaultValue="24px">
