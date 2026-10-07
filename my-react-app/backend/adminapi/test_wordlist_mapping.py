@@ -195,10 +195,9 @@ class CommandTests(TestCase):
         return out.getvalue()
 
     def _decide(self, form, word_id):
-        from adminapi import wordlist_mapping as WM
+        from adminapi import wordlist_apply as A
         f = WordlistForm.objects.get(form=form)
-        f.decision, f.decided_word_id, f.decided_by_uid, f.decision_basis = "accept", word_id, "u1", WM.decision_basis(form=f.form, zh=f.entry.zh, note=f.entry.note, raw_cell=f.entry.raw_cell, match_class=f.match_class,
-                                                candidate_count=f.candidate_count, fingerprint=f.candidate_fingerprint, sense_check=f.sense_check)
+        f.decision, f.decided_word_id, f.decided_by_uid, f.decision_basis = "accept", word_id, "u1", A.form_basis(f)
         f.decided_at = timezone.now()
         f.save()
         return f
