@@ -8,9 +8,13 @@ import { auth } from "../../../firebase";
 import successAnimation from "../../src/animations/success.json"
 import SuccessModal from "../ui/SuccessModal";
 import { useLottieAnimation } from "@hooks/useLottieAnimation";
+import { markAdminSession } from "../../src/_admin/session/adminSession";
 
-const LoginForm = ({ onSwitchToRegister }) => {
-    const [email, setEmail] = useState("");
+// variant 只影響呈現：'admin' 是後台專用登入頁（src/_auth/AdminLoginPage.jsx）用的版本，
+// 標題由頁面自己提供、不顯示註冊入口、成功文案改成進後台。登入函式、next 驗證與導頁邏輯兩種版本完全相同。
+const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }) => {
+    const isAdminVariant = variant === "admin";
+    const [email, setEmail] = useState(defaultEmail);
     const [password, setPassword] = useState("");
     const [errorMsg, setErrorMsg] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,7 +55,9 @@ const LoginForm = ({ onSwitchToRegister }) => {
         }
         setIsSubmitting(true);
         try {
-            await signInWithEmailAndPassword(auth, email, password);
+            const credential = await signInWithEmailAndPassword(auth, email, password);
+            // 後台版：記下「這個分頁已在後台登入頁輸入過密碼」，AdminRoute 才會放行（旗標只是體驗層，見 adminSession.js）
+            if (isAdminVariant) markAdminSession(credential?.user?.uid);
             setIsLogin(true);
             const redirectTarget = getRedirectTarget();
             redirectTimeoutRef.current = setTimeout(() => {
@@ -77,29 +83,31 @@ const LoginForm = ({ onSwitchToRegister }) => {
 
     return (
         <div className="login-box">
-            <h2 className="formTitle"><User size={30} />登入</h2>
+            {!isAdminVariant && <h2 className="formTitle"><User size={30} />登入</h2>}
             {errorMsg && <Alert variant="danger" className="py-2">{errorMsg}</Alert>}
             <form action="#" className="loginForm">
                 <div className="input-wrapper">
                     <Mail size={24} className="icon" />
-                    <input type="email" className="input-field" placeholder="帳號" aria-label="帳號" autoComplete="email" required onChange={(e) => { setEmail(e.target.value) }} />
+                    <input type="email" className="input-field" placeholder="帳號" aria-label="帳號" autoComplete="email" required defaultValue={defaultEmail} onChange={(e) => { setEmail(e.target.value) }} />
                 </div>
                 <div className="input-wrapper">
                     <LockKeyhole size={24} className="icon" />
                     <input type="password" className="input-field" placeholder="密碼" aria-label="密碼" autoComplete="current-password" required onChange={(e) => { setPassword(e.target.value) }} />
                 </div>
                 <a className="forgot-pass" href="/forgot" onClick={(e) => { e.preventDefault(); navigate("/forgot"); }}>忘記密碼?</a>
-                <button className="login-button" onClick={handleLogin} disabled={isSubmitting}>登入</button>
+                <button className="login-button" onClick={handleLogin} disabled={isSubmitting}>{isAdminVariant ? "登入後台" : "登入"}</button>
             </form>
-            <p>還沒有帳號?
-                {onSwitchToRegister ? (
-                    <a onClick={(e) => { e.preventDefault(); onSwitchToRegister(); }} href="/register">註冊</a>
-                ) : (
-                    <a href="/register">註冊</a>
-                )}
-            </p>
+            {!isAdminVariant && (
+                <p>還沒有帳號?
+                    {onSwitchToRegister ? (
+                        <a onClick={(e) => { e.preventDefault(); onSwitchToRegister(); }} href="/register">註冊</a>
+                    ) : (
+                        <a href="/register">註冊</a>
+                    )}
+                </p>
+            )}
 
-            <SuccessModal show={isLogin} text="登入成功！您將移至首頁" icon={<div ref={animation} />} />
+            <SuccessModal show={isLogin} text={isAdminVariant ? "登入成功！正在確認後台權限" : "登入成功！您將移至首頁"} icon={<div ref={animation} />} />
         </div>
     );
 };

@@ -1,0 +1,121 @@
+/*
+ * 後台入口載入畫面（AdminEntryFallback.jsx）。
+ * 顯示時 .admin-shell 還不存在，所以這裡不能用 --admin-* 設計變數，改用前台的 --yy-* 變數（theme-v2.css 全站載入）。
+ */
+.admin-entry {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  color: var(--yy-cream, #f3e7cf);
+  background: #14263d;
+  font-family: var(--yy-font-body, sans-serif);
+  /* 延遲 120ms 才淡入：頁面載入很快時使用者完全看不到這個畫面 */
+  animation: admin-entry-in .24s ease-out .12s both;
+}
+
+.admin-entry-core {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  margin-bottom: 14px;
+}
+
+.admin-entry-ring {
+  width: 100%;
+  height: 100%;
+  animation: admin-entry-spin 3.2s linear infinite;
+}
+
+.admin-entry-segment {
+  fill: none;
+  stroke-width: 7;
+  stroke-linecap: butt;
+  stroke-dasharray: 38 188.2;
+  /* 描線：每一段從起點「畫」出來（dashoffset 38→0），五段依序，像手一筆一筆畫圓環 */
+  stroke-dashoffset: 38;
+  animation: admin-entry-segment .55s cubic-bezier(.55, .08, .35, 1) both;
+}
+.admin-entry-segment-red { stroke: var(--yy-red, #9e1b24); }
+.admin-entry-segment-gold { stroke: var(--yy-gold, #d9a227); }
+.admin-entry-segment-blue { stroke: #4d86b8; }
+.admin-entry-segment-teal { stroke: var(--yy-blue-light, #2c6e7f); }
+.admin-entry-segment-cream { stroke: var(--yy-cream, #f3e7cf); }
+
+.admin-entry-mark {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--yy-cream, #f3e7cf);
+  font-size: 34px;
+  font-weight: 700;
+}
+
+.admin-entry-brand {
+  margin: 0;
+  color: var(--yy-gold-light, #f6d77b);
+  font-family: var(--yy-font-pixel, monospace);
+  font-size: 13px;
+  letter-spacing: .24em;
+}
+
+.admin-entry-message {
+  margin: 0;
+  color: rgba(243, 231, 207, .78);
+  font-size: 14px;
+  letter-spacing: .08em;
+}
+
+/* 不確定進度帶：織紋色塊循環位移，不顯示百分比 */
+.admin-entry-bar {
+  width: min(240px, 60vw);
+  height: 10px;
+  margin-top: 14px;
+  border: 2px solid var(--yy-cream, #f3e7cf);
+  background-image: repeating-conic-gradient(var(--yy-red, #9e1b24) 0deg 90deg, var(--yy-gold, #d9a227) 90deg 180deg, var(--yy-blue-light, #2c6e7f) 180deg 270deg, var(--yy-cream, #f3e7cf) 270deg 360deg);
+  background-size: 20px 20px;
+  animation: yy-marquee 1.4s linear infinite;
+}
+
+@keyframes admin-entry-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes admin-entry-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes admin-entry-segment {
+  from { stroke-dashoffset: 38; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* 入口儀式版：一開始就顯示（最短可見時間由 AdminEntryGate 控制） */
+.admin-entry--instant { animation: none; }
+
+/* 收合：光圈從畫面外往中心縮小，露出底下的後台；訊號環同時放大淡出，像「門」打開 */
+.admin-entry.is-leaving {
+  animation: admin-entry-iris .65s cubic-bezier(.7, 0, .3, 1) forwards;
+}
+.admin-entry.is-leaving .admin-entry-core { animation: admin-entry-core-out .65s cubic-bezier(.7, 0, .3, 1) forwards; }
+.admin-entry.is-leaving .admin-entry-brand,
+.admin-entry.is-leaving .admin-entry-message,
+.admin-entry.is-leaving .admin-entry-bar { animation: admin-entry-text-out .3s ease-in forwards; }
+
+@keyframes admin-entry-iris {
+  from { clip-path: circle(150% at 50% 45%); }
+  to { clip-path: circle(0% at 50% 45%); }
+}
+@keyframes admin-entry-core-out {
+  to { transform: scale(2.2); opacity: 0; }
+}
+@keyframes admin-entry-text-out {
+  to { opacity: 0; transform: translateY(8px); }
+}

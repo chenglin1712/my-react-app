@@ -53,3 +53,24 @@
 
 - `cssNamespace.test.js`：禁止跨檔案同名的頂層類別。
 - `adminClasses.test.js`：JSX 用到的每個 `admin-*` class 都必須有 CSS 規則；系統、遊戲、待驗證佇列不得借用 `quiz-bank-*`。
+
+## 動畫與進入後台
+
+動畫是這個後台「第一印象」的一部分，也最容易做成「有做跟沒做看起來差不多」。規則：
+
+- **每個畫面一個主角。** 登入頁是持續動態的織紋；入口載入是被描出來的訊號環；進後台是光圈收合。不要讓所有區塊各自位移幾 px。
+- **進入的儀式只在這個分頁第一次進後台時播**（`entry/AdminEntryGate.jsx`，最短可見約 800ms，之後重新整理、換頁都不再播）。日常換頁只做 150ms 淡入，管理員一天換頁上百次。
+- 像素元素（織紋格、打字機、進度條）用 `steps()`；大面積位移用平滑曲線。
+- 只動 `transform`、`opacity`、`clip-path`；不要用 `backdrop-filter`、`blur()` 的環境動畫。
+- 降低動態偏好由 `theme-v2.css` 的全域規則處理；JS 驅動的動態用 `hooks/useReducedMotion`。
+- **驗證一定要看到動畫真的在播。** 瀏覽器工具的分頁常是 hidden，動畫時鐘會停住，截圖只會看到起點或終點。用 Edge headless
+  （頁面可見）搭配 CDP `Page.captureScreenshot` 在指定時間點擷取，才是真的畫面。
+
+## 進後台要重新輸入密碼
+
+- 前台已登入的人點進 `/admin`，`AdminRoute` 會導去 `/admin-login`，要在那裡再輸入一次密碼
+  （旗標在 `session/adminSession.js`，存 sessionStorage：同分頁重新整理保留，新分頁或重開瀏覽器要重登）。
+- **旗標只是體驗層，不是安全邊界。** 真正的把關是後端 `core/firebase_auth.py` 的 `require_role`：ID token 的 `auth_time`
+  超過 `ADMIN_REAUTH_MAX_AGE_SECONDS`（預設 30 分鐘）就回 401 `reauth_required`，`utils/apiClient.js` 會發出事件，
+  `session/AdminReauthModal.jsx` 跳出重新驗證視窗（不導頁，填到一半的表單不會消失）。
+- 前台與後台共用同一個 Firebase 登入：在 `/admin-login` 輸入另一個帳號，前台也會切換成該帳號（登入頁有說明）。

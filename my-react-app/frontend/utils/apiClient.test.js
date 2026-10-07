@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import axios from 'axios';
-import { apiPost, apiPatch, apiPut, apiDelete, trackEvent, ApiError } from './apiClient';
+import { apiGet, apiPost, apiPatch, apiPut, apiDelete, trackEvent, ApiError } from './apiClient';
 
 vi.mock('axios');
 
@@ -173,5 +173,31 @@ describe('trackEvent（P5 數據分析：輕量事件回報，任何失敗都不
   test('網路完全失敗時也不會 reject', async () => {
     axios.post.mockRejectedValueOnce(new Error('Network Error'));
     await expect(trackEvent('page_view')).resolves.toBeUndefined();
+  });
+});
+
+describe('後台重新驗證通知', () => {
+  beforeEach(() => {
+    mockCurrentUser = null;
+    axios.get.mockReset();
+    axios.isCancel.mockReturnValue(false);
+  });
+
+  test('後端回 401 reauth_required 時送出事件，錯誤照常往外丟', async () => {
+    const handler = vi.fn();
+    window.addEventListener('admin:reauth-required', handler);
+    axios.get.mockRejectedValueOnce({ response: { status: 401, data: { detail: '請重新驗證', code: 'reauth_required' } }, message: 'x' });
+    await expect(apiGet('/adminapi/x/')).rejects.toMatchObject({ status: 401 });
+    expect(handler).toHaveBeenCalledTimes(1);
+    window.removeEventListener('admin:reauth-required', handler);
+  });
+
+  test('一般 401（例如 token 過期）不送這個事件', async () => {
+    const handler = vi.fn();
+    window.addEventListener('admin:reauth-required', handler);
+    axios.get.mockRejectedValueOnce({ response: { status: 401, data: { detail: '身份驗證失敗，請重新登入' } }, message: 'x' });
+    await expect(apiGet('/adminapi/x/')).rejects.toMatchObject({ status: 401 });
+    expect(handler).not.toHaveBeenCalled();
+    window.removeEventListener('admin:reauth-required', handler);
   });
 });

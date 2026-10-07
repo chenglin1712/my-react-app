@@ -315,3 +315,26 @@
   justify-content: center;
   gap: 5px;
 }
+
+/* ------------------------------------------------------------------ 載入骨架（AdminRouteSkeleton）
+   形狀對應多數管理頁：標題、篩選列、表格。閃爍只用 opacity，降低動態偏好下由全域規則停掉。 */
+.admin-shell .admin-skeleton { max-width: var(--admin-content-max); margin: 0 auto; padding: var(--admin-page-padding); }
+.admin-shell .admin-skeleton-heading { display: grid; gap: 10px; margin-bottom: 24px; }
+.admin-shell .admin-skeleton-card { padding: 16px 18px; margin-bottom: 20px; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); box-shadow: var(--admin-shadow); }
+.admin-shell .admin-skeleton-filter { display: flex; gap: 12px; }
+.admin-shell .admin-skeleton-row { display: grid; grid-template-columns: 3fr 2fr 2fr 1fr; gap: 24px; padding: 14px 0; border-bottom: 1px solid var(--admin-border); }
+.admin-shell .admin-skeleton-row:last-child { border-bottom: 0; }
+.admin-shell .admin-skeleton-bar { display: block; height: 14px; background: var(--admin-border); border-radius: 6px; animation: admin-skeleton-pulse 1.4s ease-in-out infinite; }
+.admin-shell .admin-skeleton-title { width: 180px; height: 26px; }
+.admin-shell .admin-skeleton-subtitle { width: 320px; max-width: 70%; }
+.admin-shell .admin-skeleton-field { flex: 1; height: var(--admin-control-height); }
+.admin-shell .admin-skeleton-field-short { flex: 0 0 120px; }
+.admin-shell .admin-skeleton-cell-wide,
+.admin-shell .admin-skeleton-cell,
+.admin-shell .admin-skeleton-cell-short { height: 14px; }
+.admin-shell .admin-skeleton-cell-short { width: 60%; }
+
+@keyframes admin-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .45; }
+}

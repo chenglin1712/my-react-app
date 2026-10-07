@@ -1,0 +1,293 @@
+/*
+ * 後台專用登入頁（src/_auth/AdminLoginPage.jsx）。
+ * 左右分割：左側品牌色織紋與標語（純裝飾），右側奶油底登入卡。表單本身沿用 loginForm.css。
+ * 動畫只用 transform／opacity；降低動態偏好由 theme-v2.css 的全域規則處理（動畫直接到終態）。
+ */
+.admin-login {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  min-height: 100vh;
+  font-family: var(--yy-font-body, sans-serif);
+  color: var(--yy-ink, #221812);
+  background: var(--yy-cream, #f3e7cf);
+}
+
+/* ---------- 左側裝飾 ---------- */
+.admin-login-aside {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: clamp(32px, 6vw, 72px);
+  overflow: hidden;
+  color: var(--yy-cream, #f3e7cf);
+  background: #14263d;
+  border-right: 4px solid var(--yy-ink, #221812);
+}
+
+.admin-login-weave {
+  position: absolute;
+  top: clamp(24px, 6vh, 64px);
+  left: clamp(28px, 5vw, 64px);
+  display: grid;
+  grid-template-columns: repeat(7, clamp(38px, 4.4vw, 62px));
+  gap: 6px;
+}
+
+.admin-login-cell,
+.admin-login-cell-gap { aspect-ratio: 1; }
+
+.admin-login-cell {
+  border: 2px solid rgba(243, 231, 207, .24);
+  /* 進場：一列一列織出來。每格由左往右拉開（steps 讓它有像素的頓挫感，像線一段一段被拉過） */
+  clip-path: inset(0 100% 0 0);
+  animation:
+    admin-login-weave-in .5s steps(5, end) calc(var(--row) * 150ms + var(--col) * 30ms + .15s) forwards,
+    /* 持續：織完後從中心向外一圈一圈亮度起伏，6 秒一輪，每圈延遲 .22 秒形成擴散波 */
+    admin-login-ripple 6s ease-in-out calc(2.2s + var(--ring) * 220ms) infinite;
+}
+.admin-login-cell-gold { background: var(--yy-gold, #d9a227); }
+.admin-login-cell-red { background: var(--yy-red, #9e1b24); }
+.admin-login-cell-cream { background: var(--yy-cream, #f3e7cf); }
+.admin-login-cell-teal { background: var(--yy-blue-light, #2c6e7f); }
+.admin-login-cell-blue { background: #4d86b8; }
+
+/* 梭子：一條金線每 5 秒由上往下掃過整片織紋 */
+.admin-login-shuttle {
+  position: absolute;
+  top: 0;
+  right: -8px;
+  left: -8px;
+  height: 3px;
+  background: var(--yy-gold-light, #f6d77b);
+  box-shadow: 0 0 12px 2px rgba(246, 215, 123, .55);
+  opacity: 0;
+  animation: admin-login-shuttle 5s cubic-bezier(.45, 0, .55, 1) 2.6s infinite;
+}
+
+/* 星塵：像素方塊緩緩上升（Y2K 版的螢火蟲） */
+.admin-login-dust {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.admin-login-dust-mote {
+  position: absolute;
+  bottom: -12px;
+  opacity: 0;
+  animation: admin-login-dust 12s linear infinite;
+}
+.admin-login-dust-gold { background: var(--yy-gold-light, #f6d77b); }
+.admin-login-dust-cream { background: var(--yy-cream, #f3e7cf); }
+.admin-login-dust-red { background: #d94b57; }
+.admin-login-dust-teal { background: #5aa5b8; }
+
+.admin-login-kicker {
+  position: relative;
+  margin: 0;
+  color: var(--yy-gold-light, #f6d77b);
+  font-family: var(--yy-font-pixel, monospace);
+  font-size: 13px;
+  letter-spacing: .22em;
+  animation: admin-login-rise .5s ease-out .9s both;
+}
+
+/* 標語：打字機。寬度用 steps(字數) 一個字一個字揭露，最後一行打完後游標持續閃爍 */
+.admin-login-slogan {
+  position: relative;
+  margin: 0;
+  font-size: clamp(32px, 4.2vw, 56px);
+  font-weight: 900;
+  line-height: 1.25;
+  letter-spacing: .08em;
+}
+.admin-login-line {
+  display: block;
+  width: max-content;
+  clip-path: inset(0 100% 0 0);
+  animation: admin-login-type calc(var(--chars) * 130ms) steps(var(--chars), end) var(--line-delay) forwards;
+}
+.admin-login-line-last::after {
+  content: "";
+  display: inline-block;
+  width: .45em;
+  height: .9em;
+  margin-left: .12em;
+  vertical-align: -.08em;
+  background: var(--yy-gold-light, #f6d77b);
+  animation: admin-login-blink 1s steps(1, end) 2.3s infinite;
+}
+
+/* ---------- 右側登入卡 ---------- */
+.admin-login-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  background-image:
+    linear-gradient(45deg, rgba(34, 24, 18, .035) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(34, 24, 18, .035) 25%, transparent 25%);
+  background-size: 28px 28px;
+}
+
+.admin-login-card {
+  width: min(440px, 100%);
+  padding: 34px 32px 28px;
+  background: #fff;
+  border: 3px solid var(--yy-ink, #221812);
+  border-radius: var(--yy-radius-card, 10px);
+  box-shadow: var(--yy-shadow-lg, 7px 7px 0 #221812);
+  /* 由下方 48px 帶一點回彈落下，落地後硬陰影才「蓋」出來 */
+  animation:
+    admin-login-card-in .75s cubic-bezier(.34, 1.3, .5, 1) .2s both,
+    admin-login-stamp .35s ease-out .8s both;
+}
+.admin-login-card > * {
+  animation: admin-login-rise .5s cubic-bezier(.2, .7, .3, 1) both;
+}
+.admin-login-card > :nth-child(1) { animation-delay: .45s; }
+.admin-login-card > :nth-child(2) { animation-delay: .52s; }
+.admin-login-card > :nth-child(3) { animation-delay: .59s; }
+.admin-login-card > :nth-child(4) { animation-delay: .66s; }
+.admin-login-card > :nth-child(5) { animation-delay: .73s; }
+.admin-login-card > :nth-child(6) { animation-delay: .8s; }
+
+.admin-login-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 26px;
+}
+
+.admin-login-brand-mark {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  color: var(--yy-cream, #f3e7cf);
+  background: var(--yy-blue, #1f3a5c);
+  border: 2.5px solid var(--yy-ink, #221812);
+  border-radius: 8px;
+  box-shadow: 3px 3px 0 var(--yy-ink, #221812);
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.admin-login-brand-eyebrow {
+  display: block;
+  color: var(--yy-text-muted, #6b5a47);
+  font-family: var(--yy-font-pixel, monospace);
+  font-size: 10px;
+  letter-spacing: .2em;
+}
+
+.admin-login-brand-name {
+  display: block;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.admin-login-title {
+  margin: 0 0 6px;
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.admin-login-lead {
+  margin: 0 0 20px;
+  color: var(--yy-text-muted, #6b5a47);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.admin-login-notice {
+  margin: 0 0 18px;
+  padding: 10px 12px;
+  color: var(--yy-text-secondary, #3e3226);
+  background: var(--yy-warning-bg, #f9f1df);
+  border: 2px solid var(--yy-ink, #221812);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.admin-login-back {
+  display: inline-block;
+  margin-top: 18px;
+  color: var(--yy-text-muted, #6b5a47);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.admin-login-back:hover {
+  color: var(--yy-red, #9e1b24);
+  text-decoration: underline;
+}
+
+@keyframes admin-login-weave-in {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
+/* 亮度起伏只動 opacity 與 transform（不觸發版面重排） */
+@keyframes admin-login-ripple {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  45% { opacity: .78; transform: scale(.93); }
+}
+
+@keyframes admin-login-shuttle {
+  0% { transform: translateY(0); opacity: 0; }
+  8% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { transform: translateY(calc(7 * clamp(38px, 4.4vw, 62px) + 36px)); opacity: 0; }
+}
+
+@keyframes admin-login-dust {
+  0% { transform: translateY(0); opacity: 0; }
+  12% { opacity: .85; }
+  80% { opacity: .85; }
+  100% { transform: translateY(-105vh); opacity: 0; }
+}
+
+@keyframes admin-login-type {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
+@keyframes admin-login-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@keyframes admin-login-card-in {
+  from { opacity: 0; transform: translateY(48px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes admin-login-stamp {
+  from { box-shadow: 0 0 0 var(--yy-ink, #221812); }
+  to { box-shadow: var(--yy-shadow-lg, 7px 7px 0 #221812); }
+}
+
+@keyframes admin-login-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- 窄螢幕：裝飾區收成頂部色帶，表單排在最前 ---------- */
+@media (max-width: 900px) {
+  .admin-login {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .admin-login-aside {
+    flex-direction: row;
+    align-items: center;
+    padding: 18px 24px;
+    border-right: 0;
+    border-bottom: 4px solid var(--yy-ink, #221812);
+  }
+  .admin-login-weave,
+  .admin-login-slogan { display: none; }
+}

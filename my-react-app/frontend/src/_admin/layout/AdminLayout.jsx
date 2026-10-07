@@ -1,10 +1,12 @@
-import { Suspense } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Spinner } from 'react-bootstrap';
 import { BarChart3, BookOpen, ClipboardCheck, FileQuestion, Gamepad2, LayoutDashboard, Megaphone, Settings, Users } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import ErrorBoundary from '../../errorBoundary';
 import { ROLE_LABELS } from '../constants/roles';
+import AdminRouteSkeleton from './AdminRouteSkeleton';
+import AdminReauthModal from '../session/AdminReauthModal';
+import { useAdminEntry } from '../entry/adminEntryContext';
 import '../../../static/css/_admin/layout.css';
 import '../../../static/css/_admin/admin-base.css';
 
@@ -98,9 +100,37 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
     const { userData } = useAuth();
     const { pathname } = useLocation();
     const breadcrumb = getBreadcrumb(pathname);
+    const contentRef = useRef(null);
+    const { firstEntry, revealed, markReady } = useAdminEntry();
+
+    // 後台殼層掛載完成 = 入口閘門可以開始倒數最短可見時間，然後收合
+    useEffect(() => { markReady(); }, [markReady]);
+
+    // 第一次進入的進場儀式：hold（光圈還蓋著，全部先隱藏）→ play（光圈開始收合，播放進場）→ idle
+    const [ceremony, setCeremony] = useState(firstEntry ? 'hold' : 'idle');
+    useEffect(() => {
+        if (ceremony === 'hold' && revealed) setCeremony('play');
+    }, [ceremony, revealed]);
+    useEffect(() => {
+        if (ceremony !== 'play') return undefined;
+        const timer = setTimeout(() => setCeremony('idle'), 1800);
+        return () => clearTimeout(timer);
+    }, [ceremony]);
+
+    // 換頁時重播內容進場動畫。不能用 key={pathname} 讓內容區整個重掛：有些頁面（例如公告編輯器
+    // 「建立後導向 /:id」）靠同一個元件實例跨過路由變化，重掛會讓它的載入流程重跑。
+    // 所以改成移除再加回 class（中間強制 reflow）讓 CSS 動畫重新開始，元件完全不受影響。
+    useEffect(() => {
+        const element = contentRef.current;
+        if (!element || ceremony !== 'idle') return;
+        element.classList.remove('is-entering');
+        void element.offsetWidth;
+        element.classList.add('is-entering');
+    }, [pathname, ceremony]);
 
     return (
-        <div className="admin-shell">
+        <div className={`admin-shell${ceremony === 'hold' ? ' admin-shell--hold' : ''}${ceremony === 'play' ? ' admin-shell--play' : ''}`}>
+            <AdminReauthModal />
             <aside className="admin-sidebar">
                 <Link className="admin-brand" to="/admin"><span>源·語</span><small>ADMIN CONSOLE</small></Link>
                 <nav className="admin-navigation" aria-label="後台主選單">
@@ -160,7 +190,7 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
                     讓錯誤侷限在內容區、導覽仍然可用。
                     resetKeys 傳入 pathname：換到另一個管理頁面時自動
                     復原，不會黏在前一頁的錯誤畫面（見 errorBoundary.jsx）。 */}
-                <div className="admin-route-content">
+                <div className="admin-route-content" ref={contentRef}>
                     <ErrorBoundary
                         resetKeys={[pathname]}
                         fallback={({ reset }) => (
@@ -175,11 +205,7 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
                     >
                         {/* 後台頁面元件都改成 lazy load 了（AdminApp.jsx）；換頁時只有
                             這個內容區顯示載入中，側邊欄與麵包屑維持顯示不消失。 */}
-                        <Suspense fallback={(
-                            <div className="admin-route-loading">
-                                <Spinner animation="border" variant="primary" />
-                            </div>
-                        )}>
+                        <Suspense fallback={<AdminRouteSkeleton />}>
                             <Outlet />
                         </Suspense>
                     </ErrorBoundary>

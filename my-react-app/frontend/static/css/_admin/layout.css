@@ -86,8 +86,6 @@
 .admin-topbar-user small { margin-top: 1px; color: #5f6b7a; font-size: 11px; }
 .admin-user-avatar { display: grid; width: 36px; height: 36px; place-items: center; color: #fff; background: var(--yy-blue, #1f3a5c); border-radius: 50%; font-size: 14px; font-weight: 700; }
 .admin-route-content { min-width: 0; }
-/* 後台頁面元件改成 lazy load 後，換頁期間 Suspense fallback 顯示的載入中。 */
-.admin-route-loading { display: flex; justify-content: center; padding: 3rem 0; }
 /* FE-4：後台內容區的 scoped error boundary fallback（見 AdminLayout.jsx）。
    刻意做得比整頁錯誤畫面收斂——側邊欄與麵包屑都還在，使用者可以直接切到
    其他管理頁面，不需要整頁重載。 */
@@ -106,3 +104,34 @@
 .admin-route-error p { margin: 0; color: #6b5b5b; }
 @media (max-width: 1024px) { .admin-sidebar { width: 216px; } .admin-main-column { margin-left: 216px; } .admin-topbar { padding: 0 20px; } }
 @media (max-width: 900px) { .admin-shell { --admin-page-padding: 20px; } }
+
+/* ---------- 進入後台與換頁的轉場 ----------
+   兩種節奏（議會結論）：
+   1. 這個分頁第一次進後台（入口儀式的光圈收合時）：側欄、頂欄、內容依序「落位」，有份量、約 1 秒。
+      hold = 光圈還蓋著，先全部隱藏；play = 光圈開始收合，播放進場；idle = 之後都是日常狀態。
+   2. 日常換頁：只做 150ms 的內容淡入。管理員一天換頁上百次，大動作第三天就會嫌煩。
+   全部只用 transform／opacity；降低動態偏好由 theme-v2.css 的全域規則處理（動畫直接到終態）。 */
+.admin-shell--hold .admin-sidebar,
+.admin-shell--hold .admin-topbar,
+.admin-shell--hold .admin-route-content { opacity: 0; }
+
+.admin-shell--play .admin-sidebar { animation: admin-sidebar-in .6s cubic-bezier(.2, .7, .3, 1) both; }
+.admin-shell--play .admin-topbar { animation: admin-topbar-in .5s cubic-bezier(.2, .7, .3, 1) .14s both; }
+.admin-shell--play .admin-route-content > * > * { animation: admin-block-in .55s cubic-bezier(.2, .7, .3, 1) .34s both; }
+.admin-shell--play .admin-route-content > * > :nth-child(2) { animation-delay: .44s; }
+.admin-shell--play .admin-route-content > * > :nth-child(n + 3) { animation-delay: .54s; }
+
+.admin-route-content.is-entering > * > * { animation: admin-fade-in .15s ease-out backwards; }
+
+@keyframes admin-sidebar-in {
+  from { opacity: 0; transform: translateX(-40px); }
+}
+@keyframes admin-topbar-in {
+  from { opacity: 0; transform: translateY(-20px); }
+}
+@keyframes admin-block-in {
+  from { opacity: 0; transform: translateY(18px); }
+}
+@keyframes admin-fade-in {
+  from { opacity: 0; }
+}

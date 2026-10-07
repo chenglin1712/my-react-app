@@ -5,10 +5,13 @@ import { useAuth } from './userServives/authContext';
 import PermissionProtect from './userServives/permissionProtect';
 import ErrorBoundary from './errorBoundary';
 import { TRIBES } from './constants/tribes';
+import AdminEntryFallback from './_admin/entry/AdminEntryFallback';
+import AdminEntryGate from './_admin/entry/AdminEntryGate';
 //首頁
 const HomePage = lazy(() => import('./_home/index'));
 //登入、註冊、編輯資料
 const LoginPage = lazy(() => import('./_auth/login'));
+const AdminLoginPage = lazy(() => import('./_auth/AdminLoginPage'));
 const RegisterPage = lazy(() => import('./_auth/register'));
 const EditPage = lazy(() => import('../components/_auth/editProfile'));
 //忘記密碼、重設密碼
@@ -82,7 +85,9 @@ const ProtectedLayout = () => {
 
 const RouteLoadingFallback = () => (
   <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
-    <Spinner animation="border" variant="danger" />
+    <Spinner animation="border" variant="danger" role="status">
+      <span className="visually-hidden">載入中…</span>
+    </Spinner>
   </div>
 );
 
@@ -97,6 +102,15 @@ const AppRoutes = () => {
           <Route path="/camera/result" element={<Navigate to="/camera" replace />} />
           <Route path='/share/:id' element={<NoteShare />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/admin-login"
+            element={(
+              // 後台登入頁的 chunk 載入期間也用後台自己的載入畫面，不要落到全站紅色 spinner
+              <Suspense fallback={<AdminEntryFallback message="正在準備登入頁" />}>
+                <AdminLoginPage />
+              </Suspense>
+            )}
+          />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot" element={<ForgotPage />} />
           <Route path="/reset" element={<ResetPage />} />
@@ -151,7 +165,17 @@ const AppRoutes = () => {
             <Route path="/calendar" element={<CalendarPage />} />
           </Route>
 
-          <Route path="/admin/*" element={<AdminRoute><AdminApp /></AdminRoute>} />
+          <Route
+            path="/admin/*"
+            element={(
+              // 後台自己的載入畫面：AdminRoute／AdminApp 都是 lazy chunk，沒有這一層會落到全站的紅色 spinner
+              <AdminEntryGate>
+                <Suspense fallback={<AdminEntryFallback />}>
+                  <AdminRoute><AdminApp /></AdminRoute>
+                </Suspense>
+              </AdminEntryGate>
+            )}
+          />
         </Routes>
       </Suspense>
     </ErrorBoundary>

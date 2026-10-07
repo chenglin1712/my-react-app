@@ -60,6 +60,11 @@ function throwNormalizedError(err) {
   if (axios.isCancel(err)) throw err;
   const status = err.response?.status;
   const respData = err.response?.data;
+  // 後台 API 回 401 且 code 為 reauth_required：距離上次用密碼驗證太久。通知後台的重新驗證彈窗
+  // （src/_admin/session/AdminReauthModal.jsx），錯誤照常往外丟，呼叫端的錯誤處理不變。
+  if (status === 401 && respData?.code === 'reauth_required' && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('admin:reauth-required'));
+  }
   const message = extractMessage(respData?.detail) || extractMessage(respData?.error) || err.message || '請求失敗';
   throw new ApiError(message, { status, data: respData });
 }
