@@ -5,7 +5,6 @@ import {
 import { Save } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { apiGet, apiPatch } from '../../../utils/apiClient';
-import '../../../static/css/_admin/quiz-bank.css';
 
 const PUBLISHERS = ['owner', 'admin'];
 const STAFF_ROLES = ['owner', 'admin', 'editor', 'reviewer', 'analyst'];
@@ -136,7 +135,7 @@ export default function GameSettings() {
 
     if (loading) {
         return (
-            <div className="quiz-bank-loading">
+            <div className="admin-loading">
                 <Spinner animation="border" />
                 <span>載入中…</span>
             </div>
@@ -144,8 +143,8 @@ export default function GameSettings() {
     }
 
     return (
-        <main className="quiz-bank-admin-page">
-            <div className="quiz-bank-page-heading">
+        <main className="admin-page game-settings-page">
+            <div className="admin-page-heading">
                 <div>
                     <h1>遊戲參數設定</h1>
                     <p>聽力／句型／發音／填字四個遊戲的可調參數</p>
@@ -164,15 +163,15 @@ export default function GameSettings() {
             {success && <Alert variant="success">{success}</Alert>}
 
             <Form
-                className="quiz-bank-config-card"
+                className="admin-config-card"
                 onSubmit={saveConfig}
             >
                 {CONFIG_SECTIONS.map((section) => (
-                    <section className="quiz-bank-config-section" key={section.title}>
-                        <div className="quiz-bank-config-section-heading">
+                    <section className="admin-config-section" key={section.title}>
+                        <div className="admin-config-section-heading">
                             <h2>{section.title}</h2>
                         </div>
-                        <div className="quiz-bank-config-grid">
+                        <div className="admin-config-grid">
                             {section.fields.map(([field, label]) => (
                                 <Form.Group
                                     controlId={`game-config-${field}`}
@@ -195,7 +194,7 @@ export default function GameSettings() {
                     </section>
                 ))}
 
-                <div className="quiz-bank-config-footer">
+                <div className="admin-config-footer">
                     <span>
                         最後更新：
                         {metadata.updated_by || '尚無紀錄'}

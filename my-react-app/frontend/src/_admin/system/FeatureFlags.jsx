@@ -4,7 +4,6 @@ import {
 } from 'react-bootstrap';
 import { useAuth } from '../../userServives/authContext';
 import { apiGet, apiPatch } from '../../../utils/apiClient';
-import '../../../static/css/_admin/quiz-bank.css';
 import '../../../static/css/_admin/system.css';
 
 const PUBLISHERS = ['owner', 'admin'];
@@ -74,7 +73,7 @@ export default function FeatureFlags() {
 
     if (loading) {
         return (
-            <div className="quiz-bank-loading">
+            <div className="admin-loading">
                 <Spinner animation="border" />
                 <span>載入中…</span>
             </div>
@@ -82,8 +81,8 @@ export default function FeatureFlags() {
     }
 
     return (
-        <main className="quiz-bank-admin-page">
-            <div className="quiz-bank-page-heading">
+        <main className="admin-page system-page">
+            <div className="admin-page-heading">
                 <div>
                     <h1>功能開關</h1>
                     <p>各功能模組的啟用開關，可即時生效不需部署</p>
@@ -104,8 +103,8 @@ export default function FeatureFlags() {
             {error && <Alert variant="danger">{error}</Alert>}
             {success && <Alert variant="success">{success}</Alert>}
 
-            <div className="quiz-bank-table-card">
-                <Table responsive hover className="quiz-bank-table system-feature-table">
+            <div className="admin-table-card">
+                <Table responsive hover className="admin-table system-feature-table">
                     <thead>
                         <tr>
                             <th>key</th>
@@ -148,7 +147,7 @@ export default function FeatureFlags() {
                             );
                         }) : (
                             <tr>
-                                <td colSpan="5" className="quiz-bank-empty">
+                                <td colSpan="5" className="admin-empty">
                                     尚無功能開關
                                 </td>
                             </tr>

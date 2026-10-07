@@ -1,5 +1,5 @@
 /* 系統管理頁面的少量專用排版。通用頁首、表格、載入狀態與表單卡片
-   繼續沿用 quiz-bank.css／dictionary.css。 */
+   使用 admin-base.css 的通用 admin-* 元件。 */
 
 .system-filter-panel {
   display: grid;
@@ -8,10 +8,10 @@
   max-width: 1440px;
   margin: 0 auto 20px;
   padding: 18px;
-  background: #fff;
-  border: 1px solid #dee2e6;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(31, 58, 92, 0.06);
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  box-shadow: var(--admin-shadow);
 }
 
 .system-search-control {
@@ -23,7 +23,7 @@
   top: 50%;
   left: 12px;
   z-index: 1;
-  color: var(--yy-text-muted, #6b5a47);
+  color: var(--admin-muted);
   pointer-events: none;
   transform: translateY(-50%);
 }
@@ -33,14 +33,19 @@
 }
 
 .system-rate-table input {
-  min-width: 150px;
+  width: 140px;
+  min-width: 120px;
 }
 
 .system-rate-table code,
 .system-feature-table code {
-  color: var(--yy-blue, #1f3a5c);
+  color: var(--admin-accent);
   font-size: 13px;
   white-space: nowrap;
+}
+
+.system-feature-table td:nth-child(2) {
+  min-width: 140px;
 }
 
 .system-feature-table td:nth-child(3) {
@@ -60,7 +65,7 @@
 }
 
 .system-toggle-row > span {
-  color: var(--yy-text-muted, #6b5a47);
+  color: var(--admin-muted);
   font-size: 13px;
   white-space: nowrap;
 }
@@ -76,10 +81,10 @@
 
 .system-action-card {
   overflow: hidden;
-  background: #fff;
-  border: 1px solid #dee2e6;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(31, 58, 92, 0.07);
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  box-shadow: var(--admin-shadow);
 }
 
 .system-action-card-heading {
@@ -87,25 +92,25 @@
   align-items: flex-start;
   gap: 12px;
   padding: 22px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--admin-border);
 }
 
 .system-action-card-heading > svg {
   flex: 0 0 auto;
   margin-top: 2px;
-  color: var(--yy-blue, #1f3a5c);
+  color: var(--admin-accent);
 }
 
 .system-action-card-heading h2 {
   margin: 0 0 5px;
-  color: var(--yy-blue, #1f3a5c);
+  color: var(--admin-accent);
   font-size: 19px;
   font-weight: 700;
 }
 
 .system-action-card-heading p {
   margin: 0;
-  color: var(--yy-text-muted, #6b5a47);
+  color: var(--admin-muted);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -113,21 +118,17 @@
 .system-fastapi-note {
   min-height: 146px;
   padding: 22px;
-  color: var(--yy-text-muted, #6b5a47);
+  color: var(--admin-muted);
   line-height: 1.7;
 }
 
 .system-action-card-footer {
   display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   justify-content: flex-end;
   padding: 18px 22px;
-  border-top: 1px solid #e9ecef;
-}
-
-.system-action-card-footer .btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  border-top: 1px solid var(--admin-border);
 }
 
 .system-result-list {
@@ -142,18 +143,13 @@
   gap: 12px;
 }
 
-.game-word-create-grid .btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .system-cache-grid {
     grid-template-columns: 1fr;
   }
+}
 
+@media (max-width: 900px) {
   .game-word-create-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -180,7 +176,7 @@
 }
 
 .system-morph-stale {
-  background: rgba(255, 193, 7, 0.08);
+  background: var(--admin-warning-bg);
 }
 
 .system-morph-badges {
@@ -195,20 +191,20 @@
 
 .system-morph-muted {
   margin-top: 4px;
-  color: var(--yy-text-muted, #6b5a47);
+  color: var(--admin-muted);
   font-size: 13px;
 }
 
 .system-morph-note {
   margin-top: 6px;
-  color: #8a5a00;
+  color: var(--admin-warning-text);
   font-size: 13px;
 }
 
 .system-morph-problems {
   margin: 6px 0 0;
   padding-left: 18px;
-  color: #b02a37;
+  color: var(--admin-danger);
   font-size: 13px;
 }
 
@@ -217,7 +213,6 @@
   padding: 0;
   list-style: none;
   font-size: 13px;
-  white-space: nowrap;
 }
 
 .system-morph-definitions {
@@ -225,3 +220,22 @@
   margin-top: 16px;
   font-size: 14px;
 }
+
+/* 待專家驗證佇列的匯入區：action card 沒有主體內距，欄位與提示要自己補上和標題一致的 22px */
+.verification-page .system-action-card > .mb-3,
+.verification-page .system-action-card > .alert { margin-left: 22px; margin-right: 22px; }
+.verification-page .system-action-card > .mb-3 { margin-top: 18px; }
+
+/* 形態分析能力表：表頭與各欄允許換行，避免 1280 寬內容區只剩 972px 時橫向捲動；欄寬給個合理範圍而不是靠 nowrap 撐開 */
+.system-morph-table th { white-space: normal; }
+.system-morph-table td:nth-child(1) { min-width: 110px; max-width: 150px; }
+.system-morph-table td:nth-child(2) { min-width: 210px; max-width: 320px; }
+.system-morph-table td:nth-child(3),
+.system-morph-table td:nth-child(4) { min-width: 120px; max-width: 150px; }
+.system-morph-table td:nth-child(5) { min-width: 160px; max-width: 220px; }
+
+/* 限流表：表頭可換行，說明欄給下限，操作按鈕直向排列以免整欄被「重設為預設值」撐寬 */
+.system-rate-table th { white-space: normal; }
+.system-rate-table td:nth-child(2) { min-width: 180px; }
+.system-rate-table td:last-child { min-width: 120px; }
+.system-rate-table .admin-row-actions { min-width: 0; flex-direction: column; align-items: stretch; }

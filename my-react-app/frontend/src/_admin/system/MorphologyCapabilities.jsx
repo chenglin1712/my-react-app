@@ -7,7 +7,6 @@ import { useAuth } from '../../userServives/authContext';
 import { apiGet } from '../../../utils/apiClient';
 import { STAFF_ROLES } from '../constants/roles';
 import formatRatio from './formatRatio';
-import '../../../static/css/_admin/quiz-bank.css';
 import '../../../static/css/_admin/system.css';
 
 const TRIBE_NAMES = {
@@ -152,8 +151,8 @@ export default function MorphologyCapabilities() {
     const report = canView ? data?.report : undefined;
 
     return (
-        <main className="quiz-bank-admin-page">
-            <div className="quiz-bank-page-heading">
+        <main className="admin-page system-page">
+            <div className="admin-page-heading">
                 <div>
                     <h1>形態分析能力</h1>
                     <p>各族語詞形分析器在最終測試上的放行率、精確率與錯放行率（Wilson 95% 區間）。唯讀。</p>
@@ -178,7 +177,7 @@ export default function MorphologyCapabilities() {
             )}
 
             {canView && loading && !data && (
-                <div className="quiz-bank-loading">
+                <div className="admin-loading">
                     <Spinner animation="border" />
                     <span>載入中…</span>
                 </div>
@@ -191,7 +190,7 @@ export default function MorphologyCapabilities() {
                         {data.cached ? `（快取，約 ${data.cache_ttl_seconds} 秒內會重新計算）` : ''}
                         ｜放行檔產生器 {report.artifact_generator ?? '—'}
                     </p>
-                    <Table responsive hover className="quiz-bank-table system-morph-table">
+                    <Table responsive hover className="admin-table system-morph-table">
                         <thead>
                             <tr>
                                 <th>族語</th>

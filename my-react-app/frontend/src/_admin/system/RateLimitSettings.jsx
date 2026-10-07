@@ -5,7 +5,6 @@ import {
 import { RotateCcw, Save, Search } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { apiGet, apiPatch } from '../../../utils/apiClient';
-import '../../../static/css/_admin/quiz-bank.css';
 import '../../../static/css/_admin/system.css';
 
 const PUBLISHERS = ['owner', 'admin'];
@@ -99,7 +98,7 @@ export default function RateLimitSettings() {
 
     if (loading) {
         return (
-            <div className="quiz-bank-loading">
+            <div className="admin-loading">
                 <Spinner animation="border" />
                 <span>載入中…</span>
             </div>
@@ -107,8 +106,8 @@ export default function RateLimitSettings() {
     }
 
     return (
-        <main className="quiz-bank-admin-page">
-            <div className="quiz-bank-page-heading">
+        <main className="admin-page system-page">
+            <div className="admin-page-heading">
                 <div>
                     <h1>限流設定</h1>
                     <p>調整 Django／FastAPI 各端點的請求頻率限制</p>
@@ -152,8 +151,8 @@ export default function RateLimitSettings() {
                 </Form.Group>
             </div>
 
-            <div className="quiz-bank-table-card">
-                <Table responsive hover className="quiz-bank-table system-rate-table">
+            <div className="admin-table-card">
+                <Table responsive hover className="admin-table system-rate-table">
                     <thead>
                         <tr>
                             <th>key</th>
@@ -195,7 +194,7 @@ export default function RateLimitSettings() {
                                     <td>{item.updated_by || '—'}</td>
                                     <td>
                                         {editable && (
-                                            <div className="quiz-bank-row-actions">
+                                            <div className="admin-row-actions">
                                                 <Button
                                                     size="sm"
                                                     disabled={!changed || savingId === item.id}
@@ -232,7 +231,7 @@ export default function RateLimitSettings() {
                             );
                         }) : (
                             <tr>
-                                <td colSpan="7" className="quiz-bank-empty">
+                                <td colSpan="7" className="admin-empty">
                                     沒有符合條件的限流規則
                                 </td>
                             </tr>

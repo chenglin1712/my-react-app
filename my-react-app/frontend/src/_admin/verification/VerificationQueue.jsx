@@ -11,7 +11,6 @@ import {
     STAFF_ROLES, VERIFICATION_EXPORTERS, VERIFICATION_IMPORTERS, VERIFICATION_REVIEWERS,
 } from '../constants/roles';
 import stateLabel from './stateLabel';
-import '../../../static/css/_admin/quiz-bank.css';
 import '../../../static/css/_admin/system.css';
 
 const BASE = '/adminapi/verification';
@@ -355,8 +354,8 @@ export default function VerificationQueue() {
     const totalPages = data ? Math.max(1, Math.ceil(data.count / data.page_size)) : 1;
 
     return (
-        <main className="quiz-bank-admin-page">
-            <div className="quiz-bank-page-heading">
+        <main className="admin-page verification-page">
+            <div className="admin-page-heading">
                 <div>
                     <h1>待專家驗證佇列</h1>
                     <p>收集對候選詞形與分析結果的意見。意見不會寫回辭典或測驗題庫，所有項目都仍待專家驗證。</p>
@@ -407,11 +406,11 @@ export default function VerificationQueue() {
                     </div>
 
                     {loading && !data && (
-                        <div className="quiz-bank-loading"><Spinner animation="border" /><span>載入中…</span></div>
+                        <div className="admin-loading"><Spinner animation="border" /><span>載入中…</span></div>
                     )}
                     {data && (
-                        <>
-                            <Table responsive hover className="quiz-bank-table">
+                        <div className="admin-table-card">
+                            <Table responsive hover className="admin-table">
                                 <thead>
                                     <tr>
                                         <th>詞形</th><th>族語／種類</th><th>提案</th><th>統計（詞次／句數）</th><th>狀態</th><th />
@@ -419,7 +418,7 @@ export default function VerificationQueue() {
                                 </thead>
                                 <tbody>
                                     {data.results.length === 0 && (
-                                        <tr><td colSpan="6" className="quiz-bank-empty">沒有符合條件的項目</td></tr>
+                                        <tr><td colSpan="6" className="admin-empty">沒有符合條件的項目</td></tr>
                                     )}
                                     {data.results.map((item) => {
                                         const label = stateLabel(item);
@@ -457,12 +456,12 @@ export default function VerificationQueue() {
                                     })}
                                 </tbody>
                             </Table>
-                            <div className="d-flex align-items-center gap-3">
+                            <div className="admin-pagination">
                                 <Button size="sm" variant="outline-secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一頁</Button>
                                 <span>第 {data.page} / {totalPages} 頁（共 {data.count} 筆）</span>
                                 <Button size="sm" variant="outline-secondary" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>下一頁</Button>
                             </div>
-                        </>
+                        </div>
                     )}
                     {canImport && (
                         <div className="mt-4">

@@ -5,7 +5,6 @@ import {
 import { Database, RefreshCw, Trash2 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { apiGet, apiPost } from '../../../utils/apiClient';
-import '../../../static/css/_admin/quiz-bank.css';
 import '../../../static/css/_admin/system.css';
 
 const PUBLISHERS = ['owner', 'admin'];
@@ -95,7 +94,7 @@ export default function CacheManagement() {
 
     if (loading) {
         return (
-            <div className="quiz-bank-loading">
+            <div className="admin-loading">
                 <Spinner animation="border" />
                 <span>載入中…</span>
             </div>
@@ -103,8 +102,8 @@ export default function CacheManagement() {
     }
 
     return (
-        <main className="quiz-bank-admin-page">
-            <div className="quiz-bank-page-heading">
+        <main className="admin-page system-page">
+            <div className="admin-page-heading">
                 <div>
                     <h1>快取管理</h1>
                     <p>清除具名快取，用於內容更新後立即生效</p>
@@ -141,7 +140,7 @@ export default function CacheManagement() {
                         </div>
                     </div>
 
-                    <Table responsive hover className="quiz-bank-table">
+                    <Table responsive hover className="admin-table">
                         <thead>
                             <tr>
                                 <th>key</th>
@@ -156,7 +155,7 @@ export default function CacheManagement() {
                                 </tr>
                             )) : (
                                 <tr>
-                                    <td colSpan="2" className="quiz-bank-empty">
+                                    <td colSpan="2" className="admin-empty">
                                         尚無具名快取
                                     </td>
                                 </tr>
