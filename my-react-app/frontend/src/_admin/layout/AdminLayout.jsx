@@ -6,6 +6,7 @@ import { useAuth } from '../../userServives/authContext';
 import ErrorBoundary from '../../errorBoundary';
 import { ROLE_LABELS } from '../constants/roles';
 import '../../../static/css/_admin/layout.css';
+import '../../../static/css/_admin/admin-base.css';
 
 
 const NAV_GROUPS = [

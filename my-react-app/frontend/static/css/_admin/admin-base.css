@@ -1,0 +1,317 @@
+/*
+ * 後台共用設計層（乾淨現代的管理介面）。
+ *
+ * 為什麼是這一份：後台各功能群原本各自複製一套幾乎相同的「頁面容器／頁首／篩選列／表格卡片／
+ * 空狀態／載入／分頁」規則（announcement-*、quiz-bank-*、dictionary-*、user-*…），數值還互相
+ * 有小差異，換頁時標題位置、表格密度、間距會跳動。這裡用同一組 token 與選擇器統一它們，
+ * 各頁 CSS 只需保留自己獨有的規則。
+ *
+ * 作法限制：
+ * - 全部放在 .admin-shell 底下（specificity 比各頁單一 class 高），所以不論 lazy 載入的頁面 CSS
+ *   先後順序為何，這裡都會贏；也不會影響前台或 Bootstrap 在後台以外的元件。
+ * - 只改外觀，不動 JSX 結構、API、權限與路由。
+ * - 資訊密度優先：不使用大型硬陰影或持續動畫（前台 Y2K 的 --yy-shadow-* 不適合密集表格）。
+ */
+
+/* 設計 token（--admin-*）定義在 layout.css 的 .admin-shell 區塊：同名頂層類別只能出現在一個 CSS 檔（見 cssNamespace.test.js）。 */
+/* ------------------------------------------------------------------ 頁面容器 */
+.admin-shell :where(
+  .admin-page, .announcement-admin-page, .quiz-bank-admin-page, .dictionary-admin-page, .user-admin-page,
+  .moderation-admin-page, .exam-schedule-admin-page, .review-queue-page,
+  .search-analytics-page, .quiz-quality-page, .retention-analysis-page, .admin-dashboard-page, .homepage-config-page
+) {
+  min-height: calc(100vh - var(--admin-topbar-height));
+  padding: var(--admin-page-padding);
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  font-family: var(--yy-font-body, sans-serif);
+}
+
+/* ------------------------------------------------------------------ 頁首 */
+.admin-shell :is(
+  .announcement-page-heading, .quiz-bank-page-heading, .dictionary-page-heading, .user-page-heading,
+  .moderation-page-heading, .exam-schedule-page-heading, .review-queue-heading,
+  .search-analytics-heading, .quiz-quality-heading, .retention-analysis-heading,
+  .homepage-config-heading, .dashboard-heading, .admin-page-heading
+) {
+  max-width: var(--admin-content-max);
+  margin: 0 auto 24px;
+  gap: 20px;
+}
+.admin-shell :is(
+  .announcement-page-heading, .quiz-bank-page-heading, .dictionary-page-heading, .user-page-heading,
+  .moderation-page-heading, .exam-schedule-page-heading, .review-queue-heading,
+  .search-analytics-heading, .quiz-quality-heading, .retention-analysis-heading,
+  .homepage-config-heading, .dashboard-heading, .admin-page-heading
+) h1 {
+  margin: 0 0 4px;
+  color: var(--admin-text-strong);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: .01em;
+}
+.admin-shell :is(
+  .announcement-page-heading, .quiz-bank-page-heading, .dictionary-page-heading, .user-page-heading,
+  .moderation-page-heading, .exam-schedule-page-heading, .review-queue-heading,
+  .search-analytics-heading, .quiz-quality-heading, .retention-analysis-heading,
+  .homepage-config-heading, .dashboard-heading, .admin-page-heading
+) p {
+  margin: 0;
+  color: var(--admin-muted);
+  font-size: 14px;
+}
+
+/* ------------------------------------------------------------------ 卡片：篩選列與表格卡片 */
+.admin-shell :is(
+  .announcement-filter-panel, .quiz-bank-filter-panel, .dictionary-filter-panel, .user-filter-panel,
+  .moderation-filter-panel, .review-queue-filter-panel, .search-analytics-filter-panel,
+  .quiz-quality-filter-panel, .system-filter-panel,
+  .announcement-table-card, .quiz-bank-table-card, .dictionary-table-card, .user-table-card,
+  .moderation-table-card, .review-queue-table-card, .exam-schedule-table-card, .exam-schedule-loading,
+  .announcement-editor-card, .dictionary-editor-card, .user-detail-card, .quiz-bank-config-card,
+  .homepage-config-card, .exam-schedule-status-card, .admin-stat-card, .dashboard-filter-panel, .dashboard-panel,
+  .system-action-card, .admin-table-card, .admin-config-card, .admin-filter-panel
+) {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  box-shadow: var(--admin-shadow);
+}
+.admin-shell :is(
+  .announcement-filter-panel, .quiz-bank-filter-panel, .dictionary-filter-panel, .user-filter-panel,
+  .review-queue-filter-panel, .search-analytics-filter-panel,
+  .quiz-quality-filter-panel
+) {
+  padding: 16px 18px;
+  align-items: end;
+}
+/* 審核管理的篩選列自己用置中對齊（含勾選框），只統一內距 */
+.admin-shell .moderation-filter-panel {
+  padding: 16px 18px;
+}
+/* 辭典篩選列的關鍵字欄下方有說明文字、比其他欄高：改成頂端對齊，勾選與按鈕在頁面 CSS 自行補位 */
+.admin-shell .dictionary-filter-panel {
+  align-items: start;
+}
+/* 表格卡片：overflow 用 clip 保留圓角裁切，且不像 hidden 會建立捲動容器（內部 sticky 不受影響）。
+   注意 clip 仍會裁掉超出卡片邊界的下拉選單、tooltip 與焦點框；列內若要用下拉選單，請放進表格自己的捲動容器內。 */
+.admin-shell :is(
+  .announcement-table-card, .quiz-bank-table-card, .dictionary-table-card, .user-table-card,
+  .moderation-table-card, .review-queue-table-card, .exam-schedule-table-card, .admin-table-card
+) {
+  overflow: clip;
+}
+
+/* ------------------------------------------------------------------ 表格 */
+.admin-shell :is(
+  .announcement-table, .quiz-bank-table, .dictionary-table, .user-table, .moderation-table,
+  .review-queue-table, .exam-schedule-table, .system-rate-table, .system-feature-table,
+  .system-morph-table, .quiz-quality-table, .search-analytics-table, .quiz-bank-sources-table, .admin-table
+) {
+  margin: 0;
+  color: var(--admin-text);
+  font-size: 14px;
+  vertical-align: middle;
+  --bs-table-bg: transparent;
+  --bs-table-hover-bg: var(--admin-surface-muted);
+}
+.admin-shell :is(
+  .announcement-table, .quiz-bank-table, .dictionary-table, .user-table, .moderation-table,
+  .review-queue-table, .exam-schedule-table, .system-rate-table, .system-feature-table,
+  .system-morph-table, .quiz-quality-table, .search-analytics-table, .quiz-bank-sources-table, .admin-table
+) th {
+  padding: 12px 14px;
+  color: var(--admin-muted);
+  background: var(--admin-surface-muted);
+  border-bottom: 1px solid var(--admin-border);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.admin-shell :is(
+  .announcement-table, .quiz-bank-table, .dictionary-table, .user-table, .moderation-table,
+  .review-queue-table, .exam-schedule-table, .system-rate-table, .system-feature-table,
+  .system-morph-table, .quiz-quality-table, .search-analytics-table, .quiz-bank-sources-table, .admin-table
+) td {
+  padding: 12px 14px;
+  border-color: var(--admin-border);
+}
+.admin-shell :is(
+  .announcement-table, .quiz-bank-table, .dictionary-table, .user-table, .moderation-table,
+  .review-queue-table, .exam-schedule-table, .system-rate-table, .system-feature-table
+) tbody tr:hover > td {
+  background: var(--admin-surface-muted);
+}
+
+/* ------------------------------------------------------------------ 空狀態、載入、分頁 */
+.admin-shell :is(
+  .announcement-empty, .quiz-bank-empty, .dictionary-empty, .user-empty, .moderation-empty,
+  .review-queue-empty, .exam-schedule-empty, .admin-empty
+) {
+  padding: 56px 20px !important;
+  color: var(--admin-muted) !important;
+  text-align: center;
+}
+.admin-shell :is(
+  .announcement-loading, .quiz-bank-loading, .dictionary-loading, .exam-schedule-loading, .admin-loading, .user-loading, .moderation-loading,
+  .review-queue-loading, .search-analytics-loading, .quiz-quality-loading, .retention-analysis-loading
+) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 240px;
+  color: var(--admin-muted);
+}
+.admin-shell :is(
+  .announcement-pagination, .quiz-bank-pagination, .dictionary-pagination, .user-pagination,
+  .moderation-pagination, .review-queue-pagination, .admin-pagination
+) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--admin-border);
+  background: var(--admin-surface);
+  color: var(--admin-muted);
+  font-size: 13px;
+}
+.admin-shell :is(
+  .announcement-pagination, .quiz-bank-pagination, .dictionary-pagination, .user-pagination,
+  .moderation-pagination, .review-queue-pagination, .admin-pagination
+) > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ------------------------------------------------------------------ Bootstrap 控制項（限後台） */
+.admin-shell .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  border-radius: var(--admin-radius-sm);
+  font-weight: 600;
+  letter-spacing: .01em;
+}
+.admin-shell .btn:not(.btn-sm):not(.btn-lg) {
+  min-height: var(--admin-control-height);
+}
+.admin-shell .btn-primary {
+  --bs-btn-bg: var(--admin-accent);
+  --bs-btn-border-color: var(--admin-accent);
+  --bs-btn-hover-bg: #17304f;
+  --bs-btn-hover-border-color: #17304f;
+  --bs-btn-active-bg: #12263f;
+  --bs-btn-active-border-color: #12263f;
+  --bs-btn-disabled-bg: var(--admin-accent);
+  --bs-btn-disabled-border-color: var(--admin-accent);
+}
+.admin-shell .btn-outline-primary {
+  --bs-btn-color: var(--admin-accent);
+  --bs-btn-border-color: var(--admin-border-strong);
+  --bs-btn-hover-bg: var(--admin-accent);
+  --bs-btn-hover-border-color: var(--admin-accent);
+  --bs-btn-active-bg: var(--admin-accent);
+  --bs-btn-active-border-color: var(--admin-accent);
+}
+.admin-shell .btn-outline-secondary {
+  --bs-btn-color: var(--admin-muted);
+  --bs-btn-border-color: var(--admin-border-strong);
+}
+.admin-shell :is(.form-control, .form-select) {
+  min-height: var(--admin-control-height);
+  border-color: var(--admin-border-strong);
+  border-radius: var(--admin-radius-sm);
+  font-size: 14px;
+}
+.admin-shell :is(.form-control, .form-select):focus {
+  border-color: var(--yy-blue-light, #2c6e7f);
+  box-shadow: 0 0 0 3px var(--admin-focus);
+}
+.admin-shell .form-label {
+  margin-bottom: 4px;
+  color: var(--admin-text-strong);
+  font-size: 13px;
+  font-weight: 600;
+}
+.admin-shell .badge {
+  padding: .35em .7em;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .01em;
+}
+.admin-shell .badge.bg-light {
+  color: #3b4658 !important;
+  background-color: #eef1f5 !important;
+  border: 1px solid #dde3ea;
+}
+.admin-shell .alert {
+  border-radius: var(--admin-radius-sm);
+}
+.admin-shell .nav-tabs .nav-link {
+  color: var(--admin-muted);
+  font-weight: 600;
+}
+.admin-shell .nav-tabs .nav-link.active {
+  color: var(--admin-accent);
+}
+
+/* 後台各頁重複定義的「必填星號」統一在這裡；原本三個檔案各自一份，且沒有限定範圍 */
+.admin-shell .required-mark {
+  margin-left: 2px;
+  color: var(--yy-red, #9e1b24);
+}
+
+/* ------------------------------------------------------------------ 標題層級
+   page title 24px（上面的頁首 h1）／section title 18px／card title 16px。
+   視覺層級由語意區塊決定，不依賴 h2、h3 標籤本身（Bootstrap 預設的 h2 約 2rem，在窄欄裡會像第二個頁面標題）。 */
+.admin-shell :is(
+  .homepage-config-section-heading, .quiz-bank-config-section-heading, .admin-config-section-heading
+) h2,
+.admin-shell :is(.exam-schedule-table-card header, .user-detail-card header, .dictionary-page-heading) h2 {
+  margin: 0 0 4px;
+  color: var(--admin-text-strong);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.admin-shell :is(.dashboard-panel, .system-action-card-heading) h2 {
+  color: var(--admin-text-strong);
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+/* ------------------------------------------------------------------ 通用頁面元件（admin-*）
+   系統、遊戲、待驗證佇列原本借用題庫的 quiz-bank-* class，改題庫外觀會連帶改到它們。
+   這些 admin-* 是和功能群無關的通用版面，新頁面一律用它們。 */
+.admin-shell .admin-page-heading { display: flex; align-items: center; justify-content: space-between; }
+.admin-shell .admin-page-heading .btn,
+.admin-shell .admin-row-actions .btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.admin-shell .admin-page > .alert { max-width: var(--admin-content-max); margin: 0 auto 16px; }
+.admin-shell .admin-table-card { max-width: var(--admin-content-max); margin: 0 auto; }
+.admin-shell .admin-loading { max-width: var(--admin-content-max); margin: 0 auto; }
+.admin-shell .admin-row-actions { display: flex; flex-wrap: wrap; gap: 6px; min-width: 140px; }
+.admin-shell .admin-filter-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; max-width: var(--admin-content-max); margin: 0 auto 20px; padding: 16px 18px; align-items: end; }
+
+/* 設定表單（遊戲參數、IRT 參數這類單一表單）：卡片、分組、欄位格與頁尾 */
+.admin-shell .admin-config-card { max-width: var(--admin-content-max); margin: 0 auto; padding: 28px; }
+.admin-shell .admin-config-section { padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--admin-border); }
+.admin-shell .admin-config-section:last-of-type { border-bottom: none; margin-bottom: 0; }
+.admin-shell .admin-config-section-heading p { margin: 0 0 16px; color: var(--admin-muted); font-size: 14px; }
+.admin-shell .admin-config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+.admin-shell .admin-config-footer { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding-top: 20px; color: var(--admin-muted); font-size: 13px; }
+
+/* 彈窗（Bootstrap Modal 掛在 body 底下，不在 .admin-shell 內）：頁尾按鈕若帶圖示，圖示與文字要對齊、留間距。
+   原本在題庫與考試時程各寫一份。 */
+.modal-footer .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}

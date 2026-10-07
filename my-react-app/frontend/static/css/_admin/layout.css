@@ -1,34 +1,90 @@
-.admin-shell { min-height: 100vh; color: var(--yy-ink, #221812); background: #f5f6f8; font-family: var(--yy-font-body, sans-serif); }
-.admin-sidebar { position: fixed; inset: 0 auto 0 0; z-index: 20; display: flex; flex-direction: column; width: 252px; color: #eef2f6; background: var(--yy-blue, #1f3a5c); overflow-y: auto; }
-.admin-brand { display: flex; flex-direction: column; padding: 25px 24px 21px; color: #fff; border-bottom: 1px solid rgba(255, 255, 255, .12); text-decoration: none; }
-.admin-brand span { font-size: 23px; font-weight: 700; letter-spacing: .09em; }
-.admin-brand small { margin-top: 3px; color: rgba(255, 255, 255, .58); font-size: 10px; font-weight: 650; letter-spacing: .18em; }
-.admin-navigation { flex: 1; padding: 14px 12px 22px; }
-.admin-nav-group { margin: 0 0 9px; }
-.admin-nav-group h2 { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 12px 5px; color: rgba(255, 255, 255, .58); font-size: 11px; font-weight: 650; letter-spacing: .12em; }
+/* 後台外殼（側欄、頂欄、內容區）。共用 token 與頁面元件規則在 admin-base.css。 */
+.admin-shell { min-height: 100vh; color: var(--yy-ink, #221812); background: #f4f6f9; font-family: var(--yy-font-body, sans-serif); }
+
+/* 後台設計 token（共用規則見 admin-base.css） */
+.admin-shell {
+  /* 色彩：沿用前台 --yy-* 的品牌藍／紅／金，其餘用中性灰階 */
+  --admin-bg: #f4f6f9;
+  --admin-surface: #ffffff;
+  --admin-surface-muted: #f8fafc;
+  --admin-border: #e3e8ef;
+  --admin-border-strong: #cfd7e2;
+  --admin-text: var(--yy-ink, #221812);
+  --admin-text-strong: #14213a;
+  --admin-muted: #5f6b7a;
+  --admin-accent: var(--yy-blue, #1f3a5c);
+  --admin-accent-soft: #e8eef6;
+  --admin-focus: rgba(44, 110, 127, .35);
+  /* 語意色：狀態與提示用，不要拿來當一般強調色 */
+  --admin-success: #146c43;
+  --admin-success-bg: #ecf8f2;
+  --admin-success-border: #a3cfbb;
+  --admin-danger: #b02a37;
+  --admin-danger-bg: #fff5f5;
+  --admin-danger-border: #f1b8bd;
+  --admin-warning-text: #8a5a00;
+  --admin-warning-bg: rgba(255, 193, 7, .08);
+
+  /* 形狀與陰影 */
+  --admin-radius: 12px;
+  --admin-radius-sm: 8px;
+  --admin-shadow: 0 1px 2px rgba(20, 33, 58, .05), 0 4px 14px rgba(20, 33, 58, .05);
+
+  /* 版面 */
+  --admin-page-padding: 32px;
+  --admin-content-max: 1440px;
+  --admin-sidebar-width: 244px;
+  --admin-topbar-height: 64px;
+  --admin-control-height: 38px;
+
+  /* 層級表：之後新增 overlay 一律從這裡取，不要自己寫數字 */
+  --admin-z-topbar: 10;
+  --admin-z-dropdown: 15;
+  --admin-z-sidebar: 20;
+
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 側欄：深藍底、較大的字級與留白；啟用項目用金色左側標記 */
+.admin-sidebar { position: fixed; inset: 0 auto 0 0; z-index: 20; display: flex; flex-direction: column; width: 244px; color: #e9eef5; background: linear-gradient(180deg, #1c3556 0%, #17304f 100%); overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .22) transparent; }
+.admin-brand { display: flex; flex-direction: column; padding: 22px 22px 18px; color: #fff; border-bottom: 1px solid rgba(255, 255, 255, .1); text-decoration: none; }
+.admin-brand span { font-size: 22px; font-weight: 700; letter-spacing: .08em; }
+.admin-brand small { margin-top: 4px; color: rgba(255, 255, 255, .55); font-family: var(--yy-font-pixel, monospace); font-size: 10px; font-weight: 500; letter-spacing: .2em; }
+.admin-navigation { flex: 1; padding: 12px 12px 20px; }
+.admin-nav-group { margin: 0 0 6px; }
+.admin-nav-group h2 { display: flex; align-items: center; gap: 8px; margin: 0; padding: 12px 12px 6px; color: rgba(255, 255, 255, .5); font-size: 12px; font-weight: 600; letter-spacing: .1em; }
 .admin-nav-group ul { margin: 0; padding: 0; list-style: none; }
-.admin-nav-link { display: flex; align-items: center; justify-content: space-between; min-height: 35px; margin: 2px 0; padding: 7px 10px 7px 36px; color: rgba(255, 255, 255, .82); border-radius: 7px; font-size: 13px; text-decoration: none; transition: background-color .15s ease, color .15s ease; }
+.admin-nav-link { display: flex; align-items: center; justify-content: space-between; min-height: 36px; margin: 1px 0; padding: 7px 10px 7px 34px; color: rgba(255, 255, 255, .84); border-radius: 8px; font-size: 14px; text-decoration: none; transition: background-color .15s ease, color .15s ease; }
 .admin-nav-link:hover { color: #fff; background: rgba(255, 255, 255, .08); }
-.admin-nav-link.active { color: #fff; background: rgba(255, 255, 255, .15); box-shadow: inset 3px 0 0 var(--yy-gold, #d9a227); }
+.admin-nav-link.active { color: #fff; background: rgba(255, 255, 255, .14); box-shadow: inset 3px 0 0 var(--yy-gold, #d9a227); font-weight: 600; }
+.admin-nav-link:focus-visible { outline: 2px solid var(--yy-gold-light, #f6d77b); outline-offset: -2px; }
 .admin-nav-disabled { color: rgba(255, 255, 255, .42); cursor: default; }
 .admin-nav-disabled:hover { color: rgba(255, 255, 255, .42); background: transparent; }
-.admin-planned-badge { padding: 2px 5px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 4px; color: rgba(255, 255, 255, .5); font-size: 9px; }
-.admin-count-badge { min-width: 20px; padding: 2px 6px; color: #fff; background: var(--yy-red, #9e1b24); border-radius: 999px; font-size: 11px; font-weight: 700; text-align: center; }
-.admin-sidebar-user { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 17px 20px; border-top: 1px solid rgba(255, 255, 255, .12); }
+.admin-planned-badge { padding: 2px 6px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 4px; color: rgba(255, 255, 255, .55); font-size: 10px; }
+.admin-count-badge { min-width: 20px; padding: 1px 7px; color: #fff; background: var(--yy-red, #9e1b24); border-radius: 999px; font-size: 11px; font-weight: 700; text-align: center; }
+.admin-sidebar-user { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 20px; border-top: 1px solid rgba(255, 255, 255, .1); }
 .admin-sidebar-user div { display: flex; flex-direction: column; }
-.admin-sidebar-user span { color: rgba(255, 255, 255, .5); font-size: 10px; }
-.admin-sidebar-user strong { font-size: 13px; font-weight: 600; }
-.admin-sidebar-user a { color: var(--yy-cream, #f3e7cf); font-size: 12px; text-decoration: none; }
-.admin-main-column { min-width: 0; margin-left: 252px; }
-.admin-topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; min-height: 68px; padding: 0 32px; background: rgba(255, 255, 255, .96); border-bottom: 1px solid #dee2e6; }
-.admin-breadcrumb { display: flex; align-items: center; color: var(--yy-text-muted, #6b5a47); font-size: 14px; }
-.admin-breadcrumb span:last-child { color: var(--yy-blue, #1f3a5c); font-weight: 650; }
-.admin-breadcrumb i { margin: 0 9px; color: #adb5bd; font-style: normal; }
-.admin-topbar-user { display: flex; align-items: center; gap: 10px; }
-.admin-topbar-user > div { display: flex; flex-direction: column; line-height: 1.2; }
-.admin-topbar-user strong { color: var(--yy-blue, #1f3a5c); font-size: 13px; }
-.admin-topbar-user small { margin-top: 2px; color: var(--yy-text-muted, #6b5a47); font-size: 10px; }
-.admin-user-avatar { display: grid; width: 34px; height: 34px; place-items: center; color: #fff; background: var(--yy-blue, #1f3a5c); border-radius: 50%; font-size: 13px; font-weight: 700; }
+.admin-sidebar-user span { color: rgba(255, 255, 255, .5); font-size: 11px; }
+.admin-sidebar-user strong { font-size: 14px; font-weight: 600; }
+.admin-sidebar-user a { color: var(--yy-gold-light, #f6d77b); font-size: 13px; text-decoration: none; }
+.admin-sidebar-user a:hover { text-decoration: underline; }
+
+/* 頂欄與內容區 */
+.admin-main-column { min-width: 0; margin-left: 244px; }
+.admin-topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; min-height: 64px; padding: 0 32px; background: #fff; border-bottom: 1px solid #e3e8ef; }
+.admin-breadcrumb { display: flex; align-items: center; min-width: 0; color: #5f6b7a; font-size: 14px; }
+.admin-breadcrumb span { white-space: nowrap; }
+.admin-breadcrumb span:last-child { color: #14213a; font-weight: 650; }
+.admin-breadcrumb i { margin: 0 9px; color: #aab4c1; font-style: normal; }
+.admin-topbar-user { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.admin-topbar-user > div { display: flex; flex-direction: column; line-height: 1.25; }
+.admin-topbar-user strong { color: #14213a; font-size: 14px; }
+.admin-topbar-user small { margin-top: 1px; color: #5f6b7a; font-size: 11px; }
+.admin-user-avatar { display: grid; width: 36px; height: 36px; place-items: center; color: #fff; background: var(--yy-blue, #1f3a5c); border-radius: 50%; font-size: 14px; font-weight: 700; }
 .admin-route-content { min-width: 0; }
 /* 後台頁面元件改成 lazy load 後，換頁期間 Suspense fallback 顯示的載入中。 */
 .admin-route-loading { display: flex; justify-content: center; padding: 3rem 0; }
@@ -40,11 +96,13 @@
     flex-direction: column;
     align-items: flex-start;
     gap: .75rem;
+    margin: 32px;
     padding: 2rem;
     border: 1px solid #f0d0d0;
-    border-radius: .75rem;
+    border-radius: 12px;
     background: #fff8f8;
 }
 .admin-route-error h2 { font-size: 1.125rem; font-weight: 700; margin: 0; }
 .admin-route-error p { margin: 0; color: #6b5b5b; }
-@media (max-width: 1024px) { .admin-sidebar { width: 220px; } .admin-main-column { margin-left: 220px; } .admin-topbar { padding: 0 20px; } }
+@media (max-width: 1024px) { .admin-sidebar { width: 216px; } .admin-main-column { margin-left: 216px; } .admin-topbar { padding: 0 20px; } }
+@media (max-width: 900px) { .admin-shell { --admin-page-padding: 20px; } }
