@@ -75,6 +75,63 @@
   100% { transform: scale(1); }
 }
 
+/* ---------- 捲動進場與載入骨架 ---------- */
+
+/* 捲到才進場（components/ui/RevealOnView.jsx）：布幕由上往下拉開＋由下往上 32px 浮起，約 .9 秒。
+   尚未進場才隱藏；進場後 clip-path 留 20px 的外擴，避免把卡片的硬陰影（最多 7px）裁掉。
+   進場後 transform 清掉，不留 stacking context。 */
+.yy-reveal {
+  clip-path: inset(-20px -20px -20px -20px);
+  transition:
+    opacity .7s cubic-bezier(.2, .7, .3, 1),
+    transform .9s cubic-bezier(.2, .7, .3, 1),
+    clip-path .9s cubic-bezier(.2, .7, .3, 1);
+}
+.yy-reveal:not(.is-visible) {
+  opacity: 0;
+  transform: translateY(32px);
+  clip-path: inset(0 -20px 62% -20px);
+}
+
+/* 逐字進場（components/ui/CharReveal.jsx）：每個字各自彈出，延遲由元件依序設定 */
+.yy-char {
+  display: inline-block;
+  animation: yy-char-in .6s cubic-bezier(.2, .9, .3, 1.25) both;
+}
+@keyframes yy-char-in {
+  from { opacity: 0; transform: translateY(.7em) scale(.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* 資料載入中的佔位塊：用實際內容的尺寸，載入完成時版面不跳動 */
+.yy-skeleton {
+  display: block;
+  background: var(--yy-cream-dim);
+  border-radius: 6px;
+  animation: yy-skeleton-pulse 1.5s ease-in-out infinite;
+}
+@keyframes yy-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .5; }
+}
+
+/* ---------- 降低動態 ----------
+   使用者在作業系統設定「減少動態效果」時：所有動畫與過渡直接到終態（進場動畫仍會讓內容出現，
+   只是不再位移）、無限循環的裝飾動畫（漂浮、流光、脈動、跑馬燈、游標閃爍）只播一次就停。
+   JS 驅動的動態（輪播自動播放、平滑捲動）在各自的元件裡用 hooks/useReducedMotion 判斷。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ---------- 版面基礎 ---------- */
 
 .yy-page {
@@ -82,7 +139,11 @@
   color: var(--yy-ink);
   background: var(--yy-cream);
   min-height: 100vh;
+  /* 擋住橫向溢出，但不能用 hidden：overflow-x: hidden 會讓 overflow-y 自動變成 auto，.yy-page 就成了自己的
+     捲動容器，頁面右側會多出第二條捲軸（尚未進場的區塊 translateY 位移會讓內容超出一點點，就會出現捲軸）。
+     clip 只裁切、不建立捲動容器；舊瀏覽器不認得 clip 時退回 hidden。 */
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 .yy-fade-up {

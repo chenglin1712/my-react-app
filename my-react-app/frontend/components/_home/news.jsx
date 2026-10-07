@@ -4,10 +4,34 @@ import { Navigation, Autoplay, EffectFade } from "swiper/modules"
 import "swiper/css"
 import "swiper/css/effect-fade"
 import "swiper/css/navigation";
+import { useReducedMotion } from "../../src/hooks/useReducedMotion";
 
-const News = ({ withImage = [], withoutImage = [] }) => {
+const News = ({ withImage = [], withoutImage = [], loading = false }) => {
+    // 要求降低動態時：停用自動輪播，換張改成立即切換（使用者仍可用左右箭頭手動切）
+    const reducedMotion = useReducedMotion();
     const allNews = [...withImage, ...withoutImage];
     const hasImages = withImage.length > 0;
+
+    // 資料還沒回來：顯示和卡片同尺寸的佔位塊，不要先呈現「空列表」再跳出內容
+    if (loading) {
+        return (
+            <section className="news-section" aria-busy="true">
+                <div className="news-section-header">
+                    <div className="news-section-title-group">
+                        <span className="news-section-label">NEWS</span>
+                        <h2 className="news-section-title">活動消息</h2>
+                    </div>
+                    <div className="news-section-divider" />
+                </div>
+                <div className="news-card-grid" role="status">
+                    <span className="visually-hidden">最新消息載入中…</span>
+                    {[0, 1, 2].map((index) => (
+                        <span className="yy-skeleton news-card-skeleton" aria-hidden="true" key={index} />
+                    ))}
+                </div>
+            </section>
+        );
+    }
 
     return (
         <section className="news-section">
@@ -26,10 +50,10 @@ const News = ({ withImage = [], withoutImage = [] }) => {
                         <Swiper
                             modules={[Navigation, Autoplay, EffectFade]}
                             effect="fade"
-                            speed={800}
+                            speed={reducedMotion ? 0 : 800}
                             loop={withImage.length > 1}
                             navigation={true}
-                            autoplay={{ delay: 8000 }}
+                            autoplay={reducedMotion ? false : { delay: 8000 }}
                             grabCursor={true}
                         >
                             {withImage.map((event) => (

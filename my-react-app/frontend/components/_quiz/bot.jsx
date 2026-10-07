@@ -7,6 +7,7 @@ import StudyPlanComponent from "./bot_study_plan"
 import { useAuth } from "../../src/userServives/authContext";
 import { getUserSituation } from "../../src/userServives/uploadDb";
 import { TRIBES } from "../../src/constants/tribes";
+import { scrollBehavior } from "../../src/hooks/useReducedMotion";
 import { apiPost } from "../../utils/apiClient";
 
 const SUGGESTIONS = [
@@ -93,7 +94,7 @@ const AIAssistantOverlay = ({ onClose }) => {
     // 新訊息或「輸入中」指示器出現/消失時自動捲到底部，messageEndRef 原本宣告了
     // 卻從沒呼叫 scrollIntoView，訊息一多使用者得自己手動往下滑。
     useEffect(() => {
-        messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        messageEndRef.current?.scrollIntoView({ behavior: scrollBehavior() });
     }, [messages, isPending]);
 
     const handleInputChange = (e) => {

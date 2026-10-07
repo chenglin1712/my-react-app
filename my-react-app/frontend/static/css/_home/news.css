@@ -275,3 +275,10 @@
         white-space: normal;
     }
 }
+
+/* 資料載入中的佔位卡片（News 的 loading 狀態）：高度對應一張消息卡，載入完成時版面不跳動 */
+.news-card-skeleton {
+  min-height: 132px;
+  border: 2px solid var(--yy-ink);
+  border-radius: var(--yy-radius-card);
+}

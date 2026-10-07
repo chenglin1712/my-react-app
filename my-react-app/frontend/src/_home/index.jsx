@@ -5,6 +5,9 @@ import CertificationSection from "../../components/_home/calendar"
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { TRIBES } from "../constants/tribes";
+import { scrollBehavior } from "../hooks/useReducedMotion";
+import RevealOnView from "../../components/ui/RevealOnView";
+import CharReveal from "../../components/ui/CharReveal";
 
 const ANNOUNCEMENT_CATEGORY_LABELS = { announcement: '公告', activity: '活動', exam: '考試', maintenance: '系統維護' };
 
@@ -69,6 +72,7 @@ const HomePage = () => {
     const [rawNews, setRawNews] = useState([]);
     const [examInfo, setExamInfo] = useState([]);
     const [newsError, setNewsError] = useState(false);
+    const [newsLoading, setNewsLoading] = useState(true);
     // 存 slug 而不是 array index：TRIBES 的順序/內容以後如果調整，這裡的
     // state 語意不會跟著漂移。
     const [selectedTribeSlug, setSelectedTribeSlug] = useState(TRIBES[0].slug);
@@ -117,11 +121,13 @@ const HomePage = () => {
 
                 setExamInfo(examAnnouncements.map(mapAnnouncementToExamItem));
                 setRawNews(newsAnnouncements.map(mapAnnouncementToNewsItem));
+                setNewsLoading(false);
             })
             .catch((err) => {
                 if (cancelled) return;
                 console.error("載入最新消息失敗：", err);
                 setNewsError(true);
+                setNewsLoading(false);
             });
         return () => { cancelled = true; };
     }, []);
@@ -176,7 +182,15 @@ const HomePage = () => {
 
                 <div className="yy-fade-up">
                     <span className="yy-eyebrow">◆ 原住民族語 · 五族共學 ◆</span>
-                    <h1 className="home-title">五族語言，<br />刻進<span className="yy-holo-text">織紋</span>裡的學習旅程</h1>
+                    <h1 className="home-title" aria-label="五族語言，刻進織紋裡的學習旅程">
+                        <CharReveal text="五族語言，" start={0.2} />
+                        <br />
+                        <CharReveal text="刻進" start={0.55} />
+                        {/* 「織紋」用文字挖空漸層（background-clip: text）：不能拆成逐字的子元素（拆開後漸層文字會消失），
+                            改成這個元素本身整體彈出，延遲接在前一段之後 */}
+                        <span className="yy-holo-text yy-char" aria-hidden="true" style={{ animationDelay: "0.73s" }}>織紋</span>
+                        <CharReveal text="裡的學習旅程" start={0.9} />
+                    </h1>
                     <p className="home-desc">泰雅、布農、阿美、噶瑪蘭、排灣——影像辨識、詞彙遊戲與適性測驗，用鮮明色彩延續族語文化的生命力。</p>
                 </div>
 
@@ -199,7 +213,7 @@ const HomePage = () => {
                 <button
                     type="button"
                     className="yy-fade-up home-cta"
-                    onClick={() => functionBtnRef.current?.scrollIntoView({ behavior: "smooth" })}
+                    onClick={() => functionBtnRef.current?.scrollIntoView({ behavior: scrollBehavior() })}
                 >▸ 開始學習 PRESS START!</button>
             </section>
 
@@ -247,13 +261,17 @@ const HomePage = () => {
             </section>
 
             <div ref={functionBtnRef}>
-                <FunctionBtn enabled={{
-                    button1: homepageConfig.button1_enabled,
-                    button2: homepageConfig.button2_enabled,
-                    button3: homepageConfig.button3_enabled,
-                }} />
+                <RevealOnView>
+                    <FunctionBtn enabled={{
+                        button1: homepageConfig.button1_enabled,
+                        button2: homepageConfig.button2_enabled,
+                        button3: homepageConfig.button3_enabled,
+                    }} />
+                </RevealOnView>
             </div>
-            {homepageConfig.show_calendar_section && <CertificationSection examInfo={examInfo} />}
+            {homepageConfig.show_calendar_section && (
+                <RevealOnView><CertificationSection examInfo={examInfo} /></RevealOnView>
+            )}
             {homepageConfig.show_news_section && (
                 <>
                     {newsError && (
@@ -261,7 +279,9 @@ const HomePage = () => {
                             目前無法載入最新消息，請稍後再試。
                         </p>
                     )}
-                    <News withImage={newsWithImage} withoutImage={newsWithoutImage} />
+                    <RevealOnView>
+                        <News withImage={newsWithImage} withoutImage={newsWithoutImage} loading={newsLoading} />
+                    </RevealOnView>
                 </>
             )}
         </div>
