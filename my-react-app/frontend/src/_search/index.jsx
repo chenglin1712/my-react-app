@@ -11,6 +11,8 @@ import "../../static/css/_search/index.css";
 import SearchHeader from './components/SearchHeader';
 import WordResultsSection from './components/WordResultsSection';
 import MorphologyPanel from './components/MorphologyPanel';
+import CompactSearchBar from './components/CompactSearchBar';
+import { useScrolledPast } from '../hooks/useScrolledPast';
 import useAudioPlayback from '../../hooks/useAudioPlayback';
 
 const PAGE_SIZE = 50;
@@ -43,6 +45,7 @@ const SearchPage = () => {
   const [frequencyFilter, setFrequencyFilter] = useState('');
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const isMobile = useIsMobile();
+  const [headerRef, headerScrolledPast, navbarOffset] = useScrolledPast();
   const [visibleExactCount, setVisibleExactCount] = useState(PAGE_SIZE);
   const [visibleFuzzyCount, setVisibleFuzzyCount] = useState(PAGE_SIZE);
   const [showCategories, setShowCategories] = useState(false);
@@ -230,6 +233,7 @@ const SearchPage = () => {
     <div className="yy-page search-page">
     <Container className="p-4">
       <SearchHeader
+        headerRef={headerRef}
         query={query} setQuery={setQuery} handleSearch={handleSearch}
         loading={loading}
         tribes={tribes} selectedTribe={selectedTribe} handleTribeChange={handleTribeChange}
@@ -243,6 +247,14 @@ const SearchPage = () => {
         showCategories={showCategories} setShowCategories={setShowCategories}
         activeTab={activeTab} setActiveTab={setActiveTab}
         selectedSubCategory={selectedSubCategory} setSelectedSubCategory={setSelectedSubCategory}
+      />
+
+      <CompactSearchBar
+        query={query} setQuery={setQuery} handleSearch={handleSearch}
+        loading={loading}
+        tribeLabel={`${selectedTribe}族語`}
+        visible={headerScrolledPast}
+        offset={navbarOffset}
       />
 
       <MorphologyPanel

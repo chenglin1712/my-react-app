@@ -3,10 +3,13 @@ import TribeSelector from './TribeSelector';
 import FilterPanel from './FilterPanel';
 import CategoryBar from '../../../components/ui/CategoryBar';
 
-// 搜尋頁最上方整個 sticky 區塊：標題、族語選擇器、搜尋框、篩選/排序面板、分類 Tabs。
+// 搜尋頁最上方的區塊：標題、族語選擇器、搜尋框、篩選/排序面板、分類 Tabs。
+// 這一整塊很高（桌面約 500px），所以【不】釘在畫面上，照一般流程捲走；捲出去之後由
+// CompactSearchBar（精簡搜尋列）接手。原本整塊 sticky 時，結果列表只剩一小條可看、詞條被頁首蓋住。
 const SEARCH_INPUT_MAX_LENGTH = 100;
 
 const SearchHeader = ({
+  headerRef,
   query, setQuery, handleSearch,
   loading,
   tribes, selectedTribe, handleTribeChange,
@@ -21,7 +24,7 @@ const SearchHeader = ({
   activeTab, setActiveTab,
   selectedSubCategory, setSelectedSubCategory,
 }) => (
-  <div className="search-sticky-header">
+  <div className="search-header-block" ref={headerRef}>
     <div className="search-hero-head yy-fade-up">
       <span className="yy-eyebrow">◆ SEARCH MODE ◆</span>
       <h1 className="search-hero-title">單詞查詢</h1>

@@ -1,11 +1,60 @@
-.search-sticky-header {
-  position: sticky;
-  top: 0;
-  background: var(--yy-cream);
-  z-index: 900;
+.search-header-block {
   padding-bottom: 1rem;
   margin-bottom: 1rem;
   border-bottom: 2px solid var(--yy-ink);
+}
+
+/* 捲出頁首後才浮出的精簡搜尋列（CompactSearchBar.jsx）。
+   anchor 是高度 0 的 sticky 容器，釘在全站導覽列下方（top 由程式量測導覽列高度後帶入），不佔版面。 */
+.search-compact-anchor {
+  position: sticky;
+  z-index: 900;
+  height: 0;
+}
+.search-compact-bar {
+  position: absolute;
+  top: 10px;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 8px 10px;
+  background: var(--yy-cream);
+  border: 3px solid var(--yy-ink);
+  border-radius: 10px;
+  box-shadow: var(--yy-shadow-sm);
+  opacity: 0;
+  transform: translateY(-14px);
+  pointer-events: none;
+  transition: opacity .22s ease-out, transform .28s cubic-bezier(.2, .7, .3, 1);
+}
+.search-compact-bar.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.search-compact-tribe {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  color: var(--yy-cream);
+  background: var(--yy-red);
+  border: 2px solid var(--yy-ink);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.search-compact-terminal {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+.search-compact-top {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* ── 頁首 hero ──────────────────────────────── */
