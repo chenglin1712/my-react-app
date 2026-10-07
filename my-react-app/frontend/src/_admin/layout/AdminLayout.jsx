@@ -25,6 +25,7 @@ const NAV_GROUPS = [
     {
         label: '審核', icon: ClipboardCheck, items: [
             { label: '送審佇列', to: '/admin/review' },
+            { label: '待專家驗證佇列', to: '/admin/verification' },
             { label: '分享筆記', to: '/admin/moderation/notes' },
             { label: '發音錄音', to: '/admin/moderation/recordings' },
             { label: '檢舉佇列', to: '/admin/moderation/reports' },

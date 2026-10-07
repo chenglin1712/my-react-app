@@ -4,7 +4,7 @@ from . import (
     analytics_views, dictionary_grammar_views, dictionary_import_views, dictionary_taxonomy_views,
     dictionary_views, exam_schedule_admin_views, feature_flag_views, game_config_views,
     homepage_config_views, moderation_views, quizbank_views,
-    morphology_capability_views, rate_limit_views, review_queue_views, system_cache_views, user_views, views,
+    morphology_capability_views, rate_limit_views, review_queue_views, system_cache_views, user_views, verification_views, views,
 )
 
 
@@ -143,6 +143,12 @@ urlpatterns = [
     path('system/cache/clear-django/', system_cache_views.system_cache_clear_django),
     path('system/cache/clear-fastapi/', system_cache_views.system_cache_clear_fastapi),
     path('system/morphology-capabilities/', morphology_capability_views.morphology_capabilities),
+    path('verification/status/', verification_views.verification_status),
+    path('verification/items/', verification_views.verification_items),
+    path('verification/items/<int:pk>/', verification_views.verification_item_detail),
+    path('verification/items/<int:pk>/review/', verification_views.verification_item_review),
+    path('verification/export/', verification_views.verification_export),
+    path('verification/import/', verification_views.verification_import),
 
     # P5 數據分析
     path('public/events/', analytics_views.usage_event_create),

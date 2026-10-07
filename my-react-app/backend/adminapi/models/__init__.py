@@ -30,6 +30,7 @@ from .quizbank import (
     ReviewableContent,
 )
 from .system_config import FeatureFlag, GameConfig, IrtConfig, RateLimitRule
+from .verification import VerificationItem, VerificationObservation, VerificationReview
 
 __all__ = [
     'Announcement',
@@ -55,4 +56,7 @@ __all__ = [
     'RateLimitRule',
     'ReviewableContent',
     'UsageEvent',
+    'VerificationItem',
+    'VerificationObservation',
+    'VerificationReview',
 ]

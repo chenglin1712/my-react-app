@@ -116,6 +116,10 @@ DJANGO_RULES = [
     ("system_cache_clear_django", "10/m", "清除 Django 具名快取"),
     ("system_cache_clear_fastapi", "10/m", "清除 FastAPI 快取（通知 /internal/cache/invalidate）"),
     ("morphology_capabilities", "30/m", "形態分析能力報表（唯讀，依登入者）"),
+    ("verification_read", "60/m", "待專家驗證佇列：讀取清單／詳情／旗標狀態"),
+    ("verification_review", "60/m", "待專家驗證佇列：提交自己的意見"),
+    ("verification_export", "10/m", "待專家驗證佇列：匯出待填 CSV"),
+    ("verification_import", "10/m", "待專家驗證佇列：匯入 CSV 意見（含 dry-run 預覽與正式寫入）"),
 ]
 
 for _target_type, _type_label in _CONTENT_TYPE_LABELS.items():

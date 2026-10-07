@@ -29,6 +29,7 @@ const SharedNotesModeration = lazy(() => import('./moderation/SharedNotesModerat
 const RecordingsModeration = lazy(() => import('./moderation/RecordingsModeration'));
 const ReportsQueue = lazy(() => import('./moderation/ReportsQueue'));
 const ReviewQueue = lazy(() => import('./review/ReviewQueue'));
+const VerificationQueue = lazy(() => import('./verification/VerificationQueue'));
 const WordList = lazy(() => import('./dictionary/WordList'));
 const WordEditor = lazy(() => import('./dictionary/WordEditor'));
 const TaxonomyManager = lazy(() => import('./dictionary/TaxonomyManager'));
@@ -79,6 +80,7 @@ const AdminApp = () => {
                 <Route path="users/new" element={<UserCreate />} />
                 <Route path="users/:uid" element={<UserDetail />} />
                 <Route path="review" element={<ReviewQueue />} />
+                <Route path="verification" element={<VerificationQueue />} />
                 <Route path="moderation/notes" element={<SharedNotesModeration />} />
                 <Route path="moderation/recordings" element={<RecordingsModeration />} />
                 <Route path="moderation/reports" element={<ReportsQueue />} />

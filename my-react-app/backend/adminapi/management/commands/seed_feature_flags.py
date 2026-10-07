@@ -89,9 +89,22 @@ class Command(BaseCommand):
             )
             created_count += int(created)
 
-        total = len(TRIBES) + 8
+        # 待專家驗證佇列（M5）：預設【關閉】。後端判斷是 fail-closed（查不到這一列也視為關閉），
+        # 所以即使沒跑這個種子，佇列也不會開；打開前要先確認有人能提供意見。
+        _, created = FeatureFlag.objects.get_or_create(
+            key="verification_queue",
+            defaults={
+                "label": "待專家驗證佇列",
+                "description": "開啟後，後台『待驗證佇列』頁面可使用：檢視候選詞形、提交意見、匯出待填 CSV 與匯入意見。"
+                               "意見只被收集，不會寫回辭典或測驗題庫；所有項目都仍待專家驗證。",
+                "enabled": False,
+            },
+        )
+        created_count += int(created)
+
+        total = len(TRIBES) + 9
         self.stdout.write(self.style.SUCCESS(
             f"功能開關種子完成：共 {total} 筆（族語測驗開關 {len(TRIBES)} + 族語翻譯開關 1 + 詞形分析器 2 + 測驗詞形干擾項 1 "
-            f"+ 詞素學習 4，除了族語測驗與翻譯開關，其餘預設關閉），"
+            f"+ 詞素學習 4 + 待專家驗證佇列 1，除了族語測驗與翻譯開關，其餘預設關閉），"
             f"新增 {created_count} 筆，其餘已存在維持原值。"
         ))

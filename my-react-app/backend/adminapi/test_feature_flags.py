@@ -132,5 +132,15 @@ class SeedFeatureFlagsTest(TestCase):
         from config.tribes import TRIBES
         out = StringIO()
         call_command("seed_feature_flags", stdout=out)
-        self.assertEqual(FeatureFlag.objects.count(), len(TRIBES) + 8)
-        self.assertIn(f"共 {len(TRIBES) + 8} 筆", out.getvalue())
+        self.assertEqual(FeatureFlag.objects.count(), len(TRIBES) + 9)
+        self.assertIn(f"共 {len(TRIBES) + 9} 筆", out.getvalue())
+
+    def test_the_verification_queue_flag_is_seeded_disabled_and_a_rerun_keeps_an_admins_choice(self):
+        self._seed()
+        flag = FeatureFlag.objects.get(key="verification_queue")
+        self.assertFalse(flag.enabled)
+        self.assertTrue(flag.label and "仍待專家驗證" in flag.description)
+        flag.enabled = True
+        flag.save()
+        self._seed()
+        self.assertTrue(FeatureFlag.objects.get(key="verification_queue").enabled)
