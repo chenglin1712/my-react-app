@@ -24,9 +24,7 @@ config/morphology.py 歸納出的詞綴規則，經 build_morphology_rules 指�
 """
 from __future__ import annotations
 
-import json
 import logging
-import math
 import threading
 import time
 from dataclasses import dataclass
@@ -35,6 +33,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from config import morphology as M
+from config import morphology_artifact as artifact
 from config import morphology_calibration as C
 from config import translation_lexicon as lexicon
 from config.tribes import TRIBES
@@ -55,7 +54,7 @@ _DISABLED_TTL_SECONDS = 300
 # 啟用狀態主要靠 /internal/cache/invalidate 更新；這個較長的存活時間只是「通知遺失」的保險
 # （多 worker 其中一個漏收到失效通知時，最慢這麼久後會重建，重建時會重新驗證詞庫指紋）。
 _ENABLED_TTL_SECONDS = 6 * 3600
-_MAX_RULES = 500   # 放行檔規則數量上限，防止異常檔案撐爆記憶體
+_MAX_RULES = artifact.MAX_RULES   # 放行檔規則數量上限，防止異常檔案撐爆記憶體
 
 _TRIBE_SLUG_BY_ID = {t.id: t.slug for t in TRIBES}
 
@@ -99,31 +98,10 @@ class MorphProbe:
 # 放行檔的讀取與驗證
 # ---------------------------------------------------------------------------
 
-def _read_artifact(path: Path) -> dict:
-    data = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(data, dict) or data.get("schema") != C.SCHEMA_VERSION or not isinstance(data.get("tribes"), dict):
-        raise ValueError("放行檔格式或版本不符")
-    return data
-
-
-def _parse_rules(entry: dict) -> tuple[dict[M.MorphRule, int], dict[M.MorphRule, float]]:
-    raw_rules = entry.get("rules")
-    if not isinstance(raw_rules, list) or not raw_rules or len(raw_rules) > _MAX_RULES:
-        raise ValueError("規則清單為空或數量不合理")
-    support: dict[M.MorphRule, int] = {}
-    reliability: dict[M.MorphRule, float] = {}
-    for item in raw_rules:
-        rule = C.rule_from_dict(item)
-        sup, rel = item.get("support"), item.get("reliability")
-        if isinstance(sup, bool) or not isinstance(sup, int) or sup < 1:
-            raise ValueError(f"規則 {rule.marker} 的 support 不合法")
-        if isinstance(rel, bool) or not isinstance(rel, (int, float)) or not math.isfinite(rel) or not 0.0 <= rel <= 1.0:
-            raise ValueError(f"規則 {rule.marker} 的 reliability 不合法")
-        if rule in support:
-            raise ValueError(f"規則重複：{rule.marker}")
-        support[rule] = sup
-        reliability[rule] = float(rel)
-    return support, reliability
+# 讀檔、規則解析、「這一族現在能不能載入」的判斷在 config/morphology_artifact.py（純函式、不丟例外），
+# 後台報表用同一份判斷，才不會報表說可載入、執行期卻不行。這裡只負責快取、存活時間與記錄。
+_read_artifact = artifact.read_artifact
+_parse_rules = artifact.parse_rules
 
 
 @dataclass(frozen=True)
@@ -146,47 +124,29 @@ def _build_entry(db: Session, tribe_id: str, artifact_path: Path | None = None) 
     if slug is None:
         return _disabled(f"未知的族語 ID：{tribe_id}")
     try:
-        artifact = _read_artifact(artifact_path or ARTIFACT_PATH)
-        if artifact.get("generator") != C.GENERATOR_VERSION:
-            return _disabled("放行檔不是由目前版本的產生器產生，請重跑 build_morphology_rules")
-        entry = artifact["tribes"].get(slug)
-        if not isinstance(entry, dict):
-            return _disabled(f"放行檔沒有 {slug} 的資料")
-        if entry.get("tribe_id") != tribe_id:
-            return _disabled(f"放行檔裡 {slug} 的族語 ID 與目前資料庫不一致")
-        if entry.get("enabled") is not True:
-            return _disabled(f"放行檔標示 {slug} 停用：{entry.get('reason', '')}", log=False)
+        loaded: dict = {}
 
-        # 啟用必須有「通過最終測試閘門」的紀錄，不能只靠 enabled 欄位（手動改檔不能繞過閘門）。
-        final = entry.get("final_test")
-        if not isinstance(final, dict) or final.get("passed") is not True or final.get("failed_checks") != []:
-            return _disabled(f"放行檔裡 {slug} 沒有通過最終測試的紀錄")
+        def current_fingerprint() -> str:
+            # 只有放行檔前面所有檢查都通過才會查資料庫；查到的詞庫也順便給下面建分析器用
+            names = [n for (n,) in db.query(Word.name).filter(Word.tribe_id == tribe_id).all() if n]
+            lexicon_set = {lexicon.normalize_token(n) for n in names}
+            lexicon_set.discard("")
+            loaded["lexicon_set"] = lexicon_set
+            return C.headword_fingerprint(lexicon_set)
 
-        support, reliability = _parse_rules(entry)
-        cfg = entry.get("config")
-        min_root_len = cfg.get("min_root_len") if isinstance(cfg, dict) else None
-        if isinstance(min_root_len, bool) or not isinstance(min_root_len, int) or min_root_len < M.MIN_RESIDUE_LEN:
-            return _disabled("放行檔的 min_root_len 不合法")
-        fp = entry.get("fingerprint")
-        expected = fp.get("headwords_sha256") if isinstance(fp, dict) else None
-        if not isinstance(expected, str):
-            return _disabled("放行檔缺少詞庫指紋")
-
-        names = [n for (n,) in db.query(Word.name).filter(Word.tribe_id == tribe_id).all() if n]
-        lexicon_set = {lexicon.normalize_token(n) for n in names}
-        lexicon_set.discard("")
-        if C.headword_fingerprint(lexicon_set) != expected:
-            return _disabled(f"{slug} 的辭典詞庫內容與放行檔不一致，請重跑 build_morphology_rules 並提交新檔")
+        result = artifact.assess_artifact_entry(artifact_path or ARTIFACT_PATH, slug, tribe_id, current_fingerprint)
+        if not result.ok:
+            return _disabled(result.reason, log=result.log)
 
         analyzer = M.MorphAnalyzer(
-            support, lexicon_set, precision=reliability, rank_by="precision",
-            max_edit=0, min_rule_precision=0.0, min_root_len=min_root_len,
+            result.support, loaded["lexicon_set"], precision=result.reliability, rank_by="precision",
+            max_edit=0, min_rule_precision=0.0, min_root_len=result.min_root_len,
         )
         affix_rows = [{"affix": a, "function": f}
                       for a, f in db.query(GrammarAffix.affix, GrammarAffix.function)
                       .filter(GrammarAffix.tribe_id == tribe_id).all()]
         return _Entry(analyzer, M.build_function_table(affix_rows), "", time.monotonic() + _ENABLED_TTL_SECONDS)
-    except Exception as exc:   # 檔案、JSON、規則驗證、資料庫——任何一種都只停用，不影響請求
+    except Exception as exc:   # 建分析器、資料庫——任何一種都只停用，不影響請求
         return _disabled(f"載入失敗（{type(exc).__name__}）：{exc}")
 
 

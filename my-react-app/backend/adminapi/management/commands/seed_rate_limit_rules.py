@@ -115,6 +115,7 @@ DJANGO_RULES = [
     ("feature_flag_update", "30/m", "功能開關切換"),
     ("system_cache_clear_django", "10/m", "清除 Django 具名快取"),
     ("system_cache_clear_fastapi", "10/m", "清除 FastAPI 快取（通知 /internal/cache/invalidate）"),
+    ("morphology_capabilities", "30/m", "形態分析能力報表（唯讀，依登入者）"),
 ]
 
 for _target_type, _type_label in _CONTENT_TYPE_LABELS.items():

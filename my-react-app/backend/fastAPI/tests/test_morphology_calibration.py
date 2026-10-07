@@ -303,6 +303,28 @@ class TestFingerprints:
         # 刪一個詞、加另一個詞，筆數不變——筆數指紋看不出來，內容雜湊必須看得出來。
         assert C.headword_fingerprint(["a", "b", "c"]) != C.headword_fingerprint(["a", "b", "d"])
 
+    def test_headword_fingerprint_bytes_are_unchanged_by_the_refactor(self):
+        # 放行檔裡已經記錄的詞庫指紋就是用這個格式算的；重構後格式必須逐位元組相同，否則所有既有放行檔都會變成過期。
+        import hashlib
+        assert C.headword_fingerprint(["b", "a", "a"]) == hashlib.sha256(b"a\nb\n").hexdigest()
+        assert C.headword_fingerprint([]) == hashlib.sha256(b"").hexdigest()
+        assert C.headword_fingerprint(["ʼa", "é"]) == hashlib.sha256("\n".join(sorted(["ʼa", "é"])).encode("utf-8") + b"\n").hexdigest()
+
+    def test_attested_fingerprint_uses_the_same_format_and_is_order_independent(self):
+        assert C.attested_fingerprint(["x", "y", "x"]) == C.attested_fingerprint(["y", "x"])
+        assert C.attested_fingerprint(["x", "y"]) == C.headword_fingerprint(["x", "y"])
+        assert C.attested_fingerprint(["x", "y"]) != C.attested_fingerprint(["x", "z"])
+
+    def test_attested_fingerprint_accepts_any_iterable_including_generators(self):
+        assert C.attested_fingerprint(w for w in ["b", "a"]) == C.attested_fingerprint(["a", "b"])
+
+    @pytest.mark.parametrize("bad", [None, 5, b"x", ("a",)])
+    def test_non_string_inputs_are_refused_instead_of_silently_skipped(self, bad):
+        with pytest.raises(TypeError):
+            C.attested_fingerprint(["ok", bad])
+        with pytest.raises(TypeError):
+            C.headword_fingerprint([bad])
+
     def test_pairs_fingerprint_is_order_independent_but_content_sensitive(self):
         p1, p2 = RootPair("t", "mafilo", ("filo",)), RootPair("t", "maalaw", ("alaw",))
         assert C.pairs_fingerprint([p1, p2]) == C.pairs_fingerprint([p2, p1])

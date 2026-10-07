@@ -173,3 +173,55 @@
     width: 100%;
   }
 }
+
+/* 形態分析能力頁：四層狀態徽章與指標欄位 */
+.system-morph-table td {
+  vertical-align: top;
+}
+
+.system-morph-stale {
+  background: rgba(255, 193, 7, 0.08);
+}
+
+.system-morph-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.system-morph-badge {
+  font-weight: 600;
+}
+
+.system-morph-muted {
+  margin-top: 4px;
+  color: var(--yy-text-muted, #6b5a47);
+  font-size: 13px;
+}
+
+.system-morph-note {
+  margin-top: 6px;
+  color: #8a5a00;
+  font-size: 13px;
+}
+
+.system-morph-problems {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: #b02a37;
+  font-size: 13px;
+}
+
+.system-morph-fa {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.system-morph-definitions {
+  max-width: 880px;
+  margin-top: 16px;
+  font-size: 14px;
+}

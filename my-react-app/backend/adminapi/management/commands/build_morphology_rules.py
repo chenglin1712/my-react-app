@@ -32,12 +32,12 @@ from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
+from adminapi.morphology_inputs import load_tribe_inputs
 from config import morphology as M
 from config import morphology_calibration as C
 from config.tribes import TRIBES
-from config.translation_lexicon import build_strip_rules, normalize_token
+from config.translation_lexicon import build_strip_rules
 from dictionary_db.connect import SessionLocal
-from dictionary_db.model import GrammarAffix, TranslationAttestedForm, Word
 
 DEFAULT_OUTPUT = Path(C.__file__).resolve().parent / "morphology_rules.json"
 
@@ -79,28 +79,16 @@ class Command(BaseCommand):
 
         db = SessionLocal()
         try:
-            data = {}
-            for tribe in targets:
-                words = db.query(Word.name, Word.derivative_root).filter(Word.tribe_id == tribe.id).all()
-                lexicon_set = {normalize_token(n) for n, _ in words if n and normalize_token(n)}
-                rows = [(tribe.full_name, n, r) for n, r in words if r and r.strip()]
-                attested = {
-                    s for (s,) in db.query(TranslationAttestedForm.surface_form_norm)
-                    .filter(TranslationAttestedForm.tribe_id == tribe.id).all()
-                }
-                affix_rows = [
-                    {"affix": a, "function": f}
-                    for a, f in db.query(GrammarAffix.affix, GrammarAffix.function)
-                    .filter(GrammarAffix.tribe_id == tribe.id).all()
-                ]
-                data[tribe.slug] = (tribe, rows, lexicon_set, attested, affix_rows)
+            # 資料載入與報表指令共用 adminapi/morphology_inputs.py（查詢與處理順序原樣保留）
+            data = {tribe.slug: load_tribe_inputs(db, tribe) for tribe in targets}
         finally:
             db.close()
 
         results = dict(existing)
-        for slug, (tribe, rows, lexicon_set, attested, affix_rows) in data.items():
-            pairs, dropped = M.build_pairs(rows)
-            strip_rules = build_strip_rules(affix_rows)
+        for slug, inputs in data.items():
+            tribe, lexicon_set, attested = inputs.tribe, inputs.lexicon_set, inputs.attested
+            pairs, dropped = inputs.build_pairs()
+            strip_rules = build_strip_rules(list(inputs.affix_rows))
 
             def existing_accepts(token, lex, _sr=strip_rules):
                 return any(c.residue in lex for c in _sr.strip_candidates(token))

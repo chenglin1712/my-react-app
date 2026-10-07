@@ -38,6 +38,7 @@ const GameSettings = lazy(() => import('./games/GameSettings'));
 const RateLimitSettings = lazy(() => import('./system/RateLimitSettings'));
 const FeatureFlags = lazy(() => import('./system/FeatureFlags'));
 const CacheManagement = lazy(() => import('./system/CacheManagement'));
+const MorphologyCapabilities = lazy(() => import('./system/MorphologyCapabilities'));
 
 const AdminApp = () => {
     const [pendingAnnouncementCount, setPendingAnnouncementCount] = useState();
@@ -92,6 +93,7 @@ const AdminApp = () => {
                 <Route path="system/cache" element={<CacheManagement />} />
                 <Route path="system/rate-limits" element={<RateLimitSettings />} />
                 <Route path="system/feature-flags" element={<FeatureFlags />} />
+                <Route path="system/morphology-capabilities" element={<MorphologyCapabilities />} />
             </Route>
         </Routes>
     );

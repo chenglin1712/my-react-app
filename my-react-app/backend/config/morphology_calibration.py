@@ -483,14 +483,32 @@ def final_report(admitted: Mapping[M.MorphRule, Mapping], pairs: Sequence[M.Root
 # 指紋與放行檔（artifact）
 # ---------------------------------------------------------------------------
 
-def headword_fingerprint(lexicon_set: Iterable[str]) -> str:
-    """正規化詞庫的內容雜湊（不是筆數）：刪一個詞、加一個詞筆數不變，但候選空間與錯放行
-    風險已經改變。"""
+def _string_set_fingerprint(values: Iterable[str]) -> str:
+    """字串集合的內容雜湊：去重、排序、逐筆以換行分隔後取 SHA-256。不是字串（例如 None）直接丟
+    TypeError，不悄悄略過或轉成 'None'——那樣會產生一個看似正常、其實少算了資料的指紋。
+    已知限制：元素以換行分隔且不跳脫，所以 {"a","b"} 與 {"a
+b"} 會得到相同指紋；既有放行檔的詞庫指紋就是這個
+    格式（不能改）。詞形（token）本來就不含換行，這只在資料庫混進換行時才有影響。"""
     h = hashlib.sha256()
-    for w in sorted(set(lexicon_set)):
+    for w in sorted(set(values)):
+        if not isinstance(w, str):
+            raise TypeError(f"指紋的輸入必須是字串，收到 {type(w).__name__}")
         h.update(w.encode("utf-8"))
         h.update(b"\n")
     return h.hexdigest()
+
+
+def headword_fingerprint(lexicon_set: Iterable[str]) -> str:
+    """正規化詞庫的內容雜湊（不是筆數）：刪一個詞、加一個詞筆數不變，但候選空間與錯放行
+    風險已經改變。"""
+    return _string_set_fingerprint(lexicon_set)
+
+
+def attested_fingerprint(attested: Iterable[str]) -> str:
+    """語料詞形（translation_attested_form.surface_form_norm）的內容雜湊，作法與詞庫指紋相同。
+    校準的負例會排除這些詞形，所以它是校準的輸入之一；但目前（schema 1）放行檔沒有記錄它，
+    只有報表用來「看目前的值」，不寫進放行檔、不參與載入判斷。"""
+    return _string_set_fingerprint(attested)
 
 
 def pairs_fingerprint(pairs: Iterable[M.RootPair]) -> str:

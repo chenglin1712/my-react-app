@@ -4,7 +4,7 @@ from . import (
     analytics_views, dictionary_grammar_views, dictionary_import_views, dictionary_taxonomy_views,
     dictionary_views, exam_schedule_admin_views, feature_flag_views, game_config_views,
     homepage_config_views, moderation_views, quizbank_views,
-    rate_limit_views, review_queue_views, system_cache_views, user_views, views,
+    morphology_capability_views, rate_limit_views, review_queue_views, system_cache_views, user_views, views,
 )
 
 
@@ -142,6 +142,7 @@ urlpatterns = [
     path('system/cache/', system_cache_views.system_cache_list),
     path('system/cache/clear-django/', system_cache_views.system_cache_clear_django),
     path('system/cache/clear-fastapi/', system_cache_views.system_cache_clear_fastapi),
+    path('system/morphology-capabilities/', morphology_capability_views.morphology_capabilities),
 
     # P5 數據分析
     path('public/events/', analytics_views.usage_event_create),

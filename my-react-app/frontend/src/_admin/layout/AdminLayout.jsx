@@ -38,6 +38,7 @@ const NAV_GROUPS = [
             { label: '快取管理', to: '/admin/system/cache' },
             { label: '限流設定', to: '/admin/system/rate-limits' },
             { label: '功能開關', to: '/admin/system/feature-flags' },
+            { label: '形態分析能力', to: '/admin/system/morphology-capabilities' },
         ],
     },
 ];
