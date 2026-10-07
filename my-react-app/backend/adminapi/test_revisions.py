@@ -6,6 +6,7 @@
 核心要驗證的是使用者提出的需求本身：已發布內容編輯後，對外（一般查詢/
 GET）仍然顯示舊內容，直到核准才切換成新內容；退件則舊內容完全不受影響。
 """
+from adminapi.auth_fixtures import fresh_auth
 import json
 from contextlib import contextmanager
 from unittest.mock import patch
@@ -25,7 +26,7 @@ def _as_role(role):
             decoded = {"uid": "test-uid"}
             if role is not None:
                 decoded["role"] = role
-            with patch("firebase_admin.auth.verify_id_token", return_value=decoded):
+            with patch("firebase_admin.auth.verify_id_token", return_value=fresh_auth(decoded)):
                 yield {"HTTP_AUTHORIZATION": "Bearer test-token"}
 
 

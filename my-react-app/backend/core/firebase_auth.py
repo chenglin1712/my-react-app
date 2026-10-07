@@ -20,6 +20,7 @@ CrosswordPuzzle／crawler／adminapi 這些 Django app 本來就已經依賴 cor
 """
 import logging
 import os
+import time
 
 from django.conf import settings as django_settings
 from django.http import JsonResponse
@@ -34,6 +35,38 @@ logger = logging.getLogger(__name__)
 # 較低權限的角色（例如 "editor"）。這個旗標只在 AUTH_DEV_BYPASS=True 時才有
 # 意義，正式環境不會用到。
 _DEV_BYPASS_ROLE = os.getenv("AUTH_DEV_BYPASS_ROLE", "owner")
+
+
+# 後台「新鮮度」：進後台要重新輸入密碼（見前端 /admin-login），但前端旗標任何人都能在
+# console 自己設，不是信任邊界。真正的把關在這裡：ID token 的 auth_time 是「使用者最後一次
+# 用密碼驗證身分」的時間（一般的 token 自動更新不會改它），超過這個秒數就要求重新驗證。
+# 預設 30 分鐘；不提供「關閉」的開關，本機開發由 AUTH_DEV_BYPASS 整段略過驗證。
+def _admin_reauth_max_age():
+    try:
+        value = int(os.getenv("ADMIN_REAUTH_MAX_AGE_SECONDS", "1800"))
+    except ValueError:
+        return 1800
+    return value if value > 0 else 1800
+
+
+# 容許裝置與 Google 伺服器的時鐘誤差：auth_time 比現在「未來」不超過這個秒數視為正常。
+_ADMIN_REAUTH_CLOCK_SKEW_SECONDS = 60
+
+
+def _reauth_required_response():
+    return JsonResponse(
+        {"detail": "為了安全，請重新驗證身分後再操作", "code": "reauth_required"},
+        status=401,
+    )
+
+
+def _is_fresh_authentication(decoded):
+    auth_time = decoded.get("auth_time")
+    # bool 是 int 的子類別，True 會被當成 1 通過型別檢查，所以明確排除。
+    if isinstance(auth_time, bool) or not isinstance(auth_time, (int, float)):
+        return False
+    age = time.time() - auth_time
+    return -_ADMIN_REAUTH_CLOCK_SKEW_SECONDS <= age <= _admin_reauth_max_age()
 
 
 def verify_firebase_token(request):
@@ -139,6 +172,9 @@ def require_role(request, allowed_roles):
     回傳 (decoded_token, error_response)，用法與 verify_firebase_token 相同：
     error_response 非 None 時代表被擋下，呼叫端應直接把它當成 view 的回傳值。
 
+    通過角色檢查後還要確認「最近用密碼驗證過」（auth_time 在 ADMIN_REAUTH_MAX_AGE_SECONDS
+    內，預設 30 分鐘），否則回 401 且 code 為 reauth_required，前端據此要求重新驗證。
+
     allowed_roles 建議傳 config/roles.py 裡定義好的角色群組常數
     （例如 ACCOUNT_MANAGERS、CONTENT_APPROVERS），而不是在呼叫端各自寫死
     一份角色字串清單，避免多處清單互相漂移。
@@ -149,5 +185,10 @@ def require_role(request, allowed_roles):
 
     if decoded.get("role") not in allowed_roles:
         return None, JsonResponse({"detail": "沒有權限執行此操作"}, status=403)
+
+    # 角色通過之後才檢查新鮮度：沒有後台角色的人一律是 403，不會因為這個檢查而得知後台的存在。
+    # dev bypass 沒有真的 token（也就沒有 auth_time），整段略過。
+    if not django_settings.AUTH_DEV_BYPASS and not _is_fresh_authentication(decoded):
+        return None, _reauth_required_response()
 
     return decoded, None

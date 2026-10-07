@@ -2,6 +2,8 @@
 AUTH_DEV_BYPASS 互鎖邏輯是全站認證最關鍵的一段判斷，卻沒有專屬測試檔案，只靠
 其他 app 的測試間接覆蓋到（等於「有沒有真的鎖住」從來沒被直接驗證過）。
 """
+import json
+import time
 from unittest.mock import patch
 
 from django.http import JsonResponse
@@ -238,9 +240,10 @@ class RequireRoleTest(TestCase):
     @override_settings(AUTH_DEV_BYPASS=False)
     def test_role_in_allowed_list_passes_through_decoded_token(self):
         with patch("core.firebase_auth.ensure_firebase_initialized"):
-            with patch("firebase_admin.auth.verify_id_token", return_value={"uid": "u1", "role": ADMIN}):
+            claims = {"uid": "u1", "role": ADMIN, "auth_time": int(time.time())}
+            with patch("firebase_admin.auth.verify_id_token", return_value=claims):
                 decoded, error = require_role(_FakeRequest(auth_header="Bearer t"), (OWNER, ADMIN))
-        self.assertEqual(decoded, {"uid": "u1", "role": ADMIN})
+        self.assertEqual(decoded, claims)
         self.assertIsNone(error)
 
     @override_settings(AUTH_DEV_BYPASS=False)
@@ -270,3 +273,83 @@ class RequireRoleTest(TestCase):
         decoded, error = require_role(_FakeRequest(), (EDITOR,))
         self.assertIsNone(decoded)
         self.assertEqual(error.status_code, 403)
+
+
+class RequireRoleFreshnessTest(TestCase):
+    """require_role 的「最近用密碼驗證過」檢查（auth_time 新鮮度）。
+
+    前端進後台會要求重新輸入密碼，但前端旗標任何人都能自己設，所以真正的把關在後端：
+    ID token 的 auth_time 太舊（或缺漏、型別不對、來自未來太遠）就回 401 reauth_required。
+    """
+
+    def _call(self, claims, roles=(OWNER, ADMIN)):
+        with patch("core.firebase_auth.ensure_firebase_initialized"):
+            with patch("firebase_admin.auth.verify_id_token", return_value=claims):
+                return require_role(_FakeRequest(auth_header="Bearer t"), roles)
+
+    def _assert_reauth_required(self, error):
+        self.assertEqual(error.status_code, 401)
+        self.assertEqual(json.loads(error.content)["code"], "reauth_required")
+
+    @override_settings(AUTH_DEV_BYPASS=False)
+    def test_recent_authentication_passes(self):
+        decoded, error = self._call({"uid": "u1", "role": ADMIN, "auth_time": int(time.time()) - 60})
+        self.assertIsNone(error)
+        self.assertEqual(decoded["uid"], "u1")
+
+    @override_settings(AUTH_DEV_BYPASS=False)
+    def test_authentication_older_than_the_window_requires_reauth(self):
+        decoded, error = self._call({"uid": "u1", "role": ADMIN, "auth_time": int(time.time()) - 1801 - 5})
+        self.assertIsNone(decoded)
+        self._assert_reauth_required(error)
+
+    @override_settings(AUTH_DEV_BYPASS=False)
+    def test_exactly_inside_the_window_still_passes(self):
+        _, error = self._call({"uid": "u1", "role": ADMIN, "auth_time": int(time.time()) - 1790})
+        self.assertIsNone(error)
+
+    @override_settings(AUTH_DEV_BYPASS=False)
+    def test_missing_auth_time_requires_reauth(self):
+        _, error = self._call({"uid": "u1", "role": ADMIN})
+        self._assert_reauth_required(error)
+
+    @override_settings(AUTH_DEV_BYPASS=False)
+    def test_malformed_auth_time_requires_reauth(self):
+        for bad in ("1700000000", None, True, [1], {"a": 1}):
+            with self.subTest(bad=bad):
+                _, error = self._call({"uid": "u1", "role": ADMIN, "auth_time": bad})
+                self._assert_reauth_required(error)
+
+    @override_settings(AUTH_DEV_BYPASS=False)
+    def test_small_clock_skew_into_the_future_is_tolerated(self):
+        _, error = self._call({"uid": "u1", "role": ADMIN, "auth_time": int(time.time()) + 30})
+        self.assertIsNone(error)
+
+    @override_settings(AUTH_DEV_BYPASS=False)
+    def test_auth_time_far_in_the_future_is_rejected(self):
+        # 偽造或時鐘嚴重錯誤的 token，不能因為「age 是負數」就永遠新鮮
+        _, error = self._call({"uid": "u1", "role": ADMIN, "auth_time": int(time.time()) + 3600})
+        self._assert_reauth_required(error)
+
+    @override_settings(AUTH_DEV_BYPASS=False)
+    def test_role_check_comes_first_so_non_staff_cannot_learn_about_reauth(self):
+        # 沒有後台角色的人，不論 auth_time 新舊都是 403，不會看到 reauth_required
+        decoded, error = self._call({"uid": "learner", "auth_time": 1}, roles=STAFF_ROLES)
+        self.assertIsNone(decoded)
+        self.assertEqual(error.status_code, 403)
+
+    @override_settings(AUTH_DEV_BYPASS=False)
+    def test_the_window_can_be_configured_but_never_disabled(self):
+        old = {"uid": "u1", "role": ADMIN, "auth_time": int(time.time()) - 600}
+        with patch.dict("os.environ", {"ADMIN_REAUTH_MAX_AGE_SECONDS": "300"}):
+            self._assert_reauth_required(self._call(old)[1])
+        for bad in ("0", "-5", "abc", ""):
+            with self.subTest(setting=bad), patch.dict("os.environ", {"ADMIN_REAUTH_MAX_AGE_SECONDS": bad}):
+                # 設成 0／負數／亂碼時退回預設 30 分鐘，不會變成「不檢查」
+                self.assertIsNone(self._call(old)[1])
+
+    @override_settings(AUTH_DEV_BYPASS=True)
+    def test_dev_bypass_has_no_token_so_the_check_is_skipped(self):
+        decoded, error = self._call({"uid": "ignored"})
+        self.assertIsNone(error)
+        self.assertEqual(decoded["uid"], "dev-user")

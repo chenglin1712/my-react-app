@@ -4,6 +4,7 @@ CRUD＋合併。跟 test_dictionary_words.py 同樣的理由繼承 DictionaryDbT
 grammar_rule_affix 複合主鍵不會被違反、刪除前確實先查引用數而不是依賴
 資料庫的 FK 行為，MagicMock 證明不了這些。
 """
+from adminapi.auth_fixtures import fresh_auth
 import json
 from contextlib import contextmanager
 from unittest.mock import patch
@@ -33,7 +34,7 @@ def _as_role(role):
             decoded = {"uid": "test-uid"}
             if role is not None:
                 decoded["role"] = role
-            with patch("firebase_admin.auth.verify_id_token", return_value=decoded):
+            with patch("firebase_admin.auth.verify_id_token", return_value=fresh_auth(decoded)):
                 yield {"HTTP_AUTHORIZATION": "Bearer test-token"}
 
 

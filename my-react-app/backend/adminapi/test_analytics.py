@@ -5,6 +5,7 @@
 允許匿名（未登入）呼叫的寫入端點——測試要涵蓋「完全沒帶 token」「帶了
 有效 token 但沒有後台角色（一般學習者）」兩種情境，不是只測 STAFF_ROLES。
 """
+from adminapi.auth_fixtures import fresh_auth
 import json
 from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone as dt_timezone
@@ -33,7 +34,7 @@ def _with_uid(uid):
     """
     with override_settings(AUTH_DEV_BYPASS=False):
         with patch("core.firebase_auth.ensure_firebase_initialized"):
-            with patch("firebase_admin.auth.verify_id_token", return_value={"uid": uid}):
+            with patch("firebase_admin.auth.verify_id_token", return_value=fresh_auth({"uid": uid})):
                 yield {"HTTP_AUTHORIZATION": "Bearer test-token"}
 
 
@@ -44,7 +45,7 @@ def _as_role(role):
             decoded = {"uid": "test-uid"}
             if role is not None:
                 decoded["role"] = role
-            with patch("firebase_admin.auth.verify_id_token", return_value=decoded):
+            with patch("firebase_admin.auth.verify_id_token", return_value=fresh_auth(decoded)):
                 yield {"HTTP_AUTHORIZATION": "Bearer test-token"}
 
 

@@ -1,3 +1,4 @@
+from adminapi.auth_fixtures import fresh_auth
 import json
 from contextlib import contextmanager
 from unittest.mock import patch
@@ -18,7 +19,7 @@ def _as_role(role):
             decoded = {"uid": "test-uid"}
             if role is not None:
                 decoded["role"] = role
-            with patch("firebase_admin.auth.verify_id_token", return_value=decoded):
+            with patch("firebase_admin.auth.verify_id_token", return_value=fresh_auth(decoded)):
                 yield {"HTTP_AUTHORIZATION": "Bearer test-token"}
 
 

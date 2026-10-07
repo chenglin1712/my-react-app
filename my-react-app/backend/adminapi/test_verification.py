@@ -1,4 +1,5 @@
 """待專家驗證佇列（M5）：服務層、API、CSV 匯出入、enqueue 指令，以及「不寫回辭典」的邊界測試。"""
+from adminapi.auth_fixtures import fresh_auth
 import ast
 import csv
 import hashlib
@@ -41,7 +42,7 @@ def _as(role, uid="uid-1"):
             decoded = {"uid": uid}
             if role is not None:
                 decoded["role"] = role
-            with mock.patch("firebase_admin.auth.verify_id_token", return_value=decoded):
+            with mock.patch("firebase_admin.auth.verify_id_token", return_value=fresh_auth(decoded)):
                 yield {"HTTP_AUTHORIZATION": "Bearer test-token"}
 
 

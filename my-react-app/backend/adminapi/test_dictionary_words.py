@@ -6,6 +6,7 @@
 刪除的子節點真的被刪、跨族語參照被擋下），不能用 MagicMock 頂替，因為
 MagicMock 只能斷言「有呼叫 .filter()」，證明不了這些。
 """
+from adminapi.auth_fixtures import fresh_auth
 import json
 from contextlib import contextmanager
 from unittest.mock import patch
@@ -28,7 +29,7 @@ def _as_role(role):
             decoded = {"uid": "test-uid"}
             if role is not None:
                 decoded["role"] = role
-            with patch("firebase_admin.auth.verify_id_token", return_value=decoded):
+            with patch("firebase_admin.auth.verify_id_token", return_value=fresh_auth(decoded)):
                 yield {"HTTP_AUTHORIZATION": "Bearer test-token"}
 
 
