@@ -31,6 +31,7 @@ from .quizbank import (
 )
 from .system_config import FeatureFlag, GameConfig, IrtConfig, RateLimitRule
 from .verification import VerificationItem, VerificationObservation, VerificationReview
+from .wordlist import WordlistApplyJournal, WordlistEntry, WordlistForm
 
 __all__ = [
     'Announcement',
@@ -59,4 +60,7 @@ __all__ = [
     'VerificationItem',
     'VerificationObservation',
     'VerificationReview',
+    'WordlistApplyJournal',
+    'WordlistEntry',
+    'WordlistForm',
 ]
