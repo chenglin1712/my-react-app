@@ -20,7 +20,7 @@ const BANNED_GENERIC = ['.overlay', '.message', '.avatar', '.status', '.modal', 
 // 清掉其中一個之後請把它從這裡移除。
 const KNOWN_DUPLICATES = [
   '.btn-primary', '.close-btn', '.event-card', '.formTitle', '.home-title', '.icon',
-  '.required-mark', '.result-title', '.submit-actions', '.submit-button', '.word-cards-grid',
+  '.result-title', '.submit-actions', '.submit-button', '.word-cards-grid',
 ];
 
 function listCss(dir) {
