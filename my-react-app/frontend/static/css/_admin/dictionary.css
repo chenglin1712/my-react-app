@@ -1,14 +1,6 @@
 /* P4 辭典管理（詞條/語法/主檔/批次匯入）共用樣式。比照 users.css／
    quiz-bank.css 的既有風格：class 前綴用功能命名，不用 CSS-in-JS。 */
 
-.dictionary-admin-page {
-  min-height: 100vh;
-  padding: 32px;
-  color: var(--yy-ink, #221812);
-  background: #f5f6f8;
-  font-family: var(--yy-font-body, sans-serif);
-}
-
 .dictionary-admin-page > .alert {
   max-width: 1440px;
   margin-right: auto;
@@ -19,21 +11,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  max-width: 1440px;
-  margin: 0 auto 24px;
 }
 
-.dictionary-page-heading h1 {
-  margin: 0 0 4px;
-  color: var(--yy-blue, #1f3a5c);
-  font-size: 28px;
-  font-weight: 700;
-}
-
-.dictionary-page-heading p {
-  margin: 0;
-  color: var(--yy-text-muted, #6b5a47);
+/* 列內操作按鈕群：之前沒有 flex 與間距，編輯／合併／刪除會互相貼住 */
+.dictionary-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }
 
 .dictionary-page-heading .btn,
@@ -53,85 +38,44 @@
   gap: 12px;
   max-width: 1440px;
   margin: 0 auto 20px;
-  padding: 18px;
-  background: #fff;
-  border: 1px solid #dee2e6;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(31, 58, 92, 0.06);
 }
 
 .dictionary-pending-filter {
   display: flex;
   align-items: center;
-  padding-bottom: 8px;
+  gap: 8px;
+  min-height: 38px;
+  margin: 26px 0 0;
+  padding-left: 0;
+  white-space: nowrap;
+}
+
+.dictionary-pending-filter .form-check-input {
+  float: none;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border-color: var(--admin-border-strong);
+}
+
+.dictionary-pending-filter .form-check-label {
+  margin: 0;
 }
 
 .dictionary-filter-actions {
   display: flex;
   gap: 8px;
+  margin-top: 26px;
 }
 
 .dictionary-table-card {
   max-width: 1440px;
   margin: 0 auto;
-  background: #fff;
-  border: 1px solid #dee2e6;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(31, 58, 92, 0.07);
-  overflow: hidden;
-}
-
-.dictionary-table {
-  margin: 0;
-  vertical-align: middle;
-  font-size: 14px;
-}
-
-.dictionary-table th {
-  padding: 14px 12px;
-  color: var(--yy-blue, #1f3a5c);
-  background: #f1f3f5;
-  font-weight: 650;
-  white-space: nowrap;
-}
-
-.dictionary-table td {
-  padding: 13px 12px;
 }
 
 .dictionary-word-name {
   font-weight: 650;
-}
-
-.dictionary-empty {
-  padding: 48px !important;
-  color: var(--yy-text-muted, #6b5a47) !important;
-  text-align: center;
-}
-
-.dictionary-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  min-height: 240px;
-  color: var(--yy-text-muted, #6b5a47);
-}
-
-.dictionary-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 18px;
-  color: var(--yy-text-muted, #6b5a47);
-  border-top: 1px solid #e9ecef;
-}
-
-.dictionary-pagination > div {
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
 /* ── 整頁編輯器（WordEditor.jsx）── */
@@ -149,29 +93,30 @@
 
 .dictionary-back-link {
   margin: 0 auto 18px;
-  color: var(--yy-blue, #1f3a5c);
+  color: var(--admin-accent);
   text-decoration: none;
 }
 
 .dictionary-editor-card {
   margin: 0 auto 20px;
   padding: 26px;
-  background: #fff;
-  border: 1px solid #dee2e6;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(31, 58, 92, 0.07);
+}
+
+/* 批次匯入頁的區塊沿用同一張卡片 class，但頁首與表格是 1440px：只有整頁編輯器（WordEditor、語法節點）才收窄到 1040px */
+.dictionary-admin-page:not(.dictionary-editor-page) .dictionary-editor-card {
+  max-width: 1440px;
 }
 
 .dictionary-editor-card h2 {
   margin: 0 0 20px;
-  color: var(--yy-blue, #1f3a5c);
+  color: var(--admin-accent);
   font-size: 20px;
   font-weight: 700;
 }
 
 .dictionary-page-heading h2 {
   margin: 0 0 4px;
-  color: var(--yy-blue, #1f3a5c);
+  color: var(--admin-accent);
   font-size: 22px;
   font-weight: 700;
 }
@@ -179,8 +124,8 @@
 .dictionary-nested-card {
   padding: 18px;
   margin-bottom: 16px;
-  background: #fafafa;
-  border: 1px solid #e2e6ea;
+  background: var(--admin-surface-muted);
+  border: 1px solid var(--admin-border);
   border-radius: 9px;
 }
 
@@ -195,7 +140,7 @@
 .dictionary-nested-heading h3,
 .dictionary-nested-heading h4 {
   margin: 0;
-  color: var(--yy-blue, #1f3a5c);
+  color: var(--admin-accent);
   font-size: 16px;
   font-weight: 650;
 }
@@ -210,18 +155,14 @@
 }
 
 .dictionary-field .form-label {
-  color: var(--yy-blue, #1f3a5c);
+  color: var(--admin-accent);
   font-weight: 600;
-}
-
-.required-mark {
-  color: #b02a37;
 }
 
 .dictionary-child-section {
   padding-top: 16px;
   margin-top: 16px;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid var(--admin-border);
 }
 
 .dictionary-child-heading {
@@ -237,24 +178,30 @@
 .dictionary-child-heading h4,
 .dictionary-child-heading h5 {
   margin: 0;
-  color: var(--yy-blue, #1f3a5c);
+  color: var(--admin-accent);
 }
+
+/* 區塊標題字級：沒有指定時會吃 Bootstrap 的 h2/h3 大字（約 2rem），在窄欄裡看起來像第二個頁面標題 */
+.dictionary-child-heading h2 { font-size: 18px; font-weight: 700; }
+.dictionary-child-heading h3 { font-size: 16px; font-weight: 650; }
+.dictionary-child-heading h4,
+.dictionary-child-heading h5 { font-size: 15px; font-weight: 650; }
 
 .dictionary-empty-note {
   margin: 0 0 12px;
-  color: var(--yy-text-muted, #6b5a47);
+  color: var(--admin-muted);
   font-size: 14px;
 }
 
 .dictionary-muted {
-  color: var(--yy-text-muted, #6b5a47);
+  color: var(--admin-muted);
   font-size: 13px;
 }
 
 .dictionary-taxonomy-field {
   padding: 12px 14px;
   margin-bottom: 16px;
-  border: 1px solid #e2e6ea;
+  border: 1px solid var(--admin-border);
   border-radius: 8px;
 }
 
@@ -263,7 +210,7 @@
   padding: 0 6px;
   font-size: 13px;
   font-weight: 650;
-  color: var(--yy-blue, #1f3a5c);
+  color: var(--admin-accent);
 }
 
 .dictionary-checkbox-grid {
@@ -282,8 +229,8 @@
 .dictionary-anaphora-card {
   padding: 12px;
   margin-bottom: 10px;
-  background: #fff;
-  border: 1px solid #e2e6ea;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
   border-radius: 8px;
 }
 
@@ -310,38 +257,38 @@
   max-width: 1040px;
   margin: 20px auto 0;
   padding: 22px;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(31, 58, 92, 0.07);
+  background: var(--admin-surface);
+  border-radius: var(--admin-radius);
+  box-shadow: var(--admin-shadow);
 }
 
 .dictionary-review-card {
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--admin-border);
 }
 
 .dictionary-danger-card {
-  border: 1px solid #f1b0b7;
+  border: 1px solid var(--admin-danger-border);
 }
 
 .dictionary-review-card h3,
 .dictionary-danger-card h3 {
   margin: 0 0 12px;
-  color: var(--yy-blue, #1f3a5c);
+  color: var(--admin-accent);
   font-size: 18px;
   font-weight: 700;
 }
 
 .dictionary-danger-card p {
-  color: var(--yy-text-muted, #6b5a47);
+  color: var(--admin-muted);
 }
 
 /* ── 媒體上傳（MediaUploadField.jsx）── */
 
 .dictionary-media-field {
   padding: 14px;
-  border: 1px dashed #adb5bd;
+  border: 1px dashed var(--admin-border-strong);
   border-radius: 8px;
-  background: #fafafa;
+  background: var(--admin-surface-muted);
 }
 
 .dictionary-image-preview img {
@@ -363,7 +310,7 @@
   align-items: center;
   gap: 6px;
   padding: 20px;
-  color: #6c757d;
+  color: var(--admin-muted);
 }
 
 .dictionary-media-controls {
@@ -378,7 +325,7 @@
   align-items: center;
   gap: 7px;
   margin-top: 10px;
-  color: var(--yy-text-muted, #6b5a47);
+  color: var(--admin-muted);
   font-size: 14px;
 }
 
@@ -397,8 +344,8 @@
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  background: #fff;
-  border: 1px solid #ced4da;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border-strong);
   border-radius: 7px;
 }
 
@@ -416,13 +363,13 @@
   align-items: center;
   gap: 6px;
   margin-top: 6px;
-  color: var(--yy-blue, #1f3a5c);
+  color: var(--admin-accent);
   font-size: 13px;
 }
 
 .dictionary-word-picker-error {
   margin-top: 6px;
-  color: #b02a37;
+  color: var(--admin-danger);
   font-size: 13px;
 }
 
@@ -433,8 +380,8 @@
   max-height: 220px;
   margin-top: 4px;
   overflow-y: auto;
-  background: #fff;
-  border: 1px solid #dee2e6;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
   border-radius: 8px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
 }
@@ -448,24 +395,24 @@
   text-align: left;
   background: none;
   border: none;
-  border-bottom: 1px solid #f1f3f5;
+  border-bottom: 1px solid var(--admin-surface-muted);
   cursor: pointer;
 }
 
 .dictionary-word-picker-option:hover,
 .dictionary-word-picker-option[aria-selected="true"] {
-  background: #f1f3f5;
+  background: var(--admin-surface-muted);
 }
 
 .dictionary-word-picker-option small,
 .dictionary-word-picker-option span {
-  color: var(--yy-text-muted, #6b5a47);
+  color: var(--admin-muted);
   font-size: 12px;
 }
 
 .dictionary-word-picker-empty {
   padding: 12px;
-  color: var(--yy-text-muted, #6b5a47);
+  color: var(--admin-muted);
   font-size: 13px;
   text-align: center;
 }
@@ -484,7 +431,7 @@
 
 .dictionary-taxonomy-create-form {
   padding: 18px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--admin-border);
 }
 
 .dictionary-taxonomy-create-row {
@@ -514,6 +461,15 @@
   align-items: start;
 }
 
+/* 文法章節卡片：標題、提示與載入／空狀態直接放在卡片裡，沒有外層內距，這裡補上和章節清單一致的 16px */
+/* 卡片本身帶 margin: 0 auto（給單欄列表頁置中用），放進 grid 欄位會變成縮到內容寬度並置中，這裡改成撐滿欄位 */
+.dictionary-grammar-layout > .dictionary-table-card { margin: 0; }
+.dictionary-grammar-layout > .dictionary-table-card > .dictionary-child-heading { margin: 0; padding: 16px 16px 0; }
+.dictionary-grammar-layout > .dictionary-table-card > .alert { margin: 12px 16px 0; }
+
+/* 頁面最上方的族語選擇：不需要撐滿整列 */
+.dictionary-admin-page > .dictionary-field { max-width: 320px; }
+
 .dictionary-grammar-section-list {
   display: flex;
   flex-direction: column;
@@ -521,22 +477,23 @@
   padding: 16px;
 }
 
+.dictionary-nested-heading { min-width: 0; }
+
 .dictionary-grammar-section-link {
+  min-width: 0;
+  overflow-wrap: anywhere;
   padding: 0;
-  color: var(--yy-ink, #221812);
+  color: var(--admin-text);
   text-align: left;
   text-decoration: none;
 }
 
 .dictionary-grammar-section-link:hover,
 .dictionary-grammar-section-link:focus {
-  color: var(--yy-blue, #1f3a5c);
+  color: var(--admin-accent);
 }
 
 @media (max-width: 900px) {
-  .dictionary-admin-page {
-    padding: 20px;
-  }
 
   .dictionary-filter-panel {
     grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -1,25 +1,6 @@
 .search-analytics-page {
-    min-height: calc(100vh - 68px);
     max-width: 1440px;
     margin: 0 auto;
-    padding: 32px;
-    color: var(--yy-ink, #221812);
-}
-
-.search-analytics-heading {
-    margin-bottom: 24px;
-}
-
-.search-analytics-heading h1 {
-    margin: 0 0 4px;
-    color: var(--yy-blue, #1f3a5c);
-    font-size: 28px;
-    font-weight: 700;
-}
-
-.search-analytics-heading p {
-    margin: 0;
-    color: var(--yy-text-muted, #6b5a47);
 }
 
 .search-analytics-filter-panel {
@@ -28,10 +9,10 @@
     gap: 16px;
     margin-bottom: 20px;
     padding: 18px 20px;
-    background: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(31, 58, 92, .06);
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--admin-radius);
+    box-shadow: var(--admin-shadow);
 }
 
 .search-analytics-filter-group {
@@ -41,7 +22,7 @@
 
 .search-analytics-filter-group label {
     margin-bottom: 6px;
-    color: var(--yy-text-muted, #6b5a47);
+    color: var(--admin-muted);
     font-size: 12px;
     font-weight: 650;
 }
@@ -49,8 +30,8 @@
 .search-analytics-filter-group .form-select,
 .search-analytics-filter-group .form-control {
     min-height: 38px;
-    border-color: #ced4da;
-    color: var(--yy-ink, #221812);
+    border-color: var(--admin-border-strong);
+    color: var(--admin-text);
     font-size: 13px;
 }
 
@@ -63,7 +44,7 @@
 .search-analytics-filter-hint {
     align-self: center;
     margin: 18px 0 0;
-    color: var(--yy-text-muted, #6b5a47);
+    color: var(--admin-muted);
     font-size: 12px;
 }
 
@@ -82,10 +63,10 @@
 .search-analytics-panel,
 .search-analytics-date-placeholder {
     min-width: 0;
-    background: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(31, 58, 92, .06);
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--admin-radius);
+    box-shadow: var(--admin-shadow);
 }
 
 .search-analytics-panel {
@@ -102,27 +83,27 @@
 
 .search-analytics-panel-heading h2 {
     margin: 0;
-    color: var(--yy-blue, #1f3a5c);
+    color: var(--admin-accent);
     font-size: 16px;
     font-weight: 700;
 }
 
 .search-analytics-panel-heading > span {
-    color: var(--yy-text-muted, #6b5a47);
+    color: var(--admin-muted);
     font-size: 12px;
 }
 
 .search-analytics-table {
     margin: 0;
-    border-top: 1px solid #edf0f2;
+    border-top: 1px solid var(--admin-border);
     vertical-align: middle;
 }
 
 .search-analytics-table thead th {
     padding: 11px 18px;
-    color: var(--yy-text-muted, #6b5a47);
-    background: #f8f9fa;
-    border-bottom-color: #dee2e6;
+    color: var(--admin-muted);
+    background: var(--admin-surface-muted);
+    border-bottom-color: var(--admin-border);
     font-size: 12px;
     font-weight: 650;
     white-space: nowrap;
@@ -130,8 +111,8 @@
 
 .search-analytics-table tbody td {
     padding: 13px 18px;
-    border-color: #edf0f2;
-    color: var(--yy-ink, #221812);
+    border-color: var(--admin-border);
+    color: var(--admin-text);
     font-size: 13px;
 }
 
@@ -148,7 +129,7 @@
 }
 
 .search-analytics-count {
-    color: var(--yy-blue, #1f3a5c);
+    color: var(--admin-accent);
     font-variant-numeric: tabular-nums;
     font-weight: 700;
 }
@@ -164,16 +145,16 @@
     align-items: center;
     gap: 6px;
     border-color: rgba(31, 58, 92, .45);
-    color: var(--yy-blue, #1f3a5c);
+    color: var(--admin-accent);
     font-size: 12px;
     white-space: nowrap;
 }
 
 .search-analytics-action .btn:hover,
 .search-analytics-action .btn:focus-visible {
-    border-color: var(--yy-blue, #1f3a5c);
+    border-color: var(--admin-accent);
     color: #fff;
-    background: var(--yy-blue, #1f3a5c);
+    background: var(--admin-accent);
 }
 
 .search-analytics-loading,
@@ -184,24 +165,24 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: #adb5bd;
+    color: var(--admin-muted);
     text-align: center;
 }
 
 .search-analytics-loading {
     flex-direction: row;
     gap: 8px;
-    color: var(--yy-text-muted, #6b5a47);
+    color: var(--admin-muted);
 }
 
 .search-analytics-empty p,
 .search-analytics-date-placeholder p {
     margin: 11px 0 0;
-    color: var(--yy-text-muted, #6b5a47);
+    color: var(--admin-muted);
     font-size: 13px;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1280px) {
     .search-analytics-grid {
         grid-template-columns: 1fr;
     }

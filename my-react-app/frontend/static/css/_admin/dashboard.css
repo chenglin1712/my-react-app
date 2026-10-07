@@ -1,25 +1,11 @@
 .admin-dashboard-page {
-    min-height: calc(100vh - 68px);
     max-width: 1440px;
     margin: 0 auto;
     padding: 32px;
-    color: var(--yy-ink, #221812);
 }
 
 .dashboard-heading {
     margin-bottom: 24px;
-}
-
-.dashboard-heading h1 {
-    margin: 0 0 4px;
-    color: var(--yy-blue, #1f3a5c);
-    font-size: 28px;
-    font-weight: 700;
-}
-
-.dashboard-heading p {
-    margin: 0;
-    color: var(--yy-text-muted, #6b5a47);
 }
 
 .dashboard-stat-grid {
@@ -36,10 +22,6 @@
     min-height: 126px;
     padding: 21px;
     color: inherit;
-    background: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(31, 58, 92, .06);
     text-decoration: none;
 }
 
@@ -59,7 +41,7 @@
     width: 42px;
     height: 42px;
     place-items: center;
-    color: var(--yy-blue, #1f3a5c);
+    color: var(--admin-accent);
     background: #eef2f6;
     border-radius: 9px;
 }
@@ -73,25 +55,25 @@
 
 .admin-stat-title {
     margin-bottom: 6px;
-    color: var(--yy-text-muted, #6b5a47);
+    color: var(--admin-muted);
     font-size: 13px;
 }
 
 .admin-stat-card strong {
-    color: var(--yy-blue, #1f3a5c);
+    color: var(--admin-accent);
     font-size: 28px;
     line-height: 1.1;
 }
 
 .admin-stat-detail {
     margin-top: 7px;
-    color: var(--yy-blue, #1f3a5c);
+    color: var(--admin-accent);
     font-size: 11px;
 }
 
 .admin-stat-placeholder .badge {
     margin-top: 7px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--admin-border);
     font-weight: 500;
 }
 
@@ -107,10 +89,6 @@
     gap: 16px;
     margin-bottom: 20px;
     padding: 18px 20px;
-    background: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(31, 58, 92, .06);
 }
 
 .dashboard-filter-group {
@@ -120,7 +98,7 @@
 
 .dashboard-filter-group label {
     margin-bottom: 6px;
-    color: var(--yy-text-muted, #6b5a47);
+    color: var(--admin-muted);
     font-size: 12px;
     font-weight: 650;
 }
@@ -128,8 +106,8 @@
 .dashboard-filter-group .form-select,
 .dashboard-filter-group .form-control {
     min-height: 38px;
-    border-color: #ced4da;
-    color: var(--yy-ink, #221812);
+    border-color: var(--admin-border-strong);
+    color: var(--admin-text);
     font-size: 13px;
 }
 
@@ -142,7 +120,7 @@
 .dashboard-filter-hint {
     align-self: center;
     margin: 18px 0 0;
-    color: var(--yy-text-muted, #6b5a47);
+    color: var(--admin-muted);
     font-size: 12px;
 }
 
@@ -170,15 +148,11 @@
 .dashboard-panel {
     min-width: 0;
     padding: 22px;
-    background: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(31, 58, 92, .06);
 }
 
 .dashboard-panel h2 {
     margin: 0 0 18px;
-    color: var(--yy-blue, #1f3a5c);
+    color: var(--admin-accent);
     font-size: 16px;
     font-weight: 700;
 }
@@ -189,7 +163,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: #adb5bd;
+    color: var(--admin-muted);
     text-align: center;
 }
 
@@ -212,19 +186,19 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: #adb5bd;
+    color: var(--admin-muted);
     text-align: center;
 }
 
 .dashboard-chart-empty p {
     margin: 11px 0 0;
-    color: var(--yy-text-muted, #6b5a47);
+    color: var(--admin-muted);
     font-size: 13px;
 }
 
 .dashboard-empty-panel p {
     margin: 11px 0 0;
-    color: var(--yy-text-muted, #6b5a47);
+    color: var(--admin-muted);
     font-size: 13px;
 }
 
@@ -240,7 +214,7 @@
     justify-content: space-between;
     gap: 18px;
     padding: 11px 0;
-    border-top: 1px solid #edf0f2;
+    border-top: 1px solid var(--admin-border);
 }
 
 .dashboard-audit-panel li:first-child {
@@ -255,7 +229,7 @@
 }
 
 .dashboard-audit-panel strong {
-    color: var(--yy-blue, #1f3a5c);
+    color: var(--admin-accent);
     font-size: 13px;
     font-weight: 650;
     overflow-wrap: anywhere;
@@ -263,7 +237,7 @@
 
 .dashboard-audit-panel li span,
 .dashboard-audit-panel time {
-    color: var(--yy-text-muted, #6b5a47);
+    color: var(--admin-muted);
     font-size: 12px;
 }
 
@@ -277,7 +251,7 @@
     justify-content: center;
     gap: 8px;
     min-height: 120px;
-    color: var(--yy-text-muted, #6b5a47);
+    color: var(--admin-muted);
 }
 
 .dashboard-chart-panel .dashboard-panel-loading {
@@ -292,7 +266,7 @@
 .dashboard-no-records {
     margin: 0;
     padding: 40px 0;
-    color: var(--yy-text-muted, #6b5a47);
+    color: var(--admin-muted);
     text-align: center;
 }
 

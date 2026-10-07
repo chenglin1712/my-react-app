@@ -1,25 +1,7 @@
+/* 熱圖格子的深淺（rgba(31, 58, 92, …)）是留存率的資料編碼，數值越高越深；不是裝飾色，所以不換成 --admin-* token。 */
 .retention-analysis-page {
-    min-height: calc(100vh - 68px);
     max-width: 1440px;
     margin: 0 auto;
-    padding: 32px;
-    color: var(--yy-ink, #221812);
-}
-
-.retention-analysis-heading {
-    margin-bottom: 24px;
-}
-
-.retention-analysis-heading h1 {
-    margin: 0 0 4px;
-    color: var(--yy-blue, #1f3a5c);
-    font-size: 28px;
-    font-weight: 700;
-}
-
-.retention-analysis-heading p {
-    margin: 0;
-    color: var(--yy-text-muted, #6b5a47);
 }
 
 .retention-analysis-error {
@@ -31,10 +13,10 @@
     min-width: 0;
     margin-bottom: 20px;
     overflow: hidden;
-    background: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(31, 58, 92, 0.06);
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--admin-radius);
+    box-shadow: var(--admin-shadow);
 }
 
 .retention-analysis-panel-heading {
@@ -43,14 +25,14 @@
 
 .retention-analysis-panel-heading h2 {
     margin: 0 0 4px;
-    color: var(--yy-blue, #1f3a5c);
+    color: var(--admin-accent);
     font-size: 16px;
     font-weight: 700;
 }
 
 .retention-analysis-panel-heading p {
     margin: 0;
-    color: var(--yy-text-muted, #6b5a47);
+    color: var(--admin-muted);
     font-size: 12px;
 }
 
@@ -60,7 +42,7 @@
     min-height: 260px;
     align-items: center;
     justify-content: center;
-    color: var(--yy-text-muted, #6b5a47);
+    color: var(--admin-muted);
 }
 
 .retention-analysis-loading {
@@ -70,13 +52,13 @@
 
 .retention-analysis-empty {
     flex-direction: column;
-    color: #adb5bd;
+    color: var(--admin-muted);
     text-align: center;
 }
 
 .retention-analysis-empty p {
     margin: 11px 0 0;
-    color: var(--yy-text-muted, #6b5a47);
+    color: var(--admin-muted);
     font-size: 13px;
 }
 
@@ -106,7 +88,7 @@
 
 .retention-analysis-table thead th {
     padding: 8px 7px;
-    color: var(--yy-text-muted, #6b5a47);
+    color: var(--admin-muted);
     font-size: 12px;
     font-weight: 650;
     text-align: center;
@@ -118,8 +100,10 @@
     position: sticky;
     left: 0;
     z-index: 2;
+    width: 190px;
     min-width: 190px;
-    background: #fff;
+    max-width: 190px;
+    background: var(--admin-surface);
 }
 
 .retention-analysis-cohort-heading {
@@ -129,12 +113,13 @@
 
 .retention-analysis-cohort-label {
     padding: 10px 12px;
-    color: var(--yy-ink, #221812);
+    color: var(--admin-text);
     box-shadow: 6px 0 8px -8px rgba(31, 58, 92, 0.45);
     font-size: 13px;
     font-weight: 600;
     text-align: left;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .retention-analysis-week-heading {
@@ -165,10 +150,10 @@
     background:
         repeating-linear-gradient(
             -45deg,
-            #f1f3f5,
-            #f1f3f5 5px,
-            #e9ecef 5px,
-            #e9ecef 10px
+            var(--admin-surface-muted),
+            var(--admin-surface-muted) 5px,
+            var(--admin-border) 5px,
+            var(--admin-border) 10px
         );
     font-weight: 500;
 }
@@ -180,7 +165,7 @@
     justify-content: flex-end;
     gap: 18px;
     padding: 12px 22px 20px;
-    color: var(--yy-text-muted, #6b5a47);
+    color: var(--admin-muted);
     font-size: 11px;
 }
 
@@ -194,7 +179,7 @@
 .retention-analysis-legend-swatch {
     width: 22px;
     height: 16px;
-    background: #e9ecef;
+    background: var(--admin-border);
     border: 1px solid rgba(31, 58, 92, 0.1);
     border-radius: 3px;
 }
@@ -215,10 +200,10 @@
     background:
         repeating-linear-gradient(
             -45deg,
-            #f1f3f5,
-            #f1f3f5 4px,
-            #e9ecef 4px,
-            #e9ecef 8px
+            var(--admin-surface-muted),
+            var(--admin-surface-muted) 4px,
+            var(--admin-border) 4px,
+            var(--admin-border) 8px
         );
 }
 
