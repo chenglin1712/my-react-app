@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from config.roles import ADMIN, ANALYST, EDITOR, OWNER, REVIEWER
 
 from .models import (
-    Announcement, AnnouncementSyncStatus, AuditLog, ExamScheduleCrawlStatus, ExamScheduleOverride,
+    Announcement, AnnouncementSyncStatus, AuditLog, ExamScheduleCrawlStatus, ExamScheduleOverride, PendingRevision,
 )
 
 
@@ -229,18 +229,93 @@ class AnnouncementUpdateDeleteTest(TestCase):
         a.refresh_from_db()
         self.assertEqual(a.status, Announcement.STATUS_DRAFT)
 
-    def test_delete_only_allowed_for_draft(self):
-        published = Announcement.objects.create(title="已發布", created_by="u", status=Announcement.STATUS_PUBLISHED)
-        with _as_role(OWNER) as headers:
-            response = self.client.delete(f'/adminapi/announcements/{published.pk}/', **headers)
-        self.assertEqual(response.status_code, 409)
-        self.assertTrue(Announcement.objects.filter(pk=published.pk).exists())
+    def _delete(self, announcement, role=OWNER):
+        with _as_role(role) as headers:
+            return self.client.delete(f'/adminapi/announcements/{announcement.pk}/', **headers)
 
+    def test_delete_rejected_for_pending_and_published(self):
+        # 待審核要先撤回、已發布要先下架，才能刪
+        for status in (Announcement.STATUS_PENDING_REVIEW, Announcement.STATUS_PUBLISHED):
+            item = Announcement.objects.create(title=status, created_by="u", status=status)
+            response = self._delete(item)
+            self.assertEqual(response.status_code, 409, status)
+            item.refresh_from_db()
+            self.assertIsNone(item.deleted_at)
+
+    def test_admin_created_draft_is_hard_deleted(self):
         draft = Announcement.objects.create(title="草稿", created_by="u")
-        with _as_role(OWNER) as headers:
-            response = self.client.delete(f'/adminapi/announcements/{draft.pk}/', **headers)
+        response = self._delete(draft)
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Announcement.objects.filter(pk=draft.pk).exists())
+        log = AuditLog.objects.filter(target_type="announcement", action="delete").first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.before["title"], "草稿")
+
+    def test_rejected_and_unpublished_are_soft_deleted(self):
+        for status in (Announcement.STATUS_REJECTED, Announcement.STATUS_UNPUBLISHED):
+            item = Announcement.objects.create(title=f"軟刪-{status}", created_by="u", status=status)
+            response = self._delete(item)
+            self.assertEqual(response.status_code, 200, status)
+            # 資料列還在（保留歷史），只是標記為已刪除
+            item.refresh_from_db()
+            self.assertIsNotNone(item.deleted_at)
+            self.assertEqual(item.status, status)
+            self.assertTrue(item.deleted_by)
+            log = AuditLog.objects.filter(
+                target_type="announcement", action="soft_delete", target_id=str(item.pk),
+            ).first()
+            self.assertIsNotNone(log)
+            self.assertEqual(log.before["status"], status)
+            self.assertEqual(log.after["previous_status"], status)
+
+    def test_soft_deleted_announcement_is_hidden_everywhere(self):
+        item = Announcement.objects.create(title="看不見的公告", created_by="u", status=Announcement.STATUS_UNPUBLISHED)
+        self._delete(item)
+
+        with _as_role(OWNER) as headers:
+            listing = self.client.get('/adminapi/announcements/', **headers).json()
+            detail = self.client.get(f'/adminapi/announcements/{item.pk}/', **headers)
+            republish = _post_json(self.client, f'/adminapi/announcements/{item.pk}/republish/', headers)
+            edit = _patch_json(self.client, f'/adminapi/announcements/{item.pk}/', headers, {"title": "改"})
+            again = self.client.delete(f'/adminapi/announcements/{item.pk}/', **headers)
+        self.assertNotIn(item.pk, [row["id"] for row in listing["results"]])
+        self.assertEqual(detail.status_code, 404)
+        self.assertEqual(republish.status_code, 404)
+        self.assertEqual(edit.status_code, 404)
+        self.assertEqual(again.status_code, 404)
+
+    def test_soft_deleted_published_row_never_reaches_public_api(self):
+        # 防禦性檢查：就算資料被改成「已發布且已刪除」，公開首頁 API 也不能回傳
+        item = Announcement.objects.create(
+            title="已刪除但標成發布", created_by="u", status=Announcement.STATUS_PUBLISHED,
+            deleted_at=timezone.now(), deleted_by="u",
+        )
+        response = Client().get('/adminapi/public/announcements/')
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(item.pk, [row["id"] for row in response.json()["results"]])
+
+    def test_crawler_row_edited_back_to_draft_is_soft_deleted_not_hard_deleted(self):
+        # 爬蟲公告下架後被編輯會退回 draft；這時刪除也不能硬刪，否則 external_id 消失、下次同步會重建
+        item = Announcement.objects.create(
+            title="爬蟲草稿", created_by="system:crawler_sync", source=Announcement.SOURCE_CRAWLER,
+            external_id="tacp:draft-1", status=Announcement.STATUS_DRAFT,
+        )
+        self.assertEqual(self._delete(item).status_code, 200)
+        self.assertTrue(Announcement.objects.filter(pk=item.pk, deleted_at__isnull=False).exists())
+
+    def test_pending_revision_blocks_delete(self):
+        item = Announcement.objects.create(title="有待審修改", created_by="u", status=Announcement.STATUS_UNPUBLISHED)
+        PendingRevision.objects.create(
+            target_type="announcement", target_id=item.pk, payload={"title": "新標題"}, submitted_by="u",
+        )
+        self.assertEqual(self._delete(item).status_code, 409)
+        item.refresh_from_db()
+        self.assertIsNone(item.deleted_at)
+
+    def test_reviewer_and_analyst_cannot_delete(self):
+        item = Announcement.objects.create(title="草稿", created_by="u")
+        for role in (REVIEWER, ANALYST):
+            self.assertEqual(self._delete(item, role).status_code, 403)
 
     def test_editor_cannot_delete(self):
         # 刪除是 PUBLISHERS 專屬，editor 雖然能編輯內容，但不能刪。
@@ -853,6 +928,26 @@ class AnnouncementCrawlerSyncTest(TestCase):
         self.assertEqual(second.json()["skipped_existing"], 1)
         announcement.refresh_from_db()
         self.assertEqual(announcement.status, Announcement.STATUS_UNPUBLISHED)
+
+    @patch('crawler.exam_site.requests.get')
+    def test_soft_deleted_crawler_row_is_not_recreated_by_resync(self, mock_get):
+        # 刪除的墓碑：軟刪除保留 external_id，重新同步時 get_or_create 會找到那一列、略過，
+        # 不會把已刪除的爬蟲公告又匯入成「已發布」
+        self._mock_one_tacp_item(mock_get, item_id=12)
+        with _as_role(EDITOR) as headers:
+            _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+        announcement = Announcement.objects.get(external_id="tacp:12")
+        with _as_role(OWNER) as headers:
+            _post_json(self.client, f'/adminapi/announcements/{announcement.pk}/unpublish/', headers)
+            delete_resp = self.client.delete(f'/adminapi/announcements/{announcement.pk}/', **headers)
+        self.assertEqual(delete_resp.status_code, 200)
+
+        with _as_role(EDITOR) as headers:
+            second = _post_json(self.client, '/adminapi/announcements/sync-crawler/', headers)
+        self.assertEqual(second.json()["imported"], 0)
+        self.assertEqual(second.json()["skipped_existing"], 1)
+        self.assertEqual(Announcement.objects.filter(external_id="tacp:12").count(), 1)
+        self.assertFalse(Announcement.live.filter(external_id="tacp:12").exists())
 
     @patch('crawler.exam_site.requests.get')
     def test_sync_writes_audit_log_with_correct_target_type(self, mock_get):

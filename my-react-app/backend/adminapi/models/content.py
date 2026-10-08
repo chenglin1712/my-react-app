@@ -6,6 +6,13 @@ from django.utils import timezone
 from ._singleton import SingletonModel
 
 
+class LiveAnnouncementManager(models.Manager):
+    """只包含沒被軟刪除的公告。"""
+
+    def get_queryset(self):
+        return super().get_queryset().filter(deleted_at__isnull=True)
+
+
 class Announcement(models.Model):
     """後台公告——取代目前首頁 100% 依賴外部網站爬蟲的狀態（見規劃文件 §3.2.1）。
 
@@ -100,6 +107,20 @@ class Announcement(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # 軟刪除：deleted_at 有值代表已刪除。刻意不用新的 status 值——status 是「發布流程走到哪」，
+    # 刪除是資料生命週期，混在同一欄會讓狀態轉換與排程判斷變複雜，也看不出刪除前是哪個狀態。
+    # 資料列保留下來，爬蟲匯入公告的 external_id 就一併保留，等於天然的「墓碑」：
+    # crawler_sync 用 external_id 做 get_or_create 去重，列還在就不會被重新建回來
+    # （硬刪的話 unique 鍵一起消失，下次同步會把它又匯入成「已發布」）。
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.CharField(max_length=128, blank=True)
+
+    # objects 維持「包含已刪除」：爬蟲同步的 get_or_create 一定要看得到已刪除的列（墓碑），
+    # 否則會想再建一筆而撞上 external_id 的唯一約束。其他一般查詢（後台列表、詳情、公開首頁）
+    # 一律改用 live，只看沒被刪除的公告。
+    objects = models.Manager()
+    live = LiveAnnouncementManager()
 
     class Meta:
         ordering = ['-is_pinned', '-created_at', '-pk']

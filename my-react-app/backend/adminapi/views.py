@@ -84,7 +84,8 @@ def _locked(pk):
     效果退化成整個資料庫層級的寫入序列化，正確性一樣成立，只是沒有
     PostgreSQL 那麼細的鎖粒度。
     """
-    return get_object_or_404(Announcement.objects.select_for_update(), pk=pk)
+    # live：已軟刪除的公告對後台來說等於不存在（404），不能再被編輯或轉換狀態
+    return get_object_or_404(Announcement.live.select_for_update(), pk=pk)
 
 
 # csrf_exempt 在這裡不是「豁免掉一項保護」，而是「這項保護原本就不適用」，
@@ -105,7 +106,7 @@ def announcement_list(request):
 
 @guarded_action(method="GET", role=STAFF_ROLES)
 def _list_announcements(request, decoded):
-    qs = Announcement.objects.order_by(_announcement_source_priority(), '-created_at', '-pk')
+    qs = Announcement.live.order_by(_announcement_source_priority(), '-created_at', '-pk')
 
     status_param = request.GET.get("status")
     if status_param:
@@ -209,7 +210,7 @@ def public_announcement_list(request):
         When(is_pinned=True, pin_until__gte=today, then=0),
         default=1,
     )
-    qs = Announcement.objects.filter(status=Announcement.STATUS_PUBLISHED).filter(
+    qs = Announcement.live.filter(status=Announcement.STATUS_PUBLISHED).filter(
         Q(publish_at__isnull=True) | Q(publish_at__lte=now)
     ).filter(
         Q(unpublish_at__isnull=True) | Q(unpublish_at__gt=now)
@@ -246,7 +247,7 @@ def announcement_detail(request, pk):
 
 @guarded_action(method="GET", role=STAFF_ROLES)
 def _get_announcement(request, decoded, pk):
-    announcement = get_object_or_404(Announcement, pk=pk)
+    announcement = get_object_or_404(Announcement.live, pk=pk)
     data = AnnouncementSerializer(announcement).data
     data["has_pending_revision"] = bool(pending_revision_target_ids("announcement", [announcement.pk]))
     return JsonResponse(data)
@@ -293,15 +294,44 @@ def _update_announcement(request, decoded, pk):
 def _delete_announcement(request, decoded, pk):
     with transaction.atomic():
         announcement = _locked(pk)
-        # 只允許刪還沒進過審核流程的草稿——曾經送審／發布過的內容一律走「下架」
-        # 保留歷史，不提供真的刪除，跟 AuditLog「稽核紀錄不可竄改」同一個精神：
-        # 走過審核的內容不該連存在過的痕跡都能被抹掉。
-        if announcement.status != Announcement.STATUS_DRAFT:
+        # 只有「還沒走完發布流程」的狀態才能刪：草稿、已退件、已下架。
+        # 待審核要先撤回、已發布要先下架——刪除前一定留下「撤回／下架」這筆稽核軌跡，
+        # 公開首頁也會先停止曝光，不會有「一按刪除就從首頁消失、卻沒有下架紀錄」的情況。
+        deletable_statuses = (
+            Announcement.STATUS_DRAFT,
+            Announcement.STATUS_REJECTED,
+            Announcement.STATUS_UNPUBLISHED,
+        )
+        if announcement.status not in deletable_statuses:
             return _invalid_transition(announcement.status, "delete")
+        if pending_revision_target_ids("announcement", [announcement.pk]):
+            return JsonResponse({"detail": "這篇公告還有待審的修改，請先處理後再刪除"}, status=409)
 
         before = AnnouncementSerializer(announcement).data
-        _write_audit_log(request, decoded, "delete", announcement, before=before)
-        announcement.delete()
+
+        # 後台自建、從沒進過審核流程的草稿：維持原本的硬刪（稽核紀錄保留完整 before 快照）。
+        # 其他情況一律軟刪除，保留資料列：
+        # - 曾經送審／發布過的內容不該連存在過的痕跡都被抹掉（跟 AuditLog 不可竄改同一個精神）
+        # - 爬蟲匯入的公告帶著 external_id（包括「下架後被編輯退回草稿」的），硬刪會讓下次
+        #   同步把它重新匯入成已發布，所以有 external_id 的一律軟刪，列留著當墓碑
+        if announcement.status == Announcement.STATUS_DRAFT and not announcement.external_id:
+            _write_audit_log(request, decoded, "delete", announcement, before=before)
+            announcement.delete()
+            return JsonResponse({"detail": "已刪除"}, status=200)
+
+        announcement.deleted_at = timezone.now()
+        announcement.deleted_by = decoded.get("uid", "")
+        announcement.save(update_fields=["deleted_at", "deleted_by", "updated_at"])
+        _write_audit_log(
+            request, decoded, "soft_delete", announcement,
+            before=before,
+            after={
+                "deleted_at": announcement.deleted_at.isoformat(),
+                "deleted_by": announcement.deleted_by,
+                "previous_status": before.get("status"),
+                "source": announcement.source,
+            },
+        )
         return JsonResponse({"detail": "已刪除"}, status=200)
 
 
