@@ -9,7 +9,7 @@ import GroundedText from "../../components/_translate/GroundedText";
 import EvidencePanel from "../../components/_translate/EvidencePanel";
 import useAudioPlayback from "../../hooks/useAudioPlayback";
 import { useTranslateCapabilities } from "../../hooks/useTranslateCapabilities";
-import { apiPost, trackEvent } from "../../utils/apiClient";
+import { apiPost } from "../../utils/apiClient";
 
 const MAX_LEN = 300;
 
@@ -80,7 +80,8 @@ const TranslatePage = () => {
             );
             if (myGeneration !== requestGenerationRef.current) return;
             setResult(data);
-            trackEvent("translate_submit", { tribe, payload: { direction, len: text.length } });
+            // 翻譯的使用紀錄由後端在翻譯成功時自己寫（translation_request）；公開事件端點的白名單
+            // 不收 translate_submit，從前端再送一筆只會固定回 400
         } catch (err) {
             if (axios.isCancel(err) || myGeneration !== requestGenerationRef.current) return;
             setError(err.message || "翻譯失敗，請稍後再試");

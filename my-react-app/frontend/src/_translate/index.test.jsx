@@ -70,6 +70,8 @@ describe('TranslatePage（回歸測試：swap/切族語都要能取消還在跑�
     typeAndSubmit('hello');
 
     await waitFor(() => expect(screen.getByText('你')).toBeInTheDocument());
+    // 公開事件端點不收 translate_submit（固定 400）；使用紀錄由後端翻譯成功時自己寫
+    expect(trackEvent).not.toHaveBeenCalled();
   });
 });
 
