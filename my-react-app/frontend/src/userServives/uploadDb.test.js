@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { addDoc, getDoc, setDoc, updateDoc, runTransaction } from 'firebase/firestore';
-import { uploadQuizDB, uploadSituationDB, addCalendarEvent, addCalendarEvents, deleteCalendarEvent } from './uploadDb';
+import { stripUndefined, uploadQuizDB, uploadSituationDB, addCalendarEvent, addCalendarEvents, deleteCalendarEvent } from './uploadDb';
 
 /** firestore.rules 的 quizs read 規則允許任何登入使用者讀取，原本每題的
  * answer（正確答案）欄位會被原封不動寫進這份可被任何人讀到的文件，等於
@@ -57,6 +57,43 @@ describe('uploadQuizDB', () => {
     expect(writtenDoc.data[0]).toEqual({ question_ab: 'q1', options: ['A', 'B'] });
   });
 
+  test('題目裡值是 undefined 的欄位不會寫進 Firestore（它不接受 undefined）', async () => {
+    const data = [{
+      question_ab: 'q1', question_ch: '問題', audio: undefined,
+      images: { A: 'a.png', B: undefined, C: null }, answer: 1,
+    }];
+
+    await uploadQuizDB('中級', data, 'amis');
+
+    const written = addDoc.mock.calls[0][1].data[0];
+    expect(written).toEqual({ question_ab: 'q1', question_ch: '問題', images: { A: 'a.png', C: null } });
+    expect(Object.prototype.hasOwnProperty.call(written, 'audio')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(written.images, 'B')).toBe(false);
+  });
+
+  test('四種題型整理後的格式都能寫入，其他資料（巢狀 pairs、list／dict options、中文）原樣保留', async () => {
+    const pairs = [{ cn: '狗', word: { word: "waco'", audio: 'a.mp3' }, item_id: 1 }];
+    const data = [
+      { question_ab: 'qay', image: undefined, audio: 'a.mp3', options: { 1: 'O (符合)', 2: 'X (不符合)' }, answer: 1 },
+      { question_ab: 'x', question_ch: '「引號」\n換行', audio: undefined, images: { A: 'a', B: 'b', C: 'c' }, answer: 2 },
+      { pairs, answer: 1 },
+      { passage_ab: 'p', passage_ch: '段落', options: ['a', 'b', 'c', 'd'], answer: 3 },
+    ];
+
+    await uploadQuizDB('綜合', data, 'amis');
+
+    const written = addDoc.mock.calls[0][1].data;
+    expect(written[0]).toEqual({ question_ab: 'qay', audio: 'a.mp3', options: { 1: 'O (符合)', 2: 'X (不符合)' } });
+    expect(written[1]).toEqual({ question_ab: 'x', question_ch: '「引號」\n換行', images: { A: 'a', B: 'b', C: 'c' } });
+    expect(written[2]).toEqual({ pairs });
+    expect(written[3]).toEqual({ passage_ab: 'p', passage_ch: '段落', options: ['a', 'b', 'c', 'd'] });
+  });
+
+  test('回傳給作答流程的正確答案不受清洗影響', async () => {
+    const { ans } = await uploadQuizDB('初級', [{ question_ab: 'q', audio: undefined, answer: 2 }], 'amis');
+    expect(ans).toEqual([2]);
+  });
+
   test('回傳值仍帶有正確答案，供這次作答流程在記憶體內比對使用', async () => {
     const data = [{ answer: 1 }, { answer: 2 }];
     const result = await uploadQuizDB('初級', data, 'tayal');
@@ -75,6 +112,19 @@ describe('uploadSituationDB', () => {
   beforeEach(() => {
     addDoc.mockReset();
     addDoc.mockResolvedValue({ id: 'situation-1' });
+  });
+
+  test('沒有登入的使用者時不寫入（userId 會是 undefined，Firestore 會拒絕），明確失敗並回傳 undefined', async () => {
+    mockCurrentUser = null;
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const id = await uploadSituationDB('quiz-1', [1], [1], ['T']);
+      expect(id).toBeUndefined();
+      expect(addDoc).not.toHaveBeenCalled();
+    } finally {
+      mockCurrentUser = { uid: 'alice' };
+      errorSpy.mockRestore();
+    }
   });
 
   test('正確答案存進 situations 文件（本人才能讀的地方）', async () => {
@@ -200,5 +250,33 @@ describe('addCalendarEvent／deleteCalendarEvent（calendar/{uid} 單一文件�
 
     await expect(deleteCalendarEvent('any')).resolves.toBeUndefined();
     expect(updateDoc).not.toHaveBeenCalled();
+  });
+});
+
+describe('stripUndefined', () => {
+  test('移除 undefined 欄位；陣列裡的 undefined 換成 null 以保持索引', () => {
+    expect(stripUndefined({ a: 1, b: undefined, c: [1, undefined, { d: undefined, e: 2 }] }))
+      .toEqual({ a: 1, c: [1, null, { e: 2 }] });
+  });
+
+  test('日期、NaN、null 與其他非普通物件原樣保留（不像 JSON 序列化會改變它們）', () => {
+    const date = new Date('2026-01-01T00:00:00Z');
+    class Special { constructor() { this.x = undefined; } }
+    const special = new Special();
+    const result = stripUndefined({ date, nan: NaN, nothing: null, special });
+    expect(result.date).toBe(date);
+    expect(Number.isNaN(result.nan)).toBe(true);
+    expect(result.nothing).toBeNull();
+    expect(result.special).toBe(special);
+  });
+
+  test('稀疏陣列的空洞與沒有原型的物件也會被清洗', () => {
+    const sparse = [1, , 3]; // eslint-disable-line no-sparse-arrays
+    expect(stripUndefined({ list: sparse })).toEqual({ list: [1, null, 3] });
+
+    const bare = Object.create(null);
+    bare.keep = 1;
+    bare.drop = undefined;
+    expect(stripUndefined({ bare })).toEqual({ bare: { keep: 1 } });
   });
 });

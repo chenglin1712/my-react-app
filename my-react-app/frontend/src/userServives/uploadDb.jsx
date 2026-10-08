@@ -2,6 +2,24 @@ import { db, auth } from "../../../firebase";
 import { collection, addDoc, serverTimestamp, query, where, doc, getDoc, getDocs, orderBy, runTransaction } from "firebase/firestore";
 import { TRIBE_FULL_NAME_BY_SLUG as TRIBE_NAME } from "../constants/tribes";
 
+// 遞迴移除物件裡值為 undefined 的欄位（陣列裡的 undefined 換成 null，不能直接拿掉否則索引會位移；
+// 稀疏陣列的空洞也會變成 null）。只處理普通物件與陣列：Date、Firestore 的 Timestamp／serverTimestamp
+// 等其他型別原樣保留，不像 JSON 序列化會改變它們。
+export const stripUndefined = (value) => {
+    if (Array.isArray(value)) return Array.from(value, (item) => (item === undefined ? null : stripUndefined(item)));
+    if (value !== null && typeof value === "object") {
+        const proto = Object.getPrototypeOf(value);
+        if (proto === Object.prototype || proto === null) {
+            return Object.fromEntries(
+                Object.entries(value)
+                    .filter(([, v]) => v !== undefined)
+                    .map(([k, v]) => [k, stripUndefined(v)]),
+            );
+        }
+    }
+    return value;
+};
+
 //測驗題目存至資料庫
 export const uploadQuizDB = async (level_ch, data, tribe = "tayal") => {
     const correctAnswers = data.map(q => q.answer);
@@ -9,7 +27,9 @@ export const uploadQuizDB = async (level_ch, data, tribe = "tayal") => {
     // 寫入前先把每題的 answer 拿掉，correctAnswers 保留在記憶體（回傳值 ans）
     // 供這次作答流程使用；真正要長期保存的正確答案改存進 situations（見
     // uploadSituationDB），那份文件本來就只有本人可讀。
-    const sanitizedData = data.map(({ answer: _answer, ...rest }) => rest);
+    // Firestore 不接受 undefined（addDoc 會直接丟 Unsupported field value: undefined）。題目欄位在
+    // 後端沒有提供時（例如選擇題沒有 audio、題目沒有圖片）整理出來就是 undefined，整份測驗會建立失敗。
+    const sanitizedData = stripUndefined(data.map(({ answer: _answer, ...rest }) => rest));
 
     const quizSet = {
         title: level_ch,
@@ -30,8 +50,18 @@ export const uploadQuizDB = async (level_ch, data, tribe = "tayal") => {
 export const uploadSituationDB = async (quizId, correctAns, userAns, stars) => {
     const results = evaluateAnswers(correctAns, userAns);
 
+    // 登入狀態在作答途中失效（登出、token 過期）時 uid 會是 undefined，Firestore 會用
+    // 「Unsupported field value: undefined」拒絕整份文件，錯誤訊息完全看不出原因。紀錄必須綁定使用者
+    // （firestore.rules 與之後的本人查詢都靠 userId），沒有 uid 就不能寫，直接明確失敗。
+    // 失敗的回傳方式跟下面 catch 一致（undefined），呼叫端已有「儲存失敗」的處理。
+    const userId = auth.currentUser?.uid;
+    if (!userId) {
+        console.error("上傳失敗：目前沒有登入的使用者，作答紀錄無法儲存");
+        return undefined;
+    }
+
     const situationSet = {
-        userId: auth.currentUser?.uid,
+        userId,
         quizId: quizId,
         answeredAt: serverTimestamp(),
         stars: stars ?? [],
