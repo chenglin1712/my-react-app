@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getReviewActions } from './reviewActionPolicy';
+import { getReviewActionLayout, getReviewActions } from './reviewActionPolicy';
 
 // QuizBank.jsx 原本 actionsFor() 使用的角色門檻，逐字照抄過來當基準：
 // 核准／退件／下架用 CONTENT_APPROVERS（含 reviewer），而不是 PUBLISHERS
@@ -172,5 +172,106 @@ describe('getReviewActions', () => {
 
     it('沒有傳 roles 時不會丟例外', () => {
         expect(getReviewActions({ status: 'draft', role: 'owner' })).toEqual([]);
+    });
+});
+
+describe('deletableStatuses（哪些狀態顯示刪除）', () => {
+    const announcementRoles = { editors: ['owner', 'admin', 'editor'], approvers: ['owner', 'admin'], publishers: ['owner', 'admin'] };
+    const withDeletable = (status, role) => getReviewActions({
+        status, role, roles: announcementRoles, supportsUnpublishedState: true,
+        deletableStatuses: ['draft', 'rejected', 'unpublished'],
+    });
+
+    it('預設只有草稿能刪除（題庫維持原本規則）', () => {
+        expect(actions('rejected', 'owner')).not.toContain('delete');
+        expect(actions('draft', 'owner')).toContain('delete');
+    });
+
+    it('公告：草稿、已退件、已下架的 publishers 看得到刪除', () => {
+        for (const status of ['draft', 'rejected', 'unpublished']) {
+            expect(withDeletable(status, 'owner')).toContain('delete');
+            expect(withDeletable(status, 'admin')).toContain('delete');
+        }
+    });
+
+    it('公告：待審核與已發布不能刪除（必須先撤回／下架）', () => {
+        expect(withDeletable('pending_review', 'owner')).not.toContain('delete');
+        expect(withDeletable('published', 'owner')).not.toContain('delete');
+    });
+
+    it('公告：editor 看不到刪除（刪除限 publishers）', () => {
+        for (const status of ['draft', 'rejected', 'unpublished']) {
+            expect(withDeletable(status, 'editor')).not.toContain('delete');
+        }
+    });
+});
+
+describe('getReviewActionLayout（外露一顆主要動作 ＋ ⋯ 選單）', () => {
+    const announcementRoles = { editors: ['owner', 'admin', 'editor'], approvers: ['owner', 'admin'], publishers: ['owner', 'admin'] };
+    const announcement = (status, role, extra = {}) => getReviewActionLayout({
+        status, role, roles: announcementRoles, supportsUnpublishedState: true, viewFallback: true,
+        deletableStatuses: ['draft', 'rejected', 'unpublished'], ...extra,
+    });
+
+    it('草稿：主要動作是編輯，送審與刪除在選單，刪除排最後', () => {
+        expect(announcement('draft', 'owner')).toEqual({ primary: 'edit', menu: ['submit', 'delete'] });
+    });
+
+    it('已退件：主要動作是編輯，再次送審與刪除在選單', () => {
+        expect(announcement('rejected', 'owner')).toEqual({ primary: 'edit', menu: ['submit', 'delete'] });
+    });
+
+    it('待審核（owner）：主要動作是核准，撤回、退件、檢視在選單', () => {
+        expect(announcement('pending_review', 'owner')).toEqual({ primary: 'approve', menu: ['withdraw', 'reject', 'view'] });
+    });
+
+    it('待審核（editor）：沒有核准權限，主要動作是撤回', () => {
+        expect(announcement('pending_review', 'editor')).toEqual({ primary: 'withdraw', menu: ['view'] });
+    });
+
+    it('已發布（owner）：主要動作是下架，編輯與檢視在選單，沒有刪除', () => {
+        const layout = announcement('published', 'owner');
+        expect(layout.primary).toBe('unpublish');
+        expect(layout.menu).toEqual(['edit', 'view']);
+        expect(layout.menu).not.toContain('delete');
+    });
+
+    it('已發布（editor）：沒有下架權限，主要動作是編輯', () => {
+        expect(announcement('published', 'editor')).toEqual({ primary: 'edit', menu: ['view'] });
+    });
+
+    it('已下架（owner）：主要動作是重新發布，編輯在選單，刪除在最底', () => {
+        expect(announcement('unpublished', 'owner')).toEqual({ primary: 'republish', menu: ['edit', 'view', 'delete'] });
+    });
+
+    it('已下架（editor）：沒有重新發布與刪除權限，主要動作是編輯', () => {
+        expect(announcement('unpublished', 'editor')).toEqual({ primary: 'edit', menu: ['view'] });
+    });
+
+    it('沒有任何狀態操作權限（analyst）：只有檢視，不顯示選單', () => {
+        expect(announcement('published', 'analyst')).toEqual({ primary: 'view', menu: [] });
+        expect(announcement('pending_review', 'analyst')).toEqual({ primary: 'view', menu: [] });
+    });
+
+    it('已發布且有待審修改（owner）：核准修改與退件修改收進選單', () => {
+        const layout = announcement('published', 'owner', { hasPendingRevision: true });
+        expect(layout.primary).toBe('unpublish');
+        expect(layout.menu).toEqual(expect.arrayContaining(['approveRevision', 'rejectRevision']));
+    });
+
+    it('題庫（沒有 view 後備）：待審核 reviewer 主要動作是核准，退件在選單，不會多出檢視', () => {
+        expect(getReviewActionLayout({ status: 'pending_review', role: 'reviewer', roles: ROLES }))
+            .toEqual({ primary: 'approve', menu: ['reject'] });
+    });
+
+    it('題庫草稿：刪除仍然只有 publishers，排在選單最後', () => {
+        expect(getReviewActionLayout({ status: 'draft', role: 'owner', roles: ROLES }))
+            .toEqual({ primary: 'edit', menu: ['submit', 'delete'] });
+        expect(getReviewActionLayout({ status: 'draft', role: 'editor', roles: ROLES }))
+            .toEqual({ primary: 'edit', menu: ['submit'] });
+    });
+
+    it('沒有任何操作時主要動作是 null、選單是空的', () => {
+        expect(getReviewActionLayout({ status: 'draft', role: 'reviewer', roles: ROLES })).toEqual({ primary: null, menu: [] });
     });
 });

@@ -60,6 +60,8 @@ export const REVIEW_ACTION_META = {
  * @param {boolean} [params.supportsRevision=true] 這個內容類型是否有「已發布內容的待審修改」機制
  * @param {boolean} [params.supportsUnpublishedState=false] 這個內容類型是否有
  *   unpublished 這個中介狀態（目前只有公告有；題庫類內容下架就直接退回 draft）
+ * @param {string[]} [params.deletableStatuses=['draft']] 哪些狀態可以顯示「刪除」（需要 publishers 角色）。
+ *   預設只有草稿；公告另外開放已退件與已下架（後端對應規則見 views.py 的 _delete_announcement）
  * @param {boolean} [params.viewFallback=false] 一個操作都沒有時，是否仍提供一個
  *   「檢視」入口（公告需要，讓 reviewer／analyst 至少能開起來看）
  */
@@ -71,6 +73,7 @@ export function getReviewActions({
     supportsRevision = true,
     supportsUnpublishedState = false,
     viewFallback = false,
+    deletableStatuses = ['draft'],
 }) {
     const { editors = [], approvers = [], publishers = [] } = roles ?? {};
     const can = (allowed) => allowed.includes(role);
@@ -85,7 +88,7 @@ export function getReviewActions({
 
     if (editable && can(editors)) actions.push('edit');
     if (EDITABLE_STATUSES.includes(status) && can(editors)) actions.push('submit');
-    if (status === 'draft' && can(publishers)) actions.push('delete');
+    if (deletableStatuses.includes(status) && can(publishers)) actions.push('delete');
     if (status === 'pending_review' && can(editors)) actions.push('withdraw');
 
     if (status === 'pending_review' && can(approvers)) {
@@ -106,4 +109,46 @@ export function getReviewActions({
     if (viewFallback && actions.length === 0) actions.push('view');
 
     return actions;
+}
+
+/**
+ * 把 getReviewActions 算出來的操作，分成「外露的主要動作」與「收進『⋯』選單的其餘動作」。
+ *
+ * 每一列只外露一顆最常用的按鈕（版面不會因為操作變多而換行），其餘全部收進選單；
+ * 刪除一律放在選單最底部（AdminRowMenu 會自動加分隔線與紅色樣式）。
+ *
+ * 主要動作依狀態決定——「這一列現在最可能要做的事」：
+ *   草稿／已退件 → 編輯；待審核 → 核准（沒有核准權限則是撤回）；
+ *   已發布 → 下架（沒有下架權限則是編輯）；已下架 → 重新發布（沒有權限則是編輯）。
+ * 找不到對應的就退回第一個可用操作。
+ *
+ * @returns {{ primary: string|null, menu: string[] }} 都是 REVIEW_ACTION_META 的 key
+ */
+const PRIMARY_BY_STATUS = {
+    draft: ['edit'],
+    rejected: ['edit'],
+    pending_review: ['approve', 'withdraw'],
+    published: ['unpublish', 'edit'],
+    unpublished: ['republish', 'edit'],
+};
+
+export function getReviewActionLayout(params) {
+    const actions = getReviewActions(params);
+    const { status, viewFallback = false } = params;
+
+    // 公告的「編輯」與「檢視」是同一個頁面：待審、已發布、已下架這幾個狀態，
+    // 即使有其他主要動作，也在選單裡留一個「檢視」入口，讓人能直接打開來看。
+    const withView = [...actions];
+    if (viewFallback && ['pending_review', 'published', 'unpublished'].includes(status) && !withView.includes('view')) {
+        withView.push('view');
+    }
+
+    const primary = (PRIMARY_BY_STATUS[status] ?? []).find((key) => withView.includes(key))
+        ?? withView.find((key) => key !== 'delete')
+        ?? null;
+
+    const rest = withView.filter((key) => key !== primary);
+    // 刪除排最後，其餘維持原本的順序
+    const menu = [...rest.filter((key) => key !== 'delete'), ...rest.filter((key) => key === 'delete')];
+    return { primary, menu };
 }

@@ -3,6 +3,9 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 
 import { useReviewableContentCrud } from './useReviewableContentCrud';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../../utils/apiClient';
+import { confirmAction } from '../components/confirmAction';
+
+vi.mock('../components/confirmAction', () => ({ confirmAction: vi.fn() }));
 
 vi.mock('../../../utils/apiClient', () => ({
     apiGet: vi.fn(),
@@ -119,7 +122,7 @@ describe('useReviewableContentCrud', () => {
         });
 
         test('刪除時按取消不會呼叫 API', async () => {
-            vi.spyOn(window, 'confirm').mockReturnValue(false);
+            confirmAction.mockResolvedValueOnce(false);
             const { result } = setup();
             await waitFor(() => expect(result.current.loading).toBe(false));
 

@@ -1,3 +1,4 @@
+import { confirmAction } from '../components/confirmAction';
 import { useRef, useState } from 'react';
 
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../../utils/apiClient';
@@ -84,7 +85,12 @@ export function useReviewableContentCrud({
 
         try {
             if (action === 'delete') {
-                if (!window.confirm(deleteConfirmMessage(item))) return false;
+                const confirmed = await confirmAction({
+                    title: '刪除',
+                    message: deleteConfirmMessage(item),
+                    confirmLabel: '刪除',
+                });
+                if (!confirmed) return false;
                 await apiDelete(`${endpoint}${item.id}/`);
             } else {
                 await apiPost(`${endpoint}${item.id}/${action}/`, body);

@@ -1,0 +1,41 @@
+/* 表格列的「⋯ 更多操作」選單（AdminRowMenu）。選單掛在 .admin-shell 底下並用 fixed 定位，
+   不會被 .admin-table-card 的 overflow 與 <Table responsive> 的捲動容器裁掉。 */
+.admin-shell .admin-row-menu-toggle { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; padding-left: 8px; padding-right: 8px; }
+
+.admin-shell .admin-row-menu {
+  z-index: 30;
+  min-width: 176px;
+  padding: 6px;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  box-shadow: 0 10px 28px rgba(20, 33, 58, .18);
+}
+
+.admin-shell .admin-row-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--admin-text-strong);
+  font-size: 14px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.admin-shell .admin-row-menu-item:hover { background: var(--admin-accent-soft); color: var(--admin-text-strong); }
+.admin-shell .admin-row-menu-item:focus-visible { outline: 2px solid var(--admin-accent); outline-offset: -2px; background: var(--admin-accent-soft); }
+.admin-shell .admin-row-menu-item[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
+
+.admin-shell .admin-row-menu-item.is-danger { color: var(--admin-danger); font-weight: 600; }
+.admin-shell .admin-row-menu-item.is-danger:hover,
+.admin-shell .admin-row-menu-item.is-danger:focus-visible { background: var(--admin-danger-bg); color: var(--admin-danger); }
+.admin-shell .admin-row-menu-item.is-danger:focus-visible { outline-color: var(--admin-danger); }
+
+.admin-shell .admin-row-menu-separator { height: 1px; margin: 4px 2px; background: var(--admin-border); }
