@@ -6,14 +6,20 @@ import '../static/css/default/theme-v2.css'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom';
 import AppShell from './AppShell'
+import StartupError from './StartupError'
 import { AuthProvider } from "./userServives/authContext";
+import { firebaseInitError } from '../../firebase'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
-        <AppShell />
-      </AuthProvider>
-    </BrowserRouter>
+    {firebaseInitError ? (
+      <StartupError />
+    ) : (
+      <BrowserRouter>
+        <AuthProvider>
+          <AppShell />
+        </AuthProvider>
+      </BrowserRouter>
+    )}
   </StrictMode>
 )

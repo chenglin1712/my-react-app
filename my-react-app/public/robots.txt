@@ -1,0 +1,8 @@
+User-agent: *
+Disallow: /admin
+Disallow: /admin-login
+Disallow: /edit
+Disallow: /login
+Disallow: /register
+Disallow: /forgot
+Disallow: /reset

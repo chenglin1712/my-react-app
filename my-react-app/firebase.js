@@ -19,9 +19,21 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
+// 設定缺漏（例如沒有帶到 VITE_FIREBASE_* 環境變數）時，getAuth 會在模組載入的當下直接丟出例外，
+// 發生在 React 掛載之前，整頁只會是白屏。這裡接住並記下原因，main.jsx 看到 firebaseInitError
+// 就改顯示靜態的啟動失敗畫面（不顯示設定內容）。
+let auth;
+let db;
+let storage;
+let firebaseInitError = null;
+try {
+    const app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+    storage = getStorage(app);
+} catch (error) {
+    firebaseInitError = error;
+    console.error("Firebase 初始化失敗：", error?.code || error?.message);
+}
 
-export { auth, db, storage };
+export { auth, db, storage, firebaseInitError };
