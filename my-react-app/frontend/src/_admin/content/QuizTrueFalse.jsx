@@ -211,6 +211,7 @@ export default function QuizTrueFalse() {
                           role={role}
                           roles={QUIZ_BANK_ROLES}
                           busy={actionId === item.id}
+                          itemLabel={item.question_ab}
                           disabled={Boolean(actionId) && actionId !== item.id}
                           onAction={handleAction}
                         />

@@ -14,6 +14,7 @@ import {
   apiPost,
 } from '../../../utils/apiClient';
 
+import { getRowAction, queryRowAction } from '../testing/rowActions';
 vi.mock('../../../utils/apiClient', () => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),
@@ -95,7 +96,6 @@ describe('QuizChoice', () => {
     mockApiGet();
 
     globalThis.fetch = vi.fn();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
   test('載入後顯示中級選擇題列表與 A/B/C 正解', async () => {
@@ -117,10 +117,10 @@ describe('QuizChoice', () => {
       .closest('tr');
 
     expect(
-      within(row).getByRole('button', { name: /^核准$/ }),
+      getRowAction(row, /^核准$/),
     ).toBeInTheDocument();
     expect(
-      within(row).getByRole('button', { name: /^退件$/ }),
+      getRowAction(row, /^退件$/),
     ).toBeInTheDocument();
   });
 
@@ -147,10 +147,10 @@ describe('QuizChoice', () => {
     const firstRow = (await screen.findByText('O maan ko niyam?')).closest('tr');
     const secondRow = screen.getByText('另一題').closest('tr');
 
-    fireEvent.click(within(firstRow).getByRole('button', { name: /^核准$/ }));
+    fireEvent.click(getRowAction(firstRow, /^核准$/));
 
     await waitFor(() => {
-      expect(within(secondRow).getByRole('button', { name: /^核准$/ })).toBeDisabled();
+      expect(getRowAction(secondRow, /^核准$/)).toBeDisabled();
     });
 
     resolveApprove({});
@@ -304,7 +304,7 @@ describe('QuizChoice', () => {
       .closest('tr');
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /編輯/ }),
+      getRowAction(row, /編輯/),
     );
 
     const modal = await screen.findByRole('dialog');
@@ -348,10 +348,10 @@ describe('QuizChoice', () => {
       .closest('tr');
 
     expect(
-      within(row).getByRole('button', { name: /編輯/ }),
+      getRowAction(row, /編輯/),
     ).toBeInTheDocument();
     expect(
-      within(row).queryByRole('button', { name: /送審/ }),
+      queryRowAction(row, /送審/),
     ).not.toBeInTheDocument();
   });
 
@@ -371,7 +371,7 @@ describe('QuizChoice', () => {
       .closest('tr');
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /編輯/ }),
+      getRowAction(row, /編輯/),
     );
 
     await waitFor(() => {
@@ -406,7 +406,7 @@ describe('QuizChoice', () => {
       .closest('tr');
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /編輯/ }),
+      getRowAction(row, /編輯/),
     );
 
     const modal = await screen.findByRole('dialog');
@@ -459,7 +459,7 @@ describe('QuizChoice', () => {
       .closest('tr');
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /編輯/ }),
+      getRowAction(row, /編輯/),
     );
 
     const modal = await screen.findByRole('dialog');
@@ -512,7 +512,7 @@ describe('QuizChoice', () => {
       .closest('tr');
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /編輯/ }),
+      getRowAction(row, /編輯/),
     );
 
     const modal = await screen.findByRole('dialog');
@@ -571,19 +571,13 @@ describe('QuizChoice', () => {
       within(row).getByText('有待審修改'),
     ).toBeInTheDocument();
     expect(
-      within(row).getByRole(
-        'button',
-        { name: /核准修改/ },
-      ),
+      getRowAction(row, /核准修改/),
     ).toBeInTheDocument();
     expect(
-      within(row).getByRole(
-        'button',
-        { name: /退件修改/ },
-      ),
+      getRowAction(row, /退件修改/),
     ).toBeInTheDocument();
     expect(
-      within(row).getByRole('button', { name: /下架/ }),
+      getRowAction(row, /下架/),
     ).toBeInTheDocument();
   });
 
@@ -604,10 +598,7 @@ describe('QuizChoice', () => {
       .closest('tr');
 
     fireEvent.click(
-      within(row).getByRole(
-        'button',
-        { name: /核准修改/ },
-      ),
+      getRowAction(row, /核准修改/),
     );
 
     await waitFor(() => {
@@ -637,10 +628,7 @@ describe('QuizChoice', () => {
       .closest('tr');
 
     fireEvent.click(
-      within(row).getByRole(
-        'button',
-        { name: /退件修改/ },
-      ),
+      getRowAction(row, /退件修改/),
     );
 
     const confirmButton = await screen.findByRole(
@@ -683,19 +671,13 @@ describe('QuizChoice', () => {
       within(row).queryByText('有待審修改'),
     ).not.toBeInTheDocument();
     expect(
-      within(row).queryByRole(
-        'button',
-        { name: /核准修改/ },
-      ),
+      queryRowAction(row, /核准修改/),
     ).not.toBeInTheDocument();
     expect(
-      within(row).queryByRole(
-        'button',
-        { name: /退件修改/ },
-      ),
+      queryRowAction(row, /退件修改/),
     ).not.toBeInTheDocument();
     expect(
-      within(row).getByRole('button', { name: /下架/ }),
+      getRowAction(row, /下架/),
     ).toBeInTheDocument();
   });
 
@@ -716,22 +698,16 @@ describe('QuizChoice', () => {
       .closest('tr');
 
     expect(
-      within(row).getByRole('button', { name: /編輯/ }),
+      getRowAction(row, /編輯/),
     ).toBeInTheDocument();
     expect(
-      within(row).queryByRole(
-        'button',
-        { name: /核准修改/ },
-      ),
+      queryRowAction(row, /核准修改/),
     ).not.toBeInTheDocument();
     expect(
-      within(row).queryByRole(
-        'button',
-        { name: /退件修改/ },
-      ),
+      queryRowAction(row, /退件修改/),
     ).not.toBeInTheDocument();
     expect(
-      within(row).queryByRole('button', { name: /下架/ }),
+      queryRowAction(row, /下架/),
     ).not.toBeInTheDocument();
   });
 
@@ -751,7 +727,7 @@ describe('QuizChoice', () => {
       .closest('tr');
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /下架/ }),
+      getRowAction(row, /下架/),
     );
 
     await waitFor(() => {
@@ -774,12 +750,11 @@ describe('QuizChoice', () => {
       .closest('tr');
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /刪除/ }),
+      getRowAction(row, /刪除/),
     );
 
-    expect(window.confirm).toHaveBeenCalledWith(
-      '確定要刪除這則中級選擇題嗎？',
-    );
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: '刪除' }));
 
     await waitFor(() => {
       expect(apiDelete).toHaveBeenCalledWith(

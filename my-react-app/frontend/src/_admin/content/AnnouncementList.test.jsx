@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import AnnouncementList from './AnnouncementList';
 import { apiGet, apiPost, apiDelete } from '../../../utils/apiClient';
 
+import { getRowAction, queryRowAction } from '../testing/rowActions';
 vi.mock('../../../utils/apiClient', () => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),
@@ -49,7 +50,6 @@ describe('AnnouncementList', () => {
       page: 1,
       page_size: 10,
     });
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
   test('載入後渲染公告列表，狀態與族語正確顯示', async () => {
@@ -92,9 +92,9 @@ describe('AnnouncementList', () => {
     renderList();
     await screen.findByText('待審公告');
     const row = screen.getByText('待審公告').closest('tr');
-    expect(within(row).getByRole('button', { name: /核准/ })).toBeInTheDocument();
-    expect(within(row).getByRole('button', { name: /退件/ })).toBeInTheDocument();
-    expect(within(row).getByRole('button', { name: /撤回/ })).toBeInTheDocument();
+    expect(getRowAction(row, /核准/)).toBeInTheDocument();
+    expect(getRowAction(row, /退件/)).toBeInTheDocument();
+    expect(getRowAction(row, /撤回/)).toBeInTheDocument();
   });
 
   test('editor 檢視待審項目：看得到撤回，看不到 PUBLISHERS 專屬的核准／退件', async () => {
@@ -102,9 +102,9 @@ describe('AnnouncementList', () => {
     renderList();
     await screen.findByText('待審公告');
     const row = screen.getByText('待審公告').closest('tr');
-    expect(within(row).getByRole('button', { name: /撤回/ })).toBeInTheDocument();
-    expect(within(row).queryByRole('button', { name: /核准/ })).not.toBeInTheDocument();
-    expect(within(row).queryByRole('button', { name: /退件/ })).not.toBeInTheDocument();
+    expect(getRowAction(row, /撤回/)).toBeInTheDocument();
+    expect(queryRowAction(row, /核准/)).not.toBeInTheDocument();
+    expect(queryRowAction(row, /退件/)).not.toBeInTheDocument();
   });
 
   test('editor 檢視草稿項目：看得到編輯／送審，看不到刪除（刪除是 PUBLISHERS 專屬）', async () => {
@@ -115,9 +115,9 @@ describe('AnnouncementList', () => {
     renderList();
     await screen.findByText('草稿公告');
     const row = screen.getByText('草稿公告').closest('tr');
-    expect(within(row).getByRole('button', { name: /編輯/ })).toBeInTheDocument();
-    expect(within(row).getByRole('button', { name: /送審/ })).toBeInTheDocument();
-    expect(within(row).queryByRole('button', { name: /刪除/ })).not.toBeInTheDocument();
+    expect(getRowAction(row, /編輯/)).toBeInTheDocument();
+    expect(getRowAction(row, /送審/)).toBeInTheDocument();
+    expect(queryRowAction(row, /刪除/)).not.toBeInTheDocument();
   });
 
   test('published 狀態下 CONTENT_EDITORS 看得到編輯連結', async () => {
@@ -132,14 +132,14 @@ describe('AnnouncementList', () => {
     renderList();
 
     const row = await screen.findByText('已發布公告').then((el) => el.closest('tr'));
-    const editLink = within(row).getByRole('button', { name: /編輯/ });
+    const editLink = getRowAction(row, /編輯/);
 
     expect(editLink).toBeInTheDocument();
     expect(editLink).toHaveAttribute(
       'href',
       '/admin/content/announcements/3',
     );
-    expect(within(row).queryByRole('button', { name: /下架/ })).not.toBeInTheDocument();
+    expect(queryRowAction(row, /下架/)).not.toBeInTheDocument();
   });
 
   test('published 狀態下編輯與下架按鈕可同時顯示，且下架仍為 PUBLISHERS 專屬', async () => {
@@ -153,8 +153,8 @@ describe('AnnouncementList', () => {
     renderList();
 
     const row = await screen.findByText('已發布公告').then((el) => el.closest('tr'));
-    expect(within(row).getByRole('button', { name: /編輯/ })).toBeInTheDocument();
-    expect(within(row).getByRole('button', { name: /下架/ })).toBeInTheDocument();
+    expect(getRowAction(row, /編輯/)).toBeInTheDocument();
+    expect(getRowAction(row, /下架/)).toBeInTheDocument();
   });
 
   test('has_pending_revision 為 true 時顯示提示、核准修改與退件修改按鈕，並呼叫各自端點', async () => {
@@ -176,8 +176,8 @@ describe('AnnouncementList', () => {
     let row = await screen.findByText('已發布公告').then((el) => el.closest('tr'));
     expect(within(row).getByText('有待審修改')).toBeInTheDocument();
 
-    const approveButton = within(row).getByRole('button', { name: /核准修改/ });
-    const rejectButton = within(row).getByRole('button', { name: /退件修改/ });
+    const approveButton = getRowAction(row, /核准修改/);
+    const rejectButton = getRowAction(row, /退件修改/);
 
     expect(approveButton).toBeInTheDocument();
     expect(rejectButton).toBeInTheDocument();
@@ -195,11 +195,11 @@ describe('AnnouncementList', () => {
     await waitFor(() => {
       row = screen.getByText('已發布公告').closest('tr');
       expect(
-        within(row).getByRole('button', { name: /退件修改/ }),
+        getRowAction(row, /退件修改/),
       ).not.toBeDisabled();
     });
 
-    fireEvent.click(within(row).getByRole('button', { name: /退件修改/ }));
+    fireEvent.click(getRowAction(row, /退件修改/));
 
     expect(await screen.findByText('退件修改原因')).toBeInTheDocument();
     const confirmButton = screen.getByRole('button', { name: '確認退件' });
@@ -234,9 +234,9 @@ describe('AnnouncementList', () => {
 
     const row = await screen.findByText('已發布公告').then((el) => el.closest('tr'));
     expect(within(row).getByText('有待審修改')).toBeInTheDocument();
-    expect(within(row).getByRole('button', { name: /編輯/ })).toBeInTheDocument();
-    expect(within(row).queryByRole('button', { name: /核准修改/ })).not.toBeInTheDocument();
-    expect(within(row).queryByRole('button', { name: /退件修改/ })).not.toBeInTheDocument();
+    expect(getRowAction(row, /編輯/)).toBeInTheDocument();
+    expect(queryRowAction(row, /核准修改/)).not.toBeInTheDocument();
+    expect(queryRowAction(row, /退件修改/)).not.toBeInTheDocument();
   });
 
   test('reviewer 看不到「新增公告」入口，owner 看得到', async () => {
@@ -259,8 +259,8 @@ describe('AnnouncementList', () => {
     const row = screen.getByText('草稿公告').closest('tr');
     // react-bootstrap 的 Button as={Link} 渲染成 <a role="button">（樣式是按鈕，
     // 語意上仍是可點擊按鈕），不是 role="link"。
-    expect(within(row).getByRole('button', { name: /檢視/ })).toBeInTheDocument();
-    expect(within(row).queryByRole('button', { name: /編輯|送審|刪除/ })).not.toBeInTheDocument();
+    expect(getRowAction(row, /檢視/)).toBeInTheDocument();
+    expect(queryRowAction(row, /編輯|送審|刪除/)).not.toBeInTheDocument();
   });
 
   test('退件必須填寫理由才能送出，送出後呼叫 reject 端點並帶上理由', async () => {
@@ -268,7 +268,7 @@ describe('AnnouncementList', () => {
     renderList();
     await screen.findByText('待審公告');
     const row = screen.getByText('待審公告').closest('tr');
-    fireEvent.click(within(row).getByRole('button', { name: /退件/ }));
+    fireEvent.click(getRowAction(row, /退件/));
 
     const confirmBtn = await screen.findByRole('button', { name: '確認退件' });
     expect(confirmBtn).toBeDisabled();
@@ -297,7 +297,7 @@ describe('AnnouncementList', () => {
     renderList();
     await screen.findByText('待審公告');
     const row = screen.getByText('待審公告').closest('tr');
-    fireEvent.click(within(row).getByRole('button', { name: /退件/ }));
+    fireEvent.click(getRowAction(row, /退件/));
 
     fireEvent.change(
       screen.getByLabelText('請說明需要修改的內容'),
@@ -348,17 +348,83 @@ describe('AnnouncementList', () => {
     expect(screen.queryByText('草稿公告')).not.toBeInTheDocument();
   });
 
-  test('刪除草稿前會跳原生確認框，確認後呼叫 apiDelete', async () => {
+  test('刪除草稿前會跳確認視窗（說明無法復原），確認後呼叫 apiDelete', async () => {
     apiDelete.mockResolvedValue({});
     renderList();
     await screen.findByText('草稿公告');
     const row = screen.getByText('草稿公告').closest('tr');
-    fireEvent.click(within(row).getByRole('button', { name: /刪除/ }));
+    fireEvent.click(getRowAction(row, /刪除/));
 
-    expect(window.confirm).toHaveBeenCalled();
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('確定要刪除「草稿公告」嗎？');
+    expect(dialog).toHaveTextContent('無法復原');
+    expect(apiDelete).not.toHaveBeenCalled();
+    // 沒送審過的草稿不用輸入文字
+    fireEvent.click(within(dialog).getByRole('button', { name: '刪除公告' }));
     await waitFor(() => {
       expect(apiDelete).toHaveBeenCalledWith('/adminapi/announcements/1/');
     });
+  });
+
+  test('在確認視窗按取消不會呼叫 apiDelete', async () => {
+    renderList();
+    await screen.findByText('草稿公告');
+    const row = screen.getByText('草稿公告').closest('tr');
+    fireEvent.click(getRowAction(row, /刪除/));
+
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: '取消' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(apiDelete).not.toHaveBeenCalled();
+  });
+
+  test('已下架的公告可以刪除，但必須輸入「刪除」才能確認', async () => {
+    apiDelete.mockResolvedValue({});
+    apiGet.mockResolvedValue({
+      results: [{ ...publishedItem, id: 7, title: '舊的下架公告', status: 'unpublished', source: 'admin' }],
+      count: 1, page: 1, page_size: 10,
+    });
+    renderList();
+    await screen.findByText('舊的下架公告');
+    const row = screen.getByText('舊的下架公告').closest('tr');
+    // 主要動作是「重新發布」，刪除收在選單裡
+    expect(getRowAction(row, /重新發布/)).toBeInTheDocument();
+    fireEvent.click(getRowAction(row, /刪除/));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('已下架');
+    expect(dialog).toHaveTextContent('保留稽核紀錄');
+    const confirmButton = within(dialog).getByRole('button', { name: '刪除公告' });
+    expect(confirmButton).toBeDisabled();
+
+    fireEvent.change(within(dialog).getByLabelText(/請輸入「刪除」以確認/), { target: { value: '刪除' } });
+    expect(confirmButton).not.toBeDisabled();
+    fireEvent.click(confirmButton);
+    await waitFor(() => {
+      expect(apiDelete).toHaveBeenCalledWith('/adminapi/announcements/7/');
+    });
+  });
+
+  test('刪除爬蟲匯入的公告時，確認視窗說明不會被重新匯入', async () => {
+    apiGet.mockResolvedValue({
+      results: [{ ...publishedItem, id: 8, title: '爬蟲公告', status: 'unpublished', source: 'crawler' }],
+      count: 1, page: 1, page_size: 10,
+    });
+    renderList();
+    await screen.findByText('爬蟲公告');
+    const row = screen.getByText('爬蟲公告').closest('tr');
+    fireEvent.click(getRowAction(row, /刪除/));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('不會');
+    expect(dialog).toHaveTextContent('重新匯入');
+  });
+
+  test('已發布的公告選單裡沒有刪除（必須先下架）', async () => {
+    apiGet.mockResolvedValue({ results: [publishedItem], count: 1, page: 1, page_size: 10 });
+    renderList();
+    await screen.findByText('已發布公告');
+    const row = screen.getByText('已發布公告').closest('tr');
+    expect(queryRowAction(row, /刪除/)).toBeNull();
   });
 
   test('apiGet 失敗時顯示錯誤訊息而不是讓畫面整個空白', async () => {

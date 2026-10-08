@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import QuizBank from './QuizBank';
 import { apiGet, apiPost, apiPatch, apiDelete } from '../../../utils/apiClient';
 
+import { getRowAction, queryRowAction } from '../testing/rowActions';
 vi.mock('../../../utils/apiClient', () => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),
@@ -117,7 +118,6 @@ describe('QuizBank', () => {
     apiPatch.mockReset();
     apiDelete.mockReset();
     mockApiGet();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
   test('載入後配合題詞彙分頁顯示詞彙列表', async () => {
@@ -145,10 +145,10 @@ describe('QuizBank', () => {
       .then((element) => element.closest('tr'));
 
     expect(
-      within(row).getByRole('button', { name: /^核准$/ }),
+      getRowAction(row, /^核准$/),
     ).toBeInTheDocument();
     expect(
-      within(row).getByRole('button', { name: /^退件$/ }),
+      getRowAction(row, /^退件$/),
     ).toBeInTheDocument();
   });
 
@@ -165,13 +165,13 @@ describe('QuizBank', () => {
       .then((element) => element.closest('tr'));
 
     expect(
-      within(row).getByRole('button', { name: /編輯/ }),
+      getRowAction(row, /編輯/),
     ).toBeInTheDocument();
     expect(
-      within(row).getByRole('button', { name: /送審/ }),
+      getRowAction(row, /送審/),
     ).toBeInTheDocument();
     expect(
-      within(row).queryByRole('button', { name: /^核准$/ }),
+      queryRowAction(row, /^核准$/),
     ).not.toBeInTheDocument();
   });
 
@@ -184,7 +184,7 @@ describe('QuizBank', () => {
       .then((element) => element.closest('tr'));
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /^核准$/ }),
+      getRowAction(row, /^核准$/),
     );
 
     await waitFor(() => {
@@ -204,7 +204,7 @@ describe('QuizBank', () => {
       .then((element) => element.closest('tr'));
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /^退件$/ }),
+      getRowAction(row, /^退件$/),
     );
 
     const confirmButton = await screen.findByRole(
@@ -242,10 +242,10 @@ describe('QuizBank', () => {
       .then((element) => element.closest('tr'));
 
     expect(
-      within(row).getByRole('button', { name: /編輯/ }),
+      getRowAction(row, /編輯/),
     ).toBeInTheDocument();
     expect(
-      within(row).queryByRole('button', { name: /送審/ }),
+      queryRowAction(row, /送審/),
     ).not.toBeInTheDocument();
   });
 
@@ -263,7 +263,7 @@ describe('QuizBank', () => {
       .then((element) => element.closest('tr'));
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /編輯/ }),
+      getRowAction(row, /編輯/),
     );
 
     await waitFor(() => {
@@ -304,7 +304,7 @@ describe('QuizBank', () => {
       .then((element) => element.closest('tr'));
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /編輯/ }),
+      getRowAction(row, /編輯/),
     );
 
     const modal = await screen.findByRole('dialog');
@@ -335,7 +335,7 @@ describe('QuizBank', () => {
       .then((element) => element.closest('tr'));
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /編輯/ }),
+      getRowAction(row, /編輯/),
     );
 
     const modal = await screen.findByRole('dialog');
@@ -381,10 +381,10 @@ describe('QuizBank', () => {
 
     expect(within(row).getByText('有待審修改')).toBeInTheDocument();
     expect(
-      within(row).getByRole('button', { name: /核准修改/ }),
+      getRowAction(row, /核准修改/),
     ).toBeInTheDocument();
     expect(
-      within(row).getByRole('button', { name: /退件修改/ }),
+      getRowAction(row, /退件修改/),
     ).toBeInTheDocument();
   });
 
@@ -406,7 +406,7 @@ describe('QuizBank', () => {
       .then((element) => element.closest('tr'));
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /核准修改/ }),
+      getRowAction(row, /核准修改/),
     );
 
     await waitFor(() => {
@@ -435,7 +435,7 @@ describe('QuizBank', () => {
       .then((element) => element.closest('tr'));
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /退件修改/ }),
+      getRowAction(row, /退件修改/),
     );
 
     const confirmButton = await screen.findByRole(
@@ -473,7 +473,7 @@ describe('QuizBank', () => {
       .then((element) => element.closest('tr'));
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /下架/ }),
+      getRowAction(row, /下架/),
     );
 
     await waitFor(() => {
@@ -536,7 +536,7 @@ describe('QuizBank', () => {
       .then((element) => element.closest('tr'));
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /編輯/ }),
+      getRowAction(row, /編輯/),
     );
 
     const modal = await screen.findByRole('dialog');
@@ -570,7 +570,7 @@ describe('QuizBank', () => {
       .then((element) => element.closest('tr'));
 
     expect(
-      within(row).queryByRole('button', { name: /刪除/ }),
+      queryRowAction(row, /刪除/),
     ).not.toBeInTheDocument();
   });
 
@@ -588,10 +588,11 @@ describe('QuizBank', () => {
       .then((element) => element.closest('tr'));
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /刪除/ }),
+      getRowAction(row, /刪除/),
     );
 
-    expect(window.confirm).toHaveBeenCalled();
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: '刪除' }));
 
     await waitFor(() => {
       expect(apiDelete).toHaveBeenCalledWith(
@@ -675,7 +676,7 @@ describe('QuizBank', () => {
     const modal = await screen.findByRole('dialog');
 
     // 初始只有 blank1，新增兩次湊出 blank1/blank2/blank3。
-    const addButton = within(modal).getByRole('button', { name: /新增空格/ });
+    const addButton = getRowAction(modal, /新增空格/);
     fireEvent.click(addButton);
     fireEvent.click(addButton);
     expect(within(modal).getByText('blank3')).toBeInTheDocument();
@@ -684,7 +685,7 @@ describe('QuizBank', () => {
     const blank2Heading = within(modal).getByText('blank2');
     const blank2Card = blank2Heading.closest('.quiz-bank-blank-card');
     fireEvent.click(
-      within(blank2Card).getByRole('button', { name: /移除空格/ }),
+      getRowAction(blank2Card, /移除空格/),
     );
     expect(within(modal).queryByText('blank2')).not.toBeInTheDocument();
 
@@ -739,7 +740,7 @@ describe('QuizBank', () => {
       .then((element) => element.closest('tr'));
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /編輯/ }),
+      getRowAction(row, /編輯/),
     );
 
     await waitFor(() => {
@@ -800,7 +801,7 @@ describe('QuizBank', () => {
     expect(within(row).getByText('有待審修改')).toBeInTheDocument();
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /核准修改/ }),
+      getRowAction(row, /核准修改/),
     );
 
     await waitFor(() => {
@@ -811,7 +812,7 @@ describe('QuizBank', () => {
     });
 
     fireEvent.click(
-      within(row).getByRole('button', { name: /退件修改/ }),
+      getRowAction(row, /退件修改/),
     );
 
     fireEvent.change(

@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import QuizSituations from './QuizSituations';
 import { apiGet, apiPost, apiPatch, apiDelete } from '../../../utils/apiClient';
 
+import { getRowAction, queryRowAction } from '../testing/rowActions';
 vi.mock('../../../utils/apiClient', () => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),
@@ -34,7 +35,6 @@ describe('QuizSituations', () => {
     apiPatch.mockReset();
     apiDelete.mockReset();
     apiGet.mockResolvedValue({ results: [situationItem], count: 1, page: 1, page_size: 20 });
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
   test('載入後顯示情境題列表', async () => {
@@ -46,8 +46,8 @@ describe('QuizSituations', () => {
     mockRole = 'reviewer';
     render(<QuizSituations />);
     const row = await screen.findByText(/長輩遞給你食物/).then((el) => el.closest('tr'));
-    expect(within(row).getByRole('button', { name: /核准/ })).toBeInTheDocument();
-    expect(within(row).getByRole('button', { name: /退件/ })).toBeInTheDocument();
+    expect(getRowAction(row, /核准/)).toBeInTheDocument();
+    expect(getRowAction(row, /退件/)).toBeInTheDocument();
   });
 
   test('analyst 看不到任何操作按鈕', async () => {
@@ -88,7 +88,7 @@ describe('QuizSituations', () => {
     apiPatch.mockResolvedValueOnce({});
     render(<QuizSituations />);
     const row = await screen.findByText(/長輩遞給你食物/).then((el) => el.closest('tr'));
-    fireEvent.click(within(row).getByRole('button', { name: /編輯/ }));
+    fireEvent.click(getRowAction(row, /編輯/));
 
     const modal = await screen.findByRole('dialog');
     const radios = within(modal).getAllByRole('radio');
@@ -107,8 +107,9 @@ describe('QuizSituations', () => {
     apiDelete.mockResolvedValueOnce({});
     render(<QuizSituations />);
     const row = await screen.findByText(/長輩遞給你食物/).then((el) => el.closest('tr'));
-    fireEvent.click(within(row).getByRole('button', { name: /刪除/ }));
-    expect(window.confirm).toHaveBeenCalled();
+    fireEvent.click(getRowAction(row, /刪除/));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: '刪除' }));
     await waitFor(() => {
       expect(apiDelete).toHaveBeenCalledWith('/adminapi/quiz-bank/situations/5/');
     });

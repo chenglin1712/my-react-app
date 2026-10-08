@@ -177,6 +177,7 @@ function VocabPanel({ role }) {
                                                 role={role}
                                                 roles={QUIZ_BANK_ROLES}
                                                 busy={actionId === item.id}
+                                                itemLabel={item.foreign_word}
                                                 disabled={Boolean(actionId) && actionId !== item.id}
                                                 onAction={handleAction}
                                             />
@@ -510,6 +511,7 @@ function ClozePanel({ role }) {
                                                 role={role}
                                                 roles={QUIZ_BANK_ROLES}
                                                 busy={actionId === item.id}
+                                                itemLabel={item.passage_foreign}
                                                 disabled={Boolean(actionId) && actionId !== item.id}
                                                 onAction={handleAction}
                                             />

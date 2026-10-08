@@ -163,6 +163,7 @@ export default function QuizSituations() {
                                                 role={role}
                                                 roles={QUIZ_BANK_ROLES}
                                                 busy={actionId === item.id}
+                                                itemLabel={item.scenario_chinese}
                                                 disabled={Boolean(actionId) && actionId !== item.id}
                                                 onAction={handleAction}
                                             />

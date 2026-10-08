@@ -6,6 +6,7 @@ import { useAuth } from '../../userServives/authContext';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
 import { apiDelete, apiGet, apiPost } from '../../../utils/apiClient';
 import ReviewActions from '../reviewWorkflow/ReviewActions';
+import { confirmAction } from '../components/confirmAction';
 import ReviewPagination from '../reviewWorkflow/ReviewPagination';
 import { REVIEW_ACTION_META } from '../reviewWorkflow/reviewActionPolicy';
 import { formatDateTime } from '../adminFormat';
@@ -17,6 +18,8 @@ const PUBLISHERS = ['owner', 'admin'];
 const CATEGORIES = {
     announcement: '公告', activity: '活動', exam: '考試', maintenance: '系統維護',
 };
+// 後端 _delete_announcement 允許刪除的狀態；已發布與待審核必須先下架／撤回
+const DELETABLE_STATUSES = ['draft', 'rejected', 'unpublished'];
 const SOURCES = { admin: '後台建立', crawler: '爬蟲匯入' };
 const STATUSES = {
     draft: { label: '草稿', bg: 'secondary' },
@@ -134,6 +137,31 @@ export default function AnnouncementList() {
     // 都會接著關閉對話框，退件失敗時使用者剛打的理由就整段消失，只在
     // 頁面上方留一行錯誤訊息（跟 useReviewableContentCrud.js 修過的同一類
     // 問題）。
+    // 刪除前的確認：說明刪了會怎樣。曾經走過流程的公告（非草稿）與爬蟲匯入的公告要求輸入「刪除」才能確認。
+    const confirmDelete = (item) => {
+        const isCrawler = item.source === 'crawler';
+        const isPlainDraft = item.status === 'draft' && !isCrawler;
+        return confirmAction({
+            title: '刪除公告',
+            confirmLabel: '刪除公告',
+            requireText: isPlainDraft ? '' : '刪除',
+            message: (
+                <>
+                    <p className="mb-2">確定要刪除「{item.title}」嗎？</p>
+                    <ul className="mb-0">
+                        <li>目前狀態：{STATUSES[item.status]?.label ?? item.status}</li>
+                        {isPlainDraft ? (
+                            <li>這是還沒送審過的草稿，會直接刪除，<strong>無法復原</strong>。</li>
+                        ) : (
+                            <li>刪除後不會再出現在後台列表與公開首頁；系統會保留稽核紀錄。</li>
+                        )}
+                        {isCrawler && <li>這是爬蟲匯入的公告，系統會保留來源識別碼，之後同步<strong>不會</strong>再把它重新匯入。</li>}
+                    </ul>
+                </>
+            ),
+        });
+    };
+
     const runAction = async (item, action, body) => {
         if (actionLockRef.current) return false;
         actionLockRef.current = true;
@@ -141,7 +169,7 @@ export default function AnnouncementList() {
         setError('');
         try {
             if (action === 'delete') {
-                if (!window.confirm(`確定要刪除「${item.title}」嗎？`)) return false;
+                if (!(await confirmDelete(item))) return false;
                 await apiDelete(`/adminapi/announcements/${item.id}/`);
             } else {
                 await apiPost(`/adminapi/announcements/${item.id}/${action}/`, body);
@@ -368,7 +396,9 @@ export default function AnnouncementList() {
                                                 busy={actionId === item.id}
                                                 disabled={syncing || (Boolean(actionId) && actionId !== item.id)}
                                                 supportsUnpublishedState
+                                                deletableStatuses={DELETABLE_STATUSES}
                                                 viewFallback
+                                                itemLabel={item.title}
                                                 hrefFor={hrefFor}
                                                 onAction={handleAction}
                                             />
