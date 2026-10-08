@@ -23,6 +23,7 @@ my-react-app/
 ├── docker-compose.yml       # 本機用容器重現環境（SQLite bind mount）
 ├── docker-compose.prod.yml  # 正式環境用（PostgreSQL、健康檢查、回滾標籤），見「正式部署」一節
 ├── deploy.sh                 # 一鍵部署／回滾（正式環境專用）
+├── public/              # 原樣複製到 dist/ 根目錄的靜態檔（favicon、robots.txt），網址就是 /檔名
 ├── dist/                # `npm run build` 產物（不進版控）
 └── .env.example         # 環境變數範本
 ```
@@ -70,6 +71,8 @@ python manage.py runserver
 cd backend
 uvicorn fastAPI.main:app --reload --port 8001
 ```
+
+**資料庫 migration（Django）**：第一次啟動，或 `git pull` 之後更新裡有 `backend/adminapi/migrations/` 的新檔案，要先在 `backend/` 執行一次 `python manage.py migrate`（`manage.py` 在 `backend/`，不在專案根目錄）。**不是每次啟動都要跑**，沒有新 migration 時跑了也只會顯示沒有要套用的。沒套用就啟動的話，用到新欄位的頁面會直接出錯（例如公告軟刪除新增了 `deleted_at`，沒 migrate 時公告管理列表會壞掉）。可以用 `python manage.py showmigrations adminapi` 檢查，有 `[ ]` 就是還沒套用。正式環境不用手動跑：後端容器每次啟動都會自動 `migrate`（見 `docker-compose.prod.yml`，部署前會先備份）。
 
 根目錄的 `run.py`／`run_fastapi.py` 是另一組開發用啟動腳本（啟動前會檢查必填環境變數是否已設定），一樣只綁定 `127.0.0.1`，僅供本機開發使用，**不是**正式環境的啟動方式（見下方「正式部署」）。
 
@@ -149,6 +152,18 @@ python manage.py purge_quiz_research_data --older-than-days 180 --yes # 依保�
 - 適性選題會把挑中的字從四種題型共用的候選池取走，所以後面題型（例如句子排序）拿到的字會跟關閉旗標時不同；一份測驗裡仍不會有兩題考同一個字。
 - Firestore 規則的行為測試：`firebase emulators:exec --only firestore "npx vitest run --config vitest.rules.config.js firestore.rules.test.js"`；伺服器端狀態的交易行為測試需要 emulator：`firebase emulators:exec --only firestore "python -m pytest backend/fastAPI/tests/test_rule_state_store_firestore.py"`（沒有 emulator 時該檔自動略過）。
 
+## 前端的全站行為
+
+這些行為是全站共用的，改頁面時不用（也不該）各自再做一份：
+
+- **開頁載入殼**：`index.html` 內嵌一個不依賴任何外部檔案的載入畫面，JS 下載完、React 掛載後會自動被取代。字型 CSS 用 `media="print"` 加 `onload` 改成不阻擋首次繪製，慢速網路下才不會整頁白屏。
+- **啟動失敗畫面**：Firebase 設定缺漏時 `getAuth` 會在 React 掛載前丟錯。`firebase.js` 接住並匯出 `firebaseInitError`，`main.jsx` 看到就改顯示靜態的 `StartupError`（不依賴樣式與路由，也不顯示設定內容）。
+- **換頁**（`src/RouteEffects.jsx`、`src/routeMeta.js`）：每個路由有自己的分頁標題（新增路由時到 `routeMeta.js` 加一條，沒對應的網址就是 404）；一般換頁會捲回頂端並把焦點移到新頁的 `h1`，按上一頁／下一頁則交給瀏覽器還原位置，使用者正在輸入時不搶焦點。後台（`/admin`）的標題由 `AdminLayout` 依麵包屑設定。每個頁面都應該有一個 `h1`。
+- **404**：前台與後台各有一個 404 頁；未登入進入需要登入的功能頁，會看到說明是哪個功能的「請先登入」畫面（`userServives/permissionProtect.jsx`）。
+- **API 逾時與重試**（`utils/apiClient.js`）：預設 60 秒逾時（要比 nginx 的 `proxy_read_timeout` 90 秒短），個別呼叫可用 `options.timeout` 覆寫。**只有 GET** 遇到連不到伺服器或 502／503／504 會自動重試一次；寫入類請求（POST／PUT／PATCH／DELETE）一律不重試，避免重複寫入。
+- **鍵盤焦點與觸控**：`theme-v2.css` 有全站 `:focus-visible` 基線；自製彈窗用 `hooks/useFocusTrap`（Tab 只在彈窗內循環、關閉後還原焦點）。觸控裝置上的可點擊區至少 44×44px。
+- **離線提示**：瀏覽器斷線時畫面底部會顯示提示（`components/ui/OfflineBanner.jsx`）。
+
 ## 後台管理系統
 
 ### 登入與重新驗證
@@ -158,6 +173,19 @@ python manage.py purge_quiz_research_data --older-than-days 180 --yes # 依保�
 角色透過 Firebase custom claims 寫在 ID token 裡（`backend/config/roles.py`：`owner`／`admin`／`editor`／`reviewer`／`analyst`），每個後台 API 都會檢查角色，角色不符一律回 403，不會因此洩漏「這個後台功能存在」的訊息。
 
 角色檢查通過後還有一層「新鮮度」檢查：ID token 的 `auth_time`（使用者最後一次**用密碼**驗證身分的時間，一般的 token 自動更新不會改它）如果超過 `ADMIN_REAUTH_MAX_AGE_SECONDS`（預設 1800 秒＝30 分鐘，見 `.env.example`；設成 0、負數或亂碼一律退回預設值，沒有「關閉」的選項），後台 API 一律回 401 加 `reauth_required`，前端彈出重新驗證視窗——用彈窗而不是導去登入頁，是因為管理員常常表單填到一半才過期，導頁會讓內容全部消失；彈窗驗證成功後原本頁面狀態不變，也不會自動重送剛才失敗的請求（避免寫入類請求被重送造成重複操作）。本機 `AUTH_DEV_BYPASS=True` 時整段略過，因為 dev bypass 沒有真正的 token，也就沒有 `auth_time`。
+
+### 公告管理：刪除與列操作
+
+公告狀態：草稿 → 待審核 → 已發布 → 已下架（待審核可被退件成「已退件」，已退件可再送審）。**可以刪除的狀態只有草稿、已退件、已下架**，而且限 `owner`／`admin`；待審核要先撤回、已發布要先下架，這樣刪除前一定留下撤回／下架的稽核軌跡，公開首頁也會先停止曝光。公告還有待審的修改時不能刪。
+
+- 後台自己建立、從沒送審過的草稿是**硬刪除**（稽核紀錄保留完整的刪除前快照）。
+- 其餘一律是**軟刪除**：資料列保留，標記 `deleted_at`／`deleted_by`，稽核紀錄的動作是 `soft_delete`。已刪除的公告對後台是 404（用 `Announcement.live` 查詢），不會出現在列表與公開首頁；`Announcement.objects` 仍包含已刪除的列。
+- **爬蟲匯入的公告一律軟刪除**（包括「下架後被編輯退回草稿」的）。爬蟲同步以 `external_id` 做 `get_or_create` 去重，列還在就不會被重新匯入成「已發布」；硬刪的話 `external_id` 一起消失，下次同步會把它建回來。
+- 前端刪除前會跳站內確認視窗（`confirmAction`），說明狀態與後果；非草稿與爬蟲來源的公告要輸入「刪除」才能確認。
+
+題庫（詞彙、克漏字、是非題、選擇題、情境題）的刪除規則沒有改，仍然只有草稿能刪。
+
+列表每一列只外露一顆最常用的主要動作（草稿／已退件→編輯、待審核→核准、已發布→下架、已下架→重新發布；沒有該權限的角色會退而求其次），其餘收進「⋯ 更多操作」選單，刪除固定在選單最底部。規則在 `src/_admin/reviewWorkflow/reviewActionPolicy.js`（`getReviewActionLayout`），選單元件是 `src/_admin/components/AdminRowMenu.jsx`，用法見 `frontend/static/css/_admin/README.md`。
 
 ### 待專家驗證佇列（M5）
 
