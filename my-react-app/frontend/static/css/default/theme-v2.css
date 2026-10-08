@@ -139,6 +139,7 @@
   color: var(--yy-ink);
   background: var(--yy-cream);
   min-height: 100vh;
+  min-height: 100dvh;
   /* 擋住橫向溢出，但不能用 hidden：overflow-x: hidden 會讓 overflow-y 自動變成 auto，.yy-page 就成了自己的
      捲動容器，頁面右側會多出第二條捲軸（尚未進場的區塊 translateY 位移會讓內容超出一點點，就會出現捲軸）。
      clip 只裁切、不建立捲動容器；舊瀏覽器不認得 clip 時退回 hidden。 */
@@ -563,4 +564,57 @@
     font-size: 15px;
     font-weight: 800;
     text-align: center;
+}
+
+/* ---------- 鍵盤焦點（:focus-visible）基線 ----------
+   稽核時用鍵盤 Tab 走過註冊頁與單詞查詢頁，欄位取得焦點後只看得到閃動的游標：
+   各頁自己把 outline 拿掉（通常是因為預設外框貼著圓角邊框很醜），卻只換邊框顏色
+   或只加硬陰影，對低視力與純鍵盤使用者等於沒有焦點指示。
+   這一段集中處理，個別元件只需要在外框形狀特殊時覆寫。 */
+
+/* 1. 基線：用 :where() 讓它的優先權是 0，任何元件自己的焦點樣式都能覆寫 */
+:where(a, button, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 3px solid var(--yy-red);
+  outline-offset: 2px;
+}
+
+/* 2. 深色底（導覽列、頁尾）上的紅色外框看不清楚，改用淺金色 */
+.navbar :where(a, button):focus-visible,
+.yy-footer :where(a, button):focus-visible {
+  outline-color: var(--yy-gold-light);
+}
+
+/* 3. 外框被拿掉、只靠換邊框顏色的輸入元件：用 :root 墊高優先權，壓過各頁 css 的 outline: none */
+:root :is(
+  .translate-textarea,
+  .forgot-container input,
+  .event-input-bar input,
+  .input-box input,
+  .assistant-input input,
+  .message-input,
+  .filter-date-input,
+  .filter-select,
+  .note-title,
+  .edit-container input,
+  .edit-container select
+):focus-visible {
+  outline: 3px solid var(--yy-red);
+  outline-offset: 2px;
+}
+
+/* 4. 輸入框本身沒有外框、改由外層容器代表焦點的元件：容器在內部任何元素取得焦點時畫外框 */
+.input-wrapper:focus-within,
+.yy-terminal:focus-within {
+  outline: 3px solid var(--yy-red);
+  outline-offset: 2px;
+}
+
+/* ---------- 主要內容區的最小高度 ----------
+   頁面是 lazy 載入：內容還沒到的瞬間 <main> 是空的，頁尾會浮在導覽列正下方，
+   內容一出現又被推到頁面底部（量測到的版面位移 CLS 0.07～0.11，超過 0.1 的門檻）。
+   各頁最外層的 .yy-page 本來就是 min-height: 100vh，這裡讓 <main> 先撐到同樣高度，
+   頁尾在載入前後都待在原位。 */
+#main-content {
+  min-height: 100vh;
+  min-height: 100dvh;
 }

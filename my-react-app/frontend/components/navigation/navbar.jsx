@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { House, TextSearch, Camera, Gamepad2, BookOpenCheck, NotebookPen, User, ChevronDown, Languages } from "lucide-react";
 import "../../static/css/navigation/Navbar.css"
@@ -36,6 +36,7 @@ const Navbar = ({ onOpenBot }) => {
 
   const [isUserOpen, setIsUserOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownTriggerRef = useRef(null);
 
   const isLoggedIn = userData != null && userData.firestoreData != null;
 
@@ -63,24 +64,36 @@ const Navbar = ({ onOpenBot }) => {
             </NavLink>
           ))}
 
-          <button
-            type="button"
-            className={`menu-item note-dropdown ${location.pathname.startsWith("/note") ? "active" : ""}`}
-            aria-haspopup="true"
-            aria-expanded={isDropdownOpen}
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+          {/* 筆記下拉選單：觸發鈕與選單項目是兄弟節點（<button> 裡面不能再放連結，
+              那是巢狀互動元素，鍵盤與報讀器都會出問題）。
+              Escape 關閉並把焦點還給觸發鈕；焦點離開整組選單時自動收合。 */}
+          <div
+            className="note-dropdown-wrap"
+            onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setIsDropdownOpen(false); }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && isDropdownOpen) {
+                setIsDropdownOpen(false);
+                dropdownTriggerRef.current?.focus();
+              }
+            }}
+            onMouseLeave={() => setIsDropdownOpen(false)}
           >
-            <div className="flex items-center gap-1">
-              <NotebookPen size={20} />
-              <span>筆記</span>
-              <ChevronDown size={16} />
-            </div>
-
-            {/* 下拉選單 */}
-            <div
-              className={`dropdown-content ${isDropdownOpen ? "active" : ""}`}
-              onMouseLeave={() => setIsDropdownOpen(false)}
+            <button
+              type="button"
+              ref={dropdownTriggerRef}
+              className={`menu-item note-dropdown ${location.pathname.startsWith("/note") ? "active" : ""}`}
+              aria-haspopup="true"
+              aria-expanded={isDropdownOpen}
+              aria-controls="note-dropdown-menu"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             >
+              <span className="flex items-center gap-1">
+                <NotebookPen size={20} />
+                <span>筆記</span>
+                <ChevronDown size={16} />
+              </span>
+            </button>
+            <div id="note-dropdown-menu" className={`dropdown-content ${isDropdownOpen ? "active" : ""}`}>
               <NavLink className="dropdown-item" to="/note" onClick={() => setIsDropdownOpen(false)}>
                 寫筆記
               </NavLink>
@@ -88,7 +101,7 @@ const Navbar = ({ onOpenBot }) => {
                 筆記分享區
               </NavLink>
             </div>
-          </button>
+          </div>
 
           {!isLoggedIn ? (
             <NavLink className="menu-item login-btn" to="/login">

@@ -21,6 +21,7 @@
   .search-analytics-page, .quiz-quality-page, .retention-analysis-page, .admin-dashboard-page, .homepage-config-page
 ) {
   min-height: calc(100vh - var(--admin-topbar-height));
+  min-height: calc(100dvh - var(--admin-topbar-height));
   padding: var(--admin-page-padding);
   background: var(--admin-bg);
   color: var(--admin-text);

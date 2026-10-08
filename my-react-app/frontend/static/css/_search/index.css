@@ -212,8 +212,8 @@
 }
 
 .search-freq-chip {
-  width: 34px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   font-size: 12.5px;
 }
 
@@ -226,11 +226,32 @@
 }
 
 .search-letter-chip {
-  width: 26px;
-  height: 26px;
-  font-size: 11.5px;
+  width: 34px;
+  height: 34px;
+  font-size: 12px;
   font-family: var(--yy-font-pixel);
   border-radius: 4px;
+}
+
+/* 手指操作（手機、平板）：可點擊區要有 44×44px，字母與星級篩選鈕原本只有 26～34px，密集排列很容易點錯 */
+@media (pointer: coarse), (max-width: 720px) {
+  .search-freq-chip,
+  .search-letter-chip {
+    width: 44px;
+    height: 44px;
+  }
+
+  .search-letter-row {
+    gap: 8px;
+  }
+
+  .search-freq-row {
+    gap: 8px;
+  }
+
+  .search-filter-panel .yy-btn-outline {
+    min-height: 44px;
+  }
 }
 
 /* ── 族語空白狀態 ──────────────────────────── */
@@ -303,3 +324,8 @@
   margin: 0 auto;
 }
 
+/* 輸入框本身沒有外框，改在整個終端機輸入列畫焦點框（全站焦點基線見 theme-v2.css） */
+.search-terminal:focus-within {
+  outline: 3px solid var(--yy-red);
+  outline-offset: 3px;
+}

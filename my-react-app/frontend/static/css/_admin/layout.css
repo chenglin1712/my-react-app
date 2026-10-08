@@ -1,5 +1,5 @@
 /* 後台外殼（側欄、頂欄、內容區）。共用 token 與頁面元件規則在 admin-base.css。 */
-.admin-shell { min-height: 100vh; color: var(--yy-ink, #221812); background: #f4f6f9; font-family: var(--yy-font-body, sans-serif); }
+.admin-shell { min-height: 100vh; min-height: 100dvh; color: var(--yy-ink, #221812); background: #f4f6f9; font-family: var(--yy-font-body, sans-serif); }
 
 /* 後台設計 token（共用規則見 admin-base.css） */
 .admin-shell {

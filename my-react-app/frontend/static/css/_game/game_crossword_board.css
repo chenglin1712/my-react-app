@@ -95,3 +95,10 @@
 .area-loading{
     text-align: center;
 }
+
+/* 填字格取得鍵盤焦點時：外框畫在格子內側並加底色，避免被相鄰格子蓋住（全站焦點基線見 theme-v2.css） */
+.area-inputgrid:focus-visible {
+    outline: 3px solid var(--yy-red);
+    outline-offset: -3px;
+    background-color: rgba(217, 162, 39, 0.35);
+}

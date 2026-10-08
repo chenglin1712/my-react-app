@@ -6,6 +6,7 @@
     box-shadow: var(--yy-shadow-sm);
     background: #fff;
     height: calc(100vh - 170px);
+    height: calc(100dvh - 170px);
     max-width: 700px;
     margin: auto;
     overflow: hidden;

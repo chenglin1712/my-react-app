@@ -26,13 +26,13 @@ describe('CompactSearchBar（捲出頁首後的精簡搜尋列）', () => {
         expect(props.handleSearch).toHaveBeenCalledTimes(1);
         fireEvent.keyDown(input, { key: 'Enter', isComposing: true });
         expect(props.handleSearch).toHaveBeenCalledTimes(1);
-        fireEvent.click(screen.getByRole('button', { name: '搜尋' }));
+        fireEvent.click(screen.getByRole('button', { name: 'GO 搜尋' }));
         expect(props.handleSearch).toHaveBeenCalledTimes(2);
     });
 
     test('載入中時 GO 停用，避免重複送出', () => {
         setup({ loading: true });
-        expect(screen.getByRole('button', { name: '搜尋' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'GO 搜尋' })).toBeDisabled();
     });
 
     test('看不到時（頁首還在畫面內）整條列對鍵盤與讀屏隱藏，不佔位置', () => {

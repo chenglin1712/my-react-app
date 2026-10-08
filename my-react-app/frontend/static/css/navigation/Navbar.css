@@ -221,6 +221,9 @@
     background-color: transparent;
     border: none;
     border-radius: 8px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 8px;
 }
 
 .menu-toggle:hover {
@@ -340,7 +343,7 @@
     position: absolute;
     top: 100%;
     left: 0;
-    margin-top: 8px;
+    margin-top: 0;
     background-color: var(--yy-ink);
     border: 2px solid var(--yy-gold);
     min-width: 150px;
@@ -369,8 +372,20 @@
     color: var(--yy-ink);
 }
 
-.note-dropdown:hover .dropdown-content,
 .dropdown-content.active {
+    display: flex;
+}
+
+/* 滑鼠移上去自動展開只給有真正 hover 能力的裝置：觸控裝置點一下後會「卡」在 hover 狀態，
+   選單收不起來。觸控與鍵盤一律走 click 切換的 .active。 */
+@media (hover: hover) and (pointer: fine) {
+    .note-dropdown-wrap:hover .dropdown-content {
+        display: flex;
+    }
+}
+
+.note-dropdown-wrap {
+    position: relative;
     display: flex;
 }
 

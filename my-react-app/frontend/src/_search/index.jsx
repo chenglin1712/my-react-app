@@ -268,7 +268,7 @@ const SearchPage = () => {
       {error && (
         <Alert variant="danger" className="d-flex justify-content-between align-items-center">
           <span>{error}</span>
-          <Button type="button" variant="outline-danger" size="sm" onClick={() => handleSearch()} disabled={loading}>
+          <Button type="button" variant="danger" size="sm" onClick={() => handleSearch()} disabled={loading}>
             重試
           </Button>
         </Alert>

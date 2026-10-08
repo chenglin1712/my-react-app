@@ -16,6 +16,7 @@
   width: 100%;
   max-width: 720px;
   min-height: calc(100vh - 174px);
+  min-height: calc(100dvh - 174px);
   margin: 0 auto;
   padding: 32px;
   box-sizing: border-box;

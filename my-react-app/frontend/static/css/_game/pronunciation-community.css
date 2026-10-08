@@ -1,5 +1,6 @@
 .pron-community-page {
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 2.5rem 1.5rem 4rem;
   color: #342a28;
   background:
@@ -251,6 +252,7 @@
 .pron-community-modal {
   width: min(100%, 480px);
   max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
   overflow-y: auto;
   padding: 1.4rem;
   background: #fff;

@@ -105,12 +105,12 @@ const FavoritePage = () => {
           borderBottom: '1px solid #e5e7eb'
         }}
       >
-        <h2 className="fw-bold d-flex align-items-center mb-3">
+        <h1 className="h2 fw-bold d-flex align-items-center mb-3">
           <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" className="bi bi-heart me-2" viewBox="0 0 16 16">
             <path d="M8 2.748L7.283 2.01C5.6.281 2.514.878 1.4 3.053c-.523 1.023-.641 2.5.314 3.905C2.634 8.313 4.548 10.13 8 12.343c3.452-2.213 5.365-4.03 6.286-5.385.955-1.405.838-2.882.314-3.905C13.486.878 10.4.28 8.717 2.01L8 2.748zM8 15C-7.333 4.868 3.279-3.04 7.824 1.143c.06.055.119.112.176.171.057-.059.116-.115.176-.17C12.72-3.042 23.333 4.867 8 15z" />
           </svg>
           個人詞語庫
-        </h2>
+        </h1>
 
         <Dropdown className="mb-3" onSelect={(val) => setSelectedTribe(val)}>
           <Dropdown.Toggle variant="outline-secondary" size="sm">

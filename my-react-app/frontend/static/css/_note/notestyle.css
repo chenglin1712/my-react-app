@@ -94,3 +94,9 @@ body {
   }
   .note-text { height: 50vh; }
 }
+
+/* 編輯區內任何一處取得焦點時，在外層畫出焦點框（.ProseMirror 本身的 outline 被拿掉了，全站焦點基線見 theme-v2.css） */
+.note-text:focus-within {
+  outline: 3px solid var(--yy-red);
+  outline-offset: 2px;
+}
