@@ -157,20 +157,31 @@ describe('首頁 · 版位設定（HomepageConfig）套用', () => {
     vi.restoreAllMocks();
   });
 
-  test('設定了 hero_image_url 時，主打卡片顯示真的圖片而不是 IMAGE PLACEHOLDER', async () => {
+  test('設定了 hero_image_url 時，主打卡片顯示真的圖片而不是預設圖', async () => {
     mockFetchOk([], { ...DEFAULT_CONFIG, hero_image_url: 'https://img/hero.jpg', hero_title_override: '本週主打' });
     renderHome();
 
     const img = await screen.findByAltText('本週主打');
     expect(img).toHaveAttribute('src', 'https://img/hero.jpg');
-    expect(screen.queryByText('IMAGE PLACEHOLDER')).not.toBeInTheDocument();
+    expect(document.querySelector('.home-feature-image span')).toBeNull();
     expect(screen.getByText('本週主打')).toBeInTheDocument();
   });
 
-  test('沒有設定 hero_image_url 時維持原本的 IMAGE PLACEHOLDER 與逐族語標題', async () => {
+  test('沒有設定 hero_image_url 時顯示族語預設圖（不再出現英文 placeholder 字樣）與逐族語標題', async () => {
     mockFetchOk([], DEFAULT_CONFIG);
     renderHome();
-    expect(await screen.findByText('IMAGE PLACEHOLDER')).toBeInTheDocument();
+    expect(await screen.findByText('泰雅語主題週')).toBeInTheDocument();
+    expect(document.querySelector('.home-feature-image span')).toHaveTextContent('Tayal');
+    expect(screen.queryByText('IMAGE PLACEHOLDER')).not.toBeInTheDocument();
+  });
+
+  test('hero_image_url 的圖載入失敗時退回預設圖，不顯示破圖', async () => {
+    mockFetchOk([], { ...DEFAULT_CONFIG, hero_image_url: 'https://img/broken.jpg', hero_title_override: '本週主打' });
+    renderHome();
+    const img = await screen.findByAltText('本週主打');
+    fireEvent.error(img);
+    await waitFor(() => expect(screen.queryByAltText('本週主打')).not.toBeInTheDocument());
+    expect(document.querySelector('.home-feature-image span')).toHaveTextContent('Tayal');
   });
 
   test('hero_link_url 是內部路徑時，主打卡片用 react-router Link 導頁', async () => {
@@ -244,7 +255,7 @@ describe('首頁 · 版位設定（HomepageConfig）套用', () => {
       return Promise.reject(new Error(`unexpected url: ${url}`));
     }));
     renderHome();
-    expect(await screen.findByText('IMAGE PLACEHOLDER')).toBeInTheDocument();
+    expect(await screen.findByText('泰雅語主題週')).toBeInTheDocument();
     expect(screen.getByTestId('calendar-mock')).toBeInTheDocument();
   });
 

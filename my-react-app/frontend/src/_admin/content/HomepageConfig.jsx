@@ -145,7 +145,7 @@ export default function HomepageConfig() {
                                     </span>
                                 )}
                                 <Form.Text>
-                                    留白時，首頁會安全地沿用各族語原有的預設文字，不會顯示破圖。
+                                    留白，或圖片網址無法載入時，首頁會改顯示各族語的預設圖，不會出現破圖。圖片網址必須以 https:// 開頭。
                                 </Form.Text>
                             </div>
                         </div>
@@ -168,7 +168,7 @@ export default function HomepageConfig() {
                                 onChange={(e) => update('hero_link_url', e.target.value)}
                                 placeholder="/quiz/select 或 https://example.com"
                             />
-                            <Form.Text>選填；可填站內路徑或完整的外部網址。</Form.Text>
+                            <Form.Text>選填；可填站內路徑（以 / 開頭）或 https:// 開頭的外部網址。</Form.Text>
                         </Form.Group>
                     </div>
                 </section>

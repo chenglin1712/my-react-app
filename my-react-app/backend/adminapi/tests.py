@@ -688,6 +688,29 @@ class HomepageConfigAdminTest(TestCase):
             )
         self.assertEqual(response.status_code, 200)
 
+    def test_hero_link_rejects_plain_http_url(self):
+        with _as_role(OWNER) as headers:
+            response = _patch_json(
+                self.client, '/adminapi/homepage-config/', headers,
+                {"hero_link_url": "http://example.com"},
+            )
+        self.assertEqual(response.status_code, 400)
+
+    def test_hero_image_requires_https(self):
+        for bad in ("http://example.com/a.png", "ftp://example.com/a.png"):
+            with _as_role(OWNER) as headers:
+                response = _patch_json(
+                    self.client, '/adminapi/homepage-config/', headers,
+                    {"hero_image_url": bad},
+                )
+            self.assertEqual(response.status_code, 400, bad)
+        with _as_role(OWNER) as headers:
+            response = _patch_json(
+                self.client, '/adminapi/homepage-config/', headers,
+                {"hero_image_url": "https://example.com/a.png"},
+            )
+        self.assertEqual(response.status_code, 200)
+
     def test_news_display_count_out_of_range_rejected(self):
         with _as_role(OWNER) as headers:
             response = _patch_json(self.client, '/adminapi/homepage-config/', headers, {"news_display_count": 999})

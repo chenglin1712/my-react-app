@@ -77,6 +77,8 @@ const HomePage = () => {
     // state 語意不會跟著漂移。
     const [selectedTribeSlug, setSelectedTribeSlug] = useState(TRIBES[0].slug);
     const [homepageConfig, setHomepageConfig] = useState(DEFAULT_HOMEPAGE_CONFIG);
+    // 記下載入失敗的主圖網址（不是布林值）：後台換了新網址，新圖就會重新嘗試載入
+    const [failedHeroImage, setFailedHeroImage] = useState(null);
     const functionBtnRef = useRef(null);
     const activeTribe = TRIBES.find((t) => t.slug === selectedTribeSlug) || TRIBES[0];
 
@@ -148,9 +150,15 @@ const HomePage = () => {
                 <span>◆ ◆ ◆ ◆ ◆</span>
             </div>
             <div className="home-feature-image">
-                {homepageConfig.hero_image_url
-                    ? <img src={homepageConfig.hero_image_url} alt={heroTitle} />
-                    : <span>IMAGE PLACEHOLDER</span>}
+                {homepageConfig.hero_image_url && failedHeroImage !== homepageConfig.hero_image_url
+                    ? (
+                        <img
+                            src={homepageConfig.hero_image_url}
+                            alt={heroTitle}
+                            onError={() => setFailedHeroImage(homepageConfig.hero_image_url)}
+                        />
+                    )
+                    : <span>{activeTribe.roman}</span>}
             </div>
             <div className="home-feature-body">
                 <div className="home-feature-title">{heroTitle}</div>
@@ -240,14 +248,15 @@ const HomePage = () => {
                     </div>
 
                     {homepageConfig.hero_link_url ? (
-                        homepageConfig.hero_link_url.startsWith('http') ? (
+                        /^https?:\/\//.test(homepageConfig.hero_link_url) ? (
                             <a
                                 className="yy-card yy-fade-up home-feature-card"
                                 href={homepageConfig.hero_link_url}
                                 target="_blank"
-                                rel="noreferrer"
+                                rel="noopener noreferrer"
                             >
                                 {featureCardContent}
+                                <span className="visually-hidden">（連到外部網站，另開新視窗）</span>
                             </a>
                         ) : (
                             <Link className="yy-card yy-fade-up home-feature-card" to={homepageConfig.hero_link_url}>

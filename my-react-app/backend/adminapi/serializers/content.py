@@ -127,9 +127,18 @@ class HomepageConfigSerializer(serializers.ModelSerializer):
         normalized = value.replace('\\', '/')
         if normalized.startswith('/') and not normalized.startswith('//'):
             return value
-        if value.startswith('http://') or value.startswith('https://'):
+        # 外部網址只收 https：http 連結在公開首頁會讓訪客被帶去不加密的網站，
+        # 也容易被中途竄改；管理者貼 http 網址時要求改成 https。
+        if value.startswith('https://'):
             return value
-        raise serializers.ValidationError('連結必須是內部路徑（以 / 開頭）或 http(s) 網址')
+        raise serializers.ValidationError('連結必須是內部路徑（以 / 開頭）或 https 網址')
+
+    def validate_hero_image_url(self, value):
+        # 公開首頁會直接載入這張圖；http 圖片在 https 網頁中會被瀏覽器擋下（混合內容），
+        # 也不接受 ftp 等其他 scheme（URLField 預設允許 ftp、ftps）。
+        if value and not value.startswith('https://'):
+            raise serializers.ValidationError('圖片網址必須是 https 開頭')
+        return value
 
     def validate_news_display_count(self, value):
         if not (1 <= value <= 20):
