@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Button, Form, Modal } from 'react-bootstrap';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../../../../firebase';
-import { REAUTH_REQUIRED_EVENT } from './adminSession';
+import { REAUTH_REQUIRED_EVENT, markAdminSession } from './adminSession';
 
 /**
  * 後端回 401 reauth_required（距離上次用密碼驗證超過 30 分鐘）時彈出的重新驗證視窗。
@@ -47,6 +47,7 @@ export default function AdminReauthModal() {
             await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(email, password));
             // 強制換發新的 ID token：舊 token 裡的 auth_time 還是過期的那一個
             await auth.currentUser.getIdToken(true);
+            markAdminSession(auth.currentUser.uid);
             setDone(true);
             setPassword('');
         } catch (err) {

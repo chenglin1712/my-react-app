@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { clearAdminSession, hasAdminSession, markAdminSession } from './adminSession';
+import { ADMIN_SESSION_MAX_AGE_MS, clearAdminSession, hasAdminSession, markAdminSession } from './adminSession';
 
 afterEach(() => {
     window.sessionStorage.clear();
@@ -26,6 +26,23 @@ describe('後台工作階段旗標', () => {
     test('清除之後不算數', () => {
         markAdminSession('u1');
         clearAdminSession();
+        expect(hasAdminSession('u1')).toBe(false);
+    });
+
+    test('超過壽命就不算數（旗標不會永遠有效）', () => {
+        markAdminSession('u1');
+        const { at } = JSON.parse(window.sessionStorage.getItem('yy-admin-session'));
+        expect(hasAdminSession('u1', at + ADMIN_SESSION_MAX_AGE_MS)).toBe(true);
+        expect(hasAdminSession('u1', at + ADMIN_SESSION_MAX_AGE_MS + 1)).toBe(false);
+    });
+
+    test('時間欄位缺漏、不是數字或在未來都不算數', () => {
+        const key = 'yy-admin-session';
+        window.sessionStorage.setItem(key, JSON.stringify({ uid: 'u1' }));
+        expect(hasAdminSession('u1')).toBe(false);
+        window.sessionStorage.setItem(key, JSON.stringify({ uid: 'u1', at: 'x' }));
+        expect(hasAdminSession('u1')).toBe(false);
+        window.sessionStorage.setItem(key, JSON.stringify({ uid: 'u1', at: Date.now() + 60_000 }));
         expect(hasAdminSession('u1')).toBe(false);
     });
 

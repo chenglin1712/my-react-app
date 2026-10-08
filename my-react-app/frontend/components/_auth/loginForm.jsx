@@ -8,7 +8,7 @@ import { auth } from "../../../firebase";
 import successAnimation from "../../src/animations/success.json"
 import SuccessModal from "../ui/SuccessModal";
 import { useLottieAnimation } from "@hooks/useLottieAnimation";
-import { markAdminSession } from "../../src/_admin/session/adminSession";
+import { clearAdminSession, markAdminSession } from "../../src/_admin/session/adminSession";
 import { authErrorMessage } from "@utils/firebaseAuthErrors";
 import PasswordField from "./PasswordField";
 
@@ -59,7 +59,9 @@ const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }
         try {
             const credential = await signInWithEmailAndPassword(auth, email, password);
             // 後台版：記下「這個分頁已在後台登入頁輸入過密碼」，AdminRoute 才會放行（旗標只是體驗層，見 adminSession.js）
+            // 前台登入則一定清掉旗標：前台登入不算「在後台登入頁輸入過密碼」，之前殘留的旗標不能讓人直接進後台
             if (isAdminVariant) markAdminSession(credential?.user?.uid);
+            else clearAdminSession();
             setIsLogin(true);
             const redirectTarget = getRedirectTarget();
             redirectTimeoutRef.current = setTimeout(() => {

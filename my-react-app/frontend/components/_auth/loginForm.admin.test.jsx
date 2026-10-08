@@ -2,6 +2,7 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import LoginForm from './loginForm';
+import { hasAdminSession, markAdminSession } from '../../src/_admin/session/adminSession';
 
 const mockNavigate = vi.fn();
 let mockSearchParams = new URLSearchParams();
@@ -64,5 +65,25 @@ describe('LoginForm（後台專用登入頁版本）', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '登入後台' })); });
     await act(async () => { vi.advanceTimersByTime(2000); });
     expect(mockNavigate).toHaveBeenLastCalledWith('/');
+  });
+
+  test('前台登入會作廢殘留的後台旗標；後台登入才會寫入旗標', async () => {
+    const submit = async (name) => {
+      fireEvent.change(screen.getByLabelText('帳號'), { target: { value: 'a@b.com' } });
+      fireEvent.change(screen.getByLabelText('密碼'), { target: { value: 'secret1' } });
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name })); });
+    };
+    signInWithEmailAndPassword.mockResolvedValue({ user: { uid: 'u1' } });
+
+    markAdminSession('u1');
+    const member = render(<LoginForm />);
+    await submit('登入');
+    expect(hasAdminSession('u1')).toBe(false);
+    member.unmount();
+
+    render(<LoginForm variant="admin" />);
+    await submit('登入後台');
+    expect(hasAdminSession('u1')).toBe(true);
+    window.sessionStorage.clear();
   });
 });

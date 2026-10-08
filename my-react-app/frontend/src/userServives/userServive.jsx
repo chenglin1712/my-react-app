@@ -2,6 +2,7 @@ import { doc, getDoc, setDoc, updateDoc, runTransaction, increment, FieldPath } 
 import { getDatabase, ref, onDisconnect, set, onValue, serverTimestamp } from "firebase/database";
 import { db, auth } from "../../../firebase";
 import { onAuthStateChanged, createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import { clearAdminSession } from "../_admin/session/adminSession";
 
 // 前端版的角色開發模式開關，對應後端 config/firebase_auth.py 的
 // AUTH_DEV_BYPASS_ROLE：後端的 AUTH_DEV_BYPASS 只影響 API 請求，完全不影響
@@ -56,6 +57,9 @@ export const authChanges = (callback) => {
             });
             initUserFields(user.uid);
         } else {
+            // 登出（或登入狀態消失）時一併清掉「已在後台登入頁輸入過密碼」的旗標，
+            // 否則同一分頁重新用前台登入同一個帳號，就會不用再輸入密碼直接進後台
+            clearAdminSession();
             stopPresence();
             callback(null);
         }
