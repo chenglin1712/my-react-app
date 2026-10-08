@@ -44,10 +44,20 @@
 - 顏色、圓角、陰影、間距用 `--admin-*` 設計變數，不要寫死色碼。語意色用 `--admin-success*`、`--admin-danger*`、`--admin-warning*`。
   資料編碼用的色階（留存熱圖、題目品質四象限）是例外，檔案開頭有註解說明。
 - 標題層級：頁面標題 24px、區塊標題 18px、卡片標題 16px，依語意區塊決定，不看 `h2`／`h3` 標籤。
-- 表格卡片用 `overflow: clip`：會裁掉超出卡片的下拉選單與焦點框。列內要放下拉選單時，放進表格自己的捲動容器內。
+- 表格卡片用 `overflow: clip`：會裁掉超出卡片的下拉選單與焦點框。**列內的操作選單請用 `AdminRowMenu`**（見下方「表格列操作」），它掛在 `.admin-shell` 底下並用 fixed 定位，不會被裁切；不要自己在列內放絕對定位的下拉選單。
 - 不要用 `backdrop-filter`（在開發用的瀏覽器上會讓畫面卡住），頂欄用純色。
 - 彈窗（Bootstrap Modal）掛在 `body` 下，不在 `.admin-shell` 內；要調整彈窗樣式請給 `dialogClassName`。
 - 版面寬度以**內容區**為準（1280 視窗扣掉側欄只剩約 972px），不要只看視窗寬度做斷點。
+
+## 表格列操作（「⋯ 更多操作」選單）
+
+每一列只外露一顆最常用的主要動作，其餘收進選單；刪除固定放最後，用紅字、上方有分隔線。
+
+- `reviewWorkflow/ReviewActions.jsx`：送審工作流（公告、題庫）的操作列，由 `reviewActionPolicy.js` 的 `getReviewActionLayout` 決定外露哪一顆、選單裡有哪些。公告另外傳 `deletableStatuses`（草稿、已退件、已下架）；題庫不傳，預設只有草稿能刪。
+- `components/AdminRowMenu.jsx`：通用的列選單，其他頁面（使用者、檢舉、分享筆記…）要用時直接傳 `items`：`[{ key, label, icon, href?, onSelect?, danger?, disabled? }]`。有 `href` 的項目是真連結（可在新分頁開啟）。一定要傳 `label`（例如 `「某某標題」的更多操作`），螢幕報讀器掃過一整排「⋯」時才分得出是哪一筆。
+- 鍵盤：Enter／Space 開啟並聚焦第一項；↑↓、Home、End 移動；Escape 與 Tab 關閉並把焦點還給「⋯」按鈕。
+- `components/confirmAction.jsx`：危險操作的站內確認視窗，用法跟 `window.confirm` 一樣（`await confirmAction({ title, message, confirmLabel, requireText })`，回傳 true／false）。**不要在後台再用 `window.confirm`**；`requireText` 可要求輸入文字才能確認，風險較高的刪除才用。
+- 測試用 `testing/rowActions.js`（`getRowAction`、`queryRowAction`、`clickRowAction`、`hasRowAction`）在「外露按鈕」與「選單項目」之間找同一個操作，測試描述的仍是使用者做的事。
 
 ## 守門測試
 
