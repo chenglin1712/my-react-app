@@ -1,7 +1,7 @@
 import { doc, getDoc, setDoc, updateDoc, runTransaction, increment, FieldPath } from "firebase/firestore";
 import { getDatabase, ref, onDisconnect, set, onValue, serverTimestamp } from "firebase/database";
 import { db, auth } from "../../../firebase";
-import { onAuthStateChanged, createUserWithEmailAndPassword } from "firebase/auth";
+import { onAuthStateChanged, createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 
 // 前端版的角色開發模式開關，對應後端 config/firebase_auth.py 的
 // AUTH_DEV_BYPASS_ROLE：後端的 AUTH_DEV_BYPASS 只影響 API 請求，完全不影響
@@ -102,6 +102,14 @@ export const registerWithImg = async (name, email, password, identity, avatarUrl
             joinDate: new Date().toISOString(),
             avatarUrl: avatarUrl
         });
+
+        // 寄出 Email 驗證信（Email 打錯字的帳號才有機會被發現）。寄信失敗不影響註冊本身，
+        // 使用者之後仍可正常登入，所以只記錄、不丟出錯誤。
+        try {
+            await sendEmailVerification(user);
+        } catch (verificationError) {
+            console.error("寄送驗證信失敗: ", verificationError?.code, verificationError?.message);
+        }
 
     } catch (error) {
         console.error("X 註冊錯誤: ", error.code, error.message);

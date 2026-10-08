@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { updateDoc, runTransaction, increment } from 'firebase/firestore';
-import { toggleFavoriteWord, updateUserErrors } from './userServive';
+import { updateDoc, runTransaction, increment, setDoc } from 'firebase/firestore';
+import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { toggleFavoriteWord, updateUserErrors, registerWithImg } from './userServive';
 
 vi.mock('firebase/firestore', async (importOriginal) => {
   const actual = await importOriginal();
@@ -18,7 +19,7 @@ vi.mock('firebase/database', () => ({
   getDatabase: vi.fn(), ref: vi.fn(), onDisconnect: vi.fn(), set: vi.fn(),
   onValue: vi.fn(), serverTimestamp: vi.fn(),
 }));
-vi.mock('firebase/auth', () => ({ onAuthStateChanged: vi.fn(), createUserWithEmailAndPassword: vi.fn() }));
+vi.mock('firebase/auth', () => ({ onAuthStateChanged: vi.fn(), createUserWithEmailAndPassword: vi.fn(), sendEmailVerification: vi.fn() }));
 vi.mock('../../../firebase', () => ({ db: {}, auth: {} }));
 
 /** 簡化版的 Firestore transaction：回呼先讀到「提交當下」的文件，寫入只暫存，
@@ -114,5 +115,26 @@ describe('updateUserErrors（原子 increment）', () => {
   test('空字串單字不會送出請求', async () => {
     await updateUserErrors('u1', '');
     expect(updateDoc).not.toHaveBeenCalled();
+  });
+});
+
+describe('registerWithImg（註冊後寄驗證信）', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createUserWithEmailAndPassword.mockResolvedValue({ user: { uid: 'u1' } });
+    setDoc.mockResolvedValue(undefined);
+  });
+
+  test('建立帳號、寫入使用者資料後寄出 Email 驗證信', async () => {
+    sendEmailVerification.mockResolvedValue(undefined);
+    await registerWithImg('小明', 'a@b.c', 'secret1', '學生', null);
+    expect(setDoc).toHaveBeenCalled();
+    expect(sendEmailVerification).toHaveBeenCalledWith({ uid: 'u1' });
+  });
+
+  test('驗證信寄送失敗不影響註冊成功（只記錄，不丟錯）', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    sendEmailVerification.mockRejectedValue({ code: 'auth/too-many-requests', message: 'x' });
+    await expect(registerWithImg('小明', 'a@b.c', 'secret1', '學生', null)).resolves.toBeUndefined();
   });
 });

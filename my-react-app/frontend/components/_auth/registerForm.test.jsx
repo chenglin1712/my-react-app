@@ -18,6 +18,7 @@ const fillRequiredFields = () => {
   fireEvent.change(screen.getByLabelText('使用者名稱'), { target: { value: '小明' } });
   fireEvent.change(screen.getByLabelText('帳號'), { target: { value: 'a@b.com' } });
   fireEvent.change(screen.getByLabelText('密碼'), { target: { value: 'secret1' } });
+  fireEvent.change(screen.getByLabelText('確認密碼'), { target: { value: 'secret1' } });
 };
 
 describe('RegisterForm', () => {
@@ -50,6 +51,19 @@ describe('RegisterForm', () => {
     expect(registerWithImg).toHaveBeenCalledWith('小明', 'a@b.com', 'secret1', '學生', null);
   });
 
+  test('兩次密碼不一致時顯示提示，且不會送出註冊', async () => {
+    render(<RegisterForm />);
+    fillRequiredFields();
+    fireEvent.change(screen.getByLabelText('確認密碼'), { target: { value: 'different' } });
+    expect(screen.getByRole('alert')).toHaveTextContent('兩次輸入的密碼不一致');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '註冊' }));
+    });
+
+    expect(registerWithImg).not.toHaveBeenCalled();
+  });
+
   test('註冊失敗（email 已被使用）顯示對應錯誤訊息，且不會卡住無法重試', async () => {
     registerWithImg.mockRejectedValueOnce({ code: 'auth/email-already-in-use', message: 'x' });
     render(<RegisterForm />);
@@ -72,7 +86,8 @@ describe('RegisterForm', () => {
       fireEvent.click(screen.getByRole('button', { name: '註冊' }));
     });
 
-    expect(screen.getByText('註冊失敗')).toBeInTheDocument();
+    expect(screen.getByText('註冊失敗，請稍後再試')).toBeInTheDocument();
+    expect(screen.queryByText(/boom/)).not.toBeInTheDocument();
   });
 
   test('註冊成功後顯示成功動畫，並在延遲後導向登入頁', async () => {

@@ -5,6 +5,7 @@ import { Alert } from "react-bootstrap";
 import { getAuth, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import successAnimation from "../../src/animations/success.json"
 import { useLottieAnimation } from "@hooks/useLottieAnimation";
+import { authErrorMessage } from "@utils/firebaseAuthErrors";
 
 const ResetPassword = () => {
     const auth = getAuth();
@@ -40,17 +41,13 @@ const ResetPassword = () => {
         } catch (error) {
             console.error("密碼更新失敗: " + error.message);
             setIsSuccess(false);
-            switch (error.code) {
-                case "auth/wrong-password":
-                case "auth/invalid-credential":
-                    setErrorMsg("密碼錯誤，請再試一次。");
-                    break;
-                case "auth/weak-password":
-                    setErrorMsg("新密碼強度不足，請使用至少 6 個字元。");
-                    break;
-                default:
-                    setErrorMsg("密碼更新失敗");
-            };
+            if (error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
+                setErrorMsg("密碼錯誤，請再試一次。");
+            } else if (error.code === "auth/weak-password") {
+                setErrorMsg("新密碼強度不足，請使用至少 6 個字元。");
+            } else {
+                setErrorMsg(authErrorMessage(error, "密碼更新失敗"));
+            }
         } finally {
             setIsSubmitting(false);
         };
@@ -58,7 +55,7 @@ const ResetPassword = () => {
 
     return (
         <div className="reset-container">
-            <h2>變更密碼</h2>
+            <h1>變更密碼</h1>
             {errorMsg && <Alert variant="danger" className="py-2">{errorMsg}</Alert>}
             <form onSubmit={handleChangePassword}>
                 <input

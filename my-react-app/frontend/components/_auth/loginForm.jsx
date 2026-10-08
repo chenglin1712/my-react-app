@@ -1,5 +1,5 @@
 import "../../static/css/_auth/loginForm.css"
-import { Mail, LockKeyhole, User } from "lucide-react"
+import { Mail, User } from "lucide-react"
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Alert } from "react-bootstrap";
@@ -9,6 +9,8 @@ import successAnimation from "../../src/animations/success.json"
 import SuccessModal from "../ui/SuccessModal";
 import { useLottieAnimation } from "@hooks/useLottieAnimation";
 import { markAdminSession } from "../../src/_admin/session/adminSession";
+import { authErrorMessage } from "@utils/firebaseAuthErrors";
+import PasswordField from "./PasswordField";
 
 // variant 只影響呈現：'admin' 是後台專用登入頁（src/_auth/AdminLoginPage.jsx）用的版本，
 // 標題由頁面自己提供、不顯示註冊入口、成功文案改成進後台。登入函式、next 驗證與導頁邏輯兩種版本完全相同。
@@ -67,11 +69,9 @@ const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }
             // error.code 只有 Firebase 的錯誤才會有，非 Firebase 的例外（例如網路層
             // 的 TypeError）沒有這個欄位，直接呼叫 .includes() 會在這個 catch 區塊
             // 內再丟一次例外，讓使用者連通用錯誤訊息都看不到。
-            if (error.code?.includes('auth/invalid-credential')) {
-                setErrorMsg("帳號或密碼錯誤，請檢查電子郵件和密碼是否正確！");
-            } else {
-                setErrorMsg("登入失敗: " + error.message);
-            }
+            // 畫面只顯示中文說明；Firebase 的英文 message 只留在 console，不給使用者看
+            console.error("登入失敗:", error?.code, error?.message);
+            setErrorMsg(authErrorMessage(error, "登入失敗，請稍後再試"));
         } finally {
             setIsSubmitting(false);
         }
@@ -83,17 +83,14 @@ const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }
 
     return (
         <div className="login-box">
-            {!isAdminVariant && <h2 className="formTitle"><User size={30} />登入</h2>}
+            {!isAdminVariant && <h1 className="formTitle"><User size={30} />登入</h1>}
             {errorMsg && <Alert variant="danger" className="py-2">{errorMsg}</Alert>}
             <form action="#" className="loginForm">
                 <div className="input-wrapper">
                     <Mail size={24} className="icon" />
                     <input type="email" className="input-field" placeholder="帳號" aria-label="帳號" autoComplete="email" required defaultValue={defaultEmail} onChange={(e) => { setEmail(e.target.value) }} />
                 </div>
-                <div className="input-wrapper">
-                    <LockKeyhole size={24} className="icon" />
-                    <input type="password" className="input-field" placeholder="密碼" aria-label="密碼" autoComplete="current-password" required onChange={(e) => { setPassword(e.target.value) }} />
-                </div>
+                <PasswordField value={password} onChange={(e) => { setPassword(e.target.value) }} autoComplete="current-password" />
                 <a className="forgot-pass" href="/forgot" onClick={(e) => { e.preventDefault(); navigate("/forgot"); }}>忘記密碼?</a>
                 <button className="login-button" onClick={handleLogin} disabled={isSubmitting}>{isAdminVariant ? "登入後台" : "登入"}</button>
             </form>

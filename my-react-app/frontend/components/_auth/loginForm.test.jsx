@@ -66,12 +66,12 @@ describe('LoginForm', () => {
       fireEvent.click(screen.getByRole('button', { name: '登入' }));
     });
 
-    expect(screen.getByText('帳號或密碼錯誤，請檢查電子郵件和密碼是否正確！')).toBeInTheDocument();
+    expect(screen.getByText('帳號或密碼錯誤，請檢查電子郵件和密碼是否正確')).toBeInTheDocument();
     // 錯誤發生後按鈕仍可點擊，不會卡在無法重試的狀態
     expect(screen.getByRole('button', { name: '登入' })).not.toBeDisabled();
   });
 
-  test('其他錯誤代碼顯示帶原始訊息的錯誤文字', async () => {
+  test('其他已知錯誤代碼顯示中文說明，不顯示 Firebase 的英文訊息', async () => {
     signInWithEmailAndPassword.mockRejectedValueOnce({ code: 'auth/network-request-failed', message: 'Network Error' });
     render(<LoginForm />);
     fillLoginForm('a@b.com', 'secret1');
@@ -80,7 +80,8 @@ describe('LoginForm', () => {
       fireEvent.click(screen.getByRole('button', { name: '登入' }));
     });
 
-    expect(screen.getByText('登入失敗: Network Error')).toBeInTheDocument();
+    expect(screen.getByText('網路連線失敗，請檢查網路後再試一次')).toBeInTheDocument();
+    expect(screen.queryByText(/Network Error/)).not.toBeInTheDocument();
   });
 
   test('非 Firebase 例外（沒有 code 欄位）不會在 catch 區塊內再丟一次，仍顯示通用錯誤訊息', async () => {
@@ -92,7 +93,8 @@ describe('LoginForm', () => {
       fireEvent.click(screen.getByRole('button', { name: '登入' }));
     });
 
-    expect(screen.getByText('登入失敗: Failed to fetch')).toBeInTheDocument();
+    expect(screen.getByText('登入失敗，請稍後再試')).toBeInTheDocument();
+    expect(screen.queryByText(/Failed to fetch/)).not.toBeInTheDocument();
   });
 
   test('忘記密碼連結有 href，鍵盤使用者可以直接 Tab 到並用 Enter 觸發導頁', () => {

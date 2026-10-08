@@ -2,6 +2,7 @@ import "../../static/css/_auth/forgotPassword.css"
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAuth, sendPasswordResetEmail } from "firebase/auth";
+import { authErrorMessage } from "@utils/firebaseAuthErrors";
 
 const ForgotPassword = () => {
     const navigate = useNavigate();
@@ -21,17 +22,14 @@ const ForgotPassword = () => {
             setIsSuccess(true);
         } catch (error) {
             console.error("重設信件寄送失敗：", error);
-            switch (error.code) {
-                case "auth/invalid-email":
-                    setMessage("Email 格式不正確");
-                    break;
-                case "auth/user-not-found":
-                    setMessage("找不到此 Email 對應的帳號");
-                    break;
-                default:
-                    setMessage("寄送失敗");
+            if (error.code === "auth/user-not-found") {
+                // 不論有沒有這個帳號都顯示同樣的結果，避免這個頁面被拿來探測哪些 Email 已註冊
+                setMessage("已寄送密碼重設信件，請至信箱確認。");
+                setIsSuccess(true);
+            } else {
+                setMessage(authErrorMessage(error, "寄送失敗，請稍後再試"));
+                setIsSuccess(false);
             }
-            setIsSuccess(false);
         } finally {
             setIsSubmitting(false);
         }
@@ -39,7 +37,7 @@ const ForgotPassword = () => {
 
     return (
         <div className="forgot-container">
-            <h2>忘記密碼</h2>
+            <h1>忘記密碼</h1>
             <p className="instruction">請輸入您的電子郵件，我們會寄送重設密碼的連結。</p>
 
             <form onSubmit={handleReset}>

@@ -1,5 +1,5 @@
 import "../../static/css/_auth/registerForm.css"
-import { User, Mail, LockKeyhole, Footprints, CheckCircle } from "lucide-react"
+import { User, Mail, Footprints, CheckCircle } from "lucide-react"
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Alert } from "react-bootstrap";
@@ -9,14 +9,18 @@ import successAnimation from "../../src/animations/success.json"
 import SuccessModal from "../ui/SuccessModal";
 import { useLottieAnimation } from "@hooks/useLottieAnimation";
 import { useAvatarUpload } from "@hooks/useAvatarUpload";
+import { authErrorMessage } from "@utils/firebaseAuthErrors";
+import PasswordField from "./PasswordField";
 
 const RegisterForm = ({ onSwitchToLogin }) => {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
     const [identity, setIdentity] = useState("學生");
     const [errorMsg, setErrorMsg] = useState("");
     const isPasswordValid = password.length >= 6;
+    const isConfirmMismatch = confirmPassword.length > 0 && confirmPassword !== password;
 
     const { previewUrl, isUploading, uploadError, selectFile } = useAvatarUpload();
     const [avatarUrl, setAvatarUrl] = useState(null);
@@ -31,6 +35,10 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     const handleRegister = async (e) => {
         e.preventDefault();
         setErrorMsg("");
+        if (password !== confirmPassword) {
+            setErrorMsg("兩次輸入的密碼不一致");
+            return;
+        }
         setIsSubmitting(true);
         try {
             await registerWithImg(name, email, password, identity, avatarUrl);
@@ -39,11 +47,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                 navigate("/login");
             }, 1500);
         } catch (error) {
-            if (error.code === "auth/email-already-in-use") {
-                setErrorMsg("Email 已被註冊過");
-            } else {
-                setErrorMsg("註冊失敗");
-            }
+            setErrorMsg(authErrorMessage(error, "註冊失敗，請稍後再試"));
             setIsRegistered(false);
         } finally {
             setIsSubmitting(false);
@@ -62,7 +66,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     return (
         <div className="register-container">
             <div className="register-box">
-                <h2 className="formTitle">註冊</h2>
+                <h1 className="formTitle">註冊</h1>
                 <p className="register-subtitle">立即體驗源·語
                     <button type="button" onClick={() => alert("敬請期待")}>
                         <Footprints size={22} />訪客登入
@@ -89,16 +93,15 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                         <Mail size={24} className="icon" />
                         <input type="email" className="input-field" placeholder="帳號" aria-label="帳號" autoComplete="email" required onChange={(e) => setEmail(e.target.value)} />
                     </div>
-                    <div className="input-wrapper">
-                        <LockKeyhole size={24} className="icon" />
-                        <input type="password" className="input-field" placeholder="密碼" aria-label="密碼" autoComplete="new-password" required onChange={(e) => setPassword(e.target.value)} value={password} />
-                    </div>
+                    <PasswordField value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
                     <div className="password-requirements">
                         <span className={`check-icon ${isPasswordValid ? 'valid' : 'invalid'}`} aria-hidden="true">
                             <CheckCircle size={20} />
                         </span>
                         <p>密碼至少需要 6 個字元</p>
                     </div>
+                    <PasswordField value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="再次輸入密碼" ariaLabel="確認密碼" autoComplete="new-password" />
+                    {isConfirmMismatch && <p className="password-requirements" role="alert">兩次輸入的密碼不一致</p>}
                     <div className="input-wrapper">
                         <select name="identity" className="input-field" style={{ cursor: "pointer" }} aria-label="身分" value={identity} onChange={(e) => setIdentity(e.target.value)}>
                             <option value="學生">學生</option>

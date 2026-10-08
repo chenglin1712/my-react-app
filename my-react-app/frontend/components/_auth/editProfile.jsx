@@ -64,7 +64,7 @@ const Edit = () => {
 
     return (
         <div className="edit-container">
-            <h2 className="edit-title">編輯個人資料</h2>
+            <h1 className="edit-title">編輯個人資料</h1>
             {(errorMsg || uploadError) && <Alert variant="danger" className="py-2">{errorMsg || uploadError}</Alert>}
 
             <label className="avatar-uploader" htmlFor="edit-avatar-input">
