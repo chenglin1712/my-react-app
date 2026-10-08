@@ -1,5 +1,6 @@
 import DOMPurify from "dompurify";
 import { useEffect, useRef, useState } from "react";
+import { useFocusTrap } from "@hooks/useFocusTrap";
 
 const REPORT_REASONS = [
   { value: "inappropriate", label: "不當內容" },
@@ -66,6 +67,8 @@ export default function NoteModal({ note, canLike, iLike, canDelete, onToggleLik
   useEffect(() => {
     modalRef.current?.focus();
   }, []);
+  // Tab 只在彈窗內循環，關閉後焦點回到原本點開它的卡片
+  useFocusTrap(modalRef);
 
   return (
     <div className="ns-modal-mask" onClick={handleMaskClick}>

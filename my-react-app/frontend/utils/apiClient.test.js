@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import axios from 'axios';
-import { apiGet, apiPost, apiPatch, apiPut, apiDelete, trackEvent, ApiError } from './apiClient';
+import { apiGet, apiPost, apiPatch, apiPut, apiDelete, trackEvent, ApiError, DEFAULT_TIMEOUT_MS } from './apiClient';
 
 vi.mock('axios');
 
@@ -199,5 +199,51 @@ describe('後台重新驗證通知', () => {
     await expect(apiGet('/adminapi/x/')).rejects.toMatchObject({ status: 401 });
     expect(handler).not.toHaveBeenCalled();
     window.removeEventListener('admin:reauth-required', handler);
+  });
+});
+
+describe('逾時與自動重試', () => {
+  beforeEach(() => {
+    mockCurrentUser = null;
+    axios.get.mockReset();
+    axios.post.mockReset();
+    axios.isCancel.mockReturnValue(false);
+  });
+
+  test('每個請求都帶預設逾時，個別呼叫可以覆寫', async () => {
+    axios.get.mockResolvedValue({ data: {} });
+    await apiGet('/x');
+    expect(axios.get.mock.calls[0][1].timeout).toBe(DEFAULT_TIMEOUT_MS);
+    await apiGet('/x', { timeout: 5000 });
+    expect(axios.get.mock.calls[1][1].timeout).toBe(5000);
+  });
+
+  test('逾時顯示中文訊息並標記 timedOut', async () => {
+    axios.post.mockRejectedValueOnce(Object.assign(new Error('timeout of 60000ms exceeded'), { code: 'ECONNABORTED' }));
+    await expect(apiPost('/x', {})).rejects.toMatchObject({ message: '伺服器回應逾時，請稍後再試', timedOut: true });
+  });
+
+  test('GET 遇到暫時性失敗（502）會重試一次，之後成功就回傳資料', async () => {
+    vi.useFakeTimers();
+    try {
+      axios.get.mockRejectedValueOnce({ response: { status: 502, data: {} }, message: 'Bad Gateway' });
+      axios.get.mockResolvedValueOnce({ data: { ok: 1 } });
+      const pending = apiGet('/x');
+      await vi.advanceTimersByTimeAsync(1000);
+      await expect(pending).resolves.toEqual({ ok: 1 });
+      expect(axios.get).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('GET 遇到 4xx 不重試；POST 失敗也不重試（避免重複寫入）', async () => {
+    axios.get.mockRejectedValueOnce({ response: { status: 404, data: { detail: '找不到' } } });
+    await expect(apiGet('/x')).rejects.toMatchObject({ status: 404 });
+    expect(axios.get).toHaveBeenCalledTimes(1);
+
+    axios.post.mockRejectedValueOnce({ response: { status: 502, data: {} } });
+    await expect(apiPost('/x', {})).rejects.toMatchObject({ status: 502 });
+    expect(axios.post).toHaveBeenCalledTimes(1);
   });
 });

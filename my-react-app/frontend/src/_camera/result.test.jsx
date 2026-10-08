@@ -49,7 +49,7 @@ describe('CameraResultStep', () => {
     expect(axios.post).toHaveBeenCalledWith(
       expect.any(String),
       { words: ['balay'], tribe: 'tayal' },
-      { headers: {} },
+      { headers: {}, timeout: expect.any(Number) },
     );
   });
 
@@ -64,7 +64,7 @@ describe('CameraResultStep', () => {
     expect(axios.post).toHaveBeenCalledWith(
       expect.any(String),
       { words: ['balay'], tribe: 'tayal' },
-      { headers: { Authorization: 'Bearer fake-token' } },
+      { headers: { Authorization: 'Bearer fake-token' }, timeout: expect.any(Number) },
     );
   });
 

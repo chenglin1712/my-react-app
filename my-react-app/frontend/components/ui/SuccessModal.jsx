@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from "react";
+import { useFocusTrap } from "@hooks/useFocusTrap";
 
 // 置中成功提示 Modal：全息漸層打勾圖示 + 文字，用於登入/註冊等操作成功提示。
 // icon 可傳入自訂內容（例如登入/註冊表單原本各自維護的 lottie 動畫容器），
@@ -14,6 +15,7 @@ const SuccessModal = ({ show, text, icon }) => {
   useEffect(() => {
     if (show) boxRef.current?.focus();
   }, [show]);
+  useFocusTrap(boxRef, show);
 
   if (!show) return null;
   return (

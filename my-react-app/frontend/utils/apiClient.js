@@ -16,11 +16,12 @@ import { auth } from '../../firebase';
  * 不需要因為這次改用共用 client 而跟著更動。
  */
 export class ApiError extends Error {
-  constructor(message, { status, data } = {}) {
+  constructor(message, { status, data, timedOut } = {}) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.data = data;
+    this.timedOut = Boolean(timedOut);
   }
 }
 
@@ -29,8 +30,13 @@ async function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-function buildConfig(headers, { params, signal } = {}) {
-  const config = { headers };
+/** 預設逾時：伺服器接了連線卻一直不回應時，頁面不該永遠停在載入中。
+ * 影像辨識、翻譯、AI 出題都可能跑比較久，所以抓 60 秒（nginx 的 proxy_read_timeout 是 90 秒，
+ * 要比它短，前端才會先顯示逾時訊息）；個別呼叫可以用 options.timeout 覆寫。 */
+export const DEFAULT_TIMEOUT_MS = 60000;
+
+function buildConfig(headers, { params, signal, timeout } = {}) {
+  const config = { headers, timeout: timeout ?? DEFAULT_TIMEOUT_MS };
   if (params !== undefined) config.params = params;
   if (signal !== undefined) config.signal = signal;
   return config;
@@ -65,8 +71,10 @@ function throwNormalizedError(err) {
   if (status === 401 && respData?.code === 'reauth_required' && typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('admin:reauth-required'));
   }
-  const message = extractMessage(respData?.detail) || extractMessage(respData?.error) || err.message || '請求失敗';
-  throw new ApiError(message, { status, data: respData });
+  const isTimeout = err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT';
+  const message = extractMessage(respData?.detail) || extractMessage(respData?.error)
+    || (isTimeout ? '伺服器回應逾時，請稍後再試' : err.message) || '請求失敗';
+  throw new ApiError(message, { status, data: respData, timedOut: isTimeout });
 }
 
 /** apiGet/apiPost/apiPut/apiPatch/apiDelete 的共用執行層：附加 token、呼叫、
@@ -89,8 +97,29 @@ export function apiPost(url, data, options = {}) {
   return executeApi(options, (config) => axios.post(url, data, config));
 }
 
-export function apiGet(url, options = {}) {
-  return executeApi(options, (config) => axios.get(url, config));
+/** 值得重試的暫時性失敗：連不到伺服器（沒有 response）、或閘道回 502/503/504。
+ * 只有 GET 會自動重試（讀取是冪等的）；POST/PUT/PATCH/DELETE 重送可能造成重複寫入，一律不重試。 */
+const RETRY_DELAY_MS = 600;
+const isTransientFailure = (err) => {
+  if (axios.isCancel(err)) return false;
+  const status = err.response?.status;
+  return status === undefined || status === 502 || status === 503 || status === 504;
+};
+
+export async function apiGet(url, options = {}) {
+  const { retries = 1, ...requestOptions } = options;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await executeApi(requestOptions, (config) => axios.get(url, config));
+    } catch (err) {
+      const original = err?.cause ?? err;
+      const transient = err instanceof ApiError
+        ? (err.status === undefined || [502, 503, 504].includes(err.status)) && !err.timedOut
+        : isTransientFailure(original);
+      if (attempt >= retries || !transient || requestOptions.signal?.aborted) throw err;
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * (attempt + 1)));
+    }
+  }
 }
 
 /** 後台管理系統的端點才會用到 PATCH／PUT／DELETE（見 backend/adminapi/），
