@@ -8,7 +8,7 @@ import QuestionRenderer, { QUESTION_COMPONENTS } from "./quiz_recommon_question_
 import "../../static/css/_quiz/quiz_recommon_question.css";
 
 export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
-  const { userData } = useAuth();
+  const { userData, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   const [questionList, setQuestionList] = useState([]);
@@ -51,7 +51,14 @@ export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
     ruleFeedbackRef.current = [];
 
     const loadQuiz = async () => {
-      if (!userData?.uid) return;
+      // 登入狀態還在確認：維持「載入中」。確認完仍沒有使用者（未登入或登入已過期）：
+      // 不能留在載入中（初始值是 true，提早 return 就永遠不會變），要明確告訴使用者。
+      if (authLoading) return;
+      if (!userData?.uid) {
+        setLoadError("請先登入後再開始測驗。");
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       setLoadError(null);
       try {
@@ -87,7 +94,7 @@ export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
 
     loadQuiz();
     return () => { cancelled = true; };
-  }, [userData?.uid, tribe]);
+  }, [userData?.uid, authLoading, tribe]);
 
   // 題目載入完成、且真的有題目可作答才開始計時——原本只看 loading，
   // 載入失敗或題目為空時（loading 也會變 false）計時器仍會在錯誤畫面

@@ -103,7 +103,10 @@ const Panel = ({ tribe = "tayal" }) => {
             tribe,
             questions: savedQuestions,
             answers: userAnswers,
-            correctAnswers: quizInfo?.ans ?? []
+            correctAnswers: quizInfo?.ans ?? [],
+            // 這個頁面馬上就會被導走，上面的 submitError 使用者看不到；放在 fallback 裡，
+            // 結果頁不論是從導頁狀態或 sessionStorage 讀到這份資料，都能顯示「沒有存進資料庫」的提示
+            ...(situationID ? {} : { saveFailed: true }),
         };
         try {
             sessionStorage.setItem('quizFallback', JSON.stringify(fallbackData));
@@ -115,7 +118,7 @@ const Panel = ({ tribe = "tayal" }) => {
         navigate(`${basePath}/${level}/submit`, {
             state: {
                 situationID,
-                fallback: fallbackData
+                fallback: fallbackData,
             }
         });
     };

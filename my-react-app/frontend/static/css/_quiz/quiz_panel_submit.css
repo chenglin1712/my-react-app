@@ -264,3 +264,11 @@
     transform: translate(2px, 2px);
     box-shadow: 1px 1px 0 var(--yy-ink);
 }
+
+/* 作答結果沒能存進資料庫時的提示（內容來自暫存，離開此頁就沒了） */
+.submit-save-failed {
+    color: var(--yy-danger);
+    text-align: center;
+    margin: 8px 0 16px;
+    font-weight: 600;
+}

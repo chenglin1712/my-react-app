@@ -96,3 +96,39 @@ describe('Panel_Submit 的四種題型 ResultRenderer（FR-4a：從巢狀 ternar
     expect(await screen.findByText('未作答')).toBeInTheDocument();
   });
 });
+
+describe('Panel_Submit 的儲存失敗提示', () => {
+  const fallback = {
+    title: '初級',
+    questions: [{ question_ab: 'qay', image: 'qay.png' }],
+    answers: [1],
+    correctAnswers: [1],
+  };
+
+  test('作答結果沒存進資料庫（saveFailed）時，結果頁明說這是暫存結果', async () => {
+    mockLocationState = { fallback: { ...fallback, saveFailed: true } };
+    render(<Panel_Submit tribe="tayal" />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('作答結果儲存失敗');
+    expect(screen.getByText('qay')).toBeInTheDocument();
+  });
+
+  test('導頁狀態遺失、只剩 sessionStorage 的暫存時，提示仍然會出現', async () => {
+    mockLocationState = undefined;
+    sessionStorage.setItem('quizFallback', JSON.stringify({ ...fallback, saveFailed: true }));
+    try {
+      render(<Panel_Submit tribe="tayal" />);
+      expect(await screen.findByRole('alert')).toHaveTextContent('作答結果儲存失敗');
+    } finally {
+      sessionStorage.removeItem('quizFallback');
+    }
+  });
+
+  test('正常儲存時不顯示這則提示', async () => {
+    mockLocationState = { fallback };
+    render(<Panel_Submit tribe="tayal" />);
+
+    expect(await screen.findByText('qay')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});

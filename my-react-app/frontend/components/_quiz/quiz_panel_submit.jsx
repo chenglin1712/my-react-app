@@ -100,6 +100,8 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
         if (!raw) return null;
         try { return JSON.parse(raw); } catch { return null; }
     })();
+    // 作答結果沒能存進資料庫（見 quiz_panel.jsx 的 handleSubmit）：畫面上的內容來自暫存，要明說
+    const saveFailed = fallback?.saveFailed === true;
 
     const getDurationMMSS = (start, end) => {
         if (!start || !end) return "00:00";
@@ -191,6 +193,11 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
                 </div>
 
                 <div className="paper-body">
+                    {saveFailed && (
+                        <p className="submit-save-failed" role="alert">
+                            作答結果儲存失敗，這次的紀錄可能不會出現在「答題情形」裡。下面是暫存的結果。
+                        </p>
+                    )}
                     <div className="submit-question-header-row">
                         <span className="header-title"></span>
                         <span className="header-title"></span>

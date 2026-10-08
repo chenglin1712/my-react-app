@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import RecommendedQuizQuestion from './quiz_recommon_question';
 import { apiPost } from '../../utils/apiClient';
@@ -8,8 +8,9 @@ const mockNavigate = vi.fn();
 vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
 }));
+let mockAuth = { userData: { uid: 'user-1' }, loading: false };
 vi.mock('../../src/userServives/authContext', () => ({
-  useAuth: () => ({ userData: { uid: 'user-1' } }),
+  useAuth: () => mockAuth,
 }));
 vi.mock('../../utils/apiClient', () => ({
   apiPost: vi.fn(),
@@ -259,5 +260,46 @@ describe('RecommendedQuizQuestion（FR-4b）', () => {
       await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
       expect(mockNavigate.mock.calls[0][1].state.ruleFeedback).toEqual([]);
     });
+  });
+});
+
+describe('RecommendedQuizQuestion 的登入狀態', () => {
+  beforeEach(() => {
+    apiPost.mockReset();
+    loadQuizModel.mockReset();
+  });
+  afterEach(() => { mockAuth = { userData: { uid: 'user-1' }, loading: false }; });
+
+  test('登入狀態確認完仍沒有使用者：顯示請先登入，不會永遠停在載入中，也不會呼叫出題', async () => {
+    mockAuth = { userData: null, loading: false };
+    render(<RecommendedQuizQuestion tribe="amis" />);
+
+    expect(await screen.findByText('請先登入後再開始測驗。')).toBeInTheDocument();
+    expect(screen.queryByText(/題目載入中/)).not.toBeInTheDocument();
+    expect(apiPost).not.toHaveBeenCalled();
+  });
+
+  test('登入狀態從確認中變成已登入：只出題一次，過程中不會出現「請先登入」', async () => {
+    loadQuizModel.mockResolvedValue({});
+    apiPost.mockResolvedValue({ questions: [] });
+    mockAuth = { userData: null, loading: true };
+    const { rerender } = render(<RecommendedQuizQuestion tribe="amis" />);
+    expect(screen.queryByText('請先登入後再開始測驗。')).not.toBeInTheDocument();
+
+    mockAuth = { userData: { uid: 'user-1' }, loading: false };
+    rerender(<RecommendedQuizQuestion tribe="amis" />);
+
+    await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(1));
+    expect(loadQuizModel).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('請先登入後再開始測驗。')).not.toBeInTheDocument();
+  });
+
+  test('登入狀態還在確認時維持載入中，不誤報未登入', () => {
+    mockAuth = { userData: null, loading: true };
+    render(<RecommendedQuizQuestion tribe="amis" />);
+
+    expect(screen.getByText(/題目載入中/)).toBeInTheDocument();
+    expect(screen.queryByText('請先登入後再開始測驗。')).not.toBeInTheDocument();
+    expect(apiPost).not.toHaveBeenCalled();
   });
 });

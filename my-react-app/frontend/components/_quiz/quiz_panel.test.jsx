@@ -119,7 +119,7 @@ describe('Panel + AnswerBox 提交流程整合（FR-4a：兩顆繳交按鈕必�
 
     expect(screen.getByRole('alert')).toHaveTextContent('作答結果儲存失敗');
     expect(mockNavigate).toHaveBeenCalledWith('/quiz/1/submit', {
-      state: { situationID: undefined, fallback: expect.anything() },
+      state: { situationID: undefined, fallback: expect.objectContaining({ saveFailed: true }) },
     });
   });
 
