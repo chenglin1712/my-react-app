@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from typing import Dict, List
 
 import requests
+from ...internal_headers import DJANGO_INTERNAL_HEADERS
 
 import logging as _logging
 
@@ -140,7 +141,7 @@ def _refresh_irt_config_if_stale() -> None:
         if time.monotonic() - _irt_config_last_fetch < _IRT_CONFIG_TTL_SECONDS:
             return
         try:
-            resp = requests.get(_IRT_CONFIG_URL, timeout=5)
+            resp = requests.get(_IRT_CONFIG_URL, timeout=5, headers=DJANGO_INTERNAL_HEADERS)
             resp.raise_for_status()
             snapshot = _parse_irt_config_snapshot(resp.json())
         except Exception:

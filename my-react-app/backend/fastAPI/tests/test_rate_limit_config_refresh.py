@@ -28,6 +28,17 @@ def test_successful_fetch_updates_rules_dict():
     assert rate == "5/minute"
 
 
+def test_internal_request_declares_https_so_django_does_not_redirect():
+    # 正式環境 Django 開了 SECURE_SSL_REDIRECT：沒有 X-Forwarded-Proto 的內部請求會被導去
+    # https://127.0.0.1:8000 而 SSL 失敗，後台設定的限流就永遠讀不到
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"rules": {}}
+    with patch("fastAPI.rate_limit_config.requests.get", return_value=mock_response) as mock_get:
+        rate_limit_config.get_configured_rate("quiz_compare_audio", "20/minute")
+
+    assert mock_get.call_args.kwargs["headers"]["X-Forwarded-Proto"] == "https"
+
+
 def test_key_not_in_django_response_falls_back_to_default():
     mock_response = MagicMock()
     mock_response.status_code = 200

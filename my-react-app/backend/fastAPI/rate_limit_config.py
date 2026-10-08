@@ -20,6 +20,7 @@ import threading
 import time
 
 import requests
+from .internal_headers import DJANGO_INTERNAL_HEADERS
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ def _refresh_if_stale() -> None:
         if time.monotonic() - _rate_limit_last_fetch < _RATE_LIMIT_CONFIG_TTL_SECONDS:
             return
         try:
-            resp = requests.get(_RATE_LIMIT_CONFIG_URL, timeout=5)
+            resp = requests.get(_RATE_LIMIT_CONFIG_URL, timeout=5, headers=DJANGO_INTERNAL_HEADERS)
             resp.raise_for_status()
             _rate_limit_rules = resp.json().get("rules", {})
         except Exception:

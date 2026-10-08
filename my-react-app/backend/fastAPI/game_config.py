@@ -16,6 +16,7 @@ import threading
 import time
 
 import requests
+from .internal_headers import DJANGO_INTERNAL_HEADERS
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ def refresh_game_config_if_stale() -> None:
         if time.monotonic() - _game_config_last_fetch < _GAME_CONFIG_TTL_SECONDS:
             return
         try:
-            resp = requests.get(_GAME_CONFIG_URL, timeout=5)
+            resp = requests.get(_GAME_CONFIG_URL, timeout=5, headers=DJANGO_INTERNAL_HEADERS)
             resp.raise_for_status()
             data = resp.json()
 
