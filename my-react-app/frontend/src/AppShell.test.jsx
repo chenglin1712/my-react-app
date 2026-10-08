@@ -5,6 +5,7 @@ import AppShell from './AppShell';
 
 vi.mock('react-router-dom', () => ({ useLocation: () => ({ pathname: '/' }) }));
 vi.mock('./route', () => ({ default: () => <div>routes</div> }));
+vi.mock('./RouteEffects', () => ({ default: () => null }));
 vi.mock('../components/navigation/navbar', () => ({
   default: ({ onOpenBot }) => <button onClick={onOpenBot}>open-bot</button>,
 }));

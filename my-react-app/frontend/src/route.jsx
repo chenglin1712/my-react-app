@@ -7,6 +7,8 @@ import ErrorBoundary from './errorBoundary';
 import { TRIBES } from './constants/tribes';
 import AdminEntryFallback from './_admin/entry/AdminEntryFallback';
 import AdminEntryGate from './_admin/entry/AdminEntryGate';
+//找不到頁面
+const NotFoundPage = lazy(() => import('./_error/NotFoundPage'));
 //首頁
 const HomePage = lazy(() => import('./_home/index'));
 //登入、註冊、編輯資料
@@ -74,7 +76,8 @@ const AdminRoute = lazy(() => import('./_admin/AdminRoute'));
 const ProtectedLayout = () => {
   const { userData, loading } = useAuth();
   const { pathname } = useLocation();
-  if (loading) return null;
+  // 登入狀態還在確認時顯示載入中，不要回傳 null：內容區整個消失會讓頁尾瞬間跳到頁首下方、再被擠下去（版面位移）
+  if (loading) return <RouteLoadingFallback />;
   if (!userData) return <PermissionProtect />;
   return (
     <ErrorBoundary resetKeys={[pathname]}>
@@ -176,6 +179,8 @@ const AppRoutes = () => {
               </AdminEntryGate>
             )}
           />
+          {/* 所有沒有對應的網址：原本是只有導覽列與頁尾、中間整片空白 */}
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
     </ErrorBoundary>

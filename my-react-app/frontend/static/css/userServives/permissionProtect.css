@@ -1,34 +1,70 @@
-.permission-container {
-    padding: 20px 0px;
-    width: 100%;
-}
-
-.permission-title-container {
+.permission-hero {
+    padding: 70px 24px 100px;
     display: flex;
     justify-content: center;
-    gap: 1%;
+}
+
+.permission-card {
+    width: 520px;
+    max-width: 100%;
+    padding: 36px 32px;
+    text-align: center;
+    box-shadow: var(--yy-shadow-lg);
+}
+
+/* 用三格像素方塊組成的鎖頭，沿用站內的織紋色，不再借用外來插圖 */
+.permission-lock {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin: 22px 0 18px;
+}
+
+.permission-lock span {
+    width: 22px;
+    height: 22px;
+    border: 3px solid var(--yy-ink);
+    background: var(--yy-red);
+    box-shadow: 3px 3px 0 var(--yy-ink);
+}
+
+.permission-lock span:nth-child(2) {
+    background: var(--yy-gold);
+}
+
+.permission-lock span:nth-child(3) {
+    background: var(--yy-blue);
 }
 
 .permission-title {
-    font-weight: 600;
-    margin: 0px;
+    margin: 0 0 10px;
+    font-size: 24px;
+    font-weight: 800;
+    line-height: 1.4;
 }
 
-.permission-title-container button {
-    border-radius: 8px;
-    padding: 0px 10px;
+.permission-text {
+    margin: 0 0 24px;
+    color: var(--yy-text-tertiary);
+    line-height: 1.8;
 }
 
-.permission-title-container button:hover {
-    color: #F4F4F4;
-    background-color: #9B1B30;
-}
-
-.permission-animation-container {
+.permission-actions {
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
+    gap: 12px;
 }
 
-.permission-animation {
-    width: 40%;
+.permission-actions .yy-btn-primary,
+.permission-actions .yy-btn-outline {
+    min-height: 44px;
+    padding: 10px 20px;
+    animation: none;
+}
+
+.permission-link {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
 }

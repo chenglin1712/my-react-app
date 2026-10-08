@@ -4,6 +4,8 @@ import { AnimatePresence } from 'framer-motion';
 import AppRoutes from './route';
 import Navbar from '../components/navigation/navbar';
 import Footer from '../components/ui/Footer';
+import RouteEffects from './RouteEffects';
+import OfflineBanner from '../components/ui/OfflineBanner';
 
 import ErrorBoundary from './errorBoundary';
 
@@ -32,6 +34,8 @@ export default function AppShell() {
           是 Bootstrap（已載入）內建的 skip-link 樣式：預設隱藏，取得鍵盤焦點時
           才顯示，不用自己另外寫 CSS。 */}
       <a href="#main-content" className="visually-hidden-focusable">跳到主要內容</a>
+      <RouteEffects />
+      <OfflineBanner />
       <Navbar onOpenBot={() => setIsBotOpen(true)} />
       <main id="main-content">
         <AppRoutes />

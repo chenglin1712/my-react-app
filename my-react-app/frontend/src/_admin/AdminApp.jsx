@@ -2,6 +2,7 @@ import { lazy, useEffect, useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { apiGet } from '../../utils/apiClient';
 import AdminLayout from './layout/AdminLayout';
+import AdminNotFound from './layout/AdminNotFound';
 
 // 這 25 個後台頁面彼此互斥（一次只會顯示一個），原本用一般 import 全部
 // 一起打包進 AdminApp 這個 chunk——build 輸出裡它已經是全站數一數二大的
@@ -96,6 +97,7 @@ const AdminApp = () => {
                 <Route path="system/rate-limits" element={<RateLimitSettings />} />
                 <Route path="system/feature-flags" element={<FeatureFlags />} />
                 <Route path="system/morphology-capabilities" element={<MorphologyCapabilities />} />
+                <Route path="*" element={<AdminNotFound />} />
             </Route>
         </Routes>
     );

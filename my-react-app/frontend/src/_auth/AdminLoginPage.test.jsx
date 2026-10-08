@@ -36,4 +36,9 @@ describe('AdminLoginPage', () => {
         const { container } = renderPage();
         expect(container.querySelector('.admin-login-aside')).toHaveAttribute('aria-hidden', 'true');
     });
+
+    test('分頁標題是「後台登入」', () => {
+        renderPage();
+        expect(document.title).toBe('後台登入｜源·語');
+    });
 });

@@ -1,0 +1,55 @@
+.notfound-hero {
+    padding: 70px 24px 100px;
+    display: flex;
+    justify-content: center;
+}
+
+.notfound-panel {
+    position: relative;
+    width: 480px;
+    max-width: 100%;
+    padding: 36px 32px;
+    text-align: center;
+    box-shadow: var(--yy-shadow-lg);
+}
+
+.notfound-code {
+    margin: 18px 0 4px;
+    font-family: var(--yy-font-pixel);
+    font-size: 72px;
+    line-height: 1;
+    color: var(--yy-red);
+    text-shadow: 4px 4px 0 var(--yy-gold);
+}
+
+.notfound-panel h1 {
+    margin: 0 0 10px;
+    font-size: 26px;
+    font-weight: 800;
+}
+
+.notfound-text {
+    margin: 0 0 24px;
+    color: var(--yy-text-tertiary);
+    line-height: 1.8;
+}
+
+.notfound-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+}
+
+.notfound-actions .yy-btn-primary,
+.notfound-actions .yy-btn-outline {
+    min-height: 44px;
+    padding: 10px 20px;
+    animation: none;
+}
+
+.notfound-link {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+}

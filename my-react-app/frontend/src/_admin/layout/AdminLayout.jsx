@@ -103,6 +103,12 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
     const contentRef = useRef(null);
     const { firstEntry, revealed, markReady } = useAdminEntry();
 
+    // 分頁標題跟著麵包屑走（原本整個後台都是「源·語」）
+    const pageTitle = breadcrumb[breadcrumb.length - 1];
+    useEffect(() => {
+        document.title = `${pageTitle}｜後台管理｜源·語`;
+    }, [pageTitle]);
+
     // 後台殼層掛載完成 = 入口閘門可以開始倒數最短可見時間，然後收合
     useEffect(() => { markReady(); }, [markReady]);
 
@@ -130,6 +136,7 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
 
     return (
         <div className={`admin-shell${ceremony === 'hold' ? ' admin-shell--hold' : ''}${ceremony === 'play' ? ' admin-shell--play' : ''}`}>
+            <a href="#admin-main" className="visually-hidden-focusable">跳到後台主要內容</a>
             <AdminReauthModal />
             <aside className="admin-sidebar">
                 <Link className="admin-brand" to="/admin"><span>源·語</span><small>ADMIN CONSOLE</small></Link>
@@ -170,11 +177,11 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
             </aside>
             <div className="admin-main-column">
                 <header className="admin-topbar">
-                    <div className="admin-breadcrumb" aria-label="麵包屑">
+                    <nav className="admin-breadcrumb" aria-label="麵包屑">
                         {breadcrumb.map((part, index) => (
                             <span key={`${part}-${index}`}>{index > 0 && <i>›</i>}{part}</span>
                         ))}
-                    </div>
+                    </nav>
                     <div className="admin-topbar-user">
                         <span className="admin-user-avatar">{ROLE_LABELS[userData?.role]?.charAt(0) ?? '管'}</span>
                         <div>
@@ -190,7 +197,7 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
                     讓錯誤侷限在內容區、導覽仍然可用。
                     resetKeys 傳入 pathname：換到另一個管理頁面時自動
                     復原，不會黏在前一頁的錯誤畫面（見 errorBoundary.jsx）。 */}
-                <div className="admin-route-content" ref={contentRef}>
+                <div className="admin-route-content" id="admin-main" tabIndex={-1} ref={contentRef}>
                     <ErrorBoundary
                         resetKeys={[pathname]}
                         fallback={({ reset }) => (

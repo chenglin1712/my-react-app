@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import { Link } from "react-router-dom"
 import { useAuth } from "../userServives/authContext"
 import { auth } from "../../../firebase"
@@ -43,6 +44,9 @@ function AdminLoginPage() {
     // useAuth() 只是讓登入狀態變化時重新渲染；信箱以 Firebase 目前的使用者為準。
     useAuth()
     const currentEmail = auth.currentUser?.email ?? ""
+
+    // /admin 開頭的路徑不經過前台的 RouteEffects，分頁標題在這裡自己設定
+    useEffect(() => { document.title = "後台登入｜源·語" }, [])
 
     return (
         <div className="admin-login">
