@@ -132,3 +132,42 @@ describe('Panel_Submit 的儲存失敗提示', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
+
+describe('成績頁的無障礙（審查項 P1-7、P1-8）', () => {
+  test('每題都有「答對」或「答錯」的文字，不只靠顏色與圖示', async () => {
+    renderWithFallback({
+      title: '初級',
+      questions: [
+        { question_ab: 'qay', image: 'qay.png' },
+        { question_ab: 'lokah', image: 'lokah.png' },
+      ],
+      answers: [1, 2],
+      correctAnswers: [1, 1],
+    });
+
+    expect(await screen.findByText('答對')).toBeInTheDocument();
+    expect(screen.getByText('答錯')).toBeInTheDocument();
+  });
+
+  test('所有圖片都有有意義的 alt（初級用單詞，中級說明是你選的還是正確答案）', async () => {
+    renderWithFallback({
+      title: '初級',
+      questions: [{ question_ab: 'qay', image: 'qay.png' }],
+      answers: [1],
+      correctAnswers: [1],
+    });
+    const trueFalseImg = await screen.findByRole('img');
+    expect(trueFalseImg).toHaveAttribute('alt', '圖片：qay');
+  });
+
+  test('中級的兩張選項圖分別標明「你選的答案」與「正確答案」', async () => {
+    renderWithFallback({
+      title: '中級',
+      questions: [{ question_ab: 'q', question_ch: '問題', images: { A: 'a.png', B: 'b.png' } }],
+      answers: [1],
+      correctAnswers: [2],
+    });
+    expect(await screen.findByAltText('你選的答案：選項 A')).toBeInTheDocument();
+    expect(screen.getByAltText('正確答案：選項 B')).toBeInTheDocument();
+  });
+});

@@ -127,15 +127,37 @@ describe('Panel + AnswerBox 提交流程整合（FR-4a：兩顆繳交按鈕必�
     useQuizPanelData.mockReturnValue(baseHookState({ userAnswers: [null] }));
     render(<Panel tribe="tayal" />);
 
-    const questionButton = screen.getByRole('button', { name: '1' });
+    const questionButton = screen.getByRole('button', { name: /^第 1 題，未作答/ });
     expect(questionButton).not.toHaveClass('answer');
+    expect(questionButton.querySelector('.answered-mark')).toBeNull();
   });
 
   test('已作答的題目會顯示成已作答', () => {
     useQuizPanelData.mockReturnValue(baseHookState({ userAnswers: [1] }));
     render(<Panel tribe="tayal" />);
 
-    const questionButton = screen.getByRole('button', { name: '1' });
+    const questionButton = screen.getByRole('button', { name: /^第 1 題，已作答/ });
     expect(questionButton).toHaveClass('answer');
+    // 已作答不只靠綠底：有勾勾形狀（審查項 P1-7）
+    expect(questionButton.querySelector('.answered-mark')).not.toBeNull();
+  });
+
+  test('標星是 button：有名稱、aria-pressed 反映狀態，點擊會呼叫 handleStar 並念出結果（審查項 P1-3）', () => {
+    const handleStar = vi.fn();
+    useQuizPanelData.mockReturnValue(baseHookState({ userStars: ['F'], handleStar }));
+    render(<Panel tribe="tayal" />);
+
+    const star = screen.getByRole('button', { name: '標記待複習' });
+    expect(star).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(star);
+    expect(handleStar).toHaveBeenCalledTimes(1);
+  });
+
+  test('已標星的題目 aria-pressed 為 true，題號面板的名稱也說明已標記', () => {
+    useQuizPanelData.mockReturnValue(baseHookState({ userStars: ['T'], userAnswers: [1] }));
+    render(<Panel tribe="tayal" />);
+
+    expect(screen.getByRole('button', { name: '標記待複習' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^第 1 題，已作答，已標記待複習/ })).toBeInTheDocument();
   });
 });

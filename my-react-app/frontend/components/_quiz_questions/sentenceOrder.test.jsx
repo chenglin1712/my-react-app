@@ -1,6 +1,8 @@
 import { describe, test, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import SentenceOrder from './sentenceOrder';
+import { ANNOUNCE_EVENT } from '../../utils/announce';
 
 vi.mock('../../utils/authAudio', () => ({ createAuthorizedAudio: vi.fn() }));
 vi.mock('lottie-web', () => ({ default: { loadAnimation: () => ({ addEventListener: vi.fn(), destroy: vi.fn() }) } }));
@@ -21,15 +23,12 @@ const QUESTION = {
 };
 
 function getWordButtons() {
-  return screen.getAllByRole('button').filter((btn) => !btn.textContent.includes('確認'));
+  return screen.getAllByRole('button').filter((btn) => !btn.textContent.includes('確認') && !btn.getAttribute('aria-label'));
 }
 
-// SortableWord 用 mousedown+setTimeout(500ms)+mouseup 判斷長按/短按移動：
-// 用 fireEvent 直接在同一個 tick 內送出 mousedown/mouseup，兩者間不會真的
-// 經過 500ms，不用依賴系統負載夠低、真實計時器不會搶先觸發長按。
+// 單詞按鈕改用原生 click（滑鼠、觸控、Enter、Space 都會觸發），不再自己判斷長按
 function clickWord(button) {
-  fireEvent.mouseDown(button, { clientX: 0, clientY: 0 });
-  fireEvent.mouseUp(button, { clientX: 0, clientY: 0 });
+  fireEvent.click(button);
 }
 
 describe('SentenceOrder 重複單字識別（回歸測試：原本用單字文字當 id）', () => {
@@ -71,5 +70,110 @@ describe('SentenceOrder 重複單字識別（回歸測試：原本用單字文�
     // checked 是父層控制的 prop：父層收到 onConfirm 之後才會真的切換到結果畫面
     rerender(<SentenceOrder question={QUESTION} checked={true} onSelect={onSelect} onConfirm={onConfirm} />);
     expect(screen.getByText('正確')).toBeInTheDocument();
+  });
+});
+
+describe('SentenceOrder 鍵盤操作（審查項 P1-4）', () => {
+  const QUESTION_3 = {
+    tayal: { sentence: 'a b c', cn: '三個字', audio: null },
+    words: [
+      { word: 'a', audio: null },
+      { word: 'b', audio: null },
+      { word: 'c', audio: null },
+    ],
+    answer: ['a', 'b', 'c'],
+  };
+
+  function getZoneWords() {
+    // 答案區在 DOM 裡排在單詞庫前面
+    return getWordButtons().map((btn) => btn.textContent);
+  }
+
+  test('用 Tab 聚焦單詞、按 Enter 就能把它移到答案區', async () => {
+    const user = userEvent.setup();
+    render(<SentenceOrder question={QUESTION_3} checked={false} onSelect={vi.fn()} onConfirm={vi.fn()} />);
+
+    await user.tab();
+    expect(getWordButtons()[0]).toHaveFocus();
+    await user.keyboard('{Enter}');
+
+    // 移動後答案區多了一個字，確認按鈕解除停用
+    expect(screen.getByRole('button', { name: '確認' })).toBeEnabled();
+  });
+
+  test('用鍵盤把單詞移到答案區後，焦點仍停在那個單詞上，可以接著用方向鍵', async () => {
+    const user = userEvent.setup();
+    render(<SentenceOrder question={QUESTION_3} checked={false} onSelect={vi.fn()} onConfirm={vi.fn()} />);
+
+    await user.tab();
+    await user.keyboard('{Enter}');
+    expect(document.activeElement).toHaveTextContent('a');
+    expect(document.activeElement.tagName).toBe('BUTTON');
+
+    await user.tab();
+    await user.keyboard('{Enter}');
+    // 第二個字也移進答案區，焦點跟著它
+    expect(document.activeElement).toHaveTextContent('b');
+  });
+
+  test('答案區內按左右方向鍵可以調整順序，並念出新位置', async () => {
+    const user = userEvent.setup();
+    const handler = vi.fn();
+    window.addEventListener(ANNOUNCE_EVENT, handler);
+    render(<SentenceOrder question={QUESTION_3} checked={false} onSelect={vi.fn()} onConfirm={vi.fn()} />);
+
+    // 依序放進答案區：a, b, c
+    clickWord(getWordButtons()[0]);
+    clickWord(getWordButtons()[1]);
+    clickWord(getWordButtons()[2]);
+    expect(getZoneWords()).toEqual(['a', 'b', 'c']);
+
+    getWordButtons()[0].focus();
+    await user.keyboard('{ArrowRight}');
+    expect(getZoneWords()).toEqual(['b', 'a', 'c']);
+
+    await user.keyboard('{ArrowLeft}');
+    expect(getZoneWords()).toEqual(['a', 'b', 'c']);
+
+    const messages = handler.mock.calls.map((c) => c[0].detail.message);
+    expect(messages).toContain('「a」移到第 2 個');
+    window.removeEventListener(ANNOUNCE_EVENT, handler);
+  });
+
+  test('到邊界時再按方向鍵不會報錯也不會變動', async () => {
+    const user = userEvent.setup();
+    render(<SentenceOrder question={QUESTION_3} checked={false} onSelect={vi.fn()} onConfirm={vi.fn()} />);
+    clickWord(getWordButtons()[0]);
+    clickWord(getWordButtons()[1]);
+    getWordButtons()[0].focus();
+    await user.keyboard('{ArrowLeft}');
+    expect(getZoneWords().slice(0, 2)).toEqual(['a', 'b']);
+  });
+
+  test('移動單詞時會念出結果', () => {
+    const handler = vi.fn();
+    window.addEventListener(ANNOUNCE_EVENT, handler);
+    render(<SentenceOrder question={QUESTION_3} checked={false} onSelect={vi.fn()} onConfirm={vi.fn()} />);
+    clickWord(getWordButtons()[0]);
+    expect(handler.mock.calls[0][0].detail.message).toBe('「a」已放進答案區，第 1 個');
+    clickWord(getWordButtons()[0]);
+    expect(handler.mock.calls[1][0].detail.message).toBe('「a」已放回單詞庫');
+    window.removeEventListener(ANNOUNCE_EVENT, handler);
+  });
+
+  test('有發音的單詞旁邊有明確的喇叭按鈕，不再靠長按，且按鈕不會巢狀', () => {
+    const withAudio = {
+      ...QUESTION_3,
+      words: [{ word: 'a', audio: 'a.mp3' }, { word: 'b', audio: null }, { word: 'c', audio: null }],
+    };
+    const { container } = render(<SentenceOrder question={withAudio} checked={false} onSelect={vi.fn()} onConfirm={vi.fn()} />);
+    expect(screen.getByRole('button', { name: '播放「a」的發音' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '播放「b」的發音' })).not.toBeInTheDocument();
+    expect(container.querySelector('button button')).toBeNull();
+  });
+
+  test('畫面上有鍵盤操作說明', () => {
+    render(<SentenceOrder question={QUESTION_3} checked={false} onSelect={vi.fn()} onConfirm={vi.fn()} />);
+    expect(screen.getByText(/方向鍵調整順序/)).toBeInTheDocument();
   });
 });

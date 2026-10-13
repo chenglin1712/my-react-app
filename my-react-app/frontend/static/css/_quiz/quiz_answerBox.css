@@ -85,6 +85,11 @@
     color: var(--yy-red-dark);
 }
 
+.answered-mark {
+    margin-left: 4px;
+    vertical-align: -2px;
+}
+
 .star-indicator {
     position: absolute;
     top: -10px;

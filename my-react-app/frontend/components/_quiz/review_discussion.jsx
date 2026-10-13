@@ -61,7 +61,7 @@ const ReviewDiscussion = () => {
 
     const renderAvatar = (avatar, size = 36) => {
         return avatar
-            ? <img src={avatar} alt="avatar" className="avatar-img" style={{ width: size, height: size }} loading="lazy" />
+            ? <img src={avatar} alt="" className="avatar-img" style={{ width: size, height: size }} loading="lazy" />
             : <UserCircle className="avatar" size={size} />;
     };
 

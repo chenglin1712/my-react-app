@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { ArrowDownUp, Volume2, Check, CircleCheck, CircleX } from "lucide-react";
 import { FaPlayCircle } from 'react-icons/fa';
 import {
@@ -20,14 +20,24 @@ import successAnimation from "../../src/animations/success.json";
 import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
 import { useLottieAnimation } from "../../hooks/useLottieAnimation";
 import { playCorrectSound } from "../../utils/correctSound";
+import { announce } from "@utils/announce";
 
-const LONG_PRESS_MS = 500;
-const CLICK_MOVE_THRESHOLD_PX = 5;
 const MOVE_ANIMATION_MS = 400;
+// 滑鼠與觸控要真的拖過這個距離才算拖曳；沒拖動就是點擊（移動單詞）
+const DRAG_ACTIVATION_DISTANCE_PX = 5;
 
 // 單個可排序單詞元件
-function SortableWord({ id, word, audio, onClickWord, onLongPress, isMoving }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+//
+// 原本用 mousedown/mouseup 自己判斷「短按移動、長按播音檔」：鍵盤完全沒有作用（沒有 click），
+// 觸控裝置還會同時收到 touch 與合成的 mouse 事件而重複觸發，長按播放也是沒有任何提示的隱藏手勢。
+// 現在：
+//   - 單詞按鈕用原生 onClick（滑鼠、觸控、Enter、Space 都能用）把單詞在答案區與單詞庫之間移動
+//   - 答案區的單詞按左右方向鍵調整順序
+//   - 有發音的單詞旁邊有明確的喇叭按鈕
+// 拖曳仍保留給滑鼠與觸控；不使用 dnd-kit 的 KeyboardSensor，因為它會佔用 Enter／Space，
+// 跟「按一下移動單詞」衝突。（審查項 P1-4）
+function SortableWord({ id, word, audio, inZone, onClickWord, onPlayAudio, onShift, isMoving }) {
+  const { listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id });
 
   const style = {
@@ -41,53 +51,41 @@ function SortableWord({ id, word, audio, onClickWord, onLongPress, isMoving }) {
     opacity: isDragging ? 0.8 : 1,
   };
 
-  const timerRef = useRef(null);
-  const startPos = useRef({ x: 0, y: 0 });
-
-  useEffect(() => () => clearTimeout(timerRef.current), []);
-
-  const handleMouseDown = (e) => {
-    startPos.current = { x: e.clientX, y: e.clientY };
-    timerRef.current = setTimeout(() => {
-      onLongPress(id); // 長按播放音檔
-      timerRef.current = null;
-    }, LONG_PRESS_MS);
-  };
-
-  const handleMouseUp = (e) => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-      const dx = Math.abs(e.clientX - startPos.current.x);
-      const dy = Math.abs(e.clientY - startPos.current.y);
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (distance < CLICK_MOVE_THRESHOLD_PX) {
-        // 移動距離很小才算短按移動
-        onClickWord(id);
-      }
+  const handleKeyDown = (event) => {
+    if (!inZone) return;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      onShift(id, -1);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      onShift(id, 1);
     }
   };
 
   return (
-    <button
-      type="button"
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onTouchStart={(e) => handleMouseDown(e.touches[0])}
-      onTouchEnd={(e) => handleMouseUp(e.changedTouches[0])}
-      className="custom-btn mx-2 cursor-pointer active:scale-105 flex items-center gap-2 transition-transform"
-    >
-      {word}
+    <span ref={setNodeRef} style={style} className="sortable-word mx-2 flex items-center gap-2">
+      <button
+        type="button"
+        ref={setActivatorNodeRef}
+        data-word-id={id}
+        {...listeners}
+        onClick={(event) => onClickWord(id, event.detail > 0)}
+        onKeyDown={handleKeyDown}
+        className="custom-btn cursor-pointer active:scale-105 transition-transform"
+      >
+        {word}
+      </button>
       {audio && (
-      <span className="cursor-pointer text-sm">
-        &nbsp;<Volume2 size={15} />
-      </span>)}
-    </button>
+        <button
+          type="button"
+          className="quiz-audio-btn"
+          onClick={() => onPlayAudio(id)}
+          aria-label={`播放「${word}」的發音`}
+        >
+          <Volume2 size={15} aria-hidden="true" />
+        </button>
+      )}
+    </span>
   );
 }
 
@@ -102,7 +100,7 @@ function DroppableArea({ id, children, label }) {
         isOver ? "border-[#9E1B24] bg-[#F9F1DF] scale-105" : "border-gray-400 border-dashed"
       }`}
     >
-      {children && children.length > 0 ? children : <p className="text-gray-400">{label}</p>}
+      {children && children.length > 0 ? children : <p style={{ color: "var(--yy-text-muted)" }}>{label}</p>}
     </div>
   );
 }
@@ -126,7 +124,20 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
   const [movingWordId, setMovingWordId] = useState(null);
   const { playAudio, stopAudio } = useAuthorizedAudioPlayback();
 
-  const sensors = useSensors(useSensor(PointerSensor));
+  // 鍵盤把單詞在單詞庫與答案區之間移動時，它會被卸載再重建，焦點會掉到 body；
+  // 記住要追的單詞，重新渲染後把焦點還給它，鍵盤使用者才能接著操作
+  const rootRef = useRef(null);
+  const refocusIdRef = useRef(null);
+  useEffect(() => {
+    const id = refocusIdRef.current;
+    if (id === null) return;
+    refocusIdRef.current = null;
+    rootRef.current?.querySelector(`[data-word-id="${id}"]`)?.focus();
+  }, [bank, zone]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: DRAG_ACTIVATION_DISTANCE_PX } }),
+  );
 
   const [result, setResult] = useState("");
   const [showAnimation, setShowAnimation] = useState(false);
@@ -158,23 +169,39 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
     }
   };
 
-  // 短按移動
-  const handleClickWord = (id) => {
+  // 點擊（或 Enter／Space）：把單詞在單詞庫與答案區之間移動
+  // fromPointer=false 代表是鍵盤觸發：鍵盤動作會反覆做，不加移動動畫
+  const handleClickWord = (id, fromPointer = true) => {
     if (checked) return;
-    setMovingWordId(id); // 標記動畫
-    setTimeout(() => setMovingWordId(null), MOVE_ANIMATION_MS); // 動畫結束清除
+    if (fromPointer) {
+      setMovingWordId(id); // 標記動畫
+      setTimeout(() => setMovingWordId(null), MOVE_ANIMATION_MS); // 動畫結束清除
+    }
 
+    if (!fromPointer) refocusIdRef.current = id;
+    const word = tokenById[id].word;
     if (bank.includes(id)) {
       setBank((items) => items.filter((w) => w !== id));
       setZone((items) => [...items, id]);
+      announce(`「${word}」已放進答案區，第 ${zone.length + 1} 個`);
     } else if (zone.includes(id)) {
       setZone((items) => items.filter((w) => w !== id));
       setBank((items) => [...items, id]);
+      announce(`「${word}」已放回單詞庫`);
     }
   };
 
-  // 長按播放音檔
-  const handleLongPress = (id) => {
+  // 答案區內用左右方向鍵調整順序
+  const handleShiftWord = (id, delta) => {
+    if (checked) return;
+    const from = zone.indexOf(id);
+    const to = from + delta;
+    if (from === -1 || to < 0 || to >= zone.length) return;
+    setZone((items) => arrayMove(items, from, to));
+    announce(`「${tokenById[id].word}」移到第 ${to + 1} 個`);
+  };
+
+  const handlePlayWordAudio = (id) => {
     const token = tokenById[id];
     if (token?.audio) {
       playAudio(token.audio);
@@ -201,7 +228,7 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
   };
 
   return (
-    <div className="text-center" style={{ minHeight: "400px" }}>
+    <div className="text-center" style={{ minHeight: "400px" }} ref={rootRef}>
       <h5 className="fw-bolder mb-4" style={{ display: 'flex', alignItems: 'center', justifyContent: "center" }}>
         <ArrowDownUp />&nbsp;例句排列
       </h5>
@@ -220,6 +247,10 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
         )}
       </h2>
 
+      <p className="sentence-order-hint" style={{ color: "var(--yy-text-secondary)" }}>
+        點一下單詞（或按 Enter）可在單詞庫與答案區之間移動；答案區內用左右方向鍵調整順序，也可以用滑鼠或手指拖曳。
+      </p>
+
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         {/* 拖放區 */}
         <SortableContext items={zone} strategy={horizontalListSortingStrategy}>
@@ -233,7 +264,9 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
                   word={token.word}
                   audio={token.audio}
                   onClickWord={handleClickWord}
-                  onLongPress={handleLongPress}
+                  inZone
+                  onShift={handleShiftWord}
+                  onPlayAudio={handlePlayWordAudio}
                   isMoving={movingWordId === id}
                 />
               );
@@ -255,7 +288,9 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
                   word={token.word}
                   audio={token.audio}
                   onClickWord={handleClickWord}
-                  onLongPress={handleLongPress}
+                  inZone={false}
+                  onShift={handleShiftWord}
+                  onPlayAudio={handlePlayWordAudio}
                   isMoving={movingWordId === id}
                 />
               );

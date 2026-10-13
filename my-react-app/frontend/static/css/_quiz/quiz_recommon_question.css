@@ -79,6 +79,11 @@
   max-width: 200px;
 }
 
+/* 例句排列的單詞：觸控拖曳要先關掉瀏覽器的捲動手勢，否則拖到一半會被取消（審查項 P1-4） */
+.sortable-word .custom-btn {
+    touch-action: none;
+}
+
 .custom-btn:hover {
   background-color: var(--yy-warning-bg);
   color: var(--yy-ink);

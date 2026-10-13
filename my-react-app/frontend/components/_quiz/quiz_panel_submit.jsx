@@ -14,7 +14,7 @@ function TrueFalseResult({ item, userAnswer, correctAnswer, isCorrect }) {
     return (
         <>
             <div className="submit-question-q">
-                <img src={item.image} className="submit-question-image" loading="lazy" />
+                <img src={item.image} alt={item.question_ab ? `圖片：${item.question_ab}` : "題目圖片"} className="submit-question-image" loading="lazy" />
                 <span>{item.question_ab}</span>
             </div>
             <span className={`quiz-user-answer ${isCorrect ? "correct" : "wrong"}`}>{userAnswer}</span>
@@ -33,8 +33,8 @@ function ChoiceResult({ item, userLabel, correctLabel, isCorrect }) {
                     <p style={{ margin: "0" }}>{item.question_ch}</p>
                 </div>
             </div>
-            <img className={`quiz-user-answer2 ${isCorrect ? "correct" : "wrong"}`} src={item.images?.[userLabel] ?? ""} loading="lazy" />
-            <img className="quiz-correct-answer2" src={item.images?.[correctLabel] ?? ""} loading="lazy" />
+            <img className={`quiz-user-answer2 ${isCorrect ? "correct" : "wrong"}`} src={item.images?.[userLabel] ?? ""} alt={userLabel ? `你選的答案：選項 ${userLabel}` : "未作答"} loading="lazy" />
+            <img className="quiz-correct-answer2" src={item.images?.[correctLabel] ?? ""} alt={correctLabel ? `正確答案：選項 ${correctLabel}` : "正確答案"} loading="lazy" />
         </>
     );
 }
@@ -233,11 +233,18 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
                                 <div key={idx} className="submit-question-result">
                                     <div className="submit-question-header">
                                         <span className="submit-question-num">第{idx + 1}題</span>
+                                        {/* 對錯原本只有圖示：沒有名稱，報讀器念不出來。圖示藏起來，改念文字（審查項 P1-7） */}
                                         <span>
                                             {isCorrect === true ? (
-                                                <CheckCircle style={{ color: "var(--yy-green)" }} size={20} />
+                                                <>
+                                                    <CheckCircle style={{ color: "var(--yy-green)" }} size={20} aria-hidden="true" />
+                                                    <span className="visually-hidden">答對</span>
+                                                </>
                                             ) : isCorrect === false ? (
-                                                <XCircle style={{ color: "var(--yy-red)" }} size={20} />
+                                                <>
+                                                    <XCircle style={{ color: "var(--yy-red)" }} size={20} aria-hidden="true" />
+                                                    <span className="visually-hidden">答錯</span>
+                                                </>
                                             ) : null}
                                         </span>
                                     </div>

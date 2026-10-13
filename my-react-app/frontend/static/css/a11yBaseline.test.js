@@ -143,3 +143,25 @@ describe("B-1／B-2 留下的項目", () => {
     expect(rule.body).toMatch(/overflow-wrap:\s*anywhere/);
   });
 });
+
+describe("B-6 測驗區：選中與已作答不只靠顏色，也不用低對比的金色邊框", () => {
+  const quiz = files.find((f) => f.file === "_quiz/quiz_panel.css").css;
+
+  it.each([".answers button.selected", ".quiz-image-box.selected", ".match-btn.selected", ".cloze-option-btn.selected"])("%s 的邊框是紅色（金色對米白只有 1.87:1）", (selector) => {
+    const rule = rules(quiz).find((r) => r.selector === selector);
+    expect(rule, selector).toBeTruthy();
+    expect(rule.body).toMatch(/border-color:\s*var\(--yy-red\)/);
+    expect(rule.body).not.toMatch(/border-color:\s*var\(--yy-gold\)/);
+  });
+
+  it("選中的題目有勾勾標記（是非題文字前、圖片題右上角）", () => {
+    expect(rules(quiz).find((r) => r.selector === ".answers button.selected::before").body).toMatch(/content:\s*"✓/);
+    expect(rules(quiz).find((r) => r.selector === ".quiz-image-box.selected::after").body).toMatch(/content:\s*"✓"/);
+  });
+
+  it("標星按鈕有 44px 點擊區", () => {
+    const rule = rules(quiz).find((r) => r.selector === ".star-btn");
+    expect(rule.body).toMatch(/min-width:\s*var\(--yy-control-md\)/);
+    expect(rule.body).toMatch(/min-height:\s*var\(--yy-control-md\)/);
+  });
+});

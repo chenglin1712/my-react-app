@@ -145,8 +145,20 @@
     margin: 0;
 }
 
-.title-container svg {
+.star-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--yy-control-md);
+    min-height: var(--yy-control-md);
+    padding: 0;
+    background: transparent;
+    border: 0;
     cursor: pointer;
+}
+
+.star-btn:active {
+    transform: scale(0.97);
 }
 
 .star {
@@ -173,10 +185,19 @@ audio {
     font-size: 16px;
 }
 
-.selected {
+/* 選中原本是金色邊框，對米白底只有 1.87:1，反而比沒選的墨色框更淡（審查項 P1-7）。
+   改成紅色粗框；是非題另外加勾勾，不只靠顏色分辨。 */
+.answers button.selected {
     background-color: var(--yy-warning-bg);
     color: var(--yy-ink);
-    border-color: var(--yy-gold) !important;
+    border-color: var(--yy-red) !important;
+    box-shadow: inset 0 0 0 1px var(--yy-red);
+}
+
+.answers button.selected::before {
+    content: "✓ ";
+    font-weight: 900;
+    color: var(--yy-red);
 }
 
 .answers button:hover {
@@ -259,8 +280,24 @@ audio {
 
 .quiz-image-box.selected {
     background-color: var(--yy-warning-bg);
-    border-color: var(--yy-gold);
-    box-shadow: var(--yy-shadow-sm);
+    border-color: var(--yy-red);
+    box-shadow: inset 0 0 0 1px var(--yy-red), var(--yy-shadow-sm);
+}
+
+.quiz-image-box.selected::after {
+    content: "✓";
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    color: #fff;
+    background: var(--yy-red);
+    border-radius: 50%;
 }
 
 .quiz-label {
@@ -329,7 +366,8 @@ audio {
 }
 
 .match-btn.selected {
-    border-color: var(--yy-gold);
+    border-color: var(--yy-red);
+    box-shadow: inset 0 0 0 1px var(--yy-red);
     background-color: var(--yy-warning-bg);
     color: var(--yy-ink);
 }
@@ -444,7 +482,8 @@ audio {
 }
 
 .cloze-option-btn.selected {
-    border-color: var(--yy-gold);
+    border-color: var(--yy-red);
+    box-shadow: inset 0 0 0 1px var(--yy-red);
     background-color: var(--yy-warning-bg);
     color: var(--yy-ink);
 }

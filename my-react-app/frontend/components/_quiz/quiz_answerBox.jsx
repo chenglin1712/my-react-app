@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import "../../static/css/_quiz/quiz_answerBox.css"
-import { Timer } from "lucide-react"
+import { Timer, Check } from "lucide-react"
 
 // 純顯示元件：題號導覽、作答時間、送出按鈕。繳交完全交給 parent（見
 // quiz_panel.jsx 的 handleSubmit）透過 onSubmit 處理——這裡原本自己有一套
@@ -46,9 +46,12 @@ const AnswerBox = ({ dataLen, userAnswers, userStars, currentQuestionIndex, setC
                             type="button"
                             className={`box-question-btn ${isAnswered ? "answer" : ""}`}
                             aria-current={index === currentQuestionIndex ? "step" : undefined}
+                            aria-label={`第 ${question} 題，${isAnswered ? "已作答" : "未作答"}${isStarred ? "，已標記待複習" : ""}`}
                             onClick={() => setCurrentQuestionIndex(index)}>
                             {question}
-                            {isStarred && <span className="star-indicator">⭐</span>}
+                            {/* 已作答原本只有綠底，色盲看不出來；加上勾勾形狀（審查項 P1-7） */}
+                            {isAnswered && <Check size={14} className="answered-mark" aria-hidden="true" />}
+                            {isStarred && <span className="star-indicator" aria-hidden="true">⭐</span>}
                         </button>
                     );
                 })}

@@ -43,6 +43,14 @@ const Panel = ({ tribe = "tayal" }) => {
         announce(`第 ${index + 1} 題，共 ${dataLen} 題`);
     };
 
+    // 標星原本是掛 onClick 的 SVG：不能聚焦、沒有名稱、沒有狀態，「重點複習」整個功能都靠它（審查項 P1-3）。
+    // 改成 button，aria-pressed 表示是否已標記，切換時用公告補上結果。
+    const handleToggleStar = () => {
+        const wasStarred = userStars[currentQuestionIndex] === "T";
+        handleStar();
+        announce(wasStarred ? "已取消標記待複習" : "已標記待複習");
+    };
+
     // 下一題
     const nextQuestion = () => {
         if (currentQuestionIndex < data.parts[0].questions.length - 1) {
@@ -206,7 +214,15 @@ const Panel = ({ tribe = "tayal" }) => {
                                 {currentType === "choice" && (
                                     <p>{currentQuestion.question_ab}</p>
                                 )}
-                                <Star size={24} className={`${userStars[currentQuestionIndex] === "T" ? 'star' : ''}`} onClick={handleStar} />
+                                <button
+                                    type="button"
+                                    className="star-btn"
+                                    aria-pressed={userStars[currentQuestionIndex] === "T"}
+                                    aria-label="標記待複習"
+                                    onClick={handleToggleStar}
+                                >
+                                    <Star size={24} className={`${userStars[currentQuestionIndex] === "T" ? 'star' : ''}`} aria-hidden="true" />
+                                </button>
                             </div>
 
                             {currentType === "true_false" && (
