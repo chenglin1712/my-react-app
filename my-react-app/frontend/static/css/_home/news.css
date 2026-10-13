@@ -24,7 +24,7 @@
     font-size: 0.75rem;
     font-weight: 700;
     letter-spacing: 0.2em;
-    color: #9B1B30;
+    color: var(--yy-red);
     text-transform: uppercase;
 }
 
@@ -39,7 +39,7 @@
 .news-section-divider {
     flex: 1;
     height: 2px;
-    background: linear-gradient(to right, #9B1B30 0%, #e8c39e50 100%);
+    background: linear-gradient(to right, var(--yy-red) 0%, #e8c39e50 100%);
     border-radius: 2px;
 }
 
@@ -66,9 +66,9 @@
 
 @media (hover: hover) and (pointer: fine) {
   .news-card:hover {
-      box-shadow: 0 6px 20px rgba(155, 27, 48, 0.12);
+      box-shadow: 0 6px 20px rgba(158, 27, 36, 0.12);
       transform: translateY(-3px);
-      border-color: #9B1B30;
+      border-color: var(--yy-red);
   }
 }
 
@@ -104,7 +104,7 @@
 
 .news-card-link {
     font-size: 0.82rem;
-    color: #9B1B30;
+    color: var(--yy-red);
     font-weight: 600;
     margin-top: auto;
 }
@@ -118,7 +118,7 @@
     border-radius: 20px;
     color: #fff;
     white-space: nowrap;
-    background-color: #9B1B30;
+    background-color: var(--yy-red);
     flex-shrink: 0;
 }
 

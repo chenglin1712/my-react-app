@@ -43,7 +43,7 @@
     justify-content: center;
     gap: 0.5rem;
     margin-bottom: 0.5rem;
-    color: var(--yy-red, #9E1B24);
+    color: var(--yy-red);
 }
 
 .countdown-box {
@@ -55,11 +55,11 @@
 }
 
 .days-left {
-    font-family: var(--yy-font-pixel, 'Silkscreen', monospace);
+    font-family: var(--yy-font-pixel, 'Silkscreen', 'Noto Sans TC', monospace);
     font-size: 1.875rem;
     font-weight: 700;
     margin-bottom: 0.25rem;
-    color: var(--yy-red, #9E1B24);
+    color: var(--yy-red);
 }
 
 .days-label {
@@ -84,7 +84,7 @@
     font-weight: 700;
     opacity: 0.9;
     margin-bottom: 0.5rem;
-    color: var(--yy-red, #9E1B24);
+    color: var(--yy-red);
 }
 
 .schedule-grid {
@@ -179,7 +179,7 @@
 }
 
 .toast-link {
-  color: var(--yy-red, #9E1B24);
+  color: var(--yy-red);
   text-decoration: underline;
   font-weight: 700;
 }

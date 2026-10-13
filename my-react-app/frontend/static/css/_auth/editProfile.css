@@ -12,7 +12,7 @@
     font-size: 24px;
     font-weight: 600;
     margin-bottom: 24px;
-    color: #9B1B30;
+    color: var(--yy-red);
     text-align: center;
 }
 
@@ -93,7 +93,7 @@ input {
 input:focus,
 select:focus {
     outline: none;
-    border-color: #9B1B30;
+    border-color: var(--yy-red);
 }
 
 .edit-container button {
@@ -107,7 +107,7 @@ select:focus {
 }
 
 .save-btn {
-    background-color: #9b1b30;
+    background-color: var(--yy-red);
     color: white;
     border: none;
     gap: 6px;

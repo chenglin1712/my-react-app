@@ -11,7 +11,7 @@ const GAMES = [
     subtitle: "TNINUN",
     emoji: "🧵",
     desc: "從族語詞彙中挑選正確對應，訓練詞彙記憶能力。",
-    headerBg: "linear-gradient(90deg,#9E1B24,#D9A227,#9E1B24)",
+    headerBg: "linear-gradient(90deg,var(--yy-red),var(--yy-gold),var(--yy-red))",
   },
   {
     id: "listening",
@@ -19,7 +19,7 @@ const GAMES = [
     subtitle: "MISANIQ",
     emoji: "🎧",
     desc: "聆聽族語發音，辨識正確詞彙，訓練耳朵的敏銳度。",
-    headerBg: "linear-gradient(90deg,#1F3A5C,#2C6E7F,#1F3A5C)",
+    headerBg: "linear-gradient(90deg,var(--yy-blue),var(--yy-blue-light),var(--yy-blue))",
   },
   {
     id: "pronunciation",
@@ -27,7 +27,7 @@ const GAMES = [
     subtitle: "QMISAN",
     emoji: "🎤",
     desc: "跟著發音範本錄音，AI 即時評分你的發音準確度。",
-    headerBg: "linear-gradient(90deg,#D9A227,#9E1B24,#D9A227)",
+    headerBg: "linear-gradient(90deg,var(--yy-gold),var(--yy-red),var(--yy-gold))",
   },
   {
     id: "sentence",
@@ -35,7 +35,7 @@ const GAMES = [
     subtitle: "LMUHUW",
     emoji: "📖",
     desc: "閱讀族語例句，選出正確的中文意思，訓練句型理解能力。",
-    headerBg: "linear-gradient(90deg,#4B6B3A,#D9A227,#4B6B3A)",
+    headerBg: "linear-gradient(90deg,var(--yy-green),var(--yy-gold),var(--yy-green))",
   },
 ];
 
@@ -85,7 +85,7 @@ const GameZonePage = () => {
                 onClick={() => selectGame(g.id)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectGame(g.id); } }}
               >
-                <div className="gamehub-card-head" style={{ background: g.headerBg }}>
+                <div className="gamehub-card-head" style={{ "--gamehub-head-band": g.headerBg }}>
                   <div className="gamehub-card-emoji">{g.emoji}</div>
                   <div>
                     <h3 className="gamehub-card-title">{g.title}</h3>

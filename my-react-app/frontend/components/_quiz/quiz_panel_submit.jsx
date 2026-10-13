@@ -235,9 +235,9 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
                                         <span className="submit-question-num">第{idx + 1}題</span>
                                         <span>
                                             {isCorrect === true ? (
-                                                <CheckCircle color="#4B6B3A" size={20} />
+                                                <CheckCircle style={{ color: "var(--yy-green)" }} size={20} />
                                             ) : isCorrect === false ? (
-                                                <XCircle color="#9E1B24" size={20} />
+                                                <XCircle style={{ color: "var(--yy-red)" }} size={20} />
                                             ) : null}
                                         </span>
                                     </div>

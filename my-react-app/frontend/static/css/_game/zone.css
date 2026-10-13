@@ -13,7 +13,7 @@
 .zone-title {
   font-size: 2rem;
   font-weight: 800;
-  color: #9B1B30;
+  color: var(--yy-red);
   margin-bottom: 0.4rem;
 }
 
@@ -49,13 +49,13 @@
 
 .zone-card.available {
   cursor: pointer;
-  border-color: #9B1B30;
+  border-color: var(--yy-red);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .zone-card.available:hover {
     transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(155, 27, 48, 0.18);
+    box-shadow: 0 8px 24px rgba(158, 27, 36, 0.18);
   }
 }
 
@@ -84,7 +84,7 @@
 
 .zone-card-subtitle {
   font-size: 0.8rem;
-  color: #9B1B30;
+  color: var(--yy-red);
   font-weight: 600;
   margin: 0 0 0.6rem;
   font-family: "Courier New", monospace;
@@ -107,7 +107,7 @@
 }
 
 .badge-open {
-  background: #9B1B30;
+  background: var(--yy-red);
   color: #fff;
 }
 

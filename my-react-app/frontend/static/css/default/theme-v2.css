@@ -9,6 +9,11 @@
  */
 
 :root {
+  /* 整站只有亮色版面（米白底、墨色字）：明確宣告 light，讓原生表單控制項、捲軸、
+     自動填入底色在作業系統切成深色時不會自己變深而跟頁面撞色（審查項 P2-19）。
+     日後若做深色模式，把這行改成 light dark 並補一組深色 token。 */
+  color-scheme: light;
+
   --yy-red: #9E1B24;
   --yy-red-dark: #8A171F;
   --yy-blue: #1F3A5C;
@@ -23,7 +28,9 @@
   --yy-text-tertiary: #5A4B3B;
   --yy-text-muted: #6B5A47;
   --yy-font-body: 'Noto Sans TC', sans-serif;
-  --yy-font-pixel: 'Silkscreen', monospace;
+  /* Silkscreen 只有大寫英文與數字。中文與「・」原本會落到系統等寬字型，和內文風格割裂，
+     所以中間補 Noto Sans TC（審查項 P1-20）。像素字請只用在純英文裝飾標籤。 */
+  --yy-font-pixel: 'Silkscreen', 'Noto Sans TC', monospace;
   --yy-radius-card: 10px;
   --yy-radius-btn: 6px;
   --yy-shadow-sm: 3px 3px 0 var(--yy-ink);
@@ -42,6 +49,53 @@
   --yy-warning-text: #8A6816;
   --yy-info: var(--yy-blue-light);
   --yy-info-bg: #DFE9EC;
+
+  /* ---------- 表面與焦點（審查項 P2-12、P2-19）---------- */
+  --yy-surface: #FFFFFF;          /* 卡片、輸入框、彈窗的底色 */
+  --yy-surface-page: var(--yy-cream);
+  --yy-border: var(--yy-ink);     /* Y2K 粗黑框 */
+  --yy-focus-ring: 3px solid var(--yy-red);
+  --yy-focus-offset: 2px;
+
+  /* ---------- 間距（4px 基準）---------- */
+  --yy-space-1: 4px;
+  --yy-space-2: 8px;
+  --yy-space-3: 12px;
+  --yy-space-4: 16px;
+  --yy-space-5: 24px;
+  --yy-space-6: 32px;
+  --yy-space-7: 48px;
+  --yy-space-8: 64px;
+
+  /* ---------- 字級與行高 ---------- */
+  --yy-text-xs: 12px;
+  --yy-text-sm: 14px;
+  --yy-text-base: 16px;
+  --yy-text-lg: 18px;
+  --yy-text-xl: 22px;
+  --yy-text-2xl: 28px;
+  --yy-text-3xl: 40px;
+  --yy-leading-tight: 1.25;
+  --yy-leading-normal: 1.6;
+  --yy-leading-loose: 1.8;
+
+  /* ---------- 控制項高度（觸控區至少 44px）---------- */
+  --yy-control-sm: 36px;
+  --yy-control-md: 44px;
+  --yy-control-lg: 52px;
+
+  /* ---------- 層級（z-index）----------
+     新增 z-index 請從這裡挑，不要自己發明數字。既有的 1000、1050、1100、2000 等數字
+     已對應到這幾層，之後逐步改成引用 token。 */
+  --yy-z-raised: 10;
+  --yy-z-sticky: 100;
+  --yy-z-nav: 1000;
+  --yy-z-overlay: 1050;
+  --yy-z-popover: 1100;
+  --yy-z-top: 2000;
+
+  /* 斷點（CSS 變數不能用在 @media，這裡只記錄慣用值）：
+     480 小手機、720 手機、900 平板直式／側欄收合、1100 小桌機。 */
 
   /* ---------- 動態 token（審查項 P1-24、P2-82）----------
      曲線：ease-out 用在進場與回饋（一開始就動，感覺有回應），ease-in-out 用在畫面內的移動與翻牌。
@@ -661,8 +715,8 @@
 
 /* 1. 基線：用 :where() 讓它的優先權是 0，任何元件自己的焦點樣式都能覆寫 */
 :where(a, button, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
-  outline: 3px solid var(--yy-red);
-  outline-offset: 2px;
+  outline: var(--yy-focus-ring);
+  outline-offset: var(--yy-focus-offset);
 }
 
 /* 2. 深色底（導覽列、頁尾）上的紅色外框看不清楚，改用淺金色 */
@@ -685,15 +739,15 @@
   .edit-container input,
   .edit-container select
 ):focus-visible {
-  outline: 3px solid var(--yy-red);
-  outline-offset: 2px;
+  outline: var(--yy-focus-ring);
+  outline-offset: var(--yy-focus-offset);
 }
 
 /* 4. 輸入框本身沒有外框、改由外層容器代表焦點的元件：容器在內部任何元素取得焦點時畫外框 */
 .input-wrapper:focus-within,
 .yy-terminal:focus-within {
-  outline: 3px solid var(--yy-red);
-  outline-offset: 2px;
+  outline: var(--yy-focus-ring);
+  outline-offset: var(--yy-focus-offset);
 }
 
 /* ---------- 主要內容區的最小高度 ----------

@@ -4,7 +4,7 @@
   padding: 2.5rem 1.5rem 4rem;
   color: #342a28;
   background:
-    radial-gradient(circle at top right, rgba(155, 27, 48, 0.08), transparent 28rem),
+    radial-gradient(circle at top right, rgba(158, 27, 36, 0.08), transparent 28rem),
     #faf8f5;
   box-sizing: border-box;
   font-family: "Noto Sans TC", sans-serif;
@@ -21,7 +21,7 @@
 
 .pron-community-eyebrow {
   margin: 0 0 0.4rem !important;
-  color: #9b1b30 !important;
+  color: var(--yy-red) !important;
   font-size: 0.75rem !important;
   font-weight: 800;
   letter-spacing: 0.14em;
@@ -32,7 +32,7 @@
    不變。 */
 .pron-community-heading h2 {
   margin: 0 0 0.55rem;
-  color: #9b1b30;
+  color: var(--yy-red);
   font-size: clamp(1.8rem, 4vw, 2.5rem);
   font-weight: 850;
 }
@@ -40,7 +40,7 @@
 .pron-community-back-link {
   display: inline-block;
   margin-bottom: 1rem;
-  color: #9b1b30;
+  color: var(--yy-red);
   text-decoration: none;
   font-size: 0.9rem;
   font-weight: 600;
@@ -60,9 +60,9 @@
 .pron-community-refresh {
   flex: 0 0 auto;
   padding: 0.6rem 1.2rem;
-  color: #9b1b30;
+  color: var(--yy-red);
   background: #fff;
-  border: 1.5px solid #9b1b30;
+  border: 1.5px solid var(--yy-red);
   border-radius: 8px;
   font-weight: 700;
   cursor: pointer;
@@ -120,7 +120,7 @@
   width: 1.2rem;
   height: 1.2rem;
   border: 2px solid #e0c5ca;
-  border-top-color: #9b1b30;
+  border-top-color: var(--yy-red);
   border-radius: 50%;
   animation: pron-community-spin 0.75s linear infinite;
 }
@@ -133,7 +133,7 @@
 
 .pron-community-empty h2 {
   margin: 0 0 0.5rem;
-  color: #9b1b30;
+  color: var(--yy-red);
   font-size: 1.3rem;
 }
 
@@ -169,7 +169,7 @@
 
 .pron-community-group-heading h2 {
   margin: 0;
-  color: #9b1b30;
+  color: var(--yy-red);
   font-size: 1.35rem;
   font-weight: 800;
   overflow-wrap: anywhere;
@@ -214,7 +214,7 @@
 }
 
 .pron-community-score {
-  color: #9b1b30;
+  color: var(--yy-red);
   font-size: 0.95rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -271,7 +271,7 @@
 
 .pron-community-modal-heading h2 {
   margin: 0 0 0.25rem;
-  color: #9b1b30;
+  color: var(--yy-red);
   font-size: 1.35rem;
 }
 
@@ -317,7 +317,7 @@
 }
 
 .pron-community-reason-option input {
-  accent-color: #9b1b30;
+  accent-color: var(--yy-red);
 }
 
 .pron-community-reason-text {
@@ -342,8 +342,8 @@
 }
 
 .pron-community-reason-text textarea:focus {
-  border-color: #9b1b30;
-  outline: 2px solid rgba(155, 27, 48, 0.14);
+  border-color: var(--yy-red);
+  outline: 2px solid rgba(158, 27, 36, 0.14);
 }
 
 .pron-community-modal-actions {
@@ -373,8 +373,8 @@
 
 .pron-community-submit-button {
   color: #fff;
-  background: #9b1b30;
-  border: 1px solid #9b1b30;
+  background: var(--yy-red);
+  border: 1px solid var(--yy-red);
 }
 
 .pron-community-submit-button:hover:not(:disabled) {

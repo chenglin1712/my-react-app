@@ -23,7 +23,7 @@
 
 .calendar-right h2 {
     font-size: 18px;
-    color: #9b1b30;
+    color: var(--yy-red);
     margin-bottom: 16px;
 }
 
@@ -35,12 +35,12 @@
 
 .react-calendar__tile--now {
     background: #fce4ec !important;
-    color: #9b1b30 !important;
+    color: var(--yy-red) !important;
     font-weight: bold !important;
 }
 
 .react-calendar__tile--active {
-    background: #9b1b30 !important;
+    background: var(--yy-red) !important;
     color: white !important;
 }
 
@@ -126,7 +126,7 @@
 .go-quiz-btn {
     margin-top: 8px;
     padding: 6px 12px;
-    background-color: #9b1b30;
+    background-color: var(--yy-red);
     color: #fff;
     font-size: 13px;
     font-weight: 500;
@@ -135,7 +135,7 @@
 }
 
 .go-quiz-btn:hover {
-    background-color: #9b1b30;
+    background-color: var(--yy-red);
     color: white;
 }
 
@@ -160,13 +160,13 @@
 }
 
 .event-input-bar input:focus {
-    border-color: #9b1b30;
+    border-color: var(--yy-red);
     outline: none;
 }
 
 .event-input-bar button {
     padding: 10px 16px;
-    background-color: #9b1b30;
+    background-color: var(--yy-red);
     color: white;
     border: none;
     border-radius: 6px;
@@ -182,7 +182,7 @@
     margin-top: 4px;
     width: 6px;
     height: 6px;
-    background-color: #9b1b30;
+    background-color: var(--yy-red);
     border-radius: 50%;
     margin-left: auto;
     margin-right: auto;

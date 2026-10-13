@@ -90,11 +90,25 @@
     transition: box-shadow .2s ease;
 }
 
+/* 標題原本直接壓在紅、藍、金、綠的漸層上，墨黑字對紅與藍只有約 1.5～2.2:1（審查項 P1-15），
+   而且漸層會流動，字會輪流壓在每一種顏色上，沒有一個字色能全程達標。
+   改成：整個頭部是米白底（墨字約 13:1），漸層縮成頂端一條裝飾色帶，保留原本的流動與色彩識別。 */
 .gamehub-card-head {
-    padding: 24px 26px;
+    position: relative;
+    padding: 34px 26px 24px;
     display: flex;
     gap: 18px;
     align-items: flex-start;
+    background: var(--yy-cream);
+    border-bottom: 3px solid var(--yy-ink);
+}
+
+.gamehub-card-head::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 10px;
+    background: var(--gamehub-head-band);
     background-size: 300% 100%;
     animation: yy-holo 6s linear infinite;
     border-bottom: 3px solid var(--yy-ink);

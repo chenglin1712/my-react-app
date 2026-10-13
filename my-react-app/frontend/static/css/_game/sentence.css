@@ -30,7 +30,7 @@
 .sent-btn-primary {
   margin-top: 1.8rem;
   padding: 0.65rem 2.5rem;
-  background: #9B1B30;
+  background: var(--yy-red);
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -58,8 +58,8 @@
   margin-top: 1.8rem;
   padding: 0.65rem 1.8rem;
   background: #fff;
-  color: #9B1B30;
-  border: 2px solid #9B1B30;
+  color: var(--yy-red);
+  border: 2px solid var(--yy-red);
   border-radius: 8px;
   font-size: 1rem;
   font-weight: 700;
@@ -92,7 +92,7 @@
 }
 .sent-progress-bar {
   height: 100%;
-  background: #9B1B30;
+  background: var(--yy-red);
   border-radius: 999px;
   transition: width 0.35s ease;
 }
@@ -120,7 +120,7 @@
 .sent-sentence {
   font-size: 1.55rem;
   font-weight: 800;
-  color: #9B1B30;
+  color: var(--yy-red);
   margin: 0;
   text-align: center;
   letter-spacing: 0.02em;
@@ -129,7 +129,7 @@
 
 .sent-play-btn {
   padding: 0.45rem 1.4rem;
-  background: #9B1B30;
+  background: var(--yy-red);
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -153,9 +153,9 @@
   animation: sentPulse 0.9s infinite;
 }
 @keyframes sentPulse {
-  0%   { box-shadow: 0 0 0 0 rgba(155, 27, 48, 0.45); }
-  70%  { box-shadow: 0 0 0 12px rgba(155, 27, 48, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(155, 27, 48, 0); }
+  0%   { box-shadow: 0 0 0 0 rgba(158, 27, 36, 0.45); }
+  70%  { box-shadow: 0 0 0 12px rgba(158, 27, 36, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(158, 27, 36, 0); }
 }
 
 .sent-question-hint {
@@ -191,7 +191,7 @@
 }
 @media (hover: hover) and (pointer: fine) {
   .sent-option:hover:not(:disabled) {
-    border-color: #9B1B30;
+    border-color: var(--yy-red);
     background: #fdf5f5;
     transform: translateX(4px);
   }
@@ -235,7 +235,7 @@
 .sent-result-title {
   font-size: 1.6rem;
   font-weight: 800;
-  color: #9B1B30;
+  color: var(--yy-red);
   margin-bottom: 1.2rem;
 }
 
@@ -251,7 +251,7 @@
 .sent-result-score.fair      { background: #fef9e7; border: 1.5px solid #f9e79f; }
 .sent-result-score.poor      { background: #fdedec; border: 1.5px solid #f5b7b1; }
 
-.sent-result-num   { font-size: 3.5rem; font-weight: 900; color: #9B1B30; line-height: 1; }
+.sent-result-num   { font-size: 3.5rem; font-weight: 900; color: var(--yy-red); line-height: 1; }
 .sent-result-denom { font-size: 1.6rem; color: #888; }
 .sent-result-pct   { font-size: 1.1rem; color: #aaa; margin: 0.3rem 0 0; }
 
@@ -290,7 +290,7 @@
 }
 .sent-result-tayal {
   font-weight: 700;
-  color: #9B1B30;
+  color: var(--yy-red);
   font-size: 0.95rem;
 }
 .sent-result-ans { color: #555; font-size: 0.88rem; }

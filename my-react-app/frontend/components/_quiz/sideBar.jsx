@@ -5,12 +5,12 @@ import { ClipboardList, ChartPie, Star, Play, X, Menu } from "lucide-react"
 import { TRIBES } from "../../src/constants/tribes";
 
 const ICONS = {
-    quiz: <ClipboardList size={24} fill="#E4E9E1" color="#4B6B3A" />,
-    situation: <ChartPie size={24} color="#2C6E7F" />,
-    review: <Star size={24} fill="#F9F1DF" color="#D9A227" />,
-    play: <Play size={22} fill="#9E1B24" color="#9E1B24" />,
-    menu: <Menu size={25} color="#9E1B24" />,
-    close: <X size={24} color="#9E1B24" />,
+    quiz: <ClipboardList size={24} style={{ color: "var(--yy-green)", fill: "var(--yy-success-bg)" }} />,
+    situation: <ChartPie size={24} style={{ color: "var(--yy-blue-light)" }} />,
+    review: <Star size={24} style={{ color: "var(--yy-gold)", fill: "var(--yy-warning-bg)" }} />,
+    play: <Play size={22} style={{ color: "var(--yy-red)", fill: "var(--yy-red)" }} />,
+    menu: <Menu size={25} style={{ color: "var(--yy-red)" }} />,
+    close: <X size={24} style={{ color: "var(--yy-red)" }} />,
 };
 const MENU_ITEMS = [
     { key: "quiz", text: "開始測驗" },

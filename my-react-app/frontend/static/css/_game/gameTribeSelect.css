@@ -19,7 +19,7 @@
   top: 0.3rem;
   background: none;
   border: none;
-  color: #9B1B30;
+  color: var(--yy-red);
   text-decoration: none;
   font-size: 0.9rem;
   font-weight: 600;
@@ -36,7 +36,7 @@
 .vocab-title {
   font-size: 1.9rem;
   font-weight: 800;
-  color: #9B1B30;
+  color: var(--yy-red);
   margin-bottom: 0.3rem;
 }
 
@@ -113,7 +113,7 @@
 }
 
 .vocab-tribe-tag.available {
-  background: #9B1B30;
+  background: var(--yy-red);
   color: #fff;
 }
 

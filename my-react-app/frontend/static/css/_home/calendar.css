@@ -52,7 +52,7 @@
 
 .exam-card {
     background-color: var(--yy-cream, #F3E7CF);
-    border-left: 4px solid var(--yy-red, #9E1B24);
+    border-left: 4px solid var(--yy-red);
     padding: 12px 16px;
     margin-bottom: 12px;
     border-radius: 6px;
@@ -73,10 +73,10 @@
 
 .exam-date {
     background: #fff;
-    border: 1.5px solid var(--yy-red, #9E1B24);
+    border: 1.5px solid var(--yy-red);
     padding: 2px 10px;
     border-radius: 20px;
-    color: var(--yy-red, #9E1B24);
+    color: var(--yy-red);
     font-weight: 700;
 }
 
@@ -89,7 +89,7 @@
 
 .exam-link:hover {
     text-decoration: underline;
-    color: var(--yy-red, #9E1B24);
+    color: var(--yy-red);
 }
 
 @media (max-width: 900px) {

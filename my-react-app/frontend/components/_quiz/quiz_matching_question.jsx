@@ -130,7 +130,7 @@ const MatchingQuestion = ({ question, answered, resultValue, onAnswer }) => {
 
             {wrongPair && (
                 <div className="match-wrong-hint">
-                    <CircleX size={18} color="#9E1B24" />
+                    <CircleX size={18} style={{ color: "var(--yy-red)" }} />
                     &nbsp;{wrongPair.cn} 的正確配對是「{wrongPair.correct}」
                 </div>
             )}

@@ -117,7 +117,7 @@ const UserCalendar = () => {
                             return (
                                 <div
                                     className="dot-indicator"
-                                    style={{ backgroundColor: isSelected ? "white" : "#9b1b30" }}
+                                    style={{ backgroundColor: isSelected ? "white" : "var(--yy-red)" }}
                                 />
                             );
                         }

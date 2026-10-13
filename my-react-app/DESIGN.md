@@ -133,7 +133,7 @@ components:
 ## Typography
 
 **Display／Body Font:** Noto Sans TC（fallback：sans-serif）
-**Label Font:** Silkscreen（fallback：monospace），只用於小標籤
+**Label Font:** Silkscreen（fallback：Noto Sans TC，再 monospace），只用於小標籤。Silkscreen 沒有中文與「・」，所以中文會落到 Noto Sans TC，風格與內文一致
 
 **Character:** 圓潤中性的黑體承擔所有閱讀；像素字只當章戳般的小標籤，增加 Y2K 感而不干擾閱讀。
 
@@ -141,6 +141,11 @@ components:
 - **Body／按鈕文字** (700, 13–15px)：全站大量使用粗體；按鈕 15px（主要）、13px（外框）、14px（族語膠囊與頁籤）。
 - **Label（像素）** (Silkscreen, 12px, 字距 0.12em)：`.yy-eyebrow` 標籤，墨色底、金色字與金色邊框。
 - **步驟徽章數字** (Silkscreen, 15px, 700)：步驟菱形內的數字。
+
+### Token（theme-v2.css 的 :root）
+- **色彩**：品牌紅一律寫 `var(--yy-red)`，不再寫死 `#9E1B24` 或舊紅 `#9B1B30`；筆記頁的 `--brand-red`、`--danger`、`--rose-700` 都指向全站 token。
+- **版面**：`--yy-space-1`～`8`（4px 基準）、`--yy-text-xs`～`3xl` 與 `--yy-leading-*`、`--yy-control-sm/md/lg`（觸控區用 md 的 44px）、`--yy-z-raised/sticky/nav/overlay/popover/top`、`--yy-surface`、`--yy-focus-ring`。新增樣式請引用，不要自己發明數字。既有的零散數字會在各頁改版時逐步換成 token。
+- **配色模式**：目前只有亮色。`:root` 宣告 `color-scheme: light`，讓原生表單控制項與捲軸不會在系統深色模式下自己變深。
 
 ### Named Rules
 **The 像素字限小標籤 Rule.** 像素字（Silkscreen）只用在小標籤、徽章數字；不用於需要閱讀的內容，也不用於族語詞彙，以免特殊字母與符號顯示錯誤。（使用者已確認。）
