@@ -23,6 +23,7 @@ import {
 } from 'recharts';
 import { TRIBES } from '../../constants/tribes';
 import { useAnalyticsQuery } from '../hooks/useAnalyticsQuery';
+import ChartFigure from '../../../components/ui/ChartFigure';
 import '../../../static/css/_admin/quiz-quality-analysis.css';
 
 const DATE_RANGE_OPTIONS = [
@@ -274,7 +275,26 @@ export default function QuizQualityAnalysis() {
                         ) : chartItems.length === 0 ? (
                             <EmptyState />
                         ) : (
-                            <div className="quiz-quality-chart">
+                            <ChartFigure
+                                plotClassName="quiz-quality-chart"
+                                title="題目品質散布圖"
+                                interactive
+                                summary={`共 ${chartItems.length} 題，橫軸為答對率、縱軸為鑑別度。答對率低於 50% 的 ${chartItems.filter((i) => i.accuracy_rate < 0.5).length} 題，鑑別度為負的 ${chartItems.filter((i) => i.discrimination < 0).length} 題。圓點可前往題庫列表。`}
+                                columns={[
+                                    { key: 'label', label: '題目' },
+                                    { key: 'kind', label: '題型' },
+                                    { key: 'attempts', label: '作答次數' },
+                                    { key: 'accuracy', label: '答對率' },
+                                    { key: 'discrimination', label: '鑑別度' },
+                                ]}
+                                rows={chartItems.map((i) => ({
+                                    label: i.label,
+                                    kind: ITEM_KIND_LABELS[i.item_kind] ?? i.item_kind,
+                                    attempts: i.attempt_count,
+                                    accuracy: formatPercent(i.accuracy_rate),
+                                    discrimination: i.discrimination.toFixed(2),
+                                }))}
+                            >
                                 <ResponsiveContainer width="100%" height="100%">
                                     <ScatterChart
                                         margin={{
@@ -389,7 +409,7 @@ export default function QuizQualityAnalysis() {
                                         />
                                     </ScatterChart>
                                 </ResponsiveContainer>
-                            </div>
+                            </ChartFigure>
                         )}
                     </section>
 

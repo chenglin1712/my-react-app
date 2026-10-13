@@ -9,6 +9,7 @@ import {
 } from "recharts";
 import "../../static/css/_quiz/situation_0judy_1.css";
 import { Star } from "lucide-react";
+import ChartFigure from "../ui/ChartFigure";
 
 const SituationSummary = ({ summary, radarData }) => {
   const ticks = [0, 20, 40, 60, 80, 100];
@@ -29,6 +30,13 @@ const SituationSummary = ({ summary, radarData }) => {
     }
   };
   const difficultyLevel = getDifficultyLevel(summary.level);
+
+  const scored = radarData.filter((d) => Number.isFinite(d.score));
+  const best = scored.reduce((a, b) => (b.score > a.score ? b : a), scored[0]);
+  const worst = scored.reduce((a, b) => (b.score < a.score ? b : a), scored[0]);
+  const radarSummary = scored.length
+    ? `共 ${scored.length} 個面向，最高是「${best.category}」${best.score} 分，最低是「${worst.category}」${worst.score} 分。`
+    : "目前還沒有各面向的分數。";
 
   return (
     <div className="situation-summary-container">
@@ -65,7 +73,13 @@ const SituationSummary = ({ summary, radarData }) => {
       </div>
 
       {/* 右邊 - 雷達圖 */}
-      <div className="summary-radar">
+      <ChartFigure
+        className="summary-radar"
+        title="各面向分數雷達圖"
+        summary={radarSummary}
+        columns={[{ key: "category", label: "面向" }, { key: "score", label: "分數" }]}
+        rows={radarData.map((d) => ({ category: d.category, score: Number.isFinite(d.score) ? d.score : "無資料" }))}
+      >
         <ResponsiveContainer width="100%" height={350}>
           <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
             <PolarGrid stroke="#EFE1C4" />
@@ -94,7 +108,7 @@ const SituationSummary = ({ summary, radarData }) => {
             />
           </RadarChart>
         </ResponsiveContainer>
-      </div>
+      </ChartFigure>
     </div>
   );
 };

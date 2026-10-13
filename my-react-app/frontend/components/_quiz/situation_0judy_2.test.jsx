@@ -23,12 +23,12 @@ vi.mock('recharts', () => {
 describe('SituationLine（回歸測試：原本 data 是空陣列時除以 0 得到 NaN）', () => {
   test('data 為空陣列時顯示 0，不是 NaN', () => {
     render(<SituationLine data={[]} />);
-    expect(screen.getByText('0.0')).toBeInTheDocument();
+    expect(screen.getAllByText('0.0').length).toBeGreaterThan(0);
     expect(screen.queryByText('NaN')).not.toBeInTheDocument();
   });
 
   test('data 都是有效值時正確計算平均', () => {
     render(<SituationLine data={[{ date: '1月', correctRate: 80 }, { date: '2月', correctRate: 60 }]} />);
-    expect(screen.getByText('70.0')).toBeInTheDocument();
+    expect(screen.getAllByText('70.0').length).toBeGreaterThan(0);
   });
 });

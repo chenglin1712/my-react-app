@@ -25,6 +25,7 @@ import { useAuth } from '../../userServives/authContext';
 import { apiGet } from '../../../utils/apiClient';
 import { useAnalyticsQuery } from '../hooks/useAnalyticsQuery';
 import { useAsyncValue } from '../hooks/useAsyncValue';
+import ChartFigure from '../../../components/ui/ChartFigure';
 import { TRIBES } from '../../constants/tribes';
 import '../../../static/css/_admin/dashboard.css';
 
@@ -331,7 +332,21 @@ export default function Dashboard() {
                                 <p>請選擇開始與結束日期</p>
                             </div>
                         ) : (
-                            <div className="dashboard-chart-container">
+                            <ChartFigure
+                                plotClassName="dashboard-chart-container"
+                                title="每日活躍與新註冊"
+                                summary={`共 ${activityChartData.length} 天，活躍使用者合計 ${activityChartData.reduce((s, d) => s + (Number(d.activeUsers) || 0), 0)} 人次，新註冊合計 ${activityChartData.reduce((s, d) => s + (Number(d.newRegistrations) || 0), 0)} 人。`}
+                                columns={[
+                                    { key: 'date', label: '日期' },
+                                    { key: 'activeUsers', label: '活躍使用者' },
+                                    { key: 'newRegistrations', label: '新註冊' },
+                                ]}
+                                rows={activityChartData.map((d) => ({
+                                    date: d.date ?? d.dateLabel,
+                                    activeUsers: d.activeUsers,
+                                    newRegistrations: d.newRegistrations,
+                                }))}
+                            >
                                 <ResponsiveContainer width="100%" height="100%">
                                     <LineChart
                                         data={activityChartData}
@@ -374,7 +389,7 @@ export default function Dashboard() {
                                         />
                                     </LineChart>
                                 </ResponsiveContainer>
-                            </div>
+                            </ChartFigure>
                         )}
                     </PanelState>
                 </section>
@@ -391,7 +406,13 @@ export default function Dashboard() {
                                 <p>請選擇開始與結束日期</p>
                             </div>
                         ) : (
-                            <div className="dashboard-chart-container">
+                            <ChartFigure
+                                plotClassName="dashboard-chart-container"
+                                title="族語使用分布"
+                                summary={`共 ${tribeChartData.length} 種族語，使用次數合計 ${tribeChartData.reduce((s, d) => s + (Number(d.count) || 0), 0)}。`}
+                                columns={[{ key: 'label', label: '族語' }, { key: 'count', label: '使用次數' }]}
+                                rows={tribeChartData.map((d) => ({ label: d.label, count: d.count }))}
+                            >
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart
                                         data={tribeChartData}
@@ -425,7 +446,7 @@ export default function Dashboard() {
                                         </Bar>
                                     </BarChart>
                                 </ResponsiveContainer>
-                            </div>
+                            </ChartFigure>
                         )}
                     </PanelState>
                 </section>
@@ -442,7 +463,13 @@ export default function Dashboard() {
                                 <p>請選擇開始與結束日期</p>
                             </div>
                         ) : (
-                            <div className="dashboard-chart-container">
+                            <ChartFigure
+                                plotClassName="dashboard-chart-container"
+                                title="功能使用熱度"
+                                summary={`共 ${featureChartData.length} 項功能，使用次數合計 ${featureChartData.reduce((s, d) => s + (Number(d.count) || 0), 0)}。`}
+                                columns={[{ key: 'label', label: '功能' }, { key: 'count', label: '使用次數' }]}
+                                rows={featureChartData.map((d) => ({ label: d.label, count: d.count }))}
+                            >
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart
                                         data={featureChartData}
@@ -472,7 +499,7 @@ export default function Dashboard() {
                                         </Bar>
                                     </BarChart>
                                 </ResponsiveContainer>
-                            </div>
+                            </ChartFigure>
                         )}
                     </PanelState>
                 </section>

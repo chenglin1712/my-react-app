@@ -158,7 +158,7 @@ describe('Dashboard', () => {
   test('待審公告與兩張分析統計卡顯示 API 回傳的真實數字', async () => {
     renderDashboard();
 
-    expect(await screen.findByText('5')).toBeInTheDocument();
+    expect((await screen.findAllByText('5')).length).toBeGreaterThan(0);
 
     const activeCard = screen.getByText('今日活躍使用者')
       .closest('.admin-stat-card');
@@ -180,17 +180,18 @@ describe('Dashboard', () => {
     renderDashboard();
 
     expect(await screen.findByText('泰雅語')).toBeInTheDocument();
-    expect(screen.getByText('阿美語')).toBeInTheDocument();
+    expect(screen.getAllByText('阿美語').length).toBeGreaterThan(0);
     // mock 的 BarChart 把整筆 data item 攤平成一個文字節點（見上面 vi.mock('recharts')），
     // 「辭典搜尋」不是獨立節點，要用子字串比對，不能用 getByText 的預設完全比對。
-    expect(screen.getByText((content) => content.includes('辭典搜尋'))).toBeInTheDocument();
-    expect(screen.getByText((content) => content.includes('頁面瀏覽'))).toBeInTheDocument();
+    // 圖表現在另附資料表，同樣的詞會出現在圖與表兩處，所以用 getAllByText
+    expect(screen.getAllByText((content) => content.includes('辭典搜尋')).length).toBeGreaterThan(0);
+    expect(screen.getAllByText((content) => content.includes('頁面瀏覽')).length).toBeGreaterThan(0);
 
     expect(screen.getByText('每日活躍與新註冊')).toBeInTheDocument();
     expect(screen.getByText('族語使用分布')).toBeInTheDocument();
     expect(screen.getByText('功能使用熱度')).toBeInTheDocument();
-    expect(screen.getByText('活躍使用者')).toBeInTheDocument();
-    expect(screen.getByText('新註冊')).toBeInTheDocument();
+    expect(screen.getAllByText('活躍使用者').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('新註冊').length).toBeGreaterThan(0);
     expect(screen.getAllByTestId('mock-chart')).toHaveLength(3);
   });
 
@@ -292,7 +293,7 @@ describe('Dashboard', () => {
 
   test('今日測驗完成與系統健康仍維持即將推出佔位', async () => {
     renderDashboard();
-    await screen.findByText('5');
+    await screen.findAllByText('5');
 
     const quizCard = screen.getByText('今日測驗完成')
       .closest('.admin-stat-card');
@@ -322,7 +323,7 @@ describe('Dashboard', () => {
     mockRole = 'editor';
     renderDashboard();
 
-    await screen.findByText('5');
+    await screen.findAllByText('5');
 
     expect(screen.queryByText('最近操作')).not.toBeInTheDocument();
     expect(apiGet).not.toHaveBeenCalledWith(

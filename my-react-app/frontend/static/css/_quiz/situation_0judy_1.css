@@ -56,3 +56,16 @@
     fill: var(--yy-text-muted);
     font-size: 13px;
 }
+
+/* 手機寬度：建議卡片與雷達圖改縱排，不橫向溢出 */
+.summary-radar {
+    flex: 1;
+    min-width: 0;
+}
+
+@media (max-width: 720px) {
+    .situation-summary-container {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}

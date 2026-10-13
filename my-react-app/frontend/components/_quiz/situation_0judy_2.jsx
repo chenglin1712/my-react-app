@@ -12,7 +12,10 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import ChartFigure from "../ui/ChartFigure";
 import "../../static/css/_quiz/situation_0judy_2.css";
+
+const formatRate = (value) => (Number.isFinite(value) ? `${value}%` : "無資料");
 
 const SituationLine = ({ data }) => {
   // 計算使用者總平均。data 是空陣列時（例如剛開始使用、還沒有月度資料）
@@ -28,15 +31,33 @@ const SituationLine = ({ data }) => {
   ];
   const COLORS = ["#9E1B24", "#EFE1C4"];
 
+  // 圖表的文字摘要：看不到圖、或沒有 hover 的人也拿得到重點（審查項 P1-17）
+  const historySummary = validRates.length
+    ? `共 ${data.length} 筆紀錄，正確率最高 ${Math.max(...validRates)}%，最低 ${Math.min(...validRates)}%，平均 ${userAvg.toFixed(1)}%。`
+    : "目前還沒有歷史紀錄。";
+
   return (
     <div className="judy-situation-line-container">
       <h2 className="situation-header" style={{ fontWeight: "500" }}>歷史表現</h2>
-      <div
-        className="judy-situation-line-chart-wrapper"
-        style={{ display: "flex", gap: "20px" }}
-      >
-        {/* 左邊 - 組合圖 */}
-        <div style={{ flex: 2, height: 400 }}>
+      {/* 手機寬度改縱排（審查項 P1-16）：原本用 inline style 寫死左右並排，CSS 也沒有任何媒體查詢 */}
+      <div className="judy-situation-line-chart-wrapper">
+        {/* 組合圖 */}
+        <ChartFigure
+          className="judy-line-main"
+          plotClassName="judy-line-plot"
+          title="歷史表現"
+          summary={historySummary}
+          columns={[
+            { key: "date", label: "日期" },
+            { key: "correctRate", label: "正確率" },
+            { key: "averageAccuracy", label: "同期平均" },
+          ]}
+          rows={data.map((item) => ({
+            date: item.date,
+            correctRate: formatRate(item.correctRate),
+            averageAccuracy: formatRate(item.averageAccuracy),
+          }))}
+        >
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
               data={data}
@@ -94,47 +115,49 @@ const SituationLine = ({ data }) => {
               />
             </ComposedChart>
           </ResponsiveContainer>
-        </div>
+        </ChartFigure>
 
-        {/* 右邊 - 使用者平均分數 */}
-        <div
-          style={{
-            flex: 1,
-            height: 400,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <div style={{ fontSize: 18, fontWeight: 600, color: "#221812" }}>
-            平均分數
-          </div>
-          <ResponsiveContainer width="70%" height="60%">
-            <PieChart>
-              <Pie
-                data={pieData}
-                innerRadius={70}
-                outerRadius={100}
-                startAngle={90}
-                endAngle={-270}
-                dataKey="value"
-              >
-                {pieData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <text
-                x="50%"
-                y="50%"
-                textAnchor="middle"
-                dominantBaseline="middle"
-                style={{ fontSize: "30px", fontWeight: "bold", fill: "#9E1B24" }}
-              >
-                {userAvg.toFixed(1)}
-              </text>
-            </PieChart>
-          </ResponsiveContainer>
+        {/* 使用者平均分數 */}
+        <div className="judy-line-side">
+          <div className="judy-pie-title">平均分數</div>
+          <ChartFigure
+            className="judy-pie-figure"
+            plotClassName="judy-pie-plot"
+            title="平均分數"
+            summary={`平均分數 ${userAvg.toFixed(1)} 分（滿分 100）。`}
+            columns={[
+              { key: "name", label: "項目" },
+              { key: "value", label: "數值" },
+            ]}
+            rows={[{ name: "平均分數", value: userAvg.toFixed(1) }]}
+          >
+            {/* 半徑用百分比：原本固定 70/100 像素，容器變小時圓環會被裁切 */}
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  innerRadius="68%"
+                  outerRadius="92%"
+                  startAngle={90}
+                  endAngle={-270}
+                  dataKey="value"
+                >
+                  {pieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <text
+                  x="50%"
+                  y="50%"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  style={{ fontSize: "30px", fontWeight: "bold", fill: "#9E1B24" }}
+                >
+                  {userAvg.toFixed(1)}
+                </text>
+              </PieChart>
+            </ResponsiveContainer>
+          </ChartFigure>
         </div>
       </div>
     </div>

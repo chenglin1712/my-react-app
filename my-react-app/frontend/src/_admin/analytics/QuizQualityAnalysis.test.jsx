@@ -124,10 +124,10 @@ describe('QuizQualityAnalysis', () => {
   test('正確渲染受試者數、散佈圖資料與樣本不足清單', async () => {
     renderPage();
 
-    expect(await screen.findByText('這是狗。')).toBeInTheDocument();
+    expect((await screen.findAllByText('這是狗。')).length).toBeGreaterThan(0);
     expect(
-      screen.getByText('請選出正確的族語詞。'),
-    ).toBeInTheDocument();
+      screen.getAllByText('請選出正確的族語詞。').length,
+    ).toBeGreaterThan(0);
 
     expect(screen.getByText('34')).toBeInTheDocument();
     expect(screen.getByText('位受試者')).toBeInTheDocument();
@@ -182,7 +182,7 @@ describe('QuizQualityAnalysis', () => {
 
   test('切換日期區間與族語會帶正確 query 參數重新呼叫 API', async () => {
     renderPage();
-    await screen.findByText('這是狗。');
+    await screen.findAllByText('這是狗。');
 
     fireEvent.change(screen.getByLabelText('日期區間'), {
       target: { value: '30d' },
@@ -207,7 +207,7 @@ describe('QuizQualityAnalysis', () => {
 
   test('自訂日期填妥後送出正確日期參數', async () => {
     renderPage();
-    await screen.findByText('這是狗。');
+    await screen.findAllByText('這是狗。');
 
     fireEvent.change(screen.getByLabelText('日期區間'), {
       target: { value: 'custom' },

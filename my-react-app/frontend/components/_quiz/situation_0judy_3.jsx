@@ -12,6 +12,7 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
+import ChartFigure from '../ui/ChartFigure';
 import '../../static/css/_quiz/situation_0judy_3.css';
 
 const typeMap = {
@@ -59,6 +60,17 @@ const SituationDashboard = ({ data, typeRatio }) => {
     color: (typeMap[key] ?? FALLBACK_TYPE).color
   }));
 
+  // 圖表文字摘要：圓餅圖 5% 以下的切片不顯示百分比標籤，所以完整數字也放在摘要與圖例（審查項 P1-17）
+  const typeTotal = questionTypeData.reduce((sum, item) => sum + (Number.isFinite(item.value) ? item.value : 0), 0);
+  const percentOf = (value) => (typeTotal > 0 && Number.isFinite(value) ? `${((value / typeTotal) * 100).toFixed(1)}%` : "0%");
+  const pieSummary = typeTotal > 0
+    ? `共 ${questionTypeData.length} 種題型：${questionTypeData.map((i) => `${i.name} ${percentOf(i.value)}`).join("、")}。`
+    : "目前還沒有題型資料。";
+  const countByPerformance = (label) => performanceData.filter((i) => i.performance === label).length;
+  const barSummary = performanceData.length
+    ? `共 ${performanceData.length} 種題型，良好 ${countByPerformance("良好")} 種、需加強 ${countByPerformance("需加強")} 種、不及格 ${countByPerformance("不及格")} 種。`
+    : "目前還沒有各題型的正確率。";
+
   const getPerformanceColor = (performance) => {
     switch (performance) {
       case '良好': return '#4B6B3A';
@@ -91,7 +103,13 @@ const SituationDashboard = ({ data, typeRatio }) => {
         {/* 題型分布圓餅圖 */}
         <div className="situation-card">
           <h2 className="situation-card-title">題型分布</h2>
-          <div className="situation-chart-container-judy">
+          <ChartFigure
+            plotClassName="situation-chart-container-judy"
+            title="題型分布"
+            summary={pieSummary}
+            columns={[{ key: "name", label: "題型" }, { key: "share", label: "比例" }]}
+            rows={questionTypeData.map((i) => ({ name: i.name, share: percentOf(i.value) }))}
+          >
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -110,14 +128,15 @@ const SituationDashboard = ({ data, typeRatio }) => {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
+                <Tooltip formatter={(value, name) => [percentOf(value), name]} />
               </PieChart>
             </ResponsiveContainer>
-          </div>
+          </ChartFigure>
           <div className="situation-legend-grid">
             {questionTypeData.map((item, index) => (
               <div key={index} className="situation-legend-item">
                 <div className="situation-legend-color" style={{ backgroundColor: item.color }}></div>
-                <span className="situation-legend-name">{item.name}</span>
+                <span className="situation-legend-name">{item.name} {percentOf(item.value)}</span>
               </div>
             ))}
           </div>
@@ -125,7 +144,23 @@ const SituationDashboard = ({ data, typeRatio }) => {
 
         {/* 組合圖 */}
         <div className="situation-card">
-          <div className="situation-chart-container-judy" style={{ height: "100%" }}>
+          <ChartFigure
+            plotClassName="situation-chart-container-judy"
+            title="各題型正確率"
+            summary={barSummary}
+            columns={[
+              { key: "type", label: "題型" },
+              { key: "correctRate", label: "正確率" },
+              { key: "averageAccuracy", label: "平均正確率" },
+              { key: "performance", label: "表現" },
+            ]}
+            rows={performanceData.map((i) => ({
+              type: i.type,
+              correctRate: Number.isFinite(i.correctRate) ? `${i.correctRate}%` : "無資料",
+              averageAccuracy: Number.isFinite(i.averageAccuracy) ? `${i.averageAccuracy}%` : "無資料",
+              performance: i.performance,
+            }))}
+          >
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
                 data={performanceData}
@@ -171,7 +206,7 @@ const SituationDashboard = ({ data, typeRatio }) => {
                 />
               </ComposedChart>
             </ResponsiveContainer>
-          </div>
+          </ChartFigure>
         </div>
       </div>
     </div>

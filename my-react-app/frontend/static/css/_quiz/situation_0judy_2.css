@@ -11,3 +11,67 @@
 .judy-situation-line-chart-wrapper {
     width: 100%;
 }
+
+/* 歷史表現：電腦左右並排，720px 以下改縱排（審查項 P1-16） */
+.judy-situation-line-chart-wrapper {
+    display: flex;
+    gap: 20px;
+}
+
+.judy-line-main {
+    flex: 2;
+    min-width: 0;
+}
+
+.judy-line-plot {
+    height: 400px;
+}
+
+.judy-line-side {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.judy-pie-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--yy-ink);
+}
+
+.judy-pie-figure {
+    width: 70%;
+}
+
+.judy-pie-plot {
+    height: 240px;
+}
+
+@media (max-width: 720px) {
+    .judy-situation-line-chart-wrapper {
+        flex-direction: column;
+    }
+
+    .judy-line-plot {
+        height: 300px;
+    }
+
+    .judy-line-side {
+        align-items: stretch;
+    }
+
+    .judy-pie-title {
+        text-align: center;
+    }
+
+    .judy-pie-figure {
+        width: 100%;
+    }
+
+    .judy-pie-plot {
+        height: 220px;
+    }
+}
