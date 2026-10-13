@@ -1,24 +1,28 @@
+/* 以下全部限縮在 .note-page 底下（筆記頁根容器，見 _note/index.jsx）。
+   原本是對全站 button/.btn 與 .btn-primary 等通用名稱寫規則，lazy CSS 載入後不會卸載，
+   進過筆記頁整站按鈕都會變成最小寬 100px、顏色被改掉（審查項 P1-9）。 */
+
 /* 基本按鈕尺寸（保留你原本的寫法） */
-button,
-.btn { min-width: 100px; border-radius: 10px; padding: 10px 16px; cursor: pointer; }
+.note-page button,
+.note-page .btn { min-width: 100px; border-radius: 10px; padding: 10px 16px; cursor: pointer; }
 
 
-.btn-primary {
+.note-page .btn-primary {
   background-color: var(--danger);
   color: #fff;
   border: none;
   transition: background-color .2s ease;
 }
-.btn-primary:hover { background-color: var(--brand-red-600); }
+.note-page .btn-primary:hover { background-color: var(--brand-red-600); }
 
-.btn-ghost {
+.note-page .btn-ghost {
   background: var(--ghost-bg);
   color: var(--ghost-fg);
   border: 1px solid transparent;
 }
-.btn-ghost:hover { filter: brightness(0.98); }
+.note-page .btn-ghost:hover { filter: brightness(0.98); }
 
-.btn-upload {
+.note-page .btn-upload {
   background-color: var(--ghost-bg);
   color: var(--ghost-fg);
   border: none;
@@ -27,48 +31,48 @@ button,
   gap: 4px;
 }
 
-.btn-upload:hover { filter: brightness(0.98); }
+.note-page .btn-upload:hover { filter: brightness(0.98); }
 
 /* 危險 */
-.btn-danger {
+.note-page .btn-danger {
   background: gray;
   color:#fff;
   border: none;
 }
-.btn-danger:hover { background: var(--ghost-fg); }
+.note-page .btn-danger:hover { background: var(--ghost-fg); }
 
-.btn-add {
+.note-page .btn-add {
   background-color: #28a745;
 }
-.btn-add:hover { background-color: #218838; }
+.note-page .btn-add:hover { background-color: #218838; }
 
-.btn-page {
+.note-page .btn-page {
   color: var(--bs-btn-disabled-color);
   background-color: var(--bs-btn-disabled-bg);
   border-color: var(--bs-btn-disabled-border-color);
   opacity: var(--bs-btn-disabled-opacity);
 }
 
-.btn-page:hover {
+.note-page .btn-page:hover {
   background-color: var(--bs-btn-active-bg);
 }
 
-.btn-page.btn:disabled {
+.note-page .btn-page.btn:disabled {
   background: var(--ghost-bg);
   color: var(--ghost-fg);
 }
 
 /* 舊版相容：讓 .morandi-blue 等於主紅按鈕 */
 /* 若不支援 composes，可直接重覆宣告： */
-.morandi-blue {
+.note-page .morandi-blue {
   background-color: var(--brand-red);
   color:#fff; border:none;
   transition: background-color .2s ease;
 }
-.morandi-blue:hover { background-color: var(--brand-red-600); }
+.note-page .morandi-blue:hover { background-color: var(--brand-red-600); }
 
 @media (max-width: 768px) {
-  .btn-primary, .btn-danger, .btn-ghost, .morandi-blue {
+  .note-page .btn-primary, .note-page .btn-danger, .note-page .btn-ghost, .note-page .morandi-blue {
     width: 100%;
     max-width: 300px;
   }

@@ -19,7 +19,7 @@ const BANNED_GENERIC = ['.overlay', '.message', '.avatar', '.status', '.modal', 
 // 截至這個測試建立時已經存在的跨檔案同名類別。不要往裡面新增，應該改類別名稱；
 // 清掉其中一個之後請把它從這裡移除。
 const KNOWN_DUPLICATES = [
-  '.btn-primary', '.close-btn', '.event-card', '.formTitle', '.home-title', '.icon',
+  '.close-btn', '.event-card', '.formTitle', '.home-title', '.icon',
   '.result-title', '.submit-actions', '.submit-button', '.word-cards-grid',
 ];
 

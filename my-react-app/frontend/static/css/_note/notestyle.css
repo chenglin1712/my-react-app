@@ -10,13 +10,11 @@
   --shadow: 0 6px 14px rgba(0,0,0,.06);
 }
 
-/* ---- 全域 ---- */
-body {
-  background-size: cover;
-  background-attachment: fixed;
-  background-position: center;
-  font-family: "Microsoft JhengHei", "Segoe UI", sans-serif;
-  margin: 0;
+/* ---- 筆記頁容器 ----
+   原本是 body 規則（整站底部多 100px、字型被改），lazy CSS 不會卸載，進過筆記頁後
+   其他頁都受影響（審查項 P1-9）。body 的背景圖設定在整個專案找不到對應的背景圖，
+   margin 由 Bootstrap reboot 負責，字型由 .yy-page 負責，所以只保留底部留白。 */
+.note-page {
   padding-bottom: 100px; /* 預留底部工具列 */
 }
 

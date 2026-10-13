@@ -145,7 +145,7 @@ function NotePage() {
   const currentNote = notes[currentPage] || { title: "", content: "<p></p>" };
 
   return (
-    <div className="yy-page">
+    <div className="yy-page note-page">
     <div className="note-hero yy-fade-up">
       <span className="yy-eyebrow">◆ NOTES ◆</span>
       <h1 className="note-hero-title">筆記</h1>

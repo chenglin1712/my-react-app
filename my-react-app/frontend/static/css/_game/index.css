@@ -4,11 +4,9 @@
     }
 }
 
-body {
-    background-color: transparent;
-    height: 100%;
-    margin: 0;
-}
+/* 原本這裡有一條 body { background-color: transparent; height: 100%; margin: 0 } 全域規則，
+   lazy CSS 不會卸載，進過遊戲頁後其他頁的 body 也被改（審查項 P1-9）。
+   Bootstrap reboot 已把 body margin 設為 0，頁面底色由 .yy-page 負責，所以直接移除。 */
 
 .background {
     place-items: center;

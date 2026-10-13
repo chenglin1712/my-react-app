@@ -213,11 +213,16 @@ audio {
     color: var(--yy-cream);
 }
 
+/* 三選一圖片題：用 grid 讓三張圖在窄螢幕等比縮小，不再被 .yy-page 的 overflow-x: clip
+   裁掉第三個選項（審查項 P0-1）。三欄各佔 1fr 且最小寬為 0，整排最寬 500px
+   （3 × 160px + 2 × 10px 間距），維持電腦版原本的大小，窄螢幕則等比縮小。 */
 .quiz-multi-images {
-    display: flex;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: start;
+    max-width: 500px;
+    margin: 10px auto;
     gap: 10px;
-    margin: 10px 0;
 }
 
 .quiz-image-box {
@@ -231,11 +236,17 @@ audio {
     border-radius: var(--yy-radius-card);
     overflow: hidden;
     border: 3px solid var(--yy-ink);
-    transition: all 0.2s ease;
+    min-width: 0;
+    transition: box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, transform 0.16s ease-out;
+}
+
+.quiz-image-box:active {
+    transform: scale(0.97);
 }
 
 .quiz-multi-images img {
-    width: 160px;
+    width: 100%;
+    height: auto;
     object-fit: cover;
     display: block;
 }
@@ -473,5 +484,15 @@ audio {
 
     .answers button {
         padding: 10px 15px;
+    }
+}
+
+/* 手機上三張圖各只有 80–110px 寬，標籤縮小以免遮住圖片 */
+@media (max-width: 480px) {
+    .quiz-label {
+        top: 4px;
+        left: 4px;
+        padding: 2px 6px;
+        font-size: 14px;
     }
 }
