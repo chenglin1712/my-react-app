@@ -60,7 +60,7 @@ describe('AIAssistantOverlay（回歸測試：注音/拼音輸入法選字時的
     await userEvent.type(input, '你好');
     // fireEvent 才能自訂 nativeEvent.isComposing，userEvent 目前不支援
     const { fireEvent } = await import('@testing-library/react');
-    fireEvent.keyPress(input, { key: 'Enter', nativeEvent: { isComposing: true } });
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true });
 
     expect(apiPost).not.toHaveBeenCalled();
   });
@@ -77,7 +77,7 @@ describe('AIAssistantOverlay（回歸測試：注音/拼音輸入法選字時的
     expect(await screen.findByText('你好！')).toBeInTheDocument();
   });
 
-  test('回應還在等待時，輸入框跟發送按鈕都會被停用，不能連續送出', async () => {
+  test('回應還在等待時，輸入框標示忙碌、發送鈕標示不可用，且不能連續送出（不用 disabled，焦點才不會掉走）', async () => {
     let resolveApiPost;
     apiPost.mockImplementation(() => new Promise((resolve) => { resolveApiPost = resolve; }));
     const user = userEvent.setup();
@@ -86,8 +86,12 @@ describe('AIAssistantOverlay（回歸測試：注音/拼音輸入法選字時的
 
     await user.type(input, '你好{Enter}');
 
-    expect(screen.getByLabelText('輸入訊息')).toBeDisabled();
-    expect(screen.getByRole('button', { name: '發送' })).toBeDisabled();
+    expect(screen.getByLabelText('輸入訊息')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByLabelText('輸入訊息')).not.toBeDisabled();
+    expect(screen.getByLabelText('輸入訊息')).toHaveFocus();
+    expect(screen.getByRole('button', { name: '發送' })).toHaveAttribute('aria-disabled', 'true');
+    // 等待中再送一次也不會發出第二個請求
+    await user.type(screen.getByLabelText('輸入訊息'), '再問一次{Enter}');
     expect(apiPost).toHaveBeenCalledTimes(1);
 
     resolveApiPost({ message: '回應' });
@@ -123,5 +127,68 @@ describe('AIAssistantOverlay（回歸測試：注音/拼音輸入法選字時的
     // 卸載時的 cleanup 呼叫了同一個 AbortController 的 abort()
     expect(capturedSignal.aborted).toBe(true);
     consoleErrorSpy.mockRestore();
+  });
+});
+
+describe('AIAssistantOverlay 無障礙（審查項 P1-5、P1-6）', () => {
+  beforeEach(() => {
+    apiPost.mockReset();
+    getUserSituation.mockReset();
+    getUserSituation.mockResolvedValue({ level: 'beginner' });
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
+    authState.userData = { firestoreData: { user_errors: {}, quiz_model: { type_stats: {} } } };
+  });
+
+  test('開啟時焦點在輸入框；Esc 關閉；Tab 被困在對話框內', async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={onClose} />);
+
+    expect(screen.getByLabelText('輸入訊息')).toHaveFocus();
+    const dialog = screen.getByRole('dialog', { name: '族語 AI 助手' });
+    for (let i = 0; i < 12; i += 1) {
+      await user.tab();
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    }
+
+    await user.keyboard('{Escape}');
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test('關閉（卸載）後焦點回到開啟前的按鈕', () => {
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    opener.focus();
+    const { unmount } = render(<AIAssistantOverlay onClose={vi.fn()} />);
+    expect(opener).not.toHaveFocus();
+    unmount();
+    expect(opener).toHaveFocus();
+    opener.remove();
+  });
+
+  test('對話紀錄是 role=log 的 polite live region，等待回覆時有「助手正在輸入」文字', async () => {
+    let resolveApiPost;
+    apiPost.mockImplementation(() => new Promise((resolve) => { resolveApiPost = resolve; }));
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    const log = screen.getByRole('log', { name: '對話紀錄' });
+    expect(log).toHaveAttribute('aria-live', 'polite');
+
+    await user.type(screen.getByLabelText('輸入訊息'), '你好{Enter}');
+    expect(log).toHaveTextContent('助手正在輸入');
+    resolveApiPost({ message: '回應' });
+    expect(await screen.findByText('回應')).toBeInTheDocument();
+    expect(log).not.toHaveTextContent('助手正在輸入');
+  });
+
+  test('送出訊息後焦點仍在輸入框，可以直接打下一則', async () => {
+    apiPost.mockResolvedValue({ message: '好的' });
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+    await user.type(screen.getByLabelText('輸入訊息'), '你好');
+    await user.click(screen.getByRole('button', { name: '發送' }));
+    expect(await screen.findByText('好的')).toBeInTheDocument();
+    expect(screen.getByLabelText('輸入訊息')).toHaveFocus();
   });
 });

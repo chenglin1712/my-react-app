@@ -9,6 +9,7 @@ import { getUserSituation } from "../../src/userServives/uploadDb";
 import { TRIBES } from "../../src/constants/tribes";
 import { scrollBehavior } from "../../src/hooks/useReducedMotion";
 import { apiPost } from "../../utils/apiClient";
+import { useDialog } from "@hooks/useDialog";
 
 const SUGGESTIONS = [
     "我想了解我的學習狀況",
@@ -30,6 +31,8 @@ const AIAssistantOverlay = ({ onClose }) => {
     const [input, setInput] = useState("");
     const [isPending, setIsPending] = useState(false);
     const messageEndRef = useRef(null);
+    const dialogRef = useRef(null);
+    const inputRef = useRef(null);
     const mountedRef = useRef(true);
     const abortControllerRef = useRef(null);
     const [userStats, setUserStats] = useState({
@@ -91,6 +94,10 @@ const AIAssistantOverlay = ({ onClose }) => {
         return () => { cancelled = true; };
     }, [userData]);
 
+    // aria-modal 只是宣告：焦點陷阱、Esc、還原焦點都要自己做（審查項 P1-5）。
+    // 開啟時焦點直接放在輸入框，使用者可以馬上打字。
+    useDialog(dialogRef, { onClose: handleClose, initialFocusRef: inputRef });
+
     // 新訊息或「輸入中」指示器出現/消失時自動捲到底部，messageEndRef 原本宣告了
     // 卻從沒呼叫 scrollIntoView，訊息一多使用者得自己手動往下滑。
     useEffect(() => {
@@ -105,6 +112,9 @@ const AIAssistantOverlay = ({ onClose }) => {
     const handleSend = async () => {
         if (input.trim() === "" || isPending) return;
 
+        // 送出鈕與輸入框都不再用 disabled 擋住等待中的狀態（disabled 會讓焦點掉回 body，
+        // 每則訊息都得重新點輸入框），改成 aria-disabled / aria-busy，並把焦點留在輸入框（審查項 P1-6）。
+        inputRef.current?.focus({ preventScroll: true });
         const userText = input;
         const newUserMessage = { id: crypto.randomUUID(), text: userText, role: "user" };
         setMessages(prev => [...prev, newUserMessage]);
@@ -148,11 +158,11 @@ const AIAssistantOverlay = ({ onClose }) => {
         }
     };
 
-    const handleKeyPress = (e) => {
+    const handleKeyDown = (e) => {
         // 中文/日文注音等輸入法用 Enter 確認候選字時也會觸發 keydown 的
         // Enter，這裡沒有排除的話，選字確認會被誤判成「送出訊息」，把還在
-        // 組字中的內容提前送出去。
-        if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+        // 組字中的內容提前送出去。keyCode 229 是部分瀏覽器（Safari）組字結束後那一下 Enter 的標記。
+        if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) {
             handleSend();
         }
     };
@@ -164,6 +174,8 @@ const AIAssistantOverlay = ({ onClose }) => {
     return (
         <div className="bot-overlay">
             <motion.div
+                ref={dialogRef}
+                tabIndex={-1}
                 className="chat-container"
                 role="dialog"
                 aria-modal="true"
@@ -187,7 +199,7 @@ const AIAssistantOverlay = ({ onClose }) => {
                     </div>
                     <div className="header-info">
                         <h2>{TRIBES.find((t) => t.slug === tribe)?.name}智慧助手</h2>
-                        <p className="bot-status online">在線</p>
+                        <p className="bot-status online">{isPending ? "回覆中…" : "可以提問"}</p>
                     </div>
                     <select
                         value={tribe}
@@ -202,7 +214,8 @@ const AIAssistantOverlay = ({ onClose }) => {
                     </select>
                 </div>
 
-                <div className="messages-container">
+                {/* role="log"：新訊息會被報讀器依序念出，不打斷使用者正在做的事 */}
+                <div className="messages-container" role="log" aria-live="polite" aria-relevant="additions" aria-label="對話紀錄">
                     {messages.map((message) => (
                         <div key={message.id} className={`bot-message ${message.role}`}>
                             {message.role === "bot" && (
@@ -224,7 +237,8 @@ const AIAssistantOverlay = ({ onClose }) => {
                                 <Bot />
                             </div>
                             <div className="message-bubble typing">
-                                <div className="typing-indicator">
+                                <span className="visually-hidden">助手正在輸入</span>
+                                <div className="typing-indicator" aria-hidden="true">
                                     <span></span>
                                     <span></span>
                                     <span></span>
@@ -256,20 +270,21 @@ const AIAssistantOverlay = ({ onClose }) => {
 
                 <div className="input-area">
                     <input
+                        ref={inputRef}
                         type="text"
                         value={input}
                         onChange={handleInputChange}
-                        onKeyPress={handleKeyPress}
+                        onKeyDown={handleKeyDown}
                         placeholder="輸入您的訊息..."
                         className="message-input"
                         aria-label="輸入訊息"
-                        disabled={isPending}
+                        aria-busy={isPending}
                     />
                     <button
                         type="button"
-                        className={`send-button ${input.trim() ? 'active' : ''}`}
+                        className={`send-button ${input.trim() && !isPending ? 'active' : ''}`}
                         onClick={handleSend}
-                        disabled={input.trim() === "" || isPending}
+                        aria-disabled={input.trim() === "" || isPending}
                     >
                         發送
                     </button>

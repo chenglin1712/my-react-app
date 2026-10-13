@@ -1,8 +1,9 @@
 import "../../static/css/_quiz/review_AI.css"
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Send, Bot, X } from "lucide-react";
 import { TRIBE_NAME_BY_SLUG as TRIBE_NAME } from "../../src/constants/tribes";
 import { apiPost } from "../../utils/apiClient";
+import { useDialog } from "@hooks/useDialog";
 
 // review.jsx 的 ReviewTabs 目前把這個分頁標成「即將推出」並擋掉導覽——
 // 除了功能還沒做完，它現在也只收得到 tribe，收不到使用者選的是哪一題/
@@ -21,9 +22,14 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
     const [input, setInput] = useState("");
     const [isType, setIsType] = useState(false);
     const [expanded, setExpanded] = useState(null);
+    const expandedRef = useRef(null);
+
+    // 放大訊息視窗：原本連 role 都沒有（審查項 P1-5）
+    useDialog(expandedRef, { active: expanded !== null, onClose: () => setExpanded(null) });
 
     const handleSend = async () => {
-        if (!input.trim()) return;
+        // 等待回覆中不重複送出；按鈕與輸入框不用 disabled，避免焦點掉回 body（審查項 P1-6）
+        if (!input.trim() || isType) return;
 
         const userMsg = {
             id: Date.now(),
@@ -76,7 +82,17 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
             <div
                 key={msg.id}
                 className={`chat-message ${isUser ? "user" : "assistant"}`}
+                role="button"
+                tabIndex={0}
+                aria-haspopup="dialog"
                 onClick={() => setExpanded(msg)}
+                onKeyDown={(e) => {
+                    if (e.target !== e.currentTarget) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setExpanded(msg);
+                    }
+                }}
             >
                 <div className="avatar">
                     {isUser ? "" : <Bot size={24} />}
@@ -111,7 +127,7 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
                 <h4><Bot size={20} />{tribeName}AI助手</h4>
             </div>
 
-            <div className="assistant-messages">
+            <div className="assistant-messages" role="log" aria-live="polite" aria-relevant="additions" aria-label="對話紀錄">
                 {messages.map(renderMessage)}
                 {isType && (
                     <div className="message bot">
@@ -119,7 +135,8 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
                             <Bot />
                         </div>
                         <div className="review-message-bubble typing">
-                            <div className="review-typing-indicator">
+                            <span className="visually-hidden">助手正在輸入</span>
+                            <div className="review-typing-indicator" aria-hidden="true">
                                 <span></span>
                                 <span></span>
                                 <span></span>
@@ -134,17 +151,30 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                        // 組字中（注音、拼音）的 Enter 是選字，不是送出
+                        if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) handleSend();
+                    }}
                     placeholder="輸入你的問題..."
                     aria-label="輸入問題"
+                    aria-busy={isType}
                 />
-                <button onClick={handleSend} aria-label="傳送訊息"><Send size={18} /></button>
+                <button type="button" onClick={handleSend} aria-label="傳送訊息" aria-disabled={!input.trim() || isType}><Send size={18} /></button>
             </div>
 
             {/* 放大訊息 Modal */}
             {expanded && (
                 <div className="modal-overlay" onClick={() => setExpanded(null)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <button className="close-btn" onClick={() => setExpanded(null)} aria-label="關閉">
+                    <div
+                        ref={expandedRef}
+                        tabIndex={-1}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="放大檢視訊息"
+                        className="modal-content"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button type="button" className="close-btn" onClick={() => setExpanded(null)} aria-label="關閉">
                             <X size={20} />
                         </button>
                         {expanded.type === "translation" ? (

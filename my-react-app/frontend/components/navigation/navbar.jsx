@@ -6,6 +6,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../src/userServives/authContext"
 import AvatarImg from "../../static/assets/_auth/avatar.webp"
 import UserSidebar from "./userSidebar"
+import { useDialog } from "@hooks/useDialog"
 
 // 靜態的導覽路由設定，不依賴 props/state，搬到元件外，不用每次 render 重建。
 const MENU_ITEMS = [
@@ -37,8 +38,15 @@ const Navbar = ({ onOpenBot }) => {
   const [isUserOpen, setIsUserOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownTriggerRef = useRef(null);
+  const userSidebarRef = useRef(null);
 
   const isLoggedIn = userData != null && userData.firestoreData != null;
+  const userName = userData?.firestoreData?.name;
+  // 可見文字是使用者名稱，aria-label 必須以它開頭，語音控制說出名稱才能啟動（WCAG 2.5.3，審查項 P2-2）
+  const userButtonLabel = userName ? `${userName}，開啟個人資料選單` : "開啟個人資料選單";
+
+  // 個人資料側欄是自製彈窗：Esc、焦點陷阱、關閉後焦點回到按下的那顆按鈕（審查項 P1-5）
+  useDialog(userSidebarRef, { active: isLoggedIn && isUserOpen, onClose: () => setIsUserOpen(false) });
 
   //改變個人資料側拉選單狀態
   const handleUserSidebar = () => {
@@ -114,28 +122,14 @@ const Navbar = ({ onOpenBot }) => {
                 <button
                   type="button"
                   className="auth-container-user"
-                  aria-label="開啟個人資料選單"
+                  aria-label={userButtonLabel}
+                  aria-haspopup="dialog"
+                  aria-expanded={isUserOpen}
                   onClick={handleUserSidebar}
                 >
                   <img src={userData?.firestoreData?.avatarUrl || AvatarImg} className="auth-image" alt="" />
-                  <p>{userData?.firestoreData?.name}</p>
+                  <p>{userName}</p>
                 </button>
-              </div>
-
-              {
-                isUserOpen && (
-                  <div className="navbar-overlay" onClick={() => setIsUserOpen(false)}></div>
-                )
-              }
-              <div
-                className={`sidebar ${isUserOpen ? 'open' : ''}`}
-              >
-                <div className="sidebar-header">
-                  <h3> 個人資料</h3>
-                  <button className="close-btn" aria-label="關閉個人資料選單" onClick={() => setIsUserOpen(false)}>×</button>
-                </div>
-
-                <UserSidebar userData={userData} closeSidebar={() => setIsUserOpen(false)} onOpenBot={onOpenBot} />
               </div>
             </>
           )}
@@ -165,28 +159,14 @@ const Navbar = ({ onOpenBot }) => {
               <button
                 type="button"
                 className="mobile-container-user"
-                aria-label="開啟個人資料選單"
+                aria-label={userButtonLabel}
+                aria-haspopup="dialog"
+                aria-expanded={isUserOpen}
                 onClick={handleUserSidebar}
               >
                 <img src={userData?.firestoreData?.avatarUrl || AvatarImg} className="mobile-image" alt="" />
-                <p>{userData?.firestoreData?.name}</p>
+                <p>{userName}</p>
               </button>
-            </div>
-
-            {
-              isUserOpen && (
-                <div className="navbar-overlay" onClick={() => setIsUserOpen(false)}></div>
-              )
-            }
-            <div
-              className={`sidebar ${isUserOpen ? 'open' : ''}`}
-            >
-              <div className="sidebar-header">
-                <h3>&nbsp;個人資料</h3>
-                <button className="close-btn" aria-label="關閉個人資料選單" onClick={() => setIsUserOpen(false)}>×</button>
-              </div>
-
-              <UserSidebar userData={userData} closeSidebar={() => setIsUserOpen(false)} onOpenBot={onOpenBot} />
             </div>
           </>
         )}
@@ -212,6 +192,31 @@ const Navbar = ({ onOpenBot }) => {
         </NavLink>
       </div >
     </nav >
+
+    {/* 個人資料側欄只渲染一份（原本桌面與手機選單各渲染一份，共兩份側欄與兩層遮罩）。
+        收起時用 CSS visibility:hidden，Tab 不會進到看不見的「編輯資料」「登出」（審查項 P2-1）。 */}
+    {isLoggedIn && (
+      <>
+        {isUserOpen && <div className="navbar-overlay" onClick={() => setIsUserOpen(false)}></div>}
+        <div
+          ref={userSidebarRef}
+          id="user-sidebar"
+          tabIndex={-1}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="user-sidebar-title"
+          inert={!isUserOpen}
+          className={`sidebar ${isUserOpen ? 'open' : ''}`}
+        >
+          <div className="sidebar-header">
+            <h3 id="user-sidebar-title">個人資料</h3>
+            <button type="button" className="close-btn" aria-label="關閉個人資料選單" onClick={() => setIsUserOpen(false)}>×</button>
+          </div>
+
+          <UserSidebar userData={userData} closeSidebar={() => setIsUserOpen(false)} onOpenBot={onOpenBot} />
+        </div>
+      </>
+    )}
     <div className="navbar-marquee" />
     </>
   );

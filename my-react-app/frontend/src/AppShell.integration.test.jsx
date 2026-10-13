@@ -42,7 +42,7 @@ function renderApp() {
 
 async function openBotFromSidebar(user) {
   // 桌面版與行動版各有一顆開啟個人選單的按鈕，取第一個
-  await user.click(screen.getAllByRole('button', { name: '開啟個人資料選單' })[0]);
+  await user.click(screen.getAllByRole('button', { name: /開啟個人資料選單/ })[0]);
   const sidebar = document.querySelector('.sidebar.open');
   await user.click(within(sidebar).getByText('AI 助手'));
 }

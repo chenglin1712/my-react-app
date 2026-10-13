@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../../../firebase';
 import { submitReport } from '../../../src/userServives/reportService';
+import { useDialog } from '@hooks/useDialog';
 import '../../../static/css/_game/pronunciation-community.css';
 
 const REPORT_REASONS = {
@@ -46,6 +47,7 @@ export default function PronunciationCommunity({ tribe }) {
   const [reason, setReason] = useState('inappropriate');
   const [reasonText, setReasonText] = useState('');
   const [submittingReport, setSubmittingReport] = useState(false);
+  const reportDialogRef = useRef(null);
 
   const loadGenerationRef = useRef(0);
 
@@ -107,6 +109,10 @@ export default function PronunciationCommunity({ tribe }) {
       items,
     }));
   }, [recordings]);
+
+  // 檢舉視窗：Esc 關閉、焦點陷阱、關閉後焦點回到按下的「檢舉」鈕（審查項 P1-5）。
+  // 送出中 closeReportModal 會直接忽略，所以 Esc 在送出中不會關掉視窗。
+  useDialog(reportDialogRef, { active: Boolean(reportTarget), onClose: () => closeReportModal() });
 
   const openReportModal = (recording) => {
     setReportTarget(recording);
@@ -270,6 +276,8 @@ export default function PronunciationCommunity({ tribe }) {
           }}
         >
           <section
+            ref={reportDialogRef}
+            tabIndex={-1}
             className="pron-community-modal"
             role="dialog"
             aria-modal="true"

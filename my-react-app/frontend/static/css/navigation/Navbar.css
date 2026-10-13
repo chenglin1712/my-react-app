@@ -161,21 +161,6 @@
     font-weight: 600;
 }
 
-.auth-container button {
-    height: fit-content;
-    padding: 10px;
-    border-radius: 8px;
-    font-size: 16px;
-    background-color: var(--yy-red);
-    color: var(--yy-cream);
-    border: 2px solid var(--yy-ink);
-    transition: background-color 0.3s, transform 0.3s;
-}
-
-.auth-container button:hover {
-    background-color: var(--yy-red-dark);
-}
-
 /* 響應式選單 */
 .menu-mobile {
     display: none;
@@ -282,12 +267,15 @@
     background-color: #fff;
     box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
     z-index: 1001;
-    transition: right 0.3s ease;
+    visibility: hidden;
+    transition: right 0.3s ease, visibility 0s linear 0.3s;
     overflow-y: auto;
 }
 
 .sidebar.open {
     right: 0;
+    visibility: visible;
+    transition: right 0.3s ease, visibility 0s;
 }
 
 .navbar-overlay {

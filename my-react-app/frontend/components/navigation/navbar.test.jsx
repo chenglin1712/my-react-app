@@ -1,5 +1,6 @@
-import { describe, test, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import Navbar from './navbar';
 
 vi.mock('react-router-dom', () => ({
@@ -19,11 +20,12 @@ vi.mock('react-router-dom', () => ({
     </a>
   ),
 }));
+const authState = vi.hoisted(() => ({ userData: null }));
 vi.mock('../../src/userServives/authContext', () => ({
-  useAuth: () => ({ userData: null }),
+  useAuth: () => ({ userData: authState.userData }),
 }));
 vi.mock('./userSidebar', () => ({
-  default: () => null,
+  default: () => <button type="button">登出</button>,
 }));
 
 describe('Navbar navigation links', () => {
@@ -52,5 +54,80 @@ describe('Navbar navigation links', () => {
     const { container } = render(<Navbar />);
     const toggleButton = container.querySelector('.menu-toggle');
     expect(toggleButton).toHaveAttribute('aria-label', '開啟選單');
+  });
+});
+
+describe('Navbar 使用者側欄（審查項 P1-5、P2-1、P2-2）', () => {
+  beforeEach(() => {
+    authState.userData = { firestoreData: { name: '小明' } };
+  });
+  afterEach(() => {
+    authState.userData = null;
+    document.body.style.overflow = '';
+  });
+
+  test('使用者按鈕的名稱以可見的使用者名稱開頭（語音控制說出名稱即可啟動）', () => {
+    render(<Navbar />);
+    const buttons = screen.getAllByRole('button', { name: /小明/, hidden: true });
+    expect(buttons.length).toBe(2);
+    buttons.forEach((btn) => expect(btn.getAttribute('aria-label').startsWith('小明')).toBe(true));
+  });
+
+  test('側欄與遮罩只渲染一份（原本桌面與手機各一份）', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<Navbar />);
+    expect(container.querySelectorAll('.sidebar').length).toBe(1);
+    await user.click(screen.getAllByRole('button', { name: /開啟個人資料選單/, hidden: true })[0]);
+    expect(container.querySelectorAll('.navbar-overlay').length).toBe(1);
+  });
+
+  test('側欄是 dialog：開啟時焦點移進去、按鈕 aria-expanded 變 true、Esc 關閉並把焦點還給按鈕', async () => {
+    const user = userEvent.setup();
+    render(<Navbar />);
+    const trigger = screen.getAllByRole('button', { name: /開啟個人資料選單/, hidden: true })[0];
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    trigger.focus();
+    await user.click(trigger);
+
+    const dialog = screen.getByRole('dialog', { name: '個人資料' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(document.body.style.overflow).toBe('hidden');
+
+    await user.keyboard('{Escape}');
+    expect(container_open()).toBe(false);
+    expect(trigger).toHaveFocus();
+    expect(document.body.style.overflow).toBe('');
+
+    function container_open() {
+      return document.querySelector('.sidebar.open') !== null;
+    }
+  });
+
+  test('側欄開啟時 Tab 不會跑到背景導覽列', async () => {
+    const user = userEvent.setup();
+    render(<Navbar />);
+    await user.click(screen.getAllByRole('button', { name: /開啟個人資料選單/, hidden: true })[0]);
+    const dialog = screen.getByRole('dialog', { name: '個人資料' });
+    for (let i = 0; i < 6; i += 1) {
+      await user.tab();
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    }
+    expect(within(dialog).getByRole('button', { name: '登出' })).toBeInTheDocument();
+  });
+});
+
+describe('Navbar 側欄收起時 inert（Codex 審查：關閉動畫期間不可仍宣告為 modal）', () => {
+  test('收起時側欄是 inert，開啟時移除', async () => {
+    authState.userData = { firestoreData: { name: '小明' } };
+    const user = userEvent.setup();
+    const { container } = render(<Navbar />);
+    const sidebar = container.querySelector('.sidebar');
+    expect(sidebar.hasAttribute('inert')).toBe(true);
+    await user.click(screen.getAllByRole('button', { name: /開啟個人資料選單/, hidden: true })[0]);
+    expect(sidebar.hasAttribute('inert')).toBe(false);
+    await user.keyboard('{Escape}');
+    expect(sidebar.hasAttribute('inert')).toBe(true);
+    authState.userData = null;
   });
 });

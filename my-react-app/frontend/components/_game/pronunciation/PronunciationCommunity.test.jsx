@@ -293,3 +293,30 @@ describe('PronunciationCommunity', () => {
     expect(screen.getByText('mhuway')).toBeInTheDocument();
   });
 });
+
+describe('PronunciationCommunity 檢舉視窗的鍵盤操作（審查項 P1-5）', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  test('Esc 關閉檢舉視窗，焦點回到按下的「檢舉」鈕，Tab 不會離開視窗', async () => {
+    renderCommunity();
+    const lokahHeading = await screen.findByRole('heading', { name: 'lokah' });
+    const group = lokahHeading.closest('section');
+    const reportButton = within(group).getAllByRole('button', { name: '檢舉' })[0];
+    reportButton.focus();
+    fireEvent.click(reportButton);
+
+    const modal = screen.getByRole('dialog');
+    expect(modal.contains(document.activeElement)).toBe(true);
+
+    for (let i = 0; i < 10; i += 1) {
+      fireEvent.keyDown(document.activeElement, { key: 'Tab' });
+      expect(modal.contains(document.activeElement)).toBe(true);
+    }
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(reportButton).toHaveFocus();
+  });
+});

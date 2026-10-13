@@ -291,6 +291,7 @@
 .send-button.active {
     background: var(--yy-red);
     color: white;
+    cursor: pointer;
 }
 
 .send-button.active::after {

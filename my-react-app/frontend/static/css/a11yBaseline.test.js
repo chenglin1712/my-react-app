@@ -165,3 +165,18 @@ describe("B-6 測驗區：選中與已作答不只靠顏色，也不用低對比
     expect(rule.body).toMatch(/min-height:\s*var\(--yy-control-md\)/);
   });
 });
+
+describe("B-7 導覽列與側欄", () => {
+  const navbar = files.find((f) => f.file === "navigation/Navbar.css").css;
+
+  it("沒有 .auth-container button 這種會蓋過 .auth-container-user 的通用規則（P2-3）", () => {
+    expect(rules(navbar).some((r) => r.selector === ".auth-container button")).toBe(false);
+  });
+
+  it("收起的使用者側欄用 visibility:hidden，Tab 進不去（P2-1）", () => {
+    const closed = rules(navbar).find((r) => r.selector === ".sidebar");
+    expect(closed.body).toMatch(/visibility:\s*hidden/);
+    const open = rules(navbar).find((r) => r.selector === ".sidebar.open");
+    expect(open.body).toMatch(/visibility:\s*visible/);
+  });
+});

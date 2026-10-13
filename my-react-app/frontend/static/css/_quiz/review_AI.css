@@ -129,6 +129,14 @@
     background: var(--yy-red-dark);
 }
 
+/* 空輸入或等待回覆時：用 aria-disabled 而不是 disabled（避免焦點掉走），視覺上要看得出不能按 */
+.assistant-input button[aria-disabled="true"],
+.assistant-input button[aria-disabled="true"]:hover {
+    background: #e0e0e0;
+    color: #888;
+    cursor: not-allowed;
+}
+
 .translation-block {
     display: flex;
     flex-direction: column;
