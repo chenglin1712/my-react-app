@@ -3,7 +3,7 @@ import { useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Alert } from "react-bootstrap";
-import successAnimation from "../../src/animations/success.json"
+import { loadSuccessAnimation } from "../../src/animations/loaders";
 import { useLottieAnimation } from "../../hooks/useLottieAnimation";
 import { addCalendarEvent, addCalendarEvents } from "../../src/userServives/uploadDb";
 
@@ -46,7 +46,7 @@ const StudyPlan = ({ plan, onClose }) => {
     const [showSuccess, setShowSuccess] = useState(false);
     const [errorMsg, setErrorMsg] = useState("");
     const animationRef = useLottieAnimation({
-        animationData: successAnimation,
+        loadAnimationData: loadSuccessAnimation,
         enabled: showSuccess,
         loop: false,
         onComplete: () => setShowSuccess(false),

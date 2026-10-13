@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Alert } from "react-bootstrap";
 import avatarImage from '../../static/assets/_auth/avatar.webp';
 import { registerWithImg } from "../../src/userServives/userServive"
-import successAnimation from "../../src/animations/success.json"
+import { loadSuccessAnimation } from "../../src/animations/loaders";
 import SuccessModal from "../ui/SuccessModal";
 import { useLottieAnimation } from "@hooks/useLottieAnimation";
 import { useAvatarUpload } from "@hooks/useAvatarUpload";
@@ -66,7 +66,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     };
 
     //加載動畫
-    const animation = useLottieAnimation({ animationData: successAnimation, enabled: isRegistered });
+    const animation = useLottieAnimation({ loadAnimationData: loadSuccessAnimation, enabled: isRegistered });
 
     return (
         <div className="register-container">

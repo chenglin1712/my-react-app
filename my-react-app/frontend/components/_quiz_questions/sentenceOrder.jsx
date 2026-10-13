@@ -16,7 +16,7 @@ import {
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import successAnimation from "../../src/animations/success.json";
+import { loadSuccessAnimation } from "../../src/animations/loaders";
 import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
 import { useLottieAnimation } from "../../hooks/useLottieAnimation";
 import { playCorrectSound } from "../../utils/correctSound";
@@ -142,7 +142,7 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
   const [result, setResult] = useState("");
   const [showAnimation, setShowAnimation] = useState(false);
   const animationRef = useLottieAnimation({
-    animationData: successAnimation,
+    loadAnimationData: loadSuccessAnimation,
     enabled: showAnimation,
     loop: false,
     onComplete: () => setShowAnimation(false),

@@ -171,3 +171,33 @@ describe("等寬數字", () => {
     });
   });
 });
+
+// B-9（P1-23、P1-26）：常駐動畫不動 paint 屬性、導覽列動畫只在首頁、下拉選單可過渡
+describe("B-9 動畫與效能", () => {
+  const navbar = allFiles.find((f) => f.file === "navigation/Navbar.css");
+
+  it("前台 CSS 不再有動 box-shadow 的 yy-pulse-glow", () => {
+    frontFiles.forEach(({ file, css }) => {
+      expect(css, file).not.toMatch(/yy-pulse-glow/);
+    });
+  });
+
+  it("導覽列的無限循環動畫都限定在 .navbar--home 底下", () => {
+    walkRules(navbar.css)
+      .filter((r) => /animation\s*:[^;]*infinite/.test(r.body))
+      .forEach((r) => expect(r.selector, r.selector).toMatch(/--home/));
+  });
+
+  it("導覽列跑馬燈改用 transform 平移，不再動 background-position", () => {
+    expect(navbar.css).toMatch(/@keyframes yy-marquee-x[\s\S]*?translateX/);
+    expect(navbar.css).not.toMatch(/animation:\s*yy-marquee\s/);
+  });
+
+  it("下拉選單用 opacity／visibility 過渡，不再靠 display:none 切換", () => {
+    const base = walkRules(navbar.css).find((r) => r.selector === ".dropdown-content");
+    expect(base.body).not.toMatch(/display:\s*none/);
+    expect(base.body).toMatch(/visibility:\s*hidden/);
+    expect(base.body).toMatch(/transform-origin:\s*top left/);
+    expect(base.body).not.toMatch(/transition-interactive/);
+  });
+});

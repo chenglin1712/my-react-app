@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { RectangleEllipsis, Volume2, Check, CircleCheck, CircleX } from "lucide-react";
 import { FaPlayCircle } from 'react-icons/fa';
-import successAnimation from "../../src/animations/success.json";
+import { loadSuccessAnimation } from "../../src/animations/loaders";
 import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
 import { useLottieAnimation } from "../../hooks/useLottieAnimation";
 import { playCorrectSound } from "../../utils/correctSound";
@@ -11,7 +11,7 @@ export default function SentenceFill({ question, selected, checked, onSelect, on
   const [showAnimation, setShowAnimation] = useState(false);
   const { playAudio, stopAudio } = useAuthorizedAudioPlayback();
   const animationRef = useLottieAnimation({
-    animationData: successAnimation,
+    loadAnimationData: loadSuccessAnimation,
     enabled: showAnimation,
     loop: false,
     onComplete: () => setShowAnimation(false),

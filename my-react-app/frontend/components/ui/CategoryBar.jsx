@@ -52,7 +52,7 @@ export default function CategoryBar({
                       aria-pressed={selectedSubCategory === sub.name}
                       onClick={() => selectSubCategory(sub)}
                     >
-                      <img src={sub.image} alt={sub.name} loading="lazy" />
+                      <img src={sub.image} alt={sub.name} width="150" height="150" loading="lazy" decoding="async" />
                       <h5 className="fw-bold">{sub.name}</h5>
                     </button>
                   ))}

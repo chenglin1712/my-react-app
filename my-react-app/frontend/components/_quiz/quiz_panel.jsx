@@ -6,7 +6,7 @@ import MatchingQuestion from "./quiz_matching_question"
 import ClozeQuestion from "./quiz_cloze_question"
 import TrueFalseQuestion from "./quiz_true_false_question"
 import ChoiceQuestion from "./quiz_choice_question"
-import loadingAnimation from "../../src/animations/loading.json"
+import { loadLoadingAnimation } from "../../src/animations/loaders";
 import { Star, CircleHelp } from "lucide-react";
 import { uploadSituationDB } from "../../src/userServives/uploadDb"
 import { useQuizPanelData } from "./useQuizPanelData"
@@ -34,7 +34,7 @@ const Panel = ({ tribe = "tayal" }) => {
     const [submitError, setSubmitError] = useState("");
 
     //加載loading動畫
-    const animation = useLottieAnimation({ animationData: loadingAnimation, enabled: isLoading });
+    const animation = useLottieAnimation({ loadAnimationData: loadLoadingAnimation, enabled: isLoading });
 
     // 使用者主動切題（上一題、下一題、側欄題號）時，畫面整塊換內容，螢幕報讀器不會知道，
     // 用公告補上目前是第幾題（審查項 P2-99）。只在這個函式裡公告，資料重新載入造成的索引歸零不會誤報。

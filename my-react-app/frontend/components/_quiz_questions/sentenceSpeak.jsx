@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Mic, Check, CircleCheck, CircleX } from "lucide-react";
 import { FaMicrophone, FaStop, FaPlayCircle, FaRedo } from 'react-icons/fa';
-import successAnimation from "../../src/animations/success.json";
+import { loadSuccessAnimation } from "../../src/animations/loaders";
 import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
 import { useLottieAnimation } from "../../hooks/useLottieAnimation";
 import { apiPost } from "../../utils/apiClient";
@@ -27,7 +27,7 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
   const { playAudio, stopAudio } = useAuthorizedAudioPlayback();
   const [showAnimation, setShowAnimation] = useState(false);
   const animationRef = useLottieAnimation({
-    animationData: successAnimation,
+    loadAnimationData: loadSuccessAnimation,
     enabled: showAnimation,
     loop: false,
     onComplete: () => setShowAnimation(false),

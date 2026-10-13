@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Alert } from "react-bootstrap";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../../firebase";
-import successAnimation from "../../src/animations/success.json"
+import { loadSuccessAnimation } from "../../src/animations/loaders";
 import SuccessModal from "../ui/SuccessModal";
 import { useLottieAnimation } from "@hooks/useLottieAnimation";
 import { clearAdminSession, markAdminSession } from "../../src/_admin/session/adminSession";
@@ -88,7 +88,7 @@ const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }
 
     //加載動畫
     const [isLogin, setIsLogin] = useState(false);
-    const animation = useLottieAnimation({ animationData: successAnimation, enabled: isLogin });
+    const animation = useLottieAnimation({ loadAnimationData: loadSuccessAnimation, enabled: isLogin });
 
     return (
         <div className="login-box">

@@ -21,12 +21,14 @@ export default defineConfig({
   // vitest 的設定就寫在這個檔案的 `test` 區塊（同一份 resolve 設定），
   // 所以測試環境會自動沿用這裡的別名，不需要另外再設一份。
   resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./frontend/src', import.meta.url)),
-      '@components': fileURLToPath(new URL('./frontend/components', import.meta.url)),
-      '@hooks': fileURLToPath(new URL('./frontend/hooks', import.meta.url)),
-      '@utils': fileURLToPath(new URL('./frontend/utils', import.meta.url)),
-    },
+    alias: [
+      { find: '@', replacement: fileURLToPath(new URL('./frontend/src', import.meta.url)) },
+      { find: '@components', replacement: fileURLToPath(new URL('./frontend/components', import.meta.url)) },
+      { find: '@hooks', replacement: fileURLToPath(new URL('./frontend/hooks', import.meta.url)) },
+      { find: '@utils', replacement: fileURLToPath(new URL('./frontend/utils', import.meta.url)) },
+      // 只用到 svg 渲染且動畫 JSON 沒有 expression，改用精簡版播放器（P1-22）
+      { find: /^lottie-web$/, replacement: 'lottie-web/build/player/lottie_light.js' },
+    ],
   },
   optimizeDeps: {
     entries: ['index.html'],

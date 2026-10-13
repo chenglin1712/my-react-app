@@ -126,9 +126,11 @@
   50% { transform: translateY(-14px) rotate(10deg); }
   100% { transform: translateY(0) rotate(0deg); }
 }
-@keyframes yy-pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 162, 39, 0.55); }
-  50% { box-shadow: 0 0 0 12px rgba(217, 162, 39, 0); }
+/* 主按鈕的呼吸光圈（P1-23）：原本動 box-shadow 會每幀重繪，而且動畫會蓋掉按鈕自己的
+   硬陰影與 hover／active 陰影。改成偽元素只動 transform 與 opacity，走合成層。 */
+@keyframes yy-pulse-ring {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0; transform: scale(1.12); }
 }
 @keyframes yy-marquee {
   0% { background-position: 0 0; }
@@ -146,6 +148,22 @@
   0% { transform: scale(0.7); opacity: 0; }
   60% { transform: scale(1.08); opacity: 1; }
   100% { transform: scale(1); }
+}
+
+/* ---------- 主按鈕光圈（其他頁面的主按鈕各自在自己的 CSS 沿用 yy-pulse-ring） ---------- */
+.yy-btn-primary {
+  position: relative;
+  isolation: isolate;
+}
+.yy-btn-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: rgba(217, 162, 39, 0.55);
+  pointer-events: none;
+  animation: yy-pulse-ring 2.8s ease-in-out infinite;
 }
 
 /* ---------- 捲動進場與載入骨架 ---------- */
@@ -378,7 +396,6 @@
   font-size: 15px;
   cursor: pointer;
   box-shadow: 4px 4px 0 var(--yy-ink);
-  animation: yy-pulse-glow 2.8s ease-in-out infinite;
   transition: transform .15s ease, background .15s ease;
 }
 @media (hover: hover) and (pointer: fine) {
@@ -789,4 +806,11 @@
 #main-content {
   min-height: 100vh;
   min-height: 100dvh;
+}
+
+/* 停用、按下時光圈也要停（動畫在偽元素上，按鈕本體的 animation: none 管不到它） */
+.yy-btn-primary:disabled::after,
+.yy-btn-primary:active::after {
+    animation: none;
+    opacity: 0;
 }

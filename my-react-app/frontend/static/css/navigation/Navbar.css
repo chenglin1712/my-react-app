@@ -31,6 +31,12 @@
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+    position: relative;
+}
+
+/* 導覽列的常駐動畫只在首頁播放（P1-23）：每一頁都帶著無限循環動畫，既耗效能，
+   也違反 WCAG 2.2.2（自動播放超過 5 秒要能暫停）。其他頁面維持靜態畫面。 */
+.navbar--home .logo {
     animation: yy-holo 5s linear infinite;
 }
 
@@ -42,7 +48,30 @@
     background: linear-gradient(135deg, var(--yy-gold), var(--yy-gold-light), var(--yy-gold));
     transform: rotate(45deg);
     display: inline-block;
-    animation: yy-pulse-glow 2.4s ease-in-out infinite;
+}
+
+/* 菱形的脈動光圈：偽元素只動 transform 與 opacity，取代原本動 box-shadow */
+.logo::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 14px;
+    height: 14px;
+    margin-top: -7px;
+    background: rgba(217, 162, 39, 0.55);
+    transform: rotate(45deg);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.navbar--home .logo::after {
+    animation: yy-logo-ring 2.4s ease-out infinite;
+}
+
+@keyframes yy-logo-ring {
+    0% { opacity: 0.55; transform: rotate(45deg) scale(1); }
+    70%, 100% { opacity: 0; transform: rotate(45deg) scale(2.4); }
 }
 
 .logo img {
@@ -51,11 +80,33 @@
 
 /* 頁首下方織紋跑馬燈色條，見 theme-v2.css 的 .yy-marquee-bar */
 .navbar-marquee {
+    position: relative;
     height: 16px;
+    overflow: hidden;
+    border-bottom: 2px solid var(--yy-ink);
+}
+
+/* 色條畫在比外框寬 192px（6 個 32px 圖樣）的偽元素上，用 translateX 平移 192px 剛好銜接，
+   取代原本動 background-position 的做法（P1-23：background-position 每幀都要重繪）。
+   靜態時偽元素左緣在 -192px，圖樣相位與原本 background-position: 0 完全相同。 */
+.navbar-marquee::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -192px;
+    right: 0;
     background-image: repeating-conic-gradient(var(--yy-red) 0deg 90deg, var(--yy-gold) 90deg 180deg, var(--yy-blue) 180deg 270deg, var(--yy-cream) 270deg 360deg);
     background-size: 32px 32px;
-    animation: yy-marquee 6s linear infinite;
-    border-bottom: 2px solid var(--yy-ink);
+}
+
+.navbar-marquee--home::before {
+    animation: yy-marquee-x 6s linear infinite;
+}
+
+@keyframes yy-marquee-x {
+    from { transform: translateX(0); }
+    to { transform: translateX(192px); }
 }
 
 .menu {
@@ -326,8 +377,11 @@
     position: relative;
 }
 
+/* 下拉選單（P1-26）：原本用 display:none 切換，加上 transition 沒有任何效果。
+   改成一直存在、用 opacity／transform／visibility 過渡，visibility:hidden 仍讓收起來的連結
+   不能被 Tab 聚焦。展開 160ms ease-out、收合 120ms 並延遲 100ms，滑鼠斜著移出時不會一下就消失。 */
 .dropdown-content {
-    display: none;
+    display: flex;
     position: absolute;
     top: 100%;
     left: 0;
@@ -340,7 +394,15 @@
     box-shadow: var(--yy-shadow-md);
     flex-direction: column;
     overflow: hidden;
-    transition: var(--transition-interactive);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-6px) scale(0.97);
+    transform-origin: top left;
+    transition:
+        opacity 120ms var(--ease-out) 100ms,
+        transform 120ms var(--ease-out) 100ms,
+        visibility 0s linear 220ms;
 }
 
 .dropdown-item {
@@ -361,14 +423,28 @@
 }
 
 .dropdown-content.active {
-    display: flex;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+    transition:
+        opacity 160ms var(--ease-out),
+        transform 160ms var(--ease-out),
+        visibility 0s linear 0s;
 }
 
 /* 滑鼠移上去自動展開只給有真正 hover 能力的裝置：觸控裝置點一下後會「卡」在 hover 狀態，
    選單收不起來。觸控與鍵盤一律走 click 切換的 .active。 */
 @media (hover: hover) and (pointer: fine) {
     .note-dropdown-wrap:hover .dropdown-content {
-        display: flex;
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transform: none;
+        transition:
+            opacity 160ms var(--ease-out),
+            transform 160ms var(--ease-out),
+            visibility 0s linear 0s;
     }
 }
 

@@ -6,54 +6,54 @@
  * 新增/調整分類要改三個地方。這裡集中成唯一資料來源，其餘檔案改成從這裡 import。
  */
 
-import pronoun from "../../static/assets/images/pronoun.png";
-import auxiliary from "../../static/assets/images/auxiliary.png";
-import particle from "../../static/assets/images/particle.png";
-import negative from "../../static/assets/images/negative.png";
-import question from "../../static/assets/images/question.png";
+import pronoun from "../../static/assets/images/pronoun.webp";
+import auxiliary from "../../static/assets/images/auxiliary.webp";
+import particle from "../../static/assets/images/particle.webp";
+import negative from "../../static/assets/images/negative.webp";
+import question from "../../static/assets/images/question.webp";
 
 // === 人與社會 ===
-import person from "../../static/assets/images/person.png";
-import family from "../../static/assets/images/family.png";
-import culture from "../../static/assets/images/culture.png";
-import religion from "../../static/assets/images/religion.png";
-import clothing from "../../static/assets/images/clothing.png";
-import action from "../../static/assets/images/action.png";
+import person from "../../static/assets/images/person.webp";
+import family from "../../static/assets/images/family.webp";
+import culture from "../../static/assets/images/culture.webp";
+import religion from "../../static/assets/images/religion.webp";
+import clothing from "../../static/assets/images/clothing.webp";
+import action from "../../static/assets/images/action.webp";
 
 // === 自然與環境 ===
-import animal from "../../static/assets/images/animal.png";
-import plant from "../../static/assets/images/plant.png";
-import mountain from "../../static/assets/images/mountain.png";
-import nature from "../../static/assets/images/nature.png";
-import hunting from "../../static/assets/images/hunting.png";
-import farming from "../../static/assets/images/farming.png";
+import animal from "../../static/assets/images/animal.webp";
+import plant from "../../static/assets/images/plant.webp";
+import mountain from "../../static/assets/images/mountain.webp";
+import nature from "../../static/assets/images/nature.webp";
+import hunting from "../../static/assets/images/hunting.webp";
+import farming from "../../static/assets/images/farming.webp";
 
 // === 物質與生活 ===
-import building from "../../static/assets/images/building.png";
-import transport from "../../static/assets/images/transport.png";
-import object from "../../static/assets/images/object.png";
-import food from "../../static/assets/images/food.png";
-import diet from "../../static/assets/images/diet.png";
-import daily from "../../static/assets/images/daily.png";
+import building from "../../static/assets/images/building.webp";
+import transport from "../../static/assets/images/transport.webp";
+import object from "../../static/assets/images/object.webp";
+import food from "../../static/assets/images/food.webp";
+import diet from "../../static/assets/images/diet.webp";
+import daily from "../../static/assets/images/daily.webp";
 
 // === 身體與感官 ===
-import body from "../../static/assets/images/body.png";
-import move from "../../static/assets/images/move.png";
-import sense from "../../static/assets/images/sense.png";
-import emotion from "../../static/assets/images/emotion.png";
-import sound from "../../static/assets/images/sound.png";
-import life from "../../static/assets/images/life.png";
+import body from "../../static/assets/images/body.webp";
+import move from "../../static/assets/images/move.webp";
+import sense from "../../static/assets/images/sense.webp";
+import emotion from "../../static/assets/images/emotion.webp";
+import sound from "../../static/assets/images/sound.webp";
+import life from "../../static/assets/images/life.webp";
 
 // === 抽象概念 ===
-import time from "../../static/assets/images/time.png";
-import number from "../../static/assets/images/number.png";
-import space from "../../static/assets/images/space.png";
-import feature from "../../static/assets/images/feature.png";
-import color from "../../static/assets/images/color.png";
-import abstract from "../../static/assets/images/abstract.png";
+import time from "../../static/assets/images/time.webp";
+import number from "../../static/assets/images/number.webp";
+import space from "../../static/assets/images/space.webp";
+import feature from "../../static/assets/images/feature.webp";
+import color from "../../static/assets/images/color.webp";
+import abstract from "../../static/assets/images/abstract.webp";
 
 // === 其他 ===
-import other from "../../static/assets/images/other.png";
+import other from "../../static/assets/images/other.webp";
 
 export const categoryGroups = {
   "語法與功能": [

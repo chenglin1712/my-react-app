@@ -75,7 +75,6 @@
     border: 3px solid var(--yy-ink);
     border-radius: 8px;
     box-shadow: 4px 4px 0 var(--yy-ink);
-    animation: yy-pulse-glow 2.8s ease-in-out infinite;
     transition: transform 0.15s ease, background 0.15s ease;
     width: 100%;
 }
@@ -109,4 +108,28 @@
 
 .login-box p a:hover {
     text-decoration: underline;
+}
+
+/* 呼吸光圈：偽元素只動 transform 與 opacity（P1-23），keyframes 見 theme-v2.css */
+.login-button {
+    position: relative;
+    isolation: isolate;
+}
+
+.login-button::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: rgba(217, 162, 39, 0.55);
+    pointer-events: none;
+    animation: yy-pulse-ring 2.8s ease-in-out infinite;
+}
+
+/* 停用、按下時光圈也要停（動畫在偽元素上，按鈕本體的 animation: none 管不到它） */
+.login-button:disabled::after,
+.login-button:active::after {
+    animation: none;
+    opacity: 0;
 }

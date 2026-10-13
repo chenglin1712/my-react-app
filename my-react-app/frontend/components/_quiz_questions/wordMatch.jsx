@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link as LinkIcon, Volume2, CircleCheck, CircleX } from "lucide-react";
-import successAnimation from "../../src/animations/success.json";
+import { loadSuccessAnimation } from "../../src/animations/loaders";
 import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
 import { useLottieAnimation } from "../../hooks/useLottieAnimation";
 import { playCorrectSound } from "../../utils/correctSound";
@@ -36,7 +36,7 @@ export default function WordMatch({ question, _selected, _checked, onSelect, onC
 
   const [showAnimation, setShowAnimation] = useState(false);
   const animationRef = useLottieAnimation({
-    animationData: successAnimation,
+    loadAnimationData: loadSuccessAnimation,
     enabled: showAnimation,
     loop: false,
     onComplete: () => setShowAnimation(false),

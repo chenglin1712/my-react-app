@@ -285,7 +285,6 @@
     font-weight: 700;
     color: var(--yy-cream);
     cursor: pointer;
-    animation: yy-pulse-glow 2.8s ease-in-out infinite;
     transition: transform .15s ease, background .15s ease, box-shadow .15s ease;
 }
 
@@ -438,4 +437,28 @@
     .home-tribes-section {
         padding: 50px 24px 30px;
     }
+}
+
+/* 呼吸光圈：偽元素只動 transform 與 opacity（P1-23），keyframes 見 theme-v2.css */
+.home-cta {
+    position: relative;
+    isolation: isolate;
+}
+
+.home-cta::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: rgba(217, 162, 39, 0.55);
+    pointer-events: none;
+    animation: yy-pulse-ring 2.8s ease-in-out infinite;
+}
+
+/* 停用、按下時光圈也要停（動畫在偽元素上，按鈕本體的 animation: none 管不到它） */
+.home-cta:disabled::after,
+.home-cta:active::after {
+    animation: none;
+    opacity: 0;
 }

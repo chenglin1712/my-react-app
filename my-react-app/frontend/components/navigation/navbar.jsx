@@ -55,7 +55,7 @@ const Navbar = ({ onOpenBot }) => {
 
   return (
     <>
-    <nav className="navbar">
+    <nav className={`navbar${location.pathname === "/" ? " navbar--home" : ""}`}>
       <div className="navbar-container">
         <NavLink className="logo" to="/">YUAN・YU</NavLink>
 
@@ -217,7 +217,7 @@ const Navbar = ({ onOpenBot }) => {
         </div>
       </>
     )}
-    <div className="navbar-marquee" />
+    <div className={`navbar-marquee${location.pathname === "/" ? " navbar-marquee--home" : ""}`} />
     </>
   );
 };

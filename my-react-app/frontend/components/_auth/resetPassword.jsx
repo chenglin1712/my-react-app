@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Alert } from "react-bootstrap";
 import { getAuth, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
-import successAnimation from "../../src/animations/success.json"
+import { loadSuccessAnimation } from "../../src/animations/loaders";
 import { useLottieAnimation } from "@hooks/useLottieAnimation";
 import { authErrorMessage } from "@utils/firebaseAuthErrors";
 
@@ -17,7 +17,7 @@ const ResetPassword = () => {
     const [isSuccess, setIsSuccess] = useState(false);
     const [errorMsg, setErrorMsg] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const animation = useLottieAnimation({ animationData: successAnimation, enabled: isSuccess, loop: false });
+    const animation = useLottieAnimation({ loadAnimationData: loadSuccessAnimation, enabled: isSuccess, loop: false });
     const redirectTimeoutRef = useRef(null);
     useEffect(() => () => clearTimeout(redirectTimeoutRef.current), []);
 
