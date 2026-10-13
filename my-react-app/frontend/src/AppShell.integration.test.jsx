@@ -13,6 +13,9 @@ import { MemoryRouter } from 'react-router-dom';
 import AppShell from './AppShell';
 import { apiPost } from '../utils/apiClient';
 
+// 第一個測試會載入延遲載入的 AI 助手 chunk；完整測試並行時比較慢，單檔 5 秒預設會逾時
+vi.setConfig({ testTimeout: 20000 });
+
 // jsdom 沒有 canvas，真實的 lottie-web 在 import 當下就會丟例外，與本測試要驗證的流程無關
 vi.mock('lottie-web', () => ({ default: { loadAnimation: vi.fn(() => ({ destroy: vi.fn(), addEventListener: vi.fn() })) } }));
 vi.mock('./route', () => ({ default: () => <div>頁面內容</div> }));

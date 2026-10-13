@@ -170,7 +170,7 @@ export function useQuizPanelData(level, tribe, level_ch) {
         };
     }, [dataState, data, quizKey, level_ch, tribe]);
 
-    //在一開始先加載所有圖片，避免切換題目有延遲
+    //在一開始先載入所有圖片，避免切換題目有延遲
     useEffect(() => {
         if (data?.parts?.[0]?.questions) {
             const type = data.parts[0].type;

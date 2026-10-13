@@ -44,7 +44,7 @@ describe('CameraResultStep', () => {
 
     // 修正前：auth.currentUser?.getIdToken() 短路成 undefined，整條 .then/.catch/.finally
     // 都不會執行，這裡的查詢結果永遠不會出現，loading 永遠不會關掉。
-    await waitFor(() => expect(screen.getByText(/完全匹配結果/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/完全符合結果/)).toBeInTheDocument());
 
     expect(axios.post).toHaveBeenCalledWith(
       expect.any(String),
@@ -59,7 +59,7 @@ describe('CameraResultStep', () => {
 
     render(<CameraResultStep selectedWords={['balay']} tribe="tayal" onRestart={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByText(/完全匹配結果/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/完全符合結果/)).toBeInTheDocument());
 
     expect(axios.post).toHaveBeenCalledWith(
       expect.any(String),

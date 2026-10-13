@@ -2,7 +2,7 @@ import { ListGroup, Button } from 'react-bootstrap';
 import WordCard from './WordCard';
 import ErrorBoundary from '../../errorBoundary';
 
-// 全部詞條／完全匹配／相關匹配三個結果區塊原本各自複製一份幾乎一樣的
+// 全部詞條／完全符合／相關符合三個結果區塊原本各自複製一份幾乎一樣的
 // 「篩選排序 -> 分頁顯示 -> 載入更多」邏輯，這裡抽成共用元件。_camera/result.jsx
 // 原本自己也維護一份幾乎相同但沒有分頁的版本（MatchResultsList.jsx），現在靠
 // filterAndSortWords／visibleCount 的預設值（不篩選、顯示全部）合併進來。

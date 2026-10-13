@@ -5,6 +5,8 @@ import "swiper/css"
 import "swiper/css/effect-fade"
 import "swiper/css/navigation";
 import { useReducedMotion } from "../../src/hooks/useReducedMotion";
+import ExternalLink from "../ui/ExternalLink";
+import { isExternalUrl } from "../ui/externalUrl";
 
 const News = ({ withImage = [], withoutImage = [], loading = false }) => {
     // 要求降低動態時：停用自動輪播，換張改成立即切換（使用者仍可用左右箭頭手動切）
@@ -65,7 +67,9 @@ const News = ({ withImage = [], withoutImage = [], loading = false }) => {
                                                 {event.start_date}{event.end_date ? ` ～ ${event.end_date}` : ''}
                                             </div>
                                             <h3>{event.title}</h3>
-                                            <a href={event.detail} target="_blank" rel="noreferrer">查看詳情 →</a>
+                                            {isExternalUrl(event.detail) && (
+                                                <ExternalLink href={event.detail}>查看詳情 →</ExternalLink>
+                                            )}
                                         </div>
                                     </div>
                                 </SwiperSlide>
@@ -77,13 +81,13 @@ const News = ({ withImage = [], withoutImage = [], loading = false }) => {
                         <ul className="text-list">
                             {withoutImage.map((event) => (
                                 <li key={event.id}>
-                                    <a href={event.detail} className="text-item" target="_blank" rel="noreferrer">
+                                    <ExternalLink href={event.detail} as="div" className="text-item">
                                         <div className="text-item-date">{event.start_date}</div>
                                         <div className="text-item-content">
                                             <span className="tag" data-tag={event.tag}>{event.tag}</span>
                                             <h4>{event.title}</h4>
                                         </div>
-                                    </a>
+                                    </ExternalLink>
                                 </li>
                             ))}
                         </ul>
@@ -93,20 +97,19 @@ const News = ({ withImage = [], withoutImage = [], loading = false }) => {
                 /* 無圖版：卡片格狀排列 */
                 <div className="news-card-grid">
                     {allNews.map((event) => (
-                        <a
+                        <ExternalLink
                             key={event.id}
                             href={event.detail}
+                            as="div"
                             className="news-card"
-                            target="_blank"
-                            rel="noreferrer"
                         >
                             <div className="news-card-top">
                                 <span className="tag" data-tag={event.tag}>{event.tag}</span>
                                 <span className="news-card-date">{event.start_date}</span>
                             </div>
                             <h4 className="news-card-title">{event.title}</h4>
-                            <span className="news-card-link">查看詳情 →</span>
-                        </a>
+                            {isExternalUrl(event.detail) && <span className="news-card-link" aria-hidden="true">查看詳情 →</span>}
+                        </ExternalLink>
                     ))}
                 </div>
             )}

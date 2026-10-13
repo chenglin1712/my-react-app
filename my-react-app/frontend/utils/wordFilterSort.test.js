@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { countMatchedWords } from './wordFilterSort';
 
 describe('countMatchedWords', () => {
-  it('完全匹配（詞 -> 條目陣列）與相關匹配（詞 -> 分類 -> 條目陣列）都算進總筆數', () => {
+  it('完全符合（詞 -> 條目陣列）與相關符合（詞 -> 分類 -> 條目陣列）都算進總筆數', () => {
     expect(countMatchedWords({ a: [1, 2], b: [3] }, { c: { x: [4], y: [5, 6] } })).toBe(6);
   });
 

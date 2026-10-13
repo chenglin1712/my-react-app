@@ -133,7 +133,7 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
       <br />
       {exactMatchWords.length > 0 && (
         <WordResultsSection
-          title="完全匹配結果"
+          title="完全符合結果"
           titleColorClass="text-success"
           wordsFlat={exactMatchWords}
           expandedWord={expandedWord}
@@ -147,7 +147,7 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
       <br />
       {fuzzyMatchWords.length > 0 && (
         <WordResultsSection
-          title="相關匹配結果"
+          title="相關結果"
           titleColorClass="text-warning"
           wordsFlat={fuzzyMatchWords}
           expandedWord={expandedWord}

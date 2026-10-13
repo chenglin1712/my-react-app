@@ -147,7 +147,7 @@ const HomePage = () => {
         <>
             <div className="home-feature-head">
                 <span>現正主打</span>
-                <span>◆ ◆ ◆ ◆ ◆</span>
+                <span aria-hidden="true">◆ ◆ ◆ ◆ ◆</span>
             </div>
             <div className="home-feature-image">
                 {homepageConfig.hero_image_url && failedHeroImage !== homepageConfig.hero_image_url
@@ -162,7 +162,7 @@ const HomePage = () => {
             </div>
             <div className="home-feature-body">
                 <div className="home-feature-title">{heroTitle}</div>
-                <div className="home-feature-sub">{activeTribe.roman} · 點左側清單切換族語</div>
+                <div className="home-feature-sub">{activeTribe.roman} · 點清單切換族語</div>
             </div>
         </>
     );
@@ -189,7 +189,7 @@ const HomePage = () => {
                 <span className="home-diamond-glyph" aria-hidden="true">◆</span>
 
                 <div className="yy-fade-up">
-                    <span className="yy-eyebrow">◆ 原住民族語 · 五族共學 ◆</span>
+                    <span className="yy-eyebrow"><span aria-hidden="true">◆ </span>原住民族語 · 五族共學<span aria-hidden="true"> ◆</span></span>
                     <h1 className="home-title" aria-label="五族語言，刻進織紋裡的學習旅程">
                         <CharReveal text="五族語言，" start={0.2} />
                         <br />
@@ -230,7 +230,7 @@ const HomePage = () => {
             <section className="home-tribes-section">
                 <div className="home-tribes-grid">
                     <div className="yy-card yy-fade-up home-tribe-list">
-                        <div className="home-tribe-list-title">◆ 五族語言 »</div>
+                        <div className="home-tribe-list-title"><span aria-hidden="true">◆ </span>五族語言<span aria-hidden="true"> »</span></div>
                         {TRIBES.map((t) => (
                             <button
                                 key={t.slug}
@@ -256,7 +256,7 @@ const HomePage = () => {
                                 rel="noopener noreferrer"
                             >
                                 {featureCardContent}
-                                <span className="visually-hidden">（連到外部網站，另開新視窗）</span>
+                                <span className="visually-hidden">（另開新視窗）</span>
                             </a>
                         ) : (
                             <Link className="yy-card yy-fade-up home-feature-card" to={homepageConfig.hero_link_url}>

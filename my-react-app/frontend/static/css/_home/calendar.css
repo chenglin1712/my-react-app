@@ -60,7 +60,8 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .exam-card:hover {
+  /* 沒有網址的公告不是連結，不給可點擊的上浮回饋 */
+  .exam-card:has(a.exam-link):hover {
       transform: translateY(-2px);
   }
 }
@@ -87,7 +88,7 @@
     text-decoration: none;
 }
 
-.exam-link:hover {
+a.exam-link:hover {
     text-decoration: underline;
     color: var(--yy-red);
 }

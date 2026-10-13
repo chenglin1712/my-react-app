@@ -6,7 +6,7 @@ const FUNCTION_CARDS = [
         tag: "VISION",
         letter: "影",
         title: "影像辨識",
-        desc: "影像辨識詞彙學習模組中，使用者可透過攝像頭擷取目標物件，系統將進行影像辨識，檢索對應的原住民族語詞彙、語音及語義，辨識出的詞彙也可依個人喜好儲存於個人詞語庫。",
+        desc: "影像辨識詞彙學習模組中，使用者可透過手機或電腦的相機擷取目標物件，系統將進行影像辨識，檢索對應的原住民族語詞彙、語音及語義，辨識出的詞彙也可依個人喜好儲存於個人詞語庫。",
         route: "/camera",
         headerBg: "linear-gradient(90deg,#1F3A5C,#9E1B24,#1F3A5C)",
         enabledKey: "button1",
@@ -15,7 +15,7 @@ const FUNCTION_CARDS = [
         tag: "GAME",
         letter: "戲",
         title: "詞彙遊戲",
-        desc: "動態詞彙遊戲模組旨在強化使用者對詞語定義與單詞拼寫的連結，使用者需在橫豎交錯的填字格中輸入對應的族語詞彙。系統將記錄使用者的錯誤答案，並在後續測驗中強化練習，提升學習成效。",
+        desc: "遊戲專區提供詞彙填字、聽力、發音與句型四款遊戲。以詞彙填字為例，使用者需在橫豎交錯的填字格中輸入對應的族語詞彙，強化對詞語定義與單詞拼寫的連結；系統將記錄使用者的錯誤答案，並在後續測驗中強化練習，提升學習成效。",
         route: "/game",
         headerBg: "linear-gradient(90deg,#9E1B24,#D9A227,#9E1B24)",
         enabledKey: "button2",
@@ -54,7 +54,7 @@ const FunctionBtn = ({ enabled = DEFAULT_ENABLED }) => {
                     <Link key={card.route} to={card.route} className="card yy-card--hover">
                         <div className="card-head" style={{ background: card.headerBg }}>
                             <span className="card-tag">{card.tag}</span>
-                            <span className="card-diamonds">◆ ◆ ◆</span>
+                            <span className="card-diamonds" aria-hidden="true">◆ ◆ ◆</span>
                         </div>
                         <div className="card-content">
                             <div className="card-letter">{card.letter}</div>

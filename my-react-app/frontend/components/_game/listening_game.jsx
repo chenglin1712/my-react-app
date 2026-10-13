@@ -34,7 +34,7 @@ function ListeningGame({ tribe = "tayal" }) {
     start();
   };
 
-  // 播放音頻
+  // 播放音訊
   const handlePlay = () => {
     if (!q) return;
     playAudio(q.audio_id);
@@ -110,7 +110,7 @@ function ListeningGame({ tribe = "tayal" }) {
             type="button"
             className={`listening-play-btn ${isPlaying ? "playing" : ""}`}
             onClick={handlePlay}
-            title="播放音頻"
+            title="播放音訊"
             aria-label={isPlaying ? "播放中" : "播放發音"}
           >
             {isPlaying ? "♪" : "▶"}

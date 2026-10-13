@@ -33,7 +33,7 @@ const Panel = ({ tribe = "tayal" }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState("");
 
-    //加載loading動畫
+    //載入loading動畫
     const animation = useLottieAnimation({ loadAnimationData: loadLoadingAnimation, enabled: isLoading });
 
     // 使用者主動切題（上一題、下一題、側欄題號）時，畫面整塊換內容，螢幕報讀器不會知道，
@@ -139,11 +139,11 @@ const Panel = ({ tribe = "tayal" }) => {
         });
     };
 
-    //加載題目畫面
+    //載入題目畫面
     if (isLoading) {
         return (
             <div className="load-container">
-                <div className="load-title">題目加載中...</div>
+                <div className="load-title">題目載入中...</div>
                 <div className="load-animate" ref={animation}></div>
             </div>
         );
@@ -151,7 +151,7 @@ const Panel = ({ tribe = "tayal" }) => {
         if (!data || !data.parts || !data.parts[0].questions || data.parts[0].questions.length === 0) {
             return (
                 <div className="quiz-load-error text-center py-5">
-                    <p>測驗資料加載失敗，請重試。</p>
+                    <p>測驗資料載入失敗，請重試。</p>
                     <button onClick={retry}>重新載入</button>
                 </div>
             );
@@ -208,7 +208,7 @@ const Panel = ({ tribe = "tayal" }) => {
                                 {currentType === "true_false" && (
                                     <audio controls>
                                         <source src={currentQuestion.audio} type="audio/mpeg" />
-                                        您的瀏覽器不支持音檔。
+                                        您的瀏覽器不支援音檔。
                                     </audio>
                                 )}
                                 {currentType === "choice" && (

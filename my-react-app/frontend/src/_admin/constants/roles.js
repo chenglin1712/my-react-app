@@ -36,5 +36,5 @@ export const ROLE_LABELS = {
     [ADMIN]: '管理員',
     [EDITOR]: '內容編輯',
     [REVIEWER]: '審核者',
-    [ANALYST]: '數據觀察者',
+    [ANALYST]: '資料觀察者',
 };

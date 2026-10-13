@@ -137,7 +137,7 @@ export function apiDelete(url, options = {}) {
   return executeApi(options, (config) => axios.delete(url, config));
 }
 
-/** P5 數據分析用的輕量事件回報（頁面瀏覽、測驗開始/作答等）。
+/** P5 資料分析用的輕量事件回報（頁面瀏覽、測驗開始/作答等）。
  *
  * 刻意不重用 apiPost——那個函式的錯誤處理是「解析成 ApiError 往外拋」，
  * 分析事件遺漏不該讓呼叫端多包一層 try/catch，也不該讓使用者看到任何

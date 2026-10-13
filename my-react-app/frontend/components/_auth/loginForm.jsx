@@ -86,7 +86,7 @@ const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }
         }
     };
 
-    //加載動畫
+    //載入動畫
     const [isLogin, setIsLogin] = useState(false);
     const animation = useLottieAnimation({ loadAnimationData: loadSuccessAnimation, enabled: isLogin });
 

@@ -65,7 +65,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
         if (url) setAvatarUrl(url);
     };
 
-    //加載動畫
+    //載入動畫
     const animation = useLottieAnimation({ loadAnimationData: loadSuccessAnimation, enabled: isRegistered });
 
     return (

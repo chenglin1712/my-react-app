@@ -36,7 +36,7 @@ function RecommendedQuizResult() {
         </p>
       )}
 
-      {/* 成績數據卡片 */}
+      {/* 成績資料卡片 */}
       <div className="result-stats">
         <div className="stat-card">
           <h3 className="fw-bolder mb-4"><Timer /> 總花費時間</h3>

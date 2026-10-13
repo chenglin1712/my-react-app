@@ -1,4 +1,6 @@
 import "../../static/css/_home/dateReminder.css";
+import ExternalLink from "../ui/ExternalLink";
+import { isExternalUrl } from "../ui/externalUrl";
 import { useState, useEffect, useRef } from 'react';
 import { Calendar, User, FileText, Award, Mail, Bell} from 'lucide-react';
 import {
@@ -192,10 +194,10 @@ const DateReminder = () => {
                                 <button className="close-btn" onClick={() => handleCloseToast(toast.phase)} aria-label="關閉">✕</button>
                             </div>
                             <div className="toast-body">
-                                {toast.url ? (
-                                    <a href={toast.url} target="_blank" rel="noopener noreferrer" className="toast-link">
+                                {isExternalUrl(toast.url) ? (
+                                    <ExternalLink href={toast.url} className="toast-link">
                                         點我前往 {toast.phase} 頁面
-                                    </a>
+                                    </ExternalLink>
                                 ) : (
                                     <p>請注意 {toast.phase} 的相關事宜！</p>
                                 )}

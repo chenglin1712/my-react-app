@@ -138,7 +138,7 @@ describe('apiPatch／apiPut／apiDelete（後台管理系統用，跟 apiGet/api
   });
 });
 
-describe('trackEvent（P5 數據分析：輕量事件回報，任何失敗都不該讓呼叫端需要處理例外）', () => {
+describe('trackEvent（P5 資料分析：輕量事件回報，任何失敗都不該讓呼叫端需要處理例外）', () => {
   beforeEach(() => {
     mockCurrentUser = null;
     axios.post.mockReset();

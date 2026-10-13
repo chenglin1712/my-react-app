@@ -45,7 +45,7 @@ export default function ResearchConsentCard() {
     <div className="result-consent" data-testid="research-consent">
       <h3 className="fw-bolder mb-2">協助改善詞綴練習（選填）</h3>
       <p className="mb-2">
-        如果你同意，我們會在你作答句子填空題時記錄一筆資料：一組由你的帳號加上伺服器密鑰算出的代號（假名，
+        如果你同意，我們會在你作答句子填空題時記錄一筆資料：一組由你的帳號加上伺服器金鑰算出的代號（假名，
         不含你的帳號或 email；系統仍能用它在你要求撤回時找到並刪除你的資料）、這題考的詞綴規則、你選錯時選到的
         詞綴規則、錯誤的類型、答題用時的粗略分級（例如「3–6 秒」）、時間（只到小時），以及系統在你作答前預測你
         答對的機率（兩種模型各一個）、作答前後你在這條詞綴上的熟練度估計。

@@ -204,7 +204,7 @@ const SearchPage = () => {
     setAllWords([]); setAllTotal(0); setAllOffset(0);
   };
 
-  // 每次結果或篩選條件變動時，完全匹配／相關匹配的分頁顯示筆數重置回第一頁，
+  // 每次結果或篩選條件變動時，完全符合／相關符合的分頁顯示筆數重置回第一頁，
   // 避免舊頁碼對到新的（更短的）結果。這兩個區塊的篩選排序仍在前端做（見 filterAndSortWords）
   useEffect(() => {
     setVisibleExactCount(PAGE_SIZE);
@@ -214,7 +214,7 @@ const SearchPage = () => {
   // 「全部詞條」瀏覽時，篩選／排序／族語條件改變要重新向後端要資料（不是本地重新篩選），
   // 這裡統一處理（也包含 handleTribeChange 重置篩選條件之後的重新查詢，見上方註解）。
   // 用 ref 跳過掛載時的第一次執行，避免跟下面掛載用的 handleSearch() 重複打一次 API；
-  // 有輸入關鍵字時（query 非空）不做任何事，因為完全/相關匹配結果本來就是前端篩選，不需要重打 API。
+  // 有輸入關鍵字時（query 非空）不做任何事，因為完全/相關符合結果本來就是前端篩選，不需要重打 API。
   const didMountFilterEffect = useRef(false);
   useEffect(() => {
     if (!didMountFilterEffect.current) {
@@ -324,7 +324,7 @@ const SearchPage = () => {
 
       {TRIBES_WITH_DATA.includes(selectedTribe) && Object.keys(definitions.exact_match_results).length > 0 && (
         <WordResultsSection
-          title="完全匹配結果"
+          title="完全符合結果"
           titleColorClass="text-success"
           buttonVariant="outline-success"
           wordsFlat={Object.values(definitions.exact_match_results).flat()}
@@ -344,7 +344,7 @@ const SearchPage = () => {
       <br />
       {TRIBES_WITH_DATA.includes(selectedTribe) && Object.keys(definitions.fuzzy_match_results).length > 0 && (
         <WordResultsSection
-          title="相關匹配結果"
+          title="相關結果"
           titleColorClass="text-warning"
           buttonVariant="outline-warning"
           wordsFlat={Object.values(definitions.fuzzy_match_results).flatMap(wordGroup => Object.values(wordGroup).flat())}

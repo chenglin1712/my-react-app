@@ -65,14 +65,14 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .news-card:hover {
+  a.news-card:hover {
       box-shadow: 0 6px 20px rgba(158, 27, 36, 0.12);
       transform: translateY(-3px);
       border-color: var(--yy-red);
   }
 }
 
-.news-card:active {
+a.news-card:active {
   transform: scale(0.98);
 }
 
@@ -239,7 +239,7 @@
     border-radius: 6px;
 }
 
-.text-item:hover { background: #fdf6f0; }
+a.text-item:hover { background: #fdf6f0; }
 
 .text-item-date {
     width: 88px;

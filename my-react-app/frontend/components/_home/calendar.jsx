@@ -1,5 +1,6 @@
 import "../../static/css/_home/calendar.css"
 import DateReminder from "./dateReminder"
+import ExternalLink from "../ui/ExternalLink"
 
 const CertificationSection = ({ examInfo }) => {
     return (
@@ -24,14 +25,9 @@ const CertificationSection = ({ examInfo }) => {
                                         <span className="exam-date">{item.start_date}</span>
                                     </div>
                                     <div className="exam-card-body">
-                                        <a
-                                            href={item.detail}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="exam-link"
-                                        >
+                                        <ExternalLink href={item.detail} className="exam-link">
                                             {item.title}
-                                        </a>
+                                        </ExternalLink>
                                     </div>
                                 </div>
                             ))
