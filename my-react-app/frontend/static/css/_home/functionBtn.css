@@ -14,11 +14,13 @@
     color: var(--yy-ink);
 }
 
+/* 四張卡：寬螢幕一排四張，中等寬度兩欄，手機單欄；欄寬由 grid 決定，不寫死卡片寬度（窄螢幕不會被裁切） */
 .card-container {
-    display: flex;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
     gap: 26px;
-    flex-wrap: wrap;
+    max-width: 1240px;
+    margin: 0 auto;
 }
 
 .card {
@@ -31,7 +33,7 @@
     border: 3px solid var(--yy-ink) !important;
     border-radius: var(--yy-radius-card) !important;
     box-shadow: var(--yy-shadow-md);
-    width: 320px;
+    min-width: 0;
     overflow: hidden;
     cursor: pointer;
     padding: 0;
@@ -44,8 +46,6 @@
     align-items: center;
     justify-content: space-between;
     border-bottom: 3px solid var(--yy-ink);
-    background-size: 300% 100%;
-    animation: yy-holo 6s linear infinite;
 }
 
 .card-tag {
@@ -56,6 +56,17 @@
 
 .card-diamonds {
     color: var(--yy-gold);
+}
+
+/* 需要登入的功能，訪客看到的標記（文字 + 邊框，不只靠顏色） */
+.card-member {
+    font-family: var(--yy-font-pixel);
+    font-size: var(--yy-text-xs);
+    padding: 2px var(--yy-space-2);
+    background: var(--yy-cream);
+    border: 2px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
+    color: var(--yy-ink);
 }
 
 .card-content {
@@ -78,7 +89,7 @@
     margin-bottom: 16px;
 }
 
-.card-content h2 {
+.card-content h3 {
     color: var(--yy-ink);
     font-size: 18px;
     margin-bottom: 10px;
@@ -86,8 +97,8 @@
 }
 
 .card-content p {
-    font-size: 13.5px;
-    line-height: 1.8;
+    font-size: 14px;
+    line-height: 1.7;
     color: var(--yy-text-tertiary);
     margin-bottom: 18px;
 }
@@ -97,4 +108,23 @@
     color: var(--yy-red);
     font-family: var(--yy-font-pixel);
     font-size: 13px;
+}
+
+.card:focus-visible {
+    outline: var(--yy-focus-ring);
+    outline-offset: var(--yy-focus-offset);
+}
+
+@media (max-width: 720px) {
+    .function-section {
+        padding: 10px 20px 32px;
+    }
+
+    .function-section-header {
+        margin-bottom: 28px;
+    }
+
+    .card-content {
+        padding: 20px 20px 22px;
+    }
 }

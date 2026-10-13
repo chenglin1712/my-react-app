@@ -35,88 +35,6 @@
     animation-direction: reverse;
 }
 
-.home-blob--blue {
-    left: 10%;
-    bottom: 4%;
-    width: 220px;
-    height: 200px;
-    background: radial-gradient(circle, var(--yy-blue), transparent 68%);
-    opacity: .35;
-    animation-duration: 13s;
-}
-
-/* 設計稿裡原本就有、實作時漏掉的一批純裝飾小動畫元素：兩道холо色光斑條、
-   三顆浮動小菱形、左下角 YUAN・YU 貼紙徽章、右側大菱形 ◆ 字符。都是
-   aria-hidden，不影響可存取樹或鍵盤操作。 */
-.home-streak {
-    position: absolute;
-    height: 9px;
-    background-size: 300% 100%;
-    filter: blur(3px);
-    opacity: .55;
-    border-radius: 6px;
-    animation: yy-holo 6s linear infinite;
-    pointer-events: none;
-}
-
-.home-streak--1 {
-    left: 4%;
-    top: 34%;
-    width: 180px;
-    background: linear-gradient(90deg, var(--yy-red), var(--yy-gold), var(--yy-blue), var(--yy-red));
-    transform: rotate(-16deg);
-}
-
-.home-streak--2 {
-    right: 3%;
-    top: 52%;
-    width: 160px;
-    height: 8px;
-    opacity: .5;
-    background: linear-gradient(90deg, var(--yy-blue), var(--yy-gold), var(--yy-red), var(--yy-blue));
-    transform: rotate(14deg);
-    animation-duration: 7.5s;
-    animation-direction: reverse;
-}
-
-.home-sprite {
-    position: absolute;
-    display: inline-block;
-    transform: rotate(45deg);
-    animation: yy-floaty 6s ease-in-out infinite;
-    pointer-events: none;
-}
-
-.home-sprite--gold {
-    left: 9%;
-    top: 20%;
-    width: 22px;
-    height: 22px;
-    background: linear-gradient(135deg, #fff, var(--yy-gold));
-    box-shadow: 3px 3px 0 var(--yy-ink);
-}
-
-.home-sprite--red {
-    right: 10%;
-    top: 16%;
-    width: 18px;
-    height: 18px;
-    background: linear-gradient(135deg, #fff, var(--yy-red));
-    box-shadow: 2px 2px 0 var(--yy-ink);
-    animation-duration: 7s;
-    animation-direction: reverse;
-}
-
-.home-sprite--blue {
-    right: 7%;
-    bottom: 14%;
-    width: 26px;
-    height: 26px;
-    background: linear-gradient(135deg, #fff, var(--yy-blue));
-    box-shadow: 3px 3px 0 var(--yy-ink);
-    animation-duration: 8s;
-}
-
 .home-sticker {
     position: absolute;
     left: 16%;
@@ -150,26 +68,8 @@
     animation: yy-holo 5.5s linear infinite;
 }
 
-.home-diamond-glyph {
-    position: absolute;
-    right: 14%;
-    top: 44%;
-    font-size: 40px;
-    line-height: 1;
-    background: linear-gradient(135deg, #fff, var(--yy-gold) 40%, var(--yy-red) 75%, #fff);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    filter: drop-shadow(2px 3px 0 rgba(34, 24, 18, 0.35));
-    animation: yy-floaty 7.5s ease-in-out infinite reverse;
-    pointer-events: none;
-}
-
 @media (max-width: 720px) {
-    .home-streak,
-    .home-sprite,
-    .home-sticker,
-    .home-diamond-glyph {
+    .home-sticker {
         display: none;
     }
 }
@@ -192,89 +92,59 @@
     color: var(--yy-text-secondary);
 }
 
-.home-console {
+.home-cta-row {
     position: relative;
-    width: 320px;
-    margin: 0 auto;
-}
-
-.home-console-shell {
-    background: linear-gradient(160deg, #B5222C, var(--yy-red-dark));
-    border: 4px solid var(--yy-ink);
-    border-radius: var(--yy-radius-card);
-    padding: 16px;
-    box-shadow: var(--yy-shadow-lg);
-}
-
-.home-console-screen {
-    background: linear-gradient(160deg, #264C73, #1B3452);
-    border: 3px solid var(--yy-gold);
-    border-radius: 6px;
-    padding: 30px 20px;
-    text-align: center;
-}
-
-.home-console-brand {
-    font-family: var(--yy-font-pixel);
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--yy-gold);
-    letter-spacing: 0.04em;
-}
-
-.home-console-cursor {
-    animation: yy-blink 1s step-end infinite;
-}
-
-.home-console-sub {
-    font-family: var(--yy-font-pixel);
-    font-size: 11px;
-    color: var(--yy-cream);
-    margin-top: 10px;
-    letter-spacing: 0.14em;
-}
-
-.home-console-footer {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-top: 14px;
-    padding: 0 4px;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--yy-space-4);
 }
 
-.home-console-bar {
-    width: 70px;
-    height: 8px;
-    border-radius: 2px;
-    background: linear-gradient(90deg, var(--yy-gold), var(--yy-gold-light), var(--yy-gold));
-    background-size: 300% 100%;
-    animation: yy-holo 3s linear infinite;
-    opacity: .85;
+.home-cta-placeholder {
+    visibility: hidden;
+    box-shadow: none;
 }
 
-.home-console-dots {
-    display: flex;
-    gap: 6px;
+.home-cta-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--yy-control-lg);
+    padding: 0 var(--yy-space-6);
+    border-radius: var(--yy-radius-btn);
+    background: var(--yy-surface);
+    border: 3px solid var(--yy-ink);
+    box-shadow: var(--yy-shadow-md);
+    color: var(--yy-ink);
+    font-weight: 700;
+    text-decoration: none;
+    transition: transform .15s ease, box-shadow .15s ease;
 }
 
-.home-console-dots span {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: var(--yy-gold);
-    border: 2px solid var(--yy-ink);
-    display: inline-block;
+@media (hover: hover) and (pointer: fine) {
+    .home-cta-secondary:hover {
+        transform: translate(2px, 2px);
+        box-shadow: 3px 3px 0 var(--yy-ink);
+    }
 }
 
-.home-console-dots span:last-child {
-    background: var(--yy-cream);
+.home-cta-secondary:active {
+    transform: translate(3px, 3px);
+    box-shadow: none;
+}
+
+.home-cta-secondary:focus-visible,
+.home-cta:focus-visible {
+    outline: var(--yy-focus-ring);
+    outline-offset: var(--yy-focus-offset);
 }
 
 .home-cta {
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    margin-top: 40px;
+    min-height: var(--yy-control-lg);
     padding: 15px 34px;
     border-radius: var(--yy-radius-btn);
     background: var(--yy-red);
@@ -325,7 +195,7 @@
     font-size: 18px;
     font-weight: 700;
     color: var(--yy-ink);
-    margin-bottom: 18px;
+    margin: 0 0 18px;
 }
 
 .home-tribe-row {
@@ -383,8 +253,6 @@
 .home-feature-head {
     padding: 16px 24px;
     background: linear-gradient(90deg, var(--yy-red), var(--yy-gold), var(--yy-red));
-    background-size: 300% 100%;
-    animation: yy-holo 6s linear infinite;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -399,6 +267,13 @@
     background-image: repeating-conic-gradient(var(--yy-red) 0deg 90deg, var(--yy-gold) 90deg 180deg, var(--yy-blue) 180deg 270deg, var(--yy-cream) 270deg 360deg);
     background-size: 44px 44px;
     position: relative;
+}
+
+.home-feature-image img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .home-feature-image span {
@@ -420,7 +295,7 @@
 .home-feature-title {
     font-size: 17px;
     font-weight: 800;
-    margin-bottom: 8px;
+    margin: 0 0 8px;
     color: var(--yy-ink);
 }
 

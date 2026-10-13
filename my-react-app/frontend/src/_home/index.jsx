@@ -4,6 +4,7 @@ import "../../static/css/_home/index.css"
 import CertificationSection from "../../components/_home/calendar"
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from "../userServives/authContext";
 import { TRIBES } from "../constants/tribes";
 import { scrollBehavior } from "../hooks/useReducedMotion";
 import RevealOnView from "../../components/ui/RevealOnView";
@@ -80,6 +81,9 @@ const HomePage = () => {
     // 記下載入失敗的主圖網址（不是布林值）：後台換了新網址，新圖就會重新嘗試載入
     const [failedHeroImage, setFailedHeroImage] = useState(null);
     const functionBtnRef = useRef(null);
+    // 訪客（沒登入）才顯示「會員」標記與免費註冊按鈕；登入狀態確認前先當作非訪客，避免已登入的人閃一下
+    const { userData, loading: authLoading } = useAuth();
+    const isGuest = !authLoading && !userData;
     const activeTribe = TRIBES.find((t) => t.slug === selectedTribeSlug) || TRIBES[0];
 
     useEffect(() => {
@@ -142,27 +146,32 @@ const HomePage = () => {
     const newsWithImage = displayedNews.filter((item) => item.image);
     const newsWithoutImage = displayedNews.filter((item) => !item.image);
 
-    const heroTitle = homepageConfig.hero_title_override || `${activeTribe.name}語主題週`;
+    // 後台有設定標題時，這張卡是一則獨立的「現正主打」，內容不隨左邊選的族語改變；
+    // 沒設定時不能假裝有主打內容，改成目前選的族語預覽（標題、羅馬拼音隨族語變）。
+    // 標題、圖片、連結任一項有設定，就視為後台排了主打內容（三欄在後台各自選填）
+    const hasFeature = Boolean(homepageConfig.hero_title_override || homepageConfig.hero_image_url || homepageConfig.hero_link_url);
+    const heroTitle = hasFeature ? homepageConfig.hero_title_override : activeTribe.fullName;
+    const showHeroImage = homepageConfig.hero_image_url && failedHeroImage !== homepageConfig.hero_image_url;
     const featureCardContent = (
         <>
             <div className="home-feature-head">
-                <span>現正主打</span>
+                <span>{hasFeature ? "現正主打" : "語言預覽"}</span>
                 <span aria-hidden="true">◆ ◆ ◆ ◆ ◆</span>
             </div>
             <div className="home-feature-image">
-                {homepageConfig.hero_image_url && failedHeroImage !== homepageConfig.hero_image_url
+                {showHeroImage
                     ? (
                         <img
                             src={homepageConfig.hero_image_url}
-                            alt={heroTitle}
+                            alt={heroTitle ? "" : "現正主打"}
                             onError={() => setFailedHeroImage(homepageConfig.hero_image_url)}
                         />
                     )
-                    : <span>{activeTribe.roman}</span>}
+                    : (!hasFeature && <span>{activeTribe.roman}</span>)}
             </div>
             <div className="home-feature-body">
-                <div className="home-feature-title">{heroTitle}</div>
-                <div className="home-feature-sub">{activeTribe.roman} · 點清單切換族語</div>
+                {heroTitle && <h3 className="home-feature-title">{heroTitle}</h3>}
+                {!hasFeature && <div className="home-feature-sub">{activeTribe.roman} · 點清單切換族語</div>}
             </div>
         </>
     );
@@ -170,23 +179,14 @@ const HomePage = () => {
     return (
         <div className="yy-page homepage">
             <section className="yy-hero home-hero">
-                <span className="home-blob home-blob--gold" />
-                <span className="home-blob home-blob--red" />
-                <span className="home-blob home-blob--blue" />
-
-                <span className="home-streak home-streak--1" aria-hidden="true" />
-                <span className="home-streak home-streak--2" aria-hidden="true" />
-
-                <span className="home-sprite home-sprite--gold" aria-hidden="true" />
-                <span className="home-sprite home-sprite--red" aria-hidden="true" />
-                <span className="home-sprite home-sprite--blue" aria-hidden="true" />
+                {/* 裝飾只留三個（兩團光暈與貼紙徽章）：原本約十個無限循環動畫會搶走標題與按鈕的注意力 */}
+                <span className="home-blob home-blob--gold" aria-hidden="true" />
+                <span className="home-blob home-blob--red" aria-hidden="true" />
 
                 <div className="home-sticker" aria-hidden="true">
                     <span className="home-sticker-eyelet" />
                     <span className="home-sticker-badge">YUAN・YU</span>
                 </div>
-
-                <span className="home-diamond-glyph" aria-hidden="true">◆</span>
 
                 <div className="yy-fade-up">
                     <span className="yy-eyebrow"><span aria-hidden="true">◆ </span>原住民族語 · 五族共學<span aria-hidden="true"> ◆</span></span>
@@ -202,27 +202,16 @@ const HomePage = () => {
                     <p className="home-desc">泰雅、布農、阿美、噶瑪蘭、排灣——影像辨識、詞彙遊戲與適性測驗，用鮮明色彩延續族語文化的生命力。</p>
                 </div>
 
-                <div className="yy-fade-up home-console">
-                    <div className="home-console-shell">
-                        <div className="home-console-screen">
-                            <div className="home-console-brand">YUAN・YU<span className="home-console-cursor">_</span></div>
-                            <div className="home-console-sub">FIVE TRIBES ONLINE</div>
-                        </div>
-                        <div className="home-console-footer">
-                            <span className="home-console-bar" />
-                            <span className="home-console-dots">
-                                <span />
-                                <span />
-                            </span>
-                        </div>
-                    </div>
+                <div className="yy-fade-up home-cta-row">
+                    <button
+                        type="button"
+                        className="home-cta"
+                        onClick={() => functionBtnRef.current?.scrollIntoView({ behavior: scrollBehavior() })}
+                    >▸ 開始學習 PRESS START!</button>
+                    {isGuest && <Link to="/register" className="home-cta-secondary">免費註冊</Link>}
+                    {/* 登入狀態確認期間先佔位，確認為訪客後按鈕出現時主按鈕不會被推開 */}
+                    {authLoading && <span className="home-cta-secondary home-cta-placeholder" aria-hidden="true">免費註冊</span>}
                 </div>
-
-                <button
-                    type="button"
-                    className="yy-fade-up home-cta"
-                    onClick={() => functionBtnRef.current?.scrollIntoView({ behavior: scrollBehavior() })}
-                >▸ 開始學習 PRESS START!</button>
             </section>
 
             <div className="yy-divider" />
@@ -230,7 +219,7 @@ const HomePage = () => {
             <section className="home-tribes-section">
                 <div className="home-tribes-grid">
                     <div className="yy-card yy-fade-up home-tribe-list">
-                        <div className="home-tribe-list-title"><span aria-hidden="true">◆ </span>五族語言<span aria-hidden="true"> »</span></div>
+                        <h2 className="home-tribe-list-title"><span aria-hidden="true">◆ </span>五族語言<span aria-hidden="true"> »</span></h2>
                         {TRIBES.map((t) => (
                             <button
                                 key={t.slug}
@@ -271,7 +260,7 @@ const HomePage = () => {
 
             <div ref={functionBtnRef}>
                 <RevealOnView>
-                    <FunctionBtn enabled={{
+                    <FunctionBtn isGuest={isGuest} enabled={{
                         button1: homepageConfig.button1_enabled,
                         button2: homepageConfig.button2_enabled,
                         button3: homepageConfig.button3_enabled,
@@ -283,14 +272,16 @@ const HomePage = () => {
             )}
             {homepageConfig.show_news_section && (
                 <>
-                    {newsError && (
-                        <p className="text-center text-muted" style={{ margin: '1rem 0' }}>
+                    {newsError ? (
+                        // 載入失敗只顯示錯誤說明，不再多渲染一個空的 News 區塊
+                        <p className="text-center text-muted" role="status" style={{ margin: '1rem 0' }}>
                             目前無法載入最新消息，請稍後再試。
                         </p>
+                    ) : (
+                        <RevealOnView>
+                            <News withImage={newsWithImage} withoutImage={newsWithoutImage} loading={newsLoading} />
+                        </RevealOnView>
                     )}
-                    <RevealOnView>
-                        <News withImage={newsWithImage} withoutImage={newsWithoutImage} loading={newsLoading} />
-                    </RevealOnView>
                 </>
             )}
         </div>

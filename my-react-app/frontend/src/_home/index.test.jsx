@@ -3,6 +3,12 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import HomePage from './index';
 
+const authState = vi.hoisted(() => ({ current: { userData: null, loading: false } }));
+vi.mock('../userServives/authContext', () => ({ useAuth: () => authState.current }));
+beforeEach(() => {
+  authState.current = { userData: null, loading: false };
+});
+
 // News/Calendar/FunctionBtn 各自有自己的相依（Swiper 輪播、useNavigate 等），
 // 這裡只關心 App 元件怎麼撈資料、怎麼依分類分流，不是這幾個子元件怎麼畫——
 // mock 掉它們，直接檢查傳進去的 props，避免測試被子元件的實作細節綁住。
@@ -161,8 +167,12 @@ describe('首頁 · 版位設定（HomepageConfig）套用', () => {
     mockFetchOk([], { ...DEFAULT_CONFIG, hero_image_url: 'https://img/hero.jpg', hero_title_override: '本週主打' });
     renderHome();
 
-    const img = await screen.findByAltText('本週主打');
+    expect(await screen.findByText('現正主打')).toBeInTheDocument();
+    const img = document.querySelector('.home-feature-image img');
     expect(img).toHaveAttribute('src', 'https://img/hero.jpg');
+    // 標題已經在卡片上，圖片是同一內容的主視覺：alt 留空，報讀器不重複唸
+    expect(img).toHaveAttribute('alt', '');
+    expect(screen.getByRole('heading', { level: 3, name: '本週主打' })).toBeInTheDocument();
     expect(document.querySelector('.home-feature-image span')).toBeNull();
     expect(screen.getByText('本週主打')).toBeInTheDocument();
   });
@@ -170,7 +180,10 @@ describe('首頁 · 版位設定（HomepageConfig）套用', () => {
   test('沒有設定 hero_image_url 時顯示族語預設圖（不再出現英文 placeholder 字樣）與逐族語標題', async () => {
     mockFetchOk([], DEFAULT_CONFIG);
     renderHome();
-    expect(await screen.findByText('泰雅語主題週')).toBeInTheDocument();
+    // 沒有後台設定時不假裝有「現正主打」：標題就是目前選的族語名稱，不再自動湊「X語主題週」
+    expect(await screen.findByText('泰雅語')).toBeInTheDocument();
+    expect(screen.queryByText('現正主打')).not.toBeInTheDocument();
+    expect(screen.queryByText('泰雅語主題週')).not.toBeInTheDocument();
     expect(document.querySelector('.home-feature-image span')).toHaveTextContent('Tayal');
     expect(screen.queryByText('IMAGE PLACEHOLDER')).not.toBeInTheDocument();
   });
@@ -178,10 +191,11 @@ describe('首頁 · 版位設定（HomepageConfig）套用', () => {
   test('hero_image_url 的圖載入失敗時退回預設圖，不顯示破圖', async () => {
     mockFetchOk([], { ...DEFAULT_CONFIG, hero_image_url: 'https://img/broken.jpg', hero_title_override: '本週主打' });
     renderHome();
-    const img = await screen.findByAltText('本週主打');
-    fireEvent.error(img);
-    await waitFor(() => expect(screen.queryByAltText('本週主打')).not.toBeInTheDocument());
-    expect(document.querySelector('.home-feature-image span')).toHaveTextContent('Tayal');
+    await waitFor(() => expect(document.querySelector('.home-feature-image img')).not.toBeNull());
+    fireEvent.error(document.querySelector('.home-feature-image img'));
+    await waitFor(() => expect(document.querySelector('.home-feature-image img')).toBeNull());
+    // 後台有設定標題的主打卡不隨族語變：圖壞掉退回純圖樣，不顯示族語羅馬拼音
+    expect(document.querySelector('.home-feature-image span')).toBeNull();
   });
 
   test('hero_link_url 是內部路徑時，主打卡片用 react-router Link 導頁', async () => {
@@ -189,7 +203,7 @@ describe('首頁 · 版位設定（HomepageConfig）套用', () => {
     // fetch 回來前）是純 <div>，「現正主打」文字在 <div> 版跟之後的 <a>
     // 版都存在，findByText 只要找到第一個符合就會結束等待，可能剛好抓到
     // 還沒套用設定的那個版本。
-    mockFetchOk([], { ...DEFAULT_CONFIG, hero_link_url: '/quiz/select' });
+    mockFetchOk([], { ...DEFAULT_CONFIG, hero_link_url: '/quiz/select', hero_title_override: '本週主打' });
     renderHome();
     await waitFor(() => {
       const card = screen.getByText('現正主打').closest('a');
@@ -198,7 +212,7 @@ describe('首頁 · 版位設定（HomepageConfig）套用', () => {
   });
 
   test('hero_link_url 是外部網址時，用一般 <a target="_blank"> 開啟', async () => {
-    mockFetchOk([], { ...DEFAULT_CONFIG, hero_link_url: 'https://example.com' });
+    mockFetchOk([], { ...DEFAULT_CONFIG, hero_link_url: 'https://example.com', hero_title_override: '本週主打' });
     renderHome();
     await waitFor(() => {
       const card = screen.getByText('現正主打').closest('a');
@@ -255,7 +269,7 @@ describe('首頁 · 版位設定（HomepageConfig）套用', () => {
       return Promise.reject(new Error(`unexpected url: ${url}`));
     }));
     renderHome();
-    expect(await screen.findByText('泰雅語主題週')).toBeInTheDocument();
+    expect(await screen.findByText('泰雅語')).toBeInTheDocument();
     expect(screen.getByTestId('calendar-mock')).toBeInTheDocument();
   });
 
@@ -294,5 +308,64 @@ describe('首頁 · 族語切換', () => {
 
     expect(amisButton).toHaveAttribute('aria-pressed', 'true');
     expect(tayalButton).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('訪客看到免費註冊按鈕，並把 isGuest 傳給功能卡', async () => {
+    mockFetchOk([]);
+    renderHome();
+    expect(screen.getByRole('link', { name: '免費註冊' })).toHaveAttribute('href', '/register');
+    expect(JSON.parse((await screen.findByTestId('functionbtn-mock')).textContent).isGuest).toBe(true);
+  });
+
+  test('已登入不顯示免費註冊按鈕，功能卡也不標會員', async () => {
+    authState.current = { userData: { uid: 'u1' }, loading: false };
+    mockFetchOk([]);
+    renderHome();
+    expect(screen.queryByRole('link', { name: '免費註冊' })).not.toBeInTheDocument();
+    expect(JSON.parse((await screen.findByTestId('functionbtn-mock')).textContent).isGuest).toBe(false);
+  });
+
+  test('登入狀態還在確認時先不顯示註冊按鈕（避免已登入的人看到閃一下）', async () => {
+    authState.current = { userData: null, loading: true };
+    mockFetchOk([]);
+    renderHome();
+    expect(screen.queryByRole('link', { name: '免費註冊' })).not.toBeInTheDocument();
+  });
+
+  test('已移除假終端機與多餘的 hero 裝飾', async () => {
+    mockFetchOk([]);
+    renderHome();
+    expect(document.querySelector('.home-console')).toBeNull();
+    expect(document.querySelectorAll('.home-streak, .home-sprite, .home-diamond-glyph')).toHaveLength(0);
+  });
+
+  test('消息載入失敗時只顯示錯誤說明，不渲染空的 News 區塊', async () => {
+    vi.stubGlobal('fetch', vi.fn((url) => {
+      if (url.includes('/adminapi/public/homepage-config/')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(DEFAULT_CONFIG) });
+      }
+      return Promise.resolve({ ok: false, status: 500 });
+    }));
+    renderHome();
+    expect(await screen.findByText('目前無法載入最新消息，請稍後再試。')).toBeInTheDocument();
+    expect(screen.queryByTestId('news-mock')).not.toBeInTheDocument();
+  });
+
+  test('只設了連結、沒設標題時，卡片仍算主打：不顯示隨族語變的標題與羅馬拼音', async () => {
+    mockFetchOk([], { ...DEFAULT_CONFIG, hero_link_url: '/quiz/select' });
+    renderHome();
+    await waitFor(() => expect(screen.getByText('現正主打').closest('a')).toHaveAttribute('href', '/quiz/select'));
+    expect(screen.queryByText('語言預覽')).not.toBeInTheDocument();
+    expect(document.querySelector('.home-feature-title')).toBeNull();
+    expect(document.querySelector('.home-feature-sub')).toBeNull();
+  });
+
+  test('「五族語言」是 h2，登入狀態確認期間註冊按鈕只佔位、不是連結', async () => {
+    authState.current = { userData: null, loading: true };
+    mockFetchOk([]);
+    renderHome();
+    expect(screen.getByRole('heading', { level: 2, name: /五族語言/ })).toBeInTheDocument();
+    expect(document.querySelector('.home-cta-placeholder')).not.toBeNull();
+    expect(screen.queryByRole('link', { name: '免費註冊' })).not.toBeInTheDocument();
   });
 });

@@ -258,7 +258,7 @@ a.text-item:hover { background: #fdf6f0; }
     gap: 0.25rem;
 }
 
-.text-item h4 {
+.text-item h3 {
     margin: 0;
     font-size: 0.95rem;
     color: #333;
@@ -296,7 +296,7 @@ a.text-item:hover { background: #fdf6f0; }
         height: 260px;
     }
 
-    .text-item h4 {
+    .text-item h3 {
         white-space: normal;
     }
 }
@@ -306,4 +306,13 @@ a.text-item:hover { background: #fdf6f0; }
   min-height: 132px;
   border: 2px solid var(--yy-ink);
   border-radius: var(--yy-radius-card);
+}
+
+.news-empty {
+    margin: 0;
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--yy-text-muted);
+    border: 2px dashed var(--yy-text-muted);
+    border-radius: var(--yy-radius-card);
 }

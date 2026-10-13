@@ -45,7 +45,9 @@ const News = ({ withImage = [], withoutImage = [], loading = false }) => {
                 <div className="news-section-divider" />
             </div>
 
-            {hasImages ? (
+            {allNews.length === 0 ? (
+                <p className="news-empty">目前沒有新消息。</p>
+            ) : hasImages ? (
                 /* 有圖版：左側輪播 + 右側列表 */
                 <div className="event-container">
                     <div className="event-left">
@@ -85,7 +87,7 @@ const News = ({ withImage = [], withoutImage = [], loading = false }) => {
                                         <div className="text-item-date">{event.start_date}</div>
                                         <div className="text-item-content">
                                             <span className="tag" data-tag={event.tag}>{event.tag}</span>
-                                            <h4>{event.title}</h4>
+                                            <h3>{event.title}</h3>
                                         </div>
                                     </ExternalLink>
                                 </li>
@@ -107,7 +109,7 @@ const News = ({ withImage = [], withoutImage = [], loading = false }) => {
                                 <span className="tag" data-tag={event.tag}>{event.tag}</span>
                                 <span className="news-card-date">{event.start_date}</span>
                             </div>
-                            <h4 className="news-card-title">{event.title}</h4>
+                            <h3 className="news-card-title">{event.title}</h3>
                             {isExternalUrl(event.detail) && <span className="news-card-link" aria-hidden="true">查看詳情 →</span>}
                         </ExternalLink>
                     ))}
