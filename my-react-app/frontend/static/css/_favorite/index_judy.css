@@ -87,6 +87,11 @@
     justify-content: center;
 }
 
+/* 超長的族語詞或中文翻譯：允許斷行，圖示掉到下一行，而不是被擠出卡片（審查項 P1-30） */
+.word-card-front .favorite-word-info {
+    min-width: 0;
+}
+
 .word-card-front .favorite-word-info h3 {
     font-size: 1.2rem;
     font-weight: bold;
@@ -97,10 +102,31 @@
     gap: 0.5rem;
 }
 
+/* 族語詞本體最多兩行，播放鈕固定在旁邊不被擠出；完整詞在背面與 title 都看得到 */
+.word-card-front .favorite-word-info h3 .tayal-word-text {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+}
+
+.word-card-front .favorite-word-info h3 > button {
+    flex-shrink: 0;
+}
+
 .word-card-front .favorite-word-info h5 {
     font-size: 1rem;
     color: #4a5568;
     margin-bottom: 0.5rem;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
 }
 
 /* 背面樣式 */
@@ -116,15 +142,18 @@
     color: #2d3748;
     margin-bottom: 0.5rem;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
+    overflow-wrap: anywhere;
 }
 
 .chinese-word-back {
     font-size: 1.1rem;
     color: #4a5568;
     margin-bottom: 0;
+    overflow-wrap: anywhere;
 }
 
 .word-card-details {

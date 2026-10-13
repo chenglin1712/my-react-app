@@ -114,7 +114,8 @@
 /* ── 答案選項 ─────────────────────────────────── */
 .listening-options {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* 1fr 等於 minmax(auto, 1fr)，長詞會把欄位撐破；min 改成 0 才能縮小（審查項 P1-31） */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
   width: 100%;
   max-width: 460px;
@@ -131,6 +132,12 @@
   transition: border-color 0.15s, background 0.15s, transform 0.12s;
   text-align: center;
   line-height: 1.4;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  /* 長按選項時不要選到文字（遊戲按鈕） */
+  -webkit-user-select: none;
+  user-select: none;
 }
 .listening-option:hover:not(:disabled) {
   border-color: #9B1B30;
@@ -258,7 +265,7 @@
 /* ── RWD ──────────────────────────────────────── */
 @media (max-width: 480px) {
   .listening-options {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .listening-play-btn {
     width: 72px;

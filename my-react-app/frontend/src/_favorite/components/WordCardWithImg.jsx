@@ -63,11 +63,11 @@ const WordCardImage = ({ imageUrl, word, isFavorited, onToggleFavorite }) => {
 
 const WordCardInfo = ({ result, word, playAudio, failedAudio }) => (
   <div className="favorite-word-info">
-    <h3 className="tayal-word">
-      {result.name || '無資料'}
+    <h3 className="tayal-word" title={result.name || undefined}>
+      <span className="tayal-word-text">{result.name || '無資料'}</span>
       <AudioButton audioUrl={result.audioItems?.[0]?.fileId} onPlay={playAudio} size={18} failedAudio={failedAudio} />
     </h3>
-    <h5 className="chinese-word">{word}</h5>
+    <h5 className="chinese-word" title={word}>{word}</h5>
 
     <div className="word-meta">
       {result.frequency && (

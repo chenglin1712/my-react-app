@@ -165,6 +165,14 @@
   color: rgba(243, 231, 207, 0.6);
 }
 
+/* iOS Safari 聚焦字級小於 16px 的輸入框會自動放大頁面 */
+@media (max-width: 720px) {
+  .search-terminal-input,
+  .search-terminal-input.form-control {
+    font-size: 16px;
+  }
+}
+
 .search-go-btn.btn {
   background: var(--yy-gold);
   border: none;

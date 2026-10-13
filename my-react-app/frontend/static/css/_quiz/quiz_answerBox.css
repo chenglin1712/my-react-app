@@ -4,7 +4,8 @@
     border: 3px solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
     box-shadow: var(--yy-shadow-md);
-    width: 280px;
+    /* 固定 280px 在小於 320px 的手機會溢出（審查項 P1-32） */
+    width: min(280px, 100%);
     height: fit-content;
     text-align: center;
 }
@@ -18,15 +19,20 @@
 
 .box-question-list {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 8px;
     margin: 12px 0;
+    /* 題數很多時在面板內捲動，不要把整個面板撐得比螢幕高 */
+    max-height: 50vh;
+    overflow-y: auto;
 }
 
 .box-question-btn {
     position: relative;
     background-color: #fff;
     color: var(--yy-ink);
+    -webkit-user-select: none;
+    user-select: none;
     border: 2px solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
     padding: 8px;

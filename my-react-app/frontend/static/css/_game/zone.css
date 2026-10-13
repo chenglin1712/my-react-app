@@ -112,7 +112,7 @@
 
 @media (max-width: 600px) {
   .zone-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .zone-title {
     font-size: 1.6rem;

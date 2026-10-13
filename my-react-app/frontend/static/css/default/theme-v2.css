@@ -147,6 +147,20 @@
   overflow-x: clip;
 }
 
+/* ---------- 長資料文字與標題換行 ----------
+   族語詞、中文翻譯、使用者輸入都可能很長。overflow-wrap: break-word 只有在整行放不下時才斷字，
+   不影響正常換行；元件內需要縮進 flex／grid 欄位的地方另外用 min-width: 0 或 anywhere。
+   中文標題用 balance 避免最後一行只剩一個字，段落用 pretty 避免孤字。 */
+.yy-page {
+  overflow-wrap: break-word;
+}
+.yy-page :is(h1, h2, h3, h4) {
+  text-wrap: balance;
+}
+.yy-page :is(p, li) {
+  text-wrap: pretty;
+}
+
 .yy-fade-up {
   animation: yy-fade-up .6s cubic-bezier(.2, .7, .3, 1) both;
 }
@@ -509,6 +523,11 @@
   .yy-footer {
     padding-left: 24px;
     padding-right: 24px;
+  }
+
+  /* iOS Safari 聚焦字級小於 16px 的輸入框時會自動放大整個頁面 */
+  .yy-page :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="button"], [type="submit"], [type="reset"], [type="image"], [type="color"], [type="hidden"]), textarea, select) {
+    font-size: 16px;
   }
 }
 

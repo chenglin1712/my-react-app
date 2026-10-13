@@ -4,3 +4,33 @@ html {
   padding: 0;
   height: 100%;
 }
+
+/* 錨點跳轉時讓出 sticky 導覽列的高度（導覽列約 100px），目標不會被遮住 */
+html {
+  scroll-padding-top: 100px;
+}
+
+/* macOS 上淺字深底（導覽列、終端機、頁尾的奶油字）預設會偏粗 */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 觸控：取消雙擊縮放的 300ms 等待，點擊高亮改用品牌墨色的淡色 */
+a,
+button,
+summary,
+label,
+input,
+select,
+textarea,
+[role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(34, 24, 18, 0.12);
+}
+
+/* 選取文字用品牌的淡金底配墨色字（墨色 #221812 在淡金 #F6D77B 上對比度遠高於 4.5:1） */
+::selection {
+  background: #F6D77B;
+  color: #221812;
+}

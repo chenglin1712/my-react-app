@@ -237,6 +237,8 @@ audio {
     overflow: hidden;
     border: 3px solid var(--yy-ink);
     min-width: 0;
+    -webkit-user-select: none;
+    user-select: none;
     transition: box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, transform 0.16s ease-out;
 }
 

@@ -167,6 +167,9 @@
   transition: border-color 0.15s, background 0.15s, transform 0.12s;
   text-align: left;
   line-height: 1.45;
+  overflow-wrap: anywhere;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .sent-option:hover:not(:disabled) {
   border-color: #9B1B30;
