@@ -49,10 +49,11 @@ _TTL_SECONDS = 30
 _lock = threading.Lock()
 _cache: dict[str, bool] = {}
 _last_fetch = 0.0
+_last_success = 0.0  # 最後一次「成功讀到旗標表」的時間；0 代表從未成功
 
 
 def _refresh_if_stale() -> None:
-    global _last_fetch, _cache
+    global _last_fetch, _last_success, _cache
     now = time.monotonic()
     if now - _last_fetch < _TTL_SECONDS:
         return
@@ -67,6 +68,7 @@ def _refresh_if_stale() -> None:
                 rows = conn.execute(select(_feature_flag_table.c.key, _feature_flag_table.c.enabled)).fetchall()
             _cache = {r.key: bool(r.enabled) for r in rows}
             _last_fetch = now
+            _last_success = now
         except SQLAlchemyError:
             logger.warning("讀取 FeatureFlag 失敗，本次沿用舊快取（或預設全部啟用）", exc_info=True)
             _last_fetch = now  # 避免查詢持續失敗時每個請求都重試，仍照 TTL 節流
@@ -77,3 +79,17 @@ def is_enabled(key: str, default: bool = True) -> bool:
     default——這個查詢只是輔助判斷，不該因為自己故障就讓呼叫端整個掛掉。"""
     _refresh_if_stale()
     return _cache.get(key, default)
+
+
+# 旗標資料超過這個秒數沒有成功更新，就不再相信快取裡的「開啟」。
+_FAIL_CLOSED_MAX_AGE_SECONDS = 120
+
+
+def is_enabled_fail_closed(key: str) -> bool:
+    """給「開啟代表放行付費或對外風險」的旗標用（例如訪客試用）：查不到這個 key、從未成功讀過旗標表、
+    或旗標表已經超過 2 分鐘沒能成功更新，一律視為關閉。一般的 is_enabled() 為了不讓輔助判斷的故障
+    拖垮功能會沿用舊快取，不適合這種用途。營運方在資料庫異常期間需要能確定訪客入口是關著的。"""
+    _refresh_if_stale()
+    if _last_success == 0.0 or time.monotonic() - _last_success > _FAIL_CLOSED_MAX_AGE_SECONDS:
+        return False
+    return _cache.get(key, False)

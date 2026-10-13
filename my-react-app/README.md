@@ -145,6 +145,7 @@ python manage.py simulate_rule_skill_learners        # 模擬學習者：檢驗�
 python manage.py evaluate_rule_skill_events          # 用真實事件比較「規則熟練度」與「單一能力值」的預測（含信賴區間）
 python manage.py purge_quiz_research_data --uid <uid> --yes          # 依使用者清除事件（不加 --yes 只預覽）
 python manage.py purge_quiz_research_data --older-than-days 180 --yes # 依保存期限清除
+python manage.py purge_guest_trial_usage                          # 清除超過 3 天的訪客翻譯試用計次（只含雜湊值）
 ```
 
 - 模擬只能說明模型在「真實機制跟它不一樣」的世界裡的表現，以及評估流程沒有洩漏答案（負對照：只有一種整體能力時，規則熟練度模型不該贏）；**不是對真人有效的證據**。

@@ -54,6 +54,19 @@ class Command(BaseCommand):
         )
         created_count += int(created)
 
+        # 訪客翻譯試用（C-2）：預設【關閉】。要在後台「功能開關」頁手動打開，才會讓未登入的訪客
+        # 以每瀏覽器每日 10 次的額度使用翻譯。後端判斷是 fail-closed（查不到這一列也視為關閉），
+        # 所以即使沒跑種子，訪客也不會被放行。需要另外設定 GUEST_TRIAL_SECRET，見 .env.example。
+        _, created = FeatureFlag.objects.get_or_create(
+            key="guest_translation_enabled",
+            defaults={
+                "label": "訪客翻譯試用",
+                "description": "開啟後，未登入的訪客每個瀏覽器每日可試用翻譯 10 次（台灣時間午夜重置）；關閉則訪客一律需登入。",
+                "enabled": False,
+            },
+        )
+        created_count += int(created)
+
         # 詞形分析器的兩個旗標預設【關閉】（跟其他旗標預設啟用相反）：
         # 這個功能會讓更多詞被判成有佐證，錯放行比漏判嚴重，必須明確打開才生效。
         # 建議流程：先開 shadow（只記錄、不改輸出）觀察真實流量，再開 analyzer。
@@ -113,9 +126,9 @@ class Command(BaseCommand):
         )
         created_count += int(created)
 
-        total = len(TRIBES) + 10
+        total = len(TRIBES) + 11
         self.stdout.write(self.style.SUCCESS(
-            f"功能開關種子完成：共 {total} 筆（族語測驗開關 {len(TRIBES)} + 族語翻譯開關 1 + AI 助手開關 1 + 詞形分析器 2 + 測驗詞形干擾項 1 "
-            f"+ 詞素學習 4 + 待專家驗證佇列 1，除了族語測驗、翻譯與 AI 助手開關，其餘預設關閉），"
+            f"功能開關種子完成：共 {total} 筆（族語測驗開關 {len(TRIBES)} + 族語翻譯開關 1 + AI 助手開關 1 + 訪客翻譯試用 1 + 詞形分析器 2 + 測驗詞形干擾項 1 "
+            f"+ 詞素學習 4 + 待專家驗證佇列 1，除了族語測驗、翻譯與 AI 助手開關，其餘預設關閉（含訪客翻譯試用）），"
             f"新增 {created_count} 筆，其餘已存在維持原值。"
         ))

@@ -52,6 +52,19 @@ class EvidenceOut(BaseModel):
     words: list[EvidenceWordOut] = []
 
 
+class GuestQuotaOut(BaseModel):
+    limit: int
+    remaining: int
+    resetsAt: str       # 下一個台灣午夜，ISO 8601（含 +08:00）
+
+
+class GuestQuotaStatusResponse(BaseModel):
+    isGuest: bool
+    limit: Optional[int] = None
+    remaining: Optional[int] = None
+    resetsAt: Optional[str] = None
+
+
 class TranslateResponse(BaseModel):
     direction: Literal["zh2tribe", "tribe2zh"]
     tribe: str          # 族語全名，例如「泰雅語」
@@ -68,6 +81,8 @@ class TranslateResponse(BaseModel):
     notes: str
     modelUsed: Optional[str] = None
     elapsedMs: int
+    # 只有訪客才有：本次之後今天還剩幾次
+    guestQuota: Optional[GuestQuotaOut] = None
 
 
 class TribeCapabilityOut(BaseModel):

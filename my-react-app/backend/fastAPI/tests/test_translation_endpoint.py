@@ -26,6 +26,7 @@ async def _fake_auth():
 def client():
     app.dependency_overrides[get_db] = _fake_get_db
     app.dependency_overrides[auth_module.verify_firebase_token] = _fake_auth
+    app.dependency_overrides[auth_module.verify_firebase_token_or_guest] = _fake_auth
     try:
         with patch("fastAPI.feature_flags.is_enabled", return_value=True), \
              patch("fastAPI.usage_events.record_event"):

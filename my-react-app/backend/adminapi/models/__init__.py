@@ -19,6 +19,7 @@ from .content import (
     PendingRevision,
 )
 from .dictionary_review import DictionaryImportJob, DictionaryRevision
+from .guest_trial import GuestTranslationUsage
 from .quiz_research import QuizResearchConsent, QuizSkillEvent
 from .quizbank import (
     QuizChoiceItem,
@@ -42,6 +43,7 @@ __all__ = [
     'ExamScheduleCrawlStatus',
     'ExamScheduleOverride',
     'FeatureFlag',
+    'GuestTranslationUsage',
     'GameConfig',
     'HomepageConfig',
     'IrtConfig',

@@ -17,6 +17,7 @@ from fastapi import Header, HTTPException, Request
 
 from config.auth_flags import auth_dev_bypass
 from config.firebase_init import ensure_firebase_initialized
+from fastAPI import feature_flags, guest_trial
 
 logger = logging.getLogger(__name__)
 
@@ -83,5 +84,38 @@ async def verify_firebase_token(request: Request, authorization: str = Header(de
         logger.exception("Firebase ID Token 驗證發生非預期例外")
         raise HTTPException(status_code=401, detail="身份驗證失敗，請重新登入")
 
+    request.state.user = user
+    return user
+
+
+GUEST_FLAG_KEY = "guest_translation_enabled"
+
+
+async def verify_firebase_token_or_guest(
+    request: Request,
+    authorization: str = Header(default=None),
+    x_guest_id: str = Header(default=None),
+):
+    """翻譯 router 專用：已登入走原本的驗證；完全沒帶登入憑證的請求，在訪客試用開放時
+    以「訪客」身分通過（C-2）。
+
+    - 帶了 Authorization 就一律照原本驗證，失敗回 401，**不會降級成訪客**——否則 token 過期的
+      已登入使用者會悄悄變成吃訪客額度，看起來像額度變少。
+    - 訪客必須帶 X-Guest-Id（前端存在 localStorage 的隨機代號）；格式不對或沒帶，回 401。
+    - 訪客試用要同時滿足：旗標 guest_translation_enabled 開啟（查不到、或旗標表超過 2 分鐘沒能更新，視為關閉）、
+      資料庫與 GUEST_TRIAL_SECRET 就緒。任一不滿足都回原本的 401，行為與 C-2 之前完全相同。
+    - 訪客的 request.state.user 沒有 uid，所以 rate_limit_key 會退回用 IP 做每分鐘限流。
+    """
+    if authorization or _auth_dev_bypass():
+        return await verify_firebase_token(request, authorization)
+
+    if (
+        not feature_flags.is_enabled_fail_closed(GUEST_FLAG_KEY)
+        or not guest_trial.is_ready()
+        or not guest_trial.is_valid_guest_id(x_guest_id)
+    ):
+        raise HTTPException(status_code=401, detail="需要登入才能使用此功能")
+
+    user = {"uid": "", "guest": True, "guest_id": x_guest_id}
     request.state.user = user
     return user

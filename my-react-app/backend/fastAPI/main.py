@@ -188,7 +188,12 @@ app.include_router(sentence.router, prefix="/api/v1/sentence", dependencies=_req
 # 族語翻譯：跟上面幾個路由同理，會呼叫付費 LLM，要求登入才能呼叫。沒有
 # warm_cache 要掛進 _warm_caches()——這個功能直接查 PostgreSQL 的 pg_trgm
 # 索引，不維護任何應用層側索引（見 routes/translation/__init__.py 的說明）。
-app.include_router(translation.router, prefix="/api/v1/translation", dependencies=_require_login)
+# 翻譯 router 額外允許「訪客試用」（C-2）：沒帶登入憑證且訪客旗標開啟時以訪客身分通過，
+# 額度在 translate 端點內扣。
+app.include_router(
+    translation.router, prefix="/api/v1/translation",
+    dependencies=[Depends(auth.verify_firebase_token_or_guest)],
+)
 # 詞形分析：輸入一個詞形，回傳可能的詞根／切分／詞綴功能／例句與信心（見 routes/morphology/）。
 # 分析器每族第一次用到時才建立並快取，不需要掛進啟動預熱。
 app.include_router(morphology.router, prefix="/api/v1/morphology", dependencies=_require_login)
