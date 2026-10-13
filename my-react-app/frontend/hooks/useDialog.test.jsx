@@ -108,3 +108,41 @@ describe('useDialog 疊層與捲動鎖（Codex 審查補測）', () => {
     expect(document.body.style.overflow).toBe('auto');
   });
 });
+
+describe('useDialog 非 modal（右下角懸浮視窗）', () => {
+  function Floating({ onClose, active = true }) {
+    const ref = useRef(null);
+    useDialog(ref, { active, onClose, modal: false });
+    return (
+      <div ref={ref} tabIndex={-1} role="dialog" aria-modal="false" aria-label="懸浮視窗">
+        <button type="button">視窗內</button>
+      </div>
+    );
+  }
+
+  test('不鎖捲動；焦點在視窗外按 Esc 不會關閉，在視窗內才會', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(<><button type="button">頁面</button><Floating onClose={onClose} /></>);
+    expect(document.body.style.overflow).toBe('');
+
+    screen.getByRole('button', { name: '頁面' }).focus();
+    await user.keyboard('{Escape}');
+    expect(onClose).not.toHaveBeenCalled();
+
+    screen.getByRole('button', { name: '視窗內' }).focus();
+    await user.keyboard('{Escape}');
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test('疊著 modal 時，非 modal 視窗不處理 Esc', async () => {
+    const user = userEvent.setup();
+    const onCloseFloat = vi.fn();
+    const onCloseModal = vi.fn();
+    render(<><Floating onClose={onCloseFloat} /><Dialog label="modal" onClose={onCloseModal} /></>);
+    screen.getByRole('button', { name: '視窗內' }).focus();
+    await user.keyboard('{Escape}');
+    expect(onCloseModal).toHaveBeenCalledTimes(1);
+    expect(onCloseFloat).not.toHaveBeenCalled();
+  });
+});

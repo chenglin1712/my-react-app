@@ -1,8 +1,7 @@
 import "../../static/css/_quiz/bot.css"
 import { useState, useRef, useEffect } from "react";
-import { Bot, ChevronLeft } from "lucide-react"
+import { Bot, ChevronDown } from "lucide-react"
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import StudyPlanComponent from "./bot_study_plan"
 import { useAuth } from "../../src/userServives/authContext";
 import { getUserSituation } from "../../src/userServives/uploadDb";
@@ -17,7 +16,9 @@ const SUGGESTIONS = [
     "幫我排一週讀書計畫"
 ];
 
-const AIAssistantOverlay = ({ onClose }) => {
+// 右下角懸浮聊天視窗（類似 Messenger）：非 modal，背景頁面仍可操作。
+// open=false 時視窗收合但保持掛載，對話內容與進行中的請求都不會遺失。
+const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => {
     const navigate = useNavigate();
     // 直接從網址進到 /bot（沒有帶 onClose）時用 navigate(-1) 可能把使用者導到
     // 應用程式以外的頁面（例如瀏覽器歷史紀錄的上一頁是外部網站），改成固定
@@ -94,15 +95,15 @@ const AIAssistantOverlay = ({ onClose }) => {
         return () => { cancelled = true; };
     }, [userData]);
 
-    // aria-modal 只是宣告：焦點陷阱、Esc、還原焦點都要自己做（審查項 P1-5）。
-    // 開啟時焦點直接放在輸入框，使用者可以馬上打字。
-    useDialog(dialogRef, { onClose: handleClose, initialFocusRef: inputRef });
+    // 非 modal 的懸浮視窗：不鎖背景、不困住 Tab，只在焦點位於視窗內時 Esc 才收合，
+    // 開啟時焦點直接放在輸入框，收合後焦點回到右下角的啟動鈕。
+    useDialog(dialogRef, { active: open, onClose: handleClose, initialFocusRef: inputRef, modal: false, returnFocusRef });
 
     // 新訊息或「輸入中」指示器出現/消失時自動捲到底部，messageEndRef 原本宣告了
     // 卻從沒呼叫 scrollIntoView，訊息一多使用者得自己手動往下滑。
     useEffect(() => {
         messageEndRef.current?.scrollIntoView({ behavior: scrollBehavior() });
-    }, [messages, isPending]);
+    }, [messages, isPending, open]);
 
     const handleInputChange = (e) => {
         setInput(e.target.value);
@@ -172,27 +173,23 @@ const AIAssistantOverlay = ({ onClose }) => {
     };
 
     return (
-        <div className="bot-overlay">
-            <motion.div
+        <div className="bot-overlay" data-open={open} inert={!open}>
+            <div
                 ref={dialogRef}
                 tabIndex={-1}
                 className="chat-container"
                 role="dialog"
-                aria-modal="true"
+                aria-modal="false"
                 aria-label="族語 AI 助手"
-                initial={{ y: "100%", opacity: 0 }}
-                animate={{ y: "0%", opacity: 1 }}
-                exit={{ y: "100%", opacity: 0 }}
-                transition={{ duration: 0.35 }}
             >
                 <div className="chat-header">
                     <button
                         type="button"
                         onClick={handleClose}
                         className="chat-return"
-                        aria-label="返回"
+                        aria-label="收合 AI 助手"
                     >
-                        <ChevronLeft size={22} />
+                        <ChevronDown size={22} />
                     </button>
                     <div className="bot-avatar">
                         <Bot />
@@ -289,7 +286,7 @@ const AIAssistantOverlay = ({ onClose }) => {
                         發送
                     </button>
                 </div>
-            </motion.div>
+            </div>
         </div >
     );
 };

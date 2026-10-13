@@ -1,0 +1,44 @@
+/* 離線橫幅出現時（置底、z-index 1100，手機上幾乎橫跨整個寬度），啟動鈕與聊天視窗往上讓位。
+   這條規則放在啟動鈕的 CSS（隨 AppShell 載入），聊天視窗的 CSS 是 lazy 載入但同樣讀這個變數。 */
+body:has(.offline-banner) {
+    --bot-bottom: 96px;
+}
+
+/* 右下角 AI 助手啟動鈕。z-index 900：高於頁面內容，低於 Navbar 彈窗遮罩（1000）與各種 modal。 */
+.bot-launcher {
+    position: fixed;
+    right: 20px;
+    bottom: var(--bot-bottom, 20px);
+    z-index: 900;
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: var(--yy-cream);
+    background: var(--yy-red);
+    border: 3px solid var(--yy-ink);
+    border-radius: 50%;
+    box-shadow: var(--yy-shadow-sm);
+    cursor: pointer;
+    transition: transform 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+        background-color 160ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .bot-launcher:hover {
+        background: var(--yy-red-dark);
+    }
+}
+
+.bot-launcher:active {
+    transform: scale(0.97);
+}
+
+@media (max-width: 575px) {
+    .bot-launcher {
+        right: 14px;
+        bottom: var(--bot-bottom, 14px);
+    }
+}

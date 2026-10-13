@@ -1,12 +1,12 @@
-import { useState, lazy, Suspense } from 'react';
+import { useRef, useState, lazy, Suspense } from 'react';
 import { useLocation } from 'react-router-dom';
-import { AnimatePresence } from 'framer-motion';
 import AppRoutes from './route';
 import Navbar from '../components/navigation/navbar';
 import Footer from '../components/ui/Footer';
 import RouteEffects from './RouteEffects';
 import OfflineBanner from '../components/ui/OfflineBanner';
 import LiveAnnouncer from '../components/ui/LiveAnnouncer';
+import BotLauncher from '../components/_quiz/BotLauncher';
 
 import ErrorBoundary from './errorBoundary';
 
@@ -25,6 +25,12 @@ export default function AppShell() {
   const { pathname } = useLocation();
   const isAdmin = pathname.startsWith('/admin');
   const [isBotOpen, setIsBotOpen] = useState(false);
+  // 聊天視窗第一次開啟後就保持掛載（收合只是隱藏），對話內容與進行中的請求不會因為收合而遺失
+  const [botMounted, setBotMounted] = useState(false);
+  const launcherRef = useRef(null);
+  // /bot 路由本身就直接渲染一份聊天視窗：這時不再顯示啟動鈕、也不再另外掛一份，避免同一頁有兩個助手
+  const onBotRoute = pathname === '/bot';
+  const openBot = () => { if (onBotRoute) return; setBotMounted(true); setIsBotOpen(true); };
 
   if (isAdmin) return <AppRoutes />;
 
@@ -38,7 +44,7 @@ export default function AppShell() {
       <RouteEffects />
       <LiveAnnouncer />
       <OfflineBanner />
-      <Navbar onOpenBot={() => setIsBotOpen(true)} />
+      <Navbar onOpenBot={openBot} />
       <main id="main-content">
         <AppRoutes />
       </main>
@@ -56,7 +62,7 @@ export default function AppShell() {
             AI 助手暫時無法使用，請稍後再試。
             <button
               type="button"
-              onClick={() => { reset(); setIsBotOpen(false); }}
+              onClick={() => { reset(); setIsBotOpen(false); setBotMounted(false); }}
               style={{ marginLeft: 12 }}
             >
               關閉
@@ -65,11 +71,12 @@ export default function AppShell() {
         )}
       >
         <Suspense fallback={null}>
-          <AnimatePresence>
-            {isBotOpen && <OverlayAdvice onClose={() => setIsBotOpen(false)} />}
-          </AnimatePresence>
+          {botMounted && (
+            <OverlayAdvice open={isBotOpen} onClose={() => setIsBotOpen(false)} returnFocusRef={launcherRef} />
+          )}
         </Suspense>
       </ErrorBoundary>
+      {!isBotOpen && !onBotRoute && <BotLauncher ref={launcherRef} onClick={openBot} />}
     </>
   );
 }

@@ -180,3 +180,26 @@ describe("B-7 導覽列與側欄", () => {
     expect(open.body).toMatch(/visibility:\s*visible/);
   });
 });
+
+describe("AI 助手懸浮視窗", () => {
+  const bot = files.find((f) => f.file === "_quiz/bot.css").css;
+
+  it("聊天視窗是右下角定位、非全螢幕遮罩，且低於 Navbar 彈窗遮罩（1000）", () => {
+    const rule = rules(bot).find((r) => r.selector === ".bot-overlay");
+    expect(rule.body).toMatch(/position:\s*fixed/);
+    expect(rule.body).toMatch(/right:\s*20px/);
+    expect(rule.body).not.toMatch(/inset:\s*0/);
+    expect(rule.body).toMatch(/z-index:\s*900/);
+  });
+
+  it("收合時 visibility:hidden 並禁止指標事件；開合動畫有 reduced-motion 降級", () => {
+    const closed = rules(bot).find((r) => r.selector === '.bot-overlay[data-open="false"]');
+    expect(closed.body).toMatch(/visibility:\s*hidden/);
+    expect(closed.body).toMatch(/pointer-events:\s*none/);
+    expect(bot).toMatch(/prefers-reduced-motion:\s*reduce/);
+  });
+
+  it("手機版高度扣掉 Navbar（含跑馬燈約 98px）後仍留空隙", () => {
+    expect(bot).toMatch(/calc\(100dvh - var\(--bot-bottom, 8px\) - 104px\)/);
+  });
+});

@@ -76,7 +76,7 @@ describe('從側邊欄開啟 AI 助手（真實元件整合）', () => {
     expect(document.querySelector('.overlay')).not.toBeInTheDocument();
   });
 
-  test('可以送出訊息並收到回應，之後按返回能關閉，且不殘留遮罩', async () => {
+  test('可以送出訊息並收到回應，按收合後視窗隱藏、啟動鈕回來，再開啟時對話還在', async () => {
     apiPost.mockResolvedValue({ message: '你好，我是助手回應' });
     const user = userEvent.setup();
     renderApp();
@@ -85,10 +85,29 @@ describe('從側邊欄開啟 AI 助手（真實元件整合）', () => {
     await user.type(await screen.findByLabelText('輸入訊息'), '你好{Enter}');
     expect(await screen.findByText('你好，我是助手回應')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: '返回' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(document.querySelector('.bot-overlay')).not.toBeInTheDocument();
+    // 開著的時候不顯示啟動鈕
+    expect(screen.queryByRole('button', { name: '開啟 AI 助手' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '收合 AI 助手' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '族語 AI 助手' })).not.toBeInTheDocument());
+    expect(document.querySelector('.bot-overlay')).toHaveAttribute('data-open', 'false');
     expect(screen.getByText('頁面內容')).toBeInTheDocument();
+
+    // 啟動鈕回來，焦點在它身上；再點開，剛剛的對話還在
+    const launcher = await screen.findByRole('button', { name: '開啟 AI 助手' });
+    expect(launcher).toHaveFocus();
+    await user.click(launcher);
+    expect(await screen.findByRole('dialog', { name: '族語 AI 助手' })).toBeInTheDocument();
+    expect(screen.getByText('你好，我是助手回應')).toBeInTheDocument();
+  });
+
+  test('右下角啟動鈕可以直接開啟 AI 助手，開著時背景頁面仍可操作（沒有遮罩）', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByRole('button', { name: '開啟 AI 助手' }));
+    expect(await screen.findByRole('dialog', { name: '族語 AI 助手' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByText('頁面內容')).toBeVisible();
+    expect(document.body.style.overflow).toBe('');
   });
 
   test('後端失敗時聊天室顯示錯誤訊息，畫面不會崩潰', async () => {

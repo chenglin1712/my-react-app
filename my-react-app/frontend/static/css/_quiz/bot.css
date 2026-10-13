@@ -1,26 +1,65 @@
-@keyframes bot-slide-up {
-    0% {
-        transform: translateY(100%);
-        opacity: 0;
-    }
+/* 專屬 class：原本叫 .overlay，與 Navbar.css／registerForm.css／dateReminder.css
+   同名，全域 CSS 會互相覆蓋（bot.css 是 lazy 載入、後到者贏）。
 
-    100% {
-        transform: translateY(0);
-        opacity: 1;
+   右下角懸浮聊天視窗（非 modal）：沒有全螢幕遮罩，背景頁面仍可操作。
+   z-index 900：高於頁面內容，低於 Navbar 彈窗遮罩（1000）與 modal，所以開著個人選單
+   或其他彈窗時，彈窗會正確蓋在上面。
+   開關動畫：從右下角（啟動鈕的位置）縮放展開，ease-out；收合更快（120ms）。
+   收合後保持掛載、只是隱藏，對話內容不會遺失。 */
+.bot-overlay {
+    position: fixed;
+    right: 20px;
+    /* 離線橫幅（置底、z-index 1100）出現時，body 會設 --bot-bottom 讓視窗與啟動鈕往上讓出位置 */
+    bottom: var(--bot-bottom, 20px);
+    z-index: 900;
+    width: min(400px, calc(100vw - 32px));
+    height: min(620px, calc(100dvh - var(--bot-bottom, 20px) - 100px));
+    transform-origin: bottom right;
+    opacity: 1;
+    transform: none;
+    transition: opacity 180ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+        transform 180ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+
+.bot-overlay[data-open="false"] {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 120ms ease-out, transform 120ms ease-out, visibility 0s linear 120ms;
+}
+
+/* 第一次掛載（或從 display:none 回來）時也從收合狀態展開；不支援的瀏覽器就直接出現 */
+@starting-style {
+    .bot-overlay[data-open="true"] {
+        opacity: 0;
+        transform: scale(0.95) translateY(8px);
     }
 }
 
-/* 專屬 class：原本叫 .overlay，與 Navbar.css／registerForm.css／dateReminder.css
-   同名，全域 CSS 會互相覆蓋（bot.css 是 lazy 載入、後到者贏）。z-index 必須高於
-   sticky Navbar（1000），否則聊天室的標題列（返回鈕）會被導覽列蓋住而無法關閉。 */
-.bot-overlay {
-    position: fixed;
-    inset: 0;
-    background-color: rgba(0, 0, 0, 0.4);
-    z-index: 1100;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+@media (prefers-reduced-motion: reduce) {
+
+    .bot-overlay,
+    .bot-overlay[data-open="false"] {
+        transform: none;
+        transition: opacity 100ms linear, visibility 0s linear 100ms;
+    }
+
+    @starting-style {
+        .bot-overlay[data-open="true"] {
+            transform: none;
+        }
+    }
+}
+
+@media (max-width: 575px) {
+    .bot-overlay {
+        right: 8px;
+        bottom: var(--bot-bottom, 8px);
+        width: calc(100vw - 16px);
+        /* 手機 Navbar（含跑馬燈）約 98px 高，再留 6px 空隙，視窗頂端才不會被導覽列蓋住 */
+        height: calc(100dvh - var(--bot-bottom, 8px) - 104px);
+    }
 }
 
 .chat-container {
@@ -30,7 +69,22 @@
     display: flex;
     flex-direction: column;
     background-color: var(--yy-cream);
-    animation: bot-slide-up 0.35s ease-out;
+    border: 3px solid var(--yy-ink);
+    border-radius: 16px;
+    box-shadow: var(--yy-shadow-lg);
+}
+
+/* 懸浮視窗只有 400px 寬：單詞庫提示與輸入列依視窗寬度縮小，不再是全螢幕的尺寸 */
+.chat-container .chat-header {
+    padding: 12px;
+}
+
+.chat-container .message-bubble {
+    max-width: 82%;
+}
+
+.chat-container .input-area {
+    padding: 12px;
 }
 
 .chat-header {

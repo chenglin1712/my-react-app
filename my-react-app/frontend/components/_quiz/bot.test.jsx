@@ -139,20 +139,79 @@ describe('AIAssistantOverlay 無障礙（審查項 P1-5、P1-6）', () => {
     authState.userData = { firestoreData: { user_errors: {}, quiz_model: { type_stats: {} } } };
   });
 
-  test('開啟時焦點在輸入框；Esc 關閉；Tab 被困在對話框內', async () => {
+  test('是非 modal 的懸浮視窗：焦點在輸入框、Esc 收合，Tab 可以離開視窗去操作頁面', async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
-    render(<AIAssistantOverlay onClose={onClose} />);
+    render(<><button type="button">頁面上的按鈕</button><AIAssistantOverlay onClose={onClose} /></>);
 
     expect(screen.getByLabelText('輸入訊息')).toHaveFocus();
     const dialog = screen.getByRole('dialog', { name: '族語 AI 助手' });
-    for (let i = 0; i < 12; i += 1) {
-      await user.tab();
-      expect(dialog.contains(document.activeElement)).toBe(true);
-    }
+    expect(dialog).toHaveAttribute('aria-modal', 'false');
 
+    // 沒有被困住：反覆 Shift+Tab 最終會回到頁面上的按鈕
+    let leftDialog = false;
+    for (let i = 0; i < 12; i += 1) {
+      await user.tab({ shift: true });
+      if (!dialog.contains(document.activeElement)) { leftDialog = true; break; }
+    }
+    expect(leftDialog).toBe(true);
+    // 焦點在視窗外按 Esc 不會收合
+    await user.keyboard('{Escape}');
+    expect(onClose).not.toHaveBeenCalled();
+
+    // 焦點回到視窗內再按 Esc 才收合
+    screen.getByLabelText('輸入訊息').focus();
     await user.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test('沒有全螢幕遮罩，也不鎖背景捲動', () => {
+    document.body.style.overflow = '';
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+    expect(document.body.style.overflow).toBe('');
+    expect(document.querySelector('.bot-overlay').getAttribute('data-open')).toBe('true');
+  });
+
+  test('open=false 時視窗收合並 inert，但對話內容保留；再開啟時還在', async () => {
+    apiPost.mockResolvedValue({ message: '保留這則' });
+    const user = userEvent.setup();
+    const { rerender, container } = render(<AIAssistantOverlay onClose={vi.fn()} open />);
+    await user.type(screen.getByLabelText('輸入訊息'), '你好{Enter}');
+    expect(await screen.findByText('保留這則')).toBeInTheDocument();
+
+    rerender(<AIAssistantOverlay onClose={vi.fn()} open={false} />);
+    const wrap = container.querySelector('.bot-overlay');
+    expect(wrap).toHaveAttribute('data-open', 'false');
+    expect(wrap.hasAttribute('inert')).toBe(true);
+    expect(screen.getByText('保留這則')).toBeInTheDocument();
+
+    rerender(<AIAssistantOverlay onClose={vi.fn()} open />);
+    expect(wrap.hasAttribute('inert')).toBe(false);
+    expect(screen.getByLabelText('輸入訊息')).toHaveFocus();
+  });
+
+  test('收合後焦點回到 returnFocusRef 指定的啟動鈕', () => {
+    const launcher = document.createElement('button');
+    document.body.appendChild(launcher);
+    const returnFocusRef = { current: launcher };
+    const { rerender } = render(<AIAssistantOverlay onClose={vi.fn()} open returnFocusRef={returnFocusRef} />);
+    expect(screen.getByLabelText('輸入訊息')).toHaveFocus();
+    rerender(<AIAssistantOverlay onClose={vi.fn()} open={false} returnFocusRef={returnFocusRef} />);
+    expect(launcher).toHaveFocus();
+    launcher.remove();
+  });
+
+  test('使用者已經去操作頁面別處時，收合不會把焦點搶走', () => {
+    const launcher = document.createElement('button');
+    const other = document.createElement('button');
+    document.body.append(launcher, other);
+    const returnFocusRef = { current: launcher };
+    const { rerender } = render(<AIAssistantOverlay onClose={vi.fn()} open returnFocusRef={returnFocusRef} />);
+    other.focus();
+    rerender(<AIAssistantOverlay onClose={vi.fn()} open={false} returnFocusRef={returnFocusRef} />);
+    expect(other).toHaveFocus();
+    launcher.remove();
+    other.remove();
   });
 
   test('關閉（卸載）後焦點回到開啟前的按鈕', () => {
