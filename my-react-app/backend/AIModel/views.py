@@ -26,6 +26,19 @@ def _get_client():
     路徑不用跟著改。"""
     return get_llm_client()
 
+def _assistant_disabled_response():
+    """AI 助手總開關（FeatureFlag ai_assistant_enabled，後台「功能開關」頁可切換）。
+    兩個 view 都會呼叫付費的 LLM，是翻譯以外另一條費用出口，所以需要同樣能一鍵關閉。
+    找不到旗標紀錄（尚未跑 seed_feature_flags）視為未關閉，維持原本行為。
+    在限速計數之前檢查，關閉期間被擋下的請求不佔用使用者的限速額度。"""
+    from adminapi.models import FeatureFlag
+
+    flag = FeatureFlag.objects.filter(key="ai_assistant_enabled").first()
+    if flag is not None and not flag.enabled:
+        return JsonResponse({"detail": "AI 助手目前暫停服務，請稍後再試。", "code": "ai_assistant_disabled"}, status=403)
+    return None
+
+
 def _rate_limited_response(request, decoded, group, rate="10/m"):
     """依已登入使用者的 uid 限速（這兩個 view 都會呼叫付費的 GitHub Models API）。
     直接呼叫 is_ratelimited 而不是用 @ratelimit 裝飾器：裝飾器要在呼叫 view 之前
@@ -55,6 +68,9 @@ def tayal_chat(request):
         decoded, err_resp = verify_firebase_token(request)
         if err_resp:
             return err_resp
+        disabled_resp = _assistant_disabled_response()
+        if disabled_resp:
+            return disabled_resp
         limited_resp = _rate_limited_response(request, decoded, group="tayal_chat")
         if limited_resp:
             return limited_resp
@@ -105,6 +121,9 @@ def review_tayal_chat(request):
         decoded, err_resp = verify_firebase_token(request)
         if err_resp:
             return err_resp
+        disabled_resp = _assistant_disabled_response()
+        if disabled_resp:
+            return disabled_resp
         limited_resp = _rate_limited_response(request, decoded, group="review_tayal_chat")
         if limited_resp:
             return limited_resp

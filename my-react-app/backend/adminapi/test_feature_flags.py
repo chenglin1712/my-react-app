@@ -133,8 +133,14 @@ class SeedFeatureFlagsTest(TestCase):
         from config.tribes import TRIBES
         out = StringIO()
         call_command("seed_feature_flags", stdout=out)
-        self.assertEqual(FeatureFlag.objects.count(), len(TRIBES) + 9)
-        self.assertIn(f"共 {len(TRIBES) + 9} 筆", out.getvalue())
+        self.assertEqual(FeatureFlag.objects.count(), len(TRIBES) + 10)
+        self.assertIn(f"共 {len(TRIBES) + 10} 筆", out.getvalue())
+        self.assertTrue(FeatureFlag.objects.get(key="ai_assistant_enabled").enabled)
+
+        # 管理員關閉後再跑種子，不可被覆寫回啟用
+        FeatureFlag.objects.filter(key="ai_assistant_enabled").update(enabled=False)
+        call_command("seed_feature_flags", stdout=StringIO())
+        self.assertFalse(FeatureFlag.objects.get(key="ai_assistant_enabled").enabled)
 
     def test_the_verification_queue_flag_is_seeded_disabled_and_a_rerun_keeps_an_admins_choice(self):
         self._seed()

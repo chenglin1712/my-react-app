@@ -130,8 +130,9 @@ class RateLimitRule(models.Model):
 class FeatureFlag(models.Model):
     """功能開關的通用登錄表——key 是呼叫端自訂的識別字串（例如
     "quiz_enabled_tayal"），enabled 預設 True（維持現況行為，管理者主動
-    關閉才會改變）。這次唯一真正接上判斷的消費端是 crawler/views.py 的
-    get_quiz_data()／get_situation_quiz_data()（族語測驗總開關），其餘
+    關閉才會改變）。目前真正接上判斷的消費端有三處：crawler/views.py 的
+    get_quiz_data()／get_situation_quiz_data()（族語測驗總開關）、FastAPI 翻譯端點
+    （translation_enabled）、AIModel/views.py 的 AI 助手（ai_assistant_enabled），其餘
     key 目前只是登錄在這張表裡，還沒有程式碼真的去讀（見規劃文件的說明：
     這次刻意只做一個真實接點，不是把「功能開關」做成什麼都能接的通用
     中介層）。

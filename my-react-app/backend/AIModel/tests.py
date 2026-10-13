@@ -1,7 +1,7 @@
 import json
 
 from django.core.cache import cache
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 from unittest.mock import patch, MagicMock
 
 from AIModel.views import search_tayal_words, search_tayal_words_bulk
@@ -260,3 +260,74 @@ class RunReviewTayalChatServiceTest(TestCase):
             "translation": "補充說明文字",
             "image": None,
         })
+
+
+class AssistantKillSwitchTest(TestCase):
+    """AI 助手總開關（FeatureFlag ai_assistant_enabled）：關閉時兩支端點都回 403，
+    而且完全不碰 LLM client；沒有旗標紀錄或開啟時維持原本行為。"""
+
+    ENDPOINTS = ('/AIModel/tayal_chat/', '/AIModel/review_tayal_chat/')
+
+    def setUp(self):
+        self.client_http = Client()
+        cache.clear()
+
+    def _post(self, url):
+        return self.client_http.post(
+            url, data=json.dumps({"message": "hi", "tribe": "tayal"}), content_type='application/json',
+        )
+
+    @patch("AIModel.views._get_client")
+    def test_disabled_flag_returns_403_without_calling_llm(self, mock_get_client):
+        from adminapi.models import FeatureFlag
+        FeatureFlag.objects.create(key="ai_assistant_enabled", label="AI 助手", enabled=False)
+
+        for url in self.ENDPOINTS:
+            response = self._post(url)
+            self.assertEqual(response.status_code, 403, url)
+            self.assertIn("暫停服務", response.json()["detail"])
+        mock_get_client.assert_not_called()
+
+    @patch("AIModel.views._get_client")
+    def test_disabled_response_carries_machine_readable_code(self, _mock_get_client):
+        from adminapi.models import FeatureFlag
+        FeatureFlag.objects.create(key="ai_assistant_enabled", label="AI 助手", enabled=False)
+
+        self.assertEqual(self._post('/AIModel/tayal_chat/').json()["code"], "ai_assistant_disabled")
+
+    @patch("AIModel.views._rate_limited_response")
+    @patch("AIModel.views._get_client")
+    def test_disabled_flag_does_not_consume_rate_limit(self, _mock_get_client, mock_rate_limited):
+        from adminapi.models import FeatureFlag
+        FeatureFlag.objects.create(key="ai_assistant_enabled", label="AI 助手", enabled=False)
+
+        for url in self.ENDPOINTS:
+            self._post(url)
+        mock_rate_limited.assert_not_called()
+
+    @override_settings(AUTH_DEV_BYPASS=False)
+    @patch("AIModel.views._get_client")
+    def test_unauthenticated_request_gets_401_before_flag_check(self, mock_get_client):
+        from adminapi.models import FeatureFlag
+        FeatureFlag.objects.create(key="ai_assistant_enabled", label="AI 助手", enabled=False)
+
+        for url in self.ENDPOINTS:
+            self.assertEqual(self._post(url).status_code, 401, url)
+        mock_get_client.assert_not_called()
+
+    @patch("AIModel.views._get_client")
+    def test_enabled_flag_keeps_normal_behavior(self, mock_get_client):
+        from adminapi.models import FeatureFlag
+        FeatureFlag.objects.create(key="ai_assistant_enabled", label="AI 助手", enabled=True)
+        mock_get_client.return_value = _mock_chat_client("哈囉")
+
+        for url in self.ENDPOINTS:
+            self.assertEqual(self._post(url).status_code, 200, url)
+
+    @patch("AIModel.views._get_client")
+    def test_missing_flag_row_is_treated_as_enabled(self, mock_get_client):
+        mock_get_client.return_value = _mock_chat_client("哈囉")
+
+        response = self._post('/AIModel/tayal_chat/')
+
+        self.assertEqual(response.status_code, 200)

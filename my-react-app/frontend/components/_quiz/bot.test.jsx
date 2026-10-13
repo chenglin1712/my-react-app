@@ -108,6 +108,27 @@ describe('AIAssistantOverlay（回歸測試：注音/拼音輸入法選字時的
     expect(await screen.findByText('很抱歉，無法取得回應，請稍後再試。')).toBeInTheDocument();
   });
 
+  test('AI 助手被管理者關閉（403）時，顯示後端的說明，不當成網路錯誤', async () => {
+    apiPost.mockRejectedValue(Object.assign(new Error('forbidden'), { status: 403, data: { detail: 'AI 助手目前暫停服務，請稍後再試。', code: 'ai_assistant_disabled' } }));
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), '你好{Enter}');
+
+    expect(await screen.findByText('AI 助手目前暫停服務，請稍後再試。')).toBeInTheDocument();
+    expect(screen.queryByText('很抱歉，無法取得回應，請稍後再試。')).toBeNull();
+  });
+
+  test('不是總開關造成的 403（沒有指定 code）仍顯示通用錯誤訊息', async () => {
+    apiPost.mockRejectedValue(Object.assign(new Error('forbidden'), { status: 403, data: { detail: '代理層拒絕' } }));
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), '你好{Enter}');
+
+    expect(await screen.findByText('很抱歉，無法取得回應，請稍後再試。')).toBeInTheDocument();
+  });
+
   test('對話框卸載時會中止還在進行中的請求，恢復回應（真的被中止）時不當成錯誤處理', async () => {
     let capturedSignal;
     apiPost.mockImplementation((_url, _data, options) => {

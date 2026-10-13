@@ -147,9 +147,14 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
             if (controller.signal.aborted) return;
             if (!mountedRef.current) return;
 
+            // 管理者關閉了 AI 助手（總開關）：後端用 code 明確標示，照它給的說明顯示，
+            // 不要讓人以為是自己網路的問題；其他 403（例如代理層擋下）仍走通用訊息
+            const serviceOff = error?.status === 403 && error?.data?.code === "ai_assistant_disabled";
             const errorResponse = {
                 id: crypto.randomUUID(),
-                text: "很抱歉，無法取得回應，請稍後再試。",
+                text: serviceOff
+                    ? (error?.data?.detail || "AI 助手目前暫停服務，請稍後再試。")
+                    : "很抱歉，無法取得回應，請稍後再試。",
                 role: "bot"
             };
             setMessages(prev => [...prev, errorResponse]);

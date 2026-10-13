@@ -1,5 +1,5 @@
 """種入 5 個族語各一筆 quiz_enabled_<tribe> 功能開關，加上族語翻譯功能總開關
-translation_enabled，預設皆 enabled=True。
+translation_enabled、AI 助手總開關 ai_assistant_enabled，預設皆 enabled=True。
 
 用法：
     python manage.py seed_feature_flags
@@ -38,6 +38,17 @@ class Command(BaseCommand):
             defaults={
                 "label": "族語翻譯",
                 "description": "關閉後，/translate 頁面的翻譯請求會回傳 403，不再呼叫 LLM。",
+                "enabled": True,
+            },
+        )
+        created_count += int(created)
+
+        # AI 助手總開關：與翻譯同為付費 LLM 呼叫的費用出口，預設啟用，需要時可一鍵關閉。
+        _, created = FeatureFlag.objects.get_or_create(
+            key="ai_assistant_enabled",
+            defaults={
+                "label": "AI 助手",
+                "description": "關閉後，右下角 AI 助手的對話與複習建議請求會回傳 403，不再呼叫 LLM。",
                 "enabled": True,
             },
         )
@@ -102,9 +113,9 @@ class Command(BaseCommand):
         )
         created_count += int(created)
 
-        total = len(TRIBES) + 9
+        total = len(TRIBES) + 10
         self.stdout.write(self.style.SUCCESS(
-            f"功能開關種子完成：共 {total} 筆（族語測驗開關 {len(TRIBES)} + 族語翻譯開關 1 + 詞形分析器 2 + 測驗詞形干擾項 1 "
-            f"+ 詞素學習 4 + 待專家驗證佇列 1，除了族語測驗與翻譯開關，其餘預設關閉），"
+            f"功能開關種子完成：共 {total} 筆（族語測驗開關 {len(TRIBES)} + 族語翻譯開關 1 + AI 助手開關 1 + 詞形分析器 2 + 測驗詞形干擾項 1 "
+            f"+ 詞素學習 4 + 待專家驗證佇列 1，除了族語測驗、翻譯與 AI 助手開關，其餘預設關閉），"
             f"新增 {created_count} 筆，其餘已存在維持原值。"
         ))
