@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Spinner } from 'react-bootstrap';
 import { apiPost } from "../../utils/apiClient";
+import { announce } from "@utils/announce";
+import { countMatchedWords } from "../../utils/wordFilterSort";
 import { useFavorites } from "../../src/userServives/useFavorites";
 import "../../static/css/_camera/result.css";
 import { filterAndSortWords as sortWords } from "../../utils/wordFilterSort";
@@ -48,11 +50,12 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
     if (selectedWords.length === 0) {
       setError("請選擇至少一個單詞！");
       setDefinitions({ exact_match_results: {}, fuzzy_match_results: {} });
-      return;
+      return undefined;
     }
 
     setLoading(true);
     setError("");
+    announce("查詢中，請稍候");
     // apiPost 內部一定會回傳 Promise（即使 auth.currentUser 是 null，token 只影響
     // 要不要帶 Authorization header），不會有「未登入時整條 .then/.catch/.finally
     // 都不執行、loading 卡住」的問題。
@@ -63,14 +66,19 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
           exact_match_results: data.exact_match_results || {},
           fuzzy_match_results: data.fuzzy_match_results || {},
         });
+        const count = countMatchedWords(data.exact_match_results, data.fuzzy_match_results);
+        announce(count > 0 ? `找到 ${count} 筆結果` : "沒有找到符合的詞");
       })
       .catch(err => {
         if (myGeneration !== requestGenerationRef.current) return;
         setError("查詢失敗: " + err.message);
+        announce("查詢失敗", { assertive: true });
       })
       .finally(() => {
         if (myGeneration === requestGenerationRef.current) setLoading(false);
       });
+    // 步驟卸載（例如按「重新辨識」）時讓還在跑的查詢作廢，不再更新畫面或公告
+    return () => { requestGenerationRef.current += 1; };
   }, [selectedWords, tribe]);
 
   const toggleExpand = (key) => setExpandedWord(prev => (prev === key ? null : key));

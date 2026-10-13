@@ -69,3 +69,14 @@ export function filterAndSortWords(words, {
     })
     .sort(createWordComparator(sortOrder));
 }
+
+// 完全匹配與相關匹配的總筆數（結果結構：完全匹配 { 詞: [條目] }，相關匹配 { 詞: { 分類: [條目] } }），
+// 給螢幕報讀器公告「找到幾筆」用。
+export function countMatchedWords(exactMatches = {}, fuzzyMatches = {}) {
+  const exact = Object.values(exactMatches || {}).flat().length;
+  const fuzzy = Object.values(fuzzyMatches || {}).reduce(
+    (sum, group) => sum + Object.values(group || {}).flat().length,
+    0,
+  );
+  return exact + fuzzy;
+}

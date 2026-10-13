@@ -192,6 +192,25 @@
     height: 32px !important;
 }
 
+/* 點擊區從 32px 擴到 44px：Swiper 的按鈕本身是 absolute，用 ::before 往外擴。
+   Swiper 容器是 overflow:hidden，按鈕預設離左右邊 4px，擴出去的 6px 會被裁掉，
+   所以把邊距加到 8px，44px 才完整落在容器內。 */
+.swiper-button-next,
+.swiper-button-prev {
+    --swiper-navigation-sides-offset: 8px;
+}
+
+.swiper-button-next::before,
+.swiper-button-prev::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, var(--yy-control-md));
+    height: max(100%, var(--yy-control-md));
+    transform: translate(-50%, -50%);
+}
+
 /* 右側文字列表 */
 .event-right {
     flex: 1;

@@ -58,6 +58,12 @@
   overflow-y: auto;
 }
 
+/* 編輯區的 .ProseMirror 自己沒有外框，由外層容器在內部取得焦點時畫焦點外框 */
+.note-text:focus-within {
+  outline: var(--yy-focus-ring);
+  outline-offset: var(--yy-focus-offset);
+}
+
 /* TipTap 實際可編輯的節點是 .note-text 內的 .ProseMirror */
 .note-text .ProseMirror {
   padding: 12px 14px;

@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { useAuth } from "./authContext";
 import { toggleFavoriteWord } from "./userServive";
+import { announce } from "@utils/announce";
 
 const DEFAULT_CATEGORY_ID = 1;
 const EMPTY_FAVORITES = [];
@@ -30,14 +31,19 @@ export function useFavorites() {
         setError("");
 
         const previousFavorites = favorites;
+        let added = false;
         const newFavorites = favorites.map((fav) => {
             if (fav.id !== categoryId) return fav;
             const content = Array.isArray(fav.content) ? fav.content : [];
+            added = !content.includes(word);
             const newContent = content.includes(word)
                 ? content.filter((w) => w !== word)
                 : [...content, word];
             return { ...fav, content: newContent };
         });
+
+        // 愛心圖示的狀態變化螢幕報讀器看不到，用公告補上（審查項 P2-99）
+        announce(added ? `已加入收藏：${word}` : `已取消收藏：${word}`);
 
         // 樂觀更新：立刻同步 AuthContext，其他頁面不用等 Firestore 寫入完成或
         // 重新訂閱就能看到最新收藏狀態。
@@ -56,6 +62,7 @@ export function useFavorites() {
                 firestoreData: { ...user.firestoreData, favorites: previousFavorites },
             });
             setError("收藏失敗，請稍後再試。");
+            announce("收藏失敗，請稍後再試。", { assertive: true });
             console.error("同步收藏失敗", err);
         }
     }, [user, favorites, updateUserData]);

@@ -608,6 +608,12 @@
   color: var(--yy-ink);
   margin: 0 auto 18px;
 }
+.yy-modal-close {
+  margin-top: 18px;
+  min-height: var(--yy-control-md);
+  min-width: 140px;
+}
+
 .yy-modal-text {
   font-size: 16px;
   font-weight: 800;
@@ -748,6 +754,31 @@
 .yy-terminal:focus-within {
   outline: var(--yy-focus-ring);
   outline-offset: var(--yy-focus-offset);
+}
+
+/* ---------- 觸控區 44px（審查項 P2-96）----------
+   小圖示按鈕不直接把按鈕撐大（會推擠版面），改用透明的 ::after 往外擴成 44×44，
+   視覺大小不變、點擊範圍變大。 */
+.close-btn {
+  position: relative;
+}
+
+.close-btn::after,
+.favorite-btn::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, var(--yy-control-md));
+  height: max(100%, var(--yy-control-md));
+  transform: translate(-50%, -50%);
+}
+
+/* 導覽列選單項目在桌機是 40px 高，密排比較好看；觸控裝置才補到 44px */
+@media (pointer: coarse) {
+  .menu-item {
+    min-height: var(--yy-control-md);
+  }
 }
 
 /* ---------- 主要內容區的最小高度 ----------

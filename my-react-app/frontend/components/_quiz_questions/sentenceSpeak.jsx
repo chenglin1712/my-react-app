@@ -5,6 +5,7 @@ import successAnimation from "../../src/animations/success.json";
 import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
 import { useLottieAnimation } from "../../hooks/useLottieAnimation";
 import { apiPost } from "../../utils/apiClient";
+import { announce } from "@utils/announce";
 import { playCorrectSound } from "../../utils/correctSound";
 
 export default function SentenceSpeak({ question, _selected, checked, onSelect, onConfirm }) {
@@ -79,10 +80,12 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
         recordingUrlRef.current = url;
         setAudioBlob(blob);
         setAudioUrl(url);
+        announce("錄音完成");
       };
 
       mediaRecorder.current.start();
       setRecording(true);
+      announce("開始錄音");
     } catch (err) {
       console.error('startRecording error:', err);
       setRecordError('無法使用麥克風，請確認已允許瀏覽器存取麥克風權限。');

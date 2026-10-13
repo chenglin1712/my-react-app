@@ -61,6 +61,12 @@
     z-index: 1; 
 }
 
+.area-inputgrid:focus-visible {
+    /* 輸入框被格子的 overflow:hidden 包住，外框必須畫在格子裡面（負的 offset） */
+    outline: var(--yy-focus-ring);
+    outline-offset: -3px;
+}
+
 .area-topic {
     display: grid;
     gap: 10px;

@@ -30,6 +30,11 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     const navigate = useNavigate();
     const redirectTimeoutRef = useRef(null);
     useEffect(() => () => clearTimeout(redirectTimeoutRef.current), []);
+    // 成功提示出現後本來會等 1.5 秒才跳頁；按「立即前往」或 Esc 就不用等
+    const skipWait = () => {
+        clearTimeout(redirectTimeoutRef.current);
+        navigate("/login");
+    };
 
     //使用者註冊
     const handleRegister = async (e) => {
@@ -118,7 +123,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                         )}
                     </p>
                 </form>
-                <SuccessModal show={isRegistered} text="註冊成功！您將移至登入頁面" icon={<div ref={animation} />} />
+                <SuccessModal show={isRegistered} text="註冊成功！您將移至登入頁面" icon={<div ref={animation} />} onClose={skipWait} closeLabel="立即前往" />
             </div>
         </div>
     );

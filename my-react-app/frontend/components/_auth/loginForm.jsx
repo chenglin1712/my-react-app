@@ -24,6 +24,12 @@ const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }
     const [searchParams] = useSearchParams();
     const redirectTimeoutRef = useRef(null);
     useEffect(() => () => clearTimeout(redirectTimeoutRef.current), []);
+    const redirectTargetRef = useRef("/");
+    // 成功提示出現後本來會等 1.8 秒才跳頁；按「立即前往」或 Esc 就不用等
+    const skipWait = () => {
+        clearTimeout(redirectTimeoutRef.current);
+        navigate(redirectTargetRef.current);
+    };
 
     // 登入後預設回首頁；只有從「先被要求登入才能進去」的頁面過來（例如
     // AdminRoute 導去 /login?next=/admin）才會帶 next 參數，登入成功後導回
@@ -64,6 +70,7 @@ const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }
             else clearAdminSession();
             setIsLogin(true);
             const redirectTarget = getRedirectTarget();
+            redirectTargetRef.current = redirectTarget;
             redirectTimeoutRef.current = setTimeout(() => {
                 navigate(redirectTarget);
             }, 1800);
@@ -106,7 +113,7 @@ const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }
                 </p>
             )}
 
-            <SuccessModal show={isLogin} text={isAdminVariant ? "登入成功！正在確認後台權限" : "登入成功！您將移至首頁"} icon={<div ref={animation} />} />
+            <SuccessModal show={isLogin} text={isAdminVariant ? "登入成功！正在確認後台權限" : "登入成功！您將移至首頁"} icon={<div ref={animation} />} onClose={skipWait} closeLabel="立即前往" />
         </div>
     );
 };

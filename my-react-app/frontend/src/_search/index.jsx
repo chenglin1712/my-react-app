@@ -3,7 +3,8 @@ import { Container, Alert, Spinner, Button } from 'react-bootstrap';
 import { useFavorites } from "../../src/userServives/useFavorites";
 import { TRIBE_NAMES, TRIBE_SLUG_BY_NAME, TRIBE_FULL_NAME_BY_SLUG } from "../constants/tribes";
 import { apiPost } from "../../utils/apiClient";
-import { filterAndSortWords as sortWords } from "../../utils/wordFilterSort";
+import { filterAndSortWords as sortWords, countMatchedWords } from "../../utils/wordFilterSort";
+import { announce } from "@utils/announce";
 import { useTranslateCapabilities } from "../../hooks/useTranslateCapabilities";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import "../../static/css/_search/index.css";
@@ -116,6 +117,13 @@ const SearchPage = () => {
     }
   };
 
+  // 結果列表整塊換內容，螢幕報讀器不會知道；查完用公告補上筆數（審查項 P2-99）
+  const announceResultCount = (count) =>
+    announce(count > 0 ? `找到 ${count} 筆結果` : '沒有找到符合的詞');
+
+  // 離開搜尋頁時讓還在跑的查詢作廢，不再更新畫面或公告
+  useEffect(() => () => { requestGenerationRef.current += 1; }, []);
+
   const handleSearch = async (tribeOverride = null) => {
     // 遞增 generation：任何還在跑的舊主查詢或它底下的「載入更多」都不再算數。
     const myGeneration = ++requestGenerationRef.current;
@@ -135,6 +143,7 @@ const SearchPage = () => {
         setAllTotal(total);
         setAllOffset(pageWords.length);
         setDefinitions({ exact_match_results: {}, fuzzy_match_results: {} });
+        announceResultCount(total);
       } else {
         const data = await apiPost(import.meta.env.VITE_API_SEARCH_KEY_URL, { keyword: query.trim(), tribe });
         if (myGeneration !== requestGenerationRef.current) return;
@@ -143,6 +152,10 @@ const SearchPage = () => {
           fuzzy_match_results: data.fuzzy_match_results || {},
         });
         setAllWords([]); setAllTotal(0); setAllOffset(0);
+        announceResultCount(countMatchedWords(
+          Array.isArray(data.exact_match_results) ? { [query.trim()]: data.exact_match_results } : data.exact_match_results,
+          data.fuzzy_match_results,
+        ));
       }
     } catch (e) {
       if (myGeneration !== requestGenerationRef.current) return;

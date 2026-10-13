@@ -6,16 +6,26 @@ import { useFocusTrap } from "@hooks/useFocusTrap";
 // 不傳則用預設的靜態勾勾符號。
 //
 // role="dialog"＋aria-modal＋aria-labelledby 讓螢幕報讀器知道這是一個彈出視窗；
-// 顯示時把焦點移進來（原本畫面上多了一個提示視窗，但焦點還停在原本按下的按鈕上，
-// 螢幕報讀器完全不會發現有新內容出現，也收不到任何成功通知）。
-const SuccessModal = ({ show, text, icon }) => {
+// 顯示時由 useFocusTrap 把焦點移進來（原本畫面上多了一個提示視窗，但焦點還停在原本按下的按鈕上，
+// 螢幕報讀器完全不會發現有新內容出現，也收不到任何成功通知），關閉後再還給原本的按鈕。
+//
+// onClose：傳入後會多一顆按鈕，並支援 Esc。原本這個彈窗沒有任何離開方式，成功後的計時器若沒有
+// 跳頁（例如計時器故障、使用者想立刻繼續），焦點會被困在裡面（審查項 P2-73）。
+// 登入／註冊成功後本來就要自動跳頁，所以 onClose 的意思是「不用再等，立刻前往」，按鈕文字用 closeLabel 說明。
+const SuccessModal = ({ show, text, icon, onClose, closeLabel = "關閉" }) => {
   const boxRef = useRef(null);
   const textId = useId();
 
-  useEffect(() => {
-    if (show) boxRef.current?.focus();
-  }, [show]);
   useFocusTrap(boxRef, show);
+
+  useEffect(() => {
+    if (!show || !onClose) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [show, onClose]);
 
   if (!show) return null;
   return (
@@ -30,6 +40,11 @@ const SuccessModal = ({ show, text, icon }) => {
       >
         {icon ?? <div className="yy-modal-icon" aria-hidden="true">✓</div>}
         <p className="yy-modal-text" id={textId}>{text}</p>
+        {onClose && (
+          <button type="button" className="yy-btn-outline yy-modal-close" onClick={onClose}>
+            {closeLabel}
+          </button>
+        )}
       </div>
     </div>
   );

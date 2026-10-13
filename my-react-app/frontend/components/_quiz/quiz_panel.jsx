@@ -13,6 +13,7 @@ import { useQuizPanelData } from "./useQuizPanelData"
 import { trackEvent } from "../../utils/apiClient"
 import { buildQuizAnswerEvents } from "./quizAnswerTracking"
 import { useLottieAnimation } from "@hooks/useLottieAnimation";
+import { announce } from "@utils/announce";
 import { QUIZ_LEVEL_NAME_BY_ID } from "./quizLevels";
 
 const Panel = ({ tribe = "tayal" }) => {
@@ -35,17 +36,24 @@ const Panel = ({ tribe = "tayal" }) => {
     //加載loading動畫
     const animation = useLottieAnimation({ animationData: loadingAnimation, enabled: isLoading });
 
+    // 使用者主動切題（上一題、下一題、側欄題號）時，畫面整塊換內容，螢幕報讀器不會知道，
+    // 用公告補上目前是第幾題（審查項 P2-99）。只在這個函式裡公告，資料重新載入造成的索引歸零不會誤報。
+    const goToQuestion = (index) => {
+        setCurrentQuestionIndex(index);
+        announce(`第 ${index + 1} 題，共 ${dataLen} 題`);
+    };
+
     // 下一題
     const nextQuestion = () => {
         if (currentQuestionIndex < data.parts[0].questions.length - 1) {
-            setCurrentQuestionIndex(currentQuestionIndex + 1);
+            goToQuestion(currentQuestionIndex + 1);
         }
     };
 
     // 上一題
     const previousQuestion = () => {
         if (currentQuestionIndex > 0) {
-            setCurrentQuestionIndex(currentQuestionIndex - 1);
+            goToQuestion(currentQuestionIndex - 1);
         }
     };
 
@@ -255,7 +263,7 @@ const Panel = ({ tribe = "tayal" }) => {
                     userAnswers={userAnswers}
                     userStars={userStars}
                     currentQuestionIndex={currentQuestionIndex}
-                    setCurrentQuestionIndex={setCurrentQuestionIndex}
+                    setCurrentQuestionIndex={goToQuestion}
                     onSubmit={handleSubmit}
                     isSubmitting={isSubmitting}
                 />

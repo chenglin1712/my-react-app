@@ -6,6 +6,7 @@ import Navbar from '../components/navigation/navbar';
 import Footer from '../components/ui/Footer';
 import RouteEffects from './RouteEffects';
 import OfflineBanner from '../components/ui/OfflineBanner';
+import LiveAnnouncer from '../components/ui/LiveAnnouncer';
 
 import ErrorBoundary from './errorBoundary';
 
@@ -35,6 +36,7 @@ export default function AppShell() {
           才顯示，不用自己另外寫 CSS。 */}
       <a href="#main-content" className="visually-hidden-focusable">跳到主要內容</a>
       <RouteEffects />
+      <LiveAnnouncer />
       <OfflineBanner />
       <Navbar onOpenBot={() => setIsBotOpen(true)} />
       <main id="main-content">

@@ -259,10 +259,10 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
                 </div>
 
                 <div className="submit-actions">
-                    <button className="btn-secondary" onClick={() => navigate(basePath)}>
+                    <button className="submit-btn-secondary" onClick={() => navigate(basePath)}>
                         返回開始測驗
                     </button>
-                    <button className="btn-primary" onClick={() => navigate('/quiz/situation', { state: { tribe } })}>
+                    <button className="submit-btn-primary" onClick={() => navigate('/quiz/situation', { state: { tribe } })}>
                         查看答題情形
                     </button>
                 </div>

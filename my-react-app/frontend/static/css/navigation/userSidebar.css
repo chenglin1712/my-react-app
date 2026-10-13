@@ -52,6 +52,7 @@
 }
 
 .profile-btn {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -61,6 +62,17 @@
     font-size: 14px;
     cursor: pointer;
     transition: background-color 0.2s;
+}
+
+/* 按鈕約 33px 高：用透明 ::after 把點擊區擴成 44px，不改變外觀（共用規則見 theme-v2.css） */
+.profile-btn::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, var(--yy-control-md));
+    height: max(100%, var(--yy-control-md));
+    transform: translate(-50%, -50%);
 }
 
 .edit-btn {

@@ -349,7 +349,7 @@
   background: #f9f9f9;
   border: 1px solid #eee;
 }
-.pron-result-word    { font-weight: 700; color: var(--yy-red); min-width: 80px; }
+.pron-result-word    { font-weight: 700; color: var(--yy-red); min-width: min(80px, 100%); overflow-wrap: anywhere; }
 .pron-result-meaning { color: #666; flex: 1; }
 .pron-result-tag {
   padding: 0.2rem 0.6rem;

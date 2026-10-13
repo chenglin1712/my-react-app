@@ -1,0 +1,145 @@
+// B-5 全站無障礙基線的靜態檢查：
+// 1. 每個拿掉 outline 的規則都要有登記在案的替代焦點樣式（審查項 P2-97）
+// 2. 小圖示按鈕有 44px 點擊區（審查項 P2-96）
+// 3. B-1／B-2 留下的全站按鈕污染與窄螢幕寬度
+// 後台（_admin 資料夾、檔名以 admin 開頭）用另一套樣式，留到階段 G。
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+
+const ROOT = dirname(fileURLToPath(import.meta.url));
+
+const walk = (dir) =>
+  readdirSync(dir).flatMap((name) => {
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) return walk(full);
+    return full.endsWith(".css") ? [full] : [];
+  });
+
+const strip = (css) => css.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ""));
+const rel = (file) => relative(ROOT, file).split(/[\\/]/).join("/");
+const isAdmin = (file) => /(^|\/)_admin\//i.test(file) || /(^|\/)admin[^/]*$/i.test(file);
+const files = walk(ROOT).map((f) => ({ file: rel(f), css: strip(readFileSync(f, "utf8")) }));
+const front = files.filter(({ file }) => !isAdmin(file));
+const theme = files.find(({ file }) => file === "default/theme-v2.css").css;
+
+const rules = (css) => {
+  const out = [];
+  const stack = [];
+  let buf = "";
+  for (const ch of css) {
+    if (ch === "{") {
+      stack.push(buf.trim());
+      buf = "";
+    } else if (ch === "}") {
+      const prelude = stack.pop();
+      if (prelude !== undefined && !prelude.startsWith("@")) out.push({ selector: prelude.replace(/\s+/g, " "), body: buf });
+      buf = "";
+    } else buf += ch;
+  }
+  return out;
+};
+
+// [檔案, 選擇器, 負責畫焦點外框的選擇器片段, 該規則所在的檔案（省略時是 default/theme-v2.css）]
+const OUTLINE_NONE_ALLOWLIST = [
+  ["_auth/editProfile.css", "input:focus, select:focus", ".edit-container input"],
+  ["_auth/forgotPassword.css", ".forgot-container input:focus", ".forgot-container input"],
+  ["_auth/loginForm.css", ".loginForm .input-field", ".input-wrapper:focus-within"],
+  ["_auth/registerForm.css", ".input-field", ".input-wrapper:focus-within"],
+  ["_calendar/calendar_date.css", ".event-input-bar input:focus", ".event-input-bar input"],
+  ["_game/game_crossword_board.css", ".area-inputgrid", ".area-inputgrid:focus-visible", "_game/game_crossword_board.css"],
+  ["_note/notesharestyle.css", ".ns-search-input", ".ns-search:focus-within", "_note/notesharestyle.css"],
+  ["_note/notestyle.css", ".note-title", ".note-title"],
+  ["_note/notestyle.css", ".note-text .ProseMirror", ".note-text:focus-within", "_note/notestyle.css"],
+  ["_quiz/bot.css", ".message-input", ".message-input"],
+  ["_quiz/review_AI.css", ".assistant-input input", ".assistant-input input"],
+  ["_quiz/review_discussion.css", ".input-box input", ".input-box input"],
+  ["_quiz/situation_filter.css", ".filter-date-input:focus", ".filter-date-input"],
+  ["_quiz/situation_filter.css", ".filter-select:focus", ".filter-select"],
+  ["_translate/index.css", ".translate-textarea", ".translate-textarea"],
+  ["default/theme-v2.css", ".yy-terminal__input", ".yy-terminal:focus-within"],
+];
+
+describe("outline: none 一律要有替代的焦點樣式", () => {
+  const found = [];
+  front.forEach(({ file, css }) =>
+    rules(css).forEach(({ selector, body }) => {
+      if (/outline\s*:\s*(none|0)\b/.test(body)) found.push([file, selector]);
+    }),
+  );
+
+  it("前台所有拿掉 outline 的規則都已登記（新增的要先決定怎麼畫焦點，再加進清單）", () => {
+    const key = ([f, s]) => `${f} | ${s}`;
+    expect(found.map(key).sort()).toEqual(OUTLINE_NONE_ALLOWLIST.map((e) => key(e.slice(0, 2))).sort());
+  });
+
+  it.each(OUTLINE_NONE_ALLOWLIST)("%s 的「%s」由 %s 畫焦點外框", (_file, _selector, cover, coverFile = "default/theme-v2.css") => {
+    const css = files.find((f) => f.file === coverFile).css;
+    const rule = rules(css).find((r) => r.selector.includes(cover) && /--yy-focus-ring/.test(r.body));
+    expect(rule, `${coverFile} ${cover}`).toBeTruthy();
+  });
+});
+
+describe("小圖示按鈕的 44px 點擊區", () => {
+  it("--yy-control-md 是 44px，關閉鈕、收藏愛心用 ::after 往外擴到這個尺寸", () => {
+    expect(theme).toMatch(/--yy-control-md:\s*44px/);
+    const rule = rules(theme).find(
+      (r) => r.selector.includes(".close-btn::after") && r.selector.includes(".favorite-btn::after"),
+    );
+    expect(rule).toBeTruthy();
+    expect(rule.body).toMatch(/width:\s*max\(100%,\s*var\(--yy-control-md\)\)/);
+    expect(rule.body).toMatch(/height:\s*max\(100%,\s*var\(--yy-control-md\)\)/);
+  });
+
+  it.each([
+    ["navigation/userSidebar.css", ".profile-btn"],
+    ["_auth/passwordField.css", ".password-toggle"],
+  ])("%s 的 %s 同樣用 ::after 擴成 44px，並且自己是 relative", (file, selector) => {
+    const all = rules(files.find((f) => f.file === file).css);
+    expect(all.find((r) => r.selector === selector).body).toMatch(/position:\s*relative/);
+    expect(all.find((r) => r.selector === `${selector}::after`).body).toMatch(/width:\s*max\(100%,\s*var\(--yy-control-md\)\)/);
+  });
+
+  it.each([
+    ["_translate/index.css", ".translate-swap-btn", "::after"],
+    ["_home/news.css", ".swiper-button-next", "::before"],
+  ])("%s 的 %s 用 %s 把點擊區擴成 44px", (file, selector, pseudo) => {
+    const all = rules(files.find((f) => f.file === file).css);
+    const rule = all.find((r) => r.selector.split(",").map((x) => x.trim()).includes(`${selector}${pseudo}`));
+    expect(rule, `${selector}${pseudo}`).toBeTruthy();
+    expect(rule.body).toMatch(/width:\s*max\(100%,\s*var\(--yy-control-md\)\)/);
+  });
+
+  it("翻譯頁交換鈕自己是 relative；首頁輪播按鈕邊距夠大，擴大的點擊區不會被容器裁掉", () => {
+    const swap = rules(files.find((f) => f.file === "_translate/index.css").css).find((r) => r.selector === ".translate-swap-btn");
+    expect(swap.body).toMatch(/position:\s*relative/);
+    const news = rules(files.find((f) => f.file === "_home/news.css").css).find((r) => r.selector.includes(".swiper-button-prev") && /sides-offset/.test(r.body));
+    expect(Number(news.body.match(/sides-offset:\s*(\d+)px/)[1])).toBeGreaterThanOrEqual(6);
+  });
+
+  it("觸控裝置的導覽選單項目至少 44px 高", () => {
+    expect(theme).toMatch(/@media \(pointer: coarse\)\s*\{\s*\.menu-item\s*\{\s*min-height:\s*var\(--yy-control-md\)/);
+  });
+
+  it("會被 ::after 定位的按鈕本身是 relative（收藏愛心原本就是 absolute）", () => {
+    const rule = rules(theme).find((r) => r.selector === ".close-btn");
+    expect(rule.body).toMatch(/position:\s*relative/);
+  });
+});
+
+describe("B-1／B-2 留下的項目", () => {
+  it("quiz_panel_submit.css 不再定義全站通用的 .btn-primary／.btn-secondary", () => {
+    const css = files.find(({ file }) => file === "_quiz/quiz_panel_submit.css").css;
+    expect(css).not.toMatch(/(^|[\s,}])\.btn-(primary|secondary)\b/m);
+    expect(css).toMatch(/\.submit-btn-primary\s*\{/);
+    expect(css).toMatch(/\.submit-btn-secondary\s*\{/);
+  });
+
+  it("發音結果頁的詞不會在極窄螢幕把版面擠爆", () => {
+    const css = files.find(({ file }) => file === "_game/pronunciation.css").css;
+    const rule = rules(css).find((r) => r.selector === ".pron-result-word");
+    expect(rule.body).toMatch(/min-width:\s*min\(80px,\s*100%\)/);
+    expect(rule.body).toMatch(/overflow-wrap:\s*anywhere/);
+  });
+});

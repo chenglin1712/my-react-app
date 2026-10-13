@@ -50,6 +50,7 @@
 }
 
 .translate-swap-btn {
+    position: relative;
     width: 40px;
     height: 40px;
     border-radius: 50%;
@@ -62,6 +63,16 @@
     cursor: pointer;
     box-shadow: var(--yy-shadow-sm);
     transition: transform .15s ease;
+}
+/* 按鈕 40px：用透明 ::after 把點擊區擴成 44px，不改變外觀（共用寫法見 theme-v2.css） */
+.translate-swap-btn::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, var(--yy-control-md));
+    height: max(100%, var(--yy-control-md));
+    transform: translate(-50%, -50%);
 }
 @media (hover: hover) and (pointer: fine) {
   .translate-swap-btn:hover {

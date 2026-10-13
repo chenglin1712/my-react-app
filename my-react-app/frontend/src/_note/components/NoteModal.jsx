@@ -64,10 +64,8 @@ export default function NoteModal({ note, canLike, iLike, canDelete, onToggleLik
   }, [onClose, reportSubmitting]);
 
   const modalRef = useRef(null);
-  useEffect(() => {
-    modalRef.current?.focus();
-  }, []);
-  // Tab 只在彈窗內循環，關閉後焦點回到原本點開它的卡片
+  // 開啟時把焦點移進彈窗、Tab 只在彈窗內循環，關閉後焦點回到原本點開它的卡片。
+  // 初始焦點必須由 hook 負責：先自己 focus() 再呼叫 hook，hook 記到的「開啟前焦點」就是彈窗本身（P2-69）
   useFocusTrap(modalRef);
 
   return (

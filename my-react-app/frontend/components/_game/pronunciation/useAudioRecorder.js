@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { announce } from "@utils/announce";
 
 /**
  * 麥克風錄音的狀態機（idle → recording → recorded → submitted），從
@@ -82,9 +83,11 @@ export function useAudioRecorder(onError) {
         setAudioBlob(blob);
         setAudioUrl(url);
         setRecState("recorded");
+        announce("錄音完成，可以播放或重錄");
       };
       mediaRecorderRef.current.start();
       setRecState("recording");
+      announce("開始錄音");
     } catch {
       onError?.("無法存取麥克風，請確認瀏覽器權限。");
     } finally {

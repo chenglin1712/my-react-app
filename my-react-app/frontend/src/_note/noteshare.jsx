@@ -5,6 +5,7 @@ import { fetchSharedNoteById, softDeleteNote, toggleNoteLike } from "../userServ
 import { submitReport } from "../userServives/reportService";
 import { useSharedNotesPager } from "./hooks/useSharedNotesPager";
 import { useToast } from "./hooks/useToast";
+import { announce } from "@utils/announce";
 import NoteCard from "./components/NoteCard";
 import NoteModal from "./components/NoteModal";
 import "../../static/css/_note/./notesharestyle.css";
@@ -114,6 +115,9 @@ export default function NoteShare() {
       // 覆寫——不同分頁/裝置/使用者同時按讚才不會互相蓋掉對方剛寫入的結果。
       const { likes, likedBy } = await toggleNoteLike(note.id, userData.uid);
       applyLikeState(likes, likedBy);
+      // 愛心的狀態變化螢幕報讀器看不到，用公告補上（審查項 P2-99）
+      // 依伺服器回傳的結果公告：transaction 是以伺服器最新狀態切換，點擊前的快照可能已過期
+      announce(likedBy?.includes(userData.uid) ? "已按讚" : "已收回讚");
     } catch (e) {
       console.error("toggleLike error:", e);
       applyLikeState(note.likes || 0, note.likedBy || []); // 回滾成點擊前的狀態

@@ -229,7 +229,7 @@
     margin-top: 24px;
 }
 
-.btn-primary {
+.submit-btn-primary {
     background: var(--yy-red);
     color: var(--yy-cream);
     border: 3px solid var(--yy-ink);
@@ -243,19 +243,19 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .btn-primary:hover {
+  .submit-btn-primary:hover {
       background: var(--yy-red-dark);
       transform: translate(2px, 2px);
       box-shadow: 1px 1px 0 var(--yy-ink);
   }
 }
 
-.btn-primary:active {
+.submit-btn-primary:active {
   transform: translate(4px, 4px);
   box-shadow: none;
 }
 
-.btn-secondary {
+.submit-btn-secondary {
     background: #fff;
     color: var(--yy-red);
     border: 3px solid var(--yy-ink);
@@ -269,14 +269,14 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .btn-secondary:hover {
+  .submit-btn-secondary:hover {
       background: var(--yy-cream);
       transform: translate(2px, 2px);
       box-shadow: 1px 1px 0 var(--yy-ink);
   }
 }
 
-.btn-secondary:active {
+.submit-btn-secondary:active {
   transform: translate(4px, 4px);
   box-shadow: none;
 }

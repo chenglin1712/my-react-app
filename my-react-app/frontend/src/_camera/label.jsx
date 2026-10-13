@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { apiPost } from "../../utils/apiClient";
+import { announce } from "@utils/announce";
 
 // vision.py 自己的註解就寫明「圖片辨識同一批 label 常常出現重複的英文單字
 // （例如同一物件被偵測到多次）」，回傳前沒有去重。同一段中文翻譯出現兩筆時
@@ -31,6 +32,7 @@ const CameraLabelStep = ({ image, file, onConfirm, onBack }) => {
         }
 
         setLoading(true);
+        announce("辨識中，請稍候");
         const formData = new FormData();
         formData.append("file", file);
 
@@ -44,12 +46,15 @@ const CameraLabelStep = ({ image, file, onConfirm, onBack }) => {
         // HTTPException／下面的 .catch，不需要另外檢查 response.data.error。
         analyze()
             .then((data) => {
-                setLabels(mergeDuplicateLabels(data.labels || []));
+                const merged = mergeDuplicateLabels(data.labels || []);
+                setLabels(merged);
+                announce(merged.length > 0 ? `辨識完成，找到 ${merged.length} 個候選單詞` : "辨識完成，沒有找到單詞");
             })
             .catch((err) => {
                 if (axios.isCancel(err)) return;
                 console.error("影像辨識 API 錯誤:", err.data ?? err.message);
                 setError(true);
+                announce("辨識失敗", { assertive: true });
             })
             .finally(() => {
                 if (!controller.signal.aborted) setLoading(false);
