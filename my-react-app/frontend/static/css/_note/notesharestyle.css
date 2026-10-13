@@ -66,7 +66,9 @@
   border-radius:1rem; box-shadow:var(--shadow);
   cursor:pointer; overflow:hidden; transition:box-shadow .2s, transform .2s;
 }
-.ns-card:hover{box-shadow:0 8px 16px rgba(0,0,0,.08); transform:translateY(-1px);}
+@media (hover: hover) and (pointer: fine) {
+  .ns-card:hover {box-shadow:0 8px 16px rgba(0,0,0,.08); transform:translateY(-1px);}
+}
 
 /* 卡片的「開啟詳情」按鈕：視覺上要跟原本可點擊的整張 div 一樣，不像 button */
 .ns-card-open{

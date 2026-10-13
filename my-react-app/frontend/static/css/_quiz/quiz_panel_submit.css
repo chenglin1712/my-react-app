@@ -242,10 +242,17 @@
     transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
 }
 
-.btn-primary:hover {
-    background: var(--yy-red-dark);
-    transform: translate(2px, 2px);
-    box-shadow: 1px 1px 0 var(--yy-ink);
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover {
+      background: var(--yy-red-dark);
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0 var(--yy-ink);
+  }
+}
+
+.btn-primary:active {
+  transform: translate(4px, 4px);
+  box-shadow: none;
 }
 
 .btn-secondary {
@@ -261,10 +268,17 @@
     transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
 }
 
-.btn-secondary:hover {
-    background: var(--yy-cream);
-    transform: translate(2px, 2px);
-    box-shadow: 1px 1px 0 var(--yy-ink);
+@media (hover: hover) and (pointer: fine) {
+  .btn-secondary:hover {
+      background: var(--yy-cream);
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0 var(--yy-ink);
+  }
+}
+
+.btn-secondary:active {
+  transform: translate(4px, 4px);
+  box-shadow: none;
 }
 
 /* 作答結果沒能存進資料庫時的提示（內容來自暫存，離開此頁就沒了） */

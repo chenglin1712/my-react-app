@@ -39,9 +39,15 @@
   cursor: pointer;
   transition: background 0.18s, transform 0.15s;
 }
-.sent-btn-primary:hover:not(:disabled) {
-  background: #7a1326;
-  transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) {
+  .sent-btn-primary:hover:not(:disabled) {
+    background: #7a1326;
+    transform: translateY(-2px);
+  }
+}
+
+.sent-btn-primary:active:not(:disabled) {
+  transform: scale(0.97);
 }
 .sent-btn-primary:disabled {
   opacity: 0.6;
@@ -63,9 +69,15 @@
   text-decoration: none;
   display: inline-block;
 }
-.sent-btn-secondary:hover {
-  background: #fdf5f5;
-  transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) {
+  .sent-btn-secondary:hover {
+    background: #fdf5f5;
+    transform: translateY(-2px);
+  }
+}
+
+.sent-btn-secondary:active {
+  transform: scale(0.97);
 }
 
 /* ── 進度條 ───────────────────────────────────── */
@@ -126,9 +138,15 @@
   cursor: pointer;
   transition: background 0.18s, transform 0.15s;
 }
-.sent-play-btn:hover {
-  background: #7a1326;
-  transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .sent-play-btn:hover {
+    background: #7a1326;
+    transform: translateY(-1px);
+  }
+}
+
+.sent-play-btn:active {
+  transform: scale(0.97);
 }
 .sent-play-btn.playing {
   background: #c0392b;
@@ -171,10 +189,16 @@
   -webkit-user-select: none;
   user-select: none;
 }
-.sent-option:hover:not(:disabled) {
-  border-color: #9B1B30;
-  background: #fdf5f5;
-  transform: translateX(4px);
+@media (hover: hover) and (pointer: fine) {
+  .sent-option:hover:not(:disabled) {
+    border-color: #9B1B30;
+    background: #fdf5f5;
+    transform: translateX(4px);
+  }
+}
+
+.sent-option:active:not(:disabled) {
+  transform: scale(0.97);
 }
 .sent-option.correct {
   border-color: #27ae60;
@@ -220,6 +244,7 @@
   padding: 1rem 2.5rem;
   border-radius: 14px;
   margin-bottom: 1.8rem;
+  font-variant-numeric: tabular-nums;
 }
 .sent-result-score.excellent { background: #eafaf1; border: 1.5px solid #a9dfbf; }
 .sent-result-score.good      { background: #eaf4fb; border: 1.5px solid #a9cce3; }

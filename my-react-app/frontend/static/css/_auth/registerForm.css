@@ -121,10 +121,17 @@
     transition: transform 0.15s ease, background 0.15s ease;
 }
 
-.register-button:hover {
-    transform: translate(2px, 2px);
-    box-shadow: 2px 2px 0 var(--yy-ink);
-    background: var(--yy-red-dark);
+@media (hover: hover) and (pointer: fine) {
+  .register-button:hover {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0 var(--yy-ink);
+      background: var(--yy-red-dark);
+  }
+}
+
+.register-button:active {
+  transform: translate(4px, 4px);
+  box-shadow: none;
 }
 
 .register-button:disabled {

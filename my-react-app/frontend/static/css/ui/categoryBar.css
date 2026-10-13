@@ -38,7 +38,7 @@
   padding: 6px;
   background-color: #ffffff;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: var(--transition-interactive);
   border: 2px solid var(--yy-ink);
   font: inherit;
   color: inherit;

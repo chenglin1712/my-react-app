@@ -37,7 +37,7 @@
   border: 2px solid var(--yy-ink);
   border-radius: var(--yy-radius-btn);
   background-color: #fff;
-  transition: all 0.2s ease;
+  transition: var(--transition-interactive);
 }
 
 .filter-date-input:focus {

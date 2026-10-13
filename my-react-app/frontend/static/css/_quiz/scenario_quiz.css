@@ -133,10 +133,16 @@
         transform .15s ease;
 }
 
-.scenario-quiz-option:hover:not(:disabled) {
-    border-color: var(--yy-gold);
-    background: var(--yy-warning-bg);
-    transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .scenario-quiz-option:hover:not(:disabled) {
+      border-color: var(--yy-gold);
+      background: var(--yy-warning-bg);
+      transform: translateY(-1px);
+  }
+}
+
+.scenario-quiz-option:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .scenario-quiz-option:focus-visible {

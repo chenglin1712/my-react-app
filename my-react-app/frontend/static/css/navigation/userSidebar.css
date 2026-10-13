@@ -110,7 +110,7 @@
     border-radius: 12px;
     border-right: 4px solid transparent;
     cursor: pointer;
-    transition: all 0.2s ease-in-out;
+    transition: var(--transition-interactive);
 }
 
 .nav-button:hover {
@@ -230,9 +230,15 @@
     transition: transform 0.2s ease, color 0.2s ease;
 }
 
-.audio-player:hover {
-    color: #7d1526;
-    transform: scale(1.1);
+@media (hover: hover) and (pointer: fine) {
+  .audio-player:hover {
+      color: #7d1526;
+      transform: scale(1.1);
+  }
+}
+
+.audio-player:active {
+  transform: scale(0.97);
 }
 
 .material-link {

@@ -51,6 +51,7 @@
     border: 2px solid var(--yy-ink, #221812);
     border-radius: 0.75rem;
     padding: 1rem;
+    font-variant-numeric: tabular-nums;
 }
 
 .days-left {
@@ -97,7 +98,7 @@
     padding: 0.5rem;
     border-radius: 0.5rem;
     font-size: 0.75rem;
-    transition: all 0.2s;
+    transition: var(--transition-interactive);
     background: var(--yy-cream, #F3E7CF);
     color: var(--yy-text-secondary, #3E3226);
     border: 1.5px solid transparent;

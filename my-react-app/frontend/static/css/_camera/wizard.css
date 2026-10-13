@@ -209,6 +209,7 @@
 .camera-label-score {
     font-family: var(--yy-font-pixel);
     font-size: 12px;
+    font-variant-numeric: tabular-nums;
 }
 
 .camera-step2-actions {

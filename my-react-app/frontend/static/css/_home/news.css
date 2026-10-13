@@ -64,10 +64,16 @@
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
-.news-card:hover {
-    box-shadow: 0 6px 20px rgba(155, 27, 48, 0.12);
-    transform: translateY(-3px);
-    border-color: #9B1B30;
+@media (hover: hover) and (pointer: fine) {
+  .news-card:hover {
+      box-shadow: 0 6px 20px rgba(155, 27, 48, 0.12);
+      transform: translateY(-3px);
+      border-color: #9B1B30;
+  }
+}
+
+.news-card:active {
+  transform: scale(0.98);
 }
 
 .news-card-top {

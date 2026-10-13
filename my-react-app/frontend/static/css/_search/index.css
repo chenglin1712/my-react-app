@@ -95,13 +95,19 @@
   font-weight: 700;
   font-family: var(--yy-font-body);
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: var(--transition-interactive);
   white-space: nowrap;
   box-shadow: var(--yy-shadow-sm);
 }
 
-.tribe-btn:hover {
-  transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) {
+  .tribe-btn:hover {
+    transform: translateY(-2px);
+  }
+}
+
+.tribe-btn:active {
+  transform: scale(0.97);
 }
 
 .tribe-btn.active {
@@ -109,6 +115,10 @@
   color: #fff;
   transform: scale(1.06);
   box-shadow: 4px 4px 0 rgba(34, 24, 18, 0.45);
+}
+
+.tribe-btn.active:active {
+  transform: scale(1.02);
 }
 
 /* 各族語顏色 */

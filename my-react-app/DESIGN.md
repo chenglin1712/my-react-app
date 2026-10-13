@@ -208,9 +208,10 @@ components:
 - **逐字進場（CharReveal）、捲動進場（RevealOnView）：** 見動態。
 
 ### 動態（現況與準則）
-- **現況：** 捲動進場（RevealOnView）0.7～0.9 秒、`yy-fade-up` 0.6 秒、曲線 `cubic-bezier(.2,.7,.3,1)`；逐字進場 0.6 秒帶回彈曲線；主要按鈕脈動 2.8 秒；流光文字 4 秒；漂浮光斑 10 秒；跑馬燈 6 秒。共用 CSS 有全域 `prefers-reduced-motion` 規則：動畫與過渡縮到近乎 0，無限循環動畫只播一次；JS 驅動的動態在各元件用 hook 判斷，尚未逐一驗證。
+- **Motion token（theme-v2.css，B-3 新增）：** `--ease-out` cubic-bezier(0.23, 1, 0.32, 1)、`--ease-in-out` cubic-bezier(0.77, 0, 0.175, 1)；時長 `--dur-fast` 150ms、`--dur-base` 220ms、`--dur-flip` 400ms、`--dur-reveal` 550ms；`--transition-interactive` 取代 `transition: all`（只過渡顏色、陰影、位移、透明度）。新增動畫一律引用這些 token。
+- **現況：** 捲動進場與 `yy-fade-up` 用 `--dur-reveal` 與 `--ease-out`；翻牌用 `--dur-flip`；逐字進場 0.6 秒帶回彈曲線（尚未改）；主要按鈕脈動 2.8 秒（hover／按下時暫停，避免蓋掉陰影）；流光文字 4 秒；漂浮光斑 10 秒；跑馬燈 6 秒。專案內其餘內建 `ease` 與零散秒數尚未全部換成 token。共用 CSS 有全域 `prefers-reduced-motion` 規則：動畫與過渡縮到近乎 0，無限循環動畫只播一次，但游標與流光字固定可見、捲動進場與彈窗保留 150ms 淡入；JS 驅動的動態在各元件用 hook 判斷，尚未逐一驗證。
 - **尚未決定：** 持續循環的裝飾動畫（流光字、脈動按鈕、漂浮光斑、跑馬燈）是否減量，要在改版計畫 B-9 評估後與使用者決定；此處不先下結論。
-- **準則（依 Emil Kowalski 的設計工程原則，適用於之後新增的動態）：** 使用頻繁的動作（鍵盤、列表切換）不加動畫；一般 UI 回饋控制在 300ms 以內；進場用 ease-out；避免 `transition: all`；按壓回饋用小幅縮放（0.97）；hover 動畫放在 `@media (hover: hover) and (pointer: fine)` 內。現有 `.yy-pill` 使用 `transition: all`，列入 B-3 motion token 處理。
+- **準則（依 Emil Kowalski 的設計工程原則，適用於之後新增的動態）：** 使用頻繁的動作（鍵盤、列表切換）不加動畫；一般 UI 回饋控制在 300ms 以內；進場用 ease-out；避免 `transition: all`；按壓回饋用小幅縮放（0.97）；位移型 hover 動畫放在 `@media (hover: hover) and (pointer: fine)` 內，並搭配 `:active` 按壓回饋（有 `motionTokens.test.js` 檢查）。
 
 ## Do's and Don'ts
 

@@ -66,10 +66,17 @@
     cursor: pointer;
     transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
 }
-.quiz-panel-error button:hover {
-    transform: translate(2px, 2px);
-    background: var(--yy-red-dark);
-    box-shadow: 1px 1px 0 var(--yy-ink);
+@media (hover: hover) and (pointer: fine) {
+  .quiz-panel-error button:hover {
+      transform: translate(2px, 2px);
+      background: var(--yy-red-dark);
+      box-shadow: 1px 1px 0 var(--yy-ink);
+  }
+}
+
+.quiz-panel-error button:active {
+  transform: translate(4px, 4px);
+  box-shadow: none;
 }
 
 @media (max-width: 955px) {

@@ -50,9 +50,11 @@
     transition: transform .15s ease, box-shadow .15s ease;
 }
 
-.level-card:not(.disabled):hover {
-    transform: translate(-2px, -2px);
-    box-shadow: var(--yy-shadow-md);
+@media (hover: hover) and (pointer: fine) {
+  .level-card:not(.disabled):hover {
+      transform: translate(-2px, -2px);
+      box-shadow: var(--yy-shadow-md);
+  }
 }
 
 .level-recommend-img {
@@ -146,11 +148,18 @@
     transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
 }
 
-.level-card-btn:hover {
-    color: var(--yy-cream);
-    background: var(--yy-red-dark);
-    transform: translate(2px, 2px);
-    box-shadow: 1px 1px 0 var(--yy-ink);
+@media (hover: hover) and (pointer: fine) {
+  .level-card-btn:hover {
+      color: var(--yy-cream);
+      background: var(--yy-red-dark);
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0 var(--yy-ink);
+  }
+}
+
+.level-card-btn:active {
+  transform: translate(4px, 4px);
+  box-shadow: none;
 }
 
 .level-card.disabled {
@@ -220,11 +229,18 @@
     transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
 }
 
-.scenario-entry-btn:hover {
-    color: var(--yy-cream);
-    background: var(--yy-red-dark);
-    transform: translate(2px, 2px);
-    box-shadow: 1px 1px 0 var(--yy-ink);
+@media (hover: hover) and (pointer: fine) {
+  .scenario-entry-btn:hover {
+      color: var(--yy-cream);
+      background: var(--yy-red-dark);
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0 var(--yy-ink);
+  }
+}
+
+.scenario-entry-btn:active {
+  transform: translate(4px, 4px);
+  box-shadow: none;
 }
 
 @media (max-width: 768px) {

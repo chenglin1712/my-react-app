@@ -1,4 +1,4 @@
-@keyframes slide-up {
+@keyframes bot-slide-up {
     0% {
         transform: translateY(100%);
         opacity: 0;
@@ -30,7 +30,7 @@
     display: flex;
     flex-direction: column;
     background-color: var(--yy-cream);
-    animation: slide-up 0.35s ease-out;
+    animation: bot-slide-up 0.35s ease-out;
 }
 
 .chat-header {
@@ -114,7 +114,7 @@
     display: flex;
     align-items: flex-start;
     margin-bottom: 8px;
-    animation: fadeIn 0.3s ease;
+    animation: bot-fade-in 0.3s ease;
 }
 
 .bot-message.user {
@@ -200,7 +200,7 @@
     border-radius: 16px;
     font-size: 13px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--transition-interactive);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -224,7 +224,7 @@
     background-color: var(--yy-red);
     border-radius: 50%;
     margin: 0 2px;
-    animation: bounce 1.2s infinite;
+    animation: bot-bounce 1.2s infinite;
     opacity: 0.6;
 }
 
@@ -285,7 +285,7 @@
     font-size: 15px;
     font-weight: 500;
     cursor: not-allowed;
-    transition: all 0.2s ease;
+    transition: var(--transition-interactive);
 }
 
 .send-button.active {
@@ -301,7 +301,7 @@
     background: var(--yy-red-dark);
 }
 
-@keyframes bounce {
+@keyframes bot-bounce {
     0%,
     60%,
     100% {
@@ -313,7 +313,7 @@
     }
 }
 
-@keyframes fadeIn {
+@keyframes bot-fade-in {
     from {
         opacity: 0;
         transform: translateY(10px);

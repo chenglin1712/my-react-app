@@ -63,8 +63,10 @@
     box-shadow: var(--yy-shadow-sm);
     transition: transform .15s ease;
 }
-.translate-swap-btn:hover {
-    transform: rotate(180deg);
+@media (hover: hover) and (pointer: fine) {
+  .translate-swap-btn:hover {
+      transform: rotate(180deg);
+  }
 }
 
 .translate-alert {

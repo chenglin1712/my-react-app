@@ -73,10 +73,16 @@
   color: inherit;
 }
 
-.vocab-tribe-card:hover {
-  background: #fdf5f5;
-  transform: translateY(-3px);
-  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+@media (hover: hover) and (pointer: fine) {
+  .vocab-tribe-card:hover {
+    background: #fdf5f5;
+    transform: translateY(-3px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  }
+}
+
+.vocab-tribe-card:active {
+  transform: scale(0.98);
 }
 
 .vocab-tribe-badge {

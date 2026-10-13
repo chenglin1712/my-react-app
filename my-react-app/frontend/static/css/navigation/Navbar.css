@@ -352,7 +352,7 @@
     box-shadow: var(--yy-shadow-md);
     flex-direction: column;
     overflow: hidden;
-    transition: all 0.3s ease;
+    transition: var(--transition-interactive);
 }
 
 .dropdown-item {

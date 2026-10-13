@@ -217,6 +217,7 @@
   color: #9b1b30;
   font-size: 0.95rem;
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .pron-community-meta time {

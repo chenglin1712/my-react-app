@@ -295,7 +295,7 @@
     background-color: var(--yy-success);
     border-radius: 50%;
     margin: 0 2px;
-    animation: bounce 1.2s infinite;
+    animation: review-ai-bounce 1.2s infinite;
     opacity: 0.6;
 }
 
@@ -305,4 +305,17 @@
 
 .review-typing-indicator span:nth-child(3) {
     animation-delay: 0.4s;
+}
+
+/* 原本借用 bot.css 的 bounce（同名 keyframes 在不同檔案互相覆蓋，審查項 P2-87），改成自己的 */
+@keyframes review-ai-bounce {
+    0%,
+    60%,
+    100% {
+        transform: translateY(0);
+    }
+
+    30% {
+        transform: translateY(-4px);
+    }
 }

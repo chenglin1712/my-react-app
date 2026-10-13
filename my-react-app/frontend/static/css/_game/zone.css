@@ -52,9 +52,15 @@
   border-color: #9B1B30;
 }
 
-.zone-card.available:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(155, 27, 48, 0.18);
+@media (hover: hover) and (pointer: fine) {
+  .zone-card.available:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(155, 27, 48, 0.18);
+  }
+}
+
+.zone-card.available:active {
+  transform: scale(0.98);
 }
 
 .zone-card.disabled {

@@ -80,10 +80,17 @@
     width: 100%;
 }
 
-.login-button:hover {
-    transform: translate(2px, 2px);
-    box-shadow: 2px 2px 0 var(--yy-ink);
-    background-color: var(--yy-red-dark);
+@media (hover: hover) and (pointer: fine) {
+  .login-button:hover {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0 var(--yy-ink);
+      background-color: var(--yy-red-dark);
+  }
+}
+
+.login-button:active {
+  transform: translate(4px, 4px);
+  box-shadow: none;
 }
 
 .login-box p {

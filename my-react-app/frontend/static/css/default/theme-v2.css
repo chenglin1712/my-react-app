@@ -42,6 +42,25 @@
   --yy-warning-text: #8A6816;
   --yy-info: var(--yy-blue-light);
   --yy-info-bg: #DFE9EC;
+
+  /* ---------- 動態 token（審查項 P1-24、P2-82）----------
+     曲線：ease-out 用在進場與回饋（一開始就動，感覺有回應），ease-in-out 用在畫面內的移動與翻牌。
+     不用 ease-in：開頭慢會讓介面顯得遲鈍。時長：UI 回饋 150～220ms，翻牌 400ms，捲動進場 550ms。
+     新增動畫請引用這些 token，不要再寫內建的 ease 與零散秒數。 */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --dur-fast: 150ms;
+  --dur-base: 220ms;
+  --dur-flip: 400ms;
+  --dur-reveal: 550ms;
+  /* 取代 transition: all：只過渡顏色、陰影、位移與透明度，不會連版面屬性一起動畫 */
+  --transition-interactive:
+    background-color var(--dur-base) var(--ease-out),
+    border-color var(--dur-base) var(--ease-out),
+    color var(--dur-base) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out),
+    opacity var(--dur-base) var(--ease-out);
 }
 
 @keyframes yy-holo {
@@ -83,9 +102,9 @@
 .yy-reveal {
   clip-path: inset(-20px -20px -20px -20px);
   transition:
-    opacity .7s cubic-bezier(.2, .7, .3, 1),
-    transform .9s cubic-bezier(.2, .7, .3, 1),
-    clip-path .9s cubic-bezier(.2, .7, .3, 1);
+    opacity var(--dur-reveal) var(--ease-out),
+    transform var(--dur-reveal) var(--ease-out),
+    clip-path var(--dur-reveal) var(--ease-out);
 }
 .yy-reveal:not(.is-visible) {
   opacity: 0;
@@ -130,6 +149,34 @@
     transition-delay: 0s !important;
     scroll-behavior: auto !important;
   }
+
+  /* 上面把所有動畫壓到 0.01ms 會帶來兩個副作用（審查項 P2-90）：
+     1) 游標與流光字停在動畫的最後一幀，游標可能停在 opacity: 0 而永遠看不到；
+     2) 有意義的淡入（內容出現）也被一併拿掉。
+     這裡把游標與流光文字固定在可見狀態，捲動進場與彈窗保留 150ms 的淡入，但不位移。 */
+  .yy-terminal__cursor {
+    animation: none !important;
+    opacity: 1;
+  }
+  .yy-holo-text {
+    animation: none !important;
+    background-position: 0% 50%;
+  }
+  .yy-reveal,
+  .yy-reveal:not(.is-visible) {
+    transform: none !important;
+    clip-path: none !important;
+    transition-property: opacity !important;
+    transition-duration: var(--dur-fast) !important;
+  }
+  .yy-modal-box,
+  .yy-success-overlay {
+    animation: yy-fade-in-reduced var(--dur-fast) linear both !important;
+  }
+  @keyframes yy-fade-in-reduced {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
 }
 
 /* ---------- 版面基礎 ---------- */
@@ -161,8 +208,13 @@
   text-wrap: pretty;
 }
 
+/* 計時器與分數每秒更新，等寬數字才不會讓寬度抖動（審查項 P1-29） */
+.yy-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
 .yy-fade-up {
-  animation: yy-fade-up .6s cubic-bezier(.2, .7, .3, 1) both;
+  animation: yy-fade-up var(--dur-reveal) var(--ease-out) both;
 }
 
 /* 頁首下方織紋跑馬燈色條 */
@@ -251,9 +303,15 @@
 .yy-card--hover {
   transition: transform .2s ease, box-shadow .2s ease;
 }
-.yy-card--hover:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: 8px 8px 0 var(--yy-ink);
+@media (hover: hover) and (pointer: fine) {
+  .yy-card--hover:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 8px 8px 0 var(--yy-ink);
+  }
+}
+
+.yy-card--hover:active {
+  transform: scale(0.98);
 }
 
 .yy-btn-primary {
@@ -269,10 +327,20 @@
   animation: yy-pulse-glow 2.8s ease-in-out infinite;
   transition: transform .15s ease, background .15s ease;
 }
-.yy-btn-primary:hover {
-  transform: translate(2px, 2px);
-  box-shadow: 2px 2px 0 var(--yy-ink);
-  background: var(--yy-red-dark);
+@media (hover: hover) and (pointer: fine) {
+  .yy-btn-primary:hover {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 var(--yy-ink);
+    background: var(--yy-red-dark);
+    /* animation 的優先序高於一般宣告：脈動會一直蓋掉這裡縮小後的陰影（審查項 P1-28） */
+    animation: none;
+  }
+}
+
+.yy-btn-primary:active {
+  transform: translate(4px, 4px);
+  box-shadow: none;
+  animation: none;
 }
 .yy-btn-primary:disabled {
   background: #B79A8A;
@@ -312,7 +380,7 @@
   cursor: pointer;
   box-shadow: var(--yy-shadow-sm);
   transform: scale(1);
-  transition: all .2s ease;
+  transition: var(--transition-interactive);
 }
 .yy-pill.active {
   color: #fff;

@@ -282,7 +282,7 @@ audio {
     font-size: 18px;
     border-radius: var(--yy-radius-btn);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--transition-interactive);
     font-weight: bold;
 }
 
@@ -319,7 +319,7 @@ audio {
     background: #fff;
     font-size: 16px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--transition-interactive);
 }
 
 .match-btn:hover:not(:disabled) {

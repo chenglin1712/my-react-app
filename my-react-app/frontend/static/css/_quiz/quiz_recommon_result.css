@@ -7,7 +7,7 @@
   border-radius: var(--yy-radius-card);
   box-shadow: var(--yy-shadow-lg);
   text-align: center;
-  animation: fadeIn 0.5s ease;
+  animation: recommon-result-fade-in 0.5s ease;
 }
 
 .result-title {
@@ -111,9 +111,11 @@
   color: white;
 }
 
-.retry-btn:hover, .review-btn:hover {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 var(--yy-ink);
+@media (hover: hover) and (pointer: fine) {
+  .retry-btn:hover, .review-btn:hover {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 var(--yy-ink);
+  }
 }
 
 .review-btn:disabled {
@@ -130,7 +132,7 @@
 }
 
 /* 動畫 */
-@keyframes fadeIn {
+@keyframes recommon-result-fade-in {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
