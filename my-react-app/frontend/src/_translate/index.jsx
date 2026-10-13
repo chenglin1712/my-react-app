@@ -1,14 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { Alert, Spinner } from "react-bootstrap";
+import { Link } from "react-router-dom";
 import { ArrowLeftRight, Copy, Volume2 } from "lucide-react";
 import "../../static/css/_translate/index.css";
 import { TRIBES } from "../constants/tribes";
 import TribePill from "../../components/ui/TribePill";
 import GroundedText from "../../components/_translate/GroundedText";
+import GuestTrialNotice from "../../components/_translate/GuestTrialNotice";
 import EvidencePanel from "../../components/_translate/EvidencePanel";
 import useAudioPlayback from "../../hooks/useAudioPlayback";
 import { useTranslateCapabilities } from "../../hooks/useTranslateCapabilities";
+import { useGuestQuota } from "../../hooks/useGuestQuota";
+import { useAuth } from "../userServives/authContext";
+import PermissionProtect from "../userServives/permissionProtect";
 import { apiPost } from "../../utils/apiClient";
 
 const MAX_LEN = 300;
@@ -18,7 +23,14 @@ const DIRECTIONS = [
     { key: "tribe2zh", sourceLabel: "族語", targetLabel: "繁體中文" },
 ];
 
+const GUEST_LOGIN_NOTE = "發音與詞形分析需要登入，免費註冊後就能使用。";
+
 const TranslatePage = () => {
+    // 訪客（沒登入）可以試用：次數與是否開放由後端決定，這裡只負責顯示與引導註冊
+    const { userData, loading: authLoading } = useAuth();
+    const isGuest = !authLoading && !userData;
+    const guestQuota = useGuestQuota(isGuest);
+    const [guestNote, setGuestNote] = useState("");
     const [tribe, setTribe] = useState("tayal");
     const [direction, setDirection] = useState("zh2tribe");
     const [sourceText, setSourceText] = useState("");
@@ -26,7 +38,7 @@ const TranslatePage = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [activeTokenIndex, setActiveTokenIndex] = useState(null);
-    const capabilities = useTranslateCapabilities();
+    const capabilities = useTranslateCapabilities({ guest: true, enabled: !authLoading, refreshKey: userData?.uid ?? null });
 
     // abortRef 是「目前這一次請求」的 controller；requestGenerationRef 每次取消/
     // 重新發出請求都會遞增，讓被取消的那次請求即使晚一步才真的 reject/resolve，
@@ -49,12 +61,30 @@ const TranslatePage = () => {
         setLoading(false);
         setResult(null);
         setError("");
+        setGuestNote("");
         setActiveTokenIndex(null);
     }, [tribe]);
 
     useEffect(() => {
         return () => { abortRef.current?.abort(); };
     }, []);
+
+    // 登入、登出：進行中的請求是以舊身分送出的，結果不能再顯示；登出時連輸入與結果一起清掉，
+    // 共用裝置上下一位訪客不該看到前一位登入者翻譯的內容。
+    const uid = userData?.uid ?? null;
+    const prevUidRef = useRef(uid);
+    useEffect(() => {
+        const prevUid = prevUidRef.current;
+        prevUidRef.current = uid;
+        if (prevUid === uid) return;
+        cancelTranslation();
+        setLoading(false);
+        setResult(null);
+        setError("");
+        setGuestNote("");
+        setActiveTokenIndex(null);
+        if (prevUid && !uid) setSourceText("");
+    }, [uid]);
 
     const currentTribe = TRIBES.find((t) => t.slug === tribe);
     const currentCapability = capabilities?.find((c) => c.tribeSlug === tribe);
@@ -63,6 +93,7 @@ const TranslatePage = () => {
     const handleSubmit = async () => {
         const text = sourceText.trim();
         if (!text || loading) return;
+        if (isGuest && guestQuota.exhausted) return;
 
         cancelTranslation();
         const myGeneration = requestGenerationRef.current;
@@ -71,21 +102,25 @@ const TranslatePage = () => {
 
         setLoading(true);
         setError("");
+        setGuestNote("");
         setActiveTokenIndex(null);
         try {
             const data = await apiPost(
                 import.meta.env.VITE_API_TRANSLATE_URL,
                 { text, tribe, direction },
-                { signal: controller.signal },
+                { signal: controller.signal, guest: isGuest },
             );
             if (myGeneration !== requestGenerationRef.current) return;
+            if (isGuest) guestQuota.applyResponse(data?.guestQuota);
             setResult(data);
             // 翻譯的使用紀錄由後端在翻譯成功時自己寫（translation_request）；公開事件端點的白名單
             // 不收 translate_submit，從前端再送一筆只會固定回 400
         } catch (err) {
             if (axios.isCancel(err) || myGeneration !== requestGenerationRef.current) return;
-            setError(err.message || "翻譯失敗，請稍後再試");
             setResult(null);
+            // 額度用完或訪客試用被關閉：由額度提示處理，不再另外顯示紅色錯誤
+            if (isGuest && guestQuota.applyError(err)) return;
+            setError(err.message || "翻譯失敗，請稍後再試");
         } finally {
             if (myGeneration === requestGenerationRef.current) setLoading(false);
         }
@@ -126,12 +161,32 @@ const TranslatePage = () => {
         return () => { if (copyStatusTimerRef.current) clearTimeout(copyStatusTimerRef.current); };
     }, []);
 
+    // 發音與詞形分析要登入：訪客點了就說明原因，不要送出一定會失敗的請求
+    const handlePlayAudio = isGuest ? () => setGuestNote(GUEST_LOGIN_NOTE) : playAudio;
+
     const handlePlayResult = () => {
         if (!result) return;
+        if (isGuest) {
+            setGuestNote(GUEST_LOGIN_NOTE);
+            return;
+        }
         playSentence(result.translation);
     };
 
     const activeToken = activeTokenIndex != null ? result?.tokens?.[activeTokenIndex] : null;
+
+    if (authLoading) {
+        return (
+            <div className="yy-page translate-page">
+                <div className="translate-auth-loading" role="status">
+                    <Spinner animation="border" size="sm" />
+                    <span>確認登入狀態…</span>
+                </div>
+            </div>
+        );
+    }
+    // 後端沒有開放訪客試用（旗標關閉或尚未設定）：維持原本「請先登入」的畫面
+    if (isGuest && guestQuota.status === "closed") return <PermissionProtect />;
 
     return (
         <div className="yy-page translate-page">
@@ -161,6 +216,8 @@ const TranslatePage = () => {
             <div className="yy-divider" />
 
             <section className="translate-body">
+                {isGuest && <GuestTrialNotice quota={guestQuota} />}
+
                 <div className="translate-direction-bar yy-fade-up">
                     <span className="translate-direction-label">{currentDirection.sourceLabel}</span>
                     <button
@@ -193,7 +250,7 @@ const TranslatePage = () => {
                         <button
                             type="button"
                             className="yy-btn-primary translate-submit-btn"
-                            disabled={!sourceText.trim() || loading}
+                            disabled={!sourceText.trim() || loading || (isGuest && guestQuota.exhausted)}
                             onClick={handleSubmit}
                         >
                             {loading ? <Spinner animation="border" size="sm" /> : "翻譯"}
@@ -224,6 +281,11 @@ const TranslatePage = () => {
                                     activeIndex={activeTokenIndex}
                                     onTokenClick={(i) => setActiveTokenIndex((cur) => (cur === i ? null : i))}
                                 />
+                                {guestNote && (
+                                    <p className="translate-guest-note" role="status">
+                                        {guestNote} <Link to="/register">免費註冊</Link>
+                                    </p>
+                                )}
                                 <div className="translate-result-actions">
                                     <button type="button" className="yy-btn-outline" onClick={handlePlayResult}>
                                         <Volume2 size={15} /> 逐詞發音
@@ -237,7 +299,7 @@ const TranslatePage = () => {
                                 </p>
                                 {result.notes && <p className="translate-notes">{result.notes}</p>}
 
-                                <EvidencePanel token={activeToken} onPlayAudio={playAudio} tribeSlug={result.tribeSlug} />
+                                <EvidencePanel token={activeToken} onPlayAudio={handlePlayAudio} tribeSlug={isGuest ? undefined : result.tribeSlug} />
 
                                 {result.evidence.sentences.length > 0 && (
                                     <div className="translate-evidence-list">
@@ -251,7 +313,7 @@ const TranslatePage = () => {
                                                         type="button"
                                                         className="yy-evidence-audio-btn"
                                                         aria-label="播放例句原音"
-                                                        onClick={() => playAudio(s.audioFileId)}
+                                                        onClick={() => handlePlayAudio(s.audioFileId)}
                                                     >
                                                         <Volume2 size={14} />
                                                     </button>

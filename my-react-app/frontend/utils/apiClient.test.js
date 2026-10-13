@@ -247,3 +247,33 @@ describe('逾時與自動重試', () => {
     expect(axios.post).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('訪客代號標頭（C-3：只有標示 guest 的未登入請求才帶）', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    axios.post.mockReset();
+    axios.post.mockResolvedValue({ data: {} });
+  });
+
+  test('未登入且 guest: true：帶 X-Guest-Id，不帶 Authorization', async () => {
+    mockCurrentUser = null;
+    await apiPost('/x', {}, { guest: true });
+    const headers = axios.post.mock.calls[0][2].headers;
+    expect(headers['X-Guest-Id']).toMatch(/^[A-Za-z0-9_-]{16,64}$/);
+    expect(headers.Authorization).toBeUndefined();
+  });
+
+  test('未登入但沒標示 guest：不送出代號', async () => {
+    mockCurrentUser = null;
+    await apiPost('/x', {});
+    expect(axios.post.mock.calls[0][2].headers['X-Guest-Id']).toBeUndefined();
+  });
+
+  test('已登入即使標示 guest：只帶 Authorization，不帶代號', async () => {
+    mockCurrentUser = { getIdToken: vi.fn().mockResolvedValue('tok') };
+    await apiPost('/x', {}, { guest: true });
+    const headers = axios.post.mock.calls[0][2].headers;
+    expect(headers.Authorization).toBe('Bearer tok');
+    expect(headers['X-Guest-Id']).toBeUndefined();
+  });
+});

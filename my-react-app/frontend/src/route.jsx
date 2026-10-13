@@ -86,6 +86,17 @@ const ProtectedLayout = () => {
   );
 };
 
+// 不需登入就能進的功能頁（目前只有翻譯：訪客可以試用，是否開放與次數由後端決定，
+// 頁面自己處理「請先登入」）。只保留換頁自動復原的 error boundary，不做登入檢查。
+const OpenLayout = () => {
+  const { pathname } = useLocation();
+  return (
+    <ErrorBoundary resetKeys={[pathname]}>
+      <Outlet />
+    </ErrorBoundary>
+  );
+};
+
 const RouteLoadingFallback = () => (
   <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
     <Spinner animation="border" variant="danger" role="status">
@@ -118,8 +129,11 @@ const AppRoutes = () => {
           <Route path="/forgot" element={<ForgotPage />} />
           <Route path="/reset" element={<ResetPage />} />
 
-          <Route element={<ProtectedLayout />}>
+          <Route element={<OpenLayout />}>
             <Route path="/translate" element={<TranslatePage />} />
+          </Route>
+
+          <Route element={<ProtectedLayout />}>
             <Route path="/camera" element={<CameraPage />} />
             <Route path="/favorite" element={<FavoritePage />} />
             <Route path="/game" element={<GamePage />} />

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { auth } from '../../firebase';
+import { getGuestId, GUEST_ID_HEADER } from './guestId';
 
 /**
  * 統一附加 Firebase ID token、統一解析錯誤訊息的 API 呼叫工具。
@@ -25,9 +26,11 @@ export class ApiError extends Error {
   }
 }
 
-async function authHeaders() {
+async function authHeaders(guest) {
   const token = await auth.currentUser?.getIdToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  if (token) return { Authorization: `Bearer ${token}` };
+  // 沒登入、且呼叫端明確標示 guest（訪客翻譯試用）才帶瀏覽器代號；其他請求不帶，避免到處送出代號
+  return guest ? { [GUEST_ID_HEADER]: getGuestId() } : {};
 }
 
 /** 預設逾時：伺服器接了連線卻一直不回應時，頁面不該永遠停在載入中。
@@ -83,7 +86,7 @@ function throwNormalizedError(err) {
  * `request` callback 自己決定要怎麼呼叫對應的 axios method，這裡只負責
  * 「附一次 token、統一解析錯誤」這件跨 method 共用的事。 */
 async function executeApi(options, request) {
-  const headers = await authHeaders();
+  const headers = await authHeaders(options?.guest);
   try {
     const res = await request(buildConfig(headers, options));
     return res.data;
