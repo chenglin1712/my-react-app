@@ -40,9 +40,26 @@
     min-width: 20%;
 }
 
-.box-question-btn:hover {
-    background-color: var(--yy-warning-bg);
-    border-color: var(--yy-gold);
+/* 目前所在題：粗框加金色外圈，與 hover 的淡黃底明顯不同 */
+.box-question-btn[aria-current="step"] {
+    border-color: var(--yy-ink);
+    box-shadow: 0 0 0 3px var(--yy-gold);
+    font-weight: 900;
+}
+
+/* hover 只給有滑鼠的裝置，觸控點一下不會卡在 hover 色 */
+@media (hover: hover) and (pointer: fine) {
+    .box-question-btn:hover {
+        background-color: var(--yy-warning-bg);
+        border-color: var(--yy-gold);
+    }
+}
+
+/* 觸控裝置：每顆題號至少 44px 高 */
+@media (pointer: coarse) {
+    .box-question-btn {
+        min-height: 44px;
+    }
 }
 
 .box-question-btn.answer {
@@ -51,10 +68,12 @@
     border: 2px solid var(--yy-success);
 }
 
-.box-question-btn.answer:hover {
-    background-color: var(--yy-success);
-    color: #fff;
-    border-color: var(--yy-success);
+@media (hover: hover) and (pointer: fine) {
+    .box-question-btn.answer:hover {
+        background-color: var(--yy-success);
+        color: #fff;
+        border-color: var(--yy-success);
+    }
 }
 
 .box-timer {

@@ -1,8 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link as LinkIcon, Volume2, CircleCheck, CircleX } from "lucide-react";
-import { loadSuccessAnimation } from "../../src/animations/loaders";
 import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
-import { useLottieAnimation } from "../../hooks/useLottieAnimation";
 import { playCorrectSound } from "../../utils/correctSound";
 
 // Fisher–Yates shuffle
@@ -34,13 +32,6 @@ export default function WordMatch({ question, _selected, _checked, onSelect, onC
   const [wrongPair, setWrongPair] = useState(null);
   const { playAudio, stopAudio } = useAuthorizedAudioPlayback();
 
-  const [showAnimation, setShowAnimation] = useState(false);
-  const animationRef = useLottieAnimation({
-    loadAnimationData: loadSuccessAnimation,
-    enabled: showAnimation,
-    loop: false,
-    onComplete: () => setShowAnimation(false),
-  });
 
   // 左右欄位各自獨立隨機排序
   const [leftList, setLeftList] = useState([]);
@@ -85,7 +76,6 @@ export default function WordMatch({ question, _selected, _checked, onSelect, onC
           question: question.pairs,
           answer: question.pairs,
         });
-        setShowAnimation(true);
         playCorrectSound();
         onConfirm?.(true);
       }
@@ -188,7 +178,7 @@ export default function WordMatch({ question, _selected, _checked, onSelect, onC
               </h4>
             </>
           ) : (
-            <h4 className="fw-bolder mb-4 text-success">
+            <h4 className="fw-bolder mb-4 text-success yy-correct-pop">
               <CircleCheck />&nbsp; 全部配對正確
             </h4>
           )}
@@ -204,14 +194,6 @@ export default function WordMatch({ question, _selected, _checked, onSelect, onC
       )}
 
       {/* 成功動畫 */}
-      {showAnimation && (
-        <div className="yy-success-overlay">
-          <div className="yy-success-card">
-            <div ref={animationRef} />
-            <p>答案正確！</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

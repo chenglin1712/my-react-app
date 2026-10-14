@@ -1,21 +1,12 @@
 import { useState } from "react";
 import { RectangleEllipsis, Volume2, Check, CircleCheck, CircleX } from "lucide-react";
 import { FaPlayCircle } from 'react-icons/fa';
-import { loadSuccessAnimation } from "../../src/animations/loaders";
 import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
-import { useLottieAnimation } from "../../hooks/useLottieAnimation";
 import { playCorrectSound } from "../../utils/correctSound";
 
 export default function SentenceFill({ question, selected, checked, onSelect, onConfirm }) {
   const [result, setResult] = useState("");
-  const [showAnimation, setShowAnimation] = useState(false);
   const { playAudio, stopAudio } = useAuthorizedAudioPlayback();
-  const animationRef = useLottieAnimation({
-    loadAnimationData: loadSuccessAnimation,
-    enabled: showAnimation,
-    loop: false,
-    onComplete: () => setShowAnimation(false),
-  });
 
   const handleSelect = (word) => {
     const newSelection = selected === word ? null : word;
@@ -36,7 +27,6 @@ export default function SentenceFill({ question, selected, checked, onSelect, on
     onConfirm?.(true);
     if (isCorrect) {
       playCorrectSound();
-      setShowAnimation(true);
     }
   };
 
@@ -100,7 +90,7 @@ export default function SentenceFill({ question, selected, checked, onSelect, on
       ) : (
         <>
           {result === "correct" ? (
-            <h4 className="fw-bolder mb-4 text-success"><CircleCheck />&nbsp; 正確</h4>
+            <h4 className="fw-bolder mb-4 text-success yy-correct-pop"><CircleCheck />&nbsp; 正確</h4>
           ) : (
             <h4 className="fw-bolder mb-4 text-danger"><CircleX />&nbsp;  錯誤</h4>
           )}
@@ -124,15 +114,6 @@ export default function SentenceFill({ question, selected, checked, onSelect, on
         </>
       )}
 
-      {/* 成功動畫 Overlay */}
-      {showAnimation && (
-        <div className="yy-success-overlay">
-          <div className="yy-success-card">
-            <div ref={animationRef} />
-            <p>答案正確！</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

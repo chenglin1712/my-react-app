@@ -108,14 +108,9 @@
     box-shadow: var(--yy-shadow-sm);
     z-index: 101;
     font-size: 14px;
-    display: none;
     width: 240px;
     white-space: normal;
     word-wrap: break-word;
-}
-
-.intro-container:hover .intro-box {
-    display: block;
 }
 
 .intro-box .parts-title {
@@ -536,4 +531,42 @@ audio {
         padding: 2px 6px;
         font-size: 14px;
     }
+}
+
+/* 題目音檔播放鈕（取代原生 audio controls） */
+.quiz-audio-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+.quiz-audio-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 6px 16px;
+    background: #fff;
+    color: var(--yy-ink);
+    border: 2px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition-interactive);
+}
+.quiz-audio-toggle.is-playing {
+    background: var(--yy-warning-bg);
+    border-color: var(--yy-gold);
+}
+.quiz-audio-toggle:active {
+    transform: scale(0.97);
+}
+.quiz-audio-error {
+    color: var(--yy-red);
+    font-size: 14px;
+}
+
+.match-rule {
+    margin: 0 0 12px;
+    font-size: 14px;
+    color: var(--yy-text-secondary);
 }

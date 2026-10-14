@@ -1,9 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Mic, Check, CircleCheck, CircleX } from "lucide-react";
 import { FaMicrophone, FaStop, FaPlayCircle, FaRedo } from 'react-icons/fa';
-import { loadSuccessAnimation } from "../../src/animations/loaders";
 import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
-import { useLottieAnimation } from "../../hooks/useLottieAnimation";
 import { apiPost } from "../../utils/apiClient";
 import { announce } from "@utils/announce";
 import { playCorrectSound } from "../../utils/correctSound";
@@ -25,13 +23,6 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
   const [submitError, setSubmitError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const { playAudio, stopAudio } = useAuthorizedAudioPlayback();
-  const [showAnimation, setShowAnimation] = useState(false);
-  const animationRef = useLottieAnimation({
-    loadAnimationData: loadSuccessAnimation,
-    enabled: showAnimation,
-    loop: false,
-    onComplete: () => setShowAnimation(false),
-  });
 
   function releaseRecordingUrl() {
     if (recordingUrlRef.current) {
@@ -161,7 +152,6 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
       onConfirm?.(true);
       if (data.passed) {
         playCorrectSound();
-        setShowAnimation(true);
       }
     } catch (err) {
       console.error('submitSpeaking error:', err);
@@ -232,7 +222,7 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
       ):(
         <>
         {result === "correct" ? (
-            <h4 className="fw-bolder mt-4 text-success">
+            <h4 className="fw-bolder mt-4 text-success yy-correct-pop">
               <CircleCheck /> 正確！（分數：{score}）
             </h4>
           ) : (
@@ -245,14 +235,6 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
       }
 
       {/* 成功動畫 */}
-      {showAnimation && (
-        <div className="yy-success-overlay">
-          <div className="yy-success-card">
-            <div ref={animationRef} />
-            <p>答案正確！</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

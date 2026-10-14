@@ -171,3 +171,45 @@ describe('成績頁的無障礙（審查項 P1-7、P1-8）', () => {
     expect(screen.getByAltText('正確答案：選項 B')).toBeInTheDocument();
   });
 });
+
+describe('Panel_Submit 成績摘要（E-6，P2-58）', () => {
+  beforeEach(() => {
+    mockNavigate.mockReset();
+  });
+
+  const fallback = {
+    title: '初級',
+    questions: [
+      { question_ab: 'q1', image: '1.png' },
+      { question_ab: 'q2', image: '2.png' },
+      { question_ab: 'q3', image: '3.png' },
+    ],
+    answers: [1, 2, 1],
+    correctAnswers: [1, 1, 2],
+  };
+
+  test('顯示「N / M 題答對」，並列出答錯的題號連結', async () => {
+    renderWithFallback(fallback);
+    expect(await screen.findByText('1 / 3 題答對')).toBeInTheDocument();
+    const links = screen.getAllByRole('link');
+    expect(links.map((a) => a.textContent)).toEqual(['第 2 題', '第 3 題']);
+    expect(links[0]).toHaveAttribute('href', '#submit-q-2');
+  });
+
+  test('全部答對時不顯示答錯題號區', async () => {
+    renderWithFallback({ ...fallback, answers: [1, 1, 2] });
+    expect(await screen.findByText('3 / 3 題答對')).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: '答錯的題目' })).not.toBeInTheDocument();
+  });
+
+  test('不再有沒有作用的「中」按鈕', async () => {
+    renderWithFallback({
+      title: '中級',
+      questions: [{ question_ab: 'q', question_ch: '問題', images: { A: 'a.png' } }],
+      answers: [1],
+      correctAnswers: [1],
+    });
+    await screen.findByText('問題');
+    expect(screen.queryByRole('button', { name: '中' })).not.toBeInTheDocument();
+  });
+});

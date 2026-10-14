@@ -16,8 +16,9 @@ describe('RecommendedQuizStart（FR-4b）', () => {
     expect(mockNavigate).toHaveBeenCalledWith('question');
   });
 
-  test('「收藏題庫」尚未有產品規格，顯示為 disabled（回歸測試：原本 onFavorite 從未被傳入，按鈕是看起來能用但完全無反應的假功能）', () => {
+  test('尚未開放的「收藏題庫」占位按鈕不顯示（P3-6）', () => {
     render(<RecommendedQuizStart />);
-    expect(screen.getByRole('button', { name: /收藏題庫/ })).toBeDisabled();
+    expect(screen.queryByText(/收藏題庫/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/尚未開放/)).not.toBeInTheDocument();
   });
 });

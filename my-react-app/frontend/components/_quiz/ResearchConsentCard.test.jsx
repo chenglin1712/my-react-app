@@ -21,7 +21,9 @@ describe('ResearchConsentCard', () => {
     expect(screen.getByRole('button', { name: '我同意' })).toBeEnabled();
     expect(screen.getByText(/不會記錄你的姓名、email/)).toBeInTheDocument();
     // 如實說明這是假名、不是匿名，也列出會記錄熟練度估計與預測機率
-    expect(screen.getByText(/假名/)).toBeInTheDocument();
+    expect(screen.getAllByText(/假名/).length).toBeGreaterThan(0);
+    // 預設先看到一句話，完整說明收在「查看完整說明」裡（文字內容不變）
+    expect(screen.getByText('查看完整說明')).toBeInTheDocument();
     expect(screen.getByText(/找到並刪除你的資料/)).toBeInTheDocument();
     expect(screen.getByText(/作答前預測你/)).toBeInTheDocument();
     expect(screen.getByText(/作答前後你在這條詞綴上的熟練度估計/)).toBeInTheDocument();

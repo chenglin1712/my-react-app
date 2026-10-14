@@ -169,3 +169,39 @@ describe('Panel + AnswerBox 提交流程整合（FR-4a：兩顆繳交按鈕必�
     expect(screen.getByRole('button', { name: /^第 1 題，已作答，已標記待複習/ })).toBeInTheDocument();
   });
 });
+
+describe('Panel 作答頁細節（E-6，P2-59）', () => {
+  beforeEach(() => {
+    mockNavigate.mockReset();
+    confirmMock.mockResolvedValue(true);
+  });
+
+  test('說明按鈕有 aria-expanded，點一下開、再點關，Esc 也能關閉', () => {
+    useQuizPanelData.mockReturnValue(baseHookState());
+    render(<Panel tribe="tayal" />);
+    const button = screen.getByRole('button', { name: '說明' });
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(button);
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('說明', { selector: 'p' })).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('載入中有 role=status', () => {
+    useQuizPanelData.mockReturnValue(baseHookState({ isLoading: true }));
+    render(<Panel tribe="tayal" />);
+    expect(screen.getByRole('status')).toHaveTextContent('題目載入中');
+  });
+
+  test('是非題音檔改用自製的播放鈕，不再是原生 audio controls', () => {
+    const hook = baseHookState();
+    hook.data.parts[0].questions = [{ ...QUESTION, audio: 'a.mp3' }];
+    useQuizPanelData.mockReturnValue(hook);
+    const { container } = render(<Panel tribe="tayal" />);
+    expect(screen.getByRole('button', { name: '播放題目音檔' })).toBeInTheDocument();
+    expect(container.querySelector('audio')).toBeNull();
+  });
+});

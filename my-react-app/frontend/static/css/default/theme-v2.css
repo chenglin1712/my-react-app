@@ -824,3 +824,15 @@
   min-height: 100dvh;
 }
 
+/* 測驗題答對的輕量回饋（取代全螢幕 lottie，審查項 P2-54）：「正確」標題放大一下再回彈 220ms。
+   只用 transform，開了減少動態效果就不動，文字與圖示仍然在。 */
+@keyframes yy-correct-pop {
+  0%   { transform: scale(0.9); opacity: 0.6; }
+  60%  { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .yy-correct-pop {
+    animation: yy-correct-pop 220ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+}

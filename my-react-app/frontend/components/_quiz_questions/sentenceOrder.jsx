@@ -16,9 +16,7 @@ import {
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { loadSuccessAnimation } from "../../src/animations/loaders";
 import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
-import { useLottieAnimation } from "../../hooks/useLottieAnimation";
 import { playCorrectSound } from "../../utils/correctSound";
 import { announce } from "@utils/announce";
 
@@ -140,13 +138,6 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
   );
 
   const [result, setResult] = useState("");
-  const [showAnimation, setShowAnimation] = useState(false);
-  const animationRef = useLottieAnimation({
-    loadAnimationData: loadSuccessAnimation,
-    enabled: showAnimation,
-    loop: false,
-    onComplete: () => setShowAnimation(false),
-  });
 
   // 拖曳結束
   const handleDragEnd = (event) => {
@@ -223,7 +214,6 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
     onConfirm?.(true);
     if (isCorrect) {
       playCorrectSound();
-      setShowAnimation(true);
     }
   };
 
@@ -312,7 +302,7 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
       ) : (
         <>
           {result === "correct" ? (
-            <h4 className="fw-bolder mb-4 text-success"><CircleCheck />&nbsp; 正確</h4>
+            <h4 className="fw-bolder mb-4 text-success yy-correct-pop"><CircleCheck />&nbsp; 正確</h4>
           ) : (
             <h4 className="fw-bolder mb-4 text-danger"><CircleX />&nbsp;  錯誤</h4>
           )}
@@ -320,15 +310,6 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
             正確答案：{question.answer.join(" ")}
           </h4>
         </>
-      )}
-       {/* 成功動畫 Overlay */}
-      {showAnimation && (
-        <div className="yy-success-overlay">
-          <div className="yy-success-card">
-            <div ref={animationRef} />
-            <p>答案正確！</p>
-          </div>
-        </div>
       )}
     </div>
   );

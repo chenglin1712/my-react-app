@@ -165,3 +165,14 @@
   color: var(--yy-text-secondary);
   margin: 8px 0 0;
 }
+
+.result-consent-details {
+    margin-bottom: 12px;
+}
+.result-consent-details summary {
+    cursor: pointer;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    font-weight: 700;
+}

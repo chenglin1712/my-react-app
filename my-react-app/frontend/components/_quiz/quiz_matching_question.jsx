@@ -6,9 +6,17 @@ import { Link, CircleCheck, CircleX } from "lucide-react";
 // 這樣完全不用改動既有的 evaluateAnswers()/countScore() 比對邏輯與資料庫schema，
 // 只是把「選項按鈕」換成「配對版」而已。
 //
-// 一旦本題已經作答過(answered=true)，切換題目再回來時就直接顯示解答總覽，
-// 不會讓使用者重新配對一次（配對是一次性的遊戲式互動，答案已確定就不重玩)。
+// 規則：配錯一組不會結束本題，也不會顯示正確配對（考試中就揭露答案，與其他題型不一致，
+// 手機誤觸一次也會整題失敗，審查項 P2-57）。全部配對完成後才計分：途中沒配錯回報 1，
+// 配錯過回報 2；正確配對在交卷後的成績頁才看得到。
+//
+// 一旦本題已經作答過(answered=true)，切換題目再回來時只顯示結果，不會讓使用者重新配對一次，
+// 也不列出解答。
 // 抽到 module scope（不是每次 render/effect 都在裡面重新定義），單獨可測試。
+// 配錯次數記在題目物件上（WeakMap），不放元件 state：切到別題再回來元件會重建，
+// 放 state 的話「先配錯、離開再回來」就能把錯誤次數歸零換成滿分。
+const mistakeCounts = new WeakMap();
+
 function shuffle(arr) {
     const newArr = [...arr];
     for (let i = newArr.length - 1; i > 0; i--) {
@@ -23,7 +31,7 @@ const MatchingQuestion = ({ question, answered, resultValue, onAnswer }) => {
     const [rightList, setRightList] = useState([]);
     const [selectedWord, setSelectedWord] = useState(null);
     const [matches, setMatches] = useState({});
-    const [wrongPair, setWrongPair] = useState(null);
+    const [showMistakeHint, setShowMistakeHint] = useState(false);
     const [isFinished, setIsFinished] = useState(false);
 
     useEffect(() => {
@@ -31,7 +39,7 @@ const MatchingQuestion = ({ question, answered, resultValue, onAnswer }) => {
         setRightList(shuffle(question.pairs.map((p) => p.word)));
         setSelectedWord(null);
         setMatches({});
-        setWrongPair(null);
+        setShowMistakeHint(false);
         setIsFinished(false);
     }, [question]);
 
@@ -42,15 +50,7 @@ const MatchingQuestion = ({ question, answered, resultValue, onAnswer }) => {
                 <p className={resultValue === 1 ? "match-result-ok" : "match-result-bad"}>
                     {resultValue === 1 ? <><CircleCheck size={18} /> 本題配對全部正確</> : <><CircleX size={18} /> 本題配對有誤</>}
                 </p>
-                <div className="match-answer-key">
-                    {question.pairs.map((p) => (
-                        <div className="match-answer-key-row" key={p.cn}>
-                            <span>{p.cn}</span>
-                            <span className="match-answer-arrow">→</span>
-                            <span>{p.word.word}</span>
-                        </div>
-                    ))}
-                </div>
+                <p className="match-rule">正確配對會在繳交試卷後的成績頁顯示。</p>
             </div>
         );
     }
@@ -76,15 +76,17 @@ const MatchingQuestion = ({ question, answered, resultValue, onAnswer }) => {
             const newMatches = { ...matches, [cn]: wordVal };
             setMatches(newMatches);
             setSelectedWord(null);
+            setShowMistakeHint(false);
 
             if (Object.keys(newMatches).length === question.pairs.length) {
                 setIsFinished(true);
-                onAnswer(1);
+                onAnswer((mistakeCounts.get(question) ?? 0) === 0 ? 1 : 2);
             }
         } else {
-            setWrongPair({ cn, chosen: wordVal, correct: pair.word.word });
-            setIsFinished(true);
-            onAnswer(2);
+            // 配錯：只取消目前的選取並提示再選一次，不揭露正解、不結束本題
+            mistakeCounts.set(question, (mistakeCounts.get(question) ?? 0) + 1);
+            setShowMistakeHint(true);
+            setSelectedWord(null);
         }
     };
 
@@ -99,6 +101,7 @@ const MatchingQuestion = ({ question, answered, resultValue, onAnswer }) => {
     return (
         <div className="match-board">
             <h5 className="match-board-title"><Link size={18} />&nbsp;配合題：請將左右兩側配對</h5>
+            <p className="match-rule">配錯可以再選，全部配對完成後才計分；中途配錯過，本題算答錯。</p>
             <div className="match-grid">
                 <div className="match-col">
                     {leftList.map((cn) => (
@@ -128,12 +131,14 @@ const MatchingQuestion = ({ question, answered, resultValue, onAnswer }) => {
                 </div>
             </div>
 
-            {wrongPair && (
-                <div className="match-wrong-hint">
-                    <CircleX size={18} style={{ color: "var(--yy-red)" }} />
-                    &nbsp;{wrongPair.cn} 的正確配對是「{wrongPair.correct}」
-                </div>
-            )}
+            <div role="status">
+                {showMistakeHint && (
+                    <div className="match-wrong-hint">
+                        <CircleX size={18} style={{ color: "var(--yy-red)" }} />
+                        &nbsp;這兩個不是一組，再選一次。
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

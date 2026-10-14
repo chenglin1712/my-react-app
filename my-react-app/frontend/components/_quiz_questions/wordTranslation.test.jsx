@@ -42,3 +42,16 @@ describe('WordTranslation 音檔播放', () => {
     expect(audio.revokeObjectUrl).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('WordTranslation 答對回饋（E-6，P2-54）', () => {
+  test('答對只在「正確」標題做輕量 pop，不再出現全螢幕成功動畫', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<WordTranslation question={QUESTION} selected="好" checked={false} onSelect={vi.fn()} onConfirm={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: '確認' }));
+    rerender(<WordTranslation question={QUESTION} selected="好" checked onSelect={vi.fn()} onConfirm={vi.fn()} />);
+
+    expect(screen.getByText(/正確$/, { selector: 'h4' })).toHaveClass('yy-correct-pop');
+    expect(document.querySelector('.yy-success-overlay')).toBeNull();
+    expect(screen.queryByText('答案正確！')).not.toBeInTheDocument();
+  });
+});

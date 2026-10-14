@@ -29,7 +29,6 @@ function ChoiceResult({ item, userLabel, correctLabel, isCorrect }) {
             <div className="submit-question-q2">
                 <span>{item.question_ab}</span>
                 <div>
-                    <button type="button">中</button>
                     <p style={{ margin: "0" }}>{item.question_ch}</p>
                 </div>
             </div>
@@ -59,7 +58,6 @@ function ClozeResult({ item, userAnswerNum, correctAnswerNum, isCorrect }) {
             <div className="submit-question-q2">
                 <span>{item.passage_ab}</span>
                 <div>
-                    <button type="button">中</button>
                     <p style={{ margin: "0" }}>{item.passage_ch}</p>
                 </div>
             </div>
@@ -156,6 +154,12 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
 
     const displayData = data || buildFallbackData();
     const displayScore = data ? score : countScore(displayData?.results ?? []);
+    // 只有一個無標籤的百分比看不出答對幾題：另外算「N / M 題答對」與答錯的題號（審查項 P2-58）
+    const resultList = displayData?.results ?? [];
+    const totalCount = displayData?.quiz?.data?.length ?? resultList.length;
+    const correctCount = resultList.filter((r) => r?.isCorrect === true).length;
+    const wrongNumbers = resultList.reduce((list, r, i) => (r?.isCorrect === false ? [...list, i + 1] : list), []);
+    const unansweredNumbers = resultList.reduce((list, r, i) => (r?.isCorrect == null ? [...list, i + 1] : list), []);
 
     const difficulty = QUIZ_LEVEL_ID_BY_NAME[displayData?.quiz?.title] ?? 1;
     const labels = ["A", "B", "C", "D"];
@@ -189,6 +193,9 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
                         <div className="score-circle">
                             <span className="score">{displayScore}</span>
                         </div>
+                        <p className="score-summary">
+                            {totalCount > 0 ? `${correctCount} / ${totalCount} 題答對` : "尚無成績"}
+                        </p>
                     </div>
                 </div>
 
@@ -197,6 +204,22 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
                         <p className="submit-save-failed" role="alert">
                             作答結果儲存失敗，這次的紀錄可能不會出現在「答題情形」裡。下面是暫存的結果。
                         </p>
+                    )}
+                    {wrongNumbers.length > 0 && (
+                        <nav className="submit-wrong-nav" aria-label="答錯的題目">
+                            <span>答錯 {wrongNumbers.length} 題，從這裡跳到那一題複習：</span>
+                            {wrongNumbers.map((n) => (
+                                <a key={n} className="submit-wrong-link" href={`#submit-q-${n}`}>第 {n} 題</a>
+                            ))}
+                        </nav>
+                    )}
+                    {unansweredNumbers.length > 0 && (
+                        <nav className="submit-wrong-nav" aria-label="未作答的題目">
+                            <span>未作答 {unansweredNumbers.length} 題：</span>
+                            {unansweredNumbers.map((n) => (
+                                <a key={n} className="submit-wrong-link" href={`#submit-q-${n}`}>第 {n} 題</a>
+                            ))}
+                        </nav>
                     )}
                     <div className="submit-question-header-row">
                         <span className="header-title"></span>
@@ -230,7 +253,7 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
                             // 跟原本「不是前三種名稱就走 else 分支」的行為一致。
                             const ResultRenderer = RESULT_RENDERERS[QUIZ_LEVEL_TYPE_BY_NAME[displayData.quiz.title]] ?? ChoiceResult;
                             return (
-                                <div key={idx} className="submit-question-result">
+                                <div key={idx} id={`submit-q-${idx + 1}`} className="submit-question-result">
                                     <div className="submit-question-header">
                                         <span className="submit-question-num">第{idx + 1}題</span>
                                         {/* 對錯原本只有圖示：沒有名稱，報讀器念不出來。圖示藏起來，改念文字（審查項 P1-7）；文字也直接顯示出來，不只靠圖示形狀與顏色（P2-100） */}

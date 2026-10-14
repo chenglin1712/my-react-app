@@ -1,7 +1,8 @@
 import "../../static/css/_quiz/quiz_panel.css"
 import { useParams, useNavigate } from "react-router-dom";
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import AnswerBox from "./quiz_answerBox"
+import QuizAudioButton from "./quiz_audio_button"
 import MatchingQuestion from "./quiz_matching_question"
 import ClozeQuestion from "./quiz_cloze_question"
 import TrueFalseQuestion from "./quiz_true_false_question"
@@ -33,6 +34,14 @@ const Panel = ({ tribe = "tayal" }) => {
     const [showIntro, setShowIntro] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState("");
+
+    // 說明面板只留 click 開關（原本 hover 與 click 兩套並存），可用 Esc 關閉
+    useEffect(() => {
+        if (!showIntro) return undefined;
+        const onKeyDown = (event) => { if (event.key === "Escape") setShowIntro(false); };
+        document.addEventListener("keydown", onKeyDown);
+        return () => document.removeEventListener("keydown", onKeyDown);
+    }, [showIntro]);
 
     //載入loading動畫
     const animation = useLottieAnimation({ loadAnimationData: loadLoadingAnimation, enabled: isLoading });
@@ -150,7 +159,7 @@ const Panel = ({ tribe = "tayal" }) => {
     //載入題目畫面
     if (isLoading) {
         return (
-            <div className="load-container">
+            <div className="load-container" role="status">
                 <div className="load-title">題目載入中...</div>
                 <div className="load-animate" ref={animation}></div>
             </div>
@@ -201,12 +210,18 @@ const Panel = ({ tribe = "tayal" }) => {
                         <h2>{level_ch}</h2>
 
                         <div className="intro-container">
-                            <button className="intro-btn" onClick={() => { setShowIntro(!showIntro) }}>
-                                <CircleHelp />說明
+                            <button
+                                type="button"
+                                className="intro-btn"
+                                aria-expanded={showIntro}
+                                aria-controls="quiz-intro-box"
+                                onClick={() => { setShowIntro(!showIntro) }}
+                            >
+                                <CircleHelp aria-hidden="true" />說明
                             </button>
 
                             {showIntro && (
-                                <div className="intro-box">
+                                <div className="intro-box" id="quiz-intro-box">
                                     <p className="parts-title">{data.parts[0].title.replace(/.*[:：]/, "")}</p>
                                     <p>{data.parts[0].intro}</p>
                                 </div>
@@ -219,10 +234,7 @@ const Panel = ({ tribe = "tayal" }) => {
                             <div className="title-container">
                                 <p><strong>題目{currentQuestionIndex + 1}：</strong></p>
                                 {currentType === "true_false" && (
-                                    <audio controls>
-                                        <source src={currentQuestion.audio} type="audio/mpeg" />
-                                        您的瀏覽器不支援音檔。
-                                    </audio>
+                                    <QuizAudioButton key={currentQuestionIndex} src={currentQuestion.audio} />
                                 )}
                                 {currentType === "choice" && (
                                     <p>{currentQuestion.question_ab}</p>
