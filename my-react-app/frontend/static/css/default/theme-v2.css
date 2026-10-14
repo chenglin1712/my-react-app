@@ -662,6 +662,24 @@
   font-size: 11.5px;
   color: #A88E6C;
 }
+.yy-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--yy-space-4);
+}
+.yy-footer__links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--yy-control-md);
+  color: #D8C4A0;
+  font-size: var(--yy-text-sm);
+  text-underline-offset: 3px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .yy-footer__links a:hover {
+    color: var(--yy-gold-light);
+  }
+}
 
 @media (max-width: 720px) {
   .yy-hero,

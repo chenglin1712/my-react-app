@@ -23,4 +23,10 @@ describe('前台分頁標題', () => {
     test('不存在的網址標示為找不到頁面', () => {
         expect(getPageTitle('/no-such-page')).toBe('找不到頁面｜源·語');
     });
+
+  test('頁尾三個入口頁有自己的標題', () => {
+    expect(getPageTitle('/help')).toBe('使用說明｜源·語');
+    expect(getPageTitle('/privacy')).toBe('隱私與資料｜源·語');
+    expect(getPageTitle('/contact')).toBe('聯絡我們｜源·語');
+  });
 });

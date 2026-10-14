@@ -1,5 +1,5 @@
 import "../../static/css/_auth/registerForm.css"
-import { User, Mail, Footprints, CheckCircle } from "lucide-react"
+import { User, Mail, CheckCircle } from "lucide-react"
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Alert } from "react-bootstrap";
@@ -72,11 +72,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
         <div className="register-container">
             <div className="register-box">
                 <h1 className="formTitle">註冊</h1>
-                <p className="register-subtitle">立即體驗源·語
-                    <button type="button" onClick={() => alert("敬請期待")}>
-                        <Footprints size={22} />訪客登入
-                    </button>
-                </p>
+                <p className="register-subtitle">立即體驗源·語</p>
                 {(errorMsg || uploadError) && <Alert variant="danger" className="py-2">{errorMsg || uploadError}</Alert>}
                 <form action="#" className="registerForm" onSubmit={handleRegister}>
                     <div className="input-wrapper">
@@ -115,6 +111,11 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                     <button type="submit" className="register-button" disabled={isUploading || isSubmitting}>
                         {isUploading ? "上傳頭像中..." : "註冊"}
                     </button>
+                    {/* 另開新視窗：填到一半的表單不會因為去讀說明而消失 */}
+                    <p className="register-consent">
+                        我們如何使用你的資料，請見
+                        <a href="/privacy" target="_blank" rel="noopener noreferrer">隱私與資料<span className="visually-hidden">（另開新視窗）</span></a>。
+                    </p>
                     <p>已經有帳戶了?
                         {onSwitchToLogin ? (
                             <a onClick={(e) => { e.preventDefault(); onSwitchToLogin(); }} href="/login">登入</a>

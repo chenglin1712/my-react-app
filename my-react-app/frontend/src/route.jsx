@@ -25,6 +25,9 @@ const CameraPage = lazy(() => import('./_camera/index'));
 const SearchPage = lazy(() => import('./_search/index'));
 //翻譯
 const TranslatePage = lazy(() => import('./_translate/index'));
+const HelpPage = lazy(() => import('./_info/index').then((m) => ({ default: m.HelpPage })));
+const PrivacyPage = lazy(() => import('./_info/index').then((m) => ({ default: m.PrivacyPage })));
+const ContactPage = lazy(() => import('./_info/index').then((m) => ({ default: m.ContactPage })));
 //遊戲
 const GamePage = lazy(() => import('./_game/index'));
 const VocabularyPage = lazy(() => import('./_game/vocabulary'));
@@ -128,6 +131,9 @@ const AppRoutes = () => {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot" element={<ForgotPage />} />
           <Route path="/reset" element={<ResetPage />} />
+          <Route path="/help" element={<HelpPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/contact" element={<ContactPage />} />
 
           <Route element={<OpenLayout />}>
             <Route path="/translate" element={<TranslatePage />} />

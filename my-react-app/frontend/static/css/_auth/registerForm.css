@@ -31,20 +31,26 @@
     align-items: center;
 }
 
-.register-subtitle button {
-    border: 1.5px solid var(--yy-ink);
-    background-color: transparent;
-    margin-left: 6px;
-    font-size: 12px;
-    color: var(--yy-ink);
-    font-weight: 700;
-    border-radius: 12px;
-    padding: 4px 10px;
-    display: flex;
+.register-consent {
+    margin: 0;
+    font-size: var(--yy-text-sm);
+    line-height: var(--yy-leading-normal);
+    color: var(--yy-text-tertiary);
+    text-align: center;
+}
+
+.register-consent a {
+    display: inline-flex;
     align-items: center;
-    gap: 4px;
-    cursor: pointer;
-    transition: transform 0.3s ease;
+    min-height: var(--yy-control-md);
+    color: var(--yy-red);
+    font-weight: 700;
+    text-underline-offset: 3px;
+}
+
+.register-consent a:focus-visible {
+    outline: var(--yy-focus-ring);
+    outline-offset: var(--yy-focus-offset);
 }
 
 .registerForm {

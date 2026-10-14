@@ -170,4 +170,23 @@ describe('RegisterForm', () => {
       'https://cdn.example.com/avatar.png',
     );
   });
+
+  test('沒有假的「訪客登入」按鈕，點註冊頁任何按鈕都不會跳 alert', () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    render(<RegisterForm />);
+    expect(screen.queryByRole('button', { name: /訪客登入/ })).not.toBeInTheDocument();
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  test('註冊按鈕下方有資料使用說明，連到隱私與資料並另開新視窗', () => {
+    render(<RegisterForm />);
+    const link = screen.getByRole('link', { name: /隱私與資料/ });
+    expect(link).toHaveAttribute('href', '/privacy');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+    expect(screen.getByRole('link', { name: /另開新視窗/ })).toBe(link);
+    expect(screen.getByText(/我們如何使用你的資料，請見/)).toBeInTheDocument();
+    // 沒有條款頁，措辭只告知、不主張「註冊即同意」
+    expect(screen.queryByText(/註冊即/)).not.toBeInTheDocument();
+  });
 });

@@ -1,0 +1,90 @@
+/* 使用說明、隱私與資料、聯絡我們：頁尾入口的內容頁，沿用 theme-v2 的 .yy-page / .yy-card。 */
+
+.info-page {
+    padding: var(--yy-space-7) var(--yy-space-5) var(--yy-space-8);
+}
+
+.info-card {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: var(--yy-space-6);
+}
+
+.info-title {
+    margin: 0 0 var(--yy-space-2);
+    font-size: var(--yy-text-2xl);
+    font-weight: 900;
+    color: var(--yy-ink);
+}
+
+.info-lead {
+    margin: 0 0 var(--yy-space-5);
+    color: var(--yy-text-secondary);
+    line-height: var(--yy-leading-normal);
+}
+
+.info-draft {
+    margin: 0 0 var(--yy-space-5);
+    padding: var(--yy-space-3) var(--yy-space-4);
+    background: var(--yy-warning-bg);
+    border: 2px solid var(--yy-border);
+    border-radius: var(--yy-radius-btn);
+    color: var(--yy-ink);
+    font-size: var(--yy-text-sm);
+    line-height: var(--yy-leading-normal);
+}
+
+.info-section {
+    margin-top: var(--yy-space-5);
+}
+
+.info-heading {
+    margin: 0 0 var(--yy-space-2);
+    font-size: var(--yy-text-lg);
+    font-weight: 800;
+    color: var(--yy-ink);
+}
+
+.info-section p,
+.info-section li {
+    max-width: 62ch;
+    font-size: var(--yy-text-base);
+    line-height: var(--yy-leading-loose);
+    color: var(--yy-text-secondary);
+}
+
+.info-section p {
+    margin: 0 0 var(--yy-space-2);
+}
+
+.info-section ul {
+    margin: 0 0 var(--yy-space-2);
+    padding-left: var(--yy-space-5);
+}
+
+.info-card a {
+    color: var(--yy-red);
+    font-weight: 700;
+    text-underline-offset: 3px;
+}
+
+.info-card a:focus-visible {
+    outline: var(--yy-focus-ring);
+    outline-offset: var(--yy-focus-offset);
+}
+
+.info-email {
+    display: inline-block;
+    padding: var(--yy-space-2) 0;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+    .info-page {
+        padding: var(--yy-space-5) var(--yy-space-4) var(--yy-space-7);
+    }
+
+    .info-card {
+        padding: var(--yy-space-5) var(--yy-space-4);
+    }
+}
