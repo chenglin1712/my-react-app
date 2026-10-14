@@ -453,7 +453,9 @@
     display: flex;
 }
 
-@media (max-width: 948px) {
+/* 斷點 1200px：桌面導覽列（6 個連結＋筆記＋登入）在 949～1185px 之間放不進一列，會換成兩列、
+   sticky 導覽列因此變高（審查項 P2-4）。寬度不夠時直接改用漢堡選單。 */
+@media (max-width: 1200px) {
     .navbar-container {
         padding: 16px 24px;
     }

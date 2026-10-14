@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
-import { House, TextSearch, Camera, Gamepad2, BookOpenCheck, NotebookPen, User, ChevronDown, Languages } from "lucide-react";
+import { House, TextSearch, Camera, Gamepad2, BookOpenCheck, NotebookPen, User, ChevronDown, Languages, Heart } from "lucide-react";
 import "../../static/css/navigation/Navbar.css"
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../src/userServives/authContext"
@@ -190,6 +190,13 @@ const Navbar = ({ onOpenBot }) => {
           <NotebookPen size={20} />
           <span>筆記分享區</span>
         </NavLink>
+        {/* 收藏原本只藏在頭像側欄裡；登入後在手機選單也放一個直接入口（桌面版導覽列寬度已滿，見 Navbar.css 的斷點說明） */}
+        {isLoggedIn && (
+          <NavLink className="menu-mobile-item" to="/favorite" state={{ tabId: 1 }} onClick={() => setIsOpen(false)}>
+            <Heart size={20} />
+            <span>個人詞語庫</span>
+          </NavLink>
+        )}
       </div >
     </nav >
 

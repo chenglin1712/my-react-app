@@ -1,11 +1,15 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 import NotePage from './index';
 import { useNotesCloudSyncFlag } from './hooks/useNotesCloudSyncFlag';
 import { useCloudNoteSync } from './hooks/useCloudNoteSync';
 import { exportNoteAsHtml } from './sync/exportNote';
+
+// 站內確認視窗（原本是瀏覽器原生 window.confirm）：測試直接替換成可控制回傳值的 mock
+const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: confirmMock }));
 
 /** 雲端筆記同步（D-2）接進筆記頁的接線：旗標關閉時畫面和以前一樣，開啟後才出現同步狀態。 */
 
@@ -47,7 +51,7 @@ describe('NotePage 的雲端同步接線', () => {
       { id: 'a', title: '第一篇', content: '<p>A</p>' },
       { id: 'b', title: '第二篇', content: '<p>B</p>' },
     ]));
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    confirmMock.mockResolvedValue(true);
     useNotesCloudSyncFlag.mockReset();
     useCloudNoteSync.mockReset();
     exportNoteAsHtml.mockReset();
@@ -120,6 +124,6 @@ describe('NotePage 的雲端同步接線', () => {
     renderPage();
 
     fireEvent.click(screen.getByRole('button', { name: '刪除' }));
-    expect(sync.recordDelete).toHaveBeenCalledWith('a');
+    await waitFor(() => expect(sync.recordDelete).toHaveBeenCalledWith('a'));
   });
 });

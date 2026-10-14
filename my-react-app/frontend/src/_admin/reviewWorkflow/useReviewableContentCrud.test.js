@@ -3,9 +3,9 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 
 import { useReviewableContentCrud } from './useReviewableContentCrud';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../../utils/apiClient';
-import { confirmAction } from '../components/confirmAction';
+import { confirmAction } from '@components/ui/ConfirmDialog';
 
-vi.mock('../components/confirmAction', () => ({ confirmAction: vi.fn() }));
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: vi.fn() }));
 
 vi.mock('../../../utils/apiClient', () => ({
     apiGet: vi.fn(),

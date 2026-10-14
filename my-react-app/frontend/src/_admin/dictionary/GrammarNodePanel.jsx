@@ -40,6 +40,7 @@ import {
 } from './useRevisionActions';
 import { REVISION_STATUS_META as STATUS_META, revisionFromSave } from './revisionMeta';
 import { useActionLock } from '../hooks/useActionLock';
+import { confirmAction } from '@components/ui/ConfirmDialog';
 
 const emptySection = (tribeId = '') => ({
     tribe_id: tribeId,
@@ -662,10 +663,13 @@ export default function GrammarNodePanel({
         }
     };
 
-    const createDeleteProposal = () => {
-        if (!window.confirm('確定要刪除這個文法章節嗎？此操作無法復原。')) {
-            return Promise.resolve();
-        }
+    const createDeleteProposal = async () => {
+        const confirmed = await confirmAction({
+            title: '刪除文法章節',
+            message: <p className="mb-0">確定要刪除這個文法章節嗎？此操作無法復原。</p>,
+            confirmLabel: '刪除章節',
+        });
+        if (!confirmed) return undefined;
 
         return lock.runLocked('delete', async () => {
             setPageError('');

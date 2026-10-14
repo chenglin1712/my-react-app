@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 
-import { confirmAction } from './confirmAction';
+import { confirmAction } from './ConfirmDialog';
 
 const open = (options) => {
     let promise;
@@ -46,5 +46,23 @@ describe('confirmAction（站內確認視窗）', () => {
         expect(confirm).not.toBeDisabled();
         fireEvent.click(confirm);
         await expect(result).resolves.toBe(true);
+    });
+
+    test('已有一個確認視窗時再呼叫，直接回傳 false，不會疊出第二個視窗', async () => {
+        const first = open({ title: '交卷', message: '確定？', confirmLabel: '送出' });
+        await screen.findByRole('dialog');
+        const second = open({ title: '交卷', message: '確定？', confirmLabel: '送出' });
+        await expect(second).resolves.toBe(false);
+        expect(screen.getAllByRole('dialog')).toHaveLength(1);
+
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '送出' }));
+        await expect(first).resolves.toBe(true);
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+        // 關掉之後可以再開
+        const third = open({ title: '再開', message: '確定？' });
+        await screen.findByRole('dialog');
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '取消' }));
+        await expect(third).resolves.toBe(false);
     });
 });

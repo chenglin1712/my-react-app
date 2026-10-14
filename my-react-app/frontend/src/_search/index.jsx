@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Container, Alert, Spinner, Button } from 'react-bootstrap';
+import { Container, Alert, Button } from 'react-bootstrap';
+import LoadingSpinner from '@components/ui/LoadingSpinner';
 import { useFavorites } from "../../src/userServives/useFavorites";
 import { TRIBE_NAMES, TRIBE_SLUG_BY_NAME, TRIBE_FULL_NAME_BY_SLUG } from "../constants/tribes";
 import { apiPost } from "../../utils/apiClient";
@@ -277,7 +278,7 @@ const SearchPage = () => {
       />
 
       <br />
-      {loading && <Spinner animation="border" variant="primary" />}
+      {loading && <LoadingSpinner label="搜尋中…" />}
       {error && (
         <Alert variant="danger" className="d-flex justify-content-between align-items-center">
           <span>{error}</span>

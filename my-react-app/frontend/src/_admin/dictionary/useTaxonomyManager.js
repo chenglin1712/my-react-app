@@ -7,6 +7,7 @@ import {
     updateTaxonomyTerm,
 } from './dictionaryApi';
 import { useActionLock } from '../hooks/useActionLock';
+import { confirmAction } from '@components/ui/ConfirmDialog';
 
 const emptyAffixDraft = () => ({
     tribe_id: '',
@@ -144,9 +145,14 @@ export function useTaxonomyManager() {
         }
     });
 
-    const removeRow = (row) => {
+    const removeRow = async (row) => {
         const label = isAffix ? row.affix : row.name;
-        if (!window.confirm(`確定要刪除「${label}」嗎？此操作無法復原。`)) return Promise.resolve();
+        const confirmed = await confirmAction({
+            title: '刪除項目',
+            message: `確定要刪除「${label}」嗎？此操作無法復原。`,
+            confirmLabel: '刪除',
+        });
+        if (!confirmed) return undefined;
 
         return lock.runLocked('delete', async () => {
             setDeletingId(row.id);

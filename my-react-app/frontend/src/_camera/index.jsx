@@ -1,5 +1,6 @@
 import { useState, useRef, lazy, Suspense } from "react";
-import { Alert, Spinner } from "react-bootstrap";
+import { Alert } from "react-bootstrap";
+import LoadingSpinner from "@components/ui/LoadingSpinner";
 import "../../static/css/_camera/wizard.css";
 import { TRIBES } from "../constants/tribes";
 import StepBar from "../../components/ui/StepBar";
@@ -16,7 +17,7 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const StepLoading = () => (
     <div className="camera-step-loading d-flex justify-content-center py-5">
-        <Spinner animation="border" variant="primary" />
+        <LoadingSpinner label="處理中…" />
     </div>
 );
 

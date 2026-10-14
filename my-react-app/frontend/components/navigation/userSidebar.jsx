@@ -1,6 +1,6 @@
 import "../../static/css/navigation/userSidebar.css"
 import AvatarImg from "../../static/assets/_auth/avatar.webp"
-import { Heart, LogOut, Edit, ChevronDown, Bot, Calendar } from 'lucide-react';
+import { Heart, LogOut, Edit, ChevronRight, Bot, Calendar } from 'lucide-react';
 import { useState } from "react";
 import { signOut } from "../../src/userServives/userServive";
 import { useNavigate } from "react-router-dom";
@@ -81,7 +81,7 @@ const UserSidebar = ({ userData, closeSidebar, onOpenBot }) => {
                                     <span className="nav-icon" style={{ display: 'flex', alignItems: 'center' }}>{icon}</span>
                                     <span className="nav-label">{label}</span>
                                 </div>
-                                <ChevronDown size={18} className="nav-chevron" />
+                                <ChevronRight size={18} className="nav-chevron" aria-hidden="true" />
                             </button>
                         ))}
                     </nav>

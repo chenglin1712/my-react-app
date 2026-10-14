@@ -23,6 +23,10 @@ import {
     updateRevisionPayload,
 } from './dictionaryApi';
 
+// 站內確認視窗（原本是瀏覽器原生 window.confirm）：測試直接替換成可控制回傳值的 mock
+const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: confirmMock }));
+
 let mockRole = 'editor';
 
 vi.mock('../../userServives/authContext', () => ({
@@ -273,7 +277,7 @@ describe('GrammarNodePanel', () => {
 
     it('creates a delete proposal after confirmation and keeps selection', async () => {
         const onSaved = vi.fn();
-        vi.spyOn(window, 'confirm').mockReturnValue(true);
+        confirmMock.mockResolvedValue(true);
 
         renderPanel({ sectionId: 10, onSaved });
 
@@ -284,7 +288,7 @@ describe('GrammarNodePanel', () => {
         await waitFor(() => {
             expect(proposeGrammarSectionDelete).toHaveBeenCalledWith(10);
         });
-        expect(window.confirm).toHaveBeenCalledWith('確定要刪除這個文法章節嗎？此操作無法復原。');
+        expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: '刪除文法章節', confirmLabel: '刪除章節' }));
         expect(onSaved).toHaveBeenCalled();
         expect(await screen.findByText('刪除提案草稿已建立')).toBeInTheDocument();
     });
@@ -326,7 +330,7 @@ describe('GrammarNodePanel', () => {
      * 提案後整份表單仍然可以編輯，「儲存草稿」還會把一般內容 payload 寫進
      * 這筆刪除提案裡。 */
     it('建立刪除提案後表單變成唯讀，不再顯示儲存草稿', async () => {
-        vi.spyOn(window, 'confirm').mockReturnValue(true);
+        confirmMock.mockResolvedValue(true);
         proposeGrammarSectionDelete.mockResolvedValue({
             revision_id: 84, status: 'draft', operation: 'delete',
         });

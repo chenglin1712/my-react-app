@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, Spinner } from 'react-bootstrap';
+import { Alert, Button } from 'react-bootstrap';
+import LoadingSpinner from '@components/ui/LoadingSpinner';
 import {
     ArrowLeft,
     CheckCircle2,
@@ -108,7 +109,7 @@ export default function ScenarioQuiz({ tribe = 'tayal' }) {
         return (
             <div className="scenario-quiz-page">
                 <div className="scenario-quiz-loading">
-                    <Spinner animation="border" variant="danger" />
+                    <LoadingSpinner decorative />
                     <span>正在準備情境題…</span>
                 </div>
             </div>

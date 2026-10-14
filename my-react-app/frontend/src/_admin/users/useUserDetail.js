@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiGet, apiPost } from '../../../utils/apiClient';
 import { ROLE_LABELS } from '../constants/roles';
 import { useActionLock } from '../hooks/useActionLock';
+import { confirmAction } from '@components/ui/ConfirmDialog';
 
 /**
  * 單一使用者管理頁的資料與帳號操作（FE-6）。
@@ -98,10 +99,16 @@ export function useUserDetail({ uid, canViewUser }) {
         }
     });
 
-    const assignRole = () => {
+    const assignRole = async () => {
         const roleLabel = selectedRole ? ROLE_LABELS[selectedRole] : '一般使用者';
 
-        if (!window.confirm(`確定要將此帳號的角色設為「${roleLabel}」嗎？`)) return undefined;
+        const confirmed = await confirmAction({
+            title: '變更角色',
+            message: `確定要將此帳號的角色設為「${roleLabel}」嗎？`,
+            confirmLabel: '變更角色',
+            danger: false,
+        });
+        if (!confirmed) return undefined;
 
         return lock.runLocked('role', async () => {
             const generation = uidGenerationRef.current;
@@ -120,11 +127,16 @@ export function useUserDetail({ uid, canViewUser }) {
         });
     };
 
-    const toggleSuspension = () => {
+    const toggleSuspension = async () => {
         const endpoint = user.disabled ? 'unsuspend' : 'suspend';
         const verb = user.disabled ? '解除停權' : '停權';
 
-        if (!window.confirm(`確定要${verb}帳號 ${user.email} 嗎？`)) return undefined;
+        const confirmed = await confirmAction({
+            title: `${verb}帳號`,
+            message: `確定要${verb}帳號 ${user.email} 嗎？`,
+            confirmLabel: verb,
+        });
+        if (!confirmed) return undefined;
 
         return runAccountAction(
             endpoint,
@@ -133,8 +145,13 @@ export function useUserDetail({ uid, canViewUser }) {
         );
     };
 
-    const forceLogout = () => {
-        if (!window.confirm(`確定要強制登出帳號 ${user.email} 嗎？`)) return undefined;
+    const forceLogout = async () => {
+        const confirmed = await confirmAction({
+            title: '強制登出',
+            message: `確定要強制登出帳號 ${user.email} 嗎？`,
+            confirmLabel: '強制登出',
+        });
+        if (!confirmed) return undefined;
 
         return runAccountAction('force-logout', 'force-logout', '已撤銷使用者的登入憑證。');
     };

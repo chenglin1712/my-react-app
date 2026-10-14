@@ -21,6 +21,7 @@ import { ACCOUNT_MANAGERS, STAFF_ROLES } from '../constants/roles';
 import ReviewPagination from '../reviewWorkflow/ReviewPagination';
 import { stripHtml } from './notePreviewText';
 import '../../../static/css/_admin/moderation.css';
+import { confirmAction } from '@components/ui/ConfirmDialog';
 
 const PAGE_SIZE = 20;
 
@@ -51,14 +52,20 @@ export default function SharedNotesModeration() {
     const [success, setSuccess] = useState('');
     const toggleLock = useActionLock();
 
-    const toggleDeleted = (item) => {
+    const toggleDeleted = async (item) => {
         const actionLabel = item.deleted ? '恢復' : '下架';
         const previewText = stripHtml(item.preview) || item.id;
         const confirmation = item.deleted
             ? `確定要恢復「${previewText}」嗎？`
             : `確定要下架「${previewText}」嗎？`;
 
-        if (!window.confirm(confirmation)) return;
+        const confirmed = await confirmAction({
+            title: `${actionLabel}分享筆記`,
+            message: confirmation,
+            confirmLabel: actionLabel,
+            danger: !item.deleted,
+        });
+        if (!confirmed) return;
 
         toggleLock.runLocked(item.id, async () => {
             setError('');

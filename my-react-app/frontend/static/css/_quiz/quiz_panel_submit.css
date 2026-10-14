@@ -288,3 +288,10 @@
     margin: 8px 0 16px;
     font-weight: 600;
 }
+
+.submit-result-label {
+    margin-left: 6px;
+    font-size: 14px;
+    font-weight: 700;
+    vertical-align: middle;
+}

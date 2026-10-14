@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Container, Button, Row, Col, Spinner, Form, Alert } from "react-bootstrap";
+import { Container, Button, Row, Col, Form, Alert } from "react-bootstrap";
+import LoadingSpinner from "@components/ui/LoadingSpinner";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../src/userServives/authContext";
 import { db } from "../../../firebase";
@@ -10,6 +11,7 @@ import "../../static/css/_note/buttons.css";
 import DOMPurify from "dompurify";
 import ErrorBoundary from "../errorBoundary";
 import TabSwitch from "../../components/ui/TabSwitch";
+import { confirmAction } from "@components/ui/ConfirmDialog";
 import { EditorContent } from "@tiptap/react";
 import { useNotePages } from "./hooks/useNotePages";
 import { useNotesCloudSyncFlag } from "./hooks/useNotesCloudSyncFlag";
@@ -175,9 +177,13 @@ function NotePage() {
         avatarUrl: effectiveImg,
       });
 
-      const goToShare = window.confirm(
-        "上傳成功！\n\n要立即前往分享頁面嗎？\n\n按「確定」前往，按「取消」繼續留在此頁。"
-      );
+      const goToShare = await confirmAction({
+        title: "上傳成功",
+        message: <p className="mb-0">要立即前往分享頁面嗎？</p>,
+        confirmLabel: "前往分享頁面",
+        cancelLabel: "留在此頁",
+        danger: false,
+      });
       setError("");
       if (goToShare) {
         navigate("/note/share");
@@ -203,7 +209,7 @@ function NotePage() {
   if (loading) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ height: "70vh" }}>
-        <Spinner animation="border" variant="primary" />
+        <LoadingSpinner label="載入筆記中…" />
       </div>
     );
   }
@@ -218,6 +224,8 @@ function NotePage() {
       <TabSwitch
         tabs={[{ key: "write", label: "✎ 寫筆記" }, { key: "share", label: "☺ 筆記分享區" }]}
         active="write"
+        ariaLabel="筆記功能"
+        idPrefix="note-tab"
         onChange={(key) => { if (key === "share") navigate("/note/share"); }}
       />
     </div>

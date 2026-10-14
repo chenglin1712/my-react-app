@@ -20,6 +20,7 @@ import { useActionLock } from '../hooks/useActionLock';
 import { ACCOUNT_MANAGERS, STAFF_ROLES } from '../constants/roles';
 import ReviewPagination from '../reviewWorkflow/ReviewPagination';
 import '../../../static/css/_admin/moderation.css';
+import { confirmAction } from '@components/ui/ConfirmDialog';
 
 const PAGE_SIZE = 20;
 
@@ -52,10 +53,12 @@ export default function RecordingsModeration() {
     const [success, setSuccess] = useState('');
     const deleteLock = useActionLock();
 
-    const deleteRecording = (item) => {
-        const confirmed = window.confirm(
-            `確定要永久刪除「${item.word || item.id}」的發音錄音嗎？此操作無法復原。`,
-        );
+    const deleteRecording = async (item) => {
+        const confirmed = await confirmAction({
+            title: '刪除發音錄音',
+            message: `確定要永久刪除「${item.word || item.id}」的發音錄音嗎？此操作無法復原。`,
+            confirmLabel: '永久刪除',
+        });
         if (!confirmed) return;
 
         deleteLock.runLocked(recordingKey(item), async () => {

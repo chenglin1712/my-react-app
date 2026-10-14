@@ -6,6 +6,7 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import { Image as ImageExtension } from "@tiptap/extension-image";
 import FontSize from "../fontSizeExtension";
+import { confirmAction } from "@components/ui/ConfirmDialog";
 
 function createEmptyNote(title = "") {
   return { id: crypto.randomUUID(), title, content: "<p></p>" };
@@ -289,8 +290,13 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
     setCurrentPage(updatedNotes.length - 1);
   };
 
-  const handleDelete = () => {
-    if (!window.confirm("確定要刪除這則筆記？")) return;
+  const handleDelete = async () => {
+    if (!await confirmAction({
+      title: "刪除這則筆記？",
+      message: "刪除後無法復原。",
+      confirmLabel: "刪除筆記",
+      cancelLabel: "先不要",
+    })) return;
     const deletedId = notes[currentPage]?.id;
     const newNotes = notes.filter((_, i) => i !== currentPage);
     const newPage = Math.max(currentPage - 1, 0);

@@ -123,6 +123,23 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
         return () => clearTimeout(timer);
     }, [ceremony]);
 
+    // 換頁後把鍵盤焦點移到內容區（審查項 P3-26）：後台不經過前台的 RouteEffects，
+    // 不處理的話焦點會留在已經換掉內容的側邊欄連結上，報讀器不知道頁面換了。
+    // 第一次載入不搶焦點；使用者正在輸入時也不搶。
+    const focusedPathRef = useRef(pathname);
+    useEffect(() => {
+        if (focusedPathRef.current === pathname) return undefined;
+        focusedPathRef.current = pathname;
+        const frame = requestAnimationFrame(() => {
+            // 有彈窗開著（內容自己已經安排了焦點）就不要把焦點拉回背景
+            if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+            const active = document.activeElement;
+            if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT' || active.isContentEditable)) return;
+            contentRef.current?.focus({ preventScroll: true });
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [pathname]);
+
     // 換頁時重播內容進場動畫。不能用 key={pathname} 讓內容區整個重掛：有些頁面（例如公告編輯器
     // 「建立後導向 /:id」）靠同一個元件實例跨過路由變化，重掛會讓它的載入流程重跑。
     // 所以改成移除再加回 class（中間強制 reflow）讓 CSS 動畫重新開始，元件完全不受影響。

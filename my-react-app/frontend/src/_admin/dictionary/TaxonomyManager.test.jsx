@@ -17,6 +17,10 @@ import {
     createTaxonomyTerm, deleteTaxonomyTerm, listTaxonomies, updateTaxonomyTerm,
 } from './dictionaryApi';
 
+// 站內確認視窗（原本是瀏覽器原生 window.confirm）：測試直接替換成可控制回傳值的 mock
+const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: confirmMock }));
+
 vi.mock('./dictionaryApi', () => ({
     listTaxonomies: vi.fn(),
     createTaxonomyTerm: vi.fn(),
@@ -68,7 +72,7 @@ describe('TaxonomyManager', () => {
         updateTaxonomyTerm.mockReset();
         deleteTaxonomyTerm.mockReset();
         listTaxonomies.mockResolvedValue(baseTaxonomies());
-        vi.spyOn(window, 'confirm').mockReturnValue(true);
+        confirmMock.mockResolvedValue(true);
     });
 
     test('預設顯示來源分頁，可切換到其他主檔', async () => {
@@ -151,7 +155,7 @@ describe('TaxonomyManager', () => {
         await waitFor(() => {
             expect(deleteTaxonomyTerm).toHaveBeenCalledWith('source', 1);
         });
-        expect(window.confirm).toHaveBeenCalled();
+        expect(confirmMock).toHaveBeenCalled();
     });
 
     test('有引用的項目刪除按鈕停用', async () => {

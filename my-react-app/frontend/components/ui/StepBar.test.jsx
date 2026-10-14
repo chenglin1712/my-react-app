@@ -31,3 +31,23 @@ describe('StepBar', () => {
     expect(container.querySelectorAll('.yy-step-connector')).toHaveLength(steps.length - 1);
   });
 });
+
+describe('StepBar 無障礙', () => {
+  const steps = ['選擇圖片', '選字確認', '查詢結果'];
+
+  test('是有序清單，目前步驟標 aria-current=step，其餘沒有', () => {
+    render(<StepBar steps={steps} current={2} />);
+    const items = screen.getAllByRole('listitem');
+    expect(items).toHaveLength(3);
+    expect(items[1]).toHaveAttribute('aria-current', 'step');
+    expect(items[0]).not.toHaveAttribute('aria-current');
+    expect(items[2]).not.toHaveAttribute('aria-current');
+  });
+
+  test('完成的步驟顯示勾號並有「已完成」文字，不只靠顏色', () => {
+    const { container } = render(<StepBar steps={steps} current={3} />);
+    expect(container.querySelectorAll('.yy-step-diamond.done')[0].textContent).toBe('✓');
+    expect(screen.getAllByText('（已完成）')).toHaveLength(2);
+    expect(screen.getByText('（目前步驟）')).toBeInTheDocument();
+  });
+});

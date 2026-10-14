@@ -7,6 +7,10 @@ import NotePage from './index';
 import { shareNote } from '../userServives/noteService';
 import { uploadToCloudinary } from '@utils/uploadToCloudinary';
 
+// 站內確認視窗（原本是瀏覽器原生 window.confirm）：測試直接替換成可控制回傳值的 mock
+const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: confirmMock }));
+
 /** 回歸測試：圖片原本是選取後轉成 Base64 直接塞進編輯器內容，這段內容會
  * 原封不動存進 localStorage、分享時又整包寫進 Firestore 的 pages 欄位，
  * 容易讓內容超過 Firestore 單一文件 1 MiB 的上限（buildPreview() 的註解記錄
@@ -139,7 +143,7 @@ describe('NotePage（_note/index.jsx）', () => {
       { id: 'a', title: '第一頁', content: `<p>${'x'.repeat(200 * 1024)}</p>` },
     ]));
     shareNote.mockResolvedValue({ id: 'shared-1' });
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    confirmMock.mockResolvedValue(false);
 
     renderPage();
     fireEvent.click(await screen.findByRole('checkbox'));

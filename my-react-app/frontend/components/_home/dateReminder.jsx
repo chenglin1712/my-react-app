@@ -1,10 +1,11 @@
 import "../../static/css/_home/dateReminder.css";
 import ExternalLink from "../ui/ExternalLink";
 import { isExternalUrl } from "../ui/externalUrl";
+import LoadingSpinner from "../ui/LoadingSpinner";
 import { useState, useEffect, useRef } from 'react';
 import { Calendar, User, FileText, Award, Mail, Bell} from 'lucide-react';
 import {
-  Button, Spinner
+  Button
 } from 'react-bootstrap';
 
 // phase（後端 /crawler/exam_schedule/ 回傳的簡短期程代稱）-> 圖示，純前端呈現用，
@@ -218,7 +219,7 @@ const DateReminder = () => {
 
                 {loading && (
                     <div className="text-center py-4">
-                        <Spinner animation="border" size="sm" />
+                        <LoadingSpinner size="sm" decorative />
                         <p className="schedule-loading-text">時程載入中...</p>
                     </div>
                 )}

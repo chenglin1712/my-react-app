@@ -1,4 +1,4 @@
-import { confirmAction } from '../components/confirmAction';
+import { confirmAction } from '@components/ui/ConfirmDialog';
 import { useRef, useState } from 'react';
 
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../../utils/apiClient';

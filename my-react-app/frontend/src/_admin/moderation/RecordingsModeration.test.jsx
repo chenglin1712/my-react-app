@@ -16,6 +16,10 @@ import { MemoryRouter } from 'react-router-dom';
 import RecordingsModeration from './RecordingsModeration';
 import { apiDelete, apiGet } from '../../../utils/apiClient';
 
+// 站內確認視窗（原本是瀏覽器原生 window.confirm）：測試直接替換成可控制回傳值的 mock
+const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: confirmMock }));
+
 vi.mock('../../../utils/apiClient', () => ({
     apiGet: vi.fn(),
     apiDelete: vi.fn(),
@@ -82,7 +86,7 @@ describe('RecordingsModeration', () => {
             deleted: true,
             storage_deleted: true,
         });
-        vi.spyOn(window, 'confirm').mockReturnValue(true);
+        confirmMock.mockResolvedValue(true);
     });
 
     test('載入後顯示詞彙、族語、分數與檢舉數', async () => {
@@ -148,8 +152,8 @@ describe('RecordingsModeration', () => {
             within(row).getByRole('button', { name: /刪除/ }),
         );
 
-        expect(window.confirm).toHaveBeenCalledWith(
-            expect.stringMatching(/永久刪除.*此操作無法復原/),
+        expect(confirmMock).toHaveBeenCalledWith(
+            expect.objectContaining({ message: expect.stringMatching(/永久刪除.*此操作無法復原/) }),
         );
 
         await waitFor(() => {
@@ -188,7 +192,7 @@ describe('RecordingsModeration', () => {
     });
 
     test('取消確認時不呼叫刪除 API', async () => {
-        window.confirm.mockReturnValue(false);
+        confirmMock.mockResolvedValue(false);
         renderPage();
 
         const row = await screen
@@ -199,7 +203,7 @@ describe('RecordingsModeration', () => {
             within(row).getByRole('button', { name: /刪除/ }),
         );
 
-        expect(window.confirm).toHaveBeenCalled();
+        expect(confirmMock).toHaveBeenCalled();
         expect(apiDelete).not.toHaveBeenCalled();
     });
 

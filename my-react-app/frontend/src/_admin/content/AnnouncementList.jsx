@@ -6,7 +6,7 @@ import { useAuth } from '../../userServives/authContext';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
 import { apiDelete, apiGet, apiPost } from '../../../utils/apiClient';
 import ReviewActions from '../reviewWorkflow/ReviewActions';
-import { confirmAction } from '../components/confirmAction';
+import { confirmAction } from '@components/ui/ConfirmDialog';
 import ReviewPagination from '../reviewWorkflow/ReviewPagination';
 import { REVIEW_ACTION_META } from '../reviewWorkflow/reviewActionPolicy';
 import { formatDateTime } from '../adminFormat';

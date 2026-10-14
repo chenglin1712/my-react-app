@@ -16,6 +16,10 @@ import { MemoryRouter } from 'react-router-dom';
 import SharedNotesModeration from './SharedNotesModeration';
 import { apiGet, apiPost } from '../../../utils/apiClient';
 
+// 站內確認視窗（原本是瀏覽器原生 window.confirm）：測試直接替換成可控制回傳值的 mock
+const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: confirmMock }));
+
 vi.mock('../../../utils/apiClient', () => ({
     apiGet: vi.fn(),
     apiPost: vi.fn(),
@@ -82,7 +86,7 @@ describe('SharedNotesModeration', () => {
             id: 'note123',
             deleted: true,
         });
-        vi.spyOn(window, 'confirm').mockReturnValue(true);
+        confirmMock.mockResolvedValue(true);
     });
 
     test('載入後顯示分享筆記、作者、檢舉數與狀態', async () => {
@@ -164,8 +168,8 @@ describe('SharedNotesModeration', () => {
             within(row).getByRole('button', { name: /下架/ }),
         );
 
-        expect(window.confirm).toHaveBeenCalledWith(
-            expect.stringContaining('確定要下架'),
+        expect(confirmMock).toHaveBeenCalledWith(
+            expect.objectContaining({ message: expect.stringContaining('確定要下架') }),
         );
 
         await waitFor(() => {
@@ -196,8 +200,8 @@ describe('SharedNotesModeration', () => {
             within(row).getByRole('button', { name: /恢復/ }),
         );
 
-        expect(window.confirm).toHaveBeenCalledWith(
-            expect.stringContaining('確定要恢復'),
+        expect(confirmMock).toHaveBeenCalledWith(
+            expect.objectContaining({ message: expect.stringContaining('確定要恢復') }),
         );
 
         await waitFor(() => {
@@ -211,7 +215,7 @@ describe('SharedNotesModeration', () => {
     });
 
     test('取消原生確認框時不呼叫下架 API', async () => {
-        window.confirm.mockReturnValue(false);
+        confirmMock.mockResolvedValue(false);
         renderPage();
 
         const row = await screen
@@ -222,7 +226,7 @@ describe('SharedNotesModeration', () => {
             within(row).getByRole('button', { name: /下架/ }),
         );
 
-        expect(window.confirm).toHaveBeenCalled();
+        expect(confirmMock).toHaveBeenCalled();
         expect(apiPost).not.toHaveBeenCalled();
     });
 

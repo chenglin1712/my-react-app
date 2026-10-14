@@ -36,3 +36,17 @@ describe('StarRating', () => {
     expect(container.textContent).toBe('');
   });
 });
+
+describe('StarRating 文字替代', () => {
+  test('整組星星是 role=img，名稱說明星數與數值', () => {
+    const { getByRole } = render(<StarRating frequency={500} />);
+    expect(getByRole('img')).toHaveAccessibleName('詞頻 3 顆星（滿 5 顆），數值 500');
+  });
+});
+
+describe('StarRating 數值 0', () => {
+  test('詞頻 0 的名稱仍包含數值 0（可見的括號數值是 aria-hidden）', () => {
+    const { getByRole } = render(<StarRating frequency={0} />);
+    expect(getByRole('img')).toHaveAccessibleName('詞頻 1 顆星（滿 5 顆），數值 0');
+  });
+});

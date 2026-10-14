@@ -150,21 +150,8 @@
   100% { transform: scale(1); }
 }
 
-/* ---------- 主按鈕光圈（其他頁面的主按鈕各自在自己的 CSS 沿用 yy-pulse-ring） ---------- */
-.yy-btn-primary {
-  position: relative;
-  isolation: isolate;
-}
-.yy-btn-primary::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  background: rgba(217, 162, 39, 0.55);
-  pointer-events: none;
-  animation: yy-pulse-ring 2.8s ease-in-out infinite;
-}
+/* 脈動光圈只留在首頁主要行動按鈕（.home-cta，見 _home/index.css）：表單與工具頁的按鈕不該一直在動，
+   會分散填寫與閱讀時的注意力（審查項 P2-5）。 */
 
 /* ---------- 捲動進場與載入骨架 ---------- */
 
@@ -466,6 +453,17 @@
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.yy-step-item {
+  display: flex;
+  align-items: center;
+}
+.yy-loading {
+  display: inline-flex;
+  align-items: center;
 }
 .yy-step {
   display: flex;
@@ -826,9 +824,3 @@
   min-height: 100dvh;
 }
 
-/* 停用、按下時光圈也要停（動畫在偽元素上，按鈕本體的 animation: none 管不到它） */
-.yy-btn-primary:disabled::after,
-.yy-btn-primary:active::after {
-    animation: none;
-    opacity: 0;
-}

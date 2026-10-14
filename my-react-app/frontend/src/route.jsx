@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
-import { Spinner } from 'react-bootstrap';
+import LoadingSpinner from '@components/ui/LoadingSpinner';
 import { useAuth } from './userServives/authContext';
 import PermissionProtect from './userServives/permissionProtect';
 import ErrorBoundary from './errorBoundary';
@@ -102,9 +102,7 @@ const OpenLayout = () => {
 
 const RouteLoadingFallback = () => (
   <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
-    <Spinner animation="border" variant="danger" role="status">
-      <span className="visually-hidden">載入中…</span>
-    </Spinner>
+    <LoadingSpinner label="頁面載入中…" />
   </div>
 );
 

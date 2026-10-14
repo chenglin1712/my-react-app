@@ -3,6 +3,10 @@ import { act, renderHook } from '@testing-library/react';
 
 import { useNotePages } from './useNotePages';
 
+// 站內確認視窗（原本是瀏覽器原生 window.confirm）：測試直接替換成可控制回傳值的 mock
+const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: confirmMock }));
+
 /** FE-11：分享選取原本存的是陣列索引，而 handleDelete 會從中間刪掉一頁卻
  * 完全沒有調整選取內容。選了某一頁之後刪掉它前面的頁，選取就會指到另一篇
  * 筆記——分享出去的是錯的內容；索引超出範圍時 notes[i] 是 undefined，
@@ -42,7 +46,7 @@ function seedNotes(notes) {
 describe('useNotePages 的分享選取（FE-11）', () => {
     beforeEach(() => {
         localStorage.clear();
-        vi.spyOn(window, 'confirm').mockReturnValue(true);
+        confirmMock.mockResolvedValue(true);
     });
 
     afterEach(() => {
@@ -50,7 +54,7 @@ describe('useNotePages 的分享選取（FE-11）', () => {
         localStorage.clear();
     });
 
-    test('刪除前面的頁次後，選取仍然指向原本那一篇筆記', () => {
+    test('刪除前面的頁次後，選取仍然指向原本那一篇筆記', async () => {
         seedNotes([
             { id: 'a', title: '第一篇', content: '<p>A</p>' },
             { id: 'b', title: '第二篇', content: '<p>B</p>' },
@@ -64,14 +68,14 @@ describe('useNotePages 的分享選取（FE-11）', () => {
         expect(result.current.selectedPageIds).toEqual(['c']);
 
         // 停在第一頁並刪掉它——修正前選取的索引 2 會變成指向不存在的位置
-        act(() => { result.current.handleDelete(); });
+        await act(async () => { await result.current.handleDelete(); });
 
         expect(result.current.notes.map((n) => n.id)).toEqual(['b', 'c']);
         // 選取仍然是「第三篇」這篇筆記本身
         expect(result.current.selectedPageIds).toEqual(['c']);
     });
 
-    test('刪除的正好是被選取的那一頁時，會一併移出選取', () => {
+    test('刪除的正好是被選取的那一頁時，會一併移出選取', async () => {
         seedNotes([
             { id: 'a', title: '第一篇', content: '<p>A</p>' },
             { id: 'b', title: '第二篇', content: '<p>B</p>' },
@@ -82,7 +86,7 @@ describe('useNotePages 的分享選取（FE-11）', () => {
         act(() => { result.current.handleToggleSelect('a'); });
         expect(result.current.selectedPageIds).toEqual(['a']);
 
-        act(() => { result.current.handleDelete(); });
+        await act(async () => { await result.current.handleDelete(); });
 
         expect(result.current.selectedPageIds).toEqual([]);
     });
@@ -139,7 +143,7 @@ describe('useNotePages 的分享選取（FE-11）', () => {
 describe('useNotePages 的存檔與不可變更新', () => {
     beforeEach(() => {
         localStorage.clear();
-        vi.spyOn(window, 'confirm').mockReturnValue(true);
+        confirmMock.mockResolvedValue(true);
         fakeEditor.html = '<p></p>';
         fakeEditor.commands.setContent.mockClear();
     });
@@ -304,7 +308,7 @@ describe('useNotePages 的雲端同步支援（D-2）', () => {
         fakeEditor.commands.setContent.mockClear();
         vi.useFakeTimers();
         vi.setSystemTime(1_760_000_000_000);
-        vi.spyOn(window, 'confirm').mockReturnValue(true);
+        confirmMock.mockResolvedValue(true);
     });
 
     afterEach(() => {
@@ -438,11 +442,11 @@ describe('useNotePages 的雲端同步支援（D-2）', () => {
         });
     });
 
-    test('刪除一頁時通知同步（帶筆記 id）', () => {
+    test('刪除一頁時通知同步（帶筆記 id）', async () => {
         seedNotes([{ id: 'a', title: '一', content: '<p>A</p>' }, { id: 'b', title: '二', content: '<p>B</p>' }]);
         const onNoteDeleted = vi.fn();
         const { result } = renderHook(() => useNotePages(UID, { cloudSync: true, onNoteDeleted }));
-        act(() => { result.current.handleDelete(); });
+        await act(async () => { await result.current.handleDelete(); });
         expect(onNoteDeleted).toHaveBeenCalledWith('a');
     });
 });

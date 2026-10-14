@@ -233,17 +233,17 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
                                 <div key={idx} className="submit-question-result">
                                     <div className="submit-question-header">
                                         <span className="submit-question-num">第{idx + 1}題</span>
-                                        {/* 對錯原本只有圖示：沒有名稱，報讀器念不出來。圖示藏起來，改念文字（審查項 P1-7） */}
+                                        {/* 對錯原本只有圖示：沒有名稱，報讀器念不出來。圖示藏起來，改念文字（審查項 P1-7）；文字也直接顯示出來，不只靠圖示形狀與顏色（P2-100） */}
                                         <span>
                                             {isCorrect === true ? (
                                                 <>
                                                     <CheckCircle style={{ color: "var(--yy-green)" }} size={20} aria-hidden="true" />
-                                                    <span className="visually-hidden">答對</span>
+                                                    <span className="submit-result-label" style={{ color: "var(--yy-green)" }}>答對</span>
                                                 </>
                                             ) : isCorrect === false ? (
                                                 <>
                                                     <XCircle style={{ color: "var(--yy-red)" }} size={20} aria-hidden="true" />
-                                                    <span className="visually-hidden">答錯</span>
+                                                    <span className="submit-result-label" style={{ color: "var(--yy-red)" }}>答錯</span>
                                                 </>
                                             ) : null}
                                         </span>

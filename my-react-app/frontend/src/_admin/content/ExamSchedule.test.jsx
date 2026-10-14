@@ -4,6 +4,10 @@ import { MemoryRouter } from 'react-router-dom';
 import ExamSchedule from './ExamSchedule';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../utils/apiClient';
 
+// 站內確認視窗（原本是瀏覽器原生 window.confirm）：測試直接替換成可控制回傳值的 mock
+const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: confirmMock }));
+
 vi.mock('../../../utils/apiClient', () => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),
@@ -49,7 +53,7 @@ describe('ExamSchedule', () => {
     apiPut.mockReset();
     apiDelete.mockReset();
     apiGet.mockResolvedValue(baseData);
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    confirmMock.mockResolvedValue(true);
   });
 
   test('載入後同時顯示爬蟲原始結果與後台生效值兩欄', async () => {
@@ -151,7 +155,7 @@ describe('ExamSchedule', () => {
     const row = within(rightTable).getByText('報名').closest('tr');
     fireEvent.click(within(row).getByRole('button', { name: /清除覆寫/ }));
 
-    expect(window.confirm).toHaveBeenCalled();
+    expect(confirmMock).toHaveBeenCalled();
     await waitFor(() => {
       expect(apiDelete).toHaveBeenCalledWith('/adminapi/exam-schedule/overrides/%E5%A0%B1%E5%90%8D/');
     });

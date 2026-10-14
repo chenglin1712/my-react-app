@@ -10,6 +10,10 @@ import {
 } from '../userServives/noteService';
 import { submitReport } from '../userServives/reportService';
 
+// 站內確認視窗（原本是瀏覽器原生 window.confirm）：測試直接替換成可控制回傳值的 mock
+const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: confirmMock }));
+
 vi.mock('../userServives/noteService', () => ({
   fetchSharedNotesPage: vi.fn(),
   fetchSharedNotesCount: vi.fn(),
@@ -110,7 +114,7 @@ describe('NoteShare', () => {
       id, uid: 'user-1', pages: [{ title: id === 'mine-1' ? '筆記1' : '筆記2', content: '<p></p>' }],
     }));
     softDeleteNote.mockResolvedValue(undefined);
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    confirmMock.mockResolvedValue(true);
 
     const user = userEvent.setup();
     renderPage();

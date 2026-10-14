@@ -6,6 +6,7 @@ import { apiDelete, apiGet, apiPost, apiPut } from '../../../utils/apiClient';
 import { useActionLock } from '../hooks/useActionLock';
 import { formatDateTime } from '../adminFormat';
 import '../../../static/css/_admin/exam-schedule.css';
+import { confirmAction } from '@components/ui/ConfirmDialog';
 
 const CONTENT_EDITORS = ['owner', 'admin', 'editor'];
 
@@ -122,8 +123,13 @@ export default function ExamSchedule() {
         });
     };
 
-    const clearOverride = (phase) => {
-        if (!window.confirm(`確定要清除「${phase}」的覆寫嗎？`)) return Promise.resolve();
+    const clearOverride = async (phase) => {
+        const confirmed = await confirmAction({
+            title: '清除覆寫',
+            message: <p className="mb-0">確定要清除「{phase}」的覆寫嗎？</p>,
+            confirmLabel: '清除覆寫',
+        });
+        if (!confirmed) return undefined;
 
         return lock.runLocked(`phase:${phase}`, async () => {
             setError('');

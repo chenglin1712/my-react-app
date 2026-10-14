@@ -5,6 +5,10 @@ import { useQuizPanelData } from './useQuizPanelData';
 import { uploadSituationDB } from '../../src/userServives/uploadDb';
 import { trackEvent } from '../../utils/apiClient';
 
+// 站內確認視窗（原本是瀏覽器原生 window.confirm）：測試直接替換成可控制回傳值的 mock
+const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: confirmMock }));
+
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ level: '1' }),
@@ -50,7 +54,7 @@ describe('Panel + AnswerBox 提交流程整合（FR-4a：兩顆繳交按鈕必�
     mockNavigate.mockReset();
     uploadSituationDB.mockReset();
     trackEvent.mockReset();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    confirmMock.mockResolvedValue(true);
     sessionStorage.clear();
   });
 
@@ -92,7 +96,7 @@ describe('Panel + AnswerBox 提交流程整合（FR-4a：兩顆繳交按鈕必�
 
   test('作答未完成時兩顆按鈕都會先跳確認框，取消就不會存檔也不會導頁', async () => {
     useQuizPanelData.mockReturnValue(baseHookState({ userAnswers: [null] }));
-    window.confirm.mockReturnValueOnce(false);
+    confirmMock.mockResolvedValueOnce(false);
 
     render(<Panel tribe="tayal" />);
     const submitButtons = screen.getAllByRole('button', { name: '繳交試卷' });
@@ -101,7 +105,11 @@ describe('Panel + AnswerBox 提交流程整合（FR-4a：兩顆繳交按鈕必�
       fireEvent.click(submitButtons[1]);
     });
 
-    expect(window.confirm).toHaveBeenCalled();
+    expect(confirmMock).toHaveBeenCalled();
+    // 確認內容要說出還有幾題沒答（P2-56）
+    const { message } = confirmMock.mock.calls[0][0];
+    const { container } = render(message);
+    expect(container.textContent).toContain('還有 1 題尚未作答');
     expect(uploadSituationDB).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
   });

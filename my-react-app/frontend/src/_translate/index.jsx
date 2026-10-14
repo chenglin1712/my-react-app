@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { Alert, Spinner } from "react-bootstrap";
+import { Alert } from "react-bootstrap";
+import LoadingSpinner from "@components/ui/LoadingSpinner";
 import { Link } from "react-router-dom";
 import { ArrowLeftRight, Copy, Volume2 } from "lucide-react";
 import "../../static/css/_translate/index.css";
@@ -179,7 +180,7 @@ const TranslatePage = () => {
         return (
             <div className="yy-page translate-page">
                 <div className="translate-auth-loading" role="status">
-                    <Spinner animation="border" size="sm" />
+                    <LoadingSpinner size="sm" decorative />
                     <span>確認登入狀態…</span>
                 </div>
             </div>
@@ -253,7 +254,7 @@ const TranslatePage = () => {
                             disabled={!sourceText.trim() || loading || (isGuest && guestQuota.exhausted)}
                             onClick={handleSubmit}
                         >
-                            {loading ? <Spinner animation="border" size="sm" /> : "翻譯"}
+                            {loading ? <LoadingSpinner size="sm" announce={false} label="翻譯中…" /> : "翻譯"}
                         </button>
                     </div>
 
@@ -269,7 +270,7 @@ const TranslatePage = () => {
 
                         {loading && (
                             <div className="translate-result-loading">
-                                <Spinner animation="border" size="sm" />
+                                <LoadingSpinner size="sm" decorative />
                                 <span>翻譯中…</span>
                             </div>
                         )}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Spinner } from 'react-bootstrap';
+import { Alert } from 'react-bootstrap';
+import LoadingSpinner from '@components/ui/LoadingSpinner';
 import { apiPost } from "../../utils/apiClient";
 import { announce } from "@utils/announce";
 import { countMatchedWords } from "../../utils/wordFilterSort";
@@ -126,7 +127,7 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
         onRestart={onRestart}
       />
 
-      {loading && <Spinner animation="border" variant="primary" />}
+      {loading && <LoadingSpinner label="查詢中…" />}
       {error && <Alert variant="danger">{error}</Alert>}
       {favoritesError && <Alert variant="danger">{favoritesError}</Alert>}
 

@@ -14,6 +14,7 @@ import { trackEvent } from "../../utils/apiClient"
 import { buildQuizAnswerEvents } from "./quizAnswerTracking"
 import { useLottieAnimation } from "@hooks/useLottieAnimation";
 import { announce } from "@utils/announce";
+import { confirmAction } from "@components/ui/ConfirmDialog";
 import { QUIZ_LEVEL_NAME_BY_ID } from "./quizLevels";
 
 const Panel = ({ tribe = "tayal" }) => {
@@ -89,8 +90,15 @@ const Panel = ({ tribe = "tayal" }) => {
     // situationID——使用者點側邊欄那顆「繳交試卷」，作答結果會直接遺失。
     const handleSubmit = async () => {
         if (isSubmitting) return;
-        if (userAnswers.some(a => a === null)) {
-            const confirmSubmit = window.confirm("⚠️您尚未作答完成，確定要繳交嗎？");
+        const unanswered = userAnswers.filter(a => a === null).length;
+        if (unanswered > 0) {
+            const confirmSubmit = await confirmAction({
+                title: "還有題目沒有作答",
+                message: <p className="mb-0">還有 {unanswered} 題尚未作答，確定要現在繳交嗎？</p>,
+                confirmLabel: "繳交試卷",
+                cancelLabel: "回去作答",
+                danger: false,
+            });
             if (!confirmSubmit) {
                 return;
             }
@@ -177,8 +185,13 @@ const Panel = ({ tribe = "tayal" }) => {
                     <div className="panel-header">
                         <button
                             className="exit-btn"
-                            onClick={() => {
-                                const isConfirmed = window.confirm("你確定要離開測驗嗎？未完成的測驗將不會保存。");
+                            onClick={async () => {
+                                const isConfirmed = await confirmAction({
+                                    title: "離開測驗？",
+                                    message: <p className="mb-0">未完成的測驗將不會保存。</p>,
+                                    confirmLabel: "離開測驗",
+                                    cancelLabel: "繼續作答",
+                                });
                                 if (isConfirmed) {
                                     navigate(basePath);
                                 }

@@ -10,6 +10,7 @@ import NoteCard from "./components/NoteCard";
 import NoteModal from "./components/NoteModal";
 import "../../static/css/_note/./notesharestyle.css";
 import TabSwitch from "../../components/ui/TabSwitch";
+import { confirmAction } from "@components/ui/ConfirmDialog";
 
 export default function NoteShare() {
   const { id } = useParams();
@@ -149,7 +150,12 @@ export default function NoteShare() {
 
   const handleModalDelete = async () => {
     if (!modalNote || !isMyTab || myUid !== modalNote.uid) return;
-    if (!window.confirm("確定要刪除這則筆記？")) return;
+    if (!await confirmAction({
+      title: "刪除這則筆記？",
+      message: <p className="mb-0">刪除後無法復原。</p>,
+      confirmLabel: "刪除筆記",
+      cancelLabel: "先不要",
+    })) return;
     try {
       await softDeleteNote(modalNote.id);
       // 刪掉的正好是這一頁唯一一筆、而且不是第一頁時，留在原地只會看到空白頁，
@@ -197,6 +203,8 @@ export default function NoteShare() {
       <TabSwitch
         tabs={[{ key: "write", label: "✎ 寫筆記" }, { key: "share", label: "☺ 筆記分享區" }]}
         active="share"
+        ariaLabel="筆記功能"
+        idPrefix="note-tab"
         onChange={(key) => { if (key === "write") navigate("/note"); }}
       />
     </div>

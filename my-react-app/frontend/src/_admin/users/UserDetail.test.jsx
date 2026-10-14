@@ -21,6 +21,10 @@ import {
   apiPost,
 } from '../../../utils/apiClient';
 
+// 站內確認視窗（原本是瀏覽器原生 window.confirm）：測試直接替換成可控制回傳值的 mock
+const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: confirmMock }));
+
 vi.mock('../../../utils/apiClient', () => ({
   apiGet: vi.fn(),
   apiPatch: vi.fn(),
@@ -137,7 +141,7 @@ describe('UserDetail', () => {
     apiPatch.mockReset();
     apiPost.mockReset();
     mockDetailApi();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    confirmMock.mockResolvedValue(true);
   });
 
   test('顯示基本資料、產出計數與 Firestore 原始欄位', async () => {
@@ -178,7 +182,7 @@ describe('UserDetail', () => {
       screen.getByRole('button', { name: '更新角色' }),
     );
 
-    expect(window.confirm).toHaveBeenCalled();
+    expect(confirmMock).toHaveBeenCalled();
 
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith(
@@ -569,7 +573,7 @@ describe('UserDetail', () => {
       screen.getByRole('button', { name: '停權帳號' }),
     );
 
-    expect(window.confirm).toHaveBeenCalled();
+    expect(confirmMock).toHaveBeenCalled();
 
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith(
