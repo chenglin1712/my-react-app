@@ -181,7 +181,7 @@ const DateReminder = () => {
 
             <div className="date-reminder-content">
                 <div className="reset-reminders">
-                    <Button variant="outline-danger" onClick={handleResetNotifications}><Bell /> 開啟通知</Button>
+                    <Button variant="outline-danger" onClick={handleResetNotifications}><Bell /> 重設提醒</Button>
                 </div>
 
                 {/* aria-live 包在這個常駐的外層容器上（而不是各自的 toast-notification

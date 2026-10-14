@@ -30,3 +30,21 @@ describe('EditorToolbar（筆記工具列）', () => {
         expect(screen.getByRole('button', { name: '文字顏色：藍色' })).toHaveAttribute('aria-pressed', 'false');
     });
 });
+
+describe('EditorToolbar 粗斜體（E-7，P3-27）', () => {
+    test('粗體與斜體是圖示按鈕（不是數學字母符號），有 aria-pressed 並在點擊後切換', () => {
+        const execStyle = vi.fn();
+        render(<EditorToolbar execStyle={execStyle} onImageFileSelected={vi.fn()} isUploadingImage={false} />);
+        const bold = screen.getByRole('button', { name: '粗體' });
+        const italic = screen.getByRole('button', { name: '斜體' });
+
+        expect(bold.textContent).toBe('');
+        expect(bold.querySelector('svg')).not.toBeNull();
+        expect(bold).toHaveAttribute('aria-pressed', 'false');
+
+        fireEvent.click(bold);
+        expect(execStyle).toHaveBeenCalledWith('bold');
+        expect(bold).toHaveAttribute('aria-pressed', 'true');
+        expect(italic).toHaveAttribute('aria-pressed', 'false');
+    });
+});

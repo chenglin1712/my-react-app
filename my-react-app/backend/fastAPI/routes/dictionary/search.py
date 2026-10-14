@@ -22,6 +22,7 @@ from fastAPI.usage_events import record_event
 from ..keyed_cache import KeyedCache
 from .schemas import (
     AllWordsRequest,
+    FavoriteCountsRequest,
     KeywordRequest,
     MultiWordSearchRequest,
     WordResult,
@@ -286,6 +287,24 @@ def available_initial_letters(db: Session, tribe: str = '泰雅語') -> List[str
     return sorted(letters)
 
 
+def count_words_by_tribe(db: Session, names: List[str]) -> Dict[str, int]:
+    """每個族語各有幾個詞條的名稱在 names 裡，回傳 {tribe slug: 筆數}（五個族語都會有，沒有就是 0）。
+
+    筆數的算法跟收藏頁字卡一致：沿用 search_all 的「沒有釋義的詞不列入」，並且一筆詞條算一張
+    字卡（同一個詞名在同一族語有多筆詞條就算多筆），這樣頁面上寫的數字跟實際看到的卡片數相同。
+    走 tribe 級快取（app 啟動時已由 warm_cache() 預熱），不會每次請求都重查資料庫。"""
+    wanted = set(names)
+    if not wanted:
+        return {tribe.slug: 0 for tribe in TRIBES}
+    counts: Dict[str, int] = {}
+    for tribe in TRIBES:
+        counts[tribe.slug] = sum(
+            1 for wr in _load_tribe_words(db, tribe.full_name)
+            if wr.explanationItems and wr.name in wanted
+        )
+    return counts
+
+
 # ------------------------- API 路由 -------------------------
 def _call_with_own_session(fn, *args, **kwargs):
     """在目前所在的 thread 裡自己建立、自己關閉 SQLAlchemy Session，執行 fn
@@ -394,6 +413,19 @@ async def all_tayal_dictionary(request: Request, body: AllWordsRequest):
         },
         status_code=200
     )
+
+
+@router.post("/favorites-summary/")
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_favorites_summary", "30/minute"))  # 只讀 tribe 級快取、不查資料庫，上限放寬但仍避免被大量重送
+async def favorites_summary(request: Request, body: FavoriteCountsRequest):
+    """各族語收藏數：前端送來目前收藏分類的詞名，回傳每個族語裡有幾張對應的字卡。
+    收藏頁用它在族語選單旁寫出「泰雅 12・阿美 3…」，讓使用者切換族語前就知道其他族語
+    有沒有收藏，不必逐一切換才發現。
+
+    冷快取時 _load_tribe_words 是同步的全表掃描＋JSON parse，丟到執行緒池執行
+    （見 /keys/ 同樣的說明）。"""
+    counts = await asyncio.to_thread(_call_with_own_session, count_words_by_tribe, body.names)
+    return JSONResponse({"counts": counts}, status_code=200)
 
 
 def _search_single_keyword(db: Session, keyword: str, tribe_name: str):

@@ -187,3 +187,39 @@
     margin-left: auto;
     margin-right: auto;
 }
+
+.calendar-page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 16px 0;
+}
+.calendar-title {
+    margin: 0;
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    font-weight: 800;
+}
+.calendar-page .calendar-wrapper {
+    margin-top: 16px;
+}
+
+/* 時間欄只佔需要的寬度，文字欄吃剩下的 */
+.event-input-bar input[type="time"] {
+    flex: 0 0 auto;
+    width: 130px;
+}
+
+.event-input-bar select {
+    flex: 0 0 auto;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+    background: #fff;
+    color: inherit;
+}
+
+.event-input-bar select:focus-visible {
+    border-color: var(--yy-red);
+    outline: var(--yy-focus-ring);
+    outline-offset: 2px;
+}

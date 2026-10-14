@@ -1,4 +1,4 @@
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from 'react-bootstrap';
 import { FaHeart, FaRegHeart, FaPlayCircle, FaImage } from 'react-icons/fa';
 import StarRating from '../../../components/ui/StarRating';
@@ -136,6 +136,21 @@ const DefinitionDetails = ({ definitions, playAudio, failedAudio }) => {
 //單字卡
 const WordCardWithImg = memo(({ word, result, keyName, isExpanded, toggleExpand, toggleFavorite, wordName, categoryId, playAudio, isFavorited, failedAudio }) => {
   const isFlipped = isExpanded;
+  const frontRef = useRef(null);
+  const backRef = useRef(null);
+  const mountedRef = useRef(false);
+
+  // 翻面後原本有焦點的那一面變 inert，焦點會掉到 body，鍵盤使用者就失去位置：
+  // 翻面（不是第一次渲染）且焦點掉到 body 時，移到現在可操作的那一面。
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    if (document.activeElement === document.body || document.activeElement === null) {
+      (isFlipped ? backRef : frontRef).current?.focus({ preventScroll: true });
+    }
+  }, [isFlipped]);
 
   const handleToggleFavorite = useCallback(() => {
     toggleFavorite(wordName, categoryId);
@@ -154,9 +169,11 @@ const WordCardWithImg = memo(({ word, result, keyName, isExpanded, toggleExpand,
       <div className={`word-card ${isFlipped ? 'flipped' : ''}`}>
         {/* 正面 */}
         <div
+          ref={frontRef}
           className="word-card-front"
           role="button"
           tabIndex={0}
+          inert={isFlipped}
           aria-expanded={isFlipped}
           onClick={handleToggleExpand}
           onKeyDown={handleToggleExpandKeyDown}
@@ -180,9 +197,11 @@ const WordCardWithImg = memo(({ word, result, keyName, isExpanded, toggleExpand,
 
         {/* 背面 */}
         <div
+          ref={backRef}
           className="word-card-back"
           role="button"
           tabIndex={0}
+          inert={!isFlipped}
           aria-expanded={isFlipped}
           onClick={handleToggleExpand}
           onKeyDown={handleToggleExpandKeyDown}

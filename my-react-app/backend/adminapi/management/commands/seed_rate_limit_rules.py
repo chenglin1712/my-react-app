@@ -147,6 +147,7 @@ FASTAPI_RULES = [
     ("dictionary_search_multiword", "60/minute", "辭典多關鍵字搜尋"),
     ("dictionary_search_all_words", "60/minute", "辭典全詞條查詢"),
     ("dictionary_search_allsearch", "60/minute", "辭典單字搜尋"),
+    ("dictionary_favorites_summary", "30/minute", "各族語收藏數統計"),
     ("translation_translate", "10/minute", "族語翻譯（含 LLM 呼叫）"),
     ("translation_capabilities", "60/minute", "翻譯能力資訊查詢"),
 ]

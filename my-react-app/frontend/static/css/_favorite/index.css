@@ -3,6 +3,15 @@
     margin-bottom: 1rem;
 }
 
+/* 收藏上百張時，畫面外的卡片先不渲染（3D 翻牌每張一個合成層，審查項 P2-108）。
+   放在字卡外層的包裝上，不放在負責 perspective 的 .word-card-container 本身；
+   content-visibility 會裁掉包裝外的內容，所以留出放陰影的內距，高度先用預估值佔位避免捲軸跳動。 */
+.word-card-cv {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 316px;
+    padding: 4px 8px 12px;
+}
+
 .word-card {
     position: relative;
     width: 100%;
@@ -291,3 +300,30 @@
 
 /* .category-bar／.category-panel／.subcategory-* 已搬到共用的
    components/ui/CategoryBar.jsx + static/css/ui/categoryBar.css。 */
+
+.favorite-hero {
+    padding: 36px 24px 24px;
+}
+.favorite-title {
+    margin: 0 0 8px;
+    font-size: clamp(1.6rem, 4vw, 2.2rem);
+    font-weight: 800;
+}
+.favorite-desc {
+    margin: 0;
+    color: var(--yy-text-secondary);
+}
+.favorite-controls {
+    padding-top: 1rem;
+}
+.favorite-count {
+    font-size: 14px;
+    color: var(--yy-text-secondary);
+}
+
+/* 族語下拉選單裡每個族語的收藏數：次要資訊，用較淡的字色 */
+.favorite-tribe-count {
+    color: var(--yy-text-muted, #6B5A47);
+    font-size: 0.85em;
+    font-variant-numeric: tabular-nums;
+}

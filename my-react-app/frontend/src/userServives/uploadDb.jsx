@@ -1,6 +1,7 @@
 import { db, auth } from "../../../firebase";
 import { collection, addDoc, serverTimestamp, query, where, doc, getDoc, getDocs, orderBy, runTransaction } from "firebase/firestore";
 import { TRIBE_FULL_NAME_BY_SLUG as TRIBE_NAME } from "../constants/tribes";
+import { normalizeCalendarEvent } from "../../utils/calendarEvents";
 
 // 遞迴移除物件裡值為 undefined 的欄位（陣列裡的 undefined 換成 null，不能直接拿掉否則索引會位移；
 // 稀疏陣列的空洞也會變成 null）。只處理普通物件與陣列：Date、Firestore 的 Timestamp／serverTimestamp
@@ -372,7 +373,9 @@ export const addCalendarEvents = async (events) => {
     if (!user) throw new Error("請先登入才能新增行程");
 
     const docRef = doc(db, "calendar", user.uid);
-    const newEvents = events.map((event) => ({ ...event, id: crypto.randomUUID() }));
+    // 每一筆都補齊 allDay（是否全天）與 type（"quiz" | "general"）：呼叫端（行事曆頁、學習計畫）
+    // 沒明確給的，用 utils/calendarEvents.js 的判讀補上，之後讀取不必再靠猜。
+    const newEvents = events.map((event) => ({ ...normalizeCalendarEvent(event), id: crypto.randomUUID() }));
 
     await runTransaction(db, async (tx) => {
         const docSnap = await tx.get(docRef);

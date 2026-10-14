@@ -5,6 +5,14 @@ import "react-calendar/dist/Calendar.css";
 import { Trash2 } from "lucide-react";
 import { getCalendar, addCalendarEvent, deleteCalendarEvent } from "../../src/userServives/uploadDb"
 import { useNavigate } from "react-router-dom";
+import { confirmAction } from "@components/ui/ConfirmDialog";
+import {
+    EVENT_TYPE_GENERAL,
+    EVENT_TYPE_QUIZ,
+    buildEventRange,
+    formatEventTime,
+    getEventType,
+} from "@utils/calendarEvents";
 
 // 本地日期 key（YYYY-MM-DD）。原本同時用 toLocaleDateString().split("/").join("-")
 // 和 toISOString().split("T")[0] 兩種方式產生日期 key：後者是 UTC，跟使用者
@@ -18,12 +26,20 @@ function toLocalDateKey(date) {
     return `${year}-${month}-${day}`;
 }
 
+// 標題用中文日期（例如「10月14日 星期三」），不是 ISO 的 2026-10-14
+function formatChineseDate(date) {
+    return date.toLocaleDateString("zh-TW", { month: "long", day: "numeric", weekday: "long" });
+}
+
 const UserCalendar = () => {
     const navigate = useNavigate();
     const [date, setDate] = useState(new Date());
     const [newEvent, setNewEvent] = useState("");
     const [eventsByDate, setEventsByDate] = useState({});
+    const [newEventTime, setNewEventTime] = useState("");
+    const [newEventType, setNewEventType] = useState(EVENT_TYPE_GENERAL);
     const [isSaving, setIsSaving] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState("");
 
     const dateKey = toLocalDateKey(date);
@@ -46,6 +62,8 @@ const UserCalendar = () => {
                     console.error("載入行事曆失敗：", err);
                     setError("載入行事曆失敗，請稍後再試。");
                 }
+            } finally {
+                if (!cancelled) setIsLoading(false);
             }
         };
         fetchEvents();
@@ -61,8 +79,8 @@ const UserCalendar = () => {
         const newEventObj = {
             summary: newEvent.trim(),
             description: "",
-            start: `${dateKey}T00:00:00+08:00`,
-            end: `${dateKey}T00:30:00+08:00`
+            ...buildEventRange(dateKey, newEventTime),
+            type: newEventType,
         };
 
         try {
@@ -72,6 +90,8 @@ const UserCalendar = () => {
                 [dateKey]: [...(prev[dateKey] || []), saved],
             }));
             setNewEvent("");
+            setNewEventTime("");
+            setNewEventType(EVENT_TYPE_GENERAL);
         } catch (err) {
             console.error("新增行程失敗：", err);
             setError("新增行程失敗，請稍後再試。");
@@ -80,7 +100,16 @@ const UserCalendar = () => {
         }
     };
 
-    const handleDelete = async (eventId) => {
+    const handleDelete = async (event) => {
+        const eventId = event.id;
+        // 刪除沒有復原，先確認，並說明刪的是哪一筆
+        const confirmed = await confirmAction({
+            title: "刪除這個行程？",
+            message: <p className="mb-0">「{event.summary}」刪除後無法復原。</p>,
+            confirmLabel: "刪除",
+            cancelLabel: "保留",
+        });
+        if (!confirmed) return;
         setError("");
         try {
             await deleteCalendarEvent(eventId);
@@ -97,8 +126,10 @@ const UserCalendar = () => {
     const eventsForDate = eventsByDate[dateKey] || [];
 
     return (
+        <div className="calendar-page">
+        <h1 className="calendar-title">行事曆</h1>
         <div className="calendar-wrapper">
-            <div className="calendar-left">
+            <div className="calendar-left" aria-busy={isLoading}>
                 <Calendar
                     onChange={setDate}
                     value={date}
@@ -126,22 +157,23 @@ const UserCalendar = () => {
                 />
             </div>
             <div className="calendar-right">
-                <h2>{dateKey} 的行程</h2>
+                <h2>{formatChineseDate(date)} 的行程</h2>
                 {error && <p className="calendar-error-text" role="alert">{error}</p>}
                 <div className="event-list-scroll">
-                    {eventsForDate.map((event, index) => (
+                    {isLoading && <div className="no-event" role="status">載入行程中…</div>}
+                    {!isLoading && eventsForDate.map((event, index) => (
                         <div className="event-card" key={event.id ?? `${dateKey}-${index}`}>
                             <h4>{event.summary}</h4>
                             <p>{event.description}</p>
                             <span>
-                                {new Date(event.start).toLocaleTimeString()} -{" "}
-                                {new Date(event.end).toLocaleTimeString()}
+                                {formatEventTime(event)}
                             </span>
-                            <button onClick={() => handleDelete(event.id)} title="刪除" className="delete-btn" aria-label="刪除">
+                            <button type="button" onClick={() => handleDelete(event)} title="刪除" className="delete-btn" aria-label={`刪除「${event.summary}」`}>
                                 <Trash2 size={16} />
                             </button>
-                            {/(測驗)/.test(`${event.summary}${event.description || ""}`) && (
+                            {getEventType(event) === EVENT_TYPE_QUIZ && (
                                 <button
+                                    type="button"
                                     className="go-quiz-btn"
                                     onClick={() => navigate('/quiz/select')}
                                 >
@@ -150,7 +182,7 @@ const UserCalendar = () => {
                             )}
                         </div>
                     ))}
-                    {eventsForDate.length === 0 && <div className="no-event">尚無紀錄</div>}
+                    {!isLoading && eventsForDate.length === 0 && <div className="no-event">尚無紀錄</div>}
                 </div>
 
                 <form className="event-input-bar" onSubmit={handleAddEvent}>
@@ -161,9 +193,24 @@ const UserCalendar = () => {
                         onChange={(e) => setNewEvent(e.target.value)}
                         aria-label="新增事件"
                     />
+                    <input
+                        type="time"
+                        value={newEventTime}
+                        onChange={(e) => setNewEventTime(e.target.value)}
+                        aria-label="時間（不填就是全天）"
+                    />
+                    <select
+                        value={newEventType}
+                        onChange={(e) => setNewEventType(e.target.value)}
+                        aria-label="事件類型"
+                    >
+                        <option value={EVENT_TYPE_GENERAL}>一般行程</option>
+                        <option value={EVENT_TYPE_QUIZ}>測驗提醒</option>
+                    </select>
                     <button type="submit" disabled={isSaving}>{isSaving ? "新增中..." : "新增"}</button>
                 </form>
             </div>
+        </div>
         </div>
     );
 };

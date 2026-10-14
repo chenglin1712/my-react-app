@@ -3,7 +3,7 @@ import { Alert, Container, Button, Dropdown } from 'react-bootstrap';
 import { Link, useLocation } from 'react-router-dom';
 import { useFavorites } from "../../src/userServives/useFavorites";
 import ErrorBoundary from "../errorBoundary";
-import { TRIBE_NAMES as TRIBES } from "../constants/tribes";
+import { TRIBES as TRIBE_LIST, TRIBE_NAMES as TRIBES } from "../constants/tribes";
 import { apiPost } from "../../utils/apiClient";
 import useAudioPlayback from "../../hooks/useAudioPlayback";
 import { useIsMobile } from "../../hooks/useIsMobile";
@@ -12,11 +12,16 @@ import { filterFavoriteWords } from "./filterFavoriteWords";
 import WordCardWithImg from "./components/WordCardWithImg";
 import SearchAndFilterControls from "./components/SearchAndFilterControls";
 import EmptyState from "@components/ui/EmptyState";
+import LoadingSpinner from "@components/ui/LoadingSpinner";
 import { describeActiveFilters } from "@utils/wordFilterState";
 import { deriveInitialLetters } from "@utils/wordLetters";
 import "../../static/css/_favorite/index.css"
 
 const PAGE_SIZE = 50;
+// 後端 FavoriteCountsRequest.names 的筆數上限
+const MAX_SUMMARY_NAMES = 2000;
+// 使用者連續取消收藏時等一下再問後端，避免每點一次就打一次（後端每分鐘 30 次）
+const SUMMARY_DEBOUNCE_MS = 400;
 
 const FavoritePage = () => {
   // /favorite 已經在 route.jsx 的 <ProtectedLayout> 底下，未登入會由它統一導去
@@ -27,8 +32,12 @@ const FavoritePage = () => {
   const [expandedWord, setExpandedWord] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [selectedTribe, setSelectedTribe] = useState('泰雅');
+  // 後端統計的各族語收藏數 { 泰雅: 12, 阿美: 3, ... }；還沒拿到或查詢失敗就是 null（只是少了其他族語的數字，不影響收藏本身）
+  // 連同它是哪個收藏分類的統計一起存：切換分類後舊分類的數字不能拿來顯示
+  const [tribeCountsState, setTribeCountsState] = useState(null);
   const toggleExpand = useCallback((key) => setExpandedWord(prev => (prev === key ? null : key)), []);
 
   const [tabStates, updateTabState] = useTabState(favorites);
@@ -72,7 +81,7 @@ const FavoritePage = () => {
         setLoadError(true);
         setLoading(false);
       });
-  }, [selectedTribe]);
+  }, [selectedTribe, loadAttempt]);
 
   const currentTab = favorites.find(t => t.id === activeTab);
   const currentState = tabStates[activeTab] || {};
@@ -107,36 +116,75 @@ const FavoritePage = () => {
     setSelectedSubCategory(null);
   };
 
-  return (
-    <Container className="p-2 word-library-container">
-      <div
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 900,
-          backgroundColor: 'white',
-          paddingTop: '1rem',
-          paddingBottom: '1rem',
-          borderBottom: '1px solid #e5e7eb'
-        }}
-      >
-        <h1 className="h2 fw-bold d-flex align-items-center mb-3">
-          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" className="bi bi-heart me-2" viewBox="0 0 16 16">
-            <path d="M8 2.748L7.283 2.01C5.6.281 2.514.878 1.4 3.053c-.523 1.023-.641 2.5.314 3.905C2.634 8.313 4.548 10.13 8 12.343c3.452-2.213 5.365-4.03 6.286-5.385.955-1.405.838-2.882.314-3.905C13.486.878 10.4.28 8.717 2.01L8 2.748zM8 15C-7.333 4.868 3.279-3.04 7.824 1.143c.06.055.119.112.176.171.057-.059.116-.115.176-.17C12.72-3.042 23.333 4.867 8 15z" />
-          </svg>
-          個人詞語庫
-        </h1>
+  // 目前族語裡屬於這個收藏分類的詞數：切換族語後使用者容易以為收藏不見了，所以直接寫出來
+  const tribeFavoriteCount = currentTab
+    ? allWords.filter(w => currentTab.content.includes(w.name)).length
+    : 0;
 
-        <Dropdown className="mb-3" onSelect={(val) => setSelectedTribe(val)}>
-          <Dropdown.Toggle variant="outline-secondary" size="sm">
-            族語：{selectedTribe}
-          </Dropdown.Toggle>
-          <Dropdown.Menu>
-            {TRIBES.map(t => (
-              <Dropdown.Item key={t} eventKey={t}>{t}</Dropdown.Item>
-            ))}
-          </Dropdown.Menu>
-        </Dropdown>
+  // 其他族語各收藏幾個詞：收藏只存詞名、不分族語，要請後端對照各族語詞條。
+  // 目前選的族語用畫面上實際的字卡數（即時、不必等後端）。
+  const summaryNames = currentTab?.content;
+  useEffect(() => {
+    // 超過後端單次上限就不統計其他族語（寧可不顯示，也不顯示被截斷的不完整數字）
+    if (!Array.isArray(summaryNames) || summaryNames.length > MAX_SUMMARY_NAMES) return undefined;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      apiPost(import.meta.env.VITE_API_FAVORITES_SUMMARY_URL, { names: summaryNames })
+        .then(data => {
+          if (cancelled || !data?.counts) return;
+          setTribeCountsState({
+            tabId: activeTab,
+            counts: Object.fromEntries(TRIBE_LIST.map(t => [t.name, data.counts[t.slug] ?? 0])),
+          });
+        })
+        .catch(err => {
+          if (!cancelled) console.error("載入各族語收藏數失敗：", err);
+        });
+    }, SUMMARY_DEBOUNCE_MS);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [summaryNames, activeTab]);
+
+  const tribeCounts = tribeCountsState?.tabId === activeTab ? tribeCountsState.counts : null;
+
+  const countsReady = !loading && !loadError && Boolean(currentTab);
+  const countByTribe = tribeCounts
+    ? { ...tribeCounts, ...(countsReady ? { [selectedTribe]: tribeFavoriteCount } : {}) }
+    : null;
+  const otherTribeCounts = countByTribe
+    ? TRIBES.filter(t => t !== selectedTribe && countByTribe[t] > 0).map(t => `${t} ${countByTribe[t]}`)
+    : [];
+
+  return (
+    <div className="yy-page favorite-page">
+    <section className="yy-hero favorite-hero">
+      <div className="yy-fade-up">
+        <h1 className="favorite-title">個人詞語庫</h1>
+        <p className="favorite-desc">你收藏的詞會依族語分開顯示，切換族語就能看到其他族語的收藏。</p>
+      </div>
+    </section>
+    <Container className="p-2 word-library-container">
+      {/* 頁首不再 sticky：原本 top:0 會被 z-index 1000 的全站導覽列蓋住（審查項 P1-14），改成隨內容捲走，跟辭典頁一致 */}
+      <div className="favorite-controls">
+        <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+          <Dropdown onSelect={(val) => setSelectedTribe(val)}>
+            <Dropdown.Toggle variant="outline-secondary" size="sm">
+              族語：{selectedTribe}
+            </Dropdown.Toggle>
+            <Dropdown.Menu>
+              {TRIBES.map(t => (
+                <Dropdown.Item key={t} eventKey={t} className="d-flex justify-content-between gap-3">
+                  <span>{t}</span>
+                  {countByTribe && <span className="favorite-tribe-count">{countByTribe[t]} 個詞</span>}
+                </Dropdown.Item>
+              ))}
+            </Dropdown.Menu>
+          </Dropdown>
+          {/* live region 常駐，載入完成後只更新文字，報讀器才會可靠唸出 */}
+          <span className="favorite-count" role="status">
+            {countsReady && `${selectedTribe}族語已收藏 ${tribeFavoriteCount} 個詞`}
+            {countsReady && otherTribeCounts.length > 0 && `（其他族語：${otherTribeCounts.join('、')}）`}
+          </span>
+        </div>
 
         {currentTab && (
           <SearchAndFilterControls
@@ -159,12 +207,11 @@ const FavoritePage = () => {
       {favoritesError && <Alert variant="danger">{favoritesError}</Alert>}
 
       {loading ? (
-        <div className="text-center py-5">
-          <div className="text-muted">載入中...</div>
-        </div>
+        <LoadingSpinner label="載入收藏中…" />
       ) : loadError ? (
-        <div className="text-center py-5 text-danger">
-          單字資料載入失敗，請重新整理頁面再試一次。
+        <div className="text-center py-5" role="alert">
+          <p className="text-danger">單字資料暫時載入失敗，請稍後再試。</p>
+          <Button type="button" variant="danger" onClick={() => setLoadAttempt(n => n + 1)}>重試</Button>
         </div>
       ) : (
         <>
@@ -194,8 +241,8 @@ const FavoritePage = () => {
           <div className="word-cards-grid">
             {filteredWords.slice(0, visibleCount).map((wordData, idx) => (
               // 單張字卡渲染出錯時只讓那張卡片顯示錯誤提示，不要讓整個收藏格線消失。
+              <div className="word-card-cv" key={wordData.name + idx}>
               <ErrorBoundary
-                key={wordData.name + idx}
                 fallback={<div className="text-danger small p-2">這個詞條顯示時發生錯誤。</div>}
               >
                 <WordCardWithImg
@@ -212,6 +259,7 @@ const FavoritePage = () => {
                   isFavorited={currentTab.content.includes(wordData.name)}
                 />
               </ErrorBoundary>
+              </div>
             ))}
           </div>
           {visibleCount < filteredWords.length && (
@@ -224,6 +272,7 @@ const FavoritePage = () => {
         </>
       )}
     </Container>
+    </div>
   );
 };
 

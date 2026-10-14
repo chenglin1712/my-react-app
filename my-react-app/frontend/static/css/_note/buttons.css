@@ -77,3 +77,9 @@
     max-width: 300px;
   }
 }
+
+/* 粗體／斜體開關：按下去的狀態要看得出來（不只靠 aria-pressed） */
+.note-page .btn-ghost[aria-pressed="true"] {
+  background: var(--yy-warning-bg);
+  border-color: var(--yy-gold);
+}

@@ -91,6 +91,13 @@ class AllWordsRequest(BaseModel):
     sort_order: str = Field(default="asc", pattern="^(asc|desc)$")
 
 
+class FavoriteCountsRequest(BaseModel):
+    # 收藏頁要顯示「各族語各收藏幾個詞」。收藏資料（Firestore users/{uid}.favorites）
+    # 只存詞名、不分族語，所以由前端把目前收藏分類的詞名送來，後端對照各族語詞條數。
+    # 筆數／長度上限跟 AllWordsRequest.favorite_names 同一個量級。
+    names: List[Annotated[str, Field(max_length=100)]] = Field(default_factory=list, max_length=2000)
+
+
 class SentenceAudioRequest(BaseModel):
     sentence: str = Field(default="", max_length=2000)
     tribe: str = Field(default="布農", max_length=50)

@@ -27,6 +27,7 @@ from .schemas import (
     AnaphoraSentence,
     AudioItem,
     ExplanationItem,
+    FavoriteCountsRequest,
     KeywordRequest,
     MultiWordSearchRequest,
     SentenceAudioRequest,
@@ -38,7 +39,7 @@ from .schemas import (
     parse_explanations,
     parse_sentences,
 )
-from .search import search_all, warm_cache
+from .search import count_words_by_tribe, search_all, warm_cache
 
 router = APIRouter()
 router.include_router(search.router)
@@ -49,11 +50,13 @@ __all__ = [
     "router",
     "warm_cache",
     "search_all",
+    "count_words_by_tribe",
     "AllWordsRequest",
     "AnaphoraItem",
     "AnaphoraSentence",
     "AudioItem",
     "ExplanationItem",
+    "FavoriteCountsRequest",
     "KeywordRequest",
     "MultiWordSearchRequest",
     "SentenceAudioRequest",

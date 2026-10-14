@@ -47,14 +47,14 @@ describe('DateReminder', () => {
     expect(screen.queryByText('時程載入中...')).not.toBeInTheDocument();
   });
 
-  test('點擊「開啟通知」會清空 localStorage 裡已忽略的提醒紀錄', async () => {
+  test('點擊「重設提醒」會清空 localStorage 裡已忽略的提醒紀錄', async () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ 測試場次: ['報名'] }));
     mockScheduleFetch({ session: '測試場次', phases: [] });
 
     render(<DateReminder />);
     await waitFor(() => expect(screen.getByText(/完整時程/)).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole('button', { name: /開啟通知/ }));
+    fireEvent.click(screen.getByRole('button', { name: /重設提醒/ }));
 
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
