@@ -51,14 +51,19 @@ export function useGameSession({ endpoint, tribe, count }) {
       const data = await apiGet(endpoint, { params: { tribe, count } });
       if (myGeneration !== generationRef.current) return null; // 已經過期，不更新畫面
       if (!Array.isArray(data?.questions)) {
-        setError("題目載入失敗，請確認後端伺服器是否啟動。");
+        setError("題目暫時載入失敗，請稍後再試。");
+        return null;
+      }
+      // 後端正常回應但沒有題目：開始鈕不能沒反應，要明講原因
+      if (data.questions.length === 0) {
+        setError("這個族語暫時沒有題目，請換一個族語或稍後再試。");
         return null;
       }
       setQuestions(data.questions);
       return data.questions;
     } catch {
       if (myGeneration !== generationRef.current) return null;
-      setError("題目載入失敗，請確認後端伺服器是否啟動。");
+      setError("題目暫時載入失敗，請稍後再試。");
       return null;
     } finally {
       if (myGeneration === generationRef.current) setLoading(false);

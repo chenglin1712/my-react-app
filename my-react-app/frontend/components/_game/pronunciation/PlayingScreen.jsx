@@ -65,8 +65,9 @@ export default function PlayingScreen({
           <span className="pron-score-num">{score}</span>
           <span className="pron-score-label">分 — {rating.label}</span>
           {officialScore !== null && score !== officialScore && (
-            <span className="pron-score-ref">（官方音檔：{officialScore} 分 · 真人音檔優化）</span>
+            <span className="pron-score-ref">（只比對官方音檔是 {officialScore} 分，加入真人錄音後調整為這個分數）</span>
           )}
+          <span className="pron-score-note">分數是 AI 比對的參考值，不代表正式的發音評量。</span>
         </div>
       )}
 

@@ -47,6 +47,9 @@ export function useTimedOptionSelect({ delayMs = 1400, onElapsed, resetKey } = {
     if (lockedRef.current) return false;
     lockedRef.current = true;
     setSelected(value);
+    // delayMs 為 null：不自動前進，選項維持鎖定，由呼叫端的「下一題」按鈕換題
+    // （resetKey 改變時才會解鎖）。給需要時間讀解答、重聽音檔的題型用。
+    if (delayMs == null) return true;
     timeoutRef.current = setTimeout(() => {
       timeoutRef.current = null;
       lockedRef.current = false;

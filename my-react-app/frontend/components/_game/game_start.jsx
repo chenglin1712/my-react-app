@@ -1,9 +1,29 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { apiPost } from "../../utils/apiClient";
 import "../../static/css/_game/game_start.css";
 import { TRIBE_INTRO } from "./crosswordIntro";
 import Game_crossword_board from "./game_crossword_board";
 import Game_result from "./game_result";
+
+// 開始頁文案：第一行是標題，前面幾行是族群背景，最後幾行是怎麼玩。
+// 文字內容完全沿用 crosswordIntro.js，只是分成標題與兩段，不再是 8 行置中的文字牆。
+function CrosswordIntroText({ lines }) {
+  const [title, ...rest] = lines;
+  const background = rest.slice(0, 3);
+  const howToPlay = rest.slice(3);
+  return (
+    <div className="crossword-intro">
+      <h2 className="game-title">{title}</h2>
+      {background.length > 0 && (
+        <p className="crossword-intro-para">{background.map((line, i) => <span key={i}>{line}</span>)}</p>
+      )}
+      {howToPlay.length > 0 && (
+        <p className="crossword-intro-para">{howToPlay.map((line, i) => <span key={i}>{line}</span>)}</p>
+      )}
+    </div>
+  );
+}
 
 function Game_Start({ tribe = "tayal" }) {
   // intro（開始畫面）/ playing（填字中）/ result（結果） 三個互斥的畫面，
@@ -25,6 +45,14 @@ function Game_Start({ tribe = "tayal" }) {
 
   const handleClickStart = () => {
     setPhase("playing");
+  };
+
+  // 再玩一次：回到開始頁，重新進入遊戲時填字格元件會重新載入一份新題目
+  const handleRestart = () => {
+    setGameResults(null);
+    setSubmitError(null);
+    setBoardReady(false);
+    setPhase("intro");
   };
 
   const handleClickSubmit = async () => {
@@ -61,12 +89,8 @@ function Game_Start({ tribe = "tayal" }) {
     <>
       {phase === "intro" && (
         <div className="start1-background">
-          <br />
-          {(TRIBE_INTRO[tribe] || TRIBE_INTRO.tayal).lines.map((line, i) => (
-            <h5 key={i} className="game-title">{line}</h5>
-          ))}
-          <br />
-          <button type="button" className="start-button" onClick={handleClickStart}>
+          <CrosswordIntroText lines={(TRIBE_INTRO[tribe] || TRIBE_INTRO.tayal).lines} />
+          <button type="button" className="yy-btn-primary start-button" onClick={handleClickStart}>
             開始
           </button>
         </div>
@@ -84,18 +108,19 @@ function Game_Start({ tribe = "tayal" }) {
             {submitError && <p className="text-danger" role="alert">{submitError}</p>}
             <button
               type="button"
-              className="submit-button"
+              className="yy-btn-primary submit-button"
               onClick={handleClickSubmit}
               disabled={submitting || !boardReady}
             >
               {submitting ? "提交中..." : "完成"}
             </button>
+            <Link className="yy-btn-outline" to={`/game/vocabulary`}>結束遊戲</Link>
           </div>
         </>
       )}
 
       {phase === "result" && gameResults && (
-        <Game_result results={gameResults} />
+        <Game_result results={gameResults} onRestart={handleRestart} backTo="/game/vocabulary" />
       )}
     </>
   );

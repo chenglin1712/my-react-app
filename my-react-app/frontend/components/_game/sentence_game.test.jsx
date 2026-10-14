@@ -41,7 +41,8 @@ describe('SentenceGame（回歸測試：跟 listening_game 一樣少了計時器
     expect(screen.getByRole('button', { name: /聽例句發音/ })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '真的很好' }));
-    await waitFor(() => expect(screen.getByText('第 2 / 2 題')).toBeInTheDocument(), { timeout: 3000 });
+    fireEvent.click(screen.getByRole('button', { name: /下一題/ }));
+    await waitFor(() => expect(screen.getByText('第 2 / 2 題')).toBeInTheDocument());
 
     expect(screen.queryByRole('button', { name: /聽例句發音/ })).not.toBeInTheDocument();
   }, 10000);
@@ -58,7 +59,8 @@ describe('SentenceGame（回歸測試：跟 listening_game 一樣少了計時器
     expect(screen.getByRole('button', { name: '真的很好' })).toHaveClass('correct');
     expect(screen.getByRole('button', { name: '假的不好' })).not.toHaveClass('wrong');
 
-    await waitFor(() => expect(screen.getByText('第 2 / 2 題')).toBeInTheDocument(), { timeout: 3000 });
+    fireEvent.click(screen.getByRole('button', { name: /下一題/ }));
+    await waitFor(() => expect(screen.getByText('第 2 / 2 題')).toBeInTheDocument());
   }, 10000);
 
   test('答對顯示「答對了」、答錯顯示正確答案', async () => {
@@ -82,4 +84,31 @@ describe('SentenceGame（回歸測試：跟 listening_game 一樣少了計時器
     expect(() => unmount()).not.toThrow();
     await new Promise((resolve) => setTimeout(resolve, 1500));
   }, 10000);
+});
+
+describe('SentenceGame 答題後的操作（E-5）', () => {
+  beforeEach(() => {
+    apiGet.mockReset();
+    createAuthorizedAudio.mockReset();
+    createAuthorizedAudio.mockResolvedValue({
+      pause: vi.fn(), play: vi.fn().mockResolvedValue(undefined), revokeObjectUrl: vi.fn(),
+    });
+  });
+
+  test('答題後不會自動跳題，要按「下一題」；選項有 ✓／✗ 標記，遊戲中有「結束遊戲」', async () => {
+    apiGet.mockResolvedValueOnce({ questions: QUESTIONS });
+    const user = userEvent.setup();
+    renderGame();
+    await startGame(user);
+    expect(screen.getByRole('link', { name: '結束遊戲' })).toHaveAttribute('href', '/game/sentence');
+
+    await user.click(screen.getByRole('button', { name: /假的不好/ }));
+    expect(screen.getByRole('button', { name: /真的很好/ }).textContent).toContain('✓');
+    expect(screen.getByRole('button', { name: /假的不好/ }).textContent).toContain('✗');
+
+    await new Promise((resolve) => setTimeout(resolve, 1600));
+    expect(screen.getByText('第 1 / 2 題')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /下一題/ }));
+    expect(await screen.findByText('第 2 / 2 題')).toBeInTheDocument();
+  });
 });

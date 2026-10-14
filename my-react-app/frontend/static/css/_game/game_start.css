@@ -4,28 +4,24 @@
     }
 }
 
+/* 開始與完成按鈕使用共用的 yy-btn-primary（有 hover、focus 與按下回饋），這裡只管間距 */
 .start-button {
-    border-radius: 5px;
-    background-color: #B7161B;
-    color: white;
-    border: 0px;
-    width: 60px;
     margin-top: 15px;
     margin-bottom: 15px;
+    min-width: 120px;
 }
 
 .submit-button {
-    border-radius: 5px;
-    background-color: #B7161B;
-    color: white;
-    border: 0px;
     margin-top: 5px;
     margin-bottom: 15px;
 }
 
 .submit-actions {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     justify-content: center;
+    gap: 12px;
 }
 
 .start1-background {
@@ -34,6 +30,30 @@
     border: 0px;
     border-radius: 10px;
     width: 100%;
-    margin: 25px;
+    margin: 25px 0;
+    padding: 0 16px;
     place-items: center;
+}
+
+/* 開始頁文案：標題加兩段，每行文字各自一行，靠左對齊好閱讀 */
+.crossword-intro {
+    max-width: 36em;
+    text-align: left;
+}
+
+.crossword-intro .game-title {
+    font-size: 1.25rem;
+    font-weight: 800;
+    margin: 0 0 16px;
+    text-align: center;
+}
+
+.crossword-intro-para {
+    margin: 0 0 14px;
+    line-height: 1.8;
+    color: var(--yy-text-secondary);
+}
+
+.crossword-intro-para span {
+    display: block;
 }

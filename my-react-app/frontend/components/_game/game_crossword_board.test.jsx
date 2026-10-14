@@ -1,5 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import Game_crossword_board from './game_crossword_board';
 import { apiGet } from '../../utils/apiClient';
@@ -52,7 +53,7 @@ describe('Game_crossword_board（回歸測試：原本題目還沒載入完成�
     const ref = createRef();
     render(<Game_crossword_board ref={ref} tribe="tayal" onReadyChange={vi.fn()} />);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('題目載入失敗');
+    expect(await screen.findByRole('alert')).toHaveTextContent('題目暫時載入失敗');
     expect(ref.current.getSubmissionPayload()).toBeNull();
   });
 
@@ -74,5 +75,79 @@ describe('Game_crossword_board（回歸測試：原本題目還沒載入完成�
 
     expect(onReadyChange).not.toHaveBeenCalled();
     expect(screen.getByText(/線索一/)).toBeInTheDocument();
+  });
+});
+
+describe('Game_crossword_board 的鍵盤操作（E-5，P1-13）', () => {
+  const GRID = {
+    grid_solution: ['abc', 'd-e'],
+    legend: [
+      { number: 1, direction: 'across', start_row: 1, start_col: 1, clue: '橫一' },
+      { number: 2, direction: 'down', start_row: 1, start_col: 1, clue: '縱二' },
+    ],
+    grid_display: ['   ', ' - '],
+  };
+
+  beforeEach(() => {
+    apiGet.mockReset();
+    apiGet.mockResolvedValue(GRID);
+  });
+
+  const cell = (label) => screen.getByRole('textbox', { name: new RegExp(label) });
+
+  test('格子名稱帶出橫向／縱向第幾題的第幾格', async () => {
+    render(<Game_crossword_board tribe="tayal" />);
+    await screen.findByText('橫向題目');
+    expect(cell('第 1 列第 1 欄')).toHaveAccessibleName(/橫向第 1 題的第 1 格.*縱向第 2 題的第 1 格/);
+    expect(cell('第 1 列第 3 欄')).toHaveAccessibleName(/橫向第 1 題的第 3 格/);
+  });
+
+  test('輸入一個字母後自動跳到同方向的下一格', async () => {
+    const user = userEvent.setup();
+    render(<Game_crossword_board tribe="tayal" />);
+    await screen.findByText('橫向題目');
+    await user.click(cell('第 1 列第 1 欄'));
+    await user.keyboard('a');
+    expect(cell('第 1 列第 2 欄')).toHaveFocus();
+    await user.keyboard('b');
+    expect(cell('第 1 列第 3 欄')).toHaveFocus();
+  });
+
+  test('方向鍵移動、跳過黑格；按下鍵後輸入會往下填', async () => {
+    const user = userEvent.setup();
+    render(<Game_crossword_board tribe="tayal" />);
+    await screen.findByText('橫向題目');
+    await user.click(cell('第 1 列第 2 欄'));
+    await user.keyboard('{ArrowDown}');
+    // 第 2 列第 2 欄是黑格，往下沒有可填的格子，焦點留在原地
+    expect(cell('第 1 列第 2 欄')).toHaveFocus();
+    await user.keyboard('{ArrowLeft}');
+    expect(cell('第 1 列第 1 欄')).toHaveFocus();
+    await user.keyboard('{ArrowDown}');
+    expect(cell('第 2 列第 1 欄')).toHaveFocus();
+    await user.keyboard('{ArrowUp}{ArrowRight}{ArrowRight}');
+    expect(cell('第 1 列第 3 欄')).toHaveFocus();
+  });
+
+  test('空格按退格會回到上一格並清掉它', async () => {
+    const user = userEvent.setup();
+    render(<Game_crossword_board tribe="tayal" />);
+    await screen.findByText('橫向題目');
+    await user.click(cell('第 1 列第 1 欄'));
+    await user.keyboard('a');
+    expect(cell('第 1 列第 1 欄')).toHaveValue('a');
+    await user.keyboard('{Backspace}');
+    expect(cell('第 1 列第 1 欄')).toHaveFocus();
+    expect(cell('第 1 列第 1 欄')).toHaveValue('');
+  });
+
+  test('載入失敗有重試鈕', async () => {
+    apiGet.mockReset();
+    apiGet.mockRejectedValueOnce(new Error('x'));
+    apiGet.mockResolvedValueOnce(GRID);
+    const user = userEvent.setup();
+    render(<Game_crossword_board tribe="tayal" />);
+    await user.click(await screen.findByRole('button', { name: '重試' }));
+    expect(await screen.findByText('橫向題目')).toBeInTheDocument();
   });
 });

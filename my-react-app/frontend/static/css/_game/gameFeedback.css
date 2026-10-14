@@ -1,0 +1,53 @@
+/* 聽力與句型遊戲共用：答對答錯回饋（審查項 P2-53）與答題後的操作列（P2-51）。
+   對錯除了顏色，還有 ✓ ／ ✗ 圖示與文字，色盲使用者也分得出來。 */
+
+.game-mark {
+    display: inline-block;
+    margin-right: 0.4em;
+    font-weight: 800;
+}
+
+.game-feedback {
+    margin: 0 0 4px;
+    font-weight: 700;
+}
+.game-feedback.correct {
+    color: #1e6b3d;
+}
+.game-feedback.wrong {
+    color: #a93226;
+}
+
+/* 下一題與結束遊戲：答題後才出現「下一題」，「結束遊戲」一直都在 */
+.game-step-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 1.25rem;
+}
+
+/* 答對：放大一下再回彈（220ms）；答錯：水平搖一下（240ms）。只用 transform，
+   使用者開了「減少動態效果」就完全不動，圖示與文字仍然在。 */
+@keyframes game-pop {
+    0%   { transform: scale(1); }
+    45%  { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+@keyframes game-shake {
+    0%, 100% { transform: translateX(0); }
+    25%      { transform: translateX(-5px); }
+    75%      { transform: translateX(5px); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .listening-option.correct,
+    .sent-option.correct {
+        animation: game-pop 220ms cubic-bezier(0.23, 1, 0.32, 1);
+    }
+    .listening-option.wrong,
+    .sent-option.wrong {
+        animation: game-shake 240ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+    }
+}

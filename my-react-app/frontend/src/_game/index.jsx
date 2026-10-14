@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../../static/css/_game/index.css";
 import { TRIBES } from "../constants/tribes";
 import DiamondBadge from "../../components/ui/DiamondBadge";
+import { scrollBehavior } from "../hooks/useReducedMotion";
 
 const GAMES = [
   {
@@ -44,6 +45,18 @@ const GameZonePage = () => {
   const [activeGame, setActiveGame] = useState(null);
   const [activeTribe, setActiveTribe] = useState(null);
 
+  const panelHeadingRef = useRef(null);
+
+  // 選了遊戲後，選擇族語的面板在四張卡片之下，可能在畫面外：捲到面板並把焦點移到標題，
+  // 鍵盤與報讀器使用者才知道下面多了東西。
+  useEffect(() => {
+    if (!activeGame) return;
+    const heading = panelHeadingRef.current;
+    if (!heading) return;
+    heading.focus({ preventScroll: true });
+    heading.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+  }, [activeGame]);
+
   const activeGameData = GAMES.find((g) => g.id === activeGame);
   const activeTribeData = TRIBES.find((t) => t.slug === activeTribe);
 
@@ -78,23 +91,30 @@ const GameZonePage = () => {
             return (
               <div
                 key={g.id}
-                role="button"
-                tabIndex={0}
-                className="yy-card yy-fade-up gamehub-card"
-                style={{ boxShadow: active ? '7px 7px 0 var(--yy-gold)' : undefined }}
-                onClick={() => selectGame(g.id)}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectGame(g.id); } }}
+                className={`yy-card yy-fade-up gamehub-card${active ? ' is-selected' : ''}`}
               >
                 <div className="gamehub-card-head" style={{ "--gamehub-head-band": g.headerBg }}>
-                  <div className="gamehub-card-emoji">{g.emoji}</div>
+                  <div className="gamehub-card-emoji" aria-hidden="true">{g.emoji}</div>
                   <div>
-                    <h3 className="gamehub-card-title">{g.title}</h3>
+                    {/* 真正的按鈕放在標題裡，用偽元素撐滿整張卡片，整張卡都點得到，鍵盤與報讀器看到的是一個有 aria-pressed 的按鈕 */}
+                    <h3 className="gamehub-card-title">
+                      <button
+                        type="button"
+                        className="gamehub-card-btn"
+                        aria-pressed={active}
+                        onClick={() => selectGame(g.id)}
+                      >
+                        {g.title}
+                      </button>
+                    </h3>
                     <span className="gamehub-card-subtitle">{g.subtitle}</span>
                   </div>
                 </div>
                 <div className="gamehub-card-body">
                   <p>{g.desc}</p>
-                  <span className={`gamehub-card-badge${active ? ' active' : ''}`}>立即遊玩</span>
+                  <span className={`gamehub-card-badge${active ? ' active' : ''}`} aria-hidden="true">
+                    {active ? '✓ 已選擇' : '選這個'}
+                  </span>
                 </div>
               </div>
             );
@@ -104,7 +124,7 @@ const GameZonePage = () => {
         {activeGameData && (
           <div className="yy-card yy-fade-up gamehub-panel">
             <div className="gamehub-panel-head">
-              <h3>{activeGameData.title} · 選擇族語</h3>
+              <h3 ref={panelHeadingRef} tabIndex={-1}>{activeGameData.title} · 選擇族語</h3>
               <button
                 type="button"
                 className="yy-btn-outline"
@@ -117,21 +137,16 @@ const GameZonePage = () => {
               {TRIBES.map((t) => {
                 const active = activeTribe === t.slug;
                 return (
-                  <div
+                  <button
                     key={t.slug}
-                    role="button"
-                    tabIndex={0}
-                    className="gamehub-tribe-card"
-                    style={{
-                      boxShadow: active ? '5px 5px 0 var(--yy-gold)' : undefined,
-                      transform: `scale(${active ? 1.05 : 1})`,
-                    }}
+                    type="button"
+                    className={`gamehub-tribe-card${active ? ' is-selected' : ''}`}
+                    aria-pressed={active}
                     onClick={() => setActiveTribe(t.slug)}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveTribe(t.slug); } }}
                   >
-                    <DiamondBadge color={t.color} size={40} fontSize={14} style={{ margin: '0 auto 10px' }}>{t.name}</DiamondBadge>
-                    <div className="gamehub-tribe-name">{t.name}族語</div>
-                  </div>
+                    <DiamondBadge as="span" color={t.color} size={40} fontSize={14} style={{ margin: '0 auto 10px' }}>{t.name}</DiamondBadge>
+                    <span className="gamehub-tribe-name">{t.name}族語{active && <span aria-hidden="true"> ✓</span>}</span>
+                  </button>
                 );
               })}
             </div>

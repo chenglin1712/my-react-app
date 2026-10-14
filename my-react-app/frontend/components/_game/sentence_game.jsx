@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import "../../static/css/_game/sentence.css";
+import "../../static/css/_game/gameFeedback.css";
 import { useGameSession } from "./useGameSession";
 import { useGameAudioPlayer } from "./useGameAudioPlayer";
 import { useTimedOptionSelect } from "./useTimedOptionSelect";
@@ -30,9 +31,9 @@ function SentenceGame({ tribe = "tayal" }) {
 
   const q = questions[current];
 
+  // 答完不再限時自動跳題，準備好再按「下一題」
   const { selected, beginSelection } = useTimedOptionSelect({
-    delayMs: 1400,
-    onElapsed: () => { stopAudio(); goToNext(); },
+    delayMs: null,
     resetKey: `${tribe}:${status}:${current}`,
   });
 
@@ -58,6 +59,16 @@ function SentenceGame({ tribe = "tayal" }) {
     restart();
   };
 
+  const handleNext = () => {
+    stopAudio();
+    goToNext();
+  };
+
+  const nextButtonRef = useRef(null);
+  useEffect(() => {
+    if (selected !== null) nextButtonRef.current?.focus();
+  }, [selected]);
+
   useEffect(() => {
     stopAudio();
   }, [current, tribe, status, stopAudio]);
@@ -71,7 +82,7 @@ function SentenceGame({ tribe = "tayal" }) {
         ))}
         {error && <p className="sent-error" role="alert">{error}</p>}
         <button type="button" className="sent-btn-primary" onClick={handleStart} disabled={loading}>
-          {loading ? "載入中..." : "開始"}
+          {loading ? "載入中..." : error ? "重試" : "開始"}
         </button>
       </div>
     );
@@ -129,19 +140,32 @@ function SentenceGame({ tribe = "tayal" }) {
                 onClick={() => handleSelect(opt)}
                 disabled={selected !== null}
               >
+                {selected !== null && opt === q.chinese && <span className="game-mark" aria-hidden="true">✓</span>}
+                {selected !== null && opt === selected && opt !== q.chinese && <span className="game-mark" aria-hidden="true">✗</span>}
                 {opt}
               </button>
             );
           })}
         </div>
 
-        {selected !== null && (
-          <p className={`sent-feedback ${selected === q.chinese ? "correct" : "wrong"}`} aria-live="polite">
-            {selected === q.chinese
-              ? "✅ 答對了！"
-              : `❌ 正確答案：${q.chinese}`}
-          </p>
-        )}
+        <div aria-live="polite">
+          {selected !== null && (
+            <p className={`sent-feedback ${selected === q.chinese ? "correct" : "wrong"}`}>
+              {selected === q.chinese
+                ? "✓ 答對了！"
+                : `✗ 正確答案：${q.chinese}`}
+            </p>
+          )}
+        </div>
+
+        <div className="game-step-actions">
+          <Link className="sent-btn-secondary" to="/game/sentence">結束遊戲</Link>
+          {selected !== null && (
+            <button type="button" className="sent-btn-primary" ref={nextButtonRef} onClick={handleNext}>
+              {current + 1 < questions.length ? "下一題 ▸" : "看結果 ▸"}
+            </button>
+          )}
+        </div>
       </div>
     );
   }

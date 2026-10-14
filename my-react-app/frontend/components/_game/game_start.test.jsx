@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import Game_Start from './game_start';
 import { apiGet, apiPost } from '../../utils/apiClient';
 
@@ -23,7 +24,7 @@ describe('Game_Start（回歸測試：提交時原本會意外觸發填字題目
 
   async function startGame() {
     const user = userEvent.setup();
-    render(<Game_Start tribe="tayal" />);
+    render(<MemoryRouter><Game_Start tribe="tayal" /></MemoryRouter>);
     await user.click(screen.getByRole('button', { name: '開始' }));
     await screen.findByText('橫向題目');
     return user;
@@ -33,7 +34,7 @@ describe('Game_Start（回歸測試：提交時原本會意外觸發填字題目
     let resolveFetch;
     apiGet.mockImplementation(() => new Promise((resolve) => { resolveFetch = resolve; }));
     const user = userEvent.setup();
-    render(<Game_Start tribe="tayal" />);
+    render(<MemoryRouter><Game_Start tribe="tayal" /></MemoryRouter>);
     await user.click(screen.getByRole('button', { name: '開始' }));
 
     expect(screen.getByRole('button', { name: '完成' })).toBeDisabled();
@@ -75,5 +76,42 @@ describe('Game_Start（回歸測試：提交時原本會意外觸發填字題目
 
     expect(await screen.findByRole('alert')).toHaveTextContent('提交失敗');
     expect(screen.getByRole('button', { name: '完成' })).toBeInTheDocument();
+  });
+});
+
+describe('Game_Start 的開始頁與結算頁（E-5）', () => {
+  beforeEach(() => {
+    apiGet.mockReset();
+    apiPost.mockReset();
+  });
+
+  test('開始頁：標題加兩段文字，開始鈕使用共用的主要按鈕樣式', () => {
+    render(<MemoryRouter><Game_Start tribe="tayal" /></MemoryRouter>);
+    expect(screen.getByRole('heading', { name: /Tninun TAYAL/ })).toBeInTheDocument();
+    expect(document.querySelectorAll('.crossword-intro-para')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: '開始' })).toHaveClass('yy-btn-primary');
+  });
+
+  test('結算頁有「再玩一次」與「返回遊戲頁面」，再玩一次回到開始頁', async () => {
+    apiGet.mockResolvedValueOnce(VALID_RESPONSE);
+    apiPost.mockResolvedValueOnce({ total_words: 1, correct_words_count: 1, word_details: [] });
+    const user = userEvent.setup();
+    render(<MemoryRouter><Game_Start tribe="tayal" /></MemoryRouter>);
+    await user.click(screen.getByRole('button', { name: '開始' }));
+    await screen.findByText('橫向題目');
+    await user.click(screen.getByRole('button', { name: '完成' }));
+    await screen.findByText('遊戲結果');
+
+    expect(screen.getByRole('link', { name: /返回遊戲頁面/ })).toHaveAttribute('href', '/game/vocabulary');
+    await user.click(screen.getByRole('button', { name: '再玩一次' }));
+    expect(screen.getByRole('button', { name: '開始' })).toBeInTheDocument();
+  });
+
+  test('遊戲中有「結束遊戲」連結', async () => {
+    apiGet.mockResolvedValueOnce(VALID_RESPONSE);
+    const user = userEvent.setup();
+    render(<MemoryRouter><Game_Start tribe="tayal" /></MemoryRouter>);
+    await user.click(screen.getByRole('button', { name: '開始' }));
+    expect(screen.getByRole('link', { name: '結束遊戲' })).toHaveAttribute('href', '/game/vocabulary');
   });
 });

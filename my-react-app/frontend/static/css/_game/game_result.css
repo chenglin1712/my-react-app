@@ -131,3 +131,11 @@
   background-color: transparent;
   border: 0;
 }
+
+.game-result-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 28px;
+}

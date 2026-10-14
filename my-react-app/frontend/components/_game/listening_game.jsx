@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import "../../static/css/_game/listening.css";
+import "../../static/css/_game/gameFeedback.css";
 import { useGameSession } from "./useGameSession";
 import { useGameAudioPlayer } from "./useGameAudioPlayer";
 import { useTimedOptionSelect } from "./useTimedOptionSelect";
@@ -22,9 +23,9 @@ function ListeningGame({ tribe = "tayal" }) {
 
   const q = questions[current];
 
+  // 答完不再限時自動跳題：使用者可以慢慢看解答、重聽音檔，準備好再按「下一題」
   const { selected, beginSelection } = useTimedOptionSelect({
-    delayMs: 1400,
-    onElapsed: () => { stopAudio(); goToNext(); },
+    delayMs: null,
     // 換題、切換族語、重新開始都代表「這是全新的一次選擇」，殘留的
     // selected/計時器都該一併清掉，不用在 handleRestart 另外手動處理。
     resetKey: `${tribe}:${status}:${current}`,
@@ -56,6 +57,17 @@ function ListeningGame({ tribe = "tayal" }) {
     restart();
   };
 
+  const handleNext = () => {
+    stopAudio();
+    goToNext();
+  };
+
+  // 答完題後把焦點移到「下一題」，鍵盤與報讀器使用者不用重新找按鈕
+  const nextButtonRef = useRef(null);
+  useEffect(() => {
+    if (selected !== null) nextButtonRef.current?.focus();
+  }, [selected]);
+
   // 切換題目、族語或畫面狀態時都要停止播放——原本只看 current，同一個
   // index 但換了族語/重新開始時不會觸發停止。
   useEffect(() => {
@@ -76,7 +88,7 @@ function ListeningGame({ tribe = "tayal" }) {
           onClick={handleStart}
           disabled={loading}
         >
-          {loading ? "載入中..." : "開始"}
+          {loading ? "載入中..." : error ? "重試" : "開始"}
         </button>
       </div>
     );
@@ -137,6 +149,8 @@ function ListeningGame({ tribe = "tayal" }) {
                 onClick={() => handleSelect(opt)}
                 disabled={selected !== null}
               >
+                {selected !== null && opt === q.correct && <span className="game-mark" aria-hidden="true">✓</span>}
+                {selected !== null && opt === selected && opt !== q.correct && <span className="game-mark" aria-hidden="true">✗</span>}
                 {opt}
               </button>
             );
@@ -144,11 +158,25 @@ function ListeningGame({ tribe = "tayal" }) {
         </div>
 
         {/* 選完後顯示單字 */}
-        {selected !== null && (
-          <p className="listening-reveal" aria-live="polite">
-            族語：<strong>{q.word}</strong>
-          </p>
-        )}
+        <div className="listening-reveal" aria-live="polite">
+          {selected !== null && (
+            <>
+              <p className={`game-feedback ${selected === q.correct ? "correct" : "wrong"}`}>
+                {selected === q.correct ? "✓ 答對了" : `✗ 答錯了，正確答案：${q.correct}`}
+              </p>
+              <p>族語：<strong>{q.word}</strong></p>
+            </>
+          )}
+        </div>
+
+        <div className="game-step-actions">
+          <Link className="listening-btn-secondary" to="/game/listening">結束遊戲</Link>
+          {selected !== null && (
+            <button type="button" className="listening-btn-primary" ref={nextButtonRef} onClick={handleNext}>
+              {current + 1 < questions.length ? "下一題 ▸" : "看結果 ▸"}
+            </button>
+          )}
+        </div>
       </div>
     );
   }

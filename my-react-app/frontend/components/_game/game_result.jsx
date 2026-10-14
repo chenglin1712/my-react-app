@@ -1,6 +1,7 @@
 import "../../static/css/_game/game_result.css"
 import { useMemo } from "react";
 import { Alert } from "react-bootstrap";
+import { Link } from "react-router-dom";
 import { useFavorites } from "../../src/userServives/useFavorites";
 
 // 單字收藏統一存在 favorites 陣列裡 id === 1 的那個分類（跟 _search/index.jsx、
@@ -16,8 +17,8 @@ const GameResultCard = ({ word, isCorrect, toggleFavorite, isFavorited }) => {
                         <h5>{word.clue}</h5>
                     </div>
                     <div>
-                        <p className="user-answer">你的答案: {word.user_word || '無答案'}</p>
-                        <p className="correct-answer">正確答案: {word.correct_word}</p>
+                        <p className="user-answer">你的答案：{word.user_word || '無答案'}</p>
+                        <p className="correct-answer">正確答案：{word.correct_word}</p>
                         <div className='result-likebtn'>
                             <LikeButton isFavorited={isFavorited} onToggle={() => toggleFavorite(word.correct_word, WORD_FAVORITES_CATEGORY_ID)} />
                         </div>
@@ -35,8 +36,9 @@ const LikeButton = ({ isFavorited, onToggle }) => {
             onClick={onToggle}
             className='result-likebtn'
             aria-label={isFavorited ? "取消收藏" : "加入收藏"}
+            aria-pressed={isFavorited}
         >
-            {isFavorited ? '❤️' : '♡'}
+            {isFavorited ? '♥' : '♡'}
         </button>
     );
 };
@@ -46,7 +48,7 @@ const LikeButton = ({ isFavorited, onToggle }) => {
  * @param {object} props
  * @param {object} props.results
  */
-const Game_result = ({ results }) => {
+const Game_result = ({ results, onRestart, backTo }) => {
     const { favorites, toggleFavorite, error: favoritesError } = useFavorites();
 
     // word_details 來自後端，格式不如預期時用空陣列保底，不要讓整個結果頁掛掉。
@@ -119,6 +121,13 @@ const Game_result = ({ results }) => {
                     )}
                 </div>
             </div>
+
+            {(onRestart || backTo) && (
+                <div className="game-result-actions">
+                    {backTo && <Link className="yy-btn-outline" to={backTo}>← 返回遊戲頁面</Link>}
+                    {onRestart && <button type="button" className="yy-btn-primary" onClick={onRestart}>再玩一次</button>}
+                </div>
+            )}
         </div>
     );
 };

@@ -84,10 +84,31 @@
 }
 
 .gamehub-card {
+    position: relative;
     padding: 0;
     overflow: hidden;
     cursor: pointer;
     transition: box-shadow .2s ease;
+}
+
+.gamehub-card.is-selected {
+    box-shadow: 7px 7px 0 var(--yy-gold);
+}
+
+/* 卡片標題裡的按鈕：外觀就是標題，偽元素撐滿整張卡片當點擊範圍 */
+.gamehub-card-btn {
+    all: unset;
+    cursor: pointer;
+}
+.gamehub-card-btn::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+}
+.gamehub-card-btn:focus-visible::after {
+    outline: var(--yy-focus-ring);
+    outline-offset: -4px;
 }
 
 /* 標題原本直接壓在紅、藍、金、綠的漸層上，墨黑字對紅與藍只有約 1.5～2.2:1（審查項 P1-15），
@@ -209,13 +230,20 @@
     border-radius: var(--yy-radius-card);
     border: 3px solid var(--yy-ink);
     background: #fff;
+    font: inherit;
     text-align: center;
     cursor: pointer;
     box-shadow: var(--yy-shadow-sm);
     transition: var(--transition-interactive);
 }
 
+.gamehub-tribe-card.is-selected {
+    box-shadow: 5px 5px 0 var(--yy-gold);
+    transform: scale(1.05);
+}
+
 .gamehub-tribe-name {
+    display: block;
     font-size: 14px;
     font-weight: 700;
     color: var(--yy-ink);

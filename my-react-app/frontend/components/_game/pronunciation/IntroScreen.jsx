@@ -11,7 +11,7 @@ export default function IntroScreen({ config, error, loading, onStart, tribe }) 
       </p>
       {error && <p className="pron-error" role="alert">{error}</p>}
       <button type="button" className="pron-btn-primary" onClick={onStart} disabled={loading}>
-        {loading ? "載入中..." : "開始"}
+        {loading ? "載入中..." : error ? "重試" : "開始"}
       </button>
       <Link className="pron-community-entry-link" to={`/game/pronunciation/${tribe}/community`}>
         聽聽看其他人的示範發音

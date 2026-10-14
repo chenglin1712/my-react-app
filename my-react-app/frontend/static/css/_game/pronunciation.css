@@ -381,3 +381,11 @@
   .pron-word { font-size: 1.4rem; }
   .pron-mic-btn { width: 76px; height: 76px; font-size: 1.6rem; }
 }
+
+.pron-score-note {
+  width: 100%;
+  text-align: center;
+  font-size: 0.78rem;
+  opacity: 0.85;
+  margin-top: 0.2rem;
+}

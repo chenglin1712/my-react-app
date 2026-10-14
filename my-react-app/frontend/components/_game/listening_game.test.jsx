@@ -32,7 +32,7 @@ describe('ListeningGame（回歸測試：原本 1.4 秒的計時器沒有清理�
     });
   });
 
-  test('選擇答案後會標示對錯、揭曉族語單字，並在 1.4 秒後自動進到下一題', async () => {
+  test('選擇答案後會標示對錯、揭曉族語單字，不會自動跳題，按「下一題」才換題', async () => {
     apiGet.mockResolvedValueOnce({ questions: QUESTIONS });
     const user = userEvent.setup();
     renderGame();
@@ -41,8 +41,14 @@ describe('ListeningGame（回歸測試：原本 1.4 秒的計時器沒有清理�
     await user.click(screen.getByRole('button', { name: '真的' }));
     expect(screen.getByRole('button', { name: '真的' })).toHaveClass('correct');
     expect(screen.getByText(/族語：/)).toBeInTheDocument();
+    expect(screen.getByText('✓ 答對了')).toBeInTheDocument();
 
-    await waitFor(() => expect(screen.getByText('第 2 / 2 題')).toBeInTheDocument(), { timeout: 3000 });
+    // 等超過舊的 1.4 秒也不會自動跳題
+    await new Promise((resolve) => setTimeout(resolve, 1600));
+    expect(screen.getByText('第 1 / 2 題')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /下一題/ }));
+    await screen.findByText('第 2 / 2 題');
   }, 10000);
 
   test('同一題快速連點兩個不同選項，只會記錄第一次點擊的答案（回歸測試：原本只靠 state 擋，同一批次內兩次點擊都讀到未選取，會記錄兩筆答案並推進兩題）', async () => {
@@ -62,7 +68,8 @@ describe('ListeningGame（回歸測試：原本 1.4 秒的計時器沒有清理�
     expect(screen.getByRole('button', { name: '假的' })).not.toHaveClass('wrong');
 
     // 只推進一題（而不是兩題），代表只有一筆答案被記錄
-    await waitFor(() => expect(screen.getByText('第 2 / 2 題')).toBeInTheDocument(), { timeout: 3000 });
+    await user.click(screen.getByRole('button', { name: /下一題/ }));
+    await waitFor(() => expect(screen.getByText('第 2 / 2 題')).toBeInTheDocument());
   }, 10000);
 
   test('選完答案、畫面卸載時不會拋錯（回歸測試：原本 setTimeout 沒有清理，卸載後還是會觸發並操作已卸載的元件）', async () => {
@@ -77,4 +84,58 @@ describe('ListeningGame（回歸測試：原本 1.4 秒的計時器沒有清理�
     // 卸載後等超過 1.4 秒，確認沒有殘留的計時器造成未捕捉的例外
     await new Promise((resolve) => setTimeout(resolve, 1500));
   }, 10000);
+});
+
+describe('ListeningGame 答題後的操作與錯誤（E-5）', () => {
+  beforeEach(() => {
+    apiGet.mockReset();
+    createAuthorizedAudio.mockReset();
+    createAuthorizedAudio.mockResolvedValue({
+      pause: vi.fn(), play: vi.fn().mockResolvedValue(undefined), revokeObjectUrl: vi.fn(),
+    });
+  });
+
+  test('答錯時有 ✗ 標記與正確答案，答完前沒有「下一題」，最後一題是「看結果」', async () => {
+    apiGet.mockResolvedValueOnce({ questions: QUESTIONS });
+    const user = userEvent.setup();
+    renderGame();
+    await startGame(user);
+    expect(screen.queryByRole('button', { name: /下一題/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /假的/ }));
+    expect(screen.getByText(/答錯了，正確答案：真的/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /下一題/ })).toHaveFocus();
+
+    await user.click(screen.getByRole('button', { name: /下一題/ }));
+    await screen.findByText('第 2 / 2 題');
+    await user.click(screen.getByRole('button', { name: '加油' }));
+    await user.click(screen.getByRole('button', { name: /看結果/ }));
+    expect(await screen.findByText('遊戲結果')).toBeInTheDocument();
+  });
+
+  test('遊戲中有「結束遊戲」連結回到遊戲頁面', async () => {
+    apiGet.mockResolvedValueOnce({ questions: QUESTIONS });
+    const user = userEvent.setup();
+    renderGame();
+    await startGame(user);
+    expect(screen.getByRole('link', { name: '結束遊戲' })).toHaveAttribute('href', '/game/listening');
+  });
+
+  test('載入題目失敗：顯示人看得懂的說明，開始鈕變成「重試」', async () => {
+    apiGet.mockRejectedValueOnce(new Error('boom'));
+    const user = userEvent.setup();
+    renderGame();
+    await user.click(screen.getByRole('button', { name: '開始' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('題目暫時載入失敗，請稍後再試。');
+    expect(screen.queryByText(/後端/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '重試' })).toBeInTheDocument();
+  });
+
+  test('題庫是空的：說明這個族語暫時沒有題目，而不是沒有任何反應', async () => {
+    apiGet.mockResolvedValueOnce({ questions: [] });
+    const user = userEvent.setup();
+    renderGame();
+    await user.click(screen.getByRole('button', { name: '開始' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('這個族語暫時沒有題目');
+  });
 });
