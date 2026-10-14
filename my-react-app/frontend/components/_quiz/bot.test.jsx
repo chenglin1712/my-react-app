@@ -272,3 +272,54 @@ describe('AIAssistantOverlay 無障礙（審查項 P1-5、P1-6）', () => {
     expect(screen.getByLabelText('輸入訊息')).toHaveFocus();
   });
 });
+
+const announceSpy = vi.hoisted(() => vi.fn());
+vi.mock('@utils/announce', () => ({ announce: announceSpy }));
+
+describe('AIAssistantOverlay 開場白與準確度提醒（E-9，P2-74）', () => {
+  beforeEach(() => {
+    apiPost.mockReset();
+    getUserSituation.mockReset();
+    getUserSituation.mockResolvedValue({ level: 'beginner' });
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
+    authState.userData = { firestoreData: { user_errors: {}, quiz_model: { type_stats: {} } } };
+  });
+
+  test('預設泰雅語：開場白帶有泰雅語問候詞與語別', () => {
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+    expect(screen.getByText(/lokah su 你好！我是您的泰雅語 AI 助手/)).toBeInTheDocument();
+  });
+
+  test('對話還沒開始就換族語：開場白跟著換，且不會帶別的族語的問候詞', async () => {
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.selectOptions(screen.getByLabelText('選擇族語'), 'amis');
+
+    expect(screen.getByText(/你好！我是您的阿美語 AI 助手/)).toBeInTheDocument();
+    expect(screen.queryByText(/lokah su/)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/AI 助手，有什麼我可以幫您的嗎/)).toHaveLength(1);
+    expect(announceSpy).toHaveBeenCalledWith('已切換為阿美語');
+  });
+
+  test('已經聊過再換族語：保留對話，另外加一句說明改用哪個族語（不重複公告）', async () => {
+    announceSpy.mockClear();
+    apiPost.mockResolvedValue({ message: '好的' });
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+    await user.type(screen.getByLabelText('輸入訊息'), '嗨{Enter}');
+    await screen.findByText('好的');
+
+    await user.selectOptions(screen.getByLabelText('選擇族語'), 'bunun');
+
+    expect(screen.getByText(/lokah su 你好！我是您的泰雅語 AI 助手/)).toBeInTheDocument();
+    expect(screen.getByText('已切換為布農語，接下來的問題會以布農語回答。')).toBeInTheDocument();
+    expect(announceSpy).not.toHaveBeenCalled();
+  });
+
+  test('畫面上有常駐的準確度提醒，並綁給輸入框', () => {
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+    expect(screen.getByText(/AI 可能寫錯族語的詞彙或拼寫/)).toBeInTheDocument();
+    expect(screen.getByLabelText('輸入訊息')).toHaveAccessibleDescription(/請以族語辭典為準/);
+  });
+});

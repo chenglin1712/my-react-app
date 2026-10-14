@@ -379,3 +379,14 @@
         transform: translateY(0);
     }
 }
+
+/* 準確度提醒：常駐在輸入框上方，文字色在白底上 4.5:1 以上 */
+.bot-disclaimer {
+    margin: 0;
+    padding: 6px 16px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--yy-text-tertiary);
+    background: rgba(255, 255, 255, 0.8);
+    border-top: 1px solid rgba(158, 27, 36, 0.15);
+}

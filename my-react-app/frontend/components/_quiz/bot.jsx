@@ -1,5 +1,5 @@
 import "../../static/css/_quiz/bot.css"
-import { useState, useRef, useEffect } from "react";
+import { useId, useState, useRef, useEffect } from "react";
 import { Bot, ChevronDown } from "lucide-react"
 import { useNavigate } from "react-router-dom";
 import StudyPlanComponent from "./bot_study_plan"
@@ -9,6 +9,7 @@ import { TRIBES } from "../../src/constants/tribes";
 import { scrollBehavior } from "../../src/hooks/useReducedMotion";
 import { apiPost } from "../../utils/apiClient";
 import { useDialog } from "@hooks/useDialog";
+import { announce } from "@utils/announce";
 
 const SUGGESTIONS = [
     "我想了解我的學習狀況",
@@ -16,18 +17,37 @@ const SUGGESTIONS = [
     "幫我排一週讀書計畫"
 ];
 
+// 各族語的族語問候詞。目前只有泰雅語的 "lokah su"（專案內遊戲題庫把它標成泰雅語「你好」）有依據；
+// 其他族語的問候詞還沒有對照官方來源（族語E樂園、線上辭典）核對，先不放，
+// 開場白只用中文，避免 AI 助手一開口就寫錯族語。核對後在這裡補上即可（審查項 P2-74）。
+const TRIBE_GREETING_WORDS = {
+    tayal: "lokah su",
+};
+
+const tribeLabel = (slug) => {
+    const found = TRIBES.find((t) => t.slug === slug);
+    return found ? `${found.name}語` : "所選族語";
+};
+
+const greetingText = (slug) => {
+    const word = TRIBE_GREETING_WORDS[slug];
+    return `${word ? `${word} ` : ""}你好！我是您的${tribeLabel(slug)} AI 助手，有什麼我可以幫您的嗎？`;
+};
+
 // 右下角懸浮聊天視窗（類似 Messenger）：非 modal，背景頁面仍可操作。
 // open=false 時視窗收合但保持掛載，對話內容與進行中的請求都不會遺失。
 const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => {
     const navigate = useNavigate();
+    const disclaimerId = useId();
     // 直接從網址進到 /bot（沒有帶 onClose）時用 navigate(-1) 可能把使用者導到
     // 應用程式以外的頁面（例如瀏覽器歷史紀錄的上一頁是外部網站），改成固定
     // 導回測驗首頁，行為可預期。
     const handleClose = onClose ?? (() => navigate("/quiz"));
     const { userData } = useAuth();
     const [tribe, setTribe] = useState("tayal");
+    // 開場白記錄它是為哪個族語寫的（greetingFor），對話還沒開始時換族語就跟著換
     const [messages, setMessages] = useState([
-        { id: 1, text: "lokah su 你好！我是您的族語 AI 助手，有什麼我可以幫您的嗎？", role: "bot" }
+        { id: 1, text: greetingText("tayal"), role: "bot", greetingFor: "tayal" }
     ]);
     const [input, setInput] = useState("");
     const [isPending, setIsPending] = useState(false);
@@ -104,6 +124,27 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     useEffect(() => {
         messageEndRef.current?.scrollIntoView({ behavior: scrollBehavior() });
     }, [messages, isPending, open]);
+
+    // 換族語：對話還沒開始就直接換開場白；已經聊過了，保留對話紀錄，另外加一句說明
+    // （live region 會念出來），讓使用者知道後面的回答改用哪個族語。
+    const handleTribeChange = (e) => {
+        const nextTribe = e.target.value;
+        if (nextTribe === tribe) return;
+        setTribe(nextTribe);
+        // 對話還沒開始時只是就地改寫開場白那一則，live region 不一定會念出文字變更，另外公告一次；
+        // 已經聊過時會新增一則說明訊息，live region 會自己念，不用重複公告
+        if (messages.length === 1 && messages[0].greetingFor) announce(`已切換為${tribeLabel(nextTribe)}`);
+        setMessages((prev) => {
+            if (prev.length === 1 && prev[0].greetingFor) {
+                return [{ ...prev[0], text: greetingText(nextTribe), greetingFor: nextTribe }];
+            }
+            return [...prev, {
+                id: crypto.randomUUID(),
+                text: `已切換為${tribeLabel(nextTribe)}，接下來的問題會以${tribeLabel(nextTribe)}回答。`,
+                role: "bot",
+            }];
+        });
+    };
 
     const handleInputChange = (e) => {
         setInput(e.target.value);
@@ -205,7 +246,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                     </div>
                     <select
                         value={tribe}
-                        onChange={(e) => setTribe(e.target.value)}
+                        onChange={handleTribeChange}
                         disabled={isPending}
                         style={{ position: "relative", zIndex: 1, borderRadius: 6, border: "none", padding: "4px 6px" }}
                         aria-label="選擇族語"
@@ -270,6 +311,8 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                     </div>
                 )}
 
+                {/* 常駐的準確度提醒：語言學習工具的 AI 可能寫錯族語詞彙與拼寫 */}
+                <p className="bot-disclaimer" id={disclaimerId}>AI 可能寫錯族語的詞彙或拼寫，學習時請以族語辭典為準。</p>
                 <div className="input-area">
                     <input
                         ref={inputRef}
@@ -280,6 +323,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                         placeholder="輸入您的訊息..."
                         className="message-input"
                         aria-label="輸入訊息"
+                        aria-describedby={disclaimerId}
                         aria-busy={isPending}
                     />
                     <button
