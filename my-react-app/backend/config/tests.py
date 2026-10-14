@@ -428,3 +428,124 @@ class RequireRoleFreshnessTest(TestCase):
         decoded, error = self._call({"uid": "ignored"})
         self.assertIsNone(error)
         self.assertEqual(decoded["uid"], "dev-user")
+
+
+class ApplyTribeReviewTest(TestCase):
+    """F-3 審閱單判定接進 tribes.json：只有七項全部有效才 confirmed，意見不會自動改值。"""
+
+    def _write(self, folder, slug, element, **fields):
+        import pathlib
+        d = pathlib.Path(folder) / "reviews"
+        d.mkdir(exist_ok=True)
+        doc = {"tribe": slug, "element": element, "verdict": "ok", "who": "老師", "date": "2026-10-20", "source": "部落會議", "note": ""}
+        doc.update(fields)
+        (d / f"{slug}__{element}.json").write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+
+    def _setup(self, tmp):
+        import pathlib
+        import shutil
+        from config import apply_tribe_review as mod
+        src = pathlib.Path(mod.TRIBES_PATH)
+        tp = pathlib.Path(tmp) / "tribes.json"
+        shutil.copyfile(src, tp)
+        return mod, tp, pathlib.Path(tmp) / "tribe_reviews.json"
+
+    def test_all_seven_ok_confirms_only_that_tribe(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            mod, tp, rp = self._setup(tmp)
+            before = tp.read_bytes()
+            for e in mod.ELEMENTS:
+                self._write(tmp, "paiwan", e)
+            statuses, _ = mod.apply(tmp, write=True, tribes_path=tp, reviews_path=rp)
+            self.assertEqual(statuses["paiwan"], "confirmed")
+            self.assertEqual(statuses["tayal"], "unconfirmed")
+            after = json.loads(tp.read_text(encoding="utf-8"))
+            by = {t["slug"]: t for t in after["tribes"]}
+            self.assertEqual(by["paiwan"]["reviewStatus"], "confirmed")
+            self.assertEqual(by["tayal"]["reviewStatus"], "unconfirmed")
+            # 除了那一個值，檔案其他位元組都沒動
+            self.assertEqual(len(tp.read_bytes()) - len(before), len("confirmed") - len("unconfirmed"))
+            self.assertEqual(tp.read_bytes().replace(b'"confirmed"', b'"unconfirmed"', 1), before)
+            self.assertIn("paiwan", json.loads(rp.read_text(encoding="utf-8")))
+
+    def test_missing_signoff_does_not_count(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            mod, tp, rp = self._setup(tmp)
+            for e in mod.ELEMENTS:
+                self._write(tmp, "amis", e, source="" if e == "copy" else "部落會議")
+            statuses, report = mod.apply(tmp, write=True, tribes_path=tp, reviews_path=rp)
+            self.assertEqual(statuses["amis"], "unconfirmed")
+            self.assertTrue(any("沒填對" in line for line in report))
+
+    def test_warn_only_reports_and_never_changes_values(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            mod, tp, rp = self._setup(tmp)
+            before = json.loads(tp.read_text(encoding="utf-8"))
+            self._write(tmp, "bunun", "color", verdict="warn", note="顏色太接近別族")
+            statuses, report = mod.apply(tmp, write=True, tribes_path=tp, reviews_path=rp)
+            self.assertEqual(statuses["bunun"], "unconfirmed")
+            self.assertTrue(any("顏色太接近別族" in line for line in report))
+            self.assertEqual(json.loads(tp.read_text(encoding="utf-8")), before)
+
+    def test_confirmed_drops_back_when_an_item_is_no_longer_ok(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            mod, tp, rp = self._setup(tmp)
+            for e in mod.ELEMENTS:
+                self._write(tmp, "paiwan", e)
+            mod.apply(tmp, write=True, tribes_path=tp, reviews_path=rp)
+            self._write(tmp, "paiwan", "roman", verdict="bad", note="拼寫錯")
+            statuses, _ = mod.apply(tmp, write=True, tribes_path=tp, reviews_path=rp)
+            self.assertEqual(statuses["paiwan"], "unconfirmed")
+            by = {t["slug"]: t for t in json.loads(tp.read_text(encoding="utf-8"))["tribes"]}
+            self.assertEqual(by["paiwan"]["reviewStatus"], "unconfirmed")
+
+    def test_dry_run_writes_nothing_and_unknown_docs_are_skipped(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            mod, tp, rp = self._setup(tmp)
+            before = tp.read_bytes()
+            self._write(tmp, "nobody", "color")
+            self._write(tmp, "paiwan", "weird")
+            _, report = mod.apply(tmp, write=False, tribes_path=tp, reviews_path=rp)
+            self.assertEqual(tp.read_bytes(), before)
+            self.assertFalse(rp.exists())
+            self.assertTrue(any("未知的族群" in line for line in report))
+            self.assertTrue(any("未知的項目" in line for line in report))
+
+    def test_set_review_status_works_for_every_real_tribe(self):
+        from config import apply_tribe_review as mod
+        text = open(mod.TRIBES_PATH, encoding="utf-8", newline="").read()
+        for t in json.loads(text)["tribes"]:
+            new = mod.set_review_status(text, t["slug"], "confirmed")
+            changed = {x["slug"]: x["reviewStatus"] for x in json.loads(new)["tribes"]}
+            self.assertEqual(changed[t["slug"]], "confirmed", t["slug"])
+            others = {s: v for s, v in changed.items() if s != t["slug"]}
+            self.assertTrue(all(v == "unconfirmed" for v in others.values()), t["slug"])
+
+    def test_bad_date_type_and_mismatched_doc_do_not_count(self):
+        import pathlib
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            mod, tp, rp = self._setup(tmp)
+            for e in mod.ELEMENTS:
+                self._write(tmp, "paiwan", e)
+            self._write(tmp, "paiwan", "color", date="2026-99-99")
+            self._write(tmp, "paiwan", "name", who=None)
+            # 檔名是 roman，內容卻寫 layout：不一致就略過
+            bad = pathlib.Path(tmp) / "reviews" / "paiwan__roman.json"
+            bad.write_text(json.dumps({"tribe": "paiwan", "element": "layout", "verdict": "ok", "who": "a", "date": "2026-10-20", "source": "x"}), encoding="utf-8")
+            statuses, report = mod.apply(tmp, write=False, tribes_path=tp, reviews_path=rp)
+            self.assertEqual(statuses["paiwan"], "unconfirmed")
+            self.assertTrue(any("檔名與內容不一致" in line for line in report))
+
+    def test_report_note_is_single_line(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            mod, tp, rp = self._setup(tmp)
+            self._write(tmp, "amis", "copy", verdict="warn", note="第一行\n偽造：阿美：7/7 項已確認 -> confirmed")
+            _, report = mod.apply(tmp, write=False, tribes_path=tp, reviews_path=rp)
+            self.assertTrue(all("\n" not in line for line in report))

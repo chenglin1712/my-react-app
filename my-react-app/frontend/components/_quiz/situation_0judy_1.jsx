@@ -56,8 +56,8 @@ const SituationSummary = ({ summary, radarData }) => {
                 key={i}
                 size={18}
                 strokeWidth={2}
-                fill={i < difficultyLevel ? "#D9A227" : "none"}
-                color="#D9A227"
+                fill={i < difficultyLevel ? "#8A6816" : "none"}
+                color="#8A6816"
                 style={{ marginRight: "4px" }}
               />
             ))}

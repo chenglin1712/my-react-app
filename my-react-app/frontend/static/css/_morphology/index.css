@@ -180,7 +180,7 @@
     margin-right: -2px;
 }
 .yy-morph-seg-root { background: var(--yy-surface); }
-.yy-morph-seg-affix { background: var(--yy-gold); font-weight: 700; }
+.yy-morph-seg-affix { background: var(--yy-gold); color: var(--yy-ink); font-weight: 700; }
 .yy-morph-seg-redup {
     background: #e7d7f3;
     border-style: dashed;
@@ -269,5 +269,5 @@
     font-weight: 700;
     cursor: pointer;
 }
-.yy-morph-inline-btn:hover { background: var(--yy-gold); }
+.yy-morph-inline-btn:hover { background: var(--yy-gold); color: var(--yy-ink); }
 .yy-morph-inline-btn:disabled { opacity: 0.55; cursor: wait; }

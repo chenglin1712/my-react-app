@@ -3,7 +3,7 @@ const TribePill = ({ tribe, active, onClick, children }) => (
   <button
     type="button"
     className={`yy-pill${active ? ' active' : ''}`}
-    style={active ? { background: tribe.color } : undefined}
+    style={active ? { background: tribe.color, color: tribe.textColor } : undefined}
     aria-pressed={active}
     onClick={onClick}
   >

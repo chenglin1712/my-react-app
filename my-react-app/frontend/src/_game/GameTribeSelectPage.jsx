@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import "../../static/css/_game/gameTribeSelect.css";
-import { TRIBES, TRIBE_COLOR_BY_SLUG, COMING_SOON_LABEL, tribeHasFeature } from "../constants/tribes";
+import { TRIBES, TRIBE_COLOR_BY_SLUG, TRIBE_TEXT_COLOR_BY_SLUG, COMING_SOON_LABEL, tribeHasFeature } from "../constants/tribes";
 
 // 詞彙/聽力/句型三個遊戲的「選擇族語」頁面原本各自複製了一份幾乎一樣的實作
 // （包含同一個「hasGame 對每個族語都寫死 true，讓建置中分支永遠不會顯示」的
@@ -20,6 +20,7 @@ export default function GameTribeSelectPage({ gameSlug, title, subtitle, actionL
       <div className="vocab-tribe-grid">
         {TRIBES.map((tribe) => {
           const color = TRIBE_COLOR_BY_SLUG[tribe.slug];
+          const textColor = TRIBE_TEXT_COLOR_BY_SLUG[tribe.slug];
           // 這個族群還沒有這個遊戲的內容：不給連結，標示「即將推出」（N-6）
           if (!tribeHasFeature(tribe.slug, gameSlug)) {
             return (
@@ -29,7 +30,7 @@ export default function GameTribeSelectPage({ gameSlug, title, subtitle, actionL
                 aria-disabled="true"
                 style={{ "--tribe-color": color }}
               >
-                <div className="vocab-tribe-badge" style={{ background: color }}>
+                <div className="vocab-tribe-badge" style={{ background: color, color: textColor }}>
                   {tribe.name}
                 </div>
                 <div className="vocab-tribe-name">{tribe.name}族語</div>
@@ -44,7 +45,7 @@ export default function GameTribeSelectPage({ gameSlug, title, subtitle, actionL
               className="vocab-tribe-card"
               style={{ "--tribe-color": color }}
             >
-              <div className="vocab-tribe-badge" style={{ background: color }}>
+              <div className="vocab-tribe-badge" style={{ background: color, color: textColor }}>
                 {tribe.name}
               </div>
               <div className="vocab-tribe-name">{tribe.name}族語</div>

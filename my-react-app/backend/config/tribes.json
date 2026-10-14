@@ -2,7 +2,7 @@
   "_說明": [
     "族群資料唯一來源（N-6）。後端 config/tribes.py 與前台 frontend/src/constants/tribes.js 都讀這一份，新增或修改族群只改這裡。",
     "放在 backend/ 底下是因為 Docker image 只複製 backend/；前台用相對路徑引入，建置時會打包進去。",
-    "enabled=true 才會出現在選單與路由；enabled=false 是預留的位置（官方承認 16 族，目前啟用 5 族），前後端都不會使用，slug 在啟用前仍可更改。",
+    "textColor 是放在族色上的文字色（淺色族色用墨字、深色族色用白字），對比至少 4.5:1，有測試守門；enabled=true 才會出現在選單與路由；enabled=false 是預留的位置（官方承認 16 族，目前啟用 5 族），前後端都不會使用，slug 在啟用前仍可更改。",
     "id 是 dictionary.db 的 tribe.id（UUID），enabled 的族群必填。dbName 是資料庫裡 tribe.name 的實際值，與顯示用的 fullName 不同時才寫。",
     "features 記錄各功能是否已有該族的內容，false 或缺少時畫面顯示「即將推出」。",
     "dialects 預留方言別，格式 {slug, name, reviewStatus}，目前全部留空，等部落與族語老師確認後再填。",
@@ -14,32 +14,32 @@
   },
   "tribes": [
     {
-      "slug": "tayal", "name": "泰雅", "fullName": "泰雅語", "roman": "Tayal", "color": "#9E1B24",
+      "slug": "tayal", "name": "泰雅", "fullName": "泰雅語", "roman": "Tayal", "color": "#9E1B24", "textColor": "#FFFFFF",
       "langCode": "tay", "id": "fc76ed97-0dd8-4587-82ad-7a6dbe125001", "enabled": true, "reviewStatus": "unconfirmed",
       "features": { "dictionary": true, "quiz": true, "vocabulary": true, "listening": true, "pronunciation": true, "sentence": true },
       "dialects": []
     },
     {
-      "slug": "amis", "name": "阿美", "fullName": "阿美語", "roman": "Pangcah", "color": "#1F3A5C",
+      "slug": "amis", "name": "阿美", "fullName": "阿美語", "roman": "Pangcah", "color": "#1F3A5C", "textColor": "#FFFFFF",
       "langCode": "ami", "id": "e68273b9-1f2b-4c42-8d95-f52189ab24b7", "enabled": true, "reviewStatus": "unconfirmed",
       "features": { "dictionary": true, "quiz": true, "vocabulary": true, "listening": true, "pronunciation": true, "sentence": true },
       "dialects": []
     },
     {
-      "slug": "bunun", "name": "布農", "fullName": "布農語", "roman": "Bunun", "color": "#4B6B3A",
+      "slug": "bunun", "name": "布農", "fullName": "布農語", "roman": "Bunun", "color": "#4B6B3A", "textColor": "#FFFFFF",
       "langCode": "bnn", "id": "865a96e3-3384-45b3-8bd0-e1f799b75515", "enabled": true, "reviewStatus": "unconfirmed",
       "features": { "dictionary": true, "quiz": true, "vocabulary": true, "listening": true, "pronunciation": true, "sentence": true },
       "dialects": []
     },
     {
       "slug": "kavalan", "name": "噶瑪蘭", "fullName": "噶瑪蘭語", "dbName": "葛瑪蘭語", "aliases": ["葛瑪蘭", "葛瑪蘭語"],
-      "roman": "Kebalan", "color": "#2C6E7F",
+      "roman": "Kebalan", "color": "#2C6E7F", "textColor": "#FFFFFF",
       "langCode": "ckv", "id": "c5974f37-b49d-466a-ab24-6893ab4ef6a5", "enabled": true, "reviewStatus": "unconfirmed",
       "features": { "dictionary": true, "quiz": true, "vocabulary": true, "listening": true, "pronunciation": true, "sentence": true },
       "dialects": []
     },
     {
-      "slug": "paiwan", "name": "排灣", "fullName": "排灣語", "roman": "Payuan", "color": "#D9A227",
+      "slug": "paiwan", "name": "排灣", "fullName": "排灣語", "roman": "Payuan", "color": "#D9A227", "textColor": "#221812",
       "langCode": "pwn", "id": "19c77a3b-3a81-496f-b0f4-afe6d9155edd", "enabled": true, "reviewStatus": "unconfirmed",
       "features": { "dictionary": true, "quiz": true, "vocabulary": true, "listening": true, "pronunciation": true, "sentence": true },
       "dialects": []

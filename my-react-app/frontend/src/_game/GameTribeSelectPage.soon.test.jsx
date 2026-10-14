@@ -11,6 +11,7 @@ vi.mock('../constants/tribes', () => {
   return {
     TRIBES,
     TRIBE_COLOR_BY_SLUG: Object.fromEntries(TRIBES.map((t) => [t.slug, t.color])),
+    TRIBE_TEXT_COLOR_BY_SLUG: Object.fromEntries(TRIBES.map((t) => [t.slug, t.textColor])),
     COMING_SOON_LABEL: '即將推出',
     tribeHasFeature: (slug, feature) => TRIBES.find((t) => t.slug === slug)?.features?.[feature] === true,
   };

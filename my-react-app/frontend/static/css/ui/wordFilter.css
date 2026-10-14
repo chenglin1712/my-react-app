@@ -66,6 +66,7 @@
 
 .wf-chip--freq.is-selected {
   background: var(--yy-gold);
+  color: var(--yy-ink);
 }
 
 .wf-chip--letter.is-selected {

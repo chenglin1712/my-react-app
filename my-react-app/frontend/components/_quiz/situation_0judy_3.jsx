@@ -18,7 +18,7 @@ import '../../static/css/_quiz/situation_0judy_3.css';
 
 const typeMap = {
   trueFalse: { name: '是非', color: '#9E1B24' },
-  multipleChoice: { name: '選擇', color: '#D9A227' },
+  multipleChoice: { name: '選擇', color: '#8A6816' },
   matching: { name: '配合', color: '#1F3A5C' },
   fillInTheBlank: { name: '閱讀填空', color: '#4B6B3A' }
 };
@@ -78,7 +78,7 @@ const SituationDashboard = ({ data, typeRatio }) => {
   const getPerformanceColor = (performance) => {
     switch (performance) {
       case '良好': return '#4B6B3A';
-      case '需加強': return '#D9A227';
+      case '需加強': return '#8A6816';
       case '不及格': return '#9E1B24';
       default: return '#6B7280';
     }
@@ -182,7 +182,7 @@ const SituationDashboard = ({ data, typeRatio }) => {
                   payload={[
                     { value: '平均正確率', type: 'line', color: '#221812' },
                     { value: '良好', type: 'square', color: '#4B6B3A' },
-                    { value: '需加強', type: 'square', color: '#D9A227' },
+                    { value: '需加強', type: 'square', color: '#8A6816' },
                     { value: '不及格', type: 'square', color: '#9E1B24' },
                   ]}
                   iconSize={16}

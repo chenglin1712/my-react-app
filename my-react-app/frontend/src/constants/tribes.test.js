@@ -35,7 +35,7 @@ describe("族群資料單一來源", () => {
 
   it("新增一個族群只改 JSON 一處，選單、名稱表與功能判斷都跟著出現", () => {
     const extra = {
-      slug: "demo", name: "測試", fullName: "測試語", roman: "Demo", color: "#123456",
+      slug: "demo", name: "測試", fullName: "測試語", roman: "Demo", color: "#123456", textColor: "#FFFFFF",
       langCode: null, id: "00000000-0000-0000-0000-000000000001", enabled: true,
       features: { quiz: true },
     };
@@ -50,7 +50,7 @@ describe("族群資料單一來源", () => {
 
   it("沒有內容的功能不是 true，畫面顯示「即將推出」", () => {
     const { enabled } = buildTribeTables([
-      { slug: "demo", name: "測試", fullName: "測試語", roman: "Demo", color: "#123456", enabled: true, features: { quiz: true } },
+      { slug: "demo", name: "測試", fullName: "測試語", roman: "Demo", color: "#123456", textColor: "#FFFFFF", enabled: true, features: { quiz: true } },
     ]);
     const demo = enabled[0];
     expect(demo.features.quiz).toBe(true);

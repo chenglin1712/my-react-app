@@ -2,7 +2,7 @@ import { NotebookPen } from "lucide-react";
 import { Link } from "react-router-dom";
 import "../../static/css/_game/zone.css";
 import { Container } from "react-bootstrap";
-import { TRIBES, TRIBE_COLOR_BY_SLUG, COMING_SOON_LABEL, tribeHasFeature } from "../constants/tribes";
+import { TRIBES, TRIBE_COLOR_BY_SLUG, TRIBE_TEXT_COLOR_BY_SLUG, COMING_SOON_LABEL, tribeHasFeature } from "../constants/tribes";
 import StepBar from "../../components/ui/StepBar";
 
 const QUIZ_STEPS = ["選擇族語", "選擇等級", "開始作答", "成績單"];
@@ -55,7 +55,7 @@ const QuizTribeSelect = () => {
               </div>
               <div
                 className="zone-card-badge badge-open"
-                style={{ background: TRIBE_COLOR_BY_SLUG[tribe.slug] }}
+                style={{ background: TRIBE_COLOR_BY_SLUG[tribe.slug], color: TRIBE_TEXT_COLOR_BY_SLUG[tribe.slug] }}
               >
                 進入測驗
               </div>

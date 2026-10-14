@@ -155,8 +155,8 @@ const HomePage = () => {
     const featureCardContent = (
         <>
             <div className="home-feature-head">
-                <span>{hasFeature ? "現正主打" : "語言預覽"}</span>
-                <span aria-hidden="true">◆ ◆ ◆ ◆ ◆</span>
+                <span className="home-feature-tag">{hasFeature ? "現正主打" : "語言預覽"}</span>
+                <span className="home-feature-tag home-feature-tag--deco" aria-hidden="true">◆ ◆ ◆ ◆ ◆</span>
             </div>
             <div className="home-feature-image">
                 {showHeroImage

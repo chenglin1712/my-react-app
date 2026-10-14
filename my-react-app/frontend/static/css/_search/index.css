@@ -132,7 +132,7 @@
 .tribe-empty-badge[data-tribe="阿美"]   { background: var(--yy-blue); }
 .tribe-empty-badge[data-tribe="布農"]   { background: var(--yy-green); }
 .tribe-empty-badge[data-tribe="噶瑪蘭"] { background: var(--yy-blue-light); }
-.tribe-empty-badge[data-tribe="排灣"]   { background: var(--yy-gold); }
+.tribe-empty-badge[data-tribe="排灣"]   { background: var(--yy-gold); color: var(--yy-ink); }
 
 /* ── 搜尋卡：終端機輸入框 + 篩選列 ─────────────── */
 .search-card {

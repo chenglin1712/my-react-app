@@ -50,6 +50,8 @@
   /* --yy-gold 本身在白色/米白底上文字對比不足（AA 檢測不過），文字場合
      用這個加深版本，底色/邊框仍用 --yy-gold。 */
   --yy-warning-text: #8A6816;
+  /* 金色拿來當資料標記（星星、圖表長條）時用這個：對白底 5.2:1、對米白 4.2:1，過了圖形元件的 3:1 */
+  --yy-gold-mark: #8A6816;
   --yy-info: var(--yy-blue-light);
   --yy-info-bg: #DFE9EC;
 
@@ -604,7 +606,7 @@
 .yy-diamond-badge {
   position: relative;
   isolation: isolate;
-  color: var(--yy-surface);
+  color: var(--yy-diamond-text, var(--yy-surface));
   display: inline-flex;
   align-items: center;
   justify-content: center;

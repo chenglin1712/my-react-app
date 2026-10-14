@@ -24,6 +24,7 @@ export function buildTribeTables(rawTribes) {
     fullName: t.fullName ?? null,
     roman: t.roman ?? null,
     color: t.color ?? null,
+    textColor: t.textColor ?? null,
     langCode: t.langCode ?? null,
     enabled: Boolean(t.enabled),
     reviewStatus: t.reviewStatus ?? "unconfirmed",
@@ -33,7 +34,7 @@ export function buildTribeTables(rawTribes) {
 
   const enabled = all.filter((t) => t.enabled);
   for (const t of enabled) {
-    for (const field of ["fullName", "roman", "color"]) {
+    for (const field of ["fullName", "roman", "color", "textColor"]) {
       if (!t[field]) throw new Error(`tribes.json：啟用的族群 ${t.slug} 缺少 ${field}`);
     }
   }
@@ -50,6 +51,9 @@ export const TRIBES = enabled;
 
 // slug -> 族語識別色（YUAN・YU v2 設計系統，design_handoff_v2/README.md）
 export const TRIBE_COLOR_BY_SLUG = Object.fromEntries(TRIBES.map((t) => [t.slug, t.color]));
+
+// slug -> 放在族色上的文字色（淺色族色如排灣金用墨字，其餘用白字；對比至少 4.5:1）
+export const TRIBE_TEXT_COLOR_BY_SLUG = Object.fromEntries(TRIBES.map((t) => [t.slug, t.textColor]));
 
 // 中文簡稱清單，例如下拉選單、族語切換按鈕列表
 export const TRIBE_NAMES = TRIBES.map((t) => t.name);

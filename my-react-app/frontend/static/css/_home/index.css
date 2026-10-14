@@ -57,7 +57,8 @@
     display: block;
     padding: 7px 16px;
     border-radius: var(--yy-radius-btn);
-    background: linear-gradient(100deg, var(--yy-gold), var(--yy-red), var(--yy-blue), var(--yy-gold));
+    /* 白字壓在漸層上，漸層裡不放金色（白字對金色只有 2.3:1），紅、藍、綠三端都在 6:1 以上 */
+    background: linear-gradient(100deg, var(--yy-red), var(--yy-blue), var(--yy-green), var(--yy-red));
     background-size: 300% 100%;
     border: 3px solid var(--yy-ink);
     color: var(--yy-surface);
@@ -260,6 +261,18 @@
     font-family: var(--yy-font-pixel);
     font-size: 14px;
     color: var(--yy-surface);
+}
+
+/* 標題文字放在墨色底板上，不直接壓在紅金漸層（金色端點的對比只有 1.9 到 2.3:1） */
+.home-feature-tag {
+    background: var(--yy-ink);
+    color: var(--yy-cream);
+    padding: 2px 10px;
+    border-radius: var(--yy-radius-btn);
+}
+
+.home-feature-tag--deco {
+    color: var(--yy-gold);
 }
 
 .home-feature-image {

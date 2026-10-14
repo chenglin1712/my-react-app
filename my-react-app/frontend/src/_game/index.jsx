@@ -147,7 +147,7 @@ const GameZonePage = () => {
                     aria-disabled={soon || undefined}
                     onClick={() => { if (!soon) setActiveTribe(t.slug); }}
                   >
-                    <DiamondBadge as="span" color={t.color} size={40} fontSize={14} style={{ margin: '0 auto 10px' }}>{t.name}</DiamondBadge>
+                    <DiamondBadge as="span" color={t.color} textColor={t.textColor} size={40} fontSize={14} style={{ margin: '0 auto 10px' }}>{t.name}</DiamondBadge>
                     <span className="gamehub-tribe-name">{t.name}族語{active && <span aria-hidden="true"> ✓</span>}</span>
                     {soon && <span className="gamehub-tribe-soon">{COMING_SOON_LABEL}</span>}
                   </button>
@@ -157,7 +157,7 @@ const GameZonePage = () => {
 
             {activeTribeData && (
               <div className="yy-fade-up gamehub-confirm">
-                <DiamondBadge color={activeTribeData.color} size={56} fontSize={18} style={{ margin: '0 auto 12px' }}>{activeTribeData.name}</DiamondBadge>
+                <DiamondBadge color={activeTribeData.color} textColor={activeTribeData.textColor} size={56} fontSize={18} style={{ margin: '0 auto 12px' }}>{activeTribeData.name}</DiamondBadge>
                 <h4>{activeTribeData.name}族語 {activeGameData.title}</h4>
                 <p>準備好了嗎？點擊下方開始挑戰</p>
                 <button type="button" className="yy-btn-primary" onClick={startChallenge}>開始挑戰 ▸</button>
