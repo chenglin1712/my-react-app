@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { AdminEmptyBody } from '../components/AdminEmpty';
 import {
   Alert,
   Badge,
@@ -193,8 +194,8 @@ export default function ReviewQueue() {
             <tbody>
               {data.results.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="review-queue-empty">
-                    目前沒有符合條件的待處理項目。
+                  <td colSpan={7} className="admin-empty-cell">
+                    <AdminEmptyBody title={typeFilter ? '沒有符合條件的待處理項目' : '目前沒有待處理項目'} />
                   </td>
                 </tr>
               ) : (

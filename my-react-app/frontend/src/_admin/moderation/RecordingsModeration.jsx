@@ -17,6 +17,7 @@ import { TRIBE_NAME_BY_SLUG } from '../../constants/tribes';
 import { apiDelete } from '../../../utils/apiClient';
 import { useAdminListQuery } from '../hooks/useAdminListQuery';
 import { useActionLock } from '../hooks/useActionLock';
+import { AdminEmptyBody } from '../components/AdminEmpty';
 import { ACCOUNT_MANAGERS, STAFF_ROLES } from '../constants/roles';
 import ReviewPagination from '../reviewWorkflow/ReviewPagination';
 import '../../../static/css/_admin/moderation.css';
@@ -250,11 +251,8 @@ export default function RecordingsModeration() {
 
                                     {!items.length && (
                                         <tr>
-                                            <td
-                                                className="moderation-empty"
-                                                colSpan={7}
-                                            >
-                                                沒有符合條件的發音錄音
+                                            <td className="admin-empty-cell" colSpan={7}>
+                                                <AdminEmptyBody title="沒有符合條件的發音錄音" />
                                             </td>
                                         </tr>
                                     )}

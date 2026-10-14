@@ -36,36 +36,47 @@ export default function AdminEntryGate({ children }) {
     const [showOverlay] = useState(() => !readEntered());
     const [phase, setPhase] = useState(showOverlay ? 'loading' : 'done'); // loading → leaving → done
     const [ready, setReady] = useState(false);
+    const [skipped, setSkipped] = useState(false);
     const startedAt = useRef(Date.now());
     const markReady = useCallback(() => setReady(true), []);
+    const skip = useCallback(() => setSkipped(true), []);
 
     useEffect(() => {
         if (!showOverlay || !ready || phase !== 'loading') return undefined;
         const minVisible = prefersReducedMotion() ? MIN_VISIBLE_REDUCED_MS : MIN_VISIBLE_MS;
-        const wait = Math.max(0, minVisible - (Date.now() - startedAt.current));
+        // 按了略過：殼層一準備好就收合，不再等最短可見時間
+        const wait = skipped ? 0 : Math.max(0, minVisible - (Date.now() - startedAt.current));
         const leave = setTimeout(() => setPhase('leaving'), wait);
         return () => clearTimeout(leave);
-    }, [showOverlay, ready, phase]);
+    }, [showOverlay, ready, phase, skipped]);
+
+    // Esc 也能略過（鍵盤使用者不必先 Tab 到按鈕）
+    useEffect(() => {
+        if (phase === 'done' || !showOverlay) return undefined;
+        const onKey = (event) => { if (event.key === 'Escape') skip(); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [phase, showOverlay, skip]);
 
     useEffect(() => {
         if (phase !== 'leaving') return undefined;
         const done = setTimeout(() => {
             writeEntered();
             setPhase('done');
-        }, LEAVE_MS);
+        }, skipped ? 0 : LEAVE_MS);
         return () => clearTimeout(done);
-    }, [phase]);
+    }, [phase, skipped]);
 
     const value = useMemo(
-        () => ({ firstEntry: showOverlay, revealed: phase !== 'loading', markReady }),
-        [showOverlay, phase, markReady],
+        () => ({ firstEntry: showOverlay, revealed: phase !== 'loading', skipped, markReady }),
+        [showOverlay, phase, skipped, markReady],
     );
 
     return (
         <AdminEntryContext.Provider value={value}>
             {children}
             {phase !== 'done' && (
-                <AdminEntryFallback instant leaving={phase === 'leaving'} message={phase === 'leaving' ? '歡迎回來' : '正在校準管理訊號'} />
+                <AdminEntryFallback instant leaving={phase === 'leaving'} message={phase === 'leaving' ? '歡迎回來' : '正在校準管理訊號'} onSkip={skip} />
             )}
         </AdminEntryContext.Provider>
     );

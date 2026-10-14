@@ -5,6 +5,7 @@ import { useAuth } from '../../userServives/authContext';
 import { apiDelete, apiGet, apiPost, apiPut } from '../../../utils/apiClient';
 import { useActionLock } from '../hooks/useActionLock';
 import { formatDateTime } from '../adminFormat';
+import AdminEmpty from '../components/AdminEmpty';
 import '../../../static/css/_admin/exam-schedule.css';
 import { confirmAction } from '@components/ui/ConfirmDialog';
 
@@ -269,7 +270,7 @@ export default function ExamSchedule() {
                             <p>未套用任何後台覆寫的來源資料</p>
                         </header>
                         {data.crawled?.available === false && !data.crawled?.phases?.length ? (
-                            <div className="exam-schedule-empty">爬蟲目前無法取得資料</div>
+                            <AdminEmpty title="爬蟲目前無法取得資料" />
                         ) : (
                             <Table responsive hover className="exam-schedule-table">
                                 <thead>
@@ -290,7 +291,7 @@ export default function ExamSchedule() {
                             <p>目前實際對外提供的時程資料</p>
                         </header>
                         {!data.effective_phases?.length ? (
-                            <div className="exam-schedule-empty">目前沒有任何生效中的時程資料</div>
+                            <AdminEmpty title="目前沒有任何生效中的時程資料" />
                         ) : (
                             <Table responsive hover className="exam-schedule-table">
                                 <thead>

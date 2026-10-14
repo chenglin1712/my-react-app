@@ -1,7 +1,8 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { BarChart3, BookOpen, ClipboardCheck, FileQuestion, Gamepad2, LayoutDashboard, Megaphone, Settings, Users } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
+import { signOut } from '../../userServives/userServive';
 import ErrorBoundary from '../../errorBoundary';
 import { ROLE_LABELS } from '../constants/roles';
 import AdminRouteSkeleton from './AdminRouteSkeleton';
@@ -11,9 +12,13 @@ import '../../../static/css/_admin/layout.css';
 import '../../../static/css/_admin/admin-base.css';
 
 
+// 導覽項目可選填 roles：只有列出的角色看得到這一項。沒填 = 所有後台角色都看得到。
+// 目前沒有任何項目填：後端所有「檢視」API 都開放給全部後台角色（STAFF_ROLES），寫入才分角色，
+// 頁面內的按鈕已依 canEdit／canManage 收起，所以導覽沒有理由藏起任何一項。
+// 之後若新增只給特定角色的頁面，在這裡填 roles 即可，不必改過濾邏輯。
 const NAV_GROUPS = [
     { label: '總覽', icon: LayoutDashboard, items: [{ label: '儀表板', to: '/admin', end: true }] },
-    { label: '內容', icon: Megaphone, items: [{ label: '公告管理', to: '/admin/content/announcements', pending: true }, { label: '考試時程', to: '/admin/content/exam-schedule' }, { label: '首頁版位', to: '/admin/content/homepage' }] },
+    { label: '內容', icon: Megaphone, items: [{ label: '公告管理', to: '/admin/content/announcements' }, { label: '考試時程', to: '/admin/content/exam-schedule' }, { label: '首頁版位', to: '/admin/content/homepage' }] },
     { label: '辭典', icon: BookOpen, items: [{ label: '詞條', to: '/admin/dictionary/words' }, { label: '語法', to: '/admin/dictionary/grammar' }, { label: '主檔', to: '/admin/dictionary/taxonomies' }, { label: '批次匯入／匯出', to: '/admin/dictionary/import' }] },
     {
         label: '題庫', icon: FileQuestion, items: [
@@ -76,6 +81,13 @@ const DETAIL_BREADCRUMBS = [
     // 註解），這裡故意不列，之前列的那幾條沒有任何路由會導到，是死碼。
 ];
 
+const visibleNavGroups = (role) => NAV_GROUPS
+    .map((group) => ({ ...group, items: group.items.filter((item) => !item.roles || item.roles.includes(role)) }))
+    .filter((group) => group.items.length > 0);
+
+// 徽章顯示上限：超過就寫 99+，避免撐寬側邊欄
+const formatBadge = (count) => (count > 99 ? '99+' : String(count));
+
 const getBreadcrumb = (pathname) => {
     if (pathname === '/admin' || pathname === '/admin/') return ['總覽', '儀表板'];
 
@@ -96,12 +108,17 @@ const getBreadcrumb = (pathname) => {
     }
 };
 
-export default function AdminLayout({ pendingAnnouncementCount }) {
+export default function AdminLayout({ pendingCounts = {} }) {
     const { userData } = useAuth();
     const { pathname } = useLocation();
+    const navigate = useNavigate();
+    const [logoutError, setLogoutError] = useState('');
+    const groups = visibleNavGroups(userData?.role);
+    const roleLabel = ROLE_LABELS[userData?.role];
+    const displayName = userData?.firestoreData?.name || '';
     const breadcrumb = getBreadcrumb(pathname);
     const contentRef = useRef(null);
-    const { firstEntry, revealed, markReady } = useAdminEntry();
+    const { firstEntry, revealed, skipped, markReady } = useAdminEntry();
 
     // 分頁標題跟著麵包屑走（原本整個後台都是「源·語」）
     const pageTitle = breadcrumb[breadcrumb.length - 1];
@@ -115,8 +132,11 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
     // 第一次進入的進場儀式：hold（光圈還蓋著，全部先隱藏）→ play（光圈開始收合，播放進場）→ idle
     const [ceremony, setCeremony] = useState(firstEntry ? 'hold' : 'idle');
     useEffect(() => {
-        if (ceremony === 'hold' && revealed) setCeremony('play');
-    }, [ceremony, revealed]);
+        if (ceremony === 'hold' && revealed) setCeremony(skipped ? 'idle' : 'play');
+    }, [ceremony, revealed, skipped]);
+    useEffect(() => {
+        if (skipped && ceremony === 'play') setCeremony('idle');
+    }, [skipped, ceremony]);
     useEffect(() => {
         if (ceremony !== 'play') return undefined;
         const timer = setTimeout(() => setCeremony('idle'), 1800);
@@ -151,6 +171,18 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
         element.classList.add('is-entering');
     }, [pathname, ceremony]);
 
+    // 登出後 AdminRoute 看到沒有登入狀態會自己導走；這裡直接回前台首頁，不停在後台登入頁。
+    // 失敗時留在原頁並顯示原因，不要讓人以為已經登出。
+    const handleLogout = async () => {
+        setLogoutError('');
+        try {
+            await signOut();
+            navigate('/', { replace: true });
+        } catch {
+            setLogoutError('登出失敗，請再試一次。');
+        }
+    };
+
     return (
         <div className={`admin-shell${ceremony === 'hold' ? ' admin-shell--hold' : ''}${ceremony === 'play' ? ' admin-shell--play' : ''}`}>
             <a href="#admin-main" className="visually-hidden-focusable">跳到後台主要內容</a>
@@ -158,7 +190,7 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
             <aside className="admin-sidebar">
                 <Link className="admin-brand" to="/admin"><span>源·語</span><small>ADMIN CONSOLE</small></Link>
                 <nav className="admin-navigation" aria-label="後台主選單">
-                    {NAV_GROUPS.map(({ label, icon: Icon, items }) => (
+                    {groups.map(({ label, icon: Icon, items }) => (
                         <section className="admin-nav-group" key={label}>
                             <h2><Icon size={16} aria-hidden="true" />{label}</h2>
                             <ul>
@@ -170,8 +202,11 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
                                             to={item.to}
                                         >
                                             <span>{item.label}</span>
-                                            {item.pending && pendingAnnouncementCount > 0 && (
-                                                <span className="admin-count-badge">{pendingAnnouncementCount}</span>
+                                            {pendingCounts[item.to] > 0 && (
+                                                <span className="admin-count-badge">
+                                                    {formatBadge(pendingCounts[item.to])}
+                                                    <span className="visually-hidden"> 項待辦</span>
+                                                </span>
                                             )}
                                         </NavLink>
                                     </li>
@@ -181,8 +216,12 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
                     ))}
                 </nav>
                 <div className="admin-sidebar-user">
-                    <div><span>目前身分</span><strong>{ROLE_LABELS[userData?.role] ?? userData?.role ?? '—'}</strong></div>
-                    <Link to="/">回到前台</Link>
+                    <div><span>目前身分</span><strong>{roleLabel ?? '後台人員'}</strong></div>
+                    <div className="admin-sidebar-actions">
+                        <Link to="/">回到前台</Link>
+                        <button type="button" className="admin-logout" onClick={handleLogout}>登出</button>
+                    </div>
+                    {logoutError && <p className="admin-logout-error" role="alert">{logoutError}</p>}
                 </div>
             </aside>
             <div className="admin-main-column">
@@ -193,10 +232,10 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
                         ))}
                     </nav>
                     <div className="admin-topbar-user">
-                        <span className="admin-user-avatar">{ROLE_LABELS[userData?.role]?.charAt(0) ?? '管'}</span>
+                        <span className="admin-user-avatar" aria-hidden="true">{(displayName || roleLabel || '管').charAt(0)}</span>
                         <div>
-                            <strong>{ROLE_LABELS[userData?.role] ?? '後台人員'}</strong>
-                            <small>{userData?.role ?? ''}</small>
+                            <strong>{displayName || roleLabel || '後台人員'}</strong>
+                            {displayName && roleLabel && <small>{roleLabel}</small>}
                         </div>
                     </div>
                 </header>
@@ -223,7 +262,7 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
                         {/* 後台頁面元件都改成 lazy load 了（AdminApp.jsx）；換頁時只有
                             這個內容區顯示載入中，側邊欄與麵包屑維持顯示不消失。 */}
                         <Suspense fallback={<AdminRouteSkeleton />}>
-                            <Outlet />
+                            <Outlet context={{ pendingCounts }} />
                         </Suspense>
                     </ErrorBoundary>
                 </div>

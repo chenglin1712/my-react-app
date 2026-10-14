@@ -12,7 +12,7 @@ const SEGMENTS = ['red', 'gold', 'blue', 'teal', 'cream'];
  * - 全部動畫只用 transform／opacity（進度帶用 background-position），沒有 blur 或 filter。
  * - 降低動態偏好由 theme-v2.css 的全域規則處理（動畫直接到終態）。
  */
-const AdminEntryFallback = ({ message = '正在校準管理訊號', instant = false, leaving = false }) => (
+const AdminEntryFallback = ({ message = '正在校準管理訊號', instant = false, leaving = false, onSkip }) => (
     <div className={`admin-entry${instant ? ' admin-entry--instant' : ''}${leaving ? ' is-leaving' : ''}`} role="status" aria-live="polite">
         <div className="admin-entry-core" aria-hidden="true">
             <svg className="admin-entry-ring" viewBox="0 0 100 100" focusable="false">
@@ -34,6 +34,7 @@ const AdminEntryFallback = ({ message = '正在校準管理訊號', instant = fa
         <p className="admin-entry-brand" aria-hidden="true">YUAN・YU ADMIN</p>
         <p className="admin-entry-message">{message}</p>
         <div className="admin-entry-bar" aria-hidden="true" />
+        {onSkip && !leaving && <button type="button" className="admin-entry-skip" onClick={onSkip}>略過</button>}
     </div>
 );
 

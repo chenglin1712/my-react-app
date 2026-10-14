@@ -145,6 +145,33 @@
 }
 
 /* ------------------------------------------------------------------ 空狀態、載入、分頁 */
+/* 共用空狀態 AdminEmpty（G-2）：標題講現況，說明與行動都是選填 */
+.admin-shell .admin-empty-cell {
+  padding: 40px 20px !important;
+  text-align: center;
+}
+.admin-shell .admin-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--admin-muted);
+  text-align: center;
+}
+.admin-shell .admin-empty-state.is-compact { padding: 12px 0; }
+.admin-shell .admin-empty-title {
+  margin: 0;
+  color: var(--admin-text-strong);
+  font-size: var(--yy-text-base);
+  font-weight: 600;
+}
+.admin-shell .admin-empty-description {
+  max-width: 44ch;
+  margin: 0;
+  font-size: var(--yy-text-sm);
+  line-height: var(--yy-leading-normal, 1.6);
+}
+.admin-shell .admin-empty-state .btn { margin-top: 4px; }
 .admin-shell :is(
   .announcement-empty, .quiz-bank-empty, .dictionary-empty, .user-empty, .moderation-empty,
   .review-queue-empty, .exam-schedule-empty, .admin-empty

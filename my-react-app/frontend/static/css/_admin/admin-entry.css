@@ -65,6 +65,19 @@
   letter-spacing: .24em;
 }
 
+/* 略過：進場儀式每個分頁只播一次，但仍然讓人可以直接跳過（Esc 也可以） */
+.admin-entry-skip {
+  margin-top: 18px;
+  padding: 6px 16px;
+  color: rgba(243, 231, 207, .85);
+  background: none;
+  border: 1px solid rgba(243, 231, 207, .45);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.admin-entry-skip:hover { color: #fff; border-color: rgba(243, 231, 207, .8); }
+.admin-entry-skip:focus-visible { outline: 2px solid var(--yy-gold-light, #f6d77b); outline-offset: 3px; }
+
 .admin-entry-message {
   margin: 0;
   color: rgba(243, 231, 207, .78);

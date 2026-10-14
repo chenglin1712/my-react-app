@@ -21,6 +21,7 @@ import { TRIBE_NAME_BY_SLUG } from '../../constants/tribes';
 import { apiPost } from '../../../utils/apiClient';
 import { useAdminListQuery } from '../hooks/useAdminListQuery';
 import { useActionLock } from '../hooks/useActionLock';
+import { AdminEmptyBody } from '../components/AdminEmpty';
 import { ACCOUNT_MANAGERS, STAFF_ROLES } from '../constants/roles';
 import ReviewPagination from '../reviewWorkflow/ReviewPagination';
 import { stripHtml } from './notePreviewText';
@@ -359,11 +360,8 @@ export default function ReportsQueue() {
 
                                     {!items.length && (
                                         <tr>
-                                            <td
-                                                className="moderation-empty"
-                                                colSpan={6}
-                                            >
-                                                沒有符合條件的檢舉
+                                            <td className="admin-empty-cell" colSpan={6}>
+                                                <AdminEmptyBody title="沒有符合條件的檢舉" />
                                             </td>
                                         </tr>
                                     )}

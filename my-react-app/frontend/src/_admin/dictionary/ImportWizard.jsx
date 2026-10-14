@@ -22,6 +22,7 @@ import {
 } from './dictionaryApi';
 import { useImportWizard } from './useImportWizard';
 import ImportPreflightReport from './ImportPreflightReport';
+import AdminEmpty from '../components/AdminEmpty';
 import '../../../static/css/_admin/dictionary.css';
 
 const CONTENT_EDITORS = ['owner', 'admin', 'editor'];
@@ -490,7 +491,7 @@ export default function ImportWizard() {
                         </Table>
                     </div>
                 ) : (
-                    <div className="dictionary-empty">尚無匯入工作</div>
+                    <AdminEmpty title="目前沒有匯入工作" description="完成第一次匯入後，工作紀錄會顯示在這裡。" />
                 )}
             </section>
 

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 import { Alert, Badge, Form, Spinner } from 'react-bootstrap';
 import {
     Activity,
@@ -26,6 +26,8 @@ import { apiGet } from '../../../utils/apiClient';
 import { useAnalyticsQuery } from '../hooks/useAnalyticsQuery';
 import { useAsyncValue } from '../hooks/useAsyncValue';
 import ChartFigure from '../../../components/ui/ChartFigure';
+import AdminEmpty from '../components/AdminEmpty';
+import { PENDING_QUEUES } from '../hooks/usePendingCounts';
 import { TRIBES } from '../../constants/tribes';
 import '../../../static/css/_admin/dashboard.css';
 
@@ -133,8 +135,44 @@ const PanelState = ({ loading, error, empty, children }) => {
     return children;
 };
 
+// 待辦事項：彙整側邊欄同一份待辦數（AdminLayout 透過 Outlet context 提供）。
+// 只列有待辦的佇列；六個都有結果（成功或失敗）且都沒有待辦才顯示「目前沒有待辦事項」，
+// 還在載入時不先宣告「沒事」；有佇列載入失敗（null，例如功能旗標關閉）時另外註明。
+function TodoPanel({ pendingCounts }) {
+    const items = PENDING_QUEUES.filter((queue) => pendingCounts[queue.to] > 0);
+    const allLoaded = PENDING_QUEUES.every((queue) => queue.to in pendingCounts);
+    const someUnavailable = PENDING_QUEUES.some((queue) => pendingCounts[queue.to] === null);
+    if (!items.length && !allLoaded) return null;
+    return (
+        <section className="dashboard-panel dashboard-todo-panel" aria-labelledby="dashboard-todo-title">
+            <h2 id="dashboard-todo-title">待辦事項</h2>
+            {items.length
+                ? (
+                    <ul className="dashboard-todo-list">
+                        {items.map((queue) => (
+                            <li key={queue.to}>
+                                <Link to={queue.to}>
+                                    <span>{queue.label}</span>
+                                    <strong>{pendingCounts[queue.to]}</strong>
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                )
+                : (
+                    <AdminEmpty
+                        compact
+                        title="目前沒有待辦事項"
+                        description={someUnavailable ? '部分佇列的待辦數暫時取不到，請直接到該佇列確認。' : undefined}
+                    />
+                )}
+        </section>
+    );
+}
+
 export default function Dashboard() {
     const { userData } = useAuth();
+    const outlet = useOutletContext();
     const canViewAudit = ['owner', 'admin'].includes(userData?.role);
 
     // 四個彼此獨立的小區塊各自取自己的值（FE-9：原本每個都手寫一次
@@ -256,6 +294,8 @@ export default function Dashboard() {
 
                 <ComingSoonStat icon={Activity} title="今日測驗完成" />
             </div>
+
+            {outlet?.pendingCounts && <TodoPanel pendingCounts={outlet.pendingCounts} />}
 
             <section className="dashboard-filter-panel" aria-label="圖表篩選器">
                 <div className="dashboard-filter-group">
@@ -537,7 +577,7 @@ export default function Dashboard() {
                                             ))}
                                         </ul>
                                     )
-                                    : <p className="dashboard-no-records">目前沒有操作紀錄</p>}
+                                    : <AdminEmpty compact title="目前沒有操作紀錄" />}
                     </section>
                 )}
 

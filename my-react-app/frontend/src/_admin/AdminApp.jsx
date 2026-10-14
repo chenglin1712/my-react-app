@@ -1,6 +1,6 @@
-import { lazy, useEffect, useState } from 'react';
+import { lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { apiGet } from '../../utils/apiClient';
+import { usePendingCounts } from './hooks/usePendingCounts';
 import AdminLayout from './layout/AdminLayout';
 import AdminNotFound from './layout/AdminNotFound';
 
@@ -43,22 +43,11 @@ const CacheManagement = lazy(() => import('./system/CacheManagement'));
 const MorphologyCapabilities = lazy(() => import('./system/MorphologyCapabilities'));
 
 const AdminApp = () => {
-    const [pendingAnnouncementCount, setPendingAnnouncementCount] = useState();
-
-    useEffect(() => {
-        let active = true;
-        (async () => {
-            try {
-                const data = await apiGet('/adminapi/announcements/?status=pending_review&page_size=1');
-                if (active) setPendingAnnouncementCount(data.count);
-            } catch { /* 側邊欄徽章是輔助資訊，載入失敗不阻擋各管理頁面。 */ }
-        })();
-        return () => { active = false; };
-    }, []);
+    const pendingCounts = usePendingCounts();
 
     return (
         <Routes>
-            <Route element={<AdminLayout pendingAnnouncementCount={pendingAnnouncementCount} />}>
+            <Route element={<AdminLayout pendingCounts={pendingCounts} />}>
                 <Route index element={<Dashboard />} />
                 <Route path="analytics/search" element={<SearchAnalytics />} />
                 <Route path="analytics/quiz-quality" element={<QuizQualityAnalysis />} />

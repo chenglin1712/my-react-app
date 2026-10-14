@@ -1,18 +1,21 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import AdminLayout from './AdminLayout';
 
 let mockRole = 'owner';
+let mockName;
 vi.mock('../../userServives/authContext', () => ({
-  useAuth: () => ({ userData: { role: mockRole }, loading: false }),
+  useAuth: () => ({ userData: { role: mockRole, firestoreData: mockName ? { name: mockName } : null }, loading: false }),
 }));
+const mockSignOut = vi.fn();
+vi.mock('../../userServives/userServive', () => ({ signOut: (...args) => mockSignOut(...args) }));
 
-function renderLayout({ initialEntries = ['/admin'], pendingAnnouncementCount } = {}) {
+function renderLayout({ initialEntries = ['/admin'], pendingCounts } = {}) {
   return render(
     <MemoryRouter initialEntries={initialEntries}>
       <Routes>
-        <Route path="/admin" element={<AdminLayout pendingAnnouncementCount={pendingAnnouncementCount} />}>
+        <Route path="/admin" element={<AdminLayout pendingCounts={pendingCounts} />}>
           <Route index element={<div>DASHBOARD_CONTENT</div>} />
           <Route path="content/announcements" element={<div>ANNOUNCEMENTS_CONTENT</div>} />
           <Route path="analytics/search" element={<div>SEARCH_ANALYTICS_CONTENT</div>} />
@@ -26,13 +29,14 @@ function renderLayout({ initialEntries = ['/admin'], pendingAnnouncementCount } 
           <Route path="users/new" element={<div>USER_NEW_CONTENT</div>} />
           <Route path="users/:uid" element={<div>USER_DETAIL_CONTENT</div>} />
         </Route>
+        <Route path="/" element={<div>HOME</div>} />
       </Routes>
     </MemoryRouter>,
   );
 }
 
 describe('AdminLayout', () => {
-  beforeEach(() => { mockRole = 'owner'; });
+  beforeEach(() => { mockRole = 'owner'; mockName = undefined; mockSignOut.mockReset(); });
 
   test('渲染品牌名稱與 Outlet 帶入的頁面內容', () => {
     renderLayout();
@@ -82,13 +86,64 @@ describe('AdminLayout', () => {
     expect(screen.queryByText('系統維運')).not.toBeInTheDocument();
   });
 
-  test('待審數量 > 0 時公告管理旁邊顯示徽章，數量是 0 或未提供時不顯示', () => {
-    const { unmount } = renderLayout({ pendingAnnouncementCount: 3 });
+  test('待辦數量 > 0 時該佇列旁邊顯示徽章，數量是 0 或未提供時不顯示', () => {
+    const { unmount } = renderLayout({ pendingCounts: { '/admin/content/announcements': 3 } });
     expect(screen.getByText('3')).toBeInTheDocument();
     unmount();
 
-    renderLayout({ pendingAnnouncementCount: 0 });
+    renderLayout({ pendingCounts: { '/admin/content/announcements': 0 } });
     expect(screen.queryByText('0')).not.toBeInTheDocument();
+  });
+
+  test('五個審核佇列與公告都能顯示待辦徽章，徽章帶報讀文字，超過 99 顯示 99+', () => {
+    renderLayout({
+      pendingCounts: {
+        '/admin/review': 4,
+        '/admin/verification': 7,
+        '/admin/moderation/notes': 2,
+        '/admin/moderation/recordings': 5,
+        '/admin/moderation/reports': 150,
+      },
+    });
+    const badgeOf = (name) => within(screen.getByRole('link', { name })).getByText(/\d/);
+    expect(badgeOf(/送審佇列/)).toHaveTextContent('4');
+    expect(badgeOf(/待專家驗證佇列/)).toHaveTextContent('7');
+    expect(badgeOf(/分享筆記/)).toHaveTextContent('2');
+    expect(badgeOf(/發音錄音/)).toHaveTextContent('5');
+    expect(badgeOf(/檢舉佇列/)).toHaveTextContent('99+');
+    expect(screen.getByRole('link', { name: /送審佇列/ })).toHaveAccessibleName(/4\s*項待辦/);
+  });
+
+  test('顯示使用者名稱與角色中文，不顯示原始角色代碼；沒有名稱時只顯示角色', () => {
+    mockRole = 'reviewer';
+    mockName = '林小明';
+    const { unmount } = renderLayout();
+    const topbar = document.querySelector('.admin-topbar-user');
+    expect(within(topbar).getByText('林小明')).toBeInTheDocument();
+    expect(within(topbar).getByText('審核者')).toBeInTheDocument();
+    expect(screen.queryByText('reviewer')).not.toBeInTheDocument();
+    unmount();
+
+    mockName = undefined;
+    renderLayout();
+    expect(within(document.querySelector('.admin-topbar-user')).getByText('審核者')).toBeInTheDocument();
+    expect(screen.queryByText('reviewer')).not.toBeInTheDocument();
+  });
+
+  test('登出成功後導回前台首頁', async () => {
+    mockSignOut.mockResolvedValue();
+    renderLayout();
+    fireEvent.click(screen.getByRole('button', { name: '登出' }));
+    expect(await screen.findByText('HOME')).toBeInTheDocument();
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  test('登出失敗時留在後台並顯示提示', async () => {
+    mockSignOut.mockRejectedValue(new Error('network'));
+    renderLayout();
+    fireEvent.click(screen.getByRole('button', { name: '登出' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('登出失敗'));
+    expect(screen.getByText('DASHBOARD_CONTENT')).toBeInTheDocument();
   });
 
   test('側邊欄與頂欄都顯示目前角色的中文標籤', () => {

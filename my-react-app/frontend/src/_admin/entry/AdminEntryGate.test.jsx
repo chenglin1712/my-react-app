@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { act, render } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useEffect } from 'react';
 import AdminEntryGate from './AdminEntryGate';
 import { useAdminEntry } from './adminEntryContext';
@@ -57,6 +57,24 @@ describe('AdminEntryGate（入口儀式）', () => {
         act(() => { vi.advanceTimersByTime(10000); });
         expect(overlay(container)).not.toBeNull();
         expect(overlay(container)).not.toHaveClass('is-leaving');
+    });
+
+    test('按「略過」：殼層一準備好就收合，不等 800ms，也不等收合動畫', () => {
+        const { container, getByTestId } = render(<AdminEntryGate><Shell /></AdminEntryGate>);
+        fireEvent.click(screen.getByRole('button', { name: '略過' }));
+        act(() => { vi.advanceTimersByTime(0); });
+        expect(overlay(container)).toHaveClass('is-leaving');
+        expect(getByTestId('shell').dataset.revealed).toBe('true');
+        act(() => { vi.advanceTimersByTime(0); });
+        expect(overlay(container)).toBeNull();
+    });
+
+    test('按 Esc 也能略過', () => {
+        const { container } = render(<AdminEntryGate><Shell /></AdminEntryGate>);
+        fireEvent.keyDown(window, { key: 'Escape' });
+        act(() => { vi.advanceTimersByTime(0); });
+        act(() => { vi.advanceTimersByTime(0); });
+        expect(overlay(container)).toBeNull();
     });
 
     test('要求降低動態時只保留極短的過場', () => {

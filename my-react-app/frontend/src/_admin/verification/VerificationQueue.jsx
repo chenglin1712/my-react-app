@@ -11,6 +11,7 @@ import {
     STAFF_ROLES, VERIFICATION_EXPORTERS, VERIFICATION_IMPORTERS, VERIFICATION_REVIEWERS,
 } from '../constants/roles';
 import stateLabel from './stateLabel';
+import AdminEmpty from '../components/AdminEmpty';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
 import '../../../static/css/_admin/system.css';
 
@@ -417,7 +418,14 @@ export default function VerificationQueue() {
                                 </thead>
                                 <tbody>
                                     {data.results.length === 0 && (
-                                        <tr><td colSpan="6" className="admin-empty">沒有符合條件的項目</td></tr>
+                                        <AdminEmpty
+                                            asCell
+                                            colSpan={6}
+                                            title={Object.values(filters).some(Boolean) ? '沒有符合條件的項目' : '目前沒有待驗證的項目'}
+                                            action={Object.values(filters).some(Boolean)
+                                                ? { label: '清除篩選', onClick: () => { setFilters(EMPTY_FILTERS); setPage(1); } }
+                                                : undefined}
+                                        />
                                     )}
                                     {data.results.map((item) => {
                                         const label = stateLabel(item);

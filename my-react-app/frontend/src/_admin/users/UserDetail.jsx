@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import AdminEmpty from '../components/AdminEmpty';
 import {
   Alert,
   Badge,
@@ -388,7 +389,7 @@ export default function UserDetail() {
               ))}
             </dl>
           ) : (
-            <p className="user-muted-text">沒有 Firestore 使用者文件。</p>
+            <AdminEmpty compact title="沒有 Firestore 使用者文件" />
           )}
       </section>
 

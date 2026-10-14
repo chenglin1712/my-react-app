@@ -138,6 +138,49 @@
     grid-column: 1 / -1;
 }
 
+/* 待辦事項（G-2）：同側邊欄的待辦數，點進對應佇列 */
+.dashboard-todo-panel {
+    margin-bottom: 20px;
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--admin-radius);
+}
+
+.dashboard-todo-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.dashboard-todo-list a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    color: var(--admin-text-strong);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--admin-radius-sm);
+    text-decoration: none;
+}
+
+.dashboard-todo-list a:hover {
+    background: var(--admin-surface-muted);
+}
+
+.dashboard-todo-list a:focus-visible {
+    outline: var(--admin-focus-ring);
+    outline-offset: var(--admin-focus-offset);
+}
+
+.dashboard-todo-list strong {
+    color: var(--yy-red);
+    font-size: 18px;
+}
+
 .dashboard-bottom-grid {
     display: grid;
     grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
