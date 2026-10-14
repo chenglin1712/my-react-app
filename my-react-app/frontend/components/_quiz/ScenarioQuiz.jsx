@@ -227,7 +227,7 @@ export default function ScenarioQuiz({ tribe = 'tayal' }) {
                 >
                     <div
                         style={{
-                            width: `${((currentIndex + 1) / questions.length) * 100}%`,
+                            transform: `scaleX(${(currentIndex + 1) / questions.length})`,
                         }}
                     />
                 </div>

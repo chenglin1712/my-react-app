@@ -113,12 +113,12 @@
 .tribe-btn.active {
   background: var(--yy-red);
   color: var(--yy-surface);
-  transform: scale(1.06);
-  box-shadow: 4px 4px 0 rgba(34, 24, 18, 0.45);
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0 rgba(34, 24, 18, 0.45);
 }
 
 .tribe-btn.active:active {
-  transform: scale(1.02);
+  transform: scale(0.97);
 }
 
 /* 各族語顏色 */

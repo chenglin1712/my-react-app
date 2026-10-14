@@ -104,7 +104,7 @@ function SentenceGame({ tribe = "tayal" }) {
         >
           <div
             className="sent-progress-bar"
-            style={{ width: `${progressPct}%` }}
+            style={{ transform: `scaleX(${progressPct / 100})` }}
           />
         </div>
         <p className="sent-counter">第 {current + 1} / {questions.length} 題</p>

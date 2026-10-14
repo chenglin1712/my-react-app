@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { vi } from 'vitest';
 import SuccessModal from './SuccessModal';
 
@@ -19,6 +19,35 @@ describe('SuccessModal', () => {
     render(<SuccessModal show text="登入成功！您將移至首頁" />);
     const dialog = screen.getByRole('dialog', { name: '登入成功！您將移至首頁' });
     await waitFor(() => expect(dialog).toHaveFocus());
+  });
+
+  test('關閉時先播退場動畫（is-leaving、inert），160ms 後才卸載', () => {
+    vi.useFakeTimers();
+    try {
+      const { rerender, container } = render(<SuccessModal show text="成功" />);
+      rerender(<SuccessModal show={false} text="成功" />);
+      const overlay = container.querySelector('.yy-modal-overlay');
+      expect(overlay).toHaveClass('is-leaving');
+      expect(overlay).toHaveAttribute('inert');
+      act(() => { vi.advanceTimersByTime(200); });
+      expect(container).toBeEmptyDOMElement();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('退場途中又打開：取消卸載，回到正常狀態', () => {
+    vi.useFakeTimers();
+    try {
+      const { rerender, container } = render(<SuccessModal show text="成功" />);
+      rerender(<SuccessModal show={false} text="成功" />);
+      rerender(<SuccessModal show text="成功" />);
+      act(() => { vi.advanceTimersByTime(300); });
+      expect(container.querySelector('.yy-modal-overlay')).not.toHaveClass('is-leaving');
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test('傳入 icon 時取代預設的打勾圖示（例如登入/註冊表單自己的 lottie 動畫容器）', () => {

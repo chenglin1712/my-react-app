@@ -141,6 +141,33 @@ a.news-card:active {
     position: relative;
 }
 
+/* 輪播暫停／繼續鈕：放右上角，避開底部的標題與左右箭頭；點擊範圍 44px */
+.news-autoplay-toggle {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 10;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--yy-control-md);
+    height: var(--yy-control-md);
+    padding: 0;
+    color: var(--yy-ink);
+    background: var(--yy-surface);
+    border: 3px solid var(--yy-ink);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: var(--transition-interactive);
+}
+.news-autoplay-toggle:active {
+    transform: scale(0.97);
+}
+.news-autoplay-toggle:focus-visible {
+    outline: var(--yy-focus-ring);
+    outline-offset: var(--yy-focus-offset);
+}
+
 .news-slide {
     position: relative;
     border-radius: var(--yy-radius-lg);

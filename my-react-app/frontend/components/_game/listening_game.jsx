@@ -111,7 +111,7 @@ function ListeningGame({ tribe = "tayal" }) {
         >
           <div
             className="listening-progress-bar"
-            style={{ width: `${progressPct}%` }}
+            style={{ transform: `scaleX(${progressPct / 100})` }}
           />
         </div>
         <p className="listening-counter">第 {current + 1} / {questions.length} 題</p>

@@ -147,10 +147,22 @@
   from { opacity: 0; transform: translateY(24px); }
   to { opacity: 1; transform: translateY(0); }
 }
+/* 彈窗進場／退場（審查項 P2-84）：從 scale(.94) 加透明度進來，不再從 .7 起跳還回彈；退場比進場快。 */
 @keyframes yy-pop {
-  0% { transform: scale(0.7); opacity: 0; }
-  60% { transform: scale(1.08); opacity: 1; }
-  100% { transform: scale(1); }
+  from { transform: scale(0.94); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes yy-pop-out {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(0.96); opacity: 0; }
+}
+@keyframes yy-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes yy-overlay-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
 /* 脈動光圈只留在首頁主要行動按鈕（.home-cta，見 _home/index.css）：表單與工具頁的按鈕不該一直在動，
@@ -174,14 +186,24 @@
   clip-path: inset(0 -20px 62% -20px);
 }
 
-/* 逐字進場（components/ui/CharReveal.jsx）：每個字各自彈出，延遲由元件依序設定 */
+/* 逐字進場（components/ui/CharReveal.jsx）：每個字各自彈出，延遲由元件依序設定，且總延遲有上限
+   （審查項 P2-83：原本 20 字的標題最後一字要 1.5 秒才定位）。時長 450ms，不再帶 overshoot。 */
 .yy-char {
   display: inline-block;
-  animation: yy-char-in .6s cubic-bezier(.2, .9, .3, 1.25) both;
+  animation: yy-char-in 450ms var(--ease-out) both;
 }
 @keyframes yy-char-in {
-  from { opacity: 0; transform: translateY(.7em) scale(.9); }
+  from { opacity: 0; transform: translateY(.5em) scale(.94); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* 超過 12 字改成整句一起淡入，不拆字 */
+.yy-char--line {
+  display: inline;
+  animation: yy-line-in 450ms var(--ease-out) both;
+}
+@keyframes yy-line-in {
+  from { opacity: 0; transform: translateY(.4em); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* 資料載入中的佔位塊：用實際內容的尺寸，載入完成時版面不跳動 */
@@ -232,12 +254,21 @@
     transition-duration: var(--dur-fast) !important;
   }
   .yy-modal-box,
-  .yy-success-overlay {
+  .yy-success-overlay,
+  .yy-modal-overlay {
     animation: yy-fade-in-reduced var(--dur-fast) linear both !important;
+  }
+  .yy-modal-overlay.is-leaving,
+  .yy-modal-overlay.is-leaving .yy-modal-box {
+    animation: yy-fade-out-reduced var(--dur-fast) linear both !important;
   }
   @keyframes yy-fade-in-reduced {
     from { opacity: 0; }
     to { opacity: 1; }
+  }
+  @keyframes yy-fade-out-reduced {
+    from { opacity: 1; }
+    to { opacity: 0; }
   }
 }
 
@@ -445,8 +476,9 @@
 }
 .yy-pill.active {
   color: var(--yy-surface);
-  transform: scale(1.06);
-  box-shadow: 4px 4px 0 rgba(34, 24, 18, 0.45);
+  /* 選取狀態不放大（scale 1.06 會壓到相鄰的膠囊，縮放過程文字邊緣也會糊），改成往左上位移並加深陰影 */
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0 rgba(34, 24, 18, 0.45);
 }
 
 /* ---------- 步驟流程條 (StepBar) ---------- */
@@ -487,6 +519,7 @@
   font-weight: 700;
   font-size: 15px;
   color: var(--yy-ink);
+  transition: color var(--dur-fast) var(--ease-out);
 }
 .yy-step-diamond::before {
   content: "";
@@ -498,6 +531,7 @@
   background: var(--yy-surface);
   box-shadow: var(--yy-shadow-sm);
   transform: rotate(45deg);
+  transition: background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
 .yy-step-diamond.active,
 .yy-step-diamond.done {
@@ -515,6 +549,7 @@
   font-weight: 700;
   color: var(--yy-text-secondary);
   white-space: nowrap;
+  transition: color var(--dur-fast) var(--ease-out);
 }
 .yy-step-connector {
   width: 60px;
@@ -541,6 +576,7 @@
   color: var(--yy-ink);
   border: none;
   border-left: 3px solid var(--yy-ink);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
 .yy-tabswitch__tab:first-child {
   border-left: none;
@@ -616,9 +652,10 @@
   align-items: center;
   justify-content: center;
   z-index: 1050;
+  animation: yy-overlay-in var(--dur-base) var(--ease-out) both;
 }
 .yy-modal-box {
-  animation: yy-pop .5s ease both;
+  animation: yy-pop 240ms var(--ease-out) both;
   background: var(--yy-surface);
   border: 4px solid var(--yy-ink);
   border-radius: var(--yy-radius-lg);
@@ -626,6 +663,13 @@
   padding: 40px 50px;
   text-align: center;
   max-width: 90vw;
+}
+.yy-modal-overlay.is-leaving {
+  pointer-events: none;
+  animation: yy-overlay-out 160ms var(--ease-out) both;
+}
+.yy-modal-overlay.is-leaving .yy-modal-box {
+  animation: yy-pop-out 160ms var(--ease-out) both;
 }
 .yy-modal-icon {
   width: 70px;

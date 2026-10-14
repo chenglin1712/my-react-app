@@ -18,7 +18,7 @@ export default function PlayingScreen({
       >
         <div
           className="pron-progress-bar"
-          style={{ width: `${progressPct}%` }}
+          style={{ transform: `scaleX(${progressPct / 100})` }}
         />
       </div>
       <p className="pron-counter">第 {current + 1} / {totalQuestions} 題</p>

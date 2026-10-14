@@ -70,11 +70,13 @@
     border-radius: 999px;
 }
 
+/* 填滿的長度用 transform: scaleX 表示（審查項 P2-86）：動 width 會每幀重排版面 */
 .scenario-quiz-progress > div {
+    width: 100%;
     height: 100%;
     background: var(--yy-red);
-    border-radius: inherit;
-    transition: width .25s ease;
+    transform-origin: left center;
+    transition: transform 250ms var(--ease-out);
 }
 
 .scenario-quiz-intro {

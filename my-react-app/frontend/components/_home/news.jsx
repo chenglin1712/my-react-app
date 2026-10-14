@@ -1,9 +1,12 @@
+import { useState } from "react";
+import { Pause, Play } from "lucide-react";
 import "../../static/css/_home/news.css"
 import { Swiper, SwiperSlide } from "swiper/react"
-import { Navigation, Autoplay, EffectFade } from "swiper/modules"
+import { Navigation, Autoplay, EffectFade, A11y } from "swiper/modules"
 import "swiper/css"
 import "swiper/css/effect-fade"
 import "swiper/css/navigation";
+import "swiper/css/a11y";
 import { useReducedMotion } from "../../src/hooks/useReducedMotion";
 import ExternalLink from "../ui/ExternalLink";
 import { isExternalUrl } from "../ui/externalUrl";
@@ -11,6 +14,14 @@ import { isExternalUrl } from "../ui/externalUrl";
 const News = ({ withImage = [], withoutImage = [], loading = false }) => {
     // 要求降低動態時：停用自動輪播，換張改成立即切換（使用者仍可用左右箭頭手動切）
     const reducedMotion = useReducedMotion();
+    // 自動輪播超過 5 秒就要給使用者暫停的方法（WCAG 2.2.2）：滑鼠移入自動暫停，鍵盤與觸控用右上角的暫停鈕
+    const [swiper, setSwiper] = useState(null);
+    const [playing, setPlaying] = useState(true);
+    const toggleAutoplay = () => {
+        if (!swiper?.autoplay) return;
+        if (swiper.autoplay.running) swiper.autoplay.stop();
+        else swiper.autoplay.start();
+    };
     const allNews = [...withImage, ...withoutImage];
     const hasImages = withImage.length > 0;
 
@@ -52,12 +63,16 @@ const News = ({ withImage = [], withoutImage = [], loading = false }) => {
                 <div className="event-container">
                     <div className="event-left">
                         <Swiper
-                            modules={[Navigation, Autoplay, EffectFade]}
+                            modules={[Navigation, Autoplay, EffectFade, A11y]}
                             effect="fade"
-                            speed={reducedMotion ? 0 : 800}
+                            speed={reducedMotion ? 0 : 500}
                             loop={withImage.length > 1}
                             navigation={true}
-                            autoplay={reducedMotion ? false : { delay: 8000 }}
+                            a11y={{ prevSlideMessage: "上一則消息", nextSlideMessage: "下一則消息", slideLabelMessage: null }}
+                            autoplay={reducedMotion ? false : { delay: 8000, pauseOnMouseEnter: true }}
+                            onSwiper={setSwiper}
+                            onAutoplayStart={() => setPlaying(true)}
+                            onAutoplayStop={() => setPlaying(false)}
                             grabCursor={true}
                         >
                             {withImage.map((event) => (
@@ -77,6 +92,16 @@ const News = ({ withImage = [], withoutImage = [], loading = false }) => {
                                 </SwiperSlide>
                             ))}
                         </Swiper>
+                        {!reducedMotion && withImage.length > 1 && (
+                            <button
+                                type="button"
+                                className="news-autoplay-toggle"
+                                onClick={toggleAutoplay}
+                                aria-label={playing ? "暫停自動輪播" : "繼續自動輪播"}
+                            >
+                                {playing ? <Pause size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
+                            </button>
+                        )}
                     </div>
 
                     <div className="event-right">

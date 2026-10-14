@@ -154,11 +154,13 @@
   overflow: hidden;
   margin-bottom: 0.6rem;
 }
+/* 填滿的長度用 transform: scaleX 表示（審查項 P2-86）：動 width 會每幀重排版面 */
 .pron-progress-bar {
+  width: 100%;
   height: 100%;
   background: var(--yy-red);
-  border-radius: 999px;
-  transition: width 0.35s ease;
+  transform-origin: left center;
+  transition: transform 350ms var(--ease-out);
 }
 .pron-counter {
   font-size: 0.85rem;

@@ -32,6 +32,15 @@ describe('News（首頁新聞）空連結處理', () => {
         expect(document.body).not.toHaveTextContent('另開新視窗');
     });
 
+    test('有兩張以上輪播圖時有暫停鈕，只有一張時不顯示', () => {
+        const slides = [1, 2].map((id) => item({ id, title: `圖${id}`, image: `https://example.org/${id}.webp` }));
+        const { unmount } = render(<News withImage={slides} withoutImage={[]} loading={false} />);
+        expect(screen.getByRole('button', { name: '暫停自動輪播' })).toBeInTheDocument();
+        unmount();
+        render(<News withImage={[slides[0]]} withoutImage={[]} loading={false} />);
+        expect(screen.queryByRole('button', { name: /自動輪播/ })).toBeNull();
+    });
+
     test('沒有任何消息：顯示「目前沒有新消息」，不是只剩標題', () => {
         render(<News withImage={[]} withoutImage={[]} loading={false} />);
         expect(screen.getByRole('heading', { level: 2, name: '活動消息' })).toBeInTheDocument();

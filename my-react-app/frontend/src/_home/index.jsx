@@ -191,13 +191,13 @@ const HomePage = () => {
                 <div className="yy-fade-up">
                     <span className="yy-eyebrow"><span aria-hidden="true">◆ </span>原住民族語 · 五族共學<span aria-hidden="true"> ◆</span></span>
                     <h1 className="home-title" aria-label="五族語言，刻進織紋裡的學習旅程">
-                        <CharReveal text="五族語言，" start={0.2} />
+                        <CharReveal text="五族語言，" start={0} />
                         <br />
-                        <CharReveal text="刻進" start={0.55} />
+                        <CharReveal text="刻進" start={0.1} />
                         {/* 「織紋」用文字挖空漸層（background-clip: text）：不能拆成逐字的子元素（拆開後漸層文字會消失），
                             改成這個元素本身整體彈出，延遲接在前一段之後 */}
-                        <span className="yy-holo-text yy-char" aria-hidden="true" style={{ animationDelay: "0.73s" }}>織紋</span>
-                        <CharReveal text="裡的學習旅程" start={0.9} />
+                        <span className="yy-holo-text yy-char" aria-hidden="true" style={{ animationDelay: "0.17s" }}>織紋</span>
+                        <CharReveal text="裡的學習旅程" start={0.2} />
                     </h1>
                     <p className="home-desc">泰雅、布農、阿美、噶瑪蘭、排灣——影像辨識、詞彙遊戲與適性測驗，用鮮明色彩延續族語文化的生命力。</p>
                 </div>
