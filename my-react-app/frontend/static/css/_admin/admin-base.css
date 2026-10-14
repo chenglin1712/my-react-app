@@ -231,7 +231,10 @@
 }
 .admin-shell :is(.form-control, .form-select):focus {
   border-color: var(--yy-blue-light, #2c6e7f);
-  box-shadow: 0 0 0 3px var(--admin-focus);
+  /* 與前台同一組焦點框；Bootstrap 預設的淡色 box-shadow 對比不足，一併取消 */
+  outline: var(--admin-focus-ring);
+  outline-offset: var(--admin-focus-offset);
+  box-shadow: none;
 }
 .admin-shell .form-label {
   margin-bottom: 4px;

@@ -50,6 +50,9 @@
   /* --yy-gold 本身在白色/米白底上文字對比不足（AA 檢測不過），文字場合
      用這個加深版本，底色/邊框仍用 --yy-gold。 */
   --yy-warning-text: #8A6816;
+  /* 狀態色的淡邊框（提示框、徽章用），由狀態色與白色混出，前後台共用（G-1） */
+  --yy-success-border: #C0CBBA;
+  --yy-danger-border: #DDAFB2;
   /* 金色拿來當資料標記（星星、圖表長條）時用這個：對白底 5.2:1、對米白 4.2:1，過了圖形元件的 3:1 */
   --yy-gold-mark: #8A6816;
   --yy-info: var(--yy-blue-light);
@@ -128,6 +131,14 @@
     box-shadow var(--dur-base) var(--ease-out),
     transform var(--dur-base) var(--ease-out),
     opacity var(--dur-base) var(--ease-out);
+}
+
+/* 舊瀏覽器沒有 color-mix() 時用上面的固定色；支援時由狀態色混出，改狀態色邊框會一起跟著變 */
+@supports (color: color-mix(in srgb, red, white)) {
+  :root {
+    --yy-success-border: color-mix(in srgb, var(--yy-success) 35%, #fff);
+    --yy-danger-border: color-mix(in srgb, var(--yy-danger) 35%, #fff);
+  }
 }
 
 @keyframes yy-holo {

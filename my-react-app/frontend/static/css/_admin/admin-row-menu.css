@@ -30,12 +30,11 @@
 }
 
 .admin-shell .admin-row-menu-item:hover { background: var(--admin-accent-soft); color: var(--admin-text-strong); }
-.admin-shell .admin-row-menu-item:focus-visible { outline: 2px solid var(--admin-accent); outline-offset: -2px; background: var(--admin-accent-soft); }
+.admin-shell .admin-row-menu-item:focus-visible { outline: var(--admin-focus-ring); outline-offset: -3px; background: var(--admin-accent-soft); }
 .admin-shell .admin-row-menu-item[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
 
 .admin-shell .admin-row-menu-item.is-danger { color: var(--admin-danger); font-weight: 600; }
 .admin-shell .admin-row-menu-item.is-danger:hover,
 .admin-shell .admin-row-menu-item.is-danger:focus-visible { background: var(--admin-danger-bg); color: var(--admin-danger); }
-.admin-shell .admin-row-menu-item.is-danger:focus-visible { outline-color: var(--admin-danger); }
 
 .admin-shell .admin-row-menu-separator { height: 1px; margin: 4px 2px; background: var(--admin-border); }

@@ -114,7 +114,10 @@
 .dashboard-filter-group .form-select:focus,
 .dashboard-filter-group .form-control:focus {
     border-color: rgba(31, 58, 92, .55);
-    box-shadow: 0 0 0 .2rem rgba(31, 58, 92, .1);
+    /* 與全站同一組焦點框；原本的淡藍 box-shadow 對比不足（G-1） */
+    outline: var(--admin-focus-ring);
+    outline-offset: var(--admin-focus-offset);
+    box-shadow: none;
 }
 
 .dashboard-filter-hint {

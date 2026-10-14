@@ -1,33 +1,37 @@
 /* 後台外殼（側欄、頂欄、內容區）。共用 token 與頁面元件規則在 admin-base.css。 */
 .admin-shell { min-height: 100vh; min-height: 100dvh; color: var(--yy-ink, #221812); background: #f4f6f9; font-family: var(--yy-font-body, sans-serif); }
 
-/* 後台設計 token（共用規則見 admin-base.css） */
+/* 後台設計 token（共用規則見 admin-base.css）
+   G-1 共用基礎層：文字色、狀態色、焦點框、圓角都取自前台 theme-v2.css 的 --yy-*，改一處前後台一起變；
+   後台底色、邊框、陰影維持中性灰（密集表格需要），不放前台的米色與粗黑框。 */
 .admin-shell {
-  /* 色彩：沿用前台 --yy-* 的品牌藍／紅／金，其餘用中性灰階 */
+  /* 色彩：文字與強調取前台 --yy-*，底色與邊框用中性灰階 */
   --admin-bg: #f4f6f9;
-  --admin-surface: #ffffff;
+  --admin-surface: var(--yy-surface);
   --admin-surface-muted: #f8fafc;
   --admin-border: #e3e8ef;
   --admin-border-strong: #cfd7e2;
   --admin-text: var(--yy-ink, #221812);
-  --admin-text-strong: #14213a;
-  --admin-muted: #5f6b7a;
+  --admin-text-strong: var(--yy-ink);
+  --admin-muted: var(--yy-text-muted);
   --admin-accent: var(--yy-blue, #1f3a5c);
   --admin-accent-soft: #e8eef6;
-  --admin-focus: rgba(44, 110, 127, .35);
+  /* 焦點框：與前台同一組（淺色底用）；側欄是深色底，另用金色，見 .admin-nav-link:focus-visible */
+  --admin-focus-ring: var(--yy-focus-ring);
+  --admin-focus-offset: var(--yy-focus-offset);
   /* 語意色：狀態與提示用，不要拿來當一般強調色 */
-  --admin-success: #146c43;
-  --admin-success-bg: #ecf8f2;
-  --admin-success-border: #a3cfbb;
-  --admin-danger: #b02a37;
-  --admin-danger-bg: #fff5f5;
-  --admin-danger-border: #f1b8bd;
-  --admin-warning-text: #8a5a00;
-  --admin-warning-bg: rgba(255, 193, 7, .08);
+  --admin-success: var(--yy-success);
+  --admin-success-bg: var(--yy-success-bg);
+  --admin-success-border: var(--yy-success-border);
+  --admin-danger: var(--yy-danger);
+  --admin-danger-bg: var(--yy-danger-bg);
+  --admin-danger-border: var(--yy-danger-border);
+  --admin-warning-text: var(--yy-warning-text);
+  --admin-warning-bg: var(--yy-warning-bg);
 
   /* 形狀與陰影 */
-  --admin-radius: 12px;
-  --admin-radius-sm: 8px;
+  --admin-radius: var(--yy-radius-card);
+  --admin-radius-sm: var(--yy-radius-btn);
   --admin-shadow: 0 1px 2px rgba(20, 33, 58, .05), 0 4px 14px rgba(20, 33, 58, .05);
 
   /* 版面 */
@@ -73,14 +77,14 @@
 /* 頂欄與內容區 */
 .admin-main-column { min-width: 0; margin-left: 244px; }
 .admin-topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; min-height: 64px; padding: 0 32px; background: #fff; border-bottom: 1px solid #e3e8ef; }
-.admin-breadcrumb { display: flex; align-items: center; min-width: 0; color: #5f6b7a; font-size: 14px; }
+.admin-breadcrumb { display: flex; align-items: center; min-width: 0; color: var(--yy-text-muted); font-size: 14px; }
 .admin-breadcrumb span { white-space: nowrap; }
-.admin-breadcrumb span:last-child { color: #14213a; font-weight: 650; }
+.admin-breadcrumb span:last-child { color: var(--yy-ink); font-weight: 650; }
 .admin-breadcrumb i { margin: 0 9px; color: #aab4c1; font-style: normal; }
 .admin-topbar-user { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .admin-topbar-user > div { display: flex; flex-direction: column; line-height: 1.25; }
-.admin-topbar-user strong { color: #14213a; font-size: 14px; }
-.admin-topbar-user small { margin-top: 1px; color: #5f6b7a; font-size: 11px; }
+.admin-topbar-user strong { color: var(--yy-ink); font-size: 14px; }
+.admin-topbar-user small { margin-top: 1px; color: var(--yy-text-muted); font-size: 11px; }
 .admin-user-avatar { display: grid; width: 36px; height: 36px; place-items: center; color: #fff; background: var(--yy-blue, #1f3a5c); border-radius: 50%; font-size: 14px; font-weight: 700; }
 .admin-route-content { min-width: 0; }
 /* FE-4：後台內容區的 scoped error boundary fallback（見 AdminLayout.jsx）。

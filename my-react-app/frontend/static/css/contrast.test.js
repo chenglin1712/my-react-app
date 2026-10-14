@@ -79,3 +79,63 @@ describe("前台不再把金色當白字底或資料標記", () => {
     expect(hits).toEqual([]);
   });
 });
+
+// G-1 後台共用基礎層：後台的文字、狀態、焦點、圓角 token 要取自前台 --yy-*，不再各自寫一份色碼
+describe("後台共用基礎層（G-1）", () => {
+  const layout = readFileSync(join(ROOT, "_admin", "layout.css"), "utf8");
+  const block = layout.slice(layout.indexOf("--admin-bg:"), layout.indexOf("--admin-page-padding:"));
+
+  it.each([
+    ["--admin-text-strong", "var(--yy-ink)"],
+    ["--admin-muted", "var(--yy-text-muted)"],
+    ["--admin-success", "var(--yy-success)"],
+    ["--admin-success-bg", "var(--yy-success-bg)"],
+    ["--admin-danger", "var(--yy-danger)"],
+    ["--admin-danger-bg", "var(--yy-danger-bg)"],
+    ["--admin-warning-text", "var(--yy-warning-text)"],
+    ["--admin-warning-bg", "var(--yy-warning-bg)"],
+    ["--admin-radius", "var(--yy-radius-card)"],
+    ["--admin-radius-sm", "var(--yy-radius-btn)"],
+    ["--admin-focus-ring", "var(--yy-focus-ring)"],
+  ])("%s 取自 %s", (name, value) => {
+    const escaped = value.replace(/[()]/g, "\\$&");
+    expect(block).toMatch(new RegExp(`${name}:\\s*${escaped}\\s*;`));
+  });
+
+  it("後台 CSS 不再硬寫被共用 token 取代的舊色碼", () => {
+    const old = /#b02a37|#146c43|#8a5a00|#14213a|#5f6b7a|#a3cfbb|#f1b8bd|#ecf8f2|#fff5f5/i;
+    const hits = [];
+    walk(join(ROOT, "_admin"), [".css"]).forEach((file) => {
+      if (old.test(readFileSync(file, "utf8"))) hits.push(rel(file));
+    });
+    expect(hits).toEqual([]);
+  });
+
+  it("表單與選單的焦點框用共用焦點框，不再用淡色 box-shadow", () => {
+    const base = readFileSync(join(ROOT, "_admin", "admin-base.css"), "utf8");
+    expect(base).not.toMatch(/--admin-focus\)/);
+    expect(base).toMatch(/\.form-select\):focus\s*\{[^}]*outline:\s*var\(--admin-focus-ring\)/);
+  });
+
+  it("各頁篩選欄的 :focus 不再用淡藍 box-shadow 蓋過共用焦點框", () => {
+    ["dashboard.css", "analytics.css", "quiz-quality-analysis.css"].forEach((name) => {
+      const css = readFileSync(join(ROOT, "_admin", name), "utf8");
+      expect(css, name).not.toMatch(/box-shadow:\s*0 0 0 \.2rem rgba\(31, 58, 92, \.1\)/);
+    });
+  });
+
+  it("--yy-*-border 有不依賴 color-mix 的固定色備援", () => {
+    const theme = readFileSync(join(ROOT, "default", "theme-v2.css"), "utf8");
+    expect(theme).toMatch(/--yy-success-border:\s*#[0-9A-Fa-f]{6};/);
+    expect(theme).toMatch(/--yy-danger-border:\s*#[0-9A-Fa-f]{6};/);
+    expect(theme).toMatch(/@supports \(color: color-mix\(/);
+  });
+
+  it("後台新的前景與底色配對對比至少 4.5:1", () => {
+    const pairs = [
+      ["#9E1B24", "#F0DDDE"], ["#9E1B24", "#F4F6F9"], ["#4B6B3A", "#E4E9E1"], ["#8A6816", "#F9F1DF"],
+      ["#6B5A47", "#F4F6F9"], ["#6B5A47", "#F8FAFC"], ["#6B5A47", "#E8EEF6"],
+    ];
+    pairs.forEach(([fg, bg]) => expect(ratio(fg, bg), `${fg}/${bg}`).toBeGreaterThanOrEqual(4.5));
+  });
+});
