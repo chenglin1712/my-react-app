@@ -20,7 +20,10 @@ const fakeEditor = {
     commands: { setContent: vi.fn() },
     chain: () => ({ focus: () => ({}) }),
 };
-vi.mock('@tiptap/react', () => ({ useEditor: () => fakeEditor }));
+// 把 useEditor 收到的選項留下來，測試才能模擬「使用者在編輯器裡打字」（觸發 onUpdate）
+vi.mock('@tiptap/react', () => ({
+    useEditor: (options) => { globalThis.__editorOptions = options; return fakeEditor; },
+}));
 vi.mock('@tiptap/starter-kit', () => ({ StarterKit: {} }));
 vi.mock('@tiptap/extension-text-style', () => ({ TextStyle: {} }));
 vi.mock('@tiptap/extension-color', () => ({ Color: {} }));
@@ -216,5 +219,161 @@ describe('useNotePages 的存檔與不可變更新', () => {
 
         const persisted = JSON.parse(localStorage.getItem(LOCAL_KEY));
         expect(persisted[0].content).toBe('<p>新</p>');
+    });
+});
+
+
+describe('useNotePages 的雲端同步支援（D-2）', () => {
+    const typeInEditor = (html) => {
+        fakeEditor.html = html;
+        act(() => { globalThis.__editorOptions.onUpdate({ editor: fakeEditor }); });
+    };
+
+    beforeEach(() => {
+        localStorage.clear();
+        fakeEditor.html = '<p></p>';
+        fakeEditor.commands.setContent.mockClear();
+        vi.useFakeTimers();
+        vi.setSystemTime(1_760_000_000_000);
+        vi.spyOn(window, 'confirm').mockReturnValue(true);
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+        localStorage.clear();
+    });
+
+    test('旗標關閉：改標題、新增頁都不寫 editedAt，也不通知同步，筆記資料形狀和以前完全一樣', () => {
+        seedNotes([{ id: 'a', title: '舊', content: '<p>A</p>' }]);
+        const { result } = renderHook(() => useNotePages(UID));
+        const listener = vi.fn();
+        const unsubscribe = result.current.subscribeEdit(listener);
+
+        act(() => { result.current.handleTitleChange({ target: { value: '新標題' } }); });
+        act(() => { result.current.handleAdd(); });
+        typeInEditor('<p>打字</p>');
+
+        expect(listener).not.toHaveBeenCalled();
+        const stored = JSON.parse(localStorage.getItem(LOCAL_KEY));
+        expect(stored.every((n) => !('editedAt' in n))).toBe(true);
+        unsubscribe();
+    });
+
+    test('旗標開啟：改標題、新增頁會蓋 editedAt，並通知同步', () => {
+        seedNotes([{ id: 'a', title: '舊', content: '<p>A</p>' }]);
+        const { result } = renderHook(() => useNotePages(UID, { cloudSync: true }));
+        const listener = vi.fn();
+        result.current.subscribeEdit(listener);
+
+        act(() => { result.current.handleTitleChange({ target: { value: '新標題' } }); });
+        expect(result.current.notes[0]).toMatchObject({ title: '新標題', editedAt: 1_760_000_000_000 });
+        expect(listener).toHaveBeenCalledTimes(1);
+
+        act(() => { result.current.handleAdd(); });
+        expect(result.current.notes[1].editedAt).toBe(1_760_000_000_000);
+    });
+
+    test('使用者打字通知同步；flushEditor 只在真的打過字時才把內容寫回並蓋 editedAt', () => {
+        seedNotes([{ id: 'a', title: '舊', content: '<p>A</p>' }]);
+        const { result } = renderHook(() => useNotePages(UID, { cloudSync: true }));
+        const listener = vi.fn();
+        result.current.subscribeEdit(listener);
+
+        // 沒打字：編輯器內容就算跟儲存的不同（TipTap 會重整 HTML）也不算編輯
+        fakeEditor.html = '<p>A </p>';
+        const before = result.current.notes;
+        let returned;
+        act(() => { returned = result.current.flushEditor(); });
+        expect(returned).toBe(before);
+        expect(result.current.notes[0]).not.toHaveProperty('editedAt');
+
+        typeInEditor('<p>使用者打的</p>');
+        expect(listener).toHaveBeenCalledTimes(1);
+        act(() => { returned = result.current.flushEditor(); });
+        expect(returned[0]).toMatchObject({ content: '<p>使用者打的</p>', editedAt: 1_760_000_000_000 });
+        expect(JSON.parse(localStorage.getItem(LOCAL_KEY))[0].content).toBe('<p>使用者打的</p>');
+
+        // 寫回之後再 flush 一次不會重複蓋章
+        vi.setSystemTime(1_760_000_009_000);
+        act(() => { returned = result.current.flushEditor(); });
+        expect(returned[0].editedAt).toBe(1_760_000_000_000);
+    });
+
+    test('getNotes 在 persist 之後立刻讀得到最新的筆記（計時器裡不用等 re-render）', () => {
+        seedNotes([{ id: 'a', title: '舊', content: '<p>A</p>' }]);
+        const { result } = renderHook(() => useNotePages(UID, { cloudSync: true }));
+        act(() => {
+            result.current.handleTitleChange({ target: { value: '剛改' } });
+            expect(result.current.getNotes()[0].title).toBe('剛改');
+        });
+    });
+
+    describe('applyExternalChange', () => {
+        const three = [
+            { id: 'a', title: '一', content: '<p>A</p>' },
+            { id: 'b', title: '二', content: '<p>B</p>' },
+            { id: 'c', title: '三', content: '<p>C</p>' },
+        ];
+
+        test('目前頁之前的頁被移除：仍停在同一篇筆記（以 id 認，不是頁次）', () => {
+            seedNotes(three);
+            const { result } = renderHook(() => useNotePages(UID, { cloudSync: true }));
+            act(() => { result.current.handleChangePage(2); });
+            expect(result.current.notes[result.current.currentPage].id).toBe('c');
+
+            act(() => { result.current.applyExternalChange((prev) => prev.filter((n) => n.id !== 'a')); });
+            expect(result.current.notes.map((n) => n.id)).toEqual(['b', 'c']);
+            expect(result.current.notes[result.current.currentPage].id).toBe('c');
+        });
+
+        test('目前頁的內容被外部改掉：編輯器跟著更新；refreshEditor:false 則不動編輯器', () => {
+            seedNotes(three);
+            const { result } = renderHook(() => useNotePages(UID, { cloudSync: true }));
+            fakeEditor.commands.setContent.mockClear();
+
+            act(() => {
+                result.current.applyExternalChange(
+                    (prev) => prev.map((n) => (n.id === 'a' ? { ...n, content: '<p>換成網址版</p>' } : n)),
+                    { refreshEditor: false },
+                );
+            });
+            expect(fakeEditor.commands.setContent).not.toHaveBeenCalled();
+
+            act(() => {
+                result.current.applyExternalChange((prev) => prev.map((n) => (n.id === 'a' ? { ...n, content: '<p>另一台改的</p>' } : n)));
+            });
+            expect(fakeEditor.commands.setContent).toHaveBeenCalledWith('<p>另一台改的</p>', false);
+        });
+
+        test('目前頁被移除：改停在相鄰的頁；分享選取裡已不存在的頁一併拿掉', () => {
+            seedNotes(three);
+            const { result } = renderHook(() => useNotePages(UID, { cloudSync: true }));
+            act(() => { result.current.handleToggleSelect('a'); result.current.handleToggleSelect('b'); });
+            act(() => { result.current.applyExternalChange((prev) => prev.filter((n) => n.id !== 'a')); });
+            expect(result.current.notes[result.current.currentPage].id).toBe('b');
+            expect(result.current.selectedPageIds).toEqual(['b']);
+        });
+
+        test('全部被移除時留一張空白頁；沒有任何變動時回傳原陣列、不寫入', () => {
+            seedNotes(three);
+            const { result } = renderHook(() => useNotePages(UID, { cloudSync: true }));
+            const before = result.current.notes;
+            let returned;
+            act(() => { returned = result.current.applyExternalChange((prev) => prev); });
+            expect(returned).toBe(before);
+
+            act(() => { result.current.applyExternalChange(() => []); });
+            expect(result.current.notes).toHaveLength(1);
+            expect(result.current.notes[0].content).toBe('<p></p>');
+        });
+    });
+
+    test('刪除一頁時通知同步（帶筆記 id）', () => {
+        seedNotes([{ id: 'a', title: '一', content: '<p>A</p>' }, { id: 'b', title: '二', content: '<p>B</p>' }]);
+        const onNoteDeleted = vi.fn();
+        const { result } = renderHook(() => useNotePages(UID, { cloudSync: true, onNoteDeleted }));
+        act(() => { result.current.handleDelete(); });
+        expect(onNoteDeleted).toHaveBeenCalledWith('a');
     });
 });

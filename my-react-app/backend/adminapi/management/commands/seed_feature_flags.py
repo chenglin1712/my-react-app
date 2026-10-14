@@ -126,9 +126,22 @@ class Command(BaseCommand):
         )
         created_count += int(created)
 
-        total = len(TRIBES) + 11
+        # 雲端筆記同步（D-2）：預設【開啟】。前端會問後端這個旗標（GET /api/v1/features），
+        # 管理者關閉時筆記完全維持原本的「只存在瀏覽器」行為。種入前請先部署 firestore.rules（users/{uid}/notes）。
+        _, created = FeatureFlag.objects.get_or_create(
+            key="notes_cloud_sync",
+            defaults={
+                "label": "雲端筆記同步",
+                "description": "開啟後，登入的使用者筆記會自動同步到雲端（停止輸入約 2 秒後儲存），換裝置登入也看得到；"
+                               "首次開啟時會自動把本機舊筆記上傳。關閉則維持只存在瀏覽器。部署 Firestore 規則後才會正常運作。",
+                "enabled": True,
+            },
+        )
+        created_count += int(created)
+
+        total = len(TRIBES) + 12
         self.stdout.write(self.style.SUCCESS(
             f"功能開關種子完成：共 {total} 筆（族語測驗開關 {len(TRIBES)} + 族語翻譯開關 1 + AI 助手開關 1 + 訪客翻譯試用 1 + 詞形分析器 2 + 測驗詞形干擾項 1 "
-            f"+ 詞素學習 4 + 待專家驗證佇列 1，除了族語測驗、翻譯與 AI 助手開關，其餘預設關閉（含訪客翻譯試用）），"
+            f"+ 詞素學習 4 + 待專家驗證佇列 1 + 雲端筆記同步 1，除了族語測驗、翻譯與 AI 助手開關，其餘預設關閉（含訪客翻譯試用）），"
             f"新增 {created_count} 筆，其餘已存在維持原值。"
         ))

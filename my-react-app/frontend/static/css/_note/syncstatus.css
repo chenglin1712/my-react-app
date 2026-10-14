@@ -1,0 +1,88 @@
+/* 筆記頁的雲端同步狀態、衝突提示、同步失敗的頁面（D-2／D-3）。沿用 theme-v2 的 token，不加動態。 */
+
+.note-sync {
+    margin-top: var(--yy-space-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--yy-space-2);
+}
+
+.note-sync__status {
+    margin: 0;
+    font-size: var(--yy-text-sm);
+    color: var(--yy-text-secondary);
+}
+
+.note-sync__status[data-status="offline"],
+.note-sync__status[data-status="error"] {
+    color: var(--yy-warning-text);
+}
+
+.note-sync__notice,
+.note-sync__failures {
+    padding: var(--yy-space-3) var(--yy-space-4);
+    border: 2px solid var(--yy-border);
+    border-radius: var(--yy-radius-btn);
+    font-size: var(--yy-text-sm);
+    line-height: var(--yy-leading-normal);
+}
+
+.note-sync__notice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--yy-space-3);
+    background: var(--yy-info-bg);
+    color: var(--yy-text-secondary);
+}
+
+.note-sync__failures {
+    background: var(--yy-warning-bg);
+    color: var(--yy-warning-text);
+}
+
+.note-sync__failures-title {
+    margin: 0 0 var(--yy-space-2);
+    font-weight: 700;
+}
+
+.note-sync__failure-list {
+    list-style: none;
+    margin: 0 0 var(--yy-space-2);
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--yy-space-2);
+}
+
+.note-sync__failure {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--yy-space-3);
+}
+
+.note-sync__failure-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.note-sync__failure-actions {
+    display: flex;
+    gap: var(--yy-space-2);
+    flex-shrink: 0;
+}
+
+.note-sync .btn {
+    min-height: var(--yy-control-md);
+}
+
+@media (max-width: 720px) {
+    .note-sync__notice,
+    .note-sync__failure {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}

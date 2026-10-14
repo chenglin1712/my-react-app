@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
-from .routes import crawler, vision, dictionary, quiz, listening, sentence, auth, internal, translation, morphology
+from .routes import crawler, vision, dictionary, quiz, listening, sentence, auth, internal, translation, morphology, features
 from .routes.pronunciation import model as pronunciation_model
 from .routes.quiz import deadline as quiz_deadline
 from dictionary_db.connect import SessionLocal
@@ -197,6 +197,8 @@ app.include_router(
 # 詞形分析：輸入一個詞形，回傳可能的詞根／切分／詞綴功能／例句與信心（見 routes/morphology/）。
 # 分析器每族第一次用到時才建立並快取，不需要掛進啟動預熱。
 app.include_router(morphology.router, prefix="/api/v1/morphology", dependencies=_require_login)
+# 前端要知道的功能開關（雲端筆記同步等），唯讀、要求登入。
+app.include_router(features.router, prefix="/api/v1/features", dependencies=_require_login)
 
 # 服務對服務的內部端點（目前只有辭典快取失效通知）：刻意不掛 _require_login
 # ——Django 呼叫端沒有使用者 Firebase token 可以附，改用共用密鑰驗證（見

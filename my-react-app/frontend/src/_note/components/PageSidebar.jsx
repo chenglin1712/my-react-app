@@ -3,7 +3,7 @@ import { Button, Form } from "react-bootstrap";
 /** 右側「分享頁面選擇」清單：勾選要分享的頁面、全選/取消、送出分享。 */
 export default function PageSidebar({
   notes, currentPage, isDirty, selectedPageIds, maxSelectable,
-  onToggleSelect, onSelectAll, onClearSelect, onShare, isSharing,
+  onToggleSelect, onSelectAll, onClearSelect, onShare, isSharing, unsyncedIds,
 }) {
   const overLimit = maxSelectable != null && notes.length > maxSelectable;
 
@@ -29,7 +29,7 @@ export default function PageSidebar({
             key={note.id}
             id={`note-page-select-${note.id}`}
             type="checkbox"
-            label={`第 ${index + 1} 頁：${note.title || "（未命名）"}${index === currentPage && isDirty ? "*" : ""}`}
+            label={`第 ${index + 1} 頁：${note.title || "（未命名）"}${index === currentPage && isDirty ? "*" : ""}${unsyncedIds?.includes(note.id) ? "（未同步）" : ""}`}
             checked={selectedPageIds.includes(note.id)}
             onChange={() => onToggleSelect(note.id)}
             className="mb-1"

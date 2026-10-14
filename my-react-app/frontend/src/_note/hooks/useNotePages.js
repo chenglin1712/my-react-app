@@ -45,7 +45,7 @@ function normalizeStoredNotes(parsed) {
  * 一起（換頁要把編輯器內容換成該頁筆記、編輯器內容變動要判斷是否為未儲存狀態），
  * 從 _note/index.jsx 抽出來，讓頁面元件只需要處理畫面。
  */
-export function useNotePages(uid) {
+export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
   const [notes, setNotes] = useState([]);
   const [currentPage, setCurrentPage] = useState(0);
   const [storageError, setStorageError] = useState(null);
@@ -60,6 +60,20 @@ export function useNotePages(uid) {
 
   const LOCAL_KEY = `userNotes_${uid}`;
 
+  // 雲端同步（D-2）的非同步流程會在計時器裡讀寫筆記，不能依賴某一次 render 的閉包，
+  // 所以最新的 notes／currentPage 放在 ref；persistNotes 會在 setNotes 之前就同步更新 notesRef。
+  // onUpdate 是在 useEditor 建立時就固定的閉包，也是用 ref 保存最新值，避免比對「是否有未儲存的更改」時讀到過期的值。
+  const notesRef = useRef(notes);
+  const currentPageRef = useRef(currentPage);
+  const cloudSyncRef = useRef(cloudSync);
+  const onNoteDeletedRef = useRef(onNoteDeleted);
+  // 使用者真的在編輯器裡打過字（不含程式載入內容）。雲端同步只在這種情況才蓋新的 editedAt，
+  // 否則舊筆記一打開就會因為編輯器把 HTML 重新整理過，被誤判成「剛剛修改過」。
+  const touchedRef = useRef(false);
+  const editListenersRef = useRef(new Set());
+  useEffect(() => { cloudSyncRef.current = cloudSync; }, [cloudSync]);
+  useEffect(() => { onNoteDeletedRef.current = onNoteDeleted; }, [onNoteDeleted]);
+
   /**
    * 每個會改動筆記內容的地方都要做同一件事：更新 state、寫回 localStorage。
    * 集中在這裡是因為 localStorage.setItem 可能因為裝置儲存空間不足、無痕模式
@@ -67,6 +81,7 @@ export function useNotePages(uid) {
    * 每個呼叫端都要各自補一份 try/catch。
    */
   const persistNotes = useCallback((updatedNotes) => {
+    notesRef.current = updatedNotes;
     setNotes(updatedNotes);
     try {
       localStorage.setItem(LOCAL_KEY, JSON.stringify(updatedNotes));
@@ -78,10 +93,6 @@ export function useNotePages(uid) {
     return updatedNotes;
   }, [LOCAL_KEY]);
 
-  // onUpdate 是在 useEditor 建立時就固定的閉包，用 ref 保存最新的 notes/currentPage，
-  // 避免比對「是否有未儲存的更改」時讀到過期的值。
-  const notesRef = useRef(notes);
-  const currentPageRef = useRef(currentPage);
   useEffect(() => { notesRef.current = notes; }, [notes]);
   useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
 
@@ -100,6 +111,10 @@ export function useNotePages(uid) {
       const currentHTML = editor.getHTML();
       const originalHTML = notesRef.current[currentPageRef.current]?.content || "<p></p>";
       setIsDirty(currentHTML !== originalHTML);
+      if (cloudSyncRef.current) {
+        touchedRef.current = true;
+        editListenersRef.current.forEach((listener) => listener());
+      }
     },
   });
 
@@ -121,6 +136,8 @@ export function useNotePages(uid) {
         }
       } catch (e) {
         console.error("讀取本機筆記失敗，改用一份空白筆記:", e);
+        // 重置之前先把原始內容留一份，才有機會事後救回（雲端同步開啟時，雲端的版本會另外還原）。
+        try { localStorage.setItem(`${LOCAL_KEY}_corrupt_backup`, stored); } catch { /* 空間不足就算了 */ }
         persistNotes([createEmptyNote()]);
       }
     } else {
@@ -139,6 +156,7 @@ export function useNotePages(uid) {
   useEffect(() => {
     if (!editor || currentNoteId == null) return;
     editor.commands.setContent(notesRef.current[currentPageRef.current]?.content || "<p></p>", false);
+    touchedRef.current = false;
     setIsDirty(false);
   }, [currentNoteId, editor]);
 
@@ -162,12 +180,72 @@ export function useNotePages(uid) {
     if (!editor) return notes;
 
     const sanitized = DOMPurify.sanitize(editor.getHTML());
+    const stamp = cloudSyncRef.current && touchedRef.current;
     const updatedNotes = notes.map((note, index) => (
-      index === currentPage ? { ...note, content: sanitized } : note
+      index === currentPage
+        ? { ...note, content: sanitized, ...(stamp ? { editedAt: Date.now() } : {}) }
+        : note
     ));
+    if (stamp) touchedRef.current = false;
 
     return persistNotes(updatedNotes);
   };
+
+  /**
+   * 雲端同步用：把編輯器目前的內容寫回筆記（只在使用者真的改過時），回傳最新的筆記陣列。
+   * 跟 updateCurrentContent 的差別是全部讀 ref、不依賴 render 閉包，可以安全地在計時器裡呼叫。
+   */
+  const flushEditor = useCallback(() => {
+    const prev = notesRef.current;
+    if (!editor || !cloudSyncRef.current || !touchedRef.current) return prev;
+    const index = currentPageRef.current;
+    if (!prev[index]) return prev;
+    const sanitized = DOMPurify.sanitize(editor.getHTML());
+    touchedRef.current = false;
+    const updated = prev.map((note, i) => (
+      i === index ? { ...note, content: sanitized, editedAt: Date.now() } : note
+    ));
+    persistNotes(updated);
+    setIsDirty(false);
+    return updated;
+  }, [editor, persistNotes]);
+
+  /**
+   * 雲端同步用：由外部（不是使用者在編輯器裡打字）改動筆記，例如另一個裝置的修改、
+   * 刪除，或圖片轉換完成後換成網址。updater 收到最新的筆記陣列、回傳新陣列（沒有改動就回傳原陣列）。
+   * 會維持目前選的頁（以 id 認），目前頁的內容被改了就同步更新編輯器，除非 refreshEditor 為 false。
+   */
+  const applyExternalChange = useCallback((updater, { refreshEditor = true } = {}) => {
+    const prev = notesRef.current;
+    const next = updater(prev);
+    if (next === prev) return prev;
+    const finalNext = next.length ? next : [createEmptyNote()];
+    const currentId = prev[currentPageRef.current]?.id;
+
+    persistNotes(finalNext);
+    let index = finalNext.findIndex((note) => note.id === currentId);
+    if (index === -1) index = Math.min(currentPageRef.current, finalNext.length - 1);
+    if (index !== currentPageRef.current) {
+      currentPageRef.current = index;
+      setCurrentPage(index);
+    }
+
+    const after = finalNext[index];
+    const before = prev.find((note) => note.id === after?.id);
+    if (refreshEditor && editor && after && before && after.id === currentId && after.content !== before.content) {
+      editor.commands.setContent(after.content || "<p></p>", false);
+      touchedRef.current = false;
+      setIsDirty(false);
+    }
+    setSelectedPageIds((ids) => ids.filter((id) => finalNext.some((note) => note.id === id)));
+    return finalNext;
+  }, [editor, persistNotes]);
+
+  /** 使用者在編輯器裡打字時通知（雲端同步用來重設「停止輸入 2 秒後存」的計時）。回傳取消訂閱的函式。 */
+  const subscribeEdit = useCallback((listener) => {
+    editListenersRef.current.add(listener);
+    return () => editListenersRef.current.delete(listener);
+  }, []);
 
   const execStyle = (command, value = null) => {
     if (!editor) return;
@@ -197,7 +275,8 @@ export function useNotePages(uid) {
     // 一定要從 updateCurrentContent() 的回傳值往下接，不能再用外層的 notes：
     // 那是這次 render 的舊值，會把剛剛寫回的當前頁內容整個蓋掉。
     const savedNotes = updateCurrentContent();
-    const updatedNotes = [...savedNotes, createEmptyNote("未命名筆記")];
+    const added = createEmptyNote("未命名筆記");
+    const updatedNotes = [...savedNotes, cloudSyncRef.current ? { ...added, editedAt: Date.now() } : added];
     persistNotes(updatedNotes);
     setCurrentPage(updatedNotes.length - 1);
   };
@@ -214,6 +293,7 @@ export function useNotePages(uid) {
     setCurrentPage(newNotes.length ? newPage : 0);
     // 被刪掉的那一頁如果正在選取中，要一起從分享選取裡移除（FE-11）。
     setSelectedPageIds((prev) => prev.filter((id) => id !== deletedId));
+    if (deletedId != null) onNoteDeletedRef.current?.(deletedId);
   };
 
   /** 回傳存檔後的最新陣列，讓呼叫端（例如分享）不必等 setNotes 生效。 */
@@ -241,9 +321,12 @@ export function useNotePages(uid) {
     // notes[currentPage]?.id，id 不變，所以改標題不會誤觸重新載入編輯器內容。
     const title = e.target.value;
     const updatedNotes = notes.map((note, index) => (
-      index === currentPage ? { ...note, title } : note
+      index === currentPage
+        ? { ...note, title, ...(cloudSyncRef.current ? { editedAt: Date.now() } : {}) }
+        : note
     ));
     persistNotes(updatedNotes);
+    if (cloudSyncRef.current) editListenersRef.current.forEach((listener) => listener());
   };
 
   /** limit 存在時最多只勾前 limit 篇（分享頁數上限由呼叫端的頁面元件決定）。 */
@@ -257,5 +340,8 @@ export function useNotePages(uid) {
     editor, notes, currentPage, selectedPageIds, loading, isDirty, storageError,
     execStyle, handleAdd, handleDelete, handleSave, handleChangePage,
     handleToggleSelect, handleTitleChange, handleSelectAll, handleClearSelect,
+    // 雲端同步（D-2）用
+    flushEditor, applyExternalChange, subscribeEdit,
+    getNotes: () => notesRef.current,
   };
 }

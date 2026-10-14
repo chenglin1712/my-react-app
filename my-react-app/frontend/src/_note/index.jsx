@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Container, Button, Row, Col, Spinner, Form, Alert } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../src/userServives/authContext";
+import { db } from "../../../firebase";
 import { shareNote } from "../userServives/noteService";
 import "../../static/css/_note/notestyle.css";
 import "../../static/css/_note/toolbar.css";
@@ -11,6 +12,11 @@ import ErrorBoundary from "../errorBoundary";
 import TabSwitch from "../../components/ui/TabSwitch";
 import { EditorContent } from "@tiptap/react";
 import { useNotePages } from "./hooks/useNotePages";
+import { useNotesCloudSyncFlag } from "./hooks/useNotesCloudSyncFlag";
+import { useCloudNoteSync } from "./hooks/useCloudNoteSync";
+import SyncStatus from "./components/SyncStatus";
+import { exportNoteAsHtml } from "./sync/exportNote";
+import { NOTE_LIMITS } from "./sync/noteSyncCore";
 import EditorToolbar from "./components/EditorToolbar";
 import PageSidebar from "./components/PageSidebar";
 import { buildPreview, SHARE_MAX_PAGES } from "../../utils/notePreview";
@@ -29,11 +35,34 @@ function NotePage() {
   const [uploadedImageUrl, setUploadedImageUrl] = useState("");
   const sharingLockRef = useRef(false);
 
+  // 雲端筆記同步（D-2）：由後台功能開關 notes_cloud_sync 控制，預設關閉。關閉時筆記完全維持
+  // 原本只存在瀏覽器的行為，下面的同步 hook 什麼都不做。
+  const cloudSyncOn = useNotesCloudSyncFlag(uid !== "guest");
+  const syncApiRef = useRef(null);
+
   const {
     editor, notes, currentPage, selectedPageIds, loading, isDirty, storageError,
     execStyle, handleAdd, handleDelete, handleSave, handleChangePage,
     handleToggleSelect, handleTitleChange, handleSelectAll, handleClearSelect,
-  } = useNotePages(uid);
+    flushEditor, applyExternalChange, subscribeEdit, getNotes,
+  } = useNotePages(uid, {
+    cloudSync: cloudSyncOn,
+    onNoteDeleted: (id) => syncApiRef.current?.recordDelete(id),
+  });
+
+  const sync = useCloudNoteSync({
+    uid,
+    enabled: cloudSyncOn,
+    db,
+    notes,
+    getNotes,
+    flushEditor,
+    applyExternalChange,
+    subscribeEdit,
+  });
+  useEffect(() => {
+    syncApiRef.current = sync;
+  }, [sync]);
 
   /**
    * 圖片原本是選取後用 FileReader 轉成 Base64 直接塞進編輯器內容，這段內容
@@ -134,6 +163,15 @@ function NotePage() {
     }
   };
 
+  const handleExportNote = (note) => {
+    try {
+      exportNoteAsHtml(note);
+    } catch (err) {
+      console.error("匯出筆記失敗：", err);
+      setError("匯出失敗，請稍後再試。");
+    }
+  };
+
   if (loading) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ height: "70vh" }}>
@@ -169,6 +207,7 @@ function NotePage() {
             onChange={handleTitleChange}
             placeholder="請輸入筆記標題"
             aria-label="筆記標題"
+            maxLength={cloudSyncOn ? NOTE_LIMITS.TITLE_CHARS : undefined}
           />
 
           {/* 編輯區：只保留 .note-text，不再包一層卡片。
@@ -179,6 +218,7 @@ function NotePage() {
 
           {error && <Alert variant="danger" className="mt-3">{error}</Alert>}
           {storageError && <Alert variant="warning" className="mt-3">{storageError}</Alert>}
+          <SyncStatus sync={sync} notes={notes} onExport={handleExportNote} />
         </Col>
 
         {/* 右：分享頁面選擇（移到右側，且 sticky） */}
@@ -194,6 +234,7 @@ function NotePage() {
             onClearSelect={handleClearSelect}
             onShare={handleShare}
             isSharing={isSharing}
+            unsyncedIds={cloudSyncOn ? sync.failures.map((failure) => failure.id) : undefined}
           />
         </Col>
       </Row>

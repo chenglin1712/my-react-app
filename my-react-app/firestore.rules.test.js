@@ -9,10 +9,13 @@
 //
 // 執行方式：firebase emulators:exec --only firestore "npm run test:rules"
 // （emulators:exec 會先啟動模擬器、跑完測試後自動關掉，不需要另外手動啟動）。
-import { afterAll, beforeAll, beforeEach, describe, test } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import { readFileSync } from 'fs';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import {
+  saveNote, deleteNote, readNoteFromServer, subscribeNotes, classifyError, NoteLimitError,
+} from './frontend/src/_note/sync/cloudNotesRepo.js';
 
 let testEnv;
 
@@ -1104,5 +1107,101 @@ describe('雲端筆記：頁數計數與每人 200 頁上限', () => {
   test('不在 summary 的其他計數文件一律拒絕', async () => {
     const alice = testEnv.authenticatedContext('alice');
     await assertFails(setDoc(doc(alice.firestore(), 'users/alice/noteIndex/other'), indexData(1, 'create', 'n1')));
+  });
+});
+
+// ---- 前端的 cloudNotesRepo 對上真正的規則（模擬器）----
+// 單元測試的假 repo 只能證明同步流程的邏輯；這裡直接用真的 repo 跑交易，證明
+// 「交易寫入的內容」跟 firestore.rules 的計數規則真的對得起來。
+
+describe('cloudNotesRepo 搭配 Firestore 規則', () => {
+  const note = (id, overrides = {}) => ({ id, title: `標題${id}`, content: `<p>內容${id}</p>`, editedAt: 1760000000000, ...overrides });
+  const countOf = async (db) => {
+    const snap = await getDoc(doc(db, 'users/alice/noteIndex/summary'));
+    return snap.exists() ? snap.data().count : null;
+  };
+
+  test('第一次新增、再新增、更新、刪除，計數都正確', async () => {
+    const db = testEnv.authenticatedContext('alice').firestore();
+
+    expect(await saveNote(db, 'alice', note('n1'))).toEqual({ created: true });
+    expect(await countOf(db)).toBe(1);
+    expect(await saveNote(db, 'alice', note('n2'))).toEqual({ created: true });
+    expect(await countOf(db)).toBe(2);
+
+    expect(await saveNote(db, 'alice', note('n1', { title: '改過', editedAt: 1760000009999 }))).toEqual({ created: false });
+    expect(await countOf(db)).toBe(2);
+    expect((await readNoteFromServer(db, 'alice', 'n1')).title).toBe('改過');
+
+    expect(await deleteNote(db, 'alice', 'n1')).toEqual({ deleted: true });
+    expect(await countOf(db)).toBe(1);
+    expect(await readNoteFromServer(db, 'alice', 'n1')).toBeNull();
+    expect(await deleteNote(db, 'alice', 'n1')).toEqual({ deleted: false });
+    expect(await countOf(db)).toBe(1);
+
+    expect(await deleteNote(db, 'alice', 'n2')).toEqual({ deleted: true });
+    expect(await countOf(db)).toBe(0);
+    // 刪光之後可以再新增
+    expect(await saveNote(db, 'alice', note('n3'))).toEqual({ created: true });
+    expect(await countOf(db)).toBe(1);
+  });
+
+  test('已有 200 頁：repo 在送出前就擋下，丟 NoteLimitError', async () => {
+    await seedNote('alice', 'n200', 200);
+    const db = testEnv.authenticatedContext('alice').firestore();
+    await expect(saveNote(db, 'alice', note('n201'))).rejects.toBeInstanceOf(NoteLimitError);
+    expect(classifyError(new NoteLimitError())).toBe('limit');
+    // 更新已存在的頁不受影響
+    await expect(saveNote(db, 'alice', note('n200', { editedAt: 1760000009999 }))).resolves.toEqual({ created: false });
+  });
+
+  test('規則會擋下 repo 送出的不合法寫入，錯誤被分類成 permission', async () => {
+    const db = testEnv.authenticatedContext('alice').firestore();
+    const tooLong = await saveNote(db, 'alice', note('n1', { title: '字'.repeat(101) })).catch((e) => e);
+    expect(classifyError(tooLong)).toBe('permission');
+    const future = await saveNote(db, 'alice', note('n1', { editedAt: Date.now() + 10 * 86400000 })).catch((e) => e);
+    expect(classifyError(future)).toBe('permission');
+
+    const bob = testEnv.authenticatedContext('bob').firestore();
+    const crossUser = await saveNote(bob, 'alice', note('n1')).catch((e) => e);
+    expect(classifyError(crossUser)).toBe('permission');
+    expect(await countOf(testEnv.authenticatedContext('alice').firestore())).toBeNull();
+  });
+
+  test('舊版本不能覆蓋新版本：repo 看到雲端較新就不寫入並回傳雲端版本；直接繞過 repo 的舊寫入被規則擋下', async () => {
+    const db = testEnv.authenticatedContext('alice').firestore();
+    await saveNote(db, 'alice', note('n1', { title: '新', editedAt: 1760000200000 }));
+
+    const result = await saveNote(db, 'alice', note('n1', { title: '舊', editedAt: 1760000100000 }));
+    expect(result).toMatchObject({ created: false, stale: true, cloud: { title: '新', editedAt: 1760000200000 } });
+    expect((await readNoteFromServer(db, 'alice', 'n1')).title).toBe('新');
+
+    // 不經過 repo 的檢查，直接更新成較舊的 editedAt：規則拒絕
+    await assertFails(updateDoc(doc(db, 'users/alice/notes/n1'), {
+      title: '舊', content: '<p>舊</p>', updatedAt: serverTimestamp(), editedAt: 1760000100000,
+    }));
+    // 同一個 editedAt 或更晚都可以
+    await assertSucceeds(updateDoc(doc(db, 'users/alice/notes/n1'), {
+      title: '同時間', content: '<p>x</p>', updatedAt: serverTimestamp(), editedAt: 1760000200000,
+    }));
+  });
+
+  test('subscribeNotes 收得到自己的筆記，別人的收不到', async () => {
+    const alice = testEnv.authenticatedContext('alice').firestore();
+    await saveNote(alice, 'alice', note('n1'));
+    const seen = await new Promise((resolve, reject) => {
+      const stop = subscribeNotes(alice, 'alice', (snapshot) => {
+        if (snapshot.fromCache) return;
+        stop();
+        resolve(snapshot.notes);
+      }, reject);
+    });
+    expect(seen).toEqual([expect.objectContaining({ id: 'n1', title: '標題n1', editedAt: 1760000000000 })]);
+
+    const bob = testEnv.authenticatedContext('bob').firestore();
+    const denied = await new Promise((resolve) => {
+      const stop = subscribeNotes(bob, 'alice', () => {}, (err) => { stop(); resolve(err); });
+    });
+    expect(classifyError(denied)).toBe('permission');
   });
 });

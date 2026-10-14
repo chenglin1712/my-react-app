@@ -110,9 +110,11 @@ service cloud.firestore {
         && getAfter(noteIndexPath(userId)).data.lastId == noteId;
       // createdAt 不在可改清單裡，所以建立時間改不了；content／title 超過上限的更新
       // 也會因為 isValidCloudNote 而被擋下。
+      // editedAt 只能前進（>=）：離線的舊裝置晚一步送出較舊的版本時，不能蓋掉雲端較新的內容。
       allow update: if request.auth != null && request.auth.uid == userId
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'content', 'updatedAt', 'editedAt'])
-        && isValidCloudNote(request.resource.data);
+        && isValidCloudNote(request.resource.data)
+        && request.resource.data.editedAt >= resource.data.editedAt;
       allow delete: if request.auth != null && request.auth.uid == userId
         && getAfter(noteIndexPath(userId)).data.count == get(noteIndexPath(userId)).data.count - 1
         && getAfter(noteIndexPath(userId)).data.lastOp == 'delete'
