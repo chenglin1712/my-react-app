@@ -51,8 +51,8 @@ const SearchHeader = ({
             }
           }}
         />
-        <Button type="button" aria-label="GO 搜尋" className="search-go-btn" onClick={() => handleSearch()} disabled={loading}>
-          GO ▸
+        <Button type="button" className="search-go-btn" onClick={() => handleSearch()} disabled={loading}>
+          搜尋 ▸
         </Button>
       </InputGroup>
 
@@ -65,6 +65,7 @@ const SearchHeader = ({
           frequencyFilter={frequencyFilter} setFrequencyFilter={setFrequencyFilter}
           showOnlyFavorites={showOnlyFavorites} setShowOnlyFavorites={setShowOnlyFavorites}
           alphabet={alphabet}
+          activeExtraCount={selectedSubCategory ? 1 : 0}
         />
       </div>
     </div>

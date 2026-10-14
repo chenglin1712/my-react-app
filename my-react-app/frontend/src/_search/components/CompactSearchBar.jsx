@@ -33,8 +33,8 @@ const CompactSearchBar = ({ query, setQuery, handleSearch, loading, tribeLabel, 
                         }
                     }}
                 />
-                <Button type="button" aria-label="GO 搜尋" className="search-go-btn" onClick={() => handleSearch()} disabled={loading}>
-                    GO ▸
+                <Button type="button" className="search-go-btn" onClick={() => handleSearch()} disabled={loading}>
+                    搜尋 ▸
                 </Button>
             </InputGroup>
             <button

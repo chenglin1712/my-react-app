@@ -55,7 +55,7 @@ describe("motion token", () => {
   });
 
   it("翻牌與捲動進場使用 token，不再是 0.6s／0.9s", () => {
-    const flip = allFiles.find(({ file }) => file === "_favorite/index_judy.css").css;
+    const flip = allFiles.find(({ file }) => file === "_favorite/index.css").css;
     expect(flip).toMatch(/transition:\s*transform var\(--dur-flip\) var\(--ease-in-out\)/);
     const result = allFiles.find(({ file }) => file === "_game/game_result.css").css;
     expect(result).toMatch(/transition:\s*transform var\(--dur-flip\) var\(--ease-in-out\)/);

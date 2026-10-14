@@ -1,0 +1,113 @@
+/* 字詞篩選列（排序／收藏／詞頻／開頭字母），辭典、影像辨識、收藏與手機抽屜共用（審查項 P2-20、P2-38）。
+   選中狀態不只靠底色：aria-pressed 之外還有勾號（收藏、詞頻）或加粗外框（字母）。 */
+.wf-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wf-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wf-group-label {
+  font-size: 12.5px;
+  color: var(--yy-text-secondary);
+  font-weight: 700;
+  margin-right: 2px;
+}
+
+.wf-chip {
+  border: 2px solid var(--yy-ink);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--yy-ink);
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 120ms var(--ease-out), background-color 120ms var(--ease-out);
+}
+
+.wf-chip:active {
+  transform: scale(0.97);
+}
+
+.wf-chip--text {
+  padding: 9px 14px;
+}
+
+.wf-chip--freq {
+  min-width: 52px;
+  height: 36px;
+  padding: 0 10px;
+}
+
+.wf-chip--letter {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 12px;
+  font-family: var(--yy-font-pixel);
+  border-radius: 4px;
+}
+
+.wf-chip.is-selected {
+  box-shadow: 0 0 0 2px var(--yy-ink);
+}
+
+.wf-chip--text.is-selected {
+  background: var(--yy-red);
+  color: var(--yy-cream);
+}
+
+.wf-chip--freq.is-selected {
+  background: var(--yy-gold);
+}
+
+.wf-chip--letter.is-selected {
+  background: var(--yy-blue);
+  color: #fff;
+}
+
+/* 勾號（文字與詞頻 chip 選中時多一個形狀線索）是 JSX 裡 aria-hidden 的 .wf-check，不放偽元素，
+   免得瀏覽器把它算進按鈕名稱 */
+.wf-check {
+  font-weight: 800;
+}
+
+.wf-letter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* 手指操作（手機、平板）：可點擊區要有 44×44px */
+@media (pointer: coarse), (max-width: 720px) {
+  .wf-chip--text { min-height: 44px; }
+  .wf-chip--freq { min-width: 52px; height: 44px; }
+  .wf-chip--letter { width: 44px; height: 44px; }
+  .wf-letter-row, .wf-row { gap: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wf-chip { transition: none; }
+}
+
+/* 手機篩選抽屜 */
+.wf-drawer-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.wf-drawer-actions > button {
+  flex: 1;
+}
+
+.wf-trigger-count {
+  font-variant-numeric: tabular-nums;
+}

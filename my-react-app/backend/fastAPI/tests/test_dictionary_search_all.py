@@ -9,6 +9,7 @@ monkeypatch fastAPI.routes.dictionary.search._load_tribe_words 回傳固定的�
 from unittest.mock import patch
 
 from fastAPI.routes.dictionary import search_all, WordResult, ExplanationItem
+from fastAPI.routes.dictionary.search import available_initial_letters
 
 
 def _word(name, frequency=None, category=None, has_explanation=True):
@@ -101,3 +102,12 @@ def test_no_filters_returns_all_with_explanations_ungrouped_by_index(mock_load):
     # 每個詞各自一組，key 是序號字串，不是舊版的 chineseExplanation
     assert set(content.keys()) == {"0", "1", "2", "3"}
     assert all(len(v) == 1 for v in content.values())
+
+
+@patch("fastAPI.routes.dictionary.search._load_tribe_words", return_value=FAKE_WORDS + [_word("'abc"), _word("ʼxyz")])
+def test_available_initial_letters_comes_from_real_words(mock_load):
+    """開頭字母只列出實際有詞的字元：小寫去重、沒有釋義的詞不算、連字號開頭（詞綴）不收，喉塞音撇號保留。"""
+    letters = available_initial_letters(None, "泰雅語")
+    # balay、cyux、Zzz（轉小寫）、'abc、ʼxyz；empty-explanation 沒有釋義、-suffix 開頭是符號都不收
+    assert letters == sorted(["b", "c", "z", "'", "ʼ"])
+    assert "e" not in letters and "-" not in letters

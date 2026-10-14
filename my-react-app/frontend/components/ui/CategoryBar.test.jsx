@@ -38,3 +38,24 @@ describe('CategoryBar', () => {
     expect(bar.tagName).toBe('BUTTON');
   });
 });
+
+describe('CategoryBar 無障礙（P3-8）', () => {
+  test('選了分類後出現「清除分類」，按下去會清掉分類', async () => {
+    const user = userEvent.setup();
+    const { props } = renderBar({ selectedSubCategory: '動物' });
+    await user.click(screen.getByRole('button', { name: '清除分類' }));
+    expect(props.setSelectedSubCategory).toHaveBeenCalledWith(null);
+  });
+
+  test('沒選分類時不顯示「清除分類」', () => {
+    renderBar();
+    expect(screen.queryByRole('button', { name: '清除分類' })).not.toBeInTheDocument();
+  });
+
+  test('📂 圖示是裝飾（aria-hidden），分類卡片的圖片 alt 留空，不會和下方標題重複念兩次', () => {
+    renderBar({ showCategories: true });
+    const bar = screen.getByRole('button', { name: /單詞分類/ });
+    expect(bar).toHaveAccessibleName('單詞分類');
+    document.querySelectorAll('.subcategory-card img').forEach((img) => expect(img).toHaveAttribute('alt', ''));
+  });
+});

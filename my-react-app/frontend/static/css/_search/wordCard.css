@@ -1,0 +1,54 @@
+/* 單詞字卡的標題列（審查項 P2-40）：標題裡是一顆 disclosure 按鈕，看起來跟原本一樣是一整塊可以點的區域 */
+.word-card-heading {
+  flex: 1;
+  margin: 0;
+  min-width: 0;
+}
+
+.word-card-toggle {
+  display: block;
+  width: 100%;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.word-card-name {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.word-card-gloss {
+  display: block;
+  margin-top: 2px;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--yy-ink);
+  overflow-wrap: anywhere;
+}
+
+/* 展開狀態用箭頭提示（形狀線索，不只靠 aria-expanded） */
+.word-card-toggle .word-card-name::after {
+  content: "\25B8";
+  margin-left: 8px;
+  font-size: 0.7em;
+  vertical-align: middle;
+  display: inline-block;
+  transition: transform 160ms var(--ease-out);
+}
+
+.word-card-toggle[aria-expanded="true"] .word-card-name::after {
+  transform: rotate(90deg);
+}
+
+.word-card-actions {
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .word-card-toggle .word-card-name::after { transition: none; }
+}

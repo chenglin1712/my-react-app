@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Alert, Container, Button, Dropdown } from 'react-bootstrap';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useFavorites } from "../../src/userServives/useFavorites";
 import ErrorBoundary from "../errorBoundary";
 import { TRIBE_NAMES as TRIBES } from "../constants/tribes";
@@ -11,13 +11,12 @@ import { useTabState } from "./hooks/useTabState";
 import { filterFavoriteWords } from "./filterFavoriteWords";
 import WordCardWithImg from "./components/WordCardWithImg";
 import SearchAndFilterControls from "./components/SearchAndFilterControls";
-import "../../static/css/_favorite/index_judy.css"
+import EmptyState from "@components/ui/EmptyState";
+import { describeActiveFilters } from "@utils/wordFilterState";
+import { deriveInitialLetters } from "@utils/wordLetters";
+import "../../static/css/_favorite/index.css"
 
 const PAGE_SIZE = 50;
-const EXCLUDED_LETTERS = ['d', 'f', 'j', 'v'];
-const ALPHABET = Array.from({ length: 26 }, (_, i) => String.fromCharCode(97 + i))
-  .concat("'")
-  .filter(l => !EXCLUDED_LETTERS.includes(l));
 
 const FavoritePage = () => {
   // /favorite 已經在 route.jsx 的 <ProtectedLayout> 底下，未登入會由它統一導去
@@ -92,6 +91,22 @@ const FavoritePage = () => {
     ? filterFavoriteWords(allWords, currentTab.content, currentState, selectedSubCategory)
     : [];
 
+  // 開頭字母只列出這個收藏分類裡真的有的字母
+  const alphabet = deriveInitialLetters(currentTab ? allWords.filter(w => currentTab.content.includes(w.name)) : []);
+  const activeFilterParts = describeActiveFilters({
+    filterLetter: currentState.filterLetter,
+    frequencyFilter: currentState.frequencyFilter,
+    selectedSubCategory,
+  });
+  const hasSearchQuery = Boolean((currentState.activeQuery || '').trim());
+  const clearFilters = () => {
+    updateTabState(activeTab, 'filterLetter', '');
+    updateTabState(activeTab, 'frequencyFilter', '');
+    updateTabState(activeTab, 'activeQuery', '');
+    updateTabState(activeTab, 'inputValue', '');
+    setSelectedSubCategory(null);
+  };
+
   return (
     <Container className="p-2 word-library-container">
       <div
@@ -127,7 +142,7 @@ const FavoritePage = () => {
           <SearchAndFilterControls
             state={currentState}
             onStateChange={(key, value) => updateTabState(activeTab, key, value)}
-            alphabet={ALPHABET}
+            alphabet={alphabet}
             isMobile={isMobile}
             activeTabcat={activeTabcat}
             setActiveTabcat={setActiveTabcat}
@@ -153,6 +168,29 @@ const FavoritePage = () => {
         </div>
       ) : (
         <>
+          {currentTab && filteredWords.length === 0 && (
+            currentTab.content.length === 0 ? (
+              <EmptyState
+                title="這個分類還沒有收藏的詞"
+                actions={<Link to="/search" className="btn btn-danger">去單詞查詢</Link>}
+              >
+                <p>在單詞查詢找到喜歡的詞，點字卡旁的愛心就會收進來。</p>
+              </EmptyState>
+            ) : (
+              <EmptyState
+                title="目前的條件下沒有符合的收藏"
+                actions={(hasSearchQuery || activeFilterParts.length > 0) ? (
+                  <Button type="button" variant="danger" onClick={clearFilters}>清除搜尋與篩選</Button>
+                ) : undefined}
+              >
+                {(hasSearchQuery || activeFilterParts.length > 0) && (
+                  <p>
+                    目前的條件：{[hasSearchQuery && `關鍵字「${currentState.activeQuery.trim()}」`, ...activeFilterParts].filter(Boolean).join('、')}。
+                  </p>
+                )}
+              </EmptyState>
+            )
+          )}
           <div className="word-cards-grid">
             {filteredWords.slice(0, visibleCount).map((wordData, idx) => (
               // 單張字卡渲染出錯時只讓那張卡片顯示錯誤提示，不要讓整個收藏格線消失。

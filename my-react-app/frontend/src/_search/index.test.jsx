@@ -145,3 +145,86 @@ describe('SearchPage 的詞形分析面板', () => {
     await waitFor(() => expect(screen.queryByText('辭典查無此詞形')).not.toBeInTheDocument());
   });
 });
+
+describe('SearchPage 的空狀態與字母篩選（E-2）', () => {
+  const word = (name) => ({ name, explanationItems: [{ chineseExplanation: '義' }] });
+
+  beforeEach(() => {
+    apiPost.mockReset();
+  });
+
+  const searchFor = async (keyword) => {
+    fireEvent.change(await screen.findByLabelText('查詢關鍵字'), { target: { value: keyword } });
+    fireEvent.keyDown(screen.getByLabelText('查詢關鍵字'), { key: 'Enter' });
+  };
+
+  test('開頭字母清單用後端回傳的實際字母（包含 d、f），不再寫死排除', async () => {
+    apiPost.mockResolvedValue({ all_results: { 0: [word('balay')] }, total: 1, available_letters: ['b', 'd', 'f'] });
+    render(<SearchPage />);
+    await screen.findByText('balay');
+    const group = screen.getByRole('group', { name: '開頭字母' });
+    expect(Array.from(group.querySelectorAll('button')).map((b) => b.textContent)).toEqual(['b', 'd', 'f']);
+  });
+
+  test('後端沒有提供字母清單時用保底字母表，不排除 d、f、j、v', async () => {
+    apiPost.mockResolvedValue({ all_results: { 0: [word('balay')] }, total: 1 });
+    render(<SearchPage />);
+    await screen.findByText('balay');
+    const group = screen.getByRole('group', { name: '開頭字母' });
+    ['d', 'f', 'j', 'v'].forEach((l) => expect(group.textContent).toContain(l));
+  });
+
+  test('關鍵字查不到：顯示「找不到」、建議，有篩選條件時可一鍵清除', async () => {
+    apiPost.mockImplementation((url, body) => (
+      body.keyword
+        ? Promise.resolve({ exact_match_results: [], fuzzy_match_results: {} })
+        : Promise.resolve({ all_results: { 0: [word('balay')] }, total: 1, available_letters: ['b'] })
+    ));
+    render(<SearchPage />);
+    await screen.findByText('balay');
+    fireEvent.click(screen.getByRole('button', { name: 'b' }));
+    await searchFor('zzzz');
+
+    expect(await screen.findByRole('heading', { name: '找不到「zzzz」' })).toBeInTheDocument();
+    expect(screen.getByText(/目前的篩選條件：開頭「b」/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '清除篩選' }));
+    await waitFor(() => expect(screen.queryByText(/目前的篩選條件：開頭「b」/)).not.toBeInTheDocument());
+  });
+
+  test('關鍵字查不到時，「用詞形分析試試」會展開面板並帶入剛剛查的詞', async () => {
+    apiPost.mockImplementation((url, body) => {
+      if (String(url).includes('/morphology/')) {
+        return Promise.resolve({
+          tribe: '泰雅語', tribeSlug: 'tayal', input: body.word, normalized: body.word,
+          token: { status: 'unknown', wordIds: [] }, candidates: [], rulesAvailable: true, admittedRuleCount: 2, notes: [],
+        });
+      }
+      return body.keyword
+        ? Promise.resolve({ exact_match_results: [], fuzzy_match_results: {} })
+        : Promise.resolve({ all_results: {}, total: 0 });
+    });
+    render(<SearchPage />);
+    await searchFor('mafiloo');
+    fireEvent.click(await screen.findByRole('button', { name: '用詞形分析試試' }));
+
+    await waitFor(() => expect(screen.getByLabelText('要分析的詞形')).toHaveValue('mafiloo'));
+    const call = apiPost.mock.calls.find(([url]) => String(url).includes('/morphology/'));
+    expect(call[1]).toEqual({ tribe: 'tayal', word: 'mafiloo' });
+  });
+
+  test('瀏覽全部詞條時篩選後 0 筆：說明目前條件，清除篩選後重新載入', async () => {
+    apiPost.mockImplementation((url, body) => (
+      body.letter
+        ? Promise.resolve({ all_results: {}, total: 0, available_letters: ['b', 'c'] })
+        : Promise.resolve({ all_results: { 0: [word('balay')] }, total: 1, available_letters: ['b', 'c'] })
+    ));
+    render(<SearchPage />);
+    await screen.findByText('balay');
+    fireEvent.click(screen.getByRole('button', { name: 'c' }));
+
+    expect(await screen.findByRole('heading', { name: '目前的條件下沒有符合的詞' })).toBeInTheDocument();
+    expect(screen.getByText(/開頭「c」/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '清除篩選' }));
+    expect(await screen.findByText('balay')).toBeInTheDocument();
+  });
+});

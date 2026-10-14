@@ -268,6 +268,24 @@ def search_all(
     return content, total
 
 
+def available_initial_letters(db: Session, tribe: str = '泰雅語') -> List[str]:
+    """這個族語的詞條實際出現過的「開頭字元」（小寫、去重、排序），供前端「開頭字母」篩選使用。
+
+    前端原本寫死一份 a-z 扣掉 d、f、j、v 的字母表（三個頁面各抄一份），不同族語的書寫系統
+    並不相同，會漏掉合法的開頭、也會列出根本沒有詞的字母。這裡改成直接從已載入的詞條（走
+    tribe 級快取）算出來，所以每一個字母點下去都一定有結果，也不需要我們替每個族語手寫字母表。
+    只收字母與喉塞音撇號；開頭是連字號（詞綴）等符號的詞條不列入。注意只看第一個字元，
+    ng、lj 這類雙字母拼寫的開頭會歸在 n、l 底下。"""
+    letters = set()
+    for wr in _load_tribe_words(db, tribe):
+        if not wr.explanationItems:  # 跟 search_all 一致：沒有釋義的詞不列入
+            continue
+        first = (wr.name or '')[:1].lower()
+        if first and (first.isalpha() or first in ("'", "’", "ʼ")):
+            letters.add(first)
+    return sorted(letters)
+
+
 # ------------------------- API 路由 -------------------------
 def _call_with_own_session(fn, *args, **kwargs):
     """在目前所在的 thread 裡自己建立、自己關閉 SQLAlchemy Session，執行 fn
@@ -367,10 +385,12 @@ async def all_tayal_dictionary(request: Request, body: AllWordsRequest):
         favorites_only=body.favorites_only, favorite_names=body.favorite_names,
         sort_order=body.sort_order,
     )
+    letters = await asyncio.to_thread(_call_with_own_session, available_initial_letters, tribe_name)
     return JSONResponse(
         {
             "all_results": {k: [r.dict() for r in v] for k, v in results.items()},
             "total": total,
+            "available_letters": letters,
         },
         status_code=200
     )

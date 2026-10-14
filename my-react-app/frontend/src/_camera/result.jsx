@@ -11,12 +11,12 @@ import useAudioPlayback from "../../hooks/useAudioPlayback";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import CameraFilterControls from "./components/CameraFilterControls";
 import WordResultsSection from "../_search/components/WordResultsSection";
+import EmptyState from "@components/ui/EmptyState";
+import { describeActiveFilters } from "@utils/wordFilterState";
+import { deriveInitialLetters } from "@utils/wordLetters";
+import { Button } from "react-bootstrap";
 
 const WORD_FAVORITES_CATEGORY_ID = 1;
-const EXCLUDED_LETTERS = ['d', 'f', 'j', 'v'];
-const ALPHABET = Array.from({ length: 26 }, (_, i) => String.fromCharCode(97 + i))
-  .concat("'")
-  .filter(l => !EXCLUDED_LETTERS.includes(l));
 
 // 影像辨識精靈第 3 步：查詢辨識出的單詞並顯示完整詞典結果。
 // selectedWords/tribe 由 index.jsx（精靈容器）傳入，取代原本從路由 state 讀取；
@@ -98,6 +98,22 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
     Object.values(definitions.fuzzy_match_results).flatMap(wordGroup => Object.values(wordGroup).flat())
   );
 
+  // 開頭字母只列出這批辨識結果裡真的出現過的字母（見 utils/wordLetters.js）
+  const alphabet = useMemo(() => deriveInitialLetters([
+    ...Object.values(definitions.exact_match_results).flat(),
+    ...Object.values(definitions.fuzzy_match_results).flatMap(wordGroup => Object.values(wordGroup).flat()),
+  ]), [definitions]);
+
+  const activeFilterParts = describeActiveFilters({ filterLetter, frequencyFilter, showOnlyFavorites, selectedSubCategory });
+  const hasRawResults = Object.keys(definitions.exact_match_results).length > 0 || Object.keys(definitions.fuzzy_match_results).length > 0;
+  const noVisibleResults = exactMatchWords.length === 0 && fuzzyMatchWords.length === 0;
+  const clearFilters = () => {
+    setFilterLetter('');
+    setFrequencyFilter('');
+    setShowOnlyFavorites(false);
+    setSelectedSubCategory(null);
+  };
+
   return (
     <div className="yy-fade-up camera-step3">
       <div className="camera-step3-header">
@@ -113,7 +129,7 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
         setSortOrder={setSortOrder}
         filterLetter={filterLetter}
         setFilterLetter={setFilterLetter}
-        alphabet={ALPHABET}
+        alphabet={alphabet}
         frequencyFilter={frequencyFilter}
         setFrequencyFilter={setFrequencyFilter}
         showOnlyFavorites={showOnlyFavorites}
@@ -130,6 +146,22 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
       {loading && <LoadingSpinner label="查詢中…" />}
       {error && <Alert variant="danger">{error}</Alert>}
       {favoritesError && <Alert variant="danger">{favoritesError}</Alert>}
+
+      {!loading && !error && noVisibleResults && (
+        <EmptyState
+          title={activeFilterParts.length > 0 && hasRawResults ? '目前的條件下沒有符合的詞' : '辭典裡找不到這些字詞'}
+          actions={(
+            <>
+              {activeFilterParts.length > 0 && <Button type="button" variant="danger" onClick={clearFilters}>清除篩選</Button>}
+              <Button type="button" variant="outline-dark" onClick={onRestart}>重新辨識</Button>
+            </>
+          )}
+        >
+          {activeFilterParts.length > 0 && hasRawResults
+            ? <p>目前的篩選條件：{activeFilterParts.join('、')}。</p>
+            : <p>可以回到上一步，換一張圖片或重新選字再試一次。</p>}
+        </EmptyState>
+      )}
 
       <br />
       {exactMatchWords.length > 0 && (

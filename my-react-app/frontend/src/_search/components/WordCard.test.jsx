@@ -1,5 +1,6 @@
 import { describe, test, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import WordCard from './WordCard';
 
 // _search、_camera 兩頁原本各自維護一份幾乎相同的 WordCard，已分岔（_search 版本有
@@ -28,7 +29,8 @@ describe('WordCard', () => {
     expect(toggleExpand).toHaveBeenCalledWith('k1');
   });
 
-  test('鍵盤 Enter／Space 可觸發展開（_camera 頁原本才有的無障礙支援）', () => {
+  test('標題是一顆 disclosure 按鈕：帶 aria-expanded、可用鍵盤 Enter／Space 展開（P2-40）', async () => {
+    const user = userEvent.setup();
     const toggleExpand = vi.fn();
     render(
       <WordCard
@@ -43,14 +45,19 @@ describe('WordCard', () => {
         isFavorited={false}
       />
     );
-    const titleArea = screen.getByRole('button', { name: /balay/ });
-    fireEvent.keyDown(titleArea, { key: 'Enter' });
+    const toggle = screen.getByRole('button', { name: /balay/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('heading', { level: 3 })).toContainElement(toggle);
+    toggle.focus();
+    await user.keyboard('{Enter}');
     expect(toggleExpand).toHaveBeenCalledWith('k1');
+    await user.keyboard(' ');
+    expect(toggleExpand).toHaveBeenCalledTimes(2);
   });
 
   test('收藏按鈕呼叫 toggleFavorite(wordName)，不是整個 keyName', () => {
     const toggleFavorite = vi.fn();
-    const { container } = render(
+    render(
       <WordCard
         word="真的"
         result={baseResult}
@@ -63,10 +70,7 @@ describe('WordCard', () => {
         isFavorited={false}
       />
     );
-    // 收藏愛心按鈕是標題列（.d-flex.justify-content-between）裡緊接在標題區塊
-    // 後面的按鈕，圖示按鈕沒有文字/aria-label 可用 getByRole name 區分。
-    const favoriteButton = container.querySelector('.d-flex.justify-content-between > button');
-    fireEvent.click(favoriteButton);
+    fireEvent.click(screen.getByRole('button', { name: '加入收藏' }));
     expect(toggleFavorite).toHaveBeenCalledWith('balay');
   });
 
@@ -85,7 +89,9 @@ describe('WordCard', () => {
         isFavorited={false}
       />
     );
-    expect(screen.getByLabelText('播放音訊')).toBeInTheDocument();
+    // 播放鈕在標題旁邊，不再巢狀放在標題裡（P2-40），名稱帶出是哪個詞
+    const play = screen.getByRole('button', { name: '播放「balay」的發音' });
+    expect(screen.getByRole('heading', { level: 3 })).not.toContainElement(play);
   });
 
   test('沒有傳入 playSentence 時，例句不會顯示 TTS 備用播放鈕（避免呼叫 undefined 函式）', () => {
@@ -109,7 +115,7 @@ describe('WordCard', () => {
         isFavorited={false}
       />
     );
-    expect(screen.queryByLabelText('播放音訊')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('播放例句發音')).not.toBeInTheDocument();
   });
 
   describe('句子 TTS 備用播放鈕（回歸測試：原本寫死「布農語／排灣語」才顯示，改成問後端翻譯能力 API 的 hasSentenceAudio）', () => {
@@ -136,7 +142,7 @@ describe('WordCard', () => {
           isFavorited={false}
         />
       );
-      expect(screen.getByLabelText('播放音訊')).toBeInTheDocument();
+      expect(screen.getByLabelText('播放例句發音')).toBeInTheDocument();
     });
 
     test('hasSentenceAudio 為 true 時不顯示 TTS 備用播放鈕（這個族語已經有整句真人原音）', () => {
@@ -155,7 +161,7 @@ describe('WordCard', () => {
           isFavorited={false}
         />
       );
-      expect(screen.queryByLabelText('播放音訊')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('播放例句發音')).not.toBeInTheDocument();
     });
   });
 });

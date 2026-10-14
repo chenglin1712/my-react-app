@@ -69,3 +69,20 @@
   background-color: var(--yy-cream);
   box-shadow: var(--yy-shadow-sm);
 }
+
+/* 分類列：切換鈕＋「清除分類」並排（審查項 P3-8） */
+.category-bar-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.category-bar-row .category-bar {
+  flex: 1;
+  min-width: 0;
+}
+
+.category-clear-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}

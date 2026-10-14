@@ -53,7 +53,7 @@ describe('EvidencePanel 的詞形分析', () => {
     render(<EvidencePanel token={derived} onPlayAudio={vi.fn()} tribeSlug="kavalan" />);
     fireEvent.click(screen.getByRole('button', { name: /詞形分析/ }));
 
-    expect(await screen.findByText('高信心')).toBeInTheDocument();
+    expect(await screen.findByText('把握程度高')).toBeInTheDocument();
     expect(apiPost).toHaveBeenCalledWith(expect.stringContaining('/morphology/analyze'), { tribe: 'kavalan', word: 'lemintun' }, expect.any(Object));
     expect(screen.getAllByTitle(/^(詞根|詞綴)$/).map((s) => s.textContent)).toEqual(['l', 'em', 'intun']);
     // 分析結果出來之後按鈕就不再顯示
@@ -79,10 +79,10 @@ describe('EvidencePanel 的詞形分析', () => {
     apiPost.mockResolvedValue(analysis());
     const { rerender } = render(<EvidencePanel token={derived} onPlayAudio={vi.fn()} tribeSlug="kavalan" />);
     fireEvent.click(screen.getByRole('button', { name: /詞形分析/ }));
-    await screen.findByText('高信心');
+    await screen.findByText('把握程度高');
 
     rerender(<EvidencePanel token={{ surface: 'other', status: 'headword', lemma: 'other' }} onPlayAudio={vi.fn()} tribeSlug="kavalan" />);
-    await waitFor(() => expect(screen.queryByText('高信心')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('把握程度高')).not.toBeInTheDocument());
     expect(screen.getByRole('button', { name: /詞形分析/ })).toBeInTheDocument();
   });
 

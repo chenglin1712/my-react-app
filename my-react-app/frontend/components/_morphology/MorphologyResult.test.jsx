@@ -55,7 +55,7 @@ describe('MorphologyResult', () => {
 
   test('規則結果：顯示詞根、釋義、規則標記與功能，以及依序的切分片段', () => {
     render(<MorphologyResult result={base({ candidates: [ruleCandidate()] })} />);
-    expect(screen.getByText('高信心')).toBeInTheDocument();
+    expect(screen.getByText('把握程度高')).toBeInTheDocument();
     expect(screen.getByText('maopohay', { selector: 'strong' })).toBeInTheDocument();
     expect(screen.getByText(/迅速又勤快地工作的/)).toBeInTheDocument();
     expect(screen.getByText('ci-…-ay')).toBeInTheDocument();
@@ -83,10 +83,10 @@ describe('MorphologyResult', () => {
 
   test.each([
     ['dictionary', '辭典標註'],
-    ['high', '高信心'],
-    ['medium', '中信心・僅供參考'],
-    ['low', '拼寫相近・低信心'],
-  ])('信心 %s 的標籤是「%s」，並有說明文字', (confidence, label) => {
+    ['high', '把握程度高'],
+    ['medium', '把握程度中・僅供參考'],
+    ['low', '拼寫相近・把握程度低'],
+  ])('把握程度 %s 的標籤是「%s」，並有說明文字', (confidence, label) => {
     const c = ruleCandidate({ confidence, source: confidence === 'dictionary' ? 'dictionary' : 'rule' });
     render(<MorphologyResult result={base({ candidates: [c] })} />);
     const badge = screen.getByText(label);

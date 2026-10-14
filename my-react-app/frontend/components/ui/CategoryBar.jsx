@@ -22,21 +22,32 @@ export default function CategoryBar({
 
   return (
     <>
-      <button
-        type="button"
-        className="category-bar yy-card d-flex justify-content-between align-items-center"
-        onClick={() => setShowCategories(!showCategories)}
-        aria-expanded={showCategories}
-      >
-        <span className="fw-bold">📂 單詞分類
-          {selectedSubCategory && (
-            <span style={{ marginLeft: "8px" }}>
-              - <span style={{ color: "var(--yy-red)" }}>{selectedSubCategory}</span>
-            </span>
-          )}
-        </span>
-        {showCategories ? <FaChevronUp /> : <FaChevronDown />}
-      </button>
+      <div className="category-bar-row">
+        <button
+          type="button"
+          className="category-bar yy-card d-flex justify-content-between align-items-center"
+          onClick={() => setShowCategories(!showCategories)}
+          aria-expanded={showCategories}
+        >
+          <span className="fw-bold"><span aria-hidden="true">📂 </span>單詞分類
+            {selectedSubCategory && (
+              <span style={{ marginLeft: "8px" }}>
+                - <span style={{ color: "var(--yy-red)" }}>{selectedSubCategory}</span>
+              </span>
+            )}
+          </span>
+          {showCategories ? <FaChevronUp aria-hidden="true" /> : <FaChevronDown aria-hidden="true" />}
+        </button>
+        {selectedSubCategory && (
+          <button
+            type="button"
+            className="category-clear-btn yy-btn-outline"
+            onClick={() => setSelectedSubCategory(null)}
+          >
+            清除分類
+          </button>
+        )}
+      </div>
 
       {showCategories && (
         <div className="category-panel yy-card mt-2">
@@ -52,7 +63,7 @@ export default function CategoryBar({
                       aria-pressed={selectedSubCategory === sub.name}
                       onClick={() => selectSubCategory(sub)}
                     >
-                      <img src={sub.image} alt={sub.name} width="150" height="150" loading="lazy" decoding="async" />
+                      <img src={sub.image} alt="" width="150" height="150" loading="lazy" decoding="async" />
                       <h5 className="fw-bold">{sub.name}</h5>
                     </button>
                   ))}

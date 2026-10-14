@@ -10,9 +10,11 @@ vi.mock('../../utils/apiClient', () => ({ apiPost: vi.fn() }));
 // 判斷要不要重建 tabStates，每次呼叫都回傳新陣列會讓那個 effect 每次 render
 // 都判定「favorites 變了」而一直重新觸發，造成無窮迴圈。
 const MOCK_FAVORITES = [{ id: 1, content: ['balay', 'cyux'] }];
+const EMPTY_FAVORITES = [{ id: 1, content: [] }];
+const favoritesHolder = vi.hoisted(() => ({ current: null }));
 vi.mock('../../src/userServives/useFavorites', () => ({
   useFavorites: () => ({
-    favorites: MOCK_FAVORITES,
+    favorites: favoritesHolder.current,
     toggleFavorite: vi.fn(),
     error: '',
   }),
@@ -28,6 +30,7 @@ function renderPage() {
 describe('FavoritePage（回歸測試：/favorite 已在 ProtectedLayout 底下，不需要自己再判斷登入狀態；切族語的競態防護）', () => {
   beforeEach(() => {
     apiPost.mockReset();
+    favoritesHolder.current = MOCK_FAVORITES;
   });
 
   test('回歸測試：快速切換族語時，比較慢的舊族語回應不會蓋掉新族語已經顯示的結果', async () => {
@@ -60,5 +63,20 @@ describe('FavoritePage（回歸測試：/favorite 已在 ProtectedLayout 底下�
     renderPage();
 
     await waitFor(() => expect(screen.getAllByText('真的').length).toBeGreaterThan(0));
+  });
+});
+
+describe('FavoritePage 空狀態（P1-12）', () => {
+  beforeEach(() => {
+    apiPost.mockReset();
+  });
+
+  test('收藏分類裡沒有任何詞：說明怎麼收藏，並提供前往單詞查詢的連結', async () => {
+    favoritesHolder.current = EMPTY_FAVORITES;
+    apiPost.mockResolvedValue({ all_results: {} });
+    renderPage();
+
+    expect(await screen.findByRole('heading', { name: '這個分類還沒有收藏的詞' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '去單詞查詢' })).toHaveAttribute('href', '/search');
   });
 });

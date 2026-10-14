@@ -36,9 +36,12 @@ const WordResultsSection = ({
   const total = serverPaginated ? (totalCount ?? wordsFlat.length) : filteredSorted.length;
   const remaining = Math.max(0, total - visibleWords.length);
 
+  // 篩選後一筆都沒有就整塊不顯示，不要留下「完全符合結果 (0)」這種空標題
+  if (total === 0) return null;
+
   return (
     <>
-      <h4 className={`fw-bold ${titleColorClass}`}>{title} ({total})</h4>
+      <h2 className={`h4 fw-bold ${titleColorClass}`}>{title} ({total})</h2>
       <ListGroup>
         {visibleWords.map((wordData, idx) => {
           const word = wordData.explanationItems?.[0]?.chineseExplanation || wordData.chineseExplanation || '';

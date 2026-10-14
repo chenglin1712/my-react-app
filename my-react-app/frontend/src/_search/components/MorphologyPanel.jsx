@@ -10,7 +10,7 @@ const WORD_MAX_LENGTH = 40;
  * 詞綴切分、詞綴功能與辭典例句。跟上面的搜尋是兩件獨立的事，所以預設收合，不干擾原本的查詢。
  * 族語跟著頁面上方選的族語走；換族語就清掉上一次的結果。
  */
-const MorphologyPanel = ({ tribeSlug, tribeName, playAudio }) => {
+const MorphologyPanel = ({ tribeSlug, tribeName, playAudio, prefill = null }) => {
     const [open, setOpen] = useState(false);
     const [word, setWord] = useState("");
     const { loading, result, error, analyze, reset } = useMorphologyAnalysis();
@@ -19,6 +19,18 @@ const MorphologyPanel = ({ tribeSlug, tribeName, playAudio }) => {
     useEffect(() => {
         reset();
     }, [tribeSlug, reset]);
+
+    // 搜尋查不到時，空狀態的「用詞形分析試試」會帶著剛剛查的詞過來：展開面板、填入詞形並直接分析
+    const prefillNonce = prefill?.nonce;
+    useEffect(() => {
+        if (!prefill?.word) return;
+        const prefillWord = prefill.word.slice(0, WORD_MAX_LENGTH);
+        setOpen(true);
+        setWord(prefillWord);
+        analyze(tribeSlug, prefillWord);
+        // 只在每次按下「用詞形分析試試」（nonce 改變）時觸發
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [prefillNonce]);
 
     const submit = () => {
         if (!word.trim() || loading) return;
@@ -60,7 +72,7 @@ const MorphologyPanel = ({ tribeSlug, tribeName, playAudio }) => {
                             {loading ? "分析中…" : "分析"}
                         </button>
                     </div>
-                    <p className="yy-morph-hint">一次輸入一個詞形（不含空白）。結果會標示每個答案的來源與信心。</p>
+                    <p className="yy-morph-hint">一次輸入一個詞形（不含空白）。結果會標示每個答案的來源與把握程度。</p>
 
                     {error && <p className="yy-morph-error" role="alert">{error}</p>}
                     <MorphologyResult result={result} onPlayAudio={playAudio} />

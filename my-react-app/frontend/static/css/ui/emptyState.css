@@ -1,0 +1,39 @@
+/* 共用空狀態（EmptyState） */
+.yy-empty {
+  margin: 24px 0;
+  padding: 24px 20px;
+  border: 3px solid var(--yy-ink);
+  border-radius: var(--yy-radius-card, 12px);
+  background: #fff;
+  box-shadow: 4px 4px 0 var(--yy-ink);
+}
+
+.yy-empty__title {
+  margin: 0 0 8px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--yy-ink);
+  overflow-wrap: anywhere;
+}
+
+.yy-empty__body {
+  color: var(--yy-text-secondary);
+  line-height: 1.7;
+  font-size: 0.95rem;
+}
+
+.yy-empty__body p {
+  margin: 0 0 8px;
+}
+
+.yy-empty__body ul {
+  margin: 0 0 8px;
+  padding-left: 1.2em;
+}
+
+.yy-empty__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}

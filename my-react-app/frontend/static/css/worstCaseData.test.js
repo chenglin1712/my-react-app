@@ -36,7 +36,7 @@ describe("長詞不會撐破 grid／flex 欄位", () => {
   });
 
   it("收藏字卡的標題可換行、中文翻譯最多兩行", () => {
-    const src = css("_favorite/index_judy.css");
+    const src = css("_favorite/index.css");
     const word = rule(src, ".word-card-front .favorite-word-info h3 .tayal-word-text");
     expect(word).toMatch(/min-width:\s*0/);
     expect(word).toMatch(/overflow-wrap:\s*anywhere/);
