@@ -34,7 +34,7 @@ describe('LoginForm（後台專用登入頁版本）', () => {
     expect(screen.queryByRole('heading', { name: '登入' })).not.toBeInTheDocument();
     expect(screen.queryByText('註冊')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '登入後台' })).toBeInTheDocument();
-    expect(screen.getByText('忘記密碼?')).toBeInTheDocument();
+    expect(screen.getByText('忘記密碼？')).toBeInTheDocument();
   });
 
   test('一般會員版本不受影響：仍有標題、註冊入口與「登入」按鈕', () => {
@@ -51,7 +51,7 @@ describe('LoginForm（後台專用登入頁版本）', () => {
 
     mockSearchParams = new URLSearchParams({ next: '/admin/users' });
     const first = render(<LoginForm variant="admin" />);
-    fireEvent.change(screen.getByLabelText('帳號'), { target: { value: 'a@b.com' } });
+    fireEvent.change(screen.getByLabelText('電子郵件'), { target: { value: 'a@b.com' } });
     fireEvent.change(screen.getByLabelText('密碼'), { target: { value: 'secret1' } });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '登入後台' })); });
     await act(async () => { vi.advanceTimersByTime(2000); });
@@ -60,7 +60,7 @@ describe('LoginForm（後台專用登入頁版本）', () => {
 
     mockSearchParams = new URLSearchParams({ next: 'https://evil.example/admin' });
     render(<LoginForm variant="admin" />);
-    fireEvent.change(screen.getByLabelText('帳號'), { target: { value: 'a@b.com' } });
+    fireEvent.change(screen.getByLabelText('電子郵件'), { target: { value: 'a@b.com' } });
     fireEvent.change(screen.getByLabelText('密碼'), { target: { value: 'secret1' } });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '登入後台' })); });
     await act(async () => { vi.advanceTimersByTime(2000); });
@@ -69,7 +69,7 @@ describe('LoginForm（後台專用登入頁版本）', () => {
 
   test('前台登入會作廢殘留的後台旗標；後台登入才會寫入旗標', async () => {
     const submit = async (name) => {
-      fireEvent.change(screen.getByLabelText('帳號'), { target: { value: 'a@b.com' } });
+      fireEvent.change(screen.getByLabelText('電子郵件'), { target: { value: 'a@b.com' } });
       fireEvent.change(screen.getByLabelText('密碼'), { target: { value: 'secret1' } });
       await act(async () => { fireEvent.click(screen.getByRole('button', { name })); });
     };

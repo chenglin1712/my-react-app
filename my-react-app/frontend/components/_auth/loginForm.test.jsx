@@ -22,7 +22,7 @@ vi.mock('lottie-web', () => ({
 }));
 
 const fillLoginForm = (email, password) => {
-  fireEvent.change(screen.getByLabelText('帳號'), { target: { value: email } });
+  fireEvent.change(screen.getByLabelText('電子郵件'), { target: { value: email } });
   fireEvent.change(screen.getByLabelText('密碼'), { target: { value: password } });
 };
 
@@ -33,12 +33,64 @@ describe('LoginForm', () => {
     mockSearchParams = new URLSearchParams();
   });
 
-  test('email 或密碼為空時顯示驗證錯誤，不呼叫 signIn', () => {
+  test('email 或密碼為空時，錯誤顯示在各自欄位下方並綁定 aria-describedby，焦點移到第一個有問題的欄位，不呼叫 signIn', () => {
     render(<LoginForm />);
     fireEvent.click(screen.getByRole('button', { name: '登入' }));
 
-    expect(screen.getByText('請輸入電子郵件和密碼！')).toBeInTheDocument();
+    const emailInput = screen.getByLabelText('電子郵件');
+    const passwordInput = screen.getByLabelText('密碼');
+    expect(screen.getByText('請輸入電子郵件')).toBeInTheDocument();
+    expect(screen.getByText('請輸入密碼')).toBeInTheDocument();
+    expect(emailInput).toHaveAttribute('aria-invalid', 'true');
+    expect(emailInput).toHaveAccessibleDescription('請輸入電子郵件');
+    expect(passwordInput).toHaveAccessibleDescription('請輸入密碼');
+    expect(emailInput).toHaveFocus();
     expect(signInWithEmailAndPassword).not.toHaveBeenCalled();
+  });
+
+  test('開始輸入後，該欄位的錯誤就消失', () => {
+    render(<LoginForm />);
+    fireEvent.click(screen.getByRole('button', { name: '登入' }));
+    fireEvent.change(screen.getByLabelText('電子郵件'), { target: { value: 'a@b.com' } });
+
+    expect(screen.queryByText('請輸入電子郵件')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('電子郵件')).not.toHaveAttribute('aria-invalid');
+    expect(screen.getByText('請輸入密碼')).toBeInTheDocument();
+  });
+
+  test('欄位有可見的 label，不是只靠 placeholder', () => {
+    const { container } = render(<LoginForm />);
+    expect(container.querySelector('label[for]')).not.toBeNull();
+    expect(screen.getByLabelText('電子郵件')).not.toHaveAttribute('placeholder');
+  });
+
+  test('在欄位按 Enter 就能送出（表單用 onSubmit，不是只有按鈕 onClick）', async () => {
+    signInWithEmailAndPassword.mockResolvedValueOnce({});
+    render(<LoginForm />);
+    fillLoginForm('a@b.com', 'secret1');
+
+    await act(async () => {
+      fireEvent.submit(screen.getByLabelText('密碼').closest('form'));
+    });
+
+    expect(signInWithEmailAndPassword).toHaveBeenCalledTimes(1);
+  });
+
+  test('Firebase 回報電子郵件格式錯誤時，訊息放在電子郵件欄位下方', async () => {
+    signInWithEmailAndPassword.mockRejectedValueOnce({ code: 'auth/invalid-email', message: 'x' });
+    render(<LoginForm />);
+    fillLoginForm('not-an-email', 'secret1');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '登入' }));
+    });
+
+    expect(screen.getByLabelText('電子郵件')).toHaveAccessibleDescription('電子郵件格式不正確');
+  });
+
+  test('defaultEmail 會帶進欄位（後台重新驗證時沿用目前帳號）', () => {
+    render(<LoginForm defaultEmail="boss@example.com" />);
+    expect(screen.getByLabelText('電子郵件')).toHaveValue('boss@example.com');
   });
 
   test('輸入帳密後送出，呼叫 signInWithEmailAndPassword 並帶正確參數', async () => {
@@ -99,7 +151,7 @@ describe('LoginForm', () => {
 
   test('忘記密碼連結有 href，鍵盤使用者可以直接 Tab 到並用 Enter 觸發導頁', () => {
     render(<LoginForm />);
-    const forgotLink = screen.getByText('忘記密碼?');
+    const forgotLink = screen.getByText('忘記密碼？');
 
     expect(forgotLink).toHaveAttribute('href', '/forgot');
 
@@ -124,7 +176,7 @@ describe('LoginForm', () => {
       expect(mockNavigate).not.toHaveBeenCalled();
 
       act(() => {
-        vi.advanceTimersByTime(1800);
+        vi.advanceTimersByTime(800);
       });
 
       expect(mockNavigate).toHaveBeenCalledWith('/');
@@ -148,7 +200,7 @@ describe('LoginForm', () => {
       });
 
       act(() => {
-        vi.advanceTimersByTime(1800);
+        vi.advanceTimersByTime(800);
       });
 
       expect(mockNavigate).toHaveBeenCalledWith('/admin');
@@ -172,7 +224,7 @@ describe('LoginForm', () => {
       });
 
       act(() => {
-        vi.advanceTimersByTime(1800);
+        vi.advanceTimersByTime(800);
       });
 
       expect(mockNavigate).toHaveBeenCalledWith('/');
@@ -200,12 +252,32 @@ describe('LoginForm', () => {
       });
 
       act(() => {
-        vi.advanceTimersByTime(1800);
+        vi.advanceTimersByTime(800);
       });
 
       expect(mockNavigate).toHaveBeenCalledWith('/');
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('LoginForm 重複送出', () => {
+  test('連續觸發兩次 submit 只會登入一次（同步送出鎖）', async () => {
+    mockNavigate.mockReset();
+    signInWithEmailAndPassword.mockReset();
+    let resolveSignIn;
+    signInWithEmailAndPassword.mockImplementation(() => new Promise((resolve) => { resolveSignIn = resolve; }));
+    render(<LoginForm />);
+    fillLoginForm('a@b.com', 'secret1');
+    const form = screen.getByLabelText('密碼').closest('form');
+
+    await act(async () => {
+      fireEvent.submit(form);
+      fireEvent.submit(form);
+    });
+    expect(signInWithEmailAndPassword).toHaveBeenCalledTimes(1);
+
+    await act(async () => { resolveSignIn({}); });
   });
 });

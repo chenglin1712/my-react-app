@@ -1,0 +1,39 @@
+/* 登入／註冊表單的欄位：可見標籤在上、錯誤與提示在下。
+   選擇器用 .auth-field .xxx（兩層）是為了壓過 .login-box p／.register-box p 的置中與灰字。 */
+.auth-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    text-align: left;
+}
+
+.auth-field .auth-field-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--yy-ink);
+}
+
+.auth-field .auth-field-hint {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--yy-text-tertiary);
+    text-align: left;
+}
+
+.auth-field .auth-field-error {
+    margin: 0;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--yy-danger);
+    text-align: left;
+}
+
+.auth-field .input-wrapper[data-invalid="true"] {
+    border-color: var(--yy-danger);
+}
+
+/* 提示字色要夠深：原本 placeholder 是唯一的欄位說明且對比偏低 */
+.auth-field .input-field::placeholder {
+    color: var(--yy-text-muted);
+    opacity: 1;
+}

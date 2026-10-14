@@ -29,7 +29,7 @@ describe('AdminLoginPage', () => {
         renderPage();
         expect(screen.getByRole('note')).toHaveTextContent('staff@example.com');
         expect(screen.getByRole('note')).toHaveTextContent('再輸入一次密碼');
-        expect(screen.getByLabelText('帳號')).toHaveValue('staff@example.com');
+        expect(screen.getByLabelText('電子郵件')).toHaveValue('staff@example.com');
     });
 
     test('左側裝飾對輔助科技隱藏，標語文字不會被朗讀成內容', () => {

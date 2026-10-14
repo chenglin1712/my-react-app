@@ -80,16 +80,24 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .login-button:hover {
+  .login-button:hover:not(:disabled) {
       transform: translate(2px, 2px);
       box-shadow: 2px 2px 0 var(--yy-ink);
       background-color: var(--yy-red-dark);
   }
 }
 
-.login-button:active {
+.login-button:active:not(:disabled) {
   transform: translate(4px, 4px);
   box-shadow: none;
+}
+
+/* 停用態（登入中）：文字與底色維持 3:1 以上，不是只靠透明度變淡 */
+.login-button:disabled {
+    background: #7A6455;
+    color: #fff;
+    box-shadow: none;
+    cursor: not-allowed;
 }
 
 .login-box p {

@@ -9,7 +9,11 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         const unsubscribe = authChanges((user) => {
-            setUserData(user);
+            // 註冊時帳號建立的登入事件早於使用者資料寫入 Firestore，這次事件讀到的是「沒有資料」；
+            // 註冊表單寫入後會用 updateUserData 補上完整資料，這裡不能讓較晚才回來的舊讀取把它蓋回空的。
+            setUserData((prev) => (
+                user && !user.firestoreData && prev?.uid === user.uid && prev.firestoreData ? prev : user
+            ));
             setLoading(false);
         });
 

@@ -10,7 +10,9 @@ import SuccessModal from "../ui/SuccessModal";
 import { useLottieAnimation } from "@hooks/useLottieAnimation";
 import { clearAdminSession, markAdminSession } from "../../src/_admin/session/adminSession";
 import { authErrorMessage } from "@utils/firebaseAuthErrors";
+import AuthField from "./AuthField";
 import PasswordField from "./PasswordField";
+import { AUTH_SUCCESS_REDIRECT_MS } from "./authTiming";
 
 // variant 只影響呈現：'admin' 是後台專用登入頁（src/_auth/AdminLoginPage.jsx）用的版本，
 // 標題由頁面自己提供、不顯示註冊入口、成功文案改成進後台。登入函式、next 驗證與導頁邏輯兩種版本完全相同。
@@ -18,18 +20,31 @@ const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }
     const isAdminVariant = variant === "admin";
     const [email, setEmail] = useState(defaultEmail);
     const [password, setPassword] = useState("");
+    // errorMsg：不屬於單一欄位的錯誤（帳密錯誤、網路失敗…）放表單上方；
+    // fieldErrors：缺哪個欄位就把訊息放在那個欄位正下方（審查項 P2-72）
     const [errorMsg, setErrorMsg] = useState("");
+    const [fieldErrors, setFieldErrors] = useState({});
+    const [attempt, setAttempt] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const formRef = useRef(null);
+    // 同步的送出鎖：isSubmitting 要等 render 後按鈕才 disabled，兩次 submit 若在那之前進來會重複登入
+    const submittingRef = useRef(false);
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const redirectTimeoutRef = useRef(null);
     useEffect(() => () => clearTimeout(redirectTimeoutRef.current), []);
     const redirectTargetRef = useRef("/");
-    // 成功提示出現後本來會等 1.8 秒才跳頁；按「立即前往」或 Esc 就不用等
+    // 成功提示出現後本來會等一小段時間才跳頁；按「立即前往」或 Esc 就不用等
     const skipWait = () => {
         clearTimeout(redirectTimeoutRef.current);
         navigate(redirectTargetRef.current);
     };
+
+    // 送出後有欄位錯誤時，把焦點移到第一個有問題的欄位（鍵盤與報讀器使用者才知道錯在哪）
+    useEffect(() => {
+        if (attempt === 0) return;
+        formRef.current?.querySelector('[aria-invalid="true"]')?.focus();
+    }, [attempt]);
 
     // 登入後預設回首頁；只有從「先被要求登入才能進去」的頁面過來（例如
     // AdminRoute 導去 /login?next=/admin）才會帶 next 參數，登入成功後導回
@@ -55,15 +70,21 @@ const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }
     //使用者登入
     const handleLogin = async (e) => {
         e.preventDefault();
+        if (submittingRef.current) return;
         setErrorMsg("");
 
-        if (!email || !password) {
-            setErrorMsg("請輸入電子郵件和密碼！");
+        const nextFieldErrors = {};
+        if (!email.trim()) nextFieldErrors.email = "請輸入電子郵件";
+        if (!password) nextFieldErrors.password = "請輸入密碼";
+        setFieldErrors(nextFieldErrors);
+        if (Object.keys(nextFieldErrors).length > 0) {
+            setAttempt((n) => n + 1);
             return;
         }
+        submittingRef.current = true;
         setIsSubmitting(true);
         try {
-            const credential = await signInWithEmailAndPassword(auth, email, password);
+            const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
             // 後台版：記下「這個分頁已在後台登入頁輸入過密碼」，AdminRoute 才會放行（旗標只是體驗層，見 adminSession.js）
             // 前台登入則一定清掉旗標：前台登入不算「在後台登入頁輸入過密碼」，之前殘留的旗標不能讓人直接進後台
             if (isAdminVariant) markAdminSession(credential?.user?.uid);
@@ -73,15 +94,22 @@ const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }
             redirectTargetRef.current = redirectTarget;
             redirectTimeoutRef.current = setTimeout(() => {
                 navigate(redirectTarget);
-            }, 1800);
+            }, AUTH_SUCCESS_REDIRECT_MS);
         } catch (error) {
             // error.code 只有 Firebase 的錯誤才會有，非 Firebase 的例外（例如網路層
             // 的 TypeError）沒有這個欄位，直接呼叫 .includes() 會在這個 catch 區塊
             // 內再丟一次例外，讓使用者連通用錯誤訊息都看不到。
             // 畫面只顯示中文說明；Firebase 的英文 message 只留在 console，不給使用者看
             console.error("登入失敗:", error?.code, error?.message);
-            setErrorMsg(authErrorMessage(error, "登入失敗，請稍後再試"));
+            const message = authErrorMessage(error, "登入失敗，請稍後再試");
+            if (error?.code === "auth/invalid-email") {
+                setFieldErrors({ email: message });
+                setAttempt((n) => n + 1);
+            } else {
+                setErrorMsg(message);
+            }
         } finally {
+            submittingRef.current = false;
             setIsSubmitting(false);
         }
     };
@@ -94,17 +122,36 @@ const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }
         <div className="login-box">
             {!isAdminVariant && <h1 className="formTitle"><User size={30} />登入</h1>}
             {errorMsg && <Alert variant="danger" className="py-2">{errorMsg}</Alert>}
-            <form action="#" className="loginForm">
-                <div className="input-wrapper">
-                    <Mail size={24} className="icon" />
-                    <input type="email" className="input-field" placeholder="帳號" aria-label="帳號" autoComplete="email" required defaultValue={defaultEmail} onChange={(e) => { setEmail(e.target.value) }} />
-                </div>
-                <PasswordField value={password} onChange={(e) => { setPassword(e.target.value) }} autoComplete="current-password" />
-                <a className="forgot-pass" href="/forgot" onClick={(e) => { e.preventDefault(); navigate("/forgot"); }}>忘記密碼?</a>
-                <button className="login-button" onClick={handleLogin} disabled={isSubmitting}>{isAdminVariant ? "登入後台" : "登入"}</button>
+            <form className="loginForm" onSubmit={handleLogin} noValidate ref={formRef}>
+                <AuthField
+                    label="電子郵件"
+                    icon={Mail}
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    error={fieldErrors.email}
+                    onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                    }}
+                />
+                <PasswordField
+                    value={password}
+                    error={fieldErrors.password}
+                    onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                    }}
+                    autoComplete="current-password"
+                />
+                <a className="forgot-pass" href="/forgot" onClick={(e) => { e.preventDefault(); navigate("/forgot"); }}>忘記密碼？</a>
+                <button type="submit" className="login-button" disabled={isSubmitting}>
+                    {isSubmitting ? "登入中…" : (isAdminVariant ? "登入後台" : "登入")}
+                </button>
             </form>
             {!isAdminVariant && (
-                <p>還沒有帳號?
+                <p>還沒有帳號？
                     {onSwitchToRegister ? (
                         <a onClick={(e) => { e.preventDefault(); onSwitchToRegister(); }} href="/register">註冊</a>
                     ) : (

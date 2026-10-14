@@ -47,7 +47,7 @@ describe('Forgot (forgotPassword)', () => {
   });
 
   test.each([
-    ['auth/invalid-email', 'Email 格式不正確'],
+    ['auth/invalid-email', '電子郵件格式不正確'],
     ['auth/unknown-error', '寄送失敗，請稍後再試'],
   ])('錯誤代碼 %s 顯示對應訊息，且不會卡住無法重試', async (code, expectedMessage) => {
     sendPasswordResetEmail.mockRejectedValueOnce({ code, message: 'boom' });

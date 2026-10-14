@@ -97,7 +97,7 @@ export const registerWithImg = async (name, email, password, identity, avatarUrl
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         //把其他需要的資料存到firestore的users
-        await setDoc(doc(db, "users", user.uid), {
+        const firestoreData = {
             name: name,
             email: email,
             identity: identity,
@@ -105,7 +105,8 @@ export const registerWithImg = async (name, email, password, identity, avatarUrl
             user_errors: {},
             joinDate: new Date().toISOString(),
             avatarUrl: avatarUrl
-        });
+        };
+        await setDoc(doc(db, "users", user.uid), firestoreData);
 
         // 寄出 Email 驗證信（Email 打錯字的帳號才有機會被發現）。寄信失敗不影響註冊本身，
         // 使用者之後仍可正常登入，所以只記錄、不丟出錯誤。
@@ -115,6 +116,9 @@ export const registerWithImg = async (name, email, password, identity, avatarUrl
             console.error("寄送驗證信失敗: ", verificationError?.code, verificationError?.message);
         }
 
+        // 帳號建立時 Firebase 就已經登入了；回傳剛寫入的資料，讓呼叫端（註冊表單）能直接更新
+        // 全站使用者資料，不必再手動登入一次。
+        return { uid: user.uid, firestoreData };
     } catch (error) {
         console.error("X 註冊錯誤: ", error.code, error.message);
         throw error;

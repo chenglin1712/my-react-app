@@ -135,6 +135,6 @@ describe('registerWithImg（註冊後寄驗證信）', () => {
   test('驗證信寄送失敗不影響註冊成功（只記錄，不丟錯）', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     sendEmailVerification.mockRejectedValue({ code: 'auth/too-many-requests', message: 'x' });
-    await expect(registerWithImg('小明', 'a@b.c', 'secret1', '學生', null)).resolves.toBeUndefined();
+    await expect(registerWithImg('小明', 'a@b.c', 'secret1', '學生', null)).resolves.toMatchObject({ uid: 'u1', firestoreData: { name: '小明', identity: '學生' } });
   });
 });

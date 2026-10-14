@@ -77,6 +77,12 @@
     box-shadow: 3px 3px 0 var(--yy-ink);
 }
 
+/* 鍵盤聚焦要看得出來：只靠陰影位移太弱，跟登入表單一樣在外層畫出焦點框 */
+.register-box .input-wrapper:focus-within {
+    outline: var(--yy-focus-ring);
+    outline-offset: 2px;
+}
+
 .input-wrapper svg {
     color: var(--yy-text-muted);
     margin-right: 0;
@@ -92,25 +98,37 @@
     padding: 2px;
 }
 
-.password-requirements {
+/* 密碼規則：狀態用文字（已符合／未符合）加圖示表示，圖示色與文字色都在白底上 4.5:1 以上 */
+.password-rules {
+    list-style: none;
+    margin: -6px 0 0;
+    padding: 0;
+    text-align: left;
+}
+
+.password-rule {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 12px;
+    font-size: 12.5px;
     color: var(--yy-text-tertiary);
-    height: 20px;
 }
 
-.check-icon {
-    color: #C9BBA0;
-}
-
-.check-icon.valid {
+.password-rule.valid svg {
     color: #2E7D32;
 }
 
-.check-icon.invalid {
-    color: #C9BBA0;
+.password-rule.invalid svg {
+    color: var(--yy-text-muted);
+}
+
+.password-rule-state {
+    margin-left: auto;
+    font-weight: 700;
+}
+
+.password-rule.valid .password-rule-state {
+    color: #2E7D32;
 }
 
 .register-button {
@@ -127,20 +145,23 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .register-button:hover {
+  .register-button:hover:not(:disabled) {
       transform: translate(2px, 2px);
       box-shadow: 2px 2px 0 var(--yy-ink);
       background: var(--yy-red-dark);
   }
 }
 
-.register-button:active {
+.register-button:active:not(:disabled) {
   transform: translate(4px, 4px);
   box-shadow: none;
 }
 
+/* 停用態：文字與底色維持 3:1 以上（原本 2.14:1，審查項 P2-18） */
 .register-button:disabled {
-    background: #B79A8A;
+    background: #7A6455;
+    color: #fff;
+    box-shadow: none;
     animation: none;
     cursor: not-allowed;
 }
