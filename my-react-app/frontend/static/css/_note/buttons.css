@@ -71,7 +71,7 @@
 }
 .note-page .morandi-blue:hover { background-color: var(--brand-red-600); }
 
-@media (max-width: 768px) {
+@media (max-width: 720px) {
   .note-page .btn-primary, .note-page .btn-danger, .note-page .btn-ghost, .note-page .morandi-blue {
     width: 100%;
     max-width: 300px;

@@ -22,7 +22,7 @@
 }
 
 .register-subtitle {
-    font-size: 12.5px;
+    font-size: 13px;
     color: var(--yy-text-tertiary);
     margin-bottom: 20px;
     font-weight: 600;
@@ -110,7 +110,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 12.5px;
+    font-size: 13px;
     color: var(--yy-text-tertiary);
 }
 

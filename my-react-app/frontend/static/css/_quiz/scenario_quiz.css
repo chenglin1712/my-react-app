@@ -357,7 +357,7 @@
     font-weight: 700;
 }
 
-@media (max-width: 620px) {
+@media (max-width: 600px) {
     .scenario-quiz-page {
         padding: 18px 12px 36px;
     }

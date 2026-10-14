@@ -53,6 +53,7 @@
 .note-text {
   border: 2px solid var(--brand-red);
   height: 60vh;
+  height: 60dvh;
   background-color: var(--yy-surface);
   border-radius: var(--yy-radius-lg);
   overflow-y: auto;
@@ -93,12 +94,12 @@
 }
 
 /* ---- RWD ---- */
-@media (max-width: 768px) {
+@media (max-width: 720px) {
   .fullscreen-notebook {
     padding: 20px 30px;
     margin: 20px auto 100px auto;
   }
-  .note-text { height: 50vh; }
+  .note-text { height: 50vh; height: 50dvh; }
 }
 
 /* 編輯區內任何一處取得焦點時，在外層畫出焦點框（.ProseMirror 本身的 outline 被拿掉了，全站焦點基線見 theme-v2.css） */

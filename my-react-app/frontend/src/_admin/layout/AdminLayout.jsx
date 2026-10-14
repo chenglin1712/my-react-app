@@ -164,23 +164,16 @@ export default function AdminLayout({ pendingAnnouncementCount }) {
                             <ul>
                                 {items.map((item) => (
                                     <li key={item.label}>
-                                        {item.to ? (
-                                            <NavLink
-                                                className={({ isActive }) => `admin-nav-link${isActive ? ' active' : ''}`}
-                                                end={item.end}
-                                                to={item.to}
-                                            >
-                                                <span>{item.label}</span>
-                                                {item.pending && pendingAnnouncementCount > 0 && (
-                                                    <span className="admin-count-badge">{pendingAnnouncementCount}</span>
-                                                )}
-                                            </NavLink>
-                                        ) : (
-                                            <div className="admin-nav-link admin-nav-disabled">
-                                                <span>{item.label}</span>
-                                                <span className="admin-planned-badge">規劃中</span>
-                                            </div>
-                                        )}
+                                        <NavLink
+                                            className={({ isActive }) => `admin-nav-link${isActive ? ' active' : ''}`}
+                                            end={item.end}
+                                            to={item.to}
+                                        >
+                                            <span>{item.label}</span>
+                                            {item.pending && pendingAnnouncementCount > 0 && (
+                                                <span className="admin-count-badge">{pendingAnnouncementCount}</span>
+                                            )}
+                                        </NavLink>
                                     </li>
                                 ))}
                             </ul>

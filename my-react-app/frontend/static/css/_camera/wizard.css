@@ -12,7 +12,7 @@
 .camera-desc {
     max-width: 540px;
     margin: 0 auto;
-    font-size: 15.5px;
+    font-size: 16px;
     line-height: 1.8;
     color: var(--yy-text-secondary);
 }
@@ -109,7 +109,7 @@
 }
 
 .camera-hint {
-    font-size: 12.5px;
+    font-size: 13px;
     color: var(--yy-text-muted);
     margin: 10px 0 0;
 }
@@ -194,7 +194,7 @@
 }
 
 .camera-privacy {
-    font-size: 12.5px;
+    font-size: 13px;
     color: var(--yy-text-secondary);
     margin: 8px 0 0;
 }

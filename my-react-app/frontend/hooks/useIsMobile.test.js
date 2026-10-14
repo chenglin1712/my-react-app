@@ -30,6 +30,15 @@ describe('useIsMobile', () => {
     expect(result.current).toBe(true);
   });
 
+  test('斷點與 CSS 的 max-width: 720px 一致：720 以下（含 720）是手機，721 起不是', () => {
+    window.innerWidth = 720;
+    const { result } = renderHook(() => useIsMobile());
+    expect(result.current).toBe(true);
+
+    act(() => { setWindowWidth(721); });
+    expect(result.current).toBe(false);
+  });
+
   test('unmount 後會移除 resize 監聽', () => {
     const removeSpy = vi.spyOn(window, 'removeEventListener');
     const { unmount } = renderHook(() => useIsMobile());

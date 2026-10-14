@@ -232,7 +232,7 @@
 }
 
 /* 響應式設計 */
-@media (max-width: 768px) {
+@media (max-width: 720px) {
     .study-plan-container {
         padding: 24px 12px;
     }

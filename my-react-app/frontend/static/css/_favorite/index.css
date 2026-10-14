@@ -252,7 +252,7 @@
     width: -webkit-fill-available;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 720px) {
     .word-card-back {
         padding: 0.75rem;
     }

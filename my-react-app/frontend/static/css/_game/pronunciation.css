@@ -242,7 +242,7 @@
   transition: background 0.18s, transform 0.15s;
 }
 .pron-mic-btn span {
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.03em;
 }

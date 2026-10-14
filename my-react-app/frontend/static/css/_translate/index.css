@@ -11,7 +11,7 @@
     max-width: 640px;
     margin: 0 auto;
     color: var(--yy-text-secondary);
-    font-size: 14.5px;
+    font-size: 15px;
 }
 
 .translate-tribe-row {
@@ -23,7 +23,7 @@
 }
 
 .translate-capability-note {
-    font-size: 12.5px;
+    font-size: 13px;
     color: var(--yy-text-muted);
 }
 
@@ -43,7 +43,7 @@
 
 .translate-direction-label {
     font-family: var(--yy-font-pixel);
-    font-size: 13px;
+    font-size: 14px;
     color: var(--yy-text-secondary);
     min-width: 88px;
     text-align: center;
@@ -84,7 +84,7 @@
     max-width: 640px;
     margin: 0 auto 14px;
     padding: 8px 12px;
-    font-size: 13.5px;
+    font-size: 14px;
     color: var(--yy-text-secondary);
     border: 2px solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
@@ -102,7 +102,7 @@
 
 .translate-submit-hint {
     margin: 6px 0 0;
-    font-size: 12.5px;
+    font-size: 13px;
     color: var(--yy-text-secondary);
 }
 
@@ -116,7 +116,7 @@
     grid-template-columns: 1fr 1fr;
     gap: 24px;
 }
-@media (max-width: 860px) {
+@media (max-width: 900px) {
     .translate-grid {
         grid-template-columns: 1fr;
     }
@@ -178,7 +178,7 @@
     width: auto;
     height: 26px;
     padding: 0 10px;
-    font-size: 11px;
+    font-size: 12px;
 }
 /* 這顆是一般膠囊，不是菱形：背景層不旋轉 */
 .translate-exact-badge::before {
@@ -253,7 +253,7 @@
     align-items: center;
     gap: 6px;
     padding: 8px 14px;
-    font-size: 12.5px;
+    font-size: 13px;
 }
 
 .translate-coverage-summary {
@@ -264,7 +264,7 @@
 }
 
 .translate-notes {
-    font-size: 12.5px;
+    font-size: 13px;
     color: var(--yy-text-muted);
     font-style: italic;
 }
@@ -290,7 +290,7 @@
 }
 
 .yy-evidence-badge {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
     padding: 2px 8px;
     border-radius: var(--yy-radius-btn);
@@ -300,7 +300,7 @@
 
 .yy-evidence-body,
 .yy-evidence-note {
-    font-size: 13.5px;
+    font-size: 14px;
     color: var(--yy-text-secondary);
     margin: 4px 0;
 }
@@ -361,6 +361,7 @@
 /* 確認登入狀態期間佔位，避免內容區整個消失 */
 .translate-auth-loading {
     min-height: 60vh;
+    min-height: 60dvh;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -521,7 +522,7 @@
     }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 600px) {
     .translate-guest-btn {
         flex: 1 1 100%;
     }

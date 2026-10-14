@@ -23,7 +23,8 @@ const UserSidebar = ({ userData, closeSidebar, onOpenBot }) => {
             await signOut();
             navigate("/");
         } catch (err) {
-            setSignOutError("登出失敗：" + err.message);
+            console.error("登出失敗", err);
+            setSignOutError("登出失敗，請稍後再試。");
         }
     };
 

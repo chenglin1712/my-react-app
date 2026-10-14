@@ -24,6 +24,7 @@
     margin: 12px 0;
     /* 題數很多時在面板內捲動，不要把整個面板撐得比螢幕高 */
     max-height: 50vh;
+    max-height: 50dvh;
     overflow-y: auto;
 }
 

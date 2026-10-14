@@ -496,7 +496,7 @@ audio {
     font-size: 14px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 720px) {
     .match-grid {
         gap: 16px;
     }

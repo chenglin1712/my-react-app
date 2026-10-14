@@ -15,14 +15,14 @@
 
 .auth-field .auth-field-hint {
     margin: 0;
-    font-size: 12.5px;
+    font-size: 13px;
     color: var(--yy-text-tertiary);
     text-align: left;
 }
 
 .auth-field .auth-field-error {
     margin: 0;
-    font-size: 12.5px;
+    font-size: 13px;
     font-weight: 700;
     color: var(--yy-danger);
     text-align: left;

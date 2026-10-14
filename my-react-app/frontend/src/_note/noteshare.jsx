@@ -278,7 +278,7 @@ export default function NoteShare() {
           hasMore 是這次查詢實際多抓的那 1 筆是否存在，才是「還有沒有下一頁」的準確依據；
           totalPages 只是用 getCountFromServer 抓到的總筆數換算，僅供顯示參考 */}
       {(pageNotes.length > 0 || currentPage > 1) && (
-        <div className="ns-pager">
+        <nav className="ns-pager" aria-label="筆記分頁">
           <div className="ns-pager-btns">
             <button
               type="button"
@@ -297,11 +297,11 @@ export default function NoteShare() {
               下一頁
             </button>
           </div>
-          <div className="ns-page-info">
+          <div className="ns-page-info" aria-live="polite">
             第 <strong className="ns-page-num">{currentPage}</strong> 頁
             {totalPages != null && ` / 共 ${totalPages} 頁`}
           </div>
-        </div>
+        </nav>
       )}
 
       {/* Modal */}

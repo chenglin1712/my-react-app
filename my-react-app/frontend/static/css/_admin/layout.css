@@ -62,9 +62,6 @@
 .admin-nav-link:hover { color: #fff; background: rgba(255, 255, 255, .08); }
 .admin-nav-link.active { color: #fff; background: rgba(255, 255, 255, .14); box-shadow: inset 3px 0 0 var(--yy-gold, #d9a227); font-weight: 600; }
 .admin-nav-link:focus-visible { outline: 2px solid var(--yy-gold-light, #f6d77b); outline-offset: -2px; }
-.admin-nav-disabled { color: rgba(255, 255, 255, .42); cursor: default; }
-.admin-nav-disabled:hover { color: rgba(255, 255, 255, .42); background: transparent; }
-.admin-planned-badge { padding: 2px 6px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 4px; color: rgba(255, 255, 255, .55); font-size: 10px; }
 .admin-count-badge { min-width: 20px; padding: 1px 7px; color: #fff; background: var(--yy-red, #9e1b24); border-radius: 999px; font-size: 11px; font-weight: 700; text-align: center; }
 .admin-sidebar-user { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 20px; border-top: 1px solid rgba(255, 255, 255, .1); }
 .admin-sidebar-user div { display: flex; flex-direction: column; }

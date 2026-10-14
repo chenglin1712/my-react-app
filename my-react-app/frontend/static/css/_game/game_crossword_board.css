@@ -1,4 +1,4 @@
-@media (max-width: 768px) {
+@media (max-width: 720px) {
     .game-background
     {
         width: 90%;
@@ -21,7 +21,7 @@
     max-width: 640px;
     margin: 12px auto 0;
     padding: 0 12px;
-    font-size: 13.5px;
+    font-size: 14px;
     color: var(--yy-text-secondary);
     text-align: center;
 }
@@ -62,7 +62,7 @@
     position: absolute;
     top: 1px;
     left: 2px;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: bold;
     color: black;
     z-index: 10;

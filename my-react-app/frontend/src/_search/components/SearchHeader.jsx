@@ -39,7 +39,7 @@ const SearchHeader = ({
         <span className="search-terminal-prompt">&gt;</span>
         <Form.Control
           className="search-terminal-input"
-          placeholder="請輸入查詢內容"
+          placeholder="輸入中文或族語詞彙"
           aria-label="查詢關鍵字"
           value={query}
           maxLength={SEARCH_INPUT_MAX_LENGTH}

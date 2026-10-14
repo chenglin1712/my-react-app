@@ -52,7 +52,7 @@
     }
 }
 
-@media (max-width: 575px) {
+@media (max-width: 600px) {
     .bot-overlay {
         right: 8px;
         bottom: var(--bot-bottom, 8px);
@@ -384,7 +384,7 @@
 .bot-disclaimer {
     margin: 0;
     padding: 6px 16px;
-    font-size: 12.5px;
+    font-size: 13px;
     line-height: 1.5;
     color: var(--yy-text-tertiary);
     background: rgba(255, 255, 255, 0.8);

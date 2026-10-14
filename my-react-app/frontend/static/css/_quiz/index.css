@@ -42,6 +42,7 @@
     justify-content: center;
     gap: 14px;
     min-height: 50vh;
+    min-height: 50dvh;
     padding: 32px;
     text-align: center;
 }
@@ -79,7 +80,7 @@
   box-shadow: none;
 }
 
-@media (max-width: 955px) {
+@media (max-width: 900px) {
     .quiz-body {
         display: block;
         padding: 20px 16px 96px;

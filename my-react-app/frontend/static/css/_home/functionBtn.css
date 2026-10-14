@@ -107,7 +107,7 @@
     display: inline-block;
     color: var(--yy-red);
     font-family: var(--yy-font-pixel);
-    font-size: 13px;
+    font-size: 14px;
 }
 
 .home-func-card:focus-visible {

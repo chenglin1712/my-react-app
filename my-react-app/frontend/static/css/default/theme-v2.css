@@ -78,7 +78,11 @@
   --yy-text-xl: 22px;
   --yy-text-2xl: 28px;
   --yy-text-3xl: 40px;
+  /* 字級用上面的 --yy-text-*，最小 12px；半階值（12.5、13.5…）不要再出現。
+     行高：tight 給單行或英數大標、heading 給繁中標題（中文字高，1.25 會偏擠）、normal 給一般內文、loose 給長篇閱讀。
+     Silkscreen 像素字型搭中文時字級不低於 14px（中文會落到後備字型，小字筆畫會黏在一起）。 */
   --yy-leading-tight: 1.25;
+  --yy-leading-heading: 1.35;
   --yy-leading-normal: 1.6;
   --yy-leading-loose: 1.8;
 
@@ -374,6 +378,10 @@
   font-size: 12px;
   letter-spacing: 0.12em;
   color: var(--yy-gold);
+}
+/* 標籤裡有中文時（像素字型的中文會落到後備字型）字級放到 14px */
+.yy-eyebrow--zh {
+  font-size: 14px;
 }
 
 .yy-holo-text {
@@ -716,11 +724,11 @@
   color: var(--yy-gold);
 }
 .yy-footer__tribes {
-  font-size: 12.5px;
+  font-size: 13px;
   color: #D8C4A0;
 }
 .yy-footer__copyright {
-  font-size: 11.5px;
+  font-size: 12px;
   color: #A88E6C;
 }
 .yy-footer__links {

@@ -118,7 +118,7 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
                 if (result) {
                     setData(result);
                     if (result?.quiz?.createdAt && result?.answeredAt) {
-                        setCreatedAt(result.quiz.createdAt.toDate().toLocaleString().split(" ")[0]);
+                        setCreatedAt(result.quiz.createdAt.toDate().toLocaleDateString("zh-TW"));
                         const diff = getDurationMMSS(result.quiz.createdAt, result.answeredAt);
                         setDuration(diff);
                     }
@@ -185,7 +185,7 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
                                     ))}
                                 </span>
                             </p>
-                            <p>日期：<span className="user-info">{createdAt ?? new Date().toLocaleDateString()}</span></p>
+                            <p>日期：<span className="user-info">{createdAt ?? new Date().toLocaleDateString("zh-TW")}</span></p>
                             <p>用時：<span className="user-info">{duration ?? "--:--"}</span></p>
                         </div>
                     </div>
