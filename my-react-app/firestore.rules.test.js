@@ -12,7 +12,7 @@
 import { afterAll, beforeAll, beforeEach, describe, test } from 'vitest';
 import { readFileSync } from 'fs';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 
 let testEnv;
 
@@ -863,5 +863,246 @@ describe('reports delete 規則', () => {
     const staffBob = testEnv.authenticatedContext('bob', { role: 'owner' });
     const { deleteDoc } = await import('firebase/firestore');
     await assertFails(deleteDoc(doc(staffBob.firestore(), 'reports/r1')));
+  });
+});
+
+// ---- 雲端筆記（D-1）：users/{uid}/notes ＋ users/{uid}/noteIndex/summary ----
+
+const validCloudNote = (overrides = {}) => ({
+  title: '我的筆記',
+  content: '<p>內容</p>',
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+  editedAt: 1760000000000,
+  ...overrides,
+});
+
+const indexData = (count, lastOp, lastId) => ({
+  count,
+  lastOp,
+  lastId,
+  updatedAt: serverTimestamp(),
+});
+
+// 新增一頁 = 筆記＋計數在同一個批次。count 是「新增之後」的頁數。
+const createNoteBatch = (ctx, uid, noteId, count, noteOverrides = {}, indexOverrides = {}) => {
+  const db = ctx.firestore();
+  const batch = writeBatch(db);
+  batch.set(doc(db, `users/${uid}/notes/${noteId}`), validCloudNote(noteOverrides));
+  batch.set(doc(db, `users/${uid}/noteIndex/summary`), { ...indexData(count, 'create', noteId), ...indexOverrides });
+  return batch.commit();
+};
+
+const seedNote = async (uid, noteId, count) => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, `users/${uid}/notes/${noteId}`), {
+      title: '舊筆記', content: '<p>x</p>', createdAt: new Date(), updatedAt: new Date(), editedAt: 1760000000000,
+    });
+    await setDoc(doc(db, `users/${uid}/noteIndex/summary`), {
+      count, lastOp: 'create', lastId: noteId, updatedAt: new Date(),
+    });
+  });
+};
+
+describe('雲端筆記 users/{uid}/notes：隔離', () => {
+  test('本人可以新增並讀回自己的筆記', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(createNoteBatch(alice, 'alice', 'note-1', 1));
+    await assertSucceeds(getDoc(doc(alice.firestore(), 'users/alice/notes/note-1')));
+  });
+
+  test('別的帳號讀不到、也寫不進我的筆記', async () => {
+    await seedNote('alice', 'note-1', 1);
+    const bob = testEnv.authenticatedContext('bob');
+    await assertFails(getDoc(doc(bob.firestore(), 'users/alice/notes/note-1')));
+    await assertFails(createNoteBatch(bob, 'alice', 'note-2', 2));
+    await assertFails(updateDoc(doc(bob.firestore(), 'users/alice/notes/note-1'), { title: '改掉', updatedAt: serverTimestamp(), editedAt: 1760000000001 }));
+  });
+
+  test('後台人員也讀不到使用者的個人筆記', async () => {
+    await seedNote('alice', 'note-1', 1);
+    const staff = testEnv.authenticatedContext('staff1', { role: 'admin' });
+    await assertFails(getDoc(doc(staff.firestore(), 'users/alice/notes/note-1')));
+  });
+
+  test('未登入不能讀寫', async () => {
+    await seedNote('alice', 'note-1', 1);
+    const anon = testEnv.unauthenticatedContext();
+    await assertFails(getDoc(doc(anon.firestore(), 'users/alice/notes/note-1')));
+    await assertFails(createNoteBatch(anon, 'alice', 'note-2', 2));
+  });
+});
+
+describe('雲端筆記 users/{uid}/notes：單頁限制與形狀', () => {
+  test('標題剛好 100 字元可以，101 字元會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(createNoteBatch(alice, 'alice', 'n1', 1, { title: '字'.repeat(100) }));
+    await assertFails(createNoteBatch(alice, 'alice', 'n2', 2, { title: '字'.repeat(101) }));
+  });
+
+  test('空標題可以（本機筆記允許沒有標題）', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(createNoteBatch(alice, 'alice', 'n1', 1, { title: '' }));
+  });
+
+  test('內容超過 100,000 字元會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(createNoteBatch(alice, 'alice', 'n1', 1, { content: 'a'.repeat(100000) }));
+    await assertFails(createNoteBatch(alice, 'alice', 'n2', 2, { content: 'a'.repeat(100001) }));
+  });
+
+  test('夾帶多餘欄位、缺少欄位、型別不對都會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(createNoteBatch(alice, 'alice', 'n1', 1, { extra: 'x' }));
+    const db = alice.firestore();
+    const missing = writeBatch(db);
+    const { editedAt: _omit, ...withoutEditedAt } = validCloudNote();
+    missing.set(doc(db, 'users/alice/notes/n1'), withoutEditedAt);
+    missing.set(doc(db, 'users/alice/noteIndex/summary'), indexData(1, 'create', 'n1'));
+    await assertFails(missing.commit());
+    await assertFails(createNoteBatch(alice, 'alice', 'n1', 1, { title: 123 }));
+    await assertFails(createNoteBatch(alice, 'alice', 'n1', 1, { content: null }));
+    await assertFails(createNoteBatch(alice, 'alice', 'n1', 1, { editedAt: '2026-10-14' }));
+  });
+
+  test('createdAt／updatedAt 必須是伺服器時間，不能由用戶端偽造', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(createNoteBatch(alice, 'alice', 'n1', 1, { createdAt: new Date('2020-01-01') }));
+    await assertFails(createNoteBatch(alice, 'alice', 'n1', 1, { updatedAt: new Date('2020-01-01') }));
+  });
+
+  test('editedAt 不能設在遙遠的未來，一天內的時鐘誤差可以', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(createNoteBatch(alice, 'alice', 'n1', 1, { editedAt: Date.now() + 7 * 86400000 }));
+    await assertFails(createNoteBatch(alice, 'alice', 'n1', 1, { editedAt: 0 }));
+    await assertSucceeds(createNoteBatch(alice, 'alice', 'n1', 1, { editedAt: Date.now() + 3600000 }));
+  });
+
+  test('筆記 id 只能是英數、底線、連字號，長度 1 至 128', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(createNoteBatch(alice, 'alice', '3f2a9c1e-8b7d-4e6f-a1b2-c3d4e5f60718', 1));
+    await assertFails(createNoteBatch(alice, 'alice', 'a'.repeat(129), 2));
+    await assertFails(createNoteBatch(alice, 'alice', 'bad id!', 2));
+  });
+});
+
+describe('雲端筆記 users/{uid}/notes：更新', () => {
+  test('本人可以改標題與內容，並更新 editedAt', async () => {
+    await seedNote('alice', 'n1', 1);
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(updateDoc(doc(alice.firestore(), 'users/alice/notes/n1'), {
+      title: '新標題', content: '<p>新內容</p>', updatedAt: serverTimestamp(), editedAt: 1760000005000,
+    }));
+  });
+
+  test('不能改 createdAt，也不能夾帶新欄位', async () => {
+    await seedNote('alice', 'n1', 1);
+    const alice = testEnv.authenticatedContext('alice');
+    const ref = doc(alice.firestore(), 'users/alice/notes/n1');
+    await assertFails(updateDoc(ref, { createdAt: new Date('2020-01-01'), updatedAt: serverTimestamp(), editedAt: 1760000005000 }));
+    await assertFails(updateDoc(ref, { extra: 'x', updatedAt: serverTimestamp(), editedAt: 1760000005000 }));
+  });
+
+  test('更新後標題或內容超過上限會被拒絕', async () => {
+    await seedNote('alice', 'n1', 1);
+    const alice = testEnv.authenticatedContext('alice');
+    const ref = doc(alice.firestore(), 'users/alice/notes/n1');
+    await assertFails(updateDoc(ref, { title: '字'.repeat(101), updatedAt: serverTimestamp(), editedAt: 1760000005000 }));
+    await assertFails(updateDoc(ref, { content: 'a'.repeat(100001), updatedAt: serverTimestamp(), editedAt: 1760000005000 }));
+  });
+
+  test('用用戶端時間當 updatedAt 會被拒絕', async () => {
+    await seedNote('alice', 'n1', 1);
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(updateDoc(doc(alice.firestore(), 'users/alice/notes/n1'), {
+      title: '新標題', updatedAt: new Date('2020-01-01'), editedAt: 1760000005000,
+    }));
+  });
+});
+
+describe('雲端筆記：頁數計數與每人 200 頁上限', () => {
+  test('沒有同批更新計數就新增筆記會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(setDoc(doc(alice.firestore(), 'users/alice/notes/n1'), validCloudNote()));
+  });
+
+  test('計數必須剛好加 1（加 2 或不變都被拒絕）', async () => {
+    await seedNote('alice', 'n1', 1);
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(createNoteBatch(alice, 'alice', 'n2', 3));
+    await assertFails(createNoteBatch(alice, 'alice', 'n2', 1));
+    await assertSucceeds(createNoteBatch(alice, 'alice', 'n2', 2));
+  });
+
+  test('一個批次新增兩頁、只加 1 會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    const db = alice.firestore();
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'users/alice/notes/a'), validCloudNote());
+    batch.set(doc(db, 'users/alice/notes/b'), validCloudNote());
+    batch.set(doc(db, 'users/alice/noteIndex/summary'), indexData(1, 'create', 'a'));
+    await assertFails(batch.commit());
+  });
+
+  test('計數裡的 lastId 和實際新增的那一頁不同會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(createNoteBatch(alice, 'alice', 'n1', 1, {}, { lastId: 'other' }));
+  });
+
+  test('已有 200 頁時再新增第 201 頁會被拒絕', async () => {
+    await seedNote('alice', 'n200', 200);
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(createNoteBatch(alice, 'alice', 'n201', 201));
+  });
+
+  test('刪掉一頁之後可以再新增，回到 200 頁', async () => {
+    await seedNote('alice', 'n200', 200);
+    const alice = testEnv.authenticatedContext('alice');
+    const db = alice.firestore();
+    const del = writeBatch(db);
+    del.delete(doc(db, 'users/alice/notes/n200'));
+    del.set(doc(db, 'users/alice/noteIndex/summary'), indexData(199, 'delete', 'n200'));
+    await assertSucceeds(del.commit());
+    await assertSucceeds(createNoteBatch(alice, 'alice', 'n201', 200));
+  });
+
+  test('刪除筆記必須同批把計數減 1', async () => {
+    await seedNote('alice', 'n1', 1);
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(deleteDoc(doc(alice.firestore(), 'users/alice/notes/n1')));
+    const db = alice.firestore();
+    const ok = writeBatch(db);
+    ok.delete(doc(db, 'users/alice/notes/n1'));
+    ok.set(doc(db, 'users/alice/noteIndex/summary'), indexData(0, 'delete', 'n1'));
+    await assertSucceeds(ok.commit());
+  });
+
+  test('只改計數、不真的新增或刪除筆記，會被拒絕（不能偷改計數騰出名額）', async () => {
+    await seedNote('alice', 'n1', 200);
+    const alice = testEnv.authenticatedContext('alice');
+    const ref = doc(alice.firestore(), 'users/alice/noteIndex/summary');
+    await assertFails(setDoc(ref, indexData(0, 'delete', 'n1')));
+    await assertFails(setDoc(ref, indexData(199, 'delete', 'n1')));
+    await assertFails(setDoc(ref, indexData(201, 'create', 'ghost')));
+  });
+
+  test('計數文件不能刪除，也不能夾帶其他欄位', async () => {
+    await seedNote('alice', 'n1', 1);
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(deleteDoc(doc(alice.firestore(), 'users/alice/noteIndex/summary')));
+    await assertFails(createNoteBatch(alice, 'alice', 'n2', 2, {}, { extra: 'x' }));
+  });
+
+  test('別人讀不到我的計數，也改不了', async () => {
+    await seedNote('alice', 'n1', 1);
+    const bob = testEnv.authenticatedContext('bob');
+    await assertFails(getDoc(doc(bob.firestore(), 'users/alice/noteIndex/summary')));
+    await assertFails(setDoc(doc(bob.firestore(), 'users/alice/noteIndex/summary'), indexData(0, 'delete', 'n1')));
+  });
+
+  test('不在 summary 的其他計數文件一律拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(setDoc(doc(alice.firestore(), 'users/alice/noteIndex/other'), indexData(1, 'create', 'n1')));
   });
 });

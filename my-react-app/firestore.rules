@@ -60,6 +60,105 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // 雲端筆記（D-1）：每一頁一份文件，存在 users/{uid}/notes/{noteId}，noteId 沿用本機
+    // 筆記的 UUID（useNotePages.js 的 createEmptyNote），之後本機資料遷移時可以一對一對應。
+    // 只有本人可讀寫；刻意不開放 staff——這是個人筆記，只有使用者按下「分享」之後
+    // 才會另外複製一份到 sharedNotes，後台審核看的是那一份。
+    // 注意：上方 users/{userId} 的規則只管那一份文件本身，不會套用到子集合，所以
+    // 後台讀得到使用者資料，並不代表讀得到筆記。
+    //
+    // 限制：標題 100 字元、單頁內容 100,000 字元、每人 200 頁。
+    // - 規則語言只能數字元，沒辦法量位元組；100,000 字元是擋住異常寫入的後盾
+    //   （Firestore 單一文件上限 1 MiB 也會再擋一次），真正的「單頁 100 KB」位元組
+    //   檢查由 D-2 的同步程式在寫入前做。
+    // - 規則也不能數一個集合裡有幾份文件，所以頁數用 noteIndex/summary 這份計數文件
+    //   記錄，並且把「計數跟實際頁數一致」也交給規則保證：新增或刪除一頁必須和計數
+    //   ±1 在同一個批次（writeBatch／transaction）裡一起寫，而且計數文件自己的規則會
+    //   去核對 lastId 這一頁確實在這個批次裡被建立／刪除。因此計數不能憑空改動，
+    //   也不能一次新增兩頁只加一，200 頁的上限才擋得住。
+    function noteDocPath(uid, id) {
+      return /databases/$(database)/documents/users/$(uid)/notes/$(id);
+    }
+    function noteIndexPath(uid) {
+      return /databases/$(database)/documents/users/$(uid)/noteIndex/summary;
+    }
+    function noteIndexCountBefore(uid) {
+      return exists(noteIndexPath(uid)) ? get(noteIndexPath(uid)).data.count : 0;
+    }
+    function isValidCloudNote(data) {
+      return data.keys().hasOnly(['title', 'content', 'createdAt', 'updatedAt', 'editedAt'])
+        && data.keys().hasAll(['title', 'content', 'createdAt', 'updatedAt', 'editedAt'])
+        && data.title is string && data.title.size() <= 100
+        && data.content is string && data.content.size() <= 100000
+        // editedAt 是使用者在裝置上實際編輯的時間（毫秒），離線編輯時 updatedAt 會是
+        // 補送當下的伺服器時間，兩者不同；多裝置衝突要比的是 editedAt（見 D-2）。
+        // 上限是伺服器時間再加一天：容許裝置時鐘稍微不準，但擋掉把 editedAt 設成
+        // 遙遠未來、讓之後所有裝置的衝突比較永遠輸掉的寫法。
+        && data.editedAt is int && data.editedAt > 0
+        && data.editedAt <= request.time.toMillis() + 86400000
+        && data.updatedAt == request.time;
+    }
+
+    match /users/{userId}/notes/{noteId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId
+        && noteId.matches('[A-Za-z0-9_-]{1,128}')
+        && isValidCloudNote(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && getAfter(noteIndexPath(userId)).data.count == noteIndexCountBefore(userId) + 1
+        && getAfter(noteIndexPath(userId)).data.lastOp == 'create'
+        && getAfter(noteIndexPath(userId)).data.lastId == noteId;
+      // createdAt 不在可改清單裡，所以建立時間改不了；content／title 超過上限的更新
+      // 也會因為 isValidCloudNote 而被擋下。
+      allow update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'content', 'updatedAt', 'editedAt'])
+        && isValidCloudNote(request.resource.data);
+      allow delete: if request.auth != null && request.auth.uid == userId
+        && getAfter(noteIndexPath(userId)).data.count == get(noteIndexPath(userId)).data.count - 1
+        && getAfter(noteIndexPath(userId)).data.lastOp == 'delete'
+        && getAfter(noteIndexPath(userId)).data.lastId == noteId;
+    }
+
+    // 頁數計數文件：固定只有 summary 這一份。欄位 count（目前頁數）、lastOp（最後一次
+    // 是 create 或 delete）、lastId（那一頁的 id），三者配合上面 notes 的規則使用。
+    // 不開放刪除（帳號刪除由後端 Admin SDK 處理，會繞過規則）。
+    match /users/{userId}/noteIndex/summary {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['count', 'lastOp', 'lastId', 'updatedAt'])
+        && request.resource.data.keys().hasAll(['count', 'lastOp', 'lastId', 'updatedAt'])
+        && request.resource.data.count is int
+        && request.resource.data.count == 1
+        && request.resource.data.lastOp == 'create'
+        && request.resource.data.lastId is string
+        && request.resource.data.lastId.matches('[A-Za-z0-9_-]{1,128}')
+        && request.resource.data.updatedAt == request.time
+        && !exists(noteDocPath(userId, request.resource.data.lastId))
+        && existsAfter(noteDocPath(userId, request.resource.data.lastId));
+      allow update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['count', 'lastOp', 'lastId', 'updatedAt'])
+        && request.resource.data.keys().hasAll(['count', 'lastOp', 'lastId', 'updatedAt'])
+        && request.resource.data.count is int
+        && request.resource.data.count >= 0 && request.resource.data.count <= 200
+        && request.resource.data.lastId is string
+        && request.resource.data.lastId.matches('[A-Za-z0-9_-]{1,128}')
+        && request.resource.data.updatedAt == request.time
+        && (
+          (
+            request.resource.data.count == resource.data.count + 1
+            && request.resource.data.lastOp == 'create'
+            && !exists(noteDocPath(userId, request.resource.data.lastId))
+            && existsAfter(noteDocPath(userId, request.resource.data.lastId))
+          ) || (
+            request.resource.data.count == resource.data.count - 1
+            && request.resource.data.lastOp == 'delete'
+            && exists(noteDocPath(userId, request.resource.data.lastId))
+            && !existsAfter(noteDocPath(userId, request.resource.data.lastId))
+          )
+        );
+      allow delete: if false;
+    }
+
     // 測驗題目：登入者可讀；登入者可建立，且限制內容形狀——原本只檢查有沒有
     // 登入，任何已登入使用者都能寫入任意垃圾文件。uploadDb.jsx 的
     // uploadQuizDB 固定寫入 title/tribe/createdAt/data 四個欄位，這裡驗證
