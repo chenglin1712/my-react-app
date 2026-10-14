@@ -36,7 +36,7 @@ const EvidencePanel = ({ token, onPlayAudio, tribeSlug }) => {
 
             {token.status === "unsupported" && (
                 <p className="yy-evidence-body">
-                    這個詞在辭典與語料例句中都查無紀錄，可能是模型自行生成、不保證正確——請自行斟酌是否採用。
+                    這個詞在辭典與語料例句中都查無紀錄，可能是系統自行生成的，不保證正確，請自行斟酌是否採用。
                 </p>
             )}
 

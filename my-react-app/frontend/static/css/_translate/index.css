@@ -80,6 +80,32 @@
   }
 }
 
+.translate-swap-note {
+    max-width: 640px;
+    margin: 0 auto 14px;
+    padding: 8px 12px;
+    font-size: 13.5px;
+    color: var(--yy-text-secondary);
+    border: 2px solid var(--yy-ink);
+    border-radius: 8px;
+    background: #fff;
+}
+
+.translate-swap-note.is-empty {
+    /* 不用 display:none：要留在無障礙樹裡，之後更新文字才會被公告 */
+    height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+}
+
+.translate-submit-hint {
+    margin: 6px 0 0;
+    font-size: 12.5px;
+    color: var(--yy-text-secondary);
+}
+
 .translate-alert {
     max-width: 640px;
     margin: 0 auto 18px;

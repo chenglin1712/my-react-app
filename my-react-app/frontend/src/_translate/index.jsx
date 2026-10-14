@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import axios from "axios";
 import { Alert } from "react-bootstrap";
 import LoadingSpinner from "@components/ui/LoadingSpinner";
@@ -26,6 +26,26 @@ const DIRECTIONS = [
 
 const GUEST_LOGIN_NOTE = "發音與詞形分析需要登入，免費註冊後就能使用。";
 
+// 瀏覽器沒有 navigator.clipboard（非 https 或舊瀏覽器）時的備用複製：用暫時的 textarea 加 execCommand
+function legacyCopy(text) {
+    const previouslyFocused = document.activeElement;
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch { ok = false; }
+    document.body.removeChild(area);
+    // select() 會把焦點搬到暫時的 textarea，移除後要還給原本的按鈕，鍵盤使用者才不會失去位置
+    if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus({ preventScroll: true });
+    return ok;
+}
+
+const SUBMIT_HINT = /Mac|iPhone|iPad/.test(globalThis.navigator?.platform ?? "") ? "⌘ + Enter" : "Ctrl + Enter";
+
 const TranslatePage = () => {
     // 訪客（沒登入）可以試用：次數與是否開放由後端決定，這裡只負責顯示與引導註冊
     const { userData, loading: authLoading } = useAuth();
@@ -39,6 +59,9 @@ const TranslatePage = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [activeTokenIndex, setActiveTokenIndex] = useState(null);
+    const [swapNote, setSwapNote] = useState("");
+    const textareaRef = useRef(null);
+    const hintId = useId();
     const capabilities = useTranslateCapabilities({ guest: true, enabled: !authLoading, refreshKey: userData?.uid ?? null });
 
     // abortRef 是「目前這一次請求」的 controller；requestGenerationRef 每次取消/
@@ -63,6 +86,7 @@ const TranslatePage = () => {
         setResult(null);
         setError("");
         setGuestNote("");
+        setSwapNote("");
         setActiveTokenIndex(null);
     }, [tribe]);
 
@@ -104,6 +128,7 @@ const TranslatePage = () => {
         setLoading(true);
         setError("");
         setGuestNote("");
+        setSwapNote("");
         setActiveTokenIndex(null);
         try {
             const data = await apiPost(
@@ -140,21 +165,35 @@ const TranslatePage = () => {
         cancelTranslation();
         setLoading(false);
         const nextDirection = direction === "zh2tribe" ? "tribe2zh" : "zh2tribe";
+        const next = DIRECTIONS.find((d) => d.key === nextDirection);
+        const arrow = `${next.sourceLabel} → ${next.targetLabel}`;
         setDirection(nextDirection);
         setActiveTokenIndex(null);
+        // 交換後輸入框一定要和新的「原文」標籤對得上，並明講發生了什麼，不讓人拿舊方向的文字直接送出
         if (result) {
             setSourceText(result.translation);
             setResult(null);
+            setSwapNote(`方向已切換為「${arrow}」，已把剛才的翻譯結果放進輸入框。`);
+        } else if (sourceText.trim()) {
+            setSwapNote(`方向已切換為「${arrow}」。輸入框裡還是原本的文字，請確認內容符合新的方向再翻譯。`);
+        } else {
+            setSwapNote("");
         }
+        textareaRef.current?.focus();
     };
 
     const [copyStatus, setCopyStatus] = useState("idle"); // idle | copied | error
     const copyStatusTimerRef = useRef(null);
     const handleCopy = () => {
         if (!result) return;
-        navigator.clipboard?.writeText(result.translation)
-            .then(() => setCopyStatus("copied"))
-            .catch(() => setCopyStatus("error"));
+        const fallback = () => setCopyStatus(legacyCopy(result.translation) ? "copied" : "error");
+        if (navigator.clipboard?.writeText) {
+            navigator.clipboard.writeText(result.translation)
+                .then(() => setCopyStatus("copied"))
+                .catch(fallback);
+        } else {
+            fallback();
+        }
         if (copyStatusTimerRef.current) clearTimeout(copyStatusTimerRef.current);
         copyStatusTimerRef.current = setTimeout(() => setCopyStatus("idle"), 1500);
     };
@@ -196,7 +235,7 @@ const TranslatePage = () => {
                     <span className="yy-eyebrow">◆ TRANSLATE MODE ◆</span>
                     <h1 className="translate-title">族語翻譯</h1>
                     <p className="translate-desc">
-                        以辭典語料為依據，每個詞形都會標明是否有語料佐證——沒有標記不代表翻譯正確，只代表這個詞在資料庫裡查得到。
+                        以辭典語料為依據，逐詞標示有沒有語料佐證。有佐證只代表這個詞在資料庫裡查得到，不代表整句翻譯一定正確。
                     </p>
                 </div>
 
@@ -232,6 +271,8 @@ const TranslatePage = () => {
                     <span className="translate-direction-label">{currentDirection.targetLabel}</span>
                 </div>
 
+                {/* 常駐的 live region：先掛載再更新文字，報讀器才會可靠地公告 */}
+                <p className={`translate-swap-note${swapNote ? "" : " is-empty"}`} role="status">{swapNote}</p>
                 {error && <Alert variant="danger" className="translate-alert">{error}</Alert>}
 
                 <div className="translate-grid">
@@ -241,13 +282,17 @@ const TranslatePage = () => {
                             <span className="translate-char-count">{sourceText.length}/{MAX_LEN}</span>
                         </div>
                         <textarea
+                            ref={textareaRef}
                             className="translate-textarea"
+                            aria-label={`輸入${currentDirection.sourceLabel}原文`}
+                            aria-describedby={hintId}
                             value={sourceText}
                             maxLength={MAX_LEN}
                             placeholder={direction === "zh2tribe" ? "輸入要翻譯的中文句子…" : `輸入要翻譯的${currentTribe?.fullName}句子…`}
-                            onChange={(e) => setSourceText(e.target.value)}
+                            onChange={(e) => { setSourceText(e.target.value); setSwapNote(""); }}
                             onKeyDown={handleKeyDown}
                         />
+                        <p id={hintId} className="translate-submit-hint">按 {SUBMIT_HINT} 也可以送出</p>
                         <button
                             type="button"
                             className="yy-btn-primary translate-submit-btn"
@@ -296,7 +341,7 @@ const TranslatePage = () => {
                                     </button>
                                 </div>
                                 <p className="translate-coverage-summary">
-                                    {result.warning ?? `${result.coverage.total}/${result.coverage.total} 個詞有辭典語料佐證`}
+                                    {result.warning ?? `${result.coverage.total - (result.coverage.unsupported ?? 0)}/${result.coverage.total} 個詞有辭典語料佐證`}
                                 </p>
                                 {result.notes && <p className="translate-notes">{result.notes}</p>}
 

@@ -84,6 +84,78 @@ describe('TranslatePage（回歸測試：swap/切族語都要能取消還在跑�
   });
 });
 
+describe('TranslatePage 的交換方向與文字（E-3）', () => {
+  beforeEach(() => {
+    authState.current = { userData: { uid: 'u1' }, loading: false };
+    apiGet.mockReset();
+    apiPost.mockReset();
+    apiGet.mockResolvedValue({ tribes: [] });
+  });
+
+  test('還沒有結果就交換方向：輸入框保留原文，並明講方向已切換、請確認內容', () => {
+    renderPage();
+    fireEvent.change(screen.getByPlaceholderText(/輸入要翻譯的中文句子/), { target: { value: '你好' } });
+    fireEvent.click(screen.getByRole('button', { name: '交換翻譯方向' }));
+
+    expect(screen.getByRole('status')).toHaveTextContent('方向已切換為「族語 → 繁體中文」');
+    expect(screen.getByLabelText('輸入族語原文')).toHaveValue('你好');
+    // 一改輸入內容，提示就收掉
+    fireEvent.change(screen.getByLabelText('輸入族語原文'), { target: { value: 'blaq' } });
+    expect(screen.queryByText(/方向已切換為/)).not.toBeInTheDocument();
+  });
+
+  test('有結果時交換方向：翻譯結果放進輸入框並說明', async () => {
+    apiPost.mockResolvedValueOnce({
+      translation: 'blaq', tokens: [{ surface: 'blaq', status: 'headword' }],
+      coverage: { total: 1 }, evidence: { sentences: [] },
+    });
+    renderPage();
+    typeAndSubmit('好');
+    await screen.findByText('blaq');
+    fireEvent.click(screen.getByRole('button', { name: '交換翻譯方向' }));
+
+    expect(screen.getByLabelText('輸入族語原文')).toHaveValue('blaq');
+    expect(screen.getByRole('status')).toHaveTextContent('已把剛才的翻譯結果放進輸入框');
+  });
+
+  test('佐證數顯示真正有佐證的詞數（總數扣掉查無佐證）', async () => {
+    apiPost.mockResolvedValueOnce({
+      translation: 'a b c', tokens: [{ surface: 'a', status: 'headword' }],
+      coverage: { total: 3, unsupported: 0 }, evidence: { sentences: [] },
+    });
+    renderPage();
+    typeAndSubmit('好');
+    expect(await screen.findByText('3/3 個詞有辭典語料佐證')).toBeInTheDocument();
+  });
+
+  test('輸入框有 Ctrl + Enter 送出的提示', () => {
+    renderPage();
+    expect(screen.getByText(/也可以送出/)).toBeInTheDocument();
+    expect(screen.getByLabelText('輸入繁體中文原文')).toHaveAccessibleDescription(/也可以送出/);
+  });
+
+  test('沒有 navigator.clipboard 時，複製改用備用方式', async () => {
+    apiPost.mockResolvedValueOnce({
+      translation: 'blaq', tokens: [{ surface: 'blaq', status: 'headword' }],
+      coverage: { total: 1 }, evidence: { sentences: [] },
+    });
+    const original = Object.getOwnPropertyDescriptor(globalThis.navigator, 'clipboard');
+    Object.defineProperty(globalThis.navigator, 'clipboard', { value: undefined, configurable: true });
+    document.execCommand = vi.fn(() => true);
+    try {
+      renderPage();
+      typeAndSubmit('好');
+      await screen.findByText('blaq');
+      fireEvent.click(screen.getByRole('button', { name: /複製/ }));
+      expect(document.execCommand).toHaveBeenCalledWith('copy');
+      expect(await screen.findByText(/已複製/)).toBeInTheDocument();
+    } finally {
+      if (original) Object.defineProperty(globalThis.navigator, 'clipboard', original);
+      else delete globalThis.navigator.clipboard;
+    }
+  });
+});
+
 describe('TranslatePage 的依據面板：詞形分析', () => {
   beforeEach(() => {
     apiGet.mockReset();
