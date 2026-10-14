@@ -169,16 +169,16 @@ export default function WordMatch({ question, _selected, _checked, onSelect, onC
         <div className="mt-4 font-bold">
           {wrongPair ? (
             <>
-              <h4 className="fw-bolder mb-4 text-danger">
+              <h4 className="fw-bolder mb-4 yy-text-danger">
                 <CircleX />&nbsp; 錯誤
               </h4>
               <h4 className="fw-bolder mb-4">
                 {tokenById[wrongPair.cnId].cn} → 正解是{" "}
-                <span className="fw-bolder mb-4 text-success">{tokenById[wrongPair.cnId].tayal.word}</span>
+                <span className="fw-bolder mb-4 yy-text-success">{tokenById[wrongPair.cnId].tayal.word}</span>
               </h4>
             </>
           ) : (
-            <h4 className="fw-bolder mb-4 text-success yy-correct-pop">
+            <h4 className="fw-bolder mb-4 yy-text-success yy-correct-pop">
               <CircleCheck />&nbsp; 全部配對正確
             </h4>
           )}

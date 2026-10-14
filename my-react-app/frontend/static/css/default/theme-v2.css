@@ -32,6 +32,9 @@
      所以中間補 Noto Sans TC（審查項 P1-20）。像素字請只用在純英文裝飾標籤。 */
   --yy-font-pixel: 'Silkscreen', 'Noto Sans TC', monospace;
   --yy-radius-card: 10px;
+  --yy-radius-lg: 16px;
+  /* 次要分隔線、停用底色、進度條軌道；比 --yy-border 淡，不用在需要 3:1 對比的控制項邊框 */
+  --yy-border-soft: #DDD0C4;
   --yy-radius-btn: 6px;
   --yy-shadow-sm: 3px 3px 0 var(--yy-ink);
   --yy-shadow-md: 5px 5px 0 var(--yy-ink);
@@ -185,7 +188,7 @@
 .yy-skeleton {
   display: block;
   background: var(--yy-cream-dim);
-  border-radius: 6px;
+  border-radius: var(--yy-radius-btn);
   animation: yy-skeleton-pulse 1.5s ease-in-out infinite;
 }
 @keyframes yy-skeleton-pulse {
@@ -333,7 +336,7 @@
 .yy-eyebrow {
   display: inline-block;
   padding: 6px 18px;
-  border-radius: 4px;
+  border-radius: var(--yy-radius-btn);
   background: var(--yy-ink);
   border: 2px solid var(--yy-gold);
   font-family: var(--yy-font-pixel);
@@ -354,7 +357,7 @@
 /* ---------- 卡片 / 按鈕 ---------- */
 
 .yy-card {
-  background: #fff;
+  background: var(--yy-surface);
   border: 3px solid var(--yy-ink);
   border-radius: var(--yy-radius-card);
   box-shadow: var(--yy-shadow-md);
@@ -409,8 +412,8 @@
 .yy-btn-outline {
   padding: 11px 18px;
   border-radius: var(--yy-radius-btn);
-  border: 2.5px solid var(--yy-ink);
-  background: #fff;
+  border: 3px solid var(--yy-ink);
+  background: var(--yy-surface);
   color: var(--yy-ink);
   font-weight: 700;
   font-size: 13px;
@@ -430,7 +433,7 @@
 .yy-pill {
   padding: 9px 18px;
   border-radius: var(--yy-radius-btn);
-  background: #fff;
+  background: var(--yy-surface);
   color: var(--yy-ink);
   border: 3px solid var(--yy-ink);
   font-weight: 700;
@@ -441,7 +444,7 @@
   transition: var(--transition-interactive);
 }
 .yy-pill.active {
-  color: #fff;
+  color: var(--yy-surface);
   transform: scale(1.06);
   box-shadow: 4px 4px 0 rgba(34, 24, 18, 0.45);
 }
@@ -471,31 +474,40 @@
   align-items: center;
   gap: 6px;
 }
+/* 菱形只旋轉背景層（::before），文字層維持原方向：旋轉 45° 再反轉 -45° 的文字在部分瀏覽器會模糊（審查項 P3-23） */
 .yy-step-diamond {
+  position: relative;
+  isolation: isolate;
   width: 40px;
   height: 40px;
-  border-radius: var(--yy-radius-btn);
-  border: 3px solid var(--yy-ink);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--yy-font-pixel);
   font-weight: 700;
   font-size: 15px;
-  transform: rotate(45deg);
-  background: #fff;
   color: var(--yy-ink);
-  box-shadow: var(--yy-shadow-sm);
 }
-.yy-step-diamond span {
-  transform: rotate(-45deg);
+.yy-step-diamond::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--yy-radius-btn);
+  border: 3px solid var(--yy-ink);
+  background: var(--yy-surface);
+  box-shadow: var(--yy-shadow-sm);
+  transform: rotate(45deg);
 }
 .yy-step-diamond.active,
 .yy-step-diamond.done {
-  background: var(--yy-red);
   color: var(--yy-cream);
 }
-.yy-step-diamond.active {
+.yy-step-diamond.active::before,
+.yy-step-diamond.done::before {
+  background: var(--yy-red);
+}
+.yy-step-diamond.active::before {
   box-shadow: 4px 4px 0 var(--yy-gold);
 }
 .yy-step-label {
@@ -516,7 +528,7 @@
 .yy-tabswitch {
   display: inline-flex;
   border: 3px solid var(--yy-ink);
-  border-radius: 8px;
+  border-radius: var(--yy-radius-btn);
   overflow: hidden;
   box-shadow: var(--yy-shadow-md);
 }
@@ -525,7 +537,7 @@
   font-weight: 700;
   font-size: 14px;
   cursor: pointer;
-  background: #fff;
+  background: var(--yy-surface);
   color: var(--yy-ink);
   border: none;
   border-left: 3px solid var(--yy-ink);
@@ -540,18 +552,25 @@
 
 /* ---------- 菱形徽章 (DiamondBadge) ---------- */
 
+/* 同步驟菱形：旋轉的是 ::before，文字不旋轉。顏色由 --yy-diamond-color 帶入（預設品牌紅） */
 .yy-diamond-badge {
-  border-radius: var(--yy-radius-btn);
-  color: #fff;
+  position: relative;
+  isolation: isolate;
+  color: var(--yy-surface);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
-  transform: rotate(45deg);
-  border: 2px solid var(--yy-ink);
 }
-.yy-diamond-badge span {
-  transform: rotate(-45deg);
+.yy-diamond-badge::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--yy-radius-btn);
+  border: 2px solid var(--yy-ink);
+  background: var(--yy-diamond-color, var(--yy-red));
+  transform: rotate(45deg);
 }
 
 /* ---------- 終端機風格輸入列 ---------- */
@@ -600,9 +619,9 @@
 }
 .yy-modal-box {
   animation: yy-pop .5s ease both;
-  background: #fff;
+  background: var(--yy-surface);
   border: 4px solid var(--yy-ink);
-  border-radius: 14px;
+  border-radius: var(--yy-radius-lg);
   box-shadow: 8px 8px 0 var(--yy-ink);
   padding: 40px 50px;
   text-align: center;
@@ -727,9 +746,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    background-color: #fff;
+    background-color: var(--yy-surface);
     border: 4px solid var(--yy-ink);
-    border-radius: 14px;
+    border-radius: var(--yy-radius-lg);
     box-shadow: 8px 8px 0 var(--yy-ink);
     padding: 30px 24px;
     width: 260px;
@@ -835,4 +854,46 @@
   .yy-correct-pop {
     animation: yy-correct-pop 220ms cubic-bezier(0.23, 1, 0.32, 1);
   }
+}
+
+/* ---------- 文字色工具 class（取代 Bootstrap 的 text-*） ----------
+   Bootstrap 的 text-warning 對米白底只有約 1.6:1、text-danger 在紅底上更低（審查項 P2-16），
+   而且是 !important 的全站通用名稱。前台改用這組，顏色全部取自 token。 */
+.yy-text-ink { color: var(--yy-ink); }
+.yy-text-danger { color: var(--yy-danger); }
+.yy-text-success { color: var(--yy-success); }
+.yy-text-muted { color: var(--yy-text-muted); }
+.yy-text-blue { color: var(--yy-blue); }
+
+/* ---------- Bootstrap 狀態色換成品牌色（只限前台） ----------
+   react-bootstrap 的 <Button variant="danger">、<Alert variant="danger|warning"> 預設是 Bootstrap 的紅與黃。
+   後台（.admin-shell 內）留到階段 G，所以這裡用 :not(.admin-shell *) 排除。 */
+.btn-danger:not(.admin-shell *) {
+  --bs-btn-color: var(--yy-cream);
+  --bs-btn-bg: var(--yy-red);
+  --bs-btn-border-color: var(--yy-ink);
+  --bs-btn-hover-color: var(--yy-cream);
+  --bs-btn-hover-bg: var(--yy-red-dark);
+  --bs-btn-hover-border-color: var(--yy-ink);
+  --bs-btn-active-color: var(--yy-cream);
+  --bs-btn-active-bg: var(--yy-red-dark);
+  --bs-btn-active-border-color: var(--yy-ink);
+  --bs-btn-disabled-color: var(--yy-cream);
+  --bs-btn-disabled-bg: var(--yy-text-muted);
+  --bs-btn-disabled-border-color: var(--yy-text-muted);
+  --bs-btn-focus-shadow-rgb: 158, 27, 36;
+  --bs-btn-border-width: 2px;
+  font-weight: 700;
+}
+.alert-danger:not(.admin-shell *) {
+  --bs-alert-color: var(--yy-red-dark);
+  --bs-alert-bg: var(--yy-danger-bg);
+  --bs-alert-border-color: var(--yy-red);
+  --bs-alert-link-color: var(--yy-red-dark);
+}
+.alert-warning:not(.admin-shell *) {
+  --bs-alert-color: var(--yy-warning-text);
+  --bs-alert-bg: var(--yy-warning-bg);
+  --bs-alert-border-color: var(--yy-gold);
+  --bs-alert-link-color: var(--yy-warning-text);
 }

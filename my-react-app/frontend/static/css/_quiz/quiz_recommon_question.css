@@ -24,7 +24,7 @@
   flex-direction: column;
   align-items: center;
 
-  background: #fff;
+  background: var(--yy-surface);
   border: 3px solid var(--yy-ink);
   border-radius: var(--yy-radius-card);
   box-shadow: var(--yy-shadow-lg);
@@ -103,13 +103,13 @@
 
 .custom-btn.correct {
   background: var(--yy-success);
-  color: #fff;
+  color: var(--yy-surface);
   border-color: var(--yy-ink);
 }
 
 .custom-btn.wrong {
   background: var(--yy-danger);
-  color: #fff;
+  color: var(--yy-surface);
   border-color: var(--yy-ink);
 }
 
@@ -145,10 +145,10 @@
 }
 
 .confirm-btn:disabled {
-  background: #ccc;
-  color: #888;
+  background: var(--yy-border-soft);
+  color: var(--yy-text-muted);
   cursor: not-allowed;
-  border-color: #bbb;
+  border-color: var(--yy-border-soft);
   box-shadow: none;
 }
 .left,.right{

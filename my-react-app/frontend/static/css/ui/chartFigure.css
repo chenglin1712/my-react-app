@@ -19,7 +19,7 @@
     margin: 8px 0 0;
     font-size: 14px;
     line-height: 1.5;
-    color: var(--yy-text-secondary, #3e3226);
+    color: var(--yy-text-secondary);
 }
 
 .chart-figure-data {
@@ -47,8 +47,8 @@
     max-height: 280px;
     overflow: auto;
     border: 2px solid var(--yy-ink);
-    border-radius: 8px;
-    background: #fff;
+    border-radius: var(--yy-radius-btn);
+    background: var(--yy-surface);
 }
 
 .chart-figure-table-wrap table {
@@ -68,7 +68,7 @@
 .chart-figure-table-wrap thead th {
     position: sticky;
     top: 0;
-    background: var(--yy-cream, #f4e8cf);
+    background: var(--yy-cream);
     font-weight: 700;
 }
 

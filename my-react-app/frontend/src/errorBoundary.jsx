@@ -78,10 +78,10 @@ class ErrorBoundary extends Component {
           <h2 className="fw-bolder mb-3">哎呀，頁面發生錯誤</h2>
           <p className="mb-4">很抱歉，這個頁面出了一點問題，請重新整理或回到首頁再試一次。</p>
           <div className="d-flex gap-2">
-            <button className="btn btn-danger" onClick={this.handleReload}>
+            <button type="button" className="yy-btn-primary" onClick={this.handleReload}>
               重新整理
             </button>
-            <a className="btn btn-outline-dark" href="/">
+            <a className="yy-btn-outline" href="/" style={{ textDecoration: 'none', display: 'inline-block' }}>
               回首頁
             </a>
           </div>

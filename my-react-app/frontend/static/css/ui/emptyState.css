@@ -4,7 +4,7 @@
   padding: 24px 20px;
   border: 3px solid var(--yy-ink);
   border-radius: var(--yy-radius-card, 12px);
-  background: #fff;
+  background: var(--yy-surface);
   box-shadow: 4px 4px 0 var(--yy-ink);
 }
 

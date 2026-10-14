@@ -18,7 +18,7 @@ const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggle
   return (
   <ListGroup.Item className="d-flex flex-column">
     <div className="d-flex justify-content-between align-items-center word-card-head">
-      <h3 className="fw-bolder text-danger word-card-heading">
+      <h3 className="fw-bolder yy-text-ink word-card-heading">
         <button
           type="button"
           className="word-card-toggle"
@@ -33,11 +33,11 @@ const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggle
       <div className="d-flex align-items-center word-card-actions">
         {hasWordAudio && (
           <Button type="button" variant="link" aria-label={`播放「${result.name}」的發音`} onClick={() => playAudio(result.audioItems[0].fileId)}>
-            <FaPlayCircle size={20} className="text-warning" />
+            <FaPlayCircle size={20} className="yy-text-blue" />
           </Button>
         )}
         <Button type="button" variant="link" aria-label={isFavorited ? "取消收藏" : "加入收藏"} aria-pressed={isFavorited} onClick={handleToggleFavorite}>
-          {isFavorited ? <FaHeart color="red" /> : <FaRegHeart color="black" />}
+          {isFavorited ? <FaHeart color="var(--yy-red)" /> : <FaRegHeart color="var(--yy-ink)" />}
         </Button>
       </div>
     </div>
@@ -66,15 +66,15 @@ const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggle
                 const showTtsFallback = !hasNativeAudio && playSentence && !hasSentenceAudio && ex.originalSentence?.trim();
                 return (
                   <ListGroup.Item key={`${i}-${ei}`}>
-                    <p className="fw-bolder text-danger mb-1">
+                    <p className="fw-bolder yy-text-danger mb-1">
                       {ex.originalSentence}
                       {hasNativeAudio ? (
                         <Button type="button" variant="link" aria-label="播放例句發音" onClick={() => playAudio(ex.audioItems[0].fileId)}>
-                          <FaPlayCircle size={20} className="text-warning" />
+                          <FaPlayCircle size={20} className="yy-text-blue" />
                         </Button>
                       ) : showTtsFallback ? (
                         <Button type="button" variant="link" aria-label="播放例句發音" onClick={() => playSentence(ex.originalSentence)}>
-                          <FaPlayCircle size={20} className="text-warning" />
+                          <FaPlayCircle size={20} className="yy-text-blue" />
                         </Button>
                       ) : null}
                     </p>

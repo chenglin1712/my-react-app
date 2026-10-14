@@ -1,4 +1,4 @@
-import { Heart } from "lucide-react";
+import { Heart, User } from "lucide-react";
 import DOMPurify from "dompurify";
 import { timeAgo } from "../timeAgo";
 
@@ -15,7 +15,7 @@ export default function NoteCard({ note, isMyTab, isMine, iLike, onOpen, onToggl
           {note.avatarUrl ? (
             <img src={note.avatarUrl} alt="" className="ns-avatar" loading="lazy" />
           ) : (
-            <div className="ns-avatar ns-avatar-fallback" aria-hidden="true">👤</div>
+            <div className="ns-avatar ns-avatar-fallback" aria-hidden="true"><User size={18} /></div>
           )}
 
           <div className="ns-meta">

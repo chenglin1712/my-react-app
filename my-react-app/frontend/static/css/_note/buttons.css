@@ -4,12 +4,12 @@
 
 /* 基本按鈕尺寸（保留你原本的寫法） */
 .note-page button,
-.note-page .btn { min-width: 100px; border-radius: 10px; padding: 10px 16px; cursor: pointer; }
+.note-page .btn { min-width: 100px; border-radius: var(--yy-radius-card); padding: 10px 16px; cursor: pointer; }
 
 
 .note-page .btn-primary {
   background-color: var(--danger);
-  color: #fff;
+  color: var(--yy-surface);
   border: none;
   transition: background-color .2s ease;
 }
@@ -36,15 +36,15 @@
 /* 危險 */
 .note-page .btn-danger {
   background: gray;
-  color:#fff;
+  color:var(--yy-surface);
   border: none;
 }
 .note-page .btn-danger:hover { background: var(--ghost-fg); }
 
 .note-page .btn-add {
-  background-color: #28a745;
+  background-color: var(--yy-green);
 }
-.note-page .btn-add:hover { background-color: #218838; }
+.note-page .btn-add:hover { background-color: var(--yy-text-secondary); }
 
 .note-page .btn-page {
   color: var(--bs-btn-disabled-color);
@@ -66,7 +66,7 @@
 /* 若不支援 composes，可直接重覆宣告： */
 .note-page .morandi-blue {
   background-color: var(--brand-red);
-  color:#fff; border:none;
+  color:var(--yy-surface); border:none;
   transition: background-color .2s ease;
 }
 .note-page .morandi-blue:hover { background-color: var(--brand-red-600); }

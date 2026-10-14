@@ -8,7 +8,7 @@
 .home-title {
     font-size: 30px;
     text-align: center;
-    color: #8B0000;
+    color: var(--yy-red-dark);
     margin: 0px;
     letter-spacing: 2px;
     font-weight: bold;
@@ -17,32 +17,32 @@
 .home-content-container {
     margin-bottom: 2%;
     padding: 20px;
-    background: #FFF5F5;
-    border-left: 6px solid #8B0000;
-    border-radius: 12px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    background: var(--yy-danger-bg);
+    border-left: 6px solid var(--yy-red);
+    border-radius: var(--yy-radius-card);
+    box-shadow: var(--yy-shadow-md);
     width: 90%;
 }
 
 .home-content-container p {
     font-size: 16px;
-    color: #333;
+    color: var(--yy-text-secondary);
     font-weight: bold;
     line-height: 1.6;
 }
 
 .home-source-container p {
     margin: 0px;
-    color: #444;
+    color: var(--yy-text-secondary);
 }
 
 .home-source-container a {
-    color: #8B0000;
+    color: var(--yy-red-dark);
     font-weight: bold;
     text-decoration: none;
     transition: color 0.3s;
 }
 
 .home-source-container a:hover {
-    color: #B22222;
+    color: var(--yy-red);
 }

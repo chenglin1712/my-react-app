@@ -39,7 +39,7 @@
     flex: 0 1 190px;
     padding: 18px 12px 14px;
 
-    background: #fff;
+    background: var(--yy-surface);
     border: 3px solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
     box-shadow: var(--yy-shadow-sm);
@@ -74,7 +74,7 @@
     height: 72px;
     border-radius: 50%;
     border: 3px solid var(--yy-ink);
-    box-shadow: 3px 3px 0 var(--yy-ink);
+    box-shadow: var(--yy-shadow-sm);
     display: flex;
     align-items: center;
     justify-content: center;

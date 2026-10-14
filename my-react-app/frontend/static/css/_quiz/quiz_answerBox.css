@@ -1,6 +1,6 @@
 .box-container {
     padding: 20px;
-    background-color: #fff;
+    background-color: var(--yy-surface);
     border: 3px solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
     box-shadow: var(--yy-shadow-md);
@@ -29,7 +29,7 @@
 
 .box-question-btn {
     position: relative;
-    background-color: #fff;
+    background-color: var(--yy-surface);
     color: var(--yy-ink);
     -webkit-user-select: none;
     user-select: none;
@@ -71,7 +71,7 @@
 @media (hover: hover) and (pointer: fine) {
     .box-question-btn.answer:hover {
         background-color: var(--yy-success);
-        color: #fff;
+        color: var(--yy-surface);
         border-color: var(--yy-success);
     }
 }

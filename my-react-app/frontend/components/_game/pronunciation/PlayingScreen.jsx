@@ -1,3 +1,5 @@
+import { Mic, Square } from "lucide-react";
+
 export default function PlayingScreen({
   progressPct, current, totalQuestions, q, rating,
   onPlayRef, recState, onStartRecording, onStopRecording, onPlayUserAudio, onResetRecState,
@@ -37,12 +39,12 @@ export default function PlayingScreen({
       <div className="pron-record-area">
         {recState === "idle" && (
           <button type="button" className="pron-mic-btn" onClick={onStartRecording}>
-            🎤<span>開始錄音</span>
+            <Mic size={30} aria-hidden="true" /><span>開始錄音</span>
           </button>
         )}
         {recState === "recording" && (
           <button type="button" className="pron-mic-btn recording" onClick={onStopRecording}>
-            ⏹<span>停止錄音</span>
+            <Square size={26} fill="currentColor" aria-hidden="true" /><span>停止錄音</span>
           </button>
         )}
         {(recState === "recorded" || recState === "submitted") && (

@@ -9,7 +9,7 @@
     border: 3px solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
     box-shadow: var(--yy-shadow-sm);
-    background: #fff;
+    background: var(--yy-surface);
     display: flex;
     flex-direction: column;
     height: calc(100vh - 170px);
@@ -47,7 +47,7 @@
     padding: 10px;
     border-radius: var(--yy-radius-btn);
     background: var(--yy-cream-dim);
-    border: 1px solid #ddd0c4;
+    border: 1px solid var(--yy-border-soft);
     gap: 8px
 }
 
@@ -117,8 +117,8 @@
 
 .reply-card {
     display: flex;
-    background: #fff;
-    border: 1px solid #ddd0c4;
+    background: var(--yy-surface);
+    border: 1px solid var(--yy-border-soft);
     border-radius: var(--yy-radius-btn);
     padding: 8px;
     gap: 8px

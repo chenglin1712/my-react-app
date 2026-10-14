@@ -2,7 +2,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-radius: 8px;
+    border-radius: var(--yy-radius-btn);
     margin-bottom: 16px;
     position: relative;
 }
@@ -25,7 +25,7 @@
 }
 
 .review-intro-btn {
-    background: #fff;
+    background: var(--yy-surface);
     border: 2px solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
     color: var(--yy-ink);
@@ -42,7 +42,7 @@
 }
 
 .review-intro-box {
-    background: #fff;
+    background: var(--yy-surface);
     color: var(--yy-ink);
     border: 2px solid var(--yy-ink);
     padding: 10px 14px;
@@ -133,10 +133,10 @@
 .nav-item-badge {
     margin-left: 6px;
     padding: 1px 6px;
-    border-radius: 8px;
+    border-radius: var(--yy-radius-btn);
     font-size: 10px;
     background-color: var(--yy-blue);
-    color: #fff;
+    color: var(--yy-surface);
     white-space: nowrap;
 }
 
@@ -149,7 +149,7 @@
 .review-table {
     width: 100%;
     border-collapse: collapse;
-    background-color: #fff;
+    background-color: var(--yy-surface);
     border: 2px solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
     overflow: hidden;
@@ -161,7 +161,7 @@
 
 .review-table th,
 .review-table td {
-    border: 1px solid #ddd0c4;
+    border: 1px solid var(--yy-border-soft);
     padding: 8px;
     text-align: center;
 }
@@ -174,7 +174,7 @@
 .view-btn {
     padding: 6px 12px;
     border: 2px solid var(--yy-ink);
-    background: #fff;
+    background: var(--yy-surface);
     color: var(--yy-ink);
     border-radius: var(--yy-radius-btn);
     font-weight: 600;
@@ -184,7 +184,7 @@
 .view-btn:hover {
     background: var(--yy-red);
     border-color: var(--yy-ink);
-    color: #fff;
+    color: var(--yy-surface);
 }
 
 .score-good {
@@ -212,7 +212,7 @@
 }
 
 .back-btn {
-    background: #fff;
+    background: var(--yy-surface);
     border: 2px solid var(--yy-ink);
     padding: 6px 12px;
     border-radius: var(--yy-radius-btn);
@@ -238,12 +238,12 @@
     border: 3px solid var(--yy-ink);
     padding: 12px;
     border-radius: var(--yy-radius-card);
-    background: #fff;
+    background: var(--yy-surface);
     box-shadow: var(--yy-shadow-sm);
 }
 
 .review-q {
-    background: #fff;
+    background: var(--yy-surface);
     border: 2px solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
     padding: 16px 20px;
@@ -256,7 +256,7 @@
     border: 2px solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
     background: var(--yy-red);
-    color: #fff;
+    color: var(--yy-surface);
     font-weight: bold;
     transition: var(--transition-interactive);
     display: block;
@@ -320,7 +320,7 @@
 }
 
 .review-question-body img {
-    border-radius: 6px;
+    border-radius: var(--yy-radius-btn);
     border: 2px solid var(--yy-ink);
 }
 
@@ -361,7 +361,7 @@
 .option-img-wrapper {
     position: relative;
     border: 2px solid transparent;
-    border-radius: 6px;
+    border-radius: var(--yy-radius-btn);
     padding: 2px;
 }
 
@@ -380,7 +380,7 @@
     top: 4px;
     left: 4px;
     background: rgba(34, 24, 18, 0.75);
-    color: #fff;
+    color: var(--yy-surface);
     font-size: 14px;
     padding: 1px 4px;
     border-radius: 3px;

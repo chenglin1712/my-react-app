@@ -45,7 +45,7 @@
     position: relative;
     width: var(--cw-cell);
     height: var(--cw-cell);
-    border: 1px solid #ccc;
+    border: 1px solid var(--yy-border-soft);
     background-color: white;
     display: flex;
     justify-content: center;
@@ -55,7 +55,7 @@
 }
 
 .area-cell-container.is-block {
-    background-color: #ccc;
+    background-color: var(--yy-border-soft);
 }
 
 .area-cell-number-label {
@@ -114,7 +114,7 @@
     flex-wrap: wrap;
     justify-content: center;
     border: 0px;
-    border-radius: 10px;
+    border-radius: var(--yy-radius-card);
     width:100%;
     margin: 25px 0;
     place-items: center;

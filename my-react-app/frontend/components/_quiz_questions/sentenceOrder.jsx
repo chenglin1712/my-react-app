@@ -95,7 +95,7 @@ function DroppableArea({ id, children, label }) {
     <div
       ref={setNodeRef}
       className={`min-h-[60px] border-2 rounded-lg p-4 mb-6 flex flex-wrap justify-center items-center gap-2 transition ${
-        isOver ? "border-[#9E1B24] bg-[#F9F1DF] scale-105" : "border-gray-400 border-dashed"
+        isOver ? "border-(color:--yy-red) bg-(--yy-warning-bg) scale-105" : "border-(color:--yy-text-muted) border-dashed"
       }`}
     >
       {children && children.length > 0 ? children : <p style={{ color: "var(--yy-text-muted)" }}>{label}</p>}
@@ -232,7 +232,7 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
             onClick={() => playAudio(question.tayal.audio)}
             aria-label="播放句子語音"
           >
-            <FaPlayCircle size={20} className="text-warning" />
+            <FaPlayCircle size={20} className="yy-text-blue" />
           </button>
         )}
       </h2>
@@ -302,9 +302,9 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
       ) : (
         <>
           {result === "correct" ? (
-            <h4 className="fw-bolder mb-4 text-success yy-correct-pop"><CircleCheck />&nbsp; 正確</h4>
+            <h4 className="fw-bolder mb-4 yy-text-success yy-correct-pop"><CircleCheck />&nbsp; 正確</h4>
           ) : (
-            <h4 className="fw-bolder mb-4 text-danger"><CircleX />&nbsp;  錯誤</h4>
+            <h4 className="fw-bolder mb-4 yy-text-danger"><CircleX />&nbsp;  錯誤</h4>
           )}
           <h4 className="fw-bolder mb-4 ">
             正確答案：{question.answer.join(" ")}

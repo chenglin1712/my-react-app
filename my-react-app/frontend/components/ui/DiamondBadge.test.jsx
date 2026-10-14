@@ -8,7 +8,7 @@ describe('DiamondBadge', () => {
     const badge = container.querySelector('.yy-diamond-badge');
     expect(badge.style.width).toBe('44px');
     expect(badge.style.height).toBe('44px');
-    expect(badge.style.background).toBe('rgb(158, 27, 36)'); // #9E1B24
+    expect(badge.style.getPropertyValue('--yy-diamond-color')).toBe('var(--yy-red)');
     expect(badge.style.fontSize).toBe('15px');
   });
 
@@ -17,16 +17,17 @@ describe('DiamondBadge', () => {
     const badge = container.querySelector('.yy-diamond-badge');
     expect(badge.style.width).toBe('60px');
     expect(badge.style.height).toBe('60px');
-    expect(badge.style.background).toBe('rgb(0, 255, 0)');
+    expect(badge.style.getPropertyValue('--yy-diamond-color')).toBe('#00ff00');
     expect(badge.style.fontSize).toBe('20px');
   });
 
-  test('傳入的 style prop 會蓋過內建樣式（例如覆蓋 background）', () => {
+  test('傳入的 style prop 會蓋過內建樣式（例如覆蓋顏色變數、加 margin）', () => {
     const { container } = render(
-      <DiamondBadge color="#00ff00" style={{ background: '#ff0000' }}>3</DiamondBadge>,
+      <DiamondBadge color="#00ff00" style={{ '--yy-diamond-color': '#ff0000', margin: '0 auto' }}>3</DiamondBadge>,
     );
     const badge = container.querySelector('.yy-diamond-badge');
-    expect(badge.style.background).toBe('rgb(255, 0, 0)');
+    expect(badge.style.getPropertyValue('--yy-diamond-color')).toBe('#ff0000');
+    expect(badge.style.margin).toBe('0px auto');
   });
 
   test('children 會渲染在徽章內', () => {

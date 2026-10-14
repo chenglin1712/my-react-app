@@ -6,7 +6,7 @@
     margin: 0;
 
     overflow: hidden;
-    background: #fff;
+    background: var(--yy-surface);
     border: 3px solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
     box-shadow: var(--yy-shadow-md);
@@ -45,7 +45,7 @@
     height: auto;
     padding: 12px 14px;
 
-    background: #fff;
+    background: var(--yy-surface);
     border: 0;
     border-bottom: 2px solid var(--yy-ink);
     cursor: pointer;
@@ -163,7 +163,7 @@
     width: 210px;
     padding: 16px;
 
-    background: #fff;
+    background: var(--yy-surface);
     border: 3px solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
     box-shadow: var(--yy-shadow-lg);

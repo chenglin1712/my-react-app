@@ -7,7 +7,7 @@
     margin: 16px 0;
     border: 3px solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
-    background: #fff;
+    background: var(--yy-surface);
     box-shadow: var(--yy-shadow-sm);
 }
 
@@ -82,7 +82,7 @@
     padding: 8px 12px;
     border: 2px solid var(--yy-red);
     border-radius: var(--yy-radius-btn);
-    background: #fdecec;
+    background: var(--yy-danger-bg);
     color: var(--yy-red);
     font-size: 14px;
 }
@@ -104,14 +104,14 @@
 .yy-morph-status {
     padding: 2px 8px;
     border: 1.5px solid var(--yy-ink);
-    border-radius: 4px;
-    background: #fff;
+    border-radius: var(--yy-radius-btn);
+    background: var(--yy-surface);
     font-size: 11.5px;
     font-weight: 700;
 }
-.yy-morph-status-headword { background: #e6f2e6; }
-.yy-morph-status-attested { background: #e8eef7; }
-.yy-morph-status-unknown { background: #f5ecec; }
+.yy-morph-status-headword { background: var(--yy-success-bg); }
+.yy-morph-status-attested { background: var(--yy-info-bg); }
+.yy-morph-status-unknown { background: var(--yy-danger-bg); }
 
 .yy-morph-token-gloss {
     color: var(--yy-text-secondary);
@@ -135,13 +135,13 @@
     background: var(--yy-cream);
 }
 .yy-morph-conf-dictionary { border-left-color: var(--yy-blue); }
-.yy-morph-conf-high { border-left-color: #3c7a3c; }
+.yy-morph-conf-high { border-left-color: var(--yy-green); }
 .yy-morph-conf-medium { border-left-color: var(--yy-gold); }
 .yy-morph-conf-low {
     border-left-color: var(--yy-text-muted);
     border-style: dashed;
     border-left-style: solid;
-    background: #faf7f2;
+    background: var(--yy-cream);
 }
 
 .yy-morph-candidate-head {
@@ -155,16 +155,16 @@
 .yy-morph-badge {
     padding: 2px 8px;
     border: 1.5px solid var(--yy-ink);
-    border-radius: 4px;
-    background: #fff;
+    border-radius: var(--yy-radius-btn);
+    background: var(--yy-surface);
     font-size: 11.5px;
     font-weight: 700;
     cursor: help;
 }
-.yy-morph-badge-dictionary { background: #dfe8f6; }
-.yy-morph-badge-high { background: #dff0df; }
-.yy-morph-badge-medium { background: #fbf0c8; }
-.yy-morph-badge-low { background: #eee; color: var(--yy-text-secondary); }
+.yy-morph-badge-dictionary { background: var(--yy-info-bg); }
+.yy-morph-badge-high { background: var(--yy-success-bg); }
+.yy-morph-badge-medium { background: var(--yy-warning-bg); }
+.yy-morph-badge-low { background: var(--yy-cream-dim); color: var(--yy-text-secondary); }
 
 /* 詞綴切分：詞根、詞綴、重疊各用不同底色，並且都有文字標題（不只靠顏色區分） */
 .yy-morph-segments {
@@ -179,7 +179,7 @@
     border: 2px solid var(--yy-ink);
     margin-right: -2px;
 }
-.yy-morph-seg-root { background: #fff; }
+.yy-morph-seg-root { background: var(--yy-surface); }
 .yy-morph-seg-affix { background: var(--yy-gold); font-weight: 700; }
 .yy-morph-seg-redup {
     background: #e7d7f3;
@@ -193,8 +193,8 @@
 }
 .yy-morph-line code {
     padding: 1px 6px;
-    border-radius: 4px;
-    background: #fff;
+    border-radius: var(--yy-radius-btn);
+    background: var(--yy-surface);
     border: 1px solid var(--yy-text-muted);
     color: var(--yy-ink);
 }
@@ -264,7 +264,7 @@
     padding: 4px 12px;
     border: 2px solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
-    background: #fff;
+    background: var(--yy-surface);
     font-size: 12.5px;
     font-weight: 700;
     cursor: pointer;

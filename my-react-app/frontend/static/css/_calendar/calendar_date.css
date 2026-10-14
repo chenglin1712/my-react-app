@@ -5,10 +5,10 @@
     display: flex;
     gap: 24px;
     padding: 24px;
-    background-color: #fff;
-    border-radius: 12px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-    font-family: 'Segoe UI', sans-serif;
+    background-color: var(--yy-surface);
+    border-radius: var(--yy-radius-card);
+    box-shadow: var(--yy-shadow-lg);
+    font-family: var(--yy-font-body);
 }
 
 .calendar-left {
@@ -34,7 +34,7 @@
 }
 
 .react-calendar__tile--now {
-    background: #fce4ec !important;
+    background: var(--yy-danger-bg) !important;
     color: var(--yy-red) !important;
     font-weight: bold !important;
 }
@@ -46,7 +46,7 @@
 
 .react-calendar__month-view__days button {
     min-width: 100% !important;
-    border-radius: 6px !important;
+    border-radius: var(--yy-radius-btn) !important;
     padding: 10px 6px;
 }
 
@@ -64,11 +64,11 @@
 }
 
 .event-card {
-    background-color: #fff;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-    border: 1px solid #eee;
+    background-color: var(--yy-surface);
+    box-shadow: var(--yy-shadow-sm);
+    border: 1px solid var(--yy-border-soft);
     padding: 10px 12px;
-    border-radius: 8px;
+    border-radius: var(--yy-radius-btn);
     margin-bottom: 8px;
     display: flex;
     flex-direction: column;
@@ -81,12 +81,12 @@
 .event-card button {
     background: none;
     border: none;
-    color: #c62828;
+    color: var(--yy-red);
     cursor: pointer;
 }
 
 .event-card:hover {
-    background-color: #f3f3f3;
+    background-color: var(--yy-cream);
 }
 
 
@@ -94,19 +94,19 @@
     margin: 0 0 6px 0;
     font-size: 16px;
     font-weight: 600;
-    color: #1f1f1f;
+    color: var(--yy-ink);
 }
 
 .event-card p {
     margin: 0 0 8px 0;
     font-size: 14px;
-    color: #555;
+    color: var(--yy-text-tertiary);
     line-height: 1.4;
 }
 
 .event-card span {
     font-size: 12px;
-    color: #888;
+    color: var(--yy-text-muted);
     font-weight: 500;
 }
 
@@ -116,22 +116,22 @@
     right: 0px;
     background: none;
     border: none;
-    color: #c00;
+    color: var(--yy-red);
 }
 
 .event-card .delete-btn:hover {
-    color: #f00;
+    color: var(--yy-red);
 }
 
 .go-quiz-btn {
     margin-top: 8px;
     padding: 6px 12px;
     background-color: var(--yy-red);
-    color: #fff;
+    color: var(--yy-surface);
     font-size: 13px;
     font-weight: 500;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--yy-radius-btn);
 }
 
 .go-quiz-btn:hover {
@@ -140,7 +140,7 @@
 }
 
 .no-event {
-    color: #888;
+    color: var(--yy-text-muted);
     text-align: center;
     font-size: 14px;
     padding: 16px;
@@ -154,8 +154,8 @@
 .event-input-bar input {
     flex: 1;
     padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
+    border: 1px solid var(--yy-text-muted);
+    border-radius: var(--yy-radius-btn);
     font-size: 14px;
 }
 
@@ -169,13 +169,13 @@
     background-color: var(--yy-red);
     color: white;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--yy-radius-btn);
     font-weight: 500;
     cursor: pointer;
 }
 
 .event-input-bar button:hover {
-    background-color: #801526;
+    background-color: var(--yy-red);
 }
 
 .dot-indicator {
@@ -211,10 +211,10 @@
 .event-input-bar select {
     flex: 0 0 auto;
     padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
+    border: 1px solid var(--yy-text-muted);
+    border-radius: var(--yy-radius-btn);
     font-size: 14px;
-    background: #fff;
+    background: var(--yy-surface);
     color: inherit;
 }
 

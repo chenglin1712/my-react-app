@@ -115,7 +115,7 @@ const Edit = () => {
                         type="text"
                         value={new Date(formData.joinDate).toLocaleDateString("zh-TW")}
                         disabled
-                        style={{ backgroundColor: "#f5f5f5", color: "#888" }}
+                        style={{ backgroundColor: "var(--yy-cream-dim)", color: "var(--yy-text-muted)" }}
                     />
                 </div>
 
@@ -126,7 +126,7 @@ const Edit = () => {
                         type="email"
                         value={formData.email}
                         disabled
-                        style={{ backgroundColor: "#f5f5f5", cursor: "not-allowed" }}
+                        style={{ backgroundColor: "var(--yy-cream-dim)", cursor: "not-allowed" }}
                     />
                 </div>
 
@@ -137,7 +137,7 @@ const Edit = () => {
                         type="password"
                         value={formData.password}
                         disabled
-                        style={{ backgroundColor: "#f5f5f5", cursor: "not-allowed" }}
+                        style={{ backgroundColor: "var(--yy-cream-dim)", cursor: "not-allowed" }}
                     />
                     <Link className="forgot-pass" to="/reset">變更密碼</Link>
                 </div>

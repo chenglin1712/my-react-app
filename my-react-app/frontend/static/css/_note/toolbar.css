@@ -14,18 +14,18 @@
   z-index: 100;
 }
 .editor-toolbar .group { display: flex; align-items: center; gap: 8px; }
-.editor-toolbar .divider { width:1px; height:20px; background:#e5e7eb; }
+.editor-toolbar .divider { width:1px; height:20px; background:var(--yy-cream-dim); }
 
 /* 選色條（示意） */
 .editor-toolbar .colorbar { display:flex; align-items:center; gap:10px; height:4px; }
-.editor-toolbar .colorbar span { display:block; width:120px; height:4px; background:#000; }
+.editor-toolbar .colorbar span { display:block; width:120px; height:4px; background:var(--yy-ink); }
 
 /* 底部工具列（上一頁 / 下一頁 / 分享等） */
 .bottom-toolbar {
   position: fixed;
   bottom: 0; left: 0; right: 0;
-  background-color: #fff;
-  border-top: 1px solid #dee2e6;
+  background-color: var(--yy-surface);
+  border-top: 1px solid var(--yy-border-soft);
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -69,11 +69,11 @@
   inset: 6px;
   border-radius: 50%;
   background: var(--swatch);
-  border: 2px solid var(--yy-ink, #221812);
+  border: 2px solid var(--yy-ink);
   box-sizing: border-box;
 }
 .editor-toolbar .color-box[aria-pressed="true"]::before {
-  box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--yy-ink, #221812);
+  box-shadow: 0 0 0 3px var(--yy-surface), 0 0 0 5px var(--yy-ink);
 }
 .editor-toolbar .color-box[aria-pressed="true"]::after {
   content: "";
@@ -82,12 +82,12 @@
   top: 12px;
   width: 7px;
   height: 13px;
-  border: solid #fff;
+  border: solid var(--yy-surface);
   border-width: 0 3px 3px 0;
   transform: rotate(45deg);
 }
 .editor-toolbar .color-box:focus-visible {
-  outline: 3px solid var(--yy-blue, #1f3a5c);
+  outline: 3px solid var(--yy-blue);
   outline-offset: 1px;
 }
 @media (prefers-reduced-motion: no-preference) {

@@ -51,7 +51,7 @@ const WordResultsSection = ({
             // 不要讓整個搜尋結果列表跟著消失。
             <ErrorBoundary
               key={key}
-              fallback={<ListGroup.Item className="text-danger small">這個詞條顯示時發生錯誤。</ListGroup.Item>}
+              fallback={<ListGroup.Item className="yy-text-danger small">這個詞條顯示時發生錯誤。</ListGroup.Item>}
             >
               <WordCard
                 keyName={key}

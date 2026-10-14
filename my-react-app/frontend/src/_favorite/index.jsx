@@ -210,7 +210,7 @@ const FavoritePage = () => {
         <LoadingSpinner label="載入收藏中…" />
       ) : loadError ? (
         <div className="text-center py-5" role="alert">
-          <p className="text-danger">單字資料暫時載入失敗，請稍後再試。</p>
+          <p className="yy-text-danger">單字資料暫時載入失敗，請稍後再試。</p>
           <Button type="button" variant="danger" onClick={() => setLoadAttempt(n => n + 1)}>重試</Button>
         </div>
       ) : (
@@ -243,7 +243,7 @@ const FavoritePage = () => {
               // 單張字卡渲染出錯時只讓那張卡片顯示錯誤提示，不要讓整個收藏格線消失。
               <div className="word-card-cv" key={wordData.name + idx}>
               <ErrorBoundary
-                fallback={<div className="text-danger small p-2">這個詞條顯示時發生錯誤。</div>}
+                fallback={<div className="yy-text-danger small p-2">這個詞條顯示時發生錯誤。</div>}
               >
                 <WordCardWithImg
                   keyName={wordData.name + idx}

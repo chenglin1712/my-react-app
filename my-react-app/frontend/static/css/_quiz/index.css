@@ -27,7 +27,7 @@
     margin: 0;
     padding: clamp(20px, 3vw, 36px);
 
-    background: #fff;
+    background: var(--yy-surface);
     border: 3px solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
     box-shadow: var(--yy-shadow-lg);

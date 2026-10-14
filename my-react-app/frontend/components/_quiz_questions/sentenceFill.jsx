@@ -55,7 +55,7 @@ export default function SentenceFill({ question, selected, checked, onSelect, on
             onClick={() => playAudio(question.tayal.audio)}
             aria-label="播放句子語音"
           >
-            <FaPlayCircle size={20} className="text-warning" />
+            <FaPlayCircle size={20} className="yy-text-blue" />
           </button>
         )}
       </h2>
@@ -90,9 +90,9 @@ export default function SentenceFill({ question, selected, checked, onSelect, on
       ) : (
         <>
           {result === "correct" ? (
-            <h4 className="fw-bolder mb-4 text-success yy-correct-pop"><CircleCheck />&nbsp; 正確</h4>
+            <h4 className="fw-bolder mb-4 yy-text-success yy-correct-pop"><CircleCheck />&nbsp; 正確</h4>
           ) : (
-            <h4 className="fw-bolder mb-4 text-danger"><CircleX />&nbsp;  錯誤</h4>
+            <h4 className="fw-bolder mb-4 yy-text-danger"><CircleX />&nbsp;  錯誤</h4>
           )}
           <h4 className="fw-bolder mb-4 ">
             正確答案：{question.answer}
@@ -105,7 +105,7 @@ export default function SentenceFill({ question, selected, checked, onSelect, on
                   <li key={word}><strong>{word}</strong>：{note}</li>
                 ))}
               </ul>
-              <p className="text-muted small mb-0">
+              <p className="yy-text-muted small mb-0">
                 這些是依詞綴規則造出的「候選」錯誤形，辭典與例句中都找不到；
                 但辭典不可能收錄所有詞形，不代表它在族語裡一定不存在。
               </p>

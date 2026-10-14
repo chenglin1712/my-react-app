@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../src/userServives/authContext";
@@ -213,7 +214,7 @@ export default function NoteShare() {
       <div className="ns-toolbar">
         <div className="ns-search-group">
           <div className="ns-search">
-            <span className="ns-search-icon">🔎</span>
+            <span className="ns-search-icon"><Search size={16} aria-hidden="true" /></span>
             <input
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}

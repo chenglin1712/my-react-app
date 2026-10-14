@@ -23,15 +23,15 @@
     margin: 0 auto;
 }
 
-.card {
+.home-func-card {
     /* 整張卡片從 div 換成 <Link>（渲染成 <a>）之後才需要這幾行：<a> 預設是
        inline，width 不會生效；也要蓋掉瀏覽器對連結預設的底線/顏色。 */
     display: block;
     text-decoration: none;
     color: inherit;
-    background: #fff;
-    border: 3px solid var(--yy-ink) !important;
-    border-radius: var(--yy-radius-card) !important;
+    background: var(--yy-surface);
+    border: 3px solid var(--yy-ink);
+    border-radius: var(--yy-radius-card);
     box-shadow: var(--yy-shadow-md);
     min-width: 0;
     overflow: hidden;
@@ -110,7 +110,7 @@
     font-size: 13px;
 }
 
-.card:focus-visible {
+.home-func-card:focus-visible {
     outline: var(--yy-focus-ring);
     outline-offset: var(--yy-focus-offset);
 }

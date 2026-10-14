@@ -1,3 +1,4 @@
+import { Camera } from "lucide-react";
 import { useState, useRef, useCallback, lazy, Suspense } from "react";
 import { Alert } from "react-bootstrap";
 import LoadingSpinner from "@components/ui/LoadingSpinner";
@@ -103,7 +104,7 @@ const CameraWizard = () => {
                                 <img src={image} alt="預覽圖片" className="camera-dropzone-img" />
                             ) : (
                                 <div className="camera-dropzone-placeholder">
-                                    <span>📷</span>
+                                    <Camera size={44} strokeWidth={2} aria-hidden="true" />
                                     <span>點此選擇圖片</span>
                                 </div>
                             )}

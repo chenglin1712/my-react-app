@@ -1,3 +1,4 @@
+import { NotebookPen } from "lucide-react";
 import { Link } from "react-router-dom";
 import "../../static/css/_game/zone.css";
 import { Container } from "react-bootstrap";
@@ -34,7 +35,7 @@ const QuizTribeSelect = () => {
               className="zone-card available"
               style={{ borderColor: TRIBE_COLOR_BY_SLUG[tribe.slug] }}
             >
-              <div className="zone-card-emoji">📝</div>
+              <div className="zone-card-icon" aria-hidden="true"><NotebookPen size={44} strokeWidth={2} /></div>
               <div className="zone-card-body">
                 <h2 className="zone-card-title">{tribe.name}族語</h2>
                 <p className="zone-card-subtitle" style={{ color: TRIBE_COLOR_BY_SLUG[tribe.slug] }}>

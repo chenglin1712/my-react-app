@@ -26,9 +26,9 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    background: #fff;
-    border: 2.5px solid var(--yy-ink);
-    border-radius: 8px;
+    background: var(--yy-surface);
+    border: 3px solid var(--yy-ink);
+    border-radius: var(--yy-radius-btn);
     padding: 10px 16px;
 }
 
@@ -73,7 +73,7 @@
     font-size: 15px;
     font-weight: 700;
     border: 3px solid var(--yy-ink);
-    border-radius: 8px;
+    border-radius: var(--yy-radius-btn);
     box-shadow: 4px 4px 0 var(--yy-ink);
     transition: transform 0.15s ease, background 0.15s ease;
     width: 100%;
@@ -94,8 +94,8 @@
 
 /* 停用態（登入中）：文字與底色維持 3:1 以上，不是只靠透明度變淡 */
 .login-button:disabled {
-    background: #7A6455;
-    color: #fff;
+    background: var(--yy-text-muted);
+    color: var(--yy-surface);
     box-shadow: none;
     cursor: not-allowed;
 }

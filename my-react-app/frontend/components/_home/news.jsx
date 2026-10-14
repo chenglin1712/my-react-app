@@ -62,10 +62,10 @@ const News = ({ withImage = [], withoutImage = [], loading = false }) => {
                         >
                             {withImage.map((event) => (
                                 <SwiperSlide key={event.id}>
-                                    <div className="slide">
+                                    <div className="news-slide">
                                         <img src={event.image} alt={event.title} />
-                                        <div className="slide-info">
-                                            <div className="slide-date">
+                                        <div className="news-slide-info">
+                                            <div className="news-slide-date">
                                                 {event.start_date}{event.end_date ? ` ～ ${event.end_date}` : ''}
                                             </div>
                                             <h3>{event.title}</h3>
@@ -83,10 +83,10 @@ const News = ({ withImage = [], withoutImage = [], loading = false }) => {
                         <ul className="text-list">
                             {withoutImage.map((event) => (
                                 <li key={event.id}>
-                                    <ExternalLink href={event.detail} as="div" className="text-item">
-                                        <div className="text-item-date">{event.start_date}</div>
-                                        <div className="text-item-content">
-                                            <span className="tag" data-tag={event.tag}>{event.tag}</span>
+                                    <ExternalLink href={event.detail} as="div" className="news-text-item">
+                                        <div className="news-text-item-date">{event.start_date}</div>
+                                        <div className="news-text-item-content">
+                                            <span className="news-tag" data-tag={event.tag}>{event.tag}</span>
                                             <h3>{event.title}</h3>
                                         </div>
                                     </ExternalLink>
@@ -106,7 +106,7 @@ const News = ({ withImage = [], withoutImage = [], loading = false }) => {
                             className="news-card"
                         >
                             <div className="news-card-top">
-                                <span className="tag" data-tag={event.tag}>{event.tag}</span>
+                                <span className="news-tag" data-tag={event.tag}>{event.tag}</span>
                                 <span className="news-card-date">{event.start_date}</span>
                             </div>
                             <h3 className="news-card-title">{event.title}</h3>

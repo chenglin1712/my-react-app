@@ -31,8 +31,8 @@
     width: 100%;
     height: 100%;
     backface-visibility: hidden;
-    border-radius: 12px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: var(--yy-radius-card);
+    box-shadow: var(--yy-shadow-sm);
     background: white;
     overflow: hidden;
     display: flex;
@@ -48,11 +48,11 @@
     position: relative;
     width: 100%;
     height: 170px;
-    background: #f8fafc;
+    background: var(--yy-cream);
     display: flex;
     align-items: center;
     justify-content: center;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid var(--yy-border-soft);
 }
 
 .word-card-front .word-image {
@@ -66,7 +66,7 @@
     align-items: center;
     justify-content: center;
     font-size: 48px;
-    color: #cbd5e1;
+    color: var(--yy-text-muted);
 }
 
 .word-card-front .favorite-btn {
@@ -105,7 +105,7 @@
     font-size: 1.2rem;
     font-weight: bold;
     margin-bottom: 0.5rem;
-    color: #2d3748;
+    color: var(--yy-text-secondary);
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -128,7 +128,7 @@
 
 .word-card-front .favorite-word-info h5 {
     font-size: 1rem;
-    color: #4a5568;
+    color: var(--yy-text-tertiary);
     margin-bottom: 0.5rem;
     overflow-wrap: anywhere;
     display: -webkit-box;
@@ -140,7 +140,7 @@
 
 /* 背面樣式 */
 .word-card-back-header {
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--yy-border-soft);
     padding-bottom: 1rem;
     margin-bottom: 1rem;
 }
@@ -148,7 +148,7 @@
 .tayal-word-back {
     font-size: 1.3rem;
     font-weight: bold;
-    color: #2d3748;
+    color: var(--yy-text-secondary);
     margin-bottom: 0.5rem;
     display: flex;
     flex-wrap: wrap;
@@ -160,7 +160,7 @@
 
 .chinese-word-back {
     font-size: 1.1rem;
-    color: #4a5568;
+    color: var(--yy-text-tertiary);
     margin-bottom: 0;
     overflow-wrap: anywhere;
 }
@@ -174,7 +174,7 @@
 .flip-back-btn {
     text-align: center;
     padding-top: 0.5rem;
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid var(--yy-border-soft);
     margin-top: auto;
 }
 
@@ -188,23 +188,23 @@
 }
 
 .definition-category {
-    color: #e53e3e;
+    color: var(--yy-red);
     font-size: 0.9rem;
     margin-bottom: 0.5rem;
     font-weight: 600;
 }
 
 .example-item {
-    background: #f7fafc;
+    background: var(--yy-cream);
     padding: 0.75rem;
-    border-radius: 8px;
-    border-left: 3px solid #e53e3e;
+    border-radius: var(--yy-radius-btn);
+    border-left: 3px solid var(--yy-red);
     margin-bottom: 0.75rem;
 }
 
 .example-tayal {
     font-weight: 600;
-    color: #2d3748;
+    color: var(--yy-text-secondary);
     margin-bottom: 0.25rem;
     display: flex;
     align-items: center;
@@ -213,7 +213,7 @@
 }
 
 .example-ch {
-    color: #4a5568;
+    color: var(--yy-text-tertiary);
     font-size: 0.85rem;
     line-height: 1.4;
 }
@@ -222,14 +222,14 @@
     padding: 0;
     border: none;
     background: none;
-    color: #f6ad55;
+    color: var(--yy-warning-text);
     min-width: auto;
     transition: var(--transition-interactive);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .audio-button:hover {
-      color: #ed8936;
+      color: var(--yy-warning-text);
       transform: scale(1.1);
   }
 }
@@ -285,16 +285,16 @@
 .word-frequency-label,
 .word-category-label {
     font-size: 0.8rem;
-    color: #718096;
+    color: var(--yy-text-muted);
     display: flex;
     align-items: center;
     gap: 0.25rem;
 }
 
 .word-category-label {
-    background: #edf2f7;
+    background: var(--yy-cream-dim);
     padding: 0.2rem 0.5rem;
-    border-radius: 12px;
+    border-radius: var(--yy-radius-card);
     width: fit-content;
 }
 
@@ -323,7 +323,7 @@
 
 /* 族語下拉選單裡每個族語的收藏數：次要資訊，用較淡的字色 */
 .favorite-tribe-count {
-    color: var(--yy-text-muted, #6B5A47);
+    color: var(--yy-text-muted);
     font-size: 0.85em;
     font-variant-numeric: tabular-nums;
 }

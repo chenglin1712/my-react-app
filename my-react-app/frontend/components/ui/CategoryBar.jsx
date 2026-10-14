@@ -1,5 +1,5 @@
 import { Tabs, Tab } from "react-bootstrap";
-import { FaChevronDown, FaChevronUp } from "react-icons/fa";
+import { ChevronDown, ChevronUp, FolderOpen } from "lucide-react";
 import { categoryGroups } from "../../src/constants/categoryGroups";
 import "../../static/css/ui/categoryBar.css";
 
@@ -29,14 +29,14 @@ export default function CategoryBar({
           onClick={() => setShowCategories(!showCategories)}
           aria-expanded={showCategories}
         >
-          <span className="fw-bold"><span aria-hidden="true">📂 </span>單詞分類
+          <span className="fw-bold"><FolderOpen size={18} aria-hidden="true" style={{ marginRight: 6, verticalAlign: "-3px" }} />單詞分類
             {selectedSubCategory && (
               <span style={{ marginLeft: "8px" }}>
                 - <span style={{ color: "var(--yy-red)" }}>{selectedSubCategory}</span>
               </span>
             )}
           </span>
-          {showCategories ? <FaChevronUp aria-hidden="true" /> : <FaChevronDown aria-hidden="true" />}
+          {showCategories ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
         </button>
         {selectedSubCategory && (
           <button

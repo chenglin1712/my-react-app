@@ -14,13 +14,13 @@
 
 .game-title {
     text-align: center;
-    font-family: Comic Sans MS, DFKai-SB;
+    font-family: var(--yy-font-body);
 }
 
 .game-background {
-    background-color: #FFF5F5;
+    background-color: var(--yy-danger-bg);
     width: 60%;
-    border-radius: 10px;
+    border-radius: var(--yy-radius-card);
 }
 
 /* ── 遊戲專區 Landing（YUAN・YU v2）───────────── */
@@ -135,16 +135,16 @@
     border-bottom: 3px solid var(--yy-ink);
 }
 
-.gamehub-card-emoji {
+.gamehub-card-icon {
     width: 56px;
     height: 56px;
     border-radius: var(--yy-radius-btn);
-    background: #fff;
-    border: 2.5px solid var(--yy-ink);
+    background: var(--yy-surface);
+    border: 3px solid var(--yy-ink);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 28px;
+    color: var(--yy-ink);
     flex-shrink: 0;
 }
 
@@ -229,7 +229,7 @@
     padding: 20px 14px;
     border-radius: var(--yy-radius-card);
     border: 3px solid var(--yy-ink);
-    background: #fff;
+    background: var(--yy-surface);
     font: inherit;
     text-align: center;
     cursor: pointer;

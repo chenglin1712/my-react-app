@@ -176,32 +176,32 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
             onClick={() => playAudio(question.tayal.audio)}
             aria-label="播放句子語音"
           >
-            <FaPlayCircle size={20} className="text-warning" />
+            <FaPlayCircle size={20} className="yy-text-blue" />
           </button>
         )}
       </h2>
         <br/><br/>
         <br/><br/>
 
-      {recordError && <p className="text-danger" role="alert">{recordError}</p>}
+      {recordError && <p className="yy-text-danger" role="alert">{recordError}</p>}
 
       {/* 錄音按鈕 */}
       {!recording ? (
-        <button type="button" className="btn btn-danger mb-3" onClick={startRecording} disabled={!!audioBlob || starting} style={{padding: "20px"}} aria-label="開始錄音">
+        <button type="button" className="yy-btn-primary mb-3" onClick={startRecording} disabled={!!audioBlob || starting} style={{padding: "20px"}} aria-label="開始錄音">
           <FaMicrophone size={60}/>
         </button>
       ) : (
-        <button type="button" className="btn btn-secondary mb-3" onClick={stopRecording} style={{padding: "30px"}} aria-label="停止錄音">
+        <button type="button" className="yy-btn-outline mb-3" onClick={stopRecording} style={{padding: "30px"}} aria-label="停止錄音">
           <FaStop size={30}/>
         </button>
       )}
        {audioBlob && !recording &&(
         <div className="mb-3">
-          <button type="button" className="btn btn-primary me-2" onClick={playUserAudio}>
+          <button type="button" className="yy-btn-primary me-2" onClick={playUserAudio}>
             <FaPlayCircle /> 重聽你的錄音
           </button>
 
-          <button type="button" className="btn btn-warning me-2" onClick={redoRecording}>
+          <button type="button" className="yy-btn-outline me-2" onClick={redoRecording}>
             <FaRedo /> 重新錄音
           </button>
         </div>
@@ -209,7 +209,7 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
         <br/><br/>
         {!checked ? (
           <>
-            {submitError && <p className="text-danger" role="alert">{submitError}</p>}
+            {submitError && <p className="yy-text-danger" role="alert">{submitError}</p>}
             <button
                 type="button"
                 className="confirm-btn"
@@ -222,11 +222,11 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
       ):(
         <>
         {result === "correct" ? (
-            <h4 className="fw-bolder mt-4 text-success yy-correct-pop">
+            <h4 className="fw-bolder mt-4 yy-text-success yy-correct-pop">
               <CircleCheck /> 正確！（分數：{score}）
             </h4>
           ) : (
-            <h4 className="fw-bolder mt-4 text-danger">
+            <h4 className="fw-bolder mt-4 yy-text-danger">
               <CircleX /> 錯誤（分數：{score}）
             </h4>
           )}

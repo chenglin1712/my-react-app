@@ -12,7 +12,7 @@ const FUNCTION_CARDS = [
         title: "單詞查詢",
         desc: "查詢族語單詞的詞義、發音與例句。",
         route: "/search",
-        headerBg: "linear-gradient(90deg,#4B6B3A,#2C6E7F,#4B6B3A)",
+        headerBg: "linear-gradient(90deg,var(--yy-green),var(--yy-blue-light),var(--yy-green))",
         memberOnly: false,
     },
     {
@@ -22,7 +22,7 @@ const FUNCTION_CARDS = [
         title: "影像辨識",
         desc: "用相機拍下身邊的物件，查到對應的族語詞彙與發音，並存進個人詞語庫。",
         route: "/camera",
-        headerBg: "linear-gradient(90deg,#1F3A5C,#9E1B24,#1F3A5C)",
+        headerBg: "linear-gradient(90deg,var(--yy-blue),var(--yy-red),var(--yy-blue))",
         enabledKey: "button1",
         memberOnly: true,
     },
@@ -33,7 +33,7 @@ const FUNCTION_CARDS = [
         title: "詞彙遊戲",
         desc: "詞彙填字、聽力、發音與句型四款遊戲，答錯的詞會在後續練習中再出現。",
         route: "/game",
-        headerBg: "linear-gradient(90deg,#9E1B24,#D9A227,#9E1B24)",
+        headerBg: "linear-gradient(90deg,var(--yy-red),var(--yy-gold),var(--yy-red))",
         enabledKey: "button2",
         memberOnly: true,
     },
@@ -44,7 +44,7 @@ const FUNCTION_CARDS = [
         title: "測驗學習",
         desc: "依你的語言能力調整題目難度，提供個人化的學習評估。",
         route: "/quiz/select",
-        headerBg: "linear-gradient(90deg,#D9A227,#9E1B24,#D9A227)",
+        headerBg: "linear-gradient(90deg,var(--yy-gold),var(--yy-red),var(--yy-gold))",
         enabledKey: "button3",
         memberOnly: true,
     },
@@ -81,7 +81,7 @@ const FunctionBtn = ({ enabled = DEFAULT_ENABLED, isGuest = false }) => {
                         <Link
                             key={card.route}
                             to={card.route}
-                            className="card yy-card--hover"
+                            className="home-func-card yy-card--hover"
                             aria-labelledby={showMember ? `${titleId} ${memberId}` : titleId}
                             aria-describedby={`function-card-${card.id}-desc`}
                         >

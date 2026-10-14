@@ -1,3 +1,4 @@
+import { Spool, Headphones, Mic, BookOpen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../../static/css/_game/index.css";
@@ -10,7 +11,7 @@ const GAMES = [
     id: "vocabulary",
     title: "詞彙遊戲",
     subtitle: "TNINUN",
-    emoji: "🧵",
+    Icon: Spool,
     desc: "從族語詞彙中挑選正確對應，訓練詞彙記憶能力。",
     headerBg: "linear-gradient(90deg,var(--yy-red),var(--yy-gold),var(--yy-red))",
   },
@@ -18,7 +19,7 @@ const GAMES = [
     id: "listening",
     title: "聽力遊戲",
     subtitle: "MISANIQ",
-    emoji: "🎧",
+    Icon: Headphones,
     desc: "聆聽族語發音，辨識正確詞彙，訓練耳朵的敏銳度。",
     headerBg: "linear-gradient(90deg,var(--yy-blue),var(--yy-blue-light),var(--yy-blue))",
   },
@@ -26,7 +27,7 @@ const GAMES = [
     id: "pronunciation",
     title: "發音練習",
     subtitle: "QMISAN",
-    emoji: "🎤",
+    Icon: Mic,
     desc: "跟著發音範本錄音，AI 即時評分你的發音準確度。",
     headerBg: "linear-gradient(90deg,var(--yy-gold),var(--yy-red),var(--yy-gold))",
   },
@@ -34,7 +35,7 @@ const GAMES = [
     id: "sentence",
     title: "句型練習",
     subtitle: "LMUHUW",
-    emoji: "📖",
+    Icon: BookOpen,
     desc: "閱讀族語例句，選出正確的中文意思，訓練句型理解能力。",
     headerBg: "linear-gradient(90deg,var(--yy-green),var(--yy-gold),var(--yy-green))",
   },
@@ -94,7 +95,7 @@ const GameZonePage = () => {
                 className={`yy-card yy-fade-up gamehub-card${active ? ' is-selected' : ''}`}
               >
                 <div className="gamehub-card-head" style={{ "--gamehub-head-band": g.headerBg }}>
-                  <div className="gamehub-card-emoji" aria-hidden="true">{g.emoji}</div>
+                  <div className="gamehub-card-icon" aria-hidden="true"><g.Icon size={28} strokeWidth={2.25} /></div>
                   <div>
                     {/* 真正的按鈕放在標題裡，用偽元素撐滿整張卡片，整張卡都點得到，鍵盤與報讀器看到的是一個有 aria-pressed 的按鈕 */}
                     <h3 className="gamehub-card-title">

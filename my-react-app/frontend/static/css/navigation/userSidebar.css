@@ -1,6 +1,6 @@
 /* 頂部個人資料 */
 .sidebar-container {
-    border-left: 1px solid #e5e5e5;
+    border-left: 1px solid var(--yy-border-soft);
 }
 
 .sidebar-profile {
@@ -21,7 +21,7 @@
     height: 70px;
     border-radius: 50%;
     object-fit: cover;
-    border: 2px solid #e8c39e;
+    border: 2px solid var(--yy-border-soft);
 }
 
 .profile-info h3 {
@@ -38,10 +38,10 @@
 }
 
 .profile-info span {
-    background-color: #543729;
+    background-color: var(--yy-ink);
     display: inline-block;
     margin-top: 6px;
-    border-radius: 12px;
+    border-radius: var(--yy-radius-card);
     padding: 4px 10px;
     font-size: 12px;
 }
@@ -76,21 +76,21 @@
 }
 
 .edit-btn {
-    background-color: #F9F5F0;
+    background-color: var(--yy-cream);
     color: var(--yy-red);
 }
 
 .edit-btn:hover {
-    background-color: #e8e1d9;
+    background-color: var(--yy-cream-dim);
 }
 
 .logout-btn {
-    background-color: #543729;
+    background-color: var(--yy-ink);
     color: white;
 }
 
 .logout-btn:hover {
-    background-color: #6b4a38;
+    background-color: var(--yy-text-secondary);
 }
 
 .icon {
@@ -117,19 +117,19 @@
     justify-content: space-between;
     align-items: center;
     background: transparent;
-    color: #543729;
+    color: var(--yy-text-tertiary);
     border: none;
-    border-radius: 12px;
+    border-radius: var(--yy-radius-card);
     border-right: 4px solid transparent;
     cursor: pointer;
     transition: var(--transition-interactive);
 }
 
 .nav-button:hover {
-    background-color: #ffffff;
+    background-color: var(--yy-surface);
     color: var(--yy-red);
     border-right: 4px solid var(--yy-red);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    box-shadow: var(--yy-shadow-sm);
 }
 
 .nav-content {
@@ -146,14 +146,14 @@
 /* 導覽列-個人詞語庫 */
 .content-panel {
     padding: 16px;
-    border-radius: 8px;
+    border-radius: var(--yy-radius-btn);
 }
 
 .section-title {
     font-weight: bold;
     font-size: 18px;
     margin-bottom: 16px;
-    color: #543729;
+    color: var(--yy-text-tertiary);
 }
 
 .favorites-list {
@@ -163,10 +163,10 @@
 }
 
 .favorite-item {
-    background-color: #F9F5F0;
+    background-color: var(--yy-cream);
     padding: 16px;
-    border-radius: 12px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+    border-radius: var(--yy-radius-card);
+    box-shadow: var(--yy-shadow-sm);
     border-right: 3px solid var(--yy-red);
 }
 
@@ -178,7 +178,7 @@
 
 .item-title {
     font-weight: 600;
-    color: #543729;
+    color: var(--yy-text-tertiary);
     font-size: 16px;
 }
 
@@ -197,19 +197,19 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    background-color: #f9f5f0;
+    background-color: var(--yy-cream);
     padding-top: 4px;
-    border-radius: 8px;
+    border-radius: var(--yy-radius-btn);
 }
 
 .word-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-radius: 8px;
+    border-radius: var(--yy-radius-btn);
     padding: 12px 16px;
-    background-color: #ffffff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    background-color: var(--yy-surface);
+    box-shadow: var(--yy-shadow-sm);
 }
 
 .word-info {
@@ -220,13 +220,13 @@
 
 .word-term {
     font-weight: bold;
-    color: #543729;
+    color: var(--yy-text-tertiary);
     font-size: 16px;
 }
 
 .word-translation {
     font-size: 14px;
-    color: #777;
+    color: var(--yy-text-muted);
 }
 
 .word-actions {
@@ -244,7 +244,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .audio-player:hover {
-      color: #7d1526;
+      color: var(--yy-red);
       transform: scale(1.1);
   }
 }
@@ -264,6 +264,26 @@
 .empty-text {
     text-align: center;
     font-size: 14px;
-    color: #999999;
+    color: var(--yy-text-muted);
     padding: 16px 0;
+}
+
+/* 登出失敗訊息位在紅色頭部上：用米白字（對紅底 7.9:1），不用 Bootstrap 的紅字（紅疊紅只有 1.79:1） */
+.sidebar-signout-error {
+    margin: 8px 0 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--yy-cream);
+}
+
+.sidebar-nav-wrap {
+    background: var(--yy-cream);
+}
+
+.sidebar-footer {
+    padding: 16px;
+    text-align: center;
+    font-size: 14px;
+    color: var(--yy-text-tertiary);
+    border-top: 1px solid var(--yy-border-soft);
 }

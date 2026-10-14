@@ -105,7 +105,7 @@ function Game_Start({ tribe = "tayal" }) {
             onReadyChange={setBoardReady}
           />
           <div className="submit-actions">
-            {submitError && <p className="text-danger" role="alert">{submitError}</p>}
+            {submitError && <p className="yy-text-danger" role="alert">{submitError}</p>}
             <button
               type="button"
               className="yy-btn-primary submit-button"

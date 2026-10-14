@@ -22,8 +22,8 @@
 
 .wf-chip {
   border: 2px solid var(--yy-ink);
-  border-radius: 6px;
-  background: #fff;
+  border-radius: var(--yy-radius-btn);
+  background: var(--yy-surface);
   color: var(--yy-ink);
   font-weight: 700;
   font-size: 13px;
@@ -52,7 +52,7 @@
   padding: 0;
   font-size: 12px;
   font-family: var(--yy-font-pixel);
-  border-radius: 4px;
+  border-radius: var(--yy-radius-btn);
 }
 
 .wf-chip.is-selected {
@@ -70,7 +70,7 @@
 
 .wf-chip--letter.is-selected {
   background: var(--yy-blue);
-  color: #fff;
+  color: var(--yy-surface);
 }
 
 /* 勾號（文字與詞頻 chip 選中時多一個形狀線索）是 JSX 裡 aria-hidden 的 .wf-check，不放偽元素，

@@ -1,7 +1,7 @@
 .result-container {
   max-width: 600px;
   margin: 40px auto;
-  background: #fff;
+  background: var(--yy-surface);
   padding: 30px;
   border: 3px solid var(--yy-ink);
   border-radius: var(--yy-radius-card);
@@ -119,9 +119,9 @@
 }
 
 .review-btn:disabled {
-  background: #ccc;
-  color: #888;
-  border-color: #bbb;
+  background: var(--yy-border-soft);
+  color: var(--yy-text-muted);
+  border-color: var(--yy-border-soft);
   box-shadow: none;
   cursor: not-allowed;
   transform: none;

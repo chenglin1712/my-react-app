@@ -6,9 +6,9 @@
   --brand-red-600: var(--yy-red-dark);
   --danger: var(--yy-danger);
   --danger-dark: var(--yy-red-dark);
-  --ghost-bg: #eef2f6;
-  --ghost-fg: #374151;
-  --border-rose: #e5bfc7;    /* 紅系邊框 */
+  --ghost-bg: var(--yy-cream-dim);
+  --ghost-fg: var(--yy-text-secondary);
+  --border-rose: var(--yy-border-soft);    /* 紅系邊框 */
   --shadow: 0 6px 14px rgba(0,0,0,.06);
 }
 
@@ -24,13 +24,13 @@
 .fullscreen-notebook {
   background-color: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(2px);
-  border: 1px solid #ccc;
-  border-radius: 8px;
+  border: 1px solid var(--yy-border-soft);
+  border-radius: var(--yy-radius-btn);
   padding: 40px 60px;
   margin: 40px auto 80px auto;
   max-width: 800px;
   min-height: 600px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--yy-shadow-md);
 }
 
 /* ---- 標題輸入框：紅色圓角邊框 ---- */
@@ -38,8 +38,8 @@
   width: 100%;
   padding: 12px 14px;
   border: 2px solid var(--brand-red);
-  border-radius: 14px;
-  background: #fff;
+  border-radius: var(--yy-radius-lg);
+  background: var(--yy-surface);
   font-size: 1.1rem;
   outline: none;
   transition: box-shadow .15s ease;
@@ -53,8 +53,8 @@
 .note-text {
   border: 2px solid var(--brand-red);
   height: 60vh;
-  background-color: #fff;
-  border-radius: 14px;
+  background-color: var(--yy-surface);
+  border-radius: var(--yy-radius-lg);
   overflow-y: auto;
 }
 
@@ -89,7 +89,7 @@
 /* ---- 分享頁面選擇：已選/上限提示 ---- */
 .ns-select-hint {
   font-size: .8rem;
-  color: #777;
+  color: var(--yy-text-muted);
 }
 
 /* ---- RWD ---- */

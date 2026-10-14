@@ -16,7 +16,7 @@ const AudioButton = ({ audioUrl, onPlay, size, failedAudio }) => {
         onPlay(audioUrl);
       }}
     >
-      <FaPlayCircle size={size} className="text-warning" />
+      <FaPlayCircle size={size} className="yy-text-blue" />
     </Button>
   );
 };
@@ -224,7 +224,7 @@ const WordCardWithImg = memo(({ word, result, keyName, isExpanded, toggleExpand,
 
           {/* 返回按鈕 */}
           <div className="flip-back-btn">
-            <small className="text-muted">點擊返回</small>
+            <small className="yy-text-muted">點擊返回</small>
           </div>
         </div>
       </div>

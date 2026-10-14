@@ -52,7 +52,7 @@ export default function WordTranslation({ question, selected, checked, onSelect,
             onClick={() => playAudio(question.tayal.audio)}
             aria-label="播放語音"
           >
-            <FaPlayCircle size={20} className="text-warning" />
+            <FaPlayCircle size={20} className="yy-text-blue" />
           </button>
         )}
       </h2>
@@ -77,9 +77,9 @@ export default function WordTranslation({ question, selected, checked, onSelect,
       ) : (
         <>
           {result === "correct" ? (
-            <h4 className="fw-bolder mb-4 text-success yy-correct-pop"><CircleCheck />&nbsp; 正確</h4>
+            <h4 className="fw-bolder mb-4 yy-text-success yy-correct-pop"><CircleCheck />&nbsp; 正確</h4>
           ) : (
-            <h4 className="fw-bolder mb-4 text-danger"><CircleX />&nbsp;  錯誤</h4>
+            <h4 className="fw-bolder mb-4 yy-text-danger"><CircleX />&nbsp;  錯誤</h4>
           )}
           <h4 className="fw-bolder mb-4 ">
             正確答案：{question.answer}

@@ -56,15 +56,15 @@
 .home-sticker-badge {
     display: block;
     padding: 7px 16px;
-    border-radius: 8px;
+    border-radius: var(--yy-radius-btn);
     background: linear-gradient(100deg, var(--yy-gold), var(--yy-red), var(--yy-blue), var(--yy-gold));
     background-size: 300% 100%;
-    border: 2.5px solid var(--yy-ink);
-    color: #fff;
+    border: 3px solid var(--yy-ink);
+    color: var(--yy-surface);
     font-family: var(--yy-font-pixel);
     font-weight: 700;
     font-size: 12px;
-    box-shadow: 3px 3px 0 var(--yy-ink);
+    box-shadow: var(--yy-shadow-sm);
     animation: yy-holo 5.5s linear infinite;
 }
 
@@ -125,7 +125,7 @@
 @media (hover: hover) and (pointer: fine) {
     .home-cta-secondary:hover {
         transform: translate(2px, 2px);
-        box-shadow: 3px 3px 0 var(--yy-ink);
+        box-shadow: var(--yy-shadow-sm);
     }
 }
 
@@ -161,7 +161,7 @@
 @media (hover: hover) and (pointer: fine) {
   .home-cta:hover {
       transform: translate(2px, 2px);
-      box-shadow: 5px 5px 0 var(--yy-ink);
+      box-shadow: var(--yy-shadow-md);
       background: var(--yy-red-dark);
   }
 }
@@ -213,7 +213,7 @@
     align-items: center;
     gap: 14px;
     padding: 10px 8px;
-    border-radius: 6px;
+    border-radius: var(--yy-radius-btn);
     cursor: pointer;
     transition: var(--transition-interactive);
 }
@@ -259,7 +259,7 @@
     border-bottom: 3px solid var(--yy-ink);
     font-family: var(--yy-font-pixel);
     font-size: 13px;
-    color: #fff;
+    color: var(--yy-surface);
 }
 
 .home-feature-image {
@@ -281,9 +281,9 @@
     top: 14px;
     left: 14px;
     padding: 5px 12px;
-    border-radius: 4px;
+    border-radius: var(--yy-radius-btn);
     background: rgba(34, 24, 18, 0.78);
-    color: #fff;
+    color: var(--yy-surface);
     font-size: 11px;
     letter-spacing: 0.08em;
 }

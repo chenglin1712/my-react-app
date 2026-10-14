@@ -55,7 +55,7 @@
     height: 40px;
     border-radius: 50%;
     border: 3px solid var(--yy-ink);
-    background: #fff;
+    background: var(--yy-surface);
     color: var(--yy-ink);
     display: flex;
     align-items: center;
@@ -87,8 +87,8 @@
     font-size: 13.5px;
     color: var(--yy-text-secondary);
     border: 2px solid var(--yy-ink);
-    border-radius: 8px;
-    background: #fff;
+    border-radius: var(--yy-radius-btn);
+    background: var(--yy-surface);
 }
 
 .translate-swap-note.is-empty {
@@ -172,15 +172,19 @@
 }
 
 .translate-exact-badge {
-    background: var(--yy-gold);
+    --yy-diamond-color: var(--yy-gold);
+    /* 金底配墨色字（白字對金色只有約 2.2:1） */
+    color: var(--yy-ink);
     width: auto;
     height: 26px;
     padding: 0 10px;
     font-size: 11px;
+}
+/* 這顆是一般膠囊，不是菱形：背景層不旋轉 */
+.translate-exact-badge::before {
     transform: none;
 }
 .translate-exact-badge span {
-    transform: none;
     font-family: var(--yy-font-pixel);
 }
 
@@ -289,8 +293,8 @@
     font-size: 11px;
     font-weight: 700;
     padding: 2px 8px;
-    border-radius: 4px;
-    background: #fff;
+    border-radius: var(--yy-radius-btn);
+    background: var(--yy-surface);
     border: 1.5px solid var(--yy-ink);
 }
 

@@ -2,7 +2,7 @@
     padding: 40px 5% 56px;
     width: 100%;
     max-width: 100%;
-    background-color: var(--yy-cream, #F3E7CF);
+    background-color: var(--yy-cream);
 }
 
 .secRow {
@@ -35,27 +35,27 @@
 .exam-section {
     width: 100%;
     padding: 24px;
-    background-color: #fff;
-    border: 3px solid var(--yy-ink, #221812);
+    background-color: var(--yy-surface);
+    border: 3px solid var(--yy-ink);
     border-radius: var(--yy-radius-card, 10px);
-    box-shadow: var(--yy-shadow-md, 5px 5px 0 #221812);
+    box-shadow: var(--yy-shadow-md, 5px 5px 0 var(--yy-ink));
 }
 
 .exam-title {
     font-size: 18px;
     font-weight: 800;
-    color: var(--yy-ink, #221812);
+    color: var(--yy-ink);
     margin-bottom: 16px;
-    border-bottom: 2px solid var(--yy-gold, #D9A227);
+    border-bottom: 2px solid var(--yy-gold);
     padding-bottom: 8px;
 }
 
 .exam-card {
-    background-color: var(--yy-cream, #F3E7CF);
+    background-color: var(--yy-cream);
     border-left: 4px solid var(--yy-red);
     padding: 12px 16px;
     margin-bottom: 12px;
-    border-radius: 6px;
+    border-radius: var(--yy-radius-btn);
     transition: transform 0.2s ease;
 }
 
@@ -68,12 +68,12 @@
 
 .exam-card-header {
     font-size: 13px;
-    color: var(--yy-text-muted, #6B5A47);
+    color: var(--yy-text-muted);
     margin-bottom: 6px;
 }
 
 .exam-date {
-    background: #fff;
+    background: var(--yy-surface);
     border: 1.5px solid var(--yy-red);
     padding: 2px 10px;
     border-radius: 20px;
@@ -82,7 +82,7 @@
 }
 
 .exam-link {
-    color: var(--yy-ink, #221812);
+    color: var(--yy-ink);
     font-size: 15px;
     font-weight: 600;
     text-decoration: none;

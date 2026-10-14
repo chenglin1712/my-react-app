@@ -31,6 +31,6 @@ textarea,
 
 /* 選取文字用品牌的淡金底配墨色字（墨色 #221812 在淡金 #F6D77B 上對比度遠高於 4.5:1） */
 ::selection {
-  background: #F6D77B;
-  color: #221812;
+  background: var(--yy-gold-light);
+  color: var(--yy-ink);
 }

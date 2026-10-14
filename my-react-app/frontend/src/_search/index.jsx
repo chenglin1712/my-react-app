@@ -391,7 +391,7 @@ const SearchPage = () => {
       {TRIBES_WITH_DATA.includes(selectedTribe) && exactVisibleTotal > 0 && (
         <WordResultsSection
           title="完全符合結果"
-          titleColorClass="text-success"
+          titleColorClass="yy-text-success"
           buttonVariant="outline-success"
           wordsFlat={exactWords}
           visibleCount={visibleExactCount}
@@ -411,7 +411,7 @@ const SearchPage = () => {
       {TRIBES_WITH_DATA.includes(selectedTribe) && fuzzyVisibleTotal > 0 && (
         <WordResultsSection
           title="相關結果"
-          titleColorClass="text-warning"
+          titleColorClass="yy-text-ink"
           buttonVariant="outline-warning"
           wordsFlat={fuzzyWords}
           visibleCount={visibleFuzzyCount}

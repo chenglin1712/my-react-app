@@ -18,7 +18,7 @@
     align-items: center;
     background-color: rgba(0, 0, 0, 0.7);
     padding: 20px;
-    border-radius: 8px;
+    border-radius: var(--yy-radius-btn);
     width: 300px;
 }
 
@@ -35,7 +35,7 @@
 .study-plan-container {
     max-width: 900px;
     padding: 16px 8px;
-    font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+    font-family: var(--yy-font-body);
 }
 
 .study-plan-header {
@@ -67,7 +67,7 @@
 
 .event-count {
     padding-left: 4px;
-    color: #6b7280;
+    color: var(--yy-text-muted);
     font-size: 12px;
     font-weight: 600;
 }
@@ -173,7 +173,7 @@
 
 .event-description {
     font-size: 14px;
-    color: #6b7280;
+    color: var(--yy-text-muted);
     width: 95%;
 }
 
@@ -195,7 +195,7 @@
 
 .time-text {
     font-size: 13px;
-    color: #6b7280;
+    color: var(--yy-text-muted);
 }
 
 /* 單個加入按鈕 */

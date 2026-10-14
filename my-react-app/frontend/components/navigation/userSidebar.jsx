@@ -55,12 +55,12 @@ const UserSidebar = ({ userData, closeSidebar, onOpenBot }) => {
                         </button>
                     </div>
                     {signOutError && (
-                        <p className="text-danger small mt-2 mb-0" role="alert">{signOutError}</p>
+                        <p className="sidebar-signout-error" role="alert">{signOutError}</p>
                     )}
                 </div>
 
                 {/* 導航列 */}
-                <div style={{ background: "#F9F5F0" }}>
+                <div className="sidebar-nav-wrap">
                     <nav className="sidebar-nav">
                         {menuItems.map(({ id, label, icon }) => (
                             <button
@@ -88,7 +88,7 @@ const UserSidebar = ({ userData, closeSidebar, onOpenBot }) => {
                 </div>
 
                 {/* 底部資訊 */}
-                <div className="p-3 border-t text-center text-sm" style={{ borderColor: "rgba(232, 195, 158, 0.314)", color: "#543729" }}>
+                <div className="sidebar-footer">
                     ⓘ 原住民族語學習平台
                 </div>
             </div>

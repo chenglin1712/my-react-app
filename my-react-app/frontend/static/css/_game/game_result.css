@@ -17,7 +17,7 @@
   height: 100%;
   transition: transform var(--dur-flip) var(--ease-in-out);
   transform-style: preserve-3d;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--yy-shadow-sm);
   border-radius: 1rem;
 }
 
@@ -34,15 +34,15 @@
 }
 
 .game-result-card-front {
-  color: #212529;
+  color: var(--yy-ink);
 }
 
 .game-result-card.correct .game-result-card-front {
-  border: 2px solid #34d399;
+  border: 2px solid var(--yy-green);
 }
 
 .game-result-card.incorrect .game-result-card-front {
-  border: 2px solid #ef4444;
+  border: 2px solid var(--yy-red);
 }
 
 .game-result-card-front h5 {
@@ -50,14 +50,14 @@
 }
 
 .game-result-card-front .correct-answer {
-  color: #10b981;
+  color: var(--yy-green);
   font-weight: 700;
   font-size: 18px;
   width: 100%;
 }
 
 .game-result-card-front .user-answer {
-  color: #3b82f6;
+  color: var(--yy-blue);
   font-weight: 700;
   margin-top: 0.5rem;
   font-size: 18px;
@@ -80,24 +80,24 @@
   text-align: center;
   padding: 10px 20px;
   margin: 0 10px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--yy-border-soft);
   border-radius: 5px;
 }
 
 .result-total {
-  background-color: #999999;
+  background-color: var(--yy-text-muted);
   font-weight: bold;
   width: 30%;
 }
 
 .result-correct {
-  background-color: #d1fae5;
+  background-color: var(--yy-success-bg);
   font-weight: bold;
   width: 30%;
 }
 
 .result-incorrect {
-  background-color: #fee2e2;
+  background-color: var(--yy-danger-bg);
   font-weight: bold;
   width: 30%;
 }
@@ -116,13 +116,13 @@
 }
 
 .result-correctword {
-  background-color: #d1fae5;
+  background-color: var(--yy-success-bg);
   height: 45px;
   margin-top: 20px;
 }
 
 .result-incorrectword {
-  background-color: #fee2e2;
+  background-color: var(--yy-danger-bg);
   height: 45px;
   margin-top: 20px;
 }

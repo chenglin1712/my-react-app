@@ -124,7 +124,7 @@
     background-color: transparent;
     color: var(--yy-cream);
     padding: 9px 16px;
-    border-radius: 6px;
+    border-radius: var(--yy-radius-btn);
     border: 2px solid transparent;
     font-size: 14px;
     font-weight: 600;
@@ -235,7 +235,7 @@
     font-family: var(--yy-font-body);
     font-weight: 600;
     padding: 10px 16px;
-    border-radius: 6px;
+    border-radius: var(--yy-radius-btn);
     border: 2px solid transparent;
     transition: border-color 0.2s;
     margin-bottom: 4px;
@@ -256,7 +256,7 @@
     color: var(--yy-cream);
     background-color: transparent;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--yy-radius-btn);
     min-width: 44px;
     min-height: 44px;
     padding: 0 8px;
@@ -278,7 +278,7 @@
     justify-content: flex-start;
     gap: 10px;
     padding: 10px 16px;
-    border-radius: 6px;
+    border-radius: var(--yy-radius-btn);
     cursor: pointer;
     font-size: 16px;
     font-family: var(--yy-font-body);
@@ -315,7 +315,7 @@
     right: -350px;
     width: 350px;
     height: 100%;
-    background-color: #fff;
+    background-color: var(--yy-surface);
     box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
     z-index: 1001;
     visibility: hidden;
@@ -390,7 +390,7 @@
     border: 2px solid var(--yy-gold);
     min-width: 150px;
     z-index: 1002;
-    border-radius: 8px;
+    border-radius: var(--yy-radius-btn);
     box-shadow: var(--yy-shadow-md);
     flex-direction: column;
     overflow: hidden;

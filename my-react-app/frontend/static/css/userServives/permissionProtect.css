@@ -25,7 +25,7 @@
     height: 22px;
     border: 3px solid var(--yy-ink);
     background: var(--yy-red);
-    box-shadow: 3px 3px 0 var(--yy-ink);
+    box-shadow: var(--yy-shadow-sm);
 }
 
 .permission-lock span:nth-child(2) {

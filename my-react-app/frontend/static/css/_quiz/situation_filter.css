@@ -16,7 +16,7 @@
   font-weight: bold;
   border: 2px solid var(--yy-ink);
   border-radius: var(--yy-radius-btn);
-  background-color: #fff;
+  background-color: var(--yy-surface);
   color: var(--yy-ink);
   min-width: auto;
 }
@@ -28,7 +28,7 @@
 .filter-mode-btn.active {
   background-color: var(--yy-red);
   border-color: var(--yy-ink);
-  color: #fff;
+  color: var(--yy-surface);
 }
 
 .filter-date-input {
@@ -36,7 +36,7 @@
   font-size: 14px;
   border: 2px solid var(--yy-ink);
   border-radius: var(--yy-radius-btn);
-  background-color: #fff;
+  background-color: var(--yy-surface);
   transition: var(--transition-interactive);
 }
 
@@ -46,10 +46,10 @@
 }
 
 .filter-date-input:disabled {
-  background-color: #f5f5f5;
-  color: #999;
+  background-color: var(--yy-cream-dim);
+  color: var(--yy-text-muted);
   cursor: not-allowed;
-  border-color: #ddd;
+  border-color: var(--yy-border-soft);
 }
 
 .filter-select {
@@ -57,7 +57,7 @@
   font-size: 14px;
   border: 2px solid var(--yy-ink);
   border-radius: var(--yy-radius-btn);
-  background-color: #fff;
+  background-color: var(--yy-surface);
   cursor: pointer;
 }
 

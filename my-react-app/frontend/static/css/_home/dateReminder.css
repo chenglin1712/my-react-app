@@ -2,15 +2,15 @@
     position: relative;
     overflow: hidden;
     border-radius: var(--yy-radius-card, 10px);
-    background: #fff;
-    color: var(--yy-ink, #221812);
-    box-shadow: var(--yy-shadow-md, 5px 5px 0 #221812);
-    border: 3px solid var(--yy-ink, #221812);
+    background: var(--yy-surface);
+    color: var(--yy-ink);
+    box-shadow: var(--yy-shadow-md, 5px 5px 0 var(--yy-ink));
+    border: 3px solid var(--yy-ink);
 }
 
 .circle {
     position: absolute;
-    background: var(--yy-cream, #F3E7CF);
+    background: var(--yy-cream);
     border-radius: 50%;
 }
 
@@ -47,8 +47,8 @@
 }
 
 .countdown-box {
-    background: var(--yy-cream, #F3E7CF);
-    border: 2px solid var(--yy-ink, #221812);
+    background: var(--yy-cream);
+    border: 2px solid var(--yy-ink);
     border-radius: 0.75rem;
     padding: 1rem;
     font-variant-numeric: tabular-nums;
@@ -65,14 +65,14 @@
 .days-label {
     font-size: 0.875rem;
     opacity: 0.8;
-    color: var(--yy-text-tertiary, #5A4B3B);
+    color: var(--yy-text-tertiary);
 }
 
 .date-range {
     font-size: 0.75rem;
     opacity: 0.7;
     margin-top: 0.5rem;
-    color: var(--yy-text-muted, #6B5A47);
+    color: var(--yy-text-muted);
 }
 
 .schedule {
@@ -99,8 +99,8 @@
     border-radius: 0.5rem;
     font-size: 0.75rem;
     transition: var(--transition-interactive);
-    background: var(--yy-cream, #F3E7CF);
-    color: var(--yy-text-secondary, #3E3226);
+    background: var(--yy-cream);
+    color: var(--yy-text-secondary);
     border: 1.5px solid transparent;
 }
 
@@ -123,9 +123,9 @@
 }
 
 .schedule-item.current {
-    background: #fff;
-    border-color: var(--yy-gold, #D9A227);
-    box-shadow: 3px 3px 0 var(--yy-ink, #221812);
+    background: var(--yy-surface);
+    border-color: var(--yy-gold);
+    box-shadow: var(--yy-shadow-sm);
 }
 
 .schedule-item.past {
@@ -133,7 +133,7 @@
 }
 
 .schedule-item.upcoming {
-    background: var(--yy-cream, #F3E7CF);
+    background: var(--yy-cream);
 }
 
 .schedule-loading-text,
@@ -150,19 +150,19 @@
     text-align: center;
     margin-top: 1rem;
     line-height: 1.5;
-    color: var(--yy-text-muted, #6B5A47);
+    color: var(--yy-text-muted);
 }
 
 .toast-notification {
   position: fixed;
   top: 20px;
   right: 20px;
-  background-color: #fff;
-  border: 3px solid var(--yy-ink, #221812);
-  border-left: 6px solid var(--yy-gold, #D9A227);
+  background-color: var(--yy-surface);
+  border: 3px solid var(--yy-ink);
+  border-left: 6px solid var(--yy-gold);
   padding: 1rem 1.5rem;
-  border-radius: 8px;
-  box-shadow: var(--yy-shadow-md, 5px 5px 0 #221812);
+  border-radius: var(--yy-radius-btn);
+  box-shadow: var(--yy-shadow-md, 5px 5px 0 var(--yy-ink));
   z-index: 1000;
   width: fixed;
 }
@@ -199,7 +199,7 @@
 .dismiss-forever-btn {
     background: none;
     border: none;
-    color: #555;
+    color: var(--yy-text-tertiary);
     font-size: 0.85rem;
     cursor: pointer;
     text-decoration: underline;
@@ -210,7 +210,7 @@
     align-items: center;
     margin-top: 10px;
     font-size: 0.9rem;
-    color: #555;
+    color: var(--yy-text-tertiary);
 }
 
 .checkbox-label input[type="checkbox"] {

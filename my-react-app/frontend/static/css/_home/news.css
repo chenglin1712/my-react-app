@@ -3,7 +3,7 @@
     max-width: 1200px;
     margin: 3rem auto;
     padding: 0 2rem 3rem;
-    font-family: "Noto Sans TC", sans-serif;
+    font-family: var(--yy-font-body);
 }
 
 /* ── 標題列 ────────────────────────────────── */
@@ -31,7 +31,7 @@
 .news-section-title {
     font-size: 1.8rem;
     font-weight: 800;
-    color: #222;
+    color: var(--yy-ink);
     margin: 0;
     line-height: 1.2;
 }
@@ -55,18 +55,18 @@
     flex-direction: column;
     gap: 0.6rem;
     padding: 1.25rem 1.4rem;
-    background: #fff;
-    border: 1px solid #ede8e2;
-    border-radius: 12px;
+    background: var(--yy-surface);
+    border: 1px solid var(--yy-border-soft);
+    border-radius: var(--yy-radius-card);
     text-decoration: none;
     color: inherit;
     transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    box-shadow: var(--yy-shadow-sm);
 }
 
 @media (hover: hover) and (pointer: fine) {
   a.news-card:hover {
-      box-shadow: 0 6px 20px rgba(158, 27, 36, 0.12);
+      box-shadow: var(--yy-shadow-lg);
       transform: translateY(-3px);
       border-color: var(--yy-red);
   }
@@ -85,7 +85,7 @@ a.news-card:active {
 
 .news-card-date {
     font-size: 0.78rem;
-    color: #888;
+    color: var(--yy-text-muted);
     white-space: nowrap;
     flex-shrink: 0;
 }
@@ -93,7 +93,7 @@ a.news-card:active {
 .news-card-title {
     font-size: 0.95rem;
     font-weight: 600;
-    color: #222;
+    color: var(--yy-ink);
     margin: 0;
     line-height: 1.5;
     display: -webkit-box;
@@ -110,23 +110,23 @@ a.news-card:active {
 }
 
 /* ── Tag 標籤 ──────────────────────────────── */
-.tag {
+.news-tag {
     display: inline-block;
     font-size: 0.72rem;
     font-weight: 600;
     padding: 0.2rem 0.6rem;
     border-radius: 20px;
-    color: #fff;
+    color: var(--yy-surface);
     white-space: nowrap;
     background-color: var(--yy-red);
     flex-shrink: 0;
 }
 
-.tag[data-tag*="展覽"] { background-color: #D4890A; }
-.tag[data-tag*="消息"] { background-color: #E05A2B; }
-.tag[data-tag*="公告"] { background-color: #4A7FA5; }
-.tag[data-tag*="園區"] { background-color: #4E7F63; }
-.tag[data-tag*="新聞"] { background-color: #6B4FAA; }
+.news-tag[data-tag*="展覽"] { background-color: #D4890A; }
+.news-tag[data-tag*="消息"] { background-color: #E05A2B; }
+.news-tag[data-tag*="公告"] { background-color: #4A7FA5; }
+.news-tag[data-tag*="園區"] { background-color: #4E7F63; }
+.news-tag[data-tag*="新聞"] { background-color: #6B4FAA; }
 
 /* ── 有圖版：左右排版 ──────────────────────── */
 .event-container {
@@ -141,49 +141,49 @@ a.news-card:active {
     position: relative;
 }
 
-.slide {
+.news-slide {
     position: relative;
-    border-radius: 14px;
+    border-radius: var(--yy-radius-lg);
     overflow: hidden;
 }
 
-.slide img {
+.news-slide img {
     width: 100%;
     height: 440px;
     object-fit: cover;
     display: block;
 }
 
-.slide-info {
+.news-slide-info {
     position: absolute;
     bottom: 0;
     width: 100%;
     padding: 1.2rem 1.4rem;
     background: linear-gradient(transparent, rgba(0,0,0,0.72));
-    color: #fff;
+    color: var(--yy-surface);
 }
 
-.slide-info h3 {
+.news-slide-info h3 {
     font-size: 1.05rem;
     font-weight: 700;
     margin: 0.35rem 0 0.5rem;
     line-height: 1.4;
 }
 
-.slide-date {
+.news-slide-date {
     font-size: 0.82rem;
     font-weight: 600;
-    color: #ffe28a;
+    color: var(--yy-gold-light);
 }
 
-.slide-info a {
-    color: #ffe28a;
+.news-slide-info a {
+    color: var(--yy-gold-light);
     text-decoration: none;
     font-size: 0.82rem;
     font-weight: 600;
 }
 
-.slide-info a:hover { text-decoration: underline; }
+.news-slide-info a:hover { text-decoration: underline; }
 
 .swiper-button-next,
 .swiper-button-prev {
@@ -228,29 +228,29 @@ a.news-card:active {
     gap: 0;
 }
 
-.text-item {
+.news-text-item {
     display: flex;
     align-items: flex-start;
     padding: 0.9rem 0.5rem;
-    border-bottom: 1px solid #f0ebe4;
+    border-bottom: 1px solid var(--yy-border-soft);
     text-decoration: none;
     gap: 0.75rem;
     transition: background 0.15s;
-    border-radius: 6px;
+    border-radius: var(--yy-radius-btn);
 }
 
-a.text-item:hover { background: #fdf6f0; }
+a.news-text-item:hover { background: var(--yy-cream); }
 
-.text-item-date {
+.news-text-item-date {
     width: 88px;
     font-size: 0.82rem;
-    color: #999;
+    color: var(--yy-text-muted);
     font-weight: 600;
     flex-shrink: 0;
     padding-top: 0.15rem;
 }
 
-.text-item-content {
+.news-text-item-content {
     flex: 1;
     min-width: 0;
     display: flex;
@@ -258,10 +258,10 @@ a.text-item:hover { background: #fdf6f0; }
     gap: 0.25rem;
 }
 
-.text-item h3 {
+.news-text-item h3 {
     margin: 0;
     font-size: 0.95rem;
-    color: #333;
+    color: var(--yy-text-secondary);
     font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -292,11 +292,11 @@ a.text-item:hover { background: #fdf6f0; }
         width: 100%;
     }
 
-    .slide img {
+    .news-slide img {
         height: 260px;
     }
 
-    .text-item h3 {
+    .news-text-item h3 {
         white-space: normal;
     }
 }

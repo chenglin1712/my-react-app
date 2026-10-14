@@ -28,7 +28,7 @@ describe('News（首頁新聞）空連結處理', () => {
             />,
         );
         expect(screen.queryByRole('link', { name: /查看詳情/ })).toBeNull();
-        expect(screen.getByText('文字公告').closest('div.text-item')).not.toBeNull();
+        expect(screen.getByText('文字公告').closest('div.news-text-item')).not.toBeNull();
         expect(document.body).not.toHaveTextContent('另開新視窗');
     });
 

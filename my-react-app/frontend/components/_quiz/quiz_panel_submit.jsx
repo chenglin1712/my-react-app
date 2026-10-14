@@ -179,8 +179,8 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
                                         <Star
                                             key={i}
                                             size={16}
-                                            color={i < difficulty ? "#D9A227" : "#ccc"}
-                                            fill={i < difficulty ? "#D9A227" : "#ccc"}
+                                            color={i < difficulty ? "var(--yy-gold)" : "var(--yy-border-soft)"}
+                                            fill={i < difficulty ? "var(--yy-gold)" : "var(--yy-border-soft)"}
                                         />
                                     ))}
                                 </span>

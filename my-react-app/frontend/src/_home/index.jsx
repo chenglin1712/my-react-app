@@ -274,7 +274,7 @@ const HomePage = () => {
                 <>
                     {newsError ? (
                         // 載入失敗只顯示錯誤說明，不再多渲染一個空的 News 區塊
-                        <p className="text-center text-muted" role="status" style={{ margin: '1rem 0' }}>
+                        <p className="text-center yy-text-muted" role="status" style={{ margin: '1rem 0' }}>
                             目前無法載入最新消息，請稍後再試。
                         </p>
                     ) : (

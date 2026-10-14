@@ -14,7 +14,9 @@ import { fileURLToPath } from 'url';
 const CSS_ROOT = dirname(fileURLToPath(import.meta.url));
 
 // 這些名稱太通用，一定會和別的檔案撞名；請加上功能前綴（例如 .bot-overlay）。
-const BANNED_GENERIC = ['.overlay', '.message', '.avatar', '.status', '.modal', '.container', '.wrapper', '.content', '.item'];
+const BANNED_GENERIC = ['.overlay', '.message', '.avatar', '.status', '.modal', '.container', '.wrapper', '.content', '.item',
+  // Bootstrap 本身就有 .card；.tag／.slide／.text-item 也太通用（審查項 P2-22）
+  '.card', '.tag', '.slide', '.text-item'];
 
 // 截至這個測試建立時已經存在的跨檔案同名類別。不要往裡面新增，應該改類別名稱；
 // 清掉其中一個之後請把它從這裡移除。
