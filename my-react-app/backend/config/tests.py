@@ -12,7 +12,15 @@ from django.test import TestCase, override_settings
 from config.auth_flags import auth_dev_bypass
 from core.firebase_auth import require_role, verify_firebase_token
 from config.roles import ADMIN, EDITOR, OWNER, STAFF_ROLES
-from config.tribes import resolve_tribe_name
+from config.tribes import (
+    TRIBE_DATA,
+    TRIBE_IDS,
+    TRIBE_LANG_CODES,
+    TRIBE_MAP,
+    TRIBES,
+    build_tribe_tables,
+    resolve_tribe_name,
+)
 
 
 class ResolveTribeNameTest(TestCase):
@@ -42,6 +50,73 @@ class ResolveTribeNameTest(TestCase):
     def test_rejects_empty_string(self):
         with self.assertRaises(ValueError):
             resolve_tribe_name("")
+
+
+class TribeSingleSourceTest(TestCase):
+    """族群資料單一來源（N-6）：tribes.json 是唯一來源，tribes.py 只是把它轉成既有介面。"""
+
+    def test_current_five_tribes_are_unchanged(self):
+        self.assertEqual([t.slug for t in TRIBES], ["tayal", "amis", "bunun", "kavalan", "paiwan"])
+        self.assertEqual(TRIBE_MAP["tayal"], "泰雅語")
+        self.assertEqual(set(TRIBE_IDS), {"tayal", "amis", "bunun", "kavalan", "paiwan"})
+
+    def test_kavalan_uses_official_spelling_but_keeps_db_name(self):
+        kavalan = next(t for t in TRIBES if t.slug == "kavalan")
+        self.assertEqual(kavalan.short_name, "噶瑪蘭")
+        # 資料庫 tribe.name 仍是舊譯名，查詢要用它
+        self.assertEqual(kavalan.full_name, "葛瑪蘭語")
+        for spelling in ("噶瑪蘭", "噶瑪蘭語", "葛瑪蘭", "葛瑪蘭語", "kavalan"):
+            self.assertEqual(resolve_tribe_name(spelling), "葛瑪蘭語")
+
+    def test_adding_one_entry_makes_it_appear_everywhere(self):
+        extra = {
+            "slug": "demo", "name": "測試", "fullName": "測試語", "roman": "Demo", "color": "#123456",
+            "langCode": None, "id": "00000000-0000-0000-0000-000000000001", "enabled": True,
+        }
+        tribes, tribe_map, tribe_ids = build_tribe_tables(TRIBE_DATA + [extra])
+        self.assertIn("demo", [t.slug for t in tribes])
+        self.assertEqual(tribe_map["測試"], "測試語")
+        self.assertEqual(tribe_ids["demo"], extra["id"])
+
+    def test_reserved_entries_are_not_enabled(self):
+        # 官方承認 16 族，目前啟用 5 族；其餘預留，前後端都不使用
+        self.assertEqual(len(TRIBE_DATA), 16)
+        self.assertEqual(len(TRIBES), 5)
+        reserved = [t for t in TRIBE_DATA if not t.get("enabled")]
+        self.assertEqual(len(reserved), 11)
+        for entry in reserved:
+            self.assertNotIn(entry["slug"], TRIBE_IDS)
+
+    def test_enabled_entry_without_id_is_rejected(self):
+        broken = {"slug": "x", "name": "某", "fullName": "某語", "enabled": True}
+        with self.assertRaises(ValueError):
+            build_tribe_tables([broken])
+
+    def test_display_name_is_official_while_db_name_stays_legacy(self):
+        kavalan = next(t for t in TRIBES if t.slug == "kavalan")
+        self.assertEqual(kavalan.display_name, "噶瑪蘭語")
+        self.assertEqual(kavalan.full_name, "葛瑪蘭語")
+        self.assertEqual(next(t for t in TRIBES if t.slug == "tayal").display_name, "泰雅語")
+
+    def test_duplicate_slug_id_or_name_is_rejected(self):
+        base = {"name": "甲", "fullName": "甲語", "enabled": True}
+        with self.assertRaises(ValueError):
+            build_tribe_tables([{**base, "slug": "a", "id": "1"}, {**base, "slug": "a", "id": "2", "name": "乙", "fullName": "乙語"}])
+        with self.assertRaises(ValueError):
+            build_tribe_tables([{**base, "slug": "a", "id": "1"}, {**base, "slug": "b", "id": "1", "name": "乙", "fullName": "乙語"}])
+        with self.assertRaises(ValueError):
+            # 兩個族群共用同一個簡稱
+            build_tribe_tables([{**base, "slug": "a", "id": "1"}, {**base, "slug": "b", "id": "2", "fullName": "丙語"}])
+
+    def test_slugs_are_unique(self):
+        slugs = [t["slug"] for t in TRIBE_DATA]
+        self.assertEqual(len(slugs), len(set(slugs)))
+
+    def test_lang_codes_cover_the_five_enabled_tribes(self):
+        self.assertEqual(
+            TRIBE_LANG_CODES,
+            {"tayal": "tay", "amis": "ami", "bunun": "bnn", "kavalan": "ckv", "paiwan": "pwn"},
+        )
 
 
 class AuthDevBypassTest(TestCase):

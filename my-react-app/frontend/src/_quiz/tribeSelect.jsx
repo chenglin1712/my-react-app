@@ -2,7 +2,7 @@ import { NotebookPen } from "lucide-react";
 import { Link } from "react-router-dom";
 import "../../static/css/_game/zone.css";
 import { Container } from "react-bootstrap";
-import { TRIBES, TRIBE_COLOR_BY_SLUG } from "../constants/tribes";
+import { TRIBES, TRIBE_COLOR_BY_SLUG, COMING_SOON_LABEL, tribeHasFeature } from "../constants/tribes";
 import StepBar from "../../components/ui/StepBar";
 
 const QUIZ_STEPS = ["選擇族語", "選擇等級", "開始作答", "成績單"];
@@ -29,6 +29,17 @@ const QuizTribeSelect = () => {
 
         <div className="zone-grid">
           {TRIBES.map((tribe) => (
+            !tribeHasFeature(tribe.slug, "quiz") ? (
+              // 這個族群還沒有測驗題庫：不給連結，標示「即將推出」（N-6）
+              <div key={tribe.slug} className="zone-card disabled" aria-disabled="true">
+                <div className="zone-card-icon" aria-hidden="true"><NotebookPen size={44} strokeWidth={2} /></div>
+                <div className="zone-card-body">
+                  <h2 className="zone-card-title">{tribe.name}族語</h2>
+                  <p className="zone-card-subtitle">{tribe.roman}</p>
+                </div>
+                <div className="zone-card-badge badge-soon">{COMING_SOON_LABEL}</div>
+              </div>
+            ) : (
             <Link
               key={tribe.slug}
               to={quizPathForTribe(tribe.slug)}
@@ -49,6 +60,7 @@ const QuizTribeSelect = () => {
                 進入測驗
               </div>
             </Link>
+            )
           ))}
         </div>
       </div>

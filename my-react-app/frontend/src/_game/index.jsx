@@ -2,7 +2,7 @@ import { Spool, Headphones, Mic, BookOpen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../../static/css/_game/index.css";
-import { TRIBES } from "../constants/tribes";
+import { TRIBES, COMING_SOON_LABEL, tribeHasFeature } from "../constants/tribes";
 import DiamondBadge from "../../components/ui/DiamondBadge";
 import { scrollBehavior } from "../hooks/useReducedMotion";
 
@@ -137,16 +137,19 @@ const GameZonePage = () => {
             <div className="gamehub-tribe-grid">
               {TRIBES.map((t) => {
                 const active = activeTribe === t.slug;
+                const soon = !tribeHasFeature(t.slug, activeGame);
                 return (
                   <button
                     key={t.slug}
                     type="button"
-                    className={`gamehub-tribe-card${active ? ' is-selected' : ''}`}
+                    className={`gamehub-tribe-card${active ? ' is-selected' : ''}${soon ? ' is-soon' : ''}`}
                     aria-pressed={active}
-                    onClick={() => setActiveTribe(t.slug)}
+                    aria-disabled={soon || undefined}
+                    onClick={() => { if (!soon) setActiveTribe(t.slug); }}
                   >
                     <DiamondBadge as="span" color={t.color} size={40} fontSize={14} style={{ margin: '0 auto 10px' }}>{t.name}</DiamondBadge>
                     <span className="gamehub-tribe-name">{t.name}族語{active && <span aria-hidden="true"> ✓</span>}</span>
+                    {soon && <span className="gamehub-tribe-soon">{COMING_SOON_LABEL}</span>}
                   </button>
                 );
               })}

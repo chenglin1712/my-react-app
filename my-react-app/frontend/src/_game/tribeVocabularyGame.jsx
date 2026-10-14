@@ -10,7 +10,7 @@ const TITLES = {
 };
 
 const TribeVocabularyGame = () => (
-    <TribeGamePage titles={TITLES} fallbackPath="/game/vocabulary" GameComponent={Game_Start} />
+    <TribeGamePage titles={TITLES} fallbackPath="/game/vocabulary" GameComponent={Game_Start} feature="vocabulary" />
 );
 
 export default TribeVocabularyGame;

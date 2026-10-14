@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { FaPlayCircle } from "react-icons/fa";
 import { useMorphologyAnalysis } from "../../hooks/useMorphologyAnalysis";
 import MorphologyResult from "../_morphology/MorphologyResult";
+import { tribeLangCode } from "../../src/constants/tribes";
 import "../../static/css/_translate/index.css";
 import "../../static/css/_morphology/index.css";
 
@@ -77,7 +78,7 @@ const EvidencePanel = ({ token, onPlayAudio, tribeSlug }) => {
                 </button>
             )}
             {morphology.error && <p className="yy-morph-error" role="alert">{morphology.error}</p>}
-            <MorphologyResult result={morphology.result} onPlayAudio={onPlayAudio} compact />
+            <MorphologyResult result={morphology.result} onPlayAudio={onPlayAudio} compact lang={tribeLangCode(tribeSlug)} />
         </div>
     );
 };

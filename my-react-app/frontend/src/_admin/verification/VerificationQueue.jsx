@@ -11,13 +11,12 @@ import {
     STAFF_ROLES, VERIFICATION_EXPORTERS, VERIFICATION_IMPORTERS, VERIFICATION_REVIEWERS,
 } from '../constants/roles';
 import stateLabel from './stateLabel';
+import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
 import '../../../static/css/_admin/system.css';
 
 const BASE = '/adminapi/verification';
 
-const TRIBES = {
-    tayal: '泰雅語', amis: '阿美語', bunun: '布農語', kavalan: '葛瑪蘭語', paiwan: '排灣語',
-};
+const TRIBES = TRIBE_FULL_NAME_BY_SLUG;
 const KINDS = {
     unmatched_form: '詞形（辭典對不到）',
     morph_analysis: '詞形分析結果',

@@ -173,7 +173,7 @@ async def capabilities_endpoint(request: Request, db: Session = Depends(get_db))
 
     tribes = [
         TribeCapabilityOut(
-            tribeSlug=t.slug, tribeName=t.full_name,
+            tribeSlug=t.slug, tribeName=t.display_name,
             pairCount=stats[t.slug]["pair_count"], headwordCount=stats[t.slug]["headword_count"],
             hasSentenceAudio=stats[t.slug]["has_sentence_audio"],
         )

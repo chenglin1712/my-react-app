@@ -98,7 +98,7 @@ def taxonomy_list(request):
     db = SessionLocal()
     try:
         result = {
-            "tribes": [{"id": t.id, "slug": t.slug, "name": t.full_name} for t in TRIBES],
+            "tribes": [{"id": t.id, "slug": t.slug, "name": t.display_name} for t in TRIBES],
         }
         for kind, model in _taxonomy_models().items():
             junction_model, fk_field = _reference_junctions()[kind]

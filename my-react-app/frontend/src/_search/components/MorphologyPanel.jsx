@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import MorphologyResult from "../../../components/_morphology/MorphologyResult";
 import { useMorphologyAnalysis } from "../../../hooks/useMorphologyAnalysis";
+import { tribeLangCode } from "../../constants/tribes";
 import "../../../static/css/_morphology/index.css";
 
 const WORD_MAX_LENGTH = 40;
@@ -75,7 +76,7 @@ const MorphologyPanel = ({ tribeSlug, tribeName, playAudio, prefill = null }) =>
                     <p className="yy-morph-hint">一次輸入一個詞形（不含空白）。結果會標示每個答案的來源與把握程度。</p>
 
                     {error && <p className="yy-morph-error" role="alert">{error}</p>}
-                    <MorphologyResult result={result} onPlayAudio={playAudio} />
+                    <MorphologyResult result={result} onPlayAudio={playAudio} lang={tribeLangCode(tribeSlug)} />
                 </div>
             )}
         </section>

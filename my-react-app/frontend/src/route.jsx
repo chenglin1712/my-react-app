@@ -4,7 +4,7 @@ import LoadingSpinner from '@components/ui/LoadingSpinner';
 import { useAuth } from './userServives/authContext';
 import PermissionProtect from './userServives/permissionProtect';
 import ErrorBoundary from './errorBoundary';
-import { TRIBES } from './constants/tribes';
+import { TRIBES, tribeHasFeature } from './constants/tribes';
 import AdminEntryFallback from './_admin/entry/AdminEntryFallback';
 import AdminEntryGate from './_admin/entry/AdminEntryGate';
 //找不到頁面
@@ -157,7 +157,7 @@ const AppRoutes = () => {
                   元件本身的 tribe prop 預設值就是 "tayal"，所以泰雅語改成一併明確
                   傳入 tribe="tayal" 後，解析出來的行為跟原本省略不傳完全一樣，
                   可以安全地跟其他族語用同一段迴圈產生。 */}
-              {TRIBES.map((t) => (
+              {TRIBES.filter((t) => tribeHasFeature(t.slug, 'quiz')).map((t) => (
                 <Route key={t.slug} path={t.slug === 'tayal' ? '' : t.slug} element={<Comp_quiz tribe={t.slug} />} >
                   <Route index element={<Comp_quiz_start tribe={t.slug} />} />
                   <Route path="scenario" element={<ScenarioQuiz tribe={t.slug} />} />
@@ -169,7 +169,7 @@ const AppRoutes = () => {
                   _result（這兩個子頁面本身也沒有 tribe prop，結果頁只顯示已經算好的
                   作答結果，不需要知道族語），維持原樣、只有 Comp_quiz_recommon 和
                   Comp_quiz_recommon_question 需要 tribe。 */}
-              {TRIBES.map((t) => (
+              {TRIBES.filter((t) => tribeHasFeature(t.slug, 'quiz')).map((t) => (
                 <Route key={`${t.slug}-recommon`} path={t.slug === 'tayal' ? 'recommon' : `${t.slug}/recommon`} element={<Comp_quiz_recommon tribe={t.slug} />} >
                   <Route index element={<Comp_quiz_recommon_start />} />
                   <Route path="question" element={<Comp_quiz_recommon_question tribe={t.slug} />} />

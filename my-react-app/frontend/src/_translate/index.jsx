@@ -5,7 +5,7 @@ import LoadingSpinner from "@components/ui/LoadingSpinner";
 import { Link } from "react-router-dom";
 import { ArrowLeftRight, Copy, Volume2 } from "lucide-react";
 import "../../static/css/_translate/index.css";
-import { TRIBES } from "../constants/tribes";
+import { TRIBES, tribeLangCode } from "../constants/tribes";
 import TribePill from "../../components/ui/TribePill";
 import GroundedText from "../../components/_translate/GroundedText";
 import GuestTrialNotice from "../../components/_translate/GuestTrialNotice";
@@ -328,6 +328,7 @@ const TranslatePage = () => {
                         {!loading && result && (
                             <>
                                 <GroundedText
+                                    lang={tribeLangCode(result.tribeSlug ?? tribe)}
                                     tokens={result.tokens}
                                     activeIndex={activeTokenIndex}
                                     onTokenClick={(i) => setActiveTokenIndex((cur) => (cur === i ? null : i))}

@@ -38,12 +38,12 @@ const AudioButton = ({ fileId, label, onPlayAudio }) =>
         </button>
     ) : null;
 
-const Examples = ({ examples, onPlayAudio }) =>
+const Examples = ({ examples, onPlayAudio, lang }) =>
     examples?.length > 0 ? (
         <ul className="yy-morph-examples">
             {examples.map((ex, i) => (
                 <li key={i}>
-                    <span lang="und" className="yy-morph-example-original">{ex.original}</span>
+                    <span lang={lang} className="yy-morph-example-original">{ex.original}</span>
                     <AudioButton fileId={ex.audioFileId} label="播放例句發音" onPlayAudio={onPlayAudio} />
                     <span className="yy-morph-example-chinese">{ex.chinese}</span>
                 </li>
@@ -51,7 +51,7 @@ const Examples = ({ examples, onPlayAudio }) =>
         </ul>
     ) : null;
 
-const Candidate = ({ candidate: c, onPlayAudio }) => {
+const Candidate = ({ candidate: c, onPlayAudio, lang }) => {
     const conf = CONFIDENCE[c.confidence] ?? CONFIDENCE.low;
     return (
         <li className={`yy-morph-candidate yy-morph-conf-${c.confidence}`}>
@@ -59,12 +59,12 @@ const Candidate = ({ candidate: c, onPlayAudio }) => {
                 <span className={`yy-morph-badge yy-morph-badge-${c.confidence}`} title={conf.hint}>{conf.label}</span>
                 {c.source === "similar" ? (
                     <span>
-                        你是不是想找 <strong lang="und">{c.root}</strong>
+                        你是不是想找 <strong lang={lang}>{c.root}</strong>
                         <span className="yy-morph-muted">（相差 {c.distance} 個字母）</span>
                     </span>
                 ) : (
                     <span>
-                        詞根 <strong lang="und">{c.root}</strong>
+                        詞根 <strong lang={lang}>{c.root}</strong>
                     </span>
                 )}
                 <AudioButton fileId={c.audioFileId} label={`播放 ${c.root} 的發音`} onPlayAudio={onPlayAudio} />
@@ -85,7 +85,7 @@ const Candidate = ({ candidate: c, onPlayAudio }) => {
                 </p>
             )}
 
-            <Examples examples={c.examples} onPlayAudio={onPlayAudio} />
+            <Examples examples={c.examples} onPlayAudio={onPlayAudio} lang={lang} />
         </li>
     );
 };
@@ -94,14 +94,15 @@ const Candidate = ({ candidate: c, onPlayAudio }) => {
  * 詞形分析結果的顯示（純顯示，不負責取資料）。
  * result 是 POST /api/v1/morphology/analyze 的回應；compact 用在空間比較小的地方（例如翻譯的依據面板）。
  */
-const MorphologyResult = ({ result, onPlayAudio, compact = false }) => {
+// lang：族語文字的 HTML lang（ISO 639-3，由呼叫端依族群帶入，見 tribeLangCode）；不知道是哪一族時維持 und
+const MorphologyResult = ({ result, onPlayAudio, compact = false, lang = "und" }) => {
     if (!result) return null;
     const { token, candidates = [], notes = [] } = result;
 
     return (
         <div className={`yy-morph-result${compact ? " yy-morph-compact" : ""}`} aria-live="polite">
             <div className="yy-morph-token">
-                <strong lang="und">{result.input}</strong>
+                <strong lang={lang}>{result.input}</strong>
                 <span className={`yy-morph-status yy-morph-status-${token.status}`}>{TOKEN_STATUS[token.status]}</span>
                 {token.status === "headword" && token.gloss && (
                     <span className="yy-morph-token-gloss">＝ {token.gloss}</span>
@@ -112,13 +113,13 @@ const MorphologyResult = ({ result, onPlayAudio, compact = false }) => {
             {token.attestedSentence && (
                 <div className="yy-morph-attested">
                     <span className="yy-morph-muted">出現在這個辭典例句：</span>
-                    <Examples examples={[token.attestedSentence]} onPlayAudio={onPlayAudio} />
+                    <Examples examples={[token.attestedSentence]} onPlayAudio={onPlayAudio} lang={lang} />
                 </div>
             )}
 
             {candidates.length > 0 && (
                 <ul className="yy-morph-candidates">
-                    {candidates.map((c, i) => <Candidate key={`${c.source}-${c.root}-${i}`} candidate={c} onPlayAudio={onPlayAudio} />)}
+                    {candidates.map((c, i) => <Candidate key={`${c.source}-${c.root}-${i}`} candidate={c} onPlayAudio={onPlayAudio} lang={lang} />)}
                 </ul>
             )}
 

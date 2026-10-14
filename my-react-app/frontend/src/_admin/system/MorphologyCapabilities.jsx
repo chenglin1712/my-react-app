@@ -7,15 +7,10 @@ import { useAuth } from '../../userServives/authContext';
 import { apiGet } from '../../../utils/apiClient';
 import { STAFF_ROLES } from '../constants/roles';
 import formatRatio from './formatRatio';
+import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
 import '../../../static/css/_admin/system.css';
 
-const TRIBE_NAMES = {
-    tayal: '泰雅語',
-    amis: '阿美語',
-    bunun: '布農語',
-    kavalan: '葛瑪蘭語',
-    paiwan: '排灣語',
-};
+const TRIBE_NAMES = TRIBE_FULL_NAME_BY_SLUG;
 
 const FAMILY_LABELS = {
     stem: '詞幹', sub1: '替換 1', indel1: '增刪 1', sub2: '替換 2', rand: '隨機',

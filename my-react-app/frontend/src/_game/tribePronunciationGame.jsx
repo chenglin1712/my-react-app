@@ -10,7 +10,7 @@ const TITLES = {
 };
 
 const TribePronunciationGame = () => (
-    <TribeGamePage titles={TITLES} fallbackPath="/game/pronunciation" GameComponent={PronunciationGame} />
+    <TribeGamePage titles={TITLES} fallbackPath="/game/pronunciation" GameComponent={PronunciationGame} feature="pronunciation" />
 );
 
 export default TribePronunciationGame;

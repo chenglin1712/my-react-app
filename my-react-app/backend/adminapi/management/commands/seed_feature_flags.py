@@ -27,7 +27,7 @@ class Command(BaseCommand):
                 key=f"quiz_enabled_{tribe.slug}",
                 defaults={
                     "label": f"{tribe.short_name}語測驗",
-                    "description": f"關閉後，{tribe.full_name}的官方等級測驗與情境題會回傳 403，不再出題。",
+                    "description": f"關閉後，{tribe.display_name}的官方等級測驗與情境題會回傳 403，不再出題。",
                     "enabled": True,
                 },
             )

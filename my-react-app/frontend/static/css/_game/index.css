@@ -237,6 +237,21 @@
     transition: var(--transition-interactive);
 }
 
+/* 還沒有這個遊戲內容的族群：不能選，標示「即將推出」 */
+.gamehub-tribe-card.is-soon {
+    cursor: default;
+    opacity: 0.7;
+    box-shadow: none;
+}
+
+.gamehub-tribe-soon {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--yy-text-muted);
+}
+
 .gamehub-tribe-card.is-selected {
     box-shadow: 5px 5px 0 var(--yy-gold);
     transform: scale(1.05);

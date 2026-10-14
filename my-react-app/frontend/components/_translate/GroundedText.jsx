@@ -11,8 +11,9 @@ const STATUS_LABEL = {
     unsupported: "語料庫查無此詞",
 };
 
-const GroundedText = ({ tokens = [], onTokenClick, activeIndex }) => (
-    <p className="yy-grounded-text" lang="und">
+// lang：族語文字的 HTML lang（ISO 639-3，由呼叫端依族群帶入，見 tribeLangCode）
+const GroundedText = ({ tokens = [], onTokenClick, activeIndex, lang = "und" }) => (
+    <p className="yy-grounded-text" lang={lang}>
         {tokens.map((t, i) => {
             if (t.status === "punct") {
                 return <span key={i} className="yy-gt-punct">{t.surface}</span>;

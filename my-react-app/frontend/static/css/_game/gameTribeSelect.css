@@ -117,6 +117,18 @@
   color: var(--yy-surface);
 }
 
+/* 還沒有這個遊戲內容的族群：不可點、降低存在感，但文字仍要讀得到 */
+.vocab-tribe-tag.soon {
+  background: var(--yy-cream-dim);
+  color: var(--yy-text-muted);
+}
+
+.vocab-tribe-card.is-soon {
+  cursor: default;
+  opacity: 0.7;
+  box-shadow: none;
+}
+
 @media (max-width: 600px) {
   .vocab-back-btn {
     position: static;

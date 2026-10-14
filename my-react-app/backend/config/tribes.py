@@ -1,48 +1,86 @@
-"""族語對照表單一資料來源。
+"""族語對照表（讀取單一資料來源 tribes.json）。
+
+族群資料的唯一來源是同目錄的 tribes.json（N-6）：識別碼、名稱、羅馬字、色彩、語言代碼、
+審閱狀態、各功能是否有內容、預留的 16 族與方言別。前台 frontend/src/constants/tribes.js
+讀的是同一個檔案，所以新增族群只改 tribes.json 一處，前後端都會出現。
 
 原本 dictionary.py（TRIBE_MAP）、listening.py／sentence.py（TRIBE_IDS）、
 crawler/dictionary_source.py（TRIBE_IDS）、CrosswordPuzzle/views.py（_TRIBE_IDS）
-各自重複寫了一份幾乎相同的族語對照表，新增族語要改五個地方。這裡集中成
-唯一資料來源，其餘檔案改成從這裡 import。
+各自重複寫了一份幾乎相同的族語對照表，之後集中到 tribes.py，現在再把資料本身
+移到 tribes.json，這個檔案只負責把 JSON 轉成既有的 TRIBES／TRIBE_MAP／TRIBE_IDS 介面，
+其餘檔案的 import 不需要改。
 
 id 對應 dictionary.db 的 tribe.id（見 dictionary_db/model.py 的 Tribe 表、
 alembic/versions/00a315a8dfa8_...），純資料、不依賴 Django 或 FastAPI，
 兩邊都能直接 import。
 """
 
+import json
+from pathlib import Path
 from typing import NamedTuple
+
+_DATA_PATH = Path(__file__).with_name("tribes.json")
 
 
 class TribeInfo(NamedTuple):
     slug: str        # 英文代稱，例如 "tayal"
     short_name: str   # 中文簡稱，例如 "泰雅"
-    full_name: str    # 中文全名，對應 tribe.name，例如 "泰雅語"
+    full_name: str    # 資料庫 tribe.name 的實際值，例如 "泰雅語"（噶瑪蘭是舊譯名「葛瑪蘭語」）
     id: str           # tribe.id（UUID）
+    display_name: str = ""  # 畫面與 API 回應用的官方全名，例如 "噶瑪蘭語"（full_name 是資料庫舊譯名，不要拿去顯示）
 
 
-TRIBES = [
-    TribeInfo("tayal",   "泰雅",   "泰雅語",   "fc76ed97-0dd8-4587-82ad-7a6dbe125001"),
-    TribeInfo("amis",    "阿美",   "阿美語",   "e68273b9-1f2b-4c42-8d95-f52189ab24b7"),
-    TribeInfo("bunun",   "布農",   "布農語",   "865a96e3-3384-45b3-8bd0-e1f799b75515"),
-    TribeInfo("kavalan", "葛瑪蘭", "葛瑪蘭語", "c5974f37-b49d-466a-ab24-6893ab4ef6a5"),
-    TribeInfo("paiwan",  "排灣",   "排灣語",   "19c77a3b-3a81-496f-b0f4-afe6d9155edd"),
-]
+def load_tribe_data(path=_DATA_PATH):
+    """讀取 tribes.json，回傳完整的族群清單（含尚未啟用的預留族群）。"""
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)["tribes"]
 
-# 英文代稱／中文簡稱 -> 中文全名（原本各檔案的 TRIBE_MAP）
-TRIBE_MAP = {}
-for _t in TRIBES:
-    TRIBE_MAP[_t.slug] = _t.full_name
-    TRIBE_MAP[_t.short_name] = _t.full_name
+
+def build_tribe_tables(raw_tribes):
+    """把 tribes.json 的內容轉成 (TRIBES, TRIBE_MAP, TRIBE_IDS)。
+
+    只有 enabled 為 true 的族群會進入表格；啟用的族群缺 id 或 fullName 時直接丟 ValueError，
+    避免漏填資料而在執行時才出現難以追查的錯誤。
+    """
+    slugs = [entry["slug"] for entry in raw_tribes]
+    if len(slugs) != len(set(slugs)):
+        raise ValueError("tribes.json：slug 重複")
+
+    tribes = []
+    tribe_map = {}
+    tribe_ids = {}
+    for entry in raw_tribes:
+        if not entry.get("enabled"):
+            continue
+        slug = entry["slug"]
+        for field in ("name", "fullName", "id"):
+            if not entry.get(field):
+                raise ValueError(f"tribes.json：啟用的族群 {slug} 缺少 {field}")
+        db_name = entry.get("dbName") or entry["fullName"]
+        if entry["id"] in tribe_ids.values():
+            raise ValueError(f"tribes.json：id 重複（{slug}）")
+        tribes.append(TribeInfo(slug, entry["name"], db_name, entry["id"], entry["fullName"]))
+        tribe_ids[slug] = entry["id"]
+        # 英文代稱、中文簡稱、顯示全名、資料庫全名、舊寫法別名都解析到同一個資料庫全名
+        for key in (slug, entry["name"], entry["fullName"], *entry.get("aliases", [])):
+            if tribe_map.get(key, db_name) != db_name:
+                raise ValueError(f"tribes.json：名稱「{key}」同時指向兩個族群")
+            tribe_map[key] = db_name
+    return tribes, tribe_map, tribe_ids
+
+
+TRIBE_DATA = load_tribe_data()
+TRIBES, TRIBE_MAP, TRIBE_IDS = build_tribe_tables(TRIBE_DATA)
+
+# 英文代稱 -> ISO 639-3 語言代碼（沒有核對過的留空，不放進這個表）
+TRIBE_LANG_CODES = {t["slug"]: t["langCode"] for t in TRIBE_DATA if t.get("enabled") and t.get("langCode")}
 
 # dictionary.db 的 tribe.name 沿用舊譯名「葛瑪蘭語」（見 kavalan_bank.py 開頭說明），
-# 但「噶瑪蘭」才是正確漢字，前端一律改顯示「噶瑪蘭」後，這裡補一個別名，
-# 讓兩種拼法都能查到同一個 tribe，不必動到既有 DB 資料
-TRIBE_MAP["噶瑪蘭"] = TRIBE_MAP["葛瑪蘭"]
-
-# 英文代稱 -> tribe_id UUID（原本各檔案的 TRIBE_IDS）
-TRIBE_IDS = {_t.slug: _t.id for _t in TRIBES}
+# 官方用字是「噶瑪蘭」，前台與其他顯示一律用「噶瑪蘭」；兩種寫法都能查到同一個 tribe
+# 是由 tribes.json 的 aliases 處理，不必動到既有 DB 資料。
 
 _VALID_FULL_NAMES = frozenset(_t.full_name for _t in TRIBES)
+
 
 
 def resolve_tribe_name(tribe: str) -> str:

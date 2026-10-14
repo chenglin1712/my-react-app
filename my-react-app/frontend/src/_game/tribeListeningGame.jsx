@@ -10,7 +10,7 @@ const TITLES = {
 };
 
 const TribeListeningGame = () => (
-    <TribeGamePage titles={TITLES} fallbackPath="/game/listening" GameComponent={ListeningGame} />
+    <TribeGamePage titles={TITLES} fallbackPath="/game/listening" GameComponent={ListeningGame} feature="listening" />
 );
 
 export default TribeListeningGame;
