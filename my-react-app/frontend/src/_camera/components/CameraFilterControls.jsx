@@ -9,7 +9,7 @@ export default function CameraFilterControls({
   sortOrder, setSortOrder, filterLetter, setFilterLetter, alphabet,
   frequencyFilter, setFrequencyFilter, showOnlyFavorites, setShowOnlyFavorites,
   showCategories, setShowCategories, activeTab, setActiveTab, selectedSubCategory, setSelectedSubCategory,
-  onRestart,
+  onBack,
 }) {
   const backIcon = (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-arrow-return-left" viewBox="0 0 16 16" aria-hidden="true">
@@ -18,9 +18,9 @@ export default function CameraFilterControls({
   );
 
   const backButton = (
-    <Button type="button" variant="outline-danger" onClick={onRestart}>
+    <Button type="button" variant="outline-danger" onClick={onBack}>
       {backIcon}
-      &nbsp; 返回
+      &nbsp; 回到選詞
     </Button>
   );
 

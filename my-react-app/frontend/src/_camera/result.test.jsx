@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import axios from 'axios';
 import CameraResultStep from './result';
 
@@ -100,5 +100,48 @@ describe('CameraResultStep', () => {
     render(<CameraResultStep selectedWords={['balay']} tribe="tayal" onRestart={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText(/查詢失敗: Network Error/)).toBeInTheDocument());
+  });
+});
+
+describe('CameraResultStep 的導覽與族語（E-4）', () => {
+  beforeEach(() => {
+    mockCurrentUser = null;
+    axios.post.mockReset();
+    axios.post.mockResolvedValue(FAKE_RESPONSE);
+  });
+
+  test('「回到選詞」與「重新上傳圖片」是兩個不同的動作', async () => {
+    const onBack = vi.fn();
+    const onRestart = vi.fn();
+    render(<CameraResultStep selectedWords={['balay']} tribe="tayal" onTribeChange={vi.fn()} onBack={onBack} onRestart={onRestart} />);
+    await screen.findByText('balay');
+
+    fireEvent.click(screen.getAllByRole('button', { name: /回到選詞/ })[0]);
+    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(onRestart).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '重新上傳圖片' }));
+    expect(onRestart).toHaveBeenCalledTimes(1);
+  });
+
+  test('族語選擇在結果頁：切換會通知上層', async () => {
+    const onTribeChange = vi.fn();
+    render(<CameraResultStep selectedWords={['balay']} tribe="tayal" onTribeChange={onTribeChange} onBack={vi.fn()} onRestart={vi.fn()} />);
+    await screen.findByText('balay');
+
+    const group = screen.getByRole('group', { name: '查詢的族語' });
+    fireEvent.click(group.querySelectorAll('button')[1]);
+    expect(onTribeChange).toHaveBeenCalled();
+  });
+
+  test('查詢失敗可以重試，重試會再送一次', async () => {
+    axios.post.mockReset();
+    axios.post.mockRejectedValueOnce(new Error('Network Error'));
+    axios.post.mockResolvedValueOnce(FAKE_RESPONSE);
+    render(<CameraResultStep selectedWords={['balay']} tribe="tayal" onTribeChange={vi.fn()} onBack={vi.fn()} onRestart={vi.fn()} />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('查詢失敗');
+    fireEvent.click(screen.getByRole('button', { name: '重試' }));
+    expect(await screen.findByText('balay')).toBeInTheDocument();
+    expect(axios.post).toHaveBeenCalledTimes(2);
   });
 });

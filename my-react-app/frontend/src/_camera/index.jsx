@@ -1,10 +1,8 @@
-import { useState, useRef, lazy, Suspense } from "react";
+import { useState, useRef, useCallback, lazy, Suspense } from "react";
 import { Alert } from "react-bootstrap";
 import LoadingSpinner from "@components/ui/LoadingSpinner";
 import "../../static/css/_camera/wizard.css";
-import { TRIBES } from "../constants/tribes";
 import StepBar from "../../components/ui/StepBar";
-import TribePill from "../../components/ui/TribePill";
 
 // 第 2、3 步各自 lazy load：第 1 步（選圖）原本會把三步全部一起打包進去，
 // 含第 3 步查詢結果頁引用的 36 張分類圖（見 constants/categoryGroups.js），
@@ -30,7 +28,12 @@ const CameraWizard = () => {
     const [fileName, setFileName] = useState("請選擇圖片");
     const [errorMsg, setErrorMsg] = useState("");
     const [selectedWords, setSelectedWords] = useState([]);
-    const fileInputRef = useRef(null);
+    // 第 2 步辨識出的候選詞與勾選狀態：辨識是一次付費的 Vision 呼叫，從結果頁「回到選詞」時
+    // 直接沿用，不重新辨識。換圖或重新上傳時清掉。
+    const [labelState, setLabelState] = useState(null);
+    const saveLabelState = useCallback((next) => setLabelState(next), []);
+    const albumInputRef = useRef(null);
+    const cameraInputRef = useRef(null);
     // 快速選圖 A 再選圖 B、或選圖後立刻取消，A 的 FileReader 可能比較晚才讀完；
     // 沒有這個 generation 的話，晚到的 onloadend 會把預覽蓋回已經不對的那張圖。
     const fileReadGenerationRef = useRef(0);
@@ -55,6 +58,7 @@ const CameraWizard = () => {
         reader.readAsDataURL(newFile);
         setFile(newFile);
         setFileName(newFile.name);
+        setLabelState(null);
     };
 
     const handleCancel = () => {
@@ -63,9 +67,11 @@ const CameraWizard = () => {
         setFile(null);
         setInputKey(Date.now());
         setFileName("請選擇圖片");
+        setLabelState(null);
     };
 
-    const handlePreviewClick = () => fileInputRef.current?.click();
+    const handleAlbumClick = () => albumInputRef.current?.click();
+    const handleCameraClick = () => cameraInputRef.current?.click();
 
     const restart = () => {
         setStep(1);
@@ -80,12 +86,6 @@ const CameraWizard = () => {
                     <span className="yy-eyebrow">◆ VISION MODE ◆</span>
                     <h1 className="camera-title">影像辨識</h1>
                     <p className="camera-desc">拍下身邊的物件，讓 AI 找出對應的族語詞彙，打造專屬你的族語單字卡。</p>
-                </div>
-
-                <div className="yy-fade-up camera-tribe-row">
-                    {TRIBES.map((t) => (
-                        <TribePill key={t.slug} tribe={t} active={tribe === t.slug} onClick={() => setTribe(t.slug)} />
-                    ))}
                 </div>
 
                 <div className="yy-fade-up camera-stepbar-wrap">
@@ -112,22 +112,38 @@ const CameraWizard = () => {
                         <div className="camera-step1-panel">
                             <div className="yy-card camera-step1-card">
                                 <div className="camera-step1-row">
-                                    <button type="button" className="yy-btn-outline" onClick={handlePreviewClick}>選擇圖片</button>
+                                    <button type="button" className="yy-btn-outline" onClick={handleAlbumClick}>選擇圖片</button>
+                                    {/* 只在觸控裝置顯示：桌機沒有相機可拍，點了也只會開檔案對話框 */}
+                                    <button type="button" className="yy-btn-outline camera-capture-btn" onClick={handleCameraClick}>拍照</button>
                                     <span className="camera-filename">{fileName}</span>
                                 </div>
+                                {/* 相簿入口：不帶 capture，部分 Android 帶了 capture 會直接開相機、不給選相簿 */}
                                 <input
                                     id="camera-file-input"
-                                    key={inputKey}
+                                    key={`album-${inputKey}`}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageChange}
+                                    ref={albumInputRef}
+                                    style={{ display: "none" }}
+                                    aria-label="選擇圖片檔案"
+                                />
+                                <input
+                                    key={`camera-${inputKey}`}
                                     type="file"
                                     accept="image/*"
                                     capture="environment"
                                     onChange={handleImageChange}
-                                    ref={fileInputRef}
+                                    ref={cameraInputRef}
                                     style={{ display: "none" }}
-                                    aria-label="選擇圖片檔案"
+                                    aria-label="拍照"
+                                    tabIndex={-1}
                                 />
                                 {errorMsg && <Alert variant="danger" className="py-2 mt-2 mb-0">{errorMsg}</Alert>}
                                 <p className="camera-hint">支援常見圖片格式，檔案大小上限 5MB。</p>
+                                <p className="camera-privacy">
+                                    按下「提交辨識」後，圖片會上傳到本站伺服器，並送到 Google Cloud Vision 辨識圖中的物件。請避免上傳含有人臉、證件或個人資料的照片。
+                                </p>
                             </div>
                             <div className="camera-step1-actions">
                                 <button type="button" className="yy-btn-primary" disabled={!image} onClick={() => setStep(2)}>提交辨識 ▸</button>
@@ -142,6 +158,8 @@ const CameraWizard = () => {
                         <CameraLabelStep
                             image={image}
                             file={file}
+                            saved={labelState}
+                            onSave={saveLabelState}
                             onConfirm={(words) => { setSelectedWords(words); setStep(3); }}
                             onBack={() => setStep(1)}
                         />
@@ -153,6 +171,8 @@ const CameraWizard = () => {
                         <CameraResultStep
                             selectedWords={selectedWords}
                             tribe={tribe}
+                            onTribeChange={setTribe}
+                            onBack={() => setStep(2)}
                             onRestart={restart}
                         />
                     </Suspense>

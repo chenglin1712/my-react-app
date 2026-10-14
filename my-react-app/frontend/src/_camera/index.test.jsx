@@ -15,9 +15,10 @@ vi.mock('./label', () => ({
   ),
 }));
 vi.mock('./result', () => ({
-  default: ({ selectedWords, tribe, onRestart }) => (
+  default: ({ selectedWords, tribe, onBack, onRestart }) => (
     <div>
       <span>result-step words={selectedWords.join(',')} tribe={tribe}</span>
+      <button onClick={onBack}>back-to-label</button>
       <button onClick={onRestart}>restart</button>
     </div>
   ),
@@ -121,5 +122,32 @@ describe('CameraWizard', () => {
 
     expect(screen.getByText('提交辨識 ▸')).toBeDisabled();
     expect(screen.getByText('請選擇圖片')).toBeInTheDocument();
+  });
+});
+
+describe('CameraWizard 的入口與說明（E-4）', () => {
+  test('第 1 步有隱私說明，也不再顯示族語選擇（族語在結果頁才有作用）', () => {
+    render(<CameraWizard />);
+    expect(screen.getByText(/Google Cloud Vision/)).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: '查詢的族語' })).not.toBeInTheDocument();
+  });
+
+  test('相簿入口不帶 capture，拍照入口才帶 capture=environment', () => {
+    render(<CameraWizard />);
+    expect(screen.getByLabelText('選擇圖片檔案')).not.toHaveAttribute('capture');
+    expect(screen.getByLabelText('拍照', { selector: 'input' })).toHaveAttribute('capture', 'environment');
+  });
+
+  test('結果頁按「回到選詞」會回到第 2 步，不用重新上傳', async () => {
+    render(<CameraWizard />);
+    selectFile(new File(['x'], 'ok.png', { type: 'image/png' }));
+    await waitFor(() => expect(screen.getByText('提交辨識 ▸')).not.toBeDisabled());
+    fireEvent.click(screen.getByText('提交辨識 ▸'));
+    await waitFor(() => expect(screen.getByText('label-step')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('confirm-label'));
+    await waitFor(() => expect(screen.getByText(/result-step/)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('back-to-label'));
+    await waitFor(() => expect(screen.getByText('label-step')).toBeInTheDocument());
   });
 });

@@ -12,7 +12,20 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.camera-step3-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.camera-step3 .camera-tribe-row {
+  margin: 0 0 18px;
+  justify-content: flex-start;
 }
 
 .camera-step3-title {

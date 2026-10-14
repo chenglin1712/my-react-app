@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import axios from 'axios';
+import { MemoryRouter } from 'react-router-dom';
 import CameraLabelStep from './label';
 
 vi.mock('axios');
@@ -102,5 +103,88 @@ describe('CameraLabelStep', () => {
     expect(signal.aborted).toBe(true);
 
     resolvePost({ data: { labels: [] } });
+  });
+});
+
+describe('CameraLabelStep 的失敗、零結果與沿用（E-4）', () => {
+  const file = new File(['x'], 'test.png', { type: 'image/png' });
+  const renderStep = (props = {}) => render(
+    <MemoryRouter>
+      <CameraLabelStep image="x" file={file} onConfirm={vi.fn()} onBack={vi.fn()} {...props} />
+    </MemoryRouter>,
+  );
+
+  beforeEach(() => {
+    mockCurrentUser = null;
+    axios.post.mockReset();
+  });
+
+  test('圖片本身的問題（400）：顯示後端說明，不提供重試，只能換一張圖', async () => {
+    axios.post.mockRejectedValueOnce({ response: { status: 400, data: { detail: '這個檔案看起來不是有效的圖片' } } });
+    const onBack = vi.fn();
+    renderStep({ onBack });
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('這個檔案看起來不是有效的圖片');
+    expect(screen.queryByRole('button', { name: '重試' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '換一張圖片' }));
+    expect(onBack).toHaveBeenCalled();
+  });
+
+  test('服務暫時的問題（503）：說明原因並可重試，重試會再送一次請求', async () => {
+    axios.post.mockRejectedValueOnce({ response: { status: 503, data: { detail: 'x' } } });
+    axios.post.mockResolvedValueOnce({ data: { labels: [{ description: 'balay', score: 0.9 }] } });
+    renderStep();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('辨識服務暫時無法使用');
+    fireEvent.click(screen.getByRole('button', { name: '重試' }));
+    expect(await screen.findByText('balay')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(axios.post).toHaveBeenCalledTimes(2);
+  });
+
+  test('429：提示操作太頻繁', async () => {
+    axios.post.mockRejectedValueOnce({ response: { status: 429, data: {} } });
+    renderStep();
+    expect(await screen.findByRole('alert')).toHaveTextContent('操作太頻繁');
+  });
+
+  test('載入中是 role=status 的轉圈，失敗是 role=alert，兩者不會同時出現', async () => {
+    let rejectPost;
+    axios.post.mockReturnValueOnce(new Promise((_, reject) => { rejectPost = reject; }));
+    renderStep();
+    await waitFor(() => expect(axios.post).toHaveBeenCalled());
+    expect(screen.getByRole('status')).toHaveTextContent('辨識中');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    rejectPost({ response: { status: 500, data: {} } });
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  test('辨識成功但零結果：給拍攝建議，並連到單詞查詢', async () => {
+    axios.post.mockResolvedValueOnce({ data: { labels: [] } });
+    renderStep();
+    expect(await screen.findByRole('heading', { name: '沒有辨識出可以查的物件' })).toBeInTheDocument();
+    expect(screen.getByText('背景單純，一次只拍一個物件')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '去單詞查詢' })).toHaveAttribute('href', '/search');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  test('從結果頁回來時沿用先前的辨識結果與勾選，不再呼叫辨識 API', () => {
+    const saved = { file, labels: [{ description: 'balay', score: 0.9 }, { description: 'cyux', score: 0.7 }], selected: ['cyux'] };
+    renderStep({ saved, onSave: vi.fn() });
+
+    expect(screen.getByText('balay')).toBeInTheDocument();
+    expect(screen.getByText('cyux').closest('button')).toHaveAttribute('aria-pressed', 'true');
+    expect(axios.post).not.toHaveBeenCalled();
+  });
+
+  test('辨識完成與勾選變動都會存回精靈容器', async () => {
+    axios.post.mockResolvedValueOnce({ data: { labels: [{ description: 'balay', score: 0.9 }] } });
+    const onSave = vi.fn();
+    renderStep({ onSave });
+    fireEvent.click(await screen.findByText('balay'));
+    await waitFor(() => expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({ selected: ['balay'] })));
   });
 });

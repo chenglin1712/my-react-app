@@ -15,17 +15,20 @@ import EmptyState from "@components/ui/EmptyState";
 import { describeActiveFilters } from "@utils/wordFilterState";
 import { deriveInitialLetters } from "@utils/wordLetters";
 import { Button } from "react-bootstrap";
+import TribePill from "../../components/ui/TribePill";
+import { TRIBES } from "../constants/tribes";
 
 const WORD_FAVORITES_CATEGORY_ID = 1;
 
 // 影像辨識精靈第 3 步：查詢辨識出的單詞並顯示完整詞典結果。
 // selectedWords/tribe 由 index.jsx（精靈容器）傳入，取代原本從路由 state 讀取；
 // onRestart 取代原本「返回 /camera」的導頁，改成重置精靈狀態回到第 1 步。
-const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
+const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onRestart }) => {
   const [definitions, setDefinitions] = useState({ exact_match_results: {}, fuzzy_match_results: {} });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [expandedWord, setExpandedWord] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterLetter, setFilterLetter] = useState('');
   const { favorites, toggleFavorite, error: favoritesError } = useFavorites();
@@ -80,7 +83,7 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
       });
     // 步驟卸載（例如按「重新辨識」）時讓還在跑的查詢作廢，不再更新畫面或公告
     return () => { requestGenerationRef.current += 1; };
-  }, [selectedWords, tribe]);
+  }, [selectedWords, tribe, retryCount]);
 
   const toggleExpand = (key) => setExpandedWord(prev => (prev === key ? null : key));
 
@@ -118,7 +121,17 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
     <div className="yy-fade-up camera-step3">
       <div className="camera-step3-header">
         <h2 className="camera-step3-title">查詢結果</h2>
-        <button type="button" className="yy-btn-outline" onClick={onRestart}>↺ 重新辨識</button>
+        <div className="camera-step3-nav">
+          <button type="button" className="yy-btn-outline" onClick={onBack}>◂ 回到選詞</button>
+          <button type="button" className="yy-btn-outline" onClick={onRestart}>重新上傳圖片</button>
+        </div>
+      </div>
+
+      {/* 族語在這一步才有作用（查詢結果用哪個族語），所以放在這裡，切換會立刻重新查詢 */}
+      <div className="camera-tribe-row" role="group" aria-label="查詢的族語">
+        {TRIBES.map((t) => (
+          <TribePill key={t.slug} tribe={t} active={tribe === t.slug} onClick={() => onTribeChange(t.slug)} />
+        ))}
       </div>
 
       <CameraFilterControls
@@ -140,11 +153,18 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
         setActiveTab={setActiveTab}
         selectedSubCategory={selectedSubCategory}
         setSelectedSubCategory={setSelectedSubCategory}
-        onRestart={onRestart}
+        onBack={onBack}
       />
 
       {loading && <LoadingSpinner label="查詢中…" />}
-      {error && <Alert variant="danger">{error}</Alert>}
+      {error && (
+        <Alert variant="danger" role="alert">
+          <p className="mb-2">{error}</p>
+          {selectedWords.length > 0 && (
+            <Button type="button" variant="danger" size="sm" onClick={() => setRetryCount((n) => n + 1)}>重試</Button>
+          )}
+        </Alert>
+      )}
       {favoritesError && <Alert variant="danger">{favoritesError}</Alert>}
 
       {!loading && !error && noVisibleResults && (
@@ -153,13 +173,14 @@ const CameraResultStep = ({ selectedWords, tribe, onRestart }) => {
           actions={(
             <>
               {activeFilterParts.length > 0 && <Button type="button" variant="danger" onClick={clearFilters}>清除篩選</Button>}
-              <Button type="button" variant="outline-dark" onClick={onRestart}>重新辨識</Button>
+              <Button type="button" variant="outline-dark" onClick={onBack}>回到選詞</Button>
+              <Button type="button" variant="outline-dark" onClick={onRestart}>重新上傳圖片</Button>
             </>
           )}
         >
           {activeFilterParts.length > 0 && hasRawResults
             ? <p>目前的篩選條件：{activeFilterParts.join('、')}。</p>
-            : <p>可以回到上一步，換一張圖片或重新選字再試一次。</p>}
+            : <p>可以回到選詞多選幾個詞，或換一張圖片再試；也可以切換上方的族語看看。</p>}
         </EmptyState>
       )}
 
