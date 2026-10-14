@@ -27,8 +27,8 @@ export default function NoteCard({ note, isMyTab, isMine, iLike, onOpen, onToggl
         </div>
 
         <div className="ns-card-body">
-          <div className="ns-title">
-            {note.pages?.[0]?.title || "標題"}
+          <div className="ns-title" title={note.pages?.[0]?.title?.trim() || undefined}>
+            {note.pages?.[0]?.title?.trim() || "（未命名）"}
           </div>
           <div
             className="ns-preview"

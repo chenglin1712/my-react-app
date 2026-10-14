@@ -15,6 +15,40 @@ import DOMPurify from "dompurify";
 export const PREVIEW_SOURCE_TRUNCATION_LENGTH = 2000;
 export const SHARE_MAX_PAGES = 50;
 
+/**
+ * Firestore 單一文件上限是 1 MiB（1,048,576 位元組）。分享會把所有選取的頁面整包寫進同一份
+ * sharedNotes 文件的 pages 欄位，50 頁 x 每頁 100 KB 就會超過。這裡抓約 900 KB 當上限，
+ * 預留欄位名稱、preview、封面網址、按讚名單等其他欄位的空間。
+ */
+export const SHARE_MAX_PAYLOAD_BYTES = 900 * 1024;
+
+const textEncoder = typeof TextEncoder !== "undefined" ? new TextEncoder() : null;
+
+function utf8Length(text) {
+  if (textEncoder) return textEncoder.encode(text).length;
+  return text.length * 3; // 沒有 TextEncoder 時偏保守估計（中文每字 3 位元組）
+}
+
+/**
+ * 估算分享時實際會寫進 Firestore 的大小（位元組）。傳入的 pages 必須是「已經消毒、準備寫入」
+ * 的版本，因為大小要以真正寫出去的內容為準。用 JSON 字串長度當估計，JSON 的跳脫字元與標點
+ * 會讓結果略高於 Firestore 的計法，方向偏保守。但這仍是估計、不是嚴格上界：Firestore 對字串、
+ * 欄位名稱、時間戳記另有編碼成本，所以另外留 SHARE_PAYLOAD_OVERHEAD_BYTES 的緩衝，上限也
+ * 比 1 MiB 低約 124 KB。真正寫入失敗時，呼叫端仍要保留泛用的錯誤處理。
+ * @param extra 文件裡 pages、preview 以外的欄位（image、uid、username、avatarUrl…）
+ * @returns {{ total: number, perPage: number[] }}
+ */
+export const SHARE_PAYLOAD_OVERHEAD_BYTES = 4 * 1024;
+
+export function estimateSharePayload(pages, preview = "", extra = {}) {
+  const perPage = pages.map((page) => utf8Length(JSON.stringify(page)));
+  const total = perPage.reduce((sum, bytes) => sum + bytes, 0)
+    + utf8Length(preview) + utf8Length(JSON.stringify(extra)) + SHARE_PAYLOAD_OVERHEAD_BYTES;
+  return { total, perPage };
+}
+
+export const formatKb = (bytes) => `${Math.max(1, Math.round(bytes / 1024))} KB`;
+
 export function buildPreview(html) {
   const withoutImages = (html || "").replace(/<img\b[^>]*>/gi, "");
   const truncated =

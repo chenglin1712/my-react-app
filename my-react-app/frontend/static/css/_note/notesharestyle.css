@@ -57,12 +57,15 @@
   display:grid; gap:1.25rem;
   grid-template-columns:1fr;
 }
-@media(min-width:640px){.ns-grid{grid-template-columns:repeat(2,1fr);}}
-@media(min-width:900px){.ns-grid{grid-template-columns:repeat(3,1fr);}}
-@media(min-width:1200px){.ns-grid{grid-template-columns:repeat(4,1fr);}}
+/* minmax(0,1fr)：讓欄位可以比內容窄，超長的無空白標題才不會把整個 grid 撐破 */
+.ns-grid{ grid-template-columns:minmax(0,1fr); }
+@media(min-width:640px){.ns-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(min-width:900px){.ns-grid{grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media(min-width:1200px){.ns-grid{grid-template-columns:repeat(4,minmax(0,1fr));}}
 
 /* 卡片 */
 .ns-card{
+  min-width:0; /* grid 項目預設 min-width:auto，會被超長內容撐開；這裡讓卡片可以比內容窄 */
   background:rgba(255,245,247,.7);
   border:1px solid var(--border);
   border-radius:1rem; box-shadow:var(--shadow);
@@ -96,7 +99,13 @@
 
 /* 卡片身 */
 .ns-card-body{ padding: .75rem 1rem; }
-.ns-title{ color:var(--text-main); font-weight:700; font-size:1.1rem; margin-bottom:.25rem; }
+.ns-title{
+  color:var(--text-main); font-weight:700; font-size:1.1rem; margin-bottom:.25rem;
+  /* 超長標題（無空白的英文、網址）在任何位置斷行，最多兩行；統一用兩行高讓卡片高度一致 */
+  overflow-wrap:anywhere;
+  display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2;
+  overflow:hidden; line-height:1.35; min-height:2.7em;
+}
 
 /* 預覽（3行截斷的簡易作法，與實際內容高度搭配） */
 .ns-preview{

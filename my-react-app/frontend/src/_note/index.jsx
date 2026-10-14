@@ -19,7 +19,9 @@ import { exportNoteAsHtml } from "./sync/exportNote";
 import { NOTE_LIMITS } from "./sync/noteSyncCore";
 import EditorToolbar from "./components/EditorToolbar";
 import PageSidebar from "./components/PageSidebar";
-import { buildPreview, SHARE_MAX_PAGES } from "../../utils/notePreview";
+import {
+  buildPreview, estimateSharePayload, formatKb, SHARE_MAX_PAGES, SHARE_MAX_PAYLOAD_BYTES,
+} from "../../utils/notePreview";
 import { uploadToCloudinary } from "@utils/uploadToCloudinary";
 
 function NotePage() {
@@ -138,9 +140,34 @@ function NotePage() {
         content: DOMPurify.sanitize(p.content || ""),
       }));
 
+      const preview = buildPreview(pagesToShare[0]?.content);
+
+      // 所有選取的頁面會整包寫進同一份 Firestore 文件（上限 1 MiB），超過就在送出前擋下，
+      // 並指出最大的一頁，否則使用者只會看到泛用的「分享失敗」。
+      const effectiveImage = uploadedImageUrl || "";
+      const { total, perPage } = estimateSharePayload(sanitizedPages, preview, {
+        image: effectiveImage, uid, username: effectiveName, avatarUrl: effectiveImg,
+      });
+      if (total > SHARE_MAX_PAYLOAD_BYTES) {
+        const limit = formatKb(SHARE_MAX_PAYLOAD_BYTES);
+        if (sanitizedPages.length === 1) {
+          setError(`這一頁的資料量約 ${formatKb(total)}，超過分享上限約 ${limit}。請縮減內容，或移除內含的圖片後再分享。`);
+        } else {
+          const largest = perPage.indexOf(Math.max(...perPage));
+          // 標題只用來讓使用者認出是哪一頁：壓成單行並截短，避免換行或超長標題弄亂提示
+          const rawTitle = (sanitizedPages[largest]?.title || "").replace(/\s+/g, " ").trim() || "未命名筆記";
+          const largestTitle = rawTitle.length > 30 ? `${rawTitle.slice(0, 30)}…` : rawTitle;
+          setError(
+            `選取的 ${sanitizedPages.length} 頁合計約 ${formatKb(total)}，超過分享上限約 ${limit}。`
+            + `資料量最大的一頁是「${largestTitle}」（約 ${formatKb(perPage[largest])}）。請少選幾頁，或縮減那一頁的內容、移除內含的圖片後再分享。`
+          );
+        }
+        return;
+      }
+
       await shareNote({
         pages: sanitizedPages,
-        preview: buildPreview(pagesToShare[0]?.content),
+        preview,
         image: uploadedImageUrl,
         uid,
         username: effectiveName,

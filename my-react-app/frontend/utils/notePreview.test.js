@@ -1,5 +1,8 @@
 import { describe, test, expect } from 'vitest';
-import { buildPreview, PREVIEW_SOURCE_TRUNCATION_LENGTH, SHARE_MAX_PAGES } from './notePreview';
+import {
+  buildPreview, estimateSharePayload, formatKb, PREVIEW_SOURCE_TRUNCATION_LENGTH, SHARE_MAX_PAGES,
+  SHARE_MAX_PAYLOAD_BYTES, SHARE_PAYLOAD_OVERHEAD_BYTES,
+} from './notePreview';
 
 describe('buildPreview', () => {
   test('一般文字內容原樣保留（經過 DOMPurify）', () => {
@@ -43,5 +46,42 @@ describe('buildPreview', () => {
 describe('SHARE_MAX_PAGES', () => {
   test('與 Firestore 規則的 pages.size() <= 50 一致', () => {
     expect(SHARE_MAX_PAGES).toBe(50);
+  });
+});
+
+describe('estimateSharePayload（分享合計大小，D-4）', () => {
+  test('上限約 900 KB，低於 Firestore 單一文件的 1 MiB', () => {
+    expect(SHARE_MAX_PAYLOAD_BYTES).toBe(900 * 1024);
+    expect(SHARE_MAX_PAYLOAD_BYTES).toBeLessThan(1024 * 1024);
+  });
+
+  test('中文以 UTF-8 位元組計（每字 3 位元組），不是字元數', () => {
+    const { perPage } = estimateSharePayload([{ id: 'a', title: '標題', content: '字'.repeat(1000) }]);
+    expect(perPage[0]).toBeGreaterThan(3000);
+    expect(perPage[0]).toBeLessThan(3200);
+  });
+
+  test('合計包含每一頁、預覽與固定的欄位預留', () => {
+    const pages = [{ id: 'a', content: 'x'.repeat(100) }, { id: 'b', content: 'y'.repeat(200) }];
+    const { total, perPage } = estimateSharePayload(pages, 'p'.repeat(50));
+    expect(perPage).toHaveLength(2);
+    expect(total).toBe(perPage[0] + perPage[1] + 50 + 2 + SHARE_PAYLOAD_OVERHEAD_BYTES); // 2 = JSON.stringify({}) 的 "{}"
+  });
+
+  test('pages、preview 以外的欄位（封面網址、使用者名稱…）也算進去', () => {
+    const base = estimateSharePayload([{ id: 'a' }], '').total;
+    const withExtra = estimateSharePayload([{ id: 'a' }], '', { image: 'https://res.cloudinary.com/x.png', username: '某人' }).total;
+    expect(withExtra).toBeGreaterThan(base + 40);
+  });
+
+  test('50 頁各 100 KB 的合計會超過上限（這正是要擋的情況）', () => {
+    const pages = Array.from({ length: 50 }, (_, i) => ({ id: String(i), content: 'x'.repeat(100 * 1024) }));
+    expect(estimateSharePayload(pages).total).toBeGreaterThan(SHARE_MAX_PAYLOAD_BYTES);
+  });
+
+  test('formatKb 四捨五入，至少顯示 1 KB', () => {
+    expect(formatKb(0)).toBe('1 KB');
+    expect(formatKb(1536)).toBe('2 KB');
+    expect(formatKb(900 * 1024)).toBe('900 KB');
   });
 });

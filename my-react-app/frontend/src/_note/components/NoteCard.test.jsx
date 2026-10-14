@@ -49,6 +49,19 @@ describe('NoteCard', () => {
 
   test('沒有 pages 時標題退回預設文字，不會丟例外', () => {
     renderCard({ note: { ...NOTE, pages: [] } });
-    expect(screen.getByText('標題')).toBeInTheDocument();
+    expect(screen.getByText('（未命名）')).toBeInTheDocument();
+  });
+
+  test('空標題或只有空白的標題，顯示「（未命名）」佔位，卡片高度才不會塌掉', () => {
+    renderCard({ note: { ...NOTE, pages: [{ title: '   ', content: '<p>內容</p>' }] } });
+    expect(screen.getByText('（未命名）')).toBeInTheDocument();
+  });
+
+  test('超長無空白標題原樣放進 DOM（斷字與兩行截斷由 CSS 負責），並用 title 屬性保留完整標題', () => {
+    const long = 'https://example.com/' + 'a'.repeat(300);
+    renderCard({ note: { ...NOTE, pages: [{ title: long, content: '<p>內容</p>' }] } });
+    const title = screen.getByText(long);
+    expect(title).toHaveClass('ns-title');
+    expect(title).toHaveAttribute('title', long);
   });
 });

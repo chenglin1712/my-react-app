@@ -102,4 +102,49 @@ describe('NotePage（_note/index.jsx）', () => {
 
     await waitFor(() => expect(shareCallCount).toBe(1));
   });
+
+  test('D-4：選取的頁面合計超過約 900 KB 時，分享被擋下、不寫入 Firestore，並指出最大的一頁', async () => {
+    const big = (id, title, kb) => ({ id, title, content: `<p>${'x'.repeat(kb * 1024)}</p>` });
+    localStorage.setItem(LOCAL_KEY, JSON.stringify([
+      big('a', '小的一頁', 100), big('b', '最大的一頁', 500), big('c', '中的一頁', 400),
+    ]));
+
+    renderPage();
+    const boxes = await screen.findAllByRole('checkbox');
+    boxes.forEach((box) => fireEvent.click(box));
+    fireEvent.click(await screen.findByRole('button', { name: '分享' }));
+
+    expect(await screen.findByText(/合計約 \d+ KB，超過分享上限約 900 KB/)).toBeInTheDocument();
+    expect(screen.getByText(/資料量最大的一頁是「最大的一頁」/)).toBeInTheDocument();
+    expect(shareNote).not.toHaveBeenCalled();
+  });
+
+  test('D-4：只選一頁、而且那一頁本身就太大：不建議「少選幾頁」，改說明該頁過大', async () => {
+    // 分享前會先把編輯器目前的內容存回當前頁，所以假編輯器也要放同一份內容
+    const huge = `<p>${'字'.repeat(310 * 1024)}</p>`; // 中文每字 3 位元組，約 930 KB
+    localStorage.setItem(LOCAL_KEY, JSON.stringify([{ id: 'a', title: '巨大的一頁', content: huge }]));
+    fakeEditor.html = huge;
+
+    renderPage();
+    fireEvent.click(await screen.findByRole('checkbox'));
+    fireEvent.click(await screen.findByRole('button', { name: '分享' }));
+
+    expect(await screen.findByText(/這一頁的資料量約 \d+ KB，超過分享上限約 900 KB/, {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByText(/少選幾頁/)).not.toBeInTheDocument();
+    expect(shareNote).not.toHaveBeenCalled();
+  }, 20000);
+
+  test('D-4：合計在上限內照常分享', async () => {
+    localStorage.setItem(LOCAL_KEY, JSON.stringify([
+      { id: 'a', title: '第一頁', content: `<p>${'x'.repeat(200 * 1024)}</p>` },
+    ]));
+    shareNote.mockResolvedValue({ id: 'shared-1' });
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    renderPage();
+    fireEvent.click(await screen.findByRole('checkbox'));
+    fireEvent.click(await screen.findByRole('button', { name: '分享' }));
+
+    await waitFor(() => expect(shareNote).toHaveBeenCalledTimes(1));
+  });
 });
