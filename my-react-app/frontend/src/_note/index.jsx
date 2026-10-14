@@ -19,6 +19,7 @@ import { exportNoteAsHtml } from "./sync/exportNote";
 import { NOTE_LIMITS } from "./sync/noteSyncCore";
 import EditorToolbar from "./components/EditorToolbar";
 import PageSidebar from "./components/PageSidebar";
+import SaveStatus from "./components/SaveStatus";
 import {
   buildPreview, estimateSharePayload, formatKb, SHARE_MAX_PAGES, SHARE_MAX_PAYLOAD_BYTES,
 } from "../../utils/notePreview";
@@ -43,7 +44,7 @@ function NotePage() {
   const syncApiRef = useRef(null);
 
   const {
-    editor, notes, currentPage, selectedPageIds, loading, isDirty, storageError,
+    editor, notes, currentPage, selectedPageIds, loading, isDirty, storageError, lastSavedAt,
     execStyle, handleAdd, handleDelete, handleSave, handleChangePage,
     handleToggleSelect, handleTitleChange, handleSelectAll, handleClearSelect,
     flushEditor, applyExternalChange, subscribeEdit, getNotes,
@@ -228,13 +229,19 @@ function NotePage() {
         <Col md={9}>
           {/* 標題：紅色圓角邊框 */}
           <Form.Control
-            className="note-title mb-3"
+            className="note-title mb-1"
             type="text"
             value={currentNote.title}
             onChange={handleTitleChange}
             placeholder="請輸入筆記標題"
             aria-label="筆記標題"
             maxLength={cloudSyncOn ? NOTE_LIMITS.TITLE_CHARS : undefined}
+          />
+          <SaveStatus
+            isDirty={isDirty}
+            storageError={storageError}
+            lastSavedAt={lastSavedAt}
+            cloudSyncOn={cloudSyncOn}
           />
 
           {/* 編輯區：只保留 .note-text，不再包一層卡片。

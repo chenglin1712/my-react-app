@@ -57,6 +57,10 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
   const [selectedPageIds, setSelectedPageIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isDirty, setIsDirty] = useState(false);
+  // 最後一次把筆記寫進這台裝置的時間（毫秒），給畫面的存檔狀態文字用
+  const [lastSavedAt, setLastSavedAt] = useState(null);
+  // 最近一次寫入 localStorage 是否成功；失敗時畫面要保持「尚未儲存」，不能顯示已儲存
+  const persistOkRef = useRef(true);
 
   const LOCAL_KEY = `userNotes_${uid}`;
 
@@ -80,13 +84,17 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
    * 封鎖等原因丟例外（不只是讀取時的 JSON.parse 可能壞掉），沒有集中處理的話，
    * 每個呼叫端都要各自補一份 try/catch。
    */
-  const persistNotes = useCallback((updatedNotes) => {
+  const persistNotes = useCallback((updatedNotes, { track = true } = {}) => {
     notesRef.current = updatedNotes;
     setNotes(updatedNotes);
     try {
       localStorage.setItem(LOCAL_KEY, JSON.stringify(updatedNotes));
+      persistOkRef.current = true;
       setStorageError(null);
+      // 只有真的寫進這台裝置才記下時間；載入時補 id、建立預設空白頁不算使用者的儲存（track: false）
+      if (track) setLastSavedAt(Date.now());
     } catch (e) {
+      persistOkRef.current = false;
       console.error("儲存筆記到本機失敗:", e);
       setStorageError("筆記可能因為裝置儲存空間不足而沒有儲存成功，請清理瀏覽器儲存空間後再試一次。");
     }
@@ -130,7 +138,7 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
         const parsed = JSON.parse(stored);
         const { notes: normalized, changed } = normalizeStoredNotes(parsed);
         if (changed) {
-          persistNotes(normalized);
+          persistNotes(normalized, { track: false });
         } else {
           setNotes(normalized);
         }
@@ -138,10 +146,10 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
         console.error("讀取本機筆記失敗，改用一份空白筆記:", e);
         // 重置之前先把原始內容留一份，才有機會事後救回（雲端同步開啟時，雲端的版本會另外還原）。
         try { localStorage.setItem(`${LOCAL_KEY}_corrupt_backup`, stored); } catch { /* 空間不足就算了 */ }
-        persistNotes([createEmptyNote()]);
+        persistNotes([createEmptyNote()], { track: false });
       }
     } else {
-      persistNotes([createEmptyNote()]);
+      persistNotes([createEmptyNote()], { track: false });
     }
     setCurrentPage(0);
     setLoading(false);
@@ -206,7 +214,7 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
       i === index ? { ...note, content: sanitized, editedAt: Date.now() } : note
     ));
     persistNotes(updated);
-    setIsDirty(false);
+    setIsDirty(!persistOkRef.current);
     return updated;
   }, [editor, persistNotes]);
 
@@ -299,7 +307,7 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
   /** 回傳存檔後的最新陣列，讓呼叫端（例如分享）不必等 setNotes 生效。 */
   const handleSave = () => {
     const savedNotes = updateCurrentContent();
-    setIsDirty(false);
+    setIsDirty(!persistOkRef.current);
     return savedNotes;
   };
 
@@ -337,7 +345,7 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
   const handleClearSelect = () => setSelectedPageIds([]);
 
   return {
-    editor, notes, currentPage, selectedPageIds, loading, isDirty, storageError,
+    editor, notes, currentPage, selectedPageIds, loading, isDirty, storageError, lastSavedAt,
     execStyle, handleAdd, handleDelete, handleSave, handleChangePage,
     handleToggleSelect, handleTitleChange, handleSelectAll, handleClearSelect,
     // 雲端同步（D-2）用

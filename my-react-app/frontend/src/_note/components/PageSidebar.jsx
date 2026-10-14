@@ -6,6 +6,7 @@ export default function PageSidebar({
   onToggleSelect, onSelectAll, onClearSelect, onShare, isSharing, unsyncedIds,
 }) {
   const overLimit = maxSelectable != null && notes.length > maxSelectable;
+  const noneSelected = selectedPageIds.length === 0;
 
   return (
     <>
@@ -37,15 +38,20 @@ export default function PageSidebar({
         ))}
       </Form>
 
-      {selectedPageIds.length > 0 && (
-        <Button
-          type="button"
-          className="btn-primary mt-2 w-100"
-          onClick={onShare}
-          disabled={isSharing}
-        >
-          {isSharing ? "分享中…" : "分享"}
-        </Button>
+      {/* 分享按鈕始終顯示（原本要先勾選才出現，使用者找不到分享在哪）。沒勾選時用 aria-disabled
+          而不是 disabled：按鈕仍可被鍵盤聚焦，報讀器會一併唸出下面的原因說明。 */}
+      <Button
+        type="button"
+        className={`btn-primary mt-2 w-100${noneSelected ? " disabled" : ""}`}
+        onClick={() => { if (!noneSelected) onShare(); }}
+        disabled={isSharing}
+        aria-disabled={noneSelected || undefined}
+        aria-describedby={noneSelected ? "note-share-hint" : undefined}
+      >
+        {isSharing ? "分享中…" : "分享"}
+      </Button>
+      {noneSelected && (
+        <div id="note-share-hint" className="ns-select-hint mt-1">請先勾選上方要分享的頁面。</div>
       )}
     </>
   );

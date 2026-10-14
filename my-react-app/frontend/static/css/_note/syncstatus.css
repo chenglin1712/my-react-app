@@ -1,5 +1,23 @@
 /* 筆記頁的雲端同步狀態、衝突提示、同步失敗的頁面（D-2／D-3）。沿用 theme-v2 的 token，不加動態。 */
 
+/* 存檔狀態：標題欄下方一行小字，沿用同一組 token */
+.note-save {
+    margin: 0 0 var(--yy-space-3);
+}
+
+.note-save__status,
+.note-save__hint {
+    margin: 0;
+    font-size: var(--yy-text-sm);
+    color: var(--yy-text-secondary);
+}
+
+.note-save__status[data-state="dirty"],
+.note-save__status[data-state="error"] {
+    color: var(--yy-warning-text);
+    font-weight: 600;
+}
+
 .note-sync {
     margin-top: var(--yy-space-3);
     display: flex;

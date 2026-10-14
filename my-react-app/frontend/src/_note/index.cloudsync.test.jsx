@@ -91,6 +91,28 @@ describe('NotePage 的雲端同步接線', () => {
     expect(exportNoteAsHtml).toHaveBeenCalledWith(expect.objectContaining({ id: 'b', title: '第二篇' }));
   });
 
+  test('D-5：標題欄下方有存檔狀態；旗標關閉時提醒只存在這台裝置，開啟後不再提醒', () => {
+    useNotesCloudSyncFlag.mockReturnValue(false);
+    useCloudNoteSync.mockReturnValue(syncStub());
+    const { unmount } = renderPage();
+    expect(screen.getByText(/筆記只存在這台裝置的瀏覽器/)).toBeInTheDocument();
+    unmount();
+
+    useNotesCloudSyncFlag.mockReturnValue(true);
+    useCloudNoteSync.mockReturnValue(syncStub({ status: 'synced' }));
+    renderPage();
+    expect(screen.queryByText(/筆記只存在這台裝置的瀏覽器/)).not.toBeInTheDocument();
+  });
+
+  test('D-5：按「儲存」後狀態變成「已儲存於這台裝置」並顯示時間', () => {
+    useNotesCloudSyncFlag.mockReturnValue(true);
+    useCloudNoteSync.mockReturnValue(syncStub({ status: 'synced' }));
+    const { container } = renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: '儲存' }));
+    expect(container.querySelector('.note-save__status')).toHaveTextContent('已儲存於這台裝置 · 剛剛');
+  });
+
   test('刪除一頁時通知同步（帶筆記 id）', async () => {
     useNotesCloudSyncFlag.mockReturnValue(true);
     const sync = syncStub({ status: 'synced' });

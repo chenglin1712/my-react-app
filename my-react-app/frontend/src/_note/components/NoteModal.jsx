@@ -1,6 +1,7 @@
 import DOMPurify from "dompurify";
 import { useEffect, useRef, useState } from "react";
 import { useFocusTrap } from "@hooks/useFocusTrap";
+import { isBlankNote } from "../sync/noteSyncCore";
 
 const REPORT_REASONS = [
   { value: "inappropriate", label: "不當內容" },
@@ -97,15 +98,25 @@ export default function NoteModal({ note, canLike, iLike, canDelete, onToggleLik
           </div>
         )}
 
-        {pages.map((pg, i) => (
-          <div key={i} className="ns-modal-page">
-            <div className="ns-page-label">第 {i + 1} 頁</div>
-            <div
-              className="ns-modal-content"
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(pg.content || "") }}
-            />
-          </div>
-        ))}
+        {/* 沒有任何頁面時，原本整個內容區是空的，分不出是空筆記還是載入失敗 */}
+        {pages.length === 0 && (
+          <p className="ns-modal-empty">這則筆記沒有可顯示的內容</p>
+        )}
+
+        {pages.map((pg, i) => {
+          // 空白與否要看消毒之後實際會顯示的內容：被 DOMPurify 整段濾掉的標籤不能算有內容
+          const safeHtml = DOMPurify.sanitize(typeof pg.content === "string" ? pg.content : "");
+          return (
+            <div key={i} className="ns-modal-page">
+              <div className="ns-page-label">第 {i + 1} 頁</div>
+              {isBlankNote({ title: "", content: safeHtml }) ? (
+                <p className="ns-modal-empty">這一頁沒有內容</p>
+              ) : (
+                <div className="ns-modal-content" dangerouslySetInnerHTML={{ __html: safeHtml }} />
+              )}
+            </div>
+          );
+        })}
 
         <div className="ns-modal-actions">
           {canDelete && (

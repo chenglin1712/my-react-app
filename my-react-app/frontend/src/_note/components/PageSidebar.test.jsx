@@ -59,17 +59,44 @@ describe('PageSidebar', () => {
         expect(props.onToggleSelect).toHaveBeenCalledWith('b');
     });
 
-    test('沒有選取任何頁時不顯示分享按鈕，有選取時才出現', async () => {
-        const { unmount } = renderSidebar();
-        expect(screen.queryByRole('button', { name: '分享' })).not.toBeInTheDocument();
-        unmount();
+    test('D-5：沒有選取任何頁時分享按鈕仍然顯示，但不能送出，並說明原因', async () => {
+        const user = userEvent.setup();
+        const { props } = renderSidebar();
+        const shareButton = screen.getByRole('button', { name: '分享' });
 
+        expect(shareButton).toHaveAttribute('aria-disabled', 'true');
+        expect(shareButton).toHaveAccessibleDescription('請先勾選上方要分享的頁面。');
+        expect(screen.getByText('請先勾選上方要分享的頁面。')).toBeVisible();
+
+        await user.click(shareButton);
+        expect(props.onShare).not.toHaveBeenCalled();
+    });
+
+    test('D-5：沒勾選時的分享按鈕仍可被鍵盤聚焦（用 aria-disabled，不是 disabled）', async () => {
+        const user = userEvent.setup();
+        renderSidebar();
+        const shareButton = screen.getByRole('button', { name: '分享' });
+        expect(shareButton).not.toBeDisabled();
+        await user.click(screen.getByRole('button', { name: '取消' }));
+        await user.tab(); // 取消 -> 下一個可聚焦元素（頁面勾選方塊 x2）-> 分享
+        await user.tab(); await user.tab();
+        expect(shareButton).toHaveFocus();
+    });
+
+    test('有選取時分享按鈕可用、沒有原因說明，點擊會送出', async () => {
         const user = userEvent.setup();
         const { props } = renderSidebar({ selectedPageIds: ['a'] });
         const shareButton = screen.getByRole('button', { name: '分享' });
-        expect(shareButton).toBeInTheDocument();
+
+        expect(shareButton).not.toHaveAttribute('aria-disabled');
+        expect(screen.queryByText('請先勾選上方要分享的頁面。')).not.toBeInTheDocument();
 
         await user.click(shareButton);
-        expect(props.onShare).toHaveBeenCalled();
+        expect(props.onShare).toHaveBeenCalledTimes(1);
+    });
+
+    test('分享中：按鈕停用並顯示「分享中…」', () => {
+        renderSidebar({ selectedPageIds: ['a'], isSharing: true });
+        expect(screen.getByRole('button', { name: '分享中…' })).toBeDisabled();
     });
 });

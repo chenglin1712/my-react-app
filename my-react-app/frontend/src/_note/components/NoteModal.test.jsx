@@ -24,6 +24,36 @@ describe('NoteModal', () => {
     expect(screen.getByRole('heading', { name: '筆記內容' })).toBeInTheDocument();
   });
 
+  test('D-5：沒有任何頁面時顯示「這則筆記沒有可顯示的內容」', () => {
+    renderModal({ note: { ...NOTE, pages: [] } });
+    expect(screen.getByText('這則筆記沒有可顯示的內容')).toBeInTheDocument();
+  });
+
+  test('D-5：某一頁內容是空白時，那一頁顯示「這一頁沒有內容」，其他頁照常顯示', () => {
+    renderModal({ note: { ...NOTE, pages: [
+      { title: '甲', content: '<p></p>' },
+      { title: '乙', content: '<p>有內容</p>' },
+    ] } });
+    expect(screen.getByText('這一頁沒有內容')).toBeInTheDocument();
+    expect(screen.getByText('有內容')).toBeInTheDocument();
+    expect(screen.queryByText('這則筆記沒有可顯示的內容')).not.toBeInTheDocument();
+  });
+
+  test('D-5：內容被消毒濾光（例如只有 script）的那一頁，也算沒有內容', () => {
+    renderModal({ note: { ...NOTE, pages: [{ title: '甲', content: '<script>alert(1)</script>' }] } });
+    expect(screen.getByText('這一頁沒有內容')).toBeInTheDocument();
+  });
+
+  test('D-5：舊資料的 content 是 null 或不是字串時不會丟例外，視為沒有內容', () => {
+    renderModal({ note: { ...NOTE, pages: [{ title: '甲', content: null }, { title: '乙', content: 123 }] } });
+    expect(screen.getAllByText('這一頁沒有內容')).toHaveLength(2);
+  });
+
+  test('D-5：有內容的筆記不會出現空內容說明', () => {
+    renderModal();
+    expect(screen.queryByText(/沒有可顯示的內容|這一頁沒有內容/)).not.toBeInTheDocument();
+  });
+
   test('note.pages 是 undefined 時也不會丟例外', () => {
     const { pages: _pages, ...noteWithoutPages } = NOTE;
     renderModal({ note: noteWithoutPages });

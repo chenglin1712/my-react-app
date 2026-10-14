@@ -223,6 +223,75 @@ describe('useNotePages 的存檔與不可變更新', () => {
 });
 
 
+describe('useNotePages 的存檔時間（D-5）', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        fakeEditor.html = '<p></p>';
+        vi.useFakeTimers();
+        vi.setSystemTime(1_760_000_000_000);
+    });
+    afterEach(() => { vi.useRealTimers(); localStorage.clear(); });
+
+    test('還沒儲存過是 null；按儲存後記下時間', () => {
+        seedNotes([{ id: 'a', title: '舊', content: '<p>A</p>' }]);
+        const { result } = renderHook(() => useNotePages(UID));
+        expect(result.current.lastSavedAt).toBeNull();
+
+        act(() => { result.current.handleSave(); });
+        expect(result.current.lastSavedAt).toBe(1_760_000_000_000);
+    });
+
+    test('載入時補 id、建立預設空白頁不算使用者的儲存：lastSavedAt 維持 null', () => {
+        const { result } = renderHook(() => useNotePages(UID));
+        expect(result.current.notes).toHaveLength(1);
+        expect(result.current.lastSavedAt).toBeNull();
+    });
+
+    test('換頁（存下目前頁）、改標題、新增頁也都記下時間', () => {
+        seedNotes([{ id: 'a', title: '一', content: '<p>A</p>' }, { id: 'b', title: '二', content: '<p>B</p>' }]);
+        const { result } = renderHook(() => useNotePages(UID));
+
+        vi.setSystemTime(1_760_000_001_000);
+        act(() => { result.current.handleChangePage(1); });
+        expect(result.current.lastSavedAt).toBe(1_760_000_001_000);
+
+        vi.setSystemTime(1_760_000_002_000);
+        act(() => { result.current.handleTitleChange({ target: { value: '新標題' } }); });
+        expect(result.current.lastSavedAt).toBe(1_760_000_002_000);
+
+        vi.setSystemTime(1_760_000_003_000);
+        act(() => { result.current.handleAdd(); });
+        expect(result.current.lastSavedAt).toBe(1_760_000_003_000);
+    });
+
+    test('寫入 localStorage 失敗：不記時間、保持「尚未儲存」，並顯示儲存失敗訊息', () => {
+        seedNotes([{ id: 'a', title: '舊', content: '<p>A</p>' }]);
+        const { result } = renderHook(() => useNotePages(UID));
+        fakeEditor.html = '<p>打字</p>';
+        act(() => { globalThis.__editorOptions.onUpdate({ editor: fakeEditor }); });
+        expect(result.current.isDirty).toBe(true);
+
+        const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('QuotaExceededError'); });
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        act(() => { result.current.handleSave(); });
+
+        expect(result.current.lastSavedAt).toBeNull();
+        expect(result.current.isDirty).toBe(true);
+        expect(result.current.storageError).toMatch(/沒有儲存成功/);
+        setItem.mockRestore();
+    });
+
+    test('雲端同步把編輯器內容寫回時也會更新（flushEditor）', () => {
+        seedNotes([{ id: 'a', title: '舊', content: '<p>A</p>' }]);
+        const { result } = renderHook(() => useNotePages(UID, { cloudSync: true }));
+        fakeEditor.html = '<p>打字</p>';
+        act(() => { globalThis.__editorOptions.onUpdate({ editor: fakeEditor }); });
+        vi.setSystemTime(1_760_000_005_000);
+        act(() => { result.current.flushEditor(); });
+        expect(result.current.lastSavedAt).toBe(1_760_000_005_000);
+    });
+});
+
 describe('useNotePages 的雲端同步支援（D-2）', () => {
     const typeInEditor = (html) => {
         fakeEditor.html = html;
