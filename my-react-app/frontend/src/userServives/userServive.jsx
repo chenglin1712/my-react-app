@@ -1,5 +1,4 @@
 import { doc, getDoc, setDoc, updateDoc, runTransaction, increment, FieldPath } from "firebase/firestore";
-import { getDatabase, ref, onDisconnect, set, onValue, serverTimestamp } from "firebase/database";
 import { db, auth } from "../../../firebase";
 import { onAuthStateChanged, createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { clearAdminSession } from "../_admin/session/adminSession";
@@ -44,11 +43,9 @@ export const authChanges = (callback) => {
             ]);
             if (myGen !== currentGen) return;
 
-            try {
-                setupPresence(user.uid);
-            } catch (e) {
+            setupPresence(user.uid).catch((e) => {
                 console.error("[authChanges] setupPresence error:", e);
-            }
+            });
 
             callback({
                 firestoreData: userData,
@@ -274,19 +271,28 @@ let _presenceUnsubscribe = null;
 // 登出時呼叫，取消目前的 presence 監聽。原本 authChanges 的登出分支只呼叫
 // callback(null)，沒有清掉這個 listener——要等下一次登入呼叫 setupPresence
 // 時才會被「順便」取消，這段期間一個已登出的分頁還在對 RTDB 寫入 presence 狀態。
+// _presenceGen 讓「還在下載 Realtime Database SDK」的 setupPresence 在登出或再次登入時作廢。
+let _presenceGen = 0;
+
 export const stopPresence = () => {
+    _presenceGen += 1;
     if (_presenceUnsubscribe) {
         _presenceUnsubscribe();
         _presenceUnsubscribe = null;
     }
 };
 
-export const setupPresence = (uid) => {
+// Realtime Database SDK 約佔入口 chunk 的一成，而且只有登入後的上線狀態會用到，
+// 所以用動態 import 在登入後才下載，沒登入的訪客不會載入它（審查項 P2-102）。
+export const setupPresence = async (uid) => {
+    stopPresence();
+    const generation = _presenceGen;
+    const { getDatabase, ref, onDisconnect, set, onValue, serverTimestamp } = await import("firebase/database");
+    if (generation !== _presenceGen) return;
+
     const db = getDatabase();
     const statusRef = ref(db, `/status/${uid}`);
     const connectedRef = ref(db, ".info/connected");
-
-    stopPresence();
 
     // 確認使用者是否連上 RTDB
     _presenceUnsubscribe = onValue(connectedRef, async (snap) => {
@@ -300,7 +306,10 @@ export const setupPresence = (uid) => {
                 state: "offline",
                 lastChanged: serverTimestamp(),
             });
-            
+
+            // 等待期間若已登出或換帳號，就不要再寫入「上線」
+            if (generation !== _presenceGen) return;
+
             //上線
             await set(statusRef, {
                 state: "online",

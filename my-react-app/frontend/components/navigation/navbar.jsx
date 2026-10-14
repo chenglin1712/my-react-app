@@ -127,7 +127,7 @@ const Navbar = ({ onOpenBot }) => {
                   aria-expanded={isUserOpen}
                   onClick={handleUserSidebar}
                 >
-                  <img src={userData?.firestoreData?.avatarUrl || AvatarImg} className="auth-image" alt="" />
+                  <img decoding="async" src={userData?.firestoreData?.avatarUrl || AvatarImg} className="auth-image" alt="" />
                   <p>{userName}</p>
                 </button>
               </div>
@@ -164,7 +164,7 @@ const Navbar = ({ onOpenBot }) => {
                 aria-expanded={isUserOpen}
                 onClick={handleUserSidebar}
               >
-                <img src={userData?.firestoreData?.avatarUrl || AvatarImg} className="mobile-image" alt="" />
+                <img decoding="async" src={userData?.firestoreData?.avatarUrl || AvatarImg} className="mobile-image" alt="" />
                 <p>{userName}</p>
               </button>
             </div>

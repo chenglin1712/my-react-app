@@ -67,7 +67,7 @@ export function ChoiceDetail({ item, userAnswerNum, correctAnswerNum }) {
               return (
                 <div key={label}>
                   <div className={`option-img-wrapper ${isUserChoice ? "user-choice" : ""}`}>
-                    <img src={item.images[label]} alt={`選項 ${label}`} className="option-img" />
+                    <img decoding="async" loading="lazy" src={item.images[label]} alt={`選項 ${label}`} className="option-img" />
                     <span className="option-label">{label}</span>
                   </div>
                   {isCorrectChoice && <span className="correct-tip"><Check size={14} /> 正確答案</span>}

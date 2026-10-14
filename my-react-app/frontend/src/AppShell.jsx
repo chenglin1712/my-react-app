@@ -14,7 +14,7 @@ const OverlayAdvice = lazy(() => import('../components/_quiz/bot'));
 
 const BOT_ERROR_STYLE = {
   position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)',
-  zIndex: 1100, padding: '12px 16px', background: '#fff', border: '3px solid #221812',
+  zIndex: 'var(--yy-z-popover)', padding: '12px 16px', background: '#fff', border: '3px solid #221812',
   borderRadius: 10, boxShadow: '4px 4px 0 #221812',
 };
 

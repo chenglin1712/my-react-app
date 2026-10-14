@@ -36,7 +36,7 @@ const WordCardImage = ({ imageUrl, word, isFavorited, onToggleFavorite }) => {
           <FaImage />
         </div>
       ) : (
-        <img
+        <img decoding="async"
           src={imageUrl}
           alt={word}
           className="word-image"

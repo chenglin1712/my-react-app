@@ -13,6 +13,8 @@ import EvidencePanel from "../../components/_translate/EvidencePanel";
 import useAudioPlayback from "../../hooks/useAudioPlayback";
 import { useTranslateCapabilities } from "../../hooks/useTranslateCapabilities";
 import { useGuestQuota } from "../../hooks/useGuestQuota";
+import { useOnlineStatus } from "@hooks/useOnlineStatus";
+import OfflineNotice from "@components/ui/OfflineNotice";
 import { useAuth } from "../userServives/authContext";
 import PermissionProtect from "../userServives/permissionProtect";
 import { apiPost } from "../../utils/apiClient";
@@ -57,6 +59,7 @@ const TranslatePage = () => {
     const [sourceText, setSourceText] = useState("");
     const [result, setResult] = useState(null);
     const [loading, setLoading] = useState(false);
+    const online = useOnlineStatus();
     const [error, setError] = useState("");
     const [activeTokenIndex, setActiveTokenIndex] = useState(null);
     const [swapNote, setSwapNote] = useState("");
@@ -296,11 +299,13 @@ const TranslatePage = () => {
                         <button
                             type="button"
                             className="yy-btn-primary translate-submit-btn"
-                            disabled={!sourceText.trim() || loading || (isGuest && guestQuota.exhausted)}
+                            disabled={!sourceText.trim() || loading || !online || (isGuest && guestQuota.exhausted)}
+                            aria-describedby={online ? undefined : "translate-offline"}
                             onClick={handleSubmit}
                         >
                             {loading ? <LoadingSpinner size="sm" announce={false} label="翻譯中…" /> : "翻譯"}
                         </button>
+                        <OfflineNotice online={online} id="translate-offline" action="翻譯" />
                     </div>
 
                     <div className="yy-card translate-pane">

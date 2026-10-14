@@ -78,7 +78,7 @@ const News = ({ withImage = [], withoutImage = [], loading = false }) => {
                             {withImage.map((event) => (
                                 <SwiperSlide key={event.id}>
                                     <div className="news-slide">
-                                        <img src={event.image} alt={event.title} />
+                                        <img decoding="async" loading="lazy" src={event.image} alt={event.title} />
                                         <div className="news-slide-info">
                                             <div className="news-slide-date">
                                                 {event.start_date}{event.end_date ? ` ～ ${event.end_date}` : ''}

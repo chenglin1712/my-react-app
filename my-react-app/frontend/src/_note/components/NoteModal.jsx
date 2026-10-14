@@ -1,6 +1,8 @@
 import DOMPurify from "dompurify";
 import { useEffect, useRef, useState } from "react";
 import { useFocusTrap } from "@hooks/useFocusTrap";
+import { useOnlineStatus } from "@hooks/useOnlineStatus";
+import OfflineNotice from "@components/ui/OfflineNotice";
 import { isBlankNote } from "../sync/noteSyncCore";
 
 const REPORT_REASONS = [
@@ -22,6 +24,7 @@ export default function NoteModal({ note, canLike, iLike, canDelete, onToggleLik
   const [reportReason, setReportReason] = useState("inappropriate");
   const [reportText, setReportText] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
+  const online = useOnlineStatus();
 
   // 切到另一則筆記時（同一個 Modal 實例被重新指派 note），先前那則的檢舉表單
   // 狀態不該留著跨到這一則筆記上。
@@ -169,12 +172,14 @@ export default function NoteModal({ note, canLike, iLike, canDelete, onToggleLik
               <button
                 type="button"
                 className="ns-btn danger"
-                disabled={reportSubmitting || (reportReason === "other" && !reportText.trim())}
+                disabled={reportSubmitting || !online || (reportReason === "other" && !reportText.trim())}
+                aria-describedby={online ? undefined : "report-offline"}
                 onClick={submitReport}
               >
                 {reportSubmitting ? "送出中…" : "送出檢舉"}
               </button>
             </div>
+            <OfflineNotice online={online} id="report-offline" action="送出檢舉" />
           </div>
         )}
       </div>

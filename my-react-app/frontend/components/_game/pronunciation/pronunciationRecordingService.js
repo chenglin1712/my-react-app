@@ -2,8 +2,7 @@ import {
   collection, addDoc, getDocs, query,
   where, orderBy, limit, serverTimestamp,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "../../../../firebase";
+import { db, getStorageInstance } from "../../../../firebase";
 
 /**
  * pronunciations/{tribe}/recordings 的資料存取層，從 pronunciation_game.jsx
@@ -35,6 +34,7 @@ export async function fetchReferenceUrls(tribe, word) {
 // 只是為了避免同一秒內上傳的檔名相撞，不是要藏資訊。
 export async function uploadRecording(tribe, word, uid, blob) {
   const filename = `${crypto.randomUUID()}_${uid}.webm`;
+  const [{ ref, uploadBytes, getDownloadURL }, storage] = await Promise.all([import("firebase/storage"), getStorageInstance()]);
   const storageRef = ref(storage, `pronunciations/${tribe}/${encodeURIComponent(word)}/${filename}`);
   await uploadBytes(storageRef, blob, { contentType: "audio/webm" });
   return getDownloadURL(storageRef);

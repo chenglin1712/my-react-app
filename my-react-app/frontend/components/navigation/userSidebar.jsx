@@ -33,7 +33,7 @@ const UserSidebar = ({ userData, closeSidebar, onOpenBot }) => {
                 {/* 頂部個人資料 */}
                 <div className="sidebar-profile">
                     <div className="profile-avatar-container">
-                        <img src={userData.firestoreData.avatarUrl ? userData.firestoreData.avatarUrl : AvatarImg} alt="頭像" />
+                        <img decoding="async" loading="lazy" src={userData.firestoreData.avatarUrl ? userData.firestoreData.avatarUrl : AvatarImg} alt="頭像" />
                         <div className="profile-info">
                             <h3>{userData.firestoreData.name}</h3>
                             <p>{userData.firestoreData.email}</p>

@@ -13,7 +13,7 @@ export default function NoteCard({ note, isMyTab, isMine, iLike, onOpen, onToggl
       <button type="button" className="ns-card-open" onClick={() => onOpen(note)}>
         <div className="ns-card-head">
           {note.avatarUrl ? (
-            <img src={note.avatarUrl} alt="" className="ns-avatar" loading="lazy" />
+            <img decoding="async" src={note.avatarUrl} alt="" className="ns-avatar" loading="lazy" />
           ) : (
             <div className="ns-avatar ns-avatar-fallback" aria-hidden="true"><User size={18} /></div>
           )}

@@ -242,7 +242,7 @@
 
 .pron-community-modal-backdrop {
   position: fixed;
-  z-index: 1050;
+  z-index: var(--yy-z-overlay);
   inset: 0;
   display: grid;
   place-items: center;

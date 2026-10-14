@@ -163,7 +163,7 @@
   padding: 1rem 1.5rem;
   border-radius: var(--yy-radius-btn);
   box-shadow: var(--yy-shadow-md, 5px 5px 0 var(--yy-ink));
-  z-index: 1000;
+  z-index: var(--yy-z-toast);
   width: fixed;
 }
 

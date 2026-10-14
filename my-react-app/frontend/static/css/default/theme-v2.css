@@ -96,9 +96,13 @@
      已對應到這幾層，之後逐步改成引用 token。 */
   --yy-z-raised: 10;
   --yy-z-sticky: 100;
+  --yy-z-float: 900; /* 浮動按鈕、搜尋列：在導覽列之下 */
   --yy-z-nav: 1000;
-  --yy-z-overlay: 1050;
+  --yy-z-drawer: 1001; /* 個人側欄、手機選單 */
+  --yy-z-dropdown: 1002; /* 導覽列下拉選單 */
+  --yy-z-overlay: 1050; /* 彈窗與遮罩 */
   --yy-z-popover: 1100;
+  --yy-z-toast: 1200; /* 提示訊息要在彈窗之上，開著彈窗時也看得到（審查項 P3-21） */
   --yy-z-top: 2000;
 
   /* 斷點（CSS 變數不能用在 @media，這裡只記錄慣用值）：
@@ -659,7 +663,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1050;
+  z-index: var(--yy-z-overlay);
   animation: yy-overlay-in var(--dur-base) var(--ease-out) both;
 }
 .yy-modal-box {
@@ -791,7 +795,7 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1050;
+    z-index: var(--yy-z-overlay);
 }
 
 .yy-success-card {

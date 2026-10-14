@@ -106,7 +106,7 @@
     border: 2px solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
     box-shadow: var(--yy-shadow-sm);
-    z-index: 101;
+    z-index: calc(var(--yy-z-sticky) + 1);
     font-size: 14px;
     width: 240px;
     white-space: normal;
@@ -160,9 +160,12 @@
     fill: var(--yy-gold);
 }
 
+/* 圖片載入前先用比例預留位置，載入後答案按鈕不會被推走造成點錯（審查項 P2-103） */
 .question-image {
     width: 40%;
     height: auto;
+    aspect-ratio: 4 / 3;
+    object-fit: contain;
 }
 
 audio {
@@ -265,7 +268,8 @@ audio {
 .quiz-multi-images img {
     width: 100%;
     height: auto;
-    object-fit: cover;
+    aspect-ratio: 1 / 1;
+    object-fit: contain; /* 選項圖是題目內容，不裁切 */
     display: block;
 }
 

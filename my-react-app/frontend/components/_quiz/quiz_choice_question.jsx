@@ -13,7 +13,7 @@ const ChoiceQuestion = ({ question, selected, onSelect }) => (
                 onClick={() => onSelect(idx + 1)}
             >
                 <span className="quiz-label">{label}</span>
-                <img
+                <img decoding="async"
                     src={question[`image${label}`]}
                     alt={`選項 ${label}`}
                 />

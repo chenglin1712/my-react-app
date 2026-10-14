@@ -15,6 +15,8 @@ import { trackEvent } from "../../utils/apiClient"
 import { buildQuizAnswerEvents } from "./quizAnswerTracking"
 import { useLottieAnimation } from "@hooks/useLottieAnimation";
 import { announce } from "@utils/announce";
+import { useOnlineStatus } from "@hooks/useOnlineStatus";
+import OfflineNotice from "@components/ui/OfflineNotice";
 import { confirmAction } from "@components/ui/ConfirmDialog";
 import { QUIZ_LEVEL_NAME_BY_ID } from "./quizLevels";
 
@@ -33,6 +35,7 @@ const Panel = ({ tribe = "tayal" }) => {
 
     const [showIntro, setShowIntro] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const online = useOnlineStatus();
     const [submitError, setSubmitError] = useState("");
 
     // 說明面板只留 click 開關（原本 hover 與 click 兩套並存），可用 Esc 關閉
@@ -295,9 +298,10 @@ const Panel = ({ tribe = "tayal" }) => {
                         </div>
                     </div>
                     {submitError && <p className="quiz-submit-error" role="alert">{submitError}</p>}
-                    <button className="submit-button" onClick={handleSubmit} disabled={isSubmitting}>
+                    <button className="submit-button" onClick={handleSubmit} disabled={isSubmitting || !online} aria-describedby={online ? undefined : "quiz-submit-offline"}>
                         {isSubmitting ? "送出中..." : "繳交試卷"}
                     </button>
+                    <OfflineNotice online={online} id="quiz-submit-offline" action="繳交試卷" />
                 </div>
                 <AnswerBox
                     dataLen={dataLen}

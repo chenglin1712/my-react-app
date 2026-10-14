@@ -8,7 +8,7 @@
    anchor 是高度 0 的 sticky 容器，釘在全站導覽列下方（top 由程式量測導覽列高度後帶入），不佔版面。 */
 .search-compact-anchor {
   position: sticky;
-  z-index: 900;
+  z-index: var(--yy-z-float);
   height: 0;
 }
 .search-compact-bar {

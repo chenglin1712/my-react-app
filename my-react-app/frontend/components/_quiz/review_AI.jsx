@@ -111,7 +111,7 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
                                     </div>
                                 ))}
                             </div>
-                            {msg.image && <img src={msg.image} alt={msg.image_alt ?? "助手附上的圖片"} className="reply-image" loading="lazy" />}
+                            {msg.image && <img decoding="async" src={msg.image} alt={msg.image_alt ?? "助手附上的圖片"} className="reply-image" loading="lazy" />}
                         </div>
                     ) : (
                         <p>{msg.text}</p>
@@ -190,7 +190,7 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
                                         </div>
                                     ))}
                                 </div>
-                                {expanded.image && <img src={expanded.image} alt={expanded.image_alt ?? "助手附上的圖片"} className="reply-image large" />}
+                                {expanded.image && <img decoding="async" loading="lazy" src={expanded.image} alt={expanded.image_alt ?? "助手附上的圖片"} className="reply-image large" />}
                             </div>
                         ) : (
                             <p className="expanded-text">{expanded.text}</p>

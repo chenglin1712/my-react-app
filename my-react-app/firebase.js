@@ -2,7 +2,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
 // https://firebase.google.com/docs/web/setup#available-libraries
 
 // Your web app's Firebase configuration
@@ -22,18 +21,23 @@ const firebaseConfig = {
 // 設定缺漏（例如沒有帶到 VITE_FIREBASE_* 環境變數）時，getAuth 會在模組載入的當下直接丟出例外，
 // 發生在 React 掛載之前，整頁只會是白屏。這裡接住並記下原因，main.jsx 看到 firebaseInitError
 // 就改顯示靜態的啟動失敗畫面（不顯示設定內容）。
+let app;
 let auth;
 let db;
-let storage;
 let firebaseInitError = null;
 try {
-    const app = initializeApp(firebaseConfig);
+    app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
-    storage = getStorage(app);
 } catch (error) {
     firebaseInitError = error;
     console.error("Firebase 初始化失敗：", error?.code || error?.message);
 }
 
-export { auth, db, storage, firebaseInitError };
+// Storage 只有發音遊戲上傳錄音會用，SDK 改成用到才下載，不放進入口 chunk（審查項 P2-102）
+const getStorageInstance = async () => {
+    const { getStorage } = await import("firebase/storage");
+    return getStorage(app);
+};
+
+export { auth, db, getStorageInstance, firebaseInitError };

@@ -262,7 +262,7 @@ const DateReminder = () => {
 
                                     return (
                                         <div
-                                            key={index}
+                                            key={event.phase ?? index}
                                             className={`schedule-item ${isCurrent
                                                 ? "current"
                                                 : isPast

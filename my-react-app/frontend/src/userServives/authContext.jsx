@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useState, useEffect } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, useEffect } from "react";
 import { authChanges } from "./userServive";
 
 const AuthContext = createContext(null);
@@ -28,8 +28,11 @@ export const AuthProvider = ({ children }) => {
         setUserData(newUserData);
     }, []);
 
+    // value 用 useMemo 固定識別度：provider 因為父層重新 render 時，48 個 useAuth 的使用者不會跟著全部重繪（審查項 P2-106）
+    const value = useMemo(() => ({ userData, updateUserData, loading }), [userData, updateUserData, loading]);
+
     return (
-        <AuthContext.Provider value={{ userData, updateUserData, loading }}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );

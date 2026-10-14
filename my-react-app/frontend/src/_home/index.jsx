@@ -161,7 +161,8 @@ const HomePage = () => {
             <div className="home-feature-image">
                 {showHeroImage
                     ? (
-                        <img
+                        <img decoding="async"
+                            fetchPriority="high"
                             src={homepageConfig.hero_image_url}
                             alt={heroTitle ? "" : "現正主打"}
                             onError={() => setFailedHeroImage(homepageConfig.hero_image_url)}

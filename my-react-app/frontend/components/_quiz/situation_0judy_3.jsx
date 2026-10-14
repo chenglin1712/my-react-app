@@ -10,6 +10,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  LabelList,
   ResponsiveContainer
 } from 'recharts';
 import ChartFigure from '../ui/ChartFigure';
@@ -24,7 +25,8 @@ const typeMap = {
 // typeMap 這 4 個 key 是外部後端流程寫入 questionTypeDistribution 時用的彙總
 // 格式，這個 repo 沒有那份程式碼，沒辦法確認未來會不會再多別的 key——保底
 // 用「其他題型」呈現，不要讓沒對應到的 key 讓整頁掛掉。
-const FALLBACK_TYPE = { name: '其他題型', color: '#B0B0B0' };
+// 顏色用深灰（白字對比約 6:1）；原本的淺灰 #B0B0B0 搭白色百分比文字只有 2.1:1（審查項 P2-101）
+const FALLBACK_TYPE = { name: '其他題型', color: '#6B5A47' };
 
 const getPerformance = (score) => {
   if (score >= 80) return "良好";
@@ -38,7 +40,8 @@ const CustomTooltip = ({ active, payload, label }) => {
       <div className="situation-tooltip-box">
         <p className="situation-tooltip-title">{`題型: ${label}`}</p>
         {payload.map((entry, index) => (
-          <p key={index} style={{ color: entry.color }} className='situation-tooltip-subtitle'>
+          <p key={index} className='situation-tooltip-subtitle'>
+            <span className="situation-tooltip-swatch" style={{ backgroundColor: entry.color }} aria-hidden="true" />
             {`${entry.name}: ${entry.value}%`}
           </p>
         ))}
@@ -49,12 +52,13 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 const SituationDashboard = ({ data, typeRatio }) => {
-  const performanceData = data.map(item => ({
+  const performanceData = (data ?? []).map(item => ({
     ...item,
     performance: getPerformance(item.correctRate)
   }));
 
-  const questionTypeData = Object.entries(typeRatio).map(([key, value]) => ({
+  // typeRatio 可能是 undefined（後端沒有回傳題型分布），Object.entries(undefined) 會丟出例外
+  const questionTypeData = Object.entries(typeRatio ?? {}).map(([key, value]) => ({
     name: (typeMap[key] ?? FALLBACK_TYPE).name,
     value,
     color: (typeMap[key] ?? FALLBACK_TYPE).color
@@ -110,6 +114,7 @@ const SituationDashboard = ({ data, typeRatio }) => {
             columns={[{ key: "name", label: "題型" }, { key: "share", label: "比例" }]}
             rows={questionTypeData.map((i) => ({ name: i.name, share: percentOf(i.value) }))}
           >
+            {questionTypeData.length === 0 ? <p className="situation-chart-empty">尚無資料</p> : (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -131,6 +136,7 @@ const SituationDashboard = ({ data, typeRatio }) => {
                 <Tooltip formatter={(value, name) => [percentOf(value), name]} />
               </PieChart>
             </ResponsiveContainer>
+            )}
           </ChartFigure>
           <div className="situation-legend-grid">
             {questionTypeData.map((item, index) => (
@@ -161,6 +167,7 @@ const SituationDashboard = ({ data, typeRatio }) => {
               performance: i.performance,
             }))}
           >
+            {performanceData.length === 0 ? <p className="situation-chart-empty">尚無資料</p> : (
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
                 data={performanceData}
@@ -192,6 +199,14 @@ const SituationDashboard = ({ data, typeRatio }) => {
                   {performanceData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={getPerformanceColor(entry.performance)} />
                   ))}
+                  <LabelList
+                    dataKey="correctRate"
+                    content={({ x, y, width, value, index }) => (
+                      <text x={x + width / 2} y={y - 6} textAnchor="middle" fontSize={12} fontWeight={700} fill="#221812">
+                        {`${value}% ${performanceData[index]?.performance ?? ''}`}
+                      </text>
+                    )}
+                  />
                 </Bar>
 
                 <Line
@@ -206,6 +221,7 @@ const SituationDashboard = ({ data, typeRatio }) => {
                 />
               </ComposedChart>
             </ResponsiveContainer>
+            )}
           </ChartFigure>
         </div>
       </div>

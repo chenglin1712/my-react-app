@@ -189,7 +189,7 @@ describe("AI 助手懸浮視窗", () => {
     expect(rule.body).toMatch(/position:\s*fixed/);
     expect(rule.body).toMatch(/right:\s*20px/);
     expect(rule.body).not.toMatch(/inset:\s*0/);
-    expect(rule.body).toMatch(/z-index:\s*900/);
+    expect(rule.body).toMatch(/z-index:\s*var\(--yy-z-float\)/); // = 900，低於導覽列的 --yy-z-nav（1000）
   });
 
   it("收合時 visibility:hidden 並禁止指標事件；開合動畫有 reduced-motion 降級", () => {

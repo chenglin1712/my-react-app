@@ -11,7 +11,7 @@
     right: 20px;
     /* 離線橫幅（置底、z-index 1100）出現時，body 會設 --bot-bottom 讓視窗與啟動鈕往上讓出位置 */
     bottom: var(--bot-bottom, 20px);
-    z-index: 900;
+    z-index: var(--yy-z-float);
     width: min(400px, calc(100vw - 32px));
     height: min(620px, calc(100dvh - var(--bot-bottom, 20px) - 100px));
     transform-origin: bottom right;
@@ -120,7 +120,7 @@
     background-color: transparent;
     border: none;
     color: white;
-    z-index: 1000;
+    z-index: var(--yy-z-nav);
 }
 
 .bot-avatar {

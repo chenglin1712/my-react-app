@@ -4,7 +4,7 @@
 const TrueFalseQuestion = ({ question, selected, onSelect }) => (
     <>
         {/* 這題是「聽音檔、判斷圖片是否相符」，alt 不能描述圖片內容，否則等於公布答案；有內容模型提供 image_alt 才用 */}
-        <img src={question.image} alt={question.image_alt ?? "題目圖片"} className="question-image" />
+        <img decoding="async" src={question.image} alt={question.image_alt ?? "題目圖片"} className="question-image" />
         <div className="answers">
             <button type="button" aria-pressed={selected === 1} className={selected === 1 ? 'selected' : ''} onClick={() => onSelect(1)}>
                 O (符合)

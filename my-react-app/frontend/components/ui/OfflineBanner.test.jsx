@@ -20,11 +20,11 @@ describe('離線提示', () => {
     });
 
     test('斷線時出現、恢復連線後消失', () => {
-        setOnline(true);
+        const spy = setOnline(true);
         render(<OfflineBanner />);
-        act(() => { window.dispatchEvent(new Event('offline')); });
+        act(() => { spy.mockReturnValue(false); window.dispatchEvent(new Event('offline')); });
         expect(screen.getByRole('status')).toBeInTheDocument();
-        act(() => { window.dispatchEvent(new Event('online')); });
+        act(() => { spy.mockReturnValue(true); window.dispatchEvent(new Event('online')); });
         expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
 });

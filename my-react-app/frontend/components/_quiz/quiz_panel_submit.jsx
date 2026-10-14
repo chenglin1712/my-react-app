@@ -14,7 +14,7 @@ function TrueFalseResult({ item, userAnswer, correctAnswer, isCorrect }) {
     return (
         <>
             <div className="submit-question-q">
-                <img src={item.image} alt={item.question_ab ? `圖片：${item.question_ab}` : "題目圖片"} className="submit-question-image" loading="lazy" />
+                <img decoding="async" src={item.image} alt={item.question_ab ? `圖片：${item.question_ab}` : "題目圖片"} className="submit-question-image" loading="lazy" />
                 <span>{item.question_ab}</span>
             </div>
             <span className={`quiz-user-answer ${isCorrect ? "correct" : "wrong"}`}>{userAnswer}</span>
@@ -32,8 +32,8 @@ function ChoiceResult({ item, userLabel, correctLabel, isCorrect }) {
                     <p style={{ margin: "0" }}>{item.question_ch}</p>
                 </div>
             </div>
-            <img className={`quiz-user-answer2 ${isCorrect ? "correct" : "wrong"}`} src={item.images?.[userLabel] ?? ""} alt={userLabel ? `你選的答案：選項 ${userLabel}` : "未作答"} loading="lazy" />
-            <img className="quiz-correct-answer2" src={item.images?.[correctLabel] ?? ""} alt={correctLabel ? `正確答案：選項 ${correctLabel}` : "正確答案"} loading="lazy" />
+            <img decoding="async" className={`quiz-user-answer2 ${isCorrect ? "correct" : "wrong"}`} src={item.images?.[userLabel] ?? ""} alt={userLabel ? `你選的答案：選項 ${userLabel}` : "未作答"} loading="lazy" />
+            <img decoding="async" className="quiz-correct-answer2" src={item.images?.[correctLabel] ?? ""} alt={correctLabel ? `正確答案：選項 ${correctLabel}` : "正確答案"} loading="lazy" />
         </>
     );
 }

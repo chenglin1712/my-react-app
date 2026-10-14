@@ -48,6 +48,24 @@
 }
 
 /* tooltip */
+.situation-chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  margin: 0;
+  color: var(--yy-text-muted);
+  font-weight: 700;
+}
+
+.situation-tooltip-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border: 1px solid var(--yy-ink);
+}
+
 .situation-tooltip-box {
     background-color: var(--yy-surface);
     padding: 12px;

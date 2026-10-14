@@ -9,7 +9,7 @@ body:has(.offline-banner) {
     position: fixed;
     right: 20px;
     bottom: var(--bot-bottom, 20px);
-    z-index: 900;
+    z-index: var(--yy-z-float);
     width: 56px;
     height: 56px;
     display: flex;

@@ -141,7 +141,7 @@
 /* ── Modal ─────────────────────────────────── */
 .ns-modal-mask{
   position:fixed; inset:0; background:rgba(0,0,0,.5);
-  display:flex; align-items:center; justify-content:center; z-index:50;
+  display:flex; align-items:center; justify-content:center; z-index:var(--yy-z-overlay);
 }
 .ns-modal{
   background:var(--yy-surface); width:95%; max-width:720px; max-height:90vh; max-height: 90dvh; overflow:auto;
@@ -194,7 +194,7 @@
   padding: .6rem .9rem;
   border-radius: .5rem;
   font-size: .95rem;
-  z-index: 1000;
+  z-index: var(--yy-z-toast);
   box-shadow: var(--yy-shadow-md);
   animation: ns-fadein .15s ease-out;
 }

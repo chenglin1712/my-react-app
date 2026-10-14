@@ -5,7 +5,7 @@
     border-bottom: 4px solid var(--yy-gold);
     position: sticky;
     top: 0;
-    z-index: 1000;
+    z-index: var(--yy-z-nav);
 }
 
 .navbar-container {
@@ -317,7 +317,7 @@
     height: 100%;
     background-color: var(--yy-surface);
     box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
-    z-index: 1001;
+    z-index: var(--yy-z-drawer);
     visibility: hidden;
     /* 用 transform 位移而不是動 right（審查項 P2-85）：不觸發版面重算。
        曲線是 iOS 抽屜的 (0.32, 0.72, 0, 1)，280ms；收起時 visibility 等動畫結束才隱藏 */
@@ -339,7 +339,7 @@
     width: 100%;
     height: 100%;
     background-color: rgba(34, 24, 18, 0.55);
-    z-index: 1000;
+    z-index: var(--yy-z-nav);
     transition: opacity 0.3s ease;
 }
 
@@ -392,7 +392,7 @@
     background-color: var(--yy-ink);
     border: 2px solid var(--yy-gold);
     min-width: 150px;
-    z-index: 1002;
+    z-index: var(--yy-z-dropdown);
     border-radius: var(--yy-radius-btn);
     box-shadow: var(--yy-shadow-md);
     flex-direction: column;

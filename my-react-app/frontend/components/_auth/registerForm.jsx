@@ -137,7 +137,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                     <div className="auth-field">
                         <label className="auth-field-label" htmlFor="avatarInput">大頭貼（選填）</label>
                         <div className="input-wrapper">
-                            <img src={previewUrl || avatarImage} alt="使用者頭像預覽" style={{ height: "101px", padding: "inherit" }} />
+                            <img decoding="async" src={previewUrl || avatarImage} alt="使用者頭像預覽" style={{ height: "101px", padding: "inherit" }} />
                             <input
                                 id="avatarInput"
                                 type="file"

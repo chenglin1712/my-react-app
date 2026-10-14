@@ -1,4 +1,6 @@
 import { Mic, Square } from "lucide-react";
+import { useOnlineStatus } from "@hooks/useOnlineStatus";
+import OfflineNotice from "@components/ui/OfflineNotice";
 
 export default function PlayingScreen({
   progressPct, current, totalQuestions, q, rating,
@@ -6,6 +8,7 @@ export default function PlayingScreen({
   submitting, onSubmit, score, officialScore, error, onNext,
   shareState, onShare,
 }) {
+  const online = useOnlineStatus();
   return (
     <div className="pron-game">
       <div
@@ -81,10 +84,12 @@ export default function PlayingScreen({
             type="button"
             className="pron-btn-outline"
             onClick={onShare}
-            disabled={shareState === "sharing" || shareState === "shared"}
+            disabled={shareState === "sharing" || shareState === "shared" || !online}
+            aria-describedby={online ? undefined : "pron-share-offline"}
           >
             {shareState === "shared" ? "已分享 ✓" : shareState === "sharing" ? "分享中..." : "分享錄音到社群"}
           </button>
+          <OfflineNotice online={online} id="pron-share-offline" action="分享錄音" />
           <p className="pron-share-hint">分享後，其他使用者可以在社群示範發音頁面聽到這段錄音。</p>
           {shareState === "error" && <p className="pron-error" role="alert">分享失敗，請稍後再試。</p>}
         </div>

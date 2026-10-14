@@ -11,7 +11,7 @@
   padding: 12px 0;
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: var(--yy-z-sticky);
 }
 .editor-toolbar .group { display: flex; align-items: center; gap: 8px; }
 .editor-toolbar .divider { width:1px; height:20px; background:var(--yy-cream-dim); }
@@ -32,7 +32,7 @@
   gap: 10px;
   padding: 10px 20px;
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
-  z-index: 999;
+  z-index: var(--yy-z-float);
 }
 .toolbar-page-info {
   align-self: center;

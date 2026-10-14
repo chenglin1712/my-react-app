@@ -109,7 +109,7 @@
     position: fixed;
     right: 20px;
     bottom: 20px;
-    z-index: 1001;
+    z-index: var(--yy-z-drawer);
 
     width: 60px;
     height: 60px;
@@ -159,7 +159,7 @@
     position: fixed;
     right: 20px;
     bottom: 92px;
-    z-index: 1000;
+    z-index: var(--yy-z-nav);
     width: 210px;
     padding: 16px;
 

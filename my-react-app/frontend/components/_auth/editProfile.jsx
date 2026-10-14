@@ -68,7 +68,7 @@ const Edit = () => {
             {(errorMsg || uploadError) && <Alert variant="danger" className="py-2">{errorMsg || uploadError}</Alert>}
 
             <label className="avatar-uploader" htmlFor="edit-avatar-input">
-                <img src={previewUrl} alt="頭像" className="avatar-image" />
+                <img decoding="async" src={previewUrl} alt="頭像" className="avatar-image" />
                 <div className="edit-overlay">
                     <Edit2 size={18} />
                     <span>{isUploading ? "上傳中..." : "變更圖片"}</span>

@@ -52,7 +52,7 @@
     position: absolute;
     top: 80%;
     right: 0;
-    z-index: 101;
+    z-index: calc(var(--yy-z-sticky) + 1);
     font-size: 14px;
     display: none;
     width: 240px;

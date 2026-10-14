@@ -4,6 +4,8 @@ import { Alert } from "react-bootstrap";
 import LoadingSpinner from "@components/ui/LoadingSpinner";
 import "../../static/css/_camera/wizard.css";
 import StepBar from "../../components/ui/StepBar";
+import { useOnlineStatus } from "@hooks/useOnlineStatus";
+import OfflineNotice from "@components/ui/OfflineNotice";
 
 // 第 2、3 步各自 lazy load：第 1 步（選圖）原本會把三步全部一起打包進去，
 // 含第 3 步查詢結果頁引用的 36 張分類圖（見 constants/categoryGroups.js），
@@ -24,6 +26,7 @@ const CameraWizard = () => {
     const [step, setStep] = useState(1);
     const [tribe, setTribe] = useState("tayal");
     const [image, setImage] = useState(null);
+    const online = useOnlineStatus();
     const [file, setFile] = useState(null);
     const [inputKey, setInputKey] = useState(Date.now());
     const [fileName, setFileName] = useState("請選擇圖片");
@@ -101,7 +104,7 @@ const CameraWizard = () => {
                     <div className="yy-fade-up camera-step1">
                         <label htmlFor="camera-file-input" className="camera-dropzone">
                             {image ? (
-                                <img src={image} alt="預覽圖片" className="camera-dropzone-img" />
+                                <img decoding="async" src={image} alt="預覽圖片" className="camera-dropzone-img" />
                             ) : (
                                 <div className="camera-dropzone-placeholder">
                                     <Camera size={44} strokeWidth={2} aria-hidden="true" />
@@ -147,9 +150,10 @@ const CameraWizard = () => {
                                 </p>
                             </div>
                             <div className="camera-step1-actions">
-                                <button type="button" className="yy-btn-primary" disabled={!image} onClick={() => setStep(2)}>提交辨識 ▸</button>
+                                <button type="button" className="yy-btn-primary" disabled={!image || !online} aria-describedby={online ? undefined : "camera-offline"} onClick={() => setStep(2)}>提交辨識 ▸</button>
                                 <button type="button" className="yy-btn-outline" disabled={!image} onClick={handleCancel}>移除圖片</button>
                             </div>
+                            <OfflineNotice online={online} id="camera-offline" action="辨識圖片" />
                         </div>
                     </div>
                 )}

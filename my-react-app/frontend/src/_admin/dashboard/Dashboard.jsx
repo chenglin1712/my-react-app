@@ -384,6 +384,7 @@ export default function Dashboard() {
                                             name="新註冊"
                                             stroke="#2c6e7f"
                                             strokeWidth={2}
+                                            strokeDasharray="6 4"
                                             dot={{ r: 3 }}
                                             activeDot={{ r: 5 }}
                                         />

@@ -75,7 +75,7 @@ function NotePage() {
    * 一張圖轉出來的 Base64 很容易讓 pages 內容超過 Firestore 單一文件 1 MiB
    * 的上限（buildPreview() 的註解也記錄了同一個問題曾經讓「只要分享的筆記
    * 裡有圖片就一定失敗」）。改成選取後立刻上傳 Cloudinary、editor 只插入
-   * 真正的圖片網址，內容本身永遠是一段很短的 <img src="https://...">。
+   * 真正的圖片網址，內容本身永遠是一段很短的 <img decoding="async" loading="lazy" src="https://...">。
    */
   const handleImageFileSelected = async (file) => {
     if (file.size > 5 * 1024 * 1024) {

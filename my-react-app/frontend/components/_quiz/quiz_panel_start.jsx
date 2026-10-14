@@ -26,7 +26,7 @@ const Panel_Start = ({ tribe = "tayal" }) => {
                             className={`level-card level-${level.id} ${level.disabled ? "disabled" : ""}`}
                         >
                             {level.recommended && (
-                                <img src={RecommonImg} alt="推薦等級" className="level-recommend-img" />
+                                <img decoding="async" loading="lazy" src={RecommonImg} alt="推薦等級" className="level-recommend-img" />
                             )}
 
                             <div className="level-card-icon">

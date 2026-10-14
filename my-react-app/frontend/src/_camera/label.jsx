@@ -109,7 +109,7 @@ const CameraLabelStep = ({ image, file, saved, onSave, onConfirm, onBack }) => {
     return (
         <div className="yy-fade-up camera-step2">
             <div className="camera-step2-preview">
-                {image && <img src={image} alt="預覽圖片" />}
+                {image && <img decoding="async" src={image} alt="預覽圖片" />}
             </div>
 
             <div className="camera-step2-panel">
