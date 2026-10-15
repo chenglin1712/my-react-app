@@ -33,8 +33,9 @@
   margin-top: 0;
 }
 
+/* 水平捲動由 AdminTable 負責（G-3），這裡不再多一層 overflow，避免兩層捲動 */
 .moderation-table-scroll {
-  overflow-x: auto;
+  min-width: 0;
 }
 
 .moderation-table {

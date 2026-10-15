@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Alert,
-    Button,
-    Form,
-    Spinner,
-    Table,
+  Alert,
+  Button,
+  Form,
+  Spinner,
 } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import { BarChart3, ExternalLink } from 'lucide-react';
 import {
     CartesianGrid,
@@ -432,8 +432,7 @@ export default function QuizQualityAnalysis() {
                         ) : insufficientItems.length === 0 ? (
                             <EmptyState />
                         ) : (
-                            <Table
-                                responsive
+                            <AdminTable label="樣本不足題目"
                                 hover
                                 className="quiz-quality-table"
                             >
@@ -481,7 +480,7 @@ export default function QuizQualityAnalysis() {
                                         </tr>
                                     ))}
                                 </tbody>
-                            </Table>
+                            </AdminTable>
                         )}
                     </section>
                 </>

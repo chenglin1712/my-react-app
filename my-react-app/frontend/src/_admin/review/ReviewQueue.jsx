@@ -6,8 +6,8 @@ import {
   Button,
   Form,
   Spinner,
-  Table,
 } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import {
   ChevronLeft,
   ChevronRight,
@@ -178,7 +178,7 @@ export default function ReviewQueue() {
             <span>載入送審佇列中…</span>
           </div>
         ) : (
-          <Table responsive hover className="review-queue-table">
+          <AdminTable label="送審佇列" hover className="review-queue-table">
             <thead>
               <tr>
                 <th>類型</th>
@@ -246,7 +246,7 @@ export default function ReviewQueue() {
                 })
               )}
             </tbody>
-          </Table>
+          </AdminTable>
         )}
 
         {!loading && data.count > 0 && (

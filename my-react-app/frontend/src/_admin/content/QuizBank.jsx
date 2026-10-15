@@ -1,4 +1,5 @@
-import { Alert, Button, Form, Modal, Spinner, Table, Tab, Tabs } from 'react-bootstrap';
+import { Alert, Button, Form, Modal, Spinner, Tab, Tabs } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import { Minus, Plus } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
@@ -149,7 +150,7 @@ function VocabPanel({ role }) {
                         <span>載入中…</span>
                     </div>
                 ) : (
-                    <Table responsive hover className="quiz-bank-table">
+                    <AdminTable label="題庫列表" hover className="quiz-bank-table">
                         <thead>
                             <tr>
                                 <th>族語</th>
@@ -192,7 +193,7 @@ function VocabPanel({ role }) {
                                 </tr>
                             )}
                         </tbody>
-                    </Table>
+                    </AdminTable>
                 )}
 
                 <ReviewPagination
@@ -483,7 +484,7 @@ function ClozePanel({ role }) {
                         <span>載入中…</span>
                     </div>
                 ) : (
-                    <Table responsive hover className="quiz-bank-table">
+                    <AdminTable label="題庫列表" hover className="quiz-bank-table">
                         <thead>
                             <tr>
                                 <th>族語</th>
@@ -526,7 +527,7 @@ function ClozePanel({ role }) {
                                 </tr>
                             )}
                         </tbody>
-                    </Table>
+                    </AdminTable>
                 )}
 
                 <ReviewPagination

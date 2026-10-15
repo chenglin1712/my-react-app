@@ -144,6 +144,34 @@
   background: var(--admin-surface-muted);
 }
 
+/* ------------------------------------------------------------------ 表格捲動區 AdminTable（G-3） */
+/* 表格比容器寬時才可左右捲動並成為可聚焦的 region（見 AdminTable.jsx）；被藏起來的那一側顯示淡陰影 */
+.admin-shell .admin-table-scroll-wrap { position: relative; }
+.admin-shell .admin-table-scroll {
+  overflow-x: auto;
+  scroll-padding-inline: 16px;
+}
+.admin-shell .admin-table-scroll > .table { margin-bottom: 0; }
+.admin-shell .admin-table-scroll:focus-visible {
+  outline: var(--admin-focus-ring);
+  outline-offset: -3px;
+}
+.admin-shell .admin-table-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  pointer-events: none;
+}
+.admin-shell .admin-table-edge.is-start {
+  left: 0;
+  background: linear-gradient(to right, rgba(20, 33, 58, .16), rgba(20, 33, 58, 0));
+}
+.admin-shell .admin-table-edge.is-end {
+  right: 0;
+  background: linear-gradient(to left, rgba(20, 33, 58, .16), rgba(20, 33, 58, 0));
+}
+
 /* ------------------------------------------------------------------ 空狀態、載入、分頁 */
 /* 共用空狀態 AdminEmpty（G-2）：標題講現況，說明與行動都是選填 */
 .admin-shell .admin-empty-cell {

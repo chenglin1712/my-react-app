@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-    Alert, Badge, Button, Spinner, Table,
+  Alert,
+  Badge,
+  Button,
+  Spinner,
 } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import { RefreshCw } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { apiGet } from '../../../utils/apiClient';
@@ -185,7 +189,7 @@ export default function MorphologyCapabilities() {
                         {data.cached ? `（快取，約 ${data.cache_ttl_seconds} 秒內會重新計算）` : ''}
                         ｜放行檔產生器 {report.artifact_generator ?? '—'}
                     </p>
-                    <Table responsive hover className="admin-table system-morph-table">
+                    <AdminTable label="形態分析能力報表" hover className="admin-table system-morph-table">
                         <thead>
                             <tr>
                                 <th>族語</th>
@@ -198,7 +202,7 @@ export default function MorphologyCapabilities() {
                         <tbody>
                             {report.tribes.map((tribe) => <TribeRow key={tribe.tribe} tribe={tribe} />)}
                         </tbody>
-                    </Table>
+                    </AdminTable>
                     <details className="system-morph-definitions">
                         <summary>數字怎麼算</summary>
                         <ul>

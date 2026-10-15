@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-    Alert,
-    Badge,
-    Button,
-    Form,
-    Modal,
-    Spinner,
-    Table,
+  Alert,
+  Badge,
+  Button,
+  Form,
+  Modal,
+  Spinner,
 } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import {
     Check,
     ExternalLink,
@@ -234,8 +234,7 @@ export default function ReportsQueue() {
                 ) : (
                     <>
                         <div className="moderation-table-scroll">
-                            <Table
-                                responsive
+                            <AdminTable label="檢舉列表"
                                 hover
                                 className="moderation-table"
                             >
@@ -366,7 +365,7 @@ export default function ReportsQueue() {
                                         </tr>
                                     )}
                                 </tbody>
-                            </Table>
+                            </AdminTable>
                         </div>
 
                         <ReviewPagination

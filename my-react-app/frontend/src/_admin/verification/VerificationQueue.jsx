@@ -2,8 +2,14 @@ import {
     useCallback, useEffect, useRef, useState,
 } from 'react';
 import {
-    Alert, Badge, Button, Form, Modal, Spinner, Table,
+  Alert,
+  Badge,
+  Button,
+  Form,
+  Modal,
+  Spinner,
 } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import { Download, Upload } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { apiGet, apiPost } from '../../../utils/apiClient';
@@ -410,7 +416,7 @@ export default function VerificationQueue() {
                     )}
                     {data && (
                         <div className="admin-table-card">
-                            <Table responsive hover className="admin-table">
+                            <AdminTable label="待專家驗證項目" hover className="admin-table">
                                 <thead>
                                     <tr>
                                         <th>詞形</th><th>族語／種類</th><th>提案</th><th>統計（詞次／句數）</th><th>狀態</th><th />
@@ -462,7 +468,7 @@ export default function VerificationQueue() {
                                         );
                                     })}
                                 </tbody>
-                            </Table>
+                            </AdminTable>
                             <div className="admin-pagination">
                                 <Button size="sm" variant="outline-secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一頁</Button>
                                 <span>第 {data.page} / {totalPages} 頁（共 {data.count} 筆）</span>

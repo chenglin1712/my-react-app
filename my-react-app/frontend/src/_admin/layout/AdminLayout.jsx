@@ -1,6 +1,6 @@
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { BarChart3, BookOpen, ClipboardCheck, FileQuestion, Gamepad2, LayoutDashboard, Megaphone, Settings, Users } from 'lucide-react';
+import { BarChart3, BookOpen, ClipboardCheck, FileQuestion, Gamepad2, LayoutDashboard, Megaphone, Menu, Settings, Users, X } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { signOut } from '../../userServives/userServive';
 import ErrorBoundary from '../../errorBoundary';
@@ -113,6 +113,11 @@ export default function AdminLayout({ pendingCounts = {} }) {
     const { pathname } = useLocation();
     const navigate = useNavigate();
     const [logoutError, setLogoutError] = useState('');
+    // 窄螢幕的側欄選單：記下「在哪個路徑打開的」，換頁就自然視為關閉，不必另外用 effect 同步
+    const [openedAt, setOpenedAt] = useState(null);
+    const navOpen = openedAt === pathname;
+    const toggleRef = useRef(null);
+    const closeRef = useRef(null);
     const groups = visibleNavGroups(userData?.role);
     const roleLabel = ROLE_LABELS[userData?.role];
     const displayName = userData?.firestoreData?.name || '';
@@ -171,6 +176,28 @@ export default function AdminLayout({ pendingCounts = {} }) {
         element.classList.add('is-entering');
     }, [pathname, ceremony]);
 
+    const closeNav = useCallback((returnFocus = false) => {
+        setOpenedAt(null);
+        // 主內容區此刻還是 inert，要等這一輪渲染把 inert 拿掉之後才聚焦得到開關
+        if (returnFocus) requestAnimationFrame(() => toggleRef.current?.focus());
+    }, []);
+
+    // 選單打開：焦點移到選單裡的關閉鈕；Esc 關閉並把焦點還給開關；視窗拉寬到不需要選單時自動關閉
+    useEffect(() => {
+        if (!navOpen) return undefined;
+        const frame = requestAnimationFrame(() => closeRef.current?.focus());
+        const onKey = (event) => { if (event.key === 'Escape') closeNav(true); };
+        window.addEventListener('keydown', onKey);
+        const wide = typeof window.matchMedia === 'function' ? window.matchMedia('(min-width: 901px)') : null;
+        const onWide = (event) => { if (event.matches) closeNav(); };
+        wide?.addEventListener?.('change', onWide);
+        return () => {
+            cancelAnimationFrame(frame);
+            window.removeEventListener('keydown', onKey);
+            wide?.removeEventListener?.('change', onWide);
+        };
+    }, [navOpen, closeNav]);
+
     // 登出後 AdminRoute 看到沒有登入狀態會自己導走；這裡直接回前台首頁，不停在後台登入頁。
     // 失敗時留在原頁並顯示原因，不要讓人以為已經登出。
     const handleLogout = async () => {
@@ -184,11 +211,14 @@ export default function AdminLayout({ pendingCounts = {} }) {
     };
 
     return (
-        <div className={`admin-shell${ceremony === 'hold' ? ' admin-shell--hold' : ''}${ceremony === 'play' ? ' admin-shell--play' : ''}`}>
-            <a href="#admin-main" className="visually-hidden-focusable">跳到後台主要內容</a>
+        <div className={`admin-shell${navOpen ? ' is-nav-open' : ''}${ceremony === 'hold' ? ' admin-shell--hold' : ''}${ceremony === 'play' ? ' admin-shell--play' : ''}`}>
+            <a href="#admin-main" className="visually-hidden-focusable" inert={navOpen || undefined}>跳到後台主要內容</a>
             <AdminReauthModal />
-            <aside className="admin-sidebar">
-                <Link className="admin-brand" to="/admin"><span>源·語</span><small>ADMIN CONSOLE</small></Link>
+            <aside className="admin-sidebar" id="admin-sidebar">
+                <button type="button" className="admin-nav-close" ref={closeRef} onClick={() => closeNav(true)} aria-label="關閉主選單">
+                    <X size={20} aria-hidden="true" />
+                </button>
+                <Link className="admin-brand" to="/admin" onClick={() => closeNav()}><span>源·語</span><small>ADMIN CONSOLE</small></Link>
                 <nav className="admin-navigation" aria-label="後台主選單">
                     {groups.map(({ label, icon: Icon, items }) => (
                         <section className="admin-nav-group" key={label}>
@@ -200,6 +230,7 @@ export default function AdminLayout({ pendingCounts = {} }) {
                                             className={({ isActive }) => `admin-nav-link${isActive ? ' active' : ''}`}
                                             end={item.end}
                                             to={item.to}
+                                            onClick={() => closeNav()}
                                         >
                                             <span>{item.label}</span>
                                             {pendingCounts[item.to] > 0 && (
@@ -224,8 +255,20 @@ export default function AdminLayout({ pendingCounts = {} }) {
                     {logoutError && <p className="admin-logout-error" role="alert">{logoutError}</p>}
                 </div>
             </aside>
-            <div className="admin-main-column">
+            {navOpen && <button type="button" className="admin-nav-backdrop" tabIndex={-1} aria-label="關閉主選單" onClick={() => closeNav(true)} />}
+            <div className="admin-main-column" inert={navOpen || undefined}>
                 <header className="admin-topbar">
+                    <button
+                        type="button"
+                        className="admin-nav-toggle"
+                        ref={toggleRef}
+                        aria-label="開啟主選單"
+                        aria-expanded={navOpen}
+                        aria-controls="admin-sidebar"
+                        onClick={() => setOpenedAt(pathname)}
+                    >
+                        <Menu size={20} aria-hidden="true" />
+                    </button>
                     <nav className="admin-breadcrumb" aria-label="麵包屑">
                         {breadcrumb.map((part, index) => (
                             <span key={`${part}-${index}`}>{index > 0 && <i>›</i>}{part}</span>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Badge, Button, Form, Modal, Spinner, Table } from 'react-bootstrap';
+import { Alert, Badge, Button, Form, Modal, Spinner } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import { Edit3, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { apiDelete, apiGet, apiPost, apiPut } from '../../../utils/apiClient';
@@ -272,7 +273,7 @@ export default function ExamSchedule() {
                         {data.crawled?.available === false && !data.crawled?.phases?.length ? (
                             <AdminEmpty title="爬蟲目前無法取得資料" />
                         ) : (
-                            <Table responsive hover className="exam-schedule-table">
+                            <AdminTable label="爬蟲原始結果" hover className="exam-schedule-table">
                                 <thead>
                                     <tr>
                                         <th>階段</th>
@@ -282,7 +283,7 @@ export default function ExamSchedule() {
                                     </tr>
                                 </thead>
                                 <tbody>{renderRows(data.crawled?.phases || [])}</tbody>
-                            </Table>
+                            </AdminTable>
                         )}
                     </section>
                     <section className="exam-schedule-table-card">
@@ -293,7 +294,7 @@ export default function ExamSchedule() {
                         {!data.effective_phases?.length ? (
                             <AdminEmpty title="目前沒有任何生效中的時程資料" />
                         ) : (
-                            <Table responsive hover className="exam-schedule-table">
+                            <AdminTable label="後台生效值" hover className="exam-schedule-table">
                                 <thead>
                                     <tr>
                                         <th>階段</th>
@@ -304,7 +305,7 @@ export default function ExamSchedule() {
                                     </tr>
                                 </thead>
                                 <tbody>{renderRows(data.effective_phases, true)}</tbody>
-                            </Table>
+                            </AdminTable>
                         )}
                     </section>
                 </div>

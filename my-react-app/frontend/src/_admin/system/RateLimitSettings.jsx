@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-    Alert, Badge, Button, Form, Spinner, Table,
+  Alert,
+  Badge,
+  Button,
+  Form,
+  Spinner,
 } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import { RotateCcw, Save, Search } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { apiGet, apiPatch } from '../../../utils/apiClient';
@@ -152,7 +157,7 @@ export default function RateLimitSettings() {
             </div>
 
             <div className="admin-table-card">
-                <Table responsive hover className="admin-table system-rate-table">
+                <AdminTable label="限流設定列表" hover className="admin-table system-rate-table">
                     <thead>
                         <tr>
                             <th>key</th>
@@ -237,7 +242,7 @@ export default function RateLimitSettings() {
                             </tr>
                         )}
                     </tbody>
-                </Table>
+                </AdminTable>
             </div>
         </main>
     );

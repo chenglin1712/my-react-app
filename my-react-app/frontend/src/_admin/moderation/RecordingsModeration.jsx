@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import {
-    Alert,
-    Badge,
-    Button,
-    Form,
-    Spinner,
-    Table,
+  Alert,
+  Badge,
+  Button,
+  Form,
+  Spinner,
 } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import {
     RefreshCw,
     Search,
@@ -162,8 +162,7 @@ export default function RecordingsModeration() {
                 ) : (
                     <>
                         <div className="moderation-table-scroll">
-                            <Table
-                                responsive
+                            <AdminTable label="發音錄音列表"
                                 hover
                                 className="moderation-table"
                             >
@@ -257,7 +256,7 @@ export default function RecordingsModeration() {
                                         </tr>
                                     )}
                                 </tbody>
-                            </Table>
+                            </AdminTable>
                         </div>
 
                         <ReviewPagination

@@ -1,6 +1,12 @@
 import {
-    Alert, Badge, Button, Form, Nav, Spinner, Table,
+  Alert,
+  Badge,
+  Button,
+  Form,
+  Nav,
+  Spinner,
 } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import {
     GitMerge, Pencil, Plus, Trash2, X,
 } from 'lucide-react';
@@ -185,7 +191,7 @@ export default function TaxonomyManager() {
                         <span>載入中…</span>
                     </div>
                 ) : (
-                    <Table responsive hover className="dictionary-table">
+                    <AdminTable label="主檔列表" hover className="dictionary-table">
                         <thead>
                             <tr>
                                 {isAffix && <th>族語</th>}
@@ -344,7 +350,7 @@ export default function TaxonomyManager() {
                                 </tr>
                             )}
                         </tbody>
-                    </Table>
+                    </AdminTable>
                 )}
             </div>
 

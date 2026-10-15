@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
-    Alert, Button, Spinner, Table,
+  Alert,
+  Button,
+  Spinner,
 } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import { Database, RefreshCw, Trash2 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { apiGet, apiPost } from '../../../utils/apiClient';
@@ -140,7 +143,7 @@ export default function CacheManagement() {
                         </div>
                     </div>
 
-                    <Table responsive hover className="admin-table">
+                    <AdminTable label="快取列表" hover className="admin-table">
                         <thead>
                             <tr>
                                 <th>key</th>
@@ -161,7 +164,7 @@ export default function CacheManagement() {
                                 </tr>
                             )}
                         </tbody>
-                    </Table>
+                    </AdminTable>
 
                     {editable && (
                         <div className="system-action-card-footer">

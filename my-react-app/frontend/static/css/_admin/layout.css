@@ -111,6 +111,69 @@
 @media (max-width: 1024px) { .admin-sidebar { width: 216px; } .admin-main-column { margin-left: 216px; } .admin-topbar { padding: 0 20px; } }
 @media (max-width: 900px) { .admin-shell { --admin-page-padding: 20px; } }
 
+/* 窄螢幕（G-3，審查項 P2-80）：側欄變成從左邊滑出的選單，頂欄左側出現開關按鈕。
+   收起時用 visibility:hidden 讓裡面的連結不能被 Tab 到、也不會被報讀；展開時 AdminLayout 會把
+   主內容區設成 inert，鍵盤與報讀器都留在選單裡，Esc、點背景、點連結都能關。 */
+.admin-nav-toggle,
+.admin-nav-close,
+.admin-nav-backdrop { display: none; }
+
+@media (max-width: 900px) {
+  .admin-main-column { margin-left: 0; }
+  .admin-sidebar {
+    width: min(300px, 86vw);
+    box-shadow: 0 0 32px rgba(20, 33, 58, .35);
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform .2s var(--ease-out, ease-out), visibility 0s linear .2s;
+  }
+  .admin-shell.is-nav-open .admin-sidebar {
+    transform: none;
+    visibility: visible;
+    transition: transform .26s var(--ease-out, ease-out), visibility 0s;
+  }
+  /* 進場儀式的側欄動畫會把 transform 蓋回原位，窄螢幕上側欄本來就是收起的，不播 */
+  .admin-shell.admin-shell--play .admin-sidebar { animation: none; }
+  .admin-nav-toggle,
+  .admin-nav-close {
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    color: var(--yy-ink);
+    background: none;
+    border: 0;
+    border-radius: var(--admin-radius-sm);
+  }
+  .admin-nav-toggle { margin: 0 8px 0 -10px; }
+  .admin-nav-toggle:hover { background: var(--admin-surface-muted); }
+  .admin-nav-toggle:focus-visible { outline: var(--admin-focus-ring); outline-offset: var(--admin-focus-offset); }
+  .admin-nav-close { position: absolute; top: 10px; right: 8px; color: #fff; }
+  .admin-nav-close:hover { background: rgba(255, 255, 255, .1); }
+  .admin-nav-close:focus-visible { outline: 2px solid var(--yy-gold-light, #f6d77b); outline-offset: -2px; }
+  .admin-nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 19;
+    padding: 0;
+    background: rgba(20, 33, 58, .45);
+    border: 0;
+    animation: admin-fade-in .2s ease-out both;
+  }
+  .admin-topbar { padding: 0 16px; }
+  .admin-breadcrumb { overflow: hidden; text-overflow: ellipsis; }
+  .admin-topbar-user > div { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-sidebar,
+  .admin-shell.is-nav-open .admin-sidebar { transition: none; }
+  .admin-nav-backdrop { animation: none; }
+}
+
 /* ---------- 進入後台與換頁的轉場 ----------
    兩種節奏（議會結論）：
    1. 這個分頁第一次進後台（入口儀式的光圈收合時）：側欄、頂欄、內容依序「落位」，有份量、約 1 秒。

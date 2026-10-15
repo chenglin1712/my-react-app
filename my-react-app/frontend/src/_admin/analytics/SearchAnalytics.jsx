@@ -1,11 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 import {
-    Alert,
-    Button,
-    Form,
-    Spinner,
-    Table,
+  Alert,
+  Button,
+  Form,
+  Spinner,
 } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import { BarChart3, FilePlus2 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBES } from '../../constants/tribes';
@@ -52,7 +52,7 @@ function QueryTable({
             ) : items.length === 0 ? (
                 <EmptyTable />
             ) : (
-                <Table responsive hover className="search-analytics-table">
+                <AdminTable label="搜尋分析列表" hover className="search-analytics-table">
                     <thead>
                         <tr>
                             <th>查詢字詞</th>
@@ -87,7 +87,7 @@ function QueryTable({
                             </tr>
                         ))}
                     </tbody>
-                </Table>
+                </AdminTable>
             )}
         </section>
     );

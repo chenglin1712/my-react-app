@@ -1,4 +1,5 @@
-import { Badge, Table } from 'react-bootstrap';
+import { Badge } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 
 const ACTIONS = {
     create: { label: '新建', bg: 'success' },
@@ -19,7 +20,7 @@ export default function ImportPreflightReport({ report }) {
 
     return (
         <div className="dictionary-table-card">
-            <Table responsive hover className="dictionary-table">
+            <AdminTable label="匯入預檢報告" hover className="dictionary-table">
                 <thead>
                     <tr>
                         <th>列號</th>
@@ -70,7 +71,7 @@ export default function ImportPreflightReport({ report }) {
                         );
                     })}
                 </tbody>
-            </Table>
+            </AdminTable>
         </div>
     );
 }

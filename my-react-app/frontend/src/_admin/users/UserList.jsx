@@ -5,8 +5,8 @@ import {
   Button,
   Form,
   Spinner,
-  Table,
 } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import {
   Eye,
   Plus,
@@ -131,7 +131,7 @@ export default function UserList() {
         ) : (
           <>
             <div className="user-table-scroll">
-              <Table responsive className="user-table">
+              <AdminTable label="使用者列表" className="user-table">
                 <thead>
                   <tr>
                     <th>使用者</th>
@@ -216,7 +216,7 @@ export default function UserList() {
                     </tr>
                   ))}
                 </tbody>
-              </Table>
+              </AdminTable>
             </div>
 
             <ReviewPagination

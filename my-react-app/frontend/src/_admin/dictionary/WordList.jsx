@@ -7,13 +7,13 @@ import {
 } from 'react';
 import { Link } from 'react-router-dom';
 import {
-    Alert,
-    Badge,
-    Button,
-    Form,
-    Spinner,
-    Table,
+  Alert,
+  Badge,
+  Button,
+  Form,
+  Spinner,
 } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import { Eye, Plus, Search } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { listTaxonomies, listWords } from './dictionaryApi';
@@ -261,8 +261,7 @@ export default function WordList() {
                         <span>載入詞條中…</span>
                     </div>
                 ) : (
-                    <Table
-                        responsive
+                    <AdminTable label="詞條列表"
                         hover
                         className="dictionary-table"
                     >
@@ -330,7 +329,7 @@ export default function WordList() {
                                 </tr>
                             )}
                         </tbody>
-                    </Table>
+                    </AdminTable>
                 )}
 
                 <div className="dictionary-pagination">

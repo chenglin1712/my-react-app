@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import {
-    Alert,
-    Badge,
-    Button,
-    Form,
-    Spinner,
-    Table,
+  Alert,
+  Badge,
+  Button,
+  Form,
+  Spinner,
 } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import {
     Archive,
     RefreshCw,
@@ -174,8 +174,7 @@ export default function SharedNotesModeration() {
                 ) : (
                     <>
                         <div className="moderation-table-scroll">
-                            <Table
-                                responsive
+                            <AdminTable label="分享筆記列表"
                                 hover
                                 className="moderation-table"
                             >
@@ -295,7 +294,7 @@ export default function SharedNotesModeration() {
                                         </tr>
                                     )}
                                 </tbody>
-                            </Table>
+                            </AdminTable>
                         </div>
 
                         <ReviewPagination

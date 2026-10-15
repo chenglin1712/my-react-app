@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
-    Alert, Form, Spinner, Table,
+  Alert,
+  Form,
+  Spinner,
 } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import { useAuth } from '../../userServives/authContext';
 import { apiGet, apiPatch } from '../../../utils/apiClient';
 import '../../../static/css/_admin/system.css';
@@ -104,7 +107,7 @@ export default function FeatureFlags() {
             {success && <Alert variant="success">{success}</Alert>}
 
             <div className="admin-table-card">
-                <Table responsive hover className="admin-table system-feature-table">
+                <AdminTable label="功能開關列表" hover className="admin-table system-feature-table">
                     <thead>
                         <tr>
                             <th>key</th>
@@ -153,7 +156,7 @@ export default function FeatureFlags() {
                             </tr>
                         )}
                     </tbody>
-                </Table>
+                </AdminTable>
             </div>
         </main>
     );

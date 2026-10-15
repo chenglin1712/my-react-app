@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Badge, Button, Form, Modal, Spinner, Table, Alert } from 'react-bootstrap';
+import { Badge, Button, Form, Modal, Spinner, Alert } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import { Plus, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
@@ -337,7 +338,7 @@ export default function AnnouncementList() {
                         <span>載入公告中…</span>
                     </div>
                 ) : (
-                    <Table responsive hover className="announcement-table">
+                    <AdminTable label="公告列表" hover className="announcement-table">
                         <thead>
                             <tr>
                                 <th>標題</th>
@@ -413,7 +414,7 @@ export default function AnnouncementList() {
                                 </tr>
                             )}
                         </tbody>
-                    </Table>
+                    </AdminTable>
                 )}
 
                 <ReviewPagination

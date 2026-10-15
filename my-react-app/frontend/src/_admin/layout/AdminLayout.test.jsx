@@ -130,6 +130,51 @@ describe('AdminLayout', () => {
     expect(screen.queryByText('reviewer')).not.toBeInTheDocument();
   });
 
+  test('窄螢幕選單：開關按鈕展開側欄、主內容 inert，Esc 關閉並把焦點還給開關', async () => {
+    renderLayout();
+    const toggle = screen.getByLabelText('開啟主選單');
+    const shell = document.querySelector('.admin-shell');
+    const main = document.querySelector('.admin-main-column');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(shell).not.toHaveClass('is-nav-open');
+    expect(main).not.toHaveAttribute('inert');
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(shell).toHaveClass('is-nav-open');
+    expect(main).toHaveAttribute('inert');
+    await waitFor(() => expect(document.querySelector('.admin-nav-close')).toHaveFocus());
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(shell).not.toHaveClass('is-nav-open');
+    expect(main).not.toHaveAttribute('inert');
+    await waitFor(() => expect(toggle).toHaveFocus());
+  });
+
+  test('窄螢幕選單：點背景可關閉；點選單裡的連結換頁後選單自動收起', () => {
+    renderLayout();
+    fireEvent.click(screen.getByLabelText('開啟主選單'));
+    fireEvent.click(document.querySelector('.admin-nav-backdrop'));
+    expect(document.querySelector('.admin-shell')).not.toHaveClass('is-nav-open');
+
+    fireEvent.click(screen.getByLabelText('開啟主選單'));
+    expect(document.querySelector('.admin-shell')).toHaveClass('is-nav-open');
+    fireEvent.click(screen.getByRole('link', { name: /公告管理/ }));
+    expect(screen.getByText('ANNOUNCEMENTS_CONTENT')).toBeInTheDocument();
+    expect(document.querySelector('.admin-shell')).not.toHaveClass('is-nav-open');
+    expect(document.querySelector('.admin-nav-backdrop')).toBeNull();
+  });
+
+  test('窄螢幕選單：點目前所在頁的連結（路徑沒變）也會關閉；開著時跳過連結被停用', () => {
+    renderLayout({ initialEntries: ['/admin/content/announcements'] });
+    fireEvent.click(screen.getByLabelText('開啟主選單'));
+    expect(document.querySelector('.admin-shell')).toHaveClass('is-nav-open');
+    expect(screen.getByText('跳到後台主要內容')).toHaveAttribute('inert');
+    fireEvent.click(screen.getByRole('link', { name: /公告管理/ }));
+    expect(document.querySelector('.admin-shell')).not.toHaveClass('is-nav-open');
+    expect(screen.getByText('跳到後台主要內容')).not.toHaveAttribute('inert');
+  });
+
   test('登出成功後導回前台首頁', async () => {
     mockSignOut.mockResolvedValue();
     renderLayout();

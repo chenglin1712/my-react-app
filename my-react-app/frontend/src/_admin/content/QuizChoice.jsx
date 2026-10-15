@@ -1,4 +1,5 @@
-import { Alert, Button, Form, Modal, Spinner, Table } from 'react-bootstrap';
+import { Alert, Button, Form, Modal, Spinner } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import { Plus } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
@@ -176,7 +177,7 @@ export default function QuizChoice() {
             <span>載入中…</span>
           </div>
         ) : (
-          <Table responsive hover className="quiz-bank-table">
+          <AdminTable label="中級選擇題列表" hover className="quiz-bank-table">
             <thead>
               <tr>
                 <th>族語</th>
@@ -225,7 +226,7 @@ export default function QuizChoice() {
                 </tr>
               )}
             </tbody>
-          </Table>
+          </AdminTable>
         )}
 
         <ReviewPagination

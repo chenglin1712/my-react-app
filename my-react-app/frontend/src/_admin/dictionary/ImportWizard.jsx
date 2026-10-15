@@ -4,13 +4,13 @@ import {
     useParams,
 } from 'react-router-dom';
 import {
-    Alert,
-    Badge,
-    Button,
-    Form,
-    Spinner,
-    Table,
+  Alert,
+  Badge,
+  Button,
+  Form,
+  Spinner,
 } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import { useAuth } from '../../userServives/authContext';
 import {
     approveImportJob,
@@ -242,7 +242,7 @@ export default function ImportWizard() {
 
                 {outcomes.length > 0 ? (
                     <div className="dictionary-table-card">
-                        <Table responsive hover className="dictionary-table">
+                        <AdminTable label="套用結果" hover className="dictionary-table">
                             <thead>
                                 <tr>
                                     <th>列號</th>
@@ -271,7 +271,7 @@ export default function ImportWizard() {
                                     );
                                 })}
                             </tbody>
-                        </Table>
+                        </AdminTable>
                     </div>
                 ) : (
                     <div className="dictionary-empty">尚未有套用結果</div>
@@ -457,7 +457,7 @@ export default function ImportWizard() {
 
                 {jobs.results.length > 0 ? (
                     <div className="dictionary-table-card">
-                        <Table responsive hover className="dictionary-table">
+                        <AdminTable label="近期匯入工作" hover className="dictionary-table">
                             <thead>
                                 <tr>
                                     <th>檔名</th>
@@ -488,7 +488,7 @@ export default function ImportWizard() {
                                     </tr>
                                 ))}
                             </tbody>
-                        </Table>
+                        </AdminTable>
                     </div>
                 ) : (
                     <AdminEmpty title="目前沒有匯入工作" description="完成第一次匯入後，工作紀錄會顯示在這裡。" />

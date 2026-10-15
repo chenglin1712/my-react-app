@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Button, Form, Spinner, Table } from 'react-bootstrap';
+import { Alert, Button, Form, Spinner } from 'react-bootstrap';
+import AdminTable from '../components/AdminTable';
 import { Save } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
@@ -93,7 +94,7 @@ export default function QuizSourceConfig() {
             {success && <Alert variant="success">{success}</Alert>}
 
             <div className="quiz-bank-table-card">
-                <Table responsive hover className="quiz-bank-table quiz-bank-sources-table">
+                <AdminTable label="外部題源列表" hover className="quiz-bank-table quiz-bank-sources-table">
                     <thead>
                         <tr>
                             <th>族語</th>
@@ -150,7 +151,7 @@ export default function QuizSourceConfig() {
                             );
                         })}
                     </tbody>
-                </Table>
+                </AdminTable>
             </div>
         </main>
     );
