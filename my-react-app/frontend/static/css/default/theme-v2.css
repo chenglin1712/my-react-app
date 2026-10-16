@@ -205,9 +205,9 @@
    2. data-theme="dark"（手動選深色）
    data-theme 只認 system、dark 兩個值；沒有這個屬性或其他值都是淺色，切換程式要拒絕未知值。
    S2-1 起共用按鈕、標籤、晶片、頁籤已經使用 --yy-calm-*，而多數頁面底色還是舊的象牙色，
-   所以「跟隨裝置」改成明確選擇才生效（D7 決定預設值之前，沒有屬性＝淺色，深色系統的使用者畫面不變）。
+   所以「跟隨裝置」改成明確選擇才生效（D7 已決定預設淺色：沒有屬性＝淺色，使用者選「跟隨裝置」才寫入 system）。
    上面 :root 的 color-scheme 仍是 light。
-   啟用深色的前置條件（改版計畫 D7 決定預設後）：在這兩段加上 color-scheme: dark，否則原生輸入框、
+   啟用深色的前置條件（D7 已決定，完整清單見 DESIGN.md「深淺色政策」，S10 驗收時才公開）：在這兩段加上 color-scheme: dark，否則原生輸入框、
    下拉選單、捲軸仍是淺色樣式；同時 index.html 的 color-scheme meta 要改成 light dark。
    不要在這裡寫元件規則，元件一律透過 token 取色。 */
 @media (prefers-color-scheme: dark) {
