@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { House, TextSearch, Camera, Gamepad2, BookOpenCheck, NotebookPen, User, ChevronDown, Languages, Heart } from "lucide-react";
 import "../../static/css/navigation/Navbar.css"
@@ -39,6 +39,7 @@ const Navbar = ({ onOpenBot }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownTriggerRef = useRef(null);
   const userSidebarRef = useRef(null);
+  const menuToggleRef = useRef(null);
 
   const isLoggedIn = userData != null && userData.firestoreData != null;
   const userName = userData?.firestoreData?.name;
@@ -47,6 +48,18 @@ const Navbar = ({ onOpenBot }) => {
 
   // 個人資料側欄是自製彈窗：Esc、焦點陷阱、關閉後焦點回到按下的那顆按鈕（審查項 P1-5）
   useDialog(userSidebarRef, { active: isLoggedIn && isUserOpen, onClose: () => setIsUserOpen(false) });
+
+  // 手機選單開著時按 Esc 收起，焦點回到漢堡鈕（和筆記下拉、個人資料側欄的 Esc 行為一致）
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKeyDown = (e) => {
+      if (e.key !== "Escape") return;
+      setIsOpen(false);
+      menuToggleRef.current?.focus();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isOpen]);
 
   //改變個人資料側拉選單狀態
   const handleUserSidebar = () => {
@@ -137,9 +150,11 @@ const Navbar = ({ onOpenBot }) => {
 
         {/* Mobile Menu Toggle Button */}
         <button
+          ref={menuToggleRef}
           className="menu-toggle"
           aria-label={isOpen ? "關閉選單" : "開啟選單"}
           aria-expanded={isOpen}
+          aria-controls="mobile-menu"
           onClick={() => setIsOpen(!isOpen)}
         >
           {isOpen ? <X size={28} /> : <Menu size={28} />}
@@ -147,7 +162,7 @@ const Navbar = ({ onOpenBot }) => {
       </div >
 
       {/* Mobile Menu */}
-      <div className={`menu-mobile ${isOpen ? 'active' : ''}`}>
+      <div id="mobile-menu" className={`menu-mobile ${isOpen ? 'active' : ''}`}>
         {!isLoggedIn ? (
           <NavLink className="menu-mobile-item" to="/login" onClick={() => setIsOpen(false)}>
             <User size={20} />

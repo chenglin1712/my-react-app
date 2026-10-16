@@ -67,8 +67,9 @@ describe('Navbar 使用者側欄（審查項 P1-5、P2-1、P2-2）', () => {
   });
 
   test('使用者按鈕的名稱以可見的使用者名稱開頭（語音控制說出名稱即可啟動）', () => {
-    render(<Navbar />);
-    const buttons = screen.getAllByRole('button', { name: /小明/, hidden: true });
+    // 手機選單收起時是 visibility:hidden（Tab 與報讀器都進不去），所以用 class 取兩顆按鈕，不靠角色查詢
+    const { container } = render(<Navbar />);
+    const buttons = [...container.querySelectorAll('.auth-container-user, .mobile-container-user')];
     expect(buttons.length).toBe(2);
     buttons.forEach((btn) => expect(btn.getAttribute('aria-label').startsWith('小明')).toBe(true));
   });
@@ -129,5 +130,33 @@ describe('Navbar 側欄收起時 inert（Codex 審查：關閉動畫期間不可
     await user.keyboard('{Escape}');
     expect(sidebar.hasAttribute('inert')).toBe(true);
     authState.userData = null;
+  });
+});
+
+describe('Navbar 手機選單 Esc（S5-1）', () => {
+  test('開啟後按 Esc 收起，焦點回到漢堡鈕；漢堡鈕用 aria-controls 指向選單', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<Navbar />);
+    const toggle = container.querySelector('.menu-toggle');
+    expect(toggle).toHaveAttribute('aria-controls', 'mobile-menu');
+    expect(container.querySelector('#mobile-menu')).toBeInTheDocument();
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(container.querySelector('#mobile-menu')).toHaveClass('active');
+    // 焦點在選單裡的連結時按 Esc，選單收起後焦點要回到漢堡鈕，不能掉到 body
+    container.querySelector('#mobile-menu a').focus();
+    await user.keyboard('{Escape}');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(container.querySelector('#mobile-menu')).not.toHaveClass('active');
+    expect(toggle).toHaveFocus();
+  });
+
+  test('選單沒開時按 Esc 不會搶走焦點', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<Navbar />);
+    const toggle = container.querySelector('.menu-toggle');
+    expect(toggle).not.toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(toggle).not.toHaveFocus();
   });
 });

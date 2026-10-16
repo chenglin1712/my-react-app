@@ -1,8 +1,15 @@
+/* 前台導覽列（S5-1，沉穩文藝）。
+   只換外觀：選單項目、路由、手機選單、Esc 與焦點管理都在 navbar.jsx，這裡不動。
+   顏色全部取 --yy-calm-* 語意層，S5-3 的深色主題會自動跟著換，不必再改這個檔。
+   動態：只動 opacity 與 transform，曲線與時長引用 theme-v2 的 token；導覽列沒有常駐動畫。 */
 .navbar {
-    background-color: var(--yy-ink);
-    color: var(--yy-cream);
+    /* Bootstrap 的 .navbar 是 display:flex，手機選單會縮成內容寬度擠在一角；改回一般區塊，兩段（列與選單）各自撐滿 */
+    display: block;
+    background-color: var(--yy-calm-bg);
+    color: var(--yy-calm-text);
     padding: 0 !important;
-    border-bottom: 4px solid var(--yy-gold);
+    /* 報頭下緣的一條細線，像刊物的 masthead rule；比舊版 4px 金線安靜 */
+    border-bottom: var(--yy-border-width) solid var(--yy-calm-line);
     position: sticky;
     top: 0;
     z-index: var(--yy-z-nav);
@@ -13,44 +20,42 @@
     justify-content: space-between;
     align-items: center;
     width: 100%;
-    padding: 20px 56px;
+    padding: 12px 56px;
     box-sizing: border-box;
 }
 
+/* 文字標誌：實色字、襯線標題字型（--yy-font-heading，D9 決定後跟著換）。
+   D6（logo 位置）還沒決定，所以只保留原本的小菱形，改成銅褐色。 */
 .logo {
-    font-family: var(--yy-font-pixel);
+    font-family: var(--yy-font-heading);
     font-weight: 700;
-    font-size: 21px;
-    letter-spacing: 0.02em;
+    font-size: 22px;
+    letter-spacing: 0.04em;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 12px;
-    background: linear-gradient(90deg, var(--yy-cream), var(--yy-gold), var(--yy-cream));
-    background-size: 300% 100%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    min-height: var(--yy-control-md);
+    color: var(--yy-calm-text);
     position: relative;
+    border-radius: var(--yy-ui-radius);
 }
-
 
 .logo::before {
     content: '';
-    width: 14px;
-    height: 14px;
+    width: 10px;
+    height: 10px;
     flex-shrink: 0;
-    background: linear-gradient(135deg, var(--yy-gold), var(--yy-gold-light), var(--yy-gold));
+    background: var(--yy-calm-copper);
     transform: rotate(45deg);
     display: inline-block;
 }
-
 
 .logo img {
     width: 40px;
 }
 
-/* 頁首下方的織紋色條（靜態） */
+/* 頁首下方的織紋色條（靜態）。S5-2 會和全站外殼一起換成新風格，這一步先不動。 */
 .navbar-marquee {
     position: relative;
     height: 16px;
@@ -72,60 +77,113 @@
     background-size: 32px 32px;
 }
 
+/* 導覽列的連結都不畫瀏覽器預設的底線；目前頁與 hover 的底線是下面 ::after 那條銅褐細線 */
+.logo,
+.menu-item,
+.menu-mobile-item,
+.dropdown-item {
+    text-decoration: none;
+}
+
 .menu {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     flex-wrap: wrap;
 }
 
+/* 選單項目：平常只有字與圖示；目前頁與 hover 在文字下方畫一條銅褐細線（::after 用 scaleX 展開，只動 transform）。 */
 .menu-item {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: flex-start;
     background-color: transparent;
-    color: var(--yy-cream);
-    padding: 9px 16px;
-    border-radius: var(--yy-radius-btn);
+    color: var(--yy-calm-text);
+    min-height: var(--yy-control-md);
+    padding: 0 14px;
+    border-radius: var(--yy-ui-radius);
     border: var(--yy-border-width) solid transparent;
-    font-size: 14px;
+    font-size: var(--yy-text-sm);
     font-weight: 600;
     font-family: var(--yy-font-body);
     cursor: pointer;
-    transition: border-color 0.2s, background-color 0.2s, color 0.2s;
+    transition: color 160ms var(--ease-out), background-color 160ms var(--ease-out), transform 120ms var(--ease-out);
     text-align: left;
 }
 
-.menu-item:hover {
-    border-color: var(--yy-gold);
+.menu-item::after {
+    content: '';
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 5px;
+    height: 2px;
+    background: var(--yy-calm-accent);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 160ms var(--ease-out);
 }
 
 .menu-item svg {
-    margin-right: 5px;
+    margin-right: 6px;
+    flex-shrink: 0;
 }
 
 .menu-item.active {
-    background-color: var(--yy-red);
-    color: var(--yy-cream);
-    border-color: var(--yy-gold);
+    color: var(--yy-calm-accent);
     font-weight: 700;
 }
 
-.menu-item.active svg {
-    color: var(--yy-cream);
+.menu-item.active::after {
+    transform: scaleX(1);
 }
 
-/* 登入按鈕：金色外框、透明底，hover 反轉為金底墨字 */
+/* 只有真的有滑鼠的裝置才有 hover 效果；觸控裝置點一下會卡在 hover 狀態 */
+@media (hover: hover) and (pointer: fine) {
+    .menu-item:hover {
+        color: var(--yy-calm-accent);
+    }
+
+    .menu-item:hover::after {
+        transform: scaleX(1);
+    }
+}
+
+.menu-item:active {
+    transform: scale(var(--yy-ui-press));
+}
+
+.menu-item:focus-visible,
+.logo:focus-visible,
+.auth-container-user:focus-visible,
+.menu-toggle:focus-visible,
+.menu-mobile-item:focus-visible,
+.mobile-container-user:focus-visible,
+.dropdown-item:focus-visible,
+.close-btn:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+/* 登入：全站唯一的實心按鈕，深銅底、象牙白字；不畫底線 */
 .menu-item.login-btn {
-    margin-left: 6px;
-    border-color: var(--yy-gold);
+    margin-left: 8px;
+    background-color: var(--yy-calm-accent);
+    color: var(--yy-calm-accent-on);
     font-weight: 700;
 }
 
-.menu-item.login-btn:hover {
-    background-color: var(--yy-gold);
-    color: var(--yy-ink);
+.menu-item.login-btn::after {
+    display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .menu-item.login-btn:hover {
+        background-color: var(--yy-calm-text);
+        color: var(--yy-calm-bg);
+    }
 }
 
 .auth-container {
@@ -137,27 +195,34 @@
     align-items: center;
     justify-content: flex-start;
     gap: 8px;
-    padding: 8px 14px 8px 8px;
-    border-radius: 20px;
+    min-height: var(--yy-control-md);
+    padding: 4px 14px 4px 6px;
+    border-radius: 22px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: var(--yy-text-sm);
     font-family: var(--yy-font-body);
     background-color: transparent;
-    color: var(--yy-cream);
+    color: var(--yy-calm-text);
     border: var(--yy-border-width) solid transparent;
-    transition: border-color 0.2s;
+    transition: border-color 160ms var(--ease-out), transform 120ms var(--ease-out);
     text-align: left;
 }
 
 .auth-container-user p {
     margin: 0;
-    font-size: 14px;
+    font-size: var(--yy-text-sm);
     font-weight: 600;
-    color: var(--yy-cream);
+    color: var(--yy-calm-text);
 }
 
-.auth-container-user:hover {
-    border-color: var(--yy-gold);
+@media (hover: hover) and (pointer: fine) {
+    .auth-container-user:hover {
+        border-color: var(--yy-calm-line);
+    }
+}
+
+.auth-container-user:active {
+    transform: scale(var(--yy-ui-press));
 }
 
 .auth-container-user img.auth-image {
@@ -166,100 +231,152 @@
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
-    border: var(--yy-border-width) solid var(--yy-gold);
+    border: var(--yy-border-width) solid var(--yy-calm-copper);
 }
 
 .auth-container p {
     margin: 0px;
-    color: var(--yy-cream);
+    color: var(--yy-calm-text);
     font-weight: 600;
 }
 
-/* 響應式選單 */
+/* 手機選單：原本用 display 直接切換，沒有過渡。現在用 opacity／transform 過渡，
+   display 加上 allow-discrete，瀏覽器支援時展開與收合都有動畫，不支援就和以前一樣直接出現。
+   展開 160ms、收合 120ms（收合比展開快）。 */
 .menu-mobile {
     display: none;
+    box-sizing: border-box;
+    width: 100%;
+    opacity: 0;
+    transform: translateY(-6px);
+    /* visibility 等退場動畫結束才隱藏：display 的離散過渡期間，透明的連結不能還被 Tab 聚焦 */
+    visibility: hidden;
+    transition:
+        opacity 120ms var(--ease-out),
+        transform 120ms var(--ease-out),
+        visibility 0s linear 120ms,
+        display 120ms allow-discrete;
 }
 
 .menu-mobile.active {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    background-color: var(--yy-ink);
-    padding: 16px;
-    border-top: 2px solid var(--yy-gold);
+    gap: 4px;
+    opacity: 1;
+    transform: none;
+    visibility: visible;
+    background-color: var(--yy-calm-bg);
+    padding: 12px 16px 16px;
+    border-top: 1px solid var(--yy-calm-rule);
+    transition:
+        opacity 160ms var(--ease-out),
+        transform 160ms var(--ease-out),
+        visibility 0s,
+        display 160ms allow-discrete;
+}
+
+@starting-style {
+    .menu-mobile.active {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
 }
 
 .menu-mobile-item {
     display: flex;
     align-items: center;
-    font-size: 16px;
-    color: var(--yy-cream);
+    font-size: var(--yy-text-base);
+    color: var(--yy-calm-text);
     cursor: pointer;
     font-family: var(--yy-font-body);
     font-weight: 600;
-    padding: 10px 16px;
-    border-radius: var(--yy-radius-btn);
+    min-height: var(--yy-control-lg);
+    padding: 0 16px;
+    border-radius: var(--yy-ui-radius);
     border: var(--yy-border-width) solid transparent;
-    transition: border-color 0.2s;
-    margin-bottom: 4px;
+    transition: background-color 160ms var(--ease-out), transform 120ms var(--ease-out);
 }
 
-.menu-mobile-item:hover {
-    border-color: var(--yy-gold);
+@media (hover: hover) and (pointer: fine) {
+    .menu-mobile-item:hover {
+        background-color: var(--yy-calm-info-bg);
+    }
+}
+
+.menu-mobile-item:active {
+    transform: scale(var(--yy-ui-press));
 }
 
 .menu-mobile-item svg {
     margin-right: 12px;
+    flex-shrink: 0;
+}
+
+/* 目前頁：左側一條銅褐色強調條加深銅色字（單邊內陰影，不是硬偏移陰影） */
+.menu-mobile-item.active {
+    background-color: var(--yy-calm-info-bg);
+    color: var(--yy-calm-accent);
+    font-weight: 700;
+    box-shadow: inset 3px 0 0 var(--yy-calm-accent);
 }
 
 .menu-toggle {
     display: none;
-    font-size: 28px;
     cursor: pointer;
-    color: var(--yy-cream);
+    color: var(--yy-calm-text);
     background-color: transparent;
     border: none;
-    border-radius: var(--yy-radius-btn);
-    min-width: 44px;
-    min-height: 44px;
+    border-radius: var(--yy-ui-radius);
+    min-width: var(--yy-control-md);
+    min-height: var(--yy-control-md);
     padding: 0 8px;
+    transition: color 160ms var(--ease-out), transform 120ms var(--ease-out);
 }
 
-.menu-toggle:hover {
-    color: var(--yy-gold);
+@media (hover: hover) and (pointer: fine) {
+    .menu-toggle:hover {
+        color: var(--yy-calm-accent);
+    }
 }
 
-.menu-mobile-item.active {
-    background-color: var(--yy-red);
-    color: var(--yy-cream);
-    border-color: var(--yy-gold);
+.menu-toggle:active {
+    transform: scale(var(--yy-ui-press));
 }
 
 .mobile-container-user {
     display: flex;
+    box-sizing: border-box;
+    width: 100%;
     align-items: center;
     justify-content: flex-start;
     gap: 10px;
-    padding: 10px 16px;
-    border-radius: var(--yy-radius-btn);
+    min-height: var(--yy-control-lg);
+    padding: 0 16px;
+    border-radius: var(--yy-ui-radius);
     cursor: pointer;
-    font-size: 16px;
+    font-size: var(--yy-text-base);
     font-family: var(--yy-font-body);
     background-color: transparent;
-    color: var(--yy-cream);
-    border: var(--yy-border-width) solid var(--yy-gold);
-    transition: background-color 0.3s;
+    color: var(--yy-calm-text);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    transition: background-color 160ms var(--ease-out), transform 120ms var(--ease-out);
     text-align: left;
 }
 
 .mobile-container-user p {
     margin: 0;
-    font-size: 16px;
-    color: var(--yy-cream);
+    font-size: var(--yy-text-base);
+    color: var(--yy-calm-text);
 }
 
-.mobile-container-user:hover {
-    background-color: rgba(217, 162, 39, 0.15);
+@media (hover: hover) and (pointer: fine) {
+    .mobile-container-user:hover {
+        background-color: var(--yy-calm-info-bg);
+    }
+}
+
+.mobile-container-user:active {
+    transform: scale(var(--yy-ui-press));
 }
 
 .mobile-container-user img.mobile-image {
@@ -268,7 +385,7 @@
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
-    border: var(--yy-border-width) solid var(--yy-gold);
+    border: var(--yy-border-width) solid var(--yy-calm-copper);
 }
 
 /* userSidebar */
@@ -311,16 +428,16 @@
     justify-content: space-between;
     align-items: center;
     padding: 12px 5px;
-    border-bottom: 3px solid var(--yy-ink);
-    background: var(--yy-cream);
+    border-bottom: var(--yy-border-width) solid var(--yy-calm-line);
+    background: var(--yy-calm-bg);
 }
 
 .sidebar-header h3 {
     margin: 0;
     margin-left: 15px;
-    font-size: 18px;
+    font-size: var(--yy-text-lg);
     font-weight: 700;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .close-btn {
@@ -328,14 +445,17 @@
     border: none;
     font-size: 24px;
     cursor: pointer;
-    color: var(--yy-ink);
-    margin: 0;
-    margin-right: 20px;
-
+    color: var(--yy-calm-text);
+    margin: 0 12px 0 0;
+    min-width: var(--yy-control-md);
+    min-height: var(--yy-control-md);
+    border-radius: var(--yy-ui-radius);
 }
 
-.close-btn:hover {
-    color: var(--yy-red);
+@media (hover: hover) and (pointer: fine) {
+    .close-btn:hover {
+        color: var(--yy-calm-accent);
+    }
 }
 
 /* 筆記專區下拉選單 */
@@ -352,11 +472,12 @@
     top: 100%;
     left: 0;
     margin-top: 0;
-    background-color: var(--yy-ink);
-    border: var(--yy-border-width) solid var(--yy-gold);
-    min-width: 150px;
+    background-color: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    box-shadow: var(--yy-shadow-overlay);
+    min-width: 160px;
     z-index: var(--yy-z-dropdown);
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-ui-radius);
     flex-direction: column;
     overflow: hidden;
     opacity: 0;
@@ -371,20 +492,29 @@
 }
 
 .dropdown-item {
-    padding: 10px 16px;
-    color: var(--yy-cream);
-    font-size: 14px;
+    display: flex;
+    align-items: center;
+    min-height: var(--yy-control-md);
+    padding: 0 16px;
+    color: var(--yy-calm-text);
+    font-size: var(--yy-text-sm);
     font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.3s, color 0.3s;
+    transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out);
     font-family: var(--yy-font-body);
     white-space: nowrap;
     background-color: transparent;
 }
 
-.dropdown-item:hover {
-    background-color: var(--yy-gold);
-    color: var(--yy-ink);
+@media (hover: hover) and (pointer: fine) {
+    .dropdown-item:hover {
+        background-color: var(--yy-calm-info-bg);
+        color: var(--yy-calm-accent);
+    }
+}
+
+.dropdown-item.active {
+    color: var(--yy-calm-accent);
 }
 
 .dropdown-content.active {
@@ -422,7 +552,7 @@
    sticky 導覽列因此變高（審查項 P2-4）。寬度不夠時直接改用漢堡選單。 */
 @media (max-width: 1200px) {
     .navbar-container {
-        padding: 16px 24px;
+        padding: 8px 24px;
     }
 
     .menu {
@@ -432,8 +562,11 @@
     .menu-toggle {
         display: block;
     }
+}
 
-    .menu-mobile {
+/* 手機選單開著時把視窗拉寬到桌面導覽列：收起手機選單，免得兩種選單同時出現 */
+@media (min-width: 1201px) {
+    .menu-mobile.active {
         display: none;
     }
 }
@@ -441,5 +574,36 @@
 @media screen and (max-width: 768px) {
     .sidebar {
         width: 100vw;
+    }
+}
+
+/* 減少動態：不位移、不縮放，只留顏色與透明度的淡入淡出 */
+@media (prefers-reduced-motion: reduce) {
+    .menu-item,
+    .menu-item::after,
+    .auth-container-user,
+    .menu-toggle,
+    .menu-mobile-item,
+    .mobile-container-user {
+        transition-property: color, background-color, border-color;
+    }
+
+    .menu-item:active,
+    .auth-container-user:active,
+    .menu-toggle:active,
+    .menu-mobile-item:active,
+    .mobile-container-user:active {
+        transform: none;
+    }
+
+    .menu-mobile,
+    .menu-mobile.active {
+        transform: none;
+        transition-property: opacity, display;
+    }
+
+    .dropdown-content,
+    .dropdown-content.active {
+        transform: none;
     }
 }
