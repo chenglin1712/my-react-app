@@ -9,6 +9,10 @@ import AppShell from './AppShell'
 import StartupError from './StartupError'
 import { AuthProvider } from "./userServives/authContext";
 import { firebaseInitError } from '../../firebase'
+import { initTheme } from './theme/themeStore'
+
+// 套用儲存的主題偏好（index.html 的小腳本通常已經設好，這裡是保險）
+initTheme()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

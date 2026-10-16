@@ -338,7 +338,7 @@ components:
 ## 深淺色政策（D7 已決定）
 - **預設淺色。** 沒有儲存設定、儲存值損壞或未知時一律淺色；使用者選「跟隨裝置」後才讀取 `prefers-color-scheme`。
 - **儲存值只認 `light | dark | system`**（localStorage `yy-theme`），`<html data-theme>` 對應；切換不對整頁做顏色過渡。
-- **切換介面：** 導覽列右側的「顯示設定」選單（手機放抽屜），單選群組（淺色、深色、跟隨裝置）；計畫另補 S5-3 實作。
+- **切換介面：** 導覽列右側的「顯示設定」選單（手機放抽屜），單選群組（淺色、深色、跟隨裝置）。S5-3 已實作：`frontend/src/theme/themeStore.js`（狀態與儲存）、`frontend/hooks/useTheme.js`、`frontend/components/navigation/ThemeSettings.jsx`。**功能旗標 `VITE_ENABLE_DARK_THEME=true` 沒開時**（預設，S10 前）選單不顯示、儲存值被忽略、`<html data-theme>` 一律是 `light`；旗標開了才套用 `dark`／`system`。切換當下 `<html>` 暫時有 `data-theme-switching`（約 50ms），全站過渡關閉，整頁一次換色。
 - **防閃白：** `<head>` 內、樣式表之前放一小段同步 script 設定 `data-theme` 與 `color-scheme`。目前 repo 沒有 CSP；日後若加 CSP，改用 nonce、雜湊或外部小檔，不開 `unsafe-inline`。
 - **公開深色切換的前置條件（全部完成才開，預計 S10 驗收時）：** 1) 導覽、頁尾、表單、彈窗、影片播放器、焦點狀態都有深色版；2) 前台寫死色碼基線歸零；3) 兩個深色區塊加 `color-scheme: dark`、`index.html` 的 meta 改 `light dark`；4) 圖片、logo、圖表、族色、狀態色在深色底驗證；5) 首頁、辭典、筆記、測驗、登入完成視覺檢查且載入無閃爍。
 - **深色閱讀：** 不用純白字、內文字重至少 400、長文行高 1.65 到 1.8；族語字母沿用 tribal 字型 stack，深色下重新檢查組合符號、底線與連結辨識。

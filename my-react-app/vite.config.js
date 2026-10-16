@@ -1,8 +1,13 @@
 import { fileURLToPath, URL } from 'node:url'
+import process from 'node:process'
 
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+
+// index.html 的防閃白小腳本用 %VITE_ENABLE_DARK_THEME% 取得深色功能旗標（S5-3）。
+// 沒設定時 Vite 會在每次建置印出「variable is not defined」警告，先補成空字串（不是 "true" 就等於關）。
+process.env.VITE_ENABLE_DARK_THEME ??= ''
 
 // https://vite.dev/config/
 export default defineConfig({

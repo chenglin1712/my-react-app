@@ -3,6 +3,22 @@
 
 <head>
   <meta charset="UTF-8" />
+  <!-- 防閃白：在任何樣式表之前，同步讀取儲存的主題偏好並設定 <html data-theme>（見 DESIGN.md「深淺色政策」）。
+       規則與 frontend/src/theme/themeStore.js 相同：只認 light | dark | system，其他或讀取失敗一律淺色；
+       公開深色切換的功能旗標（VITE_ENABLE_DARK_THEME）沒開時一律淺色。目前 repo 沒有 CSP；
+       日後若加 CSP，改用 nonce、雜湊或外部小檔，不開 unsafe-inline。 -->
+  <script>
+    (function () {
+      var theme = "light";
+      try {
+        if ("%VITE_ENABLE_DARK_THEME%" === "true") {
+          var saved = window.localStorage.getItem("yy-theme");
+          if (saved === "dark" || saved === "system") theme = saved;
+        }
+      } catch (e) { /* 讀不到儲存空間就當淺色 */ }
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
   <link rel="icon" type="image/svg+xml" href="/languages.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#221812" />

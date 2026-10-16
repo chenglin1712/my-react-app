@@ -879,6 +879,15 @@
   margin: 0;
 }
 
+/* ---------- 主題切換（S5-3）----------
+   切換偏好的那一刻，themeStore.js 會在 <html> 暫時加上 data-theme-switching，這裡把所有元件的過渡與動畫關掉，
+   整頁顏色一次換好；不然按鈕、卡片、連結各自 150ms 淡入，會看到整頁「慢慢變色」。約 50ms 後就移除。 */
+:root[data-theme-switching] *,
+:root[data-theme-switching] *::before,
+:root[data-theme-switching] *::after {
+  transition: none !important;
+}
+
 /* ---------- Footer（S5-2，沉穩文藝）----------
    石板灰區塊（--yy-calm-block）：和首頁的最新消息區同一個色塊語彙，頁面最後留一塊穩定的底。
    版面用 grid，不動 JSX：第一列「標誌｜連結」，一條細線，第二列「族語羅馬字｜版權」；手機疊成單欄。

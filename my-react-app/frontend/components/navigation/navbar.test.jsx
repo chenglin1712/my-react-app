@@ -160,3 +160,27 @@ describe('Navbar 手機選單 Esc（S5-1）', () => {
     expect(toggle).not.toHaveFocus();
   });
 });
+
+describe('顯示設定（S5-3，深色功能旗標）', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  test('旗標沒開（預設）：導覽列沒有顯示設定按鈕，手機抽屜也沒有單選群組', () => {
+    vi.stubEnv('VITE_ENABLE_DARK_THEME', '');
+    const { container } = render(<Navbar />);
+    expect(screen.queryByRole('button', { name: '顯示設定' })).not.toBeInTheDocument();
+    // 手機抽屜收起時是 visibility:hidden（對輔助技術不可見），所以直接查 DOM，不用 role 查詢
+    expect(container.querySelector('.theme-group')).toBeNull();
+    expect(container.querySelector('.theme-trigger')).toBeNull();
+  });
+
+  test('旗標開：桌面有顯示設定按鈕，手機抽屜尾端有淺色、深色、跟隨裝置單選群組', () => {
+    vi.stubEnv('VITE_ENABLE_DARK_THEME', 'true');
+    const { container } = render(<Navbar />);
+    expect(screen.getByRole('button', { name: '顯示設定' })).toBeInTheDocument();
+    const mobileGroup = container.querySelector('#mobile-menu .theme-group--mobile');
+    expect(mobileGroup).not.toBeNull();
+    expect(within(mobileGroup).getAllByRole('radio', { hidden: true }).map((r) => r.value)).toEqual(['light', 'dark', 'system']);
+  });
+});

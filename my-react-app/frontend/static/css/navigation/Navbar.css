@@ -538,6 +538,138 @@
     display: flex;
 }
 
+/* 顯示設定（S5-3）：導覽列右側的按鈕與浮動面板，樣式比照筆記下拉選單。
+   面板從按鈕的右上角長出來（transform-origin: top right），展開 160ms、收合 120ms，都是 ease-out；
+   visibility 等退場結束才切換，收起來的選項不能被 Tab 聚焦。 */
+.theme-menu-wrap {
+    position: relative;
+    display: flex;
+}
+
+.theme-trigger {
+    justify-content: center;
+    min-width: var(--yy-control-md);
+    padding: 0 10px;
+}
+
+.theme-trigger svg {
+    margin-right: 0;
+}
+
+.theme-trigger[aria-expanded="true"] {
+    color: var(--yy-calm-accent);
+}
+
+.theme-panel {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    min-width: 176px;
+    background-color: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    box-shadow: var(--yy-shadow-overlay);
+    border-radius: var(--yy-ui-radius);
+    z-index: var(--yy-z-dropdown);
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-6px) scale(0.97);
+    transform-origin: top right;
+    transition:
+        opacity 120ms var(--ease-out),
+        transform 120ms var(--ease-out),
+        visibility 0s linear 120ms;
+}
+
+.theme-panel.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+    transition:
+        opacity 160ms var(--ease-out),
+        transform 160ms var(--ease-out),
+        visibility 0s linear 0s;
+}
+
+.theme-group {
+    min-width: 0;
+    margin: 0;
+    padding: 4px 0;
+    border: 0;
+}
+
+.theme-group__title {
+    float: none;
+    width: auto;
+    margin: 0;
+    padding: 8px 16px 4px;
+    color: var(--yy-calm-text-sub);
+    font-family: var(--yy-font-body);
+    font-size: var(--yy-text-xs);
+    font-weight: 600;
+}
+
+.theme-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: var(--yy-control-md);
+    padding: 0 16px;
+    color: var(--yy-calm-text);
+    font-family: var(--yy-font-body);
+    font-size: var(--yy-text-sm);
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out);
+}
+
+.theme-option input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    flex-shrink: 0;
+    accent-color: var(--yy-calm-accent);
+    cursor: pointer;
+}
+
+.theme-option:has(input:checked) {
+    color: var(--yy-calm-accent);
+}
+
+.theme-option:has(input:focus-visible) {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: -3px;
+}
+
+.theme-option:active {
+    background-color: var(--yy-calm-info-bg);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .theme-option:hover {
+        background-color: var(--yy-calm-info-bg);
+    }
+}
+
+/* 手機抽屜裡的版本：沒有浮動面板，直接排在選單項目後面，用細線與上面的連結隔開 */
+.theme-group--mobile {
+    margin-top: 4px;
+    padding: 8px 0 0;
+    border-top: var(--yy-border-width) solid var(--yy-calm-rule);
+}
+
+.theme-group--mobile .theme-option {
+    min-height: var(--yy-control-lg);
+    font-size: var(--yy-text-base);
+}
+
+.theme-group--mobile .theme-group__title {
+    font-size: var(--yy-text-sm);
+}
+
 /* 斷點 1200px：桌面導覽列（6 個連結＋筆記＋登入）在 949～1185px 之間放不進一列，會換成兩列、
    sticky 導覽列因此變高（審查項 P2-4）。寬度不夠時直接改用漢堡選單。 */
 @media (max-width: 1200px) {
@@ -593,7 +725,9 @@
     }
 
     .dropdown-content,
-    .dropdown-content.active {
+    .dropdown-content.active,
+    .theme-panel,
+    .theme-panel.active {
         transform: none;
     }
 }

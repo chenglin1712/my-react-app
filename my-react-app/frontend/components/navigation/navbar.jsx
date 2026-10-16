@@ -7,6 +7,8 @@ import { useAuth } from "../../src/userServives/authContext"
 import AvatarImg from "../../static/assets/_auth/avatar.webp"
 import UserSidebar from "./userSidebar"
 import { useDialog } from "@hooks/useDialog"
+import { ThemeMenu, ThemeRadioGroup } from "./ThemeSettings"
+import { isDarkThemeEnabled } from "../../src/theme/themeStore"
 
 // 靜態的導覽路由設定，不依賴 props/state，搬到元件外，不用每次 render 重建。
 const MENU_ITEMS = [
@@ -124,6 +126,8 @@ const Navbar = ({ onOpenBot }) => {
             </div>
           </div>
 
+          <ThemeMenu />
+
           {!isLoggedIn ? (
             <NavLink className="menu-item login-btn" to="/login">
               <User size={24} style={{ marginRight: '5px' }} />
@@ -205,6 +209,7 @@ const Navbar = ({ onOpenBot }) => {
           <NotebookPen size={20} />
           <span>筆記分享區</span>
         </NavLink>
+        {isDarkThemeEnabled() && <ThemeRadioGroup className="theme-group--mobile" />}
         {/* 收藏原本只藏在頭像側欄裡；登入後在手機選單也放一個直接入口（桌面版導覽列寬度已滿，見 Navbar.css 的斷點說明） */}
         {isLoggedIn && (
           <NavLink className="menu-mobile-item" to="/favorite" state={{ tabId: 1 }} onClick={() => setIsOpen(false)}>
