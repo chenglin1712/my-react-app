@@ -14,7 +14,7 @@ from ._shared import (
     rate_limited_response as _rate_limited_response,
     write_audit_log as _write_audit_log,
 )
-from .models import HomepageConfig
+from .models import HomepageConfig, PromoVideo
 from .serializers import HomepageConfigSerializer, PublicHomepageConfigSerializer
 
 
@@ -53,6 +53,11 @@ def _update_homepage_config(request):
     HomepageConfig.load()  # 確保單例那筆存在，鎖之前才有列可鎖
     with transaction.atomic():
         config = HomepageConfig.objects.select_for_update().get(pk=1)
+        # 鎖順序固定：先鎖 HomepageConfig 單例列，再鎖要啟用的 PromoVideo 列（S3-4 的替換、
+        # 刪除端點也必須照這個順序），避免「驗證時有影片檔、提交前被清掉」的競態與死結。
+        video_id = data.get("active_promo_video") if isinstance(data, dict) else None
+        if isinstance(video_id, int) and not isinstance(video_id, bool):
+            list(PromoVideo.objects.select_for_update().filter(pk=video_id))
         before = HomepageConfigSerializer(config).data
         serializer = HomepageConfigSerializer(config, data=data, partial=True)
         if not serializer.is_valid():
@@ -74,4 +79,8 @@ def public_homepage_config(request):
     if limited_resp:
         return limited_resp
     config = HomepageConfig.load()
-    return JsonResponse(PublicHomepageConfigSerializer(config).data)
+    response = JsonResponse(PublicHomepageConfigSerializer(config).data)
+    # no-cache = 使用前必須重新驗證；沒有 ETag 所以實際就是每次重新取得，後台儲存後立即生效，
+    # 也避免瀏覽器或中間代理依啟發式規則自行快取（HOMEPAGE_CONTRACT.md 第 6 節）。
+    response["Cache-Control"] = "no-cache"
+    return response

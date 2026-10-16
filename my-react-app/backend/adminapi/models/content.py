@@ -1,8 +1,17 @@
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
+from django.core.validators import MaxLengthValidator, MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 
+from ..validators import (
+    validate_nonblank,
+    validate_plain_text,
+    validate_promo_caption_path,
+    validate_promo_cover_path,
+    validate_promo_video_path,
+    validate_single_line,
+)
 from ._singleton import SingletonModel
 
 
@@ -239,6 +248,46 @@ class AnnouncementSyncStatus(SingletonModel):
         return f"公告爬蟲同步狀態（連續失敗 {self.consecutive_failures} 次）"
 
 
+# 宣傳影片上限（HOMEPAGE_CONTRACT.md 3.2）：8 分鐘、150MB。
+MAX_PROMO_DURATION_SECONDS = 8 * 60
+MAX_PROMO_VIDEO_BYTES = 150 * 1024 * 1024
+
+
+class PromoVideo(models.Model):
+    """首頁宣傳影片（自架於自己的伺服器，不接任何外部平台，決定 D3）。
+
+    影片、封面、字幕只存「相對路徑」，格式固定（見 validators.py），由 S3-4 的上傳端點在
+    驗證檔案後寫入，一般的資料更新不可直接指定。**沒有 is_active 欄位**：目前啟用哪一支
+    只由 HomepageConfig.active_promo_video 決定，避免兩個地方不一致（HOMEPAGE_CONTRACT.md 3.2）。
+    """
+    title = models.CharField(max_length=60, validators=[validate_nonblank, validate_single_line])
+    description = models.CharField(max_length=300, blank=True, validators=[validate_plain_text])
+    video_path = models.CharField(max_length=80, blank=True, validators=[validate_promo_video_path])
+    cover_path = models.CharField(max_length=80, blank=True, validators=[validate_promo_cover_path])
+    # 字幕選填（使用者決定不提供；WCAG 1.2.2 為 A 級項目，風險使用者已知）。
+    caption_path = models.CharField(max_length=80, blank=True, validators=[validate_promo_caption_path])
+    # 無字幕時的文字逐字稿；影片無法播放時前台也會顯示它。
+    transcript = models.TextField(blank=True, validators=[MaxLengthValidator(6000), validate_plain_text])
+    # 以下兩個由上傳驗證（S3-4）以實際檔案檢測結果寫入，任何 serializer 都必須唯讀；空代表未知。
+    # 上限來自契約 3.2（8 分鐘、150MB）；用欄位 validators 而不是資料庫 CheckConstraint，
+    # 日後調整上限時不需要 migration。
+    duration_seconds = models.PositiveIntegerField(
+        null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(MAX_PROMO_DURATION_SECONDS)],
+    )
+    size_bytes = models.PositiveBigIntegerField(
+        null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(MAX_PROMO_VIDEO_BYTES)],
+    )
+    created_by = models.CharField(max_length=128, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+
+    def __str__(self):
+        return f"宣傳影片：{self.title}"
+
+
 class HomepageConfig(SingletonModel):
     """首頁版位設定，單例（永遠只有一筆，pk 固定用 1，見 load()）。
 
@@ -263,6 +312,11 @@ class HomepageConfig(SingletonModel):
     button1_enabled = models.BooleanField(default=True)
     button2_enabled = models.BooleanField(default=True)
     button3_enabled = models.BooleanField(default=True)
+    # 目前啟用的宣傳影片（可為空）。刪除影片時設為空，首頁退回備援；on_delete 用 SET_NULL
+    # 讓新增這個欄位對舊程式完全向後相容（HOMEPAGE_CONTRACT.md 第 2、8 節）。
+    active_promo_video = models.ForeignKey(
+        'PromoVideo', null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+    )
     updated_by = models.CharField(max_length=128, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 

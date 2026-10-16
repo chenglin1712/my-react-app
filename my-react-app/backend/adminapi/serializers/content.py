@@ -7,6 +7,7 @@ from config.tribes import TRIBE_IDS
 from rest_framework import serializers
 
 from ..models import Announcement, ExamScheduleOverride, HomepageConfig
+from ..promo_media import public_media_url
 
 
 class AnnouncementSerializer(serializers.ModelSerializer):
@@ -107,9 +108,16 @@ class HomepageConfigSerializer(serializers.ModelSerializer):
             'hero_image_url', 'hero_link_url', 'hero_title_override',
             'show_news_section', 'show_calendar_section', 'news_display_count',
             'button1_enabled', 'button2_enabled', 'button3_enabled',
+            'active_promo_video',
             'updated_by', 'updated_at',
         ]
         read_only_fields = ['updated_by', 'updated_at']
+
+    def validate_active_promo_video(self, value):
+        # 沒有影片檔的紀錄不能啟用，否則公開首頁會拿到一個播不了的影片（可為空 = 停用）。
+        if value is not None and not value.video_path:
+            raise serializers.ValidationError('這支影片還沒有上傳影片檔，無法啟用')
+        return value
 
     def validate_hero_link_url(self, value):
         # 這個欄位最終會變成公開首頁的 <a href>，任何訪客都會執行到——只接受
@@ -147,6 +155,10 @@ class HomepageConfigSerializer(serializers.ModelSerializer):
 
 
 class PublicHomepageConfigSerializer(serializers.ModelSerializer):
+    # 啟用中的宣傳影片：沒有啟用時是 null；有啟用就輸出物件，即使檔案不見了也不變成 null，
+    # 這樣前台仍拿得到封面與逐字稿（HOMEPAGE_CONTRACT.md 4.1）。URL 一律是同網域相對路徑或 null。
+    promo_video = serializers.SerializerMethodField()
+
     class Meta:
         model = HomepageConfig
         # 公開首頁讀取用，不含 updated_by／updated_at 這些後台維運資訊。
@@ -154,7 +166,25 @@ class PublicHomepageConfigSerializer(serializers.ModelSerializer):
             'hero_image_url', 'hero_link_url', 'hero_title_override',
             'show_news_section', 'show_calendar_section', 'news_display_count',
             'button1_enabled', 'button2_enabled', 'button3_enabled',
+            'promo_video',
         ]
+
+    def get_promo_video(self, obj):
+        video = obj.active_promo_video
+        if video is None:
+            return None
+        video_url = public_media_url(video.video_path)
+        return {
+            'id': video.pk,
+            'title': video.title,
+            'description': video.description,
+            'video_url': video_url,
+            'cover_url': public_media_url(video.cover_path),
+            'caption_url': public_media_url(video.caption_path),
+            'transcript': video.transcript,
+            'duration_seconds': video.duration_seconds,
+            'available': video_url is not None,
+        }
 
 
 class PublicAnnouncementSerializer(serializers.ModelSerializer):

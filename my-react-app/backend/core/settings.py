@@ -231,6 +231,11 @@ STATIC_URL = "static/"
 # collectstatic 的輸出目的地；WhiteNoise（見上方 MIDDLEWARE）在正式環境從這裡讀檔
 # 送出去。部署流程需要在啟動前執行一次 `python manage.py collectstatic --noinput`。
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# 後台上傳的首頁媒體（宣傳影片、封面、字幕）存放根目錄。S3-1 只用來判斷檔案是否存在，
+# S3-4 的上傳端點與 nginx 才會真正寫入與送出。正式環境要掛持久化磁碟並用環境變數指過去，
+# 否則容器重建檔案就消失（見 HOMEPAGE_CONTRACT.md 第 8 節）。公開網址固定是 /media/。
+MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT") or (BASE_DIR / "media"))
+MEDIA_URL = "/media/"
 STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",

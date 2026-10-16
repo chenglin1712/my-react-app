@@ -17,6 +17,7 @@ from .content import (
     ExamScheduleOverride,
     HomepageConfig,
     PendingRevision,
+    PromoVideo,
 )
 from .dictionary_review import DictionaryImportJob, DictionaryRevision
 from .guest_trial import GuestTranslationUsage
@@ -48,6 +49,7 @@ __all__ = [
     'HomepageConfig',
     'IrtConfig',
     'PendingRevision',
+    'PromoVideo',
     'QuizChoiceItem',
     'QuizClozePassage',
     'QuizSituationItem',
