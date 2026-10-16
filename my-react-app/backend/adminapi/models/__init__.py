@@ -15,6 +15,7 @@ from .content import (
     AnnouncementSyncStatus,
     ExamScheduleCrawlStatus,
     ExamScheduleOverride,
+    FeaturedTopic,
     HomepageConfig,
     PendingRevision,
     PromoVideo,

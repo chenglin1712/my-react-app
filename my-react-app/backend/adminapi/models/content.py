@@ -5,6 +5,8 @@ from django.db import models
 from django.utils import timezone
 
 from ..validators import (
+    validate_cloudinary_image_url,
+    validate_internal_or_https_link,
     validate_marquee_items,
     validate_nonblank,
     validate_plain_text,
@@ -332,6 +334,72 @@ class HomepageConfig(SingletonModel):
 
     def __str__(self):
         return "首頁版位設定"
+
+
+class LiveFeaturedTopicManager(models.Manager):
+    """只包含沒被軟刪除的專題。"""
+
+    def get_queryset(self):
+        return super().get_queryset().filter(deleted_at__isnull=True)
+
+
+class FeaturedTopic(models.Model):
+    """首頁「本期專題」卡片（S3-3，HOMEPAGE_CONTRACT.md 3.3，決定 D8：走審核）。
+
+    狀態機與角色完全比照 Announcement（草稿、待審核、已退件、已發布、已下架）。
+    與公告不同的只有一點：同時「已發布」最多 MAX_PUBLISHED 筆，由
+    featured_topic_service 在鎖住 HomepageConfig 單例列的 transaction 內檢查；
+    「轉為已發布」只有那一條程式路徑，這裡的模型層不做狀態轉換檢查。
+
+    文案是自由文字，不寫死任何族語詞或分類。圖片只收 Cloudinary。
+    """
+
+    MAX_PUBLISHED = 3
+
+    STATUS_DRAFT = 'draft'
+    STATUS_PENDING_REVIEW = 'pending_review'
+    STATUS_REJECTED = 'rejected'
+    STATUS_PUBLISHED = 'published'
+    STATUS_UNPUBLISHED = 'unpublished'
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, '草稿'),
+        (STATUS_PENDING_REVIEW, '待審核'),
+        (STATUS_REJECTED, '已退件'),
+        (STATUS_PUBLISHED, '已發布'),
+        (STATUS_UNPUBLISHED, '已下架'),
+    ]
+
+    title = models.CharField(max_length=40, validators=[validate_nonblank, validate_single_line])
+    summary = models.CharField(max_length=120, blank=True, validators=[validate_single_line])
+    image_url = models.URLField(max_length=500, blank=True, validators=[validate_cloudinary_image_url])
+    link_url = models.CharField(max_length=500, blank=True, validators=[validate_internal_or_https_link])
+    category_label = models.CharField(max_length=12, blank=True, validators=[validate_single_line])
+    sort_order = models.PositiveSmallIntegerField(default=0, validators=[MaxValueValidator(99)])
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT)
+
+    created_by = models.CharField(max_length=128)
+    submitted_by = models.CharField(max_length=128, blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.CharField(max_length=128, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_comment = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # 軟刪除，理由同 Announcement：曾經送審或發布過的內容不抹掉存在過的痕跡。
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.CharField(max_length=128, blank=True)
+
+    objects = models.Manager()
+    live = LiveFeaturedTopicManager()
+
+    class Meta:
+        ordering = ['sort_order', 'id']
+        indexes = [models.Index(fields=['status'])]
+
+    def __str__(self):
+        return f"[{self.get_status_display()}] {self.title}"
 
 
 class PendingRevision(models.Model):

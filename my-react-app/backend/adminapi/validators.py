@@ -3,7 +3,9 @@
 驗證寫在模型欄位的 validators（不是只寫在 serializer）：DRF 的 ModelSerializer 會自動
 套用，管理命令與測試也走同一份，不會因為換一條寫入路徑就繞過（見 HOMEPAGE_CONTRACT.md 3.1）。
 """
+import os
 import re
+from urllib.parse import urlsplit
 
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
@@ -30,6 +32,74 @@ def validate_single_line(value):
         raise ValidationError("不可包含零寬等不可見字元")
     if _BIDI_BAD.search(value):
         raise ValidationError("不可包含雙向文字控制字元")
+
+
+# 專題圖片只收 Cloudinary（沿用公告封面的上傳通道）。固定主機而不是任意 https：
+# 任意外部圖片會讓第三方看到每位訪客的 IP，也讓日後 CSP 的 img-src 無法列白名單。
+CLOUDINARY_IMAGE_HOST = "res.cloudinary.com"
+_URL_BAD = re.compile(r"[\x00-\x20\x7f-\x9f\\\u2028\u2029\u200b\u2060\ufeff]")
+
+
+_LINK_BAD = re.compile(r"[\x00-\x20\x7f-\x9f\u2028\u2029\u200b\u2060\ufeff]")
+# 百分比編碼的控制字元與反斜線（%00 到 %1f、%7f、%5c）：不同層（nginx、Django、瀏覽器）正規化
+# 結果可能不一致，直接拒絕，不去猜哪一層會怎麼解。
+_ENCODED_BAD = re.compile(r"%(?:[01][0-9a-f]|7f|5c)", re.IGNORECASE)
+# 路徑段若是 . 或 ..（含編碼寫法 %2e），可能在下游被正規化成別的路徑
+_ENCODED_DOT = re.compile(r"%2e", re.IGNORECASE)
+
+
+def validate_cloudinary_image_url(value):
+    """https + 主機必須剛好是 res.cloudinary.com，不接受帳密、埠號、反斜線與空白。
+
+    若後端設了 CLOUDINARY_CLOUD_NAME，路徑還必須以 /<cloud_name>/ 開頭，避免用別人帳號的圖。
+    環境變數在驗證當下才讀，不在 import 時固定。
+    """
+    if not value:
+        return
+    if _URL_BAD.search(value) or _ENCODED_BAD.search(value):
+        raise ValidationError("圖片網址含有不允許的字元")
+    try:
+        # urlsplit 本身也會對不合法的 IPv6 括號等丟 ValueError，整段解析都要包住
+        parts = urlsplit(value)
+        hostname = parts.hostname
+        port = parts.port
+    except ValueError:
+        raise ValidationError("圖片網址格式不正確")
+    if parts.scheme != "https" or (hostname or "") != CLOUDINARY_IMAGE_HOST:
+        raise ValidationError(f"圖片必須是 https://{CLOUDINARY_IMAGE_HOST} 的網址")
+    if parts.username is not None or parts.password is not None or port not in (None, 443):
+        raise ValidationError("圖片網址不可含帳密或自訂埠號")
+    # 路徑穿越：/mycloud/../othercloud/x 能通過前綴比較，但下游正規化後是別人的帳號
+    if _ENCODED_DOT.search(parts.path) or any(seg in (".", "..") for seg in parts.path.split("/")):
+        raise ValidationError("圖片網址路徑不可含 . 或 ..")
+    cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME", "").strip()
+    if cloud_name and not parts.path.startswith(f"/{cloud_name}/"):
+        raise ValidationError("圖片不屬於本站的 Cloudinary 帳號")
+
+
+def validate_internal_or_https_link(value):
+    """內部路徑（/ 開頭且不是 //，反斜線先正規化）或 https 網址；擋掉 javascript: 之類的 scheme。
+
+    與首頁主打圖連結（HomepageConfigSerializer.validate_hero_link_url）同一規則，
+    但寫在模型欄位上，讓核准修改時的 full_clean() 也會重新檢查。
+    """
+    if not value:
+        return
+    if _LINK_BAD.search(value) or _ENCODED_BAD.search(value):
+        raise ValidationError("連結含有不允許的字元")
+    normalized = value.replace("\\", "/")
+    if normalized.startswith("/") and not normalized.startswith("//"):
+        return
+    if value.startswith("https://"):
+        try:
+            parts = urlsplit(value)
+            host = parts.hostname
+            parts.port  # 觸發埠號格式檢查
+        except ValueError:
+            raise ValidationError("連結格式不正確")
+        if host and parts.username is None and parts.password is None:
+            return
+    raise ValidationError("連結必須是內部路徑（以 / 開頭）或 https 網址，且不可含帳密")
 
 
 def validate_nonblank(value):

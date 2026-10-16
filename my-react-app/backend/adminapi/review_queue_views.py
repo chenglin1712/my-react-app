@@ -15,7 +15,7 @@ from config.roles import STAFF_ROLES
 
 from . import firebase_ops
 from .models import (
-    Announcement, DictionaryRevision, PendingRevision, QuizChoiceItem, QuizClozePassage,
+    Announcement, DictionaryRevision, FeaturedTopic, PendingRevision, QuizChoiceItem, QuizClozePassage,
     QuizSituationItem, QuizTrueFalseItem, QuizVocabItem,
 )
 
@@ -53,6 +53,7 @@ def _question_title(obj):
 # 同一份對照表決定「這筆待審修改屬於哪個內容型別、原始內容長什麼樣子」。
 _CONTENT_TYPES = [
     ("announcement", Announcement, lambda o: o.title, "/admin/content/announcements"),
+    ("featured_topic", FeaturedTopic, lambda o: o.title, "/admin/content/featured-topics"),
     ("quiz_vocab_item", QuizVocabItem, _vocab_title, "/admin/quiz-bank/vocab"),
     ("quiz_cloze_passage", QuizClozePassage, _cloze_title, "/admin/quiz-bank/vocab?tab=cloze"),
     ("quiz_situation_item", QuizSituationItem, _situation_title, "/admin/quiz-bank/situations"),
@@ -64,7 +65,9 @@ _CONTENT_TYPES = [
 def _collect_submissions():
     items = []
     for target_type, model, title_fn, link in _CONTENT_TYPES:
-        for obj in model.objects.filter(status="pending_review"):
+        # 有軟刪除機制的模型（公告、專題）用 live，已刪除的資料即使狀態殘留待審也不進佇列
+        manager = getattr(model, "live", model.objects)
+        for obj in manager.filter(status="pending_review"):
             items.append({
                 "type": "submission",
                 "content_type": target_type,

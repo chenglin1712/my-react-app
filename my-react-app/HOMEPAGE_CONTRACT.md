@@ -118,6 +118,18 @@
 - **要登記到審核佇列**（`review_queue_views.py` 的 `_CONTENT_TYPES`），否則待審的專題不會出現在審核者的待辦裡。PendingRevision 的 payload 白名單只含可編輯欄位，禁止帶 `status`、審核者等唯讀欄位。
 - 排序固定為 `sort_order, id`，兩個公開與後台列表一致。
 
+**S3-3 實作補充（已實作，Codex 審查後）：**
+- **端點：** 後台 `/adminapi/featured-topics/`（列表、新增）、`<id>/`（讀取、PATCH、DELETE）、`<id>/submit|withdraw|approve|reject|unpublish|republish/`、`<id>/pending-revision/`（含 `approve/`、`reject/`）；公開 `/adminapi/public/featured-topics/`。後台列表至多 200 筆，可用 `?status=` 篩選，每筆帶 `has_pending_revision`。
+- **唯一的發布路徑：** `featured_topic_service.publish_topic()`，簽章 `(pk, *, expected_status, actor_uid, record_review=False, review_comment="")`。`actor_uid` 必填（發布是治理行為，空值直接 `ValueError`）。核准傳 `record_review=True`，重新發布不更動審核紀錄。審核修改不經過這裡，因為狀態本來就是已發布、不改變筆數。
+- **鎖順序：** 先鎖 `HomepageConfig` 單例列，再鎖專題列。下架、撤回、退件、刪除、PATCH 只鎖專題列，不會形成相反順序的死結。
+- **發布前重新驗證：** 核准與重新發布會對整筆內容 `full_clean()`（驗證規則可能在送審後變嚴），失敗回 409 並列出欄位；核准修改套用前，`revisions.py` 對模型 `full_clean()`，因為驗證寫在模型欄位的 validators，兩條路徑檢查的是同一份規則。
+- **圖片網址：** https、主機剛好是 `res.cloudinary.com`（比對 `urlsplit().hostname`，結尾點、`@` 帳密、非 443 埠號、反斜線、空白、不可見字元一律拒絕）；路徑不可有 `.` 或 `..` 段，也不可有 `%2e`、`%5c`、`%00` 到 `%1f` 等編碼寫法（`/mycloud/../othercloud/x` 能通過前綴比較，但下游正規化後是別人的帳號）；整段解析包在 `try`，不合法的 IPv6 括號等回 400 而不是 500。
+- **連結：** 內部路徑或 https；拒絕帳密、控制字元、`%00` 到 `%1f` 與 `%5c` 編碼（nginx、Django、瀏覽器對這些的正規化可能不一致）。
+- **Cloudinary 帳號限制是選配：** 後端環境變數 `CLOUDINARY_CLOUD_NAME` 未設定時，任何 Cloudinary 帳號的圖片都能通過。為避免讓既有部署啟動失敗，只做部署檢查警告（`python manage.py check --deploy` 會回報 `adminapi.W001`）。**部署前請在後端設定與前端 `VITE_CLOUDINARY_CLOUD_NAME` 相同的值**（同一個值，不需要新金鑰）。
+- **刪除：** 從沒送審過的草稿（`submitted_at` 為空）硬刪；曾送審過的一律軟刪，即使後來撤回成草稿也一樣（保留存在過的痕跡）。軟刪的稽核紀錄保留 id、操作者與刪除前快照。審核佇列與公開端點、一般列表都只看沒被軟刪除的資料。
+- **不變量的邊界：** 「最多 3 筆」由服務函式與公開端點的硬上限守住。直接用 ORM（`update(status=...)`）、資料修復腳本仍可繞過；Django admin 不註冊這個模型（有測試）。管理命令要改狀態必須呼叫 `publish_topic()`。若日後要求任何寫入來源都不能超過三筆，才需要 PostgreSQL trigger。
+- **並行測試的限制（請知悉）：** 開發與 CI 用 SQLite，`select_for_update()` 在 SQLite 不提供列鎖，所以**單元測試只證明邏輯正確，不能證明兩個同時核准會被序列化**。在 PostgreSQL 下單例列鎖在 READ COMMITTED 隔離層級是成立的（第二個交易等待、取得鎖後重新計數），但這一點尚未在真實 PostgreSQL 上以雙連線實測。S3-4 動手前的部署驗證清單要加一項：在 staging 的 PostgreSQL 上，已有兩筆已發布時，同時核准兩個不同專題，最終只能一筆成功。
+
 ## 4. 公開端點格式
 
 ### 4.1 `GET /adminapi/public/homepage-config/`（既有端點，只加欄位）

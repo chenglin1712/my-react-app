@@ -2,7 +2,7 @@ from django.urls import path
 
 from . import (
     analytics_views, dictionary_grammar_views, dictionary_import_views, dictionary_taxonomy_views,
-    dictionary_views, exam_schedule_admin_views, feature_flag_views, game_config_views,
+    dictionary_views, exam_schedule_admin_views, featured_topic_views, feature_flag_views, game_config_views,
     homepage_config_views, moderation_views, quizbank_views,
     morphology_capability_views, rate_limit_views, review_queue_views, system_cache_views, user_views, verification_views, views,
 )
@@ -44,6 +44,18 @@ urlpatterns = [
     path('public/announcements/', views.public_announcement_list),
     path('exam-schedule/', exam_schedule_admin_views.exam_schedule_admin),
     path('exam-schedule/overrides/<str:phase>/', exam_schedule_admin_views.exam_schedule_override_detail),
+    path('featured-topics/', featured_topic_views.featured_topic_list),
+    path('featured-topics/<int:pk>/', featured_topic_views.featured_topic_detail),
+    path('featured-topics/<int:pk>/submit/', featured_topic_views.featured_topic_submit),
+    path('featured-topics/<int:pk>/withdraw/', featured_topic_views.featured_topic_withdraw),
+    path('featured-topics/<int:pk>/approve/', featured_topic_views.featured_topic_approve),
+    path('featured-topics/<int:pk>/reject/', featured_topic_views.featured_topic_reject),
+    path('featured-topics/<int:pk>/unpublish/', featured_topic_views.featured_topic_unpublish),
+    path('featured-topics/<int:pk>/republish/', featured_topic_views.featured_topic_republish),
+    path('featured-topics/<int:pk>/pending-revision/', featured_topic_views.featured_topic_pending_revision),
+    path('featured-topics/<int:pk>/pending-revision/approve/', featured_topic_views.featured_topic_revision_approve),
+    path('featured-topics/<int:pk>/pending-revision/reject/', featured_topic_views.featured_topic_revision_reject),
+    path('public/featured-topics/', featured_topic_views.public_featured_topics),
     path('homepage-config/', homepage_config_views.homepage_config_admin),
     path('public/homepage-config/', homepage_config_views.public_homepage_config),
     *_content_urls('quiz-bank/vocab', quizbank_views.quiz_vocab_views),

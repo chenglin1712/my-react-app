@@ -6,7 +6,7 @@ from config.tribes import TRIBE_IDS
 
 from rest_framework import serializers
 
-from ..models import Announcement, ExamScheduleOverride, HomepageConfig
+from ..models import Announcement, ExamScheduleOverride, FeaturedTopic, HomepageConfig
 from ..promo_media import public_media_url
 from ..validators import normalize_marquee_items
 
@@ -68,6 +68,33 @@ class AnnouncementSerializer(serializers.ModelSerializer):
         if unpublish_at and publish_at and unpublish_at <= publish_at:
             raise serializers.ValidationError({'unpublish_at': '下架時間必須晚於發布時間'})
         return data
+
+
+class FeaturedTopicSerializer(serializers.ModelSerializer):
+    """本期專題。欄位驗證全部寫在模型欄位的 validators（核准修改時 full_clean() 會重跑同一份）。
+
+    狀態機與審核欄位一律唯讀，只能由動作端點改，不然 editor 可以自己把 status 設成 published。
+    """
+
+    class Meta:
+        model = FeaturedTopic
+        fields = [
+            'id', 'title', 'summary', 'image_url', 'link_url', 'category_label', 'sort_order',
+            'status', 'created_by', 'submitted_by', 'submitted_at', 'reviewed_by', 'reviewed_at',
+            'review_comment', 'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'status', 'created_by', 'submitted_by', 'submitted_at', 'reviewed_by',
+            'reviewed_at', 'review_comment', 'created_at', 'updated_at',
+        ]
+
+
+class PublicFeaturedTopicSerializer(serializers.ModelSerializer):
+    """公開首頁用：不輸出任何狀態、審核者或建立者資訊。"""
+
+    class Meta:
+        model = FeaturedTopic
+        fields = ['id', 'title', 'summary', 'image_url', 'link_url', 'category_label']
 
 
 class RejectSerializer(serializers.Serializer):
