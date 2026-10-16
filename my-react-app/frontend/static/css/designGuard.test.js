@@ -181,7 +181,9 @@ describe("動態規則不退回舊寫法", () => {
   });
 
   // 持續循環的動畫只允許「正在進行」的狀態指示：載入佔位、錄音中、等待回覆的跳動點、轉圈、游標閃爍。
-  const INFINITE_ALLOWED = ["yy-skeleton-pulse", "yy-blink", "pron-pulse", "sentPulse", "listening-pulse", "pron-community-spin", "bot-bounce", "review-ai-bounce"];
+  // home-ticker-scroll 是例外：首頁跑馬燈是契約要求的內容（HOMEPAGE_CONTRACT.md 4.3），
+  // 有可見的暫停鈕、滑過與聚焦暫停、減少動態時改靜態（見 Ticker.jsx 與 mastheadLook.test.js）。
+  const INFINITE_ALLOWED = ["home-ticker-scroll", "yy-skeleton-pulse", "yy-blink", "pron-pulse", "sentPulse", "listening-pulse", "pron-community-spin", "bot-bounce", "review-ai-bounce"];
 
   it("前台 CSS 的無限循環動畫只限狀態指示（白名單）", () => {
     const found = new Set();

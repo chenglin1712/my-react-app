@@ -1,0 +1,225 @@
+/* 首頁報頭與跑馬燈（S6-1，沉穩文藝）。顏色一律取 --yy-calm-* 語意層。
+   報頭配色與字型的最後定案是決定 D9：目前是預設（石板灰底、宋體重磅），之後只需要改這個檔案的 token 取用。 */
+
+/* ---------- 跑馬燈 ---------- */
+
+.home-ticker {
+  display: flex;
+  align-items: stretch;
+  min-height: var(--yy-control-md);
+  color: var(--yy-calm-text-sub);
+  border-bottom: var(--yy-border-width) solid var(--yy-calm-rule);
+}
+
+.home-ticker__viewport {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  container-type: inline-size;
+  /* 兩端淡出，項目進出視窗時不會被硬切掉 */
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 4%, black 96%, transparent);
+  mask-image: linear-gradient(90deg, transparent, black 4%, black 96%, transparent);
+}
+
+.home-ticker__track {
+  display: flex;
+  width: max-content;
+  height: 100%;
+  /* 跑馬燈是契約要求的自動捲動內容：恆速 linear、只動 transform、有可見的暫停鈕（見 Ticker.jsx） */
+  animation: home-ticker-scroll var(--ticker-duration, 60s) linear infinite;
+}
+
+.home-ticker[data-paused="true"] .home-ticker__track {
+  animation-play-state: paused;
+}
+
+/* 暫停只由按鈕決定。刻意不做 hover／focus-within 自動暫停：按下「播放」後滑鼠與焦點仍在按鈕上，
+   自動暫停會讓按鈕顯示「暫停」、畫面卻沒動（審查發現）。 */
+
+.home-ticker__copy {
+  display: flex;
+  flex: none;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  /* 每一份至少和視窗一樣寬，項目少的時候接縫處才不會出現大片空白；100vw 是不支援容器單位時的退路 */
+  min-width: 100vw;
+  min-width: 100cqw;
+}
+
+.home-ticker__copy li {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding-inline-end: 28px;
+  font-family: var(--yy-font-heading);
+  font-size: var(--yy-text-sm);
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  white-space: nowrap;
+}
+
+/* 項目之間用一條細線分隔（不是裝飾點） */
+.home-ticker__copy li::before {
+  content: "";
+  width: 1px;
+  height: 14px;
+  background: var(--yy-calm-copper);
+}
+
+.home-ticker__toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--yy-control-md);
+  min-height: var(--yy-control-md);
+  padding: 0;
+  border: 0;
+  border-inline-start: var(--yy-border-width) solid var(--yy-calm-rule);
+  background: transparent;
+  color: var(--yy-calm-text);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
+}
+
+.home-ticker__toggle:active {
+  transform: scale(var(--yy-ui-press));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .home-ticker__toggle:hover {
+    color: var(--yy-calm-accent);
+  }
+}
+
+@keyframes home-ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* 減少動態：靜態呈現。全部項目換行排開、置中，沒有複本、沒有暫停鈕（元件在這個偏好下根本不輸出它們，這裡是第二道防線） */
+.home-ticker--static {
+  padding: var(--yy-space-2) 56px;
+  justify-content: center;
+}
+
+.home-ticker__copy--static {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--yy-space-1) 0;
+  min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-ticker__track {
+    animation: none;
+    width: auto;
+    flex-wrap: wrap;
+  }
+
+  .home-ticker__copy[aria-hidden="true"],
+  .home-ticker__toggle {
+    display: none;
+  }
+}
+
+/* ---------- 報頭 ---------- */
+
+.home-mast {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas: "name quote en";
+  align-items: center;
+  gap: var(--yy-space-2) var(--yy-space-6);
+  padding: var(--yy-space-3) 56px;
+  background: var(--yy-calm-block);
+  color: var(--yy-calm-block-on);
+  border-block: var(--yy-border-width) solid var(--yy-calm-line);
+}
+
+/* 內框：像書籍扉頁 */
+.home-mast::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px solid currentColor;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* 沒有引言時只剩兩欄，不留中間的空位 */
+.home-mast--no-quote {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "name en";
+}
+
+.home-mast__name {
+  grid-area: name;
+  margin: 0;
+  font-family: var(--yy-font-heading);
+  font-size: clamp(2.4rem, 5vw, 3.6rem);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: 0.06em;
+}
+
+.home-mast__quote {
+  grid-area: quote;
+  max-width: 32em;
+  margin: 0;
+  justify-self: center;
+  text-align: center;
+  font-family: var(--yy-font-heading);
+  font-size: clamp(0.95rem, 1.6vw, 1.2rem);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  line-height: 1.7;
+}
+
+.home-mast__en {
+  grid-area: en;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  justify-self: end;
+  text-align: right;
+}
+
+.home-mast__en-name {
+  font-family: var(--yy-font-heading);
+  font-size: clamp(0.9rem, 1.8vw, 1.1rem);
+  font-weight: 700;
+  letter-spacing: 0.3em;
+}
+
+.home-mast__tagline {
+  color: var(--yy-calm-block-accent);
+  font-size: var(--yy-text-sm);
+  letter-spacing: 0.06em;
+}
+
+@media (max-width: 720px) {
+  .home-ticker--static {
+    padding-inline: 24px;
+  }
+
+  .home-mast {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name en"
+      "quote quote";
+    padding: var(--yy-space-3) 24px;
+  }
+
+  .home-mast--no-quote {
+    grid-template-areas: "name en";
+  }
+}

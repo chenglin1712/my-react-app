@@ -369,3 +369,88 @@ describe('首頁 · 族語切換', () => {
     expect(screen.queryByRole('link', { name: '免費註冊' })).not.toBeInTheDocument();
   });
 });
+
+describe('首頁 · 報頭與跑馬燈（S6-1，讀後台公開設定）', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const MASTHEAD_CONFIG = {
+    ...DEFAULT_CONFIG,
+    marquee_items: ['跑馬燈第一則', '跑馬燈第二則'], show_marquee: true,
+    tagline: '讓語言回家', show_tagline: true,
+    quote_text: '每一種語言，都是一座回得去的家。', show_quote: true,
+  };
+
+  test('設定載入前與後台從沒填過：只有固定的「原語」「YUAN・YU」，沒有跑馬燈、標語、引言', async () => {
+    mockFetchOk([]);
+    renderHome();
+    // 載入前（預設值）
+    expect(screen.getByText('原語')).toBeInTheDocument();
+    expect(screen.getByText('YUAN・YU', { selector: '.home-mast__en-name' })).toBeInTheDocument();
+    expect(document.querySelector('.home-ticker')).toBeNull();
+    expect(document.querySelector('.home-mast__quote')).toBeNull();
+    expect(document.querySelector('.home-mast__tagline')).toBeNull();
+    // 載入後（後端回的也是空）
+    await waitFor(() => expect(screen.getByTestId('news-mock')).toBeInTheDocument());
+    expect(document.querySelector('.home-ticker')).toBeNull();
+    expect(document.querySelector('.home-mast__quote')).toBeNull();
+  });
+
+  test('後台填了之後：跑馬燈、標語、引言都出現，並在報頭與跑馬燈區塊裡', async () => {
+    mockFetchOk([], MASTHEAD_CONFIG);
+    renderHome();
+    expect(await screen.findByRole('region', { name: '跑馬燈' })).toBeInTheDocument();
+    expect(screen.getAllByText('跑馬燈第一則').length).toBeGreaterThan(0);
+    expect(document.querySelector('.home-mast__quote')).toHaveTextContent('每一種語言，都是一座回得去的家。');
+    expect(document.querySelector('.home-mast__tagline')).toHaveTextContent('讓語言回家');
+  });
+
+  test('跑馬燈在報頭之前、兩者都在首頁最上方（宣傳區之前）', async () => {
+    mockFetchOk([], MASTHEAD_CONFIG);
+    renderHome();
+    await screen.findByRole('region', { name: '跑馬燈' });
+    const page = document.querySelector('.homepage');
+    const order = [...page.children].map((el) => el.className);
+    expect(order[0]).toContain('home-ticker');
+    expect(order[1]).toContain('home-mast');
+    expect(order[2]).toContain('home-hero');
+  });
+
+  test('開關關閉時不輸出（即使資料裡還有內容）', async () => {
+    mockFetchOk([], { ...MASTHEAD_CONFIG, show_marquee: false, show_tagline: false, show_quote: false });
+    renderHome();
+    await waitFor(() => expect(screen.getByTestId('news-mock')).toBeInTheDocument());
+    expect(document.querySelector('.home-ticker')).toBeNull();
+    expect(document.querySelector('.home-mast__quote')).toBeNull();
+    expect(document.querySelector('.home-mast__tagline')).toBeNull();
+  });
+
+  test('只關掉跑馬燈，標語與引言不受影響', async () => {
+    mockFetchOk([], { ...MASTHEAD_CONFIG, show_marquee: false });
+    renderHome();
+    await waitFor(() => expect(document.querySelector('.home-mast__quote')).not.toBeNull());
+    expect(document.querySelector('.home-ticker')).toBeNull();
+    expect(document.querySelector('.home-mast__tagline')).not.toBeNull();
+  });
+
+  test('設定端點失敗：用預設設定（沒有跑馬燈、標語、引言），首頁其餘照常', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn((url) => {
+      if (url.includes('/adminapi/public/homepage-config/')) return Promise.resolve({ ok: false, status: 500 });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [announcementItem] }) });
+    }));
+    renderHome();
+    await waitFor(() => expect(screen.getByTestId('news-mock')).toBeInTheDocument());
+    expect(screen.getByText('原語')).toBeInTheDocument();
+    expect(document.querySelector('.home-ticker')).toBeNull();
+    expect(document.querySelector('.home-mast__quote')).toBeNull();
+  });
+
+  test('後端漏帶新欄位（舊版後端）時退回預設，不會出錯', async () => {
+    mockFetchOk([], { ...DEFAULT_CONFIG });
+    renderHome();
+    await waitFor(() => expect(screen.getByTestId('news-mock')).toBeInTheDocument());
+    expect(document.querySelector('.home-ticker')).toBeNull();
+  });
+});

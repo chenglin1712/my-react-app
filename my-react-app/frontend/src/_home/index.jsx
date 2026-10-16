@@ -8,6 +8,9 @@ import { useAuth } from "../userServives/authContext";
 import { TRIBES } from "../constants/tribes";
 import { scrollBehavior } from "../hooks/useReducedMotion";
 import RevealOnView from "../../components/ui/RevealOnView";
+import HomeTicker from "../../components/_home/Ticker";
+import HomeMasthead from "../../components/_home/Masthead";
+import { pickMastheadContent } from "../../components/_home/mastheadContent";
 
 const ANNOUNCEMENT_CATEGORY_LABELS = { announcement: '公告', activity: '活動', exam: '考試', maintenance: '系統維護' };
 
@@ -19,6 +22,11 @@ const DEFAULT_HOMEPAGE_CONFIG = {
     hero_image_url: '', hero_link_url: '', hero_title_override: '',
     show_news_section: true, show_calendar_section: true, news_display_count: 6,
     button1_enabled: true, button2_enabled: true, button3_enabled: true,
+    // 報頭與跑馬燈（S6-1，HOMEPAGE_CONTRACT.md 4.1）：預設全空，與後端預設一致，
+    // 設定載入前、載入失敗、後台從沒填過時都不輸出跑馬燈、標語、引言
+    marquee_items: [], show_marquee: true,
+    tagline: '', show_tagline: true,
+    quote_text: '', show_quote: true,
 };
 
 // 後台公告（backend/adminapi 的 Announcement，見 /adminapi/public/announcements/）
@@ -175,8 +183,13 @@ const HomePage = () => {
         </>
     );
 
+    const { marqueeItems, tagline, quote } = pickMastheadContent(homepageConfig);
+
     return (
         <div className="yy-page homepage">
+            {marqueeItems.length > 0 && <HomeTicker items={marqueeItems} />}
+            <HomeMasthead quote={quote} tagline={tagline} />
+
             <section className="yy-hero home-hero">
                 {/* 裝飾只留三個（兩團光暈與貼紙徽章）：原本約十個無限循環動畫會搶走標題與按鈕的注意力 */}
                 <span className="home-blob home-blob--gold" aria-hidden="true" />
