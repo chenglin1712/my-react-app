@@ -61,12 +61,10 @@
     text-decoration: none;
     color: inherit;
     transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
-    box-shadow: var(--yy-shadow-sm);
 }
 
 @media (hover: hover) and (pointer: fine) {
   a.news-card:hover {
-      box-shadow: var(--yy-shadow-lg);
       transform: translateY(-3px);
       border-color: var(--yy-red);
   }
@@ -155,7 +153,7 @@ a.news-card:active {
     padding: 0;
     color: var(--yy-ink);
     background: var(--yy-surface);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: 50%;
     cursor: pointer;
     transition: var(--transition-interactive);
@@ -331,7 +329,7 @@ a.news-text-item:hover { background: var(--yy-cream); }
 /* 資料載入中的佔位卡片（News 的 loading 狀態）：高度對應一張消息卡，載入完成時版面不跳動 */
 .news-card-skeleton {
   min-height: 132px;
-  border: 2px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: var(--yy-radius-card);
 }
 

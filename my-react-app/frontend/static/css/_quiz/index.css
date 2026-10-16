@@ -28,9 +28,8 @@
     padding: clamp(20px, 3vw, 36px);
 
     background: var(--yy-surface);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
-    box-shadow: var(--yy-shadow-lg);
 }
 
 /* FE-4：測驗內容區的 scoped error boundary fallback（見 src/_quiz/index.jsx）。
@@ -60,23 +59,20 @@
     padding: 11px 18px;
     color: var(--yy-cream);
     background: var(--yy-red);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
-    box-shadow: var(--yy-shadow-sm);
     font-weight: 700;
     cursor: pointer;
     transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
 }
 @media (hover: hover) and (pointer: fine) {
   .quiz-panel-error button:hover {
-      transform: translate(2px, 2px);
       background: var(--yy-red-dark);
-      box-shadow: 1px 1px 0 var(--yy-ink);
   }
 }
 
 .quiz-panel-error button:active {
-  transform: translate(4px, 4px);
+  transform: scale(0.97);
   box-shadow: none;
 }
 
@@ -92,6 +88,5 @@
         min-height: calc(100dvh - 150px);
         padding: 20px 16px;
         box-sizing: border-box;
-        box-shadow: var(--yy-shadow-md);
     }
 }

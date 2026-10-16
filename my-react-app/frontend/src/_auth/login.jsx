@@ -24,7 +24,7 @@ function AuthPage({ defaultView = "login" }) {
                 <span className="auth-blob auth-blob--blue" />
                 <div className="yy-fade-up auth-panel">
                     <div className="auth-badge-row">
-                        <span className="yy-eyebrow">◆ MEMBER ◆</span>
+                        <span className="yy-eyebrow">MEMBER</span>
                     </div>
                     <div className="auth-tabswitch-row">
                         <TabSwitch

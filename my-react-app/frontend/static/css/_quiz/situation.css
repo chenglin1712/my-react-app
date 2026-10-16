@@ -19,9 +19,8 @@
   color: var(--yy-cream);
 
   background: var(--yy-red);
-  border: 3px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: var(--yy-radius-btn);
-  box-shadow: var(--yy-shadow-sm);
   width: fit-content;
 }
 

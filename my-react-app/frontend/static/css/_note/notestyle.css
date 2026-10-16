@@ -30,14 +30,13 @@
   margin: 40px auto 80px auto;
   max-width: 800px;
   min-height: 600px;
-  box-shadow: var(--yy-shadow-md);
 }
 
 /* ---- 標題輸入框：紅色圓角邊框 ---- */
 .note-title {
   width: 100%;
   padding: 12px 14px;
-  border: 2px solid var(--brand-red);
+  border: var(--yy-border-width) solid var(--brand-red);
   border-radius: var(--yy-radius-lg);
   background: var(--yy-surface);
   font-size: 1.1rem;
@@ -51,7 +50,7 @@
 
 /* ---- 編輯區：紅色圓角邊框（非卡片） ---- */
 .note-text {
-  border: 2px solid var(--brand-red);
+  border: var(--yy-border-width) solid var(--brand-red);
   height: 60vh;
   height: 60dvh;
   background-color: var(--yy-surface);

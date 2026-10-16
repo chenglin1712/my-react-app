@@ -59,7 +59,7 @@
   padding: 0.65rem 1.8rem;
   background: var(--yy-surface);
   color: var(--yy-red);
-  border: 2px solid var(--yy-red);
+  border: var(--yy-border-width) solid var(--yy-red);
   border-radius: var(--yy-radius-btn);
   font-size: 1rem;
   font-weight: 700;
@@ -177,7 +177,7 @@
 
 .sent-option {
   padding: 0.85rem 1rem;
-  border: 2px solid var(--yy-text-muted);
+  border: var(--yy-border-width) solid var(--yy-text-muted);
   border-radius: var(--yy-radius-card);
   background: var(--yy-surface);
   font-size: 0.95rem;

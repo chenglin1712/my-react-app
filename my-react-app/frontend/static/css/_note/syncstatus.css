@@ -39,7 +39,7 @@
 .note-sync__notice,
 .note-sync__failures {
     padding: var(--yy-space-3) var(--yy-space-4);
-    border: 2px solid var(--yy-border);
+    border: var(--yy-border-width) solid var(--yy-border);
     border-radius: var(--yy-radius-btn);
     font-size: var(--yy-text-sm);
     line-height: var(--yy-leading-normal);

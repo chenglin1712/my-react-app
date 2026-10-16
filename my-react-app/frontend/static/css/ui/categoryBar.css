@@ -39,7 +39,7 @@
   background-color: var(--yy-surface);
   cursor: pointer;
   transition: var(--transition-interactive);
-  border: 2px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   font: inherit;
   color: inherit;
 }
@@ -61,13 +61,11 @@
 
 .subcategory-card:hover {
   border-color: var(--yy-gold);
-  box-shadow: var(--yy-shadow-sm);
 }
 
 .subcategory-card.active {
   border-color: var(--yy-red);
   background-color: var(--yy-cream);
-  box-shadow: var(--yy-shadow-sm);
 }
 
 /* 分類列：切換鈕＋「清除分類」並排（審查項 P3-8） */

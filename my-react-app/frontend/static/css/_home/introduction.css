@@ -20,7 +20,6 @@
     background: var(--yy-danger-bg);
     border-left: 6px solid var(--yy-red);
     border-radius: var(--yy-radius-card);
-    box-shadow: var(--yy-shadow-md);
     width: 90%;
 }
 

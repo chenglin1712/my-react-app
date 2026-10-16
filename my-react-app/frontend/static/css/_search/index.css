@@ -23,9 +23,8 @@
   margin: 0 auto;
   padding: 8px 10px;
   background: var(--yy-cream);
-  border: 3px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: var(--yy-radius-card);
-  box-shadow: var(--yy-shadow-sm);
   opacity: 0;
   transform: translateY(-14px);
   pointer-events: none;
@@ -41,7 +40,7 @@
   padding: 4px 10px;
   color: var(--yy-cream);
   background: var(--yy-red);
-  border: 2px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: var(--yy-radius-btn);
   font-size: 13px;
   font-weight: 700;
@@ -88,7 +87,7 @@
 .tribe-btn {
   padding: 9px 18px;
   border-radius: var(--yy-radius-btn);
-  border: 3px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   background: var(--yy-surface);
   color: var(--yy-ink);
   font-size: 15px;
@@ -97,7 +96,6 @@
   cursor: pointer;
   transition: var(--transition-interactive);
   white-space: nowrap;
-  box-shadow: var(--yy-shadow-sm);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -113,8 +111,7 @@
 .tribe-btn.active {
   background: var(--yy-red);
   color: var(--yy-surface);
-  transform: translate(-1px, -1px);
-  box-shadow: 5px 5px 0 rgba(34, 24, 18, 0.45);
+  transform: translateY(-1px);
 }
 
 .tribe-btn.active:active {
@@ -143,7 +140,7 @@
 
 .search-terminal {
   background: linear-gradient(160deg, #264C73, #1B3452);
-  border: 2px solid var(--yy-gold);
+  border: var(--yy-border-width) solid var(--yy-gold);
   border-radius: var(--yy-radius-btn);
   overflow: hidden;
   margin-bottom: 18px;
@@ -222,7 +219,6 @@
   font-weight: 800;
   font-family: var(--yy-font-body);
   margin-bottom: 1.25rem;
-  box-shadow: var(--yy-shadow-lg);
 }
 
 .tribe-empty-title {
@@ -243,10 +239,9 @@
 
 /* ── 查詢結果卡片 ──────────────────────────────── */
 .search-page .list-group-item {
-  border: 3px solid var(--yy-ink) !important;
+  border: var(--yy-border-width) solid var(--yy-ink) !important;
   border-radius: var(--yy-radius-card) !important;
   margin-bottom: 14px;
-  box-shadow: var(--yy-shadow-sm);
   padding: 18px 20px;
 }
 

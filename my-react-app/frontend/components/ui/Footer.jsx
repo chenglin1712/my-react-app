@@ -6,7 +6,7 @@ import { TRIBES } from "../../src/constants/tribes";
 // 兩邊資料自然保持一致。
 const Footer = () => (
   <footer className="yy-footer">
-    <div className="yy-footer__logo">YUAN・YU ◆</div>
+    <div className="yy-footer__logo">YUAN・YU</div>
     <div className="yy-footer__tribes">{TRIBES.map((t) => t.roman).join(' · ')}</div>
     <nav className="yy-footer__links" aria-label="網站資訊">
       <Link to="/help">使用說明</Link>

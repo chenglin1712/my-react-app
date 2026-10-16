@@ -156,7 +156,6 @@ const HomePage = () => {
         <>
             <div className="home-feature-head">
                 <span className="home-feature-tag">{hasFeature ? "現正主打" : "語言預覽"}</span>
-                <span className="home-feature-tag home-feature-tag--deco" aria-hidden="true">◆ ◆ ◆ ◆ ◆</span>
             </div>
             <div className="home-feature-image">
                 {showHeroImage
@@ -190,7 +189,7 @@ const HomePage = () => {
                 </div>
 
                 <div className="yy-fade-up">
-                    <span className="yy-eyebrow yy-eyebrow--zh"><span aria-hidden="true">◆ </span>原住民族語 · 五族共學<span aria-hidden="true"> ◆</span></span>
+                    <span className="yy-eyebrow yy-eyebrow--zh">原住民族語 · 五族共學</span>
                     <h1 className="home-title" aria-label="五族語言，刻進織紋裡的學習旅程">
                         <CharReveal text="五族語言，" start={0} />
                         <br />
@@ -220,7 +219,7 @@ const HomePage = () => {
             <section className="home-tribes-section">
                 <div className="home-tribes-grid">
                     <div className="yy-card yy-fade-up home-tribe-list">
-                        <h2 className="home-tribe-list-title"><span aria-hidden="true">◆ </span>五族語言<span aria-hidden="true"> »</span></h2>
+                        <h2 className="home-tribe-list-title">五族語言<span aria-hidden="true"> »</span></h2>
                         {TRIBES.map((t) => (
                             <button
                                 key={t.slug}

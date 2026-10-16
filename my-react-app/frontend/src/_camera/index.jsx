@@ -87,7 +87,7 @@ const CameraWizard = () => {
         <div className="yy-page camera-page">
             <section className="yy-hero camera-hero">
                 <div className="yy-fade-up">
-                    <span className="yy-eyebrow">◆ VISION MODE ◆</span>
+                    <span className="yy-eyebrow">VISION MODE</span>
                     <h1 className="camera-title">影像辨識</h1>
                     <p className="camera-desc">拍下身邊的物件，讓 AI 找出對應的族語詞彙，打造專屬你的族語單字卡。</p>
                 </div>

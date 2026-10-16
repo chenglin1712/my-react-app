@@ -7,7 +7,6 @@
     padding: 24px;
     background-color: var(--yy-surface);
     border-radius: var(--yy-radius-card);
-    box-shadow: var(--yy-shadow-lg);
     font-family: var(--yy-font-body);
 }
 
@@ -65,7 +64,6 @@
 
 .event-card {
     background-color: var(--yy-surface);
-    box-shadow: var(--yy-shadow-sm);
     border: 1px solid var(--yy-border-soft);
     padding: 10px 12px;
     border-radius: var(--yy-radius-btn);

@@ -1,9 +1,8 @@
 .box-container {
     padding: 20px;
     background-color: var(--yy-surface);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
-    box-shadow: var(--yy-shadow-md);
     /* 固定 280px 在小於 320px 的手機會溢出（審查項 P1-32） */
     width: min(280px, 100%);
     height: fit-content;
@@ -34,7 +33,7 @@
     color: var(--yy-ink);
     -webkit-user-select: none;
     user-select: none;
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
     padding: 8px;
     transition: var(--transition-interactive);
@@ -66,7 +65,7 @@
 .box-question-btn.answer {
     background-color: var(--yy-success-bg);
     color: var(--yy-success);
-    border: 2px solid var(--yy-success);
+    border: var(--yy-border-width) solid var(--yy-success);
 }
 
 @media (hover: hover) and (pointer: fine) {

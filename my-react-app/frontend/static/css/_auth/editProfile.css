@@ -4,7 +4,6 @@
     background: var(--yy-surface);
     padding: 32px;
     border-radius: var(--yy-radius-card);
-    box-shadow: var(--yy-shadow-lg);
     font-family: var(--yy-font-body);
 }
 

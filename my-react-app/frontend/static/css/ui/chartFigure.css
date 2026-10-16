@@ -46,7 +46,7 @@
 .chart-figure-table-wrap {
     max-height: 280px;
     overflow: auto;
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
     background: var(--yy-surface);
 }

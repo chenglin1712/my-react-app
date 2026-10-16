@@ -4,8 +4,7 @@
     border-radius: var(--yy-radius-card, 10px);
     background: var(--yy-surface);
     color: var(--yy-ink);
-    box-shadow: var(--yy-shadow-md, 5px 5px 0 var(--yy-ink));
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
 }
 
 .circle {
@@ -48,7 +47,7 @@
 
 .countdown-box {
     background: var(--yy-cream);
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: 0.75rem;
     padding: 1rem;
     font-variant-numeric: tabular-nums;
@@ -125,7 +124,6 @@
 .schedule-item.current {
     background: var(--yy-surface);
     border-color: var(--yy-gold);
-    box-shadow: var(--yy-shadow-sm);
 }
 
 .schedule-item.past {
@@ -158,11 +156,10 @@
   top: 20px;
   right: 20px;
   background-color: var(--yy-surface);
-  border: 3px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-left: 6px solid var(--yy-gold);
   padding: 1rem 1.5rem;
   border-radius: var(--yy-radius-btn);
-  box-shadow: var(--yy-shadow-md, 5px 5px 0 var(--yy-ink));
   z-index: var(--yy-z-toast);
   width: fixed;
 }

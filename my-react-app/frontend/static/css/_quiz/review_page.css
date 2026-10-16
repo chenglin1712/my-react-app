@@ -8,7 +8,7 @@
 
 .pagination button {
     padding: 6px 12px;
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
     background: white;
     color: var(--yy-ink);

@@ -26,7 +26,7 @@ const SearchHeader = ({
 }) => (
   <div className="search-header-block" ref={headerRef}>
     <div className="search-hero-head yy-fade-up">
-      <span className="yy-eyebrow">◆ SEARCH MODE ◆</span>
+      <span className="yy-eyebrow">SEARCH MODE</span>
       <h1 className="search-hero-title">單詞查詢</h1>
       <p className="search-hero-desc">輸入關鍵字，或直接瀏覽五族語言的完整詞庫。</p>
     </div>

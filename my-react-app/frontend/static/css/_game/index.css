@@ -92,7 +92,6 @@
 }
 
 .gamehub-card.is-selected {
-    box-shadow: 7px 7px 0 var(--yy-gold);
 }
 
 /* 卡片標題裡的按鈕：外觀就是標題，偽元素撐滿整張卡片當點擊範圍 */
@@ -140,7 +139,7 @@
     height: 56px;
     border-radius: var(--yy-radius-btn);
     background: var(--yy-surface);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -183,7 +182,7 @@
     font-family: var(--yy-font-pixel);
     font-size: 12px;
     font-weight: 700;
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
 }
 
 .gamehub-card-badge.active {
@@ -228,12 +227,11 @@
     width: 150px;
     padding: 20px 14px;
     border-radius: var(--yy-radius-card);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     background: var(--yy-surface);
     font: inherit;
     text-align: center;
     cursor: pointer;
-    box-shadow: var(--yy-shadow-sm);
     transition: var(--transition-interactive);
 }
 
@@ -253,7 +251,6 @@
 }
 
 .gamehub-tribe-card.is-selected {
-    box-shadow: 5px 5px 0 var(--yy-gold);
     transform: scale(1.05);
 }
 

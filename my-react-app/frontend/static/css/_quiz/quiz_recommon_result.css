@@ -3,9 +3,8 @@
   margin: 40px auto;
   background: var(--yy-surface);
   padding: 30px;
-  border: 3px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: var(--yy-radius-card);
-  box-shadow: var(--yy-shadow-lg);
   text-align: center;
   animation: recommon-result-fade-in 0.5s ease;
 }
@@ -35,7 +34,7 @@
 
 .stat-card {
   background: var(--yy-cream-dim);
-  border: 2px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: var(--yy-radius-card);
   padding: 15px 25px;
   flex: 1;
@@ -62,7 +61,7 @@
   margin: 20px 0;
   padding: 15px;
   background: var(--yy-cream-dim);
-  border: 2px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-left: 6px solid var(--yy-red);
   border-radius: var(--yy-radius-card);
 }
@@ -93,11 +92,10 @@
   align-items: center;
   gap: 6px;
   padding: 12px 20px;
-  border: 3px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: var(--yy-radius-btn);
   font-weight: bold;
   cursor: pointer;
-  box-shadow: var(--yy-shadow-sm);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -113,8 +111,6 @@
 
 @media (hover: hover) and (pointer: fine) {
   .retry-btn:hover, .review-btn:hover {
-    transform: translate(2px, 2px);
-    box-shadow: 1px 1px 0 var(--yy-ink);
   }
 }
 
@@ -143,7 +139,7 @@
   margin: 20px 0;
   padding: 15px;
   background: var(--yy-cream-dim);
-  border: 2px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-left: 6px solid var(--yy-blue);
   border-radius: var(--yy-radius-card);
 }

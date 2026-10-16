@@ -80,7 +80,7 @@
   padding: 0.65rem 1.8rem;
   background: var(--yy-surface);
   color: var(--yy-red);
-  border: 2px solid var(--yy-red);
+  border: var(--yy-border-width) solid var(--yy-red);
   border-radius: var(--yy-radius-btn);
   font-size: 1rem;
   font-weight: 700;
@@ -111,7 +111,7 @@
   padding: 0.5rem 1.4rem;
   color: var(--yy-red);
   text-decoration: none;
-  border: 2px solid var(--yy-red);
+  border: var(--yy-border-width) solid var(--yy-red);
   border-radius: var(--yy-radius-btn);
   font-size: 0.9rem;
   font-weight: 700;
@@ -238,7 +238,6 @@
   border: none;
   font-size: 2rem;
   cursor: pointer;
-  box-shadow: var(--yy-shadow-md);
   transition: background 0.18s, transform 0.15s;
 }
 .pron-mic-btn span {

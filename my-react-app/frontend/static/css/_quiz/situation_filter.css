@@ -14,7 +14,7 @@
   padding: 4px 12px;
   font-size: 13px;
   font-weight: bold;
-  border: 2px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: var(--yy-radius-btn);
   background-color: var(--yy-surface);
   color: var(--yy-ink);
@@ -34,7 +34,7 @@
 .filter-date-input {
   padding: 6px 10px;
   font-size: 14px;
-  border: 2px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: var(--yy-radius-btn);
   background-color: var(--yy-surface);
   transition: var(--transition-interactive);
@@ -55,7 +55,7 @@
 .filter-select {
   padding: 6px 10px;
   font-size: 14px;
-  border: 2px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: var(--yy-radius-btn);
   background-color: var(--yy-surface);
   cursor: pointer;

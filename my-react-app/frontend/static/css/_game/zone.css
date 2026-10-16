@@ -33,7 +33,7 @@
 .zone-card {
   background: var(--yy-surface);
   border-radius: var(--yy-radius-lg);
-  border: 2px solid var(--yy-border-soft);
+  border: var(--yy-border-width) solid var(--yy-border-soft);
   padding: 1.5rem 1.25rem 1.25rem;
   display: flex;
   flex-direction: column;
@@ -55,7 +55,6 @@
 @media (hover: hover) and (pointer: fine) {
   .zone-card.available:hover {
     transform: translateY(-4px);
-    box-shadow: var(--yy-shadow-lg);
   }
 }
 

@@ -25,9 +25,8 @@
   align-items: center;
 
   background: var(--yy-surface);
-  border: 3px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: var(--yy-radius-card);
-  box-shadow: var(--yy-shadow-lg);
 }
 
 .recommon-progress {
@@ -36,7 +35,7 @@
   height: 12px;
   margin-bottom: 16px;
   background: var(--yy-cream-dim);
-  border: 2px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -62,7 +61,7 @@
 
 /* ---------------- 通用按鈕樣式 ---------------- */
 .custom-btn, .custom0-btn, .confirm-btn {
-  border: 2px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: var(--yy-radius-btn);
   font-weight: bold;
   cursor: pointer;
@@ -133,7 +132,6 @@
   border-color: var(--yy-ink);
   min-width: 200px;
   padding: 10px 24px;
-  box-shadow: var(--yy-shadow-sm);
 }
 
 .confirm-btn:hover {

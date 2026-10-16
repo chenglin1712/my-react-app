@@ -19,7 +19,7 @@ const QuizTribeSelect = () => {
     <Container>
       <div className="zone-page">
         <div className="zone-header">
-          <span className="yy-eyebrow">◆ QUIZ MODE ◆</span>
+          <span className="yy-eyebrow">QUIZ MODE</span>
           <h1 className="zone-title" style={{ marginTop: 12 }}>測驗</h1>
           <p className="zone-subtitle">選擇族語與等級，開始自適應測驗學習。</p>
           <div style={{ marginTop: 28, marginBottom: 8 }}>

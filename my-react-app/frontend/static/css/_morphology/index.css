@@ -5,10 +5,9 @@
 
 .yy-morph-panel {
     margin: 16px 0;
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
     background: var(--yy-surface);
-    box-shadow: var(--yy-shadow-sm);
 }
 
 .yy-morph-toggle {
@@ -49,7 +48,7 @@
     flex: 1 1 200px;
     min-width: 0;
     padding: 8px 12px;
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
     font-size: 15px;
 }
@@ -59,7 +58,7 @@
 }
 .yy-morph-go {
     padding: 8px 18px;
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
     background: var(--yy-gold);
     color: var(--yy-ink);
@@ -80,7 +79,7 @@
 .yy-morph-error {
     margin: 10px 0 0;
     padding: 8px 12px;
-    border: 2px solid var(--yy-red);
+    border: var(--yy-border-width) solid var(--yy-red);
     border-radius: var(--yy-radius-btn);
     background: var(--yy-danger-bg);
     color: var(--yy-red);
@@ -129,7 +128,7 @@
 
 .yy-morph-candidate {
     padding: 12px 14px;
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-left-width: 6px;
     border-radius: var(--yy-radius-btn);
     background: var(--yy-cream);
@@ -176,7 +175,7 @@
 }
 .yy-morph-seg {
     padding: 2px 6px;
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     margin-right: -2px;
 }
 .yy-morph-seg-root { background: var(--yy-surface); }
@@ -262,7 +261,7 @@
 .yy-morph-inline-btn {
     margin-top: 8px;
     padding: 4px 12px;
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
     background: var(--yy-surface);
     font-size: 13px;

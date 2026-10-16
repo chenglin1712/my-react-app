@@ -82,8 +82,8 @@ const SituationLine = ({ data }) => {
                 contentStyle={{
                   backgroundColor: "#ffffff",
                   borderRadius: 8,
-                  border: "2px solid #221812",
-                  boxShadow: "3px 3px 0 #221812",
+                  border: "1.5px solid #221812",
+                  boxShadow: "0 10px 30px rgba(41, 45, 49, 0.18)",
                   fontSize: 13,
                 }}
                 labelStyle={{ color: "#221812", fontWeight: 600 }}

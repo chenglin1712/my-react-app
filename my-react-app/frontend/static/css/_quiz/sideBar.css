@@ -7,9 +7,8 @@
 
     overflow: hidden;
     background: var(--yy-surface);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
-    box-shadow: var(--yy-shadow-md);
 }
 
 .bar-title {
@@ -119,22 +118,19 @@
 
     color: var(--yy-red);
     background: var(--yy-gold);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
-    box-shadow: var(--yy-shadow-md);
     cursor: pointer;
     transition: transform .15s ease, box-shadow .15s ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .mobile-menu-button:hover {
-      transform: translate(2px, 2px);
-      box-shadow: var(--yy-shadow-sm);
   }
 }
 
 .mobile-menu-button:active {
-  transform: translate(4px, 4px);
+  transform: scale(0.97);
   box-shadow: none;
 }
 
@@ -148,7 +144,7 @@
 
     color: var(--yy-gold);
     background: var(--yy-red);
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: 3px;
     display: flex;
     align-items: center;
@@ -164,9 +160,8 @@
     padding: 16px;
 
     background: var(--yy-surface);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
-    box-shadow: var(--yy-shadow-lg);
 }
 
 .mobile-menu-header {
@@ -206,7 +201,7 @@
     align-items: center;
     gap: 12px;
     padding: 10px;
-    border: 2px solid transparent;
+    border: var(--yy-border-width) solid transparent;
     border-radius: var(--yy-radius-btn);
     cursor: pointer;
     transition: background .2s ease, border-color .2s ease;

@@ -21,7 +21,7 @@
     height: 70px;
     border-radius: 50%;
     object-fit: cover;
-    border: 2px solid var(--yy-border-soft);
+    border: var(--yy-border-width) solid var(--yy-border-soft);
 }
 
 .profile-info h3 {
@@ -129,7 +129,6 @@
     background-color: var(--yy-surface);
     color: var(--yy-red);
     border-right: 4px solid var(--yy-red);
-    box-shadow: var(--yy-shadow-sm);
 }
 
 .nav-content {
@@ -166,7 +165,6 @@
     background-color: var(--yy-cream);
     padding: 16px;
     border-radius: var(--yy-radius-card);
-    box-shadow: var(--yy-shadow-sm);
     border-right: 3px solid var(--yy-red);
 }
 
@@ -209,7 +207,6 @@
     border-radius: var(--yy-radius-btn);
     padding: 12px 16px;
     background-color: var(--yy-surface);
-    box-shadow: var(--yy-shadow-sm);
 }
 
 .word-info {

@@ -69,9 +69,8 @@
     display: flex;
     flex-direction: column;
     background-color: var(--yy-cream);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-lg);
-    box-shadow: var(--yy-shadow-lg);
 }
 
 /* 懸浮視窗只有 400px 寬：單詞庫提示與輸入列依視窗寬度縮小，不再是全螢幕的尺寸 */
@@ -196,7 +195,6 @@
 .user .message-bubble {
     background: linear-gradient(135deg, var(--yy-red), var(--yy-red-dark));
     border-top-right-radius: 4px;
-    box-shadow: var(--yy-shadow-sm);
     position: relative;
 }
 

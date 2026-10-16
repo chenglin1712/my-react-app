@@ -80,9 +80,8 @@
     padding: 10px 12px;
     background-color: var(--yy-red);
     color: white;
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
-    box-shadow: var(--yy-shadow-sm);
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
@@ -103,9 +102,8 @@
     padding: 10px 12px;
     background-color: white;
     color: var(--yy-red);
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
-    box-shadow: var(--yy-shadow-sm);
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
@@ -131,8 +129,7 @@
     background: white;
     border-radius: var(--yy-radius-card);
     padding: 16px 20px;
-    border: 2px solid var(--yy-ink);
-    box-shadow: var(--yy-shadow-sm);
+    border: var(--yy-border-width) solid var(--yy-ink);
 }
 
 .card-left {
@@ -154,7 +151,7 @@
     border-radius: var(--yy-radius-btn);
     font-size: 18px;
     font-weight: 700;
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
 }
 
 /* 活動資訊 */
@@ -206,7 +203,7 @@
     padding: 6px 10px;
     background-color: white;
     color: var(--yy-red);
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
     font-size: 14px;
     font-weight: 600;

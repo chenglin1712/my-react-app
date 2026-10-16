@@ -36,9 +36,8 @@
     width: 100%;
     padding: 24px;
     background-color: var(--yy-surface);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-card, 10px);
-    box-shadow: var(--yy-shadow-md, 5px 5px 0 var(--yy-ink));
 }
 
 .exam-title {

@@ -13,7 +13,7 @@ const PermissionProtect = () => {
         <div className="yy-page permission-page">
             <section className="yy-hero permission-hero">
                 <div className="yy-card permission-card">
-                    <span className="yy-eyebrow">◆ MEMBER ONLY ◆</span>
+                    <span className="yy-eyebrow">MEMBER ONLY</span>
                     <div className="permission-lock" aria-hidden="true">
                         <span /><span /><span />
                     </div>

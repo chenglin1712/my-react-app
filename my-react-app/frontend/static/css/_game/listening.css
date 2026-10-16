@@ -97,7 +97,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--yy-shadow-md);
   transition: background 0.18s, transform 0.15s;
 }
 @media (hover: hover) and (pointer: fine) {
@@ -136,7 +135,7 @@
 }
 .listening-option {
   padding: 0.85rem 0.75rem;
-  border: 2px solid var(--yy-text-muted);
+  border: var(--yy-border-width) solid var(--yy-text-muted);
   border-radius: var(--yy-radius-card);
   background: var(--yy-surface);
   font-size: 0.95rem;
@@ -268,7 +267,7 @@
   padding: 0.65rem 1.8rem;
   background: var(--yy-surface);
   color: var(--yy-red);
-  border: 2px solid var(--yy-red);
+  border: var(--yy-border-width) solid var(--yy-red);
   border-radius: var(--yy-radius-btn);
   font-size: 1rem;
   font-weight: 700;

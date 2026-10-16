@@ -27,7 +27,7 @@
     align-items: center;
     gap: 10px;
     background: var(--yy-surface);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
     padding: 10px 16px;
 }
@@ -72,23 +72,20 @@
     color: var(--yy-cream);
     font-size: 15px;
     font-weight: 700;
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
-    box-shadow: 4px 4px 0 var(--yy-ink);
     transition: transform 0.15s ease, background 0.15s ease;
     width: 100%;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .login-button:hover:not(:disabled) {
-      transform: translate(2px, 2px);
-      box-shadow: 2px 2px 0 var(--yy-ink);
       background-color: var(--yy-red-dark);
   }
 }
 
 .login-button:active:not(:disabled) {
-  transform: translate(4px, 4px);
+  transform: scale(0.97);
   box-shadow: none;
 }
 

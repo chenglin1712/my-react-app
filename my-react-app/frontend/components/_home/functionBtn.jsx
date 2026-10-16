@@ -87,9 +87,7 @@ const FunctionBtn = ({ enabled = DEFAULT_ENABLED, isGuest = false }) => {
                         >
                             <div className="card-head" style={{ background: card.headerBg }}>
                                 <span className="card-tag" aria-hidden="true">{card.tag}</span>
-                                {showMember
-                                    ? <span className="card-member" id={memberId}>會員</span>
-                                    : <span className="card-diamonds" aria-hidden="true">◆ ◆ ◆</span>}
+                                {showMember && <span className="card-member" id={memberId}>會員</span>}
                             </div>
                             <div className="card-content">
                                 <div className="card-letter" aria-hidden="true">{card.letter}</div>

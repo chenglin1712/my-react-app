@@ -24,9 +24,8 @@
     box-sizing: border-box;
     padding: 16px;
     background: var(--yy-surface);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
-    box-shadow: var(--yy-shadow-sm);
 }
 
 .situation-card-title {
@@ -69,9 +68,8 @@
 .situation-tooltip-box {
     background-color: var(--yy-surface);
     padding: 12px;
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
-    box-shadow: var(--yy-shadow-sm);
 }
 
 .situation-tooltip-title {

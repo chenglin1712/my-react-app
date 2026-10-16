@@ -1,9 +1,8 @@
 .judy-situation-line-container {
     font-family: var(--yy-font-body);
     background: var(--yy-surface);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
-    box-shadow: var(--yy-shadow-sm);
     padding: 20px;
     box-sizing: border-box;
 }

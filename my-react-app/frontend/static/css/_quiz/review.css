@@ -19,14 +19,13 @@
     color: var(--yy-cream);
 
     background: var(--yy-red);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
-    box-shadow: var(--yy-shadow-sm);
 }
 
 .review-intro-btn {
     background: var(--yy-surface);
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
     color: var(--yy-ink);
     padding: 6px 12px;
@@ -44,11 +43,10 @@
 .review-intro-box {
     background: var(--yy-surface);
     color: var(--yy-ink);
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     padding: 10px 14px;
     border-radius: var(--yy-radius-btn);
     margin-top: 10px;
-    box-shadow: var(--yy-shadow-sm);
     position: absolute;
     top: 80%;
     right: 0;
@@ -150,7 +148,7 @@
     width: 100%;
     border-collapse: collapse;
     background-color: var(--yy-surface);
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
     overflow: hidden;
 }
@@ -173,7 +171,7 @@
 
 .view-btn {
     padding: 6px 12px;
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     background: var(--yy-surface);
     color: var(--yy-ink);
     border-radius: var(--yy-radius-btn);
@@ -213,7 +211,7 @@
 
 .back-btn {
     background: var(--yy-surface);
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     padding: 6px 12px;
     border-radius: var(--yy-radius-btn);
     cursor: pointer;
@@ -235,16 +233,15 @@
 
 .quiz-question-detail {
     flex: 1.5;
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     padding: 12px;
     border-radius: var(--yy-radius-card);
     background: var(--yy-surface);
-    box-shadow: var(--yy-shadow-sm);
 }
 
 .review-q {
     background: var(--yy-surface);
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
     padding: 16px 20px;
     height: 85%;
@@ -253,7 +250,7 @@
 
 .review-q-btn {
     margin-top: 8px;
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
     background: var(--yy-red);
     color: var(--yy-surface);
@@ -300,7 +297,7 @@
 .review-question-body .question-content .play-btn {
     background: var(--yy-gold);
     color: var(--yy-ink);
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     display: flex;
     align-items: center;
     transition: var(--transition-interactive);
@@ -321,7 +318,7 @@
 
 .review-question-body img {
     border-radius: var(--yy-radius-btn);
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
 }
 
 .answer-row {
@@ -360,13 +357,13 @@
 
 .option-img-wrapper {
     position: relative;
-    border: 2px solid transparent;
+    border: var(--yy-border-width) solid transparent;
     border-radius: var(--yy-radius-btn);
     padding: 2px;
 }
 
 .option-img-wrapper.user-choice {
-    border: 3px solid var(--yy-gold);
+    border: var(--yy-border-width) solid var(--yy-gold);
 }
 
 .option-img {

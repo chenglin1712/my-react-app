@@ -17,7 +17,6 @@
   height: 100%;
   transition: transform var(--dur-flip) var(--ease-in-out);
   transform-style: preserve-3d;
-  box-shadow: var(--yy-shadow-sm);
   border-radius: 1rem;
 }
 
@@ -38,11 +37,11 @@
 }
 
 .game-result-card.correct .game-result-card-front {
-  border: 2px solid var(--yy-green);
+  border: var(--yy-border-width) solid var(--yy-green);
 }
 
 .game-result-card.incorrect .game-result-card-front {
-  border: 2px solid var(--yy-red);
+  border: var(--yy-border-width) solid var(--yy-red);
 }
 
 .game-result-card-front h5 {

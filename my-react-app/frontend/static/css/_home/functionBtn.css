@@ -30,9 +30,8 @@
     text-decoration: none;
     color: inherit;
     background: var(--yy-surface);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
-    box-shadow: var(--yy-shadow-md);
     min-width: 0;
     overflow: hidden;
     cursor: pointer;
@@ -58,20 +57,13 @@
     border-radius: var(--yy-radius-btn);
 }
 
-.card-diamonds {
-    color: var(--yy-gold);
-    background: var(--yy-ink);
-    padding: 2px 10px;
-    border-radius: var(--yy-radius-btn);
-}
-
 /* 需要登入的功能，訪客看到的標記（文字 + 邊框，不只靠顏色） */
 .card-member {
     font-family: var(--yy-font-pixel);
     font-size: var(--yy-text-xs);
     padding: 2px var(--yy-space-2);
     background: var(--yy-cream);
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
     color: var(--yy-ink);
 }
@@ -86,7 +78,7 @@
     height: 44px;
     border-radius: var(--yy-radius-btn);
     background: var(--yy-cream);
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     display: flex;
     align-items: center;
     justify-content: center;

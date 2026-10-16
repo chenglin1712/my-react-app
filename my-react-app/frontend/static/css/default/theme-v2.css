@@ -46,9 +46,16 @@
   /* 次要分隔線、停用底色、進度條軌道；比 --yy-border 淡，不用在需要 3:1 對比的控制項邊框 */
   --yy-border-soft: #DDD0C4;
   --yy-radius-btn: 6px;
+  /* 舊的硬偏移陰影（Y2K 風格）。沉穩文藝風格沒有這種陰影（S1-3）：前台樣式已全部不再引用下面三個 token，
+     只剩後台登入頁還在用，後台不在這一階段範圍，所以值先原封不動，後台改版（階段 G）時連同 token 一起刪除。
+     前台新增樣式不要用它們。 */
   --yy-shadow-sm: 3px 3px 0 var(--yy-ink);
   --yy-shadow-md: 5px 5px 0 var(--yy-ink);
   --yy-shadow-lg: 7px 7px 0 var(--yy-ink);
+  /* 全站唯一的陰影：只給浮在頁面上的容器（彈窗、下拉選單、提示），色相取自深石板，不用純黑 */
+  --yy-shadow-overlay: 0 10px 30px rgba(41, 45, 49, 0.18);
+  /* 細框一律 1.5px（DESIGN.md）。色塊分隔用的粗邊（border-left 4px 以上的強調條）不受影響 */
+  --yy-border-width: 1.5px;
 
   /* 語意狀態色（測驗答題對/錯/已選等）—— 沿用既有色相，只補淡色底供
      文字色塊使用，不另外發明新色系。 */
@@ -499,7 +506,7 @@
   padding: 6px 18px;
   border-radius: var(--yy-radius-btn);
   background: var(--yy-ink);
-  border: 2px solid var(--yy-gold);
+  border: var(--yy-border-width) solid var(--yy-gold);
   font-family: var(--yy-font-pixel);
   font-size: 12px;
   letter-spacing: 0.12em;
@@ -523,17 +530,15 @@
 
 .yy-card {
   background: var(--yy-surface);
-  border: 3px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: var(--yy-radius-card);
-  box-shadow: var(--yy-shadow-md);
 }
 .yy-card--hover {
   transition: transform .2s ease, box-shadow .2s ease;
 }
 @media (hover: hover) and (pointer: fine) {
   .yy-card--hover:hover {
-    transform: translate(-2px, -2px);
-    box-shadow: 8px 8px 0 var(--yy-ink);
+    transform: translateY(-2px);
   }
 }
 
@@ -544,19 +549,16 @@
 .yy-btn-primary {
   padding: 14px;
   border-radius: var(--yy-radius-btn);
-  border: 3px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   background: var(--yy-red);
   color: var(--yy-cream);
   font-weight: 700;
   font-size: 15px;
   cursor: pointer;
-  box-shadow: 4px 4px 0 var(--yy-ink);
   transition: transform .15s ease, background .15s ease;
 }
 @media (hover: hover) and (pointer: fine) {
   .yy-btn-primary:hover {
-    transform: translate(2px, 2px);
-    box-shadow: 2px 2px 0 var(--yy-ink);
     background: var(--yy-red-dark);
     /* animation 的優先序高於一般宣告：脈動會一直蓋掉這裡縮小後的陰影（審查項 P1-28） */
     animation: none;
@@ -564,7 +566,7 @@
 }
 
 .yy-btn-primary:active {
-  transform: translate(4px, 4px);
+  transform: scale(0.97);
   box-shadow: none;
   animation: none;
 }
@@ -577,7 +579,7 @@
 .yy-btn-outline {
   padding: 11px 18px;
   border-radius: var(--yy-radius-btn);
-  border: 3px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   background: var(--yy-surface);
   color: var(--yy-ink);
   font-weight: 700;
@@ -600,19 +602,17 @@
   border-radius: var(--yy-radius-btn);
   background: var(--yy-surface);
   color: var(--yy-ink);
-  border: 3px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   font-weight: 700;
   font-size: 14px;
   cursor: pointer;
-  box-shadow: var(--yy-shadow-sm);
   transform: scale(1);
   transition: var(--transition-interactive);
 }
 .yy-pill.active {
   color: var(--yy-surface);
   /* 選取狀態不放大（scale 1.06 會壓到相鄰的膠囊，縮放過程文字邊緣也會糊），改成往左上位移並加深陰影 */
-  transform: translate(-1px, -1px);
-  box-shadow: 5px 5px 0 rgba(34, 24, 18, 0.45);
+  transform: translateY(-1px);
 }
 
 /* ---------- 步驟流程條 (StepBar) ---------- */
@@ -661,9 +661,8 @@
   inset: 0;
   z-index: -1;
   border-radius: var(--yy-radius-btn);
-  border: 3px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   background: var(--yy-surface);
-  box-shadow: var(--yy-shadow-sm);
   transform: rotate(45deg);
   transition: background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
@@ -676,7 +675,6 @@
   background: var(--yy-red);
 }
 .yy-step-diamond.active::before {
-  box-shadow: 4px 4px 0 var(--yy-gold);
 }
 .yy-step-label {
   font-size: 12px;
@@ -696,10 +694,9 @@
 
 .yy-tabswitch {
   display: inline-flex;
-  border: 3px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: var(--yy-radius-btn);
   overflow: hidden;
-  box-shadow: var(--yy-shadow-md);
 }
 .yy-tabswitch__tab {
   padding: 11px 28px;
@@ -738,7 +735,7 @@
   inset: 0;
   z-index: -1;
   border-radius: var(--yy-radius-btn);
-  border: 2px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   background: var(--yy-diamond-color, var(--yy-red));
   transform: rotate(45deg);
 }
@@ -750,7 +747,7 @@
   gap: 10px;
   align-items: center;
   background: linear-gradient(160deg, #264C73, #1B3452);
-  border: 2px solid var(--yy-gold);
+  border: var(--yy-border-width) solid var(--yy-gold);
   border-radius: var(--yy-radius-btn);
   padding: 14px 18px;
 }
@@ -791,9 +788,9 @@
 .yy-modal-box {
   animation: yy-pop 240ms var(--ease-out) both;
   background: var(--yy-surface);
-  border: 4px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: var(--yy-radius-lg);
-  box-shadow: 8px 8px 0 var(--yy-ink);
+  box-shadow: var(--yy-shadow-overlay);
   padding: 40px 50px;
   text-align: center;
   max-width: 90vw;
@@ -812,7 +809,7 @@
   background: linear-gradient(160deg, var(--yy-gold), var(--yy-gold-light), var(--yy-gold));
   background-size: 300% 300%;
   animation: yy-holo 3s linear infinite;
-  border: 3px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -925,9 +922,9 @@
     flex-direction: column;
     align-items: center;
     background-color: var(--yy-surface);
-    border: 4px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-lg);
-    box-shadow: 8px 8px 0 var(--yy-ink);
+    box-shadow: var(--yy-shadow-overlay);
     padding: 30px 24px;
     width: 260px;
 }

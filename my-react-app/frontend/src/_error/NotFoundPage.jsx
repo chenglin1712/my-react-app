@@ -8,7 +8,7 @@ export default function NotFoundPage() {
     <div className="yy-page notfound-page">
       <section className="yy-hero notfound-hero">
         <div className="yy-card notfound-panel">
-          <span className="yy-eyebrow">◆ ERROR 404 ◆</span>
+          <span className="yy-eyebrow">ERROR 404</span>
           <p className="notfound-code" aria-hidden="true">404</p>
           <h1>找不到這個頁面</h1>
           <p className="notfound-text">網址可能輸入錯誤，或這個頁面已經搬到別的地方。</p>

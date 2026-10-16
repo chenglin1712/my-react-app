@@ -119,7 +119,7 @@
 .pron-community-spinner {
   width: 1.2rem;
   height: 1.2rem;
-  border: 2px solid var(--yy-danger-bg);
+  border: var(--yy-border-width) solid var(--yy-danger-bg);
   border-top-color: var(--yy-red);
   border-radius: 50%;
   animation: pron-community-spin 0.75s linear infinite;
@@ -154,7 +154,6 @@
   background: var(--yy-surface);
   border: 1px solid var(--yy-border-soft);
   border-radius: var(--yy-radius-lg);
-  box-shadow: var(--yy-shadow-lg);
 }
 
 .pron-community-group-heading {
@@ -258,7 +257,6 @@
   padding: 1.4rem;
   background: var(--yy-surface);
   border-radius: var(--yy-radius-lg);
-  box-shadow: var(--yy-shadow-lg);
 }
 
 .pron-community-modal-heading {

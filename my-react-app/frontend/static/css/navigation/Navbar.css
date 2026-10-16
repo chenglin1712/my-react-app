@@ -125,7 +125,7 @@
     color: var(--yy-cream);
     padding: 9px 16px;
     border-radius: var(--yy-radius-btn);
-    border: 2px solid transparent;
+    border: var(--yy-border-width) solid transparent;
     font-size: 14px;
     font-weight: 600;
     font-family: var(--yy-font-body);
@@ -181,7 +181,7 @@
     font-family: var(--yy-font-body);
     background-color: transparent;
     color: var(--yy-cream);
-    border: 2px solid transparent;
+    border: var(--yy-border-width) solid transparent;
     transition: border-color 0.2s;
     text-align: left;
 }
@@ -203,7 +203,7 @@
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
-    border: 2px solid var(--yy-gold);
+    border: var(--yy-border-width) solid var(--yy-gold);
 }
 
 .auth-container p {
@@ -236,7 +236,7 @@
     font-weight: 600;
     padding: 10px 16px;
     border-radius: var(--yy-radius-btn);
-    border: 2px solid transparent;
+    border: var(--yy-border-width) solid transparent;
     transition: border-color 0.2s;
     margin-bottom: 4px;
 }
@@ -284,7 +284,7 @@
     font-family: var(--yy-font-body);
     background-color: transparent;
     color: var(--yy-cream);
-    border: 2px solid var(--yy-gold);
+    border: var(--yy-border-width) solid var(--yy-gold);
     transition: background-color 0.3s;
     text-align: left;
 }
@@ -305,7 +305,7 @@
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
-    border: 2px solid var(--yy-gold);
+    border: var(--yy-border-width) solid var(--yy-gold);
 }
 
 /* userSidebar */
@@ -390,11 +390,10 @@
     left: 0;
     margin-top: 0;
     background-color: var(--yy-ink);
-    border: 2px solid var(--yy-gold);
+    border: var(--yy-border-width) solid var(--yy-gold);
     min-width: 150px;
     z-index: var(--yy-z-dropdown);
     border-radius: var(--yy-radius-btn);
-    box-shadow: var(--yy-shadow-md);
     flex-direction: column;
     overflow: hidden;
     opacity: 0;

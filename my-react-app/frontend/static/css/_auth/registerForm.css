@@ -67,14 +67,13 @@
     border-radius: var(--yy-radius-btn);
     padding: 10px 16px;
     width: 100%;
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     box-sizing: border-box;
     transition: box-shadow 0.2s;
 }
 
 .input-wrapper:hover,
 .input-wrapper:focus-within {
-    box-shadow: var(--yy-shadow-sm);
 }
 
 /* 鍵盤聚焦要看得出來：只靠陰影位移太弱，跟登入表單一樣在外層畫出焦點框 */
@@ -134,26 +133,23 @@
 .register-button {
     background: var(--yy-red);
     color: var(--yy-cream);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     padding: 14px;
     font-size: 15px;
     font-weight: 700;
     border-radius: var(--yy-radius-btn);
     cursor: pointer;
-    box-shadow: 4px 4px 0 var(--yy-ink);
     transition: transform 0.15s ease, background 0.15s ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .register-button:hover:not(:disabled) {
-      transform: translate(2px, 2px);
-      box-shadow: 2px 2px 0 var(--yy-ink);
       background: var(--yy-red-dark);
   }
 }
 
 .register-button:active:not(:disabled) {
-  transform: translate(4px, 4px);
+  transform: scale(0.97);
   box-shadow: none;
 }
 

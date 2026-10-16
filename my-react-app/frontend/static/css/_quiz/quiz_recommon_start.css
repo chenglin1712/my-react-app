@@ -3,9 +3,8 @@
   margin: 80px auto;
   background: var(--yy-surface);
   padding: 40px 30px;
-  border: 3px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: var(--yy-radius-card);
-  box-shadow: var(--yy-shadow-lg);
   text-align: center;
   animation: recommon-start-fade-in 0.6s ease;
 }
@@ -39,9 +38,8 @@
   border-radius: var(--yy-radius-btn);
   font-weight: bold;
   font-size: 16px;
-  border: 3px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   cursor: pointer;
-  box-shadow: var(--yy-shadow-sm);
   transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease;
 }
 
@@ -53,8 +51,6 @@
 @media (hover: hover) and (pointer: fine) {
   .start-btn.primary:hover {
     background: var(--yy-red-dark);
-    transform: translate(2px, 2px);
-    box-shadow: 1px 1px 0 var(--yy-ink);
   }
 }
 
@@ -66,8 +62,6 @@
 @media (hover: hover) and (pointer: fine) {
   .start-btn.secondary:hover {
     background: var(--yy-cream);
-    transform: translate(2px, 2px);
-    box-shadow: 1px 1px 0 var(--yy-ink);
   }
 }
 

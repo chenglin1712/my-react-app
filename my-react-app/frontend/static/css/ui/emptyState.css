@@ -2,10 +2,9 @@
 .yy-empty {
   margin: 24px 0;
   padding: 24px 20px;
-  border: 3px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: var(--yy-radius-card, 12px);
   background: var(--yy-surface);
-  box-shadow: 4px 4px 0 var(--yy-ink);
 }
 
 .yy-empty__title {

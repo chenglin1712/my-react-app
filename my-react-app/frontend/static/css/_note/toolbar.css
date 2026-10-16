@@ -69,7 +69,7 @@
   inset: 6px;
   border-radius: 50%;
   background: var(--swatch);
-  border: 2px solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-ink);
   box-sizing: border-box;
 }
 .editor-toolbar .color-box[aria-pressed="true"]::before {

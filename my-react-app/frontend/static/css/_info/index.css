@@ -27,7 +27,7 @@
     margin: 0 0 var(--yy-space-5);
     padding: var(--yy-space-3) var(--yy-space-4);
     background: var(--yy-warning-bg);
-    border: 2px solid var(--yy-border);
+    border: var(--yy-border-width) solid var(--yy-border);
     border-radius: var(--yy-radius-btn);
     color: var(--yy-ink);
     font-size: var(--yy-text-sm);

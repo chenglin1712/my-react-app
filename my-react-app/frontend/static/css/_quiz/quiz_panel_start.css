@@ -13,9 +13,8 @@
     box-sizing: border-box;
 
     background: var(--yy-cream-dim);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
-    box-shadow: var(--yy-shadow-md);
 }
 
 .panel-subtitle {
@@ -40,9 +39,8 @@
     padding: 18px 12px 14px;
 
     background: var(--yy-surface);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-card);
-    box-shadow: var(--yy-shadow-sm);
 
     display: flex;
     flex-direction: column;
@@ -52,8 +50,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .level-card:not(.disabled):hover {
-      transform: translate(-2px, -2px);
-      box-shadow: var(--yy-shadow-md);
+      transform: translateY(-2px);
   }
 }
 
@@ -73,8 +70,7 @@
     width: 72px;
     height: 72px;
     border-radius: 50%;
-    border: 3px solid var(--yy-ink);
-    box-shadow: var(--yy-shadow-sm);
+    border: var(--yy-border-width) solid var(--yy-ink);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -140,9 +136,8 @@
 
     color: var(--yy-cream);
     background: var(--yy-red);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
-    box-shadow: var(--yy-shadow-sm);
     font-weight: 700;
     cursor: pointer;
     transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
@@ -152,13 +147,11 @@
   .level-card-btn:hover {
       color: var(--yy-cream);
       background: var(--yy-red-dark);
-      transform: translate(2px, 2px);
-      box-shadow: 1px 1px 0 var(--yy-ink);
   }
 }
 
 .level-card-btn:active {
-  transform: translate(4px, 4px);
+  transform: scale(0.97);
   box-shadow: none;
 }
 
@@ -183,10 +176,9 @@
     padding: 22px 24px;
 
     background: var(--yy-blue);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-left: 10px solid var(--yy-gold);
     border-radius: var(--yy-radius-card);
-    box-shadow: var(--yy-shadow-md);
 }
 
 .scenario-entry h3 {
@@ -209,7 +201,7 @@
     padding: 4px 9px;
     color: var(--yy-ink);
     background: var(--yy-gold);
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: 3px;
     font-family: var(--yy-font-pixel);
     font-size: 14px;
@@ -221,9 +213,8 @@
     padding: 11px 16px;
     color: var(--yy-cream);
     background: var(--yy-red);
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
-    box-shadow: var(--yy-shadow-sm);
     font-weight: 700;
     cursor: pointer;
     transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
@@ -233,13 +224,11 @@
   .scenario-entry-btn:hover {
       color: var(--yy-cream);
       background: var(--yy-red-dark);
-      transform: translate(2px, 2px);
-      box-shadow: 1px 1px 0 var(--yy-ink);
   }
 }
 
 .scenario-entry-btn:active {
-  transform: translate(4px, 4px);
+  transform: scale(0.97);
   box-shadow: none;
 }
 

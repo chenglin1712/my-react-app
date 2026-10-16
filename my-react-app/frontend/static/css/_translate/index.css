@@ -54,14 +54,13 @@
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    border: 3px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     background: var(--yy-surface);
     color: var(--yy-ink);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: var(--yy-shadow-sm);
     transition: transform .15s ease;
 }
 /* 按鈕 40px：用透明 ::after 把點擊區擴成 44px，不改變外觀（共用寫法見 theme-v2.css） */
@@ -86,7 +85,7 @@
     padding: 8px 12px;
     font-size: 14px;
     color: var(--yy-text-secondary);
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
     background: var(--yy-surface);
 }
@@ -149,7 +148,7 @@
     flex: 1;
     min-height: 140px;
     resize: vertical;
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
     padding: 12px;
     font-family: var(--yy-font-body);
@@ -275,7 +274,7 @@
     margin-top: 12px;
     padding: 14px;
     background: var(--yy-cream);
-    border: 2px solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-btn);
 }
 
@@ -385,9 +384,8 @@
     gap: var(--yy-space-2) var(--yy-space-3);
     padding: var(--yy-space-3) var(--yy-space-4);
     background: var(--yy-surface);
-    border: 2px solid var(--yy-border);
+    border: var(--yy-border-width) solid var(--yy-border);
     border-radius: var(--yy-radius-card);
-    box-shadow: var(--yy-shadow-sm);
 }
 
 .translate-guest-label {
@@ -395,7 +393,7 @@
     font-size: var(--yy-text-xs);
     padding: 2px var(--yy-space-2);
     background: var(--yy-gold-light);
-    border: 2px solid var(--yy-border);
+    border: var(--yy-border-width) solid var(--yy-border);
     border-radius: var(--yy-radius-btn);
     color: var(--yy-ink);
 }
@@ -445,9 +443,8 @@
 .translate-guest-callout {
     padding: var(--yy-space-5);
     background: var(--yy-warning-bg);
-    border: 2px solid var(--yy-border);
+    border: var(--yy-border-width) solid var(--yy-border);
     border-radius: var(--yy-radius-card);
-    box-shadow: var(--yy-shadow-md);
 }
 
 .translate-guest-title {
