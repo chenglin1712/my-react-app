@@ -444,6 +444,7 @@ export default function AnnouncementEditor() {
                                 type="file"
                                 accept="image/*"
                                 disabled={!editable || uploading}
+                                aria-describedby="announcement-cover-hint"
                                 onChange={handleFileChange}
                             />
                             {uploading && (
@@ -451,6 +452,11 @@ export default function AnnouncementEditor() {
                                     <Spinner size="sm" /> 圖片上傳中…
                                 </span>
                             )}
+                            <Form.Text id="announcement-cover-hint" className="d-block">
+                                有封面圖的公告會出現在首頁「活動消息」的輪播，沒有封面圖的公告會列在輪播旁的文字清單。
+                                <br />
+                                {'建議使用 16:9 橫式圖片，例如 1600 × 900。圖片會置中裁切，上下邊緣可能被截去；標題與日期會疊在圖片底部，重要內容請放在中央並避開下緣。'}
+                            </Form.Text>
                         </div>
                     </div>
                 </Form.Group>

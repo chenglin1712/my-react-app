@@ -82,6 +82,14 @@ describe('AnnouncementEditor · 新增模式', () => {
   // 慣例（required 屬性 + 瀏覽器原生驗證，沒有額外用 noValidate 蓋掉），
   // 這裡沒有理由破例。用不會觸發表單送出流程的按鈕測，才是真的在測到
   // 元件自己的 JS 驗證邏輯。
+  test('封面圖欄位說明首頁輪播用途與建議比例，並以 aria-describedby 關聯到檔案欄位', () => {
+    const { container } = renderNew();
+    const hint = container.querySelector('#announcement-cover-hint');
+    expect(hint).toHaveTextContent('首頁「活動消息」的輪播');
+    expect(hint).toHaveTextContent('16:9');
+    expect(container.querySelector('#announcement-cover')).toHaveAttribute('aria-describedby', 'announcement-cover-hint');
+  });
+
   test('標題空白時擋下送出，不呼叫 API', async () => {
     renderNew();
     fireEvent.click(screen.getByRole('button', { name: /儲存並送審/ }));

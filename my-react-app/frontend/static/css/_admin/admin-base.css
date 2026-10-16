@@ -18,7 +18,8 @@
 .admin-shell :where(
   .admin-page, .announcement-admin-page, .quiz-bank-admin-page, .dictionary-admin-page, .user-admin-page,
   .moderation-admin-page, .exam-schedule-admin-page, .review-queue-page,
-  .search-analytics-page, .quiz-quality-page, .retention-analysis-page, .admin-dashboard-page, .homepage-config-page
+  .search-analytics-page, .quiz-quality-page, .retention-analysis-page, .admin-dashboard-page, .homepage-config-page,
+  .promo-videos-page, .featured-topics-page
 ) {
   min-height: calc(100vh - var(--admin-topbar-height));
   min-height: calc(100dvh - var(--admin-topbar-height));
@@ -33,7 +34,8 @@
   .announcement-page-heading, .quiz-bank-page-heading, .dictionary-page-heading, .user-page-heading,
   .moderation-page-heading, .exam-schedule-page-heading, .review-queue-heading,
   .search-analytics-heading, .quiz-quality-heading, .retention-analysis-heading,
-  .homepage-config-heading, .dashboard-heading, .admin-page-heading
+  .homepage-config-heading, .dashboard-heading, .admin-page-heading,
+  .promo-videos-heading, .featured-topics-heading
 ) {
   max-width: var(--admin-content-max);
   margin: 0 auto 24px;
@@ -43,7 +45,8 @@
   .announcement-page-heading, .quiz-bank-page-heading, .dictionary-page-heading, .user-page-heading,
   .moderation-page-heading, .exam-schedule-page-heading, .review-queue-heading,
   .search-analytics-heading, .quiz-quality-heading, .retention-analysis-heading,
-  .homepage-config-heading, .dashboard-heading, .admin-page-heading
+  .homepage-config-heading, .dashboard-heading, .admin-page-heading,
+  .promo-videos-heading, .featured-topics-heading
 ) h1 {
   margin: 0 0 4px;
   color: var(--admin-text-strong);
@@ -55,7 +58,8 @@
   .announcement-page-heading, .quiz-bank-page-heading, .dictionary-page-heading, .user-page-heading,
   .moderation-page-heading, .exam-schedule-page-heading, .review-queue-heading,
   .search-analytics-heading, .quiz-quality-heading, .retention-analysis-heading,
-  .homepage-config-heading, .dashboard-heading, .admin-page-heading
+  .homepage-config-heading, .dashboard-heading, .admin-page-heading,
+  .promo-videos-heading, .featured-topics-heading
 ) p {
   margin: 0;
   color: var(--admin-muted);
