@@ -338,6 +338,6 @@ a.news-text-item:hover { background: var(--yy-cream); }
     padding: 2rem 1rem;
     text-align: center;
     color: var(--yy-text-muted);
-    border: 2px dashed var(--yy-text-muted);
+    border: var(--yy-border-width) dashed var(--yy-text-muted);
     border-radius: var(--yy-radius-card);
 }

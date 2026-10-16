@@ -51,7 +51,7 @@
     height: 340px;
     border-radius: var(--yy-radius-card);
     background: var(--yy-surface);
-    border: 3px dashed var(--yy-ink);
+    border: var(--yy-border-width) dashed var(--yy-ink);
     display: flex;
     align-items: center;
     justify-content: center;

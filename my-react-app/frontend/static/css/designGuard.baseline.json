@@ -1,0 +1,20 @@
+{
+  "note": "寫死色碼基線：只能變小。由 designGuard.test.js 的 UPDATE_DESIGN_BASELINE=1 產生，不要手動加大。",
+  "css": {
+    "static/css/_home/news.css": 6,
+    "static/css/_morphology/index.css": 1,
+    "static/css/_quiz/review_AI.css": 6,
+    "static/css/_search/index.css": 2,
+    "static/css/default/theme-v2.css": 6
+  },
+  "js": {
+    "components/_quiz/sideBar.jsx": 1,
+    "components/_quiz/situation_0judy_1.jsx": 9,
+    "components/_quiz/situation_0judy_2.jsx": 14,
+    "components/_quiz/situation_0judy_3.jsx": 21,
+    "src/_favorite/components/WordCardWithImg.jsx": 2,
+    "src/_note/components/EditorToolbar.jsx": 4,
+    "src/AppShell.jsx": 2,
+    "src/StartupError.jsx": 5
+  }
+}

@@ -266,7 +266,7 @@
     padding: 22px 26px;
     border-radius: var(--yy-radius-card);
     background: linear-gradient(160deg, var(--yy-cream), var(--yy-cream-dim));
-    border: 2px dashed var(--yy-ink);
+    border: var(--yy-border-width) dashed var(--yy-ink);
     text-align: center;
 }
 

@@ -60,7 +60,7 @@
   font-size: 18px;
   font-weight: 600;
   color: var(--yy-text-secondary);
-  border: 2px dashed var(--yy-ink);
+  border: var(--yy-border-width) dashed var(--yy-ink);
   border-radius: var(--yy-radius-card);
   background-color: var(--yy-cream-dim);
 }
