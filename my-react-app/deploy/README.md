@@ -50,6 +50,42 @@ Firestore 與 Firebase Auth 預設**沒有**被備份。要備份 Firestore，�
 
 建議用 cron 每天跑一次，例如：`0 3 * * * cd /srv/yuanyu && bash deploy/backup.sh >> logs/backup.log 2>&1`。
 
+### 首頁宣傳影片媒體
+
+後台上傳的影片、封面、字幕存在 `<repo>/media/homepage/`（容器內 `/app/media`，由 `docker-compose.prod.yml` 掛載），
+nginx 直接送檔，Django 寫入同一個目錄。**第一次部署前請先做完下面幾件事：**
+
+1. **磁碟快照：** 在 Google Cloud 為開機磁碟設定每日快照，保留 7 天。**這一項是前置條件，沒做完不要上傳正式影片。**
+2. **建立目錄並限制權限：** `mkdir -p media/homepage/{video,cover,caption}`，目錄只讓部署帳號與容器寫入；
+   一般帳號不可修改。**不可以是符號連結**（`python manage.py check_promo_media` 會檢查）。
+3. **nginx：** 套用 `deploy/nginx.conf` 新增的 `/media/homepage/` 與 `/adminapi/promo-videos/` 兩段，`nginx -t` 後重新載入。
+4. **備份：** `backup.sh` 會把 `media/homepage` 鏡像到 `$BACKUP_DIR/media/`（檔名是 uuid 且不修改，鏡像不必每天打包）。
+   資料庫與媒體分開備份，**可能還原出「引用不存在檔案」的資料**，所以：
+   - 還原順序：先還原資料庫，再把鏡像複製回 `media/homepage`，最後執行 `python manage.py check_promo_media` 確認。
+   - 被取代或刪除的舊檔保留 14 天（大於快照保留期 7 天）才清除，還原後引用的檔案仍在。
+5. **排程（cron）：**
+   - 每天一次：`python manage.py cleanup_promo_media --apply`（先不加 `--apply` 預覽）。
+   - 每 15 分鐘一次：`python manage.py check_promo_media`，結束碼非 0 或日誌出現 `PROMO_MEDIA_MISSING` 時要通知你。
+     公開首頁在檔案遺失時只會安靜降級成「影片無法播放」，沒有這個檢查就只能靠訪客回報。
+6. **磁碟空間：** 上傳 150MB 的影片時，nginx 會先暫存整個請求，Django 再寫入暫存目錄，最多同時占用約 3 倍。
+   請確認 nginx 暫存路徑所在磁碟與 `media/` 所在磁碟都有足夠空間，並定期查看 `df -h`。
+7. **資源配額：** 後端上傳端點每位使用者 10 分鐘最多 6 次，只有 owner、admin 能上傳；磁碟剩餘空間低於「2 倍檔案上限加 1GB」時
+   上傳會被拒絕（回 507，日誌 `PROMO_MEDIA_DISK_LOW`）。
+8. **ffprobe 的風險：** 後端用 ffprobe 檢查上傳的影片，這是處理不可信檔案的地方。已加協定白名單與 CPU、記憶體上限，
+   但仍在 Django 容器內執行。請保持 FFmpeg 更新（重建 image 時會裝到當時的 Debian 版本），並考慮替容器設定記憶體上限。
+   更穩的做法是獨立的媒體處理容器，目前沒有做。
+9. **第一次部署後的 smoke test（照順序做，缺一不可）：**
+   - `nginx -t` 通過後重新載入。
+   - 用後台上傳一支正常的小影片（faststart 的 MP4）：預期成功。**若所有影片都回「無法讀取這個影片檔」，可能是 ffprobe 的資源上限
+     （`FFPROBE_MAX_ADDRESS_SPACE`）對這個環境太緊，先看伺服器日誌的 `ffprobe failed` 再調整。**
+   - `curl -I https://網域/media/homepage/video/<檔名>.mp4`：預期 `200`、`Content-Type: video/mp4`、`X-Content-Type-Options: nosniff`、
+     `Cache-Control: public, max-age=31536000, immutable`。
+   - `curl -I -H "Range: bytes=0-99" ...` 同一個網址：預期 `206` 與 `Content-Range`。
+   - `curl -I https://網域/media/homepage/video/不存在.mp4`：預期 `404`，而且**沒有** `immutable`。
+   - `curl -I https://網域/media/_staging/` 與 `https://網域/media/`：預期 `404`。
+   - 在 `media/homepage/video/` 放一個指向其他目錄的符號連結再請求：預期 `404`（`disable_symlinks on`），測完刪除。
+   - 執行 `python manage.py check_promo_media`：預期 `OK`。
+
 ### 還原演練（每季至少做一次，沒有還原成功過就不算有備份）
 
 在**另一個空的資料庫**（不是正式資料庫）上演練：

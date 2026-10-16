@@ -127,6 +127,23 @@ else
   echo "==> 略過 Storage（未設定 STORAGE_BACKUP_BUCKET 與 STORAGE_SOURCE_BUCKET）"
 fi
 
+# 首頁媒體（宣傳影片、封面、字幕）：檔名是 uuid 且不會被修改，所以鏡像一份就夠，不必每天打包
+# 150MB 的影片。不用 --delete：來源目錄被誤清空時，備份不會跟著一起被清空。
+# 資料庫與媒體是分開備份的，可能還原出「引用了不存在檔案」的資料；cleanup_promo_media 的 14 天延遲
+# 清理就是為了降低這個風險（見 HOMEPAGE_CONTRACT.md 3.2 與 deploy/README.md）。
+MEDIA_DIR="${MEDIA_DIR:-./media}"
+if [ -d "$MEDIA_DIR/homepage" ]; then
+  echo "==> 首頁媒體鏡像 $MEDIA_DIR/homepage -> $BACKUP_DIR/media/homepage"
+  mkdir -p "$BACKUP_DIR/media"
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a "$MEDIA_DIR/homepage" "$BACKUP_DIR/media/"
+  else
+    cp -a "$MEDIA_DIR/homepage" "$BACKUP_DIR/media/"
+  fi
+else
+  echo "==> 略過首頁媒體（$MEDIA_DIR/homepage 不存在，尚未上傳過任何檔案）"
+fi
+
 echo "==> 清理 $RETENTION_DAYS 天前的舊備份"
 find "$BACKUP_DIR" -maxdepth 1 -name '*.dump' -type f -mtime +"$RETENTION_DAYS" -print -delete
 

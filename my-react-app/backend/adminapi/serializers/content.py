@@ -6,7 +6,7 @@ from config.tribes import TRIBE_IDS
 
 from rest_framework import serializers
 
-from ..models import Announcement, ExamScheduleOverride, FeaturedTopic, HomepageConfig
+from ..models import Announcement, ExamScheduleOverride, FeaturedTopic, HomepageConfig, PromoVideo
 from ..promo_media import public_media_url
 from ..validators import normalize_marquee_items
 
@@ -232,6 +232,45 @@ class PublicHomepageConfigSerializer(serializers.ModelSerializer):
             'duration_seconds': video.duration_seconds,
             'available': video_url is not None,
         }
+
+
+class PromoVideoSerializer(serializers.ModelSerializer):
+    """後台宣傳影片。只有標題、說明、逐字稿可寫；路徑、長度、檔案大小只能由上傳端點寫入。
+
+    上傳端點需要把「目前啟用哪一支」傳進來避免每筆多查一次，經由 context["active_id"]。
+    """
+
+    is_active = serializers.SerializerMethodField()
+    video_url = serializers.SerializerMethodField()
+    cover_url = serializers.SerializerMethodField()
+    caption_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PromoVideo
+        fields = [
+            'id', 'title', 'description', 'transcript',
+            'video_path', 'cover_path', 'caption_path', 'duration_seconds', 'size_bytes',
+            'is_active', 'video_url', 'cover_url', 'caption_url',
+            'created_by', 'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'video_path', 'cover_path', 'caption_path', 'duration_seconds', 'size_bytes',
+            'created_by', 'created_at', 'updated_at',
+        ]
+
+    def get_is_active(self, obj):
+        active_id = self.context.get('active_id')
+        return active_id is not None and active_id == obj.pk
+
+    # 公開網址欄位為空代表「沒有這個檔案，或檔案遺失」；後台據此顯示「檔案遺失」警示
+    def get_video_url(self, obj):
+        return public_media_url(obj.video_path)
+
+    def get_cover_url(self, obj):
+        return public_media_url(obj.cover_path)
+
+    def get_caption_url(self, obj):
+        return public_media_url(obj.caption_path)
 
 
 class PublicAnnouncementSerializer(serializers.ModelSerializer):

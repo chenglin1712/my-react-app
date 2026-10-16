@@ -3,7 +3,7 @@ from django.urls import path
 from . import (
     analytics_views, dictionary_grammar_views, dictionary_import_views, dictionary_taxonomy_views,
     dictionary_views, exam_schedule_admin_views, featured_topic_views, feature_flag_views, game_config_views,
-    homepage_config_views, moderation_views, quizbank_views,
+    homepage_config_views, moderation_views, promo_video_views, quizbank_views,
     morphology_capability_views, rate_limit_views, review_queue_views, system_cache_views, user_views, verification_views, views,
 )
 
@@ -56,6 +56,13 @@ urlpatterns = [
     path('featured-topics/<int:pk>/pending-revision/approve/', featured_topic_views.featured_topic_revision_approve),
     path('featured-topics/<int:pk>/pending-revision/reject/', featured_topic_views.featured_topic_revision_reject),
     path('public/featured-topics/', featured_topic_views.public_featured_topics),
+    path('promo-videos/', promo_video_views.promo_video_list),
+    path('promo-videos/<int:pk>/', promo_video_views.promo_video_detail),
+    path('promo-videos/<int:pk>/video/', promo_video_views.promo_video_upload_video),
+    path('promo-videos/<int:pk>/cover/', promo_video_views.promo_video_upload_cover),
+    path('promo-videos/<int:pk>/caption/', promo_video_views.promo_video_upload_caption),
+    path('promo-videos/<int:pk>/clear-cover/', promo_video_views.promo_video_clear_cover),
+    path('promo-videos/<int:pk>/clear-caption/', promo_video_views.promo_video_clear_caption),
     path('homepage-config/', homepage_config_views.homepage_config_admin),
     path('public/homepage-config/', homepage_config_views.public_homepage_config),
     *_content_urls('quiz-bank/vocab', quizbank_views.quiz_vocab_views),

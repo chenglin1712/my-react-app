@@ -291,6 +291,21 @@ class PromoVideo(models.Model):
         return f"宣傳影片：{self.title}"
 
 
+class PromoMediaOrphan(models.Model):
+    """被取代或刪除的宣傳影片媒體檔，何時成為「孤立」。
+
+    不能用檔案的修改時間代表孤立時間：舊檔可能是幾個月前上傳的，行程若在「標記孤立」前被終止，
+    清理指令會立刻把剛被取代的舊檔刪掉。所以孤立紀錄與「取代或刪除」寫在同一個資料庫交易裡，
+    要嘛一起成功，要嘛一起回滾（HOMEPAGE_CONTRACT.md 3.2）。cleanup_promo_media 只刪
+    「目前沒有任何影片引用，且孤立超過 14 天」的檔案。
+    """
+    path = models.CharField(max_length=80, unique=True)
+    orphaned_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"孤立媒體 {self.path}"
+
+
 class HomepageConfig(SingletonModel):
     """首頁版位設定，單例（永遠只有一筆，pk 固定用 1，見 load()）。
 

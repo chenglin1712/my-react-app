@@ -18,6 +18,7 @@ from .content import (
     FeaturedTopic,
     HomepageConfig,
     PendingRevision,
+    PromoMediaOrphan,
     PromoVideo,
 )
 from .dictionary_review import DictionaryImportJob, DictionaryRevision
