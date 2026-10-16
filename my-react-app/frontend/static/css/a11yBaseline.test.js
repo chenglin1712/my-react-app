@@ -103,7 +103,6 @@ describe("小圖示按鈕的 44px 點擊區", () => {
 
   it.each([
     ["_translate/index.css", ".translate-swap-btn", "::after"],
-    ["_home/news.css", ".swiper-button-next", "::before"],
   ])("%s 的 %s 用 %s 把點擊區擴成 44px", (file, selector, pseudo) => {
     const all = rules(files.find((f) => f.file === file).css);
     const rule = all.find((r) => r.selector.split(",").map((x) => x.trim()).includes(`${selector}${pseudo}`));
@@ -111,11 +110,16 @@ describe("小圖示按鈕的 44px 點擊區", () => {
     expect(rule.body).toMatch(/width:\s*max\(100%,\s*var\(--yy-control-md\)\)/);
   });
 
-  it("翻譯頁交換鈕自己是 relative；首頁輪播按鈕邊距夠大，擴大的點擊區不會被容器裁掉", () => {
+  it("翻譯頁交換鈕自己是 relative", () => {
     const swap = rules(files.find((f) => f.file === "_translate/index.css").css).find((r) => r.selector === ".translate-swap-btn");
     expect(swap.body).toMatch(/position:\s*relative/);
-    const news = rules(files.find((f) => f.file === "_home/news.css").css).find((r) => r.selector.includes(".swiper-button-prev") && /sides-offset/.test(r.body));
-    expect(Number(news.body.match(/sides-offset:\s*(\d+)px/)[1])).toBeGreaterThanOrEqual(6);
+  });
+
+  it("首頁輪播的左右箭頭本身就是 44px（S6-3 起不再靠 ::before 擴大點擊區，見 newsLook.test.js）", () => {
+    const all = rules(files.find((f) => f.file === "_home/news.css").css);
+    const arrows = all.find((r) => r.selector.includes(".news-carousel .swiper-button-prev") && /width:/.test(r.body));
+    expect(arrows.body).toMatch(/width:\s*var\(--yy-control-md\)/);
+    expect(arrows.body).toMatch(/height:\s*var\(--yy-control-md\)/);
   });
 
   it("觸控裝置的導覽選單項目至少 44px 高", () => {

@@ -1,7 +1,6 @@
 {
   "note": "寫死色碼基線：只能變小。由 designGuard.test.js 的 UPDATE_DESIGN_BASELINE=1 產生，不要手動加大。",
   "css": {
-    "static/css/_home/news.css": 6,
     "static/css/_morphology/index.css": 1,
     "static/css/_quiz/review_AI.css": 6,
     "static/css/_search/index.css": 2,
