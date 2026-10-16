@@ -288,8 +288,17 @@ components:
 - hover 位移放在 `@media (hover: hover) and (pointer: fine)` 內，避免觸控裝置誤觸。
 - 鍵盤操作與高頻動作不加動畫。
 
-### 要移除的舊動態
-逐字進場（CharReveal）、RevealOnView 的彈跳、`yy-fade-up`、按鈕金色脈動、流光字、漂浮光斑、卡片上浮硬陰影；S2-2 處理，並更新 `motionTokens.test.js`。
+### 動態語法（S2-2 已完成）
+全站只有三種動態，其他一律不加（theme-v2.css「動態語法」註解與 `designGuard.test.js` 鎖定）：
+1. **回饋**：按下、hover、焦點的顏色與 transform，150ms（`--dur-fast`）。
+2. **狀態**：彈窗與浮層進場 200 到 240ms、退場 160ms；載入佔位、錄音中、等待回覆這類「正在進行」的指示可以循環（白名單）。
+3. **進場**：內容出現只淡入並上移 8px，一次，220ms（`--dur-base`）；整頁進場 `.yy-fade-up` 與捲到才進場 `.yy-reveal` 共用 `yy-enter`。`.yy-fade-up` 用 `backwards`，結束後不殘留 transform。
+
+曲線一律 `--ease-out`；位移只用 transform 與 opacity。
+
+**已刪除：** 逐字進場（CharReveal 元件與測試）、布幕拉開、24px 彈起、按鈕金色脈動與首頁 CTA 光圈、流光字（`.yy-holo-text` 改為靜態的 `.yy-accent-text`）、漂浮光斑與貼紙漂浮、卡片頭部流動色帶、導覽列跑馬燈與菱形光圈。導覽列沒有任何常駐動畫。
+
+**WCAG 2.2.2 備註：** 白名單內的循環動畫（骨架脈動、游標、錄音脈動、轉圈、跳動點）屬載入與進行中指示，視為必要；若日後有超過 5 秒的狀態，旁邊要有文字說明狀態。
 
 ## 首頁區段與後台編輯
 

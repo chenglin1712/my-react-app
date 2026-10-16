@@ -180,7 +180,7 @@
   --dur-fast: 150ms;
   --dur-base: 220ms;
   --dur-flip: 400ms;
-  --dur-reveal: 550ms;
+  --dur-reveal: 220ms;
   /* 取代 transition: all：只過渡顏色、陰影、位移與透明度，不會連版面屬性一起動畫 */
   --transition-interactive:
     background-color var(--dur-base) var(--ease-out),
@@ -265,31 +265,18 @@
   --yy-calm-focus-on-block: #D7A98B;
 }
 
-@keyframes yy-holo {
-  0% { background-position: 0% 50%; }
-  100% { background-position: 300% 50%; }
-}
-@keyframes yy-floaty {
-  0% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-14px) rotate(10deg); }
-  100% { transform: translateY(0) rotate(0deg); }
-}
-/* 主按鈕的呼吸光圈（P1-23）：原本動 box-shadow 會每幀重繪，而且動畫會蓋掉按鈕自己的
-   硬陰影與 hover／active 陰影。改成偽元素只動 transform 與 opacity，走合成層。 */
-@keyframes yy-pulse-ring {
-  0%, 100% { opacity: 0.55; transform: scale(1); }
-  50% { opacity: 0; transform: scale(1.12); }
-}
-@keyframes yy-marquee {
-  0% { background-position: 0 0; }
-  100% { background-position: 200px 0; }
-}
+/* 動態語法（S2-2）：全站只有三種動態，其他一律不加。
+   1. 回饋：按下、hover、焦點的顏色與 transform，150ms（--dur-fast）
+   2. 狀態：彈窗與浮層進場 200 到 240ms、退場 160ms（退場比進場快）；載入佔位與錄音中這類「正在進行」的指示可以循環
+   3. 進場：內容出現時只淡入並上移 8px，一次，220ms（--dur-base）；整頁進場與捲到才進場共用同一組
+   曲線一律 --ease-out，不用 ease-in；位移只用 transform 與 opacity。
+   已刪除：逐字進場、布幕拉開、24px 彈起、按鈕脈動光圈、流光字、漂浮光斑、導覽列跑馬燈與菱形光圈。 */
 @keyframes yy-blink {
   0%, 49% { opacity: 1; }
   50%, 100% { opacity: 0; }
 }
-@keyframes yy-fade-up {
-  from { opacity: 0; transform: translateY(24px); }
+@keyframes yy-enter {
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 /* 彈窗進場／退場（審查項 P2-84）：從 scale(.94) 加透明度進來，不再從 .7 起跳還回彈；退場比進場快。 */
@@ -310,45 +297,18 @@
   to { opacity: 0; }
 }
 
-/* 脈動光圈只留在首頁主要行動按鈕（.home-cta，見 _home/index.css）：表單與工具頁的按鈕不該一直在動，
-   會分散填寫與閱讀時的注意力（審查項 P2-5）。 */
-
 /* ---------- 捲動進場與載入骨架 ---------- */
 
-/* 捲到才進場（components/ui/RevealOnView.jsx）：布幕由上往下拉開＋由下往上 32px 浮起，約 .9 秒。
-   尚未進場才隱藏；進場後 clip-path 留 20px 的外擴，避免把卡片的硬陰影（最多 7px）裁掉。
-   進場後 transform 清掉，不留 stacking context。 */
+/* 捲到才進場（components/ui/RevealOnView.jsx）：淡入並由下往上 8px，每個區塊一次。
+   和整頁進場（.yy-fade-up）同一組動態，尚未進場時才隱藏；降低動態偏好下只淡入、不位移。 */
 .yy-reveal {
-  clip-path: inset(-20px -20px -20px -20px);
   transition:
-    opacity var(--dur-reveal) var(--ease-out),
-    transform var(--dur-reveal) var(--ease-out),
-    clip-path var(--dur-reveal) var(--ease-out);
+    opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
 }
 .yy-reveal:not(.is-visible) {
   opacity: 0;
-  transform: translateY(32px);
-  clip-path: inset(0 -20px 62% -20px);
-}
-
-/* 逐字進場（components/ui/CharReveal.jsx）：每個字各自彈出，延遲由元件依序設定，且總延遲有上限
-   （審查項 P2-83：原本 20 字的標題最後一字要 1.5 秒才定位）。時長 450ms，不再帶 overshoot。 */
-.yy-char {
-  display: inline-block;
-  animation: yy-char-in 450ms var(--ease-out) both;
-}
-@keyframes yy-char-in {
-  from { opacity: 0; transform: translateY(.5em) scale(.94); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-/* 超過 12 字改成整句一起淡入，不拆字 */
-.yy-char--line {
-  display: inline;
-  animation: yy-line-in 450ms var(--ease-out) both;
-}
-@keyframes yy-line-in {
-  from { opacity: 0; transform: translateY(.4em); }
-  to { opacity: 1; transform: translateY(0); }
+  transform: translateY(8px);
 }
 
 /* 資料載入中的佔位塊：用實際內容的尺寸，載入完成時版面不跳動 */
@@ -387,14 +347,9 @@
     animation: none !important;
     opacity: 1;
   }
-  .yy-holo-text {
-    animation: none !important;
-    background-position: 0% 50%;
-  }
   .yy-reveal,
   .yy-reveal:not(.is-visible) {
     transform: none !important;
-    clip-path: none !important;
     transition-property: opacity !important;
     transition-duration: var(--dur-fast) !important;
   }
@@ -452,16 +407,7 @@
 }
 
 .yy-fade-up {
-  animation: yy-fade-up var(--dur-reveal) var(--ease-out) both;
-}
-
-/* 頁首下方織紋跑馬燈色條 */
-.yy-marquee-bar {
-  height: 16px;
-  background-image: repeating-conic-gradient(var(--yy-red) 0deg 90deg, var(--yy-gold) 90deg 180deg, var(--yy-blue) 180deg 270deg, var(--yy-cream) 270deg 360deg);
-  background-size: 32px 32px;
-  animation: yy-marquee 6s linear infinite;
-  border-bottom: 2px solid var(--yy-ink);
+  animation: yy-enter var(--dur-base) var(--ease-out) backwards;
 }
 
 /* 區塊分隔鋸齒條，預設赭紅/赤金；.yy-divider--blue 為靛藍/赤金 */
@@ -506,7 +452,6 @@
   border-radius: 50%;
   filter: blur(28px);
   pointer-events: none;
-  animation: yy-floaty 10s ease-in-out infinite;
 }
 
 /* 標籤（小標）：深橄欖底、象牙白字，對比 5.4 以上；不是按鈕，所以沒有 hover 與 cursor。
@@ -528,13 +473,9 @@
   letter-spacing: 0.04em;
 }
 
-.yy-holo-text {
-  background: linear-gradient(90deg, var(--yy-red), var(--yy-gold), var(--yy-red));
-  background-size: 300% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: yy-holo 4s linear infinite;
+/* 標題裡的強調字：靜態的深銅色（原本是流動的漸層） */
+.yy-accent-text {
+  color: var(--yy-calm-accent);
 }
 
 /* ---------- 卡片 / 按鈕 ---------- */
@@ -917,9 +858,7 @@
   width: 70px;
   height: 70px;
   border-radius: 50%;
-  background: linear-gradient(160deg, var(--yy-gold), var(--yy-gold-light), var(--yy-gold));
-  background-size: 300% 300%;
-  animation: yy-holo 3s linear infinite;
+  background: var(--yy-gold-light);
   border: var(--yy-border-width) solid var(--yy-ink);
   display: flex;
   align-items: center;

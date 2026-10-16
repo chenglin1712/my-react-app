@@ -182,7 +182,7 @@
   margin-top: 1.2rem;
   font-size: 1rem;
   color: var(--yy-text-tertiary);
-  animation: listening-fade-in 0.3s ease;
+  animation: listening-fade-in var(--dur-base) var(--ease-out);
 }
 .listening-reveal strong {
   color: var(--yy-red);

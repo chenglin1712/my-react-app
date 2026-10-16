@@ -17,7 +17,6 @@
     border-radius: 50%;
     filter: blur(28px);
     pointer-events: none;
-    animation: yy-floaty 10s ease-in-out infinite;
 }
 
 .home-blob--gold {
@@ -40,7 +39,6 @@
     left: 16%;
     bottom: 8%;
     transform: rotate(-8deg);
-    animation: yy-floaty 8.5s ease-in-out infinite;
     pointer-events: none;
 }
 
@@ -65,7 +63,6 @@
     font-family: var(--yy-font-pixel);
     font-weight: 700;
     font-size: 12px;
-    animation: yy-holo 5.5s linear infinite;
 }
 
 @media (max-width: 720px) {
@@ -322,20 +319,3 @@
     isolation: isolate;
 }
 
-.home-cta::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    border-radius: inherit;
-    background: rgba(217, 162, 39, 0.55);
-    pointer-events: none;
-    animation: yy-pulse-ring 2.8s ease-in-out infinite;
-}
-
-/* 停用、按下時光圈也要停（動畫在偽元素上，按鈕本體的 animation: none 管不到它） */
-.home-cta:disabled::after,
-.home-cta:active::after {
-    animation: none;
-    opacity: 0;
-}

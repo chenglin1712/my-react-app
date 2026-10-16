@@ -170,6 +170,34 @@ describe("邊框粗細", () => {
 });
 
 describe("動態規則不退回舊寫法", () => {
+  // 全站只有三種動態（見 theme-v2.css「動態語法」）。下面這些是已刪除的舊裝飾動畫，不得再出現。
+  const REMOVED_MOTION = ["yy-holo", "yy-floaty", "yy-pulse-ring", "yy-marquee", "yy-logo-ring", "yy-char", "yy-pulse-glow"];
+
+  it("已刪除的裝飾動畫（流光、漂浮、脈動光圈、跑馬燈、逐字進場）不再出現在前台 CSS 與 JSX", () => {
+    const hits = [];
+    cssFiles.forEach(({ file, css }) => REMOVED_MOTION.forEach((n) => css.includes(n) && hits.push(`${file}: ${n}`)));
+    jsFiles.forEach(({ file, js }) => REMOVED_MOTION.forEach((n) => js.includes(n) && hits.push(`${file}: ${n}`)));
+    expect(hits).toEqual([]);
+  });
+
+  // 持續循環的動畫只允許「正在進行」的狀態指示：載入佔位、錄音中、等待回覆的跳動點、轉圈、游標閃爍。
+  const INFINITE_ALLOWED = ["yy-skeleton-pulse", "yy-blink", "pron-pulse", "sentPulse", "listening-pulse", "pron-community-spin", "bot-bounce", "review-ai-bounce"];
+
+  it("前台 CSS 的無限循環動畫只限狀態指示（白名單）", () => {
+    const found = new Set();
+    cssFiles.forEach(({ css }) => {
+      for (const m of css.matchAll(/animation\s*:([^;]*infinite[^;]*);/g)) found.add(m[1].trim().split(/\s+/)[0]);
+    });
+    expect([...found].sort()).toEqual([...INFINITE_ALLOWED].sort());
+  });
+
+  it("進場動畫只有一組：.yy-fade-up 與 .yy-reveal 都是淡入加上移 8px（yy-enter）", () => {
+    const theme = cssFiles.find(({ file }) => file.endsWith("default/theme-v2.css")).css;
+    expect(theme).toMatch(/@keyframes yy-enter\s*\{\s*from\s*\{\s*opacity:\s*0;\s*transform:\s*translateY\(8px\);\s*\}/);
+    expect(theme).toMatch(/\.yy-fade-up\s*\{\s*animation:\s*yy-enter var\(--dur-base\) var\(--ease-out\) backwards;/);
+    expect(theme).toMatch(/\.yy-reveal:not\(\.is-visible\)\s*\{\s*opacity:\s*0;\s*transform:\s*translateY\(8px\);/);
+  });
+
   it("前台 CSS 沒有 ease-in（UI 動畫用 ease-out 系列，ease-in-out 與 ease-out 不受影響）", () => {
     const hits = [];
     cssFiles.forEach(({ file, css }) =>

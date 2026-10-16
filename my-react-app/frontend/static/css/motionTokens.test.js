@@ -48,7 +48,7 @@ describe("motion token", () => {
   it("theme-v2 定義曲線、時長與 transition 組合", () => {
     expect(theme).toMatch(/--ease-out:\s*cubic-bezier\(0\.23,\s*1,\s*0\.32,\s*1\)/);
     expect(theme).toMatch(/--ease-in-out:\s*cubic-bezier\(0\.77,\s*0,\s*0\.175,\s*1\)/);
-    ["--dur-fast: 150ms", "--dur-base: 220ms", "--dur-flip: 400ms", "--dur-reveal: 550ms"].forEach((t) =>
+    ["--dur-fast: 150ms", "--dur-base: 220ms", "--dur-flip: 400ms", "--dur-reveal: 220ms"].forEach((t) =>
       expect(theme).toContain(t),
     );
     expect(theme).toMatch(/--transition-interactive:/);
@@ -59,7 +59,7 @@ describe("motion token", () => {
     expect(flip).toMatch(/transition:\s*transform var\(--dur-flip\) var\(--ease-in-out\)/);
     const result = allFiles.find(({ file }) => file === "_game/game_result.css").css;
     expect(result).toMatch(/transition:\s*transform var\(--dur-flip\) var\(--ease-in-out\)/);
-    expect(theme).toMatch(/opacity var\(--dur-reveal\) var\(--ease-out\)/);
+    expect(theme).toMatch(/opacity var\(--dur-base\) var\(--ease-out\)/);
   });
 });
 
@@ -137,9 +137,8 @@ describe("降低動態偏好", () => {
   }
   const reduce = theme.slice(start, end + 1);
 
-  it("游標與流光文字固定在可見狀態", () => {
+  it("游標固定在可見狀態", () => {
     expect(reduce).toMatch(/\.yy-terminal__cursor\s*\{[^}]*opacity:\s*1/);
-    expect(reduce).toMatch(/\.yy-holo-text\s*\{[^}]*animation:\s*none/);
   });
 
   it("捲動進場保留 150ms 淡入而不位移", () => {
@@ -184,15 +183,9 @@ describe("B-9 動畫與效能", () => {
     });
   });
 
-  it("導覽列的無限循環動畫都限定在 .navbar--home 底下", () => {
-    walkRules(navbar.css)
-      .filter((r) => /animation\s*:[^;]*infinite/.test(r.body))
-      .forEach((r) => expect(r.selector, r.selector).toMatch(/--home/));
-  });
-
-  it("導覽列跑馬燈改用 transform 平移，不再動 background-position", () => {
-    expect(navbar.css).toMatch(/@keyframes yy-marquee-x[\s\S]*?translateX/);
-    expect(navbar.css).not.toMatch(/animation:\s*yy-marquee\s/);
+  it("導覽列沒有任何常駐動畫（跑馬燈、菱形光圈、流光字已刪除）", () => {
+    expect(navbar.css).not.toMatch(/@keyframes/);
+    expect(walkRules(navbar.css).filter((r) => /animation\s*:/.test(r.body))).toEqual([]);
   });
 
   it("下拉選單用 opacity／visibility 過渡，不再靠 display:none 切換", () => {

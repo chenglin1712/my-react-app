@@ -34,11 +34,6 @@
     position: relative;
 }
 
-/* 導覽列的常駐動畫只在首頁播放（P1-23）：每一頁都帶著無限循環動畫，既耗效能，
-   也違反 WCAG 2.2.2（自動播放超過 5 秒要能暫停）。其他頁面維持靜態畫面。 */
-.navbar--home .logo {
-    animation: yy-holo 5s linear infinite;
-}
 
 .logo::before {
     content: '';
@@ -50,35 +45,12 @@
     display: inline-block;
 }
 
-/* 菱形的脈動光圈：偽元素只動 transform 與 opacity，取代原本動 box-shadow */
-.logo::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    width: 14px;
-    height: 14px;
-    margin-top: -7px;
-    background: rgba(217, 162, 39, 0.55);
-    transform: rotate(45deg);
-    opacity: 0;
-    pointer-events: none;
-}
-
-.navbar--home .logo::after {
-    animation: yy-logo-ring 2.4s ease-out infinite;
-}
-
-@keyframes yy-logo-ring {
-    0% { opacity: 0.55; transform: rotate(45deg) scale(1); }
-    70%, 100% { opacity: 0; transform: rotate(45deg) scale(2.4); }
-}
 
 .logo img {
     width: 40px;
 }
 
-/* 頁首下方織紋跑馬燈色條，見 theme-v2.css 的 .yy-marquee-bar */
+/* 頁首下方的織紋色條（靜態） */
 .navbar-marquee {
     position: relative;
     height: 16px;
@@ -98,15 +70,6 @@
     right: 0;
     background-image: repeating-conic-gradient(var(--yy-red) 0deg 90deg, var(--yy-gold) 90deg 180deg, var(--yy-blue) 180deg 270deg, var(--yy-cream) 270deg 360deg);
     background-size: 32px 32px;
-}
-
-.navbar-marquee--home::before {
-    animation: yy-marquee-x 6s linear infinite;
-}
-
-@keyframes yy-marquee-x {
-    from { transform: translateX(0); }
-    to { transform: translateX(192px); }
 }
 
 .menu {

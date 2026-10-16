@@ -79,9 +79,8 @@ describe("彈窗進退場與逐字進場", () => {
     expect(theme).toMatch(/\.yy-modal-overlay\.is-leaving[\s\S]*?yy-fade-out-reduced/);
   });
 
-  it("逐字進場 450ms、不帶 overshoot 的彈性曲線", () => {
-    const block = rule(read("default/theme-v2.css"), ".yy-char");
-    expect(block).toMatch(/450ms var\(--ease-out\)/);
-    expect(block).not.toMatch(/1\.25/);
+  it("逐字進場已刪除：沒有 .yy-char 與 yy-char-in", () => {
+    const theme = read("default/theme-v2.css");
+    expect(theme).not.toMatch(/yy-char/);
   });
 });

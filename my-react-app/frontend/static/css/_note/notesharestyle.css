@@ -195,7 +195,7 @@
   border-radius: .5rem;
   font-size: .95rem;
   z-index: var(--yy-z-toast);
-  animation: ns-fadein .15s ease-out;
+  animation: ns-fadein var(--dur-fast) var(--ease-out);
 }
 @keyframes ns-fadein {
   from { opacity: 0; transform: translateX(-50%) translateY(6px); }

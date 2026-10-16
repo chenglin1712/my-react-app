@@ -222,7 +222,7 @@
   margin-top: 1rem;
   font-size: 1rem;
   font-weight: 700;
-  animation: sentFadeIn 0.3s ease;
+  animation: sentFadeIn var(--dur-base) var(--ease-out);
   text-align: center;
 }
 .sent-feedback.correct { color: var(--yy-green); }

@@ -126,10 +126,10 @@ describe("遊戲專區卡片標題對比", () => {
     expect(read(join(FRONTEND, "src/_game/index.jsx"))).not.toMatch(/style=\{\{\s*background:\s*g\.headerBg/);
   });
 
-  it("漸層色帶仍保留，並維持原本的流動動畫", () => {
+  it("漸層色帶仍保留，但不再流動（S2-2 刪除流光動畫）", () => {
     const band = (gameCss.match(/\.gamehub-card-head::before\s*\{([^}]*)\}/) || [])[1] ?? "";
     expect(band).toMatch(/background:\s*var\(--gamehub-head-band\)/);
-    expect(band).toMatch(/animation:\s*yy-holo/);
+    expect(band).not.toMatch(/animation:/);
   });
 
   it("標題、副標題、說明文字對米白底都 ≥ 4.5:1", () => {

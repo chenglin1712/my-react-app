@@ -280,7 +280,7 @@
   padding: 0.75rem 2rem;
   border-radius: var(--yy-radius-card);
   margin-bottom: 0.5rem;
-  animation: pron-fade-in 0.3s ease;
+  animation: pron-fade-in var(--dur-base) var(--ease-out);
 }
 .pron-score-box.excellent { background: var(--yy-success-bg); border: 1.5px solid var(--yy-green); color: var(--yy-green); }
 .pron-score-box.good      { background: var(--yy-info-bg); border: 1.5px solid var(--yy-info-bg); color: var(--yy-blue); }

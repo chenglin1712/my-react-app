@@ -167,7 +167,7 @@
     display: flex;
     align-items: flex-start;
     margin-bottom: 8px;
-    animation: bot-fade-in 0.3s ease;
+    animation: bot-fade-in var(--dur-base) var(--ease-out);
 }
 
 .bot-message.user {

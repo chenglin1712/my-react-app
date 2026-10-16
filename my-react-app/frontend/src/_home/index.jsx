@@ -8,7 +8,6 @@ import { useAuth } from "../userServives/authContext";
 import { TRIBES } from "../constants/tribes";
 import { scrollBehavior } from "../hooks/useReducedMotion";
 import RevealOnView from "../../components/ui/RevealOnView";
-import CharReveal from "../../components/ui/CharReveal";
 
 const ANNOUNCEMENT_CATEGORY_LABELS = { announcement: '公告', activity: '活動', exam: '考試', maintenance: '系統維護' };
 
@@ -190,14 +189,10 @@ const HomePage = () => {
 
                 <div className="yy-fade-up">
                     <span className="yy-eyebrow yy-eyebrow--zh">原住民族語 · 五族共學</span>
-                    <h1 className="home-title" aria-label="五族語言，刻進織紋裡的學習旅程">
-                        <CharReveal text="五族語言，" start={0} />
+                    <h1 className="home-title">
+                        五族語言，
                         <br />
-                        <CharReveal text="刻進" start={0.1} />
-                        {/* 「織紋」用文字挖空漸層（background-clip: text）：不能拆成逐字的子元素（拆開後漸層文字會消失），
-                            改成這個元素本身整體彈出，延遲接在前一段之後 */}
-                        <span className="yy-holo-text yy-char" aria-hidden="true" style={{ animationDelay: "0.17s" }}>織紋</span>
-                        <CharReveal text="裡的學習旅程" start={0.2} />
+                        刻進<span className="yy-accent-text">織紋</span>裡的學習旅程
                     </h1>
                     <p className="home-desc">泰雅、布農、阿美、噶瑪蘭、排灣——影像辨識、詞彙遊戲與適性測驗，用鮮明色彩延續族語文化的生命力。</p>
                 </div>

@@ -6,7 +6,7 @@
   border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: var(--yy-radius-card);
   text-align: center;
-  animation: recommon-start-fade-in 0.6s ease;
+  animation: recommon-start-fade-in var(--dur-base) var(--ease-out);
 }
 
 .start-title {
