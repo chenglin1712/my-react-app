@@ -49,8 +49,8 @@
 }
 
 .register-consent a:focus-visible {
-    outline: var(--yy-focus-ring);
-    outline-offset: var(--yy-focus-offset);
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
 }
 
 .registerForm {
@@ -78,7 +78,7 @@
 
 /* 鍵盤聚焦要看得出來：只靠陰影位移太弱，跟登入表單一樣在外層畫出焦點框 */
 .register-box .input-wrapper:focus-within {
-    outline: var(--yy-focus-ring);
+    outline: var(--yy-ui-focus-ring);
     outline-offset: 2px;
 }
 

@@ -76,7 +76,7 @@ describe("outline: none 一律要有替代的焦點樣式", () => {
 
   it.each(OUTLINE_NONE_ALLOWLIST)("%s 的「%s」由 %s 畫焦點外框", (_file, _selector, cover, coverFile = "default/theme-v2.css") => {
     const css = files.find((f) => f.file === coverFile).css;
-    const rule = rules(css).find((r) => r.selector.includes(cover) && /--yy-focus-ring/.test(r.body));
+    const rule = rules(css).find((r) => r.selector.includes(cover) && /--yy-ui-focus-ring/.test(r.body));
     expect(rule, `${coverFile} ${cover}`).toBeTruthy();
   });
 });

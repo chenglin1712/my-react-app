@@ -137,7 +137,7 @@ components:
 ### 深色模式（跟隨裝置，手動可切換）
 底 #24282C、卡片 #2E3338、文字 #F2EEE3、次要文字 #D3CEC1、框線 #7D868E（原 #6B747C 對卡片底只有 2.68，未達 3:1，已調亮）、銅褐 #C99372、深銅 #D7A98B、橄欖 #B3A06A。狀態色與提示底色值見 frontmatter。
 
-實作在 `frontend/static/css/default/theme-v2.css` 的 `--yy-calm-*`（23 個語意 token，舊 token 原封不動）。`<html>` 沒有 `data-theme` 時跟隨裝置，`data-theme="dark"` 手動深色；只認 light、dark，其他值當淺色，切換程式要拒絕未知值。目前沒有頁面使用，所以不改變畫面；啟用深色前置條件：兩個深色區塊加 `color-scheme: dark`，`index.html` 的 color-scheme meta 改為 `light dark`。深色的提示底與卡片底幾乎同色（約 1.1:1），提示框必須加 1px 框線。主題切換不做顏色過渡。
+實作在 `frontend/static/css/default/theme-v2.css` 的 `--yy-calm-*`（23 個語意 token，舊 token 原封不動）。`<html data-theme="system">` 才跟隨裝置，`data-theme="dark"` 手動深色；沒有屬性或其他值都是淺色，切換程式要拒絕未知值。S2-1 起共用按鈕、標籤、晶片、頁籤已使用這些 token，而多數頁面底色仍是舊象牙色，所以跟隨裝置必須明確選擇才生效，深色系統的使用者畫面不變。啟用深色前置條件：兩個深色區塊加 `color-scheme: dark`，`index.html` 的 color-scheme meta 改為 `light dark`。深色的提示底與卡片底幾乎同色（約 1.1:1），提示框必須加 1px 框線。主題切換不做顏色過渡。
 
 ### 實測對比（WCAG 相對亮度，我計算的）
 
@@ -226,7 +226,12 @@ components:
 - **主要（Primary）:** 深銅底 (#7E5239)、象牙白字、粗體 15px、3px 圓角。對比 6.35。
 - **登入:** 深石板實心底、象牙白字（取代原本風格稿的查詞框）。
 - **外框（Outline）:** 透明底、深石板字與 1.5px 邊框。
-- **狀態:** hover 輕浮 3px（僅限有 hover 的精確指標裝置）；按下縮到 0.97 到 0.99；focus 顯示清楚焦點框；停用降低不透明度且不可點。
+- **文字連結（第三階）:** `.yy-link`，深銅字加 1.5px 底線（不靠顏色分辨），hover 底線加粗到 3px。內文與段落裡用連結，獨立成一行的動作用按鈕。
+- **標籤（Eyebrow）:** `.yy-eyebrow`，深橄欖底、象牙白字、3px 圓角、13px 粗體；不是按鈕，沒有 hover。
+- **晶片（族語切換 `.yy-pill`）:** 3px 圓角、最小高度 44px；選取狀態不只靠顏色：內縮 1.5px 石板環加字前的勾。族色只當選取時的小底色。
+- **頁籤（`.yy-tabswitch`）:** 選取＝深銅底象牙白字；焦點框往內畫，不被容器切掉。
+- **共通狀態:** 最小高度 44px；只過渡顏色與 transform（160ms ease-out），不用 `transition: all`；hover 只在有滑鼠的裝置（`hover: hover` 且 `pointer: fine`）；按下縮到 `--yy-ui-press`（0.97）；停用為 50% 不透明度、不可點、不縮放；鍵盤焦點不做動畫。
+- **焦點框（全站唯一）:** `--yy-ui-focus-ring`（2px 實線，色取 `--yy-calm-focus`，對頁面底 6.35:1）、距離 `--yy-ui-focus-offset`（3px）。前台 CSS 不得再用舊的 `--yy-focus-ring`（紅色 3px，後台還在用，階段 G 刪）。深色底（導覽列、頁尾、石板灰區塊）改用淺色焦點框。
 - **已知問題（舊系統遺留）:** `_note/buttons.css` 對全站 `button, .btn` 設 `min-width: 100px`（審查項 P1-9），改版時一併處理。
 
 ### Cards／Containers

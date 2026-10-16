@@ -81,12 +81,14 @@ describe("前台 CSS 的動態規則", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("硬陰影主按鈕按下去時不會被脈動動畫蓋掉陰影", () => {
-    const rules = walkRules(allFiles.find(({ file }) => file === "default/theme-v2.css").css);
-    const hover = rules.find((r) => r.selector === ".yy-btn-primary:hover");
-    const active = rules.find((r) => r.selector === ".yy-btn-primary:active");
-    expect(hover.body).toMatch(/animation:\s*none/);
-    expect(active.body).toMatch(/animation:\s*none/);
+  it("主要按鈕不帶任何持續動畫（舊的金色脈動已移除，hover 與按下回饋不會被蓋掉）", () => {
+    const offenders = [];
+    allFiles.forEach(({ file, css }) =>
+      walkRules(css).forEach(({ selector, body }) => {
+        if (selector.includes(".yy-btn-primary") && /animation\s*:\s*(?!none)\S/.test(body)) offenders.push(`${file}: ${selector}`);
+      }),
+    );
+    expect(offenders).toEqual([]);
   });
 
   it("同名 @keyframes 不會出現在不同檔案（避免載入順序決定動畫）", () => {

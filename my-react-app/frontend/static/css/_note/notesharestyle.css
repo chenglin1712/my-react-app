@@ -34,7 +34,7 @@
 }
 @media(min-width:720px){.ns-search-input{width:16rem;}}
 /* 輸入框自己沒有外框，由外層膠囊在輸入框取得焦點時畫焦點外框 */
-.ns-search:focus-within{outline:var(--yy-focus-ring); outline-offset:var(--yy-focus-offset);}
+.ns-search:focus-within{outline:var(--yy-ui-focus-ring); outline-offset:var(--yy-ui-focus-offset);}
 
 /* 分頁籤與刷新 */
 .ns-tabs{display:flex; align-items:center; gap:.5rem;}

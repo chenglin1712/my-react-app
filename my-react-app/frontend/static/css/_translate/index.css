@@ -323,8 +323,8 @@
     justify-content: center;
 }
 .yy-evidence-audio-btn:focus-visible {
-    outline: var(--yy-focus-ring);
-    outline-offset: var(--yy-focus-offset);
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
 }
 .yy-evidence-audio-btn:hover {
     color: var(--yy-red);
@@ -436,8 +436,8 @@
 .translate-guest-link:focus-visible,
 .translate-guest-note a:focus-visible,
 .translate-guest-privacy summary:focus-visible {
-    outline: var(--yy-focus-ring);
-    outline-offset: var(--yy-focus-offset);
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
 }
 
 .translate-guest-callout {

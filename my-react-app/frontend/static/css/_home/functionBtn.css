@@ -110,8 +110,8 @@
 }
 
 .home-func-card:focus-visible {
-    outline: var(--yy-focus-ring);
-    outline-offset: var(--yy-focus-offset);
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
 }
 
 @media (max-width: 720px) {

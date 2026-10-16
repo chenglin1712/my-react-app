@@ -15,8 +15,8 @@ const tokensIn = (body) => Object.fromEntries([...body.matchAll(/(--yy-calm-[\w-
 // 淺色：第一個 :root 區塊（沒有 :not、沒有屬性選擇器）
 const rootBody = css.match(/:root\s*\{([\s\S]*?)\n\}/)[1];
 const light = tokensIn(rootBody);
-// 深色 1：跟隨裝置（<html> 沒有 data-theme 屬性時才跟隨；未知值當淺色）
-const mediaBody = css.match(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root:not\(\[data-theme\]\)\s*\{([^}]*)\}/)[1];
+// 深色 1：跟隨裝置（要明確設 <html data-theme="system"> 才跟隨；沒有屬性或未知值都是淺色）
+const mediaBody = css.match(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root\[data-theme="system"\]\s*\{([^}]*)\}/)[1];
 const darkAuto = tokensIn(mediaBody);
 // 深色 2：使用者明確選深色
 const darkManual = tokensIn(css.match(/:root\[data-theme="dark"\]\s*\{([^}]*)\}/)[1]);

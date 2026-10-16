@@ -116,6 +116,12 @@
   --yy-border: var(--yy-ink);     /* Y2K 粗黑框 */
   --yy-focus-ring: 3px solid var(--yy-red);
   --yy-focus-offset: 2px;
+  /* 沉穩文藝的互動元件尺寸（S2-1）。舊的 --yy-radius-btn、--yy-focus-ring 後台還在用，所以另立新名，不改舊值。
+     焦點框 2px 以上、距離邊緣 3px，不被相鄰元件遮住；顏色取 --yy-calm-focus，隨深淺色主題切換。 */
+  --yy-ui-radius: 3px;
+  --yy-ui-focus-ring: 2px solid var(--yy-calm-focus);
+  --yy-ui-focus-offset: 3px;
+  --yy-ui-press: 0.97;             /* 按下回饋的縮放比例，所有可按元件共用 */
 
   /* ---------- 間距（4px 基準）---------- */
   --yy-space-1: 4px;
@@ -195,15 +201,17 @@
 
 /* ---------- 沉穩文藝語意色：深色版（S1-2）----------
    只重新定義 --yy-calm-*，兩個區塊的值必須一致（calmPalette.test.js 檢查）：
-   1. 作業系統是深色、且 <html> 沒有 data-theme 屬性時（跟隨裝置）
+   1. 作業系統是深色、且 <html data-theme="system">（明確選擇「跟隨裝置」）時
    2. data-theme="dark"（手動選深色）
-   data-theme 只認 light、dark 兩個值；其他值當淺色（既不跟隨裝置也不變深），切換程式要拒絕未知值。
-   目前沒有任何頁面使用 --yy-calm-*，所以這兩段還不會改變畫面；上面 :root 的 color-scheme 仍是 light。
+   data-theme 只認 system、dark 兩個值；沒有這個屬性或其他值都是淺色，切換程式要拒絕未知值。
+   S2-1 起共用按鈕、標籤、晶片、頁籤已經使用 --yy-calm-*，而多數頁面底色還是舊的象牙色，
+   所以「跟隨裝置」改成明確選擇才生效（D7 決定預設值之前，沒有屬性＝淺色，深色系統的使用者畫面不變）。
+   上面 :root 的 color-scheme 仍是 light。
    啟用深色的前置條件（改版計畫 D7 決定預設後）：在這兩段加上 color-scheme: dark，否則原生輸入框、
    下拉選單、捲軸仍是淺色樣式；同時 index.html 的 color-scheme meta 要改成 light dark。
    不要在這裡寫元件規則，元件一律透過 token 取色。 */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) {
+  :root[data-theme="system"] {
     --yy-calm-bg: #24282C;
     --yy-calm-surface: #2E3338;
     --yy-calm-text: #F2EEE3;
@@ -501,20 +509,23 @@
   animation: yy-floaty 10s ease-in-out infinite;
 }
 
+/* 標籤（小標）：深橄欖底、象牙白字，對比 5.4 以上；不是按鈕，所以沒有 hover 與 cursor。
+   英文全大寫靠字距撐開，中文不加字距過大，所以 --zh 縮小字距。 */
 .yy-eyebrow {
   display: inline-block;
-  padding: 6px 18px;
-  border-radius: var(--yy-radius-btn);
-  background: var(--yy-ink);
-  border: var(--yy-border-width) solid var(--yy-gold);
-  font-family: var(--yy-font-pixel);
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  color: var(--yy-gold);
+  padding: 4px 12px;
+  border-radius: var(--yy-ui-radius);
+  background: var(--yy-calm-tag);
+  color: var(--yy-calm-tag-on);
+  font-family: var(--yy-font-body);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.1em;
 }
-/* 標籤裡有中文時（像素字型的中文會落到後備字型）字級放到 14px */
 .yy-eyebrow--zh {
   font-size: 14px;
+  letter-spacing: 0.04em;
 }
 
 .yy-holo-text {
@@ -546,73 +557,159 @@
   transform: scale(0.98);
 }
 
-.yy-btn-primary {
-  padding: 14px;
-  border-radius: var(--yy-radius-btn);
-  border: var(--yy-border-width) solid var(--yy-ink);
-  background: var(--yy-red);
-  color: var(--yy-cream);
+/* 按鈕三階：主要（深銅實心）、外框（細框透明底）、文字連結（見下方「連結」）。
+   共通：最小高度 44px、3px 圓角、只過渡顏色與 transform，按下縮到 --yy-ui-press。
+   hover 只在有滑鼠的裝置生效；鍵盤焦點不做動畫（焦點框直接出現）。 */
+.yy-btn-primary,
+.yy-btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--yy-control-md);
+  border-radius: var(--yy-ui-radius);
+  border: var(--yy-border-width) solid var(--yy-calm-accent);
+  font-family: var(--yy-font-body);
   font-weight: 700;
-  font-size: 15px;
+  line-height: 1.4;
   cursor: pointer;
-  transition: transform .15s ease, background .15s ease;
+  text-decoration: none;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.yy-btn-primary:active,
+.yy-btn-outline:active {
+  transform: scale(var(--yy-ui-press));
+}
+.yy-btn-primary:disabled,
+.yy-btn-outline:disabled,
+.yy-btn-primary[aria-disabled="true"],
+.yy-btn-outline[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.yy-btn-primary {
+  padding: 10px 22px;
+  background: var(--yy-calm-accent);
+  color: var(--yy-calm-accent-on);
+  font-size: 15px;
 }
 @media (hover: hover) and (pointer: fine) {
-  .yy-btn-primary:hover {
-    background: var(--yy-red-dark);
-    /* animation 的優先序高於一般宣告：脈動會一直蓋掉這裡縮小後的陰影（審查項 P1-28） */
-    animation: none;
+  .yy-btn-primary:hover:not(:disabled):not([aria-disabled="true"]) {
+    /* 往石板字色混 14%，仍與象牙白字維持 AA（約 8:1） */
+    background: color-mix(in srgb, var(--yy-calm-accent) 86%, var(--yy-calm-text));
+    border-color: color-mix(in srgb, var(--yy-calm-accent) 86%, var(--yy-calm-text));
   }
 }
 
-.yy-btn-primary:active {
-  transform: scale(0.97);
-  box-shadow: none;
-  animation: none;
+.yy-btn-outline {
+  padding: 10px 18px;
+  background: transparent;
+  color: var(--yy-calm-text);
+  border-color: var(--yy-calm-line);
+  font-size: 14px;
 }
-.yy-btn-primary:disabled {
-  background: #B79A8A;
-  cursor: not-allowed;
-  animation: none;
+@media (hover: hover) and (pointer: fine) {
+  .yy-btn-outline:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--yy-calm-info-bg);
+  }
 }
 
-.yy-btn-outline {
-  padding: 11px 18px;
-  border-radius: var(--yy-radius-btn);
-  border: var(--yy-border-width) solid var(--yy-ink);
-  background: var(--yy-surface);
-  color: var(--yy-ink);
-  font-weight: 700;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background .15s ease;
+/* 淺色頁面裡的深色區塊（石板灰的最新消息、公告等）：區塊內的外框按鈕、連結與焦點框改用象牙白。
+   這和「整頁深色主題」是兩回事，深色主題由 --yy-calm-* 在 data-theme 下整組換值。
+   重新宣告 --yy-ui-focus-ring，區塊內所有用該 token 的焦點框都會跟著換色。 */
+.yy-on-dark {
+  --yy-ui-focus-ring: 2px solid var(--yy-calm-focus-on-block);
+  color: var(--yy-calm-block-on);
 }
-.yy-btn-outline:hover {
-  background: var(--yy-cream);
+.yy-on-dark .yy-btn-outline {
+  color: var(--yy-calm-block-on);
+  border-color: var(--yy-calm-block-on);
 }
-.yy-btn-outline:disabled {
-  opacity: .45;
-  cursor: not-allowed;
+.yy-on-dark .yy-link {
+  color: var(--yy-calm-block-accent);
+}
+@media (hover: hover) and (pointer: fine) {
+  .yy-on-dark .yy-btn-outline:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: rgb(255 249 237 / 0.12);
+  }
+}
+
+/* 連結（按鈕三階的第三階）：深銅字加底線，底線讓連結不靠顏色也認得出來。
+   用在內文與段落裡的文字連結；獨立成一行的動作用按鈕。 */
+.yy-link {
+  color: var(--yy-calm-accent);
+  text-decoration: underline;
+  text-decoration-thickness: var(--yy-border-width);
+  text-underline-offset: 0.2em;
+  transition: color var(--dur-fast) var(--ease-out), text-decoration-thickness var(--dur-fast) var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .yy-link:hover {
+    text-decoration-thickness: 3px;
+  }
 }
 
 /* ---------- 族語切換膠囊 (TribePill) ---------- */
 
+/* 晶片（族語切換）：3px 圓角，不是膠囊形狀，類名 pill 是沿用舊名。
+   選取狀態不只靠顏色：加深邊框（內縮 1.5px 的石板色環）並在字前面加勾，灰階與色盲都看得出來。
+   選取時的底色由元件以內聯樣式帶入族色（族色只當小標記，白名單見 designGuard.test.js）。 */
 .yy-pill {
-  padding: 9px 18px;
-  border-radius: var(--yy-radius-btn);
-  background: var(--yy-surface);
-  color: var(--yy-ink);
-  border: var(--yy-border-width) solid var(--yy-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--yy-control-md);
+  padding: 8px 18px;
+  border-radius: var(--yy-ui-radius);
+  background: var(--yy-calm-surface);
+  color: var(--yy-calm-text);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  font-family: var(--yy-font-body);
   font-weight: 700;
   font-size: 14px;
+  line-height: 1.4;
   cursor: pointer;
-  transform: scale(1);
-  transition: var(--transition-interactive);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .yy-pill:not(.active):hover {
+    background: var(--yy-calm-info-bg);
+  }
+}
+.yy-pill:active {
+  transform: scale(var(--yy-ui-press));
 }
 .yy-pill.active {
-  color: var(--yy-surface);
-  /* 選取狀態不放大（scale 1.06 會壓到相鄰的膠囊，縮放過程文字邊緣也會糊），改成往左上位移並加深陰影 */
-  transform: translateY(-1px);
+  box-shadow: inset 0 0 0 var(--yy-border-width) var(--yy-calm-text);
+}
+.yy-pill.active::before {
+  content: "\2713";
+  content: "\2713" / "";   /* 後半是替代文字：空字串＝報讀器略過，狀態由 aria-pressed 負責 */
+  margin-right: 6px;
+  font-weight: 800;
+}
+
+/* Windows 高對比模式會移除背景色與陰影：選取中的晶片與頁籤改用系統色框線與底線，不靠填色辨識 */
+@media (forced-colors: active) {
+  .yy-pill.active {
+    outline: 3px solid Highlight;
+    outline-offset: -3px;
+  }
+  .yy-tabswitch__tab.active {
+    text-decoration: underline;
+    text-decoration-thickness: 3px;
+    text-underline-offset: 0.3em;
+  }
 }
 
 /* ---------- 步驟流程條 (StepBar) ---------- */
@@ -694,27 +791,41 @@
 
 .yy-tabswitch {
   display: inline-flex;
-  border: var(--yy-border-width) solid var(--yy-ink);
-  border-radius: var(--yy-radius-btn);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-ui-radius);
   overflow: hidden;
 }
 .yy-tabswitch__tab {
-  padding: 11px 28px;
+  min-height: var(--yy-control-md);
+  padding: 8px 28px;
+  font-family: var(--yy-font-body);
   font-weight: 700;
   font-size: 14px;
   cursor: pointer;
-  background: var(--yy-surface);
-  color: var(--yy-ink);
+  background: var(--yy-calm-surface);
+  color: var(--yy-calm-text);
   border: none;
-  border-left: 3px solid var(--yy-ink);
+  border-left: var(--yy-border-width) solid var(--yy-calm-line);
   transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
 .yy-tabswitch__tab:first-child {
   border-left: none;
 }
+@media (hover: hover) and (pointer: fine) {
+  .yy-tabswitch__tab:not(.active):hover {
+    background: var(--yy-calm-info-bg);
+  }
+}
 .yy-tabswitch__tab.active {
-  background: var(--yy-red);
-  color: var(--yy-cream);
+  background: var(--yy-calm-accent);
+  color: var(--yy-calm-accent-on);
+}
+/* 頁籤擠在容器裡，焦點框往內畫才不會被 overflow: hidden 切掉 */
+.yy-tabswitch__tab:focus-visible {
+  outline-offset: calc(var(--yy-border-width) * -2);
+}
+.yy-tabswitch__tab.active:focus-visible {
+  outline-color: var(--yy-calm-accent-on);
 }
 
 /* ---------- 菱形徽章 (DiamondBadge) ---------- */
@@ -948,8 +1059,8 @@
 
 /* 1. 基線：用 :where() 讓它的優先權是 0，任何元件自己的焦點樣式都能覆寫 */
 :where(a, button, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
-  outline: var(--yy-focus-ring);
-  outline-offset: var(--yy-focus-offset);
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
 }
 
 /* 2. 深色底（導覽列、頁尾）上的紅色外框看不清楚，改用淺金色 */
@@ -972,15 +1083,15 @@
   .edit-container input,
   .edit-container select
 ):focus-visible {
-  outline: var(--yy-focus-ring);
-  outline-offset: var(--yy-focus-offset);
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
 }
 
 /* 4. 輸入框本身沒有外框、改由外層容器代表焦點的元件：容器在內部任何元素取得焦點時畫外框 */
 .input-wrapper:focus-within,
 .yy-terminal:focus-within {
-  outline: var(--yy-focus-ring);
-  outline-offset: var(--yy-focus-offset);
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
 }
 
 /* ---------- 觸控區 44px（審查項 P2-96）----------

@@ -127,7 +127,7 @@
 .area-inputgrid:focus-visible {
     /* 填字格取得鍵盤焦點時：外框畫在格子內側並加底色，避免被相鄰格子蓋住（全站焦點基線見 theme-v2.css）；
        輸入框被格子的 overflow:hidden 包住，外框必須畫在格子裡面（負的 offset） */
-    outline: var(--yy-focus-ring);
+    outline: var(--yy-ui-focus-ring);
     outline-offset: -3px;
     background-color: rgba(217, 162, 39, 0.35);
 }

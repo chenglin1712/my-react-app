@@ -218,6 +218,6 @@
 
 .event-input-bar select:focus-visible {
     border-color: var(--yy-red);
-    outline: var(--yy-focus-ring);
+    outline: var(--yy-ui-focus-ring);
     outline-offset: 2px;
 }

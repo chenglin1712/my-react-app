@@ -111,8 +111,8 @@ describe("theme-v2 token", () => {
     expect([...z].sort((a, b) => a - b)).toEqual(z);
   });
 
-  it("焦點基線使用 --yy-focus-ring token", () => {
-    expect(theme).toMatch(/outline:\s*var\(--yy-focus-ring\)/);
+  it("焦點基線使用 --yy-ui-focus-ring token", () => {
+    expect(theme).toMatch(/outline:\s*var\(--yy-ui-focus-ring\)/);
   });
 });
 
