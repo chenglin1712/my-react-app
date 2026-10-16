@@ -15,21 +15,34 @@
 .homepage-config-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--admin-muted); }
 .homepage-config-uploader .form-text { display: block; margin-top: 10px; }
 .homepage-config-upload-status { display: inline-flex; align-items: center; gap: 7px; margin-top: 10px; color: var(--admin-muted); font-size: 14px; }
-.homepage-config-switch-grid .homepage-config-field { padding: 14px; background: var(--admin-surface-muted); border: 1px solid var(--admin-border); border-radius: 8px; }
 .homepage-config-count { max-width: 320px; }
-.homepage-config-feature-list { display: grid; gap: 12px; }
-.homepage-config-feature-list .form-check { padding: 14px 14px 14px 48px; background: var(--admin-surface-muted); border: 1px solid var(--admin-border); border-radius: 8px; }
+/* 開關列：整列至少 44px 高，標籤可點擊；說明文字放在開關下方 */
+.homepage-config-switch { margin-bottom: 22px; padding: 12px 14px; background: var(--admin-surface-muted); border: 1px solid var(--admin-border); border-radius: 8px; }
+.homepage-config-switch .form-check { display: flex; align-items: center; gap: 12px; min-height: 44px; margin: 0; padding-left: 0; }
+.homepage-config-switch .form-check-input { flex: none; float: none; margin: 0; }
+.homepage-config-switch .form-check-label { flex: 1; cursor: pointer; }
+.homepage-config-switch .form-text { display: block; margin: 0 0 4px 0; }
+.homepage-config-switch-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; margin-bottom: 4px; }
+.homepage-config-switch-list .homepage-config-switch { margin-bottom: 14px; }
+.homepage-config-section textarea.form-control { min-height: 120px; resize: vertical; }
+.homepage-config-footer .btn:active:not(:disabled) { transform: scale(0.97); }
+.homepage-config-footer .btn { transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1); }
+@media (prefers-reduced-motion: reduce) {
+  .homepage-config-footer .btn { transition: none; }
+  .homepage-config-footer .btn:active:not(:disabled) { transform: none; }
+}
 .homepage-config-footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--admin-border); }
 .homepage-config-footer > span { color: var(--admin-muted); font-size: 14px; }
 .homepage-config-loading { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 240px; color: var(--admin-muted, var(--admin-muted)); }
 
 @media (max-width: 900px) {
   .homepage-config-page { padding-bottom: 48px; }
+  .homepage-config-switch-list { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 600px) {
   .homepage-config-card { padding: 20px; }
-  .homepage-config-grid, .homepage-config-uploader { grid-template-columns: 1fr; }
+  .homepage-config-grid, .homepage-config-uploader, .homepage-config-switch-list { grid-template-columns: 1fr; }
   .homepage-config-uploader img, .homepage-config-placeholder { width: 100%; }
   .homepage-config-footer { align-items: stretch; flex-direction: column; }
 }
