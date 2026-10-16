@@ -23,7 +23,15 @@ colors:
   dark-surface: "#2E3338"
   dark-fg: "#F2EEE3"
   dark-fg-sub: "#D3CEC1"
-  dark-line: "#6B747C"
+  dark-line: "#7D868E"
+  dark-rule: "#3C4248"
+  dark-success-fg: "#8CCFA9"
+  dark-success-bg: "#22372D"
+  dark-warning-fg: "#E3C377"
+  dark-warning-bg: "#3A3220"
+  dark-danger-fg: "#EDA4B5"
+  dark-danger-bg: "#40262E"
+  dark-info-bg: "#343A3E"
   dark-copper: "#C99372"
   dark-copper-deep: "#D7A98B"
   dark-olive: "#B3A06A"
@@ -119,7 +127,7 @@ components:
 - **深石板** (#292D31)：文字與細框。
 - **深銅** (#7E5239)：連結、小字強調、主要按鈕底色。
 - **深橄欖** (#6F6040)：小字標記底色。
-- **淺銅** (#C9976F)：只放在深色底上的點綴（石板灰上僅限大字與圖示）。
+- **淺銅** (#C9976F)：只放在深石板 (#292D31) 底上的點綴。石板灰 (#41464B) 底上改用 #D7A98B（對比 4.51），語意 token 是 `--yy-calm-block-accent`。
 - **白** (#FFFFFF)：卡片與輸入框底色。
 - **分隔線淺色** (#E9E2D2)：列表內的細分隔。
 
@@ -127,7 +135,9 @@ components:
 成功 (#2F6F4B 字／#E3F0E8 底)、需注意 (#7D5B0E／#F6ECD3)、錯誤 (#8A3A4E／#F5E1E6)、資訊底 (#EFE6DA)。深色模式各有對應的亮色字與深色底（見 frontmatter 與下表）。
 
 ### 深色模式（跟隨裝置，手動可切換）
-底 #24282C、卡片 #2E3338、文字 #F2EEE3、次要文字 #D3CEC1、框線 #6B747C、銅褐 #C99372、深銅 #D7A98B、橄欖 #B3A06A。
+底 #24282C、卡片 #2E3338、文字 #F2EEE3、次要文字 #D3CEC1、框線 #7D868E（原 #6B747C 對卡片底只有 2.68，未達 3:1，已調亮）、銅褐 #C99372、深銅 #D7A98B、橄欖 #B3A06A。狀態色與提示底色值見 frontmatter。
+
+實作在 `frontend/static/css/default/theme-v2.css` 的 `--yy-calm-*`（23 個語意 token，舊 token 原封不動）。`<html>` 沒有 `data-theme` 時跟隨裝置，`data-theme="dark"` 手動深色；只認 light、dark，其他值當淺色，切換程式要拒絕未知值。目前沒有頁面使用，所以不改變畫面；啟用深色前置條件：兩個深色區塊加 `color-scheme: dark`，`index.html` 的 color-scheme meta 改為 `light dark`。深色的提示底與卡片底幾乎同色（約 1.1:1），提示框必須加 1px 框線。主題切換不做顏色過渡。
 
 ### 實測對比（WCAG 相對亮度，我計算的）
 
@@ -142,10 +152,10 @@ components:
 | **銅褐 on 象牙白（含反向）** | **4.49** | **差 0.01 未達 4.5，只能用於大字（24px 以上，或 18.66px 以上粗體）與達 3:1 的邊框、功能圖示** |
 | **橄欖卡其 on 象牙白（含反向）** | **4.29** | **未達 4.5，限制同銅褐** |
 | 淺銅 on 深石板 (#292D31) | 5.38 | 通過 AA |
-| **淺銅 on 石板灰** | **3.70** | **只能用於大字與圖示，小字禁用** |
+| 淺銅 #C9976F on 石板灰 | 3.70 | 只能用於大字與圖示；語意層改用 #D7A98B，對石板灰 4.51 通過 AA |
 | 深色：文字 on 底 | 12.80 | 通過 AAA |
 | 深色：銅褐 on 底／on 卡片 | 5.58／4.80 | 通過 AA |
-| 深色：框線 on 底 | 3.12 | 勉強通過非文字元件 3:1，只做必要邊界，不排小字、不降低不透明度 |
+| 深色：框線 #7D868E on 底／on 卡片 | 4.01／3.44 | 通過非文字元件 3:1 |
 | 狀態色（淺色／深色）字 on 底 | 5.12 至 7.08 | 皆通過 AA |
 
 ### Named Rules

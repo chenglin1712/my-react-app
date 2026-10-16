@@ -68,6 +68,41 @@
   --yy-info: var(--yy-blue-light);
   --yy-info-bg: #DFE9EC;
 
+  /* ---------- 沉穩文藝語意色（S1-2）----------
+     新風格的色彩層，名稱一律 --yy-calm-*。上面的舊 token（--yy-red、--yy-cream、--yy-gold…）原封不動，
+     還沒改版的頁面照舊顯示；各頁改版時（S2 以後）改用這一組，全部換完再刪舊 token。
+     色值來源與對比數字見 DESIGN.md；colorTokens 旁的 calmPalette.test.js 會讀這裡的實際值重算對比。
+     規則：小字、連結、按鈕底色用 accent（深銅）或 tag（深橄欖）；copper／olive 原色對象牙白只有 4.49／4.29，
+     只放色塊、大字（24px 以上或 18.66px 以上粗體），以及「對緊鄰顏色」達 3:1 的必要邊框與功能圖示
+     （對象牙白達標，不代表對石板灰或其他色塊也達標，換底色要重算）。
+     info-bg 在深色模式與 surface 幾乎同色（約 1.1:1），提示框一定要加 1px 的 --yy-calm-line 邊框，不能只靠底色分辨。
+     主題切換不做過渡：不要對 :root 或 body 加 color／background-color 的 transition，
+     否則切換瞬間整頁會慢慢變色，而且各元件會不同步。 */
+  --yy-calm-bg: #FFF9ED;           /* 頁面底，象牙白 */
+  --yy-calm-surface: #FFFFFF;      /* 卡片、輸入框、彈窗 */
+  --yy-calm-text: #292D31;         /* 內文與標題，深石板 */
+  --yy-calm-text-sub: #41464B;     /* 次要文字 */
+  --yy-calm-line: #292D31;         /* 控制項與卡片的 1.5px 細框，要達 3:1 */
+  --yy-calm-rule: #E9E2D2;         /* 純分隔線，裝飾用，不當控制項邊框 */
+  --yy-calm-accent: #7E5239;       /* 連結、小字強調、主要按鈕底（深銅） */
+  --yy-calm-accent-on: #FFF9ED;    /* accent 底上的字 */
+  --yy-calm-copper: #98694C;       /* 銅褐原色：色塊、大字、邊框、圖示；不做小字 */
+  --yy-calm-olive: #86754D;        /* 橄欖卡其原色：同上 */
+  --yy-calm-tag: #6F6040;          /* 小字標記的底色（深橄欖） */
+  --yy-calm-tag-on: #FFF9ED;
+  --yy-calm-block: #41464B;        /* 石板灰區塊（最新消息、公告） */
+  --yy-calm-block-on: #FFF9ED;
+  --yy-calm-block-accent: #D7A98B; /* 石板灰上的淺銅，小字也可用（對比 4.51）；原淺銅 #C9976F 只有 3.70，不放進語意層 */
+  --yy-calm-info-bg: #EFE6DA;
+  --yy-calm-success: #2F6F4B;
+  --yy-calm-success-bg: #E3F0E8;
+  --yy-calm-warning: #7D5B0E;
+  --yy-calm-warning-bg: #F6ECD3;
+  --yy-calm-danger: #8A3A4E;
+  --yy-calm-danger-bg: #F5E1E6;
+  --yy-calm-focus: #7E5239;        /* 焦點外框，用在 bg／surface 上，要 3:1 */
+  --yy-calm-focus-on-block: #FFF9ED; /* 焦點外框，用在石板灰區塊（block）內的控制項；按鈕自己的焦點框畫在外側，用 --yy-calm-focus */
+
   /* ---------- 表面與焦點（審查項 P2-12、P2-19）---------- */
   --yy-surface: #FFFFFF;          /* 卡片、輸入框、彈窗的底色 */
   --yy-surface-page: var(--yy-cream);
@@ -149,6 +184,70 @@
     --yy-success-border: color-mix(in srgb, var(--yy-success) 35%, #fff);
     --yy-danger-border: color-mix(in srgb, var(--yy-danger) 35%, #fff);
   }
+}
+
+/* ---------- 沉穩文藝語意色：深色版（S1-2）----------
+   只重新定義 --yy-calm-*，兩個區塊的值必須一致（calmPalette.test.js 檢查）：
+   1. 作業系統是深色、且 <html> 沒有 data-theme 屬性時（跟隨裝置）
+   2. data-theme="dark"（手動選深色）
+   data-theme 只認 light、dark 兩個值；其他值當淺色（既不跟隨裝置也不變深），切換程式要拒絕未知值。
+   目前沒有任何頁面使用 --yy-calm-*，所以這兩段還不會改變畫面；上面 :root 的 color-scheme 仍是 light。
+   啟用深色的前置條件（改版計畫 D7 決定預設後）：在這兩段加上 color-scheme: dark，否則原生輸入框、
+   下拉選單、捲軸仍是淺色樣式；同時 index.html 的 color-scheme meta 要改成 light dark。
+   不要在這裡寫元件規則，元件一律透過 token 取色。 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --yy-calm-bg: #24282C;
+    --yy-calm-surface: #2E3338;
+    --yy-calm-text: #F2EEE3;
+    --yy-calm-text-sub: #D3CEC1;
+    --yy-calm-line: #7D868E;
+    --yy-calm-rule: #3C4248;
+    --yy-calm-accent: #D7A98B;
+    --yy-calm-accent-on: #24282C;
+    --yy-calm-copper: #C99372;
+    --yy-calm-olive: #B3A06A;
+    --yy-calm-tag: #B3A06A;
+    --yy-calm-tag-on: #24282C;
+    --yy-calm-block: #2E3338;
+    --yy-calm-block-on: #F2EEE3;
+    --yy-calm-block-accent: #D7A98B;
+    --yy-calm-info-bg: #343A3E;
+    --yy-calm-success: #8CCFA9;
+    --yy-calm-success-bg: #22372D;
+    --yy-calm-warning: #E3C377;
+    --yy-calm-warning-bg: #3A3220;
+    --yy-calm-danger: #EDA4B5;
+    --yy-calm-danger-bg: #40262E;
+    --yy-calm-focus: #D7A98B;
+    --yy-calm-focus-on-block: #D7A98B;
+  }
+}
+:root[data-theme="dark"] {
+  --yy-calm-bg: #24282C;
+  --yy-calm-surface: #2E3338;
+  --yy-calm-text: #F2EEE3;
+  --yy-calm-text-sub: #D3CEC1;
+  --yy-calm-line: #7D868E;
+  --yy-calm-rule: #3C4248;
+  --yy-calm-accent: #D7A98B;
+  --yy-calm-accent-on: #24282C;
+  --yy-calm-copper: #C99372;
+  --yy-calm-olive: #B3A06A;
+  --yy-calm-tag: #B3A06A;
+  --yy-calm-tag-on: #24282C;
+  --yy-calm-block: #2E3338;
+  --yy-calm-block-on: #F2EEE3;
+  --yy-calm-block-accent: #D7A98B;
+  --yy-calm-info-bg: #343A3E;
+  --yy-calm-success: #8CCFA9;
+  --yy-calm-success-bg: #22372D;
+  --yy-calm-warning: #E3C377;
+  --yy-calm-warning-bg: #3A3220;
+  --yy-calm-danger: #EDA4B5;
+  --yy-calm-danger-bg: #40262E;
+  --yy-calm-focus: #D7A98B;
+  --yy-calm-focus-on-block: #D7A98B;
 }
 
 @keyframes yy-holo {
