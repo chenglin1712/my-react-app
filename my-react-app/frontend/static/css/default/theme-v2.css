@@ -879,48 +879,97 @@
   margin: 0;
 }
 
-/* ---------- Footer ---------- */
+/* ---------- Footer（S5-2，沉穩文藝）----------
+   石板灰區塊（--yy-calm-block）：和首頁的最新消息區同一個色塊語彙，頁面最後留一塊穩定的底。
+   版面用 grid，不動 JSX：第一列「標誌｜連結」，一條細線，第二列「族語羅馬字｜版權」；手機疊成單欄。
+   所有顏色走語意層，深色主題會自動換。 */
 
 .yy-footer {
-  padding: 36px 56px;
-  background: var(--yy-ink);
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "logo links"
+    "rule rule"
+    "tribes copyright";
   align-items: center;
-  flex-wrap: wrap;
-  gap: 14px;
+  gap: 0 var(--yy-space-6);
+  padding: var(--yy-space-7) 56px var(--yy-space-6);
+  background: var(--yy-calm-block);
+  color: var(--yy-calm-block-on);
+  /* 深色主題裡石板灰區塊和卡片底色很接近，頂端留一條邊界，頁尾才分得出來 */
+  border-top: var(--yy-border-width) solid var(--yy-calm-line);
+}
+.yy-footer::before {
+  content: "";
+  grid-area: rule;
+  margin: var(--yy-space-4) 0;
+  border-top: 1px solid var(--yy-calm-olive);
 }
 .yy-footer__logo {
-  font-family: var(--yy-font-pixel);
+  grid-area: logo;
+  font-family: var(--yy-font-heading);
   font-weight: 700;
-  font-size: 16px;
-  color: var(--yy-gold);
+  font-size: var(--yy-text-lg);
+  letter-spacing: 0.04em;
+  color: var(--yy-calm-block-on);
 }
 .yy-footer__tribes {
-  font-size: 13px;
-  color: #D8C4A0;
+  grid-area: tribes;
+  font-size: var(--yy-text-sm);
+  color: var(--yy-calm-block-on);
 }
 .yy-footer__copyright {
-  font-size: 12px;
-  color: #A88E6C;
+  grid-area: copyright;
+  font-size: var(--yy-text-xs);
+  color: var(--yy-calm-block-accent);
 }
 .yy-footer__links {
+  grid-area: links;
   display: flex;
   flex-wrap: wrap;
-  gap: 0 var(--yy-space-4);
+  gap: 0 var(--yy-space-5);
 }
 .yy-footer__links a {
   display: inline-flex;
   align-items: center;
   min-height: var(--yy-control-md);
-  color: #D8C4A0;
+  color: var(--yy-calm-block-on);
   font-size: var(--yy-text-sm);
   text-underline-offset: 3px;
+  transition: color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
+}
+.yy-footer__links a:active {
+  transform: scale(var(--yy-ui-press));
 }
 @media (hover: hover) and (pointer: fine) {
   .yy-footer__links a:hover {
-    color: var(--yy-gold-light);
+    color: var(--yy-calm-block-accent);
   }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yy-footer__links a {
+    transition-property: color;
+  }
+  .yy-footer__links a:active {
+    transform: none;
+  }
+}
+
+/* 跳到主要內容：平常藏起來，鍵盤聚焦時固定在左上角，用深銅底的實心鈕（和登入鈕同一種），不蓋住導覽列 */
+.visually-hidden-focusable:focus {
+  position: fixed;
+  top: var(--yy-space-2);
+  left: var(--yy-space-2);
+  z-index: var(--yy-z-top);
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--yy-control-md);
+  padding: 0 var(--yy-space-4);
+  border-radius: var(--yy-ui-radius);
+  background: var(--yy-calm-accent);
+  color: var(--yy-calm-accent-on);
+  font-weight: 700;
+  text-decoration: none;
 }
 
 @media (max-width: 720px) {
@@ -928,6 +977,19 @@
   .yy-footer {
     padding-left: 24px;
     padding-right: 24px;
+  }
+
+  .yy-footer {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "logo"
+      "tribes"
+      "links"
+      "rule"
+      "copyright";
+  }
+  .yy-footer__links {
+    margin-top: var(--yy-space-2);
   }
 
   /* iOS Safari 聚焦字級小於 16px 的輸入框時會自動放大整個頁面 */
@@ -1002,10 +1064,9 @@
   outline-offset: var(--yy-ui-focus-offset);
 }
 
-/* 2. 深色底（導覽列、頁尾）上的紅色外框看不清楚，改用淺金色 */
-.navbar :where(a, button):focus-visible,
+/* 2. 石板灰底（頁尾）上的焦點外框改用象牙白（導覽列在 S5-1 改成淺色，不再需要例外） */
 .yy-footer :where(a, button):focus-visible {
-  outline-color: var(--yy-gold-light);
+  outline-color: var(--yy-calm-focus-on-block);
 }
 
 /* 3. 外框被拿掉、只靠換邊框顏色的輸入元件：用 :root 墊高優先權，壓過各頁 css 的 outline: none */

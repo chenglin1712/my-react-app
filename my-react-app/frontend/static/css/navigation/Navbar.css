@@ -55,26 +55,16 @@
     width: 40px;
 }
 
-/* 頁首下方的織紋色條（靜態）。S5-2 會和全站外殼一起換成新風格，這一步先不動。 */
+/* 頁首下方的織紋細條（靜態，S5-2）：銅褐、橄欖、石板灰三色每 24px 輪替，像一小段織帶；
+   原本 16px 高的紅金藍棋盤格太吵，和象牙白導覽列放在一起不協調。 */
 .navbar-marquee {
-    position: relative;
-    height: 16px;
-    overflow: hidden;
-    border-bottom: 2px solid var(--yy-ink);
-}
-
-/* 色條畫在比外框寬 192px（6 個 32px 圖樣）的偽元素上，用 translateX 平移 192px 剛好銜接，
-   取代原本動 background-position 的做法（P1-23：background-position 每幀都要重繪）。
-   靜態時偽元素左緣在 -192px，圖樣相位與原本 background-position: 0 完全相同。 */
-.navbar-marquee::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: -192px;
-    right: 0;
-    background-image: repeating-conic-gradient(var(--yy-red) 0deg 90deg, var(--yy-gold) 90deg 180deg, var(--yy-blue) 180deg 270deg, var(--yy-cream) 270deg 360deg);
-    background-size: 32px 32px;
+    height: 8px;
+    background-image: repeating-linear-gradient(
+        90deg,
+        var(--yy-calm-copper) 0 24px,
+        var(--yy-calm-olive) 24px 48px,
+        var(--yy-calm-block) 48px 72px
+    );
 }
 
 /* 導覽列的連結都不畫瀏覽器預設的底線；目前頁與 hover 的底線是下面 ::after 那條銅褐細線 */

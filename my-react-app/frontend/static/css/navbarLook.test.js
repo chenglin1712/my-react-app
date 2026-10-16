@@ -2,7 +2,7 @@
 //
 // S5-1 導覽列新外觀守門：導覽列顏色走 --yy-calm-* 語意層（S5-3 深色主題才會自動跟著換）、
 // 可按元件至少 44px、hover 只給有滑鼠的裝置、有減少動態的處理。
-// 織紋色條（.navbar-marquee）留到 S5-2 才換風格，所以舊色 token 只允許出現在它的規則裡。
+// 導覽下方的織紋細條（.navbar-marquee）在 S5-2 換成沉穩色，整份檔案不再有舊風格色 token。
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,11 +35,19 @@ const rules = walkRules(css);
 const find = (selector) => rules.filter((r) => r.selector === selector);
 
 describe("導覽列新外觀（S5-1）", () => {
-  it("沒有寫死的色碼，舊風格色 token 只留在織紋色條與遮罩", () => {
+  it("沒有寫死的色碼，也沒有舊風格色 token（S5-2 之後織紋條也換成沉穩色）", () => {
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     const old = /--yy-(?:red|gold|blue|cream|ink|green)\b/;
-    const offenders = rules.filter((r) => old.test(r.body) && !r.selector.startsWith(".navbar-marquee"));
-    expect(offenders.map((r) => r.selector)).toEqual([]);
+    expect(rules.filter((r) => old.test(r.body)).map((r) => r.selector)).toEqual([]);
+  });
+
+  it("導覽下方的織紋條：8px 高、銅褐橄欖石板三色輪替、靜態（沒有動畫）", () => {
+    const strip = find(".navbar-marquee")[0].body;
+    expect(strip).toMatch(/height:\s*8px/);
+    expect(strip).toMatch(/--yy-calm-copper/);
+    expect(strip).toMatch(/--yy-calm-olive/);
+    expect(strip).toMatch(/--yy-calm-block/);
+    expect(css).not.toMatch(/navbar-marquee::before/);
   });
 
   it("導覽列是區塊、手機選單撐滿寬度（Bootstrap 的 .navbar 預設 flex 會讓選單縮在一角）", () => {
