@@ -38,10 +38,11 @@ async function authHeaders(guest) {
  * 要比它短，前端才會先顯示逾時訊息）；個別呼叫可以用 options.timeout 覆寫。 */
 export const DEFAULT_TIMEOUT_MS = 60000;
 
-function buildConfig(headers, { params, signal, timeout } = {}) {
+function buildConfig(headers, { params, signal, timeout, onUploadProgress } = {}) {
   const config = { headers, timeout: timeout ?? DEFAULT_TIMEOUT_MS };
   if (params !== undefined) config.params = params;
   if (signal !== undefined) config.signal = signal;
+  if (onUploadProgress !== undefined) config.onUploadProgress = onUploadProgress;
   return config;
 }
 
