@@ -31,8 +31,9 @@ web
 
 ## Operating Context
 
-- 前端 React（Vite）；後端 Django 與 FastAPI 雙服務；登入、使用者資料、收藏與筆記在 Firebase／Firestore；圖片在 Cloudinary。
-- 另有後台管理系統（使用者、辭典、題庫、公告、功能旗標、待專家驗證佇列、千詞表對照），由管理者與審閱者使用。
+- 前端 React（Vite）；後端 Django 與 FastAPI 雙服務；登入、使用者資料、收藏與筆記在 Firebase／Firestore；現有圖片在 Cloudinary。
+- 另有後台管理系統（使用者、辭典、題庫、公告、功能旗標、待專家驗證佇列、千詞表對照、首頁版位設定、考試時程），由管理者與審閱者使用。首頁版位設定僅 owner 與 admin 可修改，寫入稽核紀錄。
+- **首頁宣傳影片（已決定、尚未實作）：** 由後台上傳、存放在自己的伺服器，不接任何外部平台（包含影音平台、Cloudinary、Firebase）。目前 Django 沒有檔案欄位與 media 目錄、nginx 上傳上限 12MB，需要新建專用上傳端點、持久化磁碟與備份。流量、容量與備份由自己負擔，所以影片需限制大小與長度（暫定 50MB、90 秒內、MP4 加 WebVTT 字幕，最終由使用者定）。
 - 與桃園市政府原住民行政局合作；使用者已確認法律面不構成影響（協議範圍我無法查證，建議留存核准文件）。
 - 文化風格的設計由部落與族語老師討論後修正；行政局目前沒有標章要求。
 
@@ -45,7 +46,10 @@ web
 - 族語拼寫與文法的依據是官方來源；未經確認的內容必須標示「推論」或「未確認」，不得當成正確答案呈現。
 - 預留擴充：16 族與方言別、審閱狀態（`frontend/src/constants/tribes.js` 前後端要同步）。
 - PWA 想做，但受阻於尚無正式網域與有效憑證規劃（待定）。
-- 尚未決定：族群文化風格的最終樣貌；`translation_morphology_analyzer` 維持 shadow；`quiz_rule_event_logging` 等待 PG 驗證與同意文字。
+- **已決定、進行中：** 全站視覺改為「沉穩文藝」風格（取代舊 Y2K 風格），分階段進行，規則見 DESIGN.md，施工順序見 Artifact「原語 沉穩改版計畫」。三主色（銅褐 #98694C、橄欖卡其 #86754D、石板灰 #41464B）為使用者指定。導覽列沿用現有網站選單，不自創項目。
+- **已決定：** 首頁每個區段都要能在後台編輯。已有後台：最新消息（公告管理）、族語認證最新公告（考試分類公告與考試時程）。待新增：宣傳影片、跑馬燈、報頭標語與引言、本期專題（獨立模型，不重用公告）。導覽列與頁尾不開放後台編輯。
+- **已建議、待使用者確認：** 功能入口與五族語言選擇列合併為第一屏下方的「開始學習」區段；導覽列保留縮小的文字標誌、報頭負責完整品牌展示。
+- 尚未決定：族群文化風格的最終樣貌（新風格為沉穩文藝，不含族群圖騰；文化元素仍須社群確認）；`translation_morphology_analyzer` 維持 shadow；`quiz_rule_event_logging` 等待 PG 驗證與同意文字。
 
 ## Brand Commitments
 
@@ -59,7 +63,8 @@ web
 
 - 資料來源：官方原住民族語言線上辭典、族語E樂園。
 - 沒有使用者見證、第三方評價或成效數據；不得捏造。
-- 稽核報告與施工順序：Claude Artifact「全站 UI/UX 改版計畫」（私人連結 https://claude.ai/artifact/3N3rfN5YMi8m3yAJ2hcFcj）。
+- 稽核報告與施工順序：Claude Artifact「全站 UI/UX 改版計畫」（私人連結 https://claude.ai/artifact/3N3rfN5YMi8m3yAJ2hcFcj，階段 A 到 G 已完成）。
+- 視覺改版計畫：Claude Artifact「原語 沉穩改版計畫」（私人連結 https://claude.ai/artifact/23x8UW4PaYMpJdrnGpRfdh）；風格稿：「原語 首頁雜誌版」（私人連結 https://claude.ai/artifact/GYxGpkmLVhcEEqscHQsniv）。
 
 ## Product Principles
 

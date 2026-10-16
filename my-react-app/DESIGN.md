@@ -1,235 +1,312 @@
 ---
 name: 原・語 YUAN・YU
-description: 以部落布告欄為比喻的族語學習平台設計系統，現行為 Y2K 硬陰影與五色配色，文化風格待部落與族語老師確認後演進。
+description: 沉穩文藝風格的族語學習平台設計系統。象牙白紙感底、銅褐／橄欖卡其／石板灰三主色、宋體標題、細框與雙線、無硬陰影、慢速淡入。取代舊的 Y2K 硬陰影與五色配色。
 colors:
-  tayal-red: "#9E1B24"
-  tayal-red-dark: "#8A171F"
-  amis-blue: "#1F3A5C"
-  kavalan-teal: "#2C6E7F"
-  paiwan-gold: "#D9A227"
-  gold-light: "#F6D77B"
-  bunun-green: "#4B6B3A"
-  paper-cream: "#F3E7CF"
-  paper-cream-dim: "#EFE1C4"
-  ink: "#221812"
-  text-secondary: "#3E3226"
-  text-tertiary: "#5A4B3B"
-  text-muted: "#6B5A47"
-  surface-white: "#FFFFFF"
-  success-bg: "#E4E9E1"
-  danger-bg: "#F0DDDE"
-  warning-bg: "#F9F1DF"
-  warning-text: "#8A6816"
-  info-bg: "#DFE9EC"
-  disabled-red: "#B79A8A"
+  ivory: "#FFF9ED"
+  ink: "#292D31"
+  slate: "#41464B"
+  copper: "#98694C"
+  copper-deep: "#7E5239"
+  copper-light: "#C9976F"
+  olive: "#86754D"
+  olive-deep: "#6F6040"
+  surface: "#FFFFFF"
+  rule: "#E9E2D2"
+  success-fg: "#2F6F4B"
+  success-bg: "#E3F0E8"
+  warning-fg: "#7D5B0E"
+  warning-bg: "#F6ECD3"
+  danger-fg: "#8A3A4E"
+  danger-bg: "#F5E1E6"
+  info-bg: "#EFE6DA"
+  dark-bg: "#24282C"
+  dark-surface: "#2E3338"
+  dark-fg: "#F2EEE3"
+  dark-fg-sub: "#D3CEC1"
+  dark-line: "#6B747C"
+  dark-copper: "#C99372"
+  dark-copper-deep: "#D7A98B"
+  dark-olive: "#B3A06A"
 typography:
+  display:
+    fontFamily: "'Noto Serif TC', 'Songti TC', serif"
+    fontWeight: 900
+  heading:
+    fontFamily: "'Noto Serif TC', 'Songti TC', serif"
+    fontWeight: 700
   body:
-    fontFamily: "'Noto Sans TC', sans-serif"
+    fontFamily: "'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif"
+    fontWeight: 400
   button-label:
     fontFamily: "'Noto Sans TC', sans-serif"
     fontSize: "15px"
     fontWeight: 700
-  label-pixel:
-    fontFamily: "'Silkscreen', monospace"
-    fontSize: "12px"
-    letterSpacing: "0.12em"
 rounded:
-  btn: "6px"
-  card: "10px"
-  tab: "8px"
-spacing:
-  hero-top: "64px"
-  hero-x: "56px"
-  hero-bottom: "50px"
+  base: "3px"
+border:
+  hairline: "1.5px"
+  section-rule: "3px double"
+motion:
+  ease-out: "cubic-bezier(0.23, 1, 0.32, 1)"
+  entrance: "800ms"
+  interactive: "150ms to 220ms"
+  hover-lift: "3px"
+  press-scale: "0.97 to 0.99"
 components:
   button-primary:
-    backgroundColor: "{colors.tayal-red}"
-    textColor: "{colors.paper-cream}"
-    rounded: "{rounded.btn}"
-    padding: "14px"
-  button-primary-hover:
-    backgroundColor: "{colors.tayal-red-dark}"
-  button-primary-disabled:
-    backgroundColor: "{colors.disabled-red}"
-  button-outline:
-    backgroundColor: "{colors.surface-white}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.btn}"
-    padding: "11px 18px"
-  card:
-    backgroundColor: "{colors.surface-white}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.card}"
-  tribe-pill:
-    backgroundColor: "{colors.surface-white}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.btn}"
-    padding: "9px 18px"
-  tabswitch-tab-active:
-    backgroundColor: "{colors.tayal-red}"
-    textColor: "{colors.paper-cream}"
-    padding: "11px 28px"
-  eyebrow:
+    backgroundColor: "{colors.copper-deep}"
+    textColor: "{colors.ivory}"
+    rounded: "{rounded.base}"
+    padding: "12px 22px"
+  button-login:
     backgroundColor: "{colors.ink}"
-    textColor: "{colors.paiwan-gold}"
-    typography: "{typography.label-pixel}"
-    padding: "6px 18px"
+    textColor: "{colors.ivory}"
+    rounded: "{rounded.base}"
+  button-outline:
+    backgroundColor: "transparent"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.base}"
+  card:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.base}"
+  announcement-panel:
+    backgroundColor: "{colors.slate}"
+    textColor: "{colors.ivory}"
+    rounded: "{rounded.base}"
 ---
 
 # Design System: 原・語 YUAN・YU
 
-> 本文件記錄**現況**（來源：`frontend/static/css/default/theme-v2.css`、`frontend/src/constants/tribes.js`、`frontend/components/ui/TribePill.jsx`），並標明哪些是使用者在對話中已決定要改變的方向（決定出自對話，無法由程式碼證實）。尚未在瀏覽器渲染各頁面。
-> frontmatter 的 token 有兩種來源：`:root` 內的 `--yy-*` 變數（顏色、圓角 6px／10px、硬陰影），以及直接寫在元件規則裡的數值（白色 `#fff`、`#B79A8A`、頁籤圓角 8px、按鈕字級 15px／粗體、Hero 留白）；後者尚未升為 CSS 變數，列入 B-4。
-> 品牌名稱的正式寫法為「原・語」（全形中點）；現有程式與 index.html 多數寫「源·語」（半形中點），僅後台登入頁有一處「源・語」，見 PRODUCT.md「Brand Commitments」。
+> **狀態說明（重要）：** 本文件描述的是**已認可的目標風格**，來源是使用者認可的首頁風格稿（Artifact「原語 首頁雜誌版」）與改版計畫（Artifact「原語 沉穩改版計畫」）。**目前程式碼仍是舊的 Y2K 系統**（`frontend/static/css/default/theme-v2.css` 的硬陰影、粗黑框、五色、Silkscreen 像素字），要到改版計畫 S1 到 S9 逐步換上。換完之前，以程式碼的實際行為為準，本文件是施工目標。
+> 三個主色（銅褐、橄欖卡其、石板灰）是使用者指定的，不再討論。象牙白、深石板、深銅、深橄欖、淺銅與深色模式的色值是我為了紙感與對比加的，**使用者尚未明確確認（改版計畫決定 D1）**。
+> **本文件的三種內容（請依此判讀）：**
+> - **使用者已確認：** 沉穩文藝方向、三主色、導覽沿用現有選單、首頁區段後台可編輯、宣傳影片自架且不接外部平台。
+> - **待使用者確認：** 輔助色與深色色值（D1）、功能入口與 logo 位置（D4、D6）、深淺色預設（D7）、字型與報頭配色（D9）、影片長度與容量、伺服器空間。
+> - **技術規範（我依標準訂的）：** 對比數字、動態與暫停規則、字幕與無障礙要求、影片格式與大小建議（MP4 H.264 加 AAC、50MB、90 秒皆為建議值，不是已確認需求）。
+> 「目前程式仍是舊 Y2K」屬於實作現況，不是設計決定。
+> 對比數字是我用 WCAG 相對亮度公式實際計算的結果，不是估計。尚未在瀏覽器逐頁量測實際渲染。
 
 ## Overview
 
-**Creative North Star: "部落布告欄"**
+**Creative North Star: "安靜的刊物"**
 
-像部落裡公共布告欄上層層貼上的告示：每張紙有明確的邊、有立體的壓痕，各自帶著所屬族群的顏色，但彼此貼在同一面牆上，大家都看得懂。目前以 Y2K 的粗黑框與偏移硬陰影來表現「貼在板子上」的立體感；這是使用者確認要保留的識別。
+像一份沉穩的文藝刊物：象牙白的紙、細細的框線、區塊標題底下一道雙線、宋體標題帶出書卷氣。資訊清楚、留白有節制、動作慢而克制。重點內容（宣傳影片、最新消息、族語認證最新公告）在第一屏同時看得到，不逼人一直往下拉。
 
-整體密度偏高、對比強、邊界清楚；立體感靠硬陰影而不是模糊陰影或玻璃質感（現有漸層只用在跑馬燈、鋸齒分隔、Hero 底紋、流光文字、終端機輸入列，且有一個模糊光斑）。五個族語各有識別色，其他顏色的角色固定（紅是主要動作，金是強調與警示，藍與青是資訊）。
+這個風格不是靠裝飾取勝，而是靠排版、字型與少量一致的規則。不使用硬陰影、貼紙、星芒、膠帶、旋轉、五色棋盤格。
 
-使用者已決定：五色棋盤格（跑馬燈色條、鋸齒分隔、Hero 底紋）將由族群文化風格取代，文化風格由部落與族語老師討論確認、並與桃園市政府原住民行政局合作；在確認之前只作為現況記錄，新設計不得擴散棋盤格。
+**使用者的版面回饋（已實作於風格稿）：** 東西畫太大會逼人下拉；報頭縮成一條；設定類控制收進面板；導覽列沿用現有網站選單，不自創項目。
 
 **Key Characteristics:**
-- 3px 黑色粗框＋無模糊的偏移硬陰影，是卡片與按鈕的共同語言。
-- 米色紙張底（#F3E7CF）、墨色文字（#221812），而不是純白底黑字。
-- 五個族語各有一個識別色，用於族語切換與標示。
-- 像素字只用在小標籤；內文使用 Noto Sans TC。
-- 目前有多個持續循環的裝飾動畫，其去留尚未決定（見 Components 的「動態」）。
+- 象牙白紙感底，深石板色文字，不用純白底黑字。
+- 1.5px 細框、全站統一 3px 圓角、區塊標題下雙線。
+- 沒有硬偏移陰影，只有浮層用一種柔和環境陰影。
+- 標題與導覽用 Noto Serif TC，內文用 Noto Sans TC。
+- 動態慢而克制，全部尊重減少動態設定。
+- 淺色與深色兩套，預設跟隨裝置並提供手動切換。
 
 ## Colors
 
-高對比、飽和度偏高、以紅金藍為主軸的暖色紙張配色。
+三主色加紙感中性色。**一頁只有一個強調色（銅褐系）**，橄欖卡其做次要標記，石板灰做承載區塊。
 
-### Primary
-- **赭紅（泰雅識別色）** (#9E1B24)：主要按鈕、啟用中的頁籤與步驟、泰雅語識別色。深色變體 (#8A171F) 用於按鈕 hover。
-- **禁用赭紅** (#B79A8A)：主要按鈕被停用時的背景。
+### 三主色（使用者指定）
+- **銅褐** (#98694C)：品牌主色。用於大面積色塊、細框強調、大字（18.66px 以上粗體或 24px 以上）、圖示。
+- **橄欖卡其** (#86754D)：次要標記色、分類標籤的底色邊框。
+- **石板灰** (#41464B)：承載區塊底色（例如族語認證最新公告面板）、導覽與報頭色塊。
 
-### Secondary
-- **靛藍（阿美識別色）** (#1F3A5C)：阿美語識別色、藍色分隔條。
-- **湖青（噶瑪蘭識別色）** (#2C6E7F)：噶瑪蘭識別色，同時作為資訊色（info）。
-- **赤金（排灣識別色）** (#D9A227)：排灣識別色、強調、邊框與脈動光暈。淡金 (#F6D77B) 為輔助。
-- **森綠（布農識別色）** (#4B6B3A)：布農識別色，同時作為成功色（success）。
-
-### Neutral
-- **米紙** (#F3E7CF)：頁面底色。
-- **暗米紙** (#EFE1C4)：骨架載入塊與次要底色。
-- **墨色** (#221812)：文字、邊框、硬陰影。
-- **次要／第三層／弱化文字** (#3E3226 / #5A4B3B / #6B5A47)：依資訊層級遞減的棕色文字。
+### 中性與輔助色（我加的，待確認 D1）
+- **象牙白** (#FFF9ED)：頁面底色。
+- **深石板** (#292D31)：文字與細框。
+- **深銅** (#7E5239)：連結、小字強調、主要按鈕底色。
+- **深橄欖** (#6F6040)：小字標記底色。
+- **淺銅** (#C9976F)：只放在深色底上的點綴（石板灰上僅限大字與圖示）。
 - **白** (#FFFFFF)：卡片與輸入框底色。
+- **分隔線淺色** (#E9E2D2)：列表內的細分隔。
 
-### 狀態底色
-- 成功 (#E4E9E1)、危險 (#F0DDDE)、警告 (#F9F1DF)、資訊 (#DFE9EC)；警告文字用加深金 (#8A6816)，因為赤金本身在米色或白底上做文字時對比不足。
+### 狀態色
+成功 (#2F6F4B 字／#E3F0E8 底)、需注意 (#7D5B0E／#F6ECD3)、錯誤 (#8A3A4E／#F5E1E6)、資訊底 (#EFE6DA)。深色模式各有對應的亮色字與深色底（見 frontmatter 與下表）。
+
+### 深色模式（跟隨裝置，手動可切換）
+底 #24282C、卡片 #2E3338、文字 #F2EEE3、次要文字 #D3CEC1、框線 #6B747C、銅褐 #C99372、深銅 #D7A98B、橄欖 #B3A06A。
+
+### 實測對比（WCAG 相對亮度，我計算的）
+
+| 組合 | 對比 | 判定 |
+| --- | --- | --- |
+| 深石板字 on 象牙白 | 13.23 | 通過 AAA |
+| 石板灰字 on 象牙白 | 9.09 | 通過 AAA |
+| 深銅字 on 象牙白 | 6.35 | 通過 AA |
+| 象牙白字 on 深銅底（主要按鈕） | 6.35 | 通過 AA |
+| 象牙白字 on 石板灰底 | 9.09 | 通過 AAA |
+| 深橄欖字／底 配象牙白 | 5.85 | 通過 AA |
+| **銅褐 on 象牙白（含反向）** | **4.49** | **差 0.01 未達 4.5，只能用於大字（24px 以上，或 18.66px 以上粗體）與達 3:1 的邊框、功能圖示** |
+| **橄欖卡其 on 象牙白（含反向）** | **4.29** | **未達 4.5，限制同銅褐** |
+| 淺銅 on 深石板 (#292D31) | 5.38 | 通過 AA |
+| **淺銅 on 石板灰** | **3.70** | **只能用於大字與圖示，小字禁用** |
+| 深色：文字 on 底 | 12.80 | 通過 AAA |
+| 深色：銅褐 on 底／on 卡片 | 5.58／4.80 | 通過 AA |
+| 深色：框線 on 底 | 3.12 | 勉強通過非文字元件 3:1，只做必要邊界，不排小字、不降低不透明度 |
+| 狀態色（淺色／深色）字 on 底 | 5.12 至 7.08 | 皆通過 AA |
 
 ### Named Rules
-**The 排灣赤金文字 Rule.** 赤金 (#D9A227) 在米色或白底上做文字對比不足，文字必須改用加深金 (#8A6816)；赤金只作底色與邊框。
+**The 主色不直接做小字 Rule.** 三個主色的原色在象牙白上做小字或普通大小的按鈕文字，對比不足（銅褐 4.49、橄欖 4.29）。小字、連結、按鈕底色一律改用深一階的深銅或深橄欖；原色保留給色塊、大字，以及對相鄰顏色達 3:1 的必要邊框與功能圖示（WCAG 1.4.11；純裝飾圖示不受限）。這不是質疑主色，是讓主色在正確的位置發揮。
 
-**現況觀察（不是規則）：** 族語識別色與狀態色共用同一組色相（布農綠＝成功、噶瑪蘭青＝資訊、泰雅赭紅＝危險與主要動作），同一畫面可能把「這是哪一族」與「對／錯」混在一起；是否分開列為 B-4 的決定，這裡不先下結論。
+**The 狀態不靠顏色單獨表達 Rule.** 答對、答錯、已選須同時有文字或圖示（WCAG 2.2 AA）。
 
-**The 狀態不靠顏色單獨表達 Rule.** 答對、答錯、已選須同時有文字或圖示（WCAG 2.2 AA 的要求，現況是否全站達成尚未驗證，見改版計畫階段 B-5、B-6）。
+**The 一頁一強調色 Rule.** 銅褐系是唯一的強調色；橄欖只當次要標記；不再引入第三個強調色。
+
+**五個族語識別色（舊系統遺留，待決定）：** 舊系統每個族語有一個識別色（泰雅赭紅、阿美靛藍、噶瑪蘭湖青、排灣赤金、布農森綠），與新的三主色風格衝突。改版計畫的方向是**只作為小標記，不做大面積色塊**；是否保留、改色或移除，在 S1 與 S8 逐頁處理時與使用者決定，這裡不先下結論。
 
 ## Typography
 
-**Display／Body Font:** Noto Sans TC（fallback：sans-serif）
-**Label Font:** Silkscreen（fallback：Noto Sans TC，再 monospace），只用於小標籤。Silkscreen 沒有中文與「・」，所以中文會落到 Noto Sans TC，風格與內文一致
+**標題與導覽:** Noto Serif TC（fallback：Songti TC、serif）
+**內文與表單:** Noto Sans TC（fallback：PingFang TC、Microsoft JhengHei、sans-serif）
 
-**Character:** 圓潤中性的黑體承擔所有閱讀；像素字只當章戳般的小標籤，增加 Y2K 感而不干擾閱讀。
+**為何用宋體:** 這是刊物與書卷氣的風格，品牌調性屬於編輯出版類，且使用者認可的風格稿明確採用 Noto Serif TC，不是因為「宋體看起來高級」。
 
-### Hierarchy
-- **Body／按鈕文字** (700, 13–15px)：全站大量使用粗體；按鈕 15px（主要）、13px（外框）、14px（族語膠囊與頁籤）。
-- **Label（像素）** (Silkscreen, 12px, 字距 0.12em)：`.yy-eyebrow` 標籤，墨色底、金色字與金色邊框。
-- **步驟徽章數字** (Silkscreen, 15px, 700)：步驟菱形內的數字。
+**載入方式:** 專案規則是用 HTML 的 `<link rel="preconnect">` 加 `<link rel="stylesheet">` 載入 Google Fonts，**不用 CSS `@import`**（效能，使用者的既有規則）。
 
-### Token（theme-v2.css 的 :root）
-- **色彩**：品牌紅一律寫 `var(--yy-red)`，不再寫死 `#9E1B24` 或舊紅 `#9B1B30`；筆記頁的 `--brand-red`、`--danger`、`--rose-700` 都指向全站 token。
-- **版面**：`--yy-space-1`～`8`（4px 基準）、`--yy-text-xs`～`3xl` 與 `--yy-leading-*`、`--yy-control-sm/md/lg`（觸控區用 md 的 44px）、`--yy-z-raised/sticky/nav/overlay/popover/top`、`--yy-surface`、`--yy-focus-ring`。新增樣式請引用，不要自己發明數字。既有的零散數字會在各頁改版時逐步換成 token。
-- **配色模式**：目前只有亮色。`:root` 宣告 `color-scheme: light`，讓原生表單控制項與捲軸不會在系統深色模式下自己變深。
+**族語字母尚未驗證:** Noto Serif TC 是否能正確顯示族語特殊字母（例如 ʼ ŋ ɨ ʉ 與組合寫法）還沒測過。**S1-1 必須先做字符測試，通過才換字型**；族語詞彙若在宋體顯示異常，族語詞彙保留使用內文黑體。
+
+### 階層（風格稿使用值，S1 時整理成 token）
+- **大標**：Noto Serif TC 900，頁面主標與報頭。
+- **區塊標題**：Noto Serif TC 700，底下 3px 雙線。
+- **內文**：Noto Sans TC 400，行高約 1.75，單行寬度約 65 字元以內。
+- **按鈕文字**：Noto Sans TC 700，15px。
 
 ### Named Rules
-**The 像素字限小標籤 Rule.** 像素字（Silkscreen）只用在小標籤、徽章數字；不用於需要閱讀的內容，也不用於族語詞彙，以免特殊字母與符號顯示錯誤。（使用者已確認。）
+**The 不使用像素字 Rule.** 舊系統的 Silkscreen 像素字將移除，不在新風格出現。
 
-字級的完整階層（標題、大標、內文行高）尚未從各頁面彙整，列為 B-4 的待辦，這裡不編造。
+**The 族語詞彙字型 Rule.** 族語詞彙必須正確顯示特殊字母；任何字型換用前先做字符測試。
 
 ## Layout
 
-頁面最外層為 `.yy-page`：米紙底、`min-height: 100dvh`，用 `overflow-x: clip` 擋住橫向溢出（不用 hidden，避免產生第二條捲軸）。Hero 區 padding 為上 64px、左右 56px、下 50px，文字置中；720px 以下左右縮為 24px，上下不變。主要的版面斷點只在 `theme-v2.css` 中找到一個：`max-width: 720px`；`.yy-footer` 同樣在 720px 以下縮左右留白；各頁面 CSS 另有自己的斷點，尚未彙整成統一斷點表（改版計畫階段 B）。
+- **第一屏規則:** 宣傳影片、最新消息、族語認證最新公告三塊同時在第一屏可見（桌面 1366x768 與 1920x1080 驗證）。左：宣傳影片（5 份）、中：最新消息（4 份）、右：族語認證公告（3 份）。
+- **報頭縮成一條:** 三欄 grid：左「原語」、中置中引言、右英文刊名 YUAN・YU。導覽列保留縮小的文字標誌連回首頁，兩處不放同尺寸品牌字（決定 D6 建議，待確認）。
+- **導覽列:** 沿用現有選單：首頁、單詞查詢、翻譯、影像辨識、遊戲專區、測驗、筆記（下拉：寫筆記、筆記分享區）、登入。**不自創項目**，先讀 `frontend/components/navigation/navbar.jsx`。高度不超過 80px、桌面單行。
+- **第一屏下方:** 「開始學習」區段：五族切換加所選族語的短預覽加四個功能入口（決定 D4 建議，待確認）；再下是本期專題三張卡。
+- **手機:** 單欄堆疊，側邊留白至少 16px，觸控區 44px 以上，不橫向捲動。手機版以程式檢查為主，最終請在實機驗證（瀏覽器工具無法穩定縮到手機寬度）。
+- **視窗高度:** 用 `min-height: 100dvh`，不用 `100vh`。
+- **斷點:** 沿用專案現有斷點，S1 整理成統一表，這裡不編造。
 
 ## Elevation & Depth
 
-沒有模糊陰影。深度全靠**偏移硬陰影**表達（陰影顏色為墨色，無模糊半徑）：
-
-### Shadow Vocabulary
-- **小** (`box-shadow: 3px 3px 0 #221812`)：族語膠囊、步驟菱形。
-- **中** (`box-shadow: 5px 5px 0 #221812`)：卡片、頁籤開關。
-- **大** (`box-shadow: 7px 7px 0 #221812`)：大型卡片。
-- **按鈕** (`4px 4px 0 #221812`)：主要按鈕，hover 時位移 (2px,2px) 並縮成 `2px 2px 0`，產生被按下去的感覺。
-- **卡片 hover** (`8px 8px 0 #221812`)：位移 (-2px,-2px)，浮起。
+**沒有硬偏移陰影，卡片靠 1.5px 細框與留白分層。** 唯一的陰影是浮層（下拉選單、彈窗）使用的一種柔和環境陰影，顏色以背景色相調和，不用純黑。
 
 ### Named Rules
-**The 硬陰影不模糊 Rule.** 立體陰影一律是無模糊的偏移色塊；新增模糊 `box-shadow` 或玻璃效果會破壞識別（使用者確認保留硬陰影＋粗黑框）。既有的 `.yy-pulse-glow` 光暈與 `.yy-blob` 模糊光斑屬裝飾動畫，其去留見「動態」。
+**The 無硬陰影 Rule.** 新增偏移色塊陰影、貼紙、星芒、膠帶、旋轉裝飾，一律不允許。S1-4 會把這條寫成守門測試。
 
 ## Shapes
 
-形狀語言為「貼在板子上的紙片」：圓角偏小到中，邊框以實心粗墨色為主（例外：Eyebrow 標籤與終端機輸入列用 2px 赤金邊框）。
-
-- 按鈕、膠囊、徽章：6px 圓角。
-- 卡片：10px。頁籤開關：8px。標籤（eyebrow）：4px。
-- 邊框：卡片與主要按鈕 3px，外框按鈕 2.5px，墨色。
-- 菱形：步驟與徽章以旋轉 45° 的 6px 圓角方塊構成。
+- 圓角：全站統一 **3px**（按鈕、卡片、輸入框、標籤皆同）。
+- 邊框：**1.5px** 細框，顏色用深石板（深色模式用框線色）。
+- 區塊標題底線：**3px double** 雙線。
+- 不使用膠囊形狀，不使用多種圓角混搭。
 
 ## Components
 
 ### Buttons
-- **Shape:** 6px 圓角、3px 墨色邊框。
-- **Primary:** 赭紅底、米色字、粗體 15px、padding 14px、`4px 4px 0` 硬陰影，並帶持續的金色脈動光暈動畫（2.8 秒循環）。
-- **Hover:** 深赭紅，向右下位移 2px、陰影縮小。
-- **Disabled:** 淡赭褐底 (#B79A8A)，停用脈動。
-- **Outline:** 白底、墨字、2.5px 邊框、13px 粗體；hover 轉米色；停用時透明度 45%。
-- **已知問題（尚未修）：** 另有 `_note/buttons.css` 對全站 `button, .btn` 設 `min-width: 100px`（審查項 P1-9），會污染手機版面。
-
-### Chips／Tribe Pill
-- **Style:** 白底、3px 墨色邊框、6px 圓角、`3px 3px 0` 陰影；選中時放大到 1.06、白字，背景色由 `TribePill.jsx` 以行內樣式設為該族識別色（CSS 本身沒有 active 背景）。
-- 待驗證（B-4）：選中時白字壓在赤金（排灣）底上，推測對比不足，尚未量測。
+- **主要（Primary）:** 深銅底 (#7E5239)、象牙白字、粗體 15px、3px 圓角。對比 6.35。
+- **登入:** 深石板實心底、象牙白字（取代原本風格稿的查詞框）。
+- **外框（Outline）:** 透明底、深石板字與 1.5px 邊框。
+- **狀態:** hover 輕浮 3px（僅限有 hover 的精確指標裝置）；按下縮到 0.97 到 0.99；focus 顯示清楚焦點框；停用降低不透明度且不可點。
+- **已知問題（舊系統遺留）:** `_note/buttons.css` 對全站 `button, .btn` 設 `min-width: 100px`（審查項 P1-9），改版時一併處理。
 
 ### Cards／Containers
-- **Corner Style:** 10px。
-- **Background:** 白。
-- **Border:** 3px 墨色。
-- **Shadow Strategy:** 中型硬陰影；可選 `.yy-card--hover` 向左上浮起。
-- 內距尚未統一，沿用各頁面既有值。
+白底、1.5px 細框、3px 圓角、無陰影。只在「分層真的有意義」時用卡片，其他用留白與分隔線。hover 輕浮 3px。
+
+### 宣傳影片播放區（新）
+- **不自動播放。** 預設顯示封面圖與清楚的播放鈕（觸控區 44px 以上）。
+- 優先使用瀏覽器原生 `controls`；若自製播放器，播放／暫停、進度、音量、字幕開關、全螢幕都要有可存取名稱與鍵盤操作，進度與目前時間要有語意。
+- 字幕用 WebVTT，`<track kind="captions" srclang label>`，提供字幕開關；無字幕時提供文字說明。
+- 影片中的重要視覺資訊要有等價的文字逐字稿（取代口述影像）；內容不得閃爍超過每秒三次。
+- 字幕檔需 UTF-8，且與頁面同網域，避免 CSP 與 CORS 問題。
+- 影片由後台上傳、存放在自己的伺服器，**不接任何外部平台**（決定 D3）。
+- 封面換成播放中用淡入，減少動態時直接切換。
+- 播放失敗時顯示文字錯誤與重試，並提供逐字稿，不能只退回封面；未設定任何影片時整區隱藏或顯示備援（主打圖）。
+
+### 最新消息輪播與列表
+有圖用輪播加 3 則列表，無圖用列表；輪播可暫停、滑過或聚焦時暫停、減少動態時不自動播放；控制鈕在卡片右下。載入中、無資料、失敗三種狀態都要有。
+
+### 族語認證最新公告面板
+石板灰底、象牙白字，列出最新 3 則；空狀態與失敗訊息沿用現有文案。
 
 ### Inputs／Fields
-尚未在共用 token 檔中定義，各頁面各自樣式；焦點樣式是否一致待 B-5 無障礙基線驗證，這裡不編造。
+標籤在上、錯誤訊息在下，不以 placeholder 取代標籤；邊框 1.5px、對比與焦點框通過 AA。焦點樣式是否全站一致待 S2-1 驗證。
 
-### Navigation／Tabs
-- **TabSwitch（登入／註冊、寫筆記／分享區）：** 一組並排按鈕，3px 墨色外框、8px 圓角、中型硬陰影；啟用的頁籤為赭紅底米色字；按鈕之間用 3px 墨色分隔線。
-- **StepBar：** 旋轉 45° 的菱形步驟，已完成與啟用為赭紅底；啟用時陰影為赤金；步驟間用虛線連接。
+### Navigation
+沿用現有結構與無障礙行為（Esc 關閉下拉、焦點管理、目前頁標示、手機漢堡選單與側欄）；只換外觀。
 
-### Signature Components
-- **Eyebrow 標籤：** 墨色底、赤金像素字、赤金邊框，4px 圓角。
-- **骨架載入塊（`.yy-skeleton`）：** 暗米紙底，透明度脈動，用實際內容尺寸，避免版面跳動。
-- **逐字進場（CharReveal）、捲動進場（RevealOnView）：** 見動態。
+### 跑馬燈
+全頁**最多一個**，內容為短語列，可暫停，減少動態時靜止。內容由後台編輯。
 
-### 動態（現況與準則）
-- **Motion token（theme-v2.css，B-3 新增）：** `--ease-out` cubic-bezier(0.23, 1, 0.32, 1)、`--ease-in-out` cubic-bezier(0.77, 0, 0.175, 1)；時長 `--dur-fast` 150ms、`--dur-base` 220ms、`--dur-flip` 400ms、`--dur-reveal` 550ms；`--transition-interactive` 取代 `transition: all`（只過渡顏色、陰影、位移、透明度）。新增動畫一律引用這些 token。
-- **現況：** 捲動進場與 `yy-fade-up` 用 `--dur-reveal` 與 `--ease-out`；翻牌用 `--dur-flip`；逐字進場 0.6 秒帶回彈曲線（尚未改）；主要按鈕脈動 2.8 秒（hover／按下時暫停，避免蓋掉陰影）；流光文字 4 秒；漂浮光斑 10 秒；跑馬燈 6 秒。專案內其餘內建 `ease` 與零散秒數尚未全部換成 token。共用 CSS 有全域 `prefers-reduced-motion` 規則：動畫與過渡縮到近乎 0，無限循環動畫只播一次，但游標與流光字固定可見、捲動進場與彈窗保留 150ms 淡入；JS 驅動的動態在各元件用 hook 判斷，尚未逐一驗證。
-- **尚未決定：** 持續循環的裝飾動畫（流光字、脈動按鈕、漂浮光斑、跑馬燈）是否減量，要在改版計畫 B-9 評估後與使用者決定；此處不先下結論。
-- **準則（依 Emil Kowalski 的設計工程原則，適用於之後新增的動態）：** 使用頻繁的動作（鍵盤、列表切換）不加動畫；一般 UI 回饋控制在 300ms 以內；進場用 ease-out；避免 `transition: all`；按壓回饋用小幅縮放（0.97）；位移型 hover 動畫放在 `@media (hover: hover) and (pointer: fine)` 內，並搭配 `:active` 按壓回饋（有 `motionTokens.test.js` 檢查）。
+## Motion
+
+動態慢而克制。每個動態都要回答「為什麼動」：階層（引導注意）、回饋（確認使用者操作）、狀態轉換。
+
+### Token
+- 曲線：`--ease-out: cubic-bezier(0.23, 1, 0.32, 1)`（進場與回饋）。
+- **進場淡入：約 800ms**，只用於首屏與區段第一次進入視窗，**每次載入只播一次**。
+- **互動回饋：150ms 到 220ms**（hover、按壓、展開收合）。
+- **hover 輕浮：translateY(-3px)**，只用 transform。
+- **按壓：scale(0.97) 到 scale(0.99)**。
+- 位移類動畫優先只用 `transform` 與 `opacity`，禁止高頻動畫 layout 屬性（width、height、top、left）；顏色、焦點框、播放進度與展開收合等必要變化可以過渡；不用 `transition: all`。
+
+### 為何 800ms 超過一般 300ms 的建議
+一般 UI 回饋應在 300ms 內。慢速淡入是這個風格的明確識別，但只適用於「每次頁面載入只看一次的進場」，不用於會反覆觸發的互動；互動回饋仍維持 150ms 到 220ms。
+
+### 暫停控制（WCAG 2.2.2，與減少動態無關，所有人都適用）
+- 自動播放超過 5 秒的內容（跑馬燈、自動輪播）**一律要有可見的暫停控制**，不能只在減少動態時才停。
+- 輪播另外在 hover、鍵盤焦點進入、分頁隱藏時暫停；使用者手動暫停後，不可因滑鼠離開而自動重新啟動。
+- **風格稿現況缺口：** 風格稿的跑馬燈暫停選項放在導覽列右側的「預覽設定」面板內，正式版必須改成跑馬燈旁的可見控制（列入 S6-1）。
+
+### 減少動態
+- `prefers-reduced-motion: reduce` 時：**直接取消進場動畫**（不位移、不淡入，內容立刻 opacity 1）；hover 不位移；跑馬燈靜止；輪播不自動播；影片本來就不自動播放。
+- **內容不得先設為透明再依賴 JS 或動畫恢復**；JS 沒載入或動畫被關閉時，內容必須可見（風格稿用 `.js` class 守門，實作時要沿用）。
+- hover 位移放在 `@media (hover: hover) and (pointer: fine)` 內，避免觸控裝置誤觸。
+- 鍵盤操作與高頻動作不加動畫。
+
+### 要移除的舊動態
+逐字進場（CharReveal）、RevealOnView 的彈跳、`yy-fade-up`、按鈕金色脈動、流光字、漂浮光斑、卡片上浮硬陰影；S2-2 處理，並更新 `motionTokens.test.js`。
+
+## 首頁區段與後台編輯
+
+首頁每個區段都要能在後台編輯。完整對照與分階段計畫見 Artifact「原語 沉穩改版計畫」。摘要：
+
+| 區段 | 後台現況 |
+| --- | --- |
+| 最新消息 | 已有（公告管理與審核流程、首頁顯示開關與筆數） |
+| 族語認證最新公告 | 已有（考試分類公告、考試時程管理） |
+| 宣傳影片 | **待新增**（自架上傳、封面、字幕、標題、說明、啟用） |
+| 跑馬燈、標語、引言 | **待新增** |
+| 本期專題（三張卡） | **待新增**（獨立模型，不重用公告） |
+| 導覽列、頁尾 | 不開放後台編輯（避免打錯路由） |
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** 用 3px 墨色邊框加偏移硬陰影表達立體（使用者已確認保留）。
-- **Do** 保持五個識別色各自代表一個族語；排灣赤金做文字時改用加深金 (#8A6816)。
-- **Do** 像素字只用於小標籤與徽章數字。
-- **Do** 每個動畫都尊重 `prefers-reduced-motion`；新的動態先回答「為什麼要動」。
-- **Do** 所有新介面文字使用繁體中文與台灣用語，並以 WCAG 2.2 AA 為基準。
+- **Do** 小字、連結、按鈕底色用深銅或深橄欖，原色主色留給色塊、邊框、大字與圖示。
+- **Do** 重點區段在第一屏同時可見；新區段先對照現有元件與路由。
+- **Do** 每個動畫尊重 `prefers-reduced-motion`，並先回答「為什麼動」。
+- **Do** 淺色與深色都要設計並檢查對比。
+- **Do** 所有介面文字使用繁體中文與台灣用語，以 WCAG 2.2 AA 為基準。
+- **Do** 換字型前先做族語字母的字符測試。
 
 ### Don't:
-- **Don't** 把五色棋盤格擴散到新頁面或新元件；它將由經部落與族語老師確認的族群文化風格取代（使用者已決定）。
-- **Don't** 用模糊陰影或玻璃擬態取代硬陰影。
-- **Don't** 把文化符號、圖騰或族群圖案當成裝飾加入，除非已經部落、族語老師與行政局確認；草案只放私人預覽並標「未確認」。
-- **Don't** 對族語詞彙使用像素字或任何可能無法正確顯示特殊字母的字型。
+- **Don't** 使用硬偏移陰影、貼紙、星芒、膠帶、旋轉裝飾、五色棋盤格。
+- **Don't** 在介面文字使用全形或半形破折號當裝飾或分隔（使用者與風格規則）。
+- **Don't** 自動播放影片或聲音。
+- **Don't** 使用外部影音平台或外部上傳服務存放宣傳影片。
+- **Don't** 把文化符號、圖騰或族群圖案當成裝飾，除非已經部落、族語老師與行政局確認。
+- **Don't** 對族語詞彙使用可能無法正確顯示特殊字母的字型。
 - **Don't** 只靠顏色表達對錯或狀態。
+- **Don't** 自創導覽列項目；以現有 `navbar.jsx` 為準。
+
+## 待使用者決定（影響本文件）
+
+- **D1** 加色（象牙白、深石板、深銅、深橄欖、淺銅、深色模式色值）是否接受。
+- **D2** 標語與引言的正式文案（風格稿的引言只是示意）。
+- **D4、D6** 功能入口與五族語言選擇列的版位、logo 位置（目前為建議，待點頭）。
+- **D7** 深淺色預設（目前計畫：跟隨裝置並提供手動切換）。
+- **D9** 報頭字型與配色（風格稿預設宋體重磅、石板底）。
+- 五族識別色去留（見 Colors）。
