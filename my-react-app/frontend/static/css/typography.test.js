@@ -67,7 +67,7 @@ describe("字級", () => {
     expect(scanLines((line) => /font-size:\s*\d+\.5px/.test(line))).toEqual([]);
   });
 
-  it("像素字型（Silkscreen）搭中文的元素字級不低於 14px", () => {
+  it("原本用像素字搭中文的元素，字級仍不低於 14px（Silkscreen 已移除，字級下限保留）", () => {
     [
       ["static/css/_home/functionBtn.css", ".card-cta"],
       ["static/css/_home/index.css", ".home-feature-head"],

@@ -166,18 +166,25 @@ components:
 
 **載入方式:** 專案規則是用 HTML 的 `<link rel="preconnect">` 加 `<link rel="stylesheet">` 載入 Google Fonts，**不用 CSS `@import`**（效能，使用者的既有規則）。
 
-**族語字母尚未驗證:** Noto Serif TC 是否能正確顯示族語特殊字母（例如 ʼ ŋ ɨ ʉ 與組合寫法）還沒測過。**S1-1 必須先做字符測試，通過才換字型**；族語詞彙若在宋體顯示異常，族語詞彙保留使用內文黑體。
+**族語字母（S1-1 已實測，2026-10-16）:**
+- **Noto Sans TC 與 Noto Serif TC 都沒有族語特殊字母。** 用 fontTools 讀完整字型檔的字元對照表，51 個候選字元（官方《原住民族語言書寫系統》113 年修正對照表出現的全部非中日韓字元，含音標，未區分書寫符號與音標；加上專案程式碼實際用到的 ʼ ʻ ʾ ṣ 與組合符號）中，TC 字型只有 11 個。其中 ʼ（U+02BC）、ŋ、ɨ、ʉ、ʔ、ʾ、ṣ、組合下點都沒有，所以**舊系統其實本來就把這些字母丟給使用者的系統字型**，並非「已正確顯示」。
+- **補法：** 在 TC 之後接不帶 TC 的 Noto Sans／Noto Serif，51 個字元全部有字形。Google 依 unicode-range 切片，只下載頁面用到的切片。
+- **已知缺口（內文堆疊）：** U+0332 組合底線有字形，但 Google 沒有把包含它的切片送給 Noto Sans，實測瀏覽器由備援字型補出底線，位置看起來正常。官方文件提到泰雅語用底線符號區分 ng 與 n、g，但真實字典資料有沒有用到這個字元還不確定。**不能宣稱 51 個字元都由網路字型保障。** 待辦：用字典資料查 U+0332 是否出現；出現時必須在 Windows Chrome、Android Chrome、iOS Safari 驗證 n̲、g̲、ng̲ 的位置、複製與搜尋；只有跨平台出現錯位或方框，才考慮自管子集字型（要承擔授權、版本與快取維運）。不使用 text-decoration 取代（會破壞複製、搜尋與語意）。
+- **字型順序有實測依據：** 全站內文必須 `Noto Sans TC` 在前。Chrome 實測 Noto 在前時，中文排版的「⋯」變成低位「...」、全形「・」縮成小圓點、破折號變粗，中文標點全部退化。顯示族語詞彙的元素才使用 `--yy-font-tribal`／`--yy-font-tribal-heading`（Noto 在前，同一個詞不中途換字型），各頁改版時套用。
+- **載入方式：** 可變字型區間（400..900、500..900），CSS 約 257KB，舊的逐一列字重約 748KB；專案用到的 650、850 字重現在是真字重（以前會被映射到 700、900），文字寬度與換行可能略有不同，各頁改版時做截圖比對。
+- **證據與重新產生：** `frontend/static/css/fontCoverage.fixture.json` 由 `scripts/build_font_coverage_fixture.py` 產生（不要手動改），`fontStack.test.js` 鎖定堆疊順序與涵蓋。字型升級或改網址時重跑腳本。
+- **尚未量測：** 頁面層級字型換字（`display=swap`）造成的 CLS，需要 Lighthouse 或實機量測後再決定是否要預載或調整備援字型的度量。
 
 ### 階層（風格稿使用值，S1 時整理成 token）
 - **大標**：Noto Serif TC 900，頁面主標與報頭。
 - **區塊標題**：Noto Serif TC 700，底下 3px 雙線。
-- **內文**：Noto Sans TC 400，行高約 1.75，單行寬度約 65 字元以內。
+- **內文**：Noto Sans TC 400，行高約 1.75，單行寬度約 65 字元以內。Token：`--yy-font-body`（內文）、`--yy-font-heading`（標題）、`--yy-font-tribal`／`--yy-font-tribal-heading`（族語詞彙）；舊 `--yy-font-pixel` 暫時是 body 的別名，待各頁改版後刪除。
 - **按鈕文字**：Noto Sans TC 700，15px。
 
 ### Named Rules
 **The 不使用像素字 Rule.** 舊系統的 Silkscreen 像素字將移除，不在新風格出現。
 
-**The 族語詞彙字型 Rule.** 族語詞彙必須正確顯示特殊字母；任何字型換用前先做字符測試。
+**The 族語詞彙字型 Rule.** 族語詞彙必須正確顯示特殊字母；任何字型換用前先重跑 `scripts/build_font_coverage_fixture.py` 並確認 `fontStack.test.js` 通過；顯示族語詞彙的元素使用 `--yy-font-tribal` 系列。
 
 ## Layout
 
@@ -290,7 +297,7 @@ components:
 - **Do** 每個動畫尊重 `prefers-reduced-motion`，並先回答「為什麼動」。
 - **Do** 淺色與深色都要設計並檢查對比。
 - **Do** 所有介面文字使用繁體中文與台灣用語，以 WCAG 2.2 AA 為基準。
-- **Do** 換字型前先做族語字母的字符測試。
+- **Do** 換字型或改字型網址前，先重跑字符涵蓋腳本與 `fontStack.test.js`。
 
 ### Don't:
 - **Don't** 使用硬偏移陰影、貼紙、星芒、膠帶、旋轉裝飾、五色棋盤格。

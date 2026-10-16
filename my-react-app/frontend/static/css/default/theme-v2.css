@@ -4,7 +4,7 @@
  * 全站共用的 CSS 變數、keyframes 與 utility class，供各頁面 CSS 取用，
  * 取代原型 .dc.html 內大量重複的 inline style。
  *
- * 字體（Noto Sans TC / Silkscreen）由 index.html 的 <link rel="stylesheet"> 載入，
+ * 字體（Noto Serif TC / Noto Sans TC，加上族語字母用的 Noto Serif / Noto Sans）由 index.html 的 <link rel="stylesheet"> 載入，
  * 這裡不用 CSS @import（會拖慢首次渲染，見該處註解）。
  */
 
@@ -27,10 +27,20 @@
   --yy-text-secondary: #3E3226;
   --yy-text-tertiary: #5A4B3B;
   --yy-text-muted: #6B5A47;
-  --yy-font-body: 'Noto Sans TC', sans-serif;
-  /* Silkscreen 只有大寫英文與數字。中文與「・」原本會落到系統等寬字型，和內文風格割裂，
-     所以中間補 Noto Sans TC（審查項 P1-20）。像素字請只用在純英文裝飾標籤。 */
-  --yy-font-pixel: 'Silkscreen', 'Noto Sans TC', monospace;
+  /* 兩個 TC 字型都沒有族語字母（ʼ ŋ ɨ ʉ ʔ ʾ 等），所以 TC 之後固定接不帶 TC 的 Noto 字型，
+     再接系統 CJK 字型（字型還沒載入時的畫面）。順序不要調換，fontStack.test.js 會檢查。 */
+  --yy-font-body: 'Noto Sans TC', 'Noto Sans', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  --yy-font-heading: 'Noto Serif TC', 'Noto Serif', 'Songti TC', 'PMingLiU', serif;
+  /* 舊的像素字 token。Silkscreen 已移除（沉穩文藝風格不用像素字），這裡保留名稱當別名指向內文字型，
+     避免一次改動約 30 個既有選擇器；各頁改版時（S1-3、S8）逐步換成 --yy-font-body 或 --yy-font-heading，
+     全部換完再刪除這個 token。 */
+  --yy-font-pixel: var(--yy-font-body);
+  /* 族語詞彙專用：拉丁字母與音標字母優先用 Noto（同一個詞不會中途換字型），CJK 再回退到 TC。
+     不能把這個順序套在全站內文：實測（Chrome，字符預覽頁）Noto 在前時，中文排版裡的「⋯」變成低位「...」、
+     全形間隔點「・」縮成小圓點、破折號變粗，中文標點全部退化。所以全站內文維持 TC 在前，
+     只有顯示族語詞彙的元素才用這兩個 token（各頁改版時套用）。 */
+  --yy-font-tribal: 'Noto Sans', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  --yy-font-tribal-heading: 'Noto Serif', 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
   --yy-radius-card: 10px;
   --yy-radius-lg: 16px;
   /* 次要分隔線、停用底色、進度條軌道；比 --yy-border 淡，不用在需要 3:1 對比的控制項邊框 */

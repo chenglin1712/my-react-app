@@ -23,14 +23,20 @@
   <!-- 字型 CSS 改成不擋住畫面：一般的 <link rel="stylesheet"> 會阻擋首次繪製，慢速網路下
        連上面的載入殼都要等到字型 CSS 下載完才看得到（實測約 3 秒）。用 media="print" 先載入、
        載完再切成 all，載入殼與頁面骨架可以立刻顯示（字型到了再換上，display=swap 本來就是這個行為）。 -->
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800;900&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-  <noscript><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800;900&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet"></noscript>
+  <!-- 字型（沉穩文藝風格）：標題與導覽 Noto Serif TC、內文 Noto Sans TC。
+       另外載入不帶 TC 的 Noto Sans / Noto Serif，是為了族語字母：兩個 TC 字型都沒有 ʼ ŋ ɨ ʉ ʔ ʾ 等字形
+       （fontTools 讀完整字型檔實測，51 個候選字元只有 11 個在 TC 字型裡），沒有這層會落到使用者系統字型。
+       Google 依 unicode-range 切片，只有頁面用到的字元才會下載對應切片。
+       用可變字型區間（400..900）而不是逐一列出字重：CSS 從約 748KB 降到約 257KB，
+       也讓專案用到的 650、850 字重真的畫得出來。證據與已知缺口見 static/css/fontStack.test.js。 -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400..900&family=Noto+Serif+TC:wght@500..900&family=Noto+Sans:wght@400..900&family=Noto+Serif:wght@500..900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400..900&family=Noto+Serif+TC:wght@500..900&family=Noto+Sans:wght@400..900&family=Noto+Serif:wght@500..900&display=swap" rel="stylesheet"></noscript>
   <!-- 開頁載入殼：JS 還沒下載完之前整頁是空白（慢速網路實測約 3.5 秒全白）。
        這段 CSS 與標記全部內嵌，不等任何外部檔案；React 的 createRoot().render()
        會直接取代 #root 的內容，所以不需要另外移除。 -->
   <style>
     html, body { margin: 0; background: #F3E7CF; }
-    .boot-shell { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; background: #F3E7CF; color: #221812; font-family: 'Silkscreen', ui-monospace, monospace; }
+    .boot-shell { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; background: #F3E7CF; color: #221812; font-family: 'Songti TC', 'PMingLiU', serif; /* 載入殼只用系統字型：網路字型這時還沒到，放進堆疊只會在字型到達時多一次換字 */ }
     .boot-shell__mark { display: grid; grid-template-columns: repeat(3, 14px); gap: 4px; }
     .boot-shell__mark i { width: 14px; height: 14px; background: #9E1B24; animation: boot-blink 1.2s steps(2, end) infinite; }
     .boot-shell__mark i:nth-child(2n) { background: #1F3A5C; animation-delay: .2s; }

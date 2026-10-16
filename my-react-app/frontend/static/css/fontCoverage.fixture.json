@@ -1,0 +1,822 @@
+{
+ "note": "涵蓋上界：官方《原住民族語言書寫系統》113年修正對照表出現的全部非中日韓字元（含音標，未區分書寫符號與音標）加上專案程式碼實際出現的字元。coveredBy = 字型檔有字形（fontTools 讀完整字型檔的字元對照表）；deliveredBy = 同時 Google 送出的 unicode-range 切片也包含該碼位。由 scripts/build_font_coverage_fixture.py 產生，不要手動修改。",
+ "generatedAt": "2026-10-16",
+ "fontsUrl": "https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400..900&family=Noto+Serif+TC:wght@500..900&family=Noto+Sans:wght@400..900&family=Noto+Serif:wght@500..900&display=swap",
+ "fonts": {
+  "Noto Sans": {
+   "url": "https://fonts.gstatic.com/s/notosans/v42/o-0mIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjcz6L1SoM-jCpoiyBUBN9d.ttf"
+  },
+  "Noto Sans TC": {
+   "url": "https://fonts.gstatic.com/s/notosanstc/v40/-nFuOG829Oofr2wohFbTp9ifNAn722rq0MXz7wm1_Co.ttf"
+  },
+  "Noto Serif": {
+   "url": "https://fonts.gstatic.com/s/notoserif/v33/ga6iaw1J5X9T9RW6j9bNVls-hfgvz8JcMofYTa32J4wsL2JAlAhZAVejwA.ttf"
+  },
+  "Noto Serif TC": {
+   "url": "https://fonts.gstatic.com/s/notoseriftc/v37/XLYzIZb5bJNDGYxLBibeHZ0BnHwmuanx8cUaGX_zN-pD.ttf"
+  }
+ },
+ "chars": [
+  {
+   "cp": "U+00E6",
+   "name": "LATIN SMALL LETTER AE",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Sans TC",
+    "Noto Serif",
+    "Noto Serif TC"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Sans TC",
+    "Noto Serif",
+    "Noto Serif TC"
+   ]
+  },
+  {
+   "cp": "U+00E9",
+   "name": "LATIN SMALL LETTER E WITH ACUTE",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Sans TC",
+    "Noto Serif",
+    "Noto Serif TC"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Sans TC",
+    "Noto Serif",
+    "Noto Serif TC"
+   ]
+  },
+  {
+   "cp": "U+00F0",
+   "name": "LATIN SMALL LETTER ETH",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Sans TC",
+    "Noto Serif",
+    "Noto Serif TC"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Sans TC",
+    "Noto Serif",
+    "Noto Serif TC"
+   ]
+  },
+  {
+   "cp": "U+0113",
+   "name": "LATIN SMALL LETTER E WITH MACRON",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Sans TC",
+    "Noto Serif",
+    "Noto Serif TC"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Sans TC",
+    "Noto Serif",
+    "Noto Serif TC"
+   ]
+  },
+  {
+   "cp": "U+0127",
+   "name": "LATIN SMALL LETTER H WITH STROKE",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+014B",
+   "name": "LATIN SMALL LETTER ENG",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0153",
+   "name": "LATIN SMALL LIGATURE OE",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Sans TC",
+    "Noto Serif",
+    "Noto Serif TC"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Sans TC",
+    "Noto Serif",
+    "Noto Serif TC"
+   ]
+  },
+  {
+   "cp": "U+0253",
+   "name": "LATIN SMALL LETTER B WITH HOOK",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0255",
+   "name": "LATIN SMALL LETTER C WITH CURL",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0256",
+   "name": "LATIN SMALL LETTER D WITH TAIL",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0257",
+   "name": "LATIN SMALL LETTER D WITH HOOK",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0259",
+   "name": "LATIN SMALL LETTER SCHWA",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+025F",
+   "name": "LATIN SMALL LETTER DOTLESS J WITH STROKE",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0263",
+   "name": "LATIN SMALL LETTER GAMMA",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0266",
+   "name": "LATIN SMALL LETTER H WITH HOOK",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0268",
+   "name": "LATIN SMALL LETTER I WITH STROKE",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+026C",
+   "name": "LATIN SMALL LETTER L WITH BELT",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+026D",
+   "name": "LATIN SMALL LETTER L WITH RETROFLEX HOOK",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+026E",
+   "name": "LATIN SMALL LETTER LEZH",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0270",
+   "name": "LATIN SMALL LETTER TURNED M WITH LONG LEG",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0278",
+   "name": "LATIN SMALL LETTER PHI",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+027B",
+   "name": "LATIN SMALL LETTER TURNED R WITH HOOK",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+027D",
+   "name": "LATIN SMALL LETTER R WITH TAIL",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+027E",
+   "name": "LATIN SMALL LETTER R WITH FISHHOOK",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0281",
+   "name": "LATIN LETTER SMALL CAPITAL INVERTED R",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0282",
+   "name": "LATIN SMALL LETTER S WITH HOOK",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0283",
+   "name": "LATIN SMALL LETTER ESH",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0288",
+   "name": "LATIN SMALL LETTER T WITH RETROFLEX HOOK",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0289",
+   "name": "LATIN SMALL LETTER U BAR",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+028E",
+   "name": "LATIN SMALL LETTER TURNED Y",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0290",
+   "name": "LATIN SMALL LETTER Z WITH RETROFLEX HOOK",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0291",
+   "name": "LATIN SMALL LETTER Z WITH CURL",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0294",
+   "name": "LATIN LETTER GLOTTAL STOP",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+02A1",
+   "name": "LATIN LETTER GLOTTAL STOP WITH STROKE",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+02A4",
+   "name": "LATIN SMALL LETTER DEZH DIGRAPH",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+02A5",
+   "name": "LATIN SMALL LETTER DZ DIGRAPH WITH CURL",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+02A6",
+   "name": "LATIN SMALL LETTER TS DIGRAPH",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+02A8",
+   "name": "LATIN SMALL LETTER TC DIGRAPH WITH CURL",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+02BB",
+   "name": "MODIFIER LETTER TURNED COMMA",
+   "sources": [
+    "repo-code"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Sans TC",
+    "Noto Serif",
+    "Noto Serif TC"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Sans TC",
+    "Noto Serif",
+    "Noto Serif TC"
+   ]
+  },
+  {
+   "cp": "U+02BC",
+   "name": "MODIFIER LETTER APOSTROPHE",
+   "sources": [
+    "repo-code"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+02BE",
+   "name": "MODIFIER LETTER RIGHT HALF RING",
+   "sources": [
+    "repo-code"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+02D0",
+   "name": "MODIFIER LETTER TRIANGULAR COLON",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0301",
+   "name": "COMBINING ACUTE ACCENT",
+   "sources": [
+    "repo-code"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Sans TC",
+    "Noto Serif",
+    "Noto Serif TC"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Sans TC",
+    "Noto Serif",
+    "Noto Serif TC"
+   ]
+  },
+  {
+   "cp": "U+0307",
+   "name": "COMBINING DOT ABOVE",
+   "sources": [
+    "repo-code"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Sans TC",
+    "Noto Serif",
+    "Noto Serif TC"
+   ],
+   "deliveredBy": [
+    "Noto Sans TC",
+    "Noto Serif",
+    "Noto Serif TC"
+   ]
+  },
+  {
+   "cp": "U+0329",
+   "name": "COMBINING VERTICAL LINE BELOW",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+0332",
+   "name": "COMBINING LOW LINE",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+03B2",
+   "name": "GREEK SMALL LETTER BETA",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Sans TC",
+    "Noto Serif",
+    "Noto Serif TC"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+03B8",
+   "name": "GREEK SMALL LETTER THETA",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Sans TC",
+    "Noto Serif",
+    "Noto Serif TC"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+03C7",
+   "name": "GREEK SMALL LETTER CHI",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Sans TC",
+    "Noto Serif",
+    "Noto Serif TC"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+1E5F",
+   "name": "LATIN SMALL LETTER R WITH LINE BELOW",
+   "sources": [
+    "official-writing-system-pdf"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  },
+  {
+   "cp": "U+1E63",
+   "name": "LATIN SMALL LETTER S WITH DOT BELOW",
+   "sources": [
+    "repo-code"
+   ],
+   "coveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ],
+   "deliveredBy": [
+    "Noto Sans",
+    "Noto Serif"
+   ]
+  }
+ ]
+}

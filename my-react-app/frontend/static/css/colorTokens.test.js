@@ -90,13 +90,9 @@ describe("theme-v2 token", () => {
     expect(readFileSync(join(FRONTEND, "..", "index.html"), "utf8")).toMatch(/<meta name="color-scheme" content="light"/);
   });
 
-  it("像素字堆疊在 Silkscreen 之後先回退到 Noto Sans TC，再回退等寬字型", () => {
-    expect(theme).toMatch(/--yy-font-pixel:\s*'Silkscreen',\s*'Noto Sans TC',\s*monospace/);
-    // 其他地方不要再單獨寫死 Silkscreen
-    // 備援寫法 var(--yy-font-pixel, 'Silkscreen', 'Noto Sans TC', monospace) 允許存在，其餘不可單獨寫死
-    const offenders = frontCss
-      .filter(({ file, css }) => !file.endsWith("theme-v2.css") && /font-family:[^;}]*Silkscreen/.test(css.replace(/var\(--yy-font-pixel,\s*'Silkscreen',\s*'Noto Sans TC',\s*monospace\)/g, "")))
-      .map(({ file }) => file);
+  it("像素字 token 已改成內文字型的別名（Silkscreen 已移除，字型堆疊細節見 fontStack.test.js）", () => {
+    expect(theme).toMatch(/--yy-font-pixel:\s*var\(--yy-font-body\)/);
+    const offenders = cssFiles.filter(({ css }) => /Silkscreen/.test(css)).map(({ file }) => file);
     expect(offenders).toEqual([]);
   });
 

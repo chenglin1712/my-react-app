@@ -55,7 +55,7 @@
 }
 
 .days-left {
-    font-family: var(--yy-font-pixel, 'Silkscreen', 'Noto Sans TC', monospace);
+    font-family: var(--yy-font-pixel, 'Noto Sans', 'Noto Sans TC', sans-serif);
     font-size: 1.875rem;
     font-weight: 700;
     margin-bottom: 0.25rem;
