@@ -10,6 +10,8 @@ import { scrollBehavior } from "../hooks/useReducedMotion";
 import RevealOnView from "../../components/ui/RevealOnView";
 import HomeTicker from "../../components/_home/Ticker";
 import HomeMasthead from "../../components/_home/Masthead";
+import HomePromoVideo from "../../components/_home/PromoVideo";
+import { pickPromoVideo } from "../../components/_home/promoVideoContent";
 import { pickMastheadContent } from "../../components/_home/mastheadContent";
 
 const ANNOUNCEMENT_CATEGORY_LABELS = { announcement: '公告', activity: '活動', exam: '考試', maintenance: '系統維護' };
@@ -27,6 +29,8 @@ const DEFAULT_HOMEPAGE_CONFIG = {
     marquee_items: [], show_marquee: true,
     tagline: '', show_tagline: true,
     quote_text: '', show_quote: true,
+    // 宣傳影片（S6-2）：沒有啟用中的影片就是 null，宣傳區不輸出
+    promo_video: null,
 };
 
 // 後台公告（backend/adminapi 的 Announcement，見 /adminapi/public/announcements/）
@@ -184,11 +188,14 @@ const HomePage = () => {
     );
 
     const { marqueeItems, tagline, quote } = pickMastheadContent(homepageConfig);
+    const promoVideo = pickPromoVideo(homepageConfig.promo_video);
 
     return (
         <div className="yy-page homepage">
             {marqueeItems.length > 0 && <HomeTicker items={marqueeItems} />}
             <HomeMasthead quote={quote} tagline={tagline} />
+            {/* 有啟用中的影片才輸出；換影片或媒體路徑、可播放狀態有變，就整個重建播放狀態 */}
+            {promoVideo && <HomePromoVideo key={`${promoVideo.id}|${promoVideo.videoUrl}|${promoVideo.coverUrl}|${promoVideo.playable}`} video={promoVideo} />}
 
             <section className="yy-hero home-hero">
                 {/* 裝飾只留三個（兩團光暈與貼紙徽章）：原本約十個無限循環動畫會搶走標題與按鈕的注意力 */}

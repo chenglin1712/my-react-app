@@ -454,3 +454,42 @@ describe('首頁 · 報頭與跑馬燈（S6-1，讀後台公開設定）', () =>
     expect(document.querySelector('.home-ticker')).toBeNull();
   });
 });
+
+describe('首頁 · 宣傳影片（S6-2，讀後台公開設定）', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const PROMO = {
+    id: 3, title: '認識原語', description: '三分鐘看懂平台。', transcript: '逐字稿內容',
+    video_url: '/media/homepage/video/a.mp4', cover_url: '/media/homepage/cover/a.webp',
+    caption_url: null, duration_seconds: 412, available: true,
+  };
+
+  test('沒有啟用中的影片（null）、載入前、設定失敗：整區不輸出', async () => {
+    mockFetchOk([], { ...DEFAULT_CONFIG, promo_video: null });
+    renderHome();
+    expect(document.querySelector('.home-promo')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('news-mock')).toBeInTheDocument());
+    expect(document.querySelector('.home-promo')).toBeNull();
+  });
+
+  test('有啟用中的影片：輸出宣傳區，在報頭之後、主視覺之前，並顯示標題與說明', async () => {
+    mockFetchOk([], { ...DEFAULT_CONFIG, promo_video: PROMO });
+    renderHome();
+    expect(await screen.findByRole('region', { name: '宣傳影片' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: '認識原語' })).toBeInTheDocument();
+    const order = [...document.querySelector('.homepage').children].map((el) => el.className);
+    expect(order[0]).toContain('home-mast');
+    expect(order[1]).toContain('home-promo');
+    expect(order[2]).toContain('home-hero');
+  });
+
+  test('影片缺檔（available 為 false）：仍輸出，顯示無法播放與逐字稿', async () => {
+    mockFetchOk([], { ...DEFAULT_CONFIG, promo_video: { ...PROMO, available: false, video_url: null } });
+    renderHome();
+    expect(await screen.findByText('影片目前無法播放。')).toBeInTheDocument();
+    expect(screen.getByText('逐字稿內容')).toBeInTheDocument();
+    expect(document.querySelector('video')).toBeNull();
+  });
+});

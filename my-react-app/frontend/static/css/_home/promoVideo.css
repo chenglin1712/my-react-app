@@ -1,0 +1,202 @@
+/* 首頁宣傳影片（S6-2，沉穩文藝）。顏色一律取 --yy-calm-* 語意層。
+   控制列放在影片下方而不是蓋在畫面上：不需要遮罩，任何影片內容下文字與圖示對比都固定。 */
+
+.home-promo {
+  display: grid;
+  gap: var(--yy-space-3);
+  padding: var(--yy-space-5) 56px;
+  min-width: 0;
+}
+
+.home-promo__stage {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--yy-calm-block);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-ui-radius);
+}
+
+.home-promo__video,
+.home-promo__cover {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 封面上的播放鈕：半徑 3px 的方形，與全站按鈕一致，不用圓形貼紙 */
+.home-promo__big-play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  background: var(--yy-calm-surface);
+  color: var(--yy-calm-text);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-ui-radius);
+  cursor: pointer;
+  transition: transform 120ms var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.home-promo__big-play:active {
+  transform: scale(var(--yy-ui-press));
+}
+
+/* ---------- 控制列 ---------- */
+
+.home-promo__bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--yy-space-2) var(--yy-space-3);
+  min-height: var(--yy-control-md);
+}
+
+.home-promo__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--yy-space-2);
+  min-width: var(--yy-control-md);
+  min-height: var(--yy-control-md);
+  padding: 0 var(--yy-space-4);
+  background: transparent;
+  color: var(--yy-calm-text);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-ui-radius);
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: transform 120ms var(--ease-out), background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.home-promo__btn:active {
+  transform: scale(var(--yy-ui-press));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .home-promo__btn:hover {
+    background: var(--yy-calm-text);
+    color: var(--yy-calm-bg);
+  }
+
+  .home-promo__big-play:hover {
+    color: var(--yy-calm-accent);
+  }
+}
+
+.home-promo__btn:focus-visible,
+.home-promo__big-play:focus-visible,
+.home-promo__seek:focus-visible,
+.home-promo__transcript summary:focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
+}
+
+.home-promo__seek {
+  flex: 1 1 160px;
+  min-width: 0;
+  height: var(--yy-control-md);
+  margin: 0;
+  accent-color: var(--yy-calm-accent);
+  background: transparent;
+  cursor: pointer;
+}
+
+.home-promo__seek:disabled {
+  cursor: default;
+}
+
+.home-promo__clock {
+  color: var(--yy-calm-text-sub);
+  font-size: var(--yy-text-sm);
+  white-space: nowrap;
+}
+
+.home-promo__error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--yy-space-3);
+  margin: 0;
+  color: var(--yy-calm-text);
+}
+
+/* ---------- 標題、說明、逐字稿 ---------- */
+
+.home-promo__text {
+  display: grid;
+  gap: var(--yy-space-1);
+}
+
+.home-promo__title {
+  margin: 0;
+  font-family: var(--yy-font-heading);
+  font-size: var(--yy-text-xl);
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0.04em;
+  color: var(--yy-calm-text);
+}
+
+.home-promo__desc {
+  max-width: 65ch;
+  margin: 0;
+  color: var(--yy-calm-text-sub);
+  line-height: 1.7;
+}
+
+.home-promo__transcript {
+  border-top: var(--yy-border-width) solid var(--yy-calm-rule);
+  color: var(--yy-calm-text);
+}
+
+.home-promo__transcript summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--yy-control-md);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.home-promo__transcript p {
+  max-width: 65ch;
+  margin: 0 0 var(--yy-space-3);
+  max-height: 16rem;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  line-height: 1.8;
+  color: var(--yy-calm-text-sub);
+}
+
+@media (max-width: 720px) {
+  .home-promo {
+    padding: var(--yy-space-4) 24px;
+  }
+
+  .home-promo__big-play {
+    width: 64px;
+    height: 64px;
+  }
+}
+
+/* 減少動態：按鈕只做顏色變化，不縮放 */
+@media (prefers-reduced-motion: reduce) {
+  .home-promo__btn,
+  .home-promo__big-play {
+    transition: color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+  }
+
+  .home-promo__btn:active,
+  .home-promo__big-play:active {
+    transform: none;
+  }
+}
