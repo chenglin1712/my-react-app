@@ -8,6 +8,7 @@ from rest_framework import serializers
 
 from ..models import Announcement, ExamScheduleOverride, HomepageConfig
 from ..promo_media import public_media_url
+from ..validators import normalize_marquee_items
 
 
 class AnnouncementSerializer(serializers.ModelSerializer):
@@ -109,9 +110,14 @@ class HomepageConfigSerializer(serializers.ModelSerializer):
             'show_news_section', 'show_calendar_section', 'news_display_count',
             'button1_enabled', 'button2_enabled', 'button3_enabled',
             'active_promo_video',
+            'marquee_items', 'show_marquee', 'tagline', 'show_tagline', 'quote_text', 'show_quote',
             'updated_by', 'updated_at',
         ]
         read_only_fields = ['updated_by', 'updated_at']
+
+    def validate_marquee_items(self, value):
+        # 模型欄位的 validator 已檢查型別與長度；這裡負責儲存前正規化：每項去前後空白。
+        return normalize_marquee_items(value)
 
     def validate_active_promo_video(self, value):
         # 沒有影片檔的紀錄不能啟用，否則公開首頁會拿到一個播不了的影片（可為空 = 停用）。
@@ -167,7 +173,21 @@ class PublicHomepageConfigSerializer(serializers.ModelSerializer):
             'show_news_section', 'show_calendar_section', 'news_display_count',
             'button1_enabled', 'button2_enabled', 'button3_enabled',
             'promo_video',
+            'marquee_items', 'show_marquee', 'tagline', 'show_tagline', 'quote_text', 'show_quote',
         ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # 開關關閉時不輸出內容：管理者可能先存了還沒要公開的文案再關掉開關，
+        # 內容留在資料庫（重新開啟即可發布），但不能從公開端點被讀走。
+        for toggle, field in (
+            ('show_marquee', 'marquee_items'),
+            ('show_tagline', 'tagline'),
+            ('show_quote', 'quote_text'),
+        ):
+            if not data[toggle]:
+                data[field] = [] if field == 'marquee_items' else ''
+        return data
 
     def get_promo_video(self, obj):
         video = obj.active_promo_video

@@ -5,6 +5,7 @@ from django.db import models
 from django.utils import timezone
 
 from ..validators import (
+    validate_marquee_items,
     validate_nonblank,
     validate_plain_text,
     validate_promo_caption_path,
@@ -317,6 +318,15 @@ class HomepageConfig(SingletonModel):
     active_promo_video = models.ForeignKey(
         'PromoVideo', null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
     )
+    # 報頭與跑馬燈文字（S3-2，HOMEPAGE_CONTRACT.md 3.1）。內容空白時前台不輸出該元素，
+    # 也不放任何示意文字；文案由使用者在後台輸入，這裡與前台都不寫死任何族語詞。
+    # 顯示開關預設為開，內容一填就會顯示；要暫時隱藏但保留內容就關開關。
+    marquee_items = models.JSONField(default=list, blank=True, validators=[validate_marquee_items])
+    show_marquee = models.BooleanField(default=True)
+    tagline = models.CharField(max_length=60, blank=True, validators=[validate_single_line])
+    show_tagline = models.BooleanField(default=True)
+    quote_text = models.CharField(max_length=120, blank=True, validators=[validate_single_line])
+    show_quote = models.BooleanField(default=True)
     updated_by = models.CharField(max_length=128, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -308,7 +308,8 @@ class PublicHomepageConfigPromoVideoTest(MediaRootMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertTrue(LEGACY_PUBLIC_KEYS.issubset(data.keys()))
-        self.assertEqual(set(data.keys()), LEGACY_PUBLIC_KEYS | {"promo_video"})
+        # S3-2 之後多了報頭與跑馬燈欄位（見 test_homepage_masthead.py），這裡只關心影片相關的鍵
+        self.assertTrue((LEGACY_PUBLIC_KEYS | {"promo_video"}).issubset(data.keys()))
         self.assertIsNone(data["promo_video"])
 
     def test_response_must_be_revalidated(self):
