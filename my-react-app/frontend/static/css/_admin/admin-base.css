@@ -26,7 +26,7 @@
   padding: var(--admin-page-padding);
   background: var(--admin-bg);
   color: var(--admin-text);
-  font-family: var(--yy-font-body, sans-serif);
+  font-family: var(--yy-font-body);
 }
 
 /* ------------------------------------------------------------------ 頁首 */
@@ -80,7 +80,6 @@
   background: var(--admin-surface);
   border: 1px solid var(--admin-border);
   border-radius: var(--admin-radius);
-  box-shadow: var(--admin-shadow);
 }
 .admin-shell :is(
   .announcement-filter-panel, .quiz-bank-filter-panel, .dictionary-filter-panel, .user-filter-panel,
@@ -141,11 +140,13 @@
   padding: 12px 14px;
   border-color: var(--admin-border);
 }
-.admin-shell :is(
+@media (hover: hover) and (pointer: fine) {
+  .admin-shell :is(
   .announcement-table, .quiz-bank-table, .dictionary-table, .user-table, .moderation-table,
   .review-queue-table, .exam-schedule-table, .system-rate-table, .system-feature-table
 ) tbody tr:hover > td {
-  background: var(--admin-surface-muted);
+    background: var(--admin-surface-muted);
+  }
 }
 
 /* ------------------------------------------------------------------ 表格捲動區 AdminTable（G-3） */
@@ -169,11 +170,13 @@
 }
 .admin-shell .admin-table-edge.is-start {
   left: 0;
-  background: linear-gradient(to right, rgba(20, 33, 58, .16), rgba(20, 33, 58, 0));
+  width: 3px;
+  background: color-mix(in srgb, var(--yy-calm-accent) 35%, transparent);
 }
 .admin-shell .admin-table-edge.is-end {
   right: 0;
-  background: linear-gradient(to left, rgba(20, 33, 58, .16), rgba(20, 33, 58, 0));
+  width: 3px;
+  background: color-mix(in srgb, var(--yy-calm-accent) 35%, transparent);
 }
 
 /* ------------------------------------------------------------------ 空狀態、載入、分頁 */
@@ -201,7 +204,7 @@
   max-width: 44ch;
   margin: 0;
   font-size: var(--yy-text-sm);
-  line-height: var(--yy-leading-normal, 1.6);
+  line-height: var(--yy-leading-normal);
 }
 .admin-shell .admin-empty-state .btn { margin-top: 4px; }
 .admin-shell :is(
@@ -263,10 +266,10 @@
 .admin-shell .btn-primary {
   --bs-btn-bg: var(--admin-accent);
   --bs-btn-border-color: var(--admin-accent);
-  --bs-btn-hover-bg: #17304f;
-  --bs-btn-hover-border-color: #17304f;
-  --bs-btn-active-bg: #12263f;
-  --bs-btn-active-border-color: #12263f;
+  --bs-btn-hover-bg: var(--yy-calm-accent);
+  --bs-btn-hover-border-color: var(--yy-calm-accent);
+  --bs-btn-active-bg: var(--yy-calm-accent);
+  --bs-btn-active-border-color: var(--yy-calm-accent);
   --bs-btn-disabled-bg: var(--admin-accent);
   --bs-btn-disabled-border-color: var(--admin-accent);
 }
@@ -289,7 +292,7 @@
   font-size: 14px;
 }
 .admin-shell :is(.form-control, .form-select):focus {
-  border-color: var(--yy-blue-light, #2c6e7f);
+  border-color: var(--yy-calm-copper);
   /* 與前台同一組焦點框；Bootstrap 預設的淡色 box-shadow 對比不足，一併取消 */
   outline: var(--admin-focus-ring);
   outline-offset: var(--admin-focus-offset);
@@ -309,9 +312,9 @@
   letter-spacing: .01em;
 }
 .admin-shell .badge.bg-light {
-  color: #3b4658 !important;
-  background-color: #eef1f5 !important;
-  border: 1px solid #dde3ea;
+  color: var(--yy-calm-text) !important;
+  background-color: var(--yy-calm-info-bg) !important;
+  border: 1px solid var(--yy-calm-rule);
 }
 .admin-shell .alert {
   border-radius: var(--admin-radius-sm);
@@ -327,7 +330,7 @@
 /* 後台各頁重複定義的「必填星號」統一在這裡；原本三個檔案各自一份，且沒有限定範圍 */
 .admin-shell .required-mark {
   margin-left: 2px;
-  color: var(--yy-red, #9e1b24);
+  color: var(--yy-calm-accent);
 }
 
 /* ------------------------------------------------------------------ 標題層級
@@ -383,7 +386,7 @@
    形狀對應多數管理頁：標題、篩選列、表格。閃爍只用 opacity，降低動態偏好下由全域規則停掉。 */
 .admin-shell .admin-skeleton { max-width: var(--admin-content-max); margin: 0 auto; padding: var(--admin-page-padding); }
 .admin-shell .admin-skeleton-heading { display: grid; gap: 10px; margin-bottom: 24px; }
-.admin-shell .admin-skeleton-card { padding: 16px 18px; margin-bottom: 20px; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); box-shadow: var(--admin-shadow); }
+.admin-shell .admin-skeleton-card { padding: 16px 18px; margin-bottom: 20px; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); }
 .admin-shell .admin-skeleton-filter { display: flex; gap: 12px; }
 .admin-shell .admin-skeleton-row { display: grid; grid-template-columns: 3fr 2fr 2fr 1fr; gap: 24px; padding: 14px 0; border-bottom: 1px solid var(--admin-border); }
 .admin-shell .admin-skeleton-row:last-child { border-bottom: 0; }

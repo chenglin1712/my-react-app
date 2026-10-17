@@ -9,8 +9,10 @@
 .featured-topics-layout { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); gap: 24px; align-items: start; }
 .featured-topics-list ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .featured-topics-item { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; width: 100%; min-height: 44px; padding: 12px 14px; text-align: left; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: 8px; color: inherit; }
-.featured-topics-item:hover { border-color: var(--admin-border-strong); }
-.featured-topics-item.is-selected { border-color: var(--admin-accent); box-shadow: inset 3px 0 0 var(--admin-accent); }
+@media (hover: hover) and (pointer: fine) {
+  .featured-topics-item:hover { border-color: var(--admin-border-strong); }
+}
+.featured-topics-item.is-selected { border-color: var(--admin-accent); border-left-width: 4px; }
 .featured-topics-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .featured-topics-order { color: var(--admin-muted); font-size: 13px; }
 

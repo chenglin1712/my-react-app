@@ -259,7 +259,6 @@
   padding: 22px;
   background: var(--admin-surface);
   border-radius: var(--admin-radius);
-  box-shadow: var(--admin-shadow);
 }
 
 .dictionary-review-card {
@@ -383,7 +382,6 @@
   background: var(--admin-surface);
   border: 1px solid var(--admin-border);
   border-radius: 8px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
 }
 
 .dictionary-word-picker-option {
@@ -399,9 +397,12 @@
   cursor: pointer;
 }
 
-.dictionary-word-picker-option:hover,
+@media (hover: hover) and (pointer: fine) {
+  .dictionary-word-picker-option:hover { background: var(--admin-surface-muted); }
+}
 .dictionary-word-picker-option[aria-selected="true"] {
   background: var(--admin-surface-muted);
+  border-left: 3px solid var(--admin-accent);
 }
 
 .dictionary-word-picker-option small,
@@ -488,9 +489,13 @@
   text-decoration: none;
 }
 
-.dictionary-grammar-section-link:hover,
-.dictionary-grammar-section-link:focus {
+@media (hover: hover) and (pointer: fine) {
+  .dictionary-grammar-section-link:hover { color: var(--admin-accent); }
+}
+.dictionary-grammar-section-link:focus-visible {
   color: var(--admin-accent);
+  outline: var(--admin-focus-ring);
+  outline-offset: var(--admin-focus-offset);
 }
 
 @media (max-width: 900px) {

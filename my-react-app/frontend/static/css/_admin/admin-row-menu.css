@@ -9,7 +9,6 @@
   background: var(--admin-surface);
   border: 1px solid var(--admin-border);
   border-radius: var(--admin-radius-sm);
-  box-shadow: 0 10px 28px rgba(20, 33, 58, .18);
 }
 
 .admin-shell .admin-row-menu-item {
@@ -29,12 +28,16 @@
   cursor: pointer;
 }
 
-.admin-shell .admin-row-menu-item:hover { background: var(--admin-accent-soft); color: var(--admin-text-strong); }
+@media (hover: hover) and (pointer: fine) {
+  .admin-shell .admin-row-menu-item:hover { background: var(--admin-accent-soft); color: var(--admin-text-strong); }
+}
 .admin-shell .admin-row-menu-item:focus-visible { outline: var(--admin-focus-ring); outline-offset: -3px; background: var(--admin-accent-soft); }
 .admin-shell .admin-row-menu-item[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
 
 .admin-shell .admin-row-menu-item.is-danger { color: var(--admin-danger); font-weight: 600; }
-.admin-shell .admin-row-menu-item.is-danger:hover,
+@media (hover: hover) and (pointer: fine) {
+  .admin-shell .admin-row-menu-item.is-danger:hover { background: var(--admin-danger-bg); color: var(--admin-danger); }
+}
 .admin-shell .admin-row-menu-item.is-danger:focus-visible { background: var(--admin-danger-bg); color: var(--admin-danger); }
 
 .admin-shell .admin-row-menu-separator { height: 1px; margin: 4px 2px; background: var(--admin-border); }

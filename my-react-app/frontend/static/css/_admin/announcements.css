@@ -4,7 +4,7 @@
 
 .announcement-filter-panel { display: grid; grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr)) auto; gap: 12px; max-width: 1440px; margin: 0 auto 20px; }
 .announcement-table-card, .announcement-editor-card { max-width: 1440px; margin: 0 auto; }
-.announcement-editor-card { background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: 12px; box-shadow: var(--admin-shadow); }
+.announcement-editor-card { background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: 12px; }
 .announcement-title-cell { min-width: 220px; max-width: 360px; font-weight: 600; }
 .announcement-cell-note { display: block; margin-top: 3px; color: var(--admin-muted); font-size: 12px; white-space: nowrap; }
 .announcement-row-actions { display: flex; flex-wrap: wrap; gap: 6px; min-width: 150px; }

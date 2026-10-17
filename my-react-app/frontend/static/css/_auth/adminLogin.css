@@ -1,6 +1,6 @@
 /*
  * 後台專用登入頁（src/_auth/AdminLoginPage.jsx）。
- * 左右分割：左側品牌色織紋與標語（純裝飾），右側奶油底登入卡。表單本身沿用 loginForm.css。
+ * 左右分割：左側織紋與標語（純裝飾），右側登入卡。表單本身沿用 loginForm.css。
  * 動畫只用 transform／opacity；降低動態偏好由 theme-v2.css 的全域規則處理（動畫直接到終態）。
  */
 .admin-login {
@@ -8,9 +8,9 @@
   grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
   min-height: 100vh;
   min-height: 100dvh;
-  font-family: var(--yy-font-body, sans-serif);
-  color: var(--yy-ink, #221812);
-  background: var(--yy-cream, #f3e7cf);
+  font-family: var(--yy-font-body);
+  color: var(--yy-calm-text);
+  background: var(--yy-calm-info-bg);
 }
 
 /* ---------- 左側裝飾 ---------- */
@@ -22,9 +22,9 @@
   gap: 10px;
   padding: clamp(32px, 6vw, 72px);
   overflow: hidden;
-  color: var(--yy-cream, #f3e7cf);
-  background: #14263d;
-  border-right: 4px solid var(--yy-ink, #221812);
+  color: var(--yy-calm-info-bg);
+  background: var(--yy-calm-block);
+  border-right: 3px double var(--yy-calm-line);
 }
 
 .admin-login-weave {
@@ -40,56 +40,26 @@
 .admin-login-cell-gap { aspect-ratio: 1; }
 
 .admin-login-cell {
-  border: 2px solid rgba(243, 231, 207, .24);
+  border: 2px solid color-mix(in srgb, var(--yy-calm-block-on) 24%, transparent);
   /* 進場：一列一列織出來。每格由左往右拉開（steps 讓它有像素的頓挫感，像線一段一段被拉過） */
   clip-path: inset(0 100% 0 0);
-  animation:
-    admin-login-weave-in .5s steps(5, end) calc(var(--row) * 150ms + var(--col) * 30ms + .15s) forwards,
-    /* 持續：織完後從中心向外一圈一圈亮度起伏，6 秒一輪，每圈延遲 .22 秒形成擴散波 */
-    admin-login-ripple 6s ease-in-out calc(2.2s + var(--ring) * 220ms) infinite;
+  animation: admin-login-weave-in .5s steps(5, end) calc(var(--row) * 150ms + var(--col) * 30ms + .15s) forwards;
 }
-.admin-login-cell-gold { background: var(--yy-gold, #d9a227); }
-.admin-login-cell-red { background: var(--yy-red, #9e1b24); }
-.admin-login-cell-cream { background: var(--yy-cream, #f3e7cf); }
-.admin-login-cell-teal { background: var(--yy-blue-light, #2c6e7f); }
-.admin-login-cell-blue { background: #4d86b8; }
+.admin-login-cell-gold { background: var(--yy-calm-olive); }
+.admin-login-cell-red { background: var(--yy-calm-accent); }
+.admin-login-cell-cream { background: var(--yy-calm-info-bg); }
+.admin-login-cell-teal { background: var(--yy-calm-copper); }
+.admin-login-cell-blue { background: var(--yy-calm-copper); }
 
-/* 梭子：一條金線每 5 秒由上往下掃過整片織紋 */
-.admin-login-shuttle {
-  position: absolute;
-  top: 0;
-  right: -8px;
-  left: -8px;
-  height: 3px;
-  background: var(--yy-gold-light, #f6d77b);
-  box-shadow: 0 0 12px 2px rgba(246, 215, 123, .55);
-  opacity: 0;
-  animation: admin-login-shuttle 5s cubic-bezier(.45, 0, .55, 1) 2.6s infinite;
-}
-
-/* 星塵：像素方塊緩緩上升（Y2K 版的螢火蟲） */
-.admin-login-dust {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.admin-login-dust-mote {
-  position: absolute;
-  bottom: -12px;
-  opacity: 0;
-  animation: admin-login-dust 12s linear infinite;
-}
-.admin-login-dust-gold { background: var(--yy-gold-light, #f6d77b); }
-.admin-login-dust-cream { background: var(--yy-cream, #f3e7cf); }
-.admin-login-dust-red { background: #d94b57; }
-.admin-login-dust-teal { background: #5aa5b8; }
+.admin-login-shuttle,
+.admin-login-dust { display: none; }
 
 .admin-login-kicker {
   position: relative;
   margin: 0;
-  color: var(--yy-gold-light, #f6d77b);
-  font-family: var(--yy-font-pixel, monospace);
-  font-size: 13px;
+  color: var(--yy-calm-tag);
+  font-family: var(--yy-font-body);
+  font-size: 14px;
   letter-spacing: .22em;
   animation: admin-login-rise .5s ease-out .9s both;
 }
@@ -116,8 +86,7 @@
   height: .9em;
   margin-left: .12em;
   vertical-align: -.08em;
-  background: var(--yy-gold-light, #f6d77b);
-  animation: admin-login-blink 1s steps(1, end) 2.3s infinite;
+  background: var(--yy-calm-tag);
 }
 
 /* ---------- 右側登入卡 ---------- */
@@ -126,23 +95,16 @@
   align-items: center;
   justify-content: center;
   padding: 32px 24px;
-  background-image:
-    linear-gradient(45deg, rgba(34, 24, 18, .035) 25%, transparent 25%),
-    linear-gradient(-45deg, rgba(34, 24, 18, .035) 25%, transparent 25%);
-  background-size: 28px 28px;
 }
 
 .admin-login-card {
   width: min(440px, 100%);
   padding: 34px 32px 28px;
-  background: #fff;
-  border: 3px solid var(--yy-ink, #221812);
-  border-radius: var(--yy-radius-card, 10px);
-  box-shadow: var(--yy-shadow-lg, 7px 7px 0 #221812);
+  background: var(--admin-surface);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-ui-radius);
   /* 由下方 48px 帶一點回彈落下，落地後硬陰影才「蓋」出來 */
-  animation:
-    admin-login-card-in .75s cubic-bezier(.34, 1.3, .5, 1) .2s both,
-    admin-login-stamp .35s ease-out .8s both;
+  animation: admin-login-card-in .3s var(--ease-out) .1s both;
 }
 .admin-login-card > * {
   animation: admin-login-rise .5s cubic-bezier(.2, .7, .3, 1) both;
@@ -166,20 +128,19 @@
   width: 44px;
   height: 44px;
   place-items: center;
-  color: var(--yy-cream, #f3e7cf);
-  background: var(--yy-blue, #1f3a5c);
-  border: 2.5px solid var(--yy-ink, #221812);
-  border-radius: 8px;
-  box-shadow: 3px 3px 0 var(--yy-ink, #221812);
+  color: var(--yy-calm-info-bg);
+  background: var(--yy-calm-accent);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-ui-radius);
   font-size: 22px;
   font-weight: 900;
 }
 
 .admin-login-brand-eyebrow {
   display: block;
-  color: var(--yy-text-muted, #6b5a47);
-  font-family: var(--yy-font-pixel, monospace);
-  font-size: 10px;
+  color: var(--yy-calm-text-sub);
+  font-family: var(--yy-font-body);
+  font-size: 14px;
   letter-spacing: .2em;
 }
 
@@ -197,7 +158,7 @@
 
 .admin-login-lead {
   margin: 0 0 20px;
-  color: var(--yy-text-muted, #6b5a47);
+  color: var(--yy-calm-text-sub);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -205,25 +166,33 @@
 .admin-login-notice {
   margin: 0 0 18px;
   padding: 10px 12px;
-  color: var(--yy-text-secondary, #3e3226);
-  background: var(--yy-warning-bg, #f9f1df);
-  border: 2px solid var(--yy-ink, #221812);
-  border-radius: 8px;
-  font-size: 13px;
+  color: var(--yy-calm-text-sub);
+  background: var(--yy-calm-warning-bg);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-ui-radius);
+  font-size: 14px;
   line-height: 1.6;
 }
 
 .admin-login-back {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--yy-control-md);
   margin-top: 18px;
-  color: var(--yy-text-muted, #6b5a47);
-  font-size: 13px;
+  color: var(--yy-calm-text-sub);
+  font-size: 14px;
   font-weight: 700;
   text-decoration: none;
 }
-.admin-login-back:hover {
-  color: var(--yy-red, #9e1b24);
-  text-decoration: underline;
+@media (hover: hover) and (pointer: fine) {
+  .admin-login-back:hover {
+    color: var(--yy-calm-accent);
+    text-decoration: underline;
+  }
+}
+.admin-login-back:focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
 }
 
 @keyframes admin-login-weave-in {
@@ -231,44 +200,14 @@
   to { clip-path: inset(0 0 0 0); }
 }
 
-/* 亮度起伏只動 opacity 與 transform（不觸發版面重排） */
-@keyframes admin-login-ripple {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  45% { opacity: .78; transform: scale(.93); }
-}
-
-@keyframes admin-login-shuttle {
-  0% { transform: translateY(0); opacity: 0; }
-  8% { opacity: 1; }
-  92% { opacity: 1; }
-  100% { transform: translateY(calc(7 * clamp(38px, 4.4vw, 62px) + 36px)); opacity: 0; }
-}
-
-@keyframes admin-login-dust {
-  0% { transform: translateY(0); opacity: 0; }
-  12% { opacity: .85; }
-  80% { opacity: .85; }
-  100% { transform: translateY(-105vh); opacity: 0; }
-}
-
 @keyframes admin-login-type {
   from { clip-path: inset(0 100% 0 0); }
   to { clip-path: inset(0 0 0 0); }
 }
 
-@keyframes admin-login-blink {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
-}
-
 @keyframes admin-login-card-in {
-  from { opacity: 0; transform: translateY(48px) scale(.97); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes admin-login-stamp {
-  from { box-shadow: 0 0 0 var(--yy-ink, #221812); }
-  to { box-shadow: var(--yy-shadow-lg, 7px 7px 0 #221812); }
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes admin-login-rise {
@@ -287,7 +226,7 @@
     align-items: center;
     padding: 18px 24px;
     border-right: 0;
-    border-bottom: 4px solid var(--yy-ink, #221812);
+    border-bottom: 3px double var(--yy-calm-line);
   }
   .admin-login-weave,
   .admin-login-slogan { display: none; }

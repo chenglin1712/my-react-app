@@ -12,9 +12,9 @@
   justify-content: center;
   gap: 10px;
   padding: 24px;
-  color: var(--yy-cream, #f3e7cf);
-  background: #14263d;
-  font-family: var(--yy-font-body, sans-serif);
+  color: var(--yy-calm-info-bg);
+  background: var(--yy-calm-block);
+  font-family: var(--yy-font-body);
   /* 延遲 120ms 才淡入：頁面載入很快時使用者完全看不到這個畫面 */
   animation: admin-entry-in .24s ease-out .12s both;
 }
@@ -41,26 +41,26 @@
   stroke-dashoffset: 38;
   animation: admin-entry-segment .55s cubic-bezier(.55, .08, .35, 1) both;
 }
-.admin-entry-segment-red { stroke: var(--yy-red, #9e1b24); }
-.admin-entry-segment-gold { stroke: var(--yy-gold, #d9a227); }
-.admin-entry-segment-blue { stroke: #4d86b8; }
-.admin-entry-segment-teal { stroke: var(--yy-blue-light, #2c6e7f); }
-.admin-entry-segment-cream { stroke: var(--yy-cream, #f3e7cf); }
+.admin-entry-segment-red { stroke: var(--yy-calm-accent); }
+.admin-entry-segment-gold { stroke: var(--yy-calm-olive); }
+.admin-entry-segment-blue { stroke: var(--yy-calm-copper); }
+.admin-entry-segment-teal { stroke: var(--yy-calm-copper); }
+.admin-entry-segment-cream { stroke: var(--yy-calm-info-bg); }
 
 .admin-entry-mark {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  color: var(--yy-cream, #f3e7cf);
+  color: var(--yy-calm-info-bg);
   font-size: 34px;
   font-weight: 700;
 }
 
 .admin-entry-brand {
   margin: 0;
-  color: var(--yy-gold-light, #f6d77b);
-  font-family: var(--yy-font-pixel, monospace);
+  color: var(--yy-calm-tag);
+  font-family: var(--yy-font-body);
   font-size: 13px;
   letter-spacing: .24em;
 }
@@ -69,18 +69,20 @@
 .admin-entry-skip {
   margin-top: 18px;
   padding: 6px 16px;
-  color: rgba(243, 231, 207, .85);
+  color: color-mix(in srgb, var(--yy-calm-block-on) 85%, transparent);
   background: none;
-  border: 1px solid rgba(243, 231, 207, .45);
+  border: 1px solid color-mix(in srgb, var(--yy-calm-block-on) 45%, transparent);
   border-radius: 6px;
   font-size: 13px;
 }
-.admin-entry-skip:hover { color: #fff; border-color: rgba(243, 231, 207, .8); }
-.admin-entry-skip:focus-visible { outline: 2px solid var(--yy-gold-light, #f6d77b); outline-offset: 3px; }
+@media (hover: hover) and (pointer: fine) {
+  .admin-entry-skip:hover { color: var(--admin-surface); border-color: color-mix(in srgb, var(--yy-calm-block-on) 80%, transparent); }
+}
+.admin-entry-skip:focus-visible { outline: 2px solid var(--yy-calm-tag); outline-offset: 3px; }
 
 .admin-entry-message {
   margin: 0;
-  color: rgba(243, 231, 207, .78);
+  color: color-mix(in srgb, var(--yy-calm-block-on) 78%, transparent);
   font-size: 14px;
   letter-spacing: .08em;
 }
@@ -90,10 +92,14 @@
   width: min(240px, 60vw);
   height: 10px;
   margin-top: 14px;
-  border: 2px solid var(--yy-cream, #f3e7cf);
-  background-image: repeating-conic-gradient(var(--yy-red, #9e1b24) 0deg 90deg, var(--yy-gold, #d9a227) 90deg 180deg, var(--yy-blue-light, #2c6e7f) 180deg 270deg, var(--yy-cream, #f3e7cf) 270deg 360deg);
-  background-size: 20px 20px;
-  animation: yy-marquee 1.4s linear infinite;
+  border: 2px solid var(--yy-calm-info-bg);
+  background: var(--yy-calm-block-accent);
+  animation: admin-entry-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes admin-entry-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .4; }
 }
 
 @keyframes admin-entry-in {
@@ -120,7 +126,7 @@
 .admin-entry.is-leaving .admin-entry-core { animation: admin-entry-core-out .65s cubic-bezier(.7, 0, .3, 1) forwards; }
 .admin-entry.is-leaving .admin-entry-brand,
 .admin-entry.is-leaving .admin-entry-message,
-.admin-entry.is-leaving .admin-entry-bar { animation: admin-entry-text-out .3s ease-in forwards; }
+.admin-entry.is-leaving .admin-entry-bar { animation: admin-entry-text-out .3s ease-out forwards; }
 
 @keyframes admin-entry-iris {
   from { clip-path: circle(150% at 50% 45%); }

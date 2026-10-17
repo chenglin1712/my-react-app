@@ -29,10 +29,12 @@
     transition: border-color .15s ease, transform .15s ease;
 }
 
-.admin-stat-link:hover {
-    color: inherit;
-    border-color: rgba(31, 58, 92, .38);
-    transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .admin-stat-link:hover {
+      color: inherit;
+      border-color: color-mix(in srgb, var(--yy-calm-accent) 38%, transparent);
+      transform: translateY(-1px);
+  }
 }
 
 .admin-stat-icon {
@@ -42,7 +44,7 @@
     height: 42px;
     place-items: center;
     color: var(--admin-accent);
-    background: #eef2f6;
+    background: var(--yy-calm-info-bg);
     border-radius: 9px;
 }
 
@@ -68,7 +70,7 @@
 .admin-stat-detail {
     margin-top: 7px;
     color: var(--admin-accent);
-    font-size: 11px;
+    font-size: 12px;
 }
 
 .admin-stat-placeholder .badge {
@@ -78,7 +80,7 @@
 }
 
 .dashboard-inline-error {
-    color: var(--yy-red, #9e1b24);
+    color: var(--yy-calm-accent);
     font-size: 12px;
     line-height: 1.4;
 }
@@ -113,7 +115,7 @@
 
 .dashboard-filter-group .form-select:focus,
 .dashboard-filter-group .form-control:focus {
-    border-color: rgba(31, 58, 92, .55);
+    border-color: color-mix(in srgb, var(--yy-calm-accent) 55%, transparent);
     /* 與全站同一組焦點框；原本的淡藍 box-shadow 對比不足（G-1） */
     outline: var(--admin-focus-ring);
     outline-offset: var(--admin-focus-offset);
@@ -167,8 +169,10 @@
     text-decoration: none;
 }
 
-.dashboard-todo-list a:hover {
-    background: var(--admin-surface-muted);
+@media (hover: hover) and (pointer: fine) {
+  .dashboard-todo-list a:hover {
+      background: var(--admin-surface-muted);
+  }
 }
 
 .dashboard-todo-list a:focus-visible {
@@ -177,7 +181,7 @@
 }
 
 .dashboard-todo-list strong {
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
     font-size: 18px;
 }
 

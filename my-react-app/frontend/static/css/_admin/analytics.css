@@ -12,7 +12,6 @@
     background: var(--admin-surface);
     border: 1px solid var(--admin-border);
     border-radius: var(--admin-radius);
-    box-shadow: var(--admin-shadow);
 }
 
 .search-analytics-filter-group {
@@ -37,7 +36,7 @@
 
 .search-analytics-filter-group .form-select:focus,
 .search-analytics-filter-group .form-control:focus {
-    border-color: rgba(31, 58, 92, .55);
+    border-color: color-mix(in srgb, var(--yy-calm-accent) 55%, transparent);
     /* 與全站同一組焦點框；原本的淡藍 box-shadow 對比不足（G-1） */
     outline: var(--admin-focus-ring);
     outline-offset: var(--admin-focus-offset);
@@ -69,7 +68,6 @@
     background: var(--admin-surface);
     border: 1px solid var(--admin-border);
     border-radius: var(--admin-radius);
-    box-shadow: var(--admin-shadow);
 }
 
 .search-analytics-panel {
@@ -147,16 +145,22 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    border-color: rgba(31, 58, 92, .45);
+    border-color: color-mix(in srgb, var(--yy-calm-accent) 45%, transparent);
     color: var(--admin-accent);
     font-size: 12px;
     white-space: nowrap;
 }
 
-.search-analytics-action .btn:hover,
+@media (hover: hover) and (pointer: fine) {
+    .search-analytics-action .btn:hover {
+        border-color: var(--admin-accent);
+        color: var(--admin-surface);
+        background: var(--admin-accent);
+    }
+}
 .search-analytics-action .btn:focus-visible {
     border-color: var(--admin-accent);
-    color: #fff;
+    color: var(--admin-surface);
     background: var(--admin-accent);
 }
 

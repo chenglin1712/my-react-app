@@ -3,7 +3,7 @@
 .exam-schedule-heading-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .exam-schedule-admin-page > .alert { max-width: 1440px; margin-left: auto; margin-right: auto; }
 
-.exam-schedule-status-card { display: grid; grid-template-columns: minmax(240px, 2fr) repeat(3, minmax(150px, 1fr)); gap: 18px; max-width: 1440px; margin: 0 auto 20px; padding: 18px; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: 12px; box-shadow: var(--admin-shadow); }
+.exam-schedule-status-card { display: grid; grid-template-columns: minmax(240px, 2fr) repeat(3, minmax(150px, 1fr)); gap: 18px; max-width: 1440px; margin: 0 auto 20px; padding: 18px; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: 12px; }
 .exam-schedule-status-card > div { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
 .exam-schedule-status-card span:not(.badge) { color: var(--admin-muted); font-size: 13px; }
 .exam-schedule-status-card strong { font-size: 14px; font-weight: 650; }

@@ -31,7 +31,7 @@
 .quiz-bank-sources-table input { max-width: 220px; }
 
 /* IRT 參數：單一設定表單，比照 homepage-config.css 的 section 分組排版邏輯 */
-.quiz-bank-config-card { max-width: 1440px; margin: 0 auto; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: 12px; box-shadow: var(--admin-shadow); padding: 28px; }
+.quiz-bank-config-card { max-width: 1440px; margin: 0 auto; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: 12px; padding: 28px; }
 .quiz-bank-config-section { padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--admin-border); }
 .quiz-bank-config-section:last-of-type { border-bottom: none; margin-bottom: 0; }
 .quiz-bank-config-section-heading h2 { margin: 0 0 4px; font-size: 18px; font-weight: 700; color: var(--admin-accent); }

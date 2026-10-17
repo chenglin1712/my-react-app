@@ -86,17 +86,17 @@ describe("後台共用基礎層（G-1）", () => {
   const block = layout.slice(layout.indexOf("--admin-bg:"), layout.indexOf("--admin-page-padding:"));
 
   it.each([
-    ["--admin-text-strong", "var(--yy-ink)"],
-    ["--admin-muted", "var(--yy-text-muted)"],
-    ["--admin-success", "var(--yy-success)"],
-    ["--admin-success-bg", "var(--yy-success-bg)"],
-    ["--admin-danger", "var(--yy-danger)"],
-    ["--admin-danger-bg", "var(--yy-danger-bg)"],
-    ["--admin-warning-text", "var(--yy-warning-text)"],
-    ["--admin-warning-bg", "var(--yy-warning-bg)"],
-    ["--admin-radius", "var(--yy-radius-card)"],
-    ["--admin-radius-sm", "var(--yy-radius-btn)"],
-    ["--admin-focus-ring", "var(--yy-focus-ring)"],
+    ["--admin-text-strong", "var(--yy-calm-text)"],
+    ["--admin-muted", "var(--yy-calm-text-sub)"],
+    ["--admin-success", "var(--yy-calm-success)"],
+    ["--admin-success-bg", "var(--yy-calm-success-bg)"],
+    ["--admin-danger", "var(--yy-calm-danger)"],
+    ["--admin-danger-bg", "var(--yy-calm-danger-bg)"],
+    ["--admin-warning-text", "var(--yy-calm-warning)"],
+    ["--admin-warning-bg", "var(--yy-calm-warning-bg)"],
+    ["--admin-radius", "var(--yy-ui-radius)"],
+    ["--admin-radius-sm", "var(--yy-ui-radius)"],
+    ["--admin-focus-ring", "var(--yy-ui-focus-ring)"],
   ])("%s 取自 %s", (name, value) => {
     const escaped = value.replace(/[()]/g, "\\$&");
     expect(block).toMatch(new RegExp(`${name}:\\s*${escaped}\\s*;`));
@@ -131,10 +131,10 @@ describe("後台共用基礎層（G-1）", () => {
     expect(theme).toMatch(/@supports \(color: color-mix\(/);
   });
 
-  it("後台新的前景與底色配對對比至少 4.5:1", () => {
+  it("後台沉穩 token 的前景與底色配對對比至少 4.5:1", () => {
     const pairs = [
-      ["#9E1B24", "#F0DDDE"], ["#9E1B24", "#F4F6F9"], ["#4B6B3A", "#E4E9E1"], ["#8A6816", "#F9F1DF"],
-      ["#6B5A47", "#F4F6F9"], ["#6B5A47", "#F8FAFC"], ["#6B5A47", "#E8EEF6"],
+      ["#8A3A4E", "#F5E1E6"], ["#8A3A4E", "#FFF9ED"], ["#2F6F4B", "#E3F0E8"], ["#7D5B0E", "#F6ECD3"],
+      ["#41464B", "#FFF9ED"], ["#41464B", "#EFE6DA"], ["#7E5239", "#EFE6DA"], ["#FFF9ED", "#41464B"], ["#D7A98B", "#41464B"],
     ];
     pairs.forEach(([fg, bg]) => expect(ratio(fg, bg), `${fg}/${bg}`).toBeGreaterThanOrEqual(4.5));
   });
