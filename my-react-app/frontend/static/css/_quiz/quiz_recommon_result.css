@@ -1,19 +1,19 @@
 .result-container {
   max-width: 600px;
   margin: 40px auto;
-  background: var(--yy-surface);
+  background: var(--yy-calm-surface);
   padding: 30px;
-  border: var(--yy-border-width) solid var(--yy-ink);
-  border-radius: var(--yy-radius-card);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-ui-radius);
   text-align: center;
   animation: recommon-result-fade-in var(--dur-base) var(--ease-out);
 }
 
 .result-title {
-  font-family: var(--yy-font-pixel);
+  font-family: var(--yy-font-body);
   font-size: 22px;
   margin-bottom: 20px;
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
   font-weight: bold;
   display: flex;
   align-items: center;
@@ -22,7 +22,7 @@
 }
 
 .result-model-warning {
-  color: var(--yy-danger);
+  color: var(--yy-calm-danger);
   text-align: center;
 }
 
@@ -33,9 +33,9 @@
 }
 
 .stat-card {
-  background: var(--yy-cream-dim);
-  border: var(--yy-border-width) solid var(--yy-ink);
-  border-radius: var(--yy-radius-card);
+  background: var(--yy-calm-info-bg);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-ui-radius);
   padding: 15px 25px;
   flex: 1;
   margin: 0 10px;
@@ -44,7 +44,7 @@
 .stat-card h3 {
   font-size: 16px;
   margin-bottom: 8px;
-  color: var(--yy-text-secondary);
+  color: var(--yy-calm-text-sub);
 }
 
 .stat-card p {
@@ -52,18 +52,18 @@
   font-weight: bold;
 }
 
-.good { color: var(--yy-success); }
-.average { color: var(--yy-warning-text); }
-.bad { color: var(--yy-danger); }
+.good { color: var(--yy-calm-success); }
+.average { color: var(--yy-calm-warning); }
+.bad { color: var(--yy-calm-danger); }
 
 .result-analysis, .result-suggestion {
   text-align: left;
   margin: 20px 0;
   padding: 15px;
-  background: var(--yy-cream-dim);
-  border: var(--yy-border-width) solid var(--yy-ink);
-  border-left: 6px solid var(--yy-red);
-  border-radius: var(--yy-radius-card);
+  background: var(--yy-calm-info-bg);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-left: 6px solid var(--yy-calm-accent);
+  border-radius: var(--yy-ui-radius);
 }
 
 .result-analysis h3,
@@ -72,12 +72,12 @@
   align-items: center;
   font-size: 18px;
   margin-bottom: 8px;
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
 }
 
 .icon {
   margin-right: 6px;
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
 }
 
 .result-actions {
@@ -92,21 +92,21 @@
   align-items: center;
   gap: 6px;
   padding: 12px 20px;
-  border: var(--yy-border-width) solid var(--yy-ink);
-  border-radius: var(--yy-radius-btn);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-ui-radius);
   font-weight: bold;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s ease;
 }
 
 .retry-btn {
-  background: var(--yy-red);
-  color: white;
+  background: var(--yy-calm-accent);
+  color: var(--yy-calm-accent-on);
 }
 
 .review-btn {
-  background: var(--yy-blue);
-  color: white;
+  background: var(--yy-calm-accent);
+  color: var(--yy-calm-accent-on);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -115,9 +115,9 @@
 }
 
 .review-btn:disabled {
-  background: var(--yy-border-soft);
-  color: var(--yy-text-muted);
-  border-color: var(--yy-border-soft);
+  background: var(--yy-calm-rule);
+  color: var(--yy-calm-text-sub);
+  border-color: var(--yy-calm-rule);
   box-shadow: none;
   cursor: not-allowed;
   transform: none;
@@ -138,17 +138,17 @@
   text-align: left;
   margin: 20px 0;
   padding: 15px;
-  background: var(--yy-cream-dim);
-  border: var(--yy-border-width) solid var(--yy-ink);
-  border-left: 6px solid var(--yy-blue);
-  border-radius: var(--yy-radius-card);
+  background: var(--yy-calm-info-bg);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-left: 6px solid var(--yy-calm-accent);
+  border-radius: var(--yy-ui-radius);
 }
 
 .result-rules h3 {
   display: flex;
   align-items: center;
   font-size: 18px;
-  color: var(--yy-blue);
+  color: var(--yy-calm-accent);
 }
 
 .result-rule-list {
@@ -157,8 +157,8 @@
 }
 
 .result-rule-note {
-  font-size: 13px;
-  color: var(--yy-text-secondary);
+  font-size: var(--yy-text-sm);
+  color: var(--yy-calm-text-sub);
   margin: 8px 0 0;
 }
 

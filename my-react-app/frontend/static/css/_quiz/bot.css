@@ -68,9 +68,9 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    background-color: var(--yy-cream);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-lg);
+    background-color: var(--yy-calm-info-bg);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
 }
 
 /* 懸浮視窗只有 400px 寬：單詞庫提示與輸入列依視窗寬度縮小，不再是全螢幕的尺寸 */
@@ -90,35 +90,21 @@
     display: flex;
     align-items: center;
     padding: 16px;
-    background: linear-gradient(135deg, var(--yy-red), var(--yy-red-dark));
-    background-size: 200% 200%;
-    color: white;
-    border-bottom: 3px solid var(--yy-ink);
+    background: var(--yy-calm-accent);
+    color: var(--yy-calm-accent-on);
+    border-bottom: 3px solid var(--yy-calm-line);
     position: relative;
     overflow: hidden;
 }
 
 .chat-header::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-image:
-        linear-gradient(45deg, rgba(0, 0, 0, 0.1) 25%, transparent 25%),
-        linear-gradient(-45deg, rgba(0, 0, 0, 0.1) 25%, transparent 25%),
-        linear-gradient(45deg, transparent 75%, rgba(0, 0, 0, 0.1) 75%),
-        linear-gradient(-45deg, transparent 75%, rgba(0, 0, 0, 0.1) 75%);
-    background-size: 20px 20px;
-    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-    opacity: 0.5;
+    display: none; /* 棋盤格圖樣已移除 */
 }
 
 .chat-return {
     background-color: transparent;
     border: none;
-    color: white;
+    color: var(--yy-calm-accent-on);
     z-index: var(--yy-z-nav);
 }
 
@@ -139,7 +125,7 @@
 
 .bot-status {
     margin: 2px 0 0;
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--yy-calm-accent-on);
 }
 
 .bot-status.online::before {
@@ -147,10 +133,9 @@
     display: inline-block;
     width: 8px;
     height: 8px;
-    background-color: var(--yy-success);
+    background-color: var(--yy-calm-success);
     border-radius: 50%;
     margin-right: 5px;
-    box-shadow: 0 0 5px var(--yy-success);
 }
 
 .messages-container {
@@ -160,7 +145,7 @@
     display: flex;
     flex-direction: column;
     gap: 14px;
-    background: white;
+    background: var(--yy-calm-surface);
 }
 
 .bot-message {
@@ -176,46 +161,34 @@
 
 .avatar-small {
     margin-right: 8px;
-    color: black;
+    color: var(--yy-calm-text);
 }
 
 .message-bubble {
     padding: 12px 16px;
-    border-radius: var(--yy-radius-lg);
+    border-radius: var(--yy-ui-radius);
     max-width: 70%;
     word-wrap: break-word;
 }
 
 .bot .message-bubble {
-    background-color: var(--yy-cream-dim);
-    color: var(--yy-ink);
+    background-color: var(--yy-calm-info-bg);
+    color: var(--yy-calm-text);
     border-top-left-radius: 4px;
 }
 
 .user .message-bubble {
-    background: linear-gradient(135deg, var(--yy-red), var(--yy-red-dark));
+    background: var(--yy-calm-accent);
     border-top-right-radius: 4px;
     position: relative;
 }
 
 .user .message-bubble p {
-    color: var(--yy-surface);
+    color: var(--yy-calm-accent-on);
 }
 
 .user .message-bubble::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-image:
-        linear-gradient(45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%),
-        linear-gradient(-45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%);
-    background-size: 10px 10px;
-    border-radius: var(--yy-radius-lg);
-    border-top-right-radius: 4px;
-    opacity: 0.2;
+    display: none; /* 斜紋圖樣已移除 */
 }
 
 .message-bubble p {
@@ -226,13 +199,13 @@
 
 .suggestions-container {
     padding: 10px 16px;
-    background-color: rgba(255, 255, 255, 0.7);
-    border-top: 1px solid rgba(158, 27, 36, 0.15);
+    background-color: var(--yy-calm-surface);
+    border-top: 1px solid var(--yy-calm-rule);
 }
 
 .suggestions-title {
     font-size: 14px;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
     margin: 0 0 8px 0;
     font-weight: 500;
 }
@@ -245,12 +218,12 @@
 }
 
 .suggestion-pill {
-    background-color: white;
-    border: 1px solid var(--yy-red);
-    color: var(--yy-red);
+    background-color: var(--yy-calm-surface);
+    border: 1px solid var(--yy-calm-accent);
+    color: var(--yy-calm-accent);
     padding: 8px 12px;
-    border-radius: var(--yy-radius-lg);
-    font-size: 13px;
+    border-radius: var(--yy-ui-radius);
+    font-size: var(--yy-text-sm);
     cursor: pointer;
     transition: var(--transition-interactive);
     white-space: nowrap;
@@ -259,9 +232,11 @@
     max-width: 100%;
 }
 
-.suggestion-pill:hover {
-    background-color: var(--yy-red);
-    color: white;
+@media (hover: hover) and (pointer: fine) {
+  .suggestion-pill:hover {
+      background-color: var(--yy-calm-accent);
+      color: var(--yy-calm-accent-on);
+  }
 }
 
 .typing-indicator {
@@ -273,7 +248,7 @@
 .typing-indicator span {
     width: 8px;
     height: 8px;
-    background-color: var(--yy-red);
+    background-color: var(--yy-calm-accent);
     border-radius: 50%;
     margin: 0 2px;
     animation: bot-bounce 1.2s infinite;
@@ -291,47 +266,37 @@
 .input-area {
     display: flex;
     padding: 16px;
-    background: rgba(255, 255, 255, 0.8);
-    border-top: 3px solid var(--yy-ink);
+    background: var(--yy-calm-surface);
+    border-top: 3px double var(--yy-calm-line);
     position: relative;
 }
 
 .input-area::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 6px;
-    background: repeating-linear-gradient(90deg,
-            var(--yy-red),
-            var(--yy-red) 10px,
-            var(--yy-ink) 10px,
-            var(--yy-ink) 20px);
-    transform: translateY(-100%);
+    display: none; /* 條紋裝飾已移除，輸入列改用雙線頂框 */
 }
 
 .message-input {
     flex-grow: 1;
     padding: 12px 16px;
-    border: 1px solid rgba(158, 27, 36, 0.35);
-    border-radius: 24px;
-    font-size: 15px;
-    outline: none;
-    transition: border 0.2s ease, box-shadow 0.2s ease;
-    background-color: rgba(255, 255, 255, 0.9);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    font-size: 16px;
+    transition: border-color var(--dur-fast) var(--ease-out);
+    background-color: var(--yy-calm-surface);
+    color: var(--yy-calm-text);
 }
 
 .message-input:focus {
-    border-color: var(--yy-red);
-    box-shadow: 0 0 0 2px rgba(158, 27, 36, 0.15);
+    border-color: var(--yy-calm-accent);
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
 }
 
 .send-button {
     margin-left: 12px;
     padding: 0 20px;
-    background-color: var(--yy-cream-dim);
-    color: var(--yy-text-muted);
+    background-color: var(--yy-calm-info-bg);
+    color: var(--yy-calm-text-sub);
     border: none;
     border-radius: 24px;
     font-size: 15px;
@@ -341,8 +306,8 @@
 }
 
 .send-button.active {
-    background: var(--yy-red);
-    color: white;
+    background: var(--yy-calm-accent);
+    color: var(--yy-calm-accent-on);
     cursor: pointer;
 }
 
@@ -350,8 +315,10 @@
     opacity: 0.3;
 }
 
-.send-button.active:hover {
-    background: var(--yy-red-dark);
+@media (hover: hover) and (pointer: fine) {
+  .send-button.active:hover {
+      background: var(--yy-calm-accent);
+  }
 }
 
 @keyframes bot-bounce {
@@ -382,9 +349,9 @@
 .bot-disclaimer {
     margin: 0;
     padding: 6px 16px;
-    font-size: 13px;
+    font-size: var(--yy-text-sm);
     line-height: 1.5;
-    color: var(--yy-text-tertiary);
-    background: rgba(255, 255, 255, 0.8);
-    border-top: 1px solid rgba(158, 27, 36, 0.15);
+    color: var(--yy-calm-text-sub);
+    background: var(--yy-calm-surface);
+    border-top: 1px solid var(--yy-calm-rule);
 }

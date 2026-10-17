@@ -121,14 +121,14 @@ describe("遊戲專區卡片標題對比", () => {
   const head = (gameCss.match(/\.gamehub-card-head\s*\{([^}]*)\}/) || [])[1] ?? "";
 
   it("卡片頭部底色是米白，不再把漸層直接鋪在標題後面", () => {
-    expect(head).toMatch(/background:\s*var\(--yy-cream\)/);
+    expect(head).toMatch(/background:\s*var\(--yy-calm-info-bg\)/);
     expect(head).not.toMatch(/animation:/);
     expect(read(join(FRONTEND, "src/_game/index.jsx"))).not.toMatch(/style=\{\{\s*background:\s*g\.headerBg/);
   });
 
-  it("漸層色帶仍保留，但不再流動（S2-2 刪除流光動畫）", () => {
+  it("漸層色帶已移除（S8-2 沉穩外觀不用漸層），也沒有流動動畫", () => {
     const band = (gameCss.match(/\.gamehub-card-head::before\s*\{([^}]*)\}/) || [])[1] ?? "";
-    expect(band).toMatch(/background:\s*var\(--gamehub-head-band\)/);
+    expect(band).toMatch(/display:\s*none/);
     expect(band).not.toMatch(/animation:/);
   });
 

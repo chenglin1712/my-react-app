@@ -33,15 +33,15 @@
 }
 
 .game-result-card-front {
-  color: var(--yy-ink);
+  color: var(--yy-calm-text);
 }
 
 .game-result-card.correct .game-result-card-front {
-  border: var(--yy-border-width) solid var(--yy-green);
+  border: var(--yy-border-width) solid var(--yy-calm-success);
 }
 
 .game-result-card.incorrect .game-result-card-front {
-  border: var(--yy-border-width) solid var(--yy-red);
+  border: var(--yy-border-width) solid var(--yy-calm-accent);
 }
 
 .game-result-card-front h5 {
@@ -49,14 +49,14 @@
 }
 
 .game-result-card-front .correct-answer {
-  color: var(--yy-green);
+  color: var(--yy-calm-success);
   font-weight: 700;
   font-size: 18px;
   width: 100%;
 }
 
 .game-result-card-front .user-answer {
-  color: var(--yy-blue);
+  color: var(--yy-calm-accent);
   font-weight: 700;
   margin-top: 0.5rem;
   font-size: 18px;
@@ -79,24 +79,24 @@
   text-align: center;
   padding: 10px 20px;
   margin: 0 10px;
-  border: 1px solid var(--yy-border-soft);
+  border: 1px solid var(--yy-calm-rule);
   border-radius: 5px;
 }
 
 .result-total {
-  background-color: var(--yy-text-muted);
+  background-color: var(--yy-calm-text-sub);
   font-weight: bold;
   width: 30%;
 }
 
 .result-correct {
-  background-color: var(--yy-success-bg);
+  background-color: var(--yy-calm-success-bg);
   font-weight: bold;
   width: 30%;
 }
 
 .result-incorrect {
-  background-color: var(--yy-danger-bg);
+  background-color: var(--yy-calm-danger-bg);
   font-weight: bold;
   width: 30%;
 }
@@ -111,17 +111,17 @@
 }
 
 .result-background {
-  background-color: white;
+  background-color: var(--yy-calm-surface);
 }
 
 .result-correctword {
-  background-color: var(--yy-success-bg);
+  background-color: var(--yy-calm-success-bg);
   height: 45px;
   margin-top: 20px;
 }
 
 .result-incorrectword {
-  background-color: var(--yy-danger-bg);
+  background-color: var(--yy-calm-danger-bg);
   height: 45px;
   margin-top: 20px;
 }

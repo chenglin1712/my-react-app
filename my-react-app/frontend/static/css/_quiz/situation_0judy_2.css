@@ -1,8 +1,8 @@
 .judy-situation-line-container {
     font-family: var(--yy-font-body);
-    background: var(--yy-surface);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-card);
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     padding: 20px;
     box-sizing: border-box;
 }
@@ -38,7 +38,7 @@
 .judy-pie-title {
     font-size: 18px;
     font-weight: 600;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .judy-pie-figure {

@@ -7,15 +7,8 @@
     padding: 32px clamp(20px, 4vw, 56px) 56px;
 
     font-family: var(--yy-font-body);
-    color: var(--yy-ink);
-    background:
-        repeating-conic-gradient(
-            rgba(158, 27, 36, .035) 0deg 90deg,
-            rgba(217, 162, 39, .035) 90deg 180deg,
-            rgba(31, 58, 92, .035) 180deg 270deg,
-            transparent 270deg 360deg
-        ) 0 0 / 64px 64px,
-        var(--yy-cream);
+    color: var(--yy-calm-text);
+    background: var(--yy-calm-info-bg);
 }
 
 .quiz-content-container {
@@ -27,9 +20,9 @@
     margin: 0;
     padding: clamp(20px, 3vw, 36px);
 
-    background: var(--yy-surface);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-card);
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
 }
 
 /* FE-4：測驗內容區的 scoped error boundary fallback（見 src/_quiz/index.jsx）。
@@ -49,25 +42,25 @@
     margin: 0;
     font-size: 22px;
     font-weight: 900;
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
 }
 .quiz-panel-error p {
     margin: 0;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
 }
 .quiz-panel-error button {
     padding: 11px 18px;
-    color: var(--yy-cream);
-    background: var(--yy-red);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    color: var(--yy-calm-info-bg);
+    background: var(--yy-calm-accent);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     font-weight: 700;
     cursor: pointer;
-    transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+    transition: transform .15s ease, background .15s ease;
 }
 @media (hover: hover) and (pointer: fine) {
   .quiz-panel-error button:hover {
-      background: var(--yy-red-dark);
+      background: var(--yy-calm-accent);
   }
 }
 

@@ -11,15 +11,16 @@
 }
 
 .zone-title {
-  font-size: 2rem;
-  font-weight: 800;
-  color: var(--yy-red);
+  font-family: var(--yy-font-heading);
+  font-size: var(--yy-text-3xl);
+  font-weight: 700;
+  color: var(--yy-calm-text);
   margin-bottom: 0.4rem;
 }
 
 .zone-subtitle {
   font-size: 1rem;
-  color: var(--yy-text-muted);
+  color: var(--yy-calm-text-sub);
   margin: 0;
 }
 
@@ -31,15 +32,15 @@
 }
 
 .zone-card {
-  background: var(--yy-surface);
-  border-radius: var(--yy-radius-lg);
-  border: var(--yy-border-width) solid var(--yy-border-soft);
+  background: var(--yy-calm-surface);
+  border-radius: var(--yy-ui-radius);
+  border: var(--yy-border-width) solid var(--yy-calm-rule);
   padding: 1.5rem 1.25rem 1.25rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+  transition: transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
   position: relative;
   /* src/_quiz/tribeSelect.jsx 把這個 class 用在 <Link>（渲染成 <a>）上，
      重設掉瀏覽器預設的底線跟連結文字顏色。 */
@@ -49,7 +50,7 @@
 
 .zone-card.available {
   cursor: pointer;
-  border-color: var(--yy-red);
+  border-color: var(--yy-calm-accent);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -65,40 +66,40 @@
 .zone-card.disabled {
   opacity: 0.55;
   cursor: default;
-  border-color: var(--yy-border-soft);
+  border-color: var(--yy-calm-rule);
 }
 
 .zone-card-icon {
   margin-bottom: 0.75rem;
   line-height: 1;
-  color: var(--yy-ink);
+  color: var(--yy-calm-text);
 }
 
 .zone-card-title {
   font-size: 1.2rem;
   font-weight: 700;
-  color: var(--yy-ink);
+  color: var(--yy-calm-text);
   margin: 0 0 0.2rem;
 }
 
 .zone-card-subtitle {
-  font-size: 0.8rem;
-  color: var(--yy-red);
+  font-size: var(--yy-text-sm);
+  color: var(--yy-calm-accent);
   font-weight: 600;
   margin: 0 0 0.6rem;
-  font-family: "Courier New", monospace;
+  font-family: var(--yy-font-body);
 }
 
 .zone-card-desc {
-  font-size: 0.85rem;
-  color: var(--yy-text-tertiary);
+  font-size: var(--yy-text-sm);
+  color: var(--yy-calm-text-sub);
   line-height: 1.5;
   margin: 0 0 1rem;
   flex: 1;
 }
 
 .zone-card-badge {
-  font-size: 0.78rem;
+  font-size: var(--yy-text-sm);
   font-weight: 700;
   padding: 0.3rem 0.9rem;
   border-radius: 999px;
@@ -106,20 +107,17 @@
 }
 
 .badge-open {
-  background: var(--yy-red);
-  color: var(--yy-surface);
+  background: var(--yy-calm-accent);
+  color: var(--yy-calm-surface);
 }
 
 .badge-soon {
-  background: var(--yy-cream-dim);
-  color: var(--yy-text-muted);
+  background: var(--yy-calm-info-bg);
+  color: var(--yy-calm-text-sub);
 }
 
 @media (max-width: 600px) {
   .zone-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .zone-title {
-    font-size: 1.6rem;
   }
 }

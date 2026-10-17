@@ -23,15 +23,15 @@
     height: 100%;
     box-sizing: border-box;
     padding: 16px;
-    background: var(--yy-surface);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-card);
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
 }
 
 .situation-card-title {
     font-size: 1.25rem;
     font-weight: 700;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
     text-align: center;
     margin: 0;
 }
@@ -41,9 +41,9 @@
 }
 
 .pie-label {
-    font-size: 12px;
+    font-size: var(--yy-text-sm);
     font-weight: 600;
-    fill: var(--yy-surface);
+    fill: var(--yy-calm-surface);
 }
 
 /* tooltip */
@@ -53,7 +53,7 @@
   justify-content: center;
   height: 100%;
   margin: 0;
-  color: var(--yy-text-muted);
+  color: var(--yy-calm-text-sub);
   font-weight: 700;
 }
 
@@ -62,25 +62,25 @@
   width: 10px;
   height: 10px;
   margin-right: 6px;
-  border: 1px solid var(--yy-ink);
+  border: 1px solid var(--yy-calm-line);
 }
 
 .situation-tooltip-box {
-    background-color: var(--yy-surface);
+    background-color: var(--yy-calm-surface);
     padding: 12px;
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
 }
 
 .situation-tooltip-title {
     font-weight: 600;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
     margin-bottom: 4px;
 }
 
 .situation-tooltip-subtitle {
-    font-size: 12px;
-    color: var(--yy-text-muted);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
     margin: 0;
 }
 
@@ -101,11 +101,11 @@
     width: 16px;
     height: 16px;
     margin-right: 4px;
-    border: 1px solid var(--yy-ink);
+    border: 1px solid var(--yy-calm-line);
     border-radius: 3px;
 }
 
 .situation-legend-name {
     font-size: 0.875rem;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
 }

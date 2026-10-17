@@ -6,16 +6,16 @@
 
 .summary-card {
     flex: 1;
-    background: var(--yy-surface);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-card);
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     padding: 20px;
 }
 
 .summary-title {
     font-size: 20px;
     font-weight: bold;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
     margin-bottom: 15px;
     text-align: center;
 }
@@ -28,32 +28,32 @@
 }
 
 .summary-item .label {
-    color: var(--yy-text-muted);
+    color: var(--yy-calm-text-sub);
 }
 
 .summary-item .value {
     font-weight: bold;
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
 }
 
 .summary-advice {
     margin-top: 20px;
     font-size: 14px;
     line-height: 1.5;
-    color: var(--yy-text-secondary);
-    background: var(--yy-cream-dim);
+    color: var(--yy-calm-text-sub);
+    background: var(--yy-calm-info-bg);
     padding: 12px;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-ui-radius);
 }
 
 .summary-radar {
     flex: 1;
-    background: white;
+    background: var(--yy-calm-surface);
 }
 
 .radar-axis-tick {
-    fill: var(--yy-text-muted);
-    font-size: 13px;
+    fill: var(--yy-calm-text-sub);
+    font-size: var(--yy-text-sm);
 }
 
 /* 手機寬度：建議卡片與雷達圖改縱排，不橫向溢出 */

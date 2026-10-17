@@ -16,9 +16,9 @@ body:has(.offline-banner) {
     align-items: center;
     justify-content: center;
     padding: 0;
-    color: var(--yy-cream);
-    background: var(--yy-red);
-    border: var(--yy-border-width) solid var(--yy-ink);
+    color: var(--yy-calm-info-bg);
+    background: var(--yy-calm-accent);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: 50%;
     cursor: pointer;
     transition: transform 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
@@ -27,7 +27,7 @@ body:has(.offline-banner) {
 
 @media (hover: hover) and (pointer: fine) {
     .bot-launcher:hover {
-        background: var(--yy-red-dark);
+        background: var(--yy-calm-accent);
     }
 }
 

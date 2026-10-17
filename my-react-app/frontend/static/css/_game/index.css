@@ -18,9 +18,9 @@
 }
 
 .game-background {
-    background-color: var(--yy-danger-bg);
+    background-color: var(--yy-calm-danger-bg);
     width: 60%;
-    border-radius: var(--yy-radius-card);
+    border-radius: var(--yy-ui-radius);
 }
 
 /* ── 遊戲專區 Landing（YUAN・YU v2）───────────── */
@@ -29,35 +29,25 @@
     padding-bottom: 30px;
 }
 
-.gamehub-blob {
-    position: absolute;
-    width: 220px;
-    height: 200px;
-    border-radius: 50%;
-    filter: blur(28px);
-    opacity: .4;
-    pointer-events: none;
+/* 共用的 .yy-hero／.yy-card 在 theme-v2.css 仍是舊風格，這裡只在遊戲專區範圍內覆蓋：
+   頁首不鋪拼色圖樣，卡片與面板用細框、小圓角 */
+.gamehub-page .yy-hero::before {
+    display: none;
 }
 
-.gamehub-blob--gold {
-    left: 6%;
-    top: 10%;
-    background: radial-gradient(circle, var(--yy-gold-light), transparent 68%);
-}
-
-.gamehub-blob--blue {
-    right: 5%;
-    top: 8%;
-    background: radial-gradient(circle, var(--yy-blue), transparent 68%);
-    animation-direction: reverse;
+.gamehub-page .yy-card {
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
 }
 
 .gamehub-title {
     position: relative;
-    font-size: 40px;
+    font-family: var(--yy-font-heading);
+    font-size: var(--yy-text-3xl);
     margin: 10px 0 12px;
-    font-weight: 900;
-    color: var(--yy-ink);
+    font-weight: 700;
+    color: var(--yy-calm-text);
 }
 
 .gamehub-desc {
@@ -66,7 +56,7 @@
     margin: 0 auto;
     font-size: 16px;
     line-height: 1.8;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
 }
 
 .gamehub-grid-section {
@@ -87,7 +77,6 @@
     padding: 0;
     overflow: hidden;
     cursor: pointer;
-    transition: box-shadow .2s ease;
 }
 
 .gamehub-card.is-selected {
@@ -118,8 +107,8 @@
     display: flex;
     gap: 18px;
     align-items: flex-start;
-    background: var(--yy-cream);
-    border-bottom: 3px solid var(--yy-ink);
+    background: var(--yy-calm-info-bg);
+    border-bottom: 3px solid var(--yy-calm-line);
 }
 
 .gamehub-card-head::before {
@@ -127,21 +116,19 @@
     position: absolute;
     inset: 0 0 auto 0;
     height: 10px;
-    background: var(--gamehub-head-band);
-    background-size: 300% 100%;
-    border-bottom: 3px solid var(--yy-ink);
+    display: none; /* 頂端流動色帶是漸層，不再使用；顏色資料仍由程式帶入但不顯示 */
 }
 
 .gamehub-card-icon {
     width: 56px;
     height: 56px;
-    border-radius: var(--yy-radius-btn);
-    background: var(--yy-surface);
-    border: var(--yy-border-width) solid var(--yy-ink);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
     flex-shrink: 0;
 }
 
@@ -149,13 +136,13 @@
     font-size: 19px;
     margin: 0 0 4px;
     font-weight: 800;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .gamehub-card-subtitle {
-    font-family: var(--yy-font-pixel);
-    font-size: 12px;
-    color: var(--yy-text-tertiary);
+    font-family: var(--yy-font-body);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
     letter-spacing: 0.04em;
 }
 
@@ -166,7 +153,7 @@
 .gamehub-card-body p {
     font-size: 14px;
     line-height: 1.8;
-    color: var(--yy-text-tertiary);
+    color: var(--yy-calm-text-sub);
     margin: 0 0 16px;
     min-height: 64px;
 }
@@ -175,17 +162,17 @@
     display: inline-block;
     padding: 8px 18px;
     border-radius: 20px;
-    background: var(--yy-cream);
-    color: var(--yy-ink);
-    font-family: var(--yy-font-pixel);
-    font-size: 12px;
+    background: var(--yy-calm-info-bg);
+    color: var(--yy-calm-text);
+    font-family: var(--yy-font-body);
+    font-size: var(--yy-text-sm);
     font-weight: 700;
-    border: var(--yy-border-width) solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
 }
 
 .gamehub-card-badge.active {
-    background: var(--yy-red);
-    color: var(--yy-cream);
+    background: var(--yy-calm-accent);
+    color: var(--yy-calm-info-bg);
 }
 
 .gamehub-panel {
@@ -210,8 +197,8 @@
 }
 
 .gamehub-panel-sub {
-    font-size: 13px;
-    color: var(--yy-text-tertiary);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
     margin: 0 0 22px;
 }
 
@@ -224,9 +211,9 @@
 .gamehub-tribe-card {
     width: 150px;
     padding: 20px 14px;
-    border-radius: var(--yy-radius-card);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    background: var(--yy-surface);
+    border-radius: var(--yy-ui-radius);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    background: var(--yy-calm-surface);
     font: inherit;
     text-align: center;
     cursor: pointer;
@@ -237,34 +224,40 @@
 .gamehub-tribe-card.is-soon {
     cursor: default;
     opacity: 0.7;
-    box-shadow: none;
 }
 
 .gamehub-tribe-soon {
     display: block;
     margin-top: 6px;
-    font-size: 12px;
+    font-size: var(--yy-text-sm);
     font-weight: 700;
-    color: var(--yy-text-muted);
+    color: var(--yy-calm-text-sub);
 }
 
+/* 選取：底色加深、框改銅色，名稱前多一個勾，不只靠顏色，也不放大位移 */
 .gamehub-tribe-card.is-selected {
-    transform: scale(1.05);
+    background: var(--yy-calm-info-bg);
+    border-color: var(--yy-calm-accent);
+}
+
+.gamehub-tribe-card.is-selected .gamehub-tribe-name::before {
+    content: "\2713";
+    margin-right: var(--yy-space-1);
 }
 
 .gamehub-tribe-name {
     display: block;
     font-size: 14px;
     font-weight: 700;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .gamehub-confirm {
     margin-top: 26px;
     padding: 22px 26px;
-    border-radius: var(--yy-radius-card);
-    background: linear-gradient(160deg, var(--yy-cream), var(--yy-cream-dim));
-    border: var(--yy-border-width) dashed var(--yy-ink);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-info-bg);
+    border: var(--yy-border-width) dashed var(--yy-calm-text);
     text-align: center;
 }
 
@@ -275,8 +268,8 @@
 }
 
 .gamehub-confirm p {
-    font-size: 13px;
-    color: var(--yy-text-muted);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
     margin: 0 0 18px;
 }
 

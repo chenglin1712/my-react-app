@@ -8,16 +8,18 @@
 
 .pagination button {
     padding: 6px 12px;
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
-    background: white;
-    color: var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-text);
     cursor: pointer;
     transition: background 0.2s;
 }
 
-.pagination button:hover:not(:disabled) {
-    background: var(--yy-cream);
+@media (hover: hover) and (pointer: fine) {
+  .pagination button:hover:not(:disabled) {
+      background: var(--yy-calm-info-bg);
+  }
 }
 
 .pagination button:disabled {

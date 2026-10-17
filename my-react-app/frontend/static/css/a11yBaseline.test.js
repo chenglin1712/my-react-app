@@ -52,7 +52,6 @@ const OUTLINE_NONE_ALLOWLIST = [
   ["_note/notesharestyle.css", ".ns-search-input", ".ns-search:focus-within", "_note/notesharestyle.css"],
   ["_note/notestyle.css", ".note-title", ".note-title"],
   ["_note/notestyle.css", ".note-text .ProseMirror", ".note-text:focus-within", "_note/notestyle.css"],
-  ["_quiz/bot.css", ".message-input", ".message-input"],
   ["_quiz/review_AI.css", ".assistant-input input", ".assistant-input input"],
   ["_quiz/review_discussion.css", ".input-box input", ".input-box input"],
   ["_quiz/situation_filter.css", ".filter-date-input:focus", ".filter-date-input"],
@@ -151,10 +150,10 @@ describe("B-1／B-2 留下的項目", () => {
 describe("B-6 測驗區：選中與已作答不只靠顏色，也不用低對比的金色邊框", () => {
   const quiz = files.find((f) => f.file === "_quiz/quiz_panel.css").css;
 
-  it.each([".answers button.selected", ".quiz-image-box.selected", ".match-btn.selected", ".cloze-option-btn.selected"])("%s 的邊框是紅色（金色對米白只有 1.87:1）", (selector) => {
+  it.each([".answers button.selected", ".quiz-image-box.selected", ".match-btn.selected", ".cloze-option-btn.selected"])("%s 的邊框是深銅色（淺色邊框對米白對比不足）", (selector) => {
     const rule = rules(quiz).find((r) => r.selector === selector);
     expect(rule, selector).toBeTruthy();
-    expect(rule.body).toMatch(/border-color:\s*var\(--yy-red\)/);
+    expect(rule.body).toMatch(/border-color:\s*var\(--yy-calm-accent\)/);
     expect(rule.body).not.toMatch(/border-color:\s*var\(--yy-gold\)/);
   });
 

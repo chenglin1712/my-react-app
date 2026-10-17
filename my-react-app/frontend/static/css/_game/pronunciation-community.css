@@ -2,10 +2,8 @@
   min-height: 100vh;
   min-height: 100dvh;
   padding: 2.5rem 1.5rem 4rem;
-  color: var(--yy-text-secondary);
-  background:
-    radial-gradient(circle at top right, rgba(158, 27, 36, 0.08), transparent 28rem),
-    var(--yy-cream);
+  color: var(--yy-calm-text-sub);
+  background: var(--yy-calm-info-bg);
   box-sizing: border-box;
   font-family: var(--yy-font-body);
 }
@@ -21,8 +19,8 @@
 
 .pron-community-eyebrow {
   margin: 0 0 0.4rem !important;
-  color: var(--yy-red) !important;
-  font-size: 0.75rem !important;
+  color: var(--yy-calm-accent) !important;
+  font-size: var(--yy-text-sm) !important;
   font-weight: 800;
   letter-spacing: 0.14em;
 }
@@ -32,7 +30,7 @@
    不變。 */
 .pron-community-heading h2 {
   margin: 0 0 0.55rem;
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
   font-size: clamp(1.8rem, 4vw, 2.5rem);
   font-weight: 850;
 }
@@ -40,36 +38,40 @@
 .pron-community-back-link {
   display: inline-block;
   margin-bottom: 1rem;
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
   text-decoration: none;
   font-size: 0.9rem;
   font-weight: 600;
 }
 
-.pron-community-back-link:hover {
-  text-decoration: underline;
+@media (hover: hover) and (pointer: fine) {
+  .pron-community-back-link:hover {
+    text-decoration: underline;
+  }
 }
 
 .pron-community-heading p {
   max-width: 650px;
   margin: 0;
-  color: var(--yy-text-muted);
+  color: var(--yy-calm-text-sub);
   line-height: 1.7;
 }
 
 .pron-community-refresh {
   flex: 0 0 auto;
   padding: 0.6rem 1.2rem;
-  color: var(--yy-red);
-  background: var(--yy-surface);
-  border: 1.5px solid var(--yy-red);
-  border-radius: var(--yy-radius-btn);
+  color: var(--yy-calm-accent);
+  background: var(--yy-calm-surface);
+  border: 1.5px solid var(--yy-calm-accent);
+  border-radius: var(--yy-ui-radius);
   font-weight: 700;
   cursor: pointer;
 }
 
-.pron-community-refresh:hover:not(:disabled) {
-  background: var(--yy-danger-bg);
+@media (hover: hover) and (pointer: fine) {
+  .pron-community-refresh:hover:not(:disabled) {
+    background: var(--yy-calm-danger-bg);
+  }
 }
 
 .pron-community-refresh:disabled {
@@ -86,15 +88,15 @@
 }
 
 .pron-community-message.success {
-  color: var(--yy-green);
-  background: var(--yy-success-bg);
-  border: 1px solid var(--yy-green);
+  color: var(--yy-calm-success);
+  background: var(--yy-calm-success-bg);
+  border: 1px solid var(--yy-calm-success);
 }
 
 .pron-community-message.error {
-  color: var(--yy-red-dark);
-  background: var(--yy-danger-bg);
-  border: 1px solid var(--yy-danger-bg);
+  color: var(--yy-calm-accent);
+  background: var(--yy-calm-danger-bg);
+  border: 1px solid var(--yy-calm-danger-bg);
 }
 
 .pron-community-loading,
@@ -102,11 +104,11 @@
   width: min(100%, 980px);
   margin: 0 auto;
   padding: 4rem 1.5rem;
-  color: var(--yy-text-muted);
+  color: var(--yy-calm-text-sub);
   text-align: center;
-  background: var(--yy-surface);
-  border: 1px solid var(--yy-border-soft);
-  border-radius: var(--yy-radius-lg);
+  background: var(--yy-calm-surface);
+  border: 1px solid var(--yy-calm-rule);
+  border-radius: var(--yy-ui-radius);
 }
 
 .pron-community-loading {
@@ -119,8 +121,8 @@
 .pron-community-spinner {
   width: 1.2rem;
   height: 1.2rem;
-  border: var(--yy-border-width) solid var(--yy-danger-bg);
-  border-top-color: var(--yy-red);
+  border: var(--yy-border-width) solid var(--yy-calm-danger-bg);
+  border-top-color: var(--yy-calm-accent);
   border-radius: 50%;
   animation: pron-community-spin 0.75s linear infinite;
 }
@@ -133,7 +135,7 @@
 
 .pron-community-empty h2 {
   margin: 0 0 0.5rem;
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
   font-size: 1.3rem;
 }
 
@@ -151,9 +153,9 @@
 
 .pron-community-group {
   overflow: hidden;
-  background: var(--yy-surface);
-  border: 1px solid var(--yy-border-soft);
-  border-radius: var(--yy-radius-lg);
+  background: var(--yy-calm-surface);
+  border: 1px solid var(--yy-calm-rule);
+  border-radius: var(--yy-ui-radius);
 }
 
 .pron-community-group-heading {
@@ -162,13 +164,13 @@
   justify-content: space-between;
   gap: 1rem;
   padding: 1rem 1.25rem;
-  background: var(--yy-danger-bg);
-  border-bottom: 1px solid var(--yy-danger-bg);
+  background: var(--yy-calm-danger-bg);
+  border-bottom: 1px solid var(--yy-calm-danger-bg);
 }
 
 .pron-community-group-heading h2 {
   margin: 0;
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
   font-size: 1.35rem;
   font-weight: 800;
   overflow-wrap: anywhere;
@@ -176,8 +178,8 @@
 
 .pron-community-group-heading span {
   flex: 0 0 auto;
-  color: var(--yy-text-muted);
-  font-size: 0.82rem;
+  color: var(--yy-calm-text-sub);
+  font-size: var(--yy-text-sm);
 }
 
 .pron-community-recordings {
@@ -195,7 +197,7 @@
 }
 
 .pron-community-recording + .pron-community-recording {
-  border-top: 1px solid var(--yy-border-soft);
+  border-top: 1px solid var(--yy-calm-rule);
 }
 
 .pron-community-recording audio {
@@ -213,30 +215,32 @@
 }
 
 .pron-community-score {
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
   font-size: 0.95rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
 .pron-community-meta time {
-  color: var(--yy-text-muted);
-  font-size: 0.78rem;
+  color: var(--yy-calm-text-sub);
+  font-size: var(--yy-text-sm);
   white-space: nowrap;
 }
 
 .pron-community-report-button {
   padding: 0.45rem 0.85rem;
-  color: var(--yy-red-dark);
+  color: var(--yy-calm-accent);
   background: transparent;
-  border: 1px solid var(--yy-danger-bg);
+  border: 1px solid var(--yy-calm-danger-bg);
   border-radius: 7px;
-  font-size: 0.85rem;
+  font-size: var(--yy-text-sm);
   cursor: pointer;
 }
 
-.pron-community-report-button:hover {
-  background: var(--yy-danger-bg);
+@media (hover: hover) and (pointer: fine) {
+  .pron-community-report-button:hover {
+    background: var(--yy-calm-danger-bg);
+  }
 }
 
 .pron-community-modal-backdrop {
@@ -246,7 +250,7 @@
   display: grid;
   place-items: center;
   padding: 1rem;
-  background: rgba(25, 18, 17, 0.56);
+  background: color-mix(in srgb, var(--yy-calm-block) 75%, transparent);
 }
 
 .pron-community-modal {
@@ -255,8 +259,8 @@
   max-height: calc(100dvh - 2rem);
   overflow-y: auto;
   padding: 1.4rem;
-  background: var(--yy-surface);
-  border-radius: var(--yy-radius-lg);
+  background: var(--yy-calm-surface);
+  border-radius: var(--yy-ui-radius);
 }
 
 .pron-community-modal-heading {
@@ -269,19 +273,19 @@
 
 .pron-community-modal-heading h2 {
   margin: 0 0 0.25rem;
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
   font-size: 1.35rem;
 }
 
 .pron-community-modal-heading p {
   margin: 0;
-  color: var(--yy-text-muted);
+  color: var(--yy-calm-text-sub);
   font-size: 0.9rem;
 }
 
 .pron-community-modal-heading > button {
   padding: 0;
-  color: var(--yy-text-muted);
+  color: var(--yy-calm-text-sub);
   background: transparent;
   border: 0;
   font-size: 1.8rem;
@@ -306,16 +310,18 @@
   align-items: center;
   gap: 0.65rem;
   padding: 0.65rem 0.75rem;
-  border-radius: var(--yy-radius-btn);
+  border-radius: var(--yy-ui-radius);
   cursor: pointer;
 }
 
-.pron-community-reason-option:hover {
-  background: var(--yy-cream);
+@media (hover: hover) and (pointer: fine) {
+  .pron-community-reason-option:hover {
+    background: var(--yy-calm-info-bg);
+  }
 }
 
 .pron-community-reason-option input {
-  accent-color: var(--yy-red);
+  accent-color: var(--yy-calm-accent);
 }
 
 .pron-community-reason-text {
@@ -330,9 +336,9 @@
 .pron-community-reason-text textarea {
   width: 100%;
   padding: 0.7rem;
-  color: var(--yy-text-secondary);
-  border: 1px solid var(--yy-text-muted);
-  border-radius: var(--yy-radius-btn);
+  color: var(--yy-calm-text-sub);
+  border: 1px solid var(--yy-calm-text-sub);
+  border-radius: var(--yy-ui-radius);
   resize: vertical;
   box-sizing: border-box;
   font: inherit;
@@ -340,8 +346,9 @@
 }
 
 .pron-community-reason-text textarea:focus {
-  border-color: var(--yy-red);
-  outline: 2px solid rgba(158, 27, 36, 0.14);
+  border-color: var(--yy-calm-accent);
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
 }
 
 .pron-community-modal-actions {
@@ -353,7 +360,7 @@
 
 .pron-community-modal-actions button {
   padding: 0.58rem 1.1rem;
-  border-radius: var(--yy-radius-btn);
+  border-radius: var(--yy-ui-radius);
   font-weight: 700;
   cursor: pointer;
 }
@@ -364,19 +371,21 @@
 }
 
 .pron-community-cancel-button {
-  color: var(--yy-text-muted);
-  background: var(--yy-surface);
-  border: 1px solid var(--yy-text-muted);
+  color: var(--yy-calm-text-sub);
+  background: var(--yy-calm-surface);
+  border: 1px solid var(--yy-calm-text-sub);
 }
 
 .pron-community-submit-button {
-  color: var(--yy-surface);
-  background: var(--yy-red);
-  border: 1px solid var(--yy-red);
+  color: var(--yy-calm-surface);
+  background: var(--yy-calm-accent);
+  border: 1px solid var(--yy-calm-accent);
 }
 
-.pron-community-submit-button:hover:not(:disabled) {
-  background: var(--yy-red);
+@media (hover: hover) and (pointer: fine) {
+  .pron-community-submit-button:hover:not(:disabled) {
+    background: var(--yy-calm-accent);
+  }
 }
 
 @media (max-width: 600px) {

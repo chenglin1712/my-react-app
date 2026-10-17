@@ -5,7 +5,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: color-mix(in srgb, var(--yy-calm-block) 75%, transparent);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -16,9 +16,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    background-color: rgba(0, 0, 0, 0.7);
+    background-color: var(--yy-calm-block);
     padding: 20px;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-ui-radius);
     width: 300px;
 }
 
@@ -27,7 +27,7 @@
 }
 
 .bot-animation-container p {
-    color: white;
+    color: var(--yy-calm-block-on);
     font-size: 18px;
     text-align: center;
 }
@@ -44,7 +44,7 @@
     align-items: center;
     margin-bottom: 14px;
     padding-bottom: 10px;
-    border-bottom: 2px solid var(--yy-ink);
+    border-bottom: 2px solid var(--yy-calm-line);
 }
 
 .header-buttons {
@@ -62,13 +62,13 @@
     margin: 0;
     font-size: 24px;
     font-weight: 700;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .event-count {
     padding-left: 4px;
-    color: var(--yy-text-muted);
-    font-size: 12px;
+    color: var(--yy-calm-text-sub);
+    font-size: var(--yy-text-sm);
     font-weight: 600;
 }
 
@@ -78,21 +78,23 @@
     align-items: center;
     gap: 8px;
     padding: 10px 12px;
-    background-color: var(--yy-red);
-    color: white;
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    background-color: var(--yy-calm-accent);
+    color: var(--yy-calm-accent-on);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
 }
 
-.add-all-btn:hover {
-    background-color: var(--yy-red-dark);
+@media (hover: hover) and (pointer: fine) {
+  .add-all-btn:hover {
+      background-color: var(--yy-calm-accent);
+  }
 }
 
 .add-all-btn:active {
-    background-color: var(--yy-red-dark);
+    background-color: var(--yy-calm-accent);
 }
 
 .view-calendar-btn {
@@ -100,18 +102,20 @@
     align-items: center;
     gap: 8px;
     padding: 10px 12px;
-    background-color: white;
-    color: var(--yy-red);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    background-color: var(--yy-calm-surface);
+    color: var(--yy-calm-accent);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
 }
 
-.view-calendar-btn:hover {
-    background-color: var(--yy-red);
-    color: white;
+@media (hover: hover) and (pointer: fine) {
+  .view-calendar-btn:hover {
+      background-color: var(--yy-calm-accent);
+      color: var(--yy-calm-accent-on);
+  }
 }
 
 /* 卡片列表 */
@@ -126,10 +130,10 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: white;
-    border-radius: var(--yy-radius-card);
+    background: var(--yy-calm-surface);
+    border-radius: var(--yy-ui-radius);
     padding: 16px 20px;
-    border: var(--yy-border-width) solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
 }
 
 .card-left {
@@ -146,12 +150,12 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: var(--yy-danger-bg);
-    color: var(--yy-red);
-    border-radius: var(--yy-radius-btn);
+    background-color: var(--yy-calm-danger-bg);
+    color: var(--yy-calm-accent);
+    border-radius: var(--yy-ui-radius);
     font-size: 18px;
     font-weight: 700;
-    border: var(--yy-border-width) solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
 }
 
 /* 活動資訊 */
@@ -163,14 +167,14 @@
     margin: 0 0 8px 0;
     font-size: 18px;
     font-weight: 600;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
     line-height: 1.4;
     text-align: left;
 }
 
 .event-description {
     font-size: 14px;
-    color: var(--yy-text-muted);
+    color: var(--yy-calm-text-sub);
     width: 95%;
 }
 
@@ -183,16 +187,16 @@
 
 .day-badge {
     padding: 4px 8px;
-    background-color: var(--yy-danger-bg);
-    color: var(--yy-red);
-    border-radius: var(--yy-radius-btn);
-    font-size: 13px;
+    background-color: var(--yy-calm-danger-bg);
+    color: var(--yy-calm-accent);
+    border-radius: var(--yy-ui-radius);
+    font-size: var(--yy-text-sm);
     font-weight: 600;
 }
 
 .time-text {
-    font-size: 13px;
-    color: var(--yy-text-muted);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
 }
 
 /* 單個加入按鈕 */
@@ -201,10 +205,10 @@
     align-items: center;
     gap: 6px;
     padding: 6px 10px;
-    background-color: white;
-    color: var(--yy-red);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    background-color: var(--yy-calm-surface);
+    color: var(--yy-calm-accent);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     font-size: 14px;
     font-weight: 600;
     white-space: nowrap;
@@ -212,13 +216,15 @@
     cursor: pointer;
 }
 
-.add-to-calendar-btn:hover {
-    background-color: var(--yy-red);
-    color: white;
+@media (hover: hover) and (pointer: fine) {
+  .add-to-calendar-btn:hover {
+      background-color: var(--yy-calm-accent);
+      color: var(--yy-calm-accent-on);
+  }
 }
 
 .add-to-calendar-btn:active {
-    background-color: var(--yy-red-dark);
+    background-color: var(--yy-calm-accent);
 }
 
 /* 圖示 */

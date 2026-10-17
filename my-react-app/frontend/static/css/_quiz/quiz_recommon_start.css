@@ -1,25 +1,25 @@
 .start-container {
   max-width: 500px;
   margin: 80px auto;
-  background: var(--yy-surface);
+  background: var(--yy-calm-surface);
   padding: 40px 30px;
-  border: var(--yy-border-width) solid var(--yy-ink);
-  border-radius: var(--yy-radius-card);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-ui-radius);
   text-align: center;
   animation: recommon-start-fade-in var(--dur-base) var(--ease-out);
 }
 
 .start-title {
-  font-family: var(--yy-font-pixel);
+  font-family: var(--yy-font-body);
   font-size: 26px;
   font-weight: bold;
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
   margin-bottom: 10px;
 }
 
 .start-subtitle {
   font-size: 16px;
-  color: var(--yy-text-secondary);
+  color: var(--yy-calm-text-sub);
   margin-bottom: 30px;
 }
 
@@ -35,33 +35,33 @@
   justify-content: center;
   gap: 8px;
   padding: 14px 22px;
-  border-radius: var(--yy-radius-btn);
+  border-radius: var(--yy-ui-radius);
   font-weight: bold;
   font-size: 16px;
-  border: var(--yy-border-width) solid var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease;
+  transition: transform 0.15s ease, background-color 0.2s ease;
 }
 
 .start-btn.primary {
-  background: var(--yy-red);
-  color: var(--yy-cream);
+  background: var(--yy-calm-accent);
+  color: var(--yy-calm-info-bg);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .start-btn.primary:hover {
-    background: var(--yy-red-dark);
+    background: var(--yy-calm-accent);
   }
 }
 
 .start-btn.secondary {
-  background: var(--yy-surface);
-  color: var(--yy-ink);
+  background: var(--yy-calm-surface);
+  color: var(--yy-calm-text);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .start-btn.secondary:hover {
-    background: var(--yy-cream);
+    background: var(--yy-calm-info-bg);
   }
 }
 

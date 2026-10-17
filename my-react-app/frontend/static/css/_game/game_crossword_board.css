@@ -22,7 +22,7 @@
     margin: 12px auto 0;
     padding: 0 12px;
     font-size: 14px;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
     text-align: center;
 }
 
@@ -45,8 +45,8 @@
     position: relative;
     width: var(--cw-cell);
     height: var(--cw-cell);
-    border: 1px solid var(--yy-border-soft);
-    background-color: white;
+    border: 1px solid var(--yy-calm-rule);
+    background-color: var(--yy-calm-surface);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -55,16 +55,16 @@
 }
 
 .area-cell-container.is-block {
-    background-color: var(--yy-border-soft);
+    background-color: var(--yy-calm-rule);
 }
 
 .area-cell-number-label {
     position: absolute;
     top: 1px;
     left: 2px;
-    font-size: 12px;
+    font-size: var(--yy-text-sm);
     font-weight: bold;
-    color: black;
+    color: var(--yy-calm-text);
     z-index: 10;
     line-height: 1;
     white-space: nowrap;
@@ -81,7 +81,7 @@
     text-transform: uppercase;
     font-size: 18px;
     font-weight: bold;
-    color: black;
+    color: var(--yy-calm-text);
     padding: 0;
     outline: none;
     box-sizing: border-box;
@@ -114,7 +114,7 @@
     flex-wrap: wrap;
     justify-content: center;
     border: 0px;
-    border-radius: var(--yy-radius-card);
+    border-radius: var(--yy-ui-radius);
     width:100%;
     margin: 25px 0;
     place-items: center;
@@ -129,5 +129,5 @@
        輸入框被格子的 overflow:hidden 包住，外框必須畫在格子裡面（負的 offset） */
     outline: var(--yy-ui-focus-ring);
     outline-offset: -3px;
-    background-color: rgba(217, 162, 39, 0.35);
+    background-color: var(--yy-calm-info-bg);
 }

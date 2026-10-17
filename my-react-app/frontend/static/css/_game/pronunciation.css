@@ -13,7 +13,7 @@
 /* ── 介紹畫面 ──────────────────────────────────── */
 .pron-intro-line {
   font-size: 0.95rem;
-  color: var(--yy-text-secondary);
+  color: var(--yy-calm-text-sub);
   text-align: center;
   margin: 0.3rem 0;
   line-height: 1.7;
@@ -21,14 +21,14 @@
 }
 
 .pron-error {
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
   font-size: 0.9rem;
   margin-top: 0.8rem;
 }
 
 .pron-intro-privacy-hint {
-  font-size: 0.8rem;
-  color: var(--yy-text-muted);
+  font-size: var(--yy-text-sm);
+  color: var(--yy-calm-text-sub);
   text-align: center;
   margin: 0.6rem 0 0;
 }
@@ -42,8 +42,8 @@
 }
 
 .pron-share-hint {
-  font-size: 0.8rem;
-  color: var(--yy-text-muted);
+  font-size: var(--yy-text-sm);
+  color: var(--yy-calm-text-sub);
   margin: 0;
 }
 
@@ -51,10 +51,10 @@
 .pron-btn-primary {
   margin-top: 1.8rem;
   padding: 0.65rem 2.5rem;
-  background: var(--yy-red);
-  color: var(--yy-surface);
+  background: var(--yy-calm-accent);
+  color: var(--yy-calm-surface);
   border: none;
-  border-radius: var(--yy-radius-btn);
+  border-radius: var(--yy-ui-radius);
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
@@ -62,7 +62,7 @@
 }
 @media (hover: hover) and (pointer: fine) {
   .pron-btn-primary:hover:not(:disabled) {
-    background: var(--yy-red);
+    background: var(--yy-calm-accent);
     transform: translateY(-2px);
   }
 }
@@ -78,10 +78,10 @@
 .pron-btn-secondary {
   margin-top: 1.8rem;
   padding: 0.65rem 1.8rem;
-  background: var(--yy-surface);
-  color: var(--yy-red);
-  border: var(--yy-border-width) solid var(--yy-red);
-  border-radius: var(--yy-radius-btn);
+  background: var(--yy-calm-surface);
+  color: var(--yy-calm-accent);
+  border: var(--yy-border-width) solid var(--yy-calm-accent);
+  border-radius: var(--yy-ui-radius);
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
@@ -93,7 +93,7 @@
 }
 @media (hover: hover) and (pointer: fine) {
   .pron-btn-secondary:hover {
-    background: var(--yy-danger-bg);
+    background: var(--yy-calm-danger-bg);
     transform: translateY(-2px);
   }
 }
@@ -109,17 +109,17 @@
   display: inline-block;
   margin-top: 1rem;
   padding: 0.5rem 1.4rem;
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
   text-decoration: none;
-  border: var(--yy-border-width) solid var(--yy-red);
-  border-radius: var(--yy-radius-btn);
+  border: var(--yy-border-width) solid var(--yy-calm-accent);
+  border-radius: var(--yy-ui-radius);
   font-size: 0.9rem;
   font-weight: 700;
   transition: background 0.18s, transform 0.15s;
 }
 @media (hover: hover) and (pointer: fine) {
   .pron-community-entry-link:hover {
-    background: var(--yy-danger-bg);
+    background: var(--yy-calm-danger-bg);
     transform: translateY(-2px);
   }
 }
@@ -130,18 +130,20 @@
 
 .pron-btn-outline {
   padding: 0.5rem 1.2rem;
-  background: var(--yy-surface);
-  color: var(--yy-text-tertiary);
-  border: 1.5px solid var(--yy-text-muted);
-  border-radius: var(--yy-radius-btn);
+  background: var(--yy-calm-surface);
+  color: var(--yy-calm-text-sub);
+  border: 1.5px solid var(--yy-calm-text-sub);
+  border-radius: var(--yy-ui-radius);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
-.pron-btn-outline:hover {
-  border-color: var(--yy-red);
-  background: var(--yy-danger-bg);
+@media (hover: hover) and (pointer: fine) {
+  .pron-btn-outline:hover {
+    border-color: var(--yy-calm-accent);
+    background: var(--yy-calm-danger-bg);
+  }
 }
 
 /* ── 進度條 ────────────────────────────────────── */
@@ -149,7 +151,7 @@
   width: 100%;
   max-width: 480px;
   height: 6px;
-  background: var(--yy-cream-dim);
+  background: var(--yy-calm-info-bg);
   border-radius: 999px;
   overflow: hidden;
   margin-bottom: 0.6rem;
@@ -158,13 +160,13 @@
 .pron-progress-bar {
   width: 100%;
   height: 100%;
-  background: var(--yy-red);
+  background: var(--yy-calm-accent);
   transform-origin: left center;
   transition: transform 350ms var(--ease-out);
 }
 .pron-counter {
-  font-size: 0.85rem;
-  color: var(--yy-text-muted);
+  font-size: var(--yy-text-sm);
+  color: var(--yy-calm-text-sub);
   margin: 0 0 1.5rem;
 }
 
@@ -173,9 +175,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: var(--yy-danger-bg);
-  border: 1.5px solid var(--yy-danger-bg);
-  border-radius: var(--yy-radius-lg);
+  background: var(--yy-calm-danger-bg);
+  border: 1.5px solid var(--yy-calm-danger-bg);
+  border-radius: var(--yy-ui-radius);
   padding: 1.5rem 2rem;
   width: 100%;
   max-width: 460px;
@@ -185,22 +187,22 @@
 .pron-word {
   font-size: 1.8rem;
   font-weight: 800;
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
   margin: 0;
   letter-spacing: 0.03em;
 }
 .pron-meaning {
   font-size: 1rem;
-  color: var(--yy-text-tertiary);
+  color: var(--yy-calm-text-sub);
   margin: 0;
 }
 .pron-play-btn {
   margin-top: 0.6rem;
   padding: 0.5rem 1.4rem;
-  background: var(--yy-red);
-  color: var(--yy-surface);
+  background: var(--yy-calm-accent);
+  color: var(--yy-calm-surface);
   border: none;
-  border-radius: var(--yy-radius-btn);
+  border-radius: var(--yy-ui-radius);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -208,7 +210,7 @@
 }
 @media (hover: hover) and (pointer: fine) {
   .pron-play-btn:hover {
-    background: var(--yy-red);
+    background: var(--yy-calm-accent);
     transform: translateY(-1px);
   }
 }
@@ -233,21 +235,21 @@
   width: 90px;
   height: 90px;
   border-radius: 50%;
-  background: var(--yy-red);
-  color: var(--yy-surface);
+  background: var(--yy-calm-accent);
+  color: var(--yy-calm-surface);
   border: none;
   font-size: 2rem;
   cursor: pointer;
   transition: background 0.18s, transform 0.15s;
 }
 .pron-mic-btn span {
-  font-size: 0.75rem;
+  font-size: var(--yy-text-sm);
   font-weight: 600;
   letter-spacing: 0.03em;
 }
 @media (hover: hover) and (pointer: fine) {
   .pron-mic-btn:hover {
-    background: var(--yy-red);
+    background: var(--yy-calm-accent);
     transform: scale(1.06);
   }
 }
@@ -256,13 +258,12 @@
   transform: scale(0.97);
 }
 .pron-mic-btn.recording {
-  background: var(--yy-red);
+  background: var(--yy-calm-accent);
   animation: pron-pulse 0.9s infinite;
 }
 @keyframes pron-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(158, 27, 36,0.45); }
-  70%  { box-shadow: 0 0 0 14px rgba(158, 27, 36,0); }
-  100% { box-shadow: 0 0 0 0 rgba(158, 27, 36,0); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
 .pron-recorded-actions {
@@ -278,14 +279,14 @@
   align-items: baseline;
   gap: 0.5rem;
   padding: 0.75rem 2rem;
-  border-radius: var(--yy-radius-card);
+  border-radius: var(--yy-ui-radius);
   margin-bottom: 0.5rem;
   animation: pron-fade-in var(--dur-base) var(--ease-out);
 }
-.pron-score-box.excellent { background: var(--yy-success-bg); border: 1.5px solid var(--yy-green); color: var(--yy-green); }
-.pron-score-box.good      { background: var(--yy-info-bg); border: 1.5px solid var(--yy-info-bg); color: var(--yy-blue); }
-.pron-score-box.fair      { background: var(--yy-warning-bg); border: 1.5px solid var(--yy-warning-bg); color: var(--yy-warning-text); }
-.pron-score-box.poor      { background: var(--yy-danger-bg); border: 1.5px solid var(--yy-danger-bg); color: var(--yy-red); }
+.pron-score-box.excellent { background: var(--yy-calm-success-bg); border: 1.5px solid var(--yy-calm-success); color: var(--yy-calm-success); }
+.pron-score-box.good      { background: var(--yy-calm-info-bg); border: 1.5px solid var(--yy-calm-info-bg); color: var(--yy-calm-accent); }
+.pron-score-box.fair      { background: var(--yy-calm-warning-bg); border: 1.5px solid var(--yy-calm-warning-bg); color: var(--yy-calm-warning); }
+.pron-score-box.poor      { background: var(--yy-calm-danger-bg); border: 1.5px solid var(--yy-calm-danger-bg); color: var(--yy-calm-accent); }
 
 .pron-score-num   { font-size: 2.2rem; font-weight: 900;   font-variant-numeric: tabular-nums;
 }
@@ -295,7 +296,7 @@
 .pron-score-ref {
   width: 100%;
   text-align: center;
-  font-size: 0.78rem;
+  font-size: var(--yy-text-sm);
   opacity: 0.75;
   margin-top: 0.2rem;
 }
@@ -309,7 +310,7 @@
 .pron-result-title {
   font-size: 1.6rem;
   font-weight: 800;
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
   margin-bottom: 1.2rem;
 }
 .pron-result-score {
@@ -319,18 +320,18 @@
   justify-content: center;
   gap: 0.3rem;
   padding: 1rem 2.5rem;
-  border-radius: var(--yy-radius-lg);
+  border-radius: var(--yy-ui-radius);
   margin-bottom: 1.8rem;
   font-variant-numeric: tabular-nums;
 }
-.pron-result-score.excellent { background: var(--yy-success-bg); border: 1.5px solid var(--yy-green); }
-.pron-result-score.good      { background: var(--yy-info-bg); border: 1.5px solid var(--yy-info-bg); }
-.pron-result-score.fair      { background: var(--yy-warning-bg); border: 1.5px solid var(--yy-warning-bg); }
-.pron-result-score.poor      { background: var(--yy-danger-bg); border: 1.5px solid var(--yy-danger-bg); }
+.pron-result-score.excellent { background: var(--yy-calm-success-bg); border: 1.5px solid var(--yy-calm-success); }
+.pron-result-score.good      { background: var(--yy-calm-info-bg); border: 1.5px solid var(--yy-calm-info-bg); }
+.pron-result-score.fair      { background: var(--yy-calm-warning-bg); border: 1.5px solid var(--yy-calm-warning-bg); }
+.pron-result-score.poor      { background: var(--yy-calm-danger-bg); border: 1.5px solid var(--yy-calm-danger-bg); }
 
-.pron-result-num  { font-size: 3.5rem; font-weight: 900; color: var(--yy-red); line-height: 1; }
-.pron-result-unit { font-size: 1.6rem; color: var(--yy-text-muted); }
-.pron-result-rating { width: 100%; text-align: center; font-size: 1.1rem; font-weight: 700; color: var(--yy-text-tertiary); margin: 0.3rem 0 0; }
+.pron-result-num  { font-size: 3.5rem; font-weight: 900; color: var(--yy-calm-accent); line-height: 1; }
+.pron-result-unit { font-size: 1.6rem; color: var(--yy-calm-text-sub); }
+.pron-result-rating { width: 100%; text-align: center; font-size: 1.1rem; font-weight: 700; color: var(--yy-calm-text-sub); margin: 0.3rem 0 0; }
 
 .pron-result-list {
   width: 100%;
@@ -345,28 +346,28 @@
   align-items: center;
   gap: 0.6rem;
   padding: 0.6rem 0.9rem;
-  border-radius: var(--yy-radius-btn);
+  border-radius: var(--yy-ui-radius);
   font-size: 0.9rem;
-  background: var(--yy-cream);
-  border: 1px solid var(--yy-border-soft);
+  background: var(--yy-calm-info-bg);
+  border: 1px solid var(--yy-calm-rule);
 }
-.pron-result-word    { font-weight: 700; color: var(--yy-red); min-width: min(80px, 100%); overflow-wrap: anywhere; }
-.pron-result-meaning { color: var(--yy-text-tertiary); flex: 1; }
+.pron-result-word    { font-weight: 700; color: var(--yy-calm-accent); min-width: min(80px, 100%); overflow-wrap: anywhere; }
+.pron-result-meaning { color: var(--yy-calm-text-sub); flex: 1; }
 .pron-result-tag {
   padding: 0.2rem 0.6rem;
-  border-radius: var(--yy-radius-btn);
-  font-size: 0.82rem;
+  border-radius: var(--yy-ui-radius);
+  font-size: var(--yy-text-sm);
   font-weight: 700;
   white-space: nowrap;
 }
-.pron-result-tag.excellent { background: var(--yy-success-bg); color: var(--yy-green); }
-.pron-result-tag.good      { background: var(--yy-info-bg); color: var(--yy-blue); }
-.pron-result-tag.fair      { background: var(--yy-warning-bg); color: var(--yy-warning-text); }
-.pron-result-tag.poor      { background: var(--yy-danger-bg); color: var(--yy-red); }
+.pron-result-tag.excellent { background: var(--yy-calm-success-bg); color: var(--yy-calm-success); }
+.pron-result-tag.good      { background: var(--yy-calm-info-bg); color: var(--yy-calm-accent); }
+.pron-result-tag.fair      { background: var(--yy-calm-warning-bg); color: var(--yy-calm-warning); }
+.pron-result-tag.poor      { background: var(--yy-calm-danger-bg); color: var(--yy-calm-accent); }
 
 .pron-result-hint {
-  font-size: 0.78rem;
-  color: var(--yy-text-muted);
+  font-size: var(--yy-text-sm);
+  color: var(--yy-calm-text-sub);
   margin: -0.8rem 0 1rem;
   text-align: center;
 }
@@ -386,7 +387,13 @@
 .pron-score-note {
   width: 100%;
   text-align: center;
-  font-size: 0.78rem;
+  font-size: var(--yy-text-sm);
   opacity: 0.85;
   margin-top: 0.2rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pron-mic-btn.recording {
+    animation: none;
+  }
 }

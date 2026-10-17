@@ -13,7 +13,7 @@
 /* ── 介紹畫面 ─────────────────────────────────── */
 .listening-intro-line {
   font-size: 0.95rem;
-  color: var(--yy-text-secondary);
+  color: var(--yy-calm-text-sub);
   text-align: center;
   margin: 0.3rem 0;
   line-height: 1.7;
@@ -21,7 +21,7 @@
 }
 
 .listening-error {
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
   font-size: 0.9rem;
   margin-top: 0.8rem;
 }
@@ -30,10 +30,10 @@
 .listening-btn-primary {
   margin-top: 1.8rem;
   padding: 0.65rem 2.5rem;
-  background: var(--yy-red);
-  color: var(--yy-surface);
+  background: var(--yy-calm-accent);
+  color: var(--yy-calm-surface);
   border: none;
-  border-radius: var(--yy-radius-btn);
+  border-radius: var(--yy-ui-radius);
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
@@ -41,7 +41,7 @@
 }
 @media (hover: hover) and (pointer: fine) {
   .listening-btn-primary:hover:not(:disabled) {
-    background: var(--yy-red);
+    background: var(--yy-calm-accent);
     transform: translateY(-2px);
   }
 }
@@ -59,7 +59,7 @@
   width: 100%;
   max-width: 480px;
   height: 6px;
-  background: var(--yy-cream-dim);
+  background: var(--yy-calm-info-bg);
   border-radius: 999px;
   overflow: hidden;
   margin-bottom: 0.6rem;
@@ -68,13 +68,13 @@
 .listening-progress-bar {
   width: 100%;
   height: 100%;
-  background: var(--yy-red);
+  background: var(--yy-calm-accent);
   transform-origin: left center;
   transition: transform 350ms var(--ease-out);
 }
 .listening-counter {
-  font-size: 0.85rem;
-  color: var(--yy-text-muted);
+  font-size: var(--yy-text-sm);
+  color: var(--yy-calm-text-sub);
   margin: 0 0 1.5rem;
 }
 
@@ -89,8 +89,8 @@
   width: 88px;
   height: 88px;
   border-radius: 50%;
-  background: var(--yy-red);
-  color: var(--yy-surface);
+  background: var(--yy-calm-accent);
+  color: var(--yy-calm-surface);
   border: none;
   font-size: 2rem;
   cursor: pointer;
@@ -101,7 +101,7 @@
 }
 @media (hover: hover) and (pointer: fine) {
   .listening-play-btn:hover {
-    background: var(--yy-red);
+    background: var(--yy-calm-accent);
     transform: scale(1.06);
   }
 }
@@ -110,18 +110,17 @@
   transform: scale(0.97);
 }
 .listening-play-btn.playing {
-  background: var(--yy-red);
+  background: var(--yy-calm-accent);
   animation: listening-pulse 0.9s infinite;
 }
 @keyframes listening-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(158, 27, 36,0.45); }
-  70%  { box-shadow: 0 0 0 12px rgba(158, 27, 36,0); }
-  100% { box-shadow: 0 0 0 0 rgba(158, 27, 36,0); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 .listening-play-hint {
   margin-top: 0.6rem;
-  font-size: 0.82rem;
-  color: var(--yy-text-muted);
+  font-size: var(--yy-text-sm);
+  color: var(--yy-calm-text-sub);
 }
 
 /* ── 答案選項 ─────────────────────────────────── */
@@ -135,12 +134,12 @@
 }
 .listening-option {
   padding: 0.85rem 0.75rem;
-  border: var(--yy-border-width) solid var(--yy-text-muted);
-  border-radius: var(--yy-radius-card);
-  background: var(--yy-surface);
+  border: var(--yy-border-width) solid var(--yy-calm-text-sub);
+  border-radius: var(--yy-ui-radius);
+  background: var(--yy-calm-surface);
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--yy-text-secondary);
+  color: var(--yy-calm-text-sub);
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s, transform 0.12s;
   text-align: center;
@@ -154,8 +153,8 @@
 }
 @media (hover: hover) and (pointer: fine) {
   .listening-option:hover:not(:disabled) {
-    border-color: var(--yy-red);
-    background: var(--yy-danger-bg);
+    border-color: var(--yy-calm-accent);
+    background: var(--yy-calm-danger-bg);
     transform: translateY(-2px);
   }
 }
@@ -164,14 +163,14 @@
   transform: scale(0.97);
 }
 .listening-option.correct {
-  border-color: var(--yy-green);
-  background: var(--yy-success-bg);
-  color: var(--yy-green);
+  border-color: var(--yy-calm-success);
+  background: var(--yy-calm-success-bg);
+  color: var(--yy-calm-success);
 }
 .listening-option.wrong {
-  border-color: var(--yy-red);
-  background: var(--yy-danger-bg);
-  color: var(--yy-red);
+  border-color: var(--yy-calm-accent);
+  background: var(--yy-calm-danger-bg);
+  color: var(--yy-calm-accent);
 }
 .listening-option.dimmed {
   opacity: 0.4;
@@ -181,11 +180,11 @@
 .listening-reveal {
   margin-top: 1.2rem;
   font-size: 1rem;
-  color: var(--yy-text-tertiary);
+  color: var(--yy-calm-text-sub);
   animation: listening-fade-in var(--dur-base) var(--ease-out);
 }
 .listening-reveal strong {
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
   font-size: 1.1rem;
 }
 
@@ -198,7 +197,7 @@
 .listening-result-title {
   font-size: 1.6rem;
   font-weight: 800;
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
   margin-bottom: 1.2rem;
 }
 .listening-result-score {
@@ -209,16 +208,16 @@
 .listening-result-num {
   font-size: 3.5rem;
   font-weight: 900;
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
   line-height: 1;
 }
 .listening-result-denom {
   font-size: 1.6rem;
-  color: var(--yy-text-muted);
+  color: var(--yy-calm-text-sub);
 }
 .listening-result-pct {
   font-size: 1.1rem;
-  color: var(--yy-text-muted);
+  color: var(--yy-calm-text-sub);
   margin: 0.3rem 0 0;
 }
 
@@ -235,24 +234,24 @@
   align-items: center;
   gap: 0.6rem;
   padding: 0.6rem 0.9rem;
-  border-radius: var(--yy-radius-btn);
+  border-radius: var(--yy-ui-radius);
   font-size: 0.9rem;
 }
 .listening-result-row.correct {
-  background: var(--yy-success-bg);
-  border: 1px solid var(--yy-green);
+  background: var(--yy-calm-success-bg);
+  border: 1px solid var(--yy-calm-success);
 }
 .listening-result-row.wrong {
-  background: var(--yy-danger-bg);
-  border: 1px solid var(--yy-danger-bg);
+  background: var(--yy-calm-danger-bg);
+  border: 1px solid var(--yy-calm-danger-bg);
 }
 .listening-result-icon { font-size: 1rem; flex-shrink: 0; }
 .listening-result-word {
   font-weight: 700;
-  color: var(--yy-text-secondary);
+  color: var(--yy-calm-text-sub);
   min-width: 80px;
 }
-.listening-result-ans { color: var(--yy-text-tertiary); flex: 1; }
+.listening-result-ans { color: var(--yy-calm-text-sub); flex: 1; }
 
 /* ── 結果頁按鈕群 ─────────────────────────────── */
 .listening-result-actions {
@@ -265,10 +264,10 @@
 .listening-btn-secondary {
   margin-top: 1.8rem;
   padding: 0.65rem 1.8rem;
-  background: var(--yy-surface);
-  color: var(--yy-red);
-  border: var(--yy-border-width) solid var(--yy-red);
-  border-radius: var(--yy-radius-btn);
+  background: var(--yy-calm-surface);
+  color: var(--yy-calm-accent);
+  border: var(--yy-border-width) solid var(--yy-calm-accent);
+  border-radius: var(--yy-ui-radius);
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
@@ -279,7 +278,7 @@
 }
 @media (hover: hover) and (pointer: fine) {
   .listening-btn-secondary:hover {
-    background: var(--yy-danger-bg);
+    background: var(--yy-calm-danger-bg);
     transform: translateY(-2px);
   }
 }
@@ -297,5 +296,11 @@
     width: 72px;
     height: 72px;
     font-size: 1.6rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .listening-play-btn.playing {
+    animation: none;
   }
 }

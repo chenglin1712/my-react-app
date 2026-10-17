@@ -19,30 +19,32 @@
   top: 0.3rem;
   background: none;
   border: none;
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
   text-decoration: none;
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
   padding: 0.3rem 0.6rem;
-  border-radius: var(--yy-radius-btn);
+  border-radius: var(--yy-ui-radius);
   transition: background 0.15s;
 }
 
-.vocab-back-btn:hover {
-  background: var(--yy-danger-bg);
+@media (hover: hover) and (pointer: fine) {
+  .vocab-back-btn:hover {
+    background: var(--yy-calm-danger-bg);
+  }
 }
 
 .vocab-title {
   font-size: 1.9rem;
   font-weight: 800;
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
   margin-bottom: 0.3rem;
 }
 
 .vocab-subtitle {
   font-size: 1rem;
-  color: var(--yy-text-muted);
+  color: var(--yy-calm-text-sub);
   margin: 0;
 }
 
@@ -62,11 +64,11 @@
   align-items: center;
   gap: 0.6rem;
   padding: 1.25rem 0.75rem 1rem;
-  border-radius: var(--yy-radius-lg);
+  border-radius: var(--yy-ui-radius);
   border: var(--yy-border-width) solid var(--tribe-color);
   cursor: pointer;
-  transition: transform 0.18s, box-shadow 0.18s, background 0.18s;
-  background: var(--yy-surface);
+  transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+  background: var(--yy-calm-surface);
   text-align: center;
   /* 渲染成 <Link>（<a>），重設掉瀏覽器預設的底線跟連結文字顏色。 */
   text-decoration: none;
@@ -75,7 +77,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .vocab-tribe-card:hover {
-    background: var(--yy-danger-bg);
+    background: var(--yy-calm-danger-bg);
     transform: translateY(-3px);
   }
 }
@@ -91,7 +93,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--yy-surface);
+  color: var(--yy-calm-surface);
   font-size: 1.1rem;
   font-weight: 800;
   font-family: var(--yy-font-body);
@@ -100,25 +102,25 @@
 .vocab-tribe-name {
   font-size: 0.95rem;
   font-weight: 700;
-  color: var(--yy-text-secondary);
+  color: var(--yy-calm-text-sub);
 }
 
 .vocab-tribe-tag {
-  font-size: 0.75rem;
+  font-size: var(--yy-text-sm);
   font-weight: 700;
   padding: 0.2rem 0.6rem;
   border-radius: 999px;
 }
 
 .vocab-tribe-tag.available {
-  background: var(--yy-red);
-  color: var(--yy-surface);
+  background: var(--yy-calm-accent);
+  color: var(--yy-calm-surface);
 }
 
 /* 還沒有這個遊戲內容的族群：不可點、降低存在感，但文字仍要讀得到 */
 .vocab-tribe-tag.soon {
-  background: var(--yy-cream-dim);
-  color: var(--yy-text-muted);
+  background: var(--yy-calm-info-bg);
+  color: var(--yy-calm-text-sub);
 }
 
 .vocab-tribe-card.is-soon {

@@ -74,10 +74,7 @@ const GameZonePage = () => {
   return (
     <div className="yy-page gamehub-page">
       <section className="yy-hero gamehub-hero">
-        <span className="gamehub-blob gamehub-blob--gold" />
-        <span className="gamehub-blob gamehub-blob--blue" />
         <div className="yy-fade-up">
-          <span className="yy-eyebrow">GAME ZONE</span>
           <h1 className="gamehub-title">遊戲專區</h1>
           <p className="gamehub-desc">透過遊戲，輕鬆學習原住民族語。</p>
         </div>

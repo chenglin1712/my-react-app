@@ -12,10 +12,10 @@
     font-weight: 700;
 }
 .game-feedback.correct {
-    color: var(--yy-green);
+    color: var(--yy-calm-success);
 }
 .game-feedback.wrong {
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
 }
 
 /* 下一題與結束遊戲：答題後才出現「下一題」，「結束遊戲」一直都在 */

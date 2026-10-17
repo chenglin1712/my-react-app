@@ -21,14 +21,14 @@
 .paper-info p {
     margin: 4px 0;
     font-size: 16px;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
 }
 
 .user-info {
-    border-bottom: 2px solid var(--yy-ink);
+    border-bottom: 2px solid var(--yy-calm-line);
     padding-bottom: 2px;
     font-weight: 700;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .user-info-row {
@@ -46,18 +46,18 @@
 .paper-score .score-circle {
     display: inline-block;
     padding: 8px 16px;
-    border: var(--yy-border-width) solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: 50%;
     font-size: 32px;
     font-weight: bold;
-    color: var(--yy-red);
-    background: var(--yy-surface);
+    color: var(--yy-calm-accent);
+    background: var(--yy-calm-surface);
     transform: rotate(-2deg);
-    font-family: var(--yy-font-pixel);
+    font-family: var(--yy-font-body);
 }
 
 .paper-body {
-    border-top: 2px solid var(--yy-ink);
+    border-top: 2px solid var(--yy-calm-line);
     padding-top: 16px;
     overflow-y: auto;
 }
@@ -65,11 +65,11 @@
 .submit-question-header-row {
     display: flex;
     justify-content: space-between;
-    background-color: var(--yy-blue);
+    background-color: var(--yy-calm-accent);
     padding: 8px 12px;
-    border-radius: var(--yy-radius-btn) var(--yy-radius-btn) 0 0;
+    border-radius: var(--yy-ui-radius) var(--yy-ui-radius) 0 0;
     font-weight: 700;
-    color: var(--yy-cream);
+    color: var(--yy-calm-info-bg);
     margin-bottom: 12px;
 }
 
@@ -92,13 +92,13 @@
     align-items: center;
     padding: 6px 0;
     font-size: 16px;
-    border-bottom: 1px dashed var(--yy-border-soft);
+    border-bottom: 1px dashed var(--yy-calm-rule);
 }
 
 .submit-question-num {
     font-weight: bold;
     margin-right: 8px;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .submit-question-q {
@@ -115,57 +115,57 @@
 .submit-question-text {
     font-size: 15px;
     margin: 8px 0;
-    color: var(--yy-text-tertiary);
+    color: var(--yy-calm-text-sub);
 }
 
 .quiz-user-answer {
     font-weight: 600;
     padding: 2px 6px;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-ui-radius);
     width: 24px;
 }
 
 .quiz-user-answer.correct {
-    color: var(--yy-success);
-    background-color: var(--yy-success-bg);
-    border: 1px solid var(--yy-success);
+    color: var(--yy-calm-success);
+    background-color: var(--yy-calm-success-bg);
+    border: 1px solid var(--yy-calm-success);
 }
 
 .quiz-user-answer.wrong {
-    color: var(--yy-danger);
-    background-color: var(--yy-danger-bg);
-    border: 1px solid var(--yy-danger);
+    color: var(--yy-calm-danger);
+    background-color: var(--yy-calm-danger-bg);
+    border: 1px solid var(--yy-calm-danger);
 }
 
 .quiz-correct-answer {
     font-weight: 600;
     padding: 2px 6px;
     width: 24px;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .quiz-user-answer-text,
 .quiz-correct-answer-text {
     font-weight: 600;
     padding: 2px 8px;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-ui-radius);
     white-space: nowrap;
 }
 
 .quiz-correct-answer-text {
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .quiz-user-answer-text.correct {
-    color: var(--yy-success);
-    background-color: var(--yy-success-bg);
-    border: 1px solid var(--yy-success);
+    color: var(--yy-calm-success);
+    background-color: var(--yy-calm-success-bg);
+    border: 1px solid var(--yy-calm-success);
 }
 
 .quiz-user-answer-text.wrong {
-    color: var(--yy-danger);
-    background-color: var(--yy-danger-bg);
-    border: 1px solid var(--yy-danger);
+    color: var(--yy-calm-danger);
+    background-color: var(--yy-calm-danger-bg);
+    border: 1px solid var(--yy-calm-danger);
 }
 
 .submit-question-q2 {
@@ -179,11 +179,11 @@
 }
 
 .submit-question-q2 button {
-    background: var(--yy-blue);
-    color: var(--yy-surface);
+    background: var(--yy-calm-accent);
+    color: var(--yy-calm-surface);
     border: none;
     padding: 4px 8px;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-ui-radius);
     font-size: 14px;
     min-width: auto;
 }
@@ -199,25 +199,25 @@
     width: 100px;
     height: 100px;
     object-fit: cover;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-ui-radius);
     border: var(--yy-border-width) solid transparent;
 }
 
 .quiz-user-answer2.correct {
-    border-color: var(--yy-success);
+    border-color: var(--yy-calm-success);
 }
 
 .quiz-user-answer2.wrong {
-    border-color: var(--yy-danger);
+    border-color: var(--yy-calm-danger);
 }
 
 .quiz-correct-answer2 {
-    border-color: var(--yy-blue-light);
+    border-color: var(--yy-calm-copper);
 }
 
 .no-results {
     text-align: center;
-    color: var(--yy-text-muted);
+    color: var(--yy-calm-text-sub);
     font-style: italic;
 }
 
@@ -229,20 +229,20 @@
 }
 
 .submit-btn-primary {
-    background: var(--yy-red);
-    color: var(--yy-cream);
-    border: var(--yy-border-width) solid var(--yy-ink);
+    background: var(--yy-calm-accent);
+    color: var(--yy-calm-info-bg);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     padding: 12px 20px;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-ui-radius);
     font-size: 16px;
     font-weight: 700;
     cursor: pointer;
-    transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+    transition: transform .15s ease, background .15s ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .submit-btn-primary:hover {
-      background: var(--yy-red-dark);
+      background: var(--yy-calm-accent);
   }
 }
 
@@ -252,20 +252,20 @@
 }
 
 .submit-btn-secondary {
-    background: var(--yy-surface);
-    color: var(--yy-red);
-    border: var(--yy-border-width) solid var(--yy-ink);
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-accent);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     padding: 12px 20px;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-ui-radius);
     font-size: 16px;
     font-weight: 700;
     cursor: pointer;
-    transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+    transition: transform .15s ease, background .15s ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .submit-btn-secondary:hover {
-      background: var(--yy-cream);
+      background: var(--yy-calm-info-bg);
   }
 }
 
@@ -276,7 +276,7 @@
 
 /* 作答結果沒能存進資料庫時的提示（內容來自暫存，離開此頁就沒了） */
 .submit-save-failed {
-    color: var(--yy-danger);
+    color: var(--yy-calm-danger);
     text-align: center;
     margin: 8px 0 16px;
     font-weight: 600;
@@ -296,7 +296,7 @@
     margin: 10px 0 0;
     font-weight: 700;
     font-size: 16px;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 /* 答錯題號：點了直接跳到那一題 */
@@ -307,9 +307,9 @@
     gap: 8px 10px;
     margin-bottom: 12px;
     padding: 10px 12px;
-    border: var(--yy-border-width) solid var(--yy-red);
-    border-radius: var(--yy-radius-btn);
-    background: var(--yy-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-accent);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-surface);
     font-size: 15px;
 }
 .submit-wrong-link {
@@ -317,7 +317,7 @@
     align-items: center;
     min-height: 44px;
     padding: 0 10px;
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
     font-weight: 700;
 }
 .submit-question-result {

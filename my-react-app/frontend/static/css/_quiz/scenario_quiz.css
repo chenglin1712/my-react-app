@@ -2,7 +2,7 @@
     width: min(860px, 100%);
     margin: 0 auto;
     padding: 28px 20px 48px;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .scenario-quiz-heading {
@@ -15,15 +15,15 @@
 
 .scenario-quiz-heading h2 {
     margin: 2px 0 0;
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
     font-size: 26px;
     font-weight: 900;
 }
 
 .scenario-quiz-eyebrow {
     margin: 0;
-    color: var(--yy-text-muted);
-    font-size: 13px;
+    color: var(--yy-calm-text-sub);
+    font-size: var(--yy-text-sm);
     font-weight: 650;
     letter-spacing: .04em;
 }
@@ -33,22 +33,24 @@
     align-items: center;
     gap: 6px;
     padding: 4px;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
     font-size: 14px;
     text-decoration: none;
 }
 
-.scenario-quiz-exit.btn:hover {
-    color: var(--yy-red);
+@media (hover: hover) and (pointer: fine) {
+  .scenario-quiz-exit.btn:hover {
+      color: var(--yy-calm-accent);
+  }
 }
 
 .scenario-quiz-card,
 .scenario-quiz-summary,
 .scenario-quiz-state-card {
     padding: 28px;
-    background: var(--yy-surface);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-card);
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
 }
 
 .scenario-quiz-progress-header {
@@ -56,16 +58,16 @@
     justify-content: space-between;
     gap: 16px;
     margin-bottom: 9px;
-    color: var(--yy-text-secondary);
-    font-size: 13px;
+    color: var(--yy-calm-text-sub);
+    font-size: var(--yy-text-sm);
 }
 
 .scenario-quiz-progress {
     height: 10px;
     overflow: hidden;
     margin-bottom: 22px;
-    background: var(--yy-cream-dim);
-    border: var(--yy-border-width) solid var(--yy-ink);
+    background: var(--yy-calm-info-bg);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: 999px;
 }
 
@@ -73,7 +75,7 @@
 .scenario-quiz-progress > div {
     width: 100%;
     height: 100%;
-    background: var(--yy-red);
+    background: var(--yy-calm-accent);
     transform-origin: left center;
     transition: transform 250ms var(--ease-out);
 }
@@ -81,11 +83,11 @@
 .scenario-quiz-intro {
     margin: 0 0 20px;
     padding: 12px 14px;
-    color: var(--yy-text-secondary);
-    background: var(--yy-cream-dim);
-    border-left: 4px solid var(--yy-gold);
-    border-radius: var(--yy-radius-btn);
-    font-size: 13px;
+    color: var(--yy-calm-text-sub);
+    background: var(--yy-calm-info-bg);
+    border-left: 4px solid var(--yy-calm-olive);
+    border-radius: var(--yy-ui-radius);
+    font-size: var(--yy-text-sm);
     line-height: 1.65;
 }
 
@@ -97,16 +99,16 @@
     display: inline-block;
     margin-bottom: 8px;
     padding: 3px 9px;
-    color: var(--yy-surface);
-    background: var(--yy-red);
+    color: var(--yy-calm-surface);
+    background: var(--yy-calm-accent);
     border-radius: 999px;
-    font-size: 12px;
+    font-size: var(--yy-text-sm);
     font-weight: 700;
 }
 
 .scenario-quiz-question h3 {
     margin: 0;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
     font-size: 21px;
     font-weight: 700;
     line-height: 1.55;
@@ -123,10 +125,10 @@
     gap: 14px;
     width: 100%;
     padding: 15px 17px;
-    color: var(--yy-ink);
-    background: var(--yy-surface);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    color: var(--yy-calm-text);
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     text-align: left;
     transition:
         border-color .15s ease,
@@ -136,8 +138,8 @@
 
 @media (hover: hover) and (pointer: fine) {
   .scenario-quiz-option:hover:not(:disabled) {
-      border-color: var(--yy-gold);
-      background: var(--yy-warning-bg);
+      border-color: var(--yy-calm-olive);
+      background: var(--yy-calm-warning-bg);
       transform: translateY(-1px);
   }
 }
@@ -147,7 +149,7 @@
 }
 
 .scenario-quiz-option:focus-visible {
-    outline: 3px solid rgba(158, 27, 36, .18);
+    outline: var(--yy-ui-focus-ring);
     outline-offset: 2px;
 }
 
@@ -157,13 +159,13 @@
 }
 
 .scenario-quiz-option.correct {
-    border-color: var(--yy-success);
-    background: var(--yy-success-bg);
+    border-color: var(--yy-calm-success);
+    background: var(--yy-calm-success-bg);
 }
 
 .scenario-quiz-option.incorrect {
-    border-color: var(--yy-danger);
-    background: var(--yy-danger-bg);
+    border-color: var(--yy-calm-danger);
+    background: var(--yy-calm-danger-bg);
 }
 
 .scenario-quiz-option-label {
@@ -172,22 +174,22 @@
     width: 34px;
     height: 34px;
     place-items: center;
-    color: var(--yy-surface);
-    background: var(--yy-red);
-    border: var(--yy-border-width) solid var(--yy-ink);
+    color: var(--yy-calm-surface);
+    background: var(--yy-calm-accent);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: 50%;
     font-size: 14px;
     font-weight: 750;
 }
 
 .scenario-quiz-option.correct .scenario-quiz-option-label {
-    color: var(--yy-surface);
-    background: var(--yy-success);
+    color: var(--yy-calm-surface);
+    background: var(--yy-calm-success);
 }
 
 .scenario-quiz-option.incorrect .scenario-quiz-option-label {
-    color: var(--yy-surface);
-    background: var(--yy-danger);
+    color: var(--yy-calm-surface);
+    background: var(--yy-calm-danger);
 }
 
 .scenario-quiz-option-copy {
@@ -205,8 +207,8 @@
 }
 
 .scenario-quiz-option-copy small {
-    color: var(--yy-text-muted);
-    font-size: 13px;
+    color: var(--yy-calm-text-sub);
+    font-size: var(--yy-text-sm);
     line-height: 1.4;
 }
 
@@ -215,11 +217,11 @@
 }
 
 .scenario-quiz-option.correct .scenario-quiz-option-result {
-    color: var(--yy-success);
+    color: var(--yy-calm-success);
 }
 
 .scenario-quiz-option.incorrect .scenario-quiz-option-result {
-    color: var(--yy-danger);
+    color: var(--yy-calm-danger);
 }
 
 .scenario-quiz-feedback {
@@ -228,18 +230,18 @@
     gap: 10px;
     margin-top: 18px;
     padding: 13px 15px;
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
 }
 
 .scenario-quiz-feedback.correct {
-    color: var(--yy-success);
-    background: var(--yy-success-bg);
+    color: var(--yy-calm-success);
+    background: var(--yy-calm-success-bg);
 }
 
 .scenario-quiz-feedback.incorrect {
-    color: var(--yy-danger);
-    background: var(--yy-danger-bg);
+    color: var(--yy-calm-danger);
+    background: var(--yy-calm-danger-bg);
 }
 
 .scenario-quiz-feedback svg {
@@ -258,7 +260,7 @@
 }
 
 .scenario-quiz-feedback span {
-    font-size: 13px;
+    font-size: var(--yy-text-sm);
 }
 
 .scenario-quiz-navigation {
@@ -269,20 +271,22 @@
 
 .scenario-quiz-navigation .btn {
     min-width: 120px;
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
-    background: var(--yy-red);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-accent);
     font-weight: 700;
 }
 
-.scenario-quiz-navigation .btn:hover:not(:disabled) {
-    border-color: var(--yy-ink);
-    background: var(--yy-red-dark);
+@media (hover: hover) and (pointer: fine) {
+  .scenario-quiz-navigation .btn:hover:not(:disabled) {
+      border-color: var(--yy-calm-text);
+      background: var(--yy-calm-accent);
+  }
 }
 
 .scenario-quiz-navigation .btn:disabled {
-    border-color: var(--yy-border-soft);
-    background: var(--yy-border-soft);
+    border-color: var(--yy-calm-rule);
+    background: var(--yy-calm-rule);
     box-shadow: none;
 }
 
@@ -293,7 +297,7 @@
     align-items: center;
     justify-content: center;
     gap: 13px;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
 }
 
 .scenario-quiz-summary,
@@ -312,16 +316,16 @@
     height: 76px;
     margin-bottom: 17px;
     place-items: center;
-    color: var(--yy-success);
-    background: var(--yy-success-bg);
-    border: var(--yy-border-width) solid var(--yy-ink);
+    color: var(--yy-calm-success);
+    background: var(--yy-calm-success-bg);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: 50%;
 }
 
 .scenario-quiz-summary h2,
 .scenario-quiz-state-card h2 {
     margin: 6px 0 10px;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
     font-size: 26px;
     font-weight: 900;
 }
@@ -329,11 +333,11 @@
 .scenario-quiz-summary > p:not(.scenario-quiz-eyebrow),
 .scenario-quiz-state-card > p {
     margin: 0;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
 }
 
 .scenario-quiz-summary > p strong {
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
 }
 
 .scenario-quiz-summary-actions,
@@ -349,8 +353,8 @@
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     font-weight: 700;
 }
 
@@ -380,7 +384,7 @@
     }
 
     .scenario-quiz-progress-header {
-        font-size: 12px;
+        font-size: var(--yy-text-sm);
     }
 
     .scenario-quiz-summary-actions,

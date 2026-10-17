@@ -12,9 +12,9 @@
     padding: clamp(20px, 3vw, 32px);
     box-sizing: border-box;
 
-    background: var(--yy-cream-dim);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-card);
+    background: var(--yy-calm-info-bg);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
 }
 
 .panel-subtitle {
@@ -22,7 +22,7 @@
     font-size: 20px;
     font-weight: 900;
     text-align: center;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .level-selection {
@@ -38,14 +38,14 @@
     flex: 0 1 190px;
     padding: 18px 12px 14px;
 
-    background: var(--yy-surface);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-card);
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
 
     display: flex;
     flex-direction: column;
     align-items: center;
-    transition: transform .15s ease, box-shadow .15s ease;
+    transition: transform .15s ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -70,49 +70,49 @@
     width: 72px;
     height: 72px;
     border-radius: 50%;
-    border: var(--yy-border-width) solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: var(--yy-font-pixel);
+    font-family: var(--yy-font-body);
     font-size: 1.6rem;
     font-weight: 700;
-    color: var(--yy-cream);
+    color: var(--yy-calm-info-bg);
 }
 
 .level-1 .level-icon-text {
-    background-color: var(--yy-red);
+    background-color: var(--yy-calm-accent);
 }
 
 .level-2 .level-icon-text {
-    background-color: var(--yy-green);
+    background-color: var(--yy-calm-success);
 }
 
 .level-3 .level-icon-text {
-    background-color: var(--yy-gold);
-    color: var(--yy-ink);
+    background-color: var(--yy-calm-olive);
+    color: var(--yy-calm-text);
 }
 
 .level-4 .level-icon-text {
-    background-color: var(--yy-blue);
+    background-color: var(--yy-calm-accent);
 }
 
 .level-5 .level-icon-text {
-    background-color: var(--yy-blue-light);
+    background-color: var(--yy-calm-copper);
 }
 
 .level-card-title {
     margin: 14px 0 7px;
     font-size: 1.2rem;
     font-weight: 900;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
     text-align: center;
 }
 
 .level-card-info {
     flex: 1;
-    font-size: 0.85rem;
-    color: var(--yy-text-tertiary);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
     text-align: center;
     margin-bottom: 14px;
     display: flex;
@@ -123,8 +123,8 @@
 .level-type-label {
     display: inline-block;
     padding: 2px 8px;
-    color: var(--yy-red);
-    border: 1px solid var(--yy-red);
+    color: var(--yy-calm-accent);
+    border: 1px solid var(--yy-calm-accent);
     border-radius: 3px;
     font-weight: 700;
 }
@@ -134,19 +134,19 @@
     margin: 0 0 4px;
     padding: 9px 10px;
 
-    color: var(--yy-cream);
-    background: var(--yy-red);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    color: var(--yy-calm-info-bg);
+    background: var(--yy-calm-accent);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     font-weight: 700;
     cursor: pointer;
-    transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+    transition: transform .15s ease, background .15s ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .level-card-btn:hover {
-      color: var(--yy-cream);
-      background: var(--yy-red-dark);
+      color: var(--yy-calm-info-bg);
+      background: var(--yy-calm-accent);
   }
 }
 
@@ -162,8 +162,8 @@
 }
 
 .level-card.disabled .level-card-btn {
-    color: var(--yy-text-muted);
-    background: var(--yy-cream-dim);
+    color: var(--yy-calm-text-sub);
+    background: var(--yy-calm-info-bg);
 }
 
 .scenario-entry {
@@ -175,15 +175,15 @@
     margin: 28px auto 0;
     padding: 22px 24px;
 
-    background: var(--yy-blue);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-left: 10px solid var(--yy-gold);
-    border-radius: var(--yy-radius-card);
+    background: var(--yy-calm-accent);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-left: 10px solid var(--yy-calm-olive);
+    border-radius: var(--yy-ui-radius);
 }
 
 .scenario-entry h3 {
     margin: 8px 0 5px;
-    color: var(--yy-gold-light);
+    color: var(--yy-calm-tag);
     font-size: 19px;
     font-weight: 900;
 }
@@ -191,19 +191,19 @@
 .scenario-entry p {
     max-width: 680px;
     margin: 0;
-    color: var(--yy-cream);
-    font-size: 13px;
+    color: var(--yy-calm-info-bg);
+    font-size: var(--yy-text-sm);
     line-height: 1.7;
 }
 
 .scenario-entry-badge {
     display: inline-block;
     padding: 4px 9px;
-    color: var(--yy-ink);
-    background: var(--yy-gold);
-    border: var(--yy-border-width) solid var(--yy-ink);
+    color: var(--yy-calm-text);
+    background: var(--yy-calm-olive);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: 3px;
-    font-family: var(--yy-font-pixel);
+    font-family: var(--yy-font-body);
     font-size: 14px;
     font-weight: 700;
 }
@@ -211,19 +211,19 @@
 .scenario-entry-btn {
     flex: 0 0 auto;
     padding: 11px 16px;
-    color: var(--yy-cream);
-    background: var(--yy-red);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    color: var(--yy-calm-info-bg);
+    background: var(--yy-calm-accent);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     font-weight: 700;
     cursor: pointer;
-    transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+    transition: transform .15s ease, background .15s ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .scenario-entry-btn:hover {
-      color: var(--yy-cream);
-      background: var(--yy-red-dark);
+      color: var(--yy-calm-info-bg);
+      background: var(--yy-calm-accent);
   }
 }
 

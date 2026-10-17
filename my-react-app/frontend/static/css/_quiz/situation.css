@@ -12,15 +12,15 @@
   margin: 0 0 24px;
   padding: 9px 16px;
 
-  font-family: var(--yy-font-pixel);
+  font-family: var(--yy-font-body);
   font-size: clamp(16px, 2vw, 22px);
   font-weight: 700;
   letter-spacing: .04em;
-  color: var(--yy-cream);
+  color: var(--yy-calm-info-bg);
 
-  background: var(--yy-red);
-  border: var(--yy-border-width) solid var(--yy-ink);
-  border-radius: var(--yy-radius-btn);
+  background: var(--yy-calm-accent);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-ui-radius);
   width: fit-content;
 }
 
@@ -59,10 +59,10 @@
   text-align: center;
   font-size: 18px;
   font-weight: 600;
-  color: var(--yy-text-secondary);
-  border: var(--yy-border-width) dashed var(--yy-ink);
-  border-radius: var(--yy-radius-card);
-  background-color: var(--yy-cream-dim);
+  color: var(--yy-calm-text-sub);
+  border: var(--yy-border-width) dashed var(--yy-calm-text);
+  border-radius: var(--yy-ui-radius);
+  background-color: var(--yy-calm-info-bg);
 }
 
 

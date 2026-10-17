@@ -6,9 +6,9 @@
     margin: 0;
 
     overflow: hidden;
-    background: var(--yy-surface);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-card);
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
 }
 
 .bar-title {
@@ -18,13 +18,13 @@
     margin: 0;
     padding: 0 16px;
 
-    font-family: var(--yy-font-pixel);
+    font-family: var(--yy-font-body);
     font-size: 15px;
     font-weight: 700;
-    color: var(--yy-gold);
+    color: var(--yy-calm-olive);
 
-    background: var(--yy-blue);
-    border-bottom: 3px solid var(--yy-ink);
+    background: var(--yy-calm-accent);
+    border-bottom: 3px solid var(--yy-calm-line);
 }
 
 .bar-items {
@@ -44,9 +44,9 @@
     height: auto;
     padding: 12px 14px;
 
-    background: var(--yy-surface);
+    background: var(--yy-calm-surface);
     border: 0;
-    border-bottom: 2px solid var(--yy-ink);
+    border-bottom: 2px solid var(--yy-calm-line);
     cursor: pointer;
     transition: transform .15s ease, background .15s ease;
 }
@@ -68,22 +68,23 @@
     font-size: 15px;
     line-height: 1.45;
     font-weight: 700;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
 }
 
 .bar-item.active {
-    background: var(--yy-gold-light);
-    box-shadow: inset 7px 0 0 var(--yy-red);
+    background: var(--yy-calm-tag);
+    border-left: 7px solid var(--yy-calm-accent);
+    padding-left: 7px;
 }
 
 .bar-item.active .bar-item-label {
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .bar-item:hover {
       transform: translateX(3px);
-      background: var(--yy-cream);
+      background: var(--yy-calm-info-bg);
   }
 }
 
@@ -93,7 +94,7 @@
 
 .func-hint {
     display: none;
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
 }
 
 .func-hint.active {
@@ -116,12 +117,12 @@
     align-items: center;
     justify-content: center;
 
-    color: var(--yy-red);
-    background: var(--yy-gold);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    color: var(--yy-calm-accent);
+    background: var(--yy-calm-olive);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     cursor: pointer;
-    transition: transform .15s ease, box-shadow .15s ease;
+    transition: transform .15s ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -142,9 +143,9 @@
     height: 22px;
     padding: 2px;
 
-    color: var(--yy-gold);
-    background: var(--yy-red);
-    border: var(--yy-border-width) solid var(--yy-ink);
+    color: var(--yy-calm-olive);
+    background: var(--yy-calm-accent);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: 3px;
     display: flex;
     align-items: center;
@@ -159,9 +160,9 @@
     width: 210px;
     padding: 16px;
 
-    background: var(--yy-surface);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-card);
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
 }
 
 .mobile-menu-header {
@@ -170,15 +171,15 @@
     align-items: center;
     margin-bottom: 10px;
     padding-bottom: 10px;
-    color: var(--yy-ink);
-    border-bottom: 3px solid var(--yy-gold);
-    font-family: var(--yy-font-pixel);
+    color: var(--yy-calm-text);
+    border-bottom: 3px solid var(--yy-calm-olive);
+    font-family: var(--yy-font-body);
     font-size: 14px;
 }
 
 .mobile-closeBtn {
     padding: 3px;
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
     background: transparent;
     border: 0;
     cursor: pointer;
@@ -202,25 +203,27 @@
     gap: 12px;
     padding: 10px;
     border: var(--yy-border-width) solid transparent;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-ui-radius);
     cursor: pointer;
     transition: background .2s ease, border-color .2s ease;
 }
 
 .mobile-menu-item[aria-current="page"] {
-    color: var(--yy-red);
-    background: var(--yy-gold-light);
-    border-color: var(--yy-ink);
+    color: var(--yy-calm-accent);
+    background: var(--yy-calm-tag);
+    border-color: var(--yy-calm-text);
 }
 
 .mobile-menu-item:active {
     transform: scale(0.97);
 }
 
-.mobile-menu-item:hover {
-    color: var(--yy-red);
-    background: var(--yy-cream);
-    border-color: var(--yy-ink);
+@media (hover: hover) and (pointer: fine) {
+  .mobile-menu-item:hover {
+      color: var(--yy-calm-accent);
+      background: var(--yy-calm-info-bg);
+      border-color: var(--yy-calm-text);
+  }
 }
 
 @media (max-width: 900px) {

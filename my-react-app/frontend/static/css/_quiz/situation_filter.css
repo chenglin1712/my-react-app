@@ -12,60 +12,64 @@
 
 .filter-mode-btn {
   padding: 4px 12px;
-  font-size: 13px;
+  font-size: var(--yy-text-sm);
   font-weight: bold;
-  border: var(--yy-border-width) solid var(--yy-ink);
-  border-radius: var(--yy-radius-btn);
-  background-color: var(--yy-surface);
-  color: var(--yy-ink);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-ui-radius);
+  background-color: var(--yy-calm-surface);
+  color: var(--yy-calm-text);
   min-width: auto;
 }
 
-.filter-mode-btn:hover {
-  background-color: var(--yy-cream);
+@media (hover: hover) and (pointer: fine) {
+  .filter-mode-btn:hover {
+    background-color: var(--yy-calm-info-bg);
+  }
 }
 
 .filter-mode-btn.active {
-  background-color: var(--yy-red);
-  border-color: var(--yy-ink);
-  color: var(--yy-surface);
+  background-color: var(--yy-calm-accent);
+  border-color: var(--yy-calm-text);
+  color: var(--yy-calm-surface);
 }
 
 .filter-date-input {
   padding: 6px 10px;
   font-size: 14px;
-  border: var(--yy-border-width) solid var(--yy-ink);
-  border-radius: var(--yy-radius-btn);
-  background-color: var(--yy-surface);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-ui-radius);
+  background-color: var(--yy-calm-surface);
   transition: var(--transition-interactive);
 }
 
 .filter-date-input:focus {
   outline: none;
-  border-color: var(--yy-gold);
+  border-color: var(--yy-calm-olive);
 }
 
 .filter-date-input:disabled {
-  background-color: var(--yy-cream-dim);
-  color: var(--yy-text-muted);
+  background-color: var(--yy-calm-info-bg);
+  color: var(--yy-calm-text-sub);
   cursor: not-allowed;
-  border-color: var(--yy-border-soft);
+  border-color: var(--yy-calm-rule);
 }
 
 .filter-select {
   padding: 6px 10px;
   font-size: 14px;
-  border: var(--yy-border-width) solid var(--yy-ink);
-  border-radius: var(--yy-radius-btn);
-  background-color: var(--yy-surface);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-ui-radius);
+  background-color: var(--yy-calm-surface);
   cursor: pointer;
 }
 
-.filter-select:hover {
-  background-color: var(--yy-cream);
+@media (hover: hover) and (pointer: fine) {
+  .filter-select:hover {
+    background-color: var(--yy-calm-info-bg);
+  }
 }
 
 .filter-select:focus {
   outline: none;
-  border-color: var(--yy-gold);
+  border-color: var(--yy-calm-olive);
 }

@@ -24,9 +24,9 @@
   flex-direction: column;
   align-items: center;
 
-  background: var(--yy-surface);
-  border: var(--yy-border-width) solid var(--yy-ink);
-  border-radius: var(--yy-radius-card);
+  background: var(--yy-calm-surface);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-ui-radius);
 }
 
 .recommon-progress {
@@ -34,35 +34,35 @@
   align-self: stretch;
   height: 12px;
   margin-bottom: 16px;
-  background: var(--yy-cream-dim);
-  border: var(--yy-border-width) solid var(--yy-ink);
+  background: var(--yy-calm-info-bg);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
   border-radius: 999px;
   overflow: hidden;
 }
 
 .recommon-progress-fill {
   height: 100%;
-  background: var(--yy-green);
+  background: var(--yy-calm-success);
   transition: width .5s ease;
 }
 
 .recommon-step-label {
   font-size: 14px;
-  color: var(--yy-text-secondary);
+  color: var(--yy-calm-text-sub);
   margin-bottom: 8px;
   text-align: center;
 }
 
 .quiz-recommon-save-warning {
-  color: var(--yy-danger);
+  color: var(--yy-calm-danger);
   text-align: center;
   margin-bottom: 8px;
 }
 
 /* ---------------- 通用按鈕樣式 ---------------- */
 .custom-btn, .custom0-btn, .confirm-btn {
-  border: var(--yy-border-width) solid var(--yy-ink);
-  border-radius: var(--yy-radius-btn);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-ui-radius);
   font-weight: bold;
   cursor: pointer;
   padding: 10px 20px;
@@ -71,9 +71,9 @@
 
 /* ---------------- custom-btn ---------------- */
 .custom-btn {
-  background-color: white;
-  color: var(--yy-red);
-  border-color: var(--yy-red);
+  background-color: var(--yy-calm-surface);
+  color: var(--yy-calm-accent);
+  border-color: var(--yy-calm-accent);
   width: 100%;
   max-width: 200px;
 }
@@ -83,10 +83,12 @@
     touch-action: none;
 }
 
-.custom-btn:hover {
-  background-color: var(--yy-warning-bg);
-  color: var(--yy-ink);
-  border-color: var(--yy-gold);
+@media (hover: hover) and (pointer: fine) {
+  .custom-btn:hover {
+    background-color: var(--yy-calm-warning-bg);
+    color: var(--yy-calm-text);
+    border-color: var(--yy-calm-olive);
+  }
 }
 
 .custom-btn:active {
@@ -95,47 +97,51 @@
 
 /* 選中 / 正確 / 錯誤狀態 */
 .custom-btn.selected {
-  background: var(--yy-warning-bg);
-  color: var(--yy-ink);
-  border-color: var(--yy-gold);
+  background: var(--yy-calm-warning-bg);
+  color: var(--yy-calm-text);
+  border-color: var(--yy-calm-olive);
 }
 
 .custom-btn.correct {
-  background: var(--yy-success);
-  color: var(--yy-surface);
-  border-color: var(--yy-ink);
+  background: var(--yy-calm-success);
+  color: var(--yy-calm-surface);
+  border-color: var(--yy-calm-text);
 }
 
 .custom-btn.wrong {
-  background: var(--yy-danger);
-  color: var(--yy-surface);
-  border-color: var(--yy-ink);
+  background: var(--yy-calm-danger);
+  color: var(--yy-calm-surface);
+  border-color: var(--yy-calm-text);
 }
 
 /* ---------------- custom0-btn ---------------- */
 .custom0-btn {
-  background-color: white;
-  color: var(--yy-ink);
+  background-color: var(--yy-calm-surface);
+  color: var(--yy-calm-text);
   border-color: transparent;
   min-width: 200px;
 }
 
-.custom0-btn:hover {
-  background-color: var(--yy-warning-bg);
-  border-color: var(--yy-gold);
+@media (hover: hover) and (pointer: fine) {
+  .custom0-btn:hover {
+    background-color: var(--yy-calm-warning-bg);
+    border-color: var(--yy-calm-olive);
+  }
 }
 
 /* ---------------- confirm-btn ---------------- */
 .confirm-btn {
-  background-color: var(--yy-red);
-  color: white;
-  border-color: var(--yy-ink);
+  background-color: var(--yy-calm-accent);
+  color: var(--yy-calm-accent-on);
+  border-color: var(--yy-calm-text);
   min-width: 200px;
   padding: 10px 24px;
 }
 
-.confirm-btn:hover {
-  background-color: var(--yy-red-dark);
+@media (hover: hover) and (pointer: fine) {
+  .confirm-btn:hover {
+    background-color: var(--yy-calm-accent);
+  }
 }
 
 .confirm-btn:active {
@@ -143,10 +149,10 @@
 }
 
 .confirm-btn:disabled {
-  background: var(--yy-border-soft);
-  color: var(--yy-text-muted);
+  background: var(--yy-calm-rule);
+  color: var(--yy-calm-text-sub);
   cursor: not-allowed;
-  border-color: var(--yy-border-soft);
+  border-color: var(--yy-calm-rule);
   box-shadow: none;
 }
 .left,.right{

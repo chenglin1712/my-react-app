@@ -2,7 +2,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-ui-radius);
     margin-bottom: 16px;
     position: relative;
 }
@@ -12,22 +12,22 @@
     margin: 0;
     padding: 9px 16px;
 
-    font-family: var(--yy-font-pixel);
+    font-family: var(--yy-font-body);
     font-size: clamp(16px, 2vw, 22px);
     font-weight: 700;
     letter-spacing: .04em;
-    color: var(--yy-cream);
+    color: var(--yy-calm-info-bg);
 
-    background: var(--yy-red);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    background: var(--yy-calm-accent);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
 }
 
 .review-intro-btn {
-    background: var(--yy-surface);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
-    color: var(--yy-ink);
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    color: var(--yy-calm-text);
     padding: 6px 12px;
     display: flex;
     align-items: center;
@@ -36,16 +36,18 @@
     cursor: pointer;
 }
 
-.review-intro-btn:hover {
-    background: var(--yy-cream);
+@media (hover: hover) and (pointer: fine) {
+  .review-intro-btn:hover {
+      background: var(--yy-calm-info-bg);
+  }
 }
 
 .review-intro-box {
-    background: var(--yy-surface);
-    color: var(--yy-ink);
-    border: var(--yy-border-width) solid var(--yy-ink);
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-text);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     padding: 10px 14px;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-ui-radius);
     margin-top: 10px;
     position: absolute;
     top: 80%;
@@ -58,8 +60,10 @@
     word-wrap: break-word;
 }
 
-.review-header:hover .review-intro-box {
-    display: block;
+@media (hover: hover) and (pointer: fine) {
+  .review-header:hover .review-intro-box {
+      display: block;
+  }
 }
 
 .review-parts-title {
@@ -79,12 +83,12 @@
 
 .review-intro-box p {
     margin-top: 10px;
-    color: var(--yy-text-muted);
+    color: var(--yy-calm-text-sub);
     font-style: italic;
 }
 
 .review-hint {
-    font-size: 0.75rem;
+    font-size: var(--yy-text-sm);
     opacity: 0.7;
 }
 
@@ -98,15 +102,15 @@
     display: flex;
     justify-content: center;
     gap: 20px;
-    border-bottom: 2px solid var(--yy-ink);
+    border-bottom: 2px solid var(--yy-calm-line);
     padding-bottom: 5px;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
     font-weight: bold;
 }
 
 .nav-item {
     padding: 5px 10px;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-ui-radius);
     cursor: pointer;
     background: none;
     border: none;
@@ -114,12 +118,14 @@
     color: inherit;
 }
 
-.nav-item:hover {
-    background-color: var(--yy-cream);
+@media (hover: hover) and (pointer: fine) {
+  .nav-item:hover {
+      background-color: var(--yy-calm-info-bg);
+  }
 }
 
 .nav-item.active {
-    background-color: var(--yy-warning-bg);
+    background-color: var(--yy-calm-warning-bg);
 }
 
 .nav-item.disabled {
@@ -131,67 +137,69 @@
 .nav-item-badge {
     margin-left: 6px;
     padding: 1px 6px;
-    border-radius: var(--yy-radius-btn);
-    font-size: 12px;
-    background-color: var(--yy-blue);
-    color: var(--yy-surface);
+    border-radius: var(--yy-ui-radius);
+    font-size: var(--yy-text-sm);
+    background-color: var(--yy-calm-accent);
+    color: var(--yy-calm-surface);
     white-space: nowrap;
 }
 
 .review-table-container {
     margin: 10px;
     font-family: var(--yy-font-body);
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .review-table {
     width: 100%;
     border-collapse: collapse;
-    background-color: var(--yy-surface);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-card);
+    background-color: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     overflow: hidden;
 }
 
 .review-table thead {
-    background-color: var(--yy-cream-dim);
+    background-color: var(--yy-calm-info-bg);
 }
 
 .review-table th,
 .review-table td {
-    border: 1px solid var(--yy-border-soft);
+    border: 1px solid var(--yy-calm-rule);
     padding: 8px;
     text-align: center;
 }
 
 .review-table th {
     font-weight: bold;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .view-btn {
     padding: 6px 12px;
-    border: var(--yy-border-width) solid var(--yy-ink);
-    background: var(--yy-surface);
-    color: var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-text);
+    border-radius: var(--yy-ui-radius);
     font-weight: 600;
     cursor: pointer;
 }
 
-.view-btn:hover {
-    background: var(--yy-red);
-    border-color: var(--yy-ink);
-    color: var(--yy-surface);
+@media (hover: hover) and (pointer: fine) {
+  .view-btn:hover {
+      background: var(--yy-calm-accent);
+      border-color: var(--yy-calm-text);
+      color: var(--yy-calm-surface);
+  }
 }
 
 .score-good {
-    color: var(--yy-success);
+    color: var(--yy-calm-success);
     font-weight: bold;
 }
 
 .score-bad {
-    color: var(--yy-danger);
+    color: var(--yy-calm-danger);
     font-weight: bold;
 }
 
@@ -210,21 +218,23 @@
 }
 
 .back-btn {
-    background: var(--yy-surface);
-    border: var(--yy-border-width) solid var(--yy-ink);
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     padding: 6px 12px;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-ui-radius);
     cursor: pointer;
 }
 
 .review-quiz-header h3 {
     margin: 0;
     font-size: 20px;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
-.back-btn:hover {
-    background: var(--yy-cream);
+@media (hover: hover) and (pointer: fine) {
+  .back-btn:hover {
+      background: var(--yy-calm-info-bg);
+  }
 }
 
 .quiz-questions {
@@ -233,27 +243,27 @@
 
 .quiz-question-detail {
     flex: 1.5;
-    border: var(--yy-border-width) solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     padding: 12px;
-    border-radius: var(--yy-radius-card);
-    background: var(--yy-surface);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-surface);
 }
 
 .review-q {
-    background: var(--yy-surface);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-card);
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     padding: 16px 20px;
     height: 85%;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .review-q-btn {
     margin-top: 8px;
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
-    background: var(--yy-red);
-    color: var(--yy-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-accent);
+    color: var(--yy-calm-surface);
     font-weight: bold;
     transition: var(--transition-interactive);
     display: block;
@@ -262,8 +272,10 @@
     cursor: pointer;
 }
 
-.review-q-btn:hover {
-    background: var(--yy-red-dark);
+@media (hover: hover) and (pointer: fine) {
+  .review-q-btn:hover {
+      background: var(--yy-calm-accent);
+  }
 }
 
 .review-question-card {
@@ -277,15 +289,15 @@
     align-items: center;
     font-weight: bold;
     margin-bottom: 12px;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .icon-correct {
-    color: var(--yy-success);
+    color: var(--yy-calm-success);
 }
 
 .icon-wrong {
-    color: var(--yy-danger);
+    color: var(--yy-calm-danger);
 }
 
 .review-question-body .question-content {
@@ -295,9 +307,9 @@
 }
 
 .review-question-body .question-content .play-btn {
-    background: var(--yy-gold);
-    color: var(--yy-ink);
-    border: var(--yy-border-width) solid var(--yy-ink);
+    background: var(--yy-calm-olive);
+    color: var(--yy-calm-text);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     display: flex;
     align-items: center;
     transition: var(--transition-interactive);
@@ -307,8 +319,10 @@
     cursor: pointer;
 }
 
-.review-question-body .question-content .play-btn:hover {
-    background: var(--yy-gold-light);
+@media (hover: hover) and (pointer: fine) {
+  .review-question-body .question-content .play-btn:hover {
+      background: var(--yy-calm-tag);
+  }
 }
 
 .review-question-body .question-content p {
@@ -317,8 +331,8 @@
 }
 
 .review-question-body img {
-    border-radius: var(--yy-radius-btn);
-    border: var(--yy-border-width) solid var(--yy-ink);
+    border-radius: var(--yy-ui-radius);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
 }
 
 .answer-row {
@@ -339,7 +353,7 @@
 
 .review-divider {
     border: none;
-    border-top: 2px solid var(--yy-cream-dim);
+    border-top: 2px solid var(--yy-calm-info-bg);
     margin: 12px 0;
 }
 
@@ -358,12 +372,12 @@
 .option-img-wrapper {
     position: relative;
     border: var(--yy-border-width) solid transparent;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-ui-radius);
     padding: 2px;
 }
 
 .option-img-wrapper.user-choice {
-    border: var(--yy-border-width) solid var(--yy-gold);
+    border: var(--yy-border-width) solid var(--yy-calm-olive);
 }
 
 .option-img {
@@ -376,8 +390,8 @@
     position: absolute;
     top: 4px;
     left: 4px;
-    background: rgba(34, 24, 18, 0.75);
-    color: var(--yy-surface);
+    background: color-mix(in srgb, var(--yy-calm-block) 75%, transparent);
+    color: var(--yy-calm-surface);
     font-size: 14px;
     padding: 1px 4px;
     border-radius: 3px;
@@ -386,7 +400,7 @@
 .correct-tip {
     display: block;
     font-size: 16px;
-    color: var(--yy-success);
+    color: var(--yy-calm-success);
     margin-top: 4px;
     font-weight: bold;
     text-align: center;

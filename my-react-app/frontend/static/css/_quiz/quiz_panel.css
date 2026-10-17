@@ -11,7 +11,7 @@
 .load-title {
     font-size: 20px;
     font-weight: 700;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .panel-container {
@@ -20,21 +20,21 @@
 }
 
 .panel-quiz-container {
-    background-color: var(--yy-surface);
+    background-color: var(--yy-calm-surface);
     width: 80%;
     padding: 3%;
     margin: 0 auto;
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-card);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     overflow: hidden;
 }
 
 .panel-quiz-container button {
     padding: 8px 16px;
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
-    background: var(--yy-surface);
-    color: var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-text);
     min-width: fit-content;
     font-size: 18px;
     font-weight: 600;
@@ -42,22 +42,24 @@
     transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
-.panel-quiz-container button:hover {
-    background-color: var(--yy-red);
-    border-color: var(--yy-ink);
-    color: var(--yy-cream);
+@media (hover: hover) and (pointer: fine) {
+  .panel-quiz-container button:hover {
+      background-color: var(--yy-calm-accent);
+      border-color: var(--yy-calm-text);
+      color: var(--yy-calm-info-bg);
+  }
 }
 
 .panel-quiz-container button:disabled {
-    background-color: var(--yy-border-soft);
-    border-color: var(--yy-border-soft);
-    color: var(--yy-text-muted);
+    background-color: var(--yy-calm-rule);
+    border-color: var(--yy-calm-rule);
+    color: var(--yy-calm-text-sub);
     cursor: not-allowed;
 }
 
 .panel-quiz-container p {
     font-size: 16px;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
 }
 
 .panel-header {
@@ -65,12 +67,12 @@
     align-items: center;
     padding: 12px 20px;
     justify-content: space-between;
-    background: var(--yy-cream-dim);
-    border-bottom: 3px solid var(--yy-ink);
+    background: var(--yy-calm-info-bg);
+    border-bottom: 3px solid var(--yy-calm-line);
 }
 
 .panel-header h2 {
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
     margin: 0;
     font-size: 20px;
     font-weight: 900;
@@ -79,11 +81,11 @@
 }
 
 .panel-header button.exit-btn {
-    background-color: var(--yy-surface);
+    background-color: var(--yy-calm-surface);
 }
 
 .panel-header button.intro-btn {
-    background-color: var(--yy-surface);
+    background-color: var(--yy-calm-surface);
     display: flex;
     align-items: center;
     gap: 3px;
@@ -99,11 +101,11 @@
     top: 100%;
     left: 20%;
     transform: translateX(-50%);
-    background: var(--yy-surface);
-    color: var(--yy-ink);
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-text);
     padding: 10px 14px;
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     z-index: calc(var(--yy-z-sticky) + 1);
     font-size: 14px;
     width: 240px;
@@ -114,14 +116,14 @@
 .intro-box .parts-title {
     font-weight: bold;
     margin-bottom: 6px;
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
 }
 
 .question-container {
     padding: 16px;
-    background-color: var(--yy-cream-dim);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-card);
+    background-color: var(--yy-calm-info-bg);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     margin-bottom: 10px;
 }
 
@@ -134,7 +136,7 @@
 
 .title-container p {
     font-size: 18px;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
     margin: 0;
 }
 
@@ -155,7 +157,7 @@
 }
 
 .star {
-    fill: var(--yy-gold-mark);
+    fill: var(--yy-calm-warning);
 }
 
 /* 圖片載入前先用比例預留位置，載入後答案按鈕不會被推走造成點錯（審查項 P2-103） */
@@ -177,29 +179,32 @@ audio {
 .answers button {
     margin: 0 10px;
     padding: 8px 16px;
-    border: var(--yy-border-width) solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     font-size: 16px;
 }
 
 /* 選中原本是金色邊框，對米白底只有 1.87:1，反而比沒選的墨色框更淡（審查項 P1-7）。
    改成紅色粗框；是非題另外加勾勾，不只靠顏色分辨。 */
 .answers button.selected {
-    background-color: var(--yy-warning-bg);
-    color: var(--yy-ink);
-    border-color: var(--yy-red) !important;
-    box-shadow: inset 0 0 0 1px var(--yy-red);
+    background-color: var(--yy-calm-warning-bg);
+    color: var(--yy-calm-text);
+    border-color: var(--yy-calm-accent) !important;
+    outline: 1px solid var(--yy-calm-accent);
+    outline-offset: -4px;
 }
 
 .answers button.selected::before {
     content: "✓ ";
     font-weight: 900;
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
 }
 
-.answers button:hover {
-    border-color: var(--yy-gold);
-    background-color: var(--yy-warning-bg);
-    color: var(--yy-ink);
+@media (hover: hover) and (pointer: fine) {
+  .answers button:hover {
+      border-color: var(--yy-calm-olive);
+      background-color: var(--yy-calm-warning-bg);
+      color: var(--yy-calm-text);
+  }
 }
 
 .navigation-buttons {
@@ -212,21 +217,23 @@ audio {
 }
 
 .quiz-submit-error {
-    color: var(--yy-danger);
+    color: var(--yy-calm-danger);
     text-align: center;
     margin-top: 8px;
 }
 
 .submit-button {
-    background-color: var(--yy-red);
-    color: var(--yy-cream);
-    border-color: var(--yy-ink);
+    background-color: var(--yy-calm-accent);
+    color: var(--yy-calm-info-bg);
+    border-color: var(--yy-calm-text);
     margin-top: 10px;
 }
 
-.submit-button:hover {
-    background-color: var(--yy-red-dark) !important;
-    color: var(--yy-cream);
+@media (hover: hover) and (pointer: fine) {
+  .submit-button:hover {
+      background-color: var(--yy-calm-accent) !important;
+      color: var(--yy-calm-info-bg);
+  }
 }
 
 /* 三選一圖片題：用 grid 讓三張圖在窄螢幕等比縮小，不再被 .yy-page 的 overflow-x: clip
@@ -249,13 +256,13 @@ audio {
     font: inherit;
     position: relative;
     cursor: pointer;
-    border-radius: var(--yy-radius-card);
+    border-radius: var(--yy-ui-radius);
     overflow: hidden;
-    border: var(--yy-border-width) solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     min-width: 0;
     -webkit-user-select: none;
     user-select: none;
-    transition: box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, transform 0.16s ease-out;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.16s ease-out;
 }
 
 .quiz-image-box:active {
@@ -270,13 +277,16 @@ audio {
     display: block;
 }
 
-.quiz-image-box:hover {
+@media (hover: hover) and (pointer: fine) {
+  .quiz-image-box:hover {
+  }
 }
 
 .quiz-image-box.selected {
-    background-color: var(--yy-warning-bg);
-    border-color: var(--yy-red);
-    box-shadow: inset 0 0 0 1px var(--yy-red);
+    background-color: var(--yy-calm-warning-bg);
+    border-color: var(--yy-calm-accent);
+    outline: 1px solid var(--yy-calm-accent);
+    outline-offset: -4px;
 }
 
 .quiz-image-box.selected::after {
@@ -290,8 +300,8 @@ audio {
     align-items: center;
     justify-content: center;
     font-weight: 900;
-    color: var(--yy-surface);
-    background: var(--yy-red);
+    color: var(--yy-calm-surface);
+    background: var(--yy-calm-accent);
     border-radius: 50%;
 }
 
@@ -299,20 +309,20 @@ audio {
     position: absolute;
     top: 8px;
     left: 8px;
-    background-color: rgba(34, 24, 18, 0.75);
-    color: var(--yy-surface);
+    background-color: color-mix(in srgb, var(--yy-calm-block) 75%, transparent);
+    color: var(--yy-calm-surface);
     font-weight: bold;
     padding: 4px 8px;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-ui-radius);
     font-size: 16px;
 }
 
 .quiz-answers button {
-    background-color: var(--yy-surface);
-    border: var(--yy-border-width) solid var(--yy-ink);
+    background-color: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     padding: 8px 18px;
     font-size: 18px;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-ui-radius);
     cursor: pointer;
     transition: var(--transition-interactive);
     font-weight: bold;
@@ -326,7 +336,7 @@ audio {
 .match-board-title {
     display: flex;
     align-items: center;
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
     font-weight: bold;
     margin-bottom: 14px;
 }
@@ -346,31 +356,34 @@ audio {
 
 .match-btn {
     padding: 10px 14px;
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
-    background: var(--yy-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-surface);
     font-size: 16px;
     cursor: pointer;
     transition: var(--transition-interactive);
 }
 
-.match-btn:hover:not(:disabled) {
-    border-color: var(--yy-gold);
-    background-color: var(--yy-warning-bg) !important;
-    color: var(--yy-ink);
+@media (hover: hover) and (pointer: fine) {
+  .match-btn:hover:not(:disabled) {
+      border-color: var(--yy-calm-olive);
+      background-color: var(--yy-calm-warning-bg) !important;
+      color: var(--yy-calm-text);
+  }
 }
 
 .match-btn.selected {
-    border-color: var(--yy-red);
-    box-shadow: inset 0 0 0 1px var(--yy-red);
-    background-color: var(--yy-warning-bg);
-    color: var(--yy-ink);
+    border-color: var(--yy-calm-accent);
+    outline: 1px solid var(--yy-calm-accent);
+    outline-offset: -4px;
+    background-color: var(--yy-calm-warning-bg);
+    color: var(--yy-calm-text);
 }
 
 .match-btn.matched {
-    border-color: var(--yy-success);
-    background-color: var(--yy-success-bg);
-    color: var(--yy-success);
+    border-color: var(--yy-calm-success);
+    background-color: var(--yy-calm-success-bg);
+    color: var(--yy-calm-success);
 }
 
 .match-wrong-hint {
@@ -378,12 +391,12 @@ audio {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--yy-danger);
+    color: var(--yy-calm-danger);
     font-weight: 600;
 }
 
 .match-board-readonly .match-result-ok {
-    color: var(--yy-success);
+    color: var(--yy-calm-success);
     display: flex;
     align-items: center;
     gap: 6px;
@@ -391,7 +404,7 @@ audio {
 }
 
 .match-board-readonly .match-result-bad {
-    color: var(--yy-danger);
+    color: var(--yy-calm-danger);
     display: flex;
     align-items: center;
     gap: 6px;
@@ -413,7 +426,7 @@ audio {
 }
 
 .match-answer-arrow {
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
 }
 
 /* ---------------- 高級：閱讀填空 ---------------- */
@@ -424,7 +437,7 @@ audio {
 .cloze-board-title {
     display: flex;
     align-items: center;
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
     font-weight: bold;
     margin-bottom: 10px;
 }
@@ -432,21 +445,21 @@ audio {
 .cloze-passage {
     font-size: 18px;
     line-height: 1.8;
-    background: var(--yy-surface);
+    background: var(--yy-calm-surface);
     padding: 14px;
-    border-radius: var(--yy-radius-card);
-    border: var(--yy-border-width) solid var(--yy-ink);
+    border-radius: var(--yy-ui-radius);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
 }
 
 .cloze-blank {
     display: inline-block;
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
     font-weight: bold;
     margin: 0 2px;
 }
 
 .cloze-passage-ch {
-    color: var(--yy-text-muted);
+    color: var(--yy-calm-text-sub);
     font-size: 14px;
     margin: 6px 0 16px;
 }
@@ -462,25 +475,28 @@ audio {
     align-items: center;
     gap: 10px;
     padding: 10px 14px;
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
-    background: var(--yy-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-surface);
     font-size: 16px;
     text-align: left;
     cursor: pointer;
 }
 
-.cloze-option-btn:hover {
-    border-color: var(--yy-gold);
-    background-color: var(--yy-warning-bg);
-    color: var(--yy-ink);
+@media (hover: hover) and (pointer: fine) {
+  .cloze-option-btn:hover {
+      border-color: var(--yy-calm-olive);
+      background-color: var(--yy-calm-warning-bg);
+      color: var(--yy-calm-text);
+  }
 }
 
 .cloze-option-btn.selected {
-    border-color: var(--yy-red);
-    box-shadow: inset 0 0 0 1px var(--yy-red);
-    background-color: var(--yy-warning-bg);
-    color: var(--yy-ink);
+    border-color: var(--yy-calm-accent);
+    outline: 1px solid var(--yy-calm-accent);
+    outline-offset: -4px;
+    background-color: var(--yy-calm-warning-bg);
+    color: var(--yy-calm-text);
 }
 
 .cloze-option-label {
@@ -490,8 +506,8 @@ audio {
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    background: var(--yy-red);
-    color: var(--yy-surface);
+    background: var(--yy-calm-accent);
+    color: var(--yy-calm-surface);
     font-weight: bold;
     font-size: 14px;
 }
@@ -545,28 +561,28 @@ audio {
     gap: 6px;
     min-height: 44px;
     padding: 6px 16px;
-    background: var(--yy-surface);
-    color: var(--yy-ink);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-text);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     font-weight: 700;
     cursor: pointer;
     transition: var(--transition-interactive);
 }
 .quiz-audio-toggle.is-playing {
-    background: var(--yy-warning-bg);
-    border-color: var(--yy-gold);
+    background: var(--yy-calm-warning-bg);
+    border-color: var(--yy-calm-olive);
 }
 .quiz-audio-toggle:active {
     transform: scale(0.97);
 }
 .quiz-audio-error {
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
     font-size: 14px;
 }
 
 .match-rule {
     margin: 0 0 12px;
     font-size: 14px;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
 }
