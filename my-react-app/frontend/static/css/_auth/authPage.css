@@ -4,28 +4,19 @@
     justify-content: center;
 }
 
+/* 共用的 .yy-hero 頁首拼色圖樣與 .yy-card 在 theme-v2.css 仍是舊風格，登入頁範圍內覆蓋；彩色光暈整個拿掉 */
 .auth-blob {
-    position: absolute;
-    width: 220px;
-    height: 200px;
-    border-radius: 50%;
-    filter: blur(28px);
-    pointer-events: none;
+    display: none;
 }
 
-.auth-blob--gold {
-    left: 6%;
-    top: 10%;
-    background: radial-gradient(circle, var(--yy-gold-light), transparent 68%);
-    opacity: .5;
+.auth-hero.yy-hero::before {
+    display: none;
 }
 
-.auth-blob--blue {
-    right: 5%;
-    top: 8%;
-    background: radial-gradient(circle, var(--yy-blue), transparent 68%);
-    opacity: .32;
-    animation-direction: reverse;
+.auth-card.yy-card {
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
 }
 
 .auth-panel {

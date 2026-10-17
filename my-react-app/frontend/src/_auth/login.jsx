@@ -20,12 +20,7 @@ function AuthPage({ defaultView = "login" }) {
     return (
         <div className="yy-page auth-page">
             <section className="yy-hero auth-hero">
-                <span className="auth-blob auth-blob--gold" />
-                <span className="auth-blob auth-blob--blue" />
                 <div className="yy-fade-up auth-panel">
-                    <div className="auth-badge-row">
-                        <span className="yy-eyebrow">MEMBER</span>
-                    </div>
                     <div className="auth-tabswitch-row">
                         <TabSwitch
                             tabs={AUTH_TABS}

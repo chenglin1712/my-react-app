@@ -1,17 +1,19 @@
 .edit-container {
     max-width: 500px;
     margin: 40px auto;
-    background: var(--yy-surface);
+    background: var(--yy-calm-surface);
     padding: 32px;
-    border-radius: var(--yy-radius-card);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     font-family: var(--yy-font-body);
 }
 
 .edit-title {
-    font-size: 24px;
-    font-weight: 600;
+    font-family: var(--yy-font-heading);
+    font-size: var(--yy-text-2xl);
+    font-weight: 700;
     margin-bottom: 24px;
-    color: var(--yy-red);
+    color: var(--yy-calm-text);
     text-align: center;
 }
 
@@ -27,12 +29,13 @@
     overflow: hidden;
     position: relative;
     cursor: pointer;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    transition: box-shadow 0.3s;
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    box-sizing: border-box;
 }
 
-.avatar-uploader:hover {
-    box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+.avatar-uploader:focus-within {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
 }
 
 .avatar-image {
@@ -45,22 +48,29 @@
 .edit-overlay {
     position: absolute;
     inset: 0;
-    background-color: rgba(0, 0, 0, 0.45);
-    color: white;
+    background-color: color-mix(in srgb, var(--yy-calm-block) 75%, transparent);
+    color: var(--yy-calm-block-on);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     opacity: 0;
-    transition: opacity 0.3s ease;
-    font-size: 13px;
+    transition: opacity var(--dur-base) var(--ease-out);
+    font-size: var(--yy-text-sm);
     text-align: center;
     pointer-events: none;
 }
 
-.avatar-uploader:hover .edit-overlay {
+@media (hover: hover) and (pointer: fine) {
+    .avatar-uploader:hover .edit-overlay {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+
+/* 鍵盤聚焦到隱藏的檔案輸入框時，也要看得到「更換頭像」的提示 */
+.avatar-uploader:focus-within .edit-overlay {
     opacity: 1;
-    pointer-events: auto;
 }
 
 .edit-overlay svg {
@@ -77,51 +87,70 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
 }
 
-select,
-input {
+/* 只作用在個人資料頁（原本是全站的 select、input，lazy CSS 載入後不會卸載，會改到其他頁的欄位） */
+.edit-container select,
+.edit-container input {
     padding: 10px 12px;
-    border: 1px solid var(--yy-text-muted);
-    border-radius: var(--yy-radius-btn);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     font-size: 15px;
-    transition: border 0.2s ease;
+    transition: border-color var(--dur-fast) var(--ease-out);
 }
 
-input:focus,
-select:focus {
-    outline: none;
-    border-color: var(--yy-red);
+.edit-container input:focus,
+.edit-container select:focus {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+    border-color: var(--yy-calm-accent);
 }
 
 .edit-container button {
     flex: 1;
     padding: 10px;
-    border-radius: var(--yy-radius-btn);
+    min-height: var(--yy-control-md);
+    border-radius: var(--yy-ui-radius);
     font-size: 15px;
+    transition: transform 120ms var(--ease-out), background-color var(--dur-fast) var(--ease-out);
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .save-btn {
-    background-color: var(--yy-red);
-    color: white;
+    background-color: var(--yy-calm-accent);
+    color: var(--yy-calm-accent-on);
     border: none;
     gap: 6px;
 }
 
-.save-btn:hover {
-    background-color: var(--yy-red-dark);
+@media (hover: hover) and (pointer: fine) {
+    .save-btn:hover {
+        background-color: var(--yy-calm-text);
+        color: var(--yy-calm-bg);
+    }
 }
 
 .cancel-btn {
-    background-color: var(--yy-cream-dim);
-    border: 1px solid var(--yy-text-muted);
-    color: var(--yy-text-secondary);
+    background-color: var(--yy-calm-info-bg);
+    border: 1px solid var(--yy-calm-text-sub);
+    color: var(--yy-calm-text-sub);
 }
 
-.cancel-btn:hover {
-    background-color: var(--yy-cream-dim);
+@media (hover: hover) and (pointer: fine) {
+    .cancel-btn:hover {
+        background-color: var(--yy-calm-rule);
+    }
+}
+
+.edit-container button:active {
+    transform: scale(var(--yy-ui-press));
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .edit-container button:active {
+        transform: none;
+    }
 }

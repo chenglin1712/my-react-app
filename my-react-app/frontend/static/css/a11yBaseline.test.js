@@ -43,8 +43,6 @@ const rules = (css) => {
 
 // [檔案, 選擇器, 負責畫焦點外框的選擇器片段, 該規則所在的檔案（省略時是 default/theme-v2.css）]
 const OUTLINE_NONE_ALLOWLIST = [
-  ["_auth/editProfile.css", "input:focus, select:focus", ".edit-container input"],
-  ["_auth/forgotPassword.css", ".forgot-container input:focus", ".forgot-container input"],
   ["_auth/loginForm.css", ".loginForm .input-field", ".input-wrapper:focus-within"],
   ["_auth/registerForm.css", ".input-field", ".input-wrapper:focus-within"],
   ["_game/game_crossword_board.css", ".area-inputgrid", ".area-inputgrid:focus-visible", "_game/game_crossword_board.css"],

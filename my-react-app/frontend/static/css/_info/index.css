@@ -4,6 +4,13 @@
     padding: var(--yy-space-7) var(--yy-space-5) var(--yy-space-8);
 }
 
+/* 共用的 .yy-card 在 theme-v2.css 仍是舊風格，說明頁範圍內覆蓋 */
+.info-card.yy-card {
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+}
+
 .info-card {
     max-width: 760px;
     margin: 0 auto;
@@ -12,24 +19,25 @@
 
 .info-title {
     margin: 0 0 var(--yy-space-2);
+    font-family: var(--yy-font-heading);
     font-size: var(--yy-text-2xl);
-    font-weight: 900;
-    color: var(--yy-ink);
+    font-weight: 700;
+    color: var(--yy-calm-text);
 }
 
 .info-lead {
     margin: 0 0 var(--yy-space-5);
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
     line-height: var(--yy-leading-normal);
 }
 
 .info-draft {
     margin: 0 0 var(--yy-space-5);
     padding: var(--yy-space-3) var(--yy-space-4);
-    background: var(--yy-warning-bg);
-    border: var(--yy-border-width) solid var(--yy-border);
-    border-radius: var(--yy-radius-btn);
-    color: var(--yy-ink);
+    background: var(--yy-calm-warning-bg);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    color: var(--yy-calm-text);
     font-size: var(--yy-text-sm);
     line-height: var(--yy-leading-normal);
 }
@@ -40,9 +48,10 @@
 
 .info-heading {
     margin: 0 0 var(--yy-space-2);
+    font-family: var(--yy-font-heading);
     font-size: var(--yy-text-lg);
-    font-weight: 800;
-    color: var(--yy-ink);
+    font-weight: 700;
+    color: var(--yy-calm-text);
 }
 
 .info-section p,
@@ -50,7 +59,7 @@
     max-width: 62ch;
     font-size: var(--yy-text-base);
     line-height: var(--yy-leading-loose);
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
 }
 
 .info-section p {
@@ -63,7 +72,7 @@
 }
 
 .info-card a {
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
     font-weight: 700;
     text-underline-offset: 3px;
 }

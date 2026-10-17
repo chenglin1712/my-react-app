@@ -8,32 +8,32 @@
 }
 
 .auth-field .auth-field-label {
-    font-size: 13px;
+    font-size: var(--yy-text-sm);
     font-weight: 700;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .auth-field .auth-field-hint {
     margin: 0;
-    font-size: 13px;
-    color: var(--yy-text-tertiary);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
     text-align: left;
 }
 
 .auth-field .auth-field-error {
     margin: 0;
-    font-size: 13px;
+    font-size: var(--yy-text-sm);
     font-weight: 700;
-    color: var(--yy-danger);
+    color: var(--yy-calm-danger);
     text-align: left;
 }
 
 .auth-field .input-wrapper[data-invalid="true"] {
-    border-color: var(--yy-danger);
+    border-color: var(--yy-calm-danger);
 }
 
 /* 提示字色要夠深：原本 placeholder 是唯一的欄位說明且對比偏低 */
 .auth-field .input-field::placeholder {
-    color: var(--yy-text-muted);
+    color: var(--yy-calm-text-sub);
     opacity: 1;
 }

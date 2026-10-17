@@ -3,9 +3,10 @@
 }
 
 .formTitle {
-    font-size: 22px;
-    font-weight: 900;
-    color: var(--yy-ink);
+    font-family: var(--yy-font-heading);
+    font-size: var(--yy-text-xl);
+    font-weight: 700;
+    color: var(--yy-calm-text);
     margin-bottom: 22px;
     justify-self: center;
     display: flex;
@@ -26,9 +27,9 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    background: var(--yy-surface);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     padding: 10px 16px;
 }
 
@@ -37,81 +38,94 @@
     outline: none;
     background: transparent;
     flex: 1;
-    font-size: 14px;
+    min-width: 0;
+    font-size: 16px; /* 16px 以上 iOS 聚焦時才不會自動放大頁面 */
 }
 
 /* input-field 拿掉了瀏覽器預設的 outline（緊貼卡片圓角邊框，預設焦點框會被邊框
    蓋住/切角，視覺上很醜），但拿掉後鍵盤 Tab 移動時完全看不出焦點在哪一個欄位。
    改成欄位內任何一個子元素取得焦點時，在外層卡片本身畫出可見的焦點框。 */
 .loginForm .input-wrapper:focus-within {
-    outline: 3px solid var(--yy-red);
+    outline: 3px solid var(--yy-calm-accent);
     outline-offset: 2px;
 }
 
 .loginForm .icon {
-    color: var(--yy-text-muted);
+    color: var(--yy-calm-text-sub);
     flex-shrink: 0;
 }
 
 .forgot-pass {
     align-self: flex-end;
-    color: var(--yy-red);
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--yy-control-md);
+    color: var(--yy-calm-accent);
     text-decoration: none;
-    font-size: 13px;
+    font-size: var(--yy-text-sm);
     font-weight: 700;
     cursor: pointer;
 }
 
-.forgot-pass:hover {
-    text-decoration: underline;
+@media (hover: hover) and (pointer: fine) {
+  .forgot-pass:hover {
+      text-decoration: underline;
+  }
 }
 
 .login-button {
     padding: 14px;
-    background-color: var(--yy-red);
-    color: var(--yy-cream);
+    min-height: var(--yy-control-md);
+    background-color: var(--yy-calm-accent);
+    color: var(--yy-calm-accent-on);
     font-size: 15px;
     font-weight: 700;
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
-    transition: transform 0.15s ease, background 0.15s ease;
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    transition: transform 120ms var(--ease-out), background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
     width: 100%;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .login-button:hover:not(:disabled) {
-      background-color: var(--yy-red-dark);
+      background-color: var(--yy-calm-text);
+      color: var(--yy-calm-bg);
   }
 }
 
 .login-button:active:not(:disabled) {
-  transform: scale(0.97);
-  box-shadow: none;
+  transform: scale(var(--yy-ui-press));
 }
 
 /* 停用態（登入中）：文字與底色維持 3:1 以上，不是只靠透明度變淡 */
 .login-button:disabled {
-    background: var(--yy-text-muted);
-    color: var(--yy-surface);
-    box-shadow: none;
+    background: var(--yy-calm-text-sub);
+    color: var(--yy-calm-surface);
     cursor: not-allowed;
 }
 
 .login-box p {
     text-align: center;
-    font-size: 13px;
-    color: var(--yy-text-tertiary);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
     margin: 4px 0 0;
 }
 
 .login-box p a {
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
     font-weight: 700;
     text-decoration: none;
     margin-left: 4px;
 }
 
-.login-box p a:hover {
-    text-decoration: underline;
+@media (hover: hover) and (pointer: fine) {
+  .login-box p a:hover {
+      text-decoration: underline;
+  }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .login-button:active:not(:disabled) {
+    transform: none;
+  }
+}

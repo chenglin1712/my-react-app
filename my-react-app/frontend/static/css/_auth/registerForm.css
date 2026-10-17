@@ -15,15 +15,16 @@
 }
 
 .formTitle {
-    font-size: 22px;
-    font-weight: 900;
-    color: var(--yy-ink);
+    font-family: var(--yy-font-heading);
+    font-size: var(--yy-text-xl);
+    font-weight: 700;
+    color: var(--yy-calm-text);
     margin-bottom: 8px;
 }
 
 .register-subtitle {
-    font-size: 13px;
-    color: var(--yy-text-tertiary);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
     margin-bottom: 20px;
     font-weight: 600;
     display: flex;
@@ -35,7 +36,7 @@
     margin: 0;
     font-size: var(--yy-text-sm);
     line-height: var(--yy-leading-normal);
-    color: var(--yy-text-tertiary);
+    color: var(--yy-calm-text-sub);
     text-align: center;
 }
 
@@ -43,7 +44,7 @@
     display: inline-flex;
     align-items: center;
     min-height: var(--yy-control-md);
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
     font-weight: 700;
     text-underline-offset: 3px;
 }
@@ -63,17 +64,12 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    background: var(--yy-surface);
-    border-radius: var(--yy-radius-btn);
+    background: var(--yy-calm-surface);
+    border-radius: var(--yy-ui-radius);
     padding: 10px 16px;
     width: 100%;
-    border: var(--yy-border-width) solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     box-sizing: border-box;
-    transition: box-shadow 0.2s;
-}
-
-.input-wrapper:hover,
-.input-wrapper:focus-within {
 }
 
 /* 鍵盤聚焦要看得出來：只靠陰影位移太弱，跟登入表單一樣在外層畫出焦點框 */
@@ -83,7 +79,7 @@
 }
 
 .input-wrapper svg {
-    color: var(--yy-text-muted);
+    color: var(--yy-calm-text-sub);
     margin-right: 0;
     flex-shrink: 0;
 }
@@ -93,7 +89,8 @@
     outline: none;
     background: none;
     flex: 1;
-    font-size: 14px;
+    min-width: 0;
+    font-size: 16px; /* 16px 以上 iOS 聚焦時才不會自動放大頁面 */
     padding: 2px;
 }
 
@@ -109,16 +106,16 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 13px;
-    color: var(--yy-text-tertiary);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
 }
 
 .password-rule.valid svg {
-    color: var(--yy-green);
+    color: var(--yy-calm-success);
 }
 
 .password-rule.invalid svg {
-    color: var(--yy-text-muted);
+    color: var(--yy-calm-text-sub);
 }
 
 .password-rule-state {
@@ -127,57 +124,63 @@
 }
 
 .password-rule.valid .password-rule-state {
-    color: var(--yy-green);
+    color: var(--yy-calm-success);
 }
 
 .register-button {
-    background: var(--yy-red);
-    color: var(--yy-cream);
-    border: var(--yy-border-width) solid var(--yy-ink);
+    background: var(--yy-calm-accent);
+    color: var(--yy-calm-accent-on);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     padding: 14px;
+    min-height: var(--yy-control-md);
     font-size: 15px;
     font-weight: 700;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-ui-radius);
     cursor: pointer;
-    transition: transform 0.15s ease, background 0.15s ease;
+    transition: transform 120ms var(--ease-out), background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .register-button:hover:not(:disabled) {
-      background: var(--yy-red-dark);
+      background: var(--yy-calm-text);
+      color: var(--yy-calm-bg);
   }
 }
 
 .register-button:active:not(:disabled) {
-  transform: scale(0.97);
-  box-shadow: none;
+  transform: scale(var(--yy-ui-press));
 }
 
 /* 停用態：文字與底色維持 3:1 以上（原本 2.14:1，審查項 P2-18） */
 .register-button:disabled {
-    background: var(--yy-text-muted);
-    color: var(--yy-surface);
-    box-shadow: none;
+    background: var(--yy-calm-text-sub);
+    color: var(--yy-calm-surface);
     animation: none;
     cursor: not-allowed;
 }
 
 .register-box p {
-    font-size: 13px;
-    color: var(--yy-text-tertiary);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
     margin-top: 4px;
 }
 
 .register-box p a,
 .register-box p a[href] {
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
     font-weight: 700;
     text-decoration: none;
     margin-left: 4px;
-    transition: color 0.3s;
 }
 
-.register-box p a:hover {
-    text-decoration: underline;
+@media (hover: hover) and (pointer: fine) {
+  .register-box p a:hover {
+      text-decoration: underline;
+  }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .register-button:active:not(:disabled) {
+    transform: none;
+  }
+}
