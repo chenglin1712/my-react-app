@@ -229,11 +229,8 @@ a.news-text-item:focus-visible,
 .news-carousel .swiper-button-prev,
 .news-carousel .swiper-button-next {
     --swiper-navigation-size: 16px;
-    top: auto;
-    bottom: var(--yy-space-2);
     width: var(--yy-control-md);
     height: var(--yy-control-md);
-    margin-top: 0;
     color: var(--yy-calm-block-on);
     background: transparent;
     border: var(--yy-border-width) solid var(--yy-calm-block-on);
@@ -241,12 +238,23 @@ a.news-text-item:focus-visible,
     transition: transform 120ms var(--ease-out), background-color var(--dur-fast) var(--ease-out);
 }
 
-.news-carousel .swiper-button-prev {
+/* 位置相關屬性（top、bottom、left、right、margin-top）一律放在這三條。
+   Swiper 14 的 .swiper-horizontal .swiper-button-prev 優先序與一般規則相同、檔案順序又在後面，
+   會把箭頭拉回垂直置中靠兩側；多加一層 .swiper 提高優先序，箭頭才會落在說明區右下。 */
+.news-carousel.swiper .swiper-button-prev,
+.news-carousel.swiper .swiper-button-next {
+    top: auto;
+    bottom: var(--yy-space-2);
+    margin-top: 0;
+}
+
+.news-carousel.swiper .swiper-button-prev {
     left: auto;
     right: calc(var(--yy-control-md) + var(--yy-space-4));
 }
 
-.news-carousel .swiper-button-next {
+.news-carousel.swiper .swiper-button-next {
+    left: auto;
     right: var(--yy-space-2);
 }
 

@@ -18,6 +18,9 @@ vi.mock('../../components/_home/news', () => ({
 vi.mock('../../components/_home/calendar', () => ({
   default: (props) => <div data-testid="calendar-mock">{JSON.stringify(props)}</div>,
 }));
+vi.mock('../../components/_home/dateReminder', () => ({
+  default: () => <div data-testid="datereminder-mock" />,
+}));
 vi.mock('../../components/_home/functionBtn', () => ({
   default: (props) => <div data-testid="functionbtn-mock">{JSON.stringify(props)}</div>,
 }));
@@ -406,7 +409,7 @@ describe('首頁 · 報頭與跑馬燈（S6-1，讀後台公開設定）', () =>
     expect(document.querySelector('.home-mast__tagline')).toHaveTextContent('讓語言回家');
   });
 
-  test('跑馬燈在報頭之前、兩者都在首頁最上方（宣傳區之前）', async () => {
+  test('跑馬燈在報頭之前、兩者都在首頁最上方（第一屏區塊之前）', async () => {
     mockFetchOk([], MASTHEAD_CONFIG);
     renderHome();
     await screen.findByRole('region', { name: '跑馬燈' });
@@ -414,7 +417,8 @@ describe('首頁 · 報頭與跑馬燈（S6-1，讀後台公開設定）', () =>
     const order = [...page.children].map((el) => el.className);
     expect(order[0]).toContain('home-ticker');
     expect(order[1]).toContain('home-mast');
-    expect(order[2]).toContain('home-hero');
+    expect(order[2]).toContain('home-first');
+    expect(order[3]).toContain('home-hero');
   });
 
   test('開關關閉時不輸出（即使資料裡還有內容）', async () => {
@@ -481,7 +485,8 @@ describe('首頁 · 宣傳影片（S6-2，讀後台公開設定）', () => {
     expect(screen.getByRole('heading', { level: 2, name: '認識原語' })).toBeInTheDocument();
     const order = [...document.querySelector('.homepage').children].map((el) => el.className);
     expect(order[0]).toContain('home-mast');
-    expect(order[1]).toContain('home-promo');
+    expect(order[1]).toContain('home-first');
+    expect(document.querySelector('.home-first > .home-promo')).not.toBeNull();
     expect(order[2]).toContain('home-hero');
   });
 
@@ -491,5 +496,83 @@ describe('首頁 · 宣傳影片（S6-2，讀後台公開設定）', () => {
     expect(await screen.findByText('影片目前無法播放。')).toBeInTheDocument();
     expect(screen.getByText('逐字稿內容')).toBeInTheDocument();
     expect(document.querySelector('video')).toBeNull();
+  });
+});
+
+describe('首頁 · 第一屏（S6-4：影片、活動消息、族語認證公告並排）', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const PROMO = {
+    id: 3, title: '認識原語', description: '', transcript: '',
+    video_url: '/media/homepage/video/a.mp4', cover_url: '/media/homepage/cover/a.webp',
+    caption_url: null, duration_seconds: 412, available: true,
+  };
+  const cols = () => document.querySelector('.home-first')?.style.getPropertyValue('--home-first-cols');
+
+  test('三塊都有：影片、消息、公告在同一層，欄寬比 5:4:3，都在主視覺之前', async () => {
+    mockFetchOk([activityAnnouncementItem, examAnnouncementItem], { ...DEFAULT_CONFIG, promo_video: PROMO });
+    renderHome();
+    await screen.findByTestId('news-mock');
+    const first = document.querySelector('.home-first');
+    expect(cols()).toBe('minmax(0, 5fr) minmax(0, 4fr) minmax(0, 3fr)');
+    expect(first.querySelector('.home-promo')).not.toBeNull();
+    expect(first.querySelector('[data-testid="news-mock"]')).not.toBeNull();
+    expect(first.querySelector('[data-testid="calendar-mock"]')).not.toBeNull();
+    const hero = document.querySelector('.home-hero');
+    expect(first.compareDocumentPosition(hero) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  test('沒有影片：消息與公告重新分配欄寬，不留空欄', async () => {
+    mockFetchOk([], DEFAULT_CONFIG);
+    renderHome();
+    await screen.findByTestId('news-mock');
+    expect(cols()).toBe('minmax(0, 4fr) minmax(0, 3fr)');
+  });
+
+  test('只開消息（公告關閉、沒有影片）：單欄', async () => {
+    mockFetchOk([], { ...DEFAULT_CONFIG, show_calendar_section: false });
+    renderHome();
+    await screen.findByTestId('news-mock');
+    expect(cols()).toBe('minmax(0, 4fr)');
+  });
+
+  test('影片、消息、公告全部沒有：不輸出第一屏這一層', async () => {
+    mockFetchOk([], { ...DEFAULT_CONFIG, show_news_section: false, show_calendar_section: false });
+    renderHome();
+    await screen.findByTestId('functionbtn-mock');
+    expect(document.querySelector('.home-first')).toBeNull();
+  });
+
+  test('消息載入失敗：第一屏只顯示那一欄的錯誤說明，公告與影片不受影響', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn((url) => {
+      if (url.includes('/adminapi/public/homepage-config/')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ ...DEFAULT_CONFIG, promo_video: PROMO }) });
+      }
+      return Promise.resolve({ ok: false, status: 500 });
+    }));
+    renderHome();
+    expect(await screen.findByText('目前無法載入最新消息，請稍後再試。')).toBeInTheDocument();
+    expect(document.querySelector('.home-first > .home-first__error')).not.toBeNull();
+    expect(screen.getByTestId('calendar-mock')).toBeInTheDocument();
+    await waitFor(() => expect(document.querySelector('.home-first > .home-promo')).not.toBeNull());
+  });
+
+  test('考試期程提醒（DateReminder）移到第一屏之外，跟公告共用同一個後台開關', async () => {
+    mockFetchOk([], DEFAULT_CONFIG);
+    renderHome();
+    await screen.findByTestId('news-mock');
+    expect(document.querySelector('.home-first [data-testid="datereminder-mock"]')).toBeNull();
+    expect(document.querySelector('.home-reminder [data-testid="datereminder-mock"]')).not.toBeNull();
+  });
+
+  test('show_calendar_section=false：公告與提醒一起不輸出', async () => {
+    mockFetchOk([], { ...DEFAULT_CONFIG, show_calendar_section: false });
+    renderHome();
+    await screen.findByTestId('news-mock');
+    expect(screen.queryByTestId('datereminder-mock')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('calendar-mock')).not.toBeInTheDocument();
   });
 });

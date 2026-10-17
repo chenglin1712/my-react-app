@@ -66,6 +66,17 @@ describe("最新消息樣式", () => {
     });
   });
 
+  it("箭頭取消垂直置中的規則要壓過 Swiper 的 .swiper-horizontal 規則（多一層 .swiper）", () => {
+    const place = find(".news-carousel.swiper .swiper-button-prev, .news-carousel.swiper .swiper-button-next");
+    expect(place.body).toMatch(/top:\s*auto/);
+    expect(place.body).toMatch(/bottom:\s*var\(--yy-space-2\)/);
+    expect(place.body).toMatch(/margin-top:\s*0/);
+    expect(find(".news-carousel.swiper .swiper-button-prev").body).toMatch(/right:\s*calc\(/);
+    expect(find(".news-carousel.swiper .swiper-button-next").body).toMatch(/right:\s*var\(--yy-space-2\)/);
+    // 位置屬性不能放在低優先序的規則裡，否則會被 Swiper 蓋掉
+    expect(find(".news-carousel .swiper-button-prev, .news-carousel .swiper-button-next").body).not.toMatch(/(?:^|[\s;])(?:top|bottom|left|right|margin-top):/);
+  });
+
   it("可按的元件按下有縮放回饋、有焦點框；減少動態時不縮放", () => {
     ["a.news-card:active", ".news-autoplay-toggle:active"].forEach((s) => expect(find(s).body, s).toMatch(/scale\(var\(--yy-ui-press\)\)/));
     expect(find(".news-autoplay-toggle:focus-visible").body).toMatch(/outline:\s*var\(--yy-ui-focus-ring\)/);

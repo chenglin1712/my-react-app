@@ -303,6 +303,77 @@
     color: var(--yy-text-muted);
 }
 
+/* ---------- 第一屏：影片、活動消息、族語認證公告 ---------- */
+
+.home-first {
+    display: grid;
+    align-items: start;
+    gap: var(--yy-space-6);
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: var(--yy-space-5) 56px;
+    width: 100%;
+}
+
+.home-first > * {
+    min-width: 0;
+}
+
+/* 三塊各自有獨立使用時的外距與內距，放進第一屏後由這一層統一管理 */
+.home-first .home-promo,
+.home-first .news-section,
+.home-first .exam-section {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* 欄比較窄，輪播與右側列表上下排 */
+.home-first .event-container {
+    flex-direction: column;
+    gap: var(--yy-space-4);
+}
+
+.home-first .event-left,
+.home-first .event-right {
+    flex: none;
+    width: 100%;
+}
+
+.home-first .news-card-grid {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.home-first__error {
+    margin: 0;
+    text-align: center;
+}
+
+@media (min-width: 1100px) {
+    .home-first {
+        grid-template-columns: var(--home-first-cols, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 720px) {
+    .home-first {
+        gap: var(--yy-space-5);
+        padding: var(--yy-space-4) 24px;
+    }
+}
+
+.home-reminder {
+    padding: var(--yy-space-5) 56px;
+    max-width: 1440px;
+    margin: 0 auto;
+}
+
+@media (max-width: 720px) {
+    .home-reminder {
+        padding: var(--yy-space-4) 24px;
+    }
+}
+
 @media (max-width: 720px) {
     .home-title {
         font-size: 32px;

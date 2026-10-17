@@ -2,6 +2,7 @@ import News from "../../components/_home/news"
 import FunctionBtn from "../../components/_home/functionBtn"
 import "../../static/css/_home/index.css"
 import CertificationSection from "../../components/_home/calendar"
+import DateReminder from "../../components/_home/dateReminder"
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from "../userServives/authContext";
@@ -189,13 +190,40 @@ const HomePage = () => {
 
     const { marqueeItems, tagline, quote } = pickMastheadContent(homepageConfig);
     const promoVideo = pickPromoVideo(homepageConfig.promo_video);
+    // 第一屏各欄的相對寬度（影片 5、消息 4、公告 3），沒有的區塊不佔欄
+    const firstScreenColumns = [
+        promoVideo ? 5 : 0,
+        homepageConfig.show_news_section ? 4 : 0,
+        homepageConfig.show_calendar_section ? 3 : 0,
+    ].filter(Boolean);
 
     return (
         <div className="yy-page homepage">
             {marqueeItems.length > 0 && <HomeTicker items={marqueeItems} />}
             <HomeMasthead quote={quote} tagline={tagline} />
-            {/* 有啟用中的影片才輸出；換影片或媒體路徑、可播放狀態有變，就整個重建播放狀態 */}
-            {promoVideo && <HomePromoVideo key={`${promoVideo.id}|${promoVideo.videoUrl}|${promoVideo.coverUrl}|${promoVideo.playable}`} video={promoVideo} />}
+
+            {/* 第一屏：宣傳影片、活動消息、族語認證公告並排（1100px 以上），較窄的螢幕直向堆疊。
+                欄寬比 5:4:3，缺的區塊不佔欄，剩下的重新分配；三塊都沒有就不輸出這一層。 */}
+            {firstScreenColumns.length > 0 && (
+                <div
+                    className="home-first"
+                    style={{ "--home-first-cols": firstScreenColumns.map((fr) => `minmax(0, ${fr}fr)`).join(" ") }}
+                >
+                    {/* 有啟用中的影片才輸出；換影片或媒體路徑、可播放狀態有變，就整個重建播放狀態 */}
+                    {promoVideo && <HomePromoVideo key={`${promoVideo.id}|${promoVideo.videoUrl}|${promoVideo.coverUrl}|${promoVideo.playable}`} video={promoVideo} />}
+                    {homepageConfig.show_news_section && (
+                        newsError ? (
+                            // 載入失敗只顯示錯誤說明，不再多渲染一個空的 News 區塊
+                            <p className="home-first__error yy-text-muted" role="status">
+                                目前無法載入最新消息，請稍後再試。
+                            </p>
+                        ) : (
+                            <News withImage={newsWithImage} withoutImage={newsWithoutImage} loading={newsLoading} />
+                        )
+                    )}
+                    {homepageConfig.show_calendar_section && <CertificationSection examInfo={examInfo} />}
+                </div>
+            )}
 
             <section className="yy-hero home-hero">
                 {/* 裝飾只留三個（兩團光暈與貼紙徽章）：原本約十個無限循環動畫會搶走標題與按鈕的注意力 */}
@@ -282,22 +310,13 @@ const HomePage = () => {
                     }} />
                 </RevealOnView>
             </div>
+            {/* 考試期程提醒：行事曆區塊的去留是決定 D5，先維持原樣放在下面，跟公告共用同一個後台開關 */}
             {homepageConfig.show_calendar_section && (
-                <RevealOnView><CertificationSection examInfo={examInfo} /></RevealOnView>
-            )}
-            {homepageConfig.show_news_section && (
-                <>
-                    {newsError ? (
-                        // 載入失敗只顯示錯誤說明，不再多渲染一個空的 News 區塊
-                        <p className="text-center yy-text-muted" role="status" style={{ margin: '1rem 0' }}>
-                            目前無法載入最新消息，請稍後再試。
-                        </p>
-                    ) : (
-                        <RevealOnView>
-                            <News withImage={newsWithImage} withoutImage={newsWithoutImage} loading={newsLoading} />
-                        </RevealOnView>
-                    )}
-                </>
+                <RevealOnView>
+                    <section className="home-reminder">
+                        <DateReminder />
+                    </section>
+                </RevealOnView>
             )}
         </div>
     );
