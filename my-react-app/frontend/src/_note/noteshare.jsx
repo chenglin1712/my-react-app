@@ -199,7 +199,6 @@ export default function NoteShare() {
   return (
     <div className="yy-page">
     <div className="note-hero yy-fade-up">
-      <span className="yy-eyebrow">NOTES</span>
       <h1 className="note-hero-title">筆記分享區</h1>
       <TabSwitch
         tabs={[{ key: "write", label: "✎ 寫筆記" }, { key: "share", label: "☺ 筆記分享區" }]}

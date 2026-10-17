@@ -70,11 +70,11 @@ describe("舊紅與寫死的品牌紅", () => {
 
   it("筆記頁的平行 token 改指向全站 token", () => {
     const note = frontCss.find(({ file }) => file.endsWith("_note/notestyle.css")).css;
-    expect(note).toMatch(/--brand-red:\s*var\(--yy-red\)/);
-    expect(note).toMatch(/--brand-red-600:\s*var\(--yy-red-dark\)/);
-    expect(note).toMatch(/--danger:\s*var\(--yy-danger\)/);
+    expect(note).toMatch(/--brand-red:\s*var\(--yy-calm-accent\)/);
+    expect(note).toMatch(/--brand-red-600:\s*var\(--yy-calm-accent\)/);
+    expect(note).toMatch(/--danger:\s*var\(--yy-calm-danger\)/);
     const share = frontCss.find(({ file }) => file.endsWith("_note/notesharestyle.css")).css;
-    expect(share).toMatch(/--rose-700:\s*var\(--yy-red\)/);
+    expect(share).toMatch(/--rose-700:\s*var\(--yy-calm-accent\)/);
   });
 
   it("測驗側欄與結果頁的圖示不再用寫死的 color 屬性", () => {

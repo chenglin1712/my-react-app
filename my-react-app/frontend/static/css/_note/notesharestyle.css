@@ -3,11 +3,10 @@
    =============================== */
 
 :root{
-  --rose-700: var(--yy-red);  /* 主色，指向全站 token（審查項 P2-11） */
-  --rose-50: var(--yy-danger-bg);         /* 淡底色 */
-  --text-main:var(--yy-red-dark);        /* 主要文字色 */
-  --border:var(--yy-border-soft);           /* 卡片邊框色 */
-  --shadow:0 4px 10px rgba(0,0,0,.06);
+  --rose-700: var(--yy-calm-accent);  /* 主色，指向全站 token（審查項 P2-11） */
+  --rose-50: var(--yy-calm-danger-bg);         /* 淡底色 */
+  --text-main:var(--yy-calm-accent);        /* 主要文字色 */
+  --border:var(--yy-calm-rule);           /* 卡片邊框色 */
 }
 
 .ns-wrap{padding:1.5rem 1rem;}
@@ -21,13 +20,13 @@
 
 /* 搜尋框 */
 .ns-search-group{display:flex; flex-direction:column; gap:.25rem;}
-.ns-search-hint{font-size:.75rem; color:var(--yy-text-muted); padding-left:.25rem;}
+.ns-search-hint{font-size:var(--yy-text-sm); color:var(--yy-calm-text-sub); padding-left:.25rem;}
 .ns-search{
   display:flex; align-items:center; gap:.5rem;
   border:1px solid var(--rose-700);
-  padding:.25rem 1rem; border-radius:999px; background:var(--yy-surface);
+  padding:.25rem 1rem; min-height:var(--yy-control-md); border-radius:var(--yy-ui-radius); background:var(--yy-calm-surface);
 }
-.ns-search-icon{color:var(--yy-text-muted);}
+.ns-search-icon{color:var(--yy-calm-text-sub);}
 .ns-search-input{
   border:none; outline:none; background:transparent;
   width:11rem;
@@ -40,17 +39,23 @@
 .ns-tabs{display:flex; align-items:center; gap:.5rem;}
 .ns-tab{
   border:1px solid var(--rose-700); color:var(--rose-700);
-  background:var(--yy-surface); padding:.5rem 1rem; border-radius:999px; transition:.2s;
+  background:var(--yy-calm-surface); padding:.5rem 1rem; min-height:var(--yy-control-md); border-radius:var(--yy-ui-radius);
+  transition:background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
 }
-.ns-tab.active{background:var(--rose-700); color:var(--yy-surface);}
+.ns-tab.active{background:var(--rose-700); color:var(--yy-calm-accent-on);}
+/* 目前分頁：除了反白，名稱前多一個勾 */
+.ns-tab.active::before{content:"\2713"; margin-right:var(--yy-space-1);}
 .ns-refresh{
   border:1px solid var(--rose-700); color:var(--rose-700);
-  background:var(--yy-surface); padding:.5rem .75rem; border-radius:999px; cursor:pointer;
+  background:var(--yy-calm-surface); padding:.5rem .75rem; min-width:var(--yy-control-md); min-height:var(--yy-control-md); border-radius:var(--yy-ui-radius); cursor:pointer;
+  transition:background-color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
 }
-.ns-refresh:hover{background:var(--yy-cream);}
+@media (hover: hover) and (pointer: fine) {
+  .ns-refresh:hover {background:var(--yy-calm-info-bg);}
+}
 
 /* ── 空狀態 ───────────────────────────────── */
-.ns-empty{ text-align:center; color:var(--yy-text-muted); margin-bottom:1rem; }
+.ns-empty{ text-align:center; color:var(--yy-calm-text-sub); margin-bottom:1rem; }
 
 /* ── Grid & Card ───────────────────────────── */
 .ns-grid{
@@ -66,10 +71,10 @@
 /* 卡片 */
 .ns-card{
   min-width:0; /* grid 項目預設 min-width:auto，會被超長內容撐開；這裡讓卡片可以比內容窄 */
-  background:rgba(255,245,247,.7);
+  background:var(--yy-calm-surface);
   border:1px solid var(--border);
-  border-radius:1rem; box-shadow:var(--shadow);
-  cursor:pointer; overflow:hidden; transition:box-shadow .2s, transform .2s;
+  border-radius:var(--yy-ui-radius);
+  cursor:pointer; overflow:hidden; transition:transform .2s;
 }
 @media (hover: hover) and (pointer: fine) {
   .ns-card:hover {transform:translateY(-1px);}
@@ -87,14 +92,14 @@
   padding:1.25rem 1.25rem 0 1.25rem;
 }
 .ns-avatar{
-  width:40px; height:40px; border-radius:999px; object-fit:cover; border:1px solid var(--yy-border-soft); flex:0 0 auto;
+  width:40px; height:40px; border-radius:999px; object-fit:cover; border:1px solid var(--yy-calm-rule); flex:0 0 auto;
 }
 .ns-avatar-fallback{
-  display:flex; align-items:center; justify-content:center; background:var(--yy-border-soft); color:var(--yy-surface);
+  display:flex; align-items:center; justify-content:center; background:var(--yy-calm-block); color:var(--yy-calm-block-on);
 }
 .ns-meta{flex:1;}
 .ns-username{color:var(--text-main); font-weight:600;}
-.ns-time{font-size:.78rem; color:var(--yy-text-muted); margin-top:.1rem;}
+.ns-time{font-size:var(--yy-text-sm); color:var(--yy-calm-text-sub); margin-top:.1rem;}
 .ns-edit{color:var(--rose-700); font-size:.9rem;}
 
 /* 卡片身 */
@@ -109,7 +114,7 @@
 
 /* 預覽（3行截斷的簡易作法，與實際內容高度搭配） */
 .ns-preview{
-  color:var(--yy-red); font-size:.95rem; max-height:4.2rem; overflow:hidden;
+  color:var(--yy-calm-accent); font-size:.95rem; max-height:4.2rem; overflow:hidden;
 }
 
 /* 讚列 */
@@ -131,8 +136,9 @@
 }
 .ns-pager-btns{ display:flex; gap:.75rem; }
 .ns-page-btn{
-  border:1px solid var(--yy-text-muted); background:var(--yy-surface); border-radius:999px;
-  padding:.5rem 1rem; cursor:pointer;
+  border:1px solid var(--yy-calm-text-sub); background:var(--yy-calm-surface); border-radius:var(--yy-ui-radius);
+  padding:.5rem 1rem; min-height:var(--yy-control-md); cursor:pointer;
+  transition:transform 120ms var(--ease-out);
 }
 .ns-page-btn:disabled{opacity:.5; cursor:not-allowed;}
 /* .ns-page-info{} */
@@ -140,18 +146,18 @@
 
 /* ── Modal ─────────────────────────────────── */
 .ns-modal-mask{
-  position:fixed; inset:0; background:rgba(0,0,0,.5);
+  position:fixed; inset:0; background:color-mix(in srgb, var(--yy-calm-block) 75%, transparent);
   display:flex; align-items:center; justify-content:center; z-index:var(--yy-z-overlay);
 }
 .ns-modal{
-  background:var(--yy-surface); width:95%; max-width:720px; max-height:90vh; max-height: 90dvh; overflow:auto;
-  border-radius:1rem; box-shadow:var(--shadow); padding:1.25rem 1.25rem 1rem;
+  background:var(--yy-calm-surface); width:95%; max-width:720px; max-height:90vh; max-height: 90dvh; overflow:auto;
+  border:var(--yy-border-width) solid var(--yy-calm-line); border-radius:var(--yy-ui-radius); padding:1.25rem 1.25rem 1rem;
 }
 .ns-modal-title{ font-size:1.25rem; font-weight:600; margin-bottom:.25rem; }
-.ns-modal-sub{ font-size:.9rem; color:var(--yy-text-tertiary); margin-bottom:.75rem; }
-.ns-modal-page{ border-top:1px solid var(--yy-border-soft); padding-top:.75rem; margin-bottom:1rem; }
-.ns-page-label{ font-size:.75rem; color:var(--yy-text-muted); margin-bottom:.25rem; }
-.ns-modal-empty{ color:var(--yy-text-tertiary); font-size:.95rem; margin:.5rem 0 1rem; }
+.ns-modal-sub{ font-size:.9rem; color:var(--yy-calm-text-sub); margin-bottom:.75rem; }
+.ns-modal-page{ border-top:1px solid var(--yy-calm-rule); padding-top:.75rem; margin-bottom:1rem; }
+.ns-page-label{ font-size:var(--yy-text-sm); color:var(--yy-calm-text-sub); margin-bottom:.25rem; }
+.ns-modal-empty{ color:var(--yy-calm-text-sub); font-size:.95rem; margin:.5rem 0 1rem; }
 .ns-modal-content{ font-size:.95rem; line-height:1.6; }
 
 /* Modal 底部按鈕 */
@@ -159,25 +165,30 @@
   display:flex; justify-content:flex-end; gap:.5rem; margin-top:.5rem;
 }
 .ns-btn{
-  background:var(--yy-cream-dim); border:none; border-radius:.5rem;
-  padding:.4rem .8rem; cursor:pointer;
+  background:var(--yy-calm-info-bg); border:none; border-radius:var(--yy-ui-radius);
+  padding:.4rem .8rem; min-height:var(--yy-control-md); cursor:pointer;
+  transition:background-color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
 }
-.ns-btn:hover{ background:var(--yy-border-soft); }
-.ns-btn.danger{ background:var(--yy-red); color:var(--yy-surface); }
-.ns-btn.danger:hover{ background:var(--yy-red); }
+@media (hover: hover) and (pointer: fine) {
+  .ns-btn:hover { background:var(--yy-calm-rule); }
+}
+.ns-btn.danger{ background:var(--yy-calm-accent); color:var(--yy-calm-accent-on); }
+@media (hover: hover) and (pointer: fine) {
+  .ns-btn.danger:hover { background:var(--yy-calm-text); color:var(--yy-calm-bg); }
+}
 
 /* 檢舉表單（NoteModal 內嵌，點「檢舉」展開） */
 .ns-report-form{
-  border-top:1px solid var(--yy-border-soft); margin-top:.75rem; padding-top:.75rem;
+  border-top:1px solid var(--yy-calm-rule); margin-top:.75rem; padding-top:.75rem;
 }
-.ns-report-title{ font-size:.9rem; font-weight:600; margin-bottom:.5rem; color:var(--yy-text-secondary); }
+.ns-report-title{ font-size:.9rem; font-weight:600; margin-bottom:.5rem; color:var(--yy-calm-text-sub); }
 .ns-report-option{
   display:flex; align-items:center; gap:.4rem; font-size:.9rem;
   padding:.3rem 0; cursor:pointer;
 }
 .ns-report-text{
-  width:100%; margin-top:.5rem; padding:.5rem; border:1px solid var(--yy-border-soft);
-  border-radius:.5rem; font:inherit; resize:vertical; box-sizing:border-box;
+  width:100%; margin-top:.5rem; padding:.5rem; border:1px solid var(--yy-calm-rule);
+  border-radius:var(--yy-ui-radius); font:inherit; resize:vertical; box-sizing:border-box;
 }
 .ns-report-actions{
   display:flex; justify-content:flex-end; gap:.5rem; margin-top:.6rem;
@@ -189,10 +200,10 @@
   left: 50%;
   bottom: 24px;
   transform: translateX(-50%);
-  background: rgba(0,0,0,.8);
-  color:var(--yy-surface);
+  background: var(--yy-calm-block);
+  color: var(--yy-calm-block-on);
   padding: .6rem .9rem;
-  border-radius: .5rem;
+  border-radius: var(--yy-ui-radius);
   font-size: .95rem;
   z-index: var(--yy-z-toast);
   animation: ns-fadein var(--dur-fast) var(--ease-out);
@@ -204,6 +215,25 @@
 
 /* 搜尋框外層：內部的 input 沒有外框，改在整個搜尋框畫焦點框（全站焦點基線見 theme-v2.css） */
 .ns-search:focus-within{
-  outline:3px solid var(--yy-red);
+  outline:3px solid var(--yy-calm-accent);
   outline-offset:2px;
+}
+
+.ns-tab:active,
+.ns-refresh:active,
+.ns-page-btn:active:not(:disabled),
+.ns-btn:active {
+  transform: scale(var(--yy-ui-press));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ns-tab:active,
+  .ns-refresh:active,
+  .ns-page-btn:active:not(:disabled),
+  .ns-btn:active { transform: none; }
+  .ns-toast { animation: none; }
+}
+
+@media (prefers-reduced-motion: reduce) and (hover: hover) and (pointer: fine) {
+  .ns-card:hover { transform: none; }
 }

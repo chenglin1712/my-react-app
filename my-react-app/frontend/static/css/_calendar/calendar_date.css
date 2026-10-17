@@ -5,8 +5,9 @@
     display: flex;
     gap: 24px;
     padding: 24px;
-    background-color: var(--yy-surface);
-    border-radius: var(--yy-radius-card);
+    background-color: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     font-family: var(--yy-font-body);
 }
 
@@ -22,7 +23,7 @@
 
 .calendar-right h2 {
     font-size: 18px;
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
     margin-bottom: 16px;
 }
 
@@ -33,19 +34,20 @@
 }
 
 .react-calendar__tile--now {
-    background: var(--yy-danger-bg) !important;
-    color: var(--yy-red) !important;
+    background: var(--yy-calm-danger-bg) !important;
+    color: var(--yy-calm-accent) !important;
     font-weight: bold !important;
+    text-decoration: underline;
 }
 
 .react-calendar__tile--active {
-    background: var(--yy-red) !important;
-    color: white !important;
+    background: var(--yy-calm-accent) !important;
+    color: var(--yy-calm-accent-on) !important;
 }
 
 .react-calendar__month-view__days button {
     min-width: 100% !important;
-    border-radius: var(--yy-radius-btn) !important;
+    border-radius: var(--yy-ui-radius) !important;
     padding: 10px 6px;
 }
 
@@ -63,10 +65,10 @@
 }
 
 .event-card {
-    background-color: var(--yy-surface);
-    border: 1px solid var(--yy-border-soft);
-    padding: 10px 12px;
-    border-radius: var(--yy-radius-btn);
+    background-color: var(--yy-calm-surface);
+    border: 1px solid var(--yy-calm-rule);
+    padding: 10px var(--yy-control-md); /* 左右各留 44px，右上角的刪除鈕才不會蓋到標題 */
+    border-radius: var(--yy-ui-radius);
     margin-bottom: 8px;
     display: flex;
     flex-direction: column;
@@ -79,12 +81,14 @@
 .event-card button {
     background: none;
     border: none;
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
     cursor: pointer;
 }
 
-.event-card:hover {
-    background-color: var(--yy-cream);
+@media (hover: hover) and (pointer: fine) {
+  .event-card:hover {
+      background-color: var(--yy-calm-info-bg);
+  }
 }
 
 
@@ -92,19 +96,19 @@
     margin: 0 0 6px 0;
     font-size: 16px;
     font-weight: 600;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .event-card p {
     margin: 0 0 8px 0;
     font-size: 14px;
-    color: var(--yy-text-tertiary);
+    color: var(--yy-calm-text-sub);
     line-height: 1.4;
 }
 
 .event-card span {
-    font-size: 12px;
-    color: var(--yy-text-muted);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
     font-weight: 500;
 }
 
@@ -112,33 +116,40 @@
     position: absolute;
     top: 0px;
     right: 0px;
+    min-width: var(--yy-control-md);
+    min-height: var(--yy-control-md);
     background: none;
     border: none;
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
 }
 
-.event-card .delete-btn:hover {
-    color: var(--yy-red);
+@media (hover: hover) and (pointer: fine) {
+  .event-card .delete-btn:hover {
+      color: var(--yy-calm-danger);
+  }
 }
 
 .go-quiz-btn {
     margin-top: 8px;
     padding: 6px 12px;
-    background-color: var(--yy-red);
-    color: var(--yy-surface);
-    font-size: 13px;
+    min-height: var(--yy-control-md);
+    background-color: var(--yy-calm-accent);
+    color: var(--yy-calm-accent-on);
+    font-size: var(--yy-text-sm);
     font-weight: 500;
     border: none;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-ui-radius);
 }
 
-.go-quiz-btn:hover {
-    background-color: var(--yy-red);
-    color: white;
+@media (hover: hover) and (pointer: fine) {
+  .go-quiz-btn:hover {
+      background-color: var(--yy-calm-text);
+      color: var(--yy-calm-bg);
+  }
 }
 
 .no-event {
-    color: var(--yy-text-muted);
+    color: var(--yy-calm-text-sub);
     text-align: center;
     font-size: 14px;
     padding: 16px;
@@ -152,35 +163,41 @@
 .event-input-bar input {
     flex: 1;
     padding: 10px;
-    border: 1px solid var(--yy-text-muted);
-    border-radius: var(--yy-radius-btn);
-    font-size: 14px;
+    border: 1px solid var(--yy-calm-text-sub);
+    min-height: var(--yy-control-md);
+    border-radius: var(--yy-ui-radius);
+    font-size: 16px;
 }
 
 .event-input-bar input:focus {
-    border-color: var(--yy-red);
-    outline: none;
+    border-color: var(--yy-calm-accent);
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
 }
 
 .event-input-bar button {
     padding: 10px 16px;
-    background-color: var(--yy-red);
-    color: white;
+    background-color: var(--yy-calm-accent);
+    color: var(--yy-calm-accent-on);
     border: none;
-    border-radius: var(--yy-radius-btn);
+    min-height: var(--yy-control-md);
+    border-radius: var(--yy-ui-radius);
     font-weight: 500;
     cursor: pointer;
 }
 
-.event-input-bar button:hover {
-    background-color: var(--yy-red);
+@media (hover: hover) and (pointer: fine) {
+  .event-input-bar button:hover {
+      background-color: var(--yy-calm-text);
+      color: var(--yy-calm-bg);
+  }
 }
 
 .dot-indicator {
     margin-top: 4px;
     width: 6px;
     height: 6px;
-    background-color: var(--yy-red);
+    background-color: var(--yy-calm-accent);
     border-radius: 50%;
     margin-left: auto;
     margin-right: auto;
@@ -193,8 +210,9 @@
 }
 .calendar-title {
     margin: 0;
-    font-size: clamp(1.5rem, 4vw, 2rem);
-    font-weight: 800;
+    font-family: var(--yy-font-heading);
+    font-size: var(--yy-text-2xl);
+    font-weight: 700;
 }
 .calendar-page .calendar-wrapper {
     margin-top: 16px;
@@ -209,15 +227,36 @@
 .event-input-bar select {
     flex: 0 0 auto;
     padding: 10px;
-    border: 1px solid var(--yy-text-muted);
-    border-radius: var(--yy-radius-btn);
-    font-size: 14px;
-    background: var(--yy-surface);
+    border: 1px solid var(--yy-calm-text-sub);
+    border-radius: var(--yy-ui-radius);
+    min-height: var(--yy-control-md);
+    font-size: 16px;
+    background: var(--yy-calm-surface);
     color: inherit;
 }
 
 .event-input-bar select:focus-visible {
-    border-color: var(--yy-red);
+    border-color: var(--yy-calm-accent);
     outline: var(--yy-ui-focus-ring);
     outline-offset: 2px;
+}
+
+.go-quiz-btn,
+.event-input-bar button,
+.event-card .delete-btn {
+    transition: transform 120ms var(--ease-out), background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.go-quiz-btn:active,
+.event-input-bar button:active,
+.event-card .delete-btn:active {
+    transform: scale(var(--yy-ui-press));
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .go-quiz-btn:active,
+    .event-input-bar button:active,
+    .event-card .delete-btn:active {
+        transform: none;
+    }
 }

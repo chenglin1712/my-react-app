@@ -4,23 +4,34 @@
 
 /* 基本按鈕尺寸（保留你原本的寫法） */
 .note-page button,
-.note-page .btn { min-width: 100px; border-radius: var(--yy-radius-card); padding: 10px 16px; cursor: pointer; }
+.note-page .btn { min-width: 100px; border-radius: var(--yy-ui-radius); padding: 10px 16px; min-height: var(--yy-control-md); cursor: pointer; transition: transform 120ms var(--ease-out), background-color var(--dur-fast) var(--ease-out); }
+
+.note-page button:active,
+.note-page .btn:active { transform: scale(var(--yy-ui-press)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .note-page button:active,
+  .note-page .btn:active { transform: none; }
+}
 
 
 .note-page .btn-primary {
   background-color: var(--danger);
-  color: var(--yy-surface);
+  color: var(--yy-calm-surface);
   border: none;
-  transition: background-color .2s ease;
 }
-.note-page .btn-primary:hover { background-color: var(--brand-red-600); }
+@media (hover: hover) and (pointer: fine) {
+  .note-page .btn-primary:hover { background-color: var(--brand-red-600); }
+}
 
 .note-page .btn-ghost {
   background: var(--ghost-bg);
   color: var(--ghost-fg);
   border: 1px solid transparent;
 }
-.note-page .btn-ghost:hover { filter: brightness(0.98); }
+@media (hover: hover) and (pointer: fine) {
+  .note-page .btn-ghost:hover { filter: brightness(0.98); }
+}
 
 .note-page .btn-upload {
   background-color: var(--ghost-bg);
@@ -31,20 +42,27 @@
   gap: 4px;
 }
 
-.note-page .btn-upload:hover { filter: brightness(0.98); }
+@media (hover: hover) and (pointer: fine) {
+  .note-page .btn-upload:hover { filter: brightness(0.98); }
+}
 
 /* 危險 */
 .note-page .btn-danger {
-  background: gray;
-  color:var(--yy-surface);
+  background: var(--yy-calm-block);
+  color: var(--yy-calm-block-on);
   border: none;
 }
-.note-page .btn-danger:hover { background: var(--ghost-fg); }
+@media (hover: hover) and (pointer: fine) {
+  .note-page .btn-danger:hover { background: var(--yy-calm-text); }
+}
 
 .note-page .btn-add {
-  background-color: var(--yy-green);
+  background-color: var(--yy-calm-success);
+  color: var(--yy-calm-surface);
 }
-.note-page .btn-add:hover { background-color: var(--yy-text-secondary); }
+@media (hover: hover) and (pointer: fine) {
+  .note-page .btn-add:hover { background-color: var(--yy-calm-text-sub); }
+}
 
 .note-page .btn-page {
   color: var(--bs-btn-disabled-color);
@@ -53,8 +71,10 @@
   opacity: var(--bs-btn-disabled-opacity);
 }
 
-.note-page .btn-page:hover {
-  background-color: var(--bs-btn-active-bg);
+@media (hover: hover) and (pointer: fine) {
+  .note-page .btn-page:hover {
+    background-color: var(--bs-btn-active-bg);
+  }
 }
 
 .note-page .btn-page.btn:disabled {
@@ -66,10 +86,11 @@
 /* 若不支援 composes，可直接重覆宣告： */
 .note-page .morandi-blue {
   background-color: var(--brand-red);
-  color:var(--yy-surface); border:none;
-  transition: background-color .2s ease;
+  color:var(--yy-calm-surface); border:none;
 }
-.note-page .morandi-blue:hover { background-color: var(--brand-red-600); }
+@media (hover: hover) and (pointer: fine) {
+  .note-page .morandi-blue:hover { background-color: var(--brand-red-600); }
+}
 
 @media (max-width: 720px) {
   .note-page .btn-primary, .note-page .btn-danger, .note-page .btn-ghost, .note-page .morandi-blue {
@@ -80,6 +101,6 @@
 
 /* 粗體／斜體開關：按下去的狀態要看得出來（不只靠 aria-pressed） */
 .note-page .btn-ghost[aria-pressed="true"] {
-  background: var(--yy-warning-bg);
-  border-color: var(--yy-gold);
+  background: var(--yy-calm-warning-bg);
+  border-color: var(--yy-calm-olive);
 }

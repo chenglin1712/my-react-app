@@ -31,8 +31,9 @@
     width: 100%;
     height: 100%;
     backface-visibility: hidden;
-    border-radius: var(--yy-radius-card);
-    background: white;
+    border: 1px solid var(--yy-calm-rule);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-surface);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -47,11 +48,11 @@
     position: relative;
     width: 100%;
     height: 170px;
-    background: var(--yy-cream);
+    background: var(--yy-calm-info-bg);
     display: flex;
     align-items: center;
     justify-content: center;
-    border-bottom: 1px solid var(--yy-border-soft);
+    border-bottom: 1px solid var(--yy-calm-rule);
 }
 
 .word-card-front .word-image {
@@ -65,14 +66,15 @@
     align-items: center;
     justify-content: center;
     font-size: 48px;
-    color: var(--yy-text-muted);
+    color: var(--yy-calm-text-sub);
 }
 
 .word-card-front .favorite-btn {
     position: absolute;
     top: 8px;
     right: 8px;
-    background: rgba(255, 255, 255, 0.9);
+    background: var(--yy-calm-surface);
+    border: 1px solid var(--yy-calm-rule);
     border-radius: 50%;
     min-width: fit-content;
     width: 32px;
@@ -83,8 +85,10 @@
     transition: var(--transition-interactive);
 }
 
-.word-card-front .favorite-btn:hover {
-    background: rgba(255, 255, 255, 1);
+@media (hover: hover) and (pointer: fine) {
+  .word-card-front .favorite-btn:hover {
+      background: var(--yy-calm-info-bg);
+  }
 }
 
 .word-card-front .word-card-header {
@@ -104,7 +108,7 @@
     font-size: 1.2rem;
     font-weight: bold;
     margin-bottom: 0.5rem;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -127,7 +131,7 @@
 
 .word-card-front .favorite-word-info h5 {
     font-size: 1rem;
-    color: var(--yy-text-tertiary);
+    color: var(--yy-calm-text-sub);
     margin-bottom: 0.5rem;
     overflow-wrap: anywhere;
     display: -webkit-box;
@@ -139,7 +143,7 @@
 
 /* 背面樣式 */
 .word-card-back-header {
-    border-bottom: 1px solid var(--yy-border-soft);
+    border-bottom: 1px solid var(--yy-calm-rule);
     padding-bottom: 1rem;
     margin-bottom: 1rem;
 }
@@ -147,7 +151,7 @@
 .tayal-word-back {
     font-size: 1.3rem;
     font-weight: bold;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
     margin-bottom: 0.5rem;
     display: flex;
     flex-wrap: wrap;
@@ -159,7 +163,7 @@
 
 .chinese-word-back {
     font-size: 1.1rem;
-    color: var(--yy-text-tertiary);
+    color: var(--yy-calm-text-sub);
     margin-bottom: 0;
     overflow-wrap: anywhere;
 }
@@ -173,7 +177,7 @@
 .flip-back-btn {
     text-align: center;
     padding-top: 0.5rem;
-    border-top: 1px solid var(--yy-border-soft);
+    border-top: 1px solid var(--yy-calm-rule);
     margin-top: auto;
 }
 
@@ -187,23 +191,23 @@
 }
 
 .definition-category {
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
     font-size: 0.9rem;
     margin-bottom: 0.5rem;
     font-weight: 600;
 }
 
 .example-item {
-    background: var(--yy-cream);
+    background: var(--yy-calm-info-bg);
     padding: 0.75rem;
-    border-radius: var(--yy-radius-btn);
-    border-left: 3px solid var(--yy-red);
+    border-radius: var(--yy-ui-radius);
+    border-left: 3px solid var(--yy-calm-accent);
     margin-bottom: 0.75rem;
 }
 
 .example-tayal {
     font-weight: 600;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
     margin-bottom: 0.25rem;
     display: flex;
     align-items: center;
@@ -212,8 +216,8 @@
 }
 
 .example-ch {
-    color: var(--yy-text-tertiary);
-    font-size: 0.85rem;
+    color: var(--yy-calm-text-sub);
+    font-size: var(--yy-text-sm);
     line-height: 1.4;
 }
 
@@ -221,14 +225,14 @@
     padding: 0;
     border: none;
     background: none;
-    color: var(--yy-warning-text);
+    color: var(--yy-calm-warning);
     min-width: auto;
     transition: var(--transition-interactive);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .audio-button:hover {
-      color: var(--yy-warning-text);
+      color: var(--yy-calm-warning);
       transform: scale(1.1);
   }
 }
@@ -271,7 +275,7 @@
 }
 
 .star-rating .star {
-    font-size: 0.8rem;
+    font-size: var(--yy-text-sm);
 }
 
 .word-meta {
@@ -283,17 +287,17 @@
 
 .word-frequency-label,
 .word-category-label {
-    font-size: 0.8rem;
-    color: var(--yy-text-muted);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
     display: flex;
     align-items: center;
     gap: 0.25rem;
 }
 
 .word-category-label {
-    background: var(--yy-cream-dim);
+    background: var(--yy-calm-info-bg);
     padding: 0.2rem 0.5rem;
-    border-radius: var(--yy-radius-card);
+    border-radius: var(--yy-ui-radius);
     width: fit-content;
 }
 
@@ -303,26 +307,36 @@
 .favorite-hero {
     padding: 36px 24px 24px;
 }
+/* 共用的 .yy-hero 頁首拼色圖樣在 theme-v2.css 仍是舊風格，收藏頁範圍內拿掉 */
+.favorite-hero.yy-hero::before {
+    display: none;
+}
 .favorite-title {
     margin: 0 0 8px;
-    font-size: clamp(1.6rem, 4vw, 2.2rem);
-    font-weight: 800;
+    font-family: var(--yy-font-heading);
+    font-size: var(--yy-text-3xl);
+    font-weight: 700;
 }
 .favorite-desc {
     margin: 0;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
 }
 .favorite-controls {
     padding-top: 1rem;
 }
 .favorite-count {
     font-size: 14px;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
 }
 
 /* 族語下拉選單裡每個族語的收藏數：次要資訊，用較淡的字色 */
 .favorite-tribe-count {
-    color: var(--yy-text-muted);
-    font-size: 0.85em;
+    color: var(--yy-calm-text-sub);
+    font-size: var(--yy-text-sm);
     font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .word-card { transition: none; }
+    .audio-button:active { transform: none; }
 }

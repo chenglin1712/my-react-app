@@ -9,12 +9,12 @@
 .note-save__hint {
     margin: 0;
     font-size: var(--yy-text-sm);
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
 }
 
 .note-save__status[data-state="dirty"],
 .note-save__status[data-state="error"] {
-    color: var(--yy-warning-text);
+    color: var(--yy-calm-warning);
     font-weight: 600;
 }
 
@@ -28,19 +28,19 @@
 .note-sync__status {
     margin: 0;
     font-size: var(--yy-text-sm);
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
 }
 
 .note-sync__status[data-status="offline"],
 .note-sync__status[data-status="error"] {
-    color: var(--yy-warning-text);
+    color: var(--yy-calm-warning);
 }
 
 .note-sync__notice,
 .note-sync__failures {
     padding: var(--yy-space-3) var(--yy-space-4);
-    border: var(--yy-border-width) solid var(--yy-border);
-    border-radius: var(--yy-radius-btn);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     font-size: var(--yy-text-sm);
     line-height: var(--yy-leading-normal);
 }
@@ -50,13 +50,13 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--yy-space-3);
-    background: var(--yy-info-bg);
-    color: var(--yy-text-secondary);
+    background: var(--yy-calm-info-bg);
+    color: var(--yy-calm-text-sub);
 }
 
 .note-sync__failures {
-    background: var(--yy-warning-bg);
-    color: var(--yy-warning-text);
+    background: var(--yy-calm-warning-bg);
+    color: var(--yy-calm-warning);
 }
 
 .note-sync__failures-title {
