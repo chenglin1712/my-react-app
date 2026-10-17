@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import HomePage from './index';
 
@@ -58,13 +58,16 @@ const DEFAULT_CONFIG = {
   button1_enabled: true, button2_enabled: true, button3_enabled: true,
 };
 
-function mockFetchOk(announcementResults, homepageConfig = DEFAULT_CONFIG) {
+function mockFetchOk(announcementResults, homepageConfig = DEFAULT_CONFIG, featuredTopicItems = []) {
   vi.stubGlobal('fetch', vi.fn((url) => {
     if (url.includes('/adminapi/public/announcements/')) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ results: announcementResults }) });
     }
     if (url.includes('/adminapi/public/homepage-config/')) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve(homepageConfig) });
+    }
+    if (url.includes('/adminapi/public/featured-topics/')) {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: featuredTopicItems }) });
     }
     return Promise.reject(new Error(`unexpected url: ${url}`));
   }));
@@ -574,5 +577,57 @@ describe('首頁 · 第一屏（S6-4：影片、活動消息、族語認證公�
     await screen.findByTestId('news-mock');
     expect(screen.queryByTestId('datereminder-mock')).not.toBeInTheDocument();
     expect(screen.queryByTestId('calendar-mock')).not.toBeInTheDocument();
+  });
+});
+
+describe('首頁 · 本期專題（S7-1）', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const topic = (id) => ({
+    id, title: `專題${id}`, summary: `摘要${id}`, image_url: '', link_url: `https://example.org/${id}`, category_label: '文化',
+  });
+
+  test('有已發布的專題：在第一屏之後、主視覺之前輸出，依回傳順序', async () => {
+    mockFetchOk([], DEFAULT_CONFIG, [topic(1), topic(2), topic(3)]);
+    renderHome();
+    expect(await screen.findByRole('heading', { level: 2, name: '本期專題' })).toBeInTheDocument();
+    const section = document.querySelector('.topics-section');
+    expect(within(section).getAllByRole('heading', { level: 3 }).map((h) => h.textContent.replace('（另開新視窗）', ''))).toEqual(['專題1', '專題2', '專題3']);
+    expect(document.querySelector('.home-first').compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(section.compareDocumentPosition(document.querySelector('.home-hero')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  test('0 筆：整區隱藏，連標題都沒有', async () => {
+    mockFetchOk([], DEFAULT_CONFIG, []);
+    renderHome();
+    await screen.findByTestId('news-mock');
+    expect(screen.queryByRole('heading', { name: '本期專題' })).not.toBeInTheDocument();
+    expect(document.querySelector('.topics-section')).toBeNull();
+  });
+
+  test('專題端點失敗：只是不顯示這一區，設定與公告照常', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn((url) => {
+      if (url.includes('/adminapi/public/featured-topics/')) return Promise.resolve({ ok: false, status: 500 });
+      if (url.includes('/adminapi/public/announcements/')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [] }) });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(DEFAULT_CONFIG) });
+    }));
+    renderHome();
+    await screen.findByTestId('news-mock');
+    expect(screen.queryByRole('heading', { name: '本期專題' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('calendar-mock')).toBeInTheDocument();
+  });
+
+  test('專題與設定各自獨立：設定端點失敗不影響專題', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn((url) => {
+      if (url.includes('/adminapi/public/homepage-config/')) return Promise.resolve({ ok: false, status: 500 });
+      if (url.includes('/adminapi/public/featured-topics/')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [topic(1)] }) });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [] }) });
+    }));
+    renderHome();
+    expect(await screen.findByRole('heading', { level: 2, name: '本期專題' })).toBeInTheDocument();
   });
 });

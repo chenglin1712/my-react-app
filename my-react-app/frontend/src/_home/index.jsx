@@ -12,6 +12,8 @@ import RevealOnView from "../../components/ui/RevealOnView";
 import HomeTicker from "../../components/_home/Ticker";
 import HomeMasthead from "../../components/_home/Masthead";
 import HomePromoVideo from "../../components/_home/PromoVideo";
+import FeaturedTopics from "../../components/_home/FeaturedTopics";
+import { pickFeaturedTopics } from "../../components/_home/featuredTopicsContent";
 import { pickPromoVideo } from "../../components/_home/promoVideoContent";
 import { pickMastheadContent } from "../../components/_home/mastheadContent";
 
@@ -84,6 +86,8 @@ const HomePage = () => {
     // 時裁切用的會是尚未套用後台設定的預設值，且之後也不會重新裁切。
     const [rawNews, setRawNews] = useState([]);
     const [examInfo, setExamInfo] = useState([]);
+    // 本期專題走獨立端點，失敗只是不顯示這一區，不影響設定與公告
+    const [featuredTopics, setFeaturedTopics] = useState([]);
     const [newsError, setNewsError] = useState(false);
     const [newsLoading, setNewsLoading] = useState(true);
     // 存 slug 而不是 array index：TRIBES 的順序/內容以後如果調整，這裡的
@@ -116,6 +120,24 @@ const HomePage = () => {
                 // 抓不到就維持預設值——首頁不能因為這個設定端點掛掉就整頁壞掉，
                 // 預設值本身就是「後台從沒動過設定」時的正確畫面。
                 console.error("載入首頁版位設定失敗：", err);
+            });
+        return () => { cancelled = true; };
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        fetch('/adminapi/public/featured-topics/')
+            .then((res) => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
+            .then((data) => {
+                if (!cancelled) setFeaturedTopics(pickFeaturedTopics(data));
+            })
+            .catch((err) => {
+                if (cancelled) return;
+                console.error("載入本期專題失敗：", err);
+                setFeaturedTopics([]);
             });
         return () => { cancelled = true; };
     }, []);
@@ -223,6 +245,11 @@ const HomePage = () => {
                     )}
                     {homepageConfig.show_calendar_section && <CertificationSection examInfo={examInfo} />}
                 </div>
+            )}
+
+            {/* 本期專題：沒有已發布的專題就整區不輸出（含標題） */}
+            {featuredTopics.length > 0 && (
+                <RevealOnView><FeaturedTopics topics={featuredTopics} /></RevealOnView>
             )}
 
             <section className="yy-hero home-hero">
