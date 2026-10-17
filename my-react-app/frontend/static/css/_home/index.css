@@ -4,93 +4,37 @@
     align-items: stretch;
 }
 
-/* ---------- Hero ---------- */
+/* ---------- 收尾區（沉穩文藝）：沒有底紋、光暈、貼紙，只有標題、說明與按鈕 ---------- */
 
 .home-hero {
-    padding-bottom: 60px;
-}
-
-.home-blob {
-    position: absolute;
-    width: 240px;
-    height: 220px;
-    border-radius: 50%;
-    filter: blur(28px);
-    pointer-events: none;
-}
-
-.home-blob--gold {
-    left: 6%;
-    top: 12%;
-    background: radial-gradient(circle, var(--yy-gold-light), transparent 68%);
-    opacity: .5;
-}
-
-.home-blob--red {
-    right: 5%;
-    top: 8%;
-    background: radial-gradient(circle, var(--yy-red), transparent 68%);
-    opacity: .32;
-    animation-direction: reverse;
-}
-
-.home-sticker {
-    position: absolute;
-    left: 16%;
-    bottom: 8%;
-    transform: rotate(-8deg);
-    pointer-events: none;
-}
-
-.home-sticker-eyelet {
-    display: block;
-    width: 10px;
-    height: 10px;
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: 50%;
-    margin: 0 auto 2px;
-}
-
-.home-sticker-badge {
-    display: block;
-    padding: 7px 16px;
-    border-radius: var(--yy-radius-btn);
-    /* 白字壓在漸層上，漸層裡不放金色（白字對金色只有 2.3:1），紅、藍、綠三端都在 6:1 以上 */
-    background: linear-gradient(100deg, var(--yy-red), var(--yy-blue), var(--yy-green), var(--yy-red));
-    background-size: 300% 100%;
-    border: var(--yy-border-width) solid var(--yy-ink);
-    color: var(--yy-surface);
-    font-family: var(--yy-font-pixel);
-    font-weight: 700;
-    font-size: 12px;
-}
-
-@media (max-width: 720px) {
-    .home-sticker {
-        display: none;
-    }
+    position: relative;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: var(--yy-space-8) 56px var(--yy-space-7);
+    text-align: center;
 }
 
 .home-title {
-    position: relative;
-    font-size: 46px;
+    margin: 0 0 var(--yy-space-4);
+    font-family: var(--yy-font-heading);
+    font-size: clamp(1.75rem, 4.4vw, 2.75rem);
+    font-weight: 700;
+    letter-spacing: 0.08em;
     line-height: var(--yy-leading-heading);
-    margin: 14px 0 18px;
-    font-weight: 900;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .home-desc {
-    position: relative;
-    max-width: 580px;
-    margin: 0 auto 34px;
-    font-size: 16px;
-    line-height: 1.85;
-    color: var(--yy-text-secondary);
+    max-width: 36em;
+    margin: 0 auto var(--yy-space-6);
+    font-family: var(--yy-font-heading);
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+    line-height: 1.9;
+    color: var(--yy-calm-text-sub);
 }
 
 .home-cta-row {
-    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -98,68 +42,76 @@
     gap: var(--yy-space-4);
 }
 
-.home-cta-placeholder {
-    visibility: hidden;
-    box-shadow: none;
-}
-
+.home-cta,
 .home-cta-secondary {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: var(--yy-control-lg);
+    min-height: var(--yy-control-md);
     padding: 0 var(--yy-space-6);
-    border-radius: var(--yy-radius-btn);
-    background: var(--yy-surface);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    color: var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    font-family: var(--yy-font-body);
+    font-size: 1rem;
     font-weight: 700;
+    letter-spacing: 0.12em;
     text-decoration: none;
-    transition: transform .15s ease, box-shadow .15s ease;
+    cursor: pointer;
+    transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+}
+
+.home-cta {
+    background: var(--yy-calm-accent);
+    border-color: var(--yy-calm-accent);
+    color: var(--yy-calm-accent-on);
+}
+
+.home-cta-secondary {
+    background: transparent;
+    color: var(--yy-calm-text);
+}
+
+.home-cta-placeholder {
+    visibility: hidden;
 }
 
 @media (hover: hover) and (pointer: fine) {
+    .home-cta:hover {
+        background: var(--yy-calm-text);
+        border-color: var(--yy-calm-text);
+    }
+
     .home-cta-secondary:hover {
+        background: var(--yy-calm-info-bg);
     }
 }
 
+.home-cta:active,
 .home-cta-secondary:active {
-    transform: scale(0.97);
-    box-shadow: none;
+    transform: scale(var(--yy-ui-press));
 }
 
-.home-cta-secondary:focus-visible,
-.home-cta:focus-visible {
+.home-cta:focus-visible,
+.home-cta-secondary:focus-visible {
     outline: var(--yy-ui-focus-ring);
     outline-offset: var(--yy-ui-focus-offset);
 }
 
-.home-cta {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    min-height: var(--yy-control-lg);
-    padding: 15px 34px;
-    border-radius: var(--yy-radius-btn);
-    background: var(--yy-red);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    font-family: var(--yy-font-pixel);
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--yy-cream);
-    cursor: pointer;
-    transition: transform .15s ease, background .15s ease, box-shadow .15s ease;
+@media (prefers-reduced-motion: reduce) {
+    .home-cta:active,
+    .home-cta-secondary:active {
+        transform: none;
+    }
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .home-cta:hover {
-      background: var(--yy-red-dark);
-  }
-}
-
-.home-cta:active {
-  transform: scale(0.97);
-  box-shadow: none;
+/* 區塊分隔：雙細線，與各頁標題底線同一種 */
+.home-rule {
+    width: calc(100% - 112px);
+    max-width: 1000px;
+    margin: 0 auto;
+    border: 0;
+    border-top: 3px double var(--yy-calm-line);
+    opacity: 1;
 }
 
 /* ---------- 五族語言 + 現正主打（S7-2，沉穩文藝） ---------- */
@@ -433,8 +385,12 @@ a.home-feature-card:focus-visible {
 }
 
 @media (max-width: 720px) {
-    .home-title {
-        font-size: 32px;
+    .home-hero {
+        padding: var(--yy-space-7) 24px var(--yy-space-6);
+    }
+
+    .home-rule {
+        width: calc(100% - 48px);
     }
 
     .home-tribes-section {
@@ -442,9 +398,4 @@ a.home-feature-card:focus-visible {
     }
 }
 
-/* 呼吸光圈：偽元素只動 transform 與 opacity（P1-23），keyframes 見 theme-v2.css */
-.home-cta {
-    position: relative;
-    isolation: isolate;
-}
 

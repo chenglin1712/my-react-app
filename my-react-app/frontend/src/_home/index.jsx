@@ -252,18 +252,8 @@ const HomePage = () => {
                 <RevealOnView><FeaturedTopics topics={featuredTopics} /></RevealOnView>
             )}
 
-            <section className="yy-hero home-hero">
-                {/* 裝飾只留三個（兩團光暈與貼紙徽章）：原本約十個無限循環動畫會搶走標題與按鈕的注意力 */}
-                <span className="home-blob home-blob--gold" aria-hidden="true" />
-                <span className="home-blob home-blob--red" aria-hidden="true" />
-
-                <div className="home-sticker" aria-hidden="true">
-                    <span className="home-sticker-eyelet" />
-                    <span className="home-sticker-badge">YUAN・YU</span>
-                </div>
-
+            <section className="home-hero">
                 <div className="yy-fade-up">
-                    <span className="yy-eyebrow yy-eyebrow--zh">原住民族語 · 五族共學</span>
                     <h1 className="home-title">
                         五族語言，
                         <br />
@@ -277,14 +267,14 @@ const HomePage = () => {
                         type="button"
                         className="home-cta"
                         onClick={() => functionBtnRef.current?.scrollIntoView({ behavior: scrollBehavior() })}
-                    >▸ 開始學習 PRESS START!</button>
+                    >開始學習</button>
                     {isGuest && <Link to="/register" className="home-cta-secondary">免費註冊</Link>}
                     {/* 登入狀態確認期間先佔位，確認為訪客後按鈕出現時主按鈕不會被推開 */}
                     {authLoading && <span className="home-cta-secondary home-cta-placeholder" aria-hidden="true">免費註冊</span>}
                 </div>
             </section>
 
-            <div className="yy-divider" />
+            <hr className="home-rule" />
 
             <section className="home-tribes-section">
                 <div className="home-tribes-grid">
