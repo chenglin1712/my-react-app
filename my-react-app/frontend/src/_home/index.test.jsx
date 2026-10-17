@@ -316,6 +316,18 @@ describe('首頁 · 族語切換', () => {
     expect(tayalButton).toHaveAttribute('aria-pressed', 'false');
   });
 
+  test('選取的族語列只靠 aria-pressed 的樣式表示，不再用行內縮放；主打卡片與族語列不再套舊的 yy-card', async () => {
+    mockFetchOk([]);
+    renderHome();
+    await waitFor(() => expect(screen.getByTestId('news-mock')).toBeInTheDocument());
+    const rows = document.querySelectorAll('.home-tribe-row');
+    expect(rows.length).toBeGreaterThan(1);
+    rows.forEach((row) => expect(row.getAttribute('style') ?? '').not.toMatch(/transform|scale/));
+    expect(document.querySelector('.home-tribe-list.yy-card')).toBeNull();
+    expect(document.querySelector('.home-feature-card.yy-card')).toBeNull();
+    expect(document.querySelector('.home-feature-sub').textContent).not.toMatch(/·/);
+  });
+
   test('訪客看到免費註冊按鈕，並把 isGuest 傳給功能卡', async () => {
     mockFetchOk([]);
     renderHome();

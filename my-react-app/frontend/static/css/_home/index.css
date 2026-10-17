@@ -162,110 +162,151 @@
   box-shadow: none;
 }
 
-/* ---------- 五族語言 + 現正主打 ---------- */
+/* ---------- 五族語言 + 現正主打（S7-2，沉穩文藝） ---------- */
 
 .home-tribes-section {
-    padding: 70px 56px 40px;
+    padding: var(--yy-space-7) 56px var(--yy-space-6);
 }
 
 .home-tribes-grid {
-    display: flex;
-    gap: 26px;
-    flex-wrap: wrap;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    gap: var(--yy-space-6);
+    max-width: 1000px;
+    margin: 0 auto;
+    align-items: start;
 }
 
 .home-tribe-list {
-    width: 420px;
-    max-width: 100%;
-    padding: 30px;
+    min-width: 0;
+    font-family: var(--yy-font-body);
+    color: var(--yy-calm-text);
 }
 
 .home-tribe-list-title {
-    font-family: var(--yy-font-pixel);
-    font-size: 18px;
+    margin: 0 0 var(--yy-space-4);
+    padding-bottom: var(--yy-space-1);
+    font-family: var(--yy-font-heading);
+    font-size: var(--yy-text-xl);
     font-weight: 700;
-    color: var(--yy-ink);
-    margin: 0 0 18px;
+    letter-spacing: 0.06em;
+    color: var(--yy-calm-text);
+    border-bottom: 3px double var(--yy-calm-line);
 }
 
 .home-tribe-row {
-    /* 原本是 div+role="button"，換成原生 <button> 之後才需要這些 reset——
-       瀏覽器預設的 button 外觀（邊框、背景、置中文字、不滿版寬）都要清掉，
-       display/padding/border-radius 等既有版面設定才不會被蓋掉。 */
+    /* 原生 <button>：清掉瀏覽器預設的背景與字型，才套得上列的版面 */
     width: 100%;
-    border: 0;
-    background: none;
+    min-height: var(--yy-control-md);
+    margin: 0;
     color: inherit;
     font: inherit;
     text-align: left;
     appearance: none;
+    background: none;
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 10px 8px;
-    border-radius: var(--yy-radius-btn);
+    gap: var(--yy-space-3);
+    padding: var(--yy-space-2) var(--yy-space-3);
+    /* 選取時才看得到邊框；先留 1px 透明邊，選取時版面不會位移 */
+    border: 1px solid transparent;
+    border-radius: var(--yy-ui-radius);
     cursor: pointer;
-    transition: var(--transition-interactive);
+    transition: background-color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
 }
 
-.home-tribe-row:hover {
-    background: var(--yy-cream);
+.home-tribe-row + .home-tribe-row {
+    margin-top: var(--yy-space-1);
+}
+
+.home-tribe-row[aria-pressed="true"] {
+    background: var(--yy-calm-info-bg);
+    border-color: var(--yy-calm-line);
+}
+
+.home-tribe-row:active {
+    transform: scale(var(--yy-ui-press));
+}
+
+.home-tribe-row:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .home-tribe-row:hover {
+        background: var(--yy-calm-info-bg);
+    }
 }
 
 .home-tribe-swatch {
     width: 22px;
     height: 22px;
-    border: var(--yy-border-width) solid var(--yy-ink);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     display: inline-block;
     transform: rotate(45deg);
     flex-shrink: 0;
 }
 
 .home-tribe-name {
-    font-size: 16px;
+    font-size: var(--yy-text-base);
     font-weight: 700;
-    color: var(--yy-ink);
+    color: var(--yy-calm-text);
 }
 
 .home-tribe-roman {
-    font-family: var(--yy-font-pixel);
-    font-size: 12px;
-    color: var(--yy-text-muted);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
 }
 
+/* 現正主打：沒有外框、不用漸層；整張是連結時有按下回饋 */
 .home-feature-card {
-    width: 420px;
-    max-width: 100%;
+    display: block;
+    min-width: 0;
     overflow: hidden;
-    padding: 0;
+    color: inherit;
+    text-decoration: none;
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    font-family: var(--yy-font-body);
+    transition: transform 120ms var(--ease-out);
+}
+
+a.home-feature-card:active {
+    transform: scale(var(--yy-ui-press));
+}
+
+a.home-feature-card:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
 }
 
 .home-feature-head {
-    padding: 16px 24px;
-    background: linear-gradient(90deg, var(--yy-red), var(--yy-gold), var(--yy-red));
+    padding: var(--yy-space-3) var(--yy-space-4) 0;
+}
+
+.home-feature-tag {
+    display: inline-block;
+    padding: 2px var(--yy-space-2);
+    font-size: var(--yy-text-sm);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    background: var(--yy-calm-tag);
+    color: var(--yy-calm-tag-on);
+    border-radius: var(--yy-ui-radius);
+}
+
+/* 沒有主打圖時，用石板灰底放大字的羅馬拼音，不用拼色圖樣 */
+.home-feature-image {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    border-bottom: 3px solid var(--yy-ink);
-    font-family: var(--yy-font-pixel);
-    font-size: 14px;
-    color: var(--yy-surface);
-}
-
-/* 標題文字放在墨色底板上，不直接壓在紅金漸層（金色端點的對比只有 1.9 到 2.3:1） */
-.home-feature-tag {
-    background: var(--yy-ink);
-    color: var(--yy-cream);
-    padding: 2px 10px;
-    border-radius: var(--yy-radius-btn);
-}
-
-.home-feature-image {
-    height: 170px;
-    background-image: repeating-conic-gradient(var(--yy-red) 0deg 90deg, var(--yy-gold) 90deg 180deg, var(--yy-blue) 180deg 270deg, var(--yy-cream) 270deg 360deg);
-    background-size: 44px 44px;
-    position: relative;
+    justify-content: center;
+    aspect-ratio: 16 / 9;
+    margin: var(--yy-space-3) var(--yy-space-4) 0;
+    background: var(--yy-calm-block);
+    border-radius: var(--yy-ui-radius);
+    overflow: hidden;
 }
 
 .home-feature-image img {
@@ -276,31 +317,48 @@
 }
 
 .home-feature-image span {
-    position: absolute;
-    top: 14px;
-    left: 14px;
-    padding: 5px 12px;
-    border-radius: var(--yy-radius-btn);
-    background: rgba(34, 24, 18, 0.78);
-    color: var(--yy-surface);
-    font-size: 12px;
+    font-family: var(--yy-font-heading);
+    font-size: var(--yy-text-2xl);
     letter-spacing: 0.08em;
+    color: var(--yy-calm-block-on);
 }
 
 .home-feature-body {
-    padding: 22px 24px;
+    padding: var(--yy-space-3) var(--yy-space-4) var(--yy-space-4);
 }
 
 .home-feature-title {
-    font-size: 17px;
-    font-weight: 800;
-    margin: 0 0 8px;
-    color: var(--yy-ink);
+    margin: 0 0 var(--yy-space-2);
+    font-family: var(--yy-font-heading);
+    font-size: var(--yy-text-xl);
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--yy-calm-text);
 }
 
 .home-feature-sub {
-    font-size: 13px;
-    color: var(--yy-text-muted);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    a.home-feature-card:hover .home-feature-title {
+        color: var(--yy-calm-accent);
+        text-decoration: underline;
+        text-underline-offset: 4px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .home-tribe-row,
+    .home-feature-card {
+        transition: color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+    }
+
+    .home-tribe-row:active,
+    a.home-feature-card:active {
+        transform: none;
+    }
 }
 
 /* ---------- 第一屏：影片、活動消息、族語認證公告 ---------- */
@@ -380,7 +438,7 @@
     }
 
     .home-tribes-section {
-        padding: 50px 24px 30px;
+        padding: var(--yy-space-6) 24px var(--yy-space-5);
     }
 }
 

@@ -47,6 +47,32 @@ describe('DateReminder', () => {
     expect(screen.queryByText('時程載入中...')).not.toBeInTheDocument();
   });
 
+  test('完整時程：目前階段與已結束的項目有文字標示（不只靠顏色），其餘沒有', async () => {
+    const day = 24 * 60 * 60 * 1000;
+    const iso = (offset) => new Date(Date.now() + offset * day).toISOString();
+    mockScheduleFetch({
+      session: '測試場次',
+      phases: [
+        { phase: '報名', start_date: iso(-10) },
+        { phase: '測驗', start_date: iso(5) },
+        { phase: '成績', start_date: iso(30) },
+      ],
+    });
+
+    const { container } = render(<DateReminder />);
+    await waitFor(() => expect(container.querySelectorAll('.schedule-item')).toHaveLength(3));
+
+    const [past, current, upcoming] = container.querySelectorAll('.schedule-item');
+    expect(past).toHaveClass('past');
+    expect(past).toHaveTextContent('（已結束）');
+    expect(current).toHaveClass('current');
+    expect(current).toHaveTextContent('（目前階段）');
+    expect(current).not.toHaveTextContent('（已結束）');
+    expect(upcoming).toHaveClass('upcoming');
+    expect(upcoming).not.toHaveTextContent('（已結束）');
+    expect(upcoming).not.toHaveTextContent('（目前階段）');
+  });
+
   test('點擊「重設提醒」會清空 localStorage 裡已忽略的提醒紀錄', async () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ 測試場次: ['報名'] }));
     mockScheduleFetch({ session: '測試場次', phases: [] });

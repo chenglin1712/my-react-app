@@ -205,7 +205,7 @@ const HomePage = () => {
             </div>
             <div className="home-feature-body">
                 {heroTitle && <h3 className="home-feature-title">{heroTitle}</h3>}
-                {!hasFeature && <div className="home-feature-sub">{activeTribe.roman} · 點清單切換族語</div>}
+                {!hasFeature && <div className="home-feature-sub">{activeTribe.roman}，點清單切換族語</div>}
             </div>
         </>
     );
@@ -288,7 +288,7 @@ const HomePage = () => {
 
             <section className="home-tribes-section">
                 <div className="home-tribes-grid">
-                    <div className="yy-card yy-fade-up home-tribe-list">
+                    <div className="home-tribe-list">
                         <h2 className="home-tribe-list-title">五族語言<span aria-hidden="true"> »</span></h2>
                         {TRIBES.map((t) => (
                             <button
@@ -296,7 +296,6 @@ const HomePage = () => {
                                 type="button"
                                 className="home-tribe-row"
                                 aria-pressed={t.slug === selectedTribeSlug}
-                                style={{ transform: `scale(${t.slug === selectedTribeSlug ? 1.04 : 1})` }}
                                 onClick={() => setSelectedTribeSlug(t.slug)}
                             >
                                 <span className="home-tribe-swatch" style={{ background: t.color }} />
@@ -309,7 +308,7 @@ const HomePage = () => {
                     {homepageConfig.hero_link_url ? (
                         /^https?:\/\//.test(homepageConfig.hero_link_url) ? (
                             <a
-                                className="yy-card yy-fade-up home-feature-card"
+                                className="home-feature-card"
                                 href={homepageConfig.hero_link_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
@@ -318,12 +317,12 @@ const HomePage = () => {
                                 <span className="visually-hidden">（另開新視窗）</span>
                             </a>
                         ) : (
-                            <Link className="yy-card yy-fade-up home-feature-card" to={homepageConfig.hero_link_url}>
+                            <Link className="home-feature-card" to={homepageConfig.hero_link_url}>
                                 {featureCardContent}
                             </Link>
                         )
                     ) : (
-                        <div className="yy-card yy-fade-up home-feature-card">{featureCardContent}</div>
+                        <div className="home-feature-card">{featureCardContent}</div>
                     )}
                 </div>
             </section>

@@ -176,9 +176,6 @@ const DateReminder = () => {
 
     return (
         <div className="exam-info-card">
-            <div className="circle top-right"></div>
-            <div className="circle bottom-left"></div>
-
             <div className="date-reminder-content">
                 <div className="reset-reminders">
                     <Button variant="outline-danger" onClick={handleResetNotifications}><Bell /> 重設提醒</Button>
@@ -272,6 +269,9 @@ const DateReminder = () => {
                                         >
                                             <div className="icon">{event.icon}</div>
                                             <div className="phase">{event.phase}</div>
+                                            {/* 目前階段與已結束不只靠顏色、框線：補上視覺隱藏文字，報讀器也聽得到 */}
+                                            {isCurrent && <div className="visually-hidden">（目前階段）</div>}
+                                            {!isCurrent && isPast && <div className="visually-hidden">（已結束）</div>}
                                             <div className="date">
                                                 {event.date.toLocaleDateString('zh-TW', { year: 'numeric', month: 'numeric', day: 'numeric' })}
                                             </div>

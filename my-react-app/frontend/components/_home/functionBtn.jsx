@@ -7,44 +7,36 @@ import { Link } from "react-router-dom";
 const FUNCTION_CARDS = [
     {
         id: "search",
-        tag: "DICTIONARY",
         letter: "辭",
         title: "單詞查詢",
         desc: "查詢族語單詞的詞義、發音與例句。",
         route: "/search",
-        headerBg: "linear-gradient(90deg,var(--yy-green),var(--yy-blue-light),var(--yy-green))",
         memberOnly: false,
     },
     {
         id: "vision",
-        tag: "VISION",
         letter: "影",
         title: "影像辨識",
         desc: "用相機拍下身邊的物件，查到對應的族語詞彙與發音，並存進個人詞語庫。",
         route: "/camera",
-        headerBg: "linear-gradient(90deg,var(--yy-blue),var(--yy-red),var(--yy-blue))",
         enabledKey: "button1",
         memberOnly: true,
     },
     {
         id: "game",
-        tag: "GAME",
         letter: "戲",
         title: "詞彙遊戲",
         desc: "詞彙填字、聽力、發音與句型四款遊戲，答錯的詞會在後續練習中再出現。",
         route: "/game",
-        headerBg: "linear-gradient(90deg,var(--yy-red),var(--yy-gold),var(--yy-red))",
         enabledKey: "button2",
         memberOnly: true,
     },
     {
         id: "quiz",
-        tag: "QUIZ",
         letter: "測",
         title: "測驗學習",
         desc: "依你的語言能力調整題目難度，提供個人化的學習評估。",
         route: "/quiz/select",
-        headerBg: "linear-gradient(90deg,var(--yy-gold),var(--yy-red),var(--yy-gold))",
         enabledKey: "button3",
         memberOnly: true,
     },
@@ -63,15 +55,11 @@ const FunctionBtn = ({ enabled = DEFAULT_ENABLED, isGuest = false }) => {
     return (
         <section className="function-section" aria-labelledby="function-section-title">
             <div className="function-section-header">
-                <span className="yy-eyebrow">LEARNING TOOLS</span>
                 <h2 className="function-section-title" id="function-section-title">功能模組</h2>
             </div>
-            {/* 整張卡片就是一個 Link：原本外層 div 用 onClick 導頁、內部又包一顆
-                真正的 button 並呼叫 stopPropagation 避免導頁兩次觸發——鍵盤只能
-                停在內部按鈕，滑鼠卻整張卡片都能點，操作範圍不一致。改成單一 Link
-                後滑鼠鍵盤的可互動範圍相同，「前往體驗 →」變成純視覺文字。
+            {/* 整個項目就是一個 Link：滑鼠鍵盤的可互動範圍相同，「前往體驗 →」是純視覺文字。
                 無障礙名稱只取標題（與「會員」標記），說明放 aria-describedby，
-                報讀器不會把標籤、菱形、整段說明一次唸完。 */}
+                報讀器不會把整段說明一次唸完。 */}
             <div className="card-container">
                 {visibleCards.map((card) => {
                     const showMember = isGuest && card.memberOnly;
@@ -81,20 +69,17 @@ const FunctionBtn = ({ enabled = DEFAULT_ENABLED, isGuest = false }) => {
                         <Link
                             key={card.route}
                             to={card.route}
-                            className="home-func-card yy-card--hover"
+                            className="home-func-card"
                             aria-labelledby={showMember ? `${titleId} ${memberId}` : titleId}
                             aria-describedby={`function-card-${card.id}-desc`}
                         >
-                            <div className="card-head" style={{ background: card.headerBg }}>
-                                <span className="card-tag" aria-hidden="true">{card.tag}</span>
+                            <span className="card-top">
+                                <span className="card-letter" aria-hidden="true">{card.letter}</span>
                                 {showMember && <span className="card-member" id={memberId}>會員</span>}
-                            </div>
-                            <div className="card-content">
-                                <div className="card-letter" aria-hidden="true">{card.letter}</div>
-                                <h3 id={titleId}>{card.title}</h3>
-                                <p id={`function-card-${card.id}-desc`}>{card.desc}</p>
-                                <span className="card-cta" aria-hidden="true">前往體驗 →</span>
-                            </div>
+                            </span>
+                            <h3 id={titleId}>{card.title}</h3>
+                            <p id={`function-card-${card.id}-desc`}>{card.desc}</p>
+                            <span className="card-cta" aria-hidden="true">前往體驗 →</span>
                         </Link>
                     );
                 })}

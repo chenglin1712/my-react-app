@@ -1,34 +1,11 @@
 .exam-info-card {
     position: relative;
     overflow: hidden;
-    border-radius: var(--yy-radius-card, 10px);
-    background: var(--yy-surface);
-    color: var(--yy-ink);
-    border: var(--yy-border-width) solid var(--yy-ink);
-}
-
-.circle {
-    position: absolute;
-    background: var(--yy-cream);
-    border-radius: 50%;
-}
-
-.circle.top-right {
-    top: 0;
-    right: 0;
-    width: 6rem;
-    height: 6rem;
-    margin-top: -3rem;
-    margin-right: -3rem;
-}
-
-.circle.bottom-left {
-    bottom: 0;
-    left: 0;
-    width: 4rem;
-    height: 4rem;
-    margin-bottom: -2rem;
-    margin-left: -2rem;
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-text);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    font-family: var(--yy-font-body);
 }
 
 .date-reminder-content {
@@ -42,36 +19,34 @@
     justify-content: center;
     gap: 0.5rem;
     margin-bottom: 0.5rem;
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
 }
 
 .countdown-box {
-    background: var(--yy-cream);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: 0.75rem;
+    background: var(--yy-calm-info-bg);
+    border: 1px solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
     padding: 1rem;
     font-variant-numeric: tabular-nums;
 }
 
 .days-left {
-    font-family: var(--yy-font-pixel, 'Noto Sans', 'Noto Sans TC', sans-serif);
+    font-family: var(--yy-font-heading);
     font-size: 1.875rem;
     font-weight: 700;
     margin-bottom: 0.25rem;
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
 }
 
 .days-label {
     font-size: 0.875rem;
-    opacity: 0.8;
-    color: var(--yy-text-tertiary);
+    color: var(--yy-calm-text-sub);
 }
 
 .date-range {
-    font-size: 0.75rem;
-    opacity: 0.7;
+    font-size: 0.875rem;
     margin-top: 0.5rem;
-    color: var(--yy-text-muted);
+    color: var(--yy-calm-text-sub);
 }
 
 .schedule {
@@ -81,9 +56,8 @@
 .schedule-title {
     font-size: 0.875rem;
     font-weight: 700;
-    opacity: 0.9;
     margin-bottom: 0.5rem;
-    color: var(--yy-red);
+    color: var(--yy-calm-text);
 }
 
 .schedule-grid {
@@ -95,12 +69,11 @@
 .schedule-item {
     text-align: center;
     padding: 0.5rem;
-    border-radius: 0.5rem;
-    font-size: 0.75rem;
-    transition: var(--transition-interactive);
-    background: var(--yy-cream);
-    color: var(--yy-text-secondary);
-    border: 1.5px solid transparent;
+    border-radius: var(--yy-ui-radius);
+    font-size: 0.875rem;
+    background: var(--yy-calm-bg);
+    color: var(--yy-calm-text-sub);
+    border: 1px solid var(--yy-calm-rule);
 }
 
 .schedule-item .icon {
@@ -111,55 +84,50 @@
     font-weight: 700;
 }
 
-.schedule-item .date {
-    opacity: 0.8;
-}
-
 .schedule-item .days {
-    font-size: 0.75rem;
-    opacity: 0.7;
+    font-size: 0.875rem;
     margin-top: 0.25rem;
 }
 
+/* 目前進行中的項目用深色細框與較重的字標出，不只靠顏色 */
 .schedule-item.current {
-    background: var(--yy-surface);
-    border-color: var(--yy-gold);
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    color: var(--yy-calm-text);
+    font-weight: 600;
 }
 
+/* 已過的項目只換成次要文字色、去掉底色，不用透明度（透明度會讓字的對比低於 4.5:1） */
 .schedule-item.past {
-    opacity: 0.55;
-}
-
-.schedule-item.upcoming {
-    background: var(--yy-cream);
+    color: var(--yy-calm-text-sub);
+    background: transparent;
 }
 
 .schedule-loading-text,
 .schedule-error-text {
-    font-size: 0.85rem;
-    opacity: 0.7;
+    font-size: 0.875rem;
+    color: var(--yy-calm-text-sub);
     text-align: center;
     margin-top: 0.5rem;
 }
 
 .note {
-    font-size: 0.75rem;
-    opacity: 0.7;
+    font-size: 0.875rem;
     text-align: center;
     margin-top: 1rem;
     line-height: 1.5;
-    color: var(--yy-text-muted);
+    color: var(--yy-calm-text-sub);
 }
 
 .toast-notification {
   position: fixed;
   top: 20px;
   right: 20px;
-  background-color: var(--yy-surface);
-  border: var(--yy-border-width) solid var(--yy-ink);
-  border-left: 6px solid var(--yy-gold);
+  background-color: var(--yy-calm-info-bg);
+  color: var(--yy-calm-text);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
   padding: 1rem 1.5rem;
-  border-radius: var(--yy-radius-btn);
+  border-radius: var(--yy-ui-radius);
   z-index: var(--yy-z-toast);
   width: fixed;
 }
@@ -172,11 +140,11 @@
 }
 
 .toast-body {
-  font-size: 14px;
+  font-size: var(--yy-text-sm);
 }
 
 .toast-link {
-  color: var(--yy-red);
+  color: var(--yy-calm-accent);
   text-decoration: underline;
   font-weight: 700;
 }
@@ -196,8 +164,8 @@
 .dismiss-forever-btn {
     background: none;
     border: none;
-    color: var(--yy-text-tertiary);
-    font-size: 0.85rem;
+    color: var(--yy-calm-text-sub);
+    font-size: 0.875rem;
     cursor: pointer;
     text-decoration: underline;
 }
@@ -207,7 +175,7 @@
     align-items: center;
     margin-top: 10px;
     font-size: 0.9rem;
-    color: var(--yy-text-tertiary);
+    color: var(--yy-calm-text-sub);
 }
 
 .checkbox-label input[type="checkbox"] {

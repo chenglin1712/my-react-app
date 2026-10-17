@@ -56,6 +56,15 @@ describe('FunctionBtn', () => {
     expect(link).toHaveAccessibleDescription(/相機/);
   });
 
+  test('沒有裝飾用的英文標籤與漸層標頭；單字標記不被報讀器唸出', () => {
+    const { container } = renderBtn({ isGuest: true });
+    expect(screen.queryByText('DICTIONARY')).not.toBeInTheDocument();
+    expect(screen.queryByText('LEARNING TOOLS')).not.toBeInTheDocument();
+    expect(container.querySelector('.card-head')).toBeNull();
+    expect(container.querySelector('[style*="gradient"]')).toBeNull();
+    container.querySelectorAll('.card-letter, .card-cta').forEach((el) => expect(el).toHaveAttribute('aria-hidden', 'true'));
+  });
+
   test('卡片標題是 h3，在「功能模組」h2 底下', () => {
     renderBtn();
     expect(screen.getByRole('heading', { level: 2, name: '功能模組' })).toBeInTheDocument();

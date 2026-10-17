@@ -1,112 +1,52 @@
+/* 首頁功能入口（S7-2，沉穩文藝）。顏色一律取 --yy-calm-* 語意層。
+   四個入口是「頂端一條細線的欄」，不是四張有框的卡片；整個項目是一個連結。 */
+
 .function-section {
-    padding: 10px 56px 40px;
+    max-width: 1200px;
+    margin: var(--yy-space-6) auto;
+    padding: 0 24px var(--yy-space-5);
+    font-family: var(--yy-font-body);
+    color: var(--yy-calm-text);
 }
 
 .function-section-header {
-    text-align: center;
-    margin-bottom: 44px;
+    margin-bottom: var(--yy-space-5);
+    padding-bottom: var(--yy-space-1);
+    border-bottom: 3px double var(--yy-calm-line);
 }
 
 .function-section-title {
-    font-size: 32px;
-    margin: 12px 0 0;
-    font-weight: 900;
-    color: var(--yy-ink);
+    margin: 0;
+    font-family: var(--yy-font-heading);
+    font-size: var(--yy-text-2xl);
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: 0.06em;
+    color: var(--yy-calm-text);
 }
 
-/* 四張卡：寬螢幕一排四張，中等寬度兩欄，手機單欄；欄寬由 grid 決定，不寫死卡片寬度（窄螢幕不會被裁切） */
+/* 手機單欄，720px 以上兩欄，1100px 以上一排四個；欄寬由 grid 決定，不寫死 */
 .card-container {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
-    gap: 26px;
-    max-width: 1240px;
-    margin: 0 auto;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--yy-space-5);
 }
 
 .home-func-card {
-    /* 整張卡片從 div 換成 <Link>（渲染成 <a>）之後才需要這幾行：<a> 預設是
-       inline，width 不會生效；也要蓋掉瀏覽器對連結預設的底線/顏色。 */
-    display: block;
-    text-decoration: none;
-    color: inherit;
-    background: var(--yy-surface);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-card);
+    position: relative;
+    display: flex;
+    flex-direction: column;
     min-width: 0;
-    overflow: hidden;
-    cursor: pointer;
-    padding: 0;
-    margin: 0;
+    padding: var(--yy-space-4) 0 var(--yy-space-2);
+    color: inherit;
+    text-decoration: none;
+    border-top: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    transition: transform 120ms var(--ease-out);
 }
 
-.card-head {
-    padding: 14px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 3px solid var(--yy-ink);
-}
-
-/* 標籤與菱形放在墨色底板上，不直接壓在漸層（含金色端點的漸層，米白字只有 1.9:1） */
-.card-tag {
-    font-family: var(--yy-font-pixel);
-    font-size: 12px;
-    color: var(--yy-cream);
-    background: var(--yy-ink);
-    padding: 2px 10px;
-    border-radius: var(--yy-radius-btn);
-}
-
-/* 需要登入的功能，訪客看到的標記（文字 + 邊框，不只靠顏色） */
-.card-member {
-    font-family: var(--yy-font-pixel);
-    font-size: var(--yy-text-xs);
-    padding: 2px var(--yy-space-2);
-    background: var(--yy-cream);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
-    color: var(--yy-ink);
-}
-
-.card-content {
-    padding: 26px 24px 28px;
-    text-align: left;
-}
-
-.card-letter {
-    width: 44px;
-    height: 44px;
-    border-radius: var(--yy-radius-btn);
-    background: var(--yy-cream);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 800;
-    font-size: 18px;
-    color: var(--yy-red);
-    margin-bottom: 16px;
-}
-
-.card-content h3 {
-    color: var(--yy-ink);
-    font-size: 18px;
-    margin-bottom: 10px;
-    font-weight: 800;
-}
-
-.card-content p {
-    font-size: 14px;
-    line-height: 1.7;
-    color: var(--yy-text-tertiary);
-    margin-bottom: 18px;
-}
-
-.card-cta {
-    display: inline-block;
-    color: var(--yy-red);
-    font-family: var(--yy-font-pixel);
-    font-size: 14px;
+.home-func-card:active {
+    transform: scale(var(--yy-ui-press));
 }
 
 .home-func-card:focus-visible {
@@ -114,16 +54,100 @@
     outline-offset: var(--yy-ui-focus-offset);
 }
 
-@media (max-width: 720px) {
+.card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--yy-space-2);
+    margin-bottom: var(--yy-space-3);
+}
+
+/* 單字當作編輯式的標記：44px 見方的細框，只是裝飾（報讀器不唸） */
+.card-letter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--yy-control-md);
+    height: var(--yy-control-md);
+    font-family: var(--yy-font-heading);
+    font-size: var(--yy-text-lg);
+    font-weight: 700;
+    color: var(--yy-calm-text);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+}
+
+/* 需要登入的功能，訪客看到的標記（文字，不只靠顏色） */
+.card-member {
+    padding: 2px var(--yy-space-2);
+    font-size: var(--yy-text-sm);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--yy-calm-tag-on);
+    background: var(--yy-calm-tag);
+    border-radius: var(--yy-ui-radius);
+}
+
+.home-func-card h3 {
+    margin: 0 0 var(--yy-space-2);
+    font-family: var(--yy-font-heading);
+    font-size: var(--yy-text-xl);
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--yy-calm-text);
+}
+
+.home-func-card p {
+    margin: 0 0 var(--yy-space-3);
+    font-size: var(--yy-text-base);
+    line-height: 1.7;
+    color: var(--yy-calm-text-sub);
+}
+
+/* 項目整個可點；這行字本身撐出 44px 高，貼在項目底部 */
+.card-cta {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--yy-control-md);
+    margin-top: auto;
+    font-size: var(--yy-text-sm);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--yy-calm-accent);
+}
+
+/* hover 只給有滑鼠的裝置：標題換成強調色加底線，不位移 */
+@media (hover: hover) and (pointer: fine) {
+    .home-func-card:hover h3 {
+        color: var(--yy-calm-accent);
+        text-decoration: underline;
+        text-underline-offset: 4px;
+    }
+}
+
+@media (min-width: 720px) {
     .function-section {
-        padding: 10px 20px 32px;
+        padding: 0 56px var(--yy-space-6);
     }
 
-    .function-section-header {
-        margin-bottom: 28px;
+    .card-container {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: var(--yy-space-6);
+    }
+}
+
+@media (min-width: 1100px) {
+    .card-container {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .home-func-card {
+        transition: none;
     }
 
-    .card-content {
-        padding: 20px 20px 22px;
+    .home-func-card:active {
+        transform: none;
     }
 }

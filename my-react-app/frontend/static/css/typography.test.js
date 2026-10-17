@@ -70,13 +70,16 @@ describe("字級", () => {
   it("原本用像素字搭中文的元素，字級仍不低於 14px（Silkscreen 已移除，字級下限保留）", () => {
     [
       ["static/css/_home/functionBtn.css", ".card-cta"],
-      ["static/css/_home/index.css", ".home-feature-head"],
       ["static/css/_translate/index.css", ".translate-direction-label"],
       ["static/css/_quiz/quiz_panel_start.css", ".scenario-entry-badge"],
       ["static/css/default/theme-v2.css", ".yy-eyebrow--zh"],
     ].forEach(([file, selector]) => {
-      const size = ruleBody(fileText(file), selector).match(/font-size:\s*(\d+)px/);
-      expect(Number(size[1]), `${file} ${selector}`).toBeGreaterThanOrEqual(14);
+      const body = ruleBody(fileText(file), selector);
+      // 字級可以直接寫 px，或用 --yy-text-sm（14px）以上的 token
+      const px = body.match(/font-size:\s*(\d+)px/);
+      const token = body.match(/font-size:\s*var\(--yy-text-(sm|base|lg|xl|2xl|3xl)\)/);
+      expect(px || token, `${file} ${selector}`).toBeTruthy();
+      if (px) expect(Number(px[1]), `${file} ${selector}`).toBeGreaterThanOrEqual(14);
     });
   });
 
