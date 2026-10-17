@@ -1,12 +1,19 @@
+.camera-page .yy-hero::before,
+.camera-hero::before {
+    display: none;
+}
+
 .camera-hero {
     padding-bottom: 30px;
 }
 
 .camera-title {
-    font-size: 40px;
-    margin: 10px 0 12px;
-    font-weight: 900;
-    color: var(--yy-ink);
+    font-family: var(--yy-font-heading);
+    font-size: var(--yy-text-3xl);
+    margin: var(--yy-space-2) 0;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--yy-calm-text);
 }
 
 .camera-desc {
@@ -14,7 +21,7 @@
     margin: 0 auto;
     font-size: 16px;
     line-height: 1.8;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
 }
 
 .camera-tribe-row {
@@ -49,14 +56,27 @@
 .camera-dropzone {
     width: 340px;
     height: 340px;
-    border-radius: var(--yy-radius-card);
-    background: var(--yy-surface);
-    border: var(--yy-border-width) dashed var(--yy-ink);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) dashed var(--yy-calm-line);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     overflow: hidden;
+    transition: background-color var(--dur-fast) var(--ease-out);
+}
+
+.camera-dropzone:focus-visible,
+.camera-dropzone:focus-within {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .camera-dropzone:hover {
+        background: var(--yy-calm-info-bg);
+    }
 }
 
 .camera-dropzone-img {
@@ -70,7 +90,7 @@
     flex-direction: column;
     align-items: center;
     gap: 10px;
-    color: var(--yy-text-muted);
+    color: var(--yy-calm-text-sub);
 }
 
 .camera-dropzone-placeholder svg {
@@ -90,8 +110,12 @@
     gap: 16px;
 }
 
-.camera-step1-card {
-    padding: 20px;
+.camera-page .yy-card.camera-step1-card {
+    padding: var(--yy-space-4) 0 0;
+    background: transparent;
+    border: none;
+    border-top: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: 0;
 }
 
 .camera-step1-row {
@@ -101,16 +125,16 @@
 }
 
 .camera-filename {
-    font-size: 13px;
-    color: var(--yy-text-tertiary);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .camera-hint {
-    font-size: 13px;
-    color: var(--yy-text-muted);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
     margin: 10px 0 0;
 }
 
@@ -138,10 +162,10 @@
 .camera-step2-preview {
     width: 300px;
     height: 300px;
-    border-radius: var(--yy-radius-card);
-    border: var(--yy-border-width) solid var(--yy-ink);
+    border-radius: var(--yy-ui-radius);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     overflow: hidden;
-    background: var(--yy-cream-dim);
+    background: var(--yy-calm-info-bg);
 }
 
 .camera-step2-preview img {
@@ -155,20 +179,21 @@
 }
 
 .camera-step2-title {
-    font-size: 18px;
-    font-weight: 800;
+    font-family: var(--yy-font-heading);
+    font-size: var(--yy-text-lg);
+    font-weight: 700;
     margin: 0 0 4px;
 }
 
 .camera-step2-sub {
-    font-size: 13px;
-    color: var(--yy-text-tertiary);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
     margin: 0 0 16px;
 }
 
 .camera-step2-sub span {
-    color: var(--yy-red);
-    font-weight: 800;
+    color: var(--yy-calm-accent);
+    font-weight: 700;
 }
 
 .camera-loading {
@@ -177,7 +202,7 @@
     gap: 10px;
     padding: 10px 0;
     font-weight: 600;
-    color: var(--yy-text-secondary);
+    color: var(--yy-calm-text-sub);
 }
 
 .camera-error-actions {
@@ -193,8 +218,8 @@
 }
 
 .camera-privacy {
-    font-size: 13px;
-    color: var(--yy-text-secondary);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
     margin: 8px 0 0;
 }
 
@@ -221,24 +246,48 @@
     align-items: center;
     justify-content: space-between;
     width: 100%;
+    min-height: var(--yy-control-md);
     padding: 12px 16px;
-    border-radius: var(--yy-radius-btn);
-    border: var(--yy-border-width) solid var(--yy-ink);
-    background: var(--yy-surface);
-    color: var(--yy-ink);
+    border-radius: var(--yy-ui-radius);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-text);
     font: inherit;
     text-align: inherit;
     cursor: pointer;
+    transition: background-color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
+}
+
+.camera-label-item:active {
+    transform: scale(var(--yy-ui-press));
+}
+
+.camera-label-item:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .camera-label-item:hover {
+        background: var(--yy-calm-info-bg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .camera-label-item:active {
+        transform: none;
+    }
 }
 
 .camera-label-name {
     font-weight: 700;
-    font-size: 15px;
+    font-size: var(--yy-text-base);
 }
 
 .camera-label-score {
-    font-family: var(--yy-font-pixel);
-    font-size: 12px;
+    font-family: var(--yy-font-body);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
     font-variant-numeric: tabular-nums;
 }
 

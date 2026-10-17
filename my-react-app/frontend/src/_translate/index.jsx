@@ -235,7 +235,6 @@ const TranslatePage = () => {
         <div className="yy-page translate-page">
             <section className="yy-hero translate-hero">
                 <div className="yy-fade-up">
-                    <span className="yy-eyebrow">TRANSLATE MODE</span>
                     <h1 className="translate-title">族語翻譯</h1>
                     <p className="translate-desc">
                         以辭典語料為依據，逐詞標示有沒有語料佐證。有佐證只代表這個詞在資料庫裡查得到，不代表整句翻譯一定正確。

@@ -3,7 +3,6 @@
   "css": {
     "static/css/_morphology/index.css": 1,
     "static/css/_quiz/review_AI.css": 6,
-    "static/css/_search/index.css": 2,
     "static/css/default/theme-v2.css": 2
   },
   "js": {

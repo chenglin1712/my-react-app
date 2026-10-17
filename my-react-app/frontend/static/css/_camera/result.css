@@ -29,8 +29,9 @@
 }
 
 .camera-step3-title {
-  font-size: 22px;
-  font-weight: 900;
+  font-family: var(--yy-font-heading);
+  font-size: var(--yy-text-xl);
+  font-weight: 700;
   margin: 0;
 }
 
@@ -39,21 +40,27 @@
 }
 
 .camera-step3 .list-group-item {
-  border: var(--yy-border-width) solid var(--yy-ink) !important;
-  border-radius: var(--yy-radius-card) !important;
-  margin-bottom: 14px;
-  padding: 18px 20px;
+  border: none !important;
+  border-bottom: 1px solid var(--yy-calm-rule) !important;
+  border-radius: 0 !important;
+  background: transparent;
+  color: var(--yy-calm-text);
+  margin-bottom: 0;
+  padding: var(--yy-space-3) var(--yy-space-1);
 }
 
 .camera-step3 .list-group-item .list-group-item {
   border: none !important;
-  border-top: 2px dashed rgba(34, 24, 18, 0.2) !important;
+  border-top: 1px solid var(--yy-calm-rule) !important;
   border-radius: 0 !important;
   box-shadow: none;
   margin-bottom: 0;
 }
 
-.camera-step3 h4.fw-bold {
-  font-family: var(--yy-font-pixel);
-  font-size: 16px;
+.camera-step3 h4.fw-bold,
+.camera-step3 h2.h4.fw-bold {
+  font-family: var(--yy-font-heading);
+  font-size: var(--yy-text-lg);
+  padding-bottom: var(--yy-space-1);
+  border-bottom: 3px double var(--yy-calm-line);
 }

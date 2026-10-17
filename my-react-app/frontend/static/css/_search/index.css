@@ -1,7 +1,9 @@
+/* 單詞查詢頁（S8-1，沉穩文藝）。顏色取 --yy-calm-*；結果是帶細線的清單列，不是有框的卡片。 */
+
 .search-header-block {
-  padding-bottom: 1rem;
-  margin-bottom: 1rem;
-  border-bottom: 2px solid var(--yy-ink);
+  padding-bottom: var(--yy-space-4);
+  margin-bottom: var(--yy-space-4);
+  border-bottom: 3px double var(--yy-calm-line);
 }
 
 /* 捲出頁首後才浮出的精簡搜尋列（CompactSearchBar.jsx）。
@@ -22,13 +24,13 @@
   max-width: 820px;
   margin: 0 auto;
   padding: 8px 10px;
-  background: var(--yy-cream);
-  border: var(--yy-border-width) solid var(--yy-ink);
-  border-radius: var(--yy-radius-card);
+  background: var(--yy-calm-surface);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-ui-radius);
   opacity: 0;
   transform: translateY(-14px);
   pointer-events: none;
-  transition: opacity .22s ease-out, transform .28s cubic-bezier(.2, .7, .3, 1);
+  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
 }
 .search-compact-bar.is-visible {
   opacity: 1;
@@ -37,12 +39,11 @@
 }
 .search-compact-tribe {
   flex-shrink: 0;
-  padding: 4px 10px;
-  color: var(--yy-cream);
-  background: var(--yy-red);
-  border: var(--yy-border-width) solid var(--yy-ink);
-  border-radius: var(--yy-radius-btn);
-  font-size: 13px;
+  padding: 2px var(--yy-space-2);
+  color: var(--yy-calm-tag-on);
+  background: var(--yy-calm-tag);
+  border-radius: var(--yy-ui-radius);
+  font-size: var(--yy-text-sm);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -56,105 +57,115 @@
   white-space: nowrap;
 }
 
-/* ── 頁首 hero ──────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .search-compact-bar {
+    transform: none;
+    transition: opacity var(--dur-fast) var(--ease-out);
+  }
+}
+
+/* ── 頁首 ──────────────────────────────── */
 .search-hero-head {
   text-align: center;
-  margin-top: 1rem;
+  margin-top: var(--yy-space-4);
 }
 
 .search-hero-title {
-  font-size: 34px;
-  margin: 10px 0 10px;
-  font-weight: 900;
-  color: var(--yy-ink);
+  font-family: var(--yy-font-heading);
+  font-size: var(--yy-text-3xl);
+  margin: var(--yy-space-2) 0;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--yy-calm-text);
 }
 
 .search-hero-desc {
-  font-size: 15px;
-  color: var(--yy-text-secondary);
-  margin: 0 0 1rem;
+  font-size: var(--yy-text-base);
+  color: var(--yy-calm-text-sub);
+  margin: 0 0 var(--yy-space-4);
 }
 
-/* ── 族語選擇器（YUAN・YU v2：赭紅/靛藍/綠/藍綠/赤金）───── */
+/* ── 族語選擇器 ───── */
 .tribe-selector {
   display: flex;
-  gap: 0.6rem;
+  gap: var(--yy-space-2);
   flex-wrap: wrap;
   justify-content: center;
-  margin: 1rem 0 1.25rem;
+  margin: var(--yy-space-4) 0 var(--yy-space-5);
 }
 
 .tribe-btn {
-  padding: 9px 18px;
-  border-radius: var(--yy-radius-btn);
-  border: var(--yy-border-width) solid var(--yy-ink);
-  background: var(--yy-surface);
-  color: var(--yy-ink);
-  font-size: 15px;
+  min-height: var(--yy-control-md);
+  padding: 0 var(--yy-space-4);
+  border-radius: var(--yy-ui-radius);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  background: var(--yy-calm-surface);
+  color: var(--yy-calm-text);
+  font-size: var(--yy-text-base);
   font-weight: 700;
   font-family: var(--yy-font-body);
   cursor: pointer;
-  transition: var(--transition-interactive);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
   white-space: nowrap;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .tribe-btn:hover {
-    transform: translateY(-2px);
+    background: var(--yy-calm-info-bg);
   }
 }
 
 .tribe-btn:active {
-  transform: scale(0.97);
+  transform: scale(var(--yy-ui-press));
 }
 
+.tribe-btn:focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
+}
+
+/* 選取靠底色與文字反白，所有族語同一個色，不再各給一種顏色 */
 .tribe-btn.active {
-  background: var(--yy-red);
-  color: var(--yy-surface);
-  transform: translateY(-1px);
+  background: var(--yy-calm-accent);
+  border-color: var(--yy-calm-accent);
+  color: var(--yy-calm-accent-on);
 }
 
-.tribe-btn.active:active {
-  transform: scale(0.97);
+/* 選取不只靠顏色：前面多一個勾（替代文字留空，報讀器只靠 aria-pressed） */
+.tribe-btn.active::before {
+  content: "¹3" / "";
+  margin-right: var(--yy-space-1);
 }
 
-/* 各族語顏色 */
-.tribe-btn[data-tribe="阿美"].active              { background: var(--yy-blue); }
-.tribe-btn[data-tribe="布農"].active              { background: var(--yy-green); }
-.tribe-btn[data-tribe="噶瑪蘭"].active            { background: var(--yy-blue-light); }
-.tribe-btn[data-tribe="排灣"].active              { background: var(--yy-gold); color: var(--yy-ink); }
+@media (prefers-reduced-motion: reduce) {
+  .tribe-btn:active {
+    transform: none;
+  }
+}
 
-/* 空白狀態徽章顏色 */
-.tribe-empty-badge[data-tribe="泰雅"]   { background: var(--yy-red); }
-.tribe-empty-badge[data-tribe="阿美"]   { background: var(--yy-blue); }
-.tribe-empty-badge[data-tribe="布農"]   { background: var(--yy-green); }
-.tribe-empty-badge[data-tribe="噶瑪蘭"] { background: var(--yy-blue-light); }
-.tribe-empty-badge[data-tribe="排灣"]   { background: var(--yy-gold); color: var(--yy-ink); }
-
-/* ── 搜尋卡：終端機輸入框 + 篩選列 ─────────────── */
+/* ── 搜尋區：輸入列 + 篩選列（一整條細框，不是卡片）─────────────── */
 .search-card {
   max-width: 720px;
-  margin: 0 auto 20px;
-  padding: 22px 26px;
+  margin: 0 auto var(--yy-space-5);
+  padding: 0;
 }
 
 .search-terminal {
-  background: linear-gradient(160deg, #264C73, #1B3452);
-  border: var(--yy-border-width) solid var(--yy-gold);
-  border-radius: var(--yy-radius-btn);
+  background: var(--yy-calm-surface);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-ui-radius);
   overflow: hidden;
-  margin-bottom: 18px;
+  margin-bottom: var(--yy-space-3);
 }
 
 .search-terminal-prompt {
   display: flex;
   align-items: center;
-  padding: 0 0 0 16px;
+  padding: 0 0 0 var(--yy-space-4);
   background: transparent;
   border: none;
-  color: var(--yy-gold);
-  font-family: var(--yy-font-pixel);
-  font-size: 16px;
+  color: var(--yy-calm-text-sub);
+  font-size: var(--yy-text-base);
 }
 
 .search-terminal-input,
@@ -162,14 +173,15 @@
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  color: var(--yy-cream) !important;
-  font-family: var(--yy-font-pixel);
-  font-size: 14px;
-  padding: 14px 10px;
+  color: var(--yy-calm-text) !important;
+  font-family: var(--yy-font-body);
+  font-size: var(--yy-text-sm);
+  min-height: var(--yy-control-md);
+  padding: var(--yy-space-3) var(--yy-space-2);
 }
 
 .search-terminal-input::placeholder {
-  color: rgba(243, 231, 207, 0.6);
+  color: var(--yy-calm-text-sub);
 }
 
 /* iOS Safari 聚焦字級小於 16px 的輸入框會自動放大頁面 */
@@ -181,20 +193,37 @@
 }
 
 .search-go-btn.btn {
-  background: var(--yy-gold);
+  min-height: var(--yy-control-md);
+  background: var(--yy-calm-accent);
   border: none;
-  border-left: 2px solid var(--yy-gold);
-  color: var(--yy-ink);
-  font-family: var(--yy-font-pixel);
+  border-radius: 0;
+  color: var(--yy-calm-accent-on);
   font-weight: 700;
-  font-size: 13px;
-  padding: 0 20px;
+  font-size: var(--yy-text-sm);
+  padding: 0 var(--yy-space-4);
+  transition: background-color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
 }
 
-.search-go-btn.btn:hover,
+.search-go-btn.btn:active {
+  transform: scale(var(--yy-ui-press));
+}
+
 .search-go-btn.btn:disabled {
-  background: var(--yy-gold-light);
-  color: var(--yy-ink);
+  background: var(--yy-calm-info-bg);
+  color: var(--yy-calm-text-sub);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .search-go-btn.btn:hover:not(:disabled) {
+    background: var(--yy-calm-text);
+    color: var(--yy-calm-bg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-go-btn.btn:active {
+    transform: none;
+  }
 }
 
 /* ── 族語空白狀態 ──────────────────────────── */
@@ -203,61 +232,71 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 5rem 2rem;
+  padding: var(--yy-space-8) var(--yy-space-5);
   text-align: center;
 }
 
+/* 沒有各族語顏色：統一用石板灰底的方塊，文字就是族語名稱 */
 .tribe-empty-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 90px;
-  height: 90px;
-  border-radius: 50%;
-  color: var(--yy-surface);
-  font-size: 1.5rem;
-  font-weight: 800;
-  font-family: var(--yy-font-body);
-  margin-bottom: 1.25rem;
+  width: 80px;
+  height: 80px;
+  border-radius: var(--yy-ui-radius);
+  background: var(--yy-calm-block);
+  color: var(--yy-calm-block-on);
+  font-size: var(--yy-text-xl);
+  font-weight: 700;
+  font-family: var(--yy-font-heading);
+  margin-bottom: var(--yy-space-4);
 }
 
 .tribe-empty-title {
-  font-size: 1.5rem;
+  font-size: var(--yy-text-xl);
   font-weight: 700;
-  color: var(--yy-text-secondary);
-  margin-bottom: 0.5rem;
+  color: var(--yy-calm-text);
+  margin-bottom: var(--yy-space-2);
 }
 
 .tribe-empty-desc {
-  font-size: 1rem;
-  color: var(--yy-text-muted);
+  font-size: var(--yy-text-base);
+  color: var(--yy-calm-text-sub);
   margin: 0;
 }
 
 /* .category-bar／.category-panel／.subcategory-* 已搬到共用的
    components/ui/CategoryBar.jsx + static/css/ui/categoryBar.css。 */
 
-/* ── 查詢結果卡片 ──────────────────────────────── */
+/* ── 查詢結果：一條一條的清單列，只有細線分隔 ──────────────────────────────── */
 .search-page .list-group-item {
-  border: var(--yy-border-width) solid var(--yy-ink) !important;
-  border-radius: var(--yy-radius-card) !important;
-  margin-bottom: 14px;
-  padding: 18px 20px;
+  border: none !important;
+  border-bottom: 1px solid var(--yy-calm-rule) !important;
+  border-radius: 0 !important;
+  background: transparent;
+  color: var(--yy-calm-text);
+  margin-bottom: 0;
+  padding: var(--yy-space-3) var(--yy-space-1);
 }
 
 .search-page .list-group-item .list-group-item {
   border: none !important;
-  border-top: 2px dashed rgba(34, 24, 18, 0.2) !important;
+  border-top: 1px solid var(--yy-calm-rule) !important;
   border-radius: 0 !important;
   box-shadow: none;
   margin-bottom: 0;
+  padding-left: 0;
+  padding-right: 0;
 }
 
-.search-page h4.fw-bold {
-  font-family: var(--yy-font-pixel);
-  font-size: 16px;
+.search-page h4.fw-bold,
+.search-page h2.h4.fw-bold {
+  font-family: var(--yy-font-heading);
+  font-size: var(--yy-text-lg);
   max-width: 720px;
-  margin: 20px auto 14px;
+  margin: var(--yy-space-5) auto var(--yy-space-2);
+  padding-bottom: var(--yy-space-1);
+  border-bottom: 3px double var(--yy-calm-line);
 }
 
 .search-page .list-group {
@@ -265,8 +304,8 @@
   margin: 0 auto;
 }
 
-/* 輸入框本身沒有外框，改在整個終端機輸入列畫焦點框（全站焦點基線見 theme-v2.css） */
+/* 輸入框本身沒有外框，改在整個輸入列畫焦點框（全站焦點基線見 theme-v2.css） */
 .search-terminal:focus-within {
-  outline: 3px solid var(--yy-red);
-  outline-offset: 3px;
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
 }

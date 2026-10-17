@@ -8,6 +8,7 @@
 .word-card-toggle {
   display: block;
   width: 100%;
+  min-height: var(--yy-control-md);
   padding: 4px 0;
   border: 0;
   background: transparent;
@@ -25,9 +26,9 @@
 .word-card-gloss {
   display: block;
   margin-top: 2px;
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: var(--yy-ink);
+  font-size: var(--yy-text-lg);
+  font-weight: 700;
+  color: var(--yy-calm-text);
   overflow-wrap: anywhere;
 }
 
@@ -45,10 +46,31 @@
   transform: rotate(90deg);
 }
 
+.word-card-toggle:focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
+}
+
 .word-card-actions {
   flex-shrink: 0;
 }
 
+/* 播放、收藏鈕是 react-bootstrap 的連結鈕：撐到 44px 見方，按下有縮放回饋 */
+.word-card-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--yy-control-md);
+  min-height: var(--yy-control-md);
+  padding: 0;
+  transition: transform 120ms var(--ease-out);
+}
+
+.word-card-actions .btn:active {
+  transform: scale(var(--yy-ui-press));
+}
+
 @media (prefers-reduced-motion: reduce) {
   .word-card-toggle .word-card-name::after { transition: none; }
+  .word-card-actions .btn:active { transform: none; }
 }
