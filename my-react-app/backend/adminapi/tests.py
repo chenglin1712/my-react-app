@@ -511,6 +511,50 @@ class PublicAnnouncementListTest(TestCase):
         response = self.client.get('/adminapi/public/announcements/')
         self.assertEqual(len(response.json()["results"]), 1)
 
+    def _publish(self, n, category=Announcement.CATEGORY_ANNOUNCEMENT):
+        for i in range(n):
+            Announcement.objects.create(
+                title=f"{category}-{i}", created_by="u", status=Announcement.STATUS_PUBLISHED, category=category,
+            )
+
+    def test_count_is_total_matching_not_page_size(self):
+        self._publish(5)
+        data = self.client.get('/adminapi/public/announcements/?limit=2').json()
+        self.assertEqual(len(data["results"]), 2)
+        self.assertEqual(data["count"], 5)
+
+    def test_offset_pages_without_overlap(self):
+        self._publish(5)
+        first = self.client.get('/adminapi/public/announcements/?limit=3').json()["results"]
+        rest = self.client.get('/adminapi/public/announcements/?limit=3&offset=3').json()["results"]
+        self.assertEqual(len(first), 3)
+        self.assertEqual(len(rest), 2)
+        self.assertFalse({a["id"] for a in first} & {b["id"] for b in rest})
+
+    def test_bad_offset_treated_as_zero(self):
+        self._publish(2)
+        for value in ("abc", "-4", ""):
+            data = self.client.get(f'/adminapi/public/announcements/?offset={value}').json()
+            self.assertEqual(len(data["results"]), 2, value)
+
+    def test_category_filter_applies_to_results_and_count(self):
+        self._publish(2, Announcement.CATEGORY_ACTIVITY)
+        self._publish(3, Announcement.CATEGORY_EXAM)
+        data = self.client.get('/adminapi/public/announcements/?category=exam').json()
+        self.assertEqual(data["count"], 3)
+        self.assertTrue(all(item["category"] == "exam" for item in data["results"]))
+
+    def test_huge_offset_is_capped_not_error(self):
+        self._publish(2)
+        response = self.client.get('/adminapi/public/announcements/?offset=99999999')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["results"], [])
+
+    def test_unknown_category_ignored(self):
+        self._publish(2)
+        data = self.client.get('/adminapi/public/announcements/?category=nope').json()
+        self.assertEqual(data["count"], 2)
+
     def test_internal_fields_not_exposed(self):
         Announcement.objects.create(
             title="公告", created_by="internal-uid", status=Announcement.STATUS_PUBLISHED,

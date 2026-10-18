@@ -185,6 +185,10 @@ def _create_announcement(request, decoded):
     return JsonResponse(AnnouncementSerializer(announcement).data, status=201)
 
 
+# 匿名可打的端點，offset 不設上限的話可以要求資料庫掃很深；所有公告頁一次 20 則，這個上限足夠翻 100 頁
+PUBLIC_ANNOUNCEMENT_MAX_OFFSET = 2000
+
+
 def public_announcement_list(request):
     """首頁用的公開公告清單——不需要登入，任何人都能打。
 
@@ -225,13 +229,25 @@ def public_announcement_list(request):
         '-created_at', '-pk',
     )
 
+    # 分類篩選：只認 Announcement 的四個分類，其餘值（含空字串）當作不篩，不報錯
+    category = request.GET.get("category", "")
+    if category in {value for value, _label in Announcement.CATEGORY_CHOICES}:
+        qs = qs.filter(category=category)
+
     try:
         limit = min(50, max(1, int(request.GET.get("limit", 20))))
     except ValueError:
         limit = 20
+    # offset 給「所有公告」頁的「載入更多」用；壞值、負數都當 0
+    try:
+        offset = min(PUBLIC_ANNOUNCEMENT_MAX_OFFSET, max(0, int(request.GET.get("offset", 0))))
+    except ValueError:
+        offset = 0
 
-    items = list(qs[:limit])
-    return JsonResponse({"results": PublicAnnouncementSerializer(items, many=True).data})
+    # count 是符合條件的總筆數（不受 limit／offset 影響），前端用它算「還有幾則」與要不要顯示載入更多
+    total = qs.count()
+    items = list(qs[offset:offset + limit])
+    return JsonResponse({"count": total, "results": PublicAnnouncementSerializer(items, many=True).data})
 
 
 @csrf_exempt
