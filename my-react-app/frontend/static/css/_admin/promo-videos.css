@@ -1,11 +1,12 @@
 .promo-videos-page { padding-bottom: 64px; }
 .admin-shell .promo-videos-heading, .admin-shell .promo-videos-layout, .promo-videos-page > .alert { max-width: 1180px; margin-left: auto; margin-right: auto; }
 .promo-videos-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
-.promo-videos-heading h1 { margin: 0 0 4px; }
+.promo-videos-heading h1 { margin: 0 0 8px; }
 .promo-videos-heading p { margin: 0; color: var(--admin-muted); }
 .promo-videos-heading .btn:active:not(:disabled), .promo-videos-editor .btn:active:not(:disabled) { transform: scale(0.97); }
 .promo-videos-heading .btn, .promo-videos-editor .btn { transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1); }
 
+.promo-videos-layout.is-solo { grid-template-columns: minmax(0, 1fr); }
 .promo-videos-layout { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); gap: 24px; align-items: start; }
 .promo-videos-list ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .promo-videos-item { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; width: 100%; min-height: 44px; padding: 12px 14px; text-align: left; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: 8px; color: inherit; }
@@ -16,6 +17,7 @@
 .promo-videos-badges { display: flex; flex-wrap: wrap; gap: 6px; }
 
 .promo-videos-detail, .promo-videos-editor { min-width: 0; }
+.promo-videos-detail { container-type: inline-size; }
 .promo-videos-editor { padding: 24px; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: 8px; }
 .promo-videos-editor h2 { margin: 0 0 16px; color: var(--admin-accent); font-size: 20px; font-weight: 700; overflow-wrap: anywhere; }
 .promo-videos-editor h3 { margin: 0 0 8px; font-size: 16px; font-weight: 700; }
@@ -32,6 +34,20 @@
 .promo-videos-publish, .promo-videos-danger { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--admin-border); }
 .promo-videos-publish p, .promo-videos-danger p { margin: 0 0 12px; color: var(--admin-muted); }
 .promo-videos-loading { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 240px; color: var(--admin-muted); }
+
+.promo-videos-editor h2 { padding-bottom: 14px; border-bottom: 1px solid var(--admin-border); }
+.promo-videos-subhead { margin: 0 0 14px !important; color: var(--admin-text-strong); font-size: 15px !important; letter-spacing: 0.04em; }
+.promo-videos-heading + * { margin-top: 20px; }
+
+/* 編輯區夠寬（側邊清單與內容區都撐開）時分兩欄：左邊文字內容，右邊影片、封面、字幕；
+   首頁使用與刪除橫跨整排放在最下面。不夠寬就維持單欄由上往下。 */
+@container (min-width: 760px) {
+  .promo-videos-editor.has-files { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 36px; align-items: start; }
+  .promo-videos-editor.has-files > h2, .promo-videos-editor.has-files > .alert, .promo-videos-publish, .promo-videos-danger, .promo-videos-note { grid-column: 1 / -1; }
+  .promo-videos-files { margin-top: 0; padding-top: 0; border-top: 0; }
+  .promo-videos-player { max-width: none; }
+  .promo-videos-cover { max-width: 100%; }
+}
 
 @media (max-width: 900px) {
   .promo-videos-layout { grid-template-columns: 1fr; }

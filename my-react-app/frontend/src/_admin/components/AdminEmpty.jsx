@@ -1,3 +1,5 @@
+import { useId } from 'react';
+import { Button } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 
 /**
@@ -36,4 +38,30 @@ export default function AdminEmpty({ asCell = false, colSpan = 1, ...rest }) {
         );
     }
     return <AdminEmptyBody {...rest} />;
+}
+
+/**
+ * 整頁空狀態：清單與編輯區並排的頁面（宣傳影片、本期專題），在「一筆都還沒有」時不該把空狀態塞進窄窄的清單欄、
+ * 右邊整片空白。改成佔滿內容區的一個區塊：圖示、標題、一句說明、「怎麼開始」的三個動作與唯一的主要按鈕。
+ * steps：怎麼把內容放上首頁的動作，依序列出；action：{ label, onClick, icon }，頁首不再另外放同樣的新增按鈕。
+ */
+export function AdminEmptyStage({ icon: Icon, title, description, steps = [], action }) {
+    const titleId = useId();
+    return (
+        <section className="admin-empty-stage" aria-labelledby={titleId}>
+            {Icon && <span className="admin-empty-stage__icon" aria-hidden="true"><Icon size={26} /></span>}
+            <h2 className="admin-empty-stage__title" id={titleId}>{title}</h2>
+            {description && <p className="admin-empty-stage__description">{description}</p>}
+            {steps.length > 0 && (
+                <ol className="admin-empty-stage__steps">
+                    {steps.map((step) => <li key={step}>{step}</li>)}
+                </ol>
+            )}
+            {action && (
+                <Button className="admin-empty-stage__action" onClick={action.onClick}>
+                    {action.icon}{action.label}
+                </Button>
+            )}
+        </section>
+    );
 }

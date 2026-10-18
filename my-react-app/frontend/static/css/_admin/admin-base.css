@@ -404,3 +404,81 @@
   0%, 100% { opacity: 1; }
   50% { opacity: .45; }
 }
+
+/* ---------- 整頁空狀態（AdminEmptyStage）---------- */
+.admin-shell .admin-empty-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 1180px;
+  margin: 28px auto 0;
+  padding: 56px 24px 52px;
+  background: var(--admin-surface);
+  border: 1px dashed var(--admin-border-strong);
+  border-radius: 8px;
+  text-align: center;
+}
+.admin-shell .admin-empty-stage__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 18px;
+  color: var(--admin-accent);
+  background: var(--admin-surface-muted);
+  border-radius: 50%;
+}
+.admin-shell .admin-empty-stage__title {
+  margin: 0 0 8px;
+  color: var(--admin-text-strong);
+  font-size: 1.375rem;
+  font-weight: 700;
+}
+.admin-shell .admin-empty-stage__description {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--admin-muted);
+  line-height: 1.7;
+}
+.admin-shell .admin-empty-stage__steps {
+  display: grid;
+  gap: 14px;
+  max-width: 52ch;
+  margin: 24px 0 0;
+  padding: 0;
+  color: var(--admin-text-strong);
+  text-align: left;
+  list-style: none;
+  counter-reset: stage-step;
+}
+.admin-shell .admin-empty-stage__steps li {
+  position: relative;
+  padding-left: 40px;
+  line-height: 1.6;
+  text-wrap: pretty;
+  counter-increment: stage-step;
+}
+.admin-shell .admin-empty-stage__steps li::before {
+  content: counter(stage-step);
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: var(--admin-accent);
+  font-size: var(--yy-text-sm);
+  font-weight: 700;
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 50%;
+}
+.admin-shell .admin-empty-stage__action {
+  margin-top: 28px;
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.admin-shell .admin-empty-stage__action:active:not(:disabled) { transform: scale(0.97); }
+@media (prefers-reduced-motion: reduce) {
+  .admin-shell .admin-empty-stage__action { transition: none; }
+  .admin-shell .admin-empty-stage__action:active:not(:disabled) { transform: none; }
+}

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Badge, Button, Form, Spinner } from 'react-bootstrap';
-import { ImagePlus, Plus, Save, Send, Trash2 } from 'lucide-react';
+import { ImagePlus, Newspaper, Plus, Save, Send, Trash2 } from 'lucide-react';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../../utils/apiClient';
 import { useAuth } from '../../userServives/authContext';
 import { useMediaUpload } from '../hooks/useMediaUpload';
 import { useActionLock } from '../hooks/useActionLock';
 import { useGuardedSelection } from '../hooks/useGuardedSelection';
 import { countChars, formatApiError } from '../apiErrors';
-import AdminEmpty from '../components/AdminEmpty';
+import { AdminEmptyStage } from '../components/AdminEmpty';
 import '../../../static/css/_admin/featured-topics.css';
 
 const CONTENT_EDITORS = ['owner', 'admin', 'editor'];
@@ -343,6 +343,9 @@ function Editor({ topic, role, publishedCount, onChanged, onCreated, onDeleted, 
     );
 }
 
+// 空狀態的按鈕按下後會被卸載，焦點要主動交給編輯器的第一個欄位，否則會掉回頁面最上方
+const focusField = (id) => requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(id)?.focus()));
+
 export default function FeaturedTopics() {
     const { userData } = useAuth();
     const role = userData?.role;
@@ -382,6 +385,9 @@ export default function FeaturedTopics() {
         if (!latest || latest.status !== knownStatus) setVersion((v) => v + 1);
     };
 
+    // 一則都還沒有、也還沒按新增：整頁空狀態，頁首不再放同樣的新增按鈕
+    const isEmptyAll = topics.length === 0 && !selected;
+
     if (loading) return <div className="featured-topics-loading"><Spinner animation="border" /><span>載入中…</span></div>;
 
     return (
@@ -391,7 +397,7 @@ export default function FeaturedTopics() {
                     <h1 ref={headingRef} tabIndex={-1}>本期專題</h1>
                     <p>首頁的專題卡片，最多同時顯示 {MAX_PUBLISHED} 則，發布前需要審核。</p>
                 </div>
-                {canCreate && (
+                {canCreate && !isEmptyAll && (
                     <Button onClick={() => { say(''); select('new'); }}>
                         <Plus size={17} aria-hidden="true" /> 新增專題
                     </Button>
@@ -407,16 +413,18 @@ export default function FeaturedTopics() {
                 </Alert>
             )}
 
-            <div className="featured-topics-layout">
+            {isEmptyAll ? (
+                <AdminEmptyStage
+                    icon={Newspaper}
+                    title="目前沒有專題"
+                    description={canCreate ? `首頁的「本期專題」會在有已發布的專題時出現，最多同時顯示 ${MAX_PUBLISHED} 則；現在訪客看到的是示意卡。` : '編輯新增後會顯示在這裡。'}
+                    steps={canCreate ? ['新增專題，填寫標題、摘要與分類，可附圖片與連結', '送出審核，等管理員核准', '核准並發布後就會出現在首頁'] : []}
+                    action={canCreate ? { label: '新增專題', icon: <Plus size={17} aria-hidden="true" />, onClick: () => { say(''); select('new'); focusField('topic-title'); } } : undefined}
+                />
+            ) : (
+            <div className={`featured-topics-layout${topics.length === 0 ? ' is-solo' : ''}`}>
+                {topics.length > 0 && (
                 <nav className="featured-topics-list" aria-label="專題清單">
-                    {topics.length === 0 ? (
-                        <AdminEmpty
-                            compact
-                            title="目前沒有專題"
-                            description={canCreate ? '新增並送審、核准後，就會出現在首頁。' : '編輯新增後會顯示在這裡。'}
-                            action={canCreate ? { label: '新增專題', onClick: () => select('new') } : undefined}
-                        />
-                    ) : (
                         <ul>
                             {topics.map((topic) => (
                                 <li key={topic.id}>
@@ -434,8 +442,8 @@ export default function FeaturedTopics() {
                                 </li>
                             ))}
                         </ul>
-                    )}
                 </nav>
+                )}
 
                 <div className="featured-topics-detail">
                     {selected === 'new' && (
@@ -452,6 +460,7 @@ export default function FeaturedTopics() {
                     {!selected && topics.length > 0 && <p className="featured-topics-hint">從左側選一則專題查看或編輯。</p>}
                 </div>
             </div>
+            )}
         </main>
     );
 }

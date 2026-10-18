@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Badge, Button, Form, Spinner } from 'react-bootstrap';
-import { Plus, Save, Trash2 } from 'lucide-react';
+import { Film, Plus, Save, Trash2 } from 'lucide-react';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../../utils/apiClient';
 import { useAuth } from '../../userServives/authContext';
 import { useActionLock } from '../hooks/useActionLock';
 import { useGuardedSelection } from '../hooks/useGuardedSelection';
 import { countChars, formatApiError, isAborted, isOutcomeUnknown } from '../apiErrors';
-import AdminEmpty from '../components/AdminEmpty';
+import { AdminEmptyStage } from '../components/AdminEmpty';
 import '../../../static/css/_admin/promo-videos.css';
 
 const PUBLISHERS = ['owner', 'admin'];
@@ -234,12 +234,13 @@ function Editor({ video, editable, activeId, onSaved, onCreated, onDeleted, onAc
     const canActivate = Boolean(video?.video_url);
 
     return (
-        <section className="promo-videos-editor" id="promo-editor" aria-labelledby="promo-editor-title">
+        <section className={`promo-videos-editor${isNew ? '' : ' has-files'}`} id="promo-editor" aria-labelledby="promo-editor-title">
             <h2 id="promo-editor-title">{isNew ? '新增宣傳影片' : video.title}</h2>
             {error && <Alert variant="danger" role="alert">{error}</Alert>}
             {success && <Alert variant="success" role="status">{success}</Alert>}
 
-            <Form noValidate onSubmit={(event) => { event.preventDefault(); save(); }}>
+            <Form noValidate className="promo-videos-text" onSubmit={(event) => { event.preventDefault(); save(); }}>
+                <h3 className="promo-videos-subhead">文字內容</h3>
                 <Form.Group className="promo-videos-field" controlId="promo-title">
                     <Form.Label>標題</Form.Label>
                     <Form.Control
@@ -288,6 +289,7 @@ function Editor({ video, editable, activeId, onSaved, onCreated, onDeleted, onAc
             ) : (
                 <>
                     <div className="promo-videos-files">
+                        <h3 className="promo-videos-subhead">影片與檔案</h3>
                         <FileSlot kind="video" video={video} editable={editable} busyKind={busyKind} progress={progress}
                             error={slotErrors.video} onUpload={upload} onCancel={() => abortRef.current?.abort()} onClear={clear}>
                             {video.video_url ? (
@@ -379,6 +381,9 @@ function Editor({ video, editable, activeId, onSaved, onCreated, onDeleted, onAc
     );
 }
 
+// 空狀態的按鈕按下後會被卸載，焦點要主動交給編輯器的第一個欄位，否則會掉回頁面最上方
+const focusField = (id) => requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(id)?.focus()));
+
 export default function PromoVideos() {
     const { userData } = useAuth();
     const editable = PUBLISHERS.includes(userData?.role);
@@ -404,6 +409,9 @@ export default function PromoVideos() {
     const replaceVideo = useCallback((saved) => setVideos((list) => list.map((v) => (v.id === saved.id ? { ...v, ...saved } : v))), []);
     const current = typeof selected === 'number' ? videos.find((v) => v.id === selected) : null;
 
+    // 一支都還沒有、也還沒按新增：整頁空狀態，頁首不再放同樣的新增按鈕
+    const isEmptyAll = videos.length === 0 && !selected;
+
     if (loading) return <div className="promo-videos-loading"><Spinner animation="border" /><span>載入中…</span></div>;
 
     return (
@@ -413,7 +421,7 @@ export default function PromoVideos() {
                     <h1 ref={headingRef} tabIndex={-1}>宣傳影片</h1>
                     <p>管理首頁宣傳區的影片、封面與字幕。同一時間首頁只會使用一支。</p>
                 </div>
-                {editable && (
+                {editable && !isEmptyAll && (
                     <Button onClick={() => select('new')}>
                         <Plus size={17} aria-hidden="true" /> 新增影片
                     </Button>
@@ -429,34 +437,36 @@ export default function PromoVideos() {
                 </Alert>
             )}
 
-            <div className="promo-videos-layout">
+            {isEmptyAll ? (
+                <AdminEmptyStage
+                    icon={Film}
+                    title="目前沒有宣傳影片"
+                    description={editable ? '首頁的宣傳區還沒有影片，訪客現在看到的是備援內容。' : '擁有者或管理員新增後會顯示在這裡。'}
+                    steps={editable ? ['新增一支影片，填寫標題與說明', '上傳影片檔，建議再補上封面與字幕', '確認預覽沒問題，設為首頁使用'] : []}
+                    action={editable ? { label: '新增影片', icon: <Plus size={17} aria-hidden="true" />, onClick: () => { select('new'); focusField('promo-title'); } } : undefined}
+                />
+            ) : (
+            <div className={`promo-videos-layout${videos.length === 0 ? ' is-solo' : ''}`}>
+                {videos.length > 0 && (
                 <nav className="promo-videos-list" aria-label="宣傳影片清單">
-                    {videos.length === 0 ? (
-                        <AdminEmpty
-                            compact
-                            title="目前沒有宣傳影片"
-                            description={editable ? '新增一支之後，就能上傳影片檔並設為首頁使用。' : '擁有者或管理員新增後會顯示在這裡。'}
-                            action={editable ? { label: '新增影片', onClick: () => select('new') } : undefined}
-                        />
-                    ) : (
-                        <ul>
-                            {videos.map((video) => (
-                                <li key={video.id}>
-                                    <button
-                                        type="button"
-                                        className={`promo-videos-item${selected === video.id ? ' is-selected' : ''}`}
-                                        aria-current={selected === video.id ? 'true' : undefined}
-                                        aria-controls="promo-editor"
-                                        onClick={() => select(video.id)}
-                                    >
-                                        <strong>{video.title}</strong>
-                                        <StatusBadges video={{ ...video, is_active: video.id === activeId }} />
-                                    </button>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
+                    <ul>
+                        {videos.map((video) => (
+                            <li key={video.id}>
+                                <button
+                                    type="button"
+                                    className={`promo-videos-item${selected === video.id ? ' is-selected' : ''}`}
+                                    aria-current={selected === video.id ? 'true' : undefined}
+                                    aria-controls="promo-editor"
+                                    onClick={() => select(video.id)}
+                                >
+                                    <strong>{video.title}</strong>
+                                    <StatusBadges video={{ ...video, is_active: video.id === activeId }} />
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
                 </nav>
+                )}
 
                 <div className="promo-videos-detail">
                     {selected === 'new' && (
@@ -478,6 +488,7 @@ export default function PromoVideos() {
                     )}
                 </div>
             </div>
+            )}
         </main>
     );
 }
