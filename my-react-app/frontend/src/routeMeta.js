@@ -21,6 +21,7 @@ const TITLE_RULES = [
   { test: (p) => p === '/register', title: '註冊' },
   { test: (p) => p === '/forgot', title: '忘記密碼' },
   { test: (p) => p === '/reset', title: '重設密碼' },
+  { test: (p) => p === '/announcements', title: '最新公告' },
   { test: (p) => p === '/help', title: '使用說明' },
   { test: (p) => p === '/privacy', title: '隱私與資料' },
   { test: (p) => p === '/contact', title: '聯絡我們' },

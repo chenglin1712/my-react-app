@@ -1,0 +1,244 @@
+/* 所有公告頁（沉穩文藝，閱讀型頁面）：窄欄置中、雙線標題、分類篩選、一則一列的清單。
+   顏色一律取 --yy-calm-* 語意層；標籤沿用首頁最新消息的 .news-tag。 */
+
+.ann-page {
+    width: 100%;
+    max-width: 760px;
+    margin-inline: auto;
+    padding: 32px 16px 72px;
+}
+
+.ann-head {
+    display: grid;
+    gap: 6px;
+    padding-bottom: 12px;
+    border-bottom: 3px double var(--yy-calm-line);
+}
+
+.ann-back {
+    display: inline-flex;
+    align-items: center;
+    justify-self: start;
+    min-height: var(--yy-control-md);
+    color: var(--yy-calm-text);
+    font-size: var(--yy-text-sm);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+.ann-back:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+.ann-title {
+    margin: 0;
+    font-family: var(--yy-font-heading);
+    font-size: clamp(1.9rem, 4vw, 2.6rem);
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: 0.08em;
+}
+
+.ann-lede {
+    margin: 0;
+    color: var(--yy-calm-text-sub);
+    font-family: var(--yy-font-heading);
+    letter-spacing: 0.04em;
+}
+
+/* ---------- 分類篩選 ---------- */
+
+.ann-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.ann-chip {
+    min-height: var(--yy-control-md);
+    padding: 0 var(--yy-space-4);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    background: transparent;
+    color: var(--yy-calm-text);
+    font: inherit;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out), transform 120ms var(--ease-out);
+}
+
+.ann-chip[aria-pressed="true"] {
+    background: var(--yy-calm-text);
+    color: var(--yy-calm-bg);
+}
+
+.ann-chip:active {
+    transform: scale(var(--yy-ui-press));
+}
+
+.ann-chip:focus-visible,
+.ann-btn:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .ann-chip[aria-pressed="false"]:hover {
+        background: color-mix(in srgb, var(--yy-calm-copper) 14%, transparent);
+    }
+}
+
+.ann-count {
+    margin: 14px 0 0;
+    min-height: 1.5em;
+    color: var(--yy-calm-text-sub);
+    font-size: var(--yy-text-sm);
+}
+
+/* ---------- 清單 ---------- */
+
+.ann-list {
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ann-list li {
+    position: relative;
+    border-bottom: 1px solid var(--yy-calm-line);
+}
+
+.ann-item {
+    display: grid;
+    gap: 6px;
+    padding: 14px 4px;
+    color: inherit;
+    text-decoration: none;
+    transition: background-color 160ms var(--ease-out), transform 120ms var(--ease-out);
+}
+
+.ann-item__meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.ann-item__date {
+    color: var(--yy-calm-text-sub);
+    font-size: var(--yy-text-sm);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.ann-item__title {
+    margin: 0;
+    font-family: var(--yy-font-heading);
+    font-size: 1.125rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    a.ann-item:hover {
+        background: color-mix(in srgb, var(--yy-calm-copper) 14%, transparent);
+    }
+}
+
+a.ann-item:active {
+    transform: scale(0.995);
+}
+
+a.ann-item:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: -3px;
+}
+
+/* ---------- 載入更多、狀態 ---------- */
+
+.ann-more {
+    display: grid;
+    justify-items: center;
+    margin-top: 28px;
+}
+
+.ann-btn {
+    min-height: var(--yy-control-md);
+    padding: 0 var(--yy-space-5);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    background: transparent;
+    color: var(--yy-calm-text);
+    font: inherit;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out), transform 120ms var(--ease-out);
+}
+
+.ann-btn:active:not(:disabled) {
+    transform: scale(var(--yy-ui-press));
+}
+
+.ann-btn:disabled {
+    cursor: progress;
+    opacity: 0.7;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .ann-btn:hover:not(:disabled) {
+        background: var(--yy-calm-text);
+        color: var(--yy-calm-bg);
+    }
+}
+
+.ann-state {
+    display: grid;
+    place-items: center;
+    gap: var(--yy-space-3);
+    margin-top: 12px;
+    padding: 40px 12px;
+    border: var(--yy-border-width) dashed var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    text-align: center;
+    font-weight: 700;
+}
+
+.ann-state p {
+    margin: 0;
+    font-size: var(--yy-text-lg);
+}
+
+.ann-inline-error {
+    margin: 16px 0 0;
+    color: var(--yy-calm-text);
+    font-weight: 700;
+    text-align: center;
+}
+
+.ann-skeleton {
+    display: grid;
+    gap: var(--yy-space-3);
+    margin-top: 12px;
+}
+
+.ann-skeleton__row {
+    display: block;
+    height: 64px;
+    border-radius: var(--yy-ui-radius);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ann-chip:active,
+    .ann-btn:active:not(:disabled),
+    a.ann-item:active {
+        transform: none;
+    }
+}

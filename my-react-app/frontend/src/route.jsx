@@ -26,6 +26,7 @@ const SearchPage = lazy(() => import('./_search/index'));
 //翻譯
 const TranslatePage = lazy(() => import('./_translate/index'));
 const HelpPage = lazy(() => import('./_info/index').then((m) => ({ default: m.HelpPage })));
+const AnnouncementsPage = lazy(() => import('./_announcements/index'));
 const PrivacyPage = lazy(() => import('./_info/index').then((m) => ({ default: m.PrivacyPage })));
 const ContactPage = lazy(() => import('./_info/index').then((m) => ({ default: m.ContactPage })));
 //遊戲
@@ -129,6 +130,7 @@ const AppRoutes = () => {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot" element={<ForgotPage />} />
           <Route path="/reset" element={<ResetPage />} />
+          <Route path="/announcements" element={<AnnouncementsPage />} />
           <Route path="/help" element={<HelpPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/contact" element={<ContactPage />} />
