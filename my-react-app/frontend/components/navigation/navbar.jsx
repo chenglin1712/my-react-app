@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Menu, X } from "lucide-react";
 import { House, TextSearch, Camera, Gamepad2, BookOpenCheck, NotebookPen, User, ChevronDown, Languages, Heart } from "lucide-react";
 import "../../static/css/navigation/Navbar.css"
@@ -9,6 +10,7 @@ import UserSidebar from "./userSidebar"
 import { useDialog } from "@hooks/useDialog"
 import { ThemeMenu, ThemeRadioGroup } from "./ThemeSettings"
 import { isDarkThemeEnabled } from "../../src/theme/themeStore"
+import { useHomeNavSlot } from "../../src/homeNavSlot"
 
 // 靜態的導覽路由設定，不依賴 props/state，搬到元件外，不用每次 render 重建。
 const MENU_ITEMS = [
@@ -36,6 +38,9 @@ const Navbar = ({ onOpenBot }) => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
   const { userData } = useAuth();
+  // 首頁（雜誌版）把選單放在報頭下方：首頁登記了 slot 就用 portal 畫進去，否則照舊畫在最上方
+  const homeSlot = useHomeNavSlot()?.slot ?? null;
+  const magazine = location.pathname === "/" && homeSlot !== null;
 
   const [isUserOpen, setIsUserOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -68,9 +73,8 @@ const Navbar = ({ onOpenBot }) => {
     setIsUserOpen(!isUserOpen);
   };
 
-  return (
-    <>
-    <nav className={`navbar${location.pathname === "/" ? " navbar--home" : ""}`}>
+  const navElement = (
+    <nav className={`navbar${location.pathname === "/" ? " navbar--home" : ""}${magazine ? " navbar--magazine" : ""}`}>
       <div className="navbar-container">
         <NavLink className="logo" to="/">YUAN・YU</NavLink>
 
@@ -219,6 +223,11 @@ const Navbar = ({ onOpenBot }) => {
         )}
       </div >
     </nav >
+  );
+
+  return (
+    <>
+    {magazine ? createPortal(navElement, homeSlot) : navElement}
 
     {/* 個人資料側欄只渲染一份（原本桌面與手機選單各渲染一份，共兩份側欄與兩層遮罩）。
         收起時用 CSS visibility:hidden，Tab 不會進到看不見的「編輯資料」「登出」（審查項 P2-1）。 */}
@@ -244,7 +253,6 @@ const Navbar = ({ onOpenBot }) => {
         </div>
       </>
     )}
-    <div className={`navbar-marquee${location.pathname === "/" ? " navbar-marquee--home" : ""}`} />
     </>
   );
 };

@@ -35,19 +35,14 @@ const rules = walkRules(css);
 const find = (selector) => rules.filter((r) => r.selector === selector);
 
 describe("導覽列新外觀（S5-1）", () => {
-  it("沒有寫死的色碼，也沒有舊風格色 token（S5-2 之後織紋條也換成沉穩色）", () => {
+  it("沒有寫死的色碼，也沒有舊風格色 token", () => {
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     const old = /--yy-(?:red|gold|blue|cream|ink|green)\b/;
     expect(rules.filter((r) => old.test(r.body)).map((r) => r.selector)).toEqual([]);
   });
 
-  it("導覽下方的織紋條：8px 高、銅褐橄欖石板三色輪替、靜態（沒有動畫）", () => {
-    const strip = find(".navbar-marquee")[0].body;
-    expect(strip).toMatch(/height:\s*8px/);
-    expect(strip).toMatch(/--yy-calm-copper/);
-    expect(strip).toMatch(/--yy-calm-olive/);
-    expect(strip).toMatch(/--yy-calm-block/);
-    expect(css).not.toMatch(/navbar-marquee::before/);
+  it("導覽下方沒有織紋彩條（與首頁雜誌版一致）", () => {
+    expect(css).not.toMatch(/navbar-marquee/);
   });
 
   it("導覽列是區塊、手機選單撐滿寬度（Bootstrap 的 .navbar 預設 flex 會讓選單縮在一角）", () => {

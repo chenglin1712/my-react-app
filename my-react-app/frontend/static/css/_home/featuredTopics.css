@@ -1,85 +1,113 @@
-/* 首頁本期專題（S7-1，沉穩文藝）。顏色一律取 --yy-calm-* 語意層。
-   一大兩小：第一張佔左側整高，其餘兩張疊在右側；不做三張等寬卡片。 */
+/* 首頁「本期專題」（雜誌版，對齊首頁設計稿）：雙線標題，三張等寬白卡並排。
+   每張卡：圖區 5:2（沒圖畫圖樣）→ 分類標籤 → 襯線標題 → 摘要。整張卡是一個連結（標題的偽元素撐滿整張卡）。
+   顏色一律取 --yy-calm-* 語意層。 */
 
 .topics-section {
-    max-width: 1200px;
-    margin: var(--yy-space-6) auto;
-    padding: 0 24px var(--yy-space-5);
-    font-family: var(--yy-font-body);
-    color: var(--yy-calm-text);
+    margin-top: 48px;
+    padding-inline: 16px;
 }
 
 .topics-header {
-    margin-bottom: var(--yy-space-5);
-    padding-bottom: var(--yy-space-1);
+    padding-bottom: 4px;
     border-bottom: 3px double var(--yy-calm-line);
 }
 
 .topics-heading {
     margin: 0;
     font-family: var(--yy-font-heading);
-    font-size: var(--yy-text-2xl);
+    font-size: 1.5rem;
     font-weight: 700;
     line-height: 1.3;
     letter-spacing: 0.06em;
-    color: var(--yy-calm-text);
 }
 
 .topics-grid {
     display: grid;
+    gap: 20px;
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--yy-space-5);
-    margin: 0;
+    margin: 12px 0 0;
     padding: 0;
     list-style: none;
 }
 
-/* ── 單張卡：整張可點（標題連結伸展），沒有外框 ── */
+/* 一張、兩張、三張都用三欄的欄寬，卡片尺寸一致，不拉成滿版 */
+@media (min-width: 720px) {
+    .topics-grid--1,
+    .topics-grid--2,
+    .topics-grid--3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
 .topic-card {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: var(--yy-space-3);
     min-width: 0;
+    overflow: hidden;
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: var(--yy-ui-radius);
-    transition: transform 120ms var(--ease-out);
+    transition: transform 220ms var(--ease-out), box-shadow 220ms var(--ease-out);
 }
 
 .topic-image {
     display: block;
     width: 100%;
-    aspect-ratio: 16 / 10;
+    aspect-ratio: 5 / 2;
     object-fit: cover;
-    background: var(--yy-calm-rule);
-    border-radius: var(--yy-ui-radius);
+    border-bottom: var(--yy-border-width) solid var(--yy-calm-line);
+    filter: saturate(0.72) contrast(0.94);
+}
+
+/* 沒有圖片時的圖樣（斜紋、直紋、圓點），用主題色畫，三款輪替 */
+.topic-image--pattern[data-pattern="0"] {
+    background: repeating-linear-gradient(45deg, var(--yy-calm-copper) 0 20px, var(--yy-calm-accent) 20px 40px);
+}
+
+.topic-image--pattern[data-pattern="1"] {
+    background: repeating-linear-gradient(90deg, var(--yy-calm-block) 0 18px, var(--yy-calm-olive) 18px 36px);
+}
+
+.topic-image--pattern[data-pattern="2"] {
+    background: radial-gradient(circle at 20% 50%, var(--yy-calm-bg) 0 14px, transparent 15px) 0 0 / 56px 56px, var(--yy-calm-olive);
 }
 
 .topic-body {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--yy-space-2);
-    min-width: 0;
+    padding: 12px 16px 18px;
 }
 
 .topic-tag {
     display: inline-block;
-    padding: 2px var(--yy-space-2);
+    padding: 1px 10px;
+    border: var(--yy-border-width) solid transparent;
+    border-radius: 2px;
+    background: var(--yy-calm-block);
+    color: var(--yy-calm-block-on);
     font-size: var(--yy-text-sm);
-    font-weight: 600;
-    letter-spacing: 0.04em;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    line-height: 1.6;
+}
+
+/* 三張卡的標籤依序用橄欖、深銅、石板灰 */
+.topic-tag[data-tone="0"] {
     background: var(--yy-calm-tag);
     color: var(--yy-calm-tag-on);
-    border-radius: var(--yy-ui-radius);
+}
+
+.topic-tag[data-tone="1"] {
+    background: var(--yy-calm-accent);
+    color: var(--yy-calm-accent-on);
 }
 
 .topic-title {
-    margin: 0;
+    margin: 6px 0 2px;
     font-family: var(--yy-font-heading);
-    font-size: var(--yy-text-xl);
+    font-size: 1.375rem;
     font-weight: 700;
-    line-height: 1.4;
-    color: var(--yy-calm-text);
+    letter-spacing: 0.03em;
+    line-height: 1.3;
     overflow-wrap: anywhere;
 }
 
@@ -88,27 +116,10 @@
     text-decoration: none;
 }
 
-/* 伸展到整張卡，點卡片任何地方都是點標題連結；卡片內沒有其他可點元件 */
 .topic-link::after {
     content: "";
     position: absolute;
     inset: 0;
-    border-radius: var(--yy-ui-radius);
-}
-
-.topic-summary {
-    display: -webkit-box;
-    margin: 0;
-    overflow: hidden;
-    font-size: var(--yy-text-base);
-    line-height: 1.7;
-    color: var(--yy-calm-text-sub);
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-}
-
-.topic-card:has(.topic-link:active) {
-    transform: scale(var(--yy-ui-press));
 }
 
 .topic-card:has(.topic-link:focus-visible) {
@@ -116,109 +127,40 @@
     outline-offset: var(--yy-ui-focus-offset);
 }
 
-/* 焦點框畫在整張卡上；連結文字自己的框改成透明（強制色彩模式下仍會顯示）。
-   瀏覽器不支援 :has() 時整張卡的框畫不出來，就保留連結自己的焦點框。 */
+/* 連結自己的框只在支援 :has() 時才隱藏（框改畫在整張卡上），否則舊瀏覽器完全沒有焦點提示 */
 @supports selector(:has(*)) {
     .topic-link:focus-visible {
         outline-color: transparent;
     }
 }
 
-/* hover 只給有滑鼠、也沒要求減少動態的裝置：標題加底線並換成強調色，不位移 */
-@media (hover: hover) and (pointer: fine) {
-    .topic-card:has(.topic-link:hover) .topic-title {
-        color: var(--yy-calm-accent);
-        text-decoration: underline;
-        text-underline-offset: 4px;
+.topic-summary {
+    margin: 0;
+    color: var(--yy-calm-text-sub);
+    font-size: 1rem;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+}
+
+/* 只有真的有滑鼠的裝置才上浮（觸控點一下會卡在 hover 狀態）；可以點的卡才有回饋 */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    .topic-card:has(.topic-link):hover {
+        transform: translateY(-3px);
+        box-shadow: 0 14px 22px -16px color-mix(in srgb, var(--yy-calm-text) 55%, transparent);
     }
 }
 
-/* 手機單欄堆疊：卡與卡之間一條細線 */
-.topic-card + .topic-card:not(.topic-card--text) {
-    padding-top: var(--yy-space-5);
-    border-top: 1px solid var(--yy-calm-rule);
-    border-radius: 0;
+.topic-card:has(.topic-link):active {
+    transform: scale(0.99);
+    box-shadow: none;
 }
-
-/* ── 版面：依張數 ── */
-
-/* 只有一張：圖在左、字在右，限制寬度不拉滿 */
-@media (min-width: 720px) {
-    .topics-section {
-        padding: 0 56px var(--yy-space-6);
-    }
-
-    /* 並排時不需要上下堆疊用的分隔線（三張的右側第二張另外加回去） */
-    .topic-card + .topic-card:not(.topic-card--text) {
-        padding-top: 0;
-        border-top: 0;
-        border-radius: var(--yy-ui-radius);
-    }
-
-    .topics-grid--1 .topic-card:not(.topic-card--text) {
-        display: grid;
-        grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
-        align-items: center;
-        gap: var(--yy-space-5);
-    }
-
-    .topics-grid--1 .topic-title {
-        font-size: var(--yy-text-2xl);
-    }
-
-    /* 兩張：左右各一，仍是一寬一窄 */
-    .topics-grid--2 {
-        grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-    }
-
-    /* 三張：第一張佔左側整高，其餘兩張疊在右側，圖左字右 */
-    .topics-grid--3 {
-        grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-        grid-template-rows: auto 1fr;
-        align-items: start;
-    }
-
-    .topics-grid--3 .topic-card--lead {
-        grid-row: span 2;
-    }
-
-    .topics-grid--3 .topic-card:not(.topic-card--lead):not(.topic-card--text) {
-        display: grid;
-        grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
-        align-items: start;
-        gap: var(--yy-space-4);
-    }
-
-    .topics-grid--3 .topic-card:not(.topic-card--lead) .topic-title {
-        font-size: var(--yy-text-lg);
-    }
-
-    .topics-grid--3 .topic-card--lead .topic-title {
-        font-size: var(--yy-text-2xl);
-    }
-
-    /* 右側兩張之間一條細線 */
-    .topics-grid--3 .topic-card:nth-child(3):not(.topic-card--text) {
-        padding-top: var(--yy-space-5);
-        border-top: 1px solid var(--yy-calm-rule);
-        border-radius: 0;
-    }
-}
-
-/* 純文字卡（沒有圖或圖載入失敗）：左側一條細線當作標記，不留空框 */
-.topic-card--text {
-    padding-left: var(--yy-space-4);
-    border-left: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: 0;
-}
-
 
 @media (prefers-reduced-motion: reduce) {
     .topic-card {
-        transition: none;
+        transition-property: box-shadow;
     }
 
-    .topic-card:has(.topic-link:active) {
+    .topic-card:has(.topic-link):active {
         transform: none;
     }
 }

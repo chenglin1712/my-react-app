@@ -1,401 +1,61 @@
+/* 首頁（雜誌版，對齊首頁設計稿）。
+   由上而下：跑馬燈 → 報頭 → 選單列 → 第一屏（影片與大標題、最新消息、族語認證公告）→ 本期專題 → 頁尾。
+   整頁收在 1200px 的欄裡，左右 16px；顏色一律取 --yy-calm-* 語意層。各區塊自己的樣式在同資料夾的對應檔。 */
+
 .homepage {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-}
-
-/* ---------- 收尾區（沉穩文藝）：沒有底紋、光暈、貼紙，只有標題、說明與按鈕 ---------- */
-
-.home-hero {
-    position: relative;
-    max-width: 1000px;
-    margin: 0 auto;
-    padding: var(--yy-space-8) 56px var(--yy-space-7);
-    text-align: center;
-}
-
-.home-title {
-    margin: 0 0 var(--yy-space-4);
-    font-family: var(--yy-font-heading);
-    font-size: clamp(1.75rem, 4.4vw, 2.75rem);
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    line-height: var(--yy-leading-heading);
-    color: var(--yy-calm-text);
-}
-
-.home-desc {
-    max-width: 36em;
-    margin: 0 auto var(--yy-space-6);
-    font-family: var(--yy-font-heading);
-    font-size: 1rem;
-    letter-spacing: 0.04em;
-    line-height: 1.9;
-    color: var(--yy-calm-text-sub);
-}
-
-.home-cta-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: var(--yy-space-4);
-}
-
-.home-cta,
-.home-cta-secondary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: var(--yy-control-md);
-    padding: 0 var(--yy-space-6);
-    border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
-    font-family: var(--yy-font-body);
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-decoration: none;
-    cursor: pointer;
-    transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
-}
-
-.home-cta {
-    background: var(--yy-calm-accent);
-    border-color: var(--yy-calm-accent);
-    color: var(--yy-calm-accent-on);
-}
-
-.home-cta-secondary {
-    background: transparent;
-    color: var(--yy-calm-text);
-}
-
-.home-cta-placeholder {
-    visibility: hidden;
-}
-
-@media (hover: hover) and (pointer: fine) {
-    .home-cta:hover {
-        background: var(--yy-calm-text);
-        border-color: var(--yy-calm-text);
-    }
-
-    .home-cta-secondary:hover {
-        background: var(--yy-calm-info-bg);
-    }
-}
-
-.home-cta:active,
-.home-cta-secondary:active {
-    transform: scale(var(--yy-ui-press));
-}
-
-.home-cta:focus-visible,
-.home-cta-secondary:focus-visible {
-    outline: var(--yy-ui-focus-ring);
-    outline-offset: var(--yy-ui-focus-offset);
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .home-cta:active,
-    .home-cta-secondary:active {
-        transform: none;
-    }
-}
-
-/* 區塊分隔：雙細線，與各頁標題底線同一種 */
-.home-rule {
-    width: calc(100% - 112px);
-    max-width: 1000px;
-    margin: 0 auto;
-    border: 0;
-    border-top: 3px double var(--yy-calm-line);
-    opacity: 1;
-}
-
-/* ---------- 五族語言 + 現正主打（S7-2，沉穩文藝） ---------- */
-
-.home-tribes-section {
-    padding: var(--yy-space-7) 56px var(--yy-space-6);
-}
-
-.home-tribes-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
-    gap: var(--yy-space-6);
-    max-width: 1000px;
-    margin: 0 auto;
-    align-items: start;
-}
-
-.home-tribe-list {
-    min-width: 0;
-    font-family: var(--yy-font-body);
-    color: var(--yy-calm-text);
-}
-
-.home-tribe-list-title {
-    margin: 0 0 var(--yy-space-4);
-    padding-bottom: var(--yy-space-1);
-    font-family: var(--yy-font-heading);
-    font-size: var(--yy-text-xl);
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    color: var(--yy-calm-text);
-    border-bottom: 3px double var(--yy-calm-line);
-}
-
-.home-tribe-row {
-    /* 原生 <button>：清掉瀏覽器預設的背景與字型，才套得上列的版面 */
-    width: 100%;
-    min-height: var(--yy-control-md);
-    margin: 0;
-    color: inherit;
-    font: inherit;
-    text-align: left;
-    appearance: none;
-    background: none;
-    display: flex;
-    align-items: center;
-    gap: var(--yy-space-3);
-    padding: var(--yy-space-2) var(--yy-space-3);
-    /* 選取時才看得到邊框；先留 1px 透明邊，選取時版面不會位移 */
-    border: 1px solid transparent;
-    border-radius: var(--yy-ui-radius);
-    cursor: pointer;
-    transition: background-color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
-}
-
-.home-tribe-row + .home-tribe-row {
-    margin-top: var(--yy-space-1);
-}
-
-.home-tribe-row[aria-pressed="true"] {
-    background: var(--yy-calm-info-bg);
-    border-color: var(--yy-calm-line);
-}
-
-.home-tribe-row:active {
-    transform: scale(var(--yy-ui-press));
-}
-
-.home-tribe-row:focus-visible {
-    outline: var(--yy-ui-focus-ring);
-    outline-offset: var(--yy-ui-focus-offset);
-}
-
-@media (hover: hover) and (pointer: fine) {
-    .home-tribe-row:hover {
-        background: var(--yy-calm-info-bg);
-    }
-}
-
-.home-tribe-swatch {
-    width: 22px;
-    height: 22px;
-    border: var(--yy-border-width) solid var(--yy-calm-line);
-    display: inline-block;
-    transform: rotate(45deg);
-    flex-shrink: 0;
-}
-
-.home-tribe-name {
-    font-size: var(--yy-text-base);
-    font-weight: 700;
-    color: var(--yy-calm-text);
-}
-
-.home-tribe-roman {
-    font-size: var(--yy-text-sm);
-    color: var(--yy-calm-text-sub);
-}
-
-/* 現正主打：沒有外框、不用漸層；整張是連結時有按下回饋 */
-.home-feature-card {
     display: block;
-    min-width: 0;
-    overflow: hidden;
-    color: inherit;
-    text-decoration: none;
-    background: var(--yy-calm-surface);
-    border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
-    font-family: var(--yy-font-body);
-    transition: transform 120ms var(--ease-out);
 }
 
-a.home-feature-card:active {
-    transform: scale(var(--yy-ui-press));
-}
-
-a.home-feature-card:focus-visible {
-    outline: var(--yy-ui-focus-ring);
-    outline-offset: var(--yy-ui-focus-offset);
-}
-
-.home-feature-head {
-    padding: var(--yy-space-3) var(--yy-space-4) 0;
-}
-
-.home-feature-tag {
-    display: inline-block;
-    padding: 2px var(--yy-space-2);
-    font-size: var(--yy-text-sm);
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    background: var(--yy-calm-tag);
-    color: var(--yy-calm-tag-on);
-    border-radius: var(--yy-ui-radius);
-}
-
-/* 沒有主打圖時，用石板灰底放大字的羅馬拼音，不用拼色圖樣 */
-.home-feature-image {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    aspect-ratio: 16 / 9;
-    margin: var(--yy-space-3) var(--yy-space-4) 0;
-    background: var(--yy-calm-block);
-    border-radius: var(--yy-ui-radius);
-    overflow: hidden;
-}
-
-.home-feature-image img {
-    display: block;
+.homepage > * {
     width: 100%;
-    height: 100%;
-    object-fit: cover;
+    max-width: 1200px;
+    margin-inline: auto;
 }
 
-.home-feature-image span {
-    font-family: var(--yy-font-heading);
-    font-size: var(--yy-text-2xl);
-    letter-spacing: 0.08em;
-    color: var(--yy-calm-block-on);
+/* 主選單的位置：Navbar 用 portal 畫進來；還沒進來時不佔位 */
+.home-nav-slot:empty {
+    display: none;
 }
 
-.home-feature-body {
-    padding: var(--yy-space-3) var(--yy-space-4) var(--yy-space-4);
-}
-
-.home-feature-title {
-    margin: 0 0 var(--yy-space-2);
-    font-family: var(--yy-font-heading);
-    font-size: var(--yy-text-xl);
-    font-weight: 700;
-    line-height: 1.4;
-    color: var(--yy-calm-text);
-}
-
-.home-feature-sub {
-    font-size: var(--yy-text-sm);
-    color: var(--yy-calm-text-sub);
-}
-
-@media (hover: hover) and (pointer: fine) {
-    a.home-feature-card:hover .home-feature-title {
-        color: var(--yy-calm-accent);
-        text-decoration: underline;
-        text-underline-offset: 4px;
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .home-tribe-row,
-    .home-feature-card {
-        transition: color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
-    }
-
-    .home-tribe-row:active,
-    a.home-feature-card:active {
-        transform: none;
-    }
-}
-
-/* ---------- 第一屏：影片、活動消息、族語認證公告 ---------- */
+/* ---------- 第一屏 ---------- */
 
 .home-first {
     display: grid;
+    grid-template-columns: var(--home-first-cols, minmax(0, 1fr));
+    gap: 24px;
     align-items: start;
-    gap: var(--yy-space-6);
-    max-width: 1440px;
-    margin: 0 auto;
-    padding: var(--yy-space-5) 56px;
-    width: 100%;
+    margin-top: 32px;
+    padding-inline: 16px;
 }
 
 .home-first > * {
     min-width: 0;
 }
 
-/* 三塊各自有獨立使用時的外距與內距，放進第一屏後由這一層統一管理 */
-.home-first .home-promo,
-.home-first .news-section,
-.home-first .exam-section {
-    max-width: none;
-    margin: 0;
+/* 左欄：宣傳影片與大標題上下排 */
+.home-first__lead {
+    display: grid;
+    align-content: start;
+}
+
+.home-first .home-promo {
     padding: 0;
 }
 
-/* 欄比較窄，輪播與右側列表上下排 */
-.home-first .event-container {
-    flex-direction: column;
-    gap: var(--yy-space-4);
-}
-
-.home-first .event-left,
-.home-first .event-right {
-    flex: none;
-    width: 100%;
-}
-
-.home-first .news-card-grid {
-    grid-template-columns: minmax(0, 1fr);
-}
-
-.home-first__error {
-    margin: 0;
-    text-align: center;
-}
-
-@media (min-width: 1100px) {
+/* 較窄的螢幕：兩欄，第三欄（族語認證公告）橫跨整列；更窄就單欄堆疊 */
+@media (max-width: 1100px) {
     .home-first {
-        grid-template-columns: var(--home-first-cols, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .home-first > :nth-child(3) {
+        grid-column: 1 / -1;
     }
 }
 
 @media (max-width: 720px) {
     .home-first {
-        gap: var(--yy-space-5);
-        padding: var(--yy-space-4) 24px;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 28px;
     }
 }
-
-.home-reminder {
-    padding: var(--yy-space-5) 56px;
-    max-width: 1440px;
-    margin: 0 auto;
-}
-
-@media (max-width: 720px) {
-    .home-reminder {
-        padding: var(--yy-space-4) 24px;
-    }
-}
-
-@media (max-width: 720px) {
-    .home-hero {
-        padding: var(--yy-space-7) 24px var(--yy-space-6);
-    }
-
-    .home-rule {
-        width: calc(100% - 48px);
-    }
-
-    .home-tribes-section {
-        padding: var(--yy-space-6) 24px var(--yy-space-5);
-    }
-}
-
-

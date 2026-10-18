@@ -1,8 +1,12 @@
 // 輪播的暫停規則（WCAG 2.2.2）：用假的 Swiper 取得 autoplay.start／stop 的呼叫，
 // 才能確定「什麼情況下輪播有沒有在跑」。真實 Swiper 的渲染由 news.test.jsx 負責。
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render as rtlRender, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import News from './news';
+
+// News 內有連到「所有公告」頁的 <Link>，需要 Router
+const render = (ui, options) => rtlRender(ui, { wrapper: MemoryRouter, ...options });
 
 const swiperState = vi.hoisted(() => ({ instance: null, props: null }));
 
@@ -50,7 +54,7 @@ const stubReducedMotion = (reduced) => {
 };
 
 const renderNews = () => render(<News withImage={SLIDES} withoutImage={TEXT} loading={false} />);
-const stage = () => document.querySelector('.event-left');
+const stage = () => document.querySelector('.news-stage');
 const lastCall = (fn) => fn.mock.calls.length;
 
 // jsdom 的 :focus-visible 判斷不可靠，直接指定「這次焦點算不算鍵盤焦點」

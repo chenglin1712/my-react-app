@@ -88,7 +88,7 @@ describe("字級", () => {
     ["tight", "heading", "normal", "loose"].forEach((name) => {
       expect(theme).toMatch(new RegExp(`--yy-leading-${name}:\\s*[0-9.]+;`));
     });
-    expect(ruleBody(fileText("static/css/_home/index.css"), ".home-title")).toMatch(/line-height:\s*var\(--yy-leading-heading\)/);
+    expect(ruleBody(fileText("static/css/_home/promoVideo.css"), ".home-intro__title")).toMatch(/line-height:\s*var\(--yy-leading-heading\)/);
   });
 });
 

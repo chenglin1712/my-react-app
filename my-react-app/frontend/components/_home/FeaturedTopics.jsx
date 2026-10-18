@@ -7,7 +7,7 @@ import "../../static/css/_home/featuredTopics.css";
  * 沒有專題就不輸出任何元素（含標題）；只有一或兩張時依張數換版面，不放空卡。
  * 標題是整張卡的連結（伸展到整張卡可點），圖片只是裝飾，alt 留空。
  */
-const TopicCard = ({ topic, featured }) => {
+const TopicCard = ({ topic, featured, index }) => {
     // 圖片載入失敗就退回純文字卡，不留破圖與空框
     const [imageFailed, setImageFailed] = useState(false);
     const showImage = topic.imageUrl && !imageFailed;
@@ -25,7 +25,8 @@ const TopicCard = ({ topic, featured }) => {
     );
 
     return (
-        <li className={`topic-card${featured ? " topic-card--lead" : ""}${showImage ? "" : " topic-card--text"}`}>
+        <li className={`topic-card${featured ? " topic-card--lead" : ""}${showImage ? "" : " topic-card--text"}`} style={{ "--i": index }}>
+            {!showImage && <div className="topic-image topic-image--pattern" data-pattern={index % 3} aria-hidden="true" />}
             {showImage && (
                 <img
                     className="topic-image"
@@ -37,7 +38,7 @@ const TopicCard = ({ topic, featured }) => {
                 />
             )}
             <div className="topic-body">
-                {topic.categoryLabel && <span className="topic-tag">{topic.categoryLabel}</span>}
+                {topic.categoryLabel && <span className="topic-tag" data-tone={index % 3}>{topic.categoryLabel}</span>}
                 <h3 className={`topic-title${link ? " topic-title--linked" : ""}`}>{title}</h3>
                 {topic.summary && <p className="topic-summary">{topic.summary}</p>}
             </div>
@@ -57,10 +58,10 @@ const FeaturedTopics = ({ topics: allTopics }) => {
             <div className="topics-header">
                 <h2 className="topics-heading" id="topics-heading">本期專題</h2>
             </div>
-            <ul className={`topics-grid topics-grid--${topics.length}`}>
+            <ul className={`topics-grid yy-stagger topics-grid--${topics.length}`}>
                 {topics.map((topic, index) => (
                     // 圖片網址參與 key：換了新圖就重新嘗試載入，不會沿用上一張圖「載入失敗」的狀態
-                    <TopicCard key={`${index}|${topic.key}|${topic.imageUrl}`} topic={topic} featured={index === 0 && topics.length > 1} />
+                    <TopicCard key={`${index}|${topic.key}|${topic.imageUrl}`} topic={topic} featured={index === 0 && topics.length > 1} index={index} />
                 ))}
             </ul>
         </section>

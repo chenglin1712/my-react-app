@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import HomeMasthead from './Masthead';
-import { pickMastheadContent } from './mastheadContent';
+import { pickMastheadContent, DEFAULT_MARQUEE_ITEMS, DEFAULT_TAGLINE, DEFAULT_QUOTE } from './mastheadContent';
+const DEFAULTS = { marqueeItems: DEFAULT_MARQUEE_ITEMS, tagline: DEFAULT_TAGLINE, quote: DEFAULT_QUOTE };
 
 describe('pickMastheadContent（公開設定 → 報頭與跑馬燈內容）', () => {
   test('一般設定：原樣取出，文字去掉頭尾空白', () => {
@@ -22,10 +23,10 @@ describe('pickMastheadContent（公開設定 → 報頭與跑馬燈內容）', (
     expect(out).toEqual({ marqueeItems: [], tagline: '', quote: '' });
   });
 
-  test('欄位缺漏或為空：全部回空，不會丟例外', () => {
-    expect(pickMastheadContent({})).toEqual({ marqueeItems: [], tagline: '', quote: '' });
-    expect(pickMastheadContent(undefined)).toEqual({ marqueeItems: [], tagline: '', quote: '' });
-    expect(pickMastheadContent({ marquee_items: [], tagline: '', quote_text: '' })).toEqual({ marqueeItems: [], tagline: '', quote: '' });
+  test('欄位缺漏或為空（開關開著）：退回預設文字，不會丟例外', () => {
+    expect(pickMastheadContent({})).toEqual(DEFAULTS);
+    expect(pickMastheadContent(undefined)).toEqual(DEFAULTS);
+    expect(pickMastheadContent({ marquee_items: [], tagline: '', quote_text: '' })).toEqual(DEFAULTS);
   });
 
   test('型別不對的資料不會畫出來：非陣列、非字串項目、全空白、null', () => {
@@ -35,10 +36,10 @@ describe('pickMastheadContent（公開設定 → 報頭與跑馬燈內容）', (
       quote_text: null,
     });
     expect(out.marqueeItems).toEqual(['甲', '乙']);
-    expect(out.tagline).toBe('');
-    expect(out.quote).toBe('');
-    expect(pickMastheadContent({ marquee_items: '甲乙丙' }).marqueeItems).toEqual([]);
-    expect(pickMastheadContent({ marquee_items: { 0: '甲' } }).marqueeItems).toEqual([]);
+    expect(out.tagline).toBe(DEFAULT_TAGLINE);
+    expect(out.quote).toBe(DEFAULT_QUOTE);
+    expect(pickMastheadContent({ marquee_items: '甲乙丙' }).marqueeItems).toEqual(DEFAULT_MARQUEE_ITEMS);
+    expect(pickMastheadContent({ marquee_items: { 0: '甲' } }).marqueeItems).toEqual(DEFAULT_MARQUEE_ITEMS);
   });
 
   test('超過 10 項只取前 10 項', () => {
@@ -52,7 +53,7 @@ describe('pickMastheadContent（公開設定 → 報頭與跑馬燈內容）', (
 describe('HomeMasthead', () => {
   test('固定品牌字「原語」與「YUAN・YU」一定有', () => {
     render(<HomeMasthead />);
-    expect(screen.getByText('原語')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: '原語' })).toBeInTheDocument();
     expect(screen.getByText('YUAN・YU')).toBeInTheDocument();
   });
 

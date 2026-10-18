@@ -1,130 +1,275 @@
-/* 族語認證最新公告（S6-4，沉穩文藝）。顏色一律取 --yy-calm-* 語意層。
-   標題下雙線、列與列之間一條細線，與「活動消息」同一套版面語言。 */
+/* 首頁「族語認證最新公告」（雜誌版，對齊首頁設計稿）：石板灰色塊，每則「日期 ｜ 標題與查看詳情」，
+   清單用細線分隔，不用票券框。顏色一律取 --yy-calm-* 語意層；深色主題 block 與 surface 同色，所以留 1.5px 外框。 */
 
 .exam-section {
     min-width: 0;
-    font-family: var(--yy-font-body);
-    color: var(--yy-calm-text);
+    padding: 12px 14px 6px;
+    background: var(--yy-calm-block);
+    color: var(--yy-calm-block-on);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
 }
 
 .exam-header {
-    margin-bottom: var(--yy-space-4);
-    padding-bottom: var(--yy-space-1);
-    border-bottom: 3px double var(--yy-calm-line);
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 3px double color-mix(in srgb, var(--yy-calm-block-on) 70%, transparent);
 }
 
 .exam-title {
     margin: 0;
     font-family: var(--yy-font-heading);
-    font-size: var(--yy-text-2xl);
+    font-size: 1.5rem;
     font-weight: 700;
     line-height: 1.3;
     letter-spacing: 0.06em;
-    color: var(--yy-calm-text);
+}
+
+.exam-session {
+    margin: 4px 0 0;
+    color: var(--yy-calm-block-accent);
+    font-size: var(--yy-text-sm);
+    letter-spacing: 0.04em;
 }
 
 .exam-list {
-    display: flex;
-    flex-direction: column;
     margin: 0;
     padding: 0;
     list-style: none;
 }
 
-.exam-card + .exam-card {
-    border-top: 1px solid var(--yy-calm-rule);
-}
-
 .exam-card {
-    display: flex;
-    flex-direction: column;
-    gap: var(--yy-space-1);
-    padding: var(--yy-space-3) 0;
+    position: relative;
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr);
+    align-items: stretch;
+    border-bottom: 1px solid color-mix(in srgb, var(--yy-calm-block-on) 35%, transparent);
+    transition: background-color 200ms var(--ease-out), transform 120ms var(--ease-out);
 }
 
 .exam-date {
+    padding: 6px 4px;
+    border-right: 1px solid color-mix(in srgb, var(--yy-calm-block-on) 35%, transparent);
+    align-self: stretch;
+    display: grid;
+    place-items: center;
+    color: var(--yy-calm-block-accent);
+    font-family: var(--yy-font-heading);
     font-size: var(--yy-text-sm);
-    font-weight: 600;
-    color: var(--yy-calm-text-sub);
-}
-
-.exam-link {
-    display: inline-flex;
-    align-items: center;
-    min-height: var(--yy-control-md);
-    color: var(--yy-calm-text);
-    font-size: var(--yy-text-base);
     font-weight: 500;
-    line-height: 1.6;
-    text-decoration: none;
-    border-radius: var(--yy-ui-radius);
-    transition: color var(--dur-fast) var(--ease-out);
+    letter-spacing: 0.02em;
+    text-align: center;
+    white-space: nowrap;
 }
 
-a.exam-link:active {
-    transform: scale(var(--yy-ui-press));
+.exam-date__end {
+    display: block;
 }
 
-@media (hover: hover) and (pointer: fine) {
-    a.exam-link:hover {
-        color: var(--yy-calm-accent);
-        text-decoration: underline;
-        text-underline-offset: 4px;
-    }
+.exam-line {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0 8px;
 }
 
-a.exam-link:focus-visible,
-.exam-more:focus-visible {
-    outline: var(--yy-ui-focus-ring);
-    outline-offset: var(--yy-ui-focus-offset);
+.exam-body {
+    display: grid;
+    gap: 2px;
+    align-content: center;
+    min-width: 0;
+    padding: 6px 10px;
 }
 
-.exam-more {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: var(--yy-control-md);
-    margin-top: var(--yy-space-2);
-    padding: 0 var(--yy-space-4);
-    background: transparent;
-    color: var(--yy-calm-text);
-    border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
-    font: inherit;
+/* 沒有日期的項目：標題欄佔滿整列 */
+.exam-body:only-child {
+    grid-column: 1 / -1;
+}
+
+.exam-item-title {
+    margin: 0;
+    font-family: var(--yy-font-heading);
+    font-size: 1rem;
     font-weight: 700;
-    letter-spacing: 0.08em;
-    cursor: pointer;
-    transition: transform 120ms var(--ease-out), background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+    letter-spacing: 0.03em;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
 }
 
-.exam-more:active {
-    transform: scale(var(--yy-ui-press));
+.exam-section .exam-link {
+    justify-self: start;
+    color: var(--yy-calm-block-on);
+    font-size: var(--yy-text-sm);
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+/* 整列都能點：連結的偽元素撐滿整列（觸控區遠大於 44px） */
+a.exam-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+}
+
+a.exam-link:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-color: var(--yy-calm-focus-on-block);
+    outline-offset: -3px;
+}
+
+/* 整列都是點擊區，焦點框也畫在整列上；不支援 :has() 的瀏覽器維持連結自己的框 */
+.exam-card:has(a.exam-link:focus-visible) {
+    outline: var(--yy-ui-focus-ring);
+    outline-color: var(--yy-calm-focus-on-block);
+    outline-offset: -3px;
+}
+
+@supports selector(:has(*)) {
+    a.exam-link:focus-visible {
+        outline-color: transparent;
+    }
 }
 
 @media (hover: hover) and (pointer: fine) {
-    .exam-more:hover {
-        background: var(--yy-calm-text);
-        color: var(--yy-calm-bg);
+    .exam-card:has(a.exam-link:hover) {
+        background: color-mix(in srgb, var(--yy-calm-block-on) 7%, transparent);
     }
+}
+
+.exam-card:has(a.exam-link:active) {
+    background: color-mix(in srgb, var(--yy-calm-block-on) 12%, transparent);
+}
+
+.exam-status {
+    margin: 0;
+    font-size: var(--yy-text-sm);
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+/* 下一個：狀態字用強調色 */
+.exam-card[data-next="true"] .exam-status {
+    color: var(--yy-calm-block-accent);
+    font-weight: 700;
+}
+
+/* 進行中：整列是這一欄的焦點。底色加深一階、期程名稱放大，狀態字做成一顆實心標籤 */
+.exam-card[data-state="current"] {
+    background: color-mix(in srgb, var(--yy-calm-block-on) 9%, transparent);
+}
+
+.exam-card[data-state="current"]::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--yy-calm-block-accent);
+}
+
+.exam-card[data-state="current"] .exam-body {
+    padding-block: 10px;
+}
+
+.exam-card[data-state="current"] .exam-item-title {
+    font-size: 1.1875rem;
+}
+
+.exam-card[data-state="current"] .exam-status {
+    padding: 1px 10px;
+    border-radius: 999px;
+    background: var(--yy-calm-block-accent);
+    color: var(--yy-calm-block-deep);
+    font-weight: 700;
+}
+
+.exam-card[data-state="past"] .exam-item-title,
+.exam-card[data-state="past"] .exam-status {
+    color: color-mix(in srgb, var(--yy-calm-block-on) 78%, var(--yy-calm-block));
+}
+
+.exam-card[data-state="past"] .exam-date {
+    color: color-mix(in srgb, var(--yy-calm-block-accent) 75%, var(--yy-calm-block));
+}
+
+.exam-note {
+    margin: 0;
+    padding: 10px 2px 8px;
+    color: color-mix(in srgb, var(--yy-calm-block-on) 82%, var(--yy-calm-block));
+    font-size: var(--yy-text-sm);
 }
 
 .exam-empty {
-    margin: 0;
-    padding: var(--yy-space-5) var(--yy-space-4);
+    display: grid;
+    place-items: center;
+    gap: var(--yy-space-3);
+    margin: 0 0 8px;
+    padding: 24px 10px;
+    border: var(--yy-border-width) dashed var(--yy-calm-block-on);
+    border-radius: var(--yy-ui-radius);
     text-align: center;
-    color: var(--yy-calm-text-sub);
-    border: var(--yy-border-width) dashed var(--yy-calm-line);
+    font-weight: 700;
+}
+
+.exam-empty p {
+    margin: 0;
+}
+
+.exam-retry {
+    min-height: var(--yy-control-md);
+    padding: 0 var(--yy-space-4);
+    border: var(--yy-border-width) solid var(--yy-calm-block-on);
+    border-radius: var(--yy-ui-radius);
+    background: transparent;
+    color: var(--yy-calm-block-on);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 120ms var(--ease-out), background-color 150ms var(--ease-out), color 150ms var(--ease-out);
+}
+
+.exam-retry:active {
+    transform: scale(var(--yy-ui-press));
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .exam-retry:hover {
+        background: var(--yy-calm-block-on);
+        color: var(--yy-calm-block);
+    }
+}
+
+.exam-retry:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-color: var(--yy-calm-focus-on-block);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+.exam-skeleton {
+    display: grid;
+    gap: var(--yy-space-3);
+    padding-bottom: 12px;
+}
+
+.exam-skeleton__row {
+    display: block;
+    height: 56px;
     border-radius: var(--yy-ui-radius);
 }
 
-/* 減少動態：只換顏色，不縮放 */
+@media (max-width: 480px) {
+    .exam-card {
+        grid-template-columns: 84px minmax(0, 1fr);
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
-    a.exam-link:active,
-    .exam-more:active {
-        transform: none;
+    .exam-card {
+        transition-property: background-color;
     }
 
-    .exam-more {
-        transition: color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+    .exam-retry:active {
+        transform: none;
     }
 }

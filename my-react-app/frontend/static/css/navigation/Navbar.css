@@ -55,18 +55,6 @@
     width: 40px;
 }
 
-/* 頁首下方的織紋細條（靜態，S5-2）：銅褐、橄欖、石板灰三色每 24px 輪替，像一小段織帶；
-   原本 16px 高的紅金藍棋盤格太吵，和象牙白導覽列放在一起不協調。 */
-.navbar-marquee {
-    height: 8px;
-    background-image: repeating-linear-gradient(
-        90deg,
-        var(--yy-calm-copper) 0 24px,
-        var(--yy-calm-olive) 24px 48px,
-        var(--yy-calm-block) 48px 72px
-    );
-}
-
 /* 導覽列的連結都不畫瀏覽器預設的底線；目前頁與 hover 的底線是下面 ::after 那條銅褐細線 */
 .logo,
 .menu-item,
@@ -730,4 +718,103 @@
     .theme-panel.active {
         transform: none;
     }
+}
+
+/* ---------- 首頁雜誌版（對齊首頁設計稿）：選單在報頭下方，純文字分頁，目前頁有銅色底線，右側深色「登入」 ---------- */
+.navbar--magazine {
+    position: static;
+    background: transparent;
+    border-bottom: 1px solid var(--yy-calm-line);
+}
+
+.navbar--magazine .navbar-container {
+    padding: 2px 16px;
+    justify-content: flex-end;
+}
+
+.navbar--magazine .logo {
+    display: none;
+}
+
+.navbar--magazine .menu {
+    flex: 1 1 auto;
+    justify-content: flex-start;
+    gap: 4px;
+}
+
+.navbar--magazine .menu-item {
+    padding: 0 16px;
+    border-radius: 0;
+    font-size: var(--yy-text-base);
+    font-weight: 500;
+    letter-spacing: 0.12em;
+}
+
+.navbar--magazine .menu-item:not(.theme-trigger) svg:first-child {
+    display: none;
+}
+
+.navbar--magazine .menu-item::after {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--yy-calm-copper);
+}
+
+.navbar--magazine .menu-item.active {
+    color: var(--yy-calm-text);
+    font-weight: 700;
+}
+
+.navbar--magazine .menu-item.active::after {
+    background: var(--yy-calm-accent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .navbar--magazine .menu-item:hover {
+        color: inherit;
+    }
+
+    .navbar--magazine .menu-item.active:hover {
+        color: var(--yy-calm-text);
+    }
+}
+
+/* 登入：靠右、深色實心（設計稿裡唯一的實心按鈕）；有顯示設定鈕時由那顆把右側推開 */
+.navbar--magazine .menu-item.login-btn,
+.navbar--magazine .auth-container {
+    margin-left: auto;
+}
+
+.navbar--magazine .menu-item.login-btn {
+    padding: 0 22px;
+    background: var(--yy-calm-text);
+    color: var(--yy-calm-bg);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    font-weight: 700;
+}
+
+.navbar--magazine .theme-menu-wrap {
+    margin-left: auto;
+}
+
+.navbar--magazine .theme-menu-wrap + .menu-item.login-btn,
+.navbar--magazine .theme-menu-wrap + .auth-container {
+    margin-left: var(--yy-space-2);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .navbar--magazine .menu-item.login-btn:hover {
+        background: var(--yy-calm-accent);
+        color: var(--yy-calm-accent-on);
+    }
+}
+
+/* 筆記下拉：細框、3px 圓角、柔和的下緣陰影，從按鈕左上角展開 */
+.navbar--magazine .dropdown-content {
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    box-shadow: 0 14px 22px -16px color-mix(in srgb, var(--yy-calm-text) 55%, transparent);
+    transform-origin: top left;
 }

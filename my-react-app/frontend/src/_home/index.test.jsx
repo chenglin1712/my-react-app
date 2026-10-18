@@ -13,10 +13,20 @@ beforeEach(() => {
 // 這裡只關心 App 元件怎麼撈資料、怎麼依分類分流，不是這幾個子元件怎麼畫——
 // mock 掉它們，直接檢查傳進去的 props，避免測試被子元件的實作細節綁住。
 vi.mock('../../components/_home/news', () => ({
-  default: (props) => <div data-testid="news-mock">{JSON.stringify(props)}</div>,
+  default: (props) => (
+    <div>
+      <div data-testid="news-mock">{JSON.stringify(props)}</div>
+      <button type="button" onClick={props.onRetry}>重新載入</button>
+    </div>
+  ),
 }));
 vi.mock('../../components/_home/calendar', () => ({
-  default: (props) => <div data-testid="calendar-mock">{JSON.stringify(props)}</div>,
+  default: (props) => (
+    <div>
+      <div data-testid="calendar-mock">{JSON.stringify(props)}</div>
+      <button type="button" onClick={props.onRetry}>重新載入時程</button>
+    </div>
+  ),
 }));
 vi.mock('../../components/_home/dateReminder', () => ({
   default: () => <div data-testid="datereminder-mock" />,
@@ -58,6 +68,14 @@ const DEFAULT_CONFIG = {
   button1_enabled: true, button2_enabled: true, button3_enabled: true,
 };
 
+const EXAM_SCHEDULE = {
+  session: '115年度原住民族語言能力認證日程表',
+  phases: [
+    { phase: '測驗', start_date: '2026-11-08', end_date: null },
+    { phase: '報名', start_date: '2026-09-01', end_date: '2026-09-15' },
+  ],
+};
+
 function mockFetchOk(announcementResults, homepageConfig = DEFAULT_CONFIG, featuredTopicItems = []) {
   vi.stubGlobal('fetch', vi.fn((url) => {
     if (url.includes('/adminapi/public/announcements/')) {
@@ -69,6 +87,9 @@ function mockFetchOk(announcementResults, homepageConfig = DEFAULT_CONFIG, featu
     if (url.includes('/adminapi/public/featured-topics/')) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: featuredTopicItems }) });
     }
+    if (url.includes('/crawler/exam_schedule/')) {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(EXAM_SCHEDULE) });
+    }
     return Promise.reject(new Error(`unexpected url: ${url}`));
   }));
 }
@@ -78,20 +99,43 @@ describe('首頁 · 後台公告（單一來源，含爬蟲匯入內容）', () 
     vi.restoreAllMocks();
   });
 
-  test('category=exam 的公告進 Calendar 的族語認證公告區塊，不會混進 News', async () => {
+  test('category=exam 的公告和其他公告一起進最新消息；右欄是認證時程，不是公告', async () => {
     mockFetchOk([announcementItem, examAnnouncementItem]);
     renderHome();
 
     await waitFor(() => {
-      const calendarProps = JSON.parse(screen.getByTestId('calendar-mock').textContent);
-      expect(calendarProps.examInfo).toHaveLength(1);
-      expect(calendarProps.examInfo[0].title).toBe('族語認證公告');
-
       const newsProps = JSON.parse(screen.getByTestId('news-mock').textContent);
       const allTitles = [...newsProps.withImage, ...newsProps.withoutImage].map((item) => item.title);
-      expect(allTitles).not.toContain('族語認證公告');
+      expect(allTitles).toContain('族語認證公告');
       expect(allTitles).toContain('後台公告');
     });
+    await waitFor(() => {
+      const calendarProps = JSON.parse(screen.getByTestId('calendar-mock').textContent);
+      expect(calendarProps.loading).toBe(false);
+      expect(calendarProps.error).toBe(false);
+      // 依開始日排序，屆次名稱去掉結尾的「日程表」
+      expect(calendarProps.schedule.session).toBe('115年度原住民族語言能力認證');
+      expect(calendarProps.schedule.phases.map((p) => p.phase)).toEqual(['報名', '測驗']);
+    });
+  });
+
+  test('時程端點失敗：只有認證時程那一欄顯示錯誤，按重新載入會重打並恢復', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    let fail = true;
+    vi.stubGlobal('fetch', vi.fn((url) => {
+      if (url.includes('/crawler/exam_schedule/')) {
+        return fail ? Promise.resolve({ ok: false, status: 500 }) : Promise.resolve({ ok: true, json: () => Promise.resolve(EXAM_SCHEDULE) });
+      }
+      if (url.includes('/adminapi/public/announcements/')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [] }) });
+      if (url.includes('/adminapi/public/featured-topics/')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [] }) });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(DEFAULT_CONFIG) });
+    }));
+    renderHome();
+    await waitFor(() => expect(JSON.parse(screen.getByTestId('calendar-mock').textContent).error).toBe(true));
+    expect(JSON.parse(screen.getByTestId('news-mock').textContent).error).toBe(false);
+    fail = false;
+    fireEvent.click(screen.getByRole('button', { name: '重新載入時程' }));
+    await waitFor(() => expect(JSON.parse(screen.getByTestId('calendar-mock').textContent).error).toBe(false));
   });
 
   test('公告的 link_url／cover_image_url 對應到 News 元件的 detail／image 欄位', async () => {
@@ -160,71 +204,35 @@ describe('首頁 · 後台公告（單一來源，含爬蟲匯入內容）', () 
       return Promise.reject(new Error(`unexpected url: ${url}`));
     }));
     renderHome();
-    expect(await screen.findByText('目前無法載入最新消息，請稍後再試。')).toBeInTheDocument();
+    await waitFor(() => expect(JSON.parse(screen.getByTestId('news-mock').textContent).error).toBe(true));
+    expect(screen.getByTestId('calendar-mock')).toBeInTheDocument();
+  });
+
+  test('按「重新載入」會重打公告端點，成功後錯誤狀態消失', async () => {
+    let fail = true;
+    vi.stubGlobal('fetch', vi.fn((url) => {
+      if (url.includes('/adminapi/public/announcements/')) {
+        return fail
+          ? Promise.resolve({ ok: false, status: 500 })
+          : Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [announcementItem] }) });
+      }
+      if (url.includes('/adminapi/public/homepage-config/')) return Promise.resolve({ ok: true, json: () => Promise.resolve(DEFAULT_CONFIG) });
+      if (url.includes('/adminapi/public/featured-topics/')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [] }) });
+      return Promise.reject(new Error(`unexpected url: ${url}`));
+    }));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderHome();
+    await waitFor(() => expect(JSON.parse(screen.getByTestId('news-mock').textContent).error).toBe(true));
+    fail = false;
+    fireEvent.click(screen.getByRole('button', { name: '重新載入' }));
+    await waitFor(() => expect(JSON.parse(screen.getByTestId('news-mock').textContent).error).toBe(false));
+    expect(globalThis.fetch.mock.calls.filter(([u]) => u.includes('/announcements/'))).toHaveLength(2);
   });
 });
 
 describe('首頁 · 版位設定（HomepageConfig）套用', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-  });
-
-  test('設定了 hero_image_url 時，主打卡片顯示真的圖片而不是預設圖', async () => {
-    mockFetchOk([], { ...DEFAULT_CONFIG, hero_image_url: 'https://img/hero.jpg', hero_title_override: '本週主打' });
-    renderHome();
-
-    expect(await screen.findByText('現正主打')).toBeInTheDocument();
-    const img = document.querySelector('.home-feature-image img');
-    expect(img).toHaveAttribute('src', 'https://img/hero.jpg');
-    // 標題已經在卡片上，圖片是同一內容的主視覺：alt 留空，報讀器不重複唸
-    expect(img).toHaveAttribute('alt', '');
-    expect(screen.getByRole('heading', { level: 3, name: '本週主打' })).toBeInTheDocument();
-    expect(document.querySelector('.home-feature-image span')).toBeNull();
-    expect(screen.getByText('本週主打')).toBeInTheDocument();
-  });
-
-  test('沒有設定 hero_image_url 時顯示族語預設圖（不再出現英文 placeholder 字樣）與逐族語標題', async () => {
-    mockFetchOk([], DEFAULT_CONFIG);
-    renderHome();
-    // 沒有後台設定時不假裝有「現正主打」：標題就是目前選的族語名稱，不再自動湊「X語主題週」
-    expect(await screen.findByText('泰雅語')).toBeInTheDocument();
-    expect(screen.queryByText('現正主打')).not.toBeInTheDocument();
-    expect(screen.queryByText('泰雅語主題週')).not.toBeInTheDocument();
-    expect(document.querySelector('.home-feature-image span')).toHaveTextContent('Tayal');
-    expect(screen.queryByText('IMAGE PLACEHOLDER')).not.toBeInTheDocument();
-  });
-
-  test('hero_image_url 的圖載入失敗時退回預設圖，不顯示破圖', async () => {
-    mockFetchOk([], { ...DEFAULT_CONFIG, hero_image_url: 'https://img/broken.jpg', hero_title_override: '本週主打' });
-    renderHome();
-    await waitFor(() => expect(document.querySelector('.home-feature-image img')).not.toBeNull());
-    fireEvent.error(document.querySelector('.home-feature-image img'));
-    await waitFor(() => expect(document.querySelector('.home-feature-image img')).toBeNull());
-    // 後台有設定標題的主打卡不隨族語變：圖壞掉退回純圖樣，不顯示族語羅馬拼音
-    expect(document.querySelector('.home-feature-image span')).toBeNull();
-  });
-
-  test('hero_link_url 是內部路徑時，主打卡片用 react-router Link 導頁', async () => {
-    // 用 waitFor 重複查詢而不是單次 findByText：卡片一開始（設定還沒
-    // fetch 回來前）是純 <div>，「現正主打」文字在 <div> 版跟之後的 <a>
-    // 版都存在，findByText 只要找到第一個符合就會結束等待，可能剛好抓到
-    // 還沒套用設定的那個版本。
-    mockFetchOk([], { ...DEFAULT_CONFIG, hero_link_url: '/quiz/select', hero_title_override: '本週主打' });
-    renderHome();
-    await waitFor(() => {
-      const card = screen.getByText('現正主打').closest('a');
-      expect(card).toHaveAttribute('href', '/quiz/select');
-    });
-  });
-
-  test('hero_link_url 是外部網址時，用一般 <a target="_blank"> 開啟', async () => {
-    mockFetchOk([], { ...DEFAULT_CONFIG, hero_link_url: 'https://example.com', hero_title_override: '本週主打' });
-    renderHome();
-    await waitFor(() => {
-      const card = screen.getByText('現正主打').closest('a');
-      expect(card).toHaveAttribute('href', 'https://example.com');
-      expect(card).toHaveAttribute('target', '_blank');
-    });
   });
 
   test('show_news_section=false 時不渲染 News 元件', async () => {
@@ -256,16 +264,6 @@ describe('首頁 · 版位設定（HomepageConfig）套用', () => {
     });
   });
 
-  test('三顆功能按鈕的啟用旗標會原樣傳給 FunctionBtn', async () => {
-    mockFetchOk([], { ...DEFAULT_CONFIG, button1_enabled: false, button2_enabled: true, button3_enabled: false });
-    renderHome();
-
-    await waitFor(() => {
-      const props = JSON.parse(screen.getByTestId('functionbtn-mock').textContent);
-      expect(props.enabled).toEqual({ button1: false, button2: true, button3: false });
-    });
-  });
-
   test('版位設定端點失敗時維持預設值，不影響其餘畫面渲染', async () => {
     vi.stubGlobal('fetch', vi.fn((url) => {
       if (url.includes('/adminapi/public/homepage-config/')) return Promise.reject(new Error('設定端點掛了'));
@@ -275,8 +273,8 @@ describe('首頁 · 版位設定（HomepageConfig）套用', () => {
       return Promise.reject(new Error(`unexpected url: ${url}`));
     }));
     renderHome();
-    expect(await screen.findByText('泰雅語')).toBeInTheDocument();
-    expect(screen.getByTestId('calendar-mock')).toBeInTheDocument();
+    expect(await screen.findByTestId('calendar-mock')).toBeInTheDocument();
+    expect(screen.getByTestId('news-mock')).toBeInTheDocument();
   });
 
   test('版位設定端點回傳的資料缺欄位時，缺的那個欄位退回預設值，而不是變成 undefined', async () => {
@@ -294,97 +292,35 @@ describe('首頁 · 版位設定（HomepageConfig）套用', () => {
   });
 });
 
-describe('首頁 · 族語切換', () => {
+describe('首頁 · 最新消息只放最新四則', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
-  test('族語列表是可鍵盤操作的按鈕，點擊後套用 aria-pressed 與族語羅馬拼音', async () => {
-    mockFetchOk([]);
+  const makeItems = (n) => Array.from({ length: n }, (_, i) => ({
+    ...announcementItem, id: 100 + i, title: `公告${i + 1}`,
+  }));
+  const shown = () => {
+    const props = JSON.parse(screen.getByTestId('news-mock').textContent);
+    return [...props.withImage, ...props.withoutImage].map((item) => item.title);
+  };
+
+  test('後台有很多則：首頁只取最前面的四則，順序不變', async () => {
+    mockFetchOk(makeItems(9));
     renderHome();
-    await waitFor(() => expect(screen.getByTestId('news-mock')).toBeInTheDocument());
-
-    const tayalButton = screen.getByRole('button', { name: /泰雅/ });
-    expect(tayalButton).toHaveAttribute('aria-pressed', 'true');
-
-    const amisButton = screen.getByRole('button', { name: /阿美/ });
-    expect(amisButton).toHaveAttribute('aria-pressed', 'false');
-
-    fireEvent.click(amisButton);
-
-    expect(amisButton).toHaveAttribute('aria-pressed', 'true');
-    expect(tayalButton).toHaveAttribute('aria-pressed', 'false');
+    await waitFor(() => expect(shown()).toEqual(['公告1', '公告2', '公告3', '公告4']));
   });
 
-  test('選取的族語列只靠 aria-pressed 的樣式表示，不再用行內縮放；主打卡片與族語列不再套舊的 yy-card', async () => {
-    mockFetchOk([]);
+  test('後台設定的筆數比四則少：照後台設定', async () => {
+    mockFetchOk(makeItems(9), { ...DEFAULT_CONFIG, news_display_count: 2 });
     renderHome();
-    await waitFor(() => expect(screen.getByTestId('news-mock')).toBeInTheDocument());
-    const rows = document.querySelectorAll('.home-tribe-row');
-    expect(rows.length).toBeGreaterThan(1);
-    rows.forEach((row) => expect(row.getAttribute('style') ?? '').not.toMatch(/transform|scale/));
-    expect(document.querySelector('.home-tribe-list.yy-card')).toBeNull();
-    expect(document.querySelector('.home-feature-card.yy-card')).toBeNull();
-    expect(document.querySelector('.home-feature-sub').textContent).not.toMatch(/·/);
+    await waitFor(() => expect(shown()).toEqual(['公告1', '公告2']));
   });
 
-  test('訪客看到免費註冊按鈕，並把 isGuest 傳給功能卡', async () => {
-    mockFetchOk([]);
+  test('考試類公告也在最新消息裡（認證欄是時程，不是公告）', async () => {
+    mockFetchOk([examAnnouncementItem]);
     renderHome();
-    expect(screen.getByRole('link', { name: '免費註冊' })).toHaveAttribute('href', '/register');
-    expect(JSON.parse((await screen.findByTestId('functionbtn-mock')).textContent).isGuest).toBe(true);
-  });
-
-  test('已登入不顯示免費註冊按鈕，功能卡也不標會員', async () => {
-    authState.current = { userData: { uid: 'u1' }, loading: false };
-    mockFetchOk([]);
-    renderHome();
-    expect(screen.queryByRole('link', { name: '免費註冊' })).not.toBeInTheDocument();
-    expect(JSON.parse((await screen.findByTestId('functionbtn-mock')).textContent).isGuest).toBe(false);
-  });
-
-  test('登入狀態還在確認時先不顯示註冊按鈕（避免已登入的人看到閃一下）', async () => {
-    authState.current = { userData: null, loading: true };
-    mockFetchOk([]);
-    renderHome();
-    expect(screen.queryByRole('link', { name: '免費註冊' })).not.toBeInTheDocument();
-  });
-
-  test('已移除假終端機與多餘的 hero 裝飾', async () => {
-    mockFetchOk([]);
-    renderHome();
-    expect(document.querySelector('.home-console')).toBeNull();
-    expect(document.querySelectorAll('.home-streak, .home-sprite, .home-diamond-glyph')).toHaveLength(0);
-  });
-
-  test('消息載入失敗時只顯示錯誤說明，不渲染空的 News 區塊', async () => {
-    vi.stubGlobal('fetch', vi.fn((url) => {
-      if (url.includes('/adminapi/public/homepage-config/')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(DEFAULT_CONFIG) });
-      }
-      return Promise.resolve({ ok: false, status: 500 });
-    }));
-    renderHome();
-    expect(await screen.findByText('目前無法載入最新消息，請稍後再試。')).toBeInTheDocument();
-    expect(screen.queryByTestId('news-mock')).not.toBeInTheDocument();
-  });
-
-  test('只設了連結、沒設標題時，卡片仍算主打：不顯示隨族語變的標題與羅馬拼音', async () => {
-    mockFetchOk([], { ...DEFAULT_CONFIG, hero_link_url: '/quiz/select' });
-    renderHome();
-    await waitFor(() => expect(screen.getByText('現正主打').closest('a')).toHaveAttribute('href', '/quiz/select'));
-    expect(screen.queryByText('語言預覽')).not.toBeInTheDocument();
-    expect(document.querySelector('.home-feature-title')).toBeNull();
-    expect(document.querySelector('.home-feature-sub')).toBeNull();
-  });
-
-  test('「五族語言」是 h2，登入狀態確認期間註冊按鈕只佔位、不是連結', async () => {
-    authState.current = { userData: null, loading: true };
-    mockFetchOk([]);
-    renderHome();
-    expect(screen.getByRole('heading', { level: 2, name: /五族語言/ })).toBeInTheDocument();
-    expect(document.querySelector('.home-cta-placeholder')).not.toBeNull();
-    expect(screen.queryByRole('link', { name: '免費註冊' })).not.toBeInTheDocument();
+    await waitFor(() => expect(shown()).toEqual(['族語認證公告']));
   });
 });
 
@@ -400,19 +336,19 @@ describe('首頁 · 報頭與跑馬燈（S6-1，讀後台公開設定）', () =>
     quote_text: '每一種語言，都是一座回得去的家。', show_quote: true,
   };
 
-  test('設定載入前與後台從沒填過：只有固定的「原語」「YUAN・YU」，沒有跑馬燈、標語、引言', async () => {
+  test('設定載入前與後台從沒填過：顯示預設文字（跑馬燈、標語、引言），不是空白', async () => {
     mockFetchOk([]);
     renderHome();
     // 載入前（預設值）
-    expect(screen.getByText('原語')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: '原語' })).toBeInTheDocument();
     expect(screen.getByText('YUAN・YU', { selector: '.home-mast__en-name' })).toBeInTheDocument();
-    expect(document.querySelector('.home-ticker')).toBeNull();
-    expect(document.querySelector('.home-mast__quote')).toBeNull();
-    expect(document.querySelector('.home-mast__tagline')).toBeNull();
+    expect(document.querySelector('.home-ticker')).not.toBeNull();
+    expect(document.querySelector('.home-mast__quote')).toHaveTextContent('每一種語言，都是一座回得去的家。');
+    expect(document.querySelector('.home-mast__tagline')).toHaveTextContent('讓語言回家');
     // 載入後（後端回的也是空）
     await waitFor(() => expect(screen.getByTestId('news-mock')).toBeInTheDocument());
-    expect(document.querySelector('.home-ticker')).toBeNull();
-    expect(document.querySelector('.home-mast__quote')).toBeNull();
+    expect(document.querySelector('.home-ticker')).not.toBeNull();
+    expect(document.querySelector('.home-mast__quote')).not.toBeNull();
   });
 
   test('後台填了之後：跑馬燈、標語、引言都出現，並在報頭與跑馬燈區塊裡', async () => {
@@ -432,8 +368,8 @@ describe('首頁 · 報頭與跑馬燈（S6-1，讀後台公開設定）', () =>
     const order = [...page.children].map((el) => el.className);
     expect(order[0]).toContain('home-ticker');
     expect(order[1]).toContain('home-mast');
-    expect(order[2]).toContain('home-first');
-    expect(order[3]).toContain('home-hero');
+    expect(order[2]).toContain('home-nav-slot');
+    expect(order[3]).toContain('home-first');
   });
 
   test('開關關閉時不輸出（即使資料裡還有內容）', async () => {
@@ -453,7 +389,7 @@ describe('首頁 · 報頭與跑馬燈（S6-1，讀後台公開設定）', () =>
     expect(document.querySelector('.home-mast__tagline')).not.toBeNull();
   });
 
-  test('設定端點失敗：用預設設定（沒有跑馬燈、標語、引言），首頁其餘照常', async () => {
+  test('設定端點失敗：用預設設定（預設文字的跑馬燈、標語、引言），首頁其餘照常', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.stubGlobal('fetch', vi.fn((url) => {
       if (url.includes('/adminapi/public/homepage-config/')) return Promise.resolve({ ok: false, status: 500 });
@@ -461,16 +397,16 @@ describe('首頁 · 報頭與跑馬燈（S6-1，讀後台公開設定）', () =>
     }));
     renderHome();
     await waitFor(() => expect(screen.getByTestId('news-mock')).toBeInTheDocument());
-    expect(screen.getByText('原語')).toBeInTheDocument();
-    expect(document.querySelector('.home-ticker')).toBeNull();
-    expect(document.querySelector('.home-mast__quote')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: '原語' })).toBeInTheDocument();
+    expect(document.querySelector('.home-ticker')).not.toBeNull();
+    expect(document.querySelector('.home-mast__quote')).not.toBeNull();
   });
 
   test('後端漏帶新欄位（舊版後端）時退回預設，不會出錯', async () => {
     mockFetchOk([], { ...DEFAULT_CONFIG });
     renderHome();
     await waitFor(() => expect(screen.getByTestId('news-mock')).toBeInTheDocument());
-    expect(document.querySelector('.home-ticker')).toBeNull();
+    expect(document.querySelector('.home-ticker')).not.toBeNull();
   });
 });
 
@@ -485,24 +421,26 @@ describe('首頁 · 宣傳影片（S6-2，讀後台公開設定）', () => {
     caption_url: null, duration_seconds: 412, available: true,
   };
 
-  test('沒有啟用中的影片（null）、載入前、設定失敗：整區不輸出', async () => {
+  test('沒有啟用中的影片（null）、載入前、設定失敗：放示意卡（不是播放器，沒有可按的東西）', async () => {
     mockFetchOk([], { ...DEFAULT_CONFIG, promo_video: null });
     renderHome();
-    expect(document.querySelector('.home-promo')).toBeNull();
+    expect(document.querySelector('.home-promo--placeholder')).not.toBeNull();
     await waitFor(() => expect(screen.getByTestId('news-mock')).toBeInTheDocument());
-    expect(document.querySelector('.home-promo')).toBeNull();
+    const card = document.querySelector('.home-promo--placeholder');
+    expect(card).not.toBeNull();
+    expect(card.querySelector('button, a, video')).toBeNull();
+    expect(card).toHaveTextContent('示意影片');
   });
 
-  test('有啟用中的影片：輸出宣傳區，在報頭之後、主視覺之前，並顯示標題與說明', async () => {
+  test('有啟用中的影片：輸出宣傳區，在報頭之後的第一屏左欄，並顯示標題與說明', async () => {
     mockFetchOk([], { ...DEFAULT_CONFIG, promo_video: PROMO });
     renderHome();
     expect(await screen.findByRole('region', { name: '宣傳影片' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: '認識原語' })).toBeInTheDocument();
     const order = [...document.querySelector('.homepage').children].map((el) => el.className);
-    expect(order[0]).toContain('home-mast');
-    expect(order[1]).toContain('home-first');
-    expect(document.querySelector('.home-first > .home-promo')).not.toBeNull();
-    expect(order[2]).toContain('home-hero');
+    expect(order[1]).toContain('home-mast');
+    expect(order[3]).toContain('home-first');
+    expect(document.querySelector('.home-first > .home-first__lead .home-promo')).not.toBeNull();
   });
 
   test('影片缺檔（available 為 false）：仍輸出，顯示無法播放與逐字稿', async () => {
@@ -514,7 +452,7 @@ describe('首頁 · 宣傳影片（S6-2，讀後台公開設定）', () => {
   });
 });
 
-describe('首頁 · 第一屏（S6-4：影片、活動消息、族語認證公告並排）', () => {
+describe('首頁 · 第一屏（S6-4：影片、活動消息、族語認證時程並排）', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -535,29 +473,38 @@ describe('首頁 · 第一屏（S6-4：影片、活動消息、族語認證公�
     expect(first.querySelector('.home-promo')).not.toBeNull();
     expect(first.querySelector('[data-testid="news-mock"]')).not.toBeNull();
     expect(first.querySelector('[data-testid="calendar-mock"]')).not.toBeNull();
-    const hero = document.querySelector('.home-hero');
-    expect(first.compareDocumentPosition(hero) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  test('沒有影片：消息與公告重新分配欄寬，不留空欄', async () => {
+  test('沒有影片：左欄放示意卡加大標題與說明，三欄 5:4:3', async () => {
     mockFetchOk([], DEFAULT_CONFIG);
     renderHome();
     await screen.findByTestId('news-mock');
-    expect(cols()).toBe('minmax(0, 4fr) minmax(0, 3fr)');
+    expect(cols()).toBe('minmax(0, 5fr) minmax(0, 4fr) minmax(0, 3fr)');
+    expect(document.querySelector('.home-first__lead .home-intro__title')).toHaveTextContent('讓語言回家');
+    expect(document.querySelector('.home-first__lead .home-intro__lede')).toHaveTextContent('用查詞、聽發音和故事，把族語帶回日常。');
   });
 
-  test('只開消息（公告關閉、沒有影片）：單欄', async () => {
+  test('標語關閉：左欄仍有示意卡，三欄不變', async () => {
+    mockFetchOk([], { ...DEFAULT_CONFIG, show_tagline: false });
+    renderHome();
+    await screen.findByTestId('news-mock');
+    expect(cols()).toBe('minmax(0, 5fr) minmax(0, 4fr) minmax(0, 3fr)');
+    expect(document.querySelector('.home-first__lead .home-intro')).toBeNull();
+  });
+
+  test('公告關閉：左欄與消息兩欄，欄寬 5:4', async () => {
     mockFetchOk([], { ...DEFAULT_CONFIG, show_calendar_section: false });
     renderHome();
     await screen.findByTestId('news-mock');
-    expect(cols()).toBe('minmax(0, 4fr)');
+    expect(cols()).toBe('minmax(0, 5fr) minmax(0, 4fr)');
   });
 
-  test('影片、消息、公告全部沒有：不輸出第一屏這一層', async () => {
+  test('消息與公告都關閉：只剩左欄', async () => {
     mockFetchOk([], { ...DEFAULT_CONFIG, show_news_section: false, show_calendar_section: false });
     renderHome();
-    await screen.findByTestId('functionbtn-mock');
-    expect(document.querySelector('.home-first')).toBeNull();
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(4));
+    expect(cols()).toBe('minmax(0, 5fr)');
+    expect(document.querySelector('[data-testid="news-mock"]')).toBeNull();
   });
 
   test('消息載入失敗：第一屏只顯示那一欄的錯誤說明，公告與影片不受影響', async () => {
@@ -569,18 +516,9 @@ describe('首頁 · 第一屏（S6-4：影片、活動消息、族語認證公�
       return Promise.resolve({ ok: false, status: 500 });
     }));
     renderHome();
-    expect(await screen.findByText('目前無法載入最新消息，請稍後再試。')).toBeInTheDocument();
-    expect(document.querySelector('.home-first > .home-first__error')).not.toBeNull();
+    await waitFor(() => expect(JSON.parse(screen.getByTestId('news-mock').textContent).error).toBe(true));
     expect(screen.getByTestId('calendar-mock')).toBeInTheDocument();
-    await waitFor(() => expect(document.querySelector('.home-first > .home-promo')).not.toBeNull());
-  });
-
-  test('考試期程提醒（DateReminder）移到第一屏之外，跟公告共用同一個後台開關', async () => {
-    mockFetchOk([], DEFAULT_CONFIG);
-    renderHome();
-    await screen.findByTestId('news-mock');
-    expect(document.querySelector('.home-first [data-testid="datereminder-mock"]')).toBeNull();
-    expect(document.querySelector('.home-reminder [data-testid="datereminder-mock"]')).not.toBeNull();
+    await waitFor(() => expect(document.querySelector('.home-first .home-promo')).not.toBeNull());
   });
 
   test('show_calendar_section=false：公告與提醒一起不輸出', async () => {
@@ -601,25 +539,34 @@ describe('首頁 · 本期專題（S7-1）', () => {
     id, title: `專題${id}`, summary: `摘要${id}`, image_url: '', link_url: `https://example.org/${id}`, category_label: '文化',
   });
 
-  test('有已發布的專題：在第一屏之後、主視覺之前輸出，依回傳順序', async () => {
+  test('有已發布的專題：在第一屏之後輸出，依回傳順序', async () => {
     mockFetchOk([], DEFAULT_CONFIG, [topic(1), topic(2), topic(3)]);
     renderHome();
     expect(await screen.findByRole('heading', { level: 2, name: '本期專題' })).toBeInTheDocument();
     const section = document.querySelector('.topics-section');
     expect(within(section).getAllByRole('heading', { level: 3 }).map((h) => h.textContent.replace('（另開新視窗）', ''))).toEqual(['專題1', '專題2', '專題3']);
     expect(document.querySelector('.home-first').compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(section.compareDocumentPosition(document.querySelector('.home-hero')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  test('0 筆：整區隱藏，連標題都沒有', async () => {
+  test('0 筆：放三張示意卡（沒有連結），不是空白', async () => {
     mockFetchOk([], DEFAULT_CONFIG, []);
     renderHome();
+    expect(await screen.findByRole('heading', { level: 2, name: '本期專題' })).toBeInTheDocument();
+    const section = document.querySelector('.topics-section');
+    expect(within(section).getAllByRole('heading', { level: 3 })).toHaveLength(3);
+    expect(within(section).queryByRole('link')).toBeNull();
+  });
+
+  test('專題還沒回來之前不先閃示意卡', async () => {
+    vi.stubGlobal('fetch', vi.fn((url) => (url.includes('/featured-topics/')
+      ? new Promise(() => {})
+      : Promise.resolve({ ok: true, json: () => Promise.resolve(url.includes('/announcements/') ? { results: [] } : DEFAULT_CONFIG) }))));
+    renderHome();
     await screen.findByTestId('news-mock');
-    expect(screen.queryByRole('heading', { name: '本期專題' })).not.toBeInTheDocument();
     expect(document.querySelector('.topics-section')).toBeNull();
   });
 
-  test('專題端點失敗：只是不顯示這一區，設定與公告照常', async () => {
+  test('專題端點失敗：退回示意卡，設定與公告照常', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.stubGlobal('fetch', vi.fn((url) => {
       if (url.includes('/adminapi/public/featured-topics/')) return Promise.resolve({ ok: false, status: 500 });
@@ -628,7 +575,7 @@ describe('首頁 · 本期專題（S7-1）', () => {
     }));
     renderHome();
     await screen.findByTestId('news-mock');
-    expect(screen.queryByRole('heading', { name: '本期專題' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '本期專題' })).toBeInTheDocument();
     expect(screen.getByTestId('calendar-mock')).toBeInTheDocument();
   });
 

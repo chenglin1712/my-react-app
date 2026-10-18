@@ -1,6 +1,6 @@
 // @vitest-environment node
 //
-// S7-1 守門：本期專題的樣式。
+// 本期專題（雜誌版，對齊 Artifact）守門：三張等寬細框白卡、5:2 圖區（沒圖畫圖樣）、整張卡可點。
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,7 +32,11 @@ describe("本期專題樣式", () => {
   it("沒有寫死色碼、舊風格色 token、陰影、動畫、transition: all、ease-in", () => {
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     expect(css).not.toMatch(/--yy-(?:red|gold|blue|cream|ink|green|border-soft|text-muted|radius-card|radius-btn|surface)\b/);
-    expect(css).not.toMatch(/box-shadow|text-shadow|@keyframes|animation\s*:|transition:\s*all|ease-in(?![\w-])/);
+    expect(css).not.toMatch(/text-shadow|@keyframes|animation\s*:|transition:\s*all|ease-in(?![\w-])/);
+  });
+
+  it("陰影只有 hover 時一道柔和的下緣（有模糊，不是硬偏移）", () => {
+    [...css.matchAll(/box-shadow:\s*([^;]+);/g)].forEach((m) => expect(m[1]).toMatch(/^(?:0 14px 22px -16px|none$)/));
   });
 
   it("標題下雙線；字級至少 14px", () => {
@@ -40,21 +44,33 @@ describe("本期專題樣式", () => {
     expect(css).not.toMatch(/font-size:\s*(?:\d|1[0-3])px/);
   });
 
-  it("三張不是等寬：第一張佔左側整高，左右 7:5", () => {
-    const three = find(".topics-grid--3", /min-width:\s*720px/);
-    expect(three.body).toMatch(/grid-template-columns:\s*minmax\(0,\s*7fr\)\s*minmax\(0,\s*5fr\)/);
-    expect(find(".topics-grid--3 .topic-card--lead", /min-width:\s*720px/).body).toMatch(/grid-row:\s*span 2/);
-    expect(css).not.toMatch(/repeat\(\s*3\s*,\s*(?:1fr|minmax\(0,\s*1fr\))\s*\)/);
+  it("三張等寬的細框白卡：一、兩、三張都用三欄的欄寬", () => {
+    ["--1", "--2", "--3"].forEach((n) => {
+      expect(find(`.topics-grid${n}`, /min-width:\s*720px/), n).toBeUndefined();
+    });
+    const three = find(".topics-grid--1, .topics-grid--2, .topics-grid--3", /min-width:\s*720px/);
+    expect(three.body).toMatch(/grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
+    const card = find(".topic-card").body;
+    expect(card).toMatch(/border:\s*var\(--yy-border-width\) solid var\(--yy-calm-line\)/);
+    expect(card).toMatch(/background:\s*var\(--yy-calm-surface\)/);
+    expect(card).toMatch(/border-radius:\s*var\(--yy-ui-radius\)/);
   });
 
-  it("整張卡可點（標題連結伸展），圖片寬高比固定避免版面跳動", () => {
+  it("整張卡可點（標題連結伸展），圖片寬高比固定避免版面跳動；沒圖時三款圖樣", () => {
     expect(find(".topic-link::after").body).toMatch(/position:\s*absolute/);
     expect(find(".topic-link::after").body).toMatch(/inset:\s*0/);
-    expect(find(".topic-image").body).toMatch(/aspect-ratio:\s*16\s*\/\s*10/);
+    expect(find(".topic-image").body).toMatch(/aspect-ratio:\s*5\s*\/\s*2/);
+    [0, 1, 2].forEach((n) => expect(find(`.topic-image--pattern[data-pattern="${n}"]`), String(n)).toBeTruthy());
   });
 
-  it("按下縮放回饋、焦點框畫在整張卡；hover 只給有滑鼠的裝置；減少動態不縮放", () => {
-    expect(find(".topic-card:has(.topic-link:active)").body).toMatch(/scale\(var\(--yy-ui-press\)\)/);
+  it("標籤顏色依序用橄欖、深銅、石板灰", () => {
+    expect(find(".topic-tag").body).toMatch(/background:\s*var\(--yy-calm-block\)/);
+    expect(find('.topic-tag[data-tone="0"]').body).toMatch(/var\(--yy-calm-tag\)/);
+    expect(find('.topic-tag[data-tone="1"]').body).toMatch(/var\(--yy-calm-accent\)/);
+  });
+
+  it("按下縮放回饋、焦點框畫在整張卡；hover 只給有滑鼠且不減少動態的裝置；減少動態不縮放", () => {
+    expect(find(".topic-card:has(.topic-link):active").body).toMatch(/scale\(0\.99\)/);
     expect(find(".topic-card:has(.topic-link:focus-visible)").body).toMatch(/outline:\s*var\(--yy-ui-focus-ring\)/);
     // 連結自己的框只在支援 :has() 時才隱藏，否則舊瀏覽器完全沒有焦點提示
     expect(find(".topic-link:focus-visible", /@supports selector\(:has/).body).toMatch(/outline-color:\s*transparent/);
@@ -66,11 +82,8 @@ describe("本期專題樣式", () => {
     expect(reduced.body).toMatch(/transform:\s*none/);
   });
 
-  it("手機單欄，左右內距 24px", () => {
-    expect(find(".topics-section").body).toMatch(/padding:\s*0 24px/);
-    expect(find(".topics-section", /min-width:\s*720px/).body).toMatch(/padding:\s*0 56px/);
-    // 兩欄以上的版面只在 720px 以上才開
-    expect(find(".topics-grid--2", /min-width:\s*720px/)).toBeTruthy();
-    expect(find(".topics-grid--2")).toBeUndefined();
+  it("手機單欄，左右內距 16px；多欄只在 720px 以上才開", () => {
+    expect(find(".topics-section").body).toMatch(/padding-inline:\s*16px/);
+    expect(find(".topics-grid").body).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/);
   });
 });

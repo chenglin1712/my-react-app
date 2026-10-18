@@ -294,7 +294,6 @@ describe("寫死色碼只減不增（顏色一律走 token）", () => {
 // 各頁改版（階段 S8）時，建議把這些出口收斂成單一元件（例如 TribeMark），這份白名單就會縮成一個檔案。
 const TRIBE_COLOR_CONSUMERS = [
   "components/ui/TribePill.jsx", // 選取中的小膠囊
-  "src/_home/index.jsx", // 22px 色票
   "src/_game/GameTribeSelectPage.jsx", // 小徽章與細框
   "src/_game/index.jsx", // 菱形徽章
 ];
@@ -338,12 +337,5 @@ describe("五族色只能當小標記", () => {
       }),
     );
     expect(hits).toEqual([]);
-  });
-
-  it("族色色票的尺寸是小標記（不超過 64px）", () => {
-    const sw = cssFiles.map(({ css }) => css.match(/\.home-tribe-swatch\s*\{([^}]*)\}/)).find(Boolean);
-    expect(sw).toBeTruthy();
-    const w = Number(sw[1].match(/width:\s*(\d+)px/)[1]);
-    expect(w).toBeLessThanOrEqual(64);
   });
 });

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import RevealOnView from '../../components/ui/RevealOnView';
+import { MemoryRouter } from 'react-router-dom';
 import News from '../../components/_home/news';
 
 vi.mock('swiper/react', () => ({ Swiper: ({ children }) => <div>{children}</div>, SwiperSlide: ({ children }) => <div>{children}</div> }));
@@ -44,13 +45,13 @@ describe('捲動進場（RevealOnView）', () => {
 
 describe('首頁消息的載入狀態', () => {
     test('資料還沒回來時顯示佔位卡片與讀屏文字，不是空列表', () => {
-        render(<News loading />);
+        render(<MemoryRouter><News loading /></MemoryRouter>);
         expect(screen.getByRole('status')).toHaveTextContent('最新消息載入中');
         expect(screen.queryByText('目前沒有任何公告')).not.toBeInTheDocument();
     });
 
     test('載入完成後顯示消息內容', () => {
-        render(<News withoutImage={[{ id: 1, title: '測試公告', tag: '公告', start_date: '2026-10-01', detail: '#' }]} />);
+        render(<MemoryRouter><News withoutImage={[{ id: 1, title: '測試公告', tag: '公告', start_date: '2026-10-01', detail: '#' }]} /></MemoryRouter>);
         expect(screen.getByText('測試公告')).toBeInTheDocument();
         expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });

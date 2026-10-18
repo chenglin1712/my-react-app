@@ -33,15 +33,9 @@ const NO_DECORATION = /box-shadow|text-shadow|linear-gradient|repeating-conic-gr
 const funcCss = read("functionBtn.css");
 const func = parse(funcCss);
 const findFunc = finder(func);
-const indexCss = read("index.css");
-const indexRules = parse(indexCss);
-const findIdx = finder(indexRules);
 const reminderCss = read("dateReminder.css");
 const reminder = parse(reminderCss);
 const findRem = finder(reminder);
-
-// 只看 index.css 裡「五族語言 + 現正主打」那一段
-const tribeSection = indexCss.slice(indexCss.indexOf(".home-tribes-section"), indexCss.indexOf(".home-first {"));
 
 describe("功能入口樣式", () => {
   it("沒有舊風格 token、寫死色碼、陰影、漸層、動畫", () => {
@@ -74,36 +68,6 @@ describe("功能入口樣式", () => {
       expect(r.atRules.some((a) => /hover:\s*hover/.test(a) && /pointer:\s*fine/.test(a)), r.selector).toBe(true);
     });
     expect(findFunc(".home-func-card:active", /prefers-reduced-motion/).body).toMatch(/transform:\s*none/);
-  });
-});
-
-describe("五族語言列與現正主打", () => {
-  it("沒有舊風格 token、陰影、漸層、拼色圖樣、動畫", () => {
-    expect(tribeSection).not.toMatch(OLD_TOKENS);
-    expect(tribeSection).not.toMatch(NO_DECORATION);
-    expect(tribeSection).not.toMatch(/rgba?\(/);
-  });
-
-  it("每一列至少 44px 高，選取狀態用 aria-pressed 畫，按下縮放，焦點框清楚", () => {
-    expect(findIdx(".home-tribe-row").body).toMatch(/min-height:\s*var\(--yy-control-md\)/);
-    expect(findIdx('.home-tribe-row[aria-pressed="true"]').body).toMatch(/border-color:\s*var\(--yy-calm-line\)/);
-    expect(findIdx(".home-tribe-row:active").body).toMatch(/scale\(var\(--yy-ui-press\)\)/);
-    expect(findIdx(".home-tribe-row:focus-visible").body).toMatch(/outline:\s*var\(--yy-ui-focus-ring\)/);
-  });
-
-  it("hover 只給有滑鼠的裝置；減少動態不縮放", () => {
-    indexRules.filter((r) => /home-tribe-row:hover|home-feature-card:hover/.test(r.selector)).forEach((r) => {
-      expect(r.atRules.some((a) => /hover:\s*hover/.test(a) && /pointer:\s*fine/.test(a)), r.selector).toBe(true);
-    });
-    const reduced = indexRules.find((r) => r.atRules.some((a) => /prefers-reduced-motion/.test(a)) && r.selector.includes(".home-tribe-row:active"));
-    expect(reduced.body).toMatch(/transform:\s*none/);
-  });
-
-  it("主打卡片：細框、小圓角、沒有漸層頭，只有連結時才有按下回饋", () => {
-    expect(findIdx(".home-feature-card").body).toMatch(/border:\s*var\(--yy-border-width\) solid var\(--yy-calm-line\)/);
-    expect(findIdx(".home-feature-card").body).toMatch(/border-radius:\s*var\(--yy-ui-radius\)/);
-    expect(findIdx("a.home-feature-card:active").body).toMatch(/scale\(var\(--yy-ui-press\)\)/);
-    expect(findIdx(".home-feature-image").body).toMatch(/aspect-ratio:\s*16\s*\/\s*9/);
   });
 });
 

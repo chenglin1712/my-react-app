@@ -4,15 +4,39 @@
 .home-promo {
   display: grid;
   gap: var(--yy-space-3);
-  padding: var(--yy-space-5) 56px;
+  padding: var(--yy-space-5) 24px;
   min-width: 0;
+}
+
+/* 影片外框：右下方錯開 12px 的一條銅色細框，像疊在後面的一張紙（對齊設計稿） */
+.home-promo__frame {
+  position: relative;
+  isolation: isolate;
+  margin: 0 12px 12px 0;
+}
+
+.home-promo__frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: var(--yy-border-width) solid var(--yy-calm-copper);
+  border-radius: var(--yy-ui-radius);
+  transform: translate(12px, 12px);
+  transition: transform 380ms var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .home-promo__frame:hover::before {
+    transform: translate(16px, 16px);
+  }
 }
 
 .home-promo__stage {
   position: relative;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  background: var(--yy-calm-block);
+  background: linear-gradient(135deg, var(--yy-calm-block) 0%, var(--yy-calm-olive) 100%);
   border: var(--yy-border-width) solid var(--yy-calm-line);
   border-radius: var(--yy-ui-radius);
 }
@@ -25,7 +49,7 @@
   object-fit: cover;
 }
 
-/* 封面上的播放鈕：半徑 3px 的方形，與全站按鈕一致，不用圓形貼紙 */
+/* 封面上的播放鈕：72px 圓形，米白底、2px 細框（對齊設計稿） */
 .home-promo__big-play {
   position: absolute;
   inset: 0;
@@ -39,7 +63,7 @@
   background: var(--yy-calm-surface);
   color: var(--yy-calm-text);
   border: var(--yy-border-width) solid var(--yy-calm-line);
-  border-radius: var(--yy-ui-radius);
+  border-radius: 50%;
   cursor: pointer;
   transition: transform 120ms var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
@@ -129,28 +153,54 @@
   color: var(--yy-calm-text);
 }
 
-/* ---------- 標題、說明、逐字稿 ---------- */
+/* ---------- 畫面上的標題與說明、逐字稿 ---------- */
 
-.home-promo__text {
+/* 標題與說明疊在畫面左下；漸層底讓米白字在任何封面上都清楚，點擊穿透到下面的播放鈕 */
+.home-promo__cap {
+  position: absolute;
+  inset: auto 0 0 0;
   display: grid;
-  gap: var(--yy-space-1);
+  gap: 2px;
+  padding: 36px 14px 12px;
+  background: linear-gradient(to top, color-mix(in srgb, var(--yy-calm-block-deep) 88%, transparent), transparent);
+  color: var(--yy-calm-block-on);
+  pointer-events: none;
 }
 
 .home-promo__title {
   margin: 0;
   font-family: var(--yy-font-heading);
-  font-size: var(--yy-text-xl);
+  font-size: var(--yy-text-base);
   font-weight: 700;
   line-height: 1.35;
   letter-spacing: 0.04em;
-  color: var(--yy-calm-text);
 }
 
 .home-promo__desc {
   max-width: 65ch;
   margin: 0;
-  color: var(--yy-calm-text-sub);
-  line-height: 1.7;
+  font-size: var(--yy-text-sm);
+  line-height: 1.5;
+}
+
+/* 「示意影片」標籤（只有尚未上傳影片的示意卡才有） */
+.home-promo__pill {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  z-index: 1;
+  padding: 2px 12px;
+  background: var(--yy-calm-bg);
+  color: var(--yy-calm-text);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: 999px;
+  font-size: var(--yy-text-sm);
+  font-weight: 700;
+}
+
+/* 示意卡上的播放圖示：只是畫面，不可按，也不吃滑鼠 */
+.home-promo__big-play--static {
+  pointer-events: none;
 }
 
 .home-promo__transcript {
@@ -198,5 +248,43 @@
   .home-promo__btn:active,
   .home-promo__big-play:active {
     transform: none;
+  }
+}
+
+/* 影片後方一條錯位的銅色細框，像疊在下面的一張紙（對齊 Artifact） */
+.home-promo__stage {
+  outline: var(--yy-border-width) solid var(--yy-calm-copper);
+  outline-offset: 10px;
+}
+
+/* ---------- 第一屏大標題與說明（對齊 Artifact） ---------- */
+.home-intro {
+  display: grid;
+  gap: var(--yy-space-2);
+}
+
+.home-intro__title {
+  margin: 28px 0 0;
+  font-family: var(--yy-font-heading);
+  font-size: clamp(2.1rem, 3.8vw, 3.25rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: var(--yy-leading-heading);
+  color: var(--yy-calm-text);
+}
+
+.home-intro__lede {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-family: var(--yy-font-heading);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  line-height: 1.7;
+  color: var(--yy-calm-text-sub);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-promo__frame::before {
+    transition: none;
   }
 }

@@ -6,9 +6,9 @@
 .home-ticker {
   display: flex;
   align-items: stretch;
-  min-height: var(--yy-control-md);
+  min-height: 32px;
   color: var(--yy-calm-text-sub);
-  border-bottom: var(--yy-border-width) solid var(--yy-calm-rule);
+  border-block: 1px solid var(--yy-calm-line);
 }
 
 .home-ticker__viewport {
@@ -16,9 +16,6 @@
   min-width: 0;
   overflow: hidden;
   container-type: inline-size;
-  /* 兩端淡出，項目進出視窗時不會被硬切掉 */
-  -webkit-mask-image: linear-gradient(90deg, transparent, black 4%, black 96%, transparent);
-  mask-image: linear-gradient(90deg, transparent, black 4%, black 96%, transparent);
 }
 
 .home-ticker__track {
@@ -51,21 +48,20 @@
 .home-ticker__copy li {
   display: flex;
   align-items: center;
-  gap: 28px;
-  padding-inline-end: 28px;
+  gap: 22px;
+  padding: 4px 22px 4px 0;
   font-family: var(--yy-font-heading);
   font-size: var(--yy-text-sm);
   font-weight: 500;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.35em;
   white-space: nowrap;
 }
 
-/* 項目之間用一條細線分隔（不是裝飾點） */
-.home-ticker__copy li::before {
-  content: "";
-  width: 1px;
-  height: 14px;
-  background: var(--yy-calm-copper);
+/* 項目後面一個銅色星號分隔（對齊 Artifact） */
+.home-ticker__copy li::after {
+  content: "\2731";
+  color: var(--yy-calm-copper);
+  letter-spacing: 0;
 }
 
 .home-ticker__toggle {
@@ -73,8 +69,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: var(--yy-control-md);
-  min-height: var(--yy-control-md);
+  min-width: 32px;
+  min-height: 32px;
   padding: 0;
   border: 0;
   border-inline-start: var(--yy-border-width) solid var(--yy-calm-rule);
@@ -105,7 +101,7 @@
 
 /* 減少動態：靜態呈現。全部項目換行排開、置中，沒有複本、沒有暫停鈕（元件在這個偏好下根本不輸出它們，這裡是第二道防線） */
 .home-ticker--static {
-  padding: var(--yy-space-2) 56px;
+  padding: var(--yy-space-2) 24px;
   justify-content: center;
 }
 
@@ -138,10 +134,10 @@
   grid-template-areas: "name quote en";
   align-items: center;
   gap: var(--yy-space-2) var(--yy-space-6);
-  padding: var(--yy-space-3) 56px;
+  padding: 10px 20px;
   background: var(--yy-calm-block);
   color: var(--yy-calm-block-on);
-  border-block: var(--yy-border-width) solid var(--yy-calm-line);
+  border-block: 1px solid var(--yy-calm-line);
 }
 
 /* 內框：像書籍扉頁 */
@@ -160,14 +156,58 @@
   grid-template-areas: "name en";
 }
 
+/* 「原語」兩個字各自進場，疊影位置由 --sx／--sy 決定（Masthead.jsx 依滑鼠位置更新，靜止時是 .055） */
 .home-mast__name {
+  --sx: 0.055;
+  --sy: 0.055;
   grid-area: name;
+  display: flex;
+  gap: 0.06em;
   margin: 0;
   font-family: var(--yy-font-heading);
-  font-size: clamp(2.4rem, 5vw, 3.6rem);
+  font-size: clamp(3.4rem, 8vw, 5rem);
   font-weight: 900;
-  line-height: 1.05;
-  letter-spacing: 0.06em;
+  line-height: 1.02;
+  letter-spacing: 0.04em;
+  /* 疊影留 1px 的模糊：全站禁止硬偏移陰影（designGuard） */
+  text-shadow: calc(var(--sx) * 0.6em) calc(var(--sy) * 0.6em) 1px color-mix(in srgb, var(--yy-calm-copper) 65%, transparent);
+}
+
+.home-mast__ch {
+  display: inline-block;
+  cursor: default;
+  transition: transform 220ms var(--ease-out);
+}
+
+.home-mast__ch:active {
+  transform: scale(0.95);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .home-mast__ch:hover {
+    transform: translateY(-2%);
+  }
+}
+
+/* 進場：由下方淡入並從模糊變清楚，一字接一字（只在沒有要求減少動態時） */
+@media (prefers-reduced-motion: no-preference) {
+  .home-mast__ch {
+    animation: home-mast-in 1100ms var(--ease-out) backwards;
+    animation-delay: calc(var(--i) * 200ms + 120ms);
+  }
+}
+
+@keyframes home-mast-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
 }
 
 .home-mast__quote {
@@ -201,7 +241,7 @@
 }
 
 .home-mast__tagline {
-  color: var(--yy-calm-block-accent);
+  color: var(--yy-calm-block-on);
   font-size: var(--yy-text-sm);
   letter-spacing: 0.06em;
 }
@@ -216,7 +256,7 @@
     grid-template-areas:
       "name en"
       "quote quote";
-    padding: var(--yy-space-3) 24px;
+    padding: 10px 20px;
   }
 
   .home-mast--no-quote {

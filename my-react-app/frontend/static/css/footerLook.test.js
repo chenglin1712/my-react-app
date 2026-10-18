@@ -30,33 +30,36 @@ const rules = walkRules(css);
 const find = (selector, at) => rules.find((r) => r.selector === selector && (at ? r.atRules.some((a) => at.test(a)) : r.atRules.length === 0));
 const footerRules = rules.filter((r) => /\.yy-footer/.test(r.selector));
 
-describe("頁尾（S5-2）", () => {
-  it("石板灰區塊、象牙白字，沒有寫死色碼或舊風格色", () => {
+describe("頁尾（雜誌版，對齊 Artifact）", () => {
+  it("收在 1200px 的欄裡的深色石板灰塊、象牙白字，沒有寫死色碼或舊風格色", () => {
     const body = find(".yy-footer").body;
-    expect(body).toMatch(/background:\s*var\(--yy-calm-block\)/);
+    expect(body).toMatch(/max-width:\s*1200px/);
+    expect(body).toMatch(/background:\s*var\(--yy-calm-block-deep\)/);
     expect(body).toMatch(/color:\s*var\(--yy-calm-block-on\)/);
-    // 深色主題裡 block 與 surface 同色，頂端邊界讓頁尾分得出來
-    expect(body).toMatch(/border-top:\s*var\(--yy-border-width\) solid var\(--yy-calm-line\)/);
+    // 深色主題裡深石板灰與卡片底色很接近，頂端邊界讓頁尾分得出來
+    expect(body).toMatch(/border-top:\s*1px solid var\(--yy-calm-line\)/);
     footerRules.forEach((r) => {
       expect(r.body, r.selector).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
       expect(r.body, r.selector).not.toMatch(/--yy-(?:red|gold|blue|cream|ink|green)\b/);
     });
   });
 
-  it("頁尾引用的焦點色 token 真的有定義（沒定義會退回深銅色，對石板灰不到 3:1）", () => {
+  it("頁尾引用的 token 真的有定義（沒定義會退回預設色）", () => {
     expect(css).toMatch(/--yy-calm-focus-on-block:\s*#[0-9A-Fa-f]{6}/);
     expect(css).toMatch(/--yy-calm-block-accent:\s*#D7A98B/);
+    expect(css).toMatch(/--yy-calm-block-deep:\s*#33383D/);
   });
 
-  it("桌面兩欄（標誌與連結、細線、族語與版權），手機疊成單欄", () => {
-    expect(find(".yy-footer").body).toMatch(/grid-template-areas:\s*"logo links"\s*"rule rule"\s*"tribes copyright"/);
-    const mobile = find(".yy-footer", /max-width:\s*720px/);
-    expect(mobile.body).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/);
-    expect(mobile.body).toMatch(/"logo"\s*"tribes"\s*"links"\s*"rule"\s*"copyright"/);
+  it("超大「原語」、連結與標語；窄螢幕自動換行，手機上方留白縮小", () => {
+    expect(find(".yy-footer__inner").body).toMatch(/flex-wrap:\s*wrap/);
+    expect(find(".yy-footer__name").body).toMatch(/font-size:\s*clamp\(3\.4rem,\s*12vw,\s*7rem\)/);
+    expect(find(".yy-footer", /max-width:\s*720px/).body).toMatch(/margin-top:\s*80px/);
   });
 
-  it("連結觸控區至少 44px，hover 只給有滑鼠的裝置，按下有回饋", () => {
-    expect(find(".yy-footer__links a").body).toMatch(/min-height:\s*var\(--yy-control-md\)/);
+  it("連結是細框按鈕：觸控區至少 44px，hover 只給有滑鼠的裝置，按下有回饋", () => {
+    const link = find(".yy-footer__links a").body;
+    expect(link).toMatch(/min-height:\s*var\(--yy-control-md\)/);
+    expect(link).toMatch(/border:\s*1px solid var\(--yy-calm-block-on\)/);
     const hover = footerRules.filter((r) => /:hover/.test(r.selector));
     expect(hover.length).toBeGreaterThan(0);
     hover.forEach((r) => expect(r.atRules.some((a) => /hover:\s*hover/.test(a) && /pointer:\s*fine/.test(a)), r.selector).toBe(true));
@@ -68,7 +71,7 @@ describe("頁尾（S5-2）", () => {
     expect(reduced.body).toMatch(/transform:\s*none/);
   });
 
-  it("石板灰底的焦點框用象牙白；導覽列不再套金色焦點框", () => {
+  it("深石板灰底的焦點框用象牙白；導覽列不再套金色焦點框", () => {
     expect(find(".yy-footer :where(a, button):focus-visible").body).toMatch(/outline-color:\s*var\(--yy-calm-focus-on-block\)/);
     expect(css).not.toMatch(/\.navbar\s+:where\(a, button\):focus-visible/);
   });

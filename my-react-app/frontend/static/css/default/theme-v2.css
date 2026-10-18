@@ -99,6 +99,7 @@
   --yy-calm-tag-on: #FFF9ED;
   --yy-calm-block: #41464B;        /* 石板灰區塊（最新消息、公告） */
   --yy-calm-block-on: #FFF9ED;
+  --yy-calm-block-deep: #33383D;   /* 頁尾：比石板灰區塊再深一階 */
   --yy-calm-block-accent: #D7A98B; /* 石板灰上的淺銅，小字也可用（對比 4.51）；原淺銅 #C9976F 只有 3.70，不放進語意層 */
   --yy-calm-info-bg: #EFE6DA;
   --yy-calm-success: #2F6F4B;
@@ -226,6 +227,7 @@
     --yy-calm-tag-on: #24282C;
     --yy-calm-block: #2E3338;
     --yy-calm-block-on: #F2EEE3;
+    --yy-calm-block-deep: #262A2E;
     --yy-calm-block-accent: #D7A98B;
     --yy-calm-info-bg: #343A3E;
     --yy-calm-success: #8CCFA9;
@@ -253,6 +255,7 @@
   --yy-calm-tag-on: #24282C;
   --yy-calm-block: #2E3338;
   --yy-calm-block-on: #F2EEE3;
+  --yy-calm-block-deep: #262A2E;
   --yy-calm-block-accent: #D7A98B;
   --yy-calm-info-bg: #343A3E;
   --yy-calm-success: #8CCFA9;
@@ -309,6 +312,16 @@
 .yy-reveal:not(.is-visible) {
   opacity: 0;
   transform: translateY(8px);
+}
+
+/* 區塊內逐項進場：包在 RevealOnView 裡的清單加 .yy-stagger，每個子項用 --i 排序，
+   捲進畫面時依序淡入並上移 8px，間隔 50ms（短而克制，不擋互動）。降低動態偏好下由下面的全域規則直接到終態。 */
+.yy-reveal.is-visible .yy-stagger > * {
+  animation: yy-stagger-in 420ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 50ms + 120ms);
+}
+@keyframes yy-stagger-in {
+  from { opacity: 0; transform: translateY(8px); }
 }
 
 /* 資料載入中的佔位塊：用實際內容的尺寸，載入完成時版面不跳動 */
@@ -376,8 +389,8 @@
 
 .yy-page {
   font-family: var(--yy-font-body);
-  color: var(--yy-ink);
-  background: var(--yy-cream);
+  color: var(--yy-calm-text);
+  background: var(--yy-calm-bg);
   min-height: 100vh;
   min-height: 100dvh;
   /* 擋住橫向溢出，但不能用 hidden：overflow-x: hidden 會讓 overflow-y 自動變成 auto，.yy-page 就成了自己的
@@ -888,76 +901,70 @@
   transition: none !important;
 }
 
-/* ---------- Footer（S5-2，沉穩文藝）----------
-   石板灰區塊（--yy-calm-block）：和首頁的最新消息區同一個色塊語彙，頁面最後留一塊穩定的底。
-   版面用 grid，不動 JSX：第一列「標誌｜連結」，一條細線，第二列「族語羅馬字｜版權」；手機疊成單欄。
+/* ---------- Footer（雜誌版，對齊首頁設計稿）----------
+   和頁面同樣收在 1200px 的欄裡的深色石板灰塊（--yy-calm-block-deep）：超大「原語」、三個細框連結、一句標語。
    所有顏色走語意層，深色主題會自動換。 */
 
 .yy-footer {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    "logo links"
-    "rule rule"
-    "tribes copyright";
-  align-items: center;
-  gap: 0 var(--yy-space-6);
-  padding: var(--yy-space-7) 56px var(--yy-space-6);
-  background: var(--yy-calm-block);
+  max-width: 1200px;
+  margin: 120px auto 0;
+  padding: 28px 16px 22px;
+  background: var(--yy-calm-block-deep);
   color: var(--yy-calm-block-on);
   /* 深色主題裡石板灰區塊和卡片底色很接近，頂端留一條邊界，頁尾才分得出來 */
-  border-top: var(--yy-border-width) solid var(--yy-calm-line);
+  border-top: 1px solid var(--yy-calm-line);
 }
-.yy-footer::before {
-  content: "";
-  grid-area: rule;
-  margin: var(--yy-space-4) 0;
-  border-top: 1px solid var(--yy-calm-olive);
-}
-.yy-footer__logo {
-  grid-area: logo;
-  font-family: var(--yy-font-heading);
-  font-weight: 700;
-  font-size: var(--yy-text-lg);
-  letter-spacing: 0.04em;
-  color: var(--yy-calm-block-on);
-}
-.yy-footer__tribes {
-  grid-area: tribes;
-  font-size: var(--yy-text-sm);
-  color: var(--yy-calm-block-on);
-}
-.yy-footer__copyright {
-  grid-area: copyright;
-  font-size: var(--yy-text-xs);
-  color: var(--yy-calm-block-accent);
-}
-.yy-footer__links {
-  grid-area: links;
+.yy-footer__inner {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 var(--yy-space-5);
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 28px;
+}
+.yy-footer__name {
+  margin: 0;
+  font-family: var(--yy-font-heading);
+  font-weight: 700;
+  font-size: clamp(3.4rem, 12vw, 7rem);
+  line-height: 1;
+  letter-spacing: 0.1em;
+}
+.yy-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--yy-space-2);
 }
 .yy-footer__links a {
   display: inline-flex;
   align-items: center;
   min-height: var(--yy-control-md);
+  padding: 0 var(--yy-space-4);
   color: var(--yy-calm-block-on);
+  border: 1px solid var(--yy-calm-block-on);
+  border-radius: 2px;
   font-size: var(--yy-text-sm);
-  text-underline-offset: 3px;
-  transition: color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
+  font-weight: 700;
+  text-decoration: none;
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
 }
 .yy-footer__links a:active {
   transform: scale(var(--yy-ui-press));
 }
 @media (hover: hover) and (pointer: fine) {
   .yy-footer__links a:hover {
-    color: var(--yy-calm-block-accent);
+    background: var(--yy-calm-block-on);
+    color: var(--yy-calm-block-deep);
   }
+}
+.yy-footer__sub {
+  display: block;
+  width: 100%;
+  font-size: var(--yy-text-sm);
+  font-weight: 500;
 }
 @media (prefers-reduced-motion: reduce) {
   .yy-footer__links a {
-    transition-property: color;
+    transition-property: color, background-color;
   }
   .yy-footer__links a:active {
     transform: none;
@@ -982,23 +989,13 @@
 }
 
 @media (max-width: 720px) {
-  .yy-hero,
-  .yy-footer {
+  .yy-hero {
     padding-left: 24px;
     padding-right: 24px;
   }
 
   .yy-footer {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "logo"
-      "tribes"
-      "links"
-      "rule"
-      "copyright";
-  }
-  .yy-footer__links {
-    margin-top: var(--yy-space-2);
+    margin-top: 80px;
   }
 
   /* iOS Safari 聚焦字級小於 16px 的輸入框時會自動放大整個頁面 */
@@ -1191,4 +1188,37 @@
   --bs-alert-bg: var(--yy-warning-bg);
   --bs-alert-border-color: var(--yy-gold);
   --bs-alert-link-color: var(--yy-warning-text);
+}
+
+/* ---------- 紙張質感（沉穩文藝，對齊首頁設計稿）----------
+   一層很淡的雜訊鋪在整個畫面後方：固定位置、不攔截點擊，列印時不印。深色主題改成更淡的一般混合。 */
+body {
+  background: var(--yy-calm-bg);
+  color: var(--yy-calm-text);
+  letter-spacing: 0.02em;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.06;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .25 0 0 0 0 .2 0 0 0 0 .15 0 0 0 .6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+:root[data-theme="dark"] body::before {
+  opacity: 0.03;
+  mix-blend-mode: normal;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] body::before {
+    opacity: 0.03;
+    mix-blend-mode: normal;
+  }
+}
+@media print {
+  body::before {
+    display: none;
+  }
 }

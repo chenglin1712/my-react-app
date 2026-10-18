@@ -39,3 +39,10 @@ export function pickFeaturedTopics(raw) {
             link: classifyLink(item.link_url),
         }));
 }
+
+// 後台還沒發布任何專題時顯示的示意卡（對齊設計稿）：沒有連結，版面先佔好；發布專題後自動換成真的
+export const DEMO_TOPICS = [
+    { key: "demo-1", title: "織紋裡的語言", categoryLabel: "專題", summary: "示意文案：一段關於族語與織紋的導讀，之後換成編輯寫的內容。", imageUrl: "", link: null },
+    { key: "demo-2", title: "今天練一句", categoryLabel: "學習", summary: "示意文案：每日一句短練習。", imageUrl: "", link: null },
+    { key: "demo-3", title: "聽長輩說", categoryLabel: "聲音", summary: "示意文案：收錄的語音與故事。", imageUrl: "", link: null },
+];

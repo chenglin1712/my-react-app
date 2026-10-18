@@ -125,6 +125,7 @@ const HomePromoVideo = ({ video }) => {
 
     return (
         <section className="home-promo" aria-label="宣傳影片">
+            <div className="home-promo__frame">
             <div className="home-promo__stage" ref={stageRef}>
                 {mounted && !failed ? (
                     <video
@@ -156,9 +157,17 @@ const HomePromoVideo = ({ video }) => {
                 )}
                 {!mounted && !failed && (
                     <button type="button" className="home-promo__big-play" onClick={togglePlay} aria-label="播放宣傳影片">
-                        <Play size={28} aria-hidden="true" />
+                        <Play size={28} fill="currentColor" aria-hidden="true" />
                     </button>
                 )}
+                {/* 標題與說明疊在畫面左下（對齊設計稿）；底下有一層漸層，任何封面上文字對比都固定 */}
+                {(video.title || video.description) && !playing && (
+                    <div className="home-promo__cap">
+                        {video.title && <h2 className="home-promo__title">{video.title}</h2>}
+                        {video.description && <p className="home-promo__desc">{video.description}</p>}
+                    </div>
+                )}
+            </div>
             </div>
 
             {/* 固定高度的控制列：影片載入前先佔位，進入畫面載入時版面不會跳動 */}
@@ -197,13 +206,6 @@ const HomePromoVideo = ({ video }) => {
                 )}
             </div>
 
-            {(video.title || video.description) && (
-                <div className="home-promo__text">
-                    {video.title && <h2 className="home-promo__title">{video.title}</h2>}
-                    {video.description && <p className="home-promo__desc">{video.description}</p>}
-                </div>
-            )}
-
             {video.transcript && (
                 <details className="home-promo__transcript" open={failed || undefined}>
                     <summary>逐字稿</summary>
@@ -213,5 +215,26 @@ const HomePromoVideo = ({ video }) => {
         </section>
     );
 };
+
+/**
+ * 後台還沒設定宣傳影片時的示意卡（對齊設計稿）：純裝飾、沒有可按的東西，
+ * 不放假的播放鈕；版面先佔好，之後上傳影片就換成上面的播放器。
+ */
+export const HomePromoPlaceholder = () => (
+    <section className="home-promo home-promo--placeholder" aria-label="宣傳影片（尚未上傳）">
+        <div className="home-promo__frame">
+            <div className="home-promo__stage">
+                <span className="home-promo__pill">示意影片</span>
+                <span className="home-promo__big-play home-promo__big-play--static" aria-hidden="true">
+                    <Play size={28} fill="currentColor" aria-hidden="true" />
+                </span>
+                <div className="home-promo__cap">
+                    <h2 className="home-promo__title">宣傳影片</h2>
+                    <p className="home-promo__desc">這裡之後放正式影片</p>
+                </div>
+            </div>
+        </div>
+    </section>
+);
 
 export default HomePromoVideo;

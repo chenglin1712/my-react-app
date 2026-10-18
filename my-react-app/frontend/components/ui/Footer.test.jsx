@@ -4,12 +4,13 @@ import { MemoryRouter } from 'react-router-dom';
 import Footer from './Footer';
 
 describe('Footer', () => {
-  test('有使用說明、隱私與資料、聯絡我們三個入口，各指向對應頁面', () => {
+  test('有關於我們、隱私權、聯絡三個入口，各指向對應頁面；有大字「原語」與標語', () => {
     render(<MemoryRouter><Footer /></MemoryRouter>);
-    const nav = screen.getByRole('navigation', { name: '網站資訊' });
-    expect(nav).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '使用說明' })).toHaveAttribute('href', '/help');
-    expect(screen.getByRole('link', { name: '隱私與資料' })).toHaveAttribute('href', '/privacy');
-    expect(screen.getByRole('link', { name: '聯絡我們' })).toHaveAttribute('href', '/contact');
+    expect(screen.getByRole('navigation', { name: '頁尾選單' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '關於我們' })).toHaveAttribute('href', '/help');
+    expect(screen.getByRole('link', { name: '隱私權' })).toHaveAttribute('href', '/privacy');
+    expect(screen.getByRole('link', { name: '聯絡' })).toHaveAttribute('href', '/contact');
+    expect(screen.getByText('原語')).toBeInTheDocument();
+    expect(screen.getByText('讓語言回家')).toBeInTheDocument();
   });
 });
