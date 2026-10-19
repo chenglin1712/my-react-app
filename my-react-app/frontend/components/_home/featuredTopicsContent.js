@@ -21,6 +21,11 @@ const classifyLink = (value) => {
     return null;
 };
 
+// 有文章頁的專題，卡片連到站內文章頁（/topics/<id>）；沒有內文才退回後台手填的連結
+const articleLink = (item) => (item.has_article === true && Number.isInteger(item.id)
+    ? { href: `/topics/${item.id}`, external: false }
+    : null);
+
 /**
  * 公開端點 /adminapi/public/featured-topics/ 的回應 → 前台要畫的專題清單。
  * 沒有標題的項目沒東西可讀也沒東西可點，直接略過；最多 3 筆；格式不對一律回空陣列（整區隱藏）。
@@ -36,7 +41,7 @@ export function pickFeaturedTopics(raw) {
             summary: cleanText(item.summary),
             categoryLabel: cleanText(item.category_label),
             imageUrl: safeImageUrl(item.image_url),
-            link: classifyLink(item.link_url),
+            link: articleLink(item) ?? classifyLink(item.link_url),
         }));
 }
 

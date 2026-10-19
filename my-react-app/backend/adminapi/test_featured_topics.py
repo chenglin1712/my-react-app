@@ -609,7 +609,7 @@ class PublicEndpointTest(Base):
         self.act(pending, "submit", role=EDITOR)
         items = self.client.get(PUBLIC_URL).json()["items"]
         self.assertEqual([i["id"] for i in items], [a, b, c])
-        self.assertEqual(set(items[2]), {"id", "title", "summary", "image_url", "link_url", "category_label"})
+        self.assertEqual(set(items[2]), {"id", "title", "summary", "image_url", "link_url", "category_label", "has_article"})
         self.assertEqual(items[2]["image_url"], IMG)
         self.assertEqual(items[0]["summary"], "")  # 空值照實輸出，前台不放示意文字
 
@@ -643,3 +643,106 @@ class PublicEndpointTest(Base):
         text = self.client.get(PUBLIC_URL).content.decode()
         for leaked in ("created_by", "reviewed_by", "review_comment", "status", "submitted"):
             self.assertNotIn(leaked, text)
+
+
+class ArticleFieldsTest(TestCase):
+    """專題文章頁的欄位：內文、作者／來源、圖說。"""
+
+    def _topic(self, **kwargs):
+        data = {"title": "專題標題", "created_by": "u"}
+        data.update(kwargs)
+        return FeaturedTopic(**data)
+
+    def test_body_allows_newlines_and_limits_length(self):
+        self._topic(body="第一段\n\n## 小標\n第二段", source_label="編輯部", image_caption="圖說").full_clean()
+        self._topic(body="字" * 20000).full_clean()
+        with self.assertRaises(ValidationError):
+            self._topic(body="字" * 20001).full_clean()
+
+    def test_body_rejects_control_characters(self):
+        with self.assertRaises(ValidationError):
+            self._topic(body="含\x00空位元組").full_clean()
+
+    def test_source_and_caption_are_single_line_with_limits(self):
+        for kwargs in ({"source_label": "字" * 31}, {"source_label": "兩行\n文字"},
+                       {"image_caption": "字" * 81}, {"image_caption": "兩行\n文字"}):
+            with self.subTest(**kwargs):
+                with self.assertRaises(ValidationError):
+                    self._topic(**kwargs).full_clean()
+
+
+class PublicArticleTest(Base):
+    def url(self, pk):
+        return f"{PUBLIC_URL}{pk}/"
+
+    def test_published_topic_with_body_returns_reading_fields_only(self):
+        pk = self.publish(
+            title="織紋裡的語言", summary="導言", body="第一段\n\n## 小標\n第二段", category_label="專題",
+            source_label="編輯部", image_url=IMG, image_caption="織布的手",
+        )
+        response = self.client.get(self.url(pk))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(set(data), {
+            "id", "title", "summary", "image_url", "image_caption", "category_label",
+            "source_label", "body", "published_at",
+        })
+        self.assertEqual(data["body"], "第一段\n\n## 小標\n第二段")
+        self.assertRegex(data["published_at"], r"^\d{4}-\d{2}-\d{2}$")
+        self.assertEqual(response["Cache-Control"], "no-cache")
+        for leaked in ("created_by", "reviewed_by", "review_comment", "submitted", "link_url", "status"):
+            self.assertNotIn(leaked, response.content.decode())
+
+    def test_not_published_or_deleted_or_empty_body_is_404(self):
+        draft = self.create(title="草稿", body="內文")
+        pending = self.create(title="待審", body="內文")
+        self.act(pending, "submit", role=EDITOR)
+        no_body = self.publish(title="沒內文")
+        unpublished = self.publish(title="已下架", body="內文")
+        self.act(unpublished, "unpublish")
+        deleted = FeaturedTopic.objects.create(
+            title="已刪", created_by="u", status="published", body="內文", deleted_at="2026-01-01T00:00:00Z",
+        )
+        for pk in (draft, pending, no_body, unpublished, deleted.pk, 999999):
+            with self.subTest(pk=pk):
+                self.assertEqual(self.client.get(self.url(pk)).status_code, 404)
+
+    def test_unpublish_then_republish_toggles_article(self):
+        pk = self.publish(title="專題", body="內文")
+        self.assertEqual(self.client.get(self.url(pk)).status_code, 200)
+        self.act(pk, "unpublish")
+        self.assertEqual(self.client.get(self.url(pk)).status_code, 404)
+        self.act(pk, "republish")
+        self.assertEqual(self.client.get(self.url(pk)).status_code, 200)
+
+    def test_article_of_a_fourth_published_topic_stays_readable_while_home_shows_three(self):
+        # 資料不一致時（已發布超過 3 筆），已分享出去的文章連結不能因為排序而失效
+        topics = [
+            FeaturedTopic.objects.create(title=f"專題{i}", created_by="u", status="published", sort_order=i, body="內文")
+            for i in range(5)
+        ]
+        self.assertEqual(self.client.get(self.url(topics[4].pk)).status_code, 200)
+        self.assertEqual(len(self.client.get(PUBLIC_URL).json()["items"]), 3)
+
+    def test_only_get_is_allowed(self):
+        pk = self.publish(title="專題", body="內文")
+        self.assertEqual(self.client.post(self.url(pk)).status_code, 405)
+
+    def test_list_flags_which_cards_have_an_article_without_sending_the_body(self):
+        with_body = self.publish(title="有文章", body="內文", sort_order=1)
+        without = self.publish(title="沒文章", sort_order=2)
+        blank = self.publish(title="只有空白", body="   \n ", sort_order=3)
+        items = {i["id"]: i for i in self.client.get(PUBLIC_URL).json()["items"]}
+        self.assertTrue(items[with_body]["has_article"])
+        self.assertFalse(items[without]["has_article"])
+        self.assertFalse(items[blank]["has_article"])
+        self.assertNotIn("body", items[with_body])
+
+    def test_editing_published_article_goes_through_revision(self):
+        pk = self.publish(title="專題", body="舊內文")
+        response = self.call("post", f"{ADMIN_URL}{pk}/pending-revision/", {"body": "新內文", "source_label": "新來源"}, role=EDITOR)
+        self.assertIn(response.status_code, (200, 201), response.content)
+        self.assertEqual(self.client.get(self.url(pk)).json()["body"], "舊內文")
+        self.assertEqual(self.call("post", f"{ADMIN_URL}{pk}/pending-revision/approve/", {"review_comment": "ok"}).status_code, 200)
+        data = self.client.get(self.url(pk)).json()
+        self.assertEqual((data["body"], data["source_label"]), ("新內文", "新來源"))

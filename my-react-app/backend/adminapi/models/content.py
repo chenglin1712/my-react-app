@@ -392,6 +392,13 @@ class FeaturedTopic(models.Model):
     sort_order = models.PositiveSmallIntegerField(default=0, validators=[MaxValueValidator(99)])
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT)
 
+    # 專題文章頁（卡片點進去看到的內容）。內文是純文字：空一行分段、「## 」開頭的行是小標，
+    # 前台用 React 文字節點輸出，不收 HTML，所以不需要也不做 HTML 清理。
+    # 內文留空 = 這張卡沒有文章頁，卡片只在有填 link_url 時才可點。
+    body = models.TextField(blank=True, validators=[MaxLengthValidator(20000), validate_plain_text])
+    source_label = models.CharField(max_length=30, blank=True, validators=[validate_single_line])
+    image_caption = models.CharField(max_length=80, blank=True, validators=[validate_single_line])
+
     created_by = models.CharField(max_length=128)
     submitted_by = models.CharField(max_length=128, blank=True)
     submitted_at = models.DateTimeField(null=True, blank=True)

@@ -28,6 +28,7 @@ describe('前台分頁標題', () => {
     expect(getPageTitle('/help')).toBe('使用說明｜源·語');
     expect(getPageTitle('/privacy')).toBe('隱私與資料｜源·語');
     expect(getPageTitle('/announcements')).toBe('最新公告｜源·語');
+    expect(getPageTitle('/topics/12')).toBe('本期專題｜源·語');
     expect(getPageTitle('/contact')).toBe('聯絡我們｜源·語');
   });
 });

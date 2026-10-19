@@ -23,7 +23,8 @@ from ._shared import (
 from .models import FeaturedTopic
 from .revisions import cancel_stale_pending_revision, make_revision_views, pending_revision_target_ids
 from .serializers import (
-    ApproveSerializer, FeaturedTopicSerializer, PublicFeaturedTopicSerializer, RejectSerializer,
+    ApproveSerializer, FeaturedTopicSerializer, PublicFeaturedTopicDetailSerializer, PublicFeaturedTopicSerializer,
+    RejectSerializer,
 )
 
 TARGET_TYPE = "featured_topic"
@@ -293,5 +294,24 @@ def public_featured_topics(request):
         .order_by("sort_order", "pk")[:FeaturedTopic.MAX_PUBLISHED]
     )
     response = JsonResponse({"items": PublicFeaturedTopicSerializer(items, many=True).data})
+    response["Cache-Control"] = "no-cache"
+    return response
+
+
+def public_featured_topic_detail(request, pk):
+    """專題文章頁讀取用，免登入。只有「已發布且沒被軟刪除」的專題讀得到，其餘一律 404（不透露存不存在）。
+
+    不套用首頁的「最多 3 筆」：已發布的專題本來就不會超過 3 筆，而且文章頁是用連結直接進來的，
+    不該因為排序變動就讓已分享出去的連結失效。
+    """
+    if request.method != "GET":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+    limited_resp = _ip_rate_limited_response(request, group="public_featured_topic_detail", rate="120/m")
+    if limited_resp:
+        return limited_resp
+    topic = FeaturedTopic.live.filter(pk=pk, status=FeaturedTopic.STATUS_PUBLISHED).first()
+    if topic is None or not topic.body.strip():
+        return JsonResponse({"detail": "找不到這篇專題"}, status=404)
+    response = JsonResponse(PublicFeaturedTopicDetailSerializer(topic).data)
     response["Cache-Control"] = "no-cache"
     return response

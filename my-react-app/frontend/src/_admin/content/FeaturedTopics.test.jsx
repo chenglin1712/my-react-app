@@ -19,7 +19,7 @@ vi.mock('../hooks/useMediaUpload', () => ({
 }));
 
 const topic = (over) => ({
-  id: 1, title: '族語學習路徑', summary: '', image_url: '', link_url: '', category_label: '', sort_order: 0,
+  id: 1, title: '族語學習路徑', summary: '', image_url: '', link_url: '', category_label: '', sort_order: 0, body: '', source_label: '', image_caption: '',
   status: 'draft', review_comment: '', has_pending_revision: false, updated_at: '2026-10-01T00:00:00Z', ...over,
 });
 
@@ -77,6 +77,37 @@ describe('FeaturedTopics', () => {
     expect(apiPost.mock.calls[1][0]).toBe('/adminapi/featured-topics/9/submit/');
   });
 
+  test('文章欄位：內文、作者／來源、圖說會一起送出（去掉前後空白），內文保留段落空行', async () => {
+    setTopics([]);
+    apiPost.mockResolvedValueOnce(topic({ id: 9 }));
+    render(<FeaturedTopics />);
+    fireEvent.click((await screen.findAllByRole('button', { name: /新增專題/ }))[0]);
+    fireEvent.change(await screen.findByLabelText('標題'), { target: { value: '專題' } });
+    fireEvent.change(screen.getByLabelText('內文'), { target: { value: '  第一段\n\n## 小標\n第二段  ' } });
+    fireEvent.change(screen.getByLabelText('作者／來源'), { target: { value: ' 編輯部 ' } });
+    fireEvent.change(screen.getByLabelText('圖說'), { target: { value: ' 織布的手 ' } });
+    fireEvent.click(screen.getByRole('button', { name: /建立草稿/ }));
+    await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(1));
+    expect(apiPost.mock.calls[0][1]).toEqual(expect.objectContaining({
+      body: '第一段\n\n## 小標\n第二段', source_label: '編輯部', image_caption: '織布的手',
+    }));
+  });
+
+  test('文章欄位超過字數上限時顯示錯誤並不送出', async () => {
+    setTopics([]);
+    render(<FeaturedTopics />);
+    fireEvent.click((await screen.findAllByRole('button', { name: /新增專題/ }))[0]);
+    fireEvent.change(await screen.findByLabelText('標題'), { target: { value: '專題' } });
+    fireEvent.change(screen.getByLabelText('內文'), { target: { value: '字'.repeat(20001) } });
+    fireEvent.change(screen.getByLabelText('作者／來源'), { target: { value: '字'.repeat(31) } });
+    fireEvent.change(screen.getByLabelText('圖說'), { target: { value: '字'.repeat(81) } });
+    fireEvent.click(screen.getByRole('button', { name: /建立草稿/ }));
+    expect(await screen.findByText('內文最多 20000 字')).toBeInTheDocument();
+    expect(screen.getByText('作者／來源最多 30 字')).toBeInTheDocument();
+    expect(screen.getByText('圖說最多 80 字')).toBeInTheDocument();
+    expect(apiPost).not.toHaveBeenCalled();
+  });
+
   test('建立成功但送審失敗：告知已存成草稿，不會重複建立', async () => {
     setTopics([]);
     apiPost.mockResolvedValueOnce(topic({ id: 9 })).mockRejectedValueOnce(new Error('已發布的專題已達 3 筆'));
@@ -94,7 +125,7 @@ describe('FeaturedTopics', () => {
     await open('族語學習路徑');
     fireEvent.change(await screen.findByLabelText('標題'), { target: { value: '' } });
     fireEvent.change(screen.getByLabelText('排序'), { target: { value: '120' } });
-    fireEvent.change(screen.getByLabelText('連結'), { target: { value: 'javascript:alert(1)' } });
+    fireEvent.change(screen.getByLabelText('改連到其他網址'), { target: { value: 'javascript:alert(1)' } });
     fireEvent.click(screen.getByRole('button', { name: /儲存草稿/ }));
     expect(await screen.findByText('請填寫標題')).toBeInTheDocument();
     expect(screen.getByText('排序請填 0 到 99 的整數')).toBeInTheDocument();
@@ -240,10 +271,10 @@ describe('FeaturedTopics', () => {
     fireEvent.click(screen.getByRole('button', { name: /考試準備/ }));
     await waitFor(() => expect(screen.getByLabelText('標題')).toHaveValue('考試準備'));
     expect(screen.queryByText(/尚未儲存的變更/)).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('摘要'), { target: { value: '寫到一半' } });
+    fireEvent.change(screen.getByLabelText('導言'), { target: { value: '寫到一半' } });
     fireEvent.click(screen.getByRole('button', { name: /族語學習路徑/ }));
     expect(await screen.findByText(/尚未儲存的變更/)).toBeInTheDocument();
-    expect(screen.getByLabelText('摘要')).toHaveValue('寫到一半');
+    expect(screen.getByLabelText('導言')).toHaveValue('寫到一半');
     fireEvent.click(screen.getByRole('button', { name: '放棄變更並切換' }));
     await waitFor(() => expect(screen.getByLabelText('標題')).toHaveValue('族語學習路徑'));
   });
@@ -285,7 +316,7 @@ describe('FeaturedTopics', () => {
   test('刪除有未儲存變更的專題時，確認文案明講會一併遺失', async () => {
     render(<FeaturedTopics />);
     await open('族語學習路徑');
-    fireEvent.change(await screen.findByLabelText('摘要'), { target: { value: '寫了一半' } });
+    fireEvent.change(await screen.findByLabelText('導言'), { target: { value: '寫了一半' } });
     fireEvent.click(screen.getByRole('button', { name: /刪除這則專題/ }));
     expect(screen.getByText(/未儲存的變更，刪除後會一併遺失/)).toBeInTheDocument();
   });

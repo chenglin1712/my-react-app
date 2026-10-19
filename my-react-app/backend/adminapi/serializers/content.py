@@ -79,7 +79,8 @@ class FeaturedTopicSerializer(serializers.ModelSerializer):
     class Meta:
         model = FeaturedTopic
         fields = [
-            'id', 'title', 'summary', 'image_url', 'link_url', 'category_label', 'sort_order',
+            'id', 'title', 'summary', 'image_url', 'image_caption', 'link_url', 'category_label',
+            'source_label', 'body', 'sort_order',
             'status', 'created_by', 'submitted_by', 'submitted_at', 'reviewed_by', 'reviewed_at',
             'review_comment', 'created_at', 'updated_at',
         ]
@@ -90,11 +91,33 @@ class FeaturedTopicSerializer(serializers.ModelSerializer):
 
 
 class PublicFeaturedTopicSerializer(serializers.ModelSerializer):
-    """公開首頁用：不輸出任何狀態、審核者或建立者資訊。"""
+    """公開首頁用：不輸出任何狀態、審核者或建立者資訊。清單不帶內文（體積），只告訴前台有沒有文章頁。"""
+
+    has_article = serializers.SerializerMethodField()
 
     class Meta:
         model = FeaturedTopic
-        fields = ['id', 'title', 'summary', 'image_url', 'link_url', 'category_label']
+        fields = ['id', 'title', 'summary', 'image_url', 'link_url', 'category_label', 'has_article']
+
+    def get_has_article(self, obj):
+        return bool(obj.body.strip())
+
+
+class PublicFeaturedTopicDetailSerializer(serializers.ModelSerializer):
+    """專題文章頁用：只給已發布專題的閱讀內容，同樣不輸出任何內部欄位。"""
+
+    published_at = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FeaturedTopic
+        fields = [
+            'id', 'title', 'summary', 'image_url', 'image_caption', 'category_label',
+            'source_label', 'body', 'published_at',
+        ]
+
+    def get_published_at(self, obj):
+        # 核准時間就是上線時間；從沒經過審核流程的資料退回建立時間
+        return (obj.reviewed_at or obj.created_at).date().isoformat()
 
 
 class RejectSerializer(serializers.Serializer):

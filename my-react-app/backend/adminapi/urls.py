@@ -56,6 +56,7 @@ urlpatterns = [
     path('featured-topics/<int:pk>/pending-revision/approve/', featured_topic_views.featured_topic_revision_approve),
     path('featured-topics/<int:pk>/pending-revision/reject/', featured_topic_views.featured_topic_revision_reject),
     path('public/featured-topics/', featured_topic_views.public_featured_topics),
+    path('public/featured-topics/<int:pk>/', featured_topic_views.public_featured_topic_detail),
     path('promo-videos/', promo_video_views.promo_video_list),
     path('promo-videos/<int:pk>/', promo_video_views.promo_video_detail),
     path('promo-videos/<int:pk>/video/', promo_video_views.promo_video_upload_video),
