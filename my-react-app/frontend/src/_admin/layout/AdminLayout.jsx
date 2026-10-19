@@ -18,7 +18,7 @@ import '../../../static/css/_admin/admin-base.css';
 // 之後若新增只給特定角色的頁面，在這裡填 roles 即可，不必改過濾邏輯。
 const NAV_GROUPS = [
     { label: '總覽', icon: LayoutDashboard, items: [{ label: '儀表板', to: '/admin', end: true }] },
-    { label: '內容', icon: Megaphone, items: [{ label: '公告管理', to: '/admin/content/announcements' }, { label: '考試時程', to: '/admin/content/exam-schedule' }, { label: '首頁版位', to: '/admin/content/homepage' }, { label: '宣傳影片', to: '/admin/content/promo-videos' }, { label: '本期專題', to: '/admin/content/featured-topics' }, { label: '隱私與資料', to: '/admin/content/privacy' }] },
+    { label: '內容', icon: Megaphone, items: [{ label: '公告管理', to: '/admin/content/announcements' }, { label: '考試時程', to: '/admin/content/exam-schedule' }, { label: '首頁版位', to: '/admin/content/homepage' }, { label: '宣傳影片', to: '/admin/content/promo-videos' }, { label: '本期專題', to: '/admin/content/featured-topics' }, { label: '隱私與資料', to: '/admin/content/privacy' }, { label: '聯絡我們', to: '/admin/content/contact' }] },
     { label: '辭典', icon: BookOpen, items: [{ label: '詞條', to: '/admin/dictionary/words' }, { label: '語法', to: '/admin/dictionary/grammar' }, { label: '主檔', to: '/admin/dictionary/taxonomies' }, { label: '批次匯入／匯出', to: '/admin/dictionary/import' }] },
     {
         label: '題庫', icon: FileQuestion, items: [

@@ -20,6 +20,7 @@ const HomepageConfig = lazy(() => import('./content/HomepageConfig'));
 const PromoVideos = lazy(() => import('./content/PromoVideos'));
 const FeaturedTopics = lazy(() => import('./content/FeaturedTopics'));
 const PrivacyPolicy = lazy(() => import('./content/PrivacyPolicy'));
+const ContactPageEditor = lazy(() => import('./content/ContactPageEditor'));
 const QuizBank = lazy(() => import('./content/QuizBank'));
 const QuizSourceConfig = lazy(() => import('./content/QuizSourceConfig'));
 const QuizSituations = lazy(() => import('./content/QuizSituations'));
@@ -63,6 +64,7 @@ const AdminApp = () => {
                 <Route path="content/promo-videos" element={<PromoVideos />} />
                 <Route path="content/featured-topics" element={<FeaturedTopics />} />
                 <Route path="content/privacy" element={<PrivacyPolicy />} />
+                <Route path="content/contact" element={<ContactPageEditor />} />
                 {/* vocab／cloze 是同一個頁面內的兩個分頁（見 QuizBank.jsx），
                     導覽列只連到 vocab，cloze 分頁在頁面裡面切換，不需要
                     自己的路由。 */}

@@ -84,7 +84,7 @@ export default function RichTextEditor({ value, onChange, disabled = false, medi
             return;
         }
         if (!safeHref(url)) {
-            setLinkError('網址請填站內路徑（以 / 開頭）或 https:// 開頭的網址');
+            setLinkError('網址請填站內路徑（以 / 開頭）、https:// 開頭的網址，或 mailto:信箱');
             return;
         }
         if (editor.state.selection.empty && !editor.isActive('link')) {

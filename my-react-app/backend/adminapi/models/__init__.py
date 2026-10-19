@@ -24,7 +24,7 @@ from .content import (
 from .dictionary_review import DictionaryImportJob, DictionaryRevision
 from .guest_trial import GuestTranslationUsage
 from .quiz_research import QuizResearchConsent, QuizSkillEvent
-from .privacy import PrivacyPolicy
+from .site_pages import ContactPage, PrivacyPolicy
 from .quizbank import (
     QuizChoiceItem,
     QuizClozePassage,
@@ -42,6 +42,7 @@ __all__ = [
     'Announcement',
     'AnnouncementSyncStatus',
     'AuditLog',
+    'ContactPage',
     'DictionaryImportJob',
     'DictionaryRevision',
     'ExamScheduleCrawlStatus',

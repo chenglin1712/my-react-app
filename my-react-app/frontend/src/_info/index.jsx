@@ -6,15 +6,8 @@ import "../../static/css/_info/index.css";
 
 // 頁尾三個入口（使用說明、隱私與資料、聯絡我們）的內容頁。
 //
-// 內容原則：只寫程式碼能證實的事。「隱私與資料」的內文由後台「隱私與資料」頁維護
-// （/adminapi/public/privacy-policy/），這裡只負責頁面骨架與載入狀態。
-
-// 聯絡信箱由部署環境設定（VITE_CONTACT_EMAIL）；沒設定、或格式不像信箱時，不顯示信箱，避免出現無效連結。
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const contactEmail = () => {
-    const value = (import.meta.env.VITE_CONTACT_EMAIL || "").trim();
-    return EMAIL_PATTERN.test(value) ? value : "";
-};
+// 內容原則：只寫程式碼能證實的事。「隱私與資料」與「聯絡我們」的正文由後台各自的頁面維護
+// （/adminapi/public/privacy-policy/、/adminapi/public/contact-page/），這裡只負責頁面骨架與載入狀態。
 
 const InfoPage = ({ title, lead, children }) => (
     <div className="yy-page info-page">
@@ -64,9 +57,9 @@ const formatUpdatedAt = (value) => {
     return `${date.getFullYear()} 年 ${date.getMonth() + 1} 月 ${date.getDate()} 日`;
 };
 
-export const PrivacyPage = () => {
-    const [policy, setPolicy] = useState(null);
-    // loading / ready / error（可重試）
+// 讀公開端點、渲染後台維護的正文。loading / ready / error（可重試）
+const AdminManagedPage = ({ endpoint, title, lead, label }) => {
+    const [page, setPage] = useState(null);
     const [state, setState] = useState("loading");
     const [reloadKey, setReloadKey] = useState(0);
 
@@ -74,29 +67,29 @@ export const PrivacyPage = () => {
         let active = true;
         const controller = new AbortController();
         setState("loading");
-        fetch("/adminapi/public/privacy-policy/", { signal: controller.signal })
+        fetch(endpoint, { signal: controller.signal })
             .then((res) => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return res.json();
             })
             .then((data) => {
                 if (!active) return;
-                setPolicy(data);
+                setPage(data);
                 setState("ready");
             })
             .catch((err) => {
                 if (!active) return;
-                console.error("載入隱私與資料失敗：", err);
+                console.error(`載入${label}失敗：`, err);
                 setState("error");
             });
         return () => { active = false; controller.abort(); };
-    }, [reloadKey]);
+    }, [endpoint, label, reloadKey]);
 
     const retry = useCallback(() => setReloadKey((n) => n + 1), []);
-    const updated = state === "ready" ? formatUpdatedAt(policy?.updated_at) : "";
+    const updated = state === "ready" ? formatUpdatedAt(page?.updated_at) : "";
 
     return (
-        <InfoPage title="隱私與資料" lead="說明這個網站收集哪些資料、用在哪裡、保存多久。">
+        <InfoPage title={title} lead={lead}>
             {state === "loading" && <p role="status" aria-busy="true" className="info-status">載入中…</p>}
             {state === "error" && (
                 <div className="info-status" role="alert">
@@ -105,8 +98,8 @@ export const PrivacyPage = () => {
                 </div>
             )}
             {state === "ready" && (
-                hasDocContent(policy?.content)
-                    ? <div className="info-rich"><RichTextRenderer doc={policy.content} /></div>
+                hasDocContent(page?.content)
+                    ? <div className="info-rich"><RichTextRenderer doc={page.content} /></div>
                     : <p className="info-status">內容籌備中。</p>
             )}
             {updated && <p className="info-updated">最後更新：{updated}</p>}
@@ -114,23 +107,15 @@ export const PrivacyPage = () => {
     );
 };
 
-export const ContactPage = () => {
-    const email = contactEmail();
-    return (
-        <InfoPage title="聯絡我們">
-            <Section id="contact-how" title="聯絡方式">
-                {email ? (
-                    <>
-                        <p>有問題、建議，或想詢問你的資料，歡迎來信：</p>
-                        <p><a className="info-email" href={`mailto:${email}`}>{email}</a></p>
-                    </>
-                ) : (
-                    <p>聯絡方式籌備中。</p>
-                )}
-            </Section>
-            <Section id="contact-more" title="先看看這些">
-                <p><Link to="/help">使用說明</Link>與<Link to="/privacy">隱私與資料</Link>可能已經回答你的問題。</p>
-            </Section>
-        </InfoPage>
-    );
-};
+export const PrivacyPage = () => (
+    <AdminManagedPage
+        endpoint="/adminapi/public/privacy-policy/"
+        title="隱私與資料"
+        lead="說明這個網站收集哪些資料、用在哪裡、保存多久。"
+        label="隱私與資料"
+    />
+);
+
+export const ContactPage = () => (
+    <AdminManagedPage endpoint="/adminapi/public/contact-page/" title="聯絡我們" label="聯絡我們" />
+);

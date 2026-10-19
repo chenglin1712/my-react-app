@@ -6,11 +6,15 @@
 
 const IMAGE_HOST = "res.cloudinary.com";
 
-/** 站內路徑（/ 開頭且不是 //）或 https 網址才是安全的連結；javascript:、data:、http: 一律不是 */
+// 只收「mailto:」加單一信箱，不收 ?subject=、多個收件人或其他參數（與後端 article_doc._MAILTO 同一個意思）
+const MAILTO = /^mailto:[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/;
+
+/** 站內路徑（/ 開頭且不是 //）、https 網址或單純的 mailto 才是安全的連結；javascript:、data:、http: 一律不是 */
 export function safeHref(value) {
     if (typeof value !== "string") return null;
     const url = value.trim();
     if (!url) return null;
+    if (url.length <= 254 && MAILTO.test(url)) return { href: url, external: false, mail: true };
     if (url.startsWith("/") && !url.startsWith("//") && !url.includes("\\")) return { href: url, external: false };
     try {
         const parsed = new URL(url);

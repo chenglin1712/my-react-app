@@ -15,6 +15,10 @@ function renderText(node, key) {
         if (mark?.type === "link") {
             const link = safeHref(mark.attrs?.href);
             if (!link) return;
+            if (link.mail) {
+                element = <a key={key} href={link.href}>{element}</a>;
+                return;
+            }
             element = link.external ? (
                 <a key={key} href={link.href} target="_blank" rel="noopener noreferrer">
                     {element}

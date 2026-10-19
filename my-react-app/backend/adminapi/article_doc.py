@@ -13,6 +13,7 @@
 圖片只收 Cloudinary；連結只收站內路徑與 https。
 """
 import json
+import re
 
 from django.core.exceptions import ValidationError
 
@@ -94,6 +95,15 @@ def _check_text(value):
         _fail("文字內容含有不可見或雙向控制字元")
 
 
+# 只收「mailto:」加單一信箱，不收 ?subject=、多個收件人或其他參數
+_MAILTO = re.compile(r"^mailto:[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$")
+
+
+def _check_mailto(href):
+    if len(href) > 254 or not _MAILTO.fullmatch(href):
+        _fail("電子郵件連結格式不正確，請用 mailto:信箱")
+
+
 def _check_marks(marks):
     if marks is None:
         return
@@ -108,7 +118,10 @@ def _check_marks(marks):
             href = attrs.get("href")
             if not isinstance(href, str) or not href.strip():
                 _fail("連結缺少網址")
-            validate_internal_or_https_link(href)
+            if href.startswith("mailto:"):
+                _check_mailto(href)
+            else:
+                validate_internal_or_https_link(href)
             if attrs.get("target") not in (None, "_blank", "_self"):
                 _fail("連結的開啟方式不正確")
             # rel／class／title 只是 TipTap 預設會帶的值，前台不採用（外部連結一律固定 noopener）；

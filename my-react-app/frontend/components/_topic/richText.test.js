@@ -10,8 +10,15 @@ describe('safeHref', () => {
     expect(safeHref('  https://example.org/a?b=1 ')).toEqual({ href: 'https://example.org/a?b=1', external: true });
   });
 
+  test('mailto 只收單一信箱，不收參數與多個收件人', () => {
+    expect(safeHref('mailto:help@example.org')).toEqual({ href: 'mailto:help@example.org', external: false, mail: true });
+    ['mailto:', 'mailto:a@b', 'mailto:a@b.org?subject=x', 'mailto:a@b.org,c@d.org', 'mailto:a b@c.org', 'MAILTO:a@b.org', 'mailto:a@b.org%0Abcc=x'].forEach((value) => {
+      expect(safeHref(value), value).toBeNull();
+    });
+  });
+
   test('其餘一律不是連結', () => {
-    ['javascript:alert(1)', 'data:text/html,x', 'http://example.org', '//evil.example', '/a\\b', 'mailto:a@b.c',
+    ['javascript:alert(1)', 'data:text/html,x', 'http://example.org', '//evil.example', '/a\\b',
       'https://u:p@example.org', '', '   ', 'quiz/select', null, undefined, 3, {}].forEach((value) => {
       expect(safeHref(value), String(value)).toBeNull();
     });

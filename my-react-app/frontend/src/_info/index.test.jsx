@@ -69,23 +69,38 @@ describe('隱私與資料', () => {
 });
 
 describe('聯絡我們', () => {
-  test('有設定信箱時顯示 mailto 連結', () => {
-    vi.stubEnv('VITE_CONTACT_EMAIL', 'help@example.org');
+  const CONTACT = {
+    content: {
+      type: 'doc',
+      content: [
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: '聯絡方式' }] },
+        { type: 'paragraph', content: [{ type: 'text', text: '來信：' }, { type: 'text', text: 'help@example.org', marks: [{ type: 'link', attrs: { href: 'mailto:help@example.org' } }] }] },
+      ],
+    },
+    updated_at: '2026-10-19T08:00:00Z',
+  };
+  const mockFetch = (impl) => vi.stubGlobal('fetch', vi.fn(impl));
+
+  test('顯示後台維護的內文，信箱是 mailto 連結', async () => {
+    mockFetch(() => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(CONTACT) }));
     renderPage(<ContactPage />);
-    expect(screen.getByRole('link', { name: 'help@example.org' })).toHaveAttribute('href', 'mailto:help@example.org');
-    expect(screen.queryByText('聯絡方式籌備中。')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: '聯絡我們' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'help@example.org' })).toHaveAttribute('href', 'mailto:help@example.org');
+    expect(fetch).toHaveBeenCalledWith('/adminapi/public/contact-page/', expect.any(Object));
   });
 
-  test('沒設定信箱時不顯示連結，只說明籌備中', () => {
-    vi.stubEnv('VITE_CONTACT_EMAIL', '');
+  test('內文是空的時顯示籌備中，不產生信箱連結', async () => {
+    mockFetch(() => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ content: {}, updated_at: '2026-10-19T08:00:00Z' }) }));
     renderPage(<ContactPage />);
-    expect(screen.getByText('聯絡方式籌備中。')).toBeInTheDocument();
+    expect(await screen.findByText('內容籌備中。')).toBeInTheDocument();
     expect(document.querySelector('a[href^="mailto:"]')).toBeNull();
   });
 
-  test('設定的值不像信箱時視為未設定，不產生無效連結', () => {
-    vi.stubEnv('VITE_CONTACT_EMAIL', 'not-an-email');
+  test('載入失敗顯示錯誤', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockFetch(() => Promise.resolve({ ok: false, status: 500 }));
     renderPage(<ContactPage />);
-    expect(screen.getByText('聯絡方式籌備中。')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('暫時無法載入');
+    errorSpy.mockRestore();
   });
 });

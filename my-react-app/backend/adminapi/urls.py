@@ -3,7 +3,7 @@ from django.urls import path
 from . import (
     analytics_views, dictionary_grammar_views, dictionary_import_views, dictionary_taxonomy_views,
     dictionary_views, exam_schedule_admin_views, featured_topic_views, feature_flag_views, game_config_views,
-    homepage_config_views, moderation_views, privacy_policy_views, promo_video_views, quizbank_views,
+    homepage_config_views, moderation_views, promo_video_views, quizbank_views, site_page_views,
     morphology_capability_views, rate_limit_views, review_queue_views, system_cache_views, user_views, verification_views, views,
 )
 
@@ -66,8 +66,10 @@ urlpatterns = [
     path('promo-videos/<int:pk>/clear-caption/', promo_video_views.promo_video_clear_caption),
     path('homepage-config/', homepage_config_views.homepage_config_admin),
     path('public/homepage-config/', homepage_config_views.public_homepage_config),
-    path('privacy-policy/', privacy_policy_views.privacy_policy_admin),
-    path('public/privacy-policy/', privacy_policy_views.public_privacy_policy),
+    path('privacy-policy/', site_page_views.privacy_policy_admin),
+    path('public/privacy-policy/', site_page_views.public_privacy_policy),
+    path('contact-page/', site_page_views.contact_page_admin),
+    path('public/contact-page/', site_page_views.public_contact_page),
     *_content_urls('quiz-bank/vocab', quizbank_views.quiz_vocab_views),
     *_content_urls('quiz-bank/cloze', quizbank_views.quiz_cloze_views),
     *_content_urls('quiz-bank/situations', quizbank_views.quiz_situation_views),
