@@ -21,7 +21,9 @@ from .content import (
     PublicAnnouncementSerializer,
     PublicFeaturedTopicDetailSerializer,
     PublicFeaturedTopicSerializer,
+    PrivacyPolicySerializer,
     PublicHomepageConfigSerializer,
+    PublicPrivacyPolicySerializer,
     RejectSerializer,
 )
 from .quizbank import (

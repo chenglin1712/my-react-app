@@ -74,6 +74,8 @@ DJANGO_RULES = [
     ("exam_schedule_override_write", "30/m", "考試時程人工覆寫"),
     ("homepage_config_update", "30/m", "首頁版位設定更新"),
     ("public_homepage_config", "120/m", "公開首頁版位設定（依 IP）"),
+    ("privacy_policy_update", "30/m", "隱私與資料頁內文更新"),
+    ("public_privacy_policy", "120/m", "公開隱私與資料頁內文（依 IP）"),
     ("dictionary_import_upload", "10/m", "辭典批次匯入上傳"),
     ("dictionary_import_preflight", "20/m", "辭典批次匯入預檢"),
     ("dictionary_import_autocreate", "10/m", "批次匯入自動建立缺漏主檔"),

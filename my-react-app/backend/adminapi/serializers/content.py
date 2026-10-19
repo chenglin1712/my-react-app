@@ -6,7 +6,7 @@ from config.tribes import TRIBE_IDS
 
 from rest_framework import serializers
 
-from ..models import Announcement, ExamScheduleOverride, FeaturedTopic, HomepageConfig, PromoVideo
+from ..models import Announcement, ExamScheduleOverride, FeaturedTopic, HomepageConfig, PrivacyPolicy, PromoVideo
 from ..promo_media import public_media_url
 from ..validators import normalize_marquee_items
 
@@ -303,3 +303,17 @@ class PublicAnnouncementSerializer(serializers.ModelSerializer):
             'cover_image_url', 'link_url', 'is_pinned', 'publish_at',
             'display_date_text', 'source_tag',
         ]
+
+
+class PrivacyPolicySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PrivacyPolicy
+        fields = ['content', 'updated_by', 'updated_at']
+        read_only_fields = ['updated_by', 'updated_at']
+
+
+class PublicPrivacyPolicySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PrivacyPolicy
+        # 公開頁不含 updated_by 這類後台維運資訊
+        fields = ['content', 'updated_at']

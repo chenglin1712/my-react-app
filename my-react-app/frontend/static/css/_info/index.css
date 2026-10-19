@@ -82,6 +82,108 @@
     outline-offset: var(--yy-ui-focus-offset);
 }
 
+/* 後台維護的內文（隱私與資料）：標題、段落、清單沿用 .info-section 的字級與行距 */
+.info-rich {
+    margin-top: var(--yy-space-5);
+}
+
+.info-rich h2 {
+    margin: var(--yy-space-5) 0 var(--yy-space-2);
+    font-family: var(--yy-font-heading);
+    font-size: var(--yy-text-lg);
+    font-weight: 700;
+    color: var(--yy-calm-text);
+}
+
+.info-rich h3 {
+    margin: var(--yy-space-4) 0 var(--yy-space-2);
+    font-family: var(--yy-font-heading);
+    font-size: var(--yy-text-base);
+    font-weight: 700;
+    color: var(--yy-calm-text);
+}
+
+.info-rich > :first-child {
+    margin-top: 0;
+}
+
+.info-rich p,
+.info-rich li {
+    max-width: 62ch;
+    font-size: var(--yy-text-base);
+    line-height: var(--yy-leading-loose);
+    color: var(--yy-calm-text-sub);
+}
+
+.info-rich p {
+    margin: 0 0 var(--yy-space-2);
+}
+
+.info-rich ul,
+.info-rich ol {
+    margin: 0 0 var(--yy-space-2);
+    padding-left: var(--yy-space-5);
+}
+
+.info-rich li > p {
+    margin: 0;
+}
+
+.info-rich blockquote {
+    margin: 0 0 var(--yy-space-3);
+    padding-left: var(--yy-space-4);
+    border-left: 3px solid var(--yy-calm-line);
+}
+
+.info-rich hr {
+    margin: var(--yy-space-5) 0;
+    border: 0;
+    border-top: var(--yy-border-width) solid var(--yy-calm-line);
+}
+
+.info-rich .rt-figure {
+    margin: var(--yy-space-4) 0;
+}
+
+.info-rich .rt-figure img {
+    max-width: 100%;
+    height: auto;
+}
+
+.info-rich figcaption {
+    margin-top: var(--yy-space-2);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
+}
+
+.info-status {
+    margin: var(--yy-space-5) 0 0;
+    color: var(--yy-calm-text-sub);
+    line-height: var(--yy-leading-normal);
+}
+
+.info-updated {
+    margin: var(--yy-space-6) 0 0;
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
+}
+
+.info-retry {
+    min-height: var(--yy-control-md);
+    padding: 0 var(--yy-space-4);
+    background: transparent;
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    color: var(--yy-calm-text);
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.info-retry:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
 .info-email {
     display: inline-block;
     padding: var(--yy-space-2) 0;

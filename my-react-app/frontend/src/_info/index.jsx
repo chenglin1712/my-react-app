@@ -1,11 +1,13 @@
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import RichTextRenderer from "../../components/_topic/RichTextRenderer";
+import { hasDocContent } from "../../components/_topic/richText";
 import "../../static/css/_info/index.css";
 
 // 頁尾三個入口（使用說明、隱私與資料、聯絡我們）的內容頁。
 //
-// 內容原則：只寫程式碼能證實的事。隱私說明是依目前系統實際行為整理的草稿，
-// 措辭尚待行政局或法務確認；確認完成後把 PRIVACY_IS_DRAFT 改成 false 即可拿掉頁首的草稿標示。
-const PRIVACY_IS_DRAFT = true;
+// 內容原則：只寫程式碼能證實的事。「隱私與資料」的內文由後台「隱私與資料」頁維護
+// （/adminapi/public/privacy-policy/），這裡只負責頁面骨架與載入狀態。
 
 // 聯絡信箱由部署環境設定（VITE_CONTACT_EMAIL）；沒設定、或格式不像信箱時，不顯示信箱，避免出現無效連結。
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -55,34 +57,62 @@ export const HelpPage = () => (
     </InfoPage>
 );
 
-export const PrivacyPage = () => (
-    <InfoPage title="隱私與資料" lead="說明這個網站收集哪些資料、用在哪裡、保存多久。">
-        {PRIVACY_IS_DRAFT && (
-            <p className="info-draft" role="note">
-                草稿：本頁依目前系統實際運作整理，措辭尚待行政局或法務確認。
-            </p>
-        )}
-        <Section id="privacy-account" title="帳號資料">
-            <p>註冊時會保存你的使用者名稱、電子郵件、身分、頭像網址與加入日期，以及你的收藏與答錯紀錄，另外會記錄你的登入／上線狀態與最後狀態變更時間。這些資料存放在 Google 的 Firebase 服務，用來讓你登入並保存學習進度。</p>
-            <p>筆記預設只存在你的瀏覽器裡；只有你選擇分享的筆記，才會存到 Firebase。</p>
-        </Section>
-        <Section id="privacy-features" title="使用功能時傳送的內容">
-            <ul>
-                <li>影像辨識：你選擇的圖片會傳送到 Google 的影像辨識服務，取得辨識結果；辨識出的標籤文字可能再送到 Google 的翻譯服務。</li>
-                <li>翻譯與 AI 助手：你輸入的文字會傳送到 AI 服務處理，用來產生翻譯或回答。</li>
-                <li>發音遊戲：錄音用來評分，不會自動公開；評分完成後，是否分享到社群示範發音頁由你自己選擇。選擇分享後，錄音會上傳到 Firebase，其他使用者可以聽到，分數較高的錄音也可能被選為其他人練習時的參考發音。</li>
-            </ul>
-        </Section>
-        <Section id="privacy-guest" title="未登入的試用">
-            <p>未登入使用翻譯試用時，為了限制每天的次數、避免被大量濫用，系統會把瀏覽器代號和連線來源 IP 各自轉換成雜湊值（無法直接還原成原本的內容），連同日期、當天的使用次數和更新時間一起保存。這份次數表不保存明文 IP。</p>
-            <p>這些紀錄原則上只保留 3 天，超過的紀錄會由系統定期清除；實際刪除的時間可能稍有延遲。</p>
-            <p>一般的網站伺服器存取紀錄另有保存期限，不屬於上述次數表。</p>
-        </Section>
-        <Section id="privacy-contact" title="你的資料">
-            <p>對你的資料有疑問，或想詢問、更正、刪除，請見<Link to="/contact">聯絡我們</Link>。</p>
-        </Section>
-    </InfoPage>
-);
+// 後端存的是 ISO 時間；顯示成「2026 年 10 月 19 日」，無法解析就不顯示
+const formatUpdatedAt = (value) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return `${date.getFullYear()} 年 ${date.getMonth() + 1} 月 ${date.getDate()} 日`;
+};
+
+export const PrivacyPage = () => {
+    const [policy, setPolicy] = useState(null);
+    // loading / ready / error（可重試）
+    const [state, setState] = useState("loading");
+    const [reloadKey, setReloadKey] = useState(0);
+
+    useEffect(() => {
+        let active = true;
+        const controller = new AbortController();
+        setState("loading");
+        fetch("/adminapi/public/privacy-policy/", { signal: controller.signal })
+            .then((res) => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
+            .then((data) => {
+                if (!active) return;
+                setPolicy(data);
+                setState("ready");
+            })
+            .catch((err) => {
+                if (!active) return;
+                console.error("載入隱私與資料失敗：", err);
+                setState("error");
+            });
+        return () => { active = false; controller.abort(); };
+    }, [reloadKey]);
+
+    const retry = useCallback(() => setReloadKey((n) => n + 1), []);
+    const updated = state === "ready" ? formatUpdatedAt(policy?.updated_at) : "";
+
+    return (
+        <InfoPage title="隱私與資料" lead="說明這個網站收集哪些資料、用在哪裡、保存多久。">
+            {state === "loading" && <p role="status" aria-busy="true" className="info-status">載入中…</p>}
+            {state === "error" && (
+                <div className="info-status" role="alert">
+                    <p>暫時無法載入內容，請稍後再試。</p>
+                    <button type="button" className="info-retry" onClick={retry}>重新載入</button>
+                </div>
+            )}
+            {state === "ready" && (
+                hasDocContent(policy?.content)
+                    ? <div className="info-rich"><RichTextRenderer doc={policy.content} /></div>
+                    : <p className="info-status">內容籌備中。</p>
+            )}
+            {updated && <p className="info-updated">最後更新：{updated}</p>}
+        </InfoPage>
+    );
+};
 
 export const ContactPage = () => {
     const email = contactEmail();
