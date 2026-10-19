@@ -127,9 +127,8 @@ describe("遊戲專區卡片標題對比", () => {
   });
 
   it("漸層色帶已移除（S8-2 沉穩外觀不用漸層），也沒有流動動畫", () => {
-    const band = (gameCss.match(/\.gamehub-card-head::before\s*\{([^}]*)\}/) || [])[1] ?? "";
-    expect(band).toMatch(/display:\s*none/);
-    expect(band).not.toMatch(/animation:/);
+    expect(gameCss).not.toMatch(/\.gamehub-card-head::before/);
+    expect(gameCss).not.toMatch(/gamehub-head-band[^;]*animation|animation:[^;]*gamehub/);
   });
 
   it("標題、副標題、說明文字對米白底都 ≥ 4.5:1", () => {

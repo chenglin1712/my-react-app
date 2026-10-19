@@ -77,12 +77,38 @@
     padding: 0;
     overflow: hidden;
     cursor: pointer;
+    transition: border-color 160ms var(--ease-out), transform 120ms var(--ease-out);
+}
+
+/* 按下回饋：整張卡都是按鈕，按下時整張微縮 */
+.gamehub-card:active {
+    transform: scale(var(--yy-ui-press));
 }
 
 .gamehub-card.is-selected {
+    border-color: var(--yy-calm-accent);
 }
 
-/* 卡片標題裡的按鈕：外觀就是標題，偽元素撐滿整張卡片當點擊範圍 */
+@media (hover: hover) and (pointer: fine) {
+    .gamehub-card:hover {
+        border-color: var(--yy-calm-accent);
+    }
+
+    .gamehub-card:hover .gamehub-card-badge:not(.active) {
+        background: var(--yy-calm-accent);
+        color: var(--yy-calm-info-bg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gamehub-card:active {
+        transform: none;
+    }
+}
+
+/* 卡片標題裡的按鈕：外觀就是標題，偽元素撐滿整張卡片當點擊範圍。
+   偽元素是對最近的定位祖先撐滿，所以卡片頭部、標題都不能設 position，只有 .gamehub-card 自己是 relative，
+   否則點擊範圍會縮到頭部，按卡片下半部（含「選這個」）沒有反應。 */
 .gamehub-card-btn {
     all: unset;
     cursor: pointer;
@@ -102,21 +128,12 @@
    而且漸層會流動，字會輪流壓在每一種顏色上，沒有一個字色能全程達標。
    改成：整個頭部是米白底（墨字約 13:1），漸層縮成頂端一條裝飾色帶，保留原本的流動與色彩識別。 */
 .gamehub-card-head {
-    position: relative;
     padding: 34px 26px 24px;
     display: flex;
     gap: 18px;
     align-items: flex-start;
     background: var(--yy-calm-info-bg);
     border-bottom: 3px solid var(--yy-calm-line);
-}
-
-.gamehub-card-head::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 10px;
-    display: none; /* 頂端流動色帶是漸層，不再使用；顏色資料仍由程式帶入但不顯示 */
 }
 
 .gamehub-card-icon {
@@ -159,6 +176,7 @@
 }
 
 .gamehub-card-badge {
+    transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out);
     display: inline-block;
     padding: 8px 18px;
     border-radius: 20px;
