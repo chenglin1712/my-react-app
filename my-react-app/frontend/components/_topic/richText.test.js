@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { countDocText, formatArticleDate, hasDocContent, safeHref, safeImageSrc } from './richText';
+import { FONT_SIZES, TEXT_COLORS, countDocText, formatArticleDate, hasDocContent, parseYoutubeId, pick, safeHref, safeImageSrc } from './richText';
 
 const doc = (...blocks) => ({ type: 'doc', content: blocks });
 const p = (text) => ({ type: 'paragraph', content: text ? [{ type: 'text', text }] : [] });
@@ -54,5 +54,29 @@ describe('formatArticleDate', () => {
   test('日期格式化，格式不對回空字串', () => {
     expect(formatArticleDate('2026-10-09')).toBe('2026 年 10 月 9 日');
     ['', null, undefined, '2026/10/09', '20261009', 'Invalid Date', 5].forEach((value) => expect(formatArticleDate(value), String(value)).toBe(''));
+  });
+});
+
+describe('parseYoutubeId', () => {
+  const ID = 'dQw4w9WgXcQ';
+  test.each([
+    [`https://www.youtube.com/watch?v=${ID}`], [`https://youtube.com/watch?v=${ID}&t=10s`], [`https://m.youtube.com/watch?v=${ID}`],
+    [`https://youtu.be/${ID}`], [`https://youtu.be/${ID}?si=abc`], [`https://www.youtube.com/embed/${ID}`],
+    [`https://www.youtube.com/shorts/${ID}`], [`https://www.youtube-nocookie.com/embed/${ID}`], [ID], [`  ${ID}  `],
+  ])('接受 %s', (url) => expect(parseYoutubeId(url)).toBe(ID));
+
+  test.each([
+    ['http://www.youtube.com/watch?v=dQw4w9WgXcQ'], ['https://evil.example/watch?v=dQw4w9WgXcQ'], ['https://youtube.com.evil.example/watch?v=dQw4w9WgXcQ'],
+    ['https://user:pw@www.youtube.com/watch?v=dQw4w9WgXcQ'], ['https://www.youtube.com/watch?v=short'], ['https://www.youtube.com/'],
+    ['javascript:alert(1)'], [''], [null], [12345678901],
+  ])('拒絕 %s', (url) => expect(parseYoutubeId(url)).toBeNull());
+});
+
+describe('pick', () => {
+  test('只回傳清單內有值的選項', () => {
+    expect(pick(TEXT_COLORS, 'red')).toBe('red');
+    expect(pick(TEXT_COLORS, '#f00')).toBeNull();
+    expect(pick(FONT_SIZES, '')).toBeNull();
+    expect(pick(FONT_SIZES, 'lg')).toBe('lg');
   });
 });

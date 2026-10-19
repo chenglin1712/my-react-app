@@ -103,6 +103,14 @@
     color: var(--yy-calm-text);
 }
 
+.info-rich h4 {
+    margin: var(--yy-space-3) 0 var(--yy-space-2);
+    font-family: var(--yy-font-heading);
+    font-size: var(--yy-text-base);
+    font-weight: 700;
+    color: var(--yy-calm-text-sub);
+}
+
 .info-rich > :first-child {
     margin-top: 0;
 }

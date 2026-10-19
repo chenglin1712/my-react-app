@@ -1,0 +1,77 @@
+/* 文章內文的固定色盤。文件裡只存色名（red、yellow…），色碼只在這裡。
+   前台（rich-text.css）與後台編輯器（_admin/rich-text-editor.css）共用，所以兩邊看到的顏色一致。
+   文字色在兩種主題的底色上都至少 4.5:1；螢光筆只改底色，文字維持內文色，所以底色要夠淡（淺色）或夠深（深色）。 */
+
+:root {
+    --rt-color-red: #b42318;
+    --rt-color-orange: #b54708;
+    --rt-color-green: #027a48;
+    --rt-color-blue: #175cd3;
+    --rt-color-purple: #6941c6;
+    --rt-color-gray: #667085;
+
+    --rt-mark-yellow: #fef0c7;
+    --rt-mark-green: #d1fadf;
+    --rt-mark-blue: #d1e9ff;
+    --rt-mark-pink: #fce7f6;
+    --rt-mark-gray: #eaecf0;
+
+    --rt-callout-info-bg: #eff8ff;
+    --rt-callout-info-line: #175cd3;
+    --rt-callout-success-bg: #ecfdf3;
+    --rt-callout-success-line: #027a48;
+    --rt-callout-warning-bg: #fffaeb;
+    --rt-callout-warning-line: #b54708;
+    --rt-callout-danger-bg: #fef3f2;
+    --rt-callout-danger-line: #b42318;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --rt-color-red: #fda29b;
+        --rt-color-orange: #fec84b;
+        --rt-color-green: #6ce9a6;
+        --rt-color-blue: #84caff;
+        --rt-color-purple: #b692f6;
+        --rt-color-gray: #98a2b3;
+
+        --rt-mark-yellow: #5c4a12;
+        --rt-mark-green: #134e2f;
+        --rt-mark-blue: #1b3a66;
+        --rt-mark-pink: #5b1f4a;
+        --rt-mark-gray: #3a4150;
+
+        --rt-callout-info-bg: #102a43;
+        --rt-callout-info-line: #84caff;
+        --rt-callout-success-bg: #0f2e22;
+        --rt-callout-success-line: #6ce9a6;
+        --rt-callout-warning-bg: #35280f;
+        --rt-callout-warning-line: #fec84b;
+        --rt-callout-danger-bg: #3a1614;
+        --rt-callout-danger-line: #fda29b;
+    }
+}
+
+:root[data-theme="dark"] {
+    --rt-color-red: #fda29b;
+    --rt-color-orange: #fec84b;
+    --rt-color-green: #6ce9a6;
+    --rt-color-blue: #84caff;
+    --rt-color-purple: #b692f6;
+    --rt-color-gray: #98a2b3;
+
+    --rt-mark-yellow: #5c4a12;
+    --rt-mark-green: #134e2f;
+    --rt-mark-blue: #1b3a66;
+    --rt-mark-pink: #5b1f4a;
+    --rt-mark-gray: #3a4150;
+
+    --rt-callout-info-bg: #102a43;
+    --rt-callout-info-line: #84caff;
+    --rt-callout-success-bg: #0f2e22;
+    --rt-callout-success-line: #6ce9a6;
+    --rt-callout-warning-bg: #35280f;
+    --rt-callout-warning-line: #fec84b;
+    --rt-callout-danger-bg: #3a1614;
+    --rt-callout-danger-line: #fda29b;
+}

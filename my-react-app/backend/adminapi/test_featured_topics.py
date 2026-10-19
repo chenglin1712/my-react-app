@@ -700,8 +700,8 @@ class ArticleDocValidationTest(TestCase):
         self.assertInvalid(_doc({"type": "paragraph", "attrs": {"style": "color:red"}}), "段落多出屬性")
         self.assertInvalid(_doc(_p(_text("x", {"type": "link", "attrs": {"href": "/a", "onclick": "x"}}))), "連結多出屬性")
 
-    def test_heading_levels_only_two_and_three(self):
-        for level in (1, 4, 6, "2", None):
+    def test_heading_levels_only_two_to_four(self):
+        for level in (1, 5, 6, "2", None):
             self.assertInvalid(_doc({"type": "heading", "attrs": {"level": level}, "content": [_text("x")]}), f"level={level}")
         _ = self._topic(_doc({"type": "heading", "attrs": {"level": 3}, "content": [_text("x")]})).full_clean()
 
@@ -864,3 +864,97 @@ class PublicArticleTest(Base):
         bad = _doc({"type": "image", "attrs": {"src": "https://evil.example/a.jpg"}})
         response = self.call("post", f"{ADMIN_URL}{pk}/pending-revision/", {"content": bad}, role=EDITOR)
         self.assertEqual(response.status_code, 400, response.content)
+
+
+def _cell(*blocks, kind="tableCell", **attrs):
+    return {"type": kind, "attrs": {"colspan": 1, "rowspan": 1, "colwidth": None, **attrs}, "content": list(blocks or [_p()])}
+
+
+def _table(*rows):
+    return {"type": "table", "content": [{"type": "tableRow", "content": list(row)} for row in rows]}
+
+
+class ArticleDocRichFeaturesTest(TestCase):
+    """進階排版（對齊、顏色、字級、表格、待辦、提示框、影片、圖片大小）的白名單：只收固定選項，不收任意值。"""
+
+    def assertValid(self, content, label=""):
+        with self.subTest(label or "valid"):
+            FeaturedTopic(title="專題標題", created_by="u", content=content).full_clean()
+
+    def assertInvalid(self, content, label=""):
+        with self.subTest(label or str(content)[:60]):
+            with self.assertRaises(ValidationError):
+                FeaturedTopic(title="專題標題", created_by="u", content=content).full_clean()
+
+    def test_alignment_and_heading_levels(self):
+        for align in ("left", "center", "right", "justify", None):
+            self.assertValid(_doc({"type": "paragraph", "attrs": {"textAlign": align}, "content": [_text("x")]}), f"對齊 {align}")
+        for level in (2, 3, 4):
+            self.assertValid(_doc({"type": "heading", "attrs": {"level": level, "textAlign": "center"}, "content": [_text("x")]}))
+        self.assertInvalid(_doc({"type": "heading", "attrs": {"level": 5}, "content": [_text("x")]}), "5 級標題")
+        self.assertInvalid(_doc({"type": "heading", "attrs": {"level": 1}, "content": [_text("x")]}), "1 級標題")
+        self.assertInvalid(_doc({"type": "paragraph", "attrs": {"textAlign": "start"}, "content": [_text("x")]}), "非清單內對齊")
+        self.assertInvalid(_doc({"type": "paragraph", "attrs": {"textAlign": "center; background:url(x)"}, "content": [_text("x")]}), "對齊夾帶 CSS")
+
+    def test_text_style_marks_only_take_fixed_choices(self):
+        def mark(kind, **attrs):
+            return {"type": kind, "attrs": attrs}
+
+        self.assertValid(_doc(_p(_text("x", mark("textColor", color="red"), mark("highlight", color="yellow"), mark("fontSize", size="lg"), "subscript"))))
+        self.assertValid(_doc(_p(_text("x", "superscript", "bold"))))
+        self.assertInvalid(_doc(_p(_text("x", mark("textColor", color="#ff0000")))), "色碼")
+        self.assertInvalid(_doc(_p(_text("x", mark("textColor", color="red; x:y")))), "夾帶 CSS")
+        self.assertInvalid(_doc(_p(_text("x", mark("textColor")))), "沒有顏色")
+        self.assertInvalid(_doc(_p(_text("x", mark("highlight", color="red")))), "螢光筆用了文字色")
+        self.assertInvalid(_doc(_p(_text("x", mark("fontSize", size="72px")))), "任意字級")
+        self.assertInvalid(_doc(_p(_text("x", mark("fontSize", size="sm", style="x")))), "多餘屬性")
+
+    def test_table_structure_and_limits(self):
+        self.assertValid(_doc(_table([_cell(kind="tableHeader"), _cell(kind="tableHeader")], [_cell(_p(_text("a"))), _cell(colspan=2)])))
+        self.assertInvalid(_doc(_table([_cell(colspan=13)])), "合併過大")
+        self.assertInvalid(_doc(_table([_cell(colspan=0)])), "合併為 0")
+        self.assertInvalid(_doc(_table([_cell(colwidth=[100])])), "自訂欄寬")
+        self.assertInvalid(_doc(_table(*([[_cell()]] * 51))), "超過 50 列")
+        self.assertInvalid(_doc(_table([_cell()] * 13)), "超過 12 欄")
+        self.assertInvalid(_doc({"type": "table", "content": [_p()]}), "表格裡直接放段落")
+        self.assertInvalid(_doc(_table([_cell({"type": "heading", "attrs": {"level": 2}, "content": [_text("x")]})])), "儲存格放標題")
+        self.assertInvalid(_doc({"type": "blockquote", "content": [_table([_cell()])]}), "引用裡放表格")
+
+    def test_task_list_and_callout(self):
+        item = {"type": "taskItem", "attrs": {"checked": True}, "content": [_p(_text("完成"))]}
+        self.assertValid(_doc({"type": "taskList", "content": [item, {**item, "attrs": {"checked": False}}]}))
+        self.assertInvalid(_doc({"type": "taskList", "content": [{"type": "taskItem", "attrs": {"checked": "yes"}, "content": [_p()]}]}), "狀態非布林")
+        self.assertInvalid(_doc({"type": "taskList", "content": [{"type": "listItem", "content": [_p()]}]}), "待辦裡放一般項目")
+        for tone in ("info", "success", "warning", "danger"):
+            self.assertValid(_doc({"type": "callout", "attrs": {"tone": tone}, "content": [_p(_text("注意"))]}), tone)
+        self.assertInvalid(_doc({"type": "callout", "attrs": {"tone": "pink"}, "content": [_p()]}), "未知種類")
+        self.assertInvalid(_doc({"type": "callout", "content": [_p()]}), "沒有種類")
+        self.assertInvalid(_doc({"type": "callout", "attrs": {"tone": "info"}, "content": [_table([_cell()])]}), "提示框裡放表格")
+
+    def test_youtube_only_takes_a_video_id(self):
+        self.assertValid(_doc({"type": "youtube", "attrs": {"videoId": "dQw4w9WgXcQ", "title": "說明"}}))
+        for bad in ("short", "dQw4w9WgXcQ1", "dQw4w9WgXc!", "https://youtu.be/dQw4w9WgXcQ", "dQw4w9WgXcQ\n", None, 12345678901):
+            self.assertInvalid(_doc({"type": "youtube", "attrs": {"videoId": bad}}), f"代號 {bad!r}")
+        self.assertInvalid(_doc({"type": "youtube", "attrs": {"videoId": "dQw4w9WgXcQ", "src": "https://evil"}}), "多餘屬性")
+        self.assertInvalid(_doc({"type": "youtube", "attrs": {"videoId": "dQw4w9WgXcQ"}, "content": [_p()]}), "影片有子節點")
+        too_many = [{"type": "youtube", "attrs": {"videoId": "dQw4w9WgXcQ"}}] * 11
+        self.assertInvalid(_doc(*too_many), "超過 10 支")
+
+    def test_image_alignment_and_size(self):
+        base = {"src": IMG_OK, "alt": "", "title": ""}
+        self.assertValid(_doc({"type": "image", "attrs": {**base, "align": "center", "size": "md"}}))
+        self.assertValid(_doc({"type": "image", "attrs": {**base, "align": None, "size": None}}))
+        self.assertInvalid(_doc({"type": "image", "attrs": {**base, "align": "justify"}}), "圖片不能兩端對齊")
+        self.assertInvalid(_doc({"type": "image", "attrs": {**base, "size": "500px"}}), "任意大小")
+
+    def test_unhashable_and_loose_values_are_400_not_500(self):
+        for bad in ([], {}, ["red"], {"a": 1}, 1, True):
+            self.assertInvalid(_doc(_p(_text("x", {"type": "textColor", "attrs": {"color": bad}}))), f"顏色 {bad!r}")
+            self.assertInvalid(_doc({"type": "paragraph", "attrs": {"textAlign": bad}, "content": [_text("x")]}), f"對齊 {bad!r}")
+            self.assertInvalid(_doc({"type": "callout", "attrs": {"tone": bad}, "content": [_p()]}), f"提示框 {bad!r}")
+        for bad in (0, 1, "true", []):
+            self.assertInvalid(_doc({"type": "taskList", "content": [{"type": "taskItem", "attrs": {"checked": bad}, "content": [_p()]}]}), f"checked {bad!r}")
+
+    def test_deepest_realistic_table_content_still_fits(self):
+        nested = {"type": "bulletList", "content": [{"type": "listItem", "content": [_p(_text("深"))]}]}
+        self.assertValid(_doc(_table([_cell(nested)])))

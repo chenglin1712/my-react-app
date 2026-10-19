@@ -193,6 +193,16 @@
     overflow-wrap: anywhere;
 }
 
+.tpage-body h4 {
+    margin: 1.5em 0 0.5em;
+    font-family: var(--yy-font-heading);
+    font-size: 1.0625rem;
+    font-weight: 700;
+    line-height: 1.5;
+    letter-spacing: 0.04em;
+    overflow-wrap: anywhere;
+}
+
 .tpage-foot {
     margin-top: 40px;
     padding-top: 20px;

@@ -4,6 +4,63 @@
  * 前台也只渲染白名單內的節點，不安全的網址整個略過。
  */
 
+// 選項型屬性的固定清單：編輯器的選單、前台渲染器、後端白名單（article_doc.py）三處一致。
+// key 是存進文件的值，label 是給編輯者看的名稱；顏色的實際色碼在 rich-palette.css，文件裡永遠不存色碼或 CSS。
+export const TEXT_COLORS = [
+    { key: "red", label: "紅色" }, { key: "orange", label: "橘色" }, { key: "green", label: "綠色" },
+    { key: "blue", label: "藍色" }, { key: "purple", label: "紫色" }, { key: "gray", label: "灰色" },
+];
+export const HIGHLIGHT_COLORS = [
+    { key: "yellow", label: "黃色" }, { key: "green", label: "綠色" }, { key: "blue", label: "藍色" },
+    { key: "pink", label: "粉紅色" }, { key: "gray", label: "灰色" },
+];
+export const FONT_SIZES = [
+    { key: "sm", label: "小" }, { key: "", label: "一般" }, { key: "lg", label: "大" }, { key: "xl", label: "特大" },
+];
+export const TEXT_ALIGNS = [
+    { key: "left", label: "靠左對齊" }, { key: "center", label: "置中對齊" },
+    { key: "right", label: "靠右對齊" }, { key: "justify", label: "左右對齊" },
+];
+export const CALLOUT_TONES = [
+    { key: "info", label: "資訊" }, { key: "success", label: "成功" },
+    { key: "warning", label: "注意" }, { key: "danger", label: "警告" },
+];
+export const IMAGE_ALIGNS = [
+    { key: "left", label: "靠左" }, { key: "center", label: "置中" }, { key: "right", label: "靠右" },
+];
+export const IMAGE_SIZES = [
+    { key: "sm", label: "小" }, { key: "md", label: "中" }, { key: "lg", label: "大" }, { key: "full", label: "滿版" },
+];
+
+/** 值是不是某個固定清單裡的選項；不是就當作沒設定（前台渲染時不採用不認得的值） */
+export const pick = (options, value) => (options.some((o) => o.key === value && o.key) ? value : null);
+
+const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
+const YOUTUBE_HOSTS = new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtube-nocookie.com", "www.youtube-nocookie.com"]);
+
+/** 從 YouTube 網址取出 11 碼影片代號；不是 YouTube 的網址或格式不對回 null。只收 https，也接受使用者直接貼代號。 */
+export function parseYoutubeId(value) {
+    if (typeof value !== "string") return null;
+    const text = value.trim();
+    if (YOUTUBE_ID.test(text)) return text;
+    let url;
+    try {
+        url = new URL(text);
+    } catch {
+        return null;
+    }
+    if (url.protocol !== "https:" || url.username || url.password) return null;
+    let id = null;
+    if (url.hostname === "youtu.be") {
+        id = url.pathname.slice(1).split("/")[0];
+    } else if (YOUTUBE_HOSTS.has(url.hostname)) {
+        const [first, second] = url.pathname.split("/").filter(Boolean);
+        if (first === "watch") id = url.searchParams.get("v");
+        else if (["embed", "shorts", "live", "v"].includes(first)) id = second;
+    }
+    return id && YOUTUBE_ID.test(id) ? id : null;
+}
+
 const IMAGE_HOST = "res.cloudinary.com";
 
 // 只收「mailto:」加單一信箱，不收 ?subject=、多個收件人或其他參數（與後端 article_doc._MAILTO 同一個意思）
@@ -61,6 +118,7 @@ export function hasDocContent(doc) {
     let found = false;
     walk(doc, (node) => {
         if (node.type === "image" && node.attrs?.src) found = true;
+        if (node.type === "youtube" && node.attrs?.videoId) found = true;
         if (node.type === "text" && typeof node.text === "string" && node.text.trim()) found = true;
     });
     return found;

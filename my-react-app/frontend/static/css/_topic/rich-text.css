@@ -1,0 +1,146 @@
+/* 前台文章內文的進階排版（對齊、顏色、字級、表格、待辦、提示框、影片、圖片大小）。
+   由 RichTextRenderer 自己匯入，所以專題文章、隱私與資料、聯絡我們三處都有同一套樣式。
+   基本的段落、標題、清單、引用樣式留在各頁自己的 CSS（.tpage-body、.info-rich）。 */
+/* 對齊：只有四個固定值 */
+.rt-align-center { text-align: center; }
+.rt-align-right { text-align: right; }
+.rt-align-justify { text-align: justify; }
+
+/* 文字色、螢光筆、字級 */
+.rt-color-red { color: var(--rt-color-red); }
+.rt-color-orange { color: var(--rt-color-orange); }
+.rt-color-green { color: var(--rt-color-green); }
+.rt-color-blue { color: var(--rt-color-blue); }
+.rt-color-purple { color: var(--rt-color-purple); }
+.rt-color-gray { color: var(--rt-color-gray); }
+
+.rt-mark {
+    padding: 0 0.15em;
+    color: inherit;
+    border-radius: 0.2em;
+}
+.rt-mark-yellow { background: var(--rt-mark-yellow); }
+.rt-mark-green { background: var(--rt-mark-green); }
+.rt-mark-blue { background: var(--rt-mark-blue); }
+.rt-mark-pink { background: var(--rt-mark-pink); }
+.rt-mark-gray { background: var(--rt-mark-gray); }
+
+.rt-size-sm { font-size: 0.875em; }
+.rt-size-lg { font-size: 1.25em; }
+.rt-size-xl { font-size: 1.5em; }
+
+/* 上標、下標不撐高行距 */
+.rt-sub,
+.rt-sup {
+    line-height: 0;
+}
+
+/* 表格：窄螢幕可以橫向捲動，不撐破版面 */
+.rt-table-wrap {
+    margin: 0 0 1.5em;
+    overflow-x: auto;
+}
+.rt-table-wrap:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+.rt-table {
+    width: 100%;
+    min-width: 32em;
+    border-collapse: collapse;
+    font-size: 1rem;
+    line-height: 1.7;
+}
+.rt-table th,
+.rt-table td {
+    padding: 8px 12px;
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    text-align: left;
+    vertical-align: top;
+}
+.rt-table th {
+    background: var(--yy-calm-bg);
+    font-weight: 700;
+}
+.rt-table td > :last-child,
+.rt-table th > :last-child {
+    margin-bottom: 0;
+}
+
+/* 待辦清單：唯讀，只顯示完成狀態 */
+.rt-tasks {
+    padding-left: 0;
+    list-style: none;
+}
+.rt-task {
+    display: flex;
+    gap: 0.6em;
+    align-items: flex-start;
+}
+.rt-task > input {
+    flex: none;
+    margin-top: 0.7em;
+}
+.rt-task-body {
+    min-width: 0;
+    flex: 1;
+}
+
+/* 重點提示框 */
+.rt-callout {
+    margin: 0 0 1.5em;
+    padding: 12px 16px;
+    border: var(--yy-border-width) solid var(--rt-callout-info-line);
+    border-left-width: 5px;
+    border-radius: var(--yy-ui-radius);
+    background: var(--rt-callout-info-bg);
+}
+.rt-callout--success { border-color: var(--rt-callout-success-line); background: var(--rt-callout-success-bg); }
+.rt-callout--warning { border-color: var(--rt-callout-warning-line); background: var(--rt-callout-warning-bg); }
+.rt-callout--danger { border-color: var(--rt-callout-danger-line); background: var(--rt-callout-danger-bg); }
+.rt-callout > :last-child {
+    margin-bottom: 0;
+}
+
+/* YouTube：16:9，隱私模式嵌入 */
+.rt-video {
+    margin: 2em 0;
+}
+.rt-video-frame {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-line);
+}
+.rt-video-frame iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+.rt-video figcaption {
+    margin-top: 8px;
+    color: var(--yy-calm-text-sub);
+    font-size: var(--yy-text-sm);
+    line-height: 1.6;
+}
+
+/* 圖片的對齊與大小（沒設定時維持滿版）。窄螢幕一律滿版，避免縮得太小看不清 */
+/* 前面加 figure. 是為了在特異性上壓過各頁自己的 .rt-figure 外距 */
+figure.rt-figure--sm { max-width: 40%; }
+figure.rt-figure--md { max-width: 60%; }
+figure.rt-figure--lg { max-width: 80%; }
+figure.rt-figure--center { margin-left: auto; margin-right: auto; }
+figure.rt-figure--right { margin-left: auto; margin-right: 0; }
+figure.rt-figure--left { margin-right: auto; margin-left: 0; }
+
+@media (max-width: 720px) {
+    figure.rt-figure--sm,
+    figure.rt-figure--md,
+    figure.rt-figure--lg {
+        max-width: 100%;
+    }
+}

@@ -9,8 +9,10 @@
 這裡的規則要與前台渲染器（frontend/components/_topic/RichTextRenderer.jsx）能渲染的節點一致：驗證放行、
 渲染器卻不認得的節點會被略過；渲染器認得、驗證卻不放行的則根本存不進來。
 
-只放行：段落、標題（2 到 3 級）、粗體／斜體／底線／刪除線、連結、項目與編號清單、引用、分隔線、換行、圖片。
-圖片只收 Cloudinary；連結只收站內路徑與 https。
+只放行：段落、標題（2 到 4 級）、對齊、粗體／斜體／底線／刪除線／上標／下標、固定色盤的文字色與螢光筆、三種字級、
+連結、項目／編號／待辦清單、引用、重點提示框、表格、YouTube 影片、分隔線、換行、圖片（可設對齊與大小）。
+圖片只收 Cloudinary；連結只收站內路徑、https 與單純的 mailto；影片只收 YouTube 影片代號。
+所有「選項型」屬性（顏色、字級、對齊、提示框種類…）都只收固定清單裡的值，不收任意 CSS。
 """
 import json
 import re
@@ -31,36 +33,68 @@ MAX_DEPTH = 8
 MAX_NODES = 5_000
 MAX_TEXT_CHARS = 50_000
 MAX_IMAGES = 40
+MAX_VIDEOS = 10
+MAX_TABLE_ROWS = 50
+MAX_TABLE_COLS = 12
+MAX_SPAN = 12
 MAX_ALT_CHARS = 200
 MAX_CAPTION_CHARS = 120
 
 _INLINE = {"text", "hardBreak"}
-_BLOCK_LEAF = {"horizontalRule", "image"}
+_LISTS = {"bulletList", "orderedList", "taskList"}
 _CONTAINERS = {
-    # 節點 -> 允許的子節點
-    "doc": {"paragraph", "heading", "bulletList", "orderedList", "blockquote", "horizontalRule", "image"},
+    # 節點 -> 允許的子節點。編輯器端（articleExtensions.js）的 schema 要收在同樣的範圍裡，編輯時就做不出存不進去的內容。
+    "doc": {"paragraph", "heading", "blockquote", "horizontalRule", "image", "table", "callout", "youtube"} | _LISTS,
     "paragraph": _INLINE,
     "heading": _INLINE,
-    "blockquote": {"paragraph", "heading", "bulletList", "orderedList", "horizontalRule", "image"},
+    "blockquote": {"paragraph", "heading", "horizontalRule", "image"} | _LISTS,
+    "callout": {"paragraph"} | _LISTS,
     "bulletList": {"listItem"},
     "orderedList": {"listItem"},
+    "taskList": {"taskItem"},
     "listItem": {"paragraph", "bulletList", "orderedList"},
+    "taskItem": {"paragraph", "bulletList", "orderedList", "taskList"},
+    "table": {"tableRow"},
+    "tableRow": {"tableCell", "tableHeader"},
+    "tableCell": {"paragraph", "bulletList", "orderedList"},
+    "tableHeader": {"paragraph", "bulletList", "orderedList"},
 }
 _ALLOWED_ATTRS = {
     "doc": set(),
-    "paragraph": set(),
-    "heading": {"level"},
+    "paragraph": {"textAlign"},
+    "heading": {"level", "textAlign"},
     "blockquote": set(),
+    "callout": {"tone"},
     "bulletList": set(),
     "orderedList": {"start", "type"},
+    "taskList": set(),
     "listItem": set(),
+    "taskItem": {"checked"},
+    "table": set(),
+    "tableRow": set(),
+    "tableCell": {"colspan", "rowspan", "colwidth"},
+    "tableHeader": {"colspan", "rowspan", "colwidth"},
     "horizontalRule": set(),
     "hardBreak": set(),
     "text": set(),
-    "image": {"src", "alt", "title"},
+    "image": {"src", "alt", "title", "align", "size"},
+    "youtube": {"videoId", "title"},
 }
-_MARKS = {"bold", "italic", "underline", "strike", "link"}
-_MARK_ATTRS = {"bold": set(), "italic": set(), "underline": set(), "strike": set(), "link": {"href", "target", "rel", "class", "title"}}
+# 選項型屬性只收固定清單（與前台 richText.js 的常數一致）
+_ALIGNS = {"left", "center", "right", "justify"}
+_TONES = {"info", "success", "warning", "danger"}
+_TEXT_COLORS = {"red", "orange", "green", "blue", "purple", "gray"}
+_HIGHLIGHT_COLORS = {"yellow", "green", "blue", "pink", "gray"}
+_FONT_SIZES = {"sm", "lg", "xl"}
+_IMAGE_ALIGNS = {"left", "center", "right"}
+_IMAGE_SIZES = {"sm", "md", "lg", "full"}
+_YOUTUBE_ID = re.compile(r"[A-Za-z0-9_-]{11}")
+_MARKS = {"bold", "italic", "underline", "strike", "subscript", "superscript", "link", "textColor", "highlight", "fontSize"}
+_MARK_ATTRS = {
+    "bold": set(), "italic": set(), "underline": set(), "strike": set(), "subscript": set(), "superscript": set(),
+    "link": {"href", "target", "rel", "class", "title"},
+    "textColor": {"color"}, "highlight": {"color"}, "fontSize": {"size"},
+}
 
 
 def _fail(message):
@@ -72,6 +106,7 @@ class _Stats:
         self.nodes = 0
         self.text = 0
         self.images = 0
+        self.videos = 0
         self.has_content = False
 
 
@@ -104,6 +139,21 @@ def _check_mailto(href):
         _fail("電子郵件連結格式不正確，請用 mailto:信箱")
 
 
+def _check_choice(value, allowed, label, required=False):
+    if value is None and not required:
+        return
+    # 先確認是字串：list／dict 不可雜湊，直接拿去查集合會丟 TypeError 變成 500
+    if not isinstance(value, str) or value not in allowed:
+        _fail(f"{label}不在允許的選項內")
+
+
+_MARK_CHOICES = {
+    "textColor": ("color", _TEXT_COLORS, "文字顏色"),
+    "highlight": ("color", _HIGHLIGHT_COLORS, "螢光筆顏色"),
+    "fontSize": ("size", _FONT_SIZES, "字級"),
+}
+
+
 def _check_marks(marks):
     if marks is None:
         return
@@ -114,6 +164,9 @@ def _check_marks(marks):
             _fail("含有不允許的文字樣式")
         kind = mark["type"]
         attrs = _check_attrs(kind, mark.get("attrs"), _MARK_ATTRS[kind])
+        if kind in _MARK_CHOICES:
+            key, allowed, label = _MARK_CHOICES[kind]
+            _check_choice(attrs.get(key), allowed, label, required=True)
         if kind == "link":
             href = attrs.get("href")
             if not isinstance(href, str) or not href.strip():
@@ -163,9 +216,43 @@ def _walk(node, parent_kind, depth, stats):
         return
     if node.get("marks"):
         _fail(f"{kind} 不能設定文字樣式")
+    if kind in ("paragraph", "heading"):
+        _check_choice(attrs.get("textAlign"), _ALIGNS, "對齊方式")
     if kind == "heading":
-        if attrs.get("level") not in (2, 3):
-            _fail("標題只能是 2 到 3 級")
+        if attrs.get("level") not in (2, 3, 4):
+            _fail("標題只能是 2 到 4 級")
+    elif kind == "callout":
+        _check_choice(attrs.get("tone"), _TONES, "提示框種類", required=True)
+    elif kind == "taskItem":
+        if attrs.get("checked") is not None and not isinstance(attrs["checked"], bool):
+            _fail("待辦項目的狀態不正確")
+    elif kind in ("tableCell", "tableHeader"):
+        for key in ("colspan", "rowspan"):
+            value = attrs.get(key)
+            if value is not None and (not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= MAX_SPAN):
+                _fail("表格儲存格的合併範圍不正確")
+        if attrs.get("colwidth") is not None:
+            _fail("表格不支援自訂欄寬")
+    elif kind == "table":
+        rows = node.get("content") or []
+        if len(rows) > MAX_TABLE_ROWS:
+            _fail(f"表格最多 {MAX_TABLE_ROWS} 列")
+    elif kind == "tableRow":
+        if len(node.get("content") or []) > MAX_TABLE_COLS:
+            _fail(f"表格最多 {MAX_TABLE_COLS} 欄")
+    elif kind == "youtube":
+        video_id = attrs.get("videoId")
+        if not isinstance(video_id, str) or not _YOUTUBE_ID.fullmatch(video_id):
+            _fail("YouTube 影片代號不正確")
+        title = attrs.get("title")
+        if title is not None:
+            if not isinstance(title, str) or len(title) > MAX_CAPTION_CHARS:
+                _fail(f"影片說明最多 {MAX_CAPTION_CHARS} 字")
+            validate_single_line(title)
+        stats.videos += 1
+        stats.has_content = True
+        if stats.videos > MAX_VIDEOS:
+            _fail(f"影片太多（最多 {MAX_VIDEOS} 支）")
     elif kind == "orderedList":
         if attrs.get("start") is not None and (not isinstance(attrs["start"], int) or isinstance(attrs["start"], bool) or not 1 <= attrs["start"] <= 9999):
             _fail("編號清單的起始數字不正確")
@@ -176,6 +263,8 @@ def _walk(node, parent_kind, depth, stats):
         if not isinstance(src, str) or not src:
             _fail("圖片缺少網址")
         validate_cloudinary_image_url(src)
+        _check_choice(attrs.get("align"), _IMAGE_ALIGNS, "圖片對齊方式")
+        _check_choice(attrs.get("size"), _IMAGE_SIZES, "圖片大小")
         for key, limit in (("alt", MAX_ALT_CHARS), ("title", MAX_CAPTION_CHARS)):
             value = attrs.get(key)
             if value is None:
