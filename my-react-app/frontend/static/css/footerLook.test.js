@@ -50,16 +50,23 @@ describe("頁尾（雜誌版，對齊 Artifact）", () => {
     expect(css).toMatch(/--yy-calm-block-deep:\s*#33383D/);
   });
 
-  it("超大「原語」、連結與標語；窄螢幕自動換行，手機上方留白縮小", () => {
+  it("品牌、連結與標語並排；窄螢幕自動換行，手機上方留白縮小", () => {
     expect(find(".yy-footer__inner").body).toMatch(/flex-wrap:\s*wrap/);
-    expect(find(".yy-footer__name").body).toMatch(/font-size:\s*clamp\(3\.4rem,\s*12vw,\s*7rem\)/);
+    expect(find(".yy-footer__name").body).toMatch(/font-size:\s*var\(--yy-footer-brand-size\)/);
     expect(find(".yy-footer", /max-width:\s*720px/).body).toMatch(/margin-top:\s*80px/);
   });
 
-  it("連結是細框按鈕：觸控區至少 44px，hover 只給有滑鼠的裝置，按下有回饋", () => {
+  it("底部版權列：用細線與上方分開，字級不小於 sm", () => {
+    const legal = find(".yy-footer__legal").body;
+    expect(legal).toMatch(/border-top:\s*1px solid color-mix\(in srgb, var\(--yy-calm-block-on\)/);
+    expect(legal).toMatch(/font-size:\s*var\(--yy-text-sm\)/);
+    expect(legal).toMatch(/text-align:\s*center/);
+    expect(find(".yy-footer__sub").body).toMatch(/font-size:\s*var\(--yy-footer-brand-size\)/);
+  });
+
+  it("連結是文字連結：觸控區至少 44px，hover 只給有滑鼠的裝置，按下有回饋", () => {
     const link = find(".yy-footer__links a").body;
     expect(link).toMatch(/min-height:\s*var\(--yy-control-md\)/);
-    expect(link).toMatch(/border:\s*1px solid var\(--yy-calm-block-on\)/);
     const hover = footerRules.filter((r) => /:hover/.test(r.selector));
     expect(hover.length).toBeGreaterThan(0);
     hover.forEach((r) => expect(r.atRules.some((a) => /hover:\s*hover/.test(a) && /pointer:\s*fine/.test(a)), r.selector).toBe(true));

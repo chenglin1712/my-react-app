@@ -902,13 +902,14 @@
 }
 
 /* ---------- Footer（雜誌版，對齊首頁設計稿）----------
-   和頁面同樣收在 1200px 的欄裡的深色石板灰塊（--yy-calm-block-deep）：超大「原語」、三個細框連結、一句標語。
+   和頁面同樣收在 1200px 的欄裡的深色石板灰塊（--yy-calm-block-deep）。
+   上排：左邊品牌（原語＋標語），右邊頁尾連結；下排隔一條細線，放版權聲明。
    所有顏色走語意層，深色主題會自動換。 */
 
 .yy-footer {
   max-width: 1200px;
   margin: 120px auto 0;
-  padding: 28px 16px 22px;
+  padding: 36px 32px 24px;
   background: var(--yy-calm-block-deep);
   color: var(--yy-calm-block-on);
   /* 深色主題裡石板灰區塊和卡片底色很接近，頂端留一條邊界，頁尾才分得出來 */
@@ -917,54 +918,79 @@
 .yy-footer__inner {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px 28px;
+  gap: 24px 48px;
+}
+.yy-footer__brand {
+  --yy-footer-brand-size: clamp(1.25rem, 4vw, 1.625rem);
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 .yy-footer__name {
   margin: 0;
   font-family: var(--yy-font-heading);
   font-weight: 700;
-  font-size: clamp(3.4rem, 12vw, 7rem);
-  line-height: 1;
+  /* 品牌名與標語同字級，只靠字重與顏色區分 */
+  font-size: var(--yy-footer-brand-size);
+  line-height: 1.2;
   letter-spacing: 0.1em;
+}
+.yy-footer__dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--yy-calm-block-accent);
+}
+.yy-footer__sub {
+  display: block;
+  font-family: var(--yy-font-heading);
+  font-size: var(--yy-footer-brand-size);
+  line-height: 1.2;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: var(--yy-calm-block-accent);
 }
 .yy-footer__links {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--yy-space-2);
+  gap: 0 var(--yy-space-6);
 }
 .yy-footer__links a {
   display: inline-flex;
   align-items: center;
   min-height: var(--yy-control-md);
-  padding: 0 var(--yy-space-4);
   color: var(--yy-calm-block-on);
-  border: 1px solid var(--yy-calm-block-on);
-  border-radius: 2px;
   font-size: var(--yy-text-sm);
   font-weight: 700;
   text-decoration: none;
-  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
+  /* 平常就有一條淡底線，連結不只靠位置辨識；hover 換成銅色 */
+  border-bottom: 2px solid color-mix(in srgb, var(--yy-calm-block-on) 35%, transparent);
+  transition: border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
 }
 .yy-footer__links a:active {
   transform: scale(var(--yy-ui-press));
 }
 @media (hover: hover) and (pointer: fine) {
   .yy-footer__links a:hover {
-    background: var(--yy-calm-block-on);
-    color: var(--yy-calm-block-deep);
+    border-bottom-color: var(--yy-calm-block-accent);
+    color: var(--yy-calm-block-accent);
   }
 }
-.yy-footer__sub {
-  display: block;
-  width: 100%;
+.yy-footer__legal {
+  margin: 28px 0 0;
+  padding-top: 16px;
+  /* 淺色主題的 --yy-calm-line 在深石板灰上幾乎看不見，改用象牙白的淡色 */
+  border-top: 1px solid color-mix(in srgb, var(--yy-calm-block-on) 28%, transparent);
   font-size: var(--yy-text-sm);
-  font-weight: 500;
+  line-height: 1.7;
+  text-align: center;
 }
 @media (prefers-reduced-motion: reduce) {
   .yy-footer__links a {
-    transition-property: color, background-color;
+    transition-property: color, border-color;
   }
   .yy-footer__links a:active {
     transform: none;
