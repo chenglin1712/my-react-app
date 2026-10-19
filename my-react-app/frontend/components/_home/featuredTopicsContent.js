@@ -1,5 +1,3 @@
-import { isExternalUrl } from "../ui/externalUrl";
-
 const MAX_TOPICS = 3;
 
 const cleanText = (value) => (typeof value === "string" ? value.trim() : "");
@@ -13,18 +11,8 @@ const safeImageUrl = (value) => {
     return null;
 };
 
-// 站內路由用 react-router 的 Link，http(s) 網址另開新視窗，其餘（空字串、javascript: 等）不是連結
-const classifyLink = (value) => {
-    const url = cleanText(value);
-    if (isExternalUrl(url)) return { href: url, external: true };
-    if (url.startsWith("/") && !url.startsWith("//") && !url.includes("\\")) return { href: url, external: false };
-    return null;
-};
-
-// 有文章頁的專題，卡片連到站內文章頁（/topics/<id>）；沒有內文才退回後台手填的連結
-const articleLink = (item) => (item.has_article === true && Number.isInteger(item.id)
-    ? { href: `/topics/${item.id}`, external: false }
-    : null);
+// 每個已發布的專題都有自己的文章頁（/topics/<id>），卡片一律連過去；沒有整數 id 的資料不能點
+const articleLink = (item) => (Number.isInteger(item.id) ? { href: `/topics/${item.id}`, external: false } : null);
 
 /**
  * 公開端點 /adminapi/public/featured-topics/ 的回應 → 前台要畫的專題清單。
@@ -41,7 +29,7 @@ export function pickFeaturedTopics(raw) {
             summary: cleanText(item.summary),
             categoryLabel: cleanText(item.category_label),
             imageUrl: safeImageUrl(item.image_url),
-            link: articleLink(item) ?? classifyLink(item.link_url),
+            link: articleLink(item),
         }));
 }
 

@@ -609,7 +609,7 @@ class PublicEndpointTest(Base):
         self.act(pending, "submit", role=EDITOR)
         items = self.client.get(PUBLIC_URL).json()["items"]
         self.assertEqual([i["id"] for i in items], [a, b, c])
-        self.assertEqual(set(items[2]), {"id", "title", "summary", "image_url", "link_url", "category_label", "has_article"})
+        self.assertEqual(set(items[2]), {"id", "title", "summary", "image_url", "category_label"})
         self.assertEqual(items[2]["image_url"], IMG)
         self.assertEqual(items[0]["summary"], "")  # 空值照實輸出，前台不放示意文字
 
@@ -645,25 +645,125 @@ class PublicEndpointTest(Base):
             self.assertNotIn(leaked, text)
 
 
+IMG_OK = "https://res.cloudinary.com/democloud/image/upload/v1/body.jpg"
+
+
+def _text(value, *marks):
+    node = {"type": "text", "text": value}
+    if marks:
+        node["marks"] = [{"type": m} if isinstance(m, str) else m for m in marks]
+    return node
+
+
+def _doc(*blocks):
+    return {"type": "doc", "content": list(blocks)}
+
+
+def _p(*inline):
+    return {"type": "paragraph", "content": list(inline)}
+
+
+GOOD_DOC = _doc(
+    {"type": "heading", "attrs": {"level": 2}, "content": [_text("小標")]},
+    _p(_text("第一段，", "bold"), _text("連結", {"type": "link", "attrs": {"href": "https://example.org/x", "target": "_blank", "rel": "noopener noreferrer nofollow", "class": None, "title": None}})),
+    {"type": "bulletList", "content": [{"type": "listItem", "content": [_p(_text("項目"))]}]},
+    {"type": "blockquote", "content": [_p(_text("引用"))]},
+    {"type": "horizontalRule"},
+    {"type": "image", "attrs": {"src": IMG_OK, "alt": "替代文字", "title": "圖說"}},
+)
+
+
+class ArticleDocValidationTest(TestCase):
+    """富文字內容（TipTap 文件樹）的白名單驗證：只有白名單內的節點、屬性、網址存得進來。"""
+
+    def _topic(self, content):
+        return FeaturedTopic(title="專題標題", created_by="u", content=content)
+
+    def assertInvalid(self, content, label=""):
+        with self.subTest(label or str(content)[:60]):
+            with self.assertRaises(ValidationError):
+                self._topic(content).full_clean()
+
+    def test_empty_and_full_valid(self):
+        self._topic({}).full_clean()
+        self._topic(_doc()).full_clean()
+        self._topic(GOOD_DOC).full_clean()
+
+    def test_rejects_non_document_shapes(self):
+        for value in ("文字", 3, {"type": "paragraph"}, {"type": "doc", "content": "x"}, {"type": "doc", "content": [3]}):
+            self.assertInvalid(value)
+
+    def test_rejects_unknown_nodes_marks_and_attributes(self):
+        self.assertInvalid(_doc({"type": "script", "content": []}), "未知節點")
+        self.assertInvalid(_doc({"type": "codeBlock", "content": []}), "未開放節點")
+        self.assertInvalid(_doc(_p(_text("x", "code"))), "未開放的樣式")
+        self.assertInvalid(_doc({"type": "paragraph", "attrs": {"style": "color:red"}}), "段落多出屬性")
+        self.assertInvalid(_doc(_p(_text("x", {"type": "link", "attrs": {"href": "/a", "onclick": "x"}}))), "連結多出屬性")
+
+    def test_heading_levels_only_two_and_three(self):
+        for level in (1, 4, 6, "2", None):
+            self.assertInvalid(_doc({"type": "heading", "attrs": {"level": level}, "content": [_text("x")]}), f"level={level}")
+        _ = self._topic(_doc({"type": "heading", "attrs": {"level": 3}, "content": [_text("x")]})).full_clean()
+
+    def test_links_only_internal_paths_and_https(self):
+        for href in ("javascript:alert(1)", "http://example.org", "//evil.example", "data:text/html,x", "mailto:a@b.c", "", "https://u:p@example.org"):
+            self.assertInvalid(_doc(_p(_text("x", {"type": "link", "attrs": {"href": href}}))), href)
+        for href in ("/quiz/select", "https://example.org/a?b=1"):
+            self._topic(_doc(_p(_text("x", {"type": "link", "attrs": {"href": href}})))).full_clean()
+
+    def test_images_only_cloudinary_https_with_limits(self):
+        for src in ("http://res.cloudinary.com/a.jpg", "https://example.com/a.jpg", "data:image/png;base64,AAAA", "javascript:alert(1)", "", None):
+            self.assertInvalid(_doc({"type": "image", "attrs": {"src": src}}), str(src))
+        self.assertInvalid(_doc({"type": "image", "attrs": {"src": IMG_OK, "alt": "字" * 201}}), "alt 過長")
+        self.assertInvalid(_doc({"type": "image", "attrs": {"src": IMG_OK, "title": "字" * 121}}), "圖說過長")
+        self.assertInvalid(_doc({"type": "image", "attrs": {"src": IMG_OK, "alt": "兩行\n文字"}}), "alt 換行")
+        self.assertInvalid(_doc({"type": "image", "attrs": {"src": IMG_OK, "width": 10}}), "多出屬性")
+        too_many = _doc(*[{"type": "image", "attrs": {"src": IMG_OK}} for _ in range(41)])
+        self.assertInvalid(too_many, "超過 40 張圖")
+
+    def test_text_rules_control_characters_and_invisible(self):
+        for bad in ("含\x00空位元組", "兩行\n文字", "含​零寬", "前‮後"):
+            self.assertInvalid(_doc(_p(_text(bad))), repr(bad))
+
+    def test_structure_rules_nesting_depth_and_size(self):
+        self.assertInvalid(_doc({"type": "bulletList", "content": [_p(_text("x"))]}), "清單裡直接放段落")
+        self.assertInvalid(_doc(_p({"type": "paragraph", "content": []})), "段落裡放段落")
+        self.assertInvalid(_doc({"type": "horizontalRule", "content": [_p()]}), "葉節點有子節點")
+        deep = _p(_text("x"))
+        for _ in range(10):
+            deep = {"type": "blockquote", "content": [deep]}
+        self.assertInvalid(_doc(deep), "巢狀過深")
+        self.assertInvalid(_doc(*[_p(_text("字" * 500)) for _ in range(101)]), "文字超過 50000 字")
+        self.assertInvalid(_doc(*[_p() for _ in range(5001)]), "節點過多")
+
+    def test_extremely_deep_nesting_is_rejected_not_a_server_error(self):
+        deep = {"type": "paragraph"}
+        for _ in range(200):
+            deep = {"type": "blockquote", "content": [deep]}
+        self.assertInvalid(_doc(deep), "極深巢狀")
+
+    def test_link_default_attributes_are_limited(self):
+        for key in ("rel", "class", "title"):
+            self.assertInvalid(_doc(_p(_text("x", {"type": "link", "attrs": {"href": "/a", key: "字" * 201}}))), f"{key} 過長")
+            self.assertInvalid(_doc(_p(_text("x", {"type": "link", "attrs": {"href": "/a", key: "兩行\n文字"}}))), f"{key} 換行")
+
+    def test_ordered_list_attributes(self):
+        item = {"type": "listItem", "content": [_p(_text("x"))]}
+        self._topic(_doc({"type": "orderedList", "attrs": {"start": 3}, "content": [item]})).full_clean()
+        for attrs in ({"start": 0}, {"start": "3"}, {"start": True}, {"type": "x"}):
+            self.assertInvalid(_doc({"type": "orderedList", "attrs": attrs, "content": [item]}), str(attrs))
+
+
 class ArticleFieldsTest(TestCase):
-    """專題文章頁的欄位：內文、作者／來源、圖說。"""
+    """作者／來源、圖說欄位。"""
 
     def _topic(self, **kwargs):
         data = {"title": "專題標題", "created_by": "u"}
         data.update(kwargs)
         return FeaturedTopic(**data)
 
-    def test_body_allows_newlines_and_limits_length(self):
-        self._topic(body="第一段\n\n## 小標\n第二段", source_label="編輯部", image_caption="圖說").full_clean()
-        self._topic(body="字" * 20000).full_clean()
-        with self.assertRaises(ValidationError):
-            self._topic(body="字" * 20001).full_clean()
-
-    def test_body_rejects_control_characters(self):
-        with self.assertRaises(ValidationError):
-            self._topic(body="含\x00空位元組").full_clean()
-
     def test_source_and_caption_are_single_line_with_limits(self):
+        self._topic(source_label="編輯部", image_caption="圖說").full_clean()
         for kwargs in ({"source_label": "字" * 31}, {"source_label": "兩行\n文字"},
                        {"image_caption": "字" * 81}, {"image_caption": "兩行\n文字"}):
             with self.subTest(**kwargs):
@@ -675,9 +775,9 @@ class PublicArticleTest(Base):
     def url(self, pk):
         return f"{PUBLIC_URL}{pk}/"
 
-    def test_published_topic_with_body_returns_reading_fields_only(self):
+    def test_published_topic_returns_reading_fields_only(self):
         pk = self.publish(
-            title="織紋裡的語言", summary="導言", body="第一段\n\n## 小標\n第二段", category_label="專題",
+            title="織紋裡的語言", summary="導言", content=GOOD_DOC, category_label="專題",
             source_label="編輯部", image_url=IMG, image_caption="織布的手",
         )
         response = self.client.get(self.url(pk))
@@ -685,30 +785,35 @@ class PublicArticleTest(Base):
         data = response.json()
         self.assertEqual(set(data), {
             "id", "title", "summary", "image_url", "image_caption", "category_label",
-            "source_label", "body", "published_at",
+            "source_label", "content", "published_at",
         })
-        self.assertEqual(data["body"], "第一段\n\n## 小標\n第二段")
+        self.assertEqual(data["content"], GOOD_DOC)
         self.assertRegex(data["published_at"], r"^\d{4}-\d{2}-\d{2}$")
         self.assertEqual(response["Cache-Control"], "no-cache")
         for leaked in ("created_by", "reviewed_by", "review_comment", "submitted", "link_url", "status"):
             self.assertNotIn(leaked, response.content.decode())
 
-    def test_not_published_or_deleted_or_empty_body_is_404(self):
-        draft = self.create(title="草稿", body="內文")
-        pending = self.create(title="待審", body="內文")
+    def test_every_published_topic_has_its_own_page_even_without_content(self):
+        pk = self.publish(title="只有標題")
+        data = self.client.get(self.url(pk)).json()
+        self.assertEqual((data["id"], data["title"]), (pk, "只有標題"))
+        self.assertEqual(data["content"], {})
+
+    def test_not_published_or_deleted_is_404(self):
+        draft = self.create(title="草稿", content=GOOD_DOC)
+        pending = self.create(title="待審", content=GOOD_DOC)
         self.act(pending, "submit", role=EDITOR)
-        no_body = self.publish(title="沒內文")
-        unpublished = self.publish(title="已下架", body="內文")
+        unpublished = self.publish(title="已下架", content=GOOD_DOC)
         self.act(unpublished, "unpublish")
         deleted = FeaturedTopic.objects.create(
-            title="已刪", created_by="u", status="published", body="內文", deleted_at="2026-01-01T00:00:00Z",
+            title="已刪", created_by="u", status="published", deleted_at="2026-01-01T00:00:00Z",
         )
-        for pk in (draft, pending, no_body, unpublished, deleted.pk, 999999):
+        for pk in (draft, pending, unpublished, deleted.pk, 999999):
             with self.subTest(pk=pk):
                 self.assertEqual(self.client.get(self.url(pk)).status_code, 404)
 
     def test_unpublish_then_republish_toggles_article(self):
-        pk = self.publish(title="專題", body="內文")
+        pk = self.publish(title="專題", content=GOOD_DOC)
         self.assertEqual(self.client.get(self.url(pk)).status_code, 200)
         self.act(pk, "unpublish")
         self.assertEqual(self.client.get(self.url(pk)).status_code, 404)
@@ -718,31 +823,44 @@ class PublicArticleTest(Base):
     def test_article_of_a_fourth_published_topic_stays_readable_while_home_shows_three(self):
         # 資料不一致時（已發布超過 3 筆），已分享出去的文章連結不能因為排序而失效
         topics = [
-            FeaturedTopic.objects.create(title=f"專題{i}", created_by="u", status="published", sort_order=i, body="內文")
+            FeaturedTopic.objects.create(title=f"專題{i}", created_by="u", status="published", sort_order=i)
             for i in range(5)
         ]
         self.assertEqual(self.client.get(self.url(topics[4].pk)).status_code, 200)
         self.assertEqual(len(self.client.get(PUBLIC_URL).json()["items"]), 3)
 
     def test_only_get_is_allowed(self):
-        pk = self.publish(title="專題", body="內文")
+        pk = self.publish(title="專題")
         self.assertEqual(self.client.post(self.url(pk)).status_code, 405)
 
-    def test_list_flags_which_cards_have_an_article_without_sending_the_body(self):
-        with_body = self.publish(title="有文章", body="內文", sort_order=1)
-        without = self.publish(title="沒文章", sort_order=2)
-        blank = self.publish(title="只有空白", body="   \n ", sort_order=3)
-        items = {i["id"]: i for i in self.client.get(PUBLIC_URL).json()["items"]}
-        self.assertTrue(items[with_body]["has_article"])
-        self.assertFalse(items[without]["has_article"])
-        self.assertFalse(items[blank]["has_article"])
-        self.assertNotIn("body", items[with_body])
+    def test_list_does_not_send_article_content(self):
+        pk = self.publish(title="有文章", content=GOOD_DOC)
+        item = next(i for i in self.client.get(PUBLIC_URL).json()["items"] if i["id"] == pk)
+        self.assertNotIn("content", item)
+        self.assertNotIn("link_url", item)
+
+    def test_api_rejects_unsafe_content_on_create_and_edit(self):
+        bad = _doc(_p(_text("x", {"type": "link", "attrs": {"href": "javascript:alert(1)"}})))
+        response = self.call("post", ADMIN_URL, _body(content=bad), role=EDITOR)
+        self.assertEqual(response.status_code, 400)
+        pk = self.create(title="專題", content=GOOD_DOC)
+        response = self.call("patch", f"{ADMIN_URL}{pk}/", {"content": _doc({"type": "script"})}, role=EDITOR)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(FeaturedTopic.objects.get(pk=pk).content, GOOD_DOC)
 
     def test_editing_published_article_goes_through_revision(self):
-        pk = self.publish(title="專題", body="舊內文")
-        response = self.call("post", f"{ADMIN_URL}{pk}/pending-revision/", {"body": "新內文", "source_label": "新來源"}, role=EDITOR)
+        old = _doc(_p(_text("舊內文")))
+        new = _doc(_p(_text("新內文")))
+        pk = self.publish(title="專題", content=old)
+        response = self.call("post", f"{ADMIN_URL}{pk}/pending-revision/", {"content": new, "source_label": "新來源"}, role=EDITOR)
         self.assertIn(response.status_code, (200, 201), response.content)
-        self.assertEqual(self.client.get(self.url(pk)).json()["body"], "舊內文")
+        self.assertEqual(self.client.get(self.url(pk)).json()["content"], old)
         self.assertEqual(self.call("post", f"{ADMIN_URL}{pk}/pending-revision/approve/", {"review_comment": "ok"}).status_code, 200)
         data = self.client.get(self.url(pk)).json()
-        self.assertEqual((data["body"], data["source_label"]), ("新內文", "新來源"))
+        self.assertEqual((data["content"], data["source_label"]), (new, "新來源"))
+
+    def test_revision_with_unsafe_content_is_rejected(self):
+        pk = self.publish(title="專題", content=GOOD_DOC)
+        bad = _doc({"type": "image", "attrs": {"src": "https://evil.example/a.jpg"}})
+        response = self.call("post", f"{ADMIN_URL}{pk}/pending-revision/", {"content": bad}, role=EDITOR)
+        self.assertEqual(response.status_code, 400, response.content)

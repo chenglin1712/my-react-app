@@ -310,7 +310,7 @@ def public_featured_topic_detail(request, pk):
     if limited_resp:
         return limited_resp
     topic = FeaturedTopic.live.filter(pk=pk, status=FeaturedTopic.STATUS_PUBLISHED).first()
-    if topic is None or not topic.body.strip():
+    if topic is None:
         return JsonResponse({"detail": "找不到這篇專題"}, status=404)
     response = JsonResponse(PublicFeaturedTopicDetailSerializer(topic).data)
     response["Cache-Control"] = "no-cache"

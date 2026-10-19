@@ -80,7 +80,7 @@ class FeaturedTopicSerializer(serializers.ModelSerializer):
         model = FeaturedTopic
         fields = [
             'id', 'title', 'summary', 'image_url', 'image_caption', 'link_url', 'category_label',
-            'source_label', 'body', 'sort_order',
+            'source_label', 'content', 'sort_order',
             'status', 'created_by', 'submitted_by', 'submitted_at', 'reviewed_by', 'reviewed_at',
             'review_comment', 'created_at', 'updated_at',
         ]
@@ -91,16 +91,11 @@ class FeaturedTopicSerializer(serializers.ModelSerializer):
 
 
 class PublicFeaturedTopicSerializer(serializers.ModelSerializer):
-    """公開首頁用：不輸出任何狀態、審核者或建立者資訊。清單不帶內文（體積），只告訴前台有沒有文章頁。"""
-
-    has_article = serializers.SerializerMethodField()
+    """公開首頁用：不輸出任何狀態、審核者或建立者資訊。清單不帶文章內容（體積）；每張卡都連到 /topics/<id>。"""
 
     class Meta:
         model = FeaturedTopic
-        fields = ['id', 'title', 'summary', 'image_url', 'link_url', 'category_label', 'has_article']
-
-    def get_has_article(self, obj):
-        return bool(obj.body.strip())
+        fields = ['id', 'title', 'summary', 'image_url', 'category_label']
 
 
 class PublicFeaturedTopicDetailSerializer(serializers.ModelSerializer):
@@ -112,7 +107,7 @@ class PublicFeaturedTopicDetailSerializer(serializers.ModelSerializer):
         model = FeaturedTopic
         fields = [
             'id', 'title', 'summary', 'image_url', 'image_caption', 'category_label',
-            'source_label', 'body', 'published_at',
+            'source_label', 'content', 'published_at',
         ]
 
     def get_published_at(self, obj):

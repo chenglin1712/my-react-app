@@ -49,6 +49,3 @@
   .featured-topics-heading .btn, .featured-topics-editor .btn { transition: none; }
   .featured-topics-heading .btn:active:not(:disabled), .featured-topics-editor .btn:active:not(:disabled) { transform: none; }
 }
-
-/* 內文：長文字，等寬以外的字型維持跟表單一致，行高放寬好讀 */
-.featured-topics-body { min-height: 260px; line-height: 1.8; resize: vertical; }

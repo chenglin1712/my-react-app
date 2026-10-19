@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { formatArticleDate, parseArticleBody } from "../../components/_topic/articleContent";
+import RichTextRenderer from "../../components/_topic/RichTextRenderer";
+import { formatArticleDate } from "../../components/_topic/richText";
 import { SITE_NAME } from "../routeMeta";
 import "../../static/css/_topic/index.css";
 
@@ -75,7 +76,6 @@ const TopicPage = () => {
         );
     }
 
-    const blocks = parseArticleBody(topic.body);
     const date = formatArticleDate(topic.published_at);
     const showImage = topic.image_url && !imageFailed;
 
@@ -103,11 +103,7 @@ const TopicPage = () => {
                 )}
 
                 <div className="tpage-body">
-                    {blocks.map((block, index) => (
-                        block.type === "h2"
-                            ? <h2 key={index}>{block.text}</h2>
-                            : <p key={index}>{block.text}</p>
-                    ))}
+                    <RichTextRenderer doc={topic.content} />
                 </div>
 
                 <footer className="tpage-foot">

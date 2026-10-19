@@ -24,12 +24,18 @@ describe("專題文章頁樣式", () => {
     expect(find(".tpage-head").body).toMatch(/border-bottom:\s*3px double/);
   });
 
-  it("內文字級至少 18px、行高至少 1.9，保留段內換行並允許長字串折行", () => {
-    const body = find(".tpage-body p").body;
-    expect(body).toMatch(/font-size:\s*1\.125rem/);
-    expect(Number(/line-height:\s*([\d.]+)/.exec(body)[1])).toBeGreaterThanOrEqual(1.9);
-    expect(body).toMatch(/white-space:\s*pre-line/);
-    expect(body).toMatch(/overflow-wrap:\s*anywhere/);
+  it("內文字級至少 18px、行高至少 1.9，清單同樣好讀，長字串自動折行", () => {
+    for (const selector of [".tpage-body p", ".tpage-body ul, .tpage-body ol"]) {
+      const body = find(selector).body;
+      expect(body, selector).toMatch(/font-size:\s*1\.125rem/);
+      expect(Number(/line-height:\s*([\d.]+)/.exec(body)[1]), selector).toBeGreaterThanOrEqual(1.9);
+    }
+    expect(find(".tpage-body p").body).toMatch(/overflow-wrap:\s*anywhere/);
+  });
+
+  it("內文裡的圖片不會超出欄寬，連結有焦點框", () => {
+    expect(find(".tpage-body .rt-figure img").body).toMatch(/width:\s*100%/);
+    expect(find(".tpage-body a:focus-visible").body).toMatch(/outline:\s*var\(--yy-ui-focus-ring\)/);
   });
 
   it("標題與導言、圖說都允許折行，不會撐出橫向捲軸", () => {

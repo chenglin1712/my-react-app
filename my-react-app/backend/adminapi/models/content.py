@@ -15,6 +15,7 @@ from ..validators import (
     validate_promo_video_path,
     validate_single_line,
 )
+from ..article_doc import validate_article_doc
 from ._singleton import SingletonModel
 
 
@@ -392,10 +393,10 @@ class FeaturedTopic(models.Model):
     sort_order = models.PositiveSmallIntegerField(default=0, validators=[MaxValueValidator(99)])
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT)
 
-    # 專題文章頁（卡片點進去看到的內容）。內文是純文字：空一行分段、「## 」開頭的行是小標，
-    # 前台用 React 文字節點輸出，不收 HTML，所以不需要也不做 HTML 清理。
-    # 內文留空 = 這張卡沒有文章頁，卡片只在有填 link_url 時才可點。
-    body = models.TextField(blank=True, validators=[MaxLengthValidator(20000), validate_plain_text])
+    # 專題文章頁（卡片點進去看到的內容）：富文字編輯器（TipTap）產生的文件樹，存成 JSON。
+    # 不存 HTML：只有白名單裡的節點與屬性存得進來（見 article_doc.py），前台逐節點渲染，沒有可注入的字串。
+    # 每個專題都有自己的文章網址 /topics/<id>；內容可以是空的（文章頁只顯示標題、導言與封面圖）。
+    content = models.JSONField(default=dict, blank=True, validators=[validate_article_doc])
     source_label = models.CharField(max_length=30, blank=True, validators=[validate_single_line])
     image_caption = models.CharField(max_length=80, blank=True, validators=[validate_single_line])
 

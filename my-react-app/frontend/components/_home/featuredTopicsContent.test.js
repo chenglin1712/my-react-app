@@ -3,7 +3,7 @@ import { pickFeaturedTopics } from './featuredTopicsContent';
 
 const topic = (id, over) => ({
   id, title: `專題${id}`, summary: `摘要${id}`, image_url: `https://res.cloudinary.com/demo/${id}.jpg`,
-  link_url: `https://example.org/${id}`, category_label: '文化', ...over,
+  category_label: '文化', ...over,
 });
 
 describe('pickFeaturedTopics', () => {
@@ -41,42 +41,19 @@ describe('pickFeaturedTopics', () => {
     });
   });
 
-  test('連結：站內路徑、外部網址、不能用的三種', () => {
-    const cases = [
-      ['/quiz/select', { href: '/quiz/select', external: false }],
-      ['https://example.org/x', { href: 'https://example.org/x', external: true }],
-      ['  http://example.org/x  ', { href: 'http://example.org/x', external: true }],
-      ['//evil.example', null],
-      ['javascript:alert(1)', null],
-      ['quiz/select', null],
-      ['', null],
-      [undefined, null],
-    ];
-    cases.forEach(([input, expected]) => {
-      const [t] = pickFeaturedTopics({ items: [topic(1, { link_url: input })] });
-      expect(t.link, String(input)).toEqual(expected);
-    });
+  test('每張卡都連到自己的文章頁 /topics/<id>（站內連結）', () => {
+    const [a, b] = pickFeaturedTopics({ items: [topic(7), topic(12)] });
+    expect(a.link).toEqual({ href: '/topics/7', external: false });
+    expect(b.link).toEqual({ href: '/topics/12', external: false });
   });
 
-  test('有文章頁的專題連到站內文章頁，優先於手填的連結；沒有文章才用手填連結', () => {
-    const [withArticle, withoutArticle, noLink] = pickFeaturedTopics({
-      items: [
-        topic(7, { has_article: true, link_url: 'https://example.org/other' }),
-        topic(8, { has_article: false, link_url: 'https://example.org/other' }),
-        topic(9, { has_article: false, link_url: '' }),
-      ],
+  test('後端若還送舊的 link_url 也不會被採用；id 不是整數就不能點', () => {
+    const [a, b, c] = pickFeaturedTopics({
+      items: [topic(1, { link_url: 'https://example.org/other' }), topic('7'), { title: '無 id' }],
     });
-    expect(withArticle.link).toEqual({ href: '/topics/7', external: false });
-    expect(withoutArticle.link).toEqual({ href: 'https://example.org/other', external: true });
-    expect(noLink.link).toBeNull();
-  });
-
-  test('has_article 必須是 true 且 id 是整數，字串或缺 id 都不算有文章', () => {
-    const [a, b] = pickFeaturedTopics({
-      items: [topic(1, { has_article: 'true', link_url: '' }), { title: '無 id', has_article: true }],
-    });
-    expect(a.link).toBeNull();
+    expect(a.link).toEqual({ href: '/topics/1', external: false });
     expect(b.link).toBeNull();
+    expect(c.link).toBeNull();
   });
 
   test('沒有 id 時給穩定的備用 key', () => {

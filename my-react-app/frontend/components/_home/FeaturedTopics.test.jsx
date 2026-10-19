@@ -6,7 +6,7 @@ import { pickFeaturedTopics } from './featuredTopicsContent';
 
 const raw = (id, over) => ({
   id, title: `專題${id}`, summary: `摘要${id}`, image_url: `https://res.cloudinary.com/demo/${id}.jpg`,
-  link_url: `https://example.org/${id}`, category_label: '文化', ...over,
+  category_label: '文化', ...over,
 });
 const topics = (n, over) => pickFeaturedTopics({ items: Array.from({ length: n }, (_, i) => raw(i + 1, over)) });
 const renderTopics = (list) => render(<MemoryRouter><FeaturedTopics topics={list} /></MemoryRouter>);
@@ -38,25 +38,26 @@ describe('首頁本期專題', () => {
     });
   });
 
-  test('外部連結：另開新視窗並附報讀器提示，整張卡共用標題連結', () => {
-    renderTopics(topics(1));
-    const link = screen.getByRole('link', { name: /專題1/ });
+  test('每張卡連到自己的文章頁：站內連結，不另開視窗', () => {
+    renderTopics(topics(2));
+    const link = screen.getByRole('link', { name: '專題1' });
+    expect(link).toHaveAttribute('href', '/topics/1');
+    expect(link).not.toHaveAttribute('target');
+    expect(screen.getByRole('link', { name: '專題2' })).toHaveAttribute('href', '/topics/2');
+    expect(document.querySelector('.topic-title--linked')).not.toBeNull();
+  });
+
+  test('外部連結（元件仍支援）：另開新視窗並附報讀器提示', () => {
+    renderTopics([{ key: 1, title: '外部專題', summary: '', categoryLabel: '', imageUrl: null, link: { href: 'https://example.org/1', external: true } }]);
+    const link = screen.getByRole('link', { name: /外部專題/ });
     expect(link).toHaveAttribute('href', 'https://example.org/1');
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
     expect(link).toHaveTextContent('（另開新視窗）');
-    expect(screen.getAllByRole('link')).toHaveLength(1);
   });
 
-  test('站內路徑：用 react-router 的連結，不另開視窗', () => {
-    renderTopics(pickFeaturedTopics({ items: [raw(1, { link_url: '/quiz/select' })] }));
-    const link = screen.getByRole('link', { name: '專題1' });
-    expect(link).toHaveAttribute('href', '/quiz/select');
-    expect(link).not.toHaveAttribute('target');
-  });
-
-  test('沒有可用連結：標題是純文字，不是連結', () => {
-    renderTopics(pickFeaturedTopics({ items: [raw(1, { link_url: '' }), raw(2, { link_url: 'javascript:alert(1)' })] }));
+  test('資料沒有 id 時不能點：標題是純文字，不是連結', () => {
+    renderTopics(pickFeaturedTopics({ items: [{ title: '專題1' }, { title: '專題2' }] }));
     expect(screen.queryByRole('link')).toBeNull();
     expect(screen.getByRole('heading', { level: 3, name: '專題1' })).toBeInTheDocument();
     expect(document.querySelector('.topic-title--linked')).toBeNull();

@@ -108,9 +108,67 @@
     font-size: 1.125rem;
     line-height: 2;
     letter-spacing: 0.02em;
-    /* 段內的單一換行照樣顯示（詩、地址、清單），長字串與網址自動折行 */
-    white-space: pre-line;
     overflow-wrap: anywhere;
+}
+
+.tpage-body ul,
+.tpage-body ol {
+    margin: 0 0 1.5em;
+    padding-left: 1.6em;
+    font-size: 1.125rem;
+    line-height: 2;
+}
+
+.tpage-body li > p {
+    margin: 0;
+}
+
+.tpage-body blockquote {
+    margin: 0 0 1.5em;
+    padding: 4px 0 4px 20px;
+    border-left: 4px solid var(--yy-calm-line);
+    color: var(--yy-calm-text-sub);
+}
+
+.tpage-body blockquote p:last-child {
+    margin-bottom: 0;
+}
+
+.tpage-body hr {
+    margin: 2.5em 0;
+    border: 0;
+    border-top: 1px solid var(--yy-calm-line);
+    opacity: 1;
+}
+
+.tpage-body a {
+    color: var(--yy-calm-text);
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+.tpage-body a:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+.tpage-body .rt-figure {
+    margin: 2em 0;
+}
+
+.tpage-body .rt-figure img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+}
+
+.tpage-body .rt-figure figcaption {
+    margin-top: 8px;
+    color: var(--yy-calm-text-sub);
+    font-size: var(--yy-text-sm);
+    line-height: 1.6;
 }
 
 .tpage-body h2 {
@@ -122,6 +180,16 @@
     font-weight: 700;
     line-height: 1.5;
     letter-spacing: 0.05em;
+    overflow-wrap: anywhere;
+}
+
+.tpage-body h3 {
+    margin: 1.75em 0 0.5em;
+    font-family: var(--yy-font-heading);
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.5;
+    letter-spacing: 0.04em;
     overflow-wrap: anywhere;
 }
 

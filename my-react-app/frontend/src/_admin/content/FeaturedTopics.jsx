@@ -8,12 +8,14 @@ import { useActionLock } from '../hooks/useActionLock';
 import { useGuardedSelection } from '../hooks/useGuardedSelection';
 import { countChars, formatApiError } from '../apiErrors';
 import { AdminEmptyStage } from '../components/AdminEmpty';
+import RichTextEditor from '../components/RichTextEditor';
+import { countDocText, hasDocContent } from '../../../components/_topic/richText';
 import '../../../static/css/_admin/featured-topics.css';
 
 const CONTENT_EDITORS = ['owner', 'admin', 'editor'];
 const PUBLISHERS = ['owner', 'admin'];
 const MAX_PUBLISHED = 3;
-const LIMITS = { title: 40, summary: 120, category: 12, source: 30, caption: 80, body: 20000 };
+const LIMITS = { title: 40, summary: 120, category: 12, source: 30, caption: 80, body: 50000 };
 const EDITABLE_STATUSES = ['draft', 'rejected', 'unpublished'];
 const STATUSES = {
     draft: { label: '草稿', bg: 'secondary' },
@@ -27,16 +29,15 @@ const formOf = (topic) => ({
     title: topic?.title ?? '',
     summary: topic?.summary ?? '',
     image_url: topic?.image_url ?? '',
-    link_url: topic?.link_url ?? '',
     category_label: topic?.category_label ?? '',
     sort_order: topic?.sort_order ?? 0,
     image_caption: topic?.image_caption ?? '',
     source_label: topic?.source_label ?? '',
-    body: topic?.body ?? '',
+    content: topic?.content ?? {},
 });
 
-// 與後端 validate_hero_link_url 同一個意思：站內路徑（/ 開頭且不是 //）或 https 網址。後端是最終判斷。
-const linkLooksValid = (value) => !value || (/^\/(?!\/)/.test(value) && !value.includes('\\')) || /^https:\/\//i.test(value);
+// 沒有任何可讀內容（只剩空段落）就當作空文章存成 {}，避免「空文件」和「沒有文件」被當成兩種狀態
+const docOf = (content) => (hasDocContent(content) ? content : {});
 
 function validate(form) {
     const errors = {};
@@ -47,9 +48,8 @@ function validate(form) {
     const order = Number(form.sort_order);
     if (countChars(form.source_label.trim()) > LIMITS.source) errors.source_label = `作者／來源最多 ${LIMITS.source} 字`;
     if (countChars(form.image_caption.trim()) > LIMITS.caption) errors.image_caption = `圖說最多 ${LIMITS.caption} 字`;
-    if (countChars(form.body.trim()) > LIMITS.body) errors.body = `內文最多 ${LIMITS.body} 字`;
+    if (countDocText(form.content) > LIMITS.body) errors.content = `內文最多 ${LIMITS.body} 字`;
     if (form.sort_order === '' || !Number.isInteger(order) || order < 0 || order > 99) errors.sort_order = '排序請填 0 到 99 的整數';
-    if (!linkLooksValid(form.link_url.trim())) errors.link_url = '連結請填站內路徑（以 / 開頭）或 https:// 開頭的網址';
     return errors;
 }
 
@@ -65,9 +65,9 @@ function Field({ id, label, hint, error, children }) {
 }
 
 const normalized = (form) => JSON.stringify({
-    ...form, title: form.title.trim(), summary: form.summary.trim(), link_url: form.link_url.trim(),
+    ...form, title: form.title.trim(), summary: form.summary.trim(), content: docOf(form.content),
     category_label: form.category_label.trim(), sort_order: String(form.sort_order),
-    image_caption: form.image_caption.trim(), source_label: form.source_label.trim(), body: form.body.trim(),
+    image_caption: form.image_caption.trim(), source_label: form.source_label.trim(),
 });
 
 function Editor({ topic, role, publishedCount, onChanged, onCreated, onDeleted, onNotice, onStale, onDirtyChange }) {
@@ -84,6 +84,8 @@ function Editor({ topic, role, publishedCount, onChanged, onCreated, onDeleted, 
     const [commentError, setCommentError] = useState('');
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [revisionNote, setRevisionNote] = useState(false);
+    // 編輯器只在掛載時載入內容；載入待審修改後換 key 重新掛載，編輯器才會顯示修改後的內容
+    const [editorKey, setEditorKey] = useState(0);
     const media = useMediaUpload({ resetKey: topic?.id ?? 'new' });
     const uploading = Boolean(media.uploadingKey);
     const lock = useActionLock();
@@ -110,6 +112,7 @@ function Editor({ topic, role, publishedCount, onChanged, onCreated, onDeleted, 
                 setBaseline(formOf({ ...topic, ...revision.payload }));
                 media.setPreview('image', revision.payload.image_url ?? topic.image_url ?? '');
                 setRevisionNote(true);
+                setEditorKey((n) => n + 1);
             } catch (err) {
                 if (err.status !== 404 && active) setError(formatApiError(err));
             }
@@ -122,12 +125,11 @@ function Editor({ topic, role, publishedCount, onChanged, onCreated, onDeleted, 
         title: form.title.trim(),
         summary: form.summary.trim(),
         image_url: form.image_url,
-        link_url: form.link_url.trim(),
         category_label: form.category_label.trim(),
         sort_order: Number(form.sort_order),
         image_caption: form.image_caption.trim(),
         source_label: form.source_label.trim(),
-        body: form.body.trim(),
+        content: docOf(form.content),
     });
 
     const run = (key, task) => {
@@ -284,20 +286,23 @@ function Editor({ topic, role, publishedCount, onChanged, onCreated, onDeleted, 
                             onChange={(e) => update('source_label', e.target.value)} />
                     </Field>
                 </div>
-                <Field id="topic-body" label="內文" error={fieldError('body')}
-                    hint={`選填，這是點進卡片後的文章。空一行就是新的一段，以「## 」開頭的一行是小標。留白則這張卡沒有文章頁。最多 ${LIMITS.body} 字（目前 ${countChars(form.body.trim())} 字）。`}>
-                    <Form.Control as="textarea" rows={14} value={form.body} disabled={fieldsLocked}
-                        className="featured-topics-body"
-                        isInvalid={Boolean(fieldError('body'))} aria-invalid={Boolean(fieldError('body'))}
-                        aria-describedby={describedBy('topic-body', 'body')}
-                        onChange={(e) => update('body', e.target.value)} />
-                </Field>
-                <Field id="topic-link" label="改連到其他網址" error={fieldError('link_url')}
-                    hint="選填。有填內文時，點卡片會前往文章頁，這裡不會生效；只有沒寫內文時，卡片才會連到這個站內路徑（以 / 開頭）或 https:// 網址。兩者都沒有時卡片不能點。">
-                    <Form.Control value={form.link_url} disabled={fieldsLocked} isInvalid={Boolean(fieldError('link_url'))}
-                        aria-invalid={Boolean(fieldError('link_url'))} aria-describedby={describedBy('topic-link', 'link_url')}
-                        onChange={(e) => update('link_url', e.target.value)} placeholder="/quiz/select 或 https://example.com" />
-                </Field>
+                <Form.Group className="featured-topics-field" controlId="topic-content">
+                    <Form.Label id="topic-content-label">內文</Form.Label>
+                    <RichTextEditor
+                        key={editorKey}
+                        value={form.content}
+                        disabled={fieldsLocked}
+                        media={media}
+                        labelledBy="topic-content-label"
+                        describedBy={describedBy('topic-content', 'content')}
+                        onChange={(doc) => update('content', doc)}
+                    />
+                    {fieldError('content') && <p className="featured-topics-error" id="topic-content-error" role="alert">{fieldError('content')}</p>}
+                    <Form.Text id="topic-content-hint">
+                        點進卡片後讀者看到的文章，用上方工具列排版（標題、粗體、清單、引用、連結），也可以插入圖片（最大 5 MB）。
+                        每個專題發布後都有自己的網址。選填，沒寫時文章頁只顯示標題、導言與封面圖。目前 {countDocText(form.content)} 字（最多 {LIMITS.body} 字）。
+                    </Form.Text>
+                </Form.Group>
 
                 {canEdit && status !== 'pending_review' && (
                     <div className="featured-topics-actions">

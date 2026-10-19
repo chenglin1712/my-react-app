@@ -6,7 +6,18 @@ import TopicPage from './index';
 const ARTICLE = {
   id: 7, title: '織紋裡的語言', summary: '一段導言', image_url: 'https://res.cloudinary.com/demo/a.jpg',
   image_caption: '織布的手', category_label: '專題', source_label: '編輯部',
-  body: '第一段\n\n## 小標\n第二段第一行\n第二段第二行', published_at: '2026-10-09',
+  published_at: '2026-10-09',
+  content: {
+    type: 'doc',
+    content: [
+      { type: 'paragraph', content: [{ type: 'text', text: '第一段' }] },
+      { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: '小標' }] },
+      { type: 'paragraph', content: [{ type: 'text', text: '第二段第一行' }, { type: 'hardBreak' }, { type: 'text', text: '粗體字', marks: [{ type: 'bold' }] }] },
+      { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: '項目一' }] }] }] },
+      { type: 'blockquote', content: [{ type: 'paragraph', content: [{ type: 'text', text: '一句引用' }] }] },
+      { type: 'image', attrs: { src: 'https://res.cloudinary.com/demo/body.jpg', alt: '內文圖', title: '內文圖說' } },
+    ],
+  },
 };
 
 const renderAt = (path = '/topics/7') => render(
@@ -37,22 +48,56 @@ describe('本期專題文章頁', () => {
     expect(screen.getByText('織布的手').tagName).toBe('FIGCAPTION');
     expect(screen.getByRole('heading', { level: 2, name: '小標' })).toBeInTheDocument();
     expect(screen.getByText('第一段')).toBeInTheDocument();
-    expect(container.querySelector('.tpage-body p:last-child').textContent).toBe('第二段第一行\n第二段第二行');
-    expect(document.title).toBe('織紋裡的語言｜源·語');
+    expect(container.querySelector('.tpage-body strong').textContent).toBe('粗體字');
+    expect(container.querySelector('.tpage-body br')).not.toBeNull();
+    expect(screen.getByText('項目一').closest('ul')).not.toBeNull();
+    expect(container.querySelector('.tpage-body blockquote').textContent).toBe('一句引用');
+    expect(screen.getByAltText('內文圖')).toHaveAttribute('src', 'https://res.cloudinary.com/demo/body.jpg');
+    expect(screen.getByText('內文圖說').tagName).toBe('FIGCAPTION');
+    await waitFor(() => expect(document.title).toBe('織紋裡的語言｜源·語'));
   });
 
-  test('內文裡的 HTML 當成純文字顯示，不會被執行', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => respond(200, { ...ARTICLE, body: '<img src=x onerror=alert(1)>' })));
+  test('內文裡的 HTML 當成純文字顯示；不安全的圖片與連結整個略過', async () => {
+    const content = {
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: '<img src=x onerror=alert(1)>' }] },
+        { type: 'paragraph', content: [{ type: 'text', text: '壞連結', marks: [{ type: 'link', attrs: { href: 'javascript:alert(1)' } }] }] },
+        { type: 'image', attrs: { src: 'https://evil.example/a.jpg' } },
+        { type: 'script', content: [] },
+      ],
+    };
+    vi.stubGlobal('fetch', vi.fn(() => respond(200, { ...ARTICLE, content, image_url: '' })));
     const { container } = renderAt();
     expect(await screen.findByText('<img src=x onerror=alert(1)>')).toBeInTheDocument();
     expect(container.querySelector('.tpage-body img')).toBeNull();
+    expect(container.querySelector('.tpage-body a')).toBeNull();
+    expect(screen.getByText('壞連結')).toBeInTheDocument();
+  });
+
+  test('正文裡的連結：站內路徑用路由連結，https 另開新視窗', async () => {
+    const link = (href, text) => ({ type: 'text', text, marks: [{ type: 'link', attrs: { href } }] });
+    const content = { type: 'doc', content: [{ type: 'paragraph', content: [link('/quiz/select', '去測驗'), link('https://example.org/x', '外部')] }] };
+    vi.stubGlobal('fetch', vi.fn(() => respond(200, { ...ARTICLE, content })));
+    renderAt();
+    expect(await screen.findByRole('link', { name: '去測驗' })).toHaveAttribute('href', '/quiz/select');
+    const external = screen.getByRole('link', { name: /外部/ });
+    expect(external).toHaveAttribute('target', '_blank');
+    expect(external).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  test('只有標題沒有內文的專題也有文章頁，只是正文區是空的', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => respond(200, { ...ARTICLE, content: {} })));
+    const { container } = renderAt();
+    expect(await screen.findByRole('heading', { level: 1, name: '織紋裡的語言' })).toBeInTheDocument();
+    expect(container.querySelector('.tpage-body').children.length).toBe(0);
   });
 
   test('沒有圖、導言、署名時對應區塊整個不輸出，不留空框', async () => {
     vi.stubGlobal('fetch', vi.fn(() => respond(200, { ...ARTICLE, image_url: '', summary: '', source_label: '', category_label: '', published_at: '' })));
     const { container } = renderAt();
     await screen.findByRole('heading', { level: 1 });
-    expect(container.querySelector('figure')).toBeNull();
+    expect(container.querySelector('.tpage-figure')).toBeNull();
     expect(container.querySelector('.tpage-lede')).toBeNull();
     expect(container.querySelector('.tpage-byline')).toBeNull();
     expect(container.querySelector('.tpage-kicker')).toBeNull();
@@ -62,8 +107,8 @@ describe('本期專題文章頁', () => {
     vi.stubGlobal('fetch', vi.fn(() => respond(200, ARTICLE)));
     const { container } = renderAt();
     await screen.findByRole('heading', { level: 1 });
-    fireEvent.error(container.querySelector('figure img'));
-    expect(container.querySelector('figure')).toBeNull();
+    fireEvent.error(container.querySelector('.tpage-figure img'));
+    expect(container.querySelector('.tpage-figure')).toBeNull();
     expect(screen.getByText('第一段')).toBeInTheDocument();
   });
 
