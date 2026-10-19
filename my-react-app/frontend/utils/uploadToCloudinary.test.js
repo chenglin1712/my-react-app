@@ -41,23 +41,22 @@ describe('uploadToCloudinary', () => {
 
   const file = new File(['x'], 'a.png', { type: 'image/png' });
 
-  // ---- 既有 10 個呼叫點觀察到的四種端點形狀 ----
-  it('圖片預設帶上 f_auto,q_auto 轉換（多數呼叫點的既有行為）', async () => {
-    const spy = mockFetchOnce(async () => jsonResponse({ secure_url: 'https://cdn/a.png' }));
+  // ---- 上傳端點一律乾淨（f_auto,q_auto 不是合法的上傳路徑，打上去 Cloudinary 回 404） ----
+  it('圖片預設在回傳網址上加 f_auto,q_auto 轉換，但上傳端點本身乾淨', async () => {
+    const spy = mockFetchOnce(async () => jsonResponse({ secure_url: 'https://res.cloudinary.com/x/image/upload/v1/a.png' }));
 
     const url = await uploadToCloudinary(file);
 
-    expect(url).toBe('https://cdn/a.png');
-    expect(lastEndpoint(spy)).toBe(
-      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload/f_auto,q_auto`,
-    );
+    expect(url).toBe('https://res.cloudinary.com/x/image/upload/f_auto,q_auto/v1/a.png');
+    expect(lastEndpoint(spy)).toBe(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`);
   });
 
-  it('transform:false 時是純 image/upload（editProfile／_note 的既有行為）', async () => {
+  it('transform:false 時回傳網址不變（editProfile／_note 的既有行為）', async () => {
     const spy = mockFetchOnce(async () => jsonResponse({ secure_url: 'https://cdn/b.png' }));
 
-    await uploadToCloudinary(file, { transform: false });
+    const url = await uploadToCloudinary(file, { transform: false });
 
+    expect(url).toBe('https://cdn/b.png');
     expect(lastEndpoint(spy)).toBe(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`);
   });
 

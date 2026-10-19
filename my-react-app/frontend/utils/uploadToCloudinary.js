@@ -16,6 +16,15 @@
  * 這裡只負責「把檔案送上去、拿回網址」這件事，不碰任何 UI 狀態
  * （uploading flag、預覽圖、錯誤訊息顯示、寫回哪個表單欄位）——那些本來就
  * 因頁面而異，留在各自的呼叫端。
+ *
+ * 2026-10-19 修正：`image/upload/f_auto,q_auto` 這個「上傳端點」其實從頭
+ * 就是錯的——`f_auto,q_auto` 是套在 res.cloudinary.com 的「取圖網址」上的
+ * 轉換參數，不是 api.cloudinary.com 上傳 API 的合法路徑，打上去 Cloudinary
+ * 一律回 404（且該 404 回應不帶 CORS header，瀏覽器主控台因此同時看到
+ * CORS 錯誤）。凡是沒有明確傳 `transform: false` 的圖片上傳（多數呼叫點）
+ * 在正式環境一律會上傳失敗。改為一律打乾淨的 `.../upload`，轉換改成上傳
+ * 成功後套在回傳的 `secure_url` 上（取圖網址，Cloudinary 真正支援轉換的
+ * 地方）。
  */
 
 const CLOUDINARY_TRANSFORM = 'f_auto,q_auto';
@@ -37,9 +46,9 @@ export class CloudinaryUploadError extends Error {
  * @param {File|Blob} file 要上傳的檔案
  * @param {object}   [options]
  * @param {'image'|'video'} [options.resourceType='image'] Cloudinary 的資源類型。
- * @param {boolean}  [options.transform] 是否加上 `f_auto,q_auto` 自動格式／品質
- *   轉換。預設值刻意跟著 resourceType 走（圖片加、影音不加），因為這正是既有
- *   10 個呼叫點的實際行為；需要純上傳不轉換的圖片（例如筆記插圖）明確傳 false。
+ * @param {boolean}  [options.transform] 是否在回傳的網址上加 `f_auto,q_auto`
+ *   自動格式／品質轉換。預設值跟著 resourceType 走（圖片加、影音不加）；
+ *   需要純網址不轉換的圖片（例如筆記插圖）明確傳 false。
  * @param {string}   [options.folder] Cloudinary 端的資料夾。
  * @param {AbortSignal} [options.signal] 讓呼叫端可以在元件卸載時中止上傳。
  * @returns {Promise<string>} 上傳後的 secure_url（保證是非空字串）。
@@ -74,8 +83,7 @@ export async function uploadToCloudinary(file, options = {}) {
   formData.append('cloud_name', cloudName);
   if (folder) formData.append('folder', folder);
 
-  const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`
-    + (transform ? `/${CLOUDINARY_TRANSFORM}` : '');
+  const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
 
   let response;
   try {
@@ -102,5 +110,8 @@ export async function uploadToCloudinary(file, options = {}) {
     throw new CloudinaryUploadError('Cloudinary 回應缺少 secure_url');
   }
 
-  return result.secure_url;
+  // 轉換套在取圖網址上（`/upload/<轉換>/...`），不是上傳端點。
+  return transform
+    ? result.secure_url.replace('/upload/', `/upload/${CLOUDINARY_TRANSFORM}/`)
+    : result.secure_url;
 }
