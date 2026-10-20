@@ -113,7 +113,7 @@ describe('編輯器輸出符合後端白名單', () => {
   });
 
   test('信箱連結保留，帶參數的不保留', () => {
-    const e = new Editor({ extensions: articleExtensions, content: '<p><a href="mailto:help@example.org">信</a><a href="mailto:a@b.org?subject=x">壞</a></p>' });
+    const e = new Editor({ extensions: articleExtensions, content: '<p><a href="mailto:help@example.org">信</a><a href="mailto:a@b.org?body=x">壞</a></p>' });
     const hrefs = [];
     walk(e.getJSON(), (node) => (node.marks ?? []).forEach((m) => m.type === 'link' && hrefs.push(m.attrs.href)));
     expect(hrefs).toEqual(['mailto:help@example.org']);

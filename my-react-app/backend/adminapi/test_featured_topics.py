@@ -706,7 +706,7 @@ class ArticleDocValidationTest(TestCase):
         _ = self._topic(_doc({"type": "heading", "attrs": {"level": 3}, "content": [_text("x")]})).full_clean()
 
     def test_links_only_internal_paths_and_https(self):
-        for href in ("javascript:alert(1)", "http://example.org", "//evil.example", "data:text/html,x", "mailto:a@b.c?subject=x", "", "https://u:p@example.org"):
+        for href in ("javascript:alert(1)", "http://example.org", "//evil.example", "data:text/html,x", "mailto:a@b.c?body=x", "", "https://u:p@example.org"):
             self.assertInvalid(_doc(_p(_text("x", {"type": "link", "attrs": {"href": href}}))), href)
         for href in ("/quiz/select", "https://example.org/a?b=1"):
             self._topic(_doc(_p(_text("x", {"type": "link", "attrs": {"href": href}})))).full_clean()

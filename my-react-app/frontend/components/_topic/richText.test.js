@@ -10,11 +10,18 @@ describe('safeHref', () => {
     expect(safeHref('  https://example.org/a?b=1 ')).toEqual({ href: 'https://example.org/a?b=1', external: true });
   });
 
-  test('mailto 只收單一信箱，不收參數與多個收件人', () => {
+  test('mailto 只收單一信箱，可帶 subject；不收其他參數與多個收件人', () => {
     expect(safeHref('mailto:help@example.org')).toEqual({ href: 'mailto:help@example.org', external: false, mail: true });
-    ['mailto:', 'mailto:a@b', 'mailto:a@b.org?subject=x', 'mailto:a@b.org,c@d.org', 'mailto:a b@c.org', 'MAILTO:a@b.org', 'mailto:a@b.org%0Abcc=x'].forEach((value) => {
+    ['mailto:', 'mailto:a@b', 'mailto:a@b.org?body=x', 'mailto:a@b.org?cc=x@y.org', 'mailto:a@b.org?subject=x&bcc=y@z.org', 'mailto:a@b.org?subject=', 'mailto:a@b.org?subject=%0ABcc:x@y.org', 'mailto:a@b.org?subject=%00', 'mailto:a@b.org?subject=%E8%81', 'mailto:a@b.org?subject=%E2%80%AE', 'mailto:a@b.org?subject=%26body%3Dx', 'mailto:a@b.org?subject=%2526', 'mailto:a@b.org?subject=a%09b', 'mailto:a@b.org?subject=%E2%81%A0', 'mailto:a%0A@b.org', 'mailto:a@b.org,c@d.org', 'mailto:a b@c.org', 'MAILTO:a@b.org', 'mailto:a@b.org%0Abcc=x'].forEach((value) => {
       expect(safeHref(value), value).toBeNull();
     });
+  });
+
+  test('mailto 可帶 URL 編碼的主旨', () => {
+    const href = 'mailto:help@example.org?subject=%E8%81%AF%E7%B5%A1%E5%8E%9F%E8%AA%9E';
+    expect(safeHref(href)).toEqual({ href, external: false, mail: true });
+    expect(safeHref(`mailto:help@example.org?subject=${'a'.repeat(100)}`)).not.toBeNull();
+    expect(safeHref(`mailto:help@example.org?subject=${'a'.repeat(101)}`)).toBeNull();
   });
 
   test('其餘一律不是連結', () => {

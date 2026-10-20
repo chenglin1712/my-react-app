@@ -105,18 +105,20 @@ class SitePageMixin:
             self.model.objects.create(content=_doc("另一筆"))
         self.assertEqual(self.model.objects.count(), 1)
 
-    def test_link_rules_allow_plain_mailto_only(self):
+    def test_link_rules_allow_mailto_with_a_safe_subject_only(self):
         base = self._base()
 
         def doc(href):
             return {"type": "doc", "content": [{"type": "paragraph", "content": [
                 {"type": "text", "text": "信箱", "marks": [{"type": "link", "attrs": {"href": href}}]}]}]}
 
-        for bad in ("mailto:", "mailto:a@b", "mailto:a@b.org?subject=x", "mailto:a@b.org,c@d.org", "mailto:a b@c.org", "MAILTO:evil", "mailto:a@b.org%0Abcc=x", "mailto:a@b.org\n", "mailto:a@b.org\r\nBcc: x@y.org"):
+        for bad in ("mailto:", "mailto:a@b", "mailto:a@b.org?body=x", "mailto:a@b.org?cc=x@y.org", "mailto:a@b.org?subject=x&bcc=y@z.org", "mailto:a@b.org?subject=x&body=y", "mailto:a@b.org?subject=", "mailto:a@b.org?subject=a b", "mailto:a@b.org?subject=%0ABcc:x@y.org", "mailto:a@b.org?subject=%0d", "mailto:a@b.org?subject=%00", "mailto:a@b.org?subject=%E8%81", "mailto:a@b.org?subject=%ZZ", "mailto:a@b.org?subject=" + "a" * 101, "mailto:a@b.org?subject=%E2%80%AE", "mailto:a@b.org?subject=%26body%3Dx", "mailto:a@b.org?subject=%2526", "mailto:a@b.org?subject=a%09b", "mailto:a@b.org?subject=%C2%85", "mailto:a@b.org?subject=%E2%81%A0", "mailto:a@b.org?subject=x\n", "mailto:a%0A@b.org", "mailto:a@b.org,c@d.org", "mailto:a b@c.org", "MAILTO:evil", "mailto:a@b.org%0Abcc=x", "mailto:a@b.org\n", "mailto:a@b.org\r\nBcc: x@y.org"):
             response = self.call("patch", self.ADMIN_URL, {"content": doc(bad), "base_updated_at": base})
             self.assertEqual(response.status_code, 400, bad)
-        response = self.call("patch", self.ADMIN_URL, {"content": doc("mailto:help@example.org"), "base_updated_at": base})
-        self.assertEqual(response.status_code, 200, response.content)
+        for good in ("mailto:help@example.org", "mailto:help@example.org?subject=%E8%81%AF%E7%B5%A1%E5%8E%9F%E8%AA%9E%E5%B9%B3%E5%8F%B0", "mailto:help@example.org?subject=Hello%20World", "mailto:help@example.org?subject=" + "a" * 100):
+            response = self.call("patch", self.ADMIN_URL, {"content": doc(good), "base_updated_at": base})
+            self.assertEqual(response.status_code, 200, f"{good}: {response.content}")
+            base = response.json()["updated_at"]
 
 
 class PrivacyPolicyTests(SitePageMixin, TestCase):

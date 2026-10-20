@@ -1,6 +1,14 @@
-import { describe, expect, test, vi } from 'vitest';
+import { beforeAll, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import RichTextEditor from './RichTextEditor';
+
+// jsdom 沒有版面計算：ProseMirror 插入內容後會捲動到游標，需要這些方法存在，否則測試結束後才丟出未處理的錯誤
+beforeAll(() => {
+  const rect = { x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 };
+  Range.prototype.getClientRects = () => [];
+  Range.prototype.getBoundingClientRect = () => rect;
+  Text.prototype.getClientRects = () => [];
+});
 
 const DOC = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '既有內文' }] }] };
 const media = (over) => ({ uploadingKey: null, error: '', upload: vi.fn(), ...over });

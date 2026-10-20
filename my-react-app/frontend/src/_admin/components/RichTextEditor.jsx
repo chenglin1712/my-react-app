@@ -190,7 +190,7 @@ export default function RichTextEditor({ value, onChange, disabled = false, medi
             return;
         }
         if (!safeHref(url)) {
-            setPanelError('網址請填站內路徑（以 / 開頭）、https:// 開頭的網址，或 mailto:信箱');
+            setPanelError('網址請填站內路徑（以 / 開頭）、https:// 開頭的網址，或 mailto:信箱（可加 ?subject=主旨）');
             return;
         }
         if (editor.state.selection.empty && !editor.isActive('link')) {

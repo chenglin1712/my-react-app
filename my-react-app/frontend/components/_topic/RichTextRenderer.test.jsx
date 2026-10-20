@@ -15,6 +15,11 @@ describe('RichTextRenderer 連結', () => {
     expect(a).not.toHaveAttribute('target');
   });
 
+  test('帶主旨的信箱連結保留主旨', () => {
+    renderDoc(doc(link('寫信', 'mailto:help@example.org?subject=%E8%81%AF%E7%B5%A1')));
+    expect(screen.getByRole('link', { name: '寫信' })).toHaveAttribute('href', 'mailto:help@example.org?subject=%E8%81%AF%E7%B5%A1');
+  });
+
   test('站內路徑走路由，外部 https 另開視窗並加 noopener', () => {
     renderDoc(doc(link('站內', '/help'), link('外部', 'https://example.org/a')));
     expect(screen.getByRole('link', { name: '站內' })).toHaveAttribute('href', '/help');
@@ -24,7 +29,7 @@ describe('RichTextRenderer 連結', () => {
   });
 
   test('不安全的網址不產生連結，文字仍顯示', () => {
-    renderDoc(doc(link('壞', 'javascript:alert(1)'), link('參數', 'mailto:a@b.org?subject=x')));
+    renderDoc(doc(link('壞', 'javascript:alert(1)'), link('參數', 'mailto:a@b.org?body=x')));
     expect(screen.queryByRole('link')).toBeNull();
     expect(screen.getByText(/壞/)).toBeInTheDocument();
   });

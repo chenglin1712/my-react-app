@@ -16,6 +16,7 @@
 """
 import json
 import re
+from urllib.parse import unquote
 
 from django.core.exceptions import ValidationError
 
@@ -130,13 +131,31 @@ def _check_text(value):
         _fail("文字內容含有不可見或雙向控制字元")
 
 
-# 只收「mailto:」加單一信箱，不收 ?subject=、多個收件人或其他參數
-_MAILTO = re.compile(r"^mailto:[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$")
+# 只收「mailto:」加單一信箱，另外可帶一個 subject（預設主旨）。不收 cc／bcc／body 或多個收件人：
+# 這些參數能讓連結替訪客預填收件副本與內文，是釣魚與濫用的常見手法。
+# 信箱本地部分不收 %（避免編碼進換行）；subject 只收 URL 編碼後的安全字元，解碼後再檢查長度與控制字元。
+_MAILTO = re.compile(
+    r"^mailto:[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+"
+    r"(\?subject=(?:[A-Za-z0-9._~!*'()-]|%[0-9A-Fa-f]{2})+)?$"
+)
+MAX_MAIL_SUBJECT_CHARS = 100
+_MAIL_SUBJECT_BAD = re.compile(r"[\x00-\x1f\x7f-\x9f%&=]")
 
 
 def _check_mailto(href):
-    if len(href) > 254 or not _MAILTO.fullmatch(href):
-        _fail("電子郵件連結格式不正確，請用 mailto:信箱")
+    if len(href) > 600 or not _MAILTO.fullmatch(href):
+        _fail("電子郵件連結格式不正確，請用 mailto:信箱，或 mailto:信箱?subject=主旨")
+    if "?subject=" in href:
+        raw = href.split("?subject=", 1)[1]
+        try:
+            subject = unquote(raw, errors="strict")
+        except UnicodeDecodeError:
+            _fail("電子郵件主旨的編碼不正確")
+        if len(subject) > MAX_MAIL_SUBJECT_CHARS:
+            _fail(f"電子郵件主旨最多 {MAX_MAIL_SUBJECT_CHARS} 字")
+        # 解碼後不可再含 % & =：避免遇到會「二次解碼」或錯誤拆分參數的郵件程式時，被還原成 body／cc 等欄位
+        if _MAIL_SUBJECT_BAD.search(subject) or _INVISIBLE_BAD.search(subject) or _BIDI_BAD.search(subject):
+            _fail("電子郵件主旨不可包含換行、Tab、控制字元、不可見字元，或 % & = 符號")
 
 
 def _check_choice(value, allowed, label, required=False):
