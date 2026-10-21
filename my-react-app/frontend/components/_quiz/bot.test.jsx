@@ -1,10 +1,10 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AIAssistantOverlay from './bot';
-import { apiGet, apiPost } from '../../utils/apiClient';
+import { apiGet, apiPost, apiStream } from '../../utils/apiClient';
 
-vi.mock('../../utils/apiClient', () => ({ apiGet: vi.fn(), apiPost: vi.fn() }));
+vi.mock('../../utils/apiClient', () => ({ apiGet: vi.fn(), apiPost: vi.fn(), apiStream: vi.fn() }));
 vi.mock('./bot_study_plan', () => ({ default: () => null }));
 
 const mockNavigate = vi.fn();
@@ -265,6 +265,221 @@ describe('AIAssistantOverlay 每日提問額度與拒答（路線圖 #5、#6）'
       { role: 'user', text: '某個問題' },
       { role: 'assistant', text: '這個問題我沒辦法回答，換個方式問問看。', sig },
     ]);
+  });
+});
+
+describe('AIAssistantOverlay 串流回覆（路線圖 #9）', () => {
+  const STREAM_URL = '/AIModel/tayal_chat/stream/';
+  const sig = 'd'.repeat(64);
+
+  // 手動控制的串流：測試決定什麼時候送出片段、什麼時候結束或失敗
+  const controlledStream = () => {
+    const control = {};
+    apiStream.mockImplementation((_url, _body, { signal, onDelta }) => {
+      control.onDelta = onDelta;
+      control.signal = signal;
+      return new Promise((resolve, reject) => {
+        control.finish = resolve;
+        control.fail = reject;
+        signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+      });
+    });
+    return control;
+  };
+
+  beforeEach(() => {
+    vi.stubEnv('VITE_API_AI_BOT_STREAM_URL', STREAM_URL);
+    apiPost.mockReset();
+    apiStream.mockReset();
+    apiGet.mockReset();
+    apiGet.mockRejectedValue(new Error('no quota'));
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  test('有設定串流網址就走串流：文字一段一段長在同一個氣泡，完成後以後端的完整文字與簽章為準', async () => {
+    const control = controlledStream();
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), '你好{Enter}');
+    expect(apiStream.mock.calls[0][0]).toBe(STREAM_URL);
+    expect(apiPost).not.toHaveBeenCalled();
+    control.onDelta('哈');
+    control.onDelta('囉');
+    expect(await screen.findByText('哈囉')).toBeInTheDocument();
+    // 串流中：氣泡標示忙碌、文字對報讀器隱藏，不再另外顯示「輸入中」的三個點
+    const bubble = screen.getByText('哈囉').closest('.message-bubble');
+    expect(bubble).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByText('哈囉')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.queryByText('助手正在輸入')).not.toBeInTheDocument();
+
+    control.finish({ message: '哈囉，同學', sig });
+
+    expect(await screen.findByText('哈囉，同學')).toBeInTheDocument();
+    expect(screen.queryByText('哈囉')).not.toBeInTheDocument(); // 同一個氣泡被換成完整文字，沒有重複
+    expect(screen.getByText('哈囉，同學')).not.toHaveAttribute('aria-hidden');
+    expect(screen.getByText('哈囉，同學').closest('.message-bubble')).not.toHaveAttribute('aria-busy');
+  });
+
+  test('串流完成後念一次完整內容給報讀器（串流中的片段不念）', async () => {
+    const control = controlledStream();
+    announceSpy.mockClear();
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), '你好{Enter}');
+    control.onDelta('哈囉');
+    await screen.findByText('哈囉');
+    expect(announceSpy).not.toHaveBeenCalled();
+    control.finish({ message: '哈囉，同學', sig });
+    await screen.findByText('哈囉，同學');
+
+    expect(announceSpy).toHaveBeenCalledTimes(1);
+    expect(announceSpy).toHaveBeenCalledWith('哈囉，同學');
+  });
+
+  test('回覆進行中，發送鈕變成「停止」；按下去保留已經收到的文字並標示已停止，可以重試', async () => {
+    const control = controlledStream();
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), '你好{Enter}');
+    expect(screen.queryByRole('button', { name: '發送' })).not.toBeInTheDocument();
+    control.onDelta('說到一半');
+    await screen.findByText('說到一半');
+
+    await user.click(screen.getByRole('button', { name: '停止' }));
+
+    expect(control.signal.aborted).toBe(true);
+    expect(await screen.findByText('已停止回覆')).toBeInTheDocument();
+    expect(screen.getByLabelText('輸入訊息')).toHaveFocus();      // 停止鈕被換掉後焦點不會掉到頁面最上面
+    expect(screen.getByText('說到一半')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '發送' })).toBeInTheDocument(); // 按鈕換回來
+    expect(screen.getByRole('button', { name: '重試' })).toBeInTheDocument();
+  });
+
+  test('一個字都還沒收到就按停止：只留一則「已停止回覆」，沒有空氣泡', async () => {
+    controlledStream();
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), '你好{Enter}');
+    await user.click(screen.getByRole('button', { name: '停止' }));
+
+    expect(await screen.findByText('已停止回覆。')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '重試' })).not.toBeInTheDocument();
+  });
+
+  test('中途斷線：保留半截文字但標示「回覆中斷了」，不當成完整回覆；重試會重送同一句並換掉中斷的那則', async () => {
+    const control = controlledStream();
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), '你好{Enter}');
+    control.onDelta('半截');
+    await screen.findByText('半截');
+    control.fail(Object.assign(new Error('斷線'), { partial: true }));
+
+    expect(await screen.findByText('回覆中斷了')).toBeInTheDocument();
+    expect(screen.getByText('半截').closest('.message-bubble')).toHaveAttribute('data-kind', 'interrupted');
+
+    // 重試：同一句再送一次，使用者的問題不會重複出現，歷史也不含中斷的那則
+    const retry = controlledStream();
+    await user.click(screen.getByRole('button', { name: '重試' }));
+    expect(apiStream).toHaveBeenCalledTimes(2);
+    expect(apiStream.mock.calls[1][1]).toMatchObject({ message: '你好', history: [] });
+    retry.onDelta('完整');
+    retry.finish({ message: '完整的回答', sig });
+
+    expect(await screen.findByText('完整的回答')).toBeInTheDocument();
+    expect(screen.queryByText('半截')).not.toBeInTheDocument();
+    expect(screen.getAllByText('你好')).toHaveLength(1);
+    consoleErrorSpy.mockRestore();
+  });
+
+  test('還沒收到任何文字就失敗：顯示一般的錯誤訊息，不是「回覆中斷」', async () => {
+    apiStream.mockRejectedValue(Object.assign(new Error('x'), { status: 502, partial: false }));
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), '你好{Enter}');
+
+    expect(await screen.findByText('很抱歉，無法取得回應，請稍後再試。')).toBeInTheDocument();
+    expect(screen.queryByText('回覆中斷了')).not.toBeInTheDocument();
+    consoleErrorSpy.mockRestore();
+  });
+
+  test('串流前的 429（今天的次數用完）和不串流時一樣處理', async () => {
+    apiStream.mockRejectedValue(Object.assign(new Error('too many'), {
+      status: 429,
+      data: { code: 'ai_daily_quota_exceeded', quota: { limit: 100, remaining: 0, resetsAt: '2026-10-22T00:00:00+08:00', tracked: true } },
+    }));
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), '你好{Enter}');
+
+    expect((await screen.findAllByText('今天的提問次數已用完，台灣時間 00:00重置。')).length).toBe(2);
+    consoleErrorSpy.mockRestore();
+  });
+
+  test('拒答發生在已經顯示部分文字之後：整則換成固定說明，已顯示的內容不留', async () => {
+    const control = controlledStream();
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), '某個問題{Enter}');
+    control.onDelta('開頭的幾句');
+    await screen.findByText('開頭的幾句');
+    control.finish({ message: '這個問題我沒辦法回答，換個方式問問看。', refused: true, sig });
+
+    const note = await screen.findByText('這個問題我沒辦法回答，換個方式問問看。');
+    expect(note.closest('.message-bubble')).toHaveAttribute('data-kind', 'refusal');
+    expect(screen.queryByText('開頭的幾句')).not.toBeInTheDocument();
+  });
+
+  test('讀書計畫這類不串流的回覆（直接收到 done）照樣顯示，不需要先有片段', async () => {
+    apiStream.mockResolvedValue({ message: '已經為你排好計畫', study_plan: { title: 't', events: [] }, sig });
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), '幫我排計畫{Enter}');
+
+    expect(await screen.findByText('已經為你排好計畫')).toBeInTheDocument();
+  });
+
+  test('完成的串流回覆帶著簽章，下一句會被當成對話記憶送回去', async () => {
+    apiStream.mockResolvedValueOnce({ message: '第一個回答', sig }).mockResolvedValueOnce({ message: '第二個回答', sig });
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), '第一問{Enter}');
+    await screen.findByText('第一個回答');
+    await user.type(screen.getByLabelText('輸入訊息'), '第二問{Enter}');
+    await waitFor(() => expect(apiStream).toHaveBeenCalledTimes(2));
+
+    expect(apiStream.mock.calls[1][1].history).toEqual([
+      { role: 'user', text: '第一問' },
+      { role: 'assistant', text: '第一個回答', sig },
+    ]);
+  });
+
+  test('沒有設定串流網址時維持原本的做法（apiPost，沒有停止鈕）', async () => {
+    vi.stubEnv('VITE_API_AI_BOT_STREAM_URL', '');
+    apiPost.mockResolvedValue({ message: '舊做法的回答' });
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), '你好{Enter}');
+
+    expect(await screen.findByText('舊做法的回答')).toBeInTheDocument();
+    expect(apiStream).not.toHaveBeenCalled();
   });
 });
 

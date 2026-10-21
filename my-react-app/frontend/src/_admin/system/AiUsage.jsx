@@ -22,6 +22,8 @@ const FEATURE_LABELS = {
     plan: 'AI 助手讀書計畫',
     review: '錯題補充說明',
     translate: '族語翻譯',
+    route: '意圖分類',
+    light: '閒聊（輕量模型）',
 };
 
 const STATUS_LABELS = {
@@ -32,6 +34,7 @@ const STATUS_LABELS = {
     server_error: '供應商錯誤',
     breaker_open: '斷路器暫停中',
     refusal: '模型拒答',
+    cancelled: '使用者中止串流',
     error: '其他錯誤',
 };
 

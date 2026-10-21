@@ -1,22 +1,24 @@
 import json
 import logging
 from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django_ratelimit.core import is_ratelimited
 import sys
+import time
 import traceback
+from dataclasses import dataclass
 
 from dictionary_db.connect import SessionLocal
 from dictionary_db.model import Word
 from dictionary_db.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS, TRIBE_MAP
 from core.firebase_auth import verify_firebase_token
-from config.llm import get_llm_client, classify_llm_error
+from config.llm import get_llm_client, classify_llm_error, llm_deadline
 from adminapi.rate_limits import get_configured_rate
 from .serializers import TayalChatSerializer, ReviewTayalChatSerializer
 from . import quota as daily_quota
 from .learner_profile import load_profile
-from .services import run_tayal_chat, run_review_tayal_chat
+from .services import run_tayal_chat, run_review_tayal_chat, stream_tayal_chat
 from .tools import SqlDictionaryLookup
 
 logger = logging.getLogger(__name__)
@@ -79,59 +81,86 @@ def _quota_exceeded_response(quota):
 # csrf_exempt 在這裡不是「豁免掉一項保護」，而是「這項保護原本就不適用」，永久生效，
 # 不隨 DEBUG 變動（過去曾經只在 DEBUG=True 才豁免，DEBUG=False 時前端從未處理過
 # CSRF token/cookie，會讓這兩個 view 一律 403）。
+@dataclass
+class _ChatRequest:
+    """通過驗證、限速、額度的一次提問（tayal_chat 與 tayal_chat_stream 共用）。"""
+    client: object
+    user_message: str
+    tribe: str
+    tribe_name: str
+    uid: str
+    history: list
+    quota: object
+
+
+def _prepare_chat(request):
+    """驗證身分、總開關、限速、請求內容並扣一次每日額度。回傳 (_ChatRequest, None) 或 (None, 錯誤回應)。
+    順序與意義見各步驟；失敗的請求（格式錯誤等）不扣額度，扣了之後的失敗由呼叫端退還。"""
+    decoded, err_resp = verify_firebase_token(request)
+    if err_resp:
+        return None, err_resp
+    disabled_resp = _assistant_disabled_response()
+    if disabled_resp:
+        return None, disabled_resp
+    limited_resp = _rate_limited_response(request, decoded, group="tayal_chat")
+    if limited_resp:
+        return None, limited_resp
+    try:
+        client = _get_client()
+    except EnvironmentError as e:
+        return None, JsonResponse({"detail": str(e)}, status=503)
+
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return None, JsonResponse({"detail": "請求格式錯誤"}, status=400)
+
+    serializer = TayalChatSerializer(data=body)
+    if not serializer.is_valid():
+        return None, JsonResponse({"detail": "請求參數錯誤", "errors": serializer.errors}, status=400)
+    validated = serializer.validated_data
+
+    user_message = validated["message"].strip()
+    if not user_message:
+        return None, JsonResponse({"detail": "取得訊息內容失敗"}, status=400)
+
+    tribe = validated.get("tribe", "tayal")
+    uid = decoded.get("uid", "")
+
+    # 通過驗證才扣額度（格式錯誤的請求不佔次數）；之後失敗會退還
+    quota = daily_quota.consume(uid)
+    if not quota.allowed:
+        return None, _quota_exceeded_response(quota)
+
+    return _ChatRequest(
+        client=client, user_message=user_message, tribe=tribe, tribe_name=TRIBE_MAP.get(tribe, "泰雅語"),
+        uid=uid, history=validated.get("history", []), quota=quota,
+    ), None
+
+
+def _chat_kwargs(chat):
+    # 學習資料由伺服器依已驗證的 uid 讀取，不採用請求裡的 user_stats（路線圖 #20）；
+    # 讀不到（沒設定 Firestore、逾時）時是 None，助手退回通用回答。
+    return dict(
+        profile=load_profile(chat.uid), uid=chat.uid, history=chat.history,
+        lookup=SqlDictionaryLookup(TRIBE_IDS.get(chat.tribe, TRIBE_IDS["tayal"])),
+    )
+
+
 @csrf_exempt
 def tayal_chat(request):
     if request.method == "POST":
-        decoded, err_resp = verify_firebase_token(request)
+        chat, err_resp = _prepare_chat(request)
         if err_resp:
             return err_resp
-        disabled_resp = _assistant_disabled_response()
-        if disabled_resp:
-            return disabled_resp
-        limited_resp = _rate_limited_response(request, decoded, group="tayal_chat")
-        if limited_resp:
-            return limited_resp
-        try:
-            client = _get_client()
-        except EnvironmentError as e:
-            return JsonResponse({"detail": str(e)}, status=503)
 
         try:
-            body = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({"detail": "請求格式錯誤"}, status=400)
-
-        serializer = TayalChatSerializer(data=body)
-        if not serializer.is_valid():
-            return JsonResponse({"detail": "請求參數錯誤", "errors": serializer.errors}, status=400)
-        validated = serializer.validated_data
-
-        user_message = validated["message"].strip()
-        if not user_message:
-            return JsonResponse({"detail": "取得訊息內容失敗"}, status=400)
-
-        tribe = validated.get("tribe", "tayal")
-        tribe_name = TRIBE_MAP.get(tribe, "泰雅語")
-        uid = decoded.get("uid", "")
-
-        # 通過驗證才扣額度（格式錯誤的請求不佔次數）；之後失敗會退還
-        quota = daily_quota.consume(uid)
-        if not quota.allowed:
-            return _quota_exceeded_response(quota)
-
-        try:
-            # 學習資料由伺服器依已驗證的 uid 讀取，不採用請求裡的 user_stats（路線圖 #20）；
-            # 讀不到（沒設定 Firestore、逾時）時是 None，助手退回通用回答。
-            result = run_tayal_chat(
-                client, tribe_name, user_message, load_profile(uid),
-                uid=uid, history=validated.get("history", []),
-                lookup=SqlDictionaryLookup(TRIBE_IDS.get(tribe, TRIBE_IDS["tayal"])),
-            )
-            result["quota"] = quota.as_dict()
+            result = run_tayal_chat(chat.client, chat.tribe_name, chat.user_message, **_chat_kwargs(chat))
+            result["quota"] = chat.quota.as_dict()
             return JsonResponse(result)
 
         except Exception:
-            daily_quota.refund(uid, quota.day)
+            daily_quota.refund(chat.uid, chat.quota.day)
             # 原本直接把 str(e) 回給前端，不論 DEBUG 與否都會洩漏內部例外訊息
             # （可能包含 API 回應細節、內部路徑等），且完全沒有寫 log，出錯時
             # 伺服器端反而看不到記錄。改成記錄完整 traceback，只回通用訊息。
@@ -141,6 +170,68 @@ def tayal_chat(request):
 
     else:
         return JsonResponse({"detail": "只接受 POST 請求"}, status=405)
+
+
+# 一次串流最久持續多少秒。gunicorn 的 --timeout 是 75 秒（docker-compose.prod.yml），sync worker 在串流期間
+# 不會回報存活，超過就被強制殺掉；留 20 秒餘裕讓這裡先用 error 事件正常收尾。
+STREAM_DEADLINE_SECONDS = 55
+
+
+def _sse(event: str, data: dict) -> bytes:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n".encode("utf-8")
+
+
+def _chat_stream_events(chat):
+    """串流端點的 SSE 內容：delta（文字片段）、done（完整結果）或 error（中途失敗，前端顯示「回覆中斷，重試」）。
+
+    退還額度的原則同 tayal_chat：失敗不是學生的錯，退還；使用者自己放棄（連線關閉，generator 被關閉）不退，
+    因為模型已經在處理。"""
+    deadline = time.monotonic() + STREAM_DEADLINE_SECONDS
+    # 同一個截止時間也限制每次 LLM 呼叫的逾時（config.llm._with_deadline），這樣卡在等模型的時候也不會拖過去
+    deadline_token = llm_deadline.set(deadline)
+    try:
+        for event in stream_tayal_chat(chat.client, chat.tribe_name, chat.user_message, **_chat_kwargs(chat)):
+            if event["type"] == "done":
+                payload = {k: v for k, v in event.items() if k != "type"}
+                payload["quota"] = chat.quota.as_dict()
+                yield _sse("done", payload)
+                return
+            if time.monotonic() > deadline:
+                raise TimeoutError("串流超過時間上限")
+            yield _sse("delta", {"t": event["t"]})
+    except GeneratorExit:
+        raise
+    except Exception as exc:
+        daily_quota.refund(chat.uid, chat.quota.day)
+        logger.error("[tayal_chat_stream] 串流中途失敗\n%s", traceback.format_exc())
+        status, detail = (504, "回覆花的時間太久，請重試。") if isinstance(exc, TimeoutError) else classify_llm_error(exc)
+        yield _sse("error", {"detail": detail, "status": status})
+    finally:
+        try:
+            llm_deadline.reset(deadline_token)
+        except ValueError:
+            pass   # generator 在別的執行緒被回收時 token 屬於另一個 context；請求已結束，不影響任何人
+
+
+@csrf_exempt
+def tayal_chat_stream(request):
+    """tayal_chat 的串流版（路線圖 #9），用 Server-Sent Events 回傳。
+
+    開始串流之前的錯誤（未登入、助手關閉、限速、額度用完、請求格式錯誤）和 tayal_chat 一樣回一般的
+    JSON 與狀態碼，前端用同一套處理；串流開始之後 HTTP 狀態碼已經是 200，錯誤改用 error 事件傳達。
+
+    部署注意：nginx 要對這條路徑關閉 proxy_buffering（見 deploy/nginx.conf），否則文字會被攢到最後才一次送出；
+    這裡也送了 X-Accel-Buffering: no。串流期間會占住一個 gunicorn worker，和不串流時等待回覆的占用時間相同。"""
+    if request.method != "POST":
+        return JsonResponse({"detail": "只接受 POST 請求"}, status=405)
+    chat, err_resp = _prepare_chat(request)
+    if err_resp:
+        return err_resp
+    response = StreamingHttpResponse(_chat_stream_events(chat), content_type="text/event-stream; charset=utf-8")
+    response["Cache-Control"] = "no-cache, no-transform"
+    response["X-Accel-Buffering"] = "no"
+    return response
+
 
 @csrf_exempt
 def review_tayal_chat(request):

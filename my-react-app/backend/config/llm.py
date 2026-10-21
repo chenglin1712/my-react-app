@@ -159,6 +159,15 @@ class _CircuitBreaker:
 
 _breaker = _CircuitBreaker(_BREAKER_THRESHOLD, _BREAKER_COOLDOWN_SECONDS)
 
+# 意圖路由與閒聊用的是另一個模型（Haiku）。它的故障不該讓主模型（Sonnet）的斷路器跳開，
+# 否則「分類失敗就退回原流程」的退路會被自己的失敗堵死，所以分開計算。
+_LIGHT_FEATURES = frozenset({"route", "light"})
+_light_breaker = _CircuitBreaker(_BREAKER_THRESHOLD, _BREAKER_COOLDOWN_SECONDS)
+
+
+def _breaker_for(feature: str):
+    return _light_breaker if feature in _LIGHT_FEATURES else _breaker
+
 
 def classify_llm_error(exc: BaseException) -> tuple[int, str]:
     """把 LLM 呼叫失敗對應成 (HTTP 狀態碼, 給使用者看的訊息)。原本一律 502，
@@ -274,10 +283,10 @@ def _refusal_category(response) -> str:
     return category if isinstance(category, str) else ""
 
 
-def _emit_breaker_events(feature: str, model: str) -> None:
+def _emit_breaker_events(breaker, model: str) -> None:
     """把斷路器剛發生的狀態轉換寫進 log 與用量表（feature="breaker"，status 為事件名稱）。
     離開斷路器的鎖之後才呼叫：寫入端會做資料庫存取。紀錄失敗不影響 LLM 呼叫。"""
-    for event in _breaker.drain_events():
+    for event in breaker.drain_events():
         try:
             logger.warning("[config.llm] 斷路器事件 event=%s detail=%s", event["event"], {k: v for k, v in event.items() if k != "event"})
             recorder = _usage_recorder
@@ -294,6 +303,48 @@ def _emit_breaker_events(feature: str, model: str) -> None:
 def breaker_state() -> dict:
     """這個 process 的斷路器目前狀態（後台「AI 用量」頁顯示用）。"""
     return _breaker.snapshot()
+
+
+# 一次請求整體的截止時間（time.monotonic() 的絕對值），由串流端點設定。設了之後每次 LLM 呼叫的逾時
+# 都被壓在剩餘時間內並且不重試，所以不論路由、工具輪次或慢速串流，整體都不會超過 gunicorn 的 --timeout。
+llm_deadline: contextvars.ContextVar = contextvars.ContextVar("llm_deadline", default=None)
+_MIN_BUDGET_SECONDS = 2.0
+
+
+class LLMDeadlineError(TimeoutError):
+    """整體截止時間快到了，不再發出新的 LLM 請求。不計入斷路器（不是供應商的錯）。"""
+
+
+def _with_deadline(client):
+    deadline = llm_deadline.get()
+    if deadline is None:
+        return client
+    remaining = deadline - time.monotonic()
+    if remaining < _MIN_BUDGET_SECONDS:
+        raise LLMDeadlineError("[config.llm] 已接近整體截止時間，不再呼叫 LLM")
+    return client.with_options(timeout=min(_TIMEOUT_SECONDS, remaining), max_retries=0)
+
+
+def _build_request(settings, system, messages, output_schema=None, tools=None, tool_choice=None) -> dict:
+    """call_claude 與 stream_claude 共用的請求內容（兩者只差在 create 或 stream）。"""
+    request = {
+        "model": settings.model,
+        "max_tokens": settings.max_tokens,
+        "system": system,
+        "messages": messages,
+    }
+    output_config = {}
+    if settings.effort:
+        output_config["effort"] = settings.effort
+    if output_schema is not None:
+        output_config["format"] = {"type": "json_schema", "schema": output_schema}
+    if output_config:
+        request["output_config"] = output_config
+    if tools:
+        request["tools"] = tools
+        if tool_choice:
+            request["tool_choice"] = tool_choice
+    return request
 
 
 def call_claude(client, *, feature: str, system: str | list, messages: list, uid: str | None = None,
@@ -319,36 +370,22 @@ def call_claude(client, *, feature: str, system: str | list, messages: list, uid
     settings = get_settings(feature)
     uid = current_uid.get() if uid is None else uid
     started = time.monotonic()
-    request = {
-        "model": settings.model,
-        "max_tokens": settings.max_tokens,
-        "system": system,
-        "messages": messages,
-    }
-    output_config = {}
-    if settings.effort:
-        output_config["effort"] = settings.effort
-    if output_schema is not None:
-        output_config["format"] = {"type": "json_schema", "schema": output_schema}
-    if output_config:
-        request["output_config"] = output_config
-    if tools:
-        request["tools"] = tools
-        if tool_choice:
-            request["tool_choice"] = tool_choice
+    request = _build_request(settings, system, messages, output_schema, tools, tool_choice)
+    client = _with_deadline(client)
+    breaker = _breaker_for(feature)
 
     try:
-        is_probe = _breaker.before_call()
+        is_probe = breaker.before_call()
     except LLMUnavailableError as exc:
         _record_usage(feature=feature, uid=uid, model=settings.model, started=started, status=_error_status(exc))
         raise
     finally:
-        _emit_breaker_events(feature, settings.model)
+        _emit_breaker_events(breaker, settings.model)
     try:
         response = client.messages.create(**request)
     except _TRANSIENT_ERRORS as exc:
-        _breaker.record_failure(is_probe)
-        _emit_breaker_events(feature, settings.model)
+        breaker.record_failure(is_probe)
+        _emit_breaker_events(breaker, settings.model)
         _record_usage(
             feature=feature, uid=uid, model=settings.model, started=started, status=_error_status(exc),
             request_id=_exception_request_id(exc),
@@ -356,7 +393,7 @@ def call_claude(client, *, feature: str, system: str | list, messages: list, uid
         raise
     except Exception as exc:
         if is_probe:
-            _breaker.abort_probe()
+            breaker.abort_probe()
         _record_usage(
             feature=feature, uid=uid, model=settings.model, started=started, status=_error_status(exc),
             request_id=_exception_request_id(exc),
@@ -365,10 +402,10 @@ def call_claude(client, *, feature: str, system: str | list, messages: list, uid
     except BaseException:
         # KeyboardInterrupt／SystemExit 等：程序正在關閉，只釋放探測名額，不做資料庫寫入。
         if is_probe:
-            _breaker.abort_probe()
+            breaker.abort_probe()
         raise
-    _breaker.record_success(is_probe)
-    _emit_breaker_events(feature, settings.model)
+    breaker.record_success(is_probe)
+    _emit_breaker_events(breaker, settings.model)
 
     refused = response.stop_reason == "refusal"
     _record_usage(
@@ -385,6 +422,97 @@ def call_claude(client, *, feature: str, system: str | list, messages: list, uid
         raise LLMRefusalError("[config.llm] Claude 拒絕回應此請求（refusal）", category=category)
 
     return response
+
+
+def stream_claude(client, *, feature: str, system: str | list, messages: list, uid: str | None = None,
+                  tools: list | None = None, tool_choice: dict | None = None):
+    """call_claude 的串流版（路線圖 #9）：generator，邊收邊 yield 文字片段（str），
+    結束時【回傳】SDK 原生的最終 Message（用 `final = yield from ...` 取得）。
+
+    斷路器、用量紀錄、拒答檢查與 call_claude 完全一致，差別只在：
+    - 串流中途失敗（連線中斷等）同樣計入斷路器失敗，並記錄實際失敗原因；已 yield 出去的文字收不回來，
+      呼叫端要負責讓使用者知道這則回覆不完整。
+    - 呼叫端提早放棄（使用者按停止、連線關閉）時 generator 被關閉：供應商本身沒問題，所以不計入斷路器失敗；
+      用量以 status="cancelled" 記錄，token 取串流到目前為止的快照（輸出只算到中斷那一刻）。
+    - 不支援結構化輸出（那是整段 JSON，串流給使用者看沒有意義）。
+
+    拒答仍是在串流結束後才知道（stop_reason == refusal），此時文字可能已經 yield 出去一部分，
+    呼叫端要以 LLMRefusalError 為準，用固定說明取代已顯示的內容。"""
+    settings = get_settings(feature)
+    uid = current_uid.get() if uid is None else uid
+    started = time.monotonic()
+    request = _build_request(settings, system, messages, tools=tools, tool_choice=tool_choice)
+    client = _with_deadline(client)
+    breaker = _breaker_for(feature)
+
+    try:
+        is_probe = breaker.before_call()
+    except LLMUnavailableError as exc:
+        _record_usage(feature=feature, uid=uid, model=settings.model, started=started, status=_error_status(exc))
+        raise
+    finally:
+        _emit_breaker_events(breaker, settings.model)
+
+    stream = None
+    try:
+        with client.messages.stream(**request) as stream:
+            for text in stream.text_stream:
+                yield text
+            response = stream.get_final_message()
+    except GeneratorExit:
+        # 呼叫端不要了。generator 只會在 yield 的地方被關閉，也就是至少已經收到並送出一段文字：供應商是通的。
+        # （還沒收到第一個字時 generator 阻塞在 SDK 裡，收不到關閉訊號，那種情況由逾時處理。）
+        breaker.record_success(is_probe)
+        _emit_breaker_events(breaker, settings.model)
+        _record_usage(
+            feature=feature, uid=uid, model=settings.model, started=started, status="cancelled",
+            response=_snapshot(stream),
+        )
+        raise
+    except _TRANSIENT_ERRORS as exc:
+        breaker.record_failure(is_probe)
+        _emit_breaker_events(breaker, settings.model)
+        _record_usage(
+            feature=feature, uid=uid, model=settings.model, started=started, status=_error_status(exc),
+            request_id=_exception_request_id(exc),
+        )
+        raise
+    except Exception as exc:
+        if is_probe:
+            breaker.abort_probe()
+        _record_usage(
+            feature=feature, uid=uid, model=settings.model, started=started, status=_error_status(exc),
+            request_id=_exception_request_id(exc),
+        )
+        raise
+    except BaseException:
+        if is_probe:
+            breaker.abort_probe()
+        raise
+    breaker.record_success(is_probe)
+    _emit_breaker_events(breaker, settings.model)
+
+    refused = response.stop_reason == "refusal"
+    _record_usage(
+        feature=feature, uid=uid, model=settings.model, started=started,
+        status="refusal" if refused else "ok", response=response,
+    )
+    if refused:
+        category = _refusal_category(response)
+        logger.warning(
+            "[config.llm] 模型拒答 feature=%s model=%s request_id=%s category=%s",
+            feature, settings.model, getattr(response, "_request_id", "") or "", category or "unknown",
+        )
+        raise LLMRefusalError("[config.llm] Claude 拒絕回應此請求（refusal）", category=category)
+    return response
+
+
+def _snapshot(stream):
+    """串流到目前為止的訊息快照（含 usage）；還沒收到任何事件或取不到就回傳 None，用量欄位留空。"""
+    try:
+        return stream.current_message_snapshot if stream is not None else None
+    except Exception:
+        return None
 
 
 def extract_text(response) -> str:

@@ -317,7 +317,7 @@ class ChatViewServerProfileTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
         load_profile.assert_called_once_with("real-uid")
-        profile = run_chat.call_args.args[3]
+        profile = run_chat.call_args.kwargs["profile"]
         self.assertEqual(profile["level"], "server")
         self.assertNotIn("forged", json.dumps(profile))
         self.assertIsNotNone(run_chat.call_args.kwargs["lookup"])

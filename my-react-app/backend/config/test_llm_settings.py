@@ -33,7 +33,19 @@ class DefaultsTests(TestCase):
 class ModelResolutionTests(TestCase):
     def test_global_model_applies_to_every_feature(self):
         with _env(LLM_MODEL="claude-sonnet-5-5"):
-            self.assertEqual({get_settings(f).model for f in llm_settings.FEATURES}, {"claude-sonnet-5-5"})
+            heavy = [f for f in llm_settings.FEATURES if f not in ("route", "light")]
+            self.assertEqual({get_settings(f).model for f in heavy}, {"claude-sonnet-5-5"})
+
+    def test_routing_and_light_chat_default_to_haiku_and_ignore_the_global_model(self):
+        # 路線圖 #8：這兩個功能存在的目的就是比主模型便宜，全域換大模型時不連帶變貴
+        with _env(LLM_MODEL="claude-opus-5-5"):
+            self.assertEqual(get_settings("route").model, "claude-haiku-5-5")
+            self.assertEqual(get_settings("light").model, "claude-haiku-5-5")
+        with _env(LLM_MODEL_ROUTE="claude-sonnet-5-5"):
+            self.assertEqual(get_settings("route").model, "claude-sonnet-5-5")
+        # effort 預設不傳：Haiku 是否接受 effort 參數未經實測
+        with _env():
+            self.assertIsNone(get_settings("route").effort)
 
     def test_feature_model_beats_global_model(self):
         with _env(LLM_MODEL="claude-sonnet-5-5", LLM_MODEL_REVIEW="claude-haiku-5-5"):

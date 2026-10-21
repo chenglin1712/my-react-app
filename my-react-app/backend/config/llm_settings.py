@@ -8,6 +8,11 @@ FastAPI（翻譯）兩個 process 共用，只靠環境變數與這裡的預設�
   plan       AI 助手的讀書計畫（結構化輸出，只回 JSON）
   review     錯題／句子補充說明
   translate  族語翻譯
+  route      意圖路由：先用便宜的模型判斷訊息屬於哪一類，再決定怎麼回（路線圖 #8）
+  light      閒聊的簡短回覆（意圖路由判斷為閒聊時使用，不查辭典、不讀學習資料）
+
+預設模型的優先順序：LLM_MODEL_<FEATURE> > 該功能自己的預設（route、light 是 Haiku）> LLM_MODEL > DEFAULT_MODEL。
+route、light 刻意不跟著 LLM_MODEL 走：它們存在的目的就是比主模型便宜，全域換成更大的模型時不該連帶變貴。
 
 環境變數（FEATURE 為上面四個名稱的大寫）：
   LLM_MODEL                全部功能預設使用的模型
@@ -27,6 +32,9 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# 意圖路由與閒聊用的輕量模型（價目見 adminapi/ai_usage.py）
+LIGHT_MODEL = "claude-haiku-5-5"
+
 # Claude Sonnet 5——此專案的用途是短句翻譯／學生對話回覆，不需要 Opus 5 的
 # 最強推理能力；Sonnet 5 品質已足夠，成本約為 Opus 5 的 4 折（經使用者確認）。
 DEFAULT_MODEL = "claude-sonnet-5"
@@ -44,6 +52,8 @@ class _FeatureDefaults:
     # None 代表「不傳 effort」，使用模型的預設值（維持原本行為）。
     effort: Optional[str]
     max_tokens: int
+    # None 代表沿用 LLM_MODEL／DEFAULT_MODEL
+    model: Optional[str] = None
 
 
 # 讀書計畫已拆成專用的結構化輸出呼叫（plan，路線圖 #10），chat 只剩短回覆，
@@ -56,6 +66,10 @@ _FEATURE_DEFAULTS = {
     "plan": _FeatureDefaults(effort="medium", max_tokens=4096),
     "review": _FeatureDefaults(effort="low", max_tokens=1024),
     "translate": _FeatureDefaults(effort=None, max_tokens=4096),
+    # 分類輸出只有一小段 JSON；effort 不傳（Haiku 是否接受 effort 參數未經實測，傳錯會整個 400），
+    # 之後實測可以用 LLM_EFFORT_ROUTE 打開。
+    "route": _FeatureDefaults(effort=None, max_tokens=256, model=LIGHT_MODEL),
+    "light": _FeatureDefaults(effort=None, max_tokens=512, model=LIGHT_MODEL),
 }
 
 FEATURES = tuple(_FEATURE_DEFAULTS)
@@ -73,9 +87,10 @@ def _clean(value: Optional[str]) -> str:
     return (value or "").strip()
 
 
-def _resolve_model(feature: str) -> str:
+def _resolve_model(feature: str, feature_default: Optional[str]) -> str:
     return (
         _clean(os.getenv(f"LLM_MODEL_{feature.upper()}"))
+        or feature_default
         or _clean(os.getenv("LLM_MODEL"))
         or DEFAULT_MODEL
     )
@@ -121,7 +136,7 @@ def get_settings(feature: str) -> LLMSettings:
         raise ValueError(f"未知的 LLM 功能名稱：{feature!r}（可用：{', '.join(FEATURES)}）")
     return LLMSettings(
         feature=feature,
-        model=_resolve_model(feature),
+        model=_resolve_model(feature, defaults.model),
         effort=_resolve_effort(feature, defaults.effort),
         max_tokens=_resolve_max_tokens(feature, defaults.max_tokens),
     )

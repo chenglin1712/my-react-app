@@ -18,7 +18,13 @@ services:
     network_mode: host
     # --timeout 必須大於 LLM 最長等待（config/llm.py：約 55 秒），否則 gunicorn 會在 LLM
     # 逾時處理執行前就強制殺掉 worker；同時要小於 nginx 的 proxy_read_timeout（90 秒）。
-    command: sh -c "python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn core.wsgi:application --workers 3 --timeout 75 --graceful-timeout 15 --bind 127.0.0.1:8000"
+    #
+    # gthread：AI 助手的串流回覆（AIModel.views.tayal_chat_stream）一次占用一條連線數十秒。
+    # 原本 3 個 sync worker 只能同時處理 3 個請求，三個人同時在串流，其他所有請求（含 /health/）都得排隊；
+    # 改成每個 worker 4 條執行緒（共 12 條）。gthread 的 --timeout 是「worker 主執行緒多久沒回報」，
+    # 不是單一請求的時間，所以長串流不會被誤殺；串流端點自己有 55 秒的整體期限。
+    # 每條執行緒各自連資料庫，連線數上限是 workers × threads = 12，要小於 PostgreSQL 的 max_connections。
+    command: sh -c "python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn core.wsgi:application --workers 3 --worker-class gthread --threads 4 --timeout 75 --graceful-timeout 15 --bind 127.0.0.1:8000"
     volumes:
       - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
       - ./logs:/app/logs

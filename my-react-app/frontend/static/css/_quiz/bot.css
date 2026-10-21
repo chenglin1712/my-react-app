@@ -321,6 +321,75 @@
   }
 }
 
+/* 按下去有回饋：縮到 0.97，鬆開 160ms 彈回（不用 all，只動 transform） */
+.send-button {
+    transition: var(--transition-interactive), transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.send-button.active:active,
+.send-button.stop:active {
+    transform: scale(0.97);
+}
+
+/* 回覆進行中，發送鈕換成「停止」：用外框而不是實心，和主要動作區分，但仍清楚可點 */
+.send-button.stop {
+    background: transparent;
+    color: var(--yy-calm-accent);
+    border: 1px solid var(--yy-calm-accent);
+    cursor: pointer;
+}
+
+/* 中斷的回覆：保留已顯示的文字，底下一行說明與重試 */
+.bot-interrupted {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--yy-calm-rule);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
+}
+
+.bot-retry {
+    min-height: 44px;
+    padding: 0 12px;
+    margin: -8px 0;
+    background: transparent;
+    color: var(--yy-calm-accent);
+    border: 0;
+    font: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+    transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.bot-retry:active {
+    transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .send-button,
+    .bot-retry {
+        transition: none;
+    }
+
+    /* 等待回覆的三個點不再持續跳動、新訊息不再位移進場（保留點點本身作為「正在回覆」的提示） */
+    .typing-indicator span,
+    .bot-message {
+        animation: none;
+    }
+
+    .send-button.active:active,
+    .send-button.stop:active,
+    .bot-retry:active {
+        transform: none;
+    }
+}
+
 @keyframes bot-bounce {
     0%,
     60%,

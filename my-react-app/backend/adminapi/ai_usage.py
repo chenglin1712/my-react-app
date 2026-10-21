@@ -96,7 +96,8 @@ class _Bucket:
 
     def add(self, row):
         self.calls += row["calls"]
-        if row["status"] != "ok":
+        # cancelled＝使用者在串流中途按了停止，不是供應商或程式的失敗
+        if row["status"] not in ("ok", "cancelled"):
             self.errors += row["calls"]
         self.input += row["input"]
         self.output += row["output"]

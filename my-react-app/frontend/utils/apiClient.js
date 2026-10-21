@@ -101,6 +101,137 @@ export function apiPost(url, data, options = {}) {
   return executeApi(options, (config) => axios.post(url, data, config));
 }
 
+/** 串流中途多久沒收到任何資料就當作斷線（毫秒）。伺服器在查辭典或等模型時可能十幾秒沒有新文字，
+ * 所以比一般逾時寬鬆，但要比後端的串流總期限（55 秒）短，卡住的連線才不會讓畫面一直停在回覆中。 */
+export const STREAM_IDLE_TIMEOUT_MS = 40000;
+
+/** 把一段 SSE 文字（可能含多個以空行分隔的事件）拆成 [{event, data}]；回傳剩下尚未收完整的片段。 */
+function parseSse(buffer) {
+  const events = [];
+  let rest = buffer;
+  for (let end = rest.indexOf('\n\n'); end !== -1; end = rest.indexOf('\n\n')) {
+    const block = rest.slice(0, end);
+    rest = rest.slice(end + 2);
+    let event = 'message';
+    const dataLines = [];
+    for (const line of block.split('\n')) {
+      if (line.startsWith('event:')) event = line.slice(6).trim();
+      else if (line.startsWith('data:')) dataLines.push(line.slice(5).replace(/^ /, ''));
+    }
+    if (!dataLines.length) continue;
+    try {
+      events.push({ event, data: JSON.parse(dataLines.join('\n')) });
+    } catch {
+      // 壞掉的事件略過；少一個片段不該讓整段回覆失敗，最後的 done 事件會帶完整文字
+    }
+  }
+  return { events, rest };
+}
+
+/**
+ * POST 後以 Server-Sent Events 讀取串流回覆（AI 助手，路線圖 #9）。
+ *
+ * 用 fetch 而不是 axios：瀏覽器端的 axios 讀不到逐段到達的回應本體。token 與 ApiError 的形狀
+ * 沿用 apiPost，呼叫端的錯誤處理（status、data.code）不用分兩套。
+ *
+ * - onDelta(text)：每收到一段文字就呼叫。
+ * - 成功時回傳 done 事件的內容（完整文字、簽章、額度…）。
+ * - 開始串流前的錯誤（401、403、429、400…）是一般 JSON，丟出帶 status 與 data 的 ApiError。
+ * - 串流中途的 error 事件、斷線、閒置逾時，丟出 ApiError；error.partial 為 true 代表已經收到過部分文字。
+ * - 呼叫端用 options.signal 中止時，原樣丟出 AbortError，由呼叫端判斷是使用者按了停止還是離開頁面。
+ */
+export async function apiStream(url, data, { signal, onDelta, idleTimeoutMs = STREAM_IDLE_TIMEOUT_MS } = {}) {
+  const headers = { 'Content-Type': 'application/json', Accept: 'text/event-stream', ...(await authHeaders()) };
+
+  // 內部的 controller 同時服務「呼叫端中止」與「閒置逾時」；兩者要分得出來，所以逾時用自己的旗標
+  const controller = new AbortController();
+  let idleTimedOut = false;
+  let idleTimer;
+  const armIdle = () => {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { idleTimedOut = true; controller.abort(); }, idleTimeoutMs);
+  };
+  const onCallerAbort = () => controller.abort();
+  if (signal) {
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener('abort', onCallerAbort, { once: true });
+  }
+
+  let received = false;
+  let reader;
+  try {
+    armIdle();
+    const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(data), signal: controller.signal });
+    if (!response.ok) {
+      const body = await response.json().catch(() => undefined);
+      throw new ApiError(extractMessage(body?.detail) || extractMessage(body?.error) || '請求失敗', { status: response.status, data: body });
+    }
+    if (!response.body) throw new ApiError('瀏覽器不支援串流回應', { status: response.status });
+
+    reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    // SSE 的換行可以是 \n、\r\n 或單獨的 \r，而且 \r 與 \n 可能被切在兩個封包。結尾的 \r 先留到下一個封包，
+    // 才分得出它是單獨的換行還是 \r\n 的前半；否則 \r 變成 \n 之後再接一個 \n，會多出一個假的事件分隔。
+    let heldCarriageReturn = '';
+    const normalize = (text) => {
+      let joined = heldCarriageReturn + text;
+      heldCarriageReturn = '';
+      if (joined.endsWith('\r')) {
+        heldCarriageReturn = '\r';
+        joined = joined.slice(0, -1);
+      }
+      return joined.replace(/\r\n|\r/g, '\n');
+    };
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        buffer += normalize(decoder.decode()) + heldCarriageReturn.replace('\r', '\n');
+        break;
+      }
+      armIdle();
+      buffer += normalize(decoder.decode(value, { stream: true }));
+      const parsed = parseSse(buffer);
+      buffer = parsed.rest;
+      for (const { event, data: payload } of parsed.events) {
+        if (event === 'delta') {
+          received = true;
+          onDelta?.(payload.t);
+        } else if (event === 'done') {
+          return payload;
+        } else if (event === 'error') {
+          const err = new ApiError(payload.detail || '回覆中斷', { status: payload.status, data: payload });
+          err.partial = received;
+          throw err;
+        }
+      }
+    }
+    // 連線結束卻沒有 done：不能把半截文字當成完整回覆（結尾殘留的最後一個事件先解析，它可能就是 done）
+    for (const { event, data: payload } of parseSse(`${buffer}\n\n`).events) {
+      if (event === 'done') return payload;
+    }
+    const err = new ApiError('回覆中斷', { data: { interrupted: true } });
+    err.partial = received;
+    throw err;
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
+    if (idleTimedOut) {
+      const timeout = new ApiError('伺服器太久沒有回應，請重試', { timedOut: true, data: { interrupted: true } });
+      timeout.partial = received;
+      throw timeout;
+    }
+    if (signal?.aborted) throw err;
+    const failure = new ApiError(err.message || '網路連線中斷', { data: { interrupted: true } });
+    failure.partial = received;
+    throw failure;
+  } finally {
+    clearTimeout(idleTimer);
+    signal?.removeEventListener('abort', onCallerAbort);
+    // 收到 done 就結束時連線可能還開著（代理延遲關閉等）：主動取消，把連線還給瀏覽器
+    reader?.cancel?.()?.catch?.(() => {});
+  }
+}
+
 /** 值得重試的暫時性失敗：連不到伺服器（沒有 response）、或閘道回 502/503/504。
  * 只有 GET 會自動重試（讀取是冪等的）；POST/PUT/PATCH/DELETE 重送可能造成重複寫入，一律不重試。 */
 const RETRY_DELAY_MS = 600;
