@@ -77,6 +77,38 @@ describe('AIAssistantOverlay（回歸測試：注音/拼音輸入法選字時的
     expect(await screen.findByText('你好！')).toBeInTheDocument();
   });
 
+  test('追問時把前面的對話一起送出，第一句沒有上文；失敗的那一輪不會被當成上文', async () => {
+    apiPost.mockResolvedValueOnce({ message: '加油的意思' }).mockResolvedValueOnce({ message: '唸作 lokah' });
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), 'lokah 是什麼意思{Enter}');
+    await screen.findByText('加油的意思');
+    await user.type(screen.getByLabelText('輸入訊息'), '它怎麼唸{Enter}');
+    await screen.findByText('唸作 lokah');
+
+    expect(apiPost.mock.calls[0][1].history).toEqual([]);
+    expect(apiPost.mock.calls[1][1].history).toEqual([
+      { role: 'user', text: 'lokah 是什麼意思' },
+      { role: 'assistant', text: '加油的意思' },
+    ]);
+  });
+
+  test('同一個事件迴圈內連按兩次 Enter 也只送出一次', async () => {
+    let resolveApiPost;
+    apiPost.mockImplementation(() => new Promise((resolve) => { resolveApiPost = resolve; }));
+    const { fireEvent } = await import('@testing-library/react');
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+    const input = screen.getByLabelText('輸入訊息');
+
+    fireEvent.change(input, { target: { value: '你好' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(apiPost).toHaveBeenCalledTimes(1);
+    resolveApiPost({ message: '回應' });
+  });
+
   test('回應還在等待時，輸入框標示忙碌、發送鈕標示不可用，且不能連續送出（不用 disabled，焦點才不會掉走）', async () => {
     let resolveApiPost;
     apiPost.mockImplementation(() => new Promise((resolve) => { resolveApiPost = resolve; }));

@@ -4,11 +4,12 @@ FastAPI（翻譯）兩個 process 共用，只靠環境變數與這裡的預設�
 那是另一種成本；這裡的設定不需要秒級即時生效，部署時調環境變數即可）。
 
 功能（feature）：
-  chat       AI 助手聊天（一般對話、學習狀況分析、讀書計畫）
+  chat       AI 助手聊天（一般對話、學習狀況分析）
+  plan       AI 助手的讀書計畫（結構化輸出，只回 JSON）
   review     錯題／句子補充說明
   translate  族語翻譯
 
-環境變數（FEATURE 為上面三個名稱的大寫）：
+環境變數（FEATURE 為上面四個名稱的大寫）：
   LLM_MODEL                全部功能預設使用的模型
   LLM_MODEL_<FEATURE>      單一功能的模型，優先於 LLM_MODEL
   LLM_EFFORT_<FEATURE>     單一功能的 effort：low／medium／high／xhigh／max；
@@ -45,13 +46,14 @@ class _FeatureDefaults:
     max_tokens: int
 
 
-# chat 目前同一個呼叫同時負責一般對話與讀書計畫 JSON，所以用 medium，
-# 等計畫改成專用的結構化輸出呼叫後（路線圖 #10）一般對話可再降到 low。
+# 讀書計畫已拆成專用的結構化輸出呼叫（plan，路線圖 #10），chat 只剩短回覆，
+# 之後有評測資料（#29）再決定是否把 chat 降到 low；目前維持 medium 不擅自改品質。
 # review 是 50 字內的補充說明，low 即可。translate 的輸出是帶證據的 JSON 且
 # 翻譯品質是核心，維持模型預設，不擅自降低。
 # max_tokens 都留了思考所需的空間（思考用掉的 token 也算在 max_tokens 內）。
 _FEATURE_DEFAULTS = {
     "chat": _FeatureDefaults(effort="medium", max_tokens=4096),
+    "plan": _FeatureDefaults(effort="medium", max_tokens=4096),
     "review": _FeatureDefaults(effort="low", max_tokens=1024),
     "translate": _FeatureDefaults(effort=None, max_tokens=4096),
 }

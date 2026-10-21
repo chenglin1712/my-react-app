@@ -164,6 +164,29 @@ class CircuitBreakerTests(TestCase):
         _, kwargs = inner.messages.create.call_args
         self.assertNotIn("output_config", kwargs)
 
+    def test_output_schema_adds_json_schema_format_next_to_effort(self):
+        inner = MagicMock()
+        inner.messages.create.return_value = MagicMock(
+            stop_reason="end_turn", content=[MagicMock(type="text", text="{}")],
+        )
+        schema = {"type": "object", "properties": {}, "additionalProperties": False}
+        llm.call_claude(inner, feature="plan", system="s", messages=[], output_schema=schema)
+        _, kwargs = inner.messages.create.call_args
+        self.assertEqual(kwargs["output_config"], {
+            "effort": llm.get_settings("plan").effort,
+            "format": {"type": "json_schema", "schema": schema},
+        })
+
+    def test_output_schema_works_without_effort(self):
+        inner = MagicMock()
+        inner.messages.create.return_value = MagicMock(
+            stop_reason="end_turn", content=[MagicMock(type="text", text="{}")],
+        )
+        with patch.dict("os.environ", {"LLM_EFFORT_PLAN": "default"}):
+            llm.call_claude(inner, feature="plan", system="s", messages=[], output_schema={"type": "object"})
+        _, kwargs = inner.messages.create.call_args
+        self.assertEqual(list(kwargs["output_config"]), ["format"])
+
 
 class UsageRecordingTests(TestCase):
     """每次呼叫（含失敗）都交給已註冊的寫入端；寫入端出錯不能影響 LLM 呼叫。"""

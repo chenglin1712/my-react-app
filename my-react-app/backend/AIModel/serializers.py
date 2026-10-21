@@ -31,10 +31,27 @@ class UserStatsSerializer(serializers.Serializer):
     level = serializers.CharField(max_length=50, allow_blank=True, required=False, default="beginner")
 
 
+HISTORY_MAX_MESSAGES = 10
+
+
+class HistoryMessageSerializer(serializers.Serializer):
+    role = serializers.ChoiceField(choices=["user", "assistant"])
+    # 與當前問題同樣上限 1000 字；助手的回覆本來就約 100 字內，讀書計畫只送確認訊息。
+    text = serializers.CharField(max_length=1000, allow_blank=False, trim_whitespace=True)
+
+
 class TayalChatSerializer(serializers.Serializer):
     message = serializers.CharField(max_length=1000, allow_blank=False, trim_whitespace=True)
     user_stats = UserStatsSerializer(required=False, default=dict)
     tribe = serializers.ChoiceField(choices=_TRIBE_CHOICES, required=False, default="tayal")
+    # 前幾輪對話（較舊的在前），讓助手看得懂追問。超過筆數或單則長度上限直接 400，
+    # 不默默截斷，避免呼叫端以為整段都送出去了。
+    history = HistoryMessageSerializer(many=True, required=False, default=list, max_length=HISTORY_MAX_MESSAGES)
+
+    def validate_history(self, value):
+        if value and value[0]["role"] != "user":
+            raise serializers.ValidationError("對話紀錄的第一則必須是使用者的訊息")
+        return value
 
 
 class ReviewTayalChatSerializer(serializers.Serializer):

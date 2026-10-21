@@ -3,6 +3,7 @@ import { useId, useState, useRef, useEffect } from "react";
 import { Bot, ChevronDown } from "lucide-react"
 import { useNavigate } from "react-router-dom";
 import StudyPlanComponent from "./bot_study_plan"
+import { buildHistory } from "./botHistory"
 import { useAuth } from "../../src/userServives/authContext";
 import { getUserSituation } from "../../src/userServives/uploadDb";
 import { TRIBES } from "../../src/constants/tribes";
@@ -56,6 +57,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     const inputRef = useRef(null);
     const mountedRef = useRef(true);
     const abortControllerRef = useRef(null);
+    const sendingRef = useRef(false);
     const [userStats, setUserStats] = useState({
         correct: 0, incorrect: 0, unanswered: 0, common_errors: [], level: "beginner"
     });
@@ -142,6 +144,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                 id: crypto.randomUUID(),
                 text: `已切換為${tribeLabel(nextTribe)}，接下來的問題會以${tribeLabel(nextTribe)}回答。`,
                 role: "bot",
+                isNote: true, // 對話記憶的分隔線，見 botHistory.js
             }];
         });
     };
@@ -152,7 +155,9 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
 
     //傳送訊息
     const handleSend = async () => {
-        if (input.trim() === "" || isPending) return;
+        // isPending 是 state，同一個事件迴圈內連按兩次還看不到更新，用 ref 同步擋住重複送出
+        if (input.trim() === "" || isPending || sendingRef.current) return;
+        sendingRef.current = true;
 
         // 送出鈕與輸入框都不再用 disabled 擋住等待中的狀態（disabled 會讓焦點掉回 body，
         // 每則訊息都得重新點輸入框），改成 aria-disabled / aria-busy，並把焦點留在輸入框（審查項 P1-6）。
@@ -169,7 +174,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
         try {
             const data = await apiPost(
                 import.meta.env.VITE_API_AI_BOT_URL,
-                { message: userText, user_stats: userStats, tribe },
+                { message: userText, user_stats: userStats, tribe, history: buildHistory(messages) },
                 { signal: controller.signal },
             );
             if (!mountedRef.current) return;
@@ -196,11 +201,13 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                 text: serviceOff
                     ? (error?.data?.detail || "AI 助手目前暫停服務，請稍後再試。")
                     : "很抱歉，無法取得回應，請稍後再試。",
-                role: "bot"
+                role: "bot",
+                isError: true,
             };
             setMessages(prev => [...prev, errorResponse]);
             console.error("取得回應失敗:", error);
         } finally {
+            sendingRef.current = false;
             if (mountedRef.current) setIsPending(false);
         }
     };

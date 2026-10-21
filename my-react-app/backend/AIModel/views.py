@@ -101,7 +101,10 @@ def tayal_chat(request):
         tribe_name = TRIBE_MAP.get(tribe, "泰雅語")
 
         try:
-            result = run_tayal_chat(client, tribe_name, user_message, user_stats, uid=decoded.get("uid", ""))
+            result = run_tayal_chat(
+                client, tribe_name, user_message, user_stats,
+                uid=decoded.get("uid", ""), history=validated.get("history", []),
+            )
             return JsonResponse(result)
 
         except Exception:

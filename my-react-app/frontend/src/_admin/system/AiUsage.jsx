@@ -19,6 +19,7 @@ const RANGE_OPTIONS = [
 // 不認得的代號（日後新增功能）原樣顯示，不會整列消失。
 const FEATURE_LABELS = {
     chat: 'AI 助手聊天',
+    plan: 'AI 助手讀書計畫',
     review: '錯題補充說明',
     translate: '族語翻譯',
 };

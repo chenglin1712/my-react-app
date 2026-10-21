@@ -215,12 +215,21 @@ def _record_usage(*, feature, uid, model, started, status, response=None):
         logger.warning("[config.llm] 用量紀錄失敗（不影響 LLM 呼叫）", exc_info=True)
 
 
-def call_claude(client, *, feature: str, system: str, messages: list, uid: str | None = None):
+class LLMRefusalError(RuntimeError):
+    """模型拒絕回應（stop_reason == refusal）。是模型的決定而不是供應商故障，
+    呼叫端可以選擇回友善訊息而不是 502；仍是 RuntimeError，原本的處理不受影響。"""
+
+
+def call_claude(client, *, feature: str, system: str, messages: list, uid: str | None = None,
+                output_schema: dict | None = None):
     """所有 LLM 請求的唯一出口：斷路器 → 請求 → 紀錄 → 拒答檢查，回傳 SDK 原生的 Message。
 
     模型、effort 與 max_tokens 由 feature 對應的設定決定（見 config/llm_settings.py），
     呼叫端不再各自指定。取樣參數（temperature 等）刻意不開放：是否支援因模型而異，
     之前的轉接層也一律不轉發，這裡維持同樣行為，避免換模型時變成呼叫端要煩惱的事。
+
+    output_schema：給 JSON Schema 時走結構化輸出（output_config.format），回應文字保證是
+    符合 schema 的 JSON；與 effort 並存於同一個 output_config。
 
     順序很重要：供應商請求一成功就立刻 record_success，之後的紀錄與拒答檢查出任何
     狀況都不能反過來影響斷路器；拒答（refusal）是模型的決定，不代表供應商故障，
@@ -234,8 +243,13 @@ def call_claude(client, *, feature: str, system: str, messages: list, uid: str |
         "system": system,
         "messages": messages,
     }
+    output_config = {}
     if settings.effort:
-        request["output_config"] = {"effort": settings.effort}
+        output_config["effort"] = settings.effort
+    if output_schema is not None:
+        output_config["format"] = {"type": "json_schema", "schema": output_schema}
+    if output_config:
+        request["output_config"] = output_config
 
     try:
         is_probe = _breaker.before_call()
@@ -267,7 +281,7 @@ def call_claude(client, *, feature: str, system: str, messages: list, uid: str |
     )
 
     if refused:
-        raise RuntimeError("[config.llm] Claude 拒絕回應此請求（refusal）")
+        raise LLMRefusalError("[config.llm] Claude 拒絕回應此請求（refusal）")
 
     return response
 
