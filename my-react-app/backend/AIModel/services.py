@@ -13,7 +13,7 @@ prompt 樣板、外部 API 呼叫、回應解析全部塞在同一個函式裡�
 import datetime
 import json
 
-from config.llm import DEFAULT_MODEL
+from config.llm import DEFAULT_MODEL, call_claude, extract_text
 
 
 def build_chat_prompt(tribe_name: str, level, correct, incorrect, unanswered, common_errors, today, tomorrow) -> str:
@@ -101,14 +101,13 @@ def run_tayal_chat(client, tribe_name: str, user_message: str, user_stats: dict)
     tomorrow = (today + datetime.timedelta(days=1)).isoformat()
     prompt = build_chat_prompt(tribe_name, level, correct, incorrect, unanswered, common_errors, today, tomorrow)
 
-    response = client.chat.completions.create(
+    response = call_claude(
+        client,
         model=DEFAULT_MODEL,
-        messages=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": user_message}
-        ]
+        system=prompt,
+        messages=[{"role": "user", "content": user_message}],
     )
-    result = response.choices[0].message.content or ""
+    result = extract_text(response)
 
     plan_data = _extract_study_plan(result)
     if plan_data:
@@ -156,14 +155,13 @@ def run_review_tayal_chat(client, tribe_name: str, user_message: str, relevant_w
 
     prompt = build_review_prompt(tribe_name, words_context)
 
-    response = client.chat.completions.create(
+    response = call_claude(
+        client,
         model=DEFAULT_MODEL,
-        messages=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": user_message}
-        ]
+        system=prompt,
+        messages=[{"role": "user", "content": user_message}],
     )
-    ai_text = response.choices[0].message.content
+    ai_text = extract_text(response)
 
     return {
         "original": user_message,

@@ -275,7 +275,7 @@ LOGGING = get_logging_config("django.log")
 
 # 錯誤追蹤／告警（選用，設定 SENTRY_DSN 後才會啟用）。原本沒有接任何錯誤追蹤
 # 服務，結構化 log 只寫在容器本機檔案，Cloud Run/Render 重啟就消失，出錯（含
-# 呼叫 Google Vision、GitHub Models 這些按用量計費的外部服務失敗）不會有人
+# 呼叫 Google Vision、Anthropic 這些按用量計費的外部服務失敗）不會有人
 # 主動被通知。未設定 SENTRY_DSN 時完全不影響現有行為。共用邏輯見
 # config/sentry_init.py（FastAPI 端 fastAPI/main.py 呼叫同一個函式）。
 def _django_sentry_integrations():

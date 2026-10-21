@@ -122,7 +122,7 @@ async def translate_endpoint(request: Request, body: TranslateRequest, db: Sessi
             return _guest_denied_response(quota)
 
     try:
-        # 檢索＋LLM 呼叫都是阻塞式操作（DB 查詢＋同步的 openai client），
+        # 檢索＋LLM 呼叫都是阻塞式操作（DB 查詢＋同步的 Anthropic client），
         # 丟到執行緒池執行，避免卡住 event loop——跟 dictionary/search.py
         # 對 _search_multi_words 的既有作法一致。
         result = await asyncio.to_thread(service.translate, db, body.tribe, body.direction, body.text)

@@ -76,7 +76,7 @@ class TestTranslateEndpoint:
 
     def test_missing_llm_token_returns_503(self, client):
         with patch("fastAPI.routes.translation.api.service.translate",
-                    side_effect=EnvironmentError("GITHUB_TOKEN 未設定")):
+                    side_effect=EnvironmentError("ANTHROPIC_API_KEY 未設定")):
             resp = client.post("/api/v1/translation/translate",
                                 json={"text": "hello", "tribe": "tayal", "direction": "zh2tribe"})
         assert resp.status_code == 503

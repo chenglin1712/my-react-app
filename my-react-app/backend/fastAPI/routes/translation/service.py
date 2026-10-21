@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
-from config.llm import get_llm_client, DEFAULT_MODEL
+from config.llm import get_llm_client, call_claude, extract_text, DEFAULT_MODEL
 from config.tribes import TRIBE_IDS, TRIBE_MAP
 from dictionary_db.model import GrammarAffix
 
@@ -211,16 +211,13 @@ def _parse_llm_json(raw: str) -> dict | None:
 
 
 def _call_llm(prompt: str, user_message: str) -> str:
-    client = get_llm_client()
-    response = client.chat.completions.create(
+    response = call_claude(
+        get_llm_client(),
         model=DEFAULT_MODEL,
-        temperature=0,
-        messages=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": user_message},
-        ],
+        system=prompt,
+        messages=[{"role": "user", "content": user_message}],
     )
-    return response.choices[0].message.content or ""
+    return extract_text(response)
 
 
 def _translate_zh2tribe(db: Session, tribe_id: str, tribe_slug: str, tribe_full_name: str,

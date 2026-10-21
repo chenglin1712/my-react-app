@@ -24,14 +24,19 @@ def _bad_request_error():
     return anthropic.BadRequestError("bad", response=httpx.Response(400, request=_request()), body=None)
 
 
-def _completions(create_side_effect=None, text="ok"):
+def _caller(create_side_effect=None, text="ok", stop_reason="end_turn"):
+    """回傳 (call, inner)：call() 透過 llm.call_claude 發一次請求，inner 是假的 SDK client。"""
     inner = MagicMock()
     if create_side_effect is not None:
         inner.messages.create.side_effect = create_side_effect
     else:
         block = MagicMock(type="text", text=text)
-        inner.messages.create.return_value = MagicMock(stop_reason="end_turn", content=[block])
-    return llm._ChatCompletions(inner), inner
+        inner.messages.create.return_value = MagicMock(stop_reason=stop_reason, content=[block])
+
+    def call():
+        return llm.call_claude(inner, model="m", system="s", messages=[{"role": "user", "content": "hi"}])
+
+    return call, inner
 
 
 class ClassifyLlmErrorTests(TestCase):
@@ -53,35 +58,114 @@ class CircuitBreakerTests(TestCase):
         self.addCleanup(patcher.stop)
 
     def test_opens_after_consecutive_transient_failures_and_skips_provider(self):
-        comp, inner = _completions(create_side_effect=_timeout_error())
+        call, inner = _caller(create_side_effect=_timeout_error())
         for _ in range(3):
             with self.assertRaises(anthropic.APITimeoutError):
-                comp.create(model="m", messages=[{"role": "user", "content": "hi"}])
+                call()
         self.assertEqual(inner.messages.create.call_count, 3)
 
         with self.assertRaises(llm.LLMUnavailableError):
-            comp.create(model="m", messages=[{"role": "user", "content": "hi"}])
+            call()
         self.assertEqual(inner.messages.create.call_count, 3)  # 第 4 次沒有打到供應商
 
     def test_success_resets_failure_count(self):
-        bad, _ = _completions(create_side_effect=_rate_limit_error())
-        good, _ = _completions()
+        bad, _ = _caller(create_side_effect=_rate_limit_error())
+        good, _ = _caller()
         for _ in range(2):
             with self.assertRaises(anthropic.RateLimitError):
-                bad.create(model="m", messages=[{"role": "user", "content": "x"}])
-        good.create(model="m", messages=[{"role": "user", "content": "x"}])
+                bad()
+        good()
         for _ in range(2):
             with self.assertRaises(anthropic.RateLimitError):
-                bad.create(model="m", messages=[{"role": "user", "content": "x"}])
+                bad()
         # 成功之後重新計數，4 次失敗中間夾一次成功，不會達到門檻 3
-        good.create(model="m", messages=[{"role": "user", "content": "x"}])
+        good()
 
     def test_non_transient_errors_do_not_count(self):
-        comp, inner = _completions(create_side_effect=_bad_request_error())
+        call, inner = _caller(create_side_effect=_bad_request_error())
         for _ in range(5):
             with self.assertRaises(anthropic.BadRequestError):
-                comp.create(model="m", messages=[{"role": "user", "content": "x"}])
+                call()
         self.assertEqual(inner.messages.create.call_count, 5)
+
+    def test_refusal_raises_but_does_not_count_as_provider_failure(self):
+        """拒答是模型的決定，不是供應商故障：丟出例外讓呼叫端回錯誤，但不累計斷路器失敗。"""
+        refused, inner = _caller(stop_reason="refusal")
+        for _ in range(5):
+            with self.assertRaises(RuntimeError):
+                refused()
+        self.assertEqual(inner.messages.create.call_count, 5)  # 門檻 3，沒被擋下
+
+    def test_rejected_by_open_breaker_never_touches_provider_or_probe_slot(self):
+        breaker = MagicMock()
+        breaker.before_call.side_effect = llm.LLMUnavailableError("open")
+        call, inner = _caller()
+        with patch.object(llm, "_breaker", breaker):
+            with self.assertRaises(llm.LLMUnavailableError):
+                call()
+        inner.messages.create.assert_not_called()
+        breaker.abort_probe.assert_not_called()
+
+    def test_probe_with_non_transient_error_releases_probe_slot(self):
+        breaker = MagicMock()
+        breaker.before_call.return_value = True  # 這次是試探請求
+        call, _ = _caller(create_side_effect=_bad_request_error())
+        with patch.object(llm, "_breaker", breaker):
+            with self.assertRaises(anthropic.BadRequestError):
+                call()
+        breaker.abort_probe.assert_called_once()
+        breaker.record_failure.assert_not_called()
+
+    def test_probe_with_transient_error_records_failure_not_abort(self):
+        breaker = MagicMock()
+        breaker.before_call.return_value = True
+        call, _ = _caller(create_side_effect=_timeout_error())
+        with patch.object(llm, "_breaker", breaker):
+            with self.assertRaises(anthropic.APITimeoutError):
+                call()
+        breaker.record_failure.assert_called_once_with(True)
+        breaker.abort_probe.assert_not_called()
+
+    def test_success_is_recorded_before_refusal_is_raised(self):
+        breaker = MagicMock()
+        breaker.before_call.return_value = False
+        call, _ = _caller(stop_reason="refusal")
+        with patch.object(llm, "_breaker", breaker):
+            with self.assertRaises(RuntimeError):
+                call()
+        breaker.record_success.assert_called_once_with(False)
+        breaker.record_failure.assert_not_called()
+
+    def test_response_without_usage_or_request_id_still_succeeds(self):
+        """紀錄用量／request id 只是附帶的；欄位缺漏不能讓已成功的呼叫變失敗。"""
+        call, inner = _caller()
+        inner.messages.create.return_value = MagicMock(
+            spec=["stop_reason", "content"], stop_reason="end_turn",
+            content=[MagicMock(type="text", text="ok")],
+        )
+        self.assertEqual(llm.extract_text(call()), "ok")
+
+    def test_request_shape_is_native_anthropic(self):
+        call, inner = _caller()
+        call()
+        _, kwargs = inner.messages.create.call_args
+        self.assertEqual(kwargs["system"], "s")
+        self.assertEqual(kwargs["messages"], [{"role": "user", "content": "hi"}])
+        self.assertEqual(kwargs["max_tokens"], llm._MAX_TOKENS)
+        self.assertNotIn("temperature", kwargs)
+
+
+class ExtractTextTests(TestCase):
+    def test_joins_text_blocks_and_skips_other_types(self):
+        response = MagicMock(content=[
+            MagicMock(type="thinking", text="不該出現"),
+            MagicMock(type="text", text="哈"),
+            MagicMock(type="text", text="囉"),
+        ])
+        self.assertEqual(llm.extract_text(response), "哈囉")
+
+    def test_no_text_blocks_returns_empty_string(self):
+        self.assertEqual(llm.extract_text(MagicMock(content=[])), "")
 
 
 class CircuitBreakerStateMachineTests(TestCase):

@@ -87,9 +87,8 @@ class SearchTayalWordsTest(TestCase):
 
 def _mock_chat_client(reply_text="哈囉"):
     mock_client = MagicMock()
-    mock_response = MagicMock()
-    mock_response.choices = [MagicMock(message=MagicMock(content=reply_text))]
-    mock_client.chat.completions.create.return_value = mock_response
+    block = MagicMock(type="text", text=reply_text)
+    mock_client.messages.create.return_value = MagicMock(stop_reason="end_turn", content=[block])
     return mock_client
 
 
@@ -129,7 +128,7 @@ class TayalChatViewTest(TestCase):
     @patch("AIModel.views._get_client")
     def test_upstream_failure_returns_generic_message_and_logs(self, mock_get_client):
         mock_client = MagicMock()
-        mock_client.chat.completions.create.side_effect = Exception("internal api key xyz")
+        mock_client.messages.create.side_effect = Exception("internal api key xyz")
         mock_get_client.return_value = mock_client
 
         with self.assertLogs("AIModel.views", level="ERROR") as logs:
@@ -139,8 +138,8 @@ class TayalChatViewTest(TestCase):
         self.assertNotIn("internal api key xyz", response.json()["detail"])
         self.assertTrue(any("tayal_chat" in entry for entry in logs.output))
 
-    @patch("AIModel.views._get_client", side_effect=EnvironmentError("GITHUB_TOKEN 未設定"))
-    def test_missing_github_token_returns_503(self, _mock_get_client):
+    @patch("AIModel.views._get_client", side_effect=EnvironmentError("ANTHROPIC_API_KEY 未設定"))
+    def test_missing_anthropic_api_key_returns_503(self, _mock_get_client):
         response = self._post({"message": "hi"})
         self.assertEqual(response.status_code, 503)
 
@@ -176,7 +175,7 @@ class ReviewTayalChatViewTest(TestCase):
     @patch("AIModel.views._get_client")
     def test_upstream_failure_returns_generic_message_and_logs(self, mock_get_client, _mock_bulk):
         mock_client = MagicMock()
-        mock_client.chat.completions.create.side_effect = Exception("internal detail")
+        mock_client.messages.create.side_effect = Exception("internal detail")
         mock_get_client.return_value = mock_client
 
         with self.assertLogs("AIModel.views", level="ERROR") as logs:
@@ -242,6 +241,18 @@ class RunTayalChatServiceTest(TestCase):
         result = run_tayal_chat(client, "泰雅語", "你好", {})
 
         self.assertEqual(result, {"message": "{ this is not valid json"})
+
+    def test_request_uses_native_anthropic_shape(self):
+        """system 走 system= 參數，messages 只放 user，沒有 role=system。"""
+        client = _mock_chat_client("哈囉")
+
+        run_tayal_chat(client, "泰雅語", "你好", {})
+
+        _, kwargs = client.messages.create.call_args
+        self.assertIn("泰雅語", kwargs["system"])
+        self.assertEqual(kwargs["messages"], [{"role": "user", "content": "你好"}])
+        self.assertEqual(kwargs["max_tokens"], 4096)
+        self.assertNotIn("temperature", kwargs)
 
 
 class RunReviewTayalChatServiceTest(TestCase):

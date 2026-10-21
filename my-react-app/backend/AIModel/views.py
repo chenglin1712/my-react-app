@@ -40,7 +40,7 @@ def _assistant_disabled_response():
 
 
 def _rate_limited_response(request, decoded, group, rate="10/m"):
-    """依已登入使用者的 uid 限速（這兩個 view 都會呼叫付費的 GitHub Models API）。
+    """依已登入使用者的 uid 限速（這兩個 view 都會呼叫付費的 Anthropic Claude API）。
     直接呼叫 is_ratelimited 而不是用 @ratelimit 裝飾器：裝飾器要在呼叫 view 之前
     就決定 key，但這裡的 key（uid）要等 verify_firebase_token 解出 token 之後才知道，
     所以放在驗證通過之後手動檢查。計數存放位置見 core/settings.py 的 CACHES

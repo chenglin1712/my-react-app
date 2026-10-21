@@ -1,20 +1,18 @@
-"""LLM client 的單一來源——原本只有 backend/AIModel/views.py 自己持有（Django
-的 tayal_chat／review_tayal_chat 兩個 AI 對話端點在用），族語翻譯功能
-(backend/fastAPI/routes/translation/) 需要在 FastAPI process 裡呼叫同一個
-LLM，於是把它搬到這個兩邊都能 import 的共用套件（比照 config/tribes.py／
-core/firebase_auth.py 的既有模式)。
+"""LLM client 的單一來源——Django 的 tayal_chat／review_tayal_chat 兩個 AI 對話端點
+(backend/AIModel/) 與族語翻譯功能 (backend/fastAPI/routes/translation/) 共用同一個
+Anthropic client、同一組逾時／重試／斷路器設定（比照 config/tribes.py／
+core/firebase_auth.py 的既有模式，放在兩邊都能 import 的共用套件）。
 
-AIModel/views.py 保留同名的 _get_client()，內容改成呼叫這裡的
-get_llm_client()，行為完全不變——這樣 AIModel/tests.py 既有的
-`@patch("AIModel.views._get_client", ...)` 測試路徑不用跟著改。
+呼叫端直接使用官方 `anthropic` SDK 的原生形狀（`client.messages.create`），
+但一律透過這裡的 `call_claude()`：斷路器、request id／用量紀錄、拒答檢查都在
+這一個函式裡，繞過它就繞過了斷路器。回傳的是 SDK 原生的 `Message`，文字用
+`extract_text()` 取出。
 
 2026-08：GitHub Models（原本代理 GPT-4o 的服務）已於 2026-07-30 正式關閉，
-不是暫時性中斷，因此改接 Anthropic 官方 Claude API。實際發送請求的是官方
-`anthropic` SDK（`anthropic.Anthropic(...).messages.create(...)`），
-`_OpenAICompatClaudeClient` 這層只是把回傳值轉成呼叫端原本期待的
-`client.chat.completions.create(...).choices[0].message.content` 形狀，
-好讓 AIModel/services.py 與 translation/service.py 兩處呼叫端完全不用改
-——並不是另外起一個 OpenAI 協定相容的服務端點。
+改接 Anthropic 官方 Claude API。改接當時為了讓呼叫端不用改，曾經在 SDK 外面
+包一層 OpenAI 形狀（`chat.completions.create(...).choices[0].message.content`）的
+轉接層；該層只轉「文字進、文字出」，串流、工具、快取、引用、結構化輸出與用量都
+過不去，已移除。
 """
 import logging
 import os
@@ -151,76 +149,65 @@ def classify_llm_error(exc: BaseException) -> tuple[int, str]:
     return 502, "AI 服務暫時無法回應，請稍後再試"
 
 
-class _ShimMessage:
-    __slots__ = ("content",)
-
-    def __init__(self, content: str):
-        self.content = content
-
-
-class _ShimChoice:
-    __slots__ = ("message",)
-
-    def __init__(self, content: str):
-        self.message = _ShimMessage(content)
-
-
-class _ShimResponse:
-    __slots__ = ("choices",)
-
-    def __init__(self, content: str):
-        self.choices = [_ShimChoice(content)]
+def _log_call(response, model: str):
+    """記錄 request id 與 token 用量，出問題時可以用 request id 對照 Anthropic 端的紀錄。
+    只記數字與 id，不記 prompt 或模型輸出（內含使用者內容）。這是附帶的紀錄，
+    任何欄位缺漏都不能讓已經成功的 LLM 呼叫變成失敗。"""
+    try:
+        usage = getattr(response, "usage", None)
+        logger.info(
+            "[config.llm] model=%s request_id=%s input_tokens=%s output_tokens=%s cache_read_tokens=%s",
+            model,
+            getattr(response, "_request_id", None),
+            getattr(usage, "input_tokens", None),
+            getattr(usage, "output_tokens", None),
+            getattr(usage, "cache_read_input_tokens", None),
+        )
+    except Exception:
+        pass
 
 
-class _ChatCompletions:
-    def __init__(self, anthropic_client: "anthropic.Anthropic"):
-        self._client = anthropic_client
+def call_claude(client, *, model: str, system: str, messages: list, max_tokens: int = _MAX_TOKENS):
+    """所有 LLM 請求的唯一出口：斷路器 → 請求 → 紀錄 → 拒答檢查，回傳 SDK 原生的 Message。
 
-    def create(self, *, model: str, messages: list, **_ignored):
-        """把 OpenAI 形狀的呼叫（messages 含 role="system"、可能夾帶
-        temperature 等取樣參數）轉成 Anthropic Messages API 的形狀。
-        `_ignored` 吞掉 temperature 等參數——是否支援因模型而異，這裡一律
-        不轉發，避免不同模型對取樣參數的支援差異變成呼叫端要煩惱的事。"""
-        system = None
-        claude_messages = []
-        for m in messages:
-            if m["role"] == "system":
-                system = m["content"]
-            else:
-                claude_messages.append({"role": m["role"], "content": m["content"]})
+    取樣參數（temperature 等）刻意不開放：是否支援因模型而異，之前的轉接層也一律
+    不轉發，這裡維持同樣行為，避免換模型時變成呼叫端要煩惱的事。
 
-        is_probe = _breaker.before_call()
-        try:
-            response = self._client.messages.create(
-                model=model,
-                max_tokens=_MAX_TOKENS,
-                system=system,
-                messages=claude_messages,
-            )
-        except _TRANSIENT_ERRORS:
-            _breaker.record_failure(is_probe)
-            raise
-        except BaseException:
-            if is_probe:
-                _breaker.abort_probe()
-            raise
-        _breaker.record_success(is_probe)
+    順序很重要：供應商請求一成功就立刻 record_success，之後的紀錄與拒答檢查出任何
+    狀況都不能反過來影響斷路器；拒答（refusal）是模型的決定，不代表供應商故障，
+    所以不計入失敗。"""
+    is_probe = _breaker.before_call()
+    try:
+        response = client.messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            system=system,
+            messages=messages,
+        )
+    except _TRANSIENT_ERRORS:
+        _breaker.record_failure(is_probe)
+        raise
+    except BaseException:
+        if is_probe:
+            _breaker.abort_probe()
+        raise
+    _breaker.record_success(is_probe)
 
-        if response.stop_reason == "refusal":
-            raise RuntimeError("[config.llm] Claude 拒絕回應此請求（refusal）")
+    _log_call(response, model)
 
-        text = "".join(block.text for block in response.content if block.type == "text")
-        return _ShimResponse(text)
+    if response.stop_reason == "refusal":
+        raise RuntimeError("[config.llm] Claude 拒絕回應此請求（refusal）")
+
+    return response
 
 
-class _ChatNamespace:
-    def __init__(self, anthropic_client: "anthropic.Anthropic"):
-        self.completions = _ChatCompletions(anthropic_client)
-
-
-class _OpenAICompatClaudeClient:
-    def __init__(self, anthropic_client: "anthropic.Anthropic"):
-        self.chat = _ChatNamespace(anthropic_client)
+def extract_text(response) -> str:
+    """串接回應中所有文字區塊（過濾掉 thinking、tool_use 等其他類型的區塊）。"""
+    return "".join(
+        getattr(block, "text", "")
+        for block in response.content
+        if getattr(block, "type", None) == "text"
+    )
 
 
 def get_llm_client():
@@ -241,5 +228,5 @@ def get_llm_client():
             "[config.llm] 環境變數 ANTHROPIC_API_KEY 未設定，AI 對話／翻譯功能無法使用。"
             "請在 .env 填入 Anthropic API key。"
         )
-    _client = _OpenAICompatClaudeClient(anthropic.Anthropic(api_key=api_key, timeout=_TIMEOUT_SECONDS, max_retries=_MAX_RETRIES))
+    _client = anthropic.Anthropic(api_key=api_key, timeout=_TIMEOUT_SECONDS, max_retries=_MAX_RETRIES)
     return _client
