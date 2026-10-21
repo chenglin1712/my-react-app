@@ -101,7 +101,7 @@ def tayal_chat(request):
         tribe_name = TRIBE_MAP.get(tribe, "泰雅語")
 
         try:
-            result = run_tayal_chat(client, tribe_name, user_message, user_stats)
+            result = run_tayal_chat(client, tribe_name, user_message, user_stats, uid=decoded.get("uid", ""))
             return JsonResponse(result)
 
         except Exception:
@@ -159,7 +159,7 @@ def review_tayal_chat(request):
                 for w in words
             ]
 
-            result = run_review_tayal_chat(client, tribe_name, user_message, relevant_words)
+            result = run_review_tayal_chat(client, tribe_name, user_message, relevant_words, uid=decoded.get("uid", ""))
             return JsonResponse(result)
 
         except Exception:

@@ -1,4 +1,4 @@
-import json
+﻿import json
 
 from django.core.cache import cache
 from django.test import TestCase, Client, override_settings
@@ -252,6 +252,7 @@ class RunTayalChatServiceTest(TestCase):
         self.assertIn("泰雅語", kwargs["system"])
         self.assertEqual(kwargs["messages"], [{"role": "user", "content": "你好"}])
         self.assertEqual(kwargs["max_tokens"], 4096)
+        self.assertEqual(kwargs["output_config"], {"effort": "medium"})
         self.assertNotIn("temperature", kwargs)
 
 

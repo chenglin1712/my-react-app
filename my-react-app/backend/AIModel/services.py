@@ -13,7 +13,7 @@ prompt 樣板、外部 API 呼叫、回應解析全部塞在同一個函式裡�
 import datetime
 import json
 
-from config.llm import DEFAULT_MODEL, call_claude, extract_text
+from config.llm import call_claude, extract_text
 
 
 def build_chat_prompt(tribe_name: str, level, correct, incorrect, unanswered, common_errors, today, tomorrow) -> str:
@@ -88,9 +88,10 @@ def _extract_study_plan(result: str):
     return None
 
 
-def run_tayal_chat(client, tribe_name: str, user_message: str, user_stats: dict) -> dict:
+def run_tayal_chat(client, tribe_name: str, user_message: str, user_stats: dict, uid: str = "") -> dict:
     """組 prompt、呼叫 LLM、解析回應，回傳可以直接塞進 JsonResponse 的 dict。
-    例外不在這裡處理，交給呼叫端（view）決定要記什麼 log、回什麼 HTTP 狀態碼。"""
+    例外不在這裡處理，交給呼叫端（view）決定要記什麼 log、回什麼 HTTP 狀態碼。
+    uid 只用於用量紀錄（後台「AI 用量」頁），不進 prompt。"""
     level = user_stats.get("level", "beginner")
     correct = user_stats.get("correct", 0)
     incorrect = user_stats.get("incorrect", 0)
@@ -103,7 +104,8 @@ def run_tayal_chat(client, tribe_name: str, user_message: str, user_stats: dict)
 
     response = call_claude(
         client,
-        model=DEFAULT_MODEL,
+        feature="chat",
+        uid=uid,
         system=prompt,
         messages=[{"role": "user", "content": user_message}],
     )
@@ -145,7 +147,7 @@ def build_review_prompt(tribe_name: str, words_context: str) -> str:
             """
 
 
-def run_review_tayal_chat(client, tribe_name: str, user_message: str, relevant_words: list) -> dict:
+def run_review_tayal_chat(client, tribe_name: str, user_message: str, relevant_words: list, uid: str = "") -> dict:
     """組 prompt、呼叫 LLM，回傳可以直接塞進 JsonResponse 的 dict。relevant_words
     由呼叫端先用既有的 search_tayal_words_bulk 查好（DB 查詢邏輯不搬進這裡，
     這裡只負責拿現成的詞彙資料組 prompt）。"""
@@ -157,7 +159,8 @@ def run_review_tayal_chat(client, tribe_name: str, user_message: str, relevant_w
 
     response = call_claude(
         client,
-        model=DEFAULT_MODEL,
+        feature="review",
+        uid=uid,
         system=prompt,
         messages=[{"role": "user", "content": user_message}],
     )

@@ -20,7 +20,9 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
+from config.llm import set_usage_recorder
 from config.logging import get_logging_config
+from .ai_usage_events import record_ai_usage
 from config.sentry_init import init_sentry
 from config.cors import get_allowed_origins
 
@@ -44,6 +46,10 @@ def _fastapi_sentry_integrations():
 
 
 init_sentry(_fastapi_sentry_integrations)
+
+# AI 用量紀錄：翻譯功能呼叫 Anthropic 的 token／延遲寫進同一張 AiUsageLog，
+# 後台「AI 用量」頁才看得到翻譯的費用（Django 端的註冊見 adminapi/apps.py）。
+set_usage_recorder(record_ai_usage)
 
 
 # 部署時同時起多個 instance／worker（rolling deploy、或單純多開幾個

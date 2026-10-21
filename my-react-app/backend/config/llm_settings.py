@@ -1,0 +1,125 @@
+"""各個 AI 功能使用的模型、effort 與輸出上限——單一來源，Django（AIModel）與
+FastAPI（翻譯）兩個 process 共用，只靠環境變數與這裡的預設值決定，不依賴資料庫
+（FastAPI 沒有 Django ORM，跨服務讀設定的做法見 adminapi/rate_limits.py 的說明，
+那是另一種成本；這裡的設定不需要秒級即時生效，部署時調環境變數即可）。
+
+功能（feature）：
+  chat       AI 助手聊天（一般對話、學習狀況分析、讀書計畫）
+  review     錯題／句子補充說明
+  translate  族語翻譯
+
+環境變數（FEATURE 為上面三個名稱的大寫）：
+  LLM_MODEL                全部功能預設使用的模型
+  LLM_MODEL_<FEATURE>      單一功能的模型，優先於 LLM_MODEL
+  LLM_EFFORT_<FEATURE>     單一功能的 effort：low／medium／high／xhigh／max；
+                           設為空字串或 default 代表不傳（使用模型預設值）
+  LLM_MAX_TOKENS_<FEATURE> 單一功能的 max_tokens（含思考用掉的 token）
+
+不傳 temperature／top_p：新模型多半不接受非預設值，維持之前的行為。
+不設定 thinking：Sonnet 5 與 5.5 對「停用思考」的寫法不同（5.5 會直接回 400），
+思考深度改由 effort 控制；max_tokens 要把思考用掉的 token 一併算進去。
+"""
+import logging
+import os
+from dataclasses import dataclass
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+# Claude Sonnet 5——此專案的用途是短句翻譯／學生對話回覆，不需要 Opus 5 的
+# 最強推理能力；Sonnet 5 品質已足夠，成本約為 Opus 5 的 4 折（經使用者確認）。
+DEFAULT_MODEL = "claude-sonnet-5"
+
+VALID_EFFORTS = ("low", "medium", "high", "xhigh", "max")
+
+# max_tokens 的合理範圍：下限防止設成 0 或個位數導致回覆被截斷成空字串；
+# 上限是目前模型的單次輸出上限（128K），超過 API 會直接回 400。
+_MIN_MAX_TOKENS = 64
+_MAX_MAX_TOKENS = 128000
+
+
+@dataclass(frozen=True)
+class _FeatureDefaults:
+    # None 代表「不傳 effort」，使用模型的預設值（維持原本行為）。
+    effort: Optional[str]
+    max_tokens: int
+
+
+# chat 目前同一個呼叫同時負責一般對話與讀書計畫 JSON，所以用 medium，
+# 等計畫改成專用的結構化輸出呼叫後（路線圖 #10）一般對話可再降到 low。
+# review 是 50 字內的補充說明，low 即可。translate 的輸出是帶證據的 JSON 且
+# 翻譯品質是核心，維持模型預設，不擅自降低。
+# max_tokens 都留了思考所需的空間（思考用掉的 token 也算在 max_tokens 內）。
+_FEATURE_DEFAULTS = {
+    "chat": _FeatureDefaults(effort="medium", max_tokens=4096),
+    "review": _FeatureDefaults(effort="low", max_tokens=1024),
+    "translate": _FeatureDefaults(effort=None, max_tokens=4096),
+}
+
+FEATURES = tuple(_FEATURE_DEFAULTS)
+
+
+@dataclass(frozen=True)
+class LLMSettings:
+    feature: str
+    model: str
+    effort: Optional[str]
+    max_tokens: int
+
+
+def _clean(value: Optional[str]) -> str:
+    return (value or "").strip()
+
+
+def _resolve_model(feature: str) -> str:
+    return (
+        _clean(os.getenv(f"LLM_MODEL_{feature.upper()}"))
+        or _clean(os.getenv("LLM_MODEL"))
+        or DEFAULT_MODEL
+    )
+
+
+def _resolve_effort(feature: str, default: Optional[str]) -> Optional[str]:
+    name = f"LLM_EFFORT_{feature.upper()}"
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    value = _clean(raw).lower()
+    if value in ("", "default"):
+        return None
+    if value in VALID_EFFORTS:
+        return value
+    logger.warning("[config.llm_settings] %s=%r 不是合法的 effort（%s），改用預設值", name, raw, "/".join(VALID_EFFORTS))
+    return default
+
+
+def _resolve_max_tokens(feature: str, default: int) -> int:
+    name = f"LLM_MAX_TOKENS_{feature.upper()}"
+    raw = os.getenv(name)
+    if raw is None or _clean(raw) == "":
+        return default
+    try:
+        value = int(_clean(raw))
+    except ValueError:
+        value = None
+    if value is None or not (_MIN_MAX_TOKENS <= value <= _MAX_MAX_TOKENS):
+        logger.warning(
+            "[config.llm_settings] %s=%r 不是 %d~%d 之間的整數，改用預設值 %d",
+            name, raw, _MIN_MAX_TOKENS, _MAX_MAX_TOKENS, default,
+        )
+        return default
+    return value
+
+
+def get_settings(feature: str) -> LLMSettings:
+    """回傳該功能目前生效的設定。每次呼叫都重新讀環境變數（成本可忽略），
+    測試用 patch.dict("os.environ") 即可切換，不需要清快取。"""
+    defaults = _FEATURE_DEFAULTS.get(feature)
+    if defaults is None:
+        raise ValueError(f"未知的 LLM 功能名稱：{feature!r}（可用：{', '.join(FEATURES)}）")
+    return LLMSettings(
+        feature=feature,
+        model=_resolve_model(feature),
+        effort=_resolve_effort(feature, defaults.effort),
+        max_tokens=_resolve_max_tokens(feature, defaults.max_tokens),
+    )

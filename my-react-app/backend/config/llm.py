@@ -14,6 +14,7 @@ core/firebase_auth.py 的既有模式，放在兩邊都能 import 的共用套�
 轉接層；該層只轉「文字進、文字出」，串流、工具、快取、引用、結構化輸出與用量都
 過不去，已移除。
 """
+import contextvars
 import logging
 import os
 import threading
@@ -22,15 +23,10 @@ import time
 import anthropic
 from dotenv import load_dotenv
 
+# 模型、effort、max_tokens 依功能設定，見 config/llm_settings.py。
+from config.llm_settings import DEFAULT_MODEL, get_settings  # noqa: F401  DEFAULT_MODEL 供外部沿用
+
 load_dotenv()
-
-# Claude Sonnet 5——此專案的用途是短句翻譯／學生對話回覆，不需要 Opus 5 的
-# 最強推理能力；Sonnet 5 品質已足夠，成本約為 Opus 5 的 4 折（經使用者確認）。
-DEFAULT_MODEL = "claude-sonnet-5"
-
-# 呼叫端目前的輸出都是短內容（50 字內中文說明、簡短讀書計畫 JSON、翻譯 JSON），
-# 4096 tokens 留有餘裕又不至於放大意外重試的成本。
-_MAX_TOKENS = 4096
 
 _client = None
 
@@ -149,53 +145,128 @@ def classify_llm_error(exc: BaseException) -> tuple[int, str]:
     return 502, "AI 服務暫時無法回應，請稍後再試"
 
 
-def _log_call(response, model: str):
-    """記錄 request id 與 token 用量，出問題時可以用 request id 對照 Anthropic 端的紀錄。
-    只記數字與 id，不記 prompt 或模型輸出（內含使用者內容）。這是附帶的紀錄，
-    任何欄位缺漏都不能讓已經成功的 LLM 呼叫變成失敗。"""
+# 呼叫端沒有明確傳 uid 時使用（例如翻譯：FastAPI 的 async 端點先設定，
+# asyncio.to_thread 會把 contextvars 複製到執行緒裡）。
+current_uid: contextvars.ContextVar[str] = contextvars.ContextVar("llm_current_uid", default="")
+
+# 用量紀錄的寫入端，由各個 process 啟動時註冊（Django：adminapi.ai_usage；FastAPI：
+# fastAPI.ai_usage_events）。config/llm.py 同時被兩個 process import，不能直接依賴
+# 任何一邊的資料庫存取方式，所以用這個掛鉤反轉依賴。沒有註冊就不記錄。
+_usage_recorder = None
+
+
+def set_usage_recorder(recorder):
+    """註冊（或傳 None 取消）用量紀錄函式。recorder(entry: dict) 的回傳值被忽略，
+    丟出的任何例外都會被吞掉並記 log，不會影響 LLM 呼叫本身。"""
+    global _usage_recorder
+    _usage_recorder = recorder
+
+
+def _error_status(exc: BaseException) -> str:
+    """把失敗原因對應成用量紀錄的 status 字串（只有固定幾種，方便後台分組）。"""
+    if isinstance(exc, LLMUnavailableError):
+        return "breaker_open"
+    if isinstance(exc, anthropic.APITimeoutError):
+        return "timeout"
+    if isinstance(exc, anthropic.RateLimitError):
+        return "rate_limit"
+    if isinstance(exc, anthropic.APIConnectionError):
+        return "connection_error"
+    if isinstance(exc, anthropic.InternalServerError):
+        return "server_error"
+    return "error"
+
+
+def _as_count(value):
+    """token 數只接受真正的非負整數；其他（欄位缺漏、型別怪異）一律當沒有數字，
+    寫入端因此永遠收到乾淨的 int 或 None。"""
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+
+
+def _record_usage(*, feature, uid, model, started, status, response=None):
+    """記錄 request id、token 用量與延遲：寫 log，並交給已註冊的寫入端。
+    只記數字、id 與狀態，不記 prompt 或模型輸出（內含使用者內容）。這是附帶的
+    紀錄，任何欄位缺漏或寫入端出錯，都不能讓 LLM 呼叫的結果改變。"""
     try:
         usage = getattr(response, "usage", None)
+        request_id = getattr(response, "_request_id", None)
+        entry = {
+            "feature": feature,
+            "uid": uid or "",
+            "model": model,
+            "status": status,
+            "request_id": request_id if isinstance(request_id, str) else "",
+            "input_tokens": _as_count(getattr(usage, "input_tokens", None)),
+            "output_tokens": _as_count(getattr(usage, "output_tokens", None)),
+            "cache_read_tokens": _as_count(getattr(usage, "cache_read_input_tokens", None)),
+            "cache_write_tokens": _as_count(getattr(usage, "cache_creation_input_tokens", None)),
+            "latency_ms": int((time.monotonic() - started) * 1000),
+        }
         logger.info(
-            "[config.llm] model=%s request_id=%s input_tokens=%s output_tokens=%s cache_read_tokens=%s",
-            model,
-            getattr(response, "_request_id", None),
-            getattr(usage, "input_tokens", None),
-            getattr(usage, "output_tokens", None),
-            getattr(usage, "cache_read_input_tokens", None),
+            "[config.llm] feature=%s model=%s status=%s request_id=%s input_tokens=%s output_tokens=%s "
+            "cache_read_tokens=%s latency_ms=%s",
+            feature, model, status, entry["request_id"], entry["input_tokens"], entry["output_tokens"],
+            entry["cache_read_tokens"], entry["latency_ms"],
         )
+        recorder = _usage_recorder
+        if recorder is not None:
+            recorder(entry)
     except Exception:
-        pass
+        logger.warning("[config.llm] 用量紀錄失敗（不影響 LLM 呼叫）", exc_info=True)
 
 
-def call_claude(client, *, model: str, system: str, messages: list, max_tokens: int = _MAX_TOKENS):
+def call_claude(client, *, feature: str, system: str, messages: list, uid: str | None = None):
     """所有 LLM 請求的唯一出口：斷路器 → 請求 → 紀錄 → 拒答檢查，回傳 SDK 原生的 Message。
 
-    取樣參數（temperature 等）刻意不開放：是否支援因模型而異，之前的轉接層也一律
-    不轉發，這裡維持同樣行為，避免換模型時變成呼叫端要煩惱的事。
+    模型、effort 與 max_tokens 由 feature 對應的設定決定（見 config/llm_settings.py），
+    呼叫端不再各自指定。取樣參數（temperature 等）刻意不開放：是否支援因模型而異，
+    之前的轉接層也一律不轉發，這裡維持同樣行為，避免換模型時變成呼叫端要煩惱的事。
 
     順序很重要：供應商請求一成功就立刻 record_success，之後的紀錄與拒答檢查出任何
     狀況都不能反過來影響斷路器；拒答（refusal）是模型的決定，不代表供應商故障，
     所以不計入失敗。"""
-    is_probe = _breaker.before_call()
+    settings = get_settings(feature)
+    uid = current_uid.get() if uid is None else uid
+    started = time.monotonic()
+    request = {
+        "model": settings.model,
+        "max_tokens": settings.max_tokens,
+        "system": system,
+        "messages": messages,
+    }
+    if settings.effort:
+        request["output_config"] = {"effort": settings.effort}
+
     try:
-        response = client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            system=system,
-            messages=messages,
-        )
-    except _TRANSIENT_ERRORS:
+        is_probe = _breaker.before_call()
+    except LLMUnavailableError as exc:
+        _record_usage(feature=feature, uid=uid, model=settings.model, started=started, status=_error_status(exc))
+        raise
+    try:
+        response = client.messages.create(**request)
+    except _TRANSIENT_ERRORS as exc:
         _breaker.record_failure(is_probe)
+        _record_usage(feature=feature, uid=uid, model=settings.model, started=started, status=_error_status(exc))
+        raise
+    except Exception as exc:
+        if is_probe:
+            _breaker.abort_probe()
+        _record_usage(feature=feature, uid=uid, model=settings.model, started=started, status=_error_status(exc))
         raise
     except BaseException:
+        # KeyboardInterrupt／SystemExit 等：程序正在關閉，只釋放探測名額，不做資料庫寫入。
         if is_probe:
             _breaker.abort_probe()
         raise
     _breaker.record_success(is_probe)
 
-    _log_call(response, model)
+    refused = response.stop_reason == "refusal"
+    _record_usage(
+        feature=feature, uid=uid, model=settings.model, started=started,
+        status="refusal" if refused else "ok", response=response,
+    )
 
-    if response.stop_reason == "refusal":
+    if refused:
         raise RuntimeError("[config.llm] Claude 拒絕回應此請求（refusal）")
 
     return response

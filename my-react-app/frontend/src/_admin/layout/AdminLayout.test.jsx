@@ -83,6 +83,7 @@ describe('AdminLayout', () => {
     expect(screen.getByRole('link', { name: /快取管理/ })).toHaveAttribute('href', '/admin/system/cache');
     expect(screen.getByRole('link', { name: /限流設定/ })).toHaveAttribute('href', '/admin/system/rate-limits');
     expect(screen.getByRole('link', { name: /功能開關/ })).toHaveAttribute('href', '/admin/system/feature-flags');
+    expect(screen.getByRole('link', { name: /AI 用量/ })).toHaveAttribute('href', '/admin/system/ai-usage');
     expect(screen.queryByText('系統維運')).not.toBeInTheDocument();
   });
 

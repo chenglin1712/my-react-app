@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from config.llm import classify_llm_error
+from config.llm import classify_llm_error, current_uid as llm_current_uid
 from config.tribes import TRIBES
 from dictionary_db.connect import get_db
 from fastAPI import feature_flags, guest_trial, rate_limit_config, usage_events
@@ -121,6 +121,9 @@ async def translate_endpoint(request: Request, body: TranslateRequest, db: Sessi
         if not quota.allowed:
             return _guest_denied_response(quota)
 
+    # 用量紀錄要知道是誰呼叫的；asyncio.to_thread 會把 contextvars 複製到執行緒裡。
+    uid_token = llm_current_uid.set(uid)
+
     try:
         # 檢索＋LLM 呼叫都是阻塞式操作（DB 查詢＋同步的 Anthropic client），
         # 丟到執行緒池執行，避免卡住 event loop——跟 dictionary/search.py
@@ -145,6 +148,8 @@ async def translate_endpoint(request: Request, body: TranslateRequest, db: Sessi
         logger.error("[translation] 處理失敗\n%s", request.url, exc_info=True)
         status_code, _ = classify_llm_error(e)
         return JSONResponse({"detail": "翻譯服務暫時無法回應，請稍後再試"}, status_code=status_code)
+    finally:
+        llm_current_uid.reset(uid_token)
 
     usage_events.record_event(
         "translation_request", uid=uid, tribe=body.tribe,

@@ -12,7 +12,8 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
-from config.llm import get_llm_client, call_claude, extract_text, DEFAULT_MODEL
+from config.llm import get_llm_client, call_claude, extract_text
+from config.llm_settings import get_settings
 from config.tribes import TRIBE_IDS, TRIBE_MAP
 from dictionary_db.model import GrammarAffix
 
@@ -213,7 +214,7 @@ def _parse_llm_json(raw: str) -> dict | None:
 def _call_llm(prompt: str, user_message: str) -> str:
     response = call_claude(
         get_llm_client(),
-        model=DEFAULT_MODEL,
+        feature="translate",
         system=prompt,
         messages=[{"role": "user", "content": user_message}],
     )
@@ -258,7 +259,7 @@ def _translate_zh2tribe(db: Session, tribe_id: str, tribe_slug: str, tribe_full_
         coverage=coverage, warning=_build_warning(coverage),
         evidence_sentences=[_sentence_to_dict(s) for s in retrieval.sentences],
         evidence_words=[_word_to_dict(w) for w in retrieval.words],
-        notes=notes, model_used=DEFAULT_MODEL,
+        notes=notes, model_used=get_settings("translate").model,
     )
 
 
@@ -305,7 +306,7 @@ def _translate_tribe2zh(db: Session, tribe_id: str, tribe_slug: str, tribe_full_
         confidence=_confidence_from_coverage(coverage), token_side="source", tokens=tokens,
         coverage=coverage, warning=_build_warning(coverage),
         evidence_sentences=[_sentence_to_dict(s) for s in retrieval.sentences],
-        evidence_words=[], notes=notes, model_used=DEFAULT_MODEL,
+        evidence_words=[], notes=notes, model_used=get_settings("translate").model,
     )
 
 

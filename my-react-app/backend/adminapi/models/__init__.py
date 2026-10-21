@@ -8,6 +8,7 @@ INSTALLED_APPS 對應到的 app 套件路徑決定 app_label，不是看 models.
 不必逐一改寫呼叫點。
 """
 
+from .ai_usage import AiUsageLog
 from .analytics import UsageEvent
 from .audit import AuditLog
 from .content import (
@@ -39,6 +40,7 @@ from .verification import VerificationItem, VerificationObservation, Verificatio
 from .wordlist import WordlistApplyJournal, WordlistEntry, WordlistForm
 
 __all__ = [
+    'AiUsageLog',
     'Announcement',
     'AnnouncementSyncStatus',
     'AuditLog',

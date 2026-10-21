@@ -34,7 +34,7 @@ def _caller(create_side_effect=None, text="ok", stop_reason="end_turn"):
         inner.messages.create.return_value = MagicMock(stop_reason=stop_reason, content=[block])
 
     def call():
-        return llm.call_claude(inner, model="m", system="s", messages=[{"role": "user", "content": "hi"}])
+        return llm.call_claude(inner, feature="chat", system="s", messages=[{"role": "user", "content": "hi"}])
 
     return call, inner
 
@@ -151,8 +151,106 @@ class CircuitBreakerTests(TestCase):
         _, kwargs = inner.messages.create.call_args
         self.assertEqual(kwargs["system"], "s")
         self.assertEqual(kwargs["messages"], [{"role": "user", "content": "hi"}])
-        self.assertEqual(kwargs["max_tokens"], llm._MAX_TOKENS)
+        settings = llm.get_settings("chat")
+        self.assertEqual(kwargs["model"], settings.model)
+        self.assertEqual(kwargs["max_tokens"], settings.max_tokens)
+        self.assertEqual(kwargs["output_config"], {"effort": settings.effort})
         self.assertNotIn("temperature", kwargs)
+
+    def test_effort_is_omitted_when_the_feature_has_no_effort(self):
+        call, inner = _caller()
+        with patch.dict("os.environ", {"LLM_EFFORT_CHAT": "default"}):
+            call()
+        _, kwargs = inner.messages.create.call_args
+        self.assertNotIn("output_config", kwargs)
+
+
+class UsageRecordingTests(TestCase):
+    """每次呼叫（含失敗）都交給已註冊的寫入端；寫入端出錯不能影響 LLM 呼叫。"""
+
+    def setUp(self):
+        patcher = patch.object(llm, "_breaker", llm._CircuitBreaker(threshold=3, cooldown=60))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.entries = []
+        # 還原成測試前的寫入端（Django 啟動時已註冊 adminapi 的），不要留下 None 影響其他測試。
+        self.addCleanup(llm.set_usage_recorder, llm._usage_recorder)
+        llm.set_usage_recorder(self.entries.append)
+
+    def _ok_caller(self):
+        call, inner = _caller()
+        inner.messages.create.return_value = MagicMock(
+            stop_reason="end_turn", _request_id="req_123",
+            content=[MagicMock(type="text", text="ok")],
+            usage=MagicMock(input_tokens=100, output_tokens=20, cache_read_input_tokens=50, cache_creation_input_tokens=7),
+        )
+        return call
+
+    def test_successful_call_is_recorded_with_tokens_and_request_id(self):
+        self._ok_caller()()
+        (entry,) = self.entries
+        self.assertEqual(entry["feature"], "chat")
+        self.assertEqual(entry["status"], "ok")
+        self.assertEqual(entry["request_id"], "req_123")
+        self.assertEqual(
+            (entry["input_tokens"], entry["output_tokens"], entry["cache_read_tokens"], entry["cache_write_tokens"]),
+            (100, 20, 50, 7),
+        )
+        self.assertGreaterEqual(entry["latency_ms"], 0)
+        self.assertEqual(entry["model"], llm.get_settings("chat").model)
+
+    def test_explicit_uid_and_context_uid(self):
+        call, inner = _caller()
+        llm.call_claude(inner, feature="chat", system="s", messages=[], uid="u-explicit")
+        token = llm.current_uid.set("u-context")
+        try:
+            call()
+        finally:
+            llm.current_uid.reset(token)
+        self.assertEqual([e["uid"] for e in self.entries], ["u-explicit", "u-context"])
+
+    def test_failures_are_recorded_with_a_status_and_no_tokens(self):
+        for error, status in [(_timeout_error(), "timeout"), (_rate_limit_error(), "rate_limit"), (_bad_request_error(), "error")]:
+            call, _ = _caller(create_side_effect=error)
+            with self.assertRaises(type(error)):
+                call()
+            self.assertEqual(self.entries[-1]["status"], status)
+            self.assertIsNone(self.entries[-1]["input_tokens"])
+
+    def test_open_breaker_is_recorded_and_never_reaches_the_provider(self):
+        failing, _ = _caller(create_side_effect=_timeout_error())
+        for _ in range(3):
+            with self.assertRaises(anthropic.APITimeoutError):
+                failing()
+        call, inner = _caller()
+        with self.assertRaises(llm.LLMUnavailableError):
+            call()
+        inner.messages.create.assert_not_called()
+        self.assertEqual(self.entries[-1]["status"], "breaker_open")
+
+    def test_refusal_is_recorded_as_refusal(self):
+        call, _ = _caller(stop_reason="refusal")
+        with self.assertRaises(RuntimeError):
+            call()
+        self.assertEqual(self.entries[-1]["status"], "refusal")
+
+    def test_non_numeric_usage_fields_are_recorded_as_none(self):
+        call, _ = _caller()  # 預設的 MagicMock 回應：usage 與 _request_id 都不是真的數字／字串
+        call()
+        entry = self.entries[-1]
+        self.assertIsNone(entry["input_tokens"])
+        self.assertIsNone(entry["cache_write_tokens"])
+        self.assertEqual(entry["request_id"], "")
+
+    def test_a_broken_recorder_never_breaks_the_call(self):
+        llm.set_usage_recorder(MagicMock(side_effect=RuntimeError("db down")))
+        call, _ = _caller()
+        self.assertEqual(llm.extract_text(call()), "ok")
+
+    def test_no_recorder_registered_is_fine(self):  # 還原由 setUp 的 addCleanup 負責
+        llm.set_usage_recorder(None)
+        call, _ = _caller()
+        self.assertEqual(llm.extract_text(call()), "ok")
 
 
 class ExtractTextTests(TestCase):

@@ -1,0 +1,226 @@
+/* 後台「AI 用量」頁的專用排版。沉穩外觀：不用陰影與卡片套卡片，
+   總覽用細線分隔的數字列，各表格沿用 admin-base.css 的 admin-table。 */
+
+.ai-usage-page > .admin-page-heading {
+  gap: 16px;
+  max-width: var(--admin-content-max);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.ai-usage-page .admin-page-heading p {
+  margin: 4px 0 0;
+  color: var(--admin-muted);
+  font-size: 14px;
+}
+
+.ai-usage-range {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-usage-range .form-label {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.ai-usage-range .form-select {
+  min-width: 150px;
+}
+
+.ai-usage-content {
+  display: grid;
+  gap: 28px;
+  max-width: var(--admin-content-max);
+  margin: 0 auto;
+  transition: opacity 160ms ease-out;
+}
+
+.ai-usage-content[aria-busy="true"] {
+  opacity: 0.6;
+}
+
+.ai-usage-note {
+  margin: 0;
+}
+
+/* 總覽：六個數字用細線分隔，數字用等寬數字對齊，不做成六張卡片 */
+.ai-usage-summary dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin: 0;
+  border-top: 1px solid var(--admin-border);
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.ai-usage-summary dl > div {
+  padding: 18px 20px 18px 0;
+}
+
+.ai-usage-summary dl > div + div {
+  padding-left: 20px;
+  border-left: 1px solid var(--admin-border);
+}
+
+.ai-usage-summary dt {
+  margin-bottom: 6px;
+  color: var(--admin-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ai-usage-summary dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin: 0;
+  color: var(--admin-text-strong);
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.ai-usage-summary dd small {
+  color: var(--admin-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.ai-usage-panel-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin-bottom: 10px;
+}
+
+.ai-usage-panel-heading h2 {
+  margin: 0;
+  color: var(--admin-accent);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.ai-usage-panel-heading p {
+  margin: 0;
+  color: var(--admin-muted);
+  font-size: 13px;
+}
+
+.ai-usage-split {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  align-items: start;
+  gap: 28px;
+}
+
+.ai-usage-table {
+  margin-bottom: 0;
+}
+
+.ai-usage-table th {
+  white-space: normal;
+}
+
+.ai-usage-table .ai-usage-num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ai-usage-table code {
+  color: var(--admin-accent);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.ai-usage-uid {
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
+/* 費用旁的「不完整」提醒：文字加細框，不只靠顏色表達 */
+.ai-usage-flag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 6px;
+  color: var(--admin-warning-text);
+  background: var(--admin-warning-bg);
+  border: 1px solid var(--admin-warning-text);
+  border-radius: var(--admin-radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+  vertical-align: 2px;
+}
+
+/* 每日費用的占比條：只畫填色，不畫底色軌道，數字才是主角 */
+.ai-usage-bar-column {
+  width: 30%;
+  min-width: 120px;
+}
+
+.ai-usage-bar {
+  display: block;
+  height: 8px;
+}
+
+.ai-usage-bar-fill {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  background: var(--admin-accent);
+  border-radius: 1px;
+  transition: width 240ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@media (max-width: 900px) {
+  .ai-usage-split {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-usage-page > .admin-page-heading {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ai-usage-range .form-select {
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .ai-usage-summary dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ai-usage-summary dl > div,
+  .ai-usage-summary dl > div + div {
+    padding: 14px 12px 14px 0;
+    border-left: 0;
+    border-bottom: 1px solid var(--admin-border);
+  }
+
+  .ai-usage-summary dl > div:nth-child(even) {
+    padding-left: 12px;
+    border-left: 1px solid var(--admin-border);
+  }
+
+  .ai-usage-summary dd {
+    font-size: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-usage-content,
+  .ai-usage-bar-fill {
+    transition: none;
+  }
+}
