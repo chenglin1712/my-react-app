@@ -84,6 +84,30 @@ class _CircuitBreaker:
         self._opened_at = 0.0
         self._probe_in_flight = False
         self._lock = threading.Lock()
+        # 狀態轉換事件（opened／half_open／probe_failed／closed）。在鎖裡只把事件放進這個清單，
+        # 由呼叫端離開鎖之後用 drain_events() 取出再寫入紀錄——鎖裡不能做資料庫寫入。
+        self._events: list[dict] = []
+
+    def _note(self, event: str, **detail):
+        self._events.append({"event": event, **detail})
+
+    def drain_events(self) -> list[dict]:
+        with self._lock:
+            events, self._events = self._events, []
+        return events
+
+    def snapshot(self) -> dict:
+        """這個 process（worker）目前的斷路器狀態；多個 worker 各有一份，互相看不到。"""
+        with self._lock:
+            state = self._state
+            remaining = 0.0
+            if state == self.OPEN:
+                remaining = max(self._cooldown - (time.monotonic() - self._opened_at), 0.0)
+            return {
+                "state": state, "consecutiveFailures": self._failures,
+                "threshold": self._threshold, "cooldownSeconds": self._cooldown,
+                "retryInSeconds": round(remaining, 1),
+            }
 
     def before_call(self) -> bool:
         """回傳這次呼叫是否為試探請求；斷路器不允許通過時丟出 LLMUnavailableError。"""
@@ -93,6 +117,7 @@ class _CircuitBreaker:
             if self._state == self.OPEN and time.monotonic() - self._opened_at >= self._cooldown:
                 self._state = self.HALF_OPEN
                 self._probe_in_flight = False
+                self._note("half_open")
             if self._state == self.HALF_OPEN and not self._probe_in_flight:
                 self._probe_in_flight = True
                 return True
@@ -104,6 +129,7 @@ class _CircuitBreaker:
                 self._state = self.CLOSED
                 self._failures = 0
                 self._probe_in_flight = False
+                self._note("closed")
             elif self._state == self.CLOSED:
                 self._failures = 0
             # 其餘情況（OPEN／HALF_OPEN 時回來的普通請求）忽略
@@ -114,12 +140,14 @@ class _CircuitBreaker:
                 self._state = self.OPEN
                 self._opened_at = time.monotonic()
                 self._probe_in_flight = False
+                self._note("probe_failed")
                 logger.error("[config.llm] LLM 試探請求失敗，再暫停呼叫 %.0f 秒", self._cooldown)
             elif self._state == self.CLOSED:
                 self._failures += 1
                 if self._failures >= self._threshold:
                     self._state = self.OPEN
                     self._opened_at = time.monotonic()
+                    self._note("opened", failures=self._failures)
                     logger.error("[config.llm] LLM 連續失敗 %d 次，暫停呼叫 %.0f 秒", self._failures, self._cooldown)
 
     def abort_probe(self):
@@ -138,6 +166,10 @@ def classify_llm_error(exc: BaseException) -> tuple[int, str]:
     內部例外訊息不外流，只回固定文字。"""
     if isinstance(exc, LLMUnavailableError):
         return 503, "AI 服務目前忙碌，請稍後再試"
+    if isinstance(exc, LLMRefusalError):
+        # 拒答是模型的決定，不是服務壞了；AI 對話在 services 層就已改回 200 與固定說明，
+        # 走到這裡的是沒有自己處理拒答的呼叫端（例如翻譯），回 422 比通用 502 準確。
+        return 422, REFUSAL_MESSAGE
     if isinstance(exc, anthropic.APITimeoutError):
         return 504, "AI 服務回應逾時，請稍後再試"
     if isinstance(exc, anthropic.RateLimitError):
@@ -183,13 +215,21 @@ def _as_count(value):
     return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
 
 
-def _record_usage(*, feature, uid, model, started, status, response=None):
+def _exception_request_id(exc: BaseException) -> str | None:
+    """失敗的呼叫沒有 response，但 SDK 的 API 錯誤帶有 request_id；有了它才能拿去對照 Anthropic 端的紀錄。
+    逾時與連線錯誤沒有（請求可能根本沒送達），回傳 None。"""
+    request_id = getattr(exc, "request_id", None)
+    return request_id if isinstance(request_id, str) else None
+
+
+def _record_usage(*, feature, uid, model, started, status, response=None, request_id=None):
     """記錄 request id、token 用量與延遲：寫 log，並交給已註冊的寫入端。
     只記數字、id 與狀態，不記 prompt 或模型輸出（內含使用者內容）。這是附帶的
-    紀錄，任何欄位缺漏或寫入端出錯，都不能讓 LLM 呼叫的結果改變。"""
+    紀錄，任何欄位缺漏或寫入端出錯，都不能讓 LLM 呼叫的結果改變。
+    request_id：失敗時由呼叫端從例外取出（成功時取自 response）。"""
     try:
         usage = getattr(response, "usage", None)
-        request_id = getattr(response, "_request_id", None)
+        request_id = getattr(response, "_request_id", None) or request_id
         entry = {
             "feature": feature,
             "uid": uid or "",
@@ -215,9 +255,45 @@ def _record_usage(*, feature, uid, model, started, status, response=None):
         logger.warning("[config.llm] 用量紀錄失敗（不影響 LLM 呼叫）", exc_info=True)
 
 
+REFUSAL_MESSAGE = "這個問題我沒辦法回答，換個方式問問看。"
+
+
 class LLMRefusalError(RuntimeError):
     """模型拒絕回應（stop_reason == refusal）。是模型的決定而不是供應商故障，
-    呼叫端可以選擇回友善訊息而不是 502；仍是 RuntimeError，原本的處理不受影響。"""
+    呼叫端可以選擇回友善訊息而不是 502；仍是 RuntimeError，原本的處理不受影響。
+    category：API 的 stop_details.category（拒答的分類，沒有就是空字串），只用於紀錄，不顯示給使用者。"""
+
+    def __init__(self, message: str = "", category: str = ""):
+        super().__init__(message)
+        self.category = category
+
+
+def _refusal_category(response) -> str:
+    details = getattr(response, "stop_details", None)
+    category = getattr(details, "category", None)
+    return category if isinstance(category, str) else ""
+
+
+def _emit_breaker_events(feature: str, model: str) -> None:
+    """把斷路器剛發生的狀態轉換寫進 log 與用量表（feature="breaker"，status 為事件名稱）。
+    離開斷路器的鎖之後才呼叫：寫入端會做資料庫存取。紀錄失敗不影響 LLM 呼叫。"""
+    for event in _breaker.drain_events():
+        try:
+            logger.warning("[config.llm] 斷路器事件 event=%s detail=%s", event["event"], {k: v for k, v in event.items() if k != "event"})
+            recorder = _usage_recorder
+            if recorder is not None:
+                recorder({
+                    "feature": "breaker", "uid": "", "model": model, "status": event["event"], "request_id": "",
+                    "input_tokens": None, "output_tokens": None, "cache_read_tokens": None, "cache_write_tokens": None,
+                    "latency_ms": 0,
+                })
+        except Exception:
+            logger.warning("[config.llm] 斷路器事件紀錄失敗（不影響 LLM 呼叫）", exc_info=True)
+
+
+def breaker_state() -> dict:
+    """這個 process 的斷路器目前狀態（後台「AI 用量」頁顯示用）。"""
+    return _breaker.snapshot()
 
 
 def call_claude(client, *, feature: str, system: str | list, messages: list, uid: str | None = None,
@@ -266,16 +342,25 @@ def call_claude(client, *, feature: str, system: str | list, messages: list, uid
     except LLMUnavailableError as exc:
         _record_usage(feature=feature, uid=uid, model=settings.model, started=started, status=_error_status(exc))
         raise
+    finally:
+        _emit_breaker_events(feature, settings.model)
     try:
         response = client.messages.create(**request)
     except _TRANSIENT_ERRORS as exc:
         _breaker.record_failure(is_probe)
-        _record_usage(feature=feature, uid=uid, model=settings.model, started=started, status=_error_status(exc))
+        _emit_breaker_events(feature, settings.model)
+        _record_usage(
+            feature=feature, uid=uid, model=settings.model, started=started, status=_error_status(exc),
+            request_id=_exception_request_id(exc),
+        )
         raise
     except Exception as exc:
         if is_probe:
             _breaker.abort_probe()
-        _record_usage(feature=feature, uid=uid, model=settings.model, started=started, status=_error_status(exc))
+        _record_usage(
+            feature=feature, uid=uid, model=settings.model, started=started, status=_error_status(exc),
+            request_id=_exception_request_id(exc),
+        )
         raise
     except BaseException:
         # KeyboardInterrupt／SystemExit 等：程序正在關閉，只釋放探測名額，不做資料庫寫入。
@@ -283,6 +368,7 @@ def call_claude(client, *, feature: str, system: str | list, messages: list, uid
             _breaker.abort_probe()
         raise
     _breaker.record_success(is_probe)
+    _emit_breaker_events(feature, settings.model)
 
     refused = response.stop_reason == "refusal"
     _record_usage(
@@ -291,7 +377,12 @@ def call_claude(client, *, feature: str, system: str | list, messages: list, uid
     )
 
     if refused:
-        raise LLMRefusalError("[config.llm] Claude 拒絕回應此請求（refusal）")
+        category = _refusal_category(response)
+        logger.warning(
+            "[config.llm] 模型拒答 feature=%s model=%s request_id=%s category=%s",
+            feature, settings.model, getattr(response, "_request_id", "") or "", category or "unknown",
+        )
+        raise LLMRefusalError("[config.llm] Claude 拒絕回應此請求（refusal）", category=category)
 
     return response
 

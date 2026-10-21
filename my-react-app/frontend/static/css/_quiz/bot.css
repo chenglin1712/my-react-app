@@ -345,6 +345,40 @@
     }
 }
 
+/* 今天剩餘的提問次數：平常是安靜的小字，剩幾次時才加上色塊，用完時說明何時重置 */
+.bot-quota {
+    margin: 0;
+    padding: 6px 16px;
+    font-size: var(--yy-text-sm);
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+    color: var(--yy-calm-text-sub);
+    background: var(--yy-calm-surface);
+    border-top: 1px solid var(--yy-calm-rule);
+}
+
+.bot-quota[data-state="low"] {
+    color: var(--yy-calm-warning);
+    background: var(--yy-calm-warning-bg);
+}
+
+.bot-quota[data-state="empty"] {
+    color: var(--yy-calm-danger);
+    background: var(--yy-calm-danger-bg);
+    font-weight: 600;
+}
+
+/* 同時有剩餘次數時，兩行提示合成一個區塊，只保留上方的分隔線 */
+.bot-quota + .bot-disclaimer {
+    border-top: 0;
+}
+
+/* 模型拒答：固定說明，不是錯誤。用虛線外框和一般回覆區分，不靠顏色表達 */
+.bot .message-bubble[data-kind="refusal"] {
+    background-color: transparent;
+    border: 1px dashed var(--yy-calm-line);
+}
+
 /* 準確度提醒：常駐在輸入框上方，文字色在白底上 4.5:1 以上 */
 .bot-disclaimer {
     margin: 0;

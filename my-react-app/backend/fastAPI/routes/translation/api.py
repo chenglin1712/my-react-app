@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from config.llm import classify_llm_error, current_uid as llm_current_uid
+from config.llm import REFUSAL_MESSAGE, LLMRefusalError, classify_llm_error, current_uid as llm_current_uid
 from config.tribes import TRIBES
 from dictionary_db.connect import get_db
 from fastAPI import feature_flags, guest_trial, rate_limit_config, usage_events
@@ -141,6 +141,9 @@ async def translate_endpoint(request: Request, body: TranslateRequest, db: Sessi
         # 回 503，不影響其他不相關的端點。
         await _refund_guest(quota)
         return JSONResponse({"detail": str(e)}, status_code=503)
+    except LLMRefusalError:
+        # 模型拒答：服務本身正常，回 422 與固定說明；不是服務故障，所以不退還訪客額度（模型已實際處理）
+        return JSONResponse({"detail": REFUSAL_MESSAGE, "refused": True}, status_code=422)
     except Exception as e:
         # 原始例外訊息（可能含 LLM API 回應細節、內部路徑）只記 log，不回給
         # client，比照 AIModel/views.py 對 tayal_chat 的既有處理。

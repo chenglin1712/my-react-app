@@ -14,6 +14,7 @@ from core.firebase_auth import verify_firebase_token
 from config.llm import get_llm_client, classify_llm_error
 from adminapi.rate_limits import get_configured_rate
 from .serializers import TayalChatSerializer, ReviewTayalChatSerializer
+from . import quota as daily_quota
 from .learner_profile import load_profile
 from .services import run_tayal_chat, run_review_tayal_chat
 from .tools import SqlDictionaryLookup
@@ -33,8 +34,11 @@ def _assistant_disabled_response():
     兩個 view 都會呼叫付費的 LLM，是翻譯以外另一條費用出口，所以需要同樣能一鍵關閉。
     找不到旗標紀錄（尚未跑 seed_feature_flags）視為未關閉，維持原本行為。
     在限速計數之前檢查，關閉期間被擋下的請求不佔用使用者的限速額度。"""
+    from adminapi import ai_budget
     from adminapi.models import FeatureFlag
 
+    # 月預算超過時這裡會自動把旗標關掉（見 adminapi/ai_budget.py）；評估有 60 秒快取，失敗只記錄不擋人。
+    ai_budget.enforce()
     flag = FeatureFlag.objects.filter(key="ai_assistant_enabled").first()
     if flag is not None and not flag.enabled:
         return JsonResponse({"detail": "AI 助手目前暫停服務，請稍後再試。", "code": "ai_assistant_disabled"}, status=403)
@@ -57,6 +61,17 @@ def _rate_limited_response(request, decoded, group, rate="10/m"):
     if limited:
         return JsonResponse({"detail": "請求過於頻繁，請稍後再試"}, status=429)
     return None
+
+
+def _quota_exceeded_response(quota):
+    """每日額度用完：429，帶剩餘次數（0）與重置時間，前端可以顯示「明天 00:00 重置」。"""
+    response = JsonResponse({
+        "detail": "今天的提問次數已經用完了，明天 00:00 重置。",
+        "code": "ai_daily_quota_exceeded",
+        "quota": quota.as_dict(),
+    }, status=429)
+    response["Retry-After"] = str(quota.retry_after_seconds())
+    return response
 
 
 # 這兩個 view 只認 Authorization: Bearer <Firebase ID Token>，不是 cookie/session-based
@@ -99,6 +114,11 @@ def tayal_chat(request):
         tribe_name = TRIBE_MAP.get(tribe, "泰雅語")
         uid = decoded.get("uid", "")
 
+        # 通過驗證才扣額度（格式錯誤的請求不佔次數）；之後失敗會退還
+        quota = daily_quota.consume(uid)
+        if not quota.allowed:
+            return _quota_exceeded_response(quota)
+
         try:
             # 學習資料由伺服器依已驗證的 uid 讀取，不採用請求裡的 user_stats（路線圖 #20）；
             # 讀不到（沒設定 Firestore、逾時）時是 None，助手退回通用回答。
@@ -107,9 +127,11 @@ def tayal_chat(request):
                 uid=uid, history=validated.get("history", []),
                 lookup=SqlDictionaryLookup(TRIBE_IDS.get(tribe, TRIBE_IDS["tayal"])),
             )
+            result["quota"] = quota.as_dict()
             return JsonResponse(result)
 
         except Exception:
+            daily_quota.refund(uid, quota.day)
             # 原本直接把 str(e) 回給前端，不論 DEBUG 與否都會洩漏內部例外訊息
             # （可能包含 API 回應細節、內部路徑等），且完全沒有寫 log，出錯時
             # 伺服器端反而看不到記錄。改成記錄完整 traceback，只回通用訊息。
@@ -154,6 +176,11 @@ def review_tayal_chat(request):
         tribe = validated.get("tribe", "tayal")
         tribe_id = TRIBE_IDS.get(tribe, TRIBE_IDS["tayal"])
         tribe_name = TRIBE_MAP.get(tribe, "泰雅語")
+        uid = decoded.get("uid", "")
+
+        quota = daily_quota.consume(uid)
+        if not quota.allowed:
+            return _quota_exceeded_response(quota)
 
         try:
             # 依空格切詞，一次查詢所有詞（避免 N 次資料庫連線）
@@ -164,10 +191,12 @@ def review_tayal_chat(request):
                 for w in words
             ]
 
-            result = run_review_tayal_chat(client, tribe_name, user_message, relevant_words, uid=decoded.get("uid", ""))
+            result = run_review_tayal_chat(client, tribe_name, user_message, relevant_words, uid=uid)
+            result["quota"] = quota.as_dict()
             return JsonResponse(result)
 
         except Exception:
+            daily_quota.refund(uid, quota.day)
             # 原本有記 log 但仍把 str(e) 回給前端；跟 tayal_chat 一樣，例外訊息
             # 只留在伺服器端的 log，回應改成通用訊息。
             logger.error("[review_tayal_chat] 處理失敗\n%s", traceback.format_exc())
@@ -175,6 +204,17 @@ def review_tayal_chat(request):
             return JsonResponse({"detail": detail}, status=status)
     else:
         return JsonResponse({"detail": "只接受 POST 請求"}, status=405)
+
+@csrf_exempt
+def ai_quota(request):
+    """今天還剩幾次提問（前端打開助手時顯示「今天還可以問 N 次」）。只讀取，不扣次數、不呼叫模型。"""
+    if request.method != "GET":
+        return JsonResponse({"detail": "只接受 GET 請求"}, status=405)
+    decoded, err_resp = verify_firebase_token(request)
+    if err_resp:
+        return err_resp
+    return JsonResponse(daily_quota.peek(decoded.get("uid", "")).as_dict())
+
 
 def _words_to_dicts(db, words) -> list:
     """把 Word ORM 物件轉成 {tayal, audio, chinese} dict 清單（依 words 原本順序，不去重）。

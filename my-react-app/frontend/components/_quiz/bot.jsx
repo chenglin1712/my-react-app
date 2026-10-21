@@ -6,7 +6,7 @@ import StudyPlanComponent from "./bot_study_plan"
 import { buildHistory } from "./botHistory"
 import { TRIBES } from "../../src/constants/tribes";
 import { scrollBehavior } from "../../src/hooks/useReducedMotion";
-import { apiPost } from "../../utils/apiClient";
+import { apiGet, apiPost } from "../../utils/apiClient";
 import { useDialog } from "@hooks/useDialog";
 import { announce } from "@utils/announce";
 
@@ -33,6 +33,24 @@ const greetingText = (slug) => {
     return `${word ? `${word} ` : ""}你好！我是您的${tribeLabel(slug)} AI 助手，有什麼我可以幫您的嗎？`;
 };
 
+// 剩餘次數 ≤ 這個數字時改用提醒樣式並讓報讀器念出來；平常不打擾
+const LOW_QUOTA = 5;
+
+// 後端只會在 tracked 為 true 時給可信的剩餘次數（計數失敗而放行時為 false，這時不顯示）
+const readQuota = (raw) => {
+    if (!raw || raw.tracked === false || !Number.isFinite(Number(raw.remaining))) return null;
+    return { remaining: Math.max(0, Number(raw.remaining)), resetsAt: raw.resetsAt ?? null };
+};
+
+// 重置時間一律是台灣午夜；用台灣時區格式化，人在國外也看到同一個時間
+const resetTimeText = (iso) => {
+    const date = iso ? new Date(iso) : null;
+    if (!date || Number.isNaN(date.getTime())) return "台灣時間 00:00";
+    return `台灣時間 ${date.toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Taipei" })}`;
+};
+
+const quotaMessage = (quota) => `今天的提問次數已用完，${resetTimeText(quota?.resetsAt)}重置。`;
+
 // 右下角懸浮聊天視窗（類似 Messenger）：非 modal，背景頁面仍可操作。
 // open=false 時視窗收合但保持掛載，對話內容與進行中的請求都不會遺失。
 const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => {
@@ -55,6 +73,24 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     const mountedRef = useRef(true);
     const abortControllerRef = useRef(null);
     const sendingRef = useRef(false);
+    const quotaLoadedRef = useRef(false);
+    // 今天剩餘的提問次數；null＝還不知道（尚未載入、載入失敗，或伺服器沒有可信的計數），這時不顯示也不擋送出
+    const [quota, setQuota] = useState(null);
+    const quotaUsedUp = quota !== null && quota.remaining === 0;
+
+    // 第一次展開時讀一次剩餘次數（只讀不扣）。失敗就不顯示，剩餘次數是輔助資訊，不能影響提問。
+    useEffect(() => {
+        if (!open || quotaLoadedRef.current) return;
+        quotaLoadedRef.current = true;
+        (async () => {
+            try {
+                const data = await apiGet("/AIModel/quota/");
+                if (mountedRef.current) setQuota(readQuota(data));
+            } catch {
+                quotaLoadedRef.current = false; // 下次展開再試
+            }
+        })();
+    }, [open]);
 
     useEffect(() => {
         mountedRef.current = true;
@@ -105,7 +141,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     //傳送訊息
     const handleSend = async () => {
         // isPending 是 state，同一個事件迴圈內連按兩次還看不到更新，用 ref 同步擋住重複送出
-        if (input.trim() === "" || isPending || sendingRef.current) return;
+        if (input.trim() === "" || isPending || sendingRef.current || quotaUsedUp) return;
         sendingRef.current = true;
 
         // 送出鈕與輸入框都不再用 disabled 擋住等待中的狀態（disabled 會讓焦點掉回 body，
@@ -134,9 +170,11 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                 role: "bot",
                 studyPlan: data?.study_plan || null,
                 sig: data?.sig || "", // 助手回覆的簽章，下次送對話紀錄時帶回，見 botHistory.js
+                isRefusal: data?.refused === true, // 模型拒答：固定說明，不是錯誤，樣式上區分
             };
 
             setMessages(prev => [...prev, botResponse]);
+            if (data && "quota" in data) setQuota(readQuota(data.quota));
         } catch (error) {
             // 手動中止（關閉對話框/卸載）不是真正的失敗，不用再顯示錯誤訊息，
             // 這時元件通常也已經卸載了。
@@ -146,11 +184,16 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
             // 管理者關閉了 AI 助手（總開關）：後端用 code 明確標示，照它給的說明顯示，
             // 不要讓人以為是自己網路的問題；其他 403（例如代理層擋下）仍走通用訊息
             const serviceOff = error?.status === 403 && error?.data?.code === "ai_assistant_disabled";
+            // 今天的提問次數用完：後端回 429 並附上最新的額度，照它的重置時間說明
+            const quotaExceeded = error?.status === 429 && error?.data?.code === "ai_daily_quota_exceeded";
+            if (quotaExceeded) setQuota(readQuota(error.data.quota) ?? { remaining: 0, resetsAt: null });
             const errorResponse = {
                 id: crypto.randomUUID(),
                 text: serviceOff
                     ? (error?.data?.detail || "AI 助手目前暫停服務，請稍後再試。")
-                    : "很抱歉，無法取得回應，請稍後再試。",
+                    : quotaExceeded
+                        ? quotaMessage(readQuota(error.data.quota))
+                        : "很抱歉，無法取得回應，請稍後再試。",
                 role: "bot",
                 isError: true,
             };
@@ -223,7 +266,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                                     <Bot />
                                 </div>
                             )}
-                            <div className="message-bubble">
+                            <div className="message-bubble" data-kind={message.isRefusal ? "refusal" : undefined}>
                                 <p>{message.text}</p>
                                 {message.studyPlan && (
                                     <StudyPlanComponent plan={message.studyPlan} onClose={handleClose} />
@@ -269,6 +312,17 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                 )}
 
                 {/* 常駐的準確度提醒：語言學習工具的 AI 可能寫錯族語詞彙與拼寫 */}
+                {quota && (
+                    <p
+                        className="bot-quota"
+                        data-state={quotaUsedUp ? "empty" : quota.remaining <= LOW_QUOTA ? "low" : "ok"}
+                        role={quota.remaining <= LOW_QUOTA ? "status" : undefined}
+                    >
+                        {quotaUsedUp
+                            ? quotaMessage(quota)
+                            : `今天還可以問 ${quota.remaining} 次`}
+                    </p>
+                )}
                 <p className="bot-disclaimer" id={disclaimerId}>AI 可能寫錯族語的詞彙或拼寫，學習時請以族語辭典為準。</p>
                 <div className="input-area">
                     <input
@@ -277,7 +331,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                         value={input}
                         onChange={handleInputChange}
                         onKeyDown={handleKeyDown}
-                        placeholder="輸入您的訊息..."
+                        placeholder={quotaUsedUp ? "今天的提問次數已用完" : "輸入您的訊息..."}
                         className="message-input"
                         aria-label="輸入訊息"
                         aria-describedby={disclaimerId}
@@ -285,9 +339,9 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                     />
                     <button
                         type="button"
-                        className={`send-button ${input.trim() && !isPending ? 'active' : ''}`}
+                        className={`send-button ${input.trim() && !isPending && !quotaUsedUp ? 'active' : ''}`}
                         onClick={handleSend}
-                        aria-disabled={input.trim() === "" || isPending}
+                        aria-disabled={input.trim() === "" || isPending || quotaUsedUp}
                     >
                         發送
                     </button>

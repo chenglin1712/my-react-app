@@ -54,6 +54,38 @@ const EMPTY_BUCKET = {
 };
 const list = (value) => (Array.isArray(value) ? value.filter(Boolean) : []);
 
+const BREAKER_STATE_LABELS = {
+    closed: '正常',
+    open: '暫停呼叫中',
+    half_open: '試探中',
+};
+
+// 預算與斷路器是後來才加的區塊：舊版後端沒有回這兩個欄位時整塊不顯示，而不是顯示一堆 0。
+function normalizeBudget(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    return {
+        level: ['ok', 'warning', 'exceeded'].includes(raw.level) ? raw.level : 'none',
+        budgetUsd: hasValue(raw.budgetUsd) ? Number(raw.budgetUsd) : null,
+        spentUsd: hasValue(raw.spentUsd) ? Number(raw.spentUsd) : null,
+        ratio: hasValue(raw.ratio) ? Number(raw.ratio) : null,
+        warnRatio: hasValue(raw.warnRatio) ? Number(raw.warnRatio) : 0.8,
+        incomplete: Boolean(raw.incomplete),
+        dailyLimitPerUser: hasValue(raw.dailyLimitPerUser) ? Number(raw.dailyLimitPerUser) : null,
+        note: raw.note ?? '',
+    };
+}
+
+function normalizeBreaker(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const process = raw.thisProcess && typeof raw.thisProcess === 'object' ? raw.thisProcess : {};
+    return {
+        state: BREAKER_STATE_LABELS[process.state] ? process.state : 'closed',
+        retryInSeconds: hasValue(process.retryInSeconds) ? Math.ceil(safe(process.retryInSeconds)) : 0,
+        events: list(raw.events),
+        lastEvent: typeof raw.lastEvent === 'string' ? raw.lastEvent : null,
+    };
+}
+
 // 把後端回應整理成頁面一定讀得動的形狀：缺的物件補空值、缺的陣列補 []。
 function normalize(raw) {
     if (!raw || typeof raw !== 'object') return null;
@@ -65,7 +97,16 @@ function normalize(raw) {
         byModel: list(raw.byModel),
         byStatus: list(raw.byStatus),
         topUsers: list(raw.topUsers),
+        budget: normalizeBudget(raw.budget),
+        breaker: normalizeBreaker(raw.breaker),
     };
+}
+
+// 事件時間一律用台灣時間顯示（後台管理者在哪裡都看同一個時區）
+function formatEventTime(iso) {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '時間不明';
+    return date.toLocaleString('zh-TW', { hour12: false, timeZone: 'Asia/Taipei' });
 }
 
 function Panel({ title, note, children }) {
@@ -98,6 +139,129 @@ function CostCell({ row }) {
                 </span>
             )}
         </>
+    );
+}
+
+const BUDGET_LEVEL_TEXT = { ok: '正常', warning: '接近上限', exceeded: '已超過' };
+
+function BudgetPanel({ budget }) {
+    const hasBudget = budget.level !== 'none' && budget.budgetUsd != null;
+    const percentUsed = hasBudget && budget.ratio != null ? Math.round(budget.ratio * 100) : null;
+    return (
+        <Panel title="月預算與每日額度" note="以本月（台灣時間）累計，含翻譯">
+            {budget.level === 'warning' && (
+                <Alert variant="warning" className="ai-usage-note">
+                    本月預算已用 {percentUsed}%。達到 100% 時，AI 助手會自動關閉。
+                </Alert>
+            )}
+            {budget.level === 'exceeded' && (
+                <Alert variant="danger" className="ai-usage-note">
+                    本月預算已用到 {percentUsed}%。AI 助手會被自動關閉；若已經關閉，
+                    需要到「功能開關」手動重新開啟，同一個月不會再被自動關閉第二次。
+                </Alert>
+            )}
+
+            <section className="ai-usage-summary" aria-label="預算與額度">
+                <dl>
+                    {hasBudget ? (
+                        <>
+                            <div>
+                                <dt>本月已花費（估算）</dt>
+                                <dd>{usd(budget.spentUsd)}</dd>
+                            </div>
+                            <div>
+                                <dt>月預算</dt>
+                                <dd>{usd(budget.budgetUsd)}</dd>
+                            </div>
+                            <div>
+                                <dt>預算使用率</dt>
+                                <dd>
+                                    {percentUsed}%
+                                    <small>{BUDGET_LEVEL_TEXT[budget.level]}</small>
+                                </dd>
+                            </div>
+                        </>
+                    ) : (
+                        <div>
+                            <dt>月預算</dt>
+                            <dd>未設定</dd>
+                        </div>
+                    )}
+                    <div>
+                        <dt>每人每日提問上限</dt>
+                        <dd>
+                            {budget.dailyLimitPerUser != null ? `${number(budget.dailyLimitPerUser)} 次` : '無資料'}
+                        </dd>
+                    </div>
+                </dl>
+            </section>
+
+            {hasBudget && (
+                <div
+                    className="ai-usage-budget-bar"
+                    data-level={budget.level}
+                    role="img"
+                    aria-label={`預算使用率 ${percentUsed}%，${Math.round(budget.warnRatio * 100)}% 開始提醒`}
+                    style={{ '--budget-warn': `${Math.round(budget.warnRatio * 100)}%` }}
+                >
+                    <span
+                        className="ai-usage-budget-fill"
+                        style={{ width: `${Math.min(100, Math.max(0, percentUsed))}%` }}
+                    />
+                </div>
+            )}
+
+            <p className="ai-usage-help">
+                {hasBudget
+                    ? '預算金額來自環境變數 AI_MONTHLY_BUDGET_USD。'
+                    : '尚未設定月預算：不會有預算提醒，也不會自動關閉 AI 助手。要啟用，請在伺服器設定環境變數 AI_MONTHLY_BUDGET_USD（美金）。'}
+                {' '}每人每日提問上限可到「限流規則」調整（ai_daily_quota，格式如 100/d）。
+                {budget.incomplete && ' 有些模型沒有價目，實際花費比上面的估算高。'}
+            </p>
+            {budget.note && <p className="ai-usage-help">{budget.note}</p>}
+        </Panel>
+    );
+}
+
+function BreakerPanel({ breaker }) {
+    const needsAttention = breaker.lastEvent === 'opened' || breaker.lastEvent === 'probe_failed';
+    return (
+        <Panel title="斷路器" note="供應商連續失敗時暫停呼叫，避免拖垮伺服器">
+            {needsAttention && (
+                <Alert variant="warning" className="ai-usage-note">
+                    最近一次事件是暫停呼叫，之後還沒有看到恢復的紀錄。
+                </Alert>
+            )}
+            <p className="ai-usage-breaker-state">
+                這個伺服器程序的狀態：
+                <span className="ai-usage-flag" data-state={breaker.state}>
+                    {BREAKER_STATE_LABELS[breaker.state]}
+                </span>
+                {breaker.state === 'open' && breaker.retryInSeconds > 0 && (
+                    <small>約 {breaker.retryInSeconds} 秒後放行一次試探</small>
+                )}
+            </p>
+            <p className="ai-usage-help">
+                這只代表剛好回應這個頁面的那一個程序；伺服器開了多個程序時各自獨立計算，
+                族語翻譯也有自己的斷路器。要看整體狀況，請看下方跨程序的事件紀錄。
+            </p>
+            <AdminTable label="斷路器事件" hover className="admin-table ai-usage-table">
+                <thead>
+                    <tr>
+                        <th>時間（台灣）</th>
+                        <th>事件</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {breaker.events.length > 0 ? breaker.events.map((event) => (
+                        <tr key={`${event.at}-${event.event}`}>
+                            <td className="ai-usage-nowrap">{formatEventTime(event.at)}</td>
+                            <td>{event.label || event.event}</td>
+                        </tr>
+                    )) : <EmptyRow colSpan={2} />}
+                </tbody>
+            </AdminTable>
+        </Panel>
     );
 }
 
@@ -216,6 +380,8 @@ export default function AiUsage() {
                         {data.priceNote}
                         {totals.costIncomplete && ' 有些模型沒有價目，下方標示「不完整」的費用會偏低。'}
                     </Alert>
+
+                    {data.budget && <BudgetPanel budget={data.budget} />}
 
                     <section className="ai-usage-summary" aria-label="用量總覽">
                         <dl>
@@ -340,6 +506,8 @@ export default function AiUsage() {
                             </AdminTable>
                         </Panel>
                     </div>
+
+                    {data.breaker && <BreakerPanel breaker={data.breaker} />}
                 </div>
             )}
         </main>

@@ -178,6 +178,85 @@ describe('AiUsage', () => {
         expect(screen.getAllByText('這段期間沒有資料').length).toBeGreaterThanOrEqual(3);
     });
 
+    const budget = (overrides = {}) => ({
+        level: 'ok',
+        budgetUsd: 10,
+        spentUsd: 3,
+        ratio: 0.3,
+        warnRatio: 0.8,
+        incomplete: false,
+        dailyLimitPerUser: 100,
+        note: '',
+        ...overrides,
+    });
+
+    test('月預算區塊顯示已花費、預算與使用率，並說明每人每日上限', async () => {
+        apiGet.mockResolvedValue(summary({ budget: budget() }));
+        render(<AiUsage />);
+
+        const region = await screen.findByRole('region', { name: '預算與額度' });
+        expect(within(region).getByText('US$3.00')).toBeInTheDocument();
+        expect(within(region).getByText('US$10.00')).toBeInTheDocument();
+        expect(within(region).getByText('30%')).toBeInTheDocument();
+        expect(within(region).getByText('100 次')).toBeInTheDocument();
+        expect(screen.getByRole('img', { name: /預算使用率 30%/ })).toBeInTheDocument();
+        expect(screen.queryByText(/本月預算已用/)).not.toBeInTheDocument();
+    });
+
+    test('接近與超過預算時分別顯示警告與危險提示', async () => {
+        apiGet.mockResolvedValueOnce(summary({ budget: budget({ level: 'warning', spentUsd: 8.5, ratio: 0.85 }) }));
+        const { unmount } = render(<AiUsage />);
+        expect(await screen.findByText(/本月預算已用 85%/)).toBeInTheDocument();
+        unmount();
+
+        apiGet.mockResolvedValueOnce(summary({ budget: budget({ level: 'exceeded', spentUsd: 11, ratio: 1.1 }) }));
+        render(<AiUsage />);
+        expect(await screen.findByText(/需要到「功能開關」手動重新開啟/)).toBeInTheDocument();
+        // 條狀圖寬度不會超過 100%
+        expect(screen.getByRole('img', { name: /預算使用率 110%/ }).firstChild).toHaveStyle({ width: '100%' });
+    });
+
+    test('沒設定預算時明講不會提醒也不會自動關閉', async () => {
+        apiGet.mockResolvedValue(summary({ budget: budget({ level: 'none', budgetUsd: null, spentUsd: 4, ratio: null }) }));
+        render(<AiUsage />);
+
+        const region = await screen.findByRole('region', { name: '預算與額度' });
+        expect(within(region).getByText('未設定')).toBeInTheDocument();
+        expect(screen.getByText(/不會有預算提醒，也不會自動關閉 AI 助手/)).toBeInTheDocument();
+        expect(screen.queryByRole('img', { name: /預算使用率/ })).not.toBeInTheDocument();
+    });
+
+    test('斷路器區塊顯示本程序狀態與跨程序事件，最近一次是暫停時提醒', async () => {
+        apiGet.mockResolvedValue(summary({
+            breaker: {
+                thisProcess: { state: 'open', retryInSeconds: 12.3 },
+                events: [
+                    { at: '2026-10-21T02:00:00+00:00', event: 'opened', label: '連續失敗，暫停呼叫' },
+                    { at: '2026-10-21T01:00:00+00:00', event: 'closed', label: '試探成功，恢復正常' },
+                ],
+                lastEvent: 'opened',
+            },
+        }));
+        render(<AiUsage />);
+
+        expect(await screen.findByText('暫停呼叫中')).toBeInTheDocument();
+        expect(screen.getByText('約 13 秒後放行一次試探')).toBeInTheDocument();
+        expect(screen.getByText(/之後還沒有看到恢復的紀錄/)).toBeInTheDocument();
+        expect(screen.getByText('連續失敗，暫停呼叫')).toBeInTheDocument();
+        // 事件時間用台灣時間：UTC 02:00 = 台灣 10:00
+        expect(screen.getByText(/10:00:00/)).toBeInTheDocument();
+    });
+
+    test('斷路器正常且沒有事件時顯示空狀態，沒有警告', async () => {
+        apiGet.mockResolvedValue(summary({
+            breaker: { thisProcess: { state: 'closed', retryInSeconds: 0 }, events: [], lastEvent: null },
+        }));
+        render(<AiUsage />);
+
+        expect(await screen.findByText('正常')).toBeInTheDocument();
+        expect(screen.queryByText(/之後還沒有看到恢復的紀錄/)).not.toBeInTheDocument();
+    });
+
     test('沒有後台角色的使用者看到無權限提示，也不發出請求', () => {
         mockRole = 'user';
         render(<AiUsage />);

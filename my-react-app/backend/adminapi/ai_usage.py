@@ -131,7 +131,8 @@ def summarize(days: int) -> dict:
     tz = timezone.get_current_timezone()
     today = timezone.localdate(now, tz)
     since = timezone.make_aware(datetime.combine(today - timedelta(days=days - 1), time.min), tz)
-    logs = AiUsageLog.objects.filter(created_at__gte=since)
+    # 斷路器事件（feature="breaker"）也存在這張表，但它們不是 API 呼叫：不計入呼叫數、成功率與費用。
+    logs = AiUsageLog.objects.filter(created_at__gte=since).exclude(feature=BREAKER_FEATURE)
 
     rows = (
         logs.annotate(day=TruncDate("created_at", tzinfo=tz))
@@ -192,4 +193,51 @@ def summarize(days: int) -> dict:
         "byStatus": [{"status": k, "calls": v} for k, v in sorted(by_status.items(), key=lambda kv: -kv[1])],
         "topUsers": [b.as_dict(uid=k or "（訪客）") for k, b in top_users],
         "priceNote": "費用依公開價目估算（快取讀取 0.1 倍、快取寫入 1.25 倍），實際金額以 Anthropic Console 為準。",
+        "breaker": breaker_summary(since),
+        "budget": budget_summary(),
+    }
+
+
+def budget_summary() -> dict:
+    """月預算與每人每日額度（路線圖 #5）。預算沒設定時 level 是 "none"，前端顯示「未設定預算」。
+    這裡只讀不動作：關閉助手的動作由 ai_budget.enforce() 在使用者請求時執行。"""
+    from AIModel.quota import daily_limit
+    from . import ai_budget
+
+    status = ai_budget.evaluate(use_cache=False)
+    return {
+        **status,
+        "warnRatio": ai_budget.WARN_RATIO,
+        "monthStart": ai_budget.month_start().isoformat(),
+        "dailyLimitPerUser": daily_limit(),
+        "note": "已花費是依價目表估算的本月用量（含翻譯），不是帳單；預算來自環境變數 AI_MONTHLY_BUDGET_USD。",
+    }
+
+
+BREAKER_FEATURE = "breaker"
+_BREAKER_EVENT_LIMIT = 20
+_BREAKER_EVENT_LABELS = {
+    "opened": "連續失敗，暫停呼叫", "half_open": "冷卻結束，放行一次試探",
+    "probe_failed": "試探失敗，再度暫停", "closed": "試探成功，恢復正常",
+}
+
+
+def breaker_summary(since) -> dict:
+    """斷路器狀態。兩個來源，意義不同，後台要分開標示：
+    - thisProcess：回應這個請求的 Django worker 自己記憶體裡的即時狀態。gunicorn 有多個 worker 時，
+      每個 worker 各有一份，看到的只是其中之一；FastAPI（翻譯）另有自己的斷路器，這裡看不到。
+    - events：各 process 的狀態轉換事件（存在用量表），跨 worker 與跨服務都看得到，是判斷「最近有沒有出事」的依據。"""
+    from config.llm import breaker_state
+
+    events = list(
+        AiUsageLog.objects.filter(feature=BREAKER_FEATURE, created_at__gte=since)
+        .order_by("-created_at", "-pk")[:_BREAKER_EVENT_LIMIT]
+    )
+    return {
+        "thisProcess": breaker_state(),
+        "events": [
+            {"at": e.created_at.isoformat(), "event": e.status, "label": _BREAKER_EVENT_LABELS.get(e.status, e.status)}
+            for e in events
+        ],
+        "lastEvent": events[0].status if events else None,
     }

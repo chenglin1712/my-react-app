@@ -2,9 +2,9 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AIAssistantOverlay from './bot';
-import { apiPost } from '../../utils/apiClient';
+import { apiGet, apiPost } from '../../utils/apiClient';
 
-vi.mock('../../utils/apiClient', () => ({ apiPost: vi.fn() }));
+vi.mock('../../utils/apiClient', () => ({ apiGet: vi.fn(), apiPost: vi.fn() }));
 vi.mock('./bot_study_plan', () => ({ default: () => null }));
 
 const mockNavigate = vi.fn();
@@ -13,6 +13,9 @@ vi.mock('react-router-dom', () => ({ useNavigate: () => mockNavigate }));
 describe('AIAssistantOverlay（回歸測試：注音/拼音輸入法選字時的 Enter 不該送出訊息）', () => {
   beforeEach(() => {
     apiPost.mockReset();
+    // 剩餘次數是輔助資訊：預設讀不到（不顯示），個別測試再覆寫
+    apiGet.mockReset();
+    apiGet.mockRejectedValue(new Error('no quota'));
     // jsdom 沒有實作 scrollIntoView
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
   });
@@ -167,9 +170,109 @@ describe('AIAssistantOverlay（回歸測試：注音/拼音輸入法選字時的
   });
 });
 
+describe('AIAssistantOverlay 每日提問額度與拒答（路線圖 #5、#6）', () => {
+  const RESETS = '2026-10-22T00:00:00+08:00';
+
+  beforeEach(() => {
+    apiPost.mockReset();
+    apiGet.mockReset();
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
+  });
+
+  test('開啟時讀取並顯示今天還可以問幾次', async () => {
+    apiGet.mockResolvedValue({ limit: 100, remaining: 87, resetsAt: RESETS, tracked: true });
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    expect(await screen.findByText('今天還可以問 87 次')).toBeInTheDocument();
+    expect(apiGet).toHaveBeenCalledWith('/AIModel/quota/');
+    // 次數還多時是安靜的小字，不是狀態通知
+    expect(screen.getByText('今天還可以問 87 次')).not.toHaveAttribute('role');
+  });
+
+  test('伺服器說計數不可信（tracked false）或讀取失敗時不顯示次數，也不擋提問', async () => {
+    apiGet.mockResolvedValue({ limit: 100, remaining: 100, resetsAt: RESETS, tracked: false });
+    apiPost.mockResolvedValue({ message: '回答' });
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), '你好{Enter}');
+
+    expect(await screen.findByText('回答')).toBeInTheDocument();
+    expect(screen.queryByText(/今天還可以問/)).not.toBeInTheDocument();
+  });
+
+  test('回應帶回新的剩餘次數就更新；剩下很少時改成會被報讀器念出的提醒', async () => {
+    apiGet.mockResolvedValue({ limit: 100, remaining: 6, resetsAt: RESETS, tracked: true });
+    apiPost.mockResolvedValue({ message: '回答', quota: { limit: 100, remaining: 5, resetsAt: RESETS, tracked: true } });
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+    await screen.findByText('今天還可以問 6 次');
+
+    await user.type(screen.getByLabelText('輸入訊息'), '你好{Enter}');
+
+    const line = await screen.findByText('今天還可以問 5 次');
+    expect(line).toHaveAttribute('role', 'status');
+    expect(line).toHaveAttribute('data-state', 'low');
+  });
+
+  test('剩 0 次時說明重置時間、不再送出，輸入框提示也跟著改', async () => {
+    apiGet.mockResolvedValue({ limit: 100, remaining: 0, resetsAt: RESETS, tracked: true });
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    expect(await screen.findByText('今天的提問次數已用完，台灣時間 00:00重置。')).toBeInTheDocument();
+    expect(screen.getByLabelText('輸入訊息')).toHaveAttribute('placeholder', '今天的提問次數已用完');
+    expect(screen.getByRole('button', { name: '發送' })).toHaveAttribute('aria-disabled', 'true');
+
+    await user.type(screen.getByLabelText('輸入訊息'), '還想問{Enter}');
+    expect(apiPost).not.toHaveBeenCalled();
+  });
+
+  test('後端回 429（今天的次數用完）時顯示重置時間並停用送出', async () => {
+    apiGet.mockRejectedValue(new Error('no quota'));
+    apiPost.mockRejectedValue(Object.assign(new Error('too many'), {
+      status: 429,
+      data: { code: 'ai_daily_quota_exceeded', quota: { limit: 100, remaining: 0, resetsAt: RESETS, tracked: true } },
+    }));
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), '你好{Enter}');
+
+    // 對話紀錄裡一則、輸入區上方一行，說的是同一件事
+    expect((await screen.findAllByText('今天的提問次數已用完，台灣時間 00:00重置。')).length).toBe(2);
+    expect(screen.queryByText('很抱歉，無法取得回應，請稍後再試。')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '發送' })).toHaveAttribute('aria-disabled', 'true');
+    consoleErrorSpy.mockRestore();
+  });
+
+  test('模型拒答時顯示固定說明並與一般回覆區分，仍帶簽章供之後的對話紀錄使用', async () => {
+    apiGet.mockRejectedValue(new Error('no quota'));
+    const sig = 'c'.repeat(64);
+    apiPost.mockResolvedValueOnce({ message: '這個問題我沒辦法回答，換個方式問問看。', refused: true, sig })
+      .mockResolvedValueOnce({ message: '好的' });
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), '某個問題{Enter}');
+    const note = await screen.findByText('這個問題我沒辦法回答，換個方式問問看。');
+    expect(note.closest('.message-bubble')).toHaveAttribute('data-kind', 'refusal');
+
+    await user.type(screen.getByLabelText('輸入訊息'), '換個問法{Enter}');
+    await screen.findByText('好的');
+    expect(apiPost.mock.calls[1][1].history).toEqual([
+      { role: 'user', text: '某個問題' },
+      { role: 'assistant', text: '這個問題我沒辦法回答，換個方式問問看。', sig },
+    ]);
+  });
+});
+
 describe('AIAssistantOverlay 無障礙（審查項 P1-5、P1-6）', () => {
   beforeEach(() => {
     apiPost.mockReset();
+    apiGet.mockReset();
+    apiGet.mockRejectedValue(new Error('no quota'));
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
   });
 

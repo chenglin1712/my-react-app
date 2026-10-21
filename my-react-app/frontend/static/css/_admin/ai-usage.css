@@ -181,6 +181,84 @@
   transition: width 240ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+/* 月預算進度：這條要看出「離 100% 還有多遠」，所以保留底色軌道，並在提醒門檻畫一條刻度 */
+.ai-usage-budget-bar {
+  position: relative;
+  height: 8px;
+  margin-top: 14px;
+  background: var(--admin-border);
+  border-radius: 1px;
+}
+
+.ai-usage-budget-bar::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: var(--budget-warn, 80%);
+  width: 1px;
+  background: var(--admin-muted);
+}
+
+.ai-usage-budget-fill {
+  display: block;
+  height: 100%;
+  background: var(--admin-accent);
+  border-radius: 1px;
+  transition: width 240ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.ai-usage-budget-bar[data-level="warning"] .ai-usage-budget-fill {
+  background: var(--admin-warning-text);
+}
+
+.ai-usage-budget-bar[data-level="exceeded"] .ai-usage-budget-fill {
+  background: var(--admin-danger);
+}
+
+.ai-usage-help {
+  max-width: 68ch;
+  margin: 10px 0 0;
+  color: var(--admin-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ai-usage-breaker-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 0;
+  margin: 0;
+  color: var(--admin-text-strong);
+  font-weight: 600;
+}
+
+.ai-usage-breaker-state small {
+  margin-left: 10px;
+  color: var(--admin-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.ai-usage-flag[data-state="open"],
+.ai-usage-flag[data-state="half_open"] {
+  color: var(--admin-danger);
+  background: var(--admin-danger-bg);
+  border-color: var(--admin-danger);
+}
+
+.ai-usage-flag[data-state="closed"] {
+  color: var(--admin-text-strong);
+  background: transparent;
+  border-color: var(--admin-border);
+}
+
+.ai-usage-nowrap {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 900px) {
   .ai-usage-split {
     grid-template-columns: 1fr;
@@ -220,6 +298,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ai-usage-content,
+  .ai-usage-budget-fill,
   .ai-usage-bar-fill {
     transition: none;
   }

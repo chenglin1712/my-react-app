@@ -602,7 +602,7 @@ class RunTayalChatServiceTest(TestCase):
         self.assertEqual(client.messages.create.call_count, 2)
         self.assertNotIn("study_plan", result)
 
-    def test_refusal_on_plan_gives_friendly_message_without_retry(self):
+    def test_refusal_on_plan_gives_the_fixed_refusal_message_without_retry(self):
         refused = _mock_response("")
         refused.stop_reason = "refusal"
         client = MagicMock()
@@ -611,7 +611,9 @@ class RunTayalChatServiceTest(TestCase):
         result = run_tayal_chat(client, "泰雅語", "排計畫", {})
 
         self.assertEqual(client.messages.create.call_count, 1)
-        self.assertIn("沒有排出有效的讀書計畫", result["message"])
+        # 路線圖 #6：所有拒答統一為固定說明並標 refused，不再用「沒有排出有效的讀書計畫」
+        self.assertEqual(result["message"], "這個問題我沒辦法回答，換個方式問問看。")
+        self.assertTrue(result["refused"])
 
     def test_history_is_sent_before_the_current_question(self):
         client = _mock_chat_client("它唸作 lokah")

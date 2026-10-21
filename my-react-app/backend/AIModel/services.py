@@ -17,7 +17,7 @@ import json
 import logging
 import re
 
-from config.llm import LLMRefusalError, call_claude, extract_text
+from config.llm import REFUSAL_MESSAGE, LLMRefusalError, call_claude, extract_text
 from .schemas import PLAN_SCHEMA
 from .tools import TOOLS, ToolInputError, run_tool
 
@@ -277,9 +277,9 @@ def _run_study_plan(client, prompt, messages: list, today: datetime.date, uid: s
                 output_schema=PLAN_SCHEMA,
             )
         except LLMRefusalError:
-            # 模型拒答不是格式問題，重試沒有意義，直接走友善訊息
+            # 模型拒答不是格式問題，重試沒有意義；往上丟，由 run_tayal_chat 回固定說明並標 refused
             logger.warning("[AIModel] 讀書計畫被模型拒答")
-            return None
+            raise
         try:
             if getattr(response, "stop_reason", None) == "max_tokens":
                 raise ValueError("輸出被 max_tokens 截斷")
@@ -350,7 +350,10 @@ def run_tayal_chat(client, tribe_name: str, user_message: str, profile: dict | N
     if wants_study_plan(user_message):
         tomorrow = (today + datetime.timedelta(days=1)).isoformat()
         prompt = build_plan_system(tribe_name, profile, today, tomorrow)
-        plan_data = _run_study_plan(client, prompt, messages, today, uid)
+        try:
+            plan_data = _run_study_plan(client, prompt, messages, today, uid)
+        except LLMRefusalError:
+            return _signed({"message": REFUSAL_MESSAGE, "refused": True}, uid)
         if plan_data:
             # 前端聊天泡泡固定顯示 data.message，補上一句簡短確認訊息。
             return _signed({
@@ -362,10 +365,14 @@ def run_tayal_chat(client, tribe_name: str, user_message: str, profile: dict | N
         )
 
     prompt = build_chat_system(tribe_name, profile, today, with_dictionary=lookup is not None)
-    if lookup is None:
-        response = call_claude(client, feature="chat", uid=uid, system=prompt, messages=messages)
-    else:
-        response = _run_chat_with_tools(client, prompt, messages, uid, lookup)
+    try:
+        if lookup is None:
+            response = call_claude(client, feature="chat", uid=uid, system=prompt, messages=messages)
+        else:
+            response = _run_chat_with_tools(client, prompt, messages, uid, lookup)
+    except LLMRefusalError:
+        # 拒答是模型的決定，不是服務故障：回 200 與固定說明（類別與 request id 已由 call_claude 寫進 log）
+        return _signed({"message": REFUSAL_MESSAGE, "refused": True}, uid)
     return _signed({"message": extract_text(response)}, uid)
 
 
@@ -403,18 +410,26 @@ def run_review_tayal_chat(client, tribe_name: str, user_message: str, relevant_w
 
     prompt = build_review_prompt(tribe_name, words_context)
 
-    response = call_claude(
-        client,
-        feature="review",
-        uid=uid,
-        system=prompt,
-        messages=[{"role": "user", "content": user_message}],
-    )
-    ai_text = extract_text(response)
+    refused = False
+    try:
+        response = call_claude(
+            client,
+            feature="review",
+            uid=uid,
+            system=prompt,
+            messages=[{"role": "user", "content": user_message}],
+        )
+        ai_text = extract_text(response)
+    except LLMRefusalError:
+        # 逐詞對照表仍然有用，只有 AI 說明部分換成固定說明
+        ai_text, refused = REFUSAL_MESSAGE, True
 
-    return {
+    result = {
         "original": user_message,
         "words": relevant_words,
         "translation": ai_text,
         "image": None,  # 之後可以依詞彙加圖
     }
+    if refused:
+        result["refused"] = True
+    return result

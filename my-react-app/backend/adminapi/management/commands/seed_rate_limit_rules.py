@@ -106,6 +106,7 @@ DJANGO_RULES = [
     ("dictionary_grammar_reorder", "30/m", "文法章節排序"),
     ("tayal_chat", "10/m", "AI 對話（泰雅語聊天）"),
     ("review_tayal_chat", "10/m", "AI 對話（複習模式）"),
+    ("ai_daily_quota", "100/d", "AI 助手每人每日提問上限（單位必須是 /d，台灣時間午夜重置，兩種對話共用）"),
     ("generate_crossword", "30/m", "產生填字遊戲"),
     ("submit_ans", "30/m", "填字遊戲繳交答案"),
     ("get_situation_quiz_data", "30/m", "情境題出題"),
