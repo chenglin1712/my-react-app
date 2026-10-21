@@ -223,6 +223,58 @@ class ChatHelpersTest(TestCase):
             self.assertFalse(wants_study_plan(text), text)
 
 
+class PromptContentTest(TestCase):
+    """路線圖 #12：prompt 不得帶某個族語的詞給所有族語，補充說明的要求不得自相矛盾。"""
+
+    def test_chat_and_plan_prompts_contain_no_tribe_words_for_any_tribe(self):
+        from config.tribes import TRIBE_MAP
+
+        for slug, name in TRIBE_MAP.items():
+            with self.subTest(tribe=slug):
+                client = _mock_chat_client("好")
+                run_tayal_chat(client, name, "你好", {})
+                chat_system = client.messages.create.call_args.kwargs["system"]
+                self.assertIn(name, chat_system)
+                self.assertNotIn("lokah", chat_system)
+
+                plan_client = _mock_chat_client("{}")
+                run_tayal_chat(plan_client, name, "幫我排一週讀書計畫", {})
+                self.assertNotIn("lokah", plan_client.messages.create.call_args.kwargs["system"])
+
+    def test_chat_prompt_tells_the_model_not_to_invent_tribe_words(self):
+        client = _mock_chat_client("好")
+        run_tayal_chat(client, "阿美語", "你好", {})
+        self.assertIn("不要自己用族語問候或造詞", client.messages.create.call_args.kwargs["system"])
+
+    def test_review_prompt_asks_for_translation_then_notes_without_contradiction(self):
+        """畫面上沒有整句的中文意思（review_AI 只顯示原句、AI 輸出、逐詞表），所以翻譯要保留；
+        原本「不要重複翻譯」與「產生完整翻譯」互相矛盾，現在只剩一個一致的要求。"""
+        client = _mock_chat_client("補充")
+        run_review_tayal_chat(client, "排灣語", "x y", [{"tayal": "x", "chinese": "", "audio": ""}])
+        system = client.messages.create.call_args.kwargs["system"]
+        self.assertNotIn("不是重複翻譯", system)
+        self.assertNotIn("已經有句子的完整中文翻譯", system)
+        self.assertIn("參考中文翻譯", system)
+        self.assertIn("參考翻譯（推測，未經族語專家確認）", system)  # 專案原則：未確認內容要標示推論
+        self.assertIn("不要猜它的意思、用法或文化背景", system)
+        self.assertIn("80字內", system)
+        self.assertNotIn("50字內", system)
+        self.assertIn("排灣語", system)
+
+    def test_review_prompt_marks_words_without_a_chinese_gloss(self):
+        client = _mock_chat_client("補充")
+        run_review_tayal_chat(client, "排灣語", "x y", [
+            {"tayal": "x", "chinese": "你好", "audio": ""},
+            {"tayal": "y", "chinese": "", "audio": ""},
+            {"tayal": "z", "chinese": "   ", "audio": ""},
+        ])
+        system = client.messages.create.call_args.kwargs["system"]
+        self.assertIn("- x：你好", system)
+        self.assertIn("- y：〔查無中文釋義〕", system)
+        self.assertIn("- z：〔查無中文釋義〕", system)  # 純空白也算沒有釋義
+        self.assertNotIn("**", system)
+
+
 class HistorySignatureTest(TestCase):
     def test_sign_is_stable_and_bound_to_user_and_text(self):
         self.assertEqual(sign_reply("u1", "你好"), sign_reply("u1", " 你好 "))

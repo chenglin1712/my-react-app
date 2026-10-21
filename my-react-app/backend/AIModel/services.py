@@ -68,7 +68,9 @@ def build_chat_prompt(tribe_name: str, level, correct, incorrect, unanswered, co
                 - 答錯: {incorrect}
                 - 未作答: {unanswered}
                 - 常見錯誤: {common_errors}
-            範例回應: "lokah su! 你的學習狀況不錯，答對了...題。要注意...的拼寫喔。"
+            用中文回覆。族語詞只在學生問到、或學習資料裡出現時才引用，不要自己用族語問候或造詞；
+            不確定的族語詞或拼寫，請直接說明不確定。
+            範例回應: "你的學習狀況不錯，答對了...題。要注意...的拼寫喔。"
 
             今天的日期是：{today.isoformat()}
             """
@@ -281,21 +283,15 @@ def build_review_prompt(tribe_name: str, words_context: str) -> str:
     只需要額外的詞彙用法／語法／文化背景補充說明。"""
     return f"""
                 你是一位{tribe_name}老師，幫助學生理解句子。
-                使用者已經有句子的完整中文翻譯，你的任務不是重複翻譯，而是提供額外的補充說明，例如：
-                - 詞彙用法
-                - 語法結構
-                - 文化背景或上下文提示
-                - 注意事項或常見錯誤
+                學生貼上一句{tribe_name}，畫面上已經列出逐詞對照，但沒有整句的中文意思。請依序說：
+                1. 先給一句簡短的參考中文翻譯，開頭寫「參考翻譯（推測，未經族語專家確認）：」。
+                2. 再補一點最值得學生注意的詞彙用法、語法結構、文化背景或常見錯誤。
 
-                詞彙庫：
+                詞彙庫只當作參考資料。標示「查無中文釋義」的詞，不要猜它的意思、用法或文化背景；
+                資訊不足時直接說明不確定。
                 {words_context}
 
-                要求：
-                1. 產生一句完整的中文翻譯
-                2. 保持正向、簡潔的教學語氣
-                3. 不要使用 Markdown 標記（例如 **）
-                4. 每個詞可以簡單說明用法或文化背景
-                5. 字數控制在50字內
+                語氣正向、簡潔，不要使用 Markdown 標記。翻譯優先寫完整，整段約控制在80字內。
 
             """
 
@@ -304,9 +300,9 @@ def run_review_tayal_chat(client, tribe_name: str, user_message: str, relevant_w
     """組 prompt、呼叫 LLM，回傳可以直接塞進 JsonResponse 的 dict。relevant_words
     由呼叫端先用既有的 search_tayal_words_bulk 查好（DB 查詢邏輯不搬進這裡，
     這裡只負責拿現成的詞彙資料組 prompt）。"""
-    words_context = f"**{tribe_name}詞彙庫參考資料：**\n"
+    words_context = f"{tribe_name}詞彙庫：\n"
     for w in relevant_words:
-        words_context += f"- {w['tayal']} : {w['chinese']}\n"
+        words_context += f"- {w['tayal']}：{(w['chinese'] or '').strip() or '〔查無中文釋義〕'}\n"
 
     prompt = build_review_prompt(tribe_name, words_context)
 
