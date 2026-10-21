@@ -3,16 +3,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AIAssistantOverlay from './bot';
 import { apiPost } from '../../utils/apiClient';
-import { getUserSituation } from '../../src/userServives/uploadDb';
 
 vi.mock('../../utils/apiClient', () => ({ apiPost: vi.fn() }));
-vi.mock('../../src/userServives/uploadDb', () => ({ getUserSituation: vi.fn() }));
-const authState = vi.hoisted(() => ({
-  userData: { firestoreData: { user_errors: {}, quiz_model: { type_stats: {} } } },
-}));
-vi.mock('../../src/userServives/authContext', () => ({
-  useAuth: () => ({ userData: authState.userData }),
-}));
 vi.mock('./bot_study_plan', () => ({ default: () => null }));
 
 const mockNavigate = vi.fn();
@@ -21,20 +13,11 @@ vi.mock('react-router-dom', () => ({ useNavigate: () => mockNavigate }));
 describe('AIAssistantOverlay（回歸測試：注音/拼音輸入法選字時的 Enter 不該送出訊息）', () => {
   beforeEach(() => {
     apiPost.mockReset();
-    getUserSituation.mockReset();
-    getUserSituation.mockResolvedValue({ level: 'beginner' });
     // jsdom 沒有實作 scrollIntoView
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
-    authState.userData = { firestoreData: { user_errors: {}, quiz_model: { type_stats: {} } } };
   });
 
-  test('Firestore 統計資料含 null／非數字項目時不會丟例外，仍能正常送出', async () => {
-    authState.userData = {
-      firestoreData: {
-        user_errors: { word1: 3, word2: null, word3: 'x' },
-        quiz_model: { type_stats: { choice: { n: 5, e: 2 }, broken: null } },
-      },
-    };
+  test('請求不再帶前端自組的學習資料（user_stats），由伺服器依登入身分讀取', async () => {
     apiPost.mockResolvedValue({ message: 'ok' });
     const user = userEvent.setup();
     render(<AIAssistantOverlay onClose={vi.fn()} />);
@@ -42,9 +25,9 @@ describe('AIAssistantOverlay（回歸測試：注音/拼音輸入法選字時的
     await user.type(screen.getByLabelText('輸入訊息'), '嗨{Enter}');
 
     expect(await screen.findByText('ok')).toBeInTheDocument();
-    const stats = apiPost.mock.calls[0][1].user_stats;
-    expect(stats.incorrect).toBe(3);
-    expect(stats.correct).toBe(3);
+    const body = apiPost.mock.calls[0][1];
+    expect(body).not.toHaveProperty('user_stats');
+    expect(body).toMatchObject({ message: '嗨', tribe: 'tayal' });
   });
 
   test('聊天室外層使用專屬 class，不再沿用會與 Navbar 衝突的 .overlay', () => {
@@ -187,10 +170,7 @@ describe('AIAssistantOverlay（回歸測試：注音/拼音輸入法選字時的
 describe('AIAssistantOverlay 無障礙（審查項 P1-5、P1-6）', () => {
   beforeEach(() => {
     apiPost.mockReset();
-    getUserSituation.mockReset();
-    getUserSituation.mockResolvedValue({ level: 'beginner' });
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
-    authState.userData = { firestoreData: { user_errors: {}, quiz_model: { type_stats: {} } } };
   });
 
   test('是非 modal 的懸浮視窗：焦點在輸入框、Esc 收合，Tab 可以離開視窗去操作頁面', async () => {
@@ -312,10 +292,7 @@ vi.mock('@utils/announce', () => ({ announce: announceSpy }));
 describe('AIAssistantOverlay 開場白與準確度提醒（E-9，P2-74）', () => {
   beforeEach(() => {
     apiPost.mockReset();
-    getUserSituation.mockReset();
-    getUserSituation.mockResolvedValue({ level: 'beginner' });
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
-    authState.userData = { firestoreData: { user_errors: {}, quiz_model: { type_stats: {} } } };
   });
 
   test('預設泰雅語：開場白帶有泰雅語問候詞與語別', () => {

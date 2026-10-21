@@ -14,7 +14,9 @@ from core.firebase_auth import verify_firebase_token
 from config.llm import get_llm_client, classify_llm_error
 from adminapi.rate_limits import get_configured_rate
 from .serializers import TayalChatSerializer, ReviewTayalChatSerializer
+from .learner_profile import load_profile
 from .services import run_tayal_chat, run_review_tayal_chat
+from .tools import SqlDictionaryLookup
 
 logger = logging.getLogger(__name__)
 
@@ -93,17 +95,17 @@ def tayal_chat(request):
         if not user_message:
             return JsonResponse({"detail": "取得訊息內容失敗"}, status=400)
 
-        # 從請求取得真實使用者學習資料（由前端傳入，已經過 TayalChatSerializer
-        # 驗證型別與長度上限，見 serializers.py 說明）
-        user_stats = validated.get("user_stats", {})
-
         tribe = validated.get("tribe", "tayal")
         tribe_name = TRIBE_MAP.get(tribe, "泰雅語")
+        uid = decoded.get("uid", "")
 
         try:
+            # 學習資料由伺服器依已驗證的 uid 讀取，不採用請求裡的 user_stats（路線圖 #20）；
+            # 讀不到（沒設定 Firestore、逾時）時是 None，助手退回通用回答。
             result = run_tayal_chat(
-                client, tribe_name, user_message, user_stats,
-                uid=decoded.get("uid", ""), history=validated.get("history", []),
+                client, tribe_name, user_message, load_profile(uid),
+                uid=uid, history=validated.get("history", []),
+                lookup=SqlDictionaryLookup(TRIBE_IDS.get(tribe, TRIBE_IDS["tayal"])),
             )
             return JsonResponse(result)
 

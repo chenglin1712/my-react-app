@@ -7,6 +7,7 @@ from unittest.mock import patch, MagicMock
 
 from AIModel.views import search_tayal_words, search_tayal_words_bulk
 from AIModel.schemas import PLAN_SCHEMA
+from AIModel.serializers import TayalChatSerializer
 from AIModel.services import (
     HISTORY_CHAR_BUDGET, TAIPEI, build_messages, run_tayal_chat, run_review_tayal_chat,
     sign_reply, validate_study_plan, verified_history, wants_study_plan,
@@ -127,12 +128,11 @@ class TayalChatViewTest(TestCase):
         response = self._post({"message": "hi", "tribe": "not-a-real-tribe"})
         self.assertEqual(response.status_code, 400)
 
-    def test_oversized_common_errors_list_returns_400(self):
-        response = self._post({
-            "message": "hi",
-            "user_stats": {"common_errors": ["x"] * 21},
-        })
-        self.assertEqual(response.status_code, 400)
+    def test_legacy_user_stats_of_any_shape_never_fails_the_request(self):
+        for stats in ({"common_errors": ["x"] * 21}, None, "junk", [1], {"correct": 10 ** 9}):
+            with self.subTest(stats=stats):
+                serializer = TayalChatSerializer(data={"message": "hi", "user_stats": stats})
+                self.assertTrue(serializer.is_valid(), serializer.errors)
 
     @patch("AIModel.views._get_client")
     def test_upstream_failure_returns_generic_message_and_logs(self, mock_get_client):

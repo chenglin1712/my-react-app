@@ -4,8 +4,6 @@ import { Bot, ChevronDown } from "lucide-react"
 import { useNavigate } from "react-router-dom";
 import StudyPlanComponent from "./bot_study_plan"
 import { buildHistory } from "./botHistory"
-import { useAuth } from "../../src/userServives/authContext";
-import { getUserSituation } from "../../src/userServives/uploadDb";
 import { TRIBES } from "../../src/constants/tribes";
 import { scrollBehavior } from "../../src/hooks/useReducedMotion";
 import { apiPost } from "../../utils/apiClient";
@@ -44,7 +42,6 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     // 應用程式以外的頁面（例如瀏覽器歷史紀錄的上一頁是外部網站），改成固定
     // 導回測驗首頁，行為可預期。
     const handleClose = onClose ?? (() => navigate("/quiz"));
-    const { userData } = useAuth();
     const [tribe, setTribe] = useState("tayal");
     // 開場白記錄它是為哪個族語寫的（greetingFor），對話還沒開始時換族語就跟著換
     const [messages, setMessages] = useState([
@@ -58,9 +55,6 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     const mountedRef = useRef(true);
     const abortControllerRef = useRef(null);
     const sendingRef = useRef(false);
-    const [userStats, setUserStats] = useState({
-        correct: 0, incorrect: 0, unanswered: 0, common_errors: [], level: "beginner"
-    });
 
     useEffect(() => {
         mountedRef.current = true;
@@ -71,51 +65,6 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
             abortControllerRef.current?.abort();
         };
     }, []);
-
-    // 在元件掛載後，從 Firebase 讀取使用者真實學習資料
-    useEffect(() => {
-        if (!userData) return;
-        let cancelled = false;
-        // Firestore 裡的舊資料／異常資料可能含 null 或非數字，這個 effect 在 overlay
-        // 一開啟就會跑，丟例外會讓整個助手（甚至整頁）掛掉，所以全部先正規化成數字。
-        const toCount = (n) => (Number.isFinite(n) ? n : 0);
-        const userErrors = userData?.firestoreData?.user_errors || {};
-        const commonErrors = Object.entries(userErrors)
-            .sort(([, a], [, b]) => toCount(b) - toCount(a))
-            .slice(0, 3)
-            .map(([word, cnt]) => `${word}（答錯${toCount(cnt)}次）`);
-        const totalErrors = Object.values(userErrors).reduce((sum, n) => sum + toCount(n), 0);
-
-        // 薦讀測驗（IRT）累積的 type_stats 內含每種題型的作答次數(n)與錯誤次數(e)，
-        // 答對數 = 總作答次數 - 總錯誤次數，取代原本永遠是 0 的寫死值
-        const typeStats = userData?.firestoreData?.quiz_model?.type_stats || {};
-        const totalAttempts = Object.values(typeStats).reduce((sum, s) => sum + toCount(s?.n), 0);
-        const totalTypeErrors = Object.values(typeStats).reduce((sum, s) => sum + toCount(s?.e), 0);
-        const totalCorrect = Math.max(totalAttempts - totalTypeErrors, 0);
-
-        getUserSituation()
-            .then(sit => {
-                if (cancelled) return;
-                setUserStats({
-                    correct: totalCorrect,
-                    incorrect: totalErrors,
-                    unanswered: 0,
-                    common_errors: commonErrors,
-                    level: sit?.level || "beginner",
-                });
-            })
-            .catch(() => {
-                if (cancelled) return;
-                setUserStats({
-                    correct: totalCorrect,
-                    incorrect: totalErrors,
-                    unanswered: 0,
-                    common_errors: commonErrors,
-                    level: "beginner",
-                });
-            });
-        return () => { cancelled = true; };
-    }, [userData]);
 
     // 非 modal 的懸浮視窗：不鎖背景、不困住 Tab，只在焦點位於視窗內時 Esc 才收合，
     // 開啟時焦點直接放在輸入框，收合後焦點回到右下角的啟動鈕。
@@ -174,7 +123,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
         try {
             const data = await apiPost(
                 import.meta.env.VITE_API_AI_BOT_URL,
-                { message: userText, user_stats: userStats, tribe, history: buildHistory(messages) },
+                { message: userText, tribe, history: buildHistory(messages) },
                 { signal: controller.signal },
             );
             if (!mountedRef.current) return;

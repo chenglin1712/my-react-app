@@ -14,23 +14,6 @@ from config.tribes import TRIBE_IDS
 _TRIBE_CHOICES = list(TRIBE_IDS.keys())
 
 
-class UserStatsSerializer(serializers.Serializer):
-    correct = serializers.IntegerField(min_value=0, max_value=100000, default=0)
-    incorrect = serializers.IntegerField(min_value=0, max_value=100000, default=0)
-    unanswered = serializers.IntegerField(min_value=0, max_value=100000, default=0)
-    # 前端最多帶 3 筆最常錯的詞（見 bot.jsx），這裡放寬到 20 筆但設上限，避免
-    # 惡意呼叫端塞入超大陣列。
-    common_errors = serializers.ListField(
-        child=serializers.CharField(max_length=100, allow_blank=True),
-        max_length=20,
-        required=False,
-        default=list,
-    )
-    # level 目前沒有固定列舉值（前端來源包含「初級」「N/A」等自由格式字串），
-    # 只限制長度，不限制內容。
-    level = serializers.CharField(max_length=50, allow_blank=True, required=False, default="beginner")
-
-
 HISTORY_MAX_MESSAGES = 10
 
 
@@ -44,7 +27,9 @@ class HistoryMessageSerializer(serializers.Serializer):
 
 class TayalChatSerializer(serializers.Serializer):
     message = serializers.CharField(max_length=1000, allow_blank=False, trim_whitespace=True)
-    user_stats = UserStatsSerializer(required=False, default=dict)
+    # 已淘汰（路線圖 #20）：學習資料改由伺服器依 uid 讀取，這個欄位只為了相容還沒更新的舊前端而接受，
+    # 內容完全不驗證、不使用（任何形狀都不會讓請求失敗）。前端都更新後可以移除這個欄位。
+    user_stats = serializers.JSONField(required=False, allow_null=True, write_only=True)
     tribe = serializers.ChoiceField(choices=_TRIBE_CHOICES, required=False, default="tayal")
     # 前幾輪對話（較舊的在前），讓助手看得懂追問。超過筆數或單則長度上限直接 400，
     # 不默默截斷，避免呼叫端以為整段都送出去了。

@@ -221,7 +221,7 @@ class LLMRefusalError(RuntimeError):
 
 
 def call_claude(client, *, feature: str, system: str, messages: list, uid: str | None = None,
-                output_schema: dict | None = None):
+                output_schema: dict | None = None, tools: list | None = None, tool_choice: dict | None = None):
     """所有 LLM 請求的唯一出口：斷路器 → 請求 → 紀錄 → 拒答檢查，回傳 SDK 原生的 Message。
 
     模型、effort 與 max_tokens 由 feature 對應的設定決定（見 config/llm_settings.py），
@@ -230,6 +230,10 @@ def call_claude(client, *, feature: str, system: str, messages: list, uid: str |
 
     output_schema：給 JSON Schema 時走結構化輸出（output_config.format），回應文字保證是
     符合 schema 的 JSON；與 effort 並存於同一個 output_config。
+
+    tools／tool_choice：用戶端工具的定義與選擇方式。回應可能是 stop_reason == "tool_use"，
+    由呼叫端執行工具後把結果放回 messages 再呼叫一次（見 AIModel/services.py 的工具迴圈）。
+    Sonnet 5.5 不能強制指定某個工具，tool_choice 只用 auto（不傳）或 {"type": "none"}。
 
     順序很重要：供應商請求一成功就立刻 record_success，之後的紀錄與拒答檢查出任何
     狀況都不能反過來影響斷路器；拒答（refusal）是模型的決定，不代表供應商故障，
@@ -250,6 +254,10 @@ def call_claude(client, *, feature: str, system: str, messages: list, uid: str |
         output_config["format"] = {"type": "json_schema", "schema": output_schema}
     if output_config:
         request["output_config"] = output_config
+    if tools:
+        request["tools"] = tools
+        if tool_choice:
+            request["tool_choice"] = tool_choice
 
     try:
         is_probe = _breaker.before_call()

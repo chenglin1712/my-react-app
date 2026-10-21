@@ -58,7 +58,10 @@ class Command(BaseCommand):
 
         today = datetime.datetime.now(TAIPEI).date()
         tomorrow = (today + datetime.timedelta(days=1)).isoformat()
-        system = build_plan_prompt("泰雅語", "beginner", 12, 5, 0, ["lokah（答錯2次）"], today, tomorrow)
+        system = build_plan_prompt(
+            "泰雅語", {"level": "beginner", "correct": 12, "incorrect": 5, "common_errors": ["lokah（答錯2次）"]},
+            today, tomorrow,
+        )
 
         passed = 0
         total_in = total_out = 0
