@@ -110,6 +110,11 @@ class DictionaryLookup:
         """forms：同一個查詢詞的各種寫法。回傳 [{word_id, name, explanations: [中文解釋...], has_audio}]。"""
         raise NotImplementedError
 
+    def names(self, forms: list) -> set:
+        """forms 之中，辭典真的有收錄的詞形（只要詞形，不載入解釋與音檔）。回覆後的族語詞驗證用（validators.py）。
+        預設用 search 湊合，正式環境的實作改成一次輕量查詢。"""
+        return {entry["name"] for entry in self.search(forms)}
+
     def get(self, word_id: str):
         """回傳 {word_id, name, explanations: [{chinese, part_of_speech, examples: [{original, chinese}]}]}，
         找不到（或不屬於這次的族語）回傳 None。"""
@@ -174,6 +179,10 @@ def run_tool(lookup: DictionaryLookup, name: str, tool_input) -> dict:
     raise ToolInputError(f"沒有這個工具：{_clip(name, 40)}")
 
 
+def _first_file_id(audio_items) -> str:
+    return str((audio_items[0].get("fileId") if audio_items else "") or "")
+
+
 class SqlDictionaryLookup(DictionaryLookup):
     """正式環境的實作：用既有的辭典資料庫（SQLAlchemy）。每次呼叫自己開關連線。"""
 
@@ -203,16 +212,29 @@ class SqlDictionaryLookup(DictionaryLookup):
                     "name": w.name,
                     "explanations": [e.get("chineseExplanation") or "" for e in explanations.get(w.id, [])],
                     "has_audio": bool(audio.get(w.id)),
+                    # 只給詞條卡片用（entries.py），不會進工具結果；run_tool 只挑特定欄位給模型
+                    "audio_file_id": _first_file_id(audio.get(w.id)),
                 }
                 for w in words
             ]
         finally:
             db.close()
 
+    def names(self, forms):
+        from dictionary_db.connect import SessionLocal
+        from dictionary_db.model import Word
+
+        db = SessionLocal()
+        try:
+            rows = db.query(Word.name).filter(Word.name.in_(forms), Word.tribe_id == self.tribe_id).distinct().all()
+            return {row[0] for row in rows}
+        finally:
+            db.close()
+
     def get(self, word_id):
         from dictionary_db.connect import SessionLocal
         from dictionary_db.model import Word
-        from dictionary_db.word_data import load_explanation_items_for_words
+        from dictionary_db.word_data import load_audio_items_for_words, load_explanation_items_for_words
 
         db = SessionLocal()
         try:
@@ -220,9 +242,11 @@ class SqlDictionaryLookup(DictionaryLookup):
             if word is None:
                 return None
             items = load_explanation_items_for_words(db, word_ids=[word.id]).get(word.id, [])
+            audio = load_audio_items_for_words(db, word_ids=[word.id]).get(word.id)
             return {
                 "word_id": str(word.id),
                 "name": word.name,
+                "audio_file_id": _first_file_id(audio),
                 "explanations": [
                     {
                         "chinese": item.get("chineseExplanation") or "",

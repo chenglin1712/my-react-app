@@ -3,6 +3,9 @@ import { useId, useState, useRef, useEffect } from "react";
 import { Bot, ChevronDown } from "lucide-react"
 import { useNavigate } from "react-router-dom";
 import StudyPlanComponent from "./bot_study_plan"
+import WordEntryCards from "./WordEntryCards"
+import UnverifiedWordsNote from "./UnverifiedWordsNote"
+import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
 import { buildHistory } from "./botHistory"
 import { TRIBES } from "../../src/constants/tribes";
 import { scrollBehavior } from "../../src/hooks/useReducedMotion";
@@ -69,6 +72,8 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     // 導回測驗首頁，行為可預期。
     const handleClose = onClose ?? (() => navigate("/quiz"));
     const [tribe, setTribe] = useState("tayal");
+    // 詞條卡片的發音：整個視窗共用一個播放器，按下新的就停掉舊的
+    const { playAudio, failedAudio } = useAuthorizedAudioPlayback();
     // 開場白記錄它是為哪個族語寫的（greetingFor），對話還沒開始時換族語就跟著換
     const [messages, setMessages] = useState([
         { id: 1, text: greetingText("tayal"), role: "bot", greetingFor: "tayal" }
@@ -253,6 +258,11 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                 studyPlan: data?.study_plan || null,
                 sig: data?.sig || "", // 助手回覆的簽章，下次送對話紀錄時帶回，見 botHistory.js
                 isRefusal: data?.refused === true, // 模型拒答：固定說明，不是錯誤，樣式上區分
+                // 這則回覆提到、而且辭典查到的詞條（後端 entries.py）；連結要用「提問當下」的族語，之後換族語不影響舊訊息
+                entries: Array.isArray(data?.entries) && data.entries.length > 0 ? data.entries : null,
+                entriesTribe: tribe,
+                // 回覆裡辭典查無的詞形（後端 validators.py）；只提醒，不改回覆
+                unverified: Array.isArray(data?.unverified) && data.unverified.length > 0 ? data.unverified : null,
             };
 
             const alreadyShown = streamTextRef.current !== "";
@@ -390,6 +400,17 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                                             <button type="button" className="bot-retry" onClick={handleRetry}>重試</button>
                                         )}
                                     </div>
+                                )}
+                                {message.entries && (
+                                    <WordEntryCards
+                                        entries={message.entries}
+                                        tribe={message.entriesTribe}
+                                        playAudio={playAudio}
+                                        failedAudio={failedAudio}
+                                    />
+                                )}
+                                {message.unverified && (
+                                    <UnverifiedWordsNote words={message.unverified} tribe={message.entriesTribe} />
                                 )}
                                 {message.studyPlan && (
                                     <StudyPlanComponent plan={message.studyPlan} onClose={handleClose} />

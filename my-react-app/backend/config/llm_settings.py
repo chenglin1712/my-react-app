@@ -64,7 +64,8 @@ class _FeatureDefaults:
 _FEATURE_DEFAULTS = {
     "chat": _FeatureDefaults(effort="medium", max_tokens=4096),
     "plan": _FeatureDefaults(effort="medium", max_tokens=4096),
-    "review": _FeatureDefaults(effort="low", max_tokens=1024),
+    # 結構化輸出（四個分欄的 JSON）比純文字長，思考也算在 max_tokens 內
+    "review": _FeatureDefaults(effort="low", max_tokens=2048),
     "translate": _FeatureDefaults(effort=None, max_tokens=4096),
     # 分類輸出只有一小段 JSON；effort 不傳（Haiku 是否接受 effort 參數未經實測，傳錯會整個 400），
     # 之後實測可以用 LLM_EFFORT_ROUTE 打開。

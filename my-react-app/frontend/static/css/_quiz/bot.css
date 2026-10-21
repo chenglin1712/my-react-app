@@ -458,3 +458,165 @@
     background: var(--yy-calm-surface);
     border-top: 1px solid var(--yy-calm-rule);
 }
+
+/* 辭典詞條卡片（路線圖 #17）：放在助手氣泡裡，用細線分隔，不另外做外框（氣泡本身已經是容器） */
+.entry-cards {
+    margin-top: 10px;
+    padding-top: 6px;
+    border-top: 1px solid var(--yy-calm-line);
+}
+
+.entry-cards-title {
+    margin: 0;
+    font-size: var(--yy-text-sm);
+    font-weight: 600;
+    color: var(--yy-calm-text-sub);
+}
+
+.entry-cards ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.entry-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.entry-card + .entry-card {
+    border-top: 1px solid var(--yy-calm-rule);
+}
+
+.entry-card-text {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 0;
+}
+
+.entry-card-word {
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.entry-card-gloss {
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
+    overflow-wrap: anywhere;
+}
+
+.entry-card-actions {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* 點擊範圍 44px，看得到的只有裡面 28px 的圓形圖示 */
+.entry-card-play {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--yy-calm-accent);
+    cursor: pointer;
+}
+
+.entry-card-play-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--yy-calm-accent);
+    border-radius: 50%;
+    transition: transform 150ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+        background-color 150ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+
+.entry-card-play:active .entry-card-play-icon {
+    transform: scale(0.94);
+}
+
+.entry-card-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 44px;
+    padding: 0 6px;
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    transition: transform 150ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+
+.entry-card-link:active {
+    transform: scale(0.97);
+}
+
+.entry-card-muted {
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
+}
+
+.entry-card-play:focus-visible,
+.entry-card-link:focus-visible {
+    outline: 2px solid var(--yy-calm-accent);
+    outline-offset: 2px;
+    border-radius: var(--yy-ui-radius);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .entry-card-play:hover .entry-card-play-icon {
+        background-color: var(--yy-calm-accent);
+        color: var(--yy-calm-accent-on);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .entry-card-play-icon,
+    .entry-card-link {
+        transition: none;
+    }
+
+    .entry-card-play:active .entry-card-play-icon,
+    .entry-card-link:active {
+        transform: none;
+    }
+}
+
+/* 回覆後的族語詞驗證提醒（路線圖 #18）：只用文字與細線，不靠顏色表達；出現時不做動畫（不位移、不淡入），不造成版面跳動 */
+.message-bubble .unverified-note {
+    margin: 10px 0 0;
+    padding-top: 6px;
+    border-top: 1px solid var(--yy-calm-line);
+    font-size: var(--yy-text-sm);
+    line-height: 1.6;
+    color: var(--yy-calm-text-sub);
+    overflow-wrap: anywhere;
+}
+
+.unverified-note-lead {
+    font-weight: 600;
+}
+
+.unverified-note a {
+    color: var(--yy-calm-accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    font-weight: 600;
+}
+
+.unverified-note a:focus-visible {
+    outline: 2px solid var(--yy-calm-accent);
+    outline-offset: 2px;
+    border-radius: var(--yy-ui-radius);
+}

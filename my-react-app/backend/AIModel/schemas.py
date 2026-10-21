@@ -6,6 +6,29 @@ additionalProperties: false，不支援 minItems／pattern 等限制），所以
 services.validate_study_plan 在伺服器端驗證。
 """
 
+# 句子補充說明（路線圖 #11）：參考翻譯加上四個分欄。沒有內容的欄位用空字串／空陣列，
+# 長度上限由 services.parse_review 在伺服器端限制（schema 不支援 maxLength）。
+REVIEW_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "translation": {"type": "string"},
+        "vocab": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"word": {"type": "string"}, "note": {"type": "string"}},
+                "required": ["word", "note"],
+                "additionalProperties": False,
+            },
+        },
+        "grammar": {"type": "string"},
+        "culture": {"type": "string"},
+        "pitfalls": {"type": "string"},
+    },
+    "required": ["translation", "vocab", "grammar", "culture", "pitfalls"],
+    "additionalProperties": False,
+}
+
 PLAN_SCHEMA = {
     "type": "object",
     "properties": {

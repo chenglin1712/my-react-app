@@ -19,7 +19,7 @@ class DefaultsTests(TestCase):
         with _env():
             chat, review, translate = get_settings("chat"), get_settings("review"), get_settings("translate")
         self.assertEqual((chat.effort, chat.max_tokens), ("medium", 4096))
-        self.assertEqual((review.effort, review.max_tokens), ("low", 1024))
+        self.assertEqual((review.effort, review.max_tokens), ("low", 2048))
         # 翻譯品質是核心，不擅自降低 effort：維持模型預設（不傳）。
         self.assertEqual((translate.effort, translate.max_tokens), (None, 4096))
         for s in (chat, review, translate):

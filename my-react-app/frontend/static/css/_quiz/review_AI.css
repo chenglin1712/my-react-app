@@ -337,3 +337,131 @@
         transform: translateY(-4px);
     }
 }
+
+/* ===== 參考翻譯的標示與分欄補充（路線圖 #11） ===== */
+/* 翻譯是模型的推測：標示放在翻譯正上方，字級小於翻譯但在白底上維持 4.5:1 */
+.translation-block .translation-label {
+    margin: 0;
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
+}
+
+.translation-block .review-notice {
+    margin: 0;
+    font-size: 15px;
+    color: var(--yy-calm-text-sub);
+}
+
+.review-sections {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.review-section {
+    padding: 8px 0;
+}
+
+.review-section + .review-section {
+    border-top: 1px solid var(--yy-calm-rule);
+}
+
+.review-section dt {
+    font-size: var(--yy-text-sm);
+    font-weight: 700;
+    color: var(--yy-calm-accent);
+    margin-bottom: 2px;
+}
+
+.review-section dd {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--yy-calm-text);
+    overflow-wrap: anywhere;
+}
+
+.review-vocab {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.review-vocab li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+}
+
+.review-vocab-word {
+    font-weight: 700;
+    color: var(--yy-calm-text);
+}
+
+a.review-vocab-word {
+    color: var(--yy-calm-accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+a.review-vocab-word:focus-visible,
+.review-word-play:focus-visible {
+    outline: 2px solid var(--yy-calm-accent);
+    outline-offset: 2px;
+    border-radius: var(--yy-ui-radius);
+}
+
+.review-word-muted {
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
+}
+
+/* 逐詞對照裡的發音鈕：點擊範圍 44px，看得到的是 28px 的圓形圖示 */
+.review-word-play {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--yy-calm-accent);
+    cursor: pointer;
+}
+
+.review-word-play-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--yy-calm-accent);
+    border-radius: 50%;
+    transition: transform 150ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+        background-color 150ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+
+.review-word-play:active .review-word-play-icon {
+    transform: scale(0.94);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .review-word-play:hover .review-word-play-icon {
+        background-color: var(--yy-calm-accent);
+        color: var(--yy-calm-accent-on);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .review-word-play-icon {
+        transition: none;
+    }
+
+    .review-word-play:active .review-word-play-icon {
+        transform: none;
+    }
+}

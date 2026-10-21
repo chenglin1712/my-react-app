@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 import SearchPage from './index';
@@ -143,6 +143,43 @@ describe('SearchPage 的詞形分析面板', () => {
 
     fireEvent.click(screen.getByText('布農族語'));
     await waitFor(() => expect(screen.queryByText('辭典查無此詞形')).not.toBeInTheDocument());
+  });
+});
+
+describe('SearchPage 從連結直接查詞（AI 助手的詞條卡片，路線圖 #17）', () => {
+  beforeEach(() => {
+    apiPost.mockReset();
+    apiPost.mockResolvedValue({ exact_match_results: [], fuzzy_match_results: {} });
+  });
+  afterEach(() => {
+    window.history.replaceState({}, '', '/');
+  });
+
+  test('?q=詞&tribe=族語代號：第一次載入就用那個族語查那個詞，輸入框也帶著它', async () => {
+    window.history.replaceState({}, '', '/search?q=lokah&tribe=amis');
+    render(<SearchPage />);
+
+    await waitFor(() => expect(apiPost).toHaveBeenCalled());
+    expect(apiPost.mock.calls[0][1]).toEqual({ keyword: 'lokah', tribe: '阿美' });
+    expect(screen.getByLabelText('查詢關鍵字')).toHaveValue('lokah');
+  });
+
+  test('族語代號不合法就用預設族語，過長的詞會被截短', async () => {
+    window.history.replaceState({}, '', `/search?q=${'a'.repeat(100)}&tribe=nothere`);
+    render(<SearchPage />);
+
+    await waitFor(() => expect(apiPost).toHaveBeenCalled());
+    expect(apiPost.mock.calls[0][1]).toEqual({ keyword: 'a'.repeat(60), tribe: '泰雅' });
+  });
+
+  test('沒有帶參數時維持原本的行為：載入全部詞條', async () => {
+    window.history.replaceState({}, '', '/search');
+    apiPost.mockResolvedValue({ all_results: {}, total: 0 });
+    render(<SearchPage />);
+
+    await waitFor(() => expect(apiPost).toHaveBeenCalled());
+    expect(apiPost.mock.calls[0][1]).toMatchObject({ tribe: '泰雅', limit: 50, offset: 0 });
+    expect(apiPost.mock.calls[0][1]).not.toHaveProperty('keyword');
   });
 });
 

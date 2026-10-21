@@ -7,6 +7,13 @@ import { apiGet, apiPost, apiStream } from '../../utils/apiClient';
 vi.mock('../../utils/apiClient', () => ({ apiGet: vi.fn(), apiPost: vi.fn(), apiStream: vi.fn() }));
 vi.mock('./bot_study_plan', () => ({ default: () => null }));
 
+// 詞條卡片的發音：真的 hook 會載入 firebase 授權的音檔請求，測試只關心有沒有呼叫、用哪個音檔編號
+const playAudioMock = vi.hoisted(() => vi.fn());
+const failedAudioMock = vi.hoisted(() => ({ current: new Set() }));
+vi.mock('../../hooks/useAuthorizedAudioPlayback', () => ({
+  default: () => ({ playAudio: playAudioMock, failedAudio: failedAudioMock.current }),
+}));
+
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', () => ({ useNavigate: () => mockNavigate }));
 
@@ -480,6 +487,155 @@ describe('AIAssistantOverlay 串流回覆（路線圖 #9）', () => {
 
     expect(await screen.findByText('舊做法的回答')).toBeInTheDocument();
     expect(apiStream).not.toHaveBeenCalled();
+  });
+});
+
+describe('AIAssistantOverlay 辭典詞條卡片（路線圖 #17）', () => {
+  const sig = 'e'.repeat(64);
+  const entries = [
+    { word_id: 'w1', word: 'lokah', chinese: '你好；加油', audio: 'f1' },
+    { word_id: 'w2', word: 'su', chinese: '你', audio: '' },
+  ];
+
+  beforeEach(() => {
+    vi.stubEnv('VITE_API_AI_BOT_STREAM_URL', '');
+    apiPost.mockReset();
+    apiGet.mockReset();
+    apiGet.mockRejectedValue(new Error('no quota'));
+    playAudioMock.mockReset();
+    failedAudioMock.current = new Set();
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const ask = async (reply) => {
+    apiPost.mockResolvedValue(reply);
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+    await user.type(screen.getByLabelText('輸入訊息'), 'lokah 是什麼{Enter}');
+    return user;
+  };
+
+  test('回覆帶有詞條時，在同一個氣泡裡列出詞、中文解釋、發音鈕與辭典連結', async () => {
+    await ask({ message: 'lokah 是你好', entries, sig });
+
+    const list = await screen.findByRole('region', { name: '本次查到的辭典詞條' });
+    expect(list).toHaveTextContent('lokah');
+    expect(list).toHaveTextContent('你好；加油');
+    expect(list.closest('.message-bubble')).toHaveTextContent('lokah 是你好');
+  });
+
+  test('辭典連結帶著詞與提問當下的族語，另開新分頁', async () => {
+    await ask({ message: 'lokah 是你好', entries, sig });
+
+    const link = await screen.findByRole('link', { name: '在辭典查看「lokah」（另開新分頁）' });
+    expect(link).toHaveAttribute('href', '/search?q=lokah&tribe=tayal');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+  });
+
+  test('有音檔的詞才有發音鈕，按下去用該詞的音檔編號播放', async () => {
+    const user = await ask({ message: 'lokah 是你好', entries, sig });
+
+    await user.click(await screen.findByRole('button', { name: '播放「lokah」的發音' }));
+
+    expect(playAudioMock).toHaveBeenCalledWith('f1');
+    expect(screen.queryByRole('button', { name: '播放「su」的發音' })).not.toBeInTheDocument();
+  });
+
+  test('音檔播放失敗過的詞，發音鈕換成文字說明，不是一顆按了沒反應的按鈕', async () => {
+    failedAudioMock.current = new Set(['f1']);
+    await ask({ message: 'lokah 是你好', entries, sig });
+
+    expect(await screen.findByText('音檔無法播放')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '播放「lokah」的發音' })).not.toBeInTheDocument();
+  });
+
+  test('沒有詞條的回覆不出現卡片區塊', async () => {
+    await ask({ message: '你好，同學', sig });
+
+    await screen.findByText('你好，同學');
+    expect(screen.queryByRole('region', { name: '本次查到的辭典詞條' })).not.toBeInTheDocument();
+  });
+
+  test('詞條資料不合法（缺詞、不是陣列）時略過，不讓畫面壞掉', async () => {
+    await ask({ message: '回覆', entries: [{ word_id: 'x' }, null, 5], sig });
+
+    await screen.findByText('回覆');
+    expect(screen.queryByRole('region', { name: '本次查到的辭典詞條' })).not.toBeInTheDocument();
+  });
+
+  test('詞條不會被當成對話記憶送回去（只有簽章的文字會）', async () => {
+    const user = await ask({ message: 'lokah 是你好', entries, sig });
+    await screen.findByRole('region', { name: '本次查到的辭典詞條' });
+    apiPost.mockResolvedValue({ message: '第二個回答', sig });
+
+    await user.type(screen.getByLabelText('輸入訊息'), '再問一次{Enter}');
+    await screen.findByText('第二個回答');
+
+    expect(apiPost.mock.calls[1][1].history).toEqual([
+      { role: 'user', text: 'lokah 是什麼' },
+      { role: 'assistant', text: 'lokah 是你好', sig },
+    ]);
+  });
+
+  test('回覆帶有辭典查無的詞形時，在回覆下方提醒（措辭是「查無此詞形」），詞連到辭典，回覆文字不變', async () => {
+    await ask({ message: 'zzzq 是我編的', unverified: ['zzzq', 'yyyp'], sig });
+
+    const note = await screen.findByRole('note');
+    expect(note).toHaveTextContent('辭典查無此詞形：zzzq、yyyp');
+    expect(note).toHaveTextContent('請再查辭典或請教老師');
+    expect(note.textContent).not.toMatch(/錯誤|不正確|是錯的/);
+    const link = screen.getByRole('link', { name: '在辭典查看「zzzq」（另開新分頁）' });
+    expect(link).toHaveAttribute('href', '/search?q=zzzq&tribe=tayal');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(screen.getByText('zzzq 是我編的')).toBeInTheDocument();
+  });
+
+  test('沒有查無的詞形（或資料不合法）時不出現提醒', async () => {
+    await ask({ message: '一切正常', unverified: [], sig });
+    await screen.findByText('一切正常');
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+  });
+
+  test('提醒不會被當成對話記憶送回去', async () => {
+    const user = await ask({ message: 'zzzq 是我編的', unverified: ['zzzq'], sig });
+    await screen.findByRole('note');
+    apiPost.mockResolvedValue({ message: '第二個回答', sig });
+
+    await user.type(screen.getByLabelText('輸入訊息'), '再問{Enter}');
+    await screen.findByText('第二個回答');
+
+    expect(apiPost.mock.calls[1][1].history).toEqual([
+      { role: 'user', text: 'lokah 是什麼' },
+      { role: 'assistant', text: 'zzzq 是我編的', sig },
+    ]);
+  });
+
+  test('串流路徑的 done 事件帶查無詞形時，完成後才出現提醒', async () => {
+    vi.stubEnv('VITE_API_AI_BOT_STREAM_URL', '/AIModel/tayal_chat/stream/');
+    apiStream.mockReset();
+    apiStream.mockResolvedValue({ message: 'zzzq 是我編的', unverified: ['zzzq'], sig });
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), 'zzzq{Enter}');
+
+    expect(await screen.findByRole('note')).toHaveTextContent('辭典查無此詞形：zzzq');
+  });
+
+  test('串流路徑的 done 事件帶詞條時同樣顯示', async () => {
+    vi.stubEnv('VITE_API_AI_BOT_STREAM_URL', '/AIModel/tayal_chat/stream/');
+    apiStream.mockReset();
+    apiStream.mockResolvedValue({ message: 'lokah 是你好', entries, sig });
+    const user = userEvent.setup();
+    render(<AIAssistantOverlay onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('輸入訊息'), 'lokah{Enter}');
+
+    expect(await screen.findByRole('region', { name: '本次查到的辭典詞條' })).toHaveTextContent('lokah');
   });
 });
 

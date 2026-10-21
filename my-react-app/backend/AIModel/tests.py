@@ -246,23 +246,23 @@ class PromptContentTest(TestCase):
         run_tayal_chat(client, "阿美語", "你好", {})
         self.assertIn("不要自己用族語問候或造詞", system_text(client.messages.create.call_args.kwargs["system"]))
 
-    def test_review_prompt_asks_for_translation_then_notes_without_contradiction(self):
-        """畫面上沒有整句的中文意思（review_AI 只顯示原句、AI 輸出、逐詞表），所以翻譯要保留；
-        原本「不要重複翻譯」與「產生完整翻譯」互相矛盾，現在只剩一個一致的要求。"""
-        client = _mock_chat_client("補充")
+    def test_review_prompt_asks_for_translation_and_four_sections_without_contradiction(self):
+        """畫面上沒有整句的中文意思，所以翻譯要保留（畫面另外標示「推測，未經族語專家確認」）；
+        四個分欄由結構化輸出的欄位決定，prompt 只說明每欄要什麼。"""
+        client = _mock_chat_client("{}")
         run_review_tayal_chat(client, "排灣語", "x y", [{"tayal": "x", "chinese": "", "audio": ""}])
         system = system_text(client.messages.create.call_args.kwargs["system"])
         self.assertNotIn("不是重複翻譯", system)
         self.assertNotIn("已經有句子的完整中文翻譯", system)
-        self.assertIn("參考中文翻譯", system)
-        self.assertIn("參考翻譯（推測，未經族語專家確認）", system)  # 專案原則：未確認內容要標示推論
+        for field in ("translation", "vocab", "grammar", "culture", "pitfalls"):
+            self.assertIn(f"- {field}：", system)
         self.assertIn("不要猜它的意思、用法或文化背景", system)
-        self.assertIn("80字內", system)
-        self.assertNotIn("50字內", system)
+        self.assertIn("沒有把握或沒有內容的欄位就留空", system)
         self.assertIn("排灣語", system)
+        self.assertEqual(client.messages.create.call_args.kwargs["output_config"]["format"]["type"], "json_schema")
 
     def test_review_prompt_marks_words_without_a_chinese_gloss(self):
-        client = _mock_chat_client("補充")
+        client = _mock_chat_client("{}")
         run_review_tayal_chat(client, "排灣語", "x y", [
             {"tayal": "x", "chinese": "你好", "audio": ""},
             {"tayal": "y", "chinese": "", "audio": ""},
@@ -507,12 +507,15 @@ class ReviewTayalChatViewTest(TestCase):
     @patch("AIModel.views.search_tayal_words_bulk", return_value={})
     @patch("AIModel.views._get_client")
     def test_valid_message_returns_200(self, mock_get_client, _mock_bulk):
-        mock_get_client.return_value = _mock_chat_client("補充說明")
+        mock_get_client.return_value = _mock_chat_client(
+            json.dumps({"translation": "補充說明", "vocab": [], "grammar": "", "culture": "", "pitfalls": ""})
+        )
 
         response = self._post({"message": "lokah su", "tribe": "tayal"})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["translation"], "補充說明")
+        self.assertNotIn("sections", response.json())  # 沒有內容的欄位不出現
 
 
 class RunTayalChatServiceTest(TestCase):
@@ -638,7 +641,9 @@ class RunReviewTayalChatServiceTest(TestCase):
     原樣帶出（不重新查詢/不遺漏欄位）。"""
 
     def test_returns_expected_shape(self):
-        client = _mock_chat_client("補充說明文字")
+        client = _mock_chat_client(
+            json.dumps({"translation": "補充說明文字", "vocab": [], "grammar": "", "culture": "", "pitfalls": ""})
+        )
         relevant_words = [{"tayal": "lokah", "audio": "f1", "chinese": "加油"}]
 
         result = run_review_tayal_chat(client, "泰雅語", "lokah su", relevant_words)

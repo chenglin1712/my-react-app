@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Container, Alert, Button } from 'react-bootstrap';
 import LoadingSpinner from '@components/ui/LoadingSpinner';
 import { useFavorites } from "../../src/userServives/useFavorites";
-import { TRIBE_NAMES, TRIBE_SLUG_BY_NAME, TRIBE_FULL_NAME_BY_SLUG } from "../constants/tribes";
+import { TRIBE_NAMES, TRIBE_NAME_BY_SLUG, TRIBE_SLUG_BY_NAME, TRIBE_FULL_NAME_BY_SLUG } from "../constants/tribes";
 import { apiPost } from "../../utils/apiClient";
 import { filterAndSortWords as sortWords, countMatchedWords } from "../../utils/wordFilterSort";
 import { announce } from "@utils/announce";
@@ -23,8 +23,20 @@ import useAudioPlayback from '../../hooks/useAudioPlayback';
 const PAGE_SIZE = 50;
 const WORD_FAVORITES_CATEGORY_ID = 1;
 
+// 從別的頁面（例如 AI 助手的詞條卡片）連過來：?q=詞&tribe=族語代號，開啟時直接查那個詞。
+// 只在第一次載入時讀一次，沒有或不合法就當作沒帶參數。
+const readSearchLink = () => {
+  if (typeof window === 'undefined') return { query: '', tribe: null };
+  const params = new URLSearchParams(window.location.search);
+  return {
+    query: (params.get('q') || '').trim().slice(0, 60),
+    tribe: TRIBE_NAME_BY_SLUG[params.get('tribe')] ?? null,
+  };
+};
+
 const SearchPage = () => {
-  const [query, setQuery] = useState('');
+  const [searchLink] = useState(readSearchLink);
+  const [query, setQuery] = useState(searchLink.query);
   const [definitions, setDefinitions] = useState({ exact_match_results: {}, fuzzy_match_results: {} });
   // 「全部詞條」的篩選／排序／分頁現在都在後端做（見 search_all），
   // allWords 是目前已載入的頁面資料（累積），allTotal 是後端算出的篩選後總筆數
@@ -52,7 +64,7 @@ const SearchPage = () => {
   const [showCategories, setShowCategories] = useState(false);
   const [activeTab, setActiveTab] = useState('語法與功能');
   const [selectedSubCategory, setSelectedSubCategory] = useState(null);
-  const [selectedTribe, setSelectedTribe] = useState('泰雅');
+  const [selectedTribe, setSelectedTribe] = useState(searchLink.tribe ?? '泰雅');
   // 開頭字母清單由後端依這個族語實際的詞條算出（見 utils/wordLetters.js），沒有時才用保底字母表
   const [availableLetters, setAvailableLetters] = useState(undefined);
   const alphabet = useMemo(() => resolveAlphabet(availableLetters), [availableLetters]);
