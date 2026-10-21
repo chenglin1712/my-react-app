@@ -16,7 +16,7 @@ import anthropic
 from django.core.management.base import BaseCommand, CommandError
 
 from AIModel.schemas import PLAN_SCHEMA
-from AIModel.services import TAIPEI, build_plan_prompt, validate_study_plan
+from AIModel.services import TAIPEI, build_plan_system, validate_study_plan
 from config.llm import LLMRefusalError, call_claude, extract_text, get_llm_client, get_settings
 
 MAX_COUNT = 100
@@ -58,7 +58,7 @@ class Command(BaseCommand):
 
         today = datetime.datetime.now(TAIPEI).date()
         tomorrow = (today + datetime.timedelta(days=1)).isoformat()
-        system = build_plan_prompt(
+        system = build_plan_system(
             "泰雅語", {"level": "beginner", "correct": 12, "incorrect": 5, "common_errors": ["lokah（答錯2次）"]},
             today, tomorrow,
         )

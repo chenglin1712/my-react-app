@@ -9,7 +9,7 @@ from AIModel.views import search_tayal_words, search_tayal_words_bulk
 from AIModel.schemas import PLAN_SCHEMA
 from AIModel.serializers import TayalChatSerializer
 from AIModel.services import (
-    HISTORY_CHAR_BUDGET, TAIPEI, build_messages, run_tayal_chat, run_review_tayal_chat,
+    HISTORY_CHAR_BUDGET, system_text, TAIPEI, build_messages, run_tayal_chat, run_review_tayal_chat,
     sign_reply, validate_study_plan, verified_history, wants_study_plan,
 )
 
@@ -233,25 +233,25 @@ class PromptContentTest(TestCase):
             with self.subTest(tribe=slug):
                 client = _mock_chat_client("好")
                 run_tayal_chat(client, name, "你好", {})
-                chat_system = client.messages.create.call_args.kwargs["system"]
+                chat_system = system_text(client.messages.create.call_args.kwargs["system"])
                 self.assertIn(name, chat_system)
                 self.assertNotIn("lokah", chat_system)
 
                 plan_client = _mock_chat_client("{}")
                 run_tayal_chat(plan_client, name, "幫我排一週讀書計畫", {})
-                self.assertNotIn("lokah", plan_client.messages.create.call_args.kwargs["system"])
+                self.assertNotIn("lokah", system_text(plan_client.messages.create.call_args.kwargs["system"]))
 
     def test_chat_prompt_tells_the_model_not_to_invent_tribe_words(self):
         client = _mock_chat_client("好")
         run_tayal_chat(client, "阿美語", "你好", {})
-        self.assertIn("不要自己用族語問候或造詞", client.messages.create.call_args.kwargs["system"])
+        self.assertIn("不要自己用族語問候或造詞", system_text(client.messages.create.call_args.kwargs["system"]))
 
     def test_review_prompt_asks_for_translation_then_notes_without_contradiction(self):
         """畫面上沒有整句的中文意思（review_AI 只顯示原句、AI 輸出、逐詞表），所以翻譯要保留；
         原本「不要重複翻譯」與「產生完整翻譯」互相矛盾，現在只剩一個一致的要求。"""
         client = _mock_chat_client("補充")
         run_review_tayal_chat(client, "排灣語", "x y", [{"tayal": "x", "chinese": "", "audio": ""}])
-        system = client.messages.create.call_args.kwargs["system"]
+        system = system_text(client.messages.create.call_args.kwargs["system"])
         self.assertNotIn("不是重複翻譯", system)
         self.assertNotIn("已經有句子的完整中文翻譯", system)
         self.assertIn("參考中文翻譯", system)
@@ -268,7 +268,7 @@ class PromptContentTest(TestCase):
             {"tayal": "y", "chinese": "", "audio": ""},
             {"tayal": "z", "chinese": "   ", "audio": ""},
         ])
-        system = client.messages.create.call_args.kwargs["system"]
+        system = system_text(client.messages.create.call_args.kwargs["system"])
         self.assertIn("- x：你好", system)
         self.assertIn("- y：〔查無中文釋義〕", system)
         self.assertIn("- z：〔查無中文釋義〕", system)  # 純空白也算沒有釋義
@@ -534,8 +534,8 @@ class RunTayalChatServiceTest(TestCase):
         run_tayal_chat(client, "泰雅語", "你好", {})
 
         _, kwargs = client.messages.create.call_args
-        self.assertIn("泰雅語", kwargs["system"])
-        self.assertNotIn("study_plan", kwargs["system"])
+        self.assertIn("泰雅語", system_text(kwargs["system"]))
+        self.assertNotIn("study_plan", system_text(kwargs["system"]))
         self.assertEqual(kwargs["messages"], [{"role": "user", "content": "你好"}])
         self.assertEqual(kwargs["max_tokens"], 4096)
         self.assertEqual(kwargs["output_config"], {"effort": "medium"})
@@ -628,7 +628,7 @@ class RunTayalChatServiceTest(TestCase):
             {"role": "assistant", "content": "lokah 是加油的意思"},
             {"role": "user", "content": "它怎麼唸"},
         ])
-        self.assertNotIn("lokah 是什麼意思", kwargs["system"])  # 歷史是資料，不併進 system
+        self.assertNotIn("lokah 是什麼意思", system_text(kwargs["system"]))  # 歷史是資料，不併進 system
 
 
 class RunReviewTayalChatServiceTest(TestCase):

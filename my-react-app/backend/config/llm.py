@@ -220,9 +220,11 @@ class LLMRefusalError(RuntimeError):
     呼叫端可以選擇回友善訊息而不是 502；仍是 RuntimeError，原本的處理不受影響。"""
 
 
-def call_claude(client, *, feature: str, system: str, messages: list, uid: str | None = None,
+def call_claude(client, *, feature: str, system: str | list, messages: list, uid: str | None = None,
                 output_schema: dict | None = None, tools: list | None = None, tool_choice: dict | None = None):
     """所有 LLM 請求的唯一出口：斷路器 → 請求 → 紀錄 → 拒答檢查，回傳 SDK 原生的 Message。
+
+    system：字串，或帶 cache_control 的 text 區塊清單（提示快取，見 AIModel/services.py 的 system_blocks）。
 
     模型、effort 與 max_tokens 由 feature 對應的設定決定（見 config/llm_settings.py），
     呼叫端不再各自指定。取樣參數（temperature 等）刻意不開放：是否支援因模型而異，

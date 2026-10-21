@@ -10,7 +10,7 @@ from django.core.cache import cache
 from django.test import Client, TestCase
 
 from AIModel import learner_profile
-from AIModel.services import run_tayal_chat
+from AIModel.services import run_tayal_chat, system_text
 from AIModel.tests import _mock_chat_client, _mock_response
 from AIModel.tools import (
     MAX_ENTRIES_PER_KEYWORD, DictionaryLookup, ToolInputError, candidate_forms, clean_keywords, run_tool,
@@ -125,7 +125,7 @@ class ToolLoopTest(TestCase):
         run_tayal_chat(client, "泰雅語", "你好", {})
         kwargs = client.messages.create.call_args.kwargs
         self.assertNotIn("tools", kwargs)
-        self.assertNotIn("search_words", kwargs["system"])
+        self.assertNotIn("search_words", system_text(kwargs["system"]))
 
     def test_model_looks_up_a_word_then_answers_from_the_result(self):
         lookup = _FakeLookup({"lokah": ["你好"]})
@@ -139,7 +139,7 @@ class ToolLoopTest(TestCase):
         self.assertEqual(client.messages.create.call_count, 2)
         first, second = (c.kwargs for c in client.messages.create.call_args_list)
         self.assertEqual([t["name"] for t in first["tools"]], ["search_words", "get_word"])
-        self.assertIn("search_words", first["system"])
+        self.assertIn("search_words", system_text(first["system"]))
         sent = second["messages"][-1]                     # 工具結果放在一則 user 訊息，內容是辭典查到的東西
         self.assertEqual(sent["role"], "user")
         self.assertEqual(sent["content"][0]["type"], "tool_result")
@@ -283,13 +283,13 @@ class LearnerProfileTest(TestCase):
         client = _mock_chat_client("好")
         profile = {"level": "初級", "correct": 7, "incorrect": 2, "common_errors": ["lokah（答錯2次）"]}
         run_tayal_chat(client, "泰雅語", "我學得如何", profile)
-        system = client.messages.create.call_args.kwargs["system"]
+        system = system_text(client.messages.create.call_args.kwargs["system"])
         self.assertIn("程度: 初級", system)
         self.assertIn("答對: 7", system)
 
         client = _mock_chat_client("好")
         run_tayal_chat(client, "泰雅語", "我學得如何", None)
-        system = client.messages.create.call_args.kwargs["system"]
+        system = system_text(client.messages.create.call_args.kwargs["system"])
         self.assertIn("讀不到這位學生的學習資料", system)
         self.assertNotIn("答對:", system)
 
