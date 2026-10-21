@@ -183,7 +183,8 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                 id: crypto.randomUUID(),
                 text: data?.message || "很抱歉，沒有取得有效的回應。",
                 role: "bot",
-                studyPlan: data?.study_plan || null
+                studyPlan: data?.study_plan || null,
+                sig: data?.sig || "", // 助手回覆的簽章，下次送對話紀錄時帶回，見 botHistory.js
             };
 
             setMessages(prev => [...prev, botResponse]);

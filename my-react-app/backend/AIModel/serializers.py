@@ -38,6 +38,8 @@ class HistoryMessageSerializer(serializers.Serializer):
     role = serializers.ChoiceField(choices=["user", "assistant"])
     # 與當前問題同樣上限 1000 字；助手的回覆本來就約 100 字內，讀書計畫只送確認訊息。
     text = serializers.CharField(max_length=1000, allow_blank=False, trim_whitespace=True)
+    # 助手訊息的簽章（services.sign_reply），缺少或不符的助手訊息會被捨棄；使用者訊息不需要。
+    sig = serializers.CharField(max_length=64, allow_blank=True, required=False, default="")
 
 
 class TayalChatSerializer(serializers.Serializer):

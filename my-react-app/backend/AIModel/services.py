@@ -11,6 +11,8 @@ prompt 樣板、外部 API 呼叫、回應解析全部塞在同一個函式裡�
 跟組裝分開），這裡是同一種思路用在 AI 呼叫上。
 """
 import datetime
+import hashlib
+import hmac
 import json
 import logging
 import re
@@ -97,13 +99,60 @@ def build_plan_prompt(tribe_name: str, level, correct, incorrect, unanswered, co
             """
 
 
+def _history_key() -> bytes:
+    from django.conf import settings
+
+    return hashlib.sha256(settings.SECRET_KEY.encode("utf-8") + b"|tayal-chat-history-v1").digest()
+
+
+def sign_reply(uid: str, text: str) -> str:
+    """助手回覆的簽章（HMAC-SHA256，綁定使用者與內容）。回覆隨 response 帶給前端，
+    前端下次送歷史時原樣帶回，後端靠它確認「這句助手訊息真的是我們說過的」。
+    歷史由用戶端保存，沒有簽章的話，使用者可以偽造助手說過的話來影響模型。
+
+    已知限制：簽章只證明「這段文字曾經對這位使用者出現過」，不綁定輪次與順序，
+    所以使用者可以重放自己以前收到的真回覆、或調換順序。這只能影響他自己的對話，
+    目前功能也只產生文字與行事曆資料；日後若加工具呼叫，要改成伺服器端保存對話。
+
+    待簽資料用固定欄位的 JSON，uid 或內容含有換行也不會有欄位邊界歧義。
+    前端不能修改已簽署的助手文字（不 trim、不截斷）；收到時序列化器會 strip，
+    這裡簽的也是 strip 之後的內容，兩邊一致。"""
+    payload = json.dumps({"v": 1, "uid": uid, "text": text.strip()}, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return hmac.new(_history_key(), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def verified_history(history: list, uid: str) -> list:
+    """任何一則助手訊息的簽章缺少或不符，就整段歷史都不用。
+    偽造內容會污染它之後的對話，而之前的部分也沒有理由繼續信任一個正在竄改歷史的呼叫端；
+    損失只是這一次沒有上文。使用者自己說的話不需要簽章。"""
+    for m in history:
+        if m["role"] != "assistant":
+            continue
+        # 以 bytes 比較：compare_digest 遇到非 ASCII 的 str 會丟 TypeError，簽章是用戶端給的
+        sig = (m.get("sig") or "").encode("utf-8")
+        if not hmac.compare_digest(sig, sign_reply(uid, m["text"]).encode("ascii")):
+            logger.warning("[AIModel] 對話紀錄中有簽章不符的助手訊息，整段上文捨棄（uid=%s）", uid or "-")
+            return []
+    return history
+
+
 def build_messages(history: list, user_message: str) -> list:
-    """history（較舊在前）+ 當前問題。總字數超過 HISTORY_CHAR_BUDGET 時由舊到新丟棄，
-    且丟完之後第一則一定是 user（Messages API 的對話要從使用者開始）。"""
-    kept = [{"role": m["role"], "content": m["text"]} for m in history]
+    """history（較舊在前）+ 當前問題。
+    - 歷史裡相鄰同角色的訊息先合併；結尾沒有得到回覆的使用者訊息直接丟掉（不併進當前問題，
+      否則多則連續使用者訊息可以繞過字數預算）。
+    - 歷史加當前問題的總字數超過 HISTORY_CHAR_BUDGET 時，由舊到新丟棄歷史，
+      且丟完之後第一則一定是 user（Messages API 的對話要從使用者開始）。"""
+    kept = []
+    for m in history:
+        if kept and kept[-1]["role"] == m["role"]:
+            kept[-1]["content"] += "\n" + m["text"]
+        else:
+            kept.append({"role": m["role"], "content": m["text"]})
+    while kept and kept[-1]["role"] == "user":
+        kept.pop()
 
     def total():
-        return sum(len(m["content"]) for m in kept)
+        return len(user_message) + sum(len(m["content"]) for m in kept)
 
     while kept and total() > HISTORY_CHAR_BUDGET:
         kept.pop(0)
@@ -118,7 +167,8 @@ def _parse_event_time(value, field: str) -> datetime.datetime:
     try:
         parsed = datetime.datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
     except ValueError:
-        raise ValueError(f"{field} 不是有效的 ISO 時間：{value!r}")
+        # 訊息會原樣接在重試提示裡給模型看，不放模型輸出的原值，避免二次提示詞注入
+        raise ValueError(f"{field} 不是有效的 ISO 8601 時間")
     # 沒帶時區就當作台灣時間，帶了就轉成台灣時間，前端一律收到 +08:00。
     return parsed.replace(tzinfo=TAIPEI) if parsed.tzinfo is None else parsed.astimezone(TAIPEI)
 
@@ -160,11 +210,13 @@ def validate_study_plan(parsed, today: datetime.date) -> dict:
 
 
 def _run_study_plan(client, prompt: str, messages: list, today: datetime.date, uid: str):
-    """用結構化輸出要計畫；沒通過語意驗證就重試一次，仍失敗回傳 None。"""
+    """用結構化輸出要計畫；沒通過語意驗證就重試一次（並告訴模型上次錯在哪），仍失敗回傳 None。"""
+    request_messages = messages
     for attempt in range(1, _PLAN_ATTEMPTS + 1):
         try:
             response = call_claude(
-                client, feature="plan", uid=uid, system=prompt, messages=messages, output_schema=PLAN_SCHEMA,
+                client, feature="plan", uid=uid, system=prompt, messages=request_messages,
+                output_schema=PLAN_SCHEMA,
             )
         except LLMRefusalError:
             # 模型拒答不是格式問題，重試沒有意義，直接走友善訊息
@@ -176,6 +228,11 @@ def _run_study_plan(client, prompt: str, messages: list, today: datetime.date, u
             return validate_study_plan(json.loads(extract_text(response)), today)
         except (ValueError, json.JSONDecodeError) as exc:
             logger.warning("[AIModel] 讀書計畫第 %d 次輸出未通過驗證：%s", attempt, exc)
+            # 錯誤訊息是我們自己的驗證文字（欄位位置與規則），不含模型輸出的原值；接在最後一則
+            # 使用者訊息後面，避免出現連續兩則同角色訊息。
+            hint = f"（上一次產生的計畫有問題：{str(exc)[:200]}。請修正後重新產生。）"
+            last = messages[-1]
+            request_messages = [*messages[:-1], {"role": "user", "content": f"{last['content']}\n\n{hint}"}]
     return None
 
 
@@ -192,7 +249,7 @@ def run_tayal_chat(client, tribe_name: str, user_message: str, user_stats: dict,
     common_errors = user_stats.get("common_errors", [])
 
     today = datetime.datetime.now(TAIPEI).date()
-    messages = build_messages(history or [], user_message)
+    messages = build_messages(verified_history(history or [], uid), user_message)
 
     if wants_study_plan(user_message):
         tomorrow = (today + datetime.timedelta(days=1)).isoformat()
@@ -200,15 +257,23 @@ def run_tayal_chat(client, tribe_name: str, user_message: str, user_stats: dict,
         plan_data = _run_study_plan(client, prompt, messages, today, uid)
         if plan_data:
             # 前端聊天泡泡固定顯示 data.message，補上一句簡短確認訊息。
-            return {
+            return _signed({
                 "message": f"已經為你排好「{plan_data['title']}」，點選下方卡片即可加入行事曆。",
                 "study_plan": plan_data,
-            }
-        return {"message": "很抱歉，這次沒有排出有效的讀書計畫，請換個說法再試一次，例如「幫我排一個一週讀書計畫」。"}
+            }, uid)
+        return _signed(
+            {"message": "很抱歉，這次沒有排出有效的讀書計畫，請換個說法再試一次，例如「幫我排一個一週讀書計畫」。"}, uid,
+        )
 
     prompt = build_chat_prompt(tribe_name, level, correct, incorrect, unanswered, common_errors, today)
     response = call_claude(client, feature="chat", uid=uid, system=prompt, messages=messages)
-    return {"message": extract_text(response)}
+    return _signed({"message": extract_text(response)}, uid)
+
+
+def _signed(result: dict, uid: str) -> dict:
+    """幫回覆加上簽章，前端之後把這句話當歷史送回來時用來驗證。"""
+    result["sig"] = sign_reply(uid, result["message"])
+    return result
 
 
 def build_review_prompt(tribe_name: str, words_context: str) -> str:

@@ -78,7 +78,8 @@ describe('AIAssistantOverlay（回歸測試：注音/拼音輸入法選字時的
   });
 
   test('追問時把前面的對話一起送出，第一句沒有上文；失敗的那一輪不會被當成上文', async () => {
-    apiPost.mockResolvedValueOnce({ message: '加油的意思' }).mockResolvedValueOnce({ message: '唸作 lokah' });
+    const sig = 'b'.repeat(64);
+    apiPost.mockResolvedValueOnce({ message: '加油的意思', sig }).mockResolvedValueOnce({ message: '唸作 lokah', sig });
     const user = userEvent.setup();
     render(<AIAssistantOverlay onClose={vi.fn()} />);
 
@@ -90,7 +91,7 @@ describe('AIAssistantOverlay（回歸測試：注音/拼音輸入法選字時的
     expect(apiPost.mock.calls[0][1].history).toEqual([]);
     expect(apiPost.mock.calls[1][1].history).toEqual([
       { role: 'user', text: 'lokah 是什麼意思' },
-      { role: 'assistant', text: '加油的意思' },
+      { role: 'assistant', text: '加油的意思', sig },
     ]);
   });
 
