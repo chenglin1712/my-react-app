@@ -133,8 +133,8 @@ class SeedFeatureFlagsTest(TestCase):
         from config.tribes import TRIBES
         out = StringIO()
         call_command("seed_feature_flags", stdout=out)
-        self.assertEqual(FeatureFlag.objects.count(), len(TRIBES) + 18)
-        self.assertIn(f"共 {len(TRIBES) + 18} 筆", out.getvalue())
+        self.assertEqual(FeatureFlag.objects.count(), len(TRIBES) + 20)
+        self.assertIn(f"共 {len(TRIBES) + 20} 筆", out.getvalue())
         # 訪客翻譯試用預設關閉，要管理者手動打開
         self.assertFalse(FeatureFlag.objects.get(key="guest_translation_enabled").enabled)
         # 單題錯題講解（#22）預設關閉：真金鑰驗收完才由管理者打開

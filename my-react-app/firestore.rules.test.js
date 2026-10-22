@@ -1205,3 +1205,187 @@ describe('cloudNotesRepo 搭配 Firestore 規則', () => {
     expect(classifyError(denied)).toBe('permission');
   });
 });
+
+describe('users/{uid}/studyPlans/current 規則（追蹤中的讀書計畫）', () => {
+  const path = 'users/alice/studyPlans/current';
+  const task = (id = 't1') => ({
+    id, summary: '練習詞彙', description: '前往初級測驗', start: '2026-10-23T10:00:00+08:00',
+    end: '2026-10-23T10:30:00+08:00', done: false,
+  });
+  const plan = (overrides = {}) => ({
+    title: '泰雅語一週讀書計畫', tasks: [task()], createdAt: serverTimestamp(), updatedAt: serverTimestamp(), ...overrides,
+  });
+  const seed = () => testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), path), { title: '舊計畫', tasks: [task()], createdAt: new Date(0), updatedAt: new Date(0) });
+  });
+
+  test('本人可以建立、讀取自己的計畫', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(setDoc(doc(alice.firestore(), path), plan()));
+    await assertSucceeds(getDoc(doc(alice.firestore(), path)));
+  });
+
+  test('別人、staff、未登入都不能讀寫', async () => {
+    await seed();
+    for (const ctx of [
+      testEnv.authenticatedContext('bob'), testEnv.authenticatedContext('bob', { role: 'admin' }), testEnv.unauthenticatedContext(),
+    ]) {
+      await assertFails(getDoc(doc(ctx.firestore(), path)));
+      await assertFails(setDoc(doc(ctx.firestore(), path), plan()));
+    }
+  });
+
+  test('只有 current 這一份文件可用，別的編號一律拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(setDoc(doc(alice.firestore(), 'users/alice/studyPlans/other'), plan()));
+  });
+
+  test('外層形狀不對會被擋：多餘欄位、缺欄位、標題空白或過長、任務 0 筆或超過 14 筆、不是列表', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    const bad = [
+      plan({ extra: 1 }),
+      plan({ title: '' }),
+      plan({ title: '字'.repeat(101) }),
+      plan({ title: 123 }),
+      plan({ tasks: [] }),
+      plan({ tasks: Array.from({ length: 15 }, (_, i) => task(`t${i}`)) }),
+      plan({ tasks: 'x' }),
+      plan({ updatedAt: new Date(0) }),
+    ];
+    for (const data of bad) await assertFails(setDoc(doc(alice.firestore(), path), data));
+    const { createdAt, ...missing } = plan();
+    await assertFails(setDoc(doc(alice.firestore(), path), missing));
+  });
+
+  test('任務內部的形狀不對會被擋：欄位太多、缺欄位、型別錯、過長、done 不是布林、不是物件', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    const { description, ...noDescription } = task();
+    const bad = [
+      { ...task(), a: 1, b: 2 },        // 欄位超過 7 個
+      noDescription,
+      { ...task(), id: 'x'.repeat(65) },
+      { ...task(), summary: '字'.repeat(101) },
+      { ...task(), summary: 123 },
+      { ...task(), description: '字'.repeat(301) },
+      { ...task(), start: 20261023 },
+      { ...task(), end: 'x'.repeat(41) },
+      { ...task(), done: 'true' },
+      { ...task(), done: 1 },
+      'x',
+      null,
+    ];
+    for (const one of bad) {
+      // 壞任務放在最後一個位置，也要抓得到（逐一位置檢查沒有漏掉）
+      await assertFails(setDoc(doc(alice.firestore(), path), plan({ tasks: [task('ok'), one] })));
+    }
+    await assertFails(setDoc(doc(alice.firestore(), path), plan({
+      tasks: [...Array.from({ length: 13 }, (_, i) => task(`t${i}`)), { ...task('t13'), done: 'no' }],
+    })));
+  });
+
+  test('calendarEventId 可以是字串、null 或不存在', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(setDoc(doc(alice.firestore(), path), plan({
+      tasks: [{ ...task('a'), calendarEventId: 'evt-1' }, { ...task('b'), calendarEventId: null }, task('c')],
+    })));
+  });
+
+  test('14 筆任務剛好可以（最壞情況：每筆都帶 calendarEventId，不能超過規則的運算式上限）', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(setDoc(doc(alice.firestore(), path), plan({
+      tasks: Array.from({ length: 14 }, (_, i) => ({ ...task(`t${i}`), calendarEventId: `evt-${i}` })),
+    })));
+  });
+
+  test('勾選完成（更新 tasks 與 updatedAt）可以，但 createdAt 不能改', async () => {
+    await seed();
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(updateDoc(doc(alice.firestore(), path), {
+      tasks: [{ ...task(), done: true }], updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(doc(alice.firestore(), path), { createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+  });
+
+  test('更新時 updatedAt 必須是伺服器時間', async () => {
+    await seed();
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(updateDoc(doc(alice.firestore(), path), { tasks: [task()], updatedAt: new Date(0) }));
+  });
+
+  test('本人可以刪除（結束追蹤），別人不行', async () => {
+    await seed();
+    await assertFails(deleteDoc(doc(testEnv.authenticatedContext('bob').firestore(), path)));
+    await assertSucceeds(deleteDoc(doc(testEnv.authenticatedContext('alice').firestore(), path)));
+  });
+});
+
+describe('users/{uid}/weeklyDigest/current 規則（每週學習摘要）', () => {
+  const path = 'users/alice/weeklyDigest/current';
+  const seed = () => testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), path), {
+      weekId: '2026-W43', summary: '這週練習得很穩。', reviewWords: [{ word: 'qutux', wrong: 2 }], dismissedAt: null,
+    });
+  });
+
+  test('本人可以讀，別人、staff、未登入不行', async () => {
+    await seed();
+    await assertSucceeds(getDoc(doc(testEnv.authenticatedContext('alice').firestore(), path)));
+    for (const ctx of [
+      testEnv.authenticatedContext('bob'), testEnv.authenticatedContext('bob', { role: 'admin' }), testEnv.unauthenticatedContext(),
+    ]) {
+      await assertFails(getDoc(doc(ctx.firestore(), path)));
+    }
+  });
+
+  test('本人可以關閉（dismissedAt 設成現在）也可以清回 null', async () => {
+    await seed();
+    const ref = doc(testEnv.authenticatedContext('alice').firestore(), path);
+    await assertSucceeds(updateDoc(ref, { dismissedAt: serverTimestamp() }));
+    await assertSucceeds(updateDoc(ref, { dismissedAt: null }));
+  });
+
+  test('本人不能改摘要內容、複習詞，也不能把 dismissedAt 設成別的時間', async () => {
+    await seed();
+    const ref = doc(testEnv.authenticatedContext('alice').firestore(), path);
+    await assertFails(updateDoc(ref, { summary: '我自己寫的' }));
+    await assertFails(updateDoc(ref, { reviewWords: [] }));
+    await assertFails(updateDoc(ref, { dismissedAt: new Date(0) }));
+    await assertFails(updateDoc(ref, { dismissedAt: serverTimestamp(), summary: 'x' }));
+  });
+
+  test('本人不能建立或刪除（只有後端排程能建立）', async () => {
+    const ref = doc(testEnv.authenticatedContext('alice').firestore(), path);
+    await assertFails(setDoc(ref, { weekId: 'x', summary: 'y', dismissedAt: null }));
+    await seed();
+    await assertFails(deleteDoc(ref));
+  });
+
+  test('只有 current 這一份文件可以讀', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users/alice/weeklyDigest/other'), { summary: 'x' });
+    });
+    await assertFails(getDoc(doc(testEnv.authenticatedContext('alice').firestore(), 'users/alice/weeklyDigest/other')));
+  });
+});
+
+describe('situations 規則：answeredAt 必須是伺服器時間（每週摘要靠它判斷本週有沒有作答）', () => {
+  const base = (over = {}) => ({ userId: 'alice', quizId: 'q1', answers: [], results: [], ...over });
+
+  test('本人用 serverTimestamp 建立可以', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(setDoc(doc(alice.firestore(), 'situations/s1'), base({ answeredAt: serverTimestamp() })));
+  });
+
+  test('未來時間、過去時間、缺 answeredAt、型別不對都不行', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    for (const [i, value] of [new Date('2099-01-01'), new Date(0), 'now', null].entries()) {
+      await assertFails(setDoc(doc(alice.firestore(), `situations/bad${i}`), base({ answeredAt: value })));
+    }
+    await assertFails(setDoc(doc(alice.firestore(), 'situations/noat'), base()));
+  });
+
+  test('替別人建立仍然不行', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(setDoc(doc(alice.firestore(), 'situations/x'), base({ userId: 'bob', answeredAt: serverTimestamp() })));
+  });
+});

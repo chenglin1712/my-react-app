@@ -75,6 +75,9 @@ _FEATURE_DEFAULTS = {
     # 後台「AI 產生題目草稿」（路線圖 #23）：結構化輸出的情境題，產生後一律進人工審核；
     # 要換更強的模型用 LLM_MODEL_QUIZ_DRAFT（例如 claude-opus-5-5）。
     "quiz_draft": _FeatureDefaults(effort="medium", max_tokens=6144),
+    # 每週學習摘要（路線圖 #25）：Batch API 批次產生，輸出只有兩三句話的 JSON，用輕量模型；
+    # 數字與複習詞都是程式算的，模型只負責措辭，所以不需要思考（effort 不傳）。
+    "digest": _FeatureDefaults(effort=None, max_tokens=512, model=LIGHT_MODEL),
     # 評測的模型評審（路線圖 #29）：用比被評測對象更強的模型打分數，只在離線評測指令裡使用，不在學生流程裡。
     # 評審刻意固定用 Opus 5.5（LLM_MODEL_EVAL_JUDGE 可覆寫）；被評測的模型換了，評審不應該跟著換，分數才可比較。
     "eval_judge": _FeatureDefaults(effort="medium", max_tokens=1024, model="claude-opus-5-5"),

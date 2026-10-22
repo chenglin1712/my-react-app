@@ -1,0 +1,149 @@
+/* 每週學習摘要卡片（路線圖 #25）：沿用 --yy-calm-* 語彙；只動 opacity／transform；偶爾才出現，關閉時淡出一下。 */
+.weekly-digest {
+    margin: 12px auto;
+    padding: 14px 16px 12px;
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-text);
+    transition: opacity 180ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+        transform 180ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+
+.weekly-digest[data-variant="home"] {
+    width: min(100% - 32px, 1100px);
+}
+
+.weekly-digest[data-variant="bot"] {
+    margin: 0 12px 8px;
+    padding: 10px 12px;
+}
+
+.weekly-digest[data-leaving] {
+    opacity: 0;
+    transform: translateY(-4px);
+    pointer-events: none;
+}
+
+.weekly-digest-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.weekly-digest-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.weekly-digest-close {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin: -8px -8px -8px 0;
+    border: 0;
+    border-radius: var(--yy-ui-radius);
+    background: transparent;
+    color: var(--yy-calm-text-sub);
+    cursor: pointer;
+    transition: transform 150ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+        background-color 150ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+
+.weekly-digest-close:active {
+    transform: scale(0.94);
+}
+
+.weekly-digest-close[aria-disabled="true"] {
+    cursor: progress;
+    opacity: 0.6;
+}
+
+.weekly-digest-close:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .weekly-digest-close:hover {
+        background: var(--yy-calm-info-bg);
+    }
+}
+
+.weekly-digest-summary {
+    margin: 6px 0 4px;
+    max-width: 65ch;
+    line-height: 1.6;
+}
+
+.weekly-digest-stats,
+.weekly-digest-words-label,
+.weekly-digest-note {
+    margin: 0;
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
+}
+
+.weekly-digest-words {
+    margin-top: 10px;
+}
+
+.weekly-digest-words ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 6px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.weekly-digest-words li {
+    display: inline-flex;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 12px;
+    align-items: center;
+    border: 1px solid var(--yy-calm-rule);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-info-bg);
+}
+
+.weekly-digest-word {
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.weekly-digest-wrong {
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
+}
+
+.weekly-digest-note {
+    margin-top: 8px;
+}
+
+.weekly-digest-error {
+    margin: 4px 0 0;
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-danger);
+}
+
+.weekly-digest-error:empty {
+    display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .weekly-digest,
+    .weekly-digest-close {
+        transition: opacity 120ms linear;
+    }
+
+    .weekly-digest[data-leaving] {
+        transform: none;
+    }
+}

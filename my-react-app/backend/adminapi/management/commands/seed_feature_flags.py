@@ -127,6 +127,29 @@ class Command(BaseCommand):
         )
         created_count += int(created)
 
+        # 讀書計畫重排（路線圖 #26）：預設【關閉】。追蹤計畫、勾選完成不用 AI，永遠可用；
+        # 「請助手重排未完成任務」會呼叫付費 LLM，所以由這個旗標控制是否顯示按鈕與端點是否放行。
+        _, created = FeatureFlag.objects.get_or_create(
+            key="ai_plan_replan_enabled",
+            defaults={
+                "label": "AI 讀書計畫重排",
+                "description": "開啟後，學生追蹤中的讀書計畫會出現「請助手重排」：把還沒完成的任務交給助手重新安排時間（呼叫付費 LLM、計入每日提問額度）；已完成的任務不會被更動。預設關閉。",
+                "enabled": False,
+            },
+        )
+        created_count += int(created)
+
+        # 每週學習摘要（路線圖 #25）：預設【關閉】。排程指令 generate_weekly_digests 會花 LLM 費用（Batch API 約五折）。
+        _, created = FeatureFlag.objects.get_or_create(
+            key="ai_weekly_digest_enabled",
+            defaults={
+                "label": "AI 每週學習摘要",
+                "description": "開啟後，排程指令 generate_weekly_digests 會為最近 7 天有作答的學生產生每週摘要與建議複習的詞（Batch API、約五折），並在助手視窗與首頁顯示，學生可以關閉。沒有作答的學生不會產生。預設關閉。",
+                "enabled": False,
+            },
+        )
+        created_count += int(created)
+
         # 訪客翻譯試用（C-2）：預設【關閉】。要在後台「功能開關」頁手動打開，才會讓未登入的訪客
         # 以每瀏覽器每日 10 次的額度使用翻譯。後端判斷是 fail-closed（查不到這一列也視為關閉），
         # 所以即使沒跑種子，訪客也不會被放行。需要另外設定 GUEST_TRIAL_SECRET，見 .env.example。
@@ -212,9 +235,9 @@ class Command(BaseCommand):
         )
         created_count += int(created)
 
-        total = len(TRIBES) + 18
+        total = len(TRIBES) + 20
         self.stdout.write(self.style.SUCCESS(
             f"功能開關種子完成：共 {total} 筆（族語測驗開關 {len(TRIBES)} + 族語翻譯開關 1 + AI 助手開關 1 + 訪客翻譯試用 1 + 詞形分析器 2 + 測驗詞形干擾項 1 "
-            f"+ 詞素學習 4 + 待專家驗證佇列 1 + 雲端筆記同步 1 + AI 單題錯題講解 1 + AI 學習記憶 1 + AI 產生題目草稿 1 + AI 助手圖片提問 1 + AI 助手意見回饋 1 + AI 助手官方網站查證 1，除了族語測驗、翻譯與 AI 助手開關，其餘預設關閉（含訪客翻譯試用）），"
+            f"+ 詞素學習 4 + 待專家驗證佇列 1 + 雲端筆記同步 1 + AI 單題錯題講解 1 + AI 學習記憶 1 + AI 產生題目草稿 1 + AI 助手圖片提問 1 + AI 助手意見回饋 1 + AI 助手官方網站查證 1 + AI 讀書計畫重排 1 + AI 每週學習摘要 1，除了族語測驗、翻譯與 AI 助手開關，其餘預設關閉（含訪客翻譯試用）），"
             f"新增 {created_count} 筆，其餘已存在維持原值。"
         ))

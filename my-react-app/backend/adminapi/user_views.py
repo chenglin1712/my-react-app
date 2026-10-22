@@ -619,6 +619,19 @@ def user_delete(request, decoded, uid):
         logger.exception("刪除帳號 %s 的 AI 助手題目紀錄失敗", uid)
         results["ai_asked_questions"] = {"deleted": 0, "error": "刪除失敗，需人工複查"}
 
+    for sub_name, result_key, label in (
+        ("studyPlans", "study_plans", "追蹤中的讀書計畫"),        # 路線圖 #26：users/{uid}/studyPlans/current
+        ("weeklyDigest", "weekly_digest", "每週學習摘要"),       # 路線圖 #25：users/{uid}/weeklyDigest/current
+    ):
+        try:
+            items = list(doc_ref.collection(sub_name).stream())
+            for item in items:
+                item.reference.delete()
+            results[result_key] = {"deleted": len(items)}
+        except Exception:
+            logger.exception("刪除帳號 %s 的%s失敗", uid, label)
+            results[result_key] = {"deleted": 0, "error": "刪除失敗，需人工複查"}
+
     try:
         # AI 助手的學習記憶（路線圖 #21）存在 Django 資料庫，不在 Firestore：刪除記憶檔與同意紀錄。
         from AIModel import memory_store

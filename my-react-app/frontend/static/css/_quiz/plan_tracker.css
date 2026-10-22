@@ -1,0 +1,278 @@
+/* 追蹤中的讀書計畫（路線圖 #26）：沿用助手視窗的 --yy-calm-* 語彙。
+   只動 transform／opacity／顏色；進度條用 scaleX，不改寬度，避免排版重算。 */
+.plan-tracker {
+    margin: 0 12px 8px;
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-text);
+}
+
+.plan-tracker-head {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 44px;
+    padding: 6px 12px 10px;
+    border: 0;
+    border-radius: var(--yy-ui-radius);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.plan-tracker-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.plan-tracker-count {
+    flex: none;
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
+}
+
+.plan-tracker-chevron {
+    flex: none;
+    transition: transform 150ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+
+.plan-tracker-head[aria-expanded="true"] .plan-tracker-chevron {
+    transform: rotate(180deg);
+}
+
+.plan-tracker-bar {
+    position: absolute;
+    right: 12px;
+    bottom: 4px;
+    left: 12px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--yy-calm-copper);
+    transform-origin: left center;
+    transition: transform 220ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+
+.plan-tracker-body {
+    padding: 4px 12px 12px;
+    border-top: 1px solid var(--yy-calm-rule);
+}
+
+.plan-tracker-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.plan-tracker-task {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 4px 0;
+    cursor: pointer;
+}
+
+/* 原生核取方塊保留給鍵盤與報讀器，視覺上由 .plan-tracker-box 取代 */
+.plan-tracker-task input {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.plan-tracker-box {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: 6px;
+    background: var(--yy-calm-surface);
+    color: transparent;
+    transition: background-color 120ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+        color 120ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+        transform 120ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+
+.plan-tracker-task:active .plan-tracker-box {
+    transform: scale(0.92);
+}
+
+.plan-tracker-task input:checked + .plan-tracker-box {
+    background: var(--yy-calm-accent);
+    color: var(--yy-calm-accent-on);
+}
+
+.plan-tracker-task input:focus-visible + .plan-tracker-box {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: 2px;
+}
+
+.plan-tracker-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.plan-tracker-summary {
+    overflow-wrap: anywhere;
+}
+
+.plan-tracker-when {
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
+}
+
+.plan-tracker-task[data-done] .plan-tracker-summary {
+    color: var(--yy-calm-text-sub);
+    text-decoration: line-through;
+}
+
+.plan-tracker-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.plan-tracker-form input[type="text"] {
+    min-height: 44px;
+    padding: 0 12px;
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-text);
+    font: inherit;
+}
+
+.plan-tracker-hint,
+.plan-tracker-status {
+    margin: 0;
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
+}
+
+.plan-tracker-status:empty {
+    display: none;
+}
+
+.plan-tracker-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.plan-tracker-primary,
+.plan-tracker-secondary,
+.plan-tracker-danger,
+.track-plan-btn,
+.track-plan-cancel {
+    min-height: 44px;
+    padding: 0 16px;
+    border-radius: var(--yy-ui-radius);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 150ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+        background-color 150ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+
+.plan-tracker-primary,
+.track-plan-btn {
+    border: var(--yy-border-width) solid var(--yy-calm-accent);
+    background: var(--yy-calm-accent);
+    color: var(--yy-calm-accent-on);
+}
+
+.plan-tracker-secondary,
+.track-plan-cancel {
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-text);
+}
+
+.plan-tracker-danger {
+    border: var(--yy-border-width) solid var(--yy-calm-danger);
+    background: var(--yy-calm-danger);
+    color: var(--yy-calm-accent-on);
+}
+
+.plan-tracker-primary:active,
+.plan-tracker-secondary:active,
+.plan-tracker-danger:active,
+.track-plan-btn:active,
+.track-plan-cancel:active {
+    transform: scale(0.97);
+}
+
+.plan-tracker-primary[aria-disabled="true"],
+.plan-tracker-secondary[aria-disabled="true"],
+.track-plan-btn[aria-disabled="true"] {
+    background: var(--yy-calm-info-bg);
+    border-color: var(--yy-calm-info-bg);
+    color: var(--yy-calm-text-sub);
+    cursor: progress;
+}
+
+.plan-tracker button:focus-visible,
+.track-plan-btn:focus-visible,
+.track-plan-cancel:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: 2px;
+}
+
+/* 計畫卡片上的「開始追蹤」 */
+.study-plan-track {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 10px 0;
+}
+
+.study-plan-track-note {
+    margin: 0;
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
+}
+
+.study-plan-track-note:empty {
+    display: none;
+}
+
+.study-plan-track-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .plan-tracker-chevron,
+    .plan-tracker-bar,
+    .plan-tracker-box {
+        transition: none;
+    }
+
+    .plan-tracker-primary,
+    .plan-tracker-secondary,
+    .plan-tracker-danger,
+    .track-plan-btn,
+    .track-plan-cancel {
+        transition: none;
+    }
+}

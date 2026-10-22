@@ -186,7 +186,9 @@ service cloud.firestore {
     // 答題情形：只有本人可讀；只有本人可建立
     match /situations/{situationId} {
       allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      // answeredAt 必須是伺服器時間：每週學習摘要（#25）用它判斷「本週有沒有作答」，不能讓客戶端寫成未來時間
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid
+        && request.resource.data.answeredAt == request.time;
     }
 
     // 使用者學習統計：本人可讀自己的資料；globalAverages 所有登入者可讀；只由後端寫入
@@ -199,6 +201,77 @@ service cloud.firestore {
     // 個人行事曆：只有本人可讀寫
     match /calendar/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // 追蹤中的讀書計畫（路線圖 #26）：users/{uid}/studyPlans/current，每人同時只有這一份，新的取代舊的。
+    // 本人可讀寫（勾選完成、套用重排都由前端寫）；刻意不開放 staff，這是個人學習資料。
+    // 規則語言沒有迴圈，所以任務最多 14 筆就用固定位置逐一檢查（areValidStudyTasks／isValidStudyTask）：
+    // 必須是物件、欄位最多 7 個（6 個必要欄位加一個選填的 calendarEventId）、必要欄位存在且長度在上限內
+    // （缺欄位或型別沒有 size() 時存取會直接讓規則失敗，等於拒絕）、done 必須是布林。
+    // 每次請求最多只能評估 1000 個運算式：14 筆任務若逐項做完整檢查（hasOnly／hasAll、is string、
+    // 非空、calendarEventId 內容）會超過上限（模擬器實測），所以這裡刻意精簡，把「擋住大型垃圾資料」放在規則，
+    // 其餘交給後端 clean_plan（不合法的任務丟掉）：空字串、欄位型別（例如 summary 是不是字串）、
+    // id 不重複、start／end 的時間格式與先後，以及 calendarEventId 的內容（後端不使用它）。
+    function isValidStudyTask(task) {
+      return task is map
+        && task.keys().size() <= 7
+        && task.id.size() <= 64
+        && task.summary.size() <= 100
+        && task.description.size() <= 300
+        && task.start.size() <= 40
+        && task.end.size() <= 40
+        && task.done is bool;
+    }
+
+    function isValidStudyPlan(data) {
+      return data.keys().hasOnly(['title', 'tasks', 'createdAt', 'updatedAt'])
+        && data.keys().hasAll(['title', 'tasks', 'createdAt', 'updatedAt'])
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 100
+        && data.tasks is list && data.tasks.size() >= 1 && data.tasks.size() <= 14
+        && data.updatedAt == request.time
+        && areValidStudyTasks(data.tasks);
+    }
+
+    function areValidStudyTasks(tasks) {
+      let n = tasks.size();
+      return true
+        && (n <= 0 || isValidStudyTask(tasks[0]))
+        && (n <= 1 || isValidStudyTask(tasks[1]))
+        && (n <= 2 || isValidStudyTask(tasks[2]))
+        && (n <= 3 || isValidStudyTask(tasks[3]))
+        && (n <= 4 || isValidStudyTask(tasks[4]))
+        && (n <= 5 || isValidStudyTask(tasks[5]))
+        && (n <= 6 || isValidStudyTask(tasks[6]))
+        && (n <= 7 || isValidStudyTask(tasks[7]))
+        && (n <= 8 || isValidStudyTask(tasks[8]))
+        && (n <= 9 || isValidStudyTask(tasks[9]))
+        && (n <= 10 || isValidStudyTask(tasks[10]))
+        && (n <= 11 || isValidStudyTask(tasks[11]))
+        && (n <= 12 || isValidStudyTask(tasks[12]))
+        && (n <= 13 || isValidStudyTask(tasks[13]));
+    }
+
+    match /users/{userId}/studyPlans/{planId} {
+      allow read: if request.auth != null && request.auth.uid == userId && planId == 'current';
+      allow create: if request.auth != null && request.auth.uid == userId && planId == 'current'
+        && isValidStudyPlan(request.resource.data)
+        && request.resource.data.createdAt == request.time;
+      // createdAt 建立後不能改
+      allow update: if request.auth != null && request.auth.uid == userId && planId == 'current'
+        && isValidStudyPlan(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if request.auth != null && request.auth.uid == userId && planId == 'current';
+    }
+
+    // 每週學習摘要（路線圖 #25）：users/{uid}/weeklyDigest/current，只有後端排程（Admin SDK）能建立與改寫內容。
+    // 本人可以讀，並且只能把 dismissedAt 設成現在（關閉這張卡片）或清回 null（重新顯示）；摘要、統計、複習詞
+    // 都不能自己改。不開放 staff，這是個人學習資料。
+    match /users/{userId}/weeklyDigest/{digestId} {
+      allow read: if request.auth != null && request.auth.uid == userId && digestId == 'current';
+      allow create, delete: if false;
+      allow update: if request.auth != null && request.auth.uid == userId && digestId == 'current'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['dismissedAt'])
+        && (request.resource.data.dismissedAt == request.time || request.resource.data.dismissedAt == null);
     }
 
     // 發音錄音：登入者可讀；登入者只能建立 uid 為本人的錄音；staff 可刪除

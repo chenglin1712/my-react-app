@@ -109,6 +109,7 @@ DJANGO_RULES = [
     ("ai_feedback", "30/m", "AI 助手回覆的讚／倒讚"),
     ("review_tayal_chat", "10/m", "AI 對話（複習模式）"),
     ("review_question", "10/m", "AI 單題錯題講解"),
+    ("study_plan_replan", "5/m", "AI 讀書計畫重排"),
     ("learner_memory", "30/m", "AI 學習記憶管理（檢視、編輯、同意、清除）"),
     ("quiz_draft_generate", "10/m", "後台 AI 產生情境題草稿"),
     ("ai_daily_quota", "100/d", "AI 助手每人每日提問上限（單位必須是 /d，台灣時間午夜重置，兩種對話共用）"),

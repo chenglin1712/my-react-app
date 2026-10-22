@@ -12,6 +12,7 @@ import { pickFeaturedTopics, DEMO_TOPICS } from "../../components/_home/featured
 import { pickPromoVideo } from "../../components/_home/promoVideoContent";
 import { useHomeNavSlot } from "../homeNavSlot";
 import HomeIntro from "../../components/_home/HomeIntro";
+import WeeklyDigestCard from "../../components/WeeklyDigestCard";
 import { pickMastheadContent, HOME_LEDE } from "../../components/_home/mastheadContent";
 import { mapAnnouncementToNewsItem, HOME_NEWS_MAX } from "../../components/_home/announcementContent";
 
@@ -181,6 +182,9 @@ const HomePage = () => {
 
             {/* 主選單的位置：Navbar 在首頁會用 portal 把自己畫進這裡（見 homeNavSlot.jsx） */}
             <div ref={registerNavSlot} className="home-nav-slot" />
+
+            {/* 每週學習摘要（#25）：登入且有未關閉的摘要才輸出，其餘情況不佔位置 */}
+            <WeeklyDigestCard variant="home" />
 
             {/* 第一屏：宣傳影片、活動消息、族語認證公告並排（1100px 以上），較窄的螢幕直向堆疊。
                 欄寬比 5:4:3，缺的區塊不佔欄，剩下的重新分配；三塊都沒有就不輸出這一層。 */}

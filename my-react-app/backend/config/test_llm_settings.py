@@ -33,7 +33,7 @@ class DefaultsTests(TestCase):
 class ModelResolutionTests(TestCase):
     def test_global_model_applies_to_every_feature(self):
         with _env(LLM_MODEL="claude-sonnet-5-5"):
-            heavy = [f for f in llm_settings.FEATURES if f not in ("route", "light", "eval_judge")]
+            heavy = [f for f in llm_settings.FEATURES if f not in ("route", "light", "digest", "eval_judge")]
             self.assertEqual({get_settings(f).model for f in heavy}, {"claude-sonnet-5-5"})
 
     def test_the_eval_judge_is_pinned_to_opus_and_ignores_the_global_model(self):

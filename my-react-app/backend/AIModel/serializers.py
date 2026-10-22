@@ -50,6 +50,12 @@ class ReviewTayalChatSerializer(serializers.Serializer):
     tribe = serializers.ChoiceField(choices=_TRIBE_CHOICES, required=False, default="tayal")
 
 
+class ReplanStudyPlanSerializer(serializers.Serializer):
+    """重排讀書計畫的請求（路線圖 #26）：只收族語與學生說明的可用時間；計畫與任務由伺服器自己讀。"""
+    tribe = serializers.ChoiceField(choices=_TRIBE_CHOICES, required=False, default="tayal")
+    availability = serializers.CharField(required=False, allow_blank=True, default="", max_length=200, trim_whitespace=True)
+
+
 class ReviewQuestionSerializer(serializers.Serializer):
     """單題錯題講解的請求（路線圖 #22）：只收「哪一次作答的第幾題」，題目內容與使用者的答案由伺服器自己讀。"""
     attempt_id = serializers.RegexField(r"^[A-Za-z0-9]{1,64}$")     # Firestore 自動產生的文件編號

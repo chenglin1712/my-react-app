@@ -13,9 +13,9 @@ from dictionary_db.model import Word
 from dictionary_db.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS, TRIBE_MAP
 from core.firebase_auth import verify_firebase_token
-from config.llm import get_llm_client, classify_llm_error, last_call, llm_deadline
+from config.llm import REFUSAL_MESSAGE, LLMRefusalError, get_llm_client, classify_llm_error, last_call, llm_deadline
 from adminapi.rate_limits import get_configured_rate
-from .serializers import TayalChatSerializer, ReviewTayalChatSerializer, ReviewQuestionSerializer
+from .serializers import TayalChatSerializer, ReviewTayalChatSerializer, ReviewQuestionSerializer, ReplanStudyPlanSerializer
 from . import memory_store
 from . import quota as daily_quota
 from .followups import starter_suggestions
@@ -23,7 +23,8 @@ from .feedback import FeedbackSerializer, feedback_enabled, hash_uid, purge_expi
 from .image_input import image_input_enabled
 from .prompt_version import prompt_version
 from .learner_profile import load_profile
-from .services import run_tayal_chat, run_review_tayal_chat, stream_tayal_chat
+from .services import run_tayal_chat, run_review_tayal_chat, run_study_plan_replan, stream_tayal_chat
+from .study_plan_store import PlanNotFound, load_current_plan
 from .question_context import QuestionNotFound, load_question_context, record_asked_question
 from .question_review import run_question_review
 from .tools import SqlDictionaryLookup
@@ -397,6 +398,100 @@ def review_question(request):
         return JsonResponse({"detail": detail}, status=status)
 
 
+PLAN_REPLAN_FLAG = "ai_plan_replan_enabled"
+
+
+def plan_replan_enabled() -> bool:
+    """讀書計畫重排的功能旗標（路線圖 #26）。【預設關閉、查不到旗標也視為關閉】：重排會呼叫付費 LLM。"""
+    from adminapi.models import FeatureFlag
+
+    flag = FeatureFlag.objects.filter(key=PLAN_REPLAN_FLAG).first()
+    return bool(flag is not None and flag.enabled)
+
+
+WEEKLY_DIGEST_FLAG = "ai_weekly_digest_enabled"
+
+
+def weekly_digest_enabled() -> bool:
+    """每週學習摘要的功能旗標（路線圖 #25）。預設關閉、查不到也視為關閉。
+    前端只用它決定要不要讀並顯示摘要；摘要本身由排程指令產生（generate_weekly_digests）。"""
+    from adminapi.models import FeatureFlag
+
+    flag = FeatureFlag.objects.filter(key=WEEKLY_DIGEST_FLAG).first()
+    return bool(flag is not None and flag.enabled)
+
+
+@csrf_exempt
+def replan_study_plan(request):
+    """把追蹤中的讀書計畫裡「未完成」的任務重新排時間（路線圖 #26）。請求只帶族語與可用時間說明，
+    計畫與任務由伺服器依已驗證的 uid 讀 Firestore；已完成的任務不經過模型，結果只含未完成任務的新時間，
+    由前端確認這些任務仍未完成後才套用。"""
+    if request.method != "POST":
+        return JsonResponse({"detail": "只接受 POST 請求"}, status=405)
+    decoded, err_resp = verify_firebase_token(request)
+    if err_resp:
+        return err_resp
+    disabled_resp = _assistant_disabled_response()
+    if disabled_resp:
+        return disabled_resp
+    if not plan_replan_enabled():
+        return JsonResponse({"detail": "計畫重排尚未開放。", "code": "ai_plan_replan_disabled"}, status=403)
+    limited_resp = _rate_limited_response(request, decoded, group="study_plan_replan", rate="5/m")
+    if limited_resp:
+        return limited_resp
+
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"detail": "請求格式錯誤"}, status=400)
+    serializer = ReplanStudyPlanSerializer(data=body)
+    if not serializer.is_valid():
+        return JsonResponse({"detail": "請求參數錯誤", "errors": serializer.errors}, status=400)
+    tribe, availability = serializer.validated_data["tribe"], serializer.validated_data["availability"]
+    uid = decoded.get("uid", "")
+
+    try:
+        plan = load_current_plan(uid)
+    except PlanNotFound:
+        return JsonResponse({"detail": "找不到追蹤中的讀書計畫。", "code": "study_plan_not_found"}, status=404)
+    except Exception:
+        logger.error("[replan_study_plan] 讀取計畫失敗\n%s", traceback.format_exc())
+        return JsonResponse({"detail": "暫時無法讀取讀書計畫，請稍後再試。"}, status=503)
+    if all(task["done"] for task in plan["tasks"]):
+        return JsonResponse({"detail": "所有任務都完成了，沒有需要重排的。", "code": "study_plan_all_done"}, status=409)
+
+    try:
+        client = _get_client()
+    except EnvironmentError as e:
+        return JsonResponse({"detail": str(e)}, status=503)
+
+    quota = daily_quota.consume(uid)      # 找不到計畫、沒有未完成任務的請求不佔額度，所以放在讀完計畫之後
+    if not quota.allowed:
+        return _quota_exceeded_response(quota)
+
+    def refund():
+        # 計數系統故障而放行時（tracked=False）這次根本沒扣，不能退，否則會把別次的使用量減掉
+        if quota.tracked:
+            daily_quota.refund(uid, quota.day)
+
+    try:
+        result = run_study_plan_replan(client, TRIBE_MAP.get(tribe, "泰雅語"), plan, availability, uid=uid)
+    except LLMRefusalError:
+        # 拒答是模型的決定，不是服務故障：回 200 與固定說明，不佔額度（回應帶退款後的剩餘次數）
+        refund()
+        return JsonResponse({"refused": True, "message": REFUSAL_MESSAGE, "quota": daily_quota.peek(uid).as_dict()})
+    except Exception:
+        refund()
+        logger.error("[replan_study_plan] 處理失敗\n%s", traceback.format_exc())
+        status, detail = classify_llm_error(sys.exc_info()[1])
+        return JsonResponse({"detail": detail}, status=status)
+    if result is None:
+        refund()
+        return JsonResponse({"detail": "這次沒有排出有效的新時間，請再試一次。", "code": "study_plan_replan_failed"}, status=422)
+    result["quota"] = quota.as_dict()
+    return JsonResponse(result)
+
+
 @csrf_exempt
 def ai_feedback(request):
     """學生對某一則助手回覆按讚或倒讚（路線圖 #30）。隱私與驗證的設計見 feedback.py 與 AiFeedback 模型。
@@ -461,6 +556,8 @@ def ai_quota(request):
         "questionReview": question_review_enabled() and assistant_on,
         "imageInput": image_input_enabled() and assistant_on,       # 圖片提問（#24）：沒開就不顯示拍照鈕
         "feedback": feedback_enabled() and assistant_on,            # 讚／倒讚（#30）：沒開就不顯示按鈕
+        "planReplan": plan_replan_enabled() and assistant_on,       # 計畫重排（#26）：沒開就不顯示「重排」按鈕
+        "weeklyDigest": weekly_digest_enabled() and assistant_on,   # 每週學習摘要（#25）：沒開就不讀、不顯示
     }
     # 第一次開啟時的建議問題（#13）：依學習資料用模板挑，不呼叫模型；讀不到學習資料就是預設三句
     data["suggestions"] = starter_suggestions(load_profile(decoded.get("uid", "")))

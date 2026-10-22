@@ -3,6 +3,8 @@ import { useId, useState, useRef, useEffect } from "react";
 import { Bot, Camera, ChevronDown, SquarePen, X } from "lucide-react"
 import { useNavigate } from "react-router-dom";
 import StudyPlanComponent from "./bot_study_plan"
+import TrackedStudyPlan from "./TrackedStudyPlan";
+import WeeklyDigestCard from "../WeeklyDigestCard";
 import WordEntryCards from "./WordEntryCards"
 import SourceLinks from "./SourceLinks";
 import { cleanSources } from "../../utils/cleanSources";
@@ -99,6 +101,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     // 對話保存（路線圖 #32）：只存在這台裝置的瀏覽器；uid 取得前（或沒登入）不保存也不還原
     const uidRef = useRef(null);
     const [storageReady, setStorageReady] = useState(false);
+    const [accountUid, setAccountUid] = useState(null);       // 給每週摘要卡片用（登入者 uid，沒登入或還不知道＝null）
     const [confirmingNew, setConfirmingNew] = useState(false);
     const cancelNewRef = useRef(null);
     const discardRef = useRef(null);         // 指向 discardInFlight（它定義在後面，登入監聽的 effect 只能經由 ref 呼叫）
@@ -121,6 +124,9 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     const [imageEnabled, setImageEnabled] = useState(false);
     // 回覆下方的讚／倒讚（路線圖 #30）：後端旗標沒開就不顯示
     const [feedbackEnabled, setFeedbackEnabled] = useState(false);
+    // 讀書計畫重排（路線圖 #26）：後端旗標沒開就不顯示「請助手重排」；勾選進度不受旗標影響
+    const [planReplanEnabled, setPlanReplanEnabled] = useState(false);
+    const [trackedPlanKey, setTrackedPlanKey] = useState(0);      // 剛按了「開始追蹤」：通知追蹤區重新讀取並展開
     // 準備送出的圖片 { media_type, data, previewUrl }；只在記憶體裡，送出後由訊息泡泡的縮圖接手預覽網址
     const [attachment, setAttachment] = useState(null);
     const [attachBusy, setAttachBusy] = useState(false);
@@ -141,6 +147,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                     setQuota(readQuota(data));
                     setImageEnabled(data?.features?.imageInput === true);
                     setFeedbackEnabled(data?.features?.feedback === true);
+                    setPlanReplanEnabled(data?.features?.planReplan === true);
                     const personal = cleanSuggestions(data?.suggestions);
                     if (personal.length > 0) setStarters(personal);
                 }
@@ -157,6 +164,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
             if (!active || uid === uidRef.current) return;
             const switched = uidRef.current !== null;      // 不是第一次解析出 uid：登出或換了帳號
             uidRef.current = uid;
+            setAccountUid(uid);
             setStorageReady(false);                        // 先停止寫入，避免把上一位的對話存到新帳號
             if (switched) {
                 // 上一位的對話不能留在畫面上，也不能帶進新帳號的請求
@@ -613,6 +621,14 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                     </div>
                 )}
 
+                <WeeklyDigestCard variant="bot" uid={accountUid} />
+                <TrackedStudyPlan
+                    refreshKey={trackedPlanKey}
+                    replanEnabled={planReplanEnabled}
+                    tribe={tribe}
+                    onQuota={(raw) => setQuota(readQuota(raw))}
+                />
+
                 {/* role="log"：新訊息會被報讀器依序念出，不打斷使用者正在做的事 */}
                 <div ref={messagesBoxRef} className="messages-container" role="log" aria-live="polite" aria-relevant="additions" aria-label="對話紀錄">
                     {messages.map((message, index) => (
@@ -661,7 +677,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                                 )}
                                 {message.sources && <SourceLinks sources={message.sources} />}
                                 {message.studyPlan && (
-                                    <StudyPlanComponent plan={message.studyPlan} onClose={handleClose} />
+                                    <StudyPlanComponent plan={message.studyPlan} onClose={handleClose} onTracked={() => setTrackedPlanKey((key) => key + 1)} />
                                 )}
                                 {message.role === "bot" && message.sig && !message.streaming && !message.interrupted && (() => {
                                     const precedingUser = messages.slice(0, index).reverse().find((m) => m.role === "user");

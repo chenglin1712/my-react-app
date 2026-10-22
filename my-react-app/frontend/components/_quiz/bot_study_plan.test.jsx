@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import StudyPlan from './bot_study_plan';
 import { addCalendarEvent, addCalendarEvents } from '../../src/userServives/uploadDb';
+import { ExistingPlanError, startTracking } from '../../src/userServives/studyPlanService';
 
 /** 原本這裡有一份完全沒被讀取/顯示/存起來的本地 events state，「加入」「全部
  * 加入」實際上什麼都沒發生，卻在「全部加入」之後顯示「成功加入行事曆!」的
@@ -12,6 +13,10 @@ import { addCalendarEvent, addCalendarEvents } from '../../src/userServives/uplo
 vi.mock('../../src/userServives/uploadDb', () => ({
   addCalendarEvent: vi.fn(),
   addCalendarEvents: vi.fn(),
+}));
+vi.mock('../../src/userServives/studyPlanService', () => ({
+  ExistingPlanError: class ExistingPlanError extends Error {},
+  startTracking: vi.fn(),
 }));
 vi.mock('lottie-web', () => ({ default: { loadAnimation: () => ({ addEventListener: vi.fn(), destroy: vi.fn() }) } }));
 
@@ -31,6 +36,7 @@ describe('StudyPlan（回歸測試：加入行事曆原本完全是假的，只�
   beforeEach(() => {
     addCalendarEvent.mockReset();
     addCalendarEvents.mockReset();
+    startTracking.mockReset();
   });
 
   test('沒有題目資料時不渲染任何內容', () => {
@@ -85,5 +91,40 @@ describe('StudyPlan（回歸測試：加入行事曆原本完全是假的，只�
     const button = await screen.findByRole('button', { name: '已全部加入' });
 
     expect(button).toBeDisabled();
+  });
+
+  test('開始追蹤：把加入行事曆時拿到的事件 id 一起帶進去，並通知父層', async () => {
+    addCalendarEvents.mockResolvedValue([{ id: 'e1' }, { id: 'e2' }]);
+    startTracking.mockResolvedValue({});
+    const onTracked = vi.fn();
+    const user = userEvent.setup();
+    renderWithRouter(<StudyPlan plan={PLAN} onClose={vi.fn()} onTracked={onTracked} />);
+
+    await user.click(screen.getByRole('button', { name: /全部加入/ }));
+    await user.click(screen.getByRole('button', { name: '開始追蹤進度' }));
+
+    expect(startTracking).toHaveBeenCalledWith(PLAN, { 0: 'e1', 1: 'e2' }, { replace: false });
+    expect(onTracked).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole('button', { name: '已開始追蹤' })).toBeInTheDocument();
+  });
+
+  test('已經在追蹤別份、還有未完成任務：先行內確認，確認前不會取代', async () => {
+    startTracking.mockRejectedValueOnce(new ExistingPlanError()).mockResolvedValue({});
+    const user = userEvent.setup();
+    renderWithRouter(<StudyPlan plan={PLAN} onClose={vi.fn()} onTracked={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: '開始追蹤進度' }));
+    await user.click(await screen.findByRole('button', { name: '取代並開始追蹤' }));
+    expect(startTracking).toHaveBeenCalledTimes(2);
+    expect(startTracking).toHaveBeenLastCalledWith(PLAN, {}, { replace: true });
+  });
+
+  test('開始追蹤失敗：提示錯誤，可以再試', async () => {
+    startTracking.mockRejectedValue(new Error('x'));
+    const user = userEvent.setup();
+    renderWithRouter(<StudyPlan plan={PLAN} onClose={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: '開始追蹤進度' }));
+    expect(await screen.findByText('沒有開始追蹤成功，請稍後再試。')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '開始追蹤進度' })).toBeInTheDocument();
   });
 });
