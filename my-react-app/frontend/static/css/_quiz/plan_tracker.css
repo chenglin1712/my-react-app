@@ -100,7 +100,7 @@
     width: 24px;
     height: 24px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: 6px;
+    border-radius: var(--yy-ui-radius);
     background: var(--yy-calm-surface);
     color: transparent;
     transition: background-color 120ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),

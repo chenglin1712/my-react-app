@@ -645,7 +645,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                                 aria-busy={message.streaming || undefined}
                             >
                                 {message.imageUrl && (
-                                    <img className="bot-message-image" src={message.imageUrl} alt="你附上的圖片" />
+                                    <img className="bot-message-image" src={message.imageUrl} alt="你附上的圖片" decoding="async" />
                                 )}
                                 {/* 串流中對報讀器隱藏：文字每幾十毫秒長一點，逐段念出來只是噪音；完成後由 announce 念一次完整內容 */}
                                 {message.role === "bot" && !message.isError
@@ -753,7 +753,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                     <div className="bot-attachment" data-state={attachError ? "error" : attachBusy ? "busy" : "ready"}>
                         {attachment && (
                             <>
-                                <img className="bot-attachment-thumb" src={attachment.previewUrl} alt="準備送出的圖片預覽" />
+                                <img className="bot-attachment-thumb" src={attachment.previewUrl} alt="準備送出的圖片預覽" decoding="async" />
                                 <span className="bot-attachment-label">已附上圖片，可以補充想問的問題</span>
                                 <button
                                     type="button"

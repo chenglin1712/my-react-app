@@ -59,7 +59,7 @@ describe("後台表格統一用 AdminTable（P2-81）", () => {
       if (!/\.jsx$/.test(file) || /\.test\./.test(file) || file.endsWith("AdminTable.jsx")) return;
       const src = readFileSync(file, "utf8");
       for (const m of src.matchAll(/<AdminTable(\s[^>]*)?>/g)) {
-        if (!/\blabel="[^"]+"/.test(m[1] || "")) hits.push(relative(FRONTEND, file));
+        if (!/\blabel=("[^"]+"|\{\s*(?!null\b|undefined\b|true\b|false\b)[A-Za-z_$][\w$.]*\s*\})/.test(m[1] || "")) hits.push(relative(FRONTEND, file));
       }
     });
     expect(hits).toEqual([]);

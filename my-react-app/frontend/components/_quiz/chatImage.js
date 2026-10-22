@@ -106,7 +106,7 @@ export async function prepareChatImage(file) {
             canvas.height = height;
             const context = canvas.getContext('2d');
             if (!context) throw new ChatImageError('decode_failed');
-            context.fillStyle = '#fff';               // 透明的 PNG 轉成 JPEG 會變黑底，先鋪白底
+            context.fillStyle = 'white';               // 透明的 PNG 轉成 JPEG 會變黑底，先鋪白底
             context.fillRect(0, 0, width, height);
             context.drawImage(bitmap, 0, 0, width, height);
 

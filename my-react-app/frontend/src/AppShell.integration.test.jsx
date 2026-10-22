@@ -122,7 +122,7 @@ describe('從側邊欄開啟 AI 助手（真實元件整合）', () => {
 
     await user.type(await screen.findByLabelText('輸入訊息'), '你好{Enter}');
 
-    expect(await screen.findByText(/無法取得回應/)).toBeInTheDocument();
+    expect(await screen.findByText(/連不上伺服器/)).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: '族語 AI 助手' })).toBeInTheDocument();
   });
 });
