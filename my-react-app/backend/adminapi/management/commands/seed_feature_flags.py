@@ -114,6 +114,19 @@ class Command(BaseCommand):
         )
         created_count += int(created)
 
+        # AI 助手官方網站查證（路線圖 #19）：預設【關閉】。開啟後，意圖路由判斷為「文化背景」的問題會搜尋官方網域
+        # （環境變數 AI_OFFICIAL_DOMAINS，預設原民會、語言研究發展基金會、族語E樂園）並在回覆下方附來源連結。
+        # 需要：AI_INTENT_ROUTING=1、Anthropic Console 的組織已啟用網路搜尋；每次搜尋另計費（約 0.01 美元）。
+        _, created = FeatureFlag.objects.get_or_create(
+            key="ai_web_search_enabled",
+            defaults={
+                "label": "AI 助手官方網站查證",
+                "description": "開啟後，AI 助手回答文化、歷史、習俗類問題時會搜尋官方網站並附上來源連結（每則最多搜尋 3 次，另計搜尋費用）。需同時啟用意圖路由。預設關閉。",
+                "enabled": False,
+            },
+        )
+        created_count += int(created)
+
         # 訪客翻譯試用（C-2）：預設【關閉】。要在後台「功能開關」頁手動打開，才會讓未登入的訪客
         # 以每瀏覽器每日 10 次的額度使用翻譯。後端判斷是 fail-closed（查不到這一列也視為關閉），
         # 所以即使沒跑種子，訪客也不會被放行。需要另外設定 GUEST_TRIAL_SECRET，見 .env.example。
@@ -199,9 +212,9 @@ class Command(BaseCommand):
         )
         created_count += int(created)
 
-        total = len(TRIBES) + 17
+        total = len(TRIBES) + 18
         self.stdout.write(self.style.SUCCESS(
             f"功能開關種子完成：共 {total} 筆（族語測驗開關 {len(TRIBES)} + 族語翻譯開關 1 + AI 助手開關 1 + 訪客翻譯試用 1 + 詞形分析器 2 + 測驗詞形干擾項 1 "
-            f"+ 詞素學習 4 + 待專家驗證佇列 1 + 雲端筆記同步 1 + AI 單題錯題講解 1 + AI 學習記憶 1 + AI 產生題目草稿 1 + AI 助手圖片提問 1 + AI 助手意見回饋 1，除了族語測驗、翻譯與 AI 助手開關，其餘預設關閉（含訪客翻譯試用）），"
+            f"+ 詞素學習 4 + 待專家驗證佇列 1 + 雲端筆記同步 1 + AI 單題錯題講解 1 + AI 學習記憶 1 + AI 產生題目草稿 1 + AI 助手圖片提問 1 + AI 助手意見回饋 1 + AI 助手官方網站查證 1，除了族語測驗、翻譯與 AI 助手開關，其餘預設關閉（含訪客翻譯試用）），"
             f"新增 {created_count} 筆，其餘已存在維持原值。"
         ))

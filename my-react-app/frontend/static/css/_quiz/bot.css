@@ -780,6 +780,69 @@
     border-radius: var(--yy-ui-radius);
 }
 
+/* 官方網站查證的來源（路線圖 #19）。和上面的詞形提醒同一套語彙：細分隔線、小字、強調色底線連結。
+   連結只做顏色回饋（行內文字不縮放）；觸控裝置把每一列撐到 44px 高，避免誤點。 */
+.message-bubble .source-links {
+    margin-top: 10px;
+    padding-top: 6px;
+    border-top: 1px solid var(--yy-calm-line);
+    font-size: var(--yy-text-sm);
+    line-height: 1.6;
+    color: var(--yy-calm-text-sub);
+}
+
+.source-links-lead {
+    margin: 0;
+    font-weight: 600;
+}
+
+.source-links ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.source-links a {
+    display: inline-block;
+    padding-block: 3px;
+    color: var(--yy-calm-accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+    transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.source-links-host {
+    margin-inline-start: 6px;
+    font-size: 0.85em;
+    overflow-wrap: anywhere;
+}
+
+.source-links a:active {
+    opacity: 0.7;
+}
+
+.source-links a:focus-visible {
+    outline: 2px solid var(--yy-calm-accent);
+    outline-offset: 2px;
+    border-radius: var(--yy-ui-radius);
+}
+
+@media (pointer: coarse) {
+    .source-links a {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .source-links a {
+        transition: none;
+    }
+}
+
 /* 回覆下方的讚／倒讚（路線圖 #30）。每則回覆只用一次，所以只做按壓回饋與狀態切換，不做進場動畫。 */
 .bot-feedback {
     margin-top: 8px;

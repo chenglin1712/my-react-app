@@ -4,6 +4,8 @@ import { Bot, Camera, ChevronDown, SquarePen, X } from "lucide-react"
 import { useNavigate } from "react-router-dom";
 import StudyPlanComponent from "./bot_study_plan"
 import WordEntryCards from "./WordEntryCards"
+import SourceLinks from "./SourceLinks";
+import { cleanSources } from "../../utils/cleanSources";
 import UnverifiedWordsNote from "./UnverifiedWordsNote"
 import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
 import { buildHistory } from "./botHistory"
@@ -432,6 +434,8 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                 unverified: Array.isArray(data?.unverified) && data.unverified.length > 0 ? data.unverified : null,
                 // 接著可以問的建議（後端用模板產生，#13）；只在這則是最後一則時顯示
                 followups: cleanSuggestions(data?.followups),
+                // 官方網站查證引用的來源（#19）；只收 https 網址，沒有就是 null
+                sources: cleanSources(data?.sources).length > 0 ? cleanSources(data.sources) : null,
             };
 
             const alreadyShown = streamTextRef.current !== "";
@@ -655,6 +659,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                                 {message.unverified && (
                                     <UnverifiedWordsNote words={message.unverified} tribe={message.entriesTribe} />
                                 )}
+                                {message.sources && <SourceLinks sources={message.sources} />}
                                 {message.studyPlan && (
                                     <StudyPlanComponent plan={message.studyPlan} onClose={handleClose} />
                                 )}

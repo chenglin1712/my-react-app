@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 import os
+import sys
 from django.core.exceptions import ImproperlyConfigured
 from pathlib import Path
 from urllib.parse import urlparse
@@ -23,6 +24,11 @@ from config.sentry_init import init_sentry
 from config.cors import get_allowed_origins
 
 load_dotenv()
+
+# 跑測試時不讓本機 .env 的 AI 開關影響結果（開了意圖路由，舊測試會去呼叫真實的分類器）；
+# 需要開的測試自己用 patch.dict(os.environ, ...)。
+if "test" in sys.argv[1:2]:
+    os.environ["AI_INTENT_ROUTING"] = ""      # 設成空字串：之後的 load_dotenv 不會覆蓋已存在的變數
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent

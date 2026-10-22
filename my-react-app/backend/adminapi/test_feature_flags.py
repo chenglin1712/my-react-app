@@ -133,12 +133,14 @@ class SeedFeatureFlagsTest(TestCase):
         from config.tribes import TRIBES
         out = StringIO()
         call_command("seed_feature_flags", stdout=out)
-        self.assertEqual(FeatureFlag.objects.count(), len(TRIBES) + 17)
-        self.assertIn(f"共 {len(TRIBES) + 17} 筆", out.getvalue())
+        self.assertEqual(FeatureFlag.objects.count(), len(TRIBES) + 18)
+        self.assertIn(f"共 {len(TRIBES) + 18} 筆", out.getvalue())
         # 訪客翻譯試用預設關閉，要管理者手動打開
         self.assertFalse(FeatureFlag.objects.get(key="guest_translation_enabled").enabled)
         # 單題錯題講解（#22）預設關閉：真金鑰驗收完才由管理者打開
         self.assertFalse(FeatureFlag.objects.get(key="ai_question_review_enabled").enabled)
+        # AI 助手官方網站查證（#19）預設關閉：搜尋另計費，要先在 Anthropic Console 啟用並確認網域
+        self.assertFalse(FeatureFlag.objects.get(key="ai_web_search_enabled").enabled)
         # 後台 AI 產生題目草稿（#23）預設關閉
         self.assertFalse(FeatureFlag.objects.get(key="ai_quiz_draft_enabled").enabled)
         # 學習記憶（#21）預設關閉

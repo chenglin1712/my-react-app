@@ -617,6 +617,75 @@ describe('AIAssistantOverlay 辭典詞條卡片（路線圖 #17）', () => {
     ]);
   });
 
+  describe('官方網站查證的來源（#19）', () => {
+    const sources = [
+      { title: '原住民族委員會 豐年祭介紹', url: 'https://www.cip.gov.tw/zh-tw/a' },
+      { title: '族語E樂園', url: 'https://web.klokah.tw/b' },
+    ];
+
+    test('回覆帶有來源時，在回覆下方列出連結，另開新分頁且不帶 opener', async () => {
+      await ask({ message: '豐年祭是祭典', sources, sig });
+
+      const note = await screen.findByText('資料來源（官方網站）');
+      expect(note).toBeInTheDocument();
+      const link = screen.getByRole('link', { name: '原住民族委員會 豐年祭介紹，www.cip.gov.tw（另開新分頁）' });
+      expect(link).toHaveAttribute('href', 'https://www.cip.gov.tw/zh-tw/a');
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+      expect(screen.getAllByRole('link')).toHaveLength(2);
+      expect(screen.getByText('web.klokah.tw')).toBeInTheDocument();       // 標題旁標示是哪個網站
+    });
+
+    test('沒有來源時不出現空區塊', async () => {
+      await ask({ message: '一般回答', sig });
+      await screen.findByText('一般回答');
+      expect(screen.queryByText('資料來源（官方網站）')).not.toBeInTheDocument();
+    });
+
+    test('不安全或不合法的網址一律不顯示（http、javascript:、帶帳密、重複、超過三個）', async () => {
+      await ask({
+        message: '回答',
+        sources: [
+          { title: '明文', url: 'http://www.cip.gov.tw/a' },
+          { title: '腳本', url: 'javascript:alert(1)' },
+          { title: '帳密', url: 'https://user:pw@cip.gov.tw/a' },
+          { title: '壞網址', url: 'not a url' },
+          { title: '沒有網址' },
+          { title: '好的一', url: 'https://cip.gov.tw/1' },
+          { title: '好的一重複', url: 'https://cip.gov.tw/1' },
+          { title: '好的二', url: 'https://cip.gov.tw/2' },
+          { title: '好的三', url: 'https://cip.gov.tw/3' },
+          { title: '好的四', url: 'https://cip.gov.tw/4' },
+        ],
+        sig,
+      });
+
+      await screen.findByText('資料來源（官方網站）');
+      expect(screen.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual([
+        'https://cip.gov.tw/1', 'https://cip.gov.tw/2', 'https://cip.gov.tw/3',
+      ]);
+    });
+
+    test('標題缺漏時以網站名稱代替', async () => {
+      await ask({ message: '回答', sources: [{ url: 'https://www.cip.gov.tw/a' }], sig });
+      expect(await screen.findByRole('link', { name: 'www.cip.gov.tw，www.cip.gov.tw（另開新分頁）' })).toBeInTheDocument();
+    });
+
+    test('來源不會被當成對話記憶送回去', async () => {
+      const user = await ask({ message: '豐年祭是祭典', sources, sig });
+      await screen.findByText('資料來源（官方網站）');
+      apiPost.mockResolvedValue({ message: '第二個回答', sig });
+
+      await user.type(screen.getByLabelText('輸入訊息'), '再問{Enter}');
+      await screen.findByText('第二個回答');
+
+      expect(apiPost.mock.calls[1][1].history).toEqual([
+        { role: 'user', text: 'lokah 是什麼' },
+        { role: 'assistant', text: '豐年祭是祭典', sig },
+      ]);
+    });
+  });
+
   test('串流路徑的 done 事件帶查無詞形時，完成後才出現提醒', async () => {
     vi.stubEnv('VITE_API_AI_BOT_STREAM_URL', '/AIModel/tayal_chat/stream/');
     apiStream.mockReset();
