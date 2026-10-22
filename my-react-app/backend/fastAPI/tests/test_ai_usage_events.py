@@ -42,7 +42,7 @@ def test_columns_match_the_django_model():
     from sqlalchemy import Column  # noqa: F401
     django_fields = {
         "created_at", "feature", "uid", "model", "status", "request_id",
-        "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "latency_ms",
+        "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "latency_ms", "prompt_version",
     }
     assert {c.name for c in ai_usage_events._ai_usage_table.columns} == django_fields
 

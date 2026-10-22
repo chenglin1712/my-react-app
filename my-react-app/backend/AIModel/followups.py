@@ -27,12 +27,16 @@ def _word(value) -> str:
 def starter_suggestions(profile: dict | None) -> list[str]:
     """第一次開啟時的建議（不呼叫模型）。有學習資料就帶入最常錯的詞；沒有就用預設三句。"""
     suggestions: list[str] = []
+    # 預設三句可由管理者在後台調整（#35）；沒設定就是 DEFAULT_STARTERS
+    from . import assistant_settings
+
+    starters = assistant_settings.active()["suggestions"]
     for raw in (profile or {}).get("common_errors", []):
         word = _word(raw)
         if word:
             suggestions.append(f"幫我複習最常錯的「{word}」")
             break
-    for text in DEFAULT_STARTERS:
+    for text in starters:
         if len(suggestions) == MAX_FOLLOWUPS:
             break
         suggestions.append(text)

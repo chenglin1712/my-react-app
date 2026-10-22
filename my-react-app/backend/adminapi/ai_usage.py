@@ -58,6 +58,7 @@ def record_ai_usage(entry: dict) -> None:
             cache_read_tokens=entry.get("cache_read_tokens") or 0,
             cache_write_tokens=entry.get("cache_write_tokens") or 0,
             latency_ms=entry.get("latency_ms") or 0,
+            prompt_version=(entry.get("prompt_version") or "")[:16],
         )
 
 

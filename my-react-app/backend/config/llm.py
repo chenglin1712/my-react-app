@@ -193,6 +193,10 @@ current_uid: contextvars.ContextVar[str] = contextvars.ContextVar("llm_current_u
 # 這個請求最近一次成功呼叫的 {request_id, model}（路線圖 #30：回覆要帶著它，回饋才能追溯到當次的模型）。
 # contextvar 是每個執行緒／請求各自一份，不會在使用者之間混用；沒有呼叫過就是 None。
 last_call: contextvars.ContextVar = contextvars.ContextVar("llm_last_call", default=None)
+# 這個請求使用的助手提示詞版本（AIModel/prompt_version.py）；由 AIModel 的請求入口設定，用量紀錄一併寫入（路線圖 #35）
+prompt_version_var: contextvars.ContextVar = contextvars.ContextVar("llm_prompt_version", default="")
+# 只有助手對話相關的功能才記提示詞版本：其他功能（摘要、命題、評審）不屬於同一組提示詞，工作執行緒殘留的值不能寫進它們的紀錄
+PROMPT_VERSIONED_FEATURES = frozenset({"chat", "plan", "route", "light", "review"})
 
 # 用量紀錄的寫入端，由各個 process 啟動時註冊（Django：adminapi.ai_usage；FastAPI：
 # fastAPI.ai_usage_events）。config/llm.py 同時被兩個 process import，不能直接依賴
@@ -254,6 +258,7 @@ def _record_usage(*, feature, uid, model, started, status, response=None, reques
             "cache_read_tokens": _as_count(getattr(usage, "cache_read_input_tokens", None)),
             "cache_write_tokens": _as_count(getattr(usage, "cache_creation_input_tokens", None)),
             "latency_ms": int((time.monotonic() - started) * 1000),
+            "prompt_version": prompt_version_var.get() if feature in PROMPT_VERSIONED_FEATURES else "",
         }
         if status == "ok":
             # 這個請求（執行緒）最近一次成功的呼叫：使用者對回覆按讚／倒讚時，要能追溯到當次的模型與 request id（#30）

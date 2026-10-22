@@ -12,6 +12,7 @@ from .ai_usage import AiUsageLog
 from .ai_quota import AiDailyUsage
 from .learner_memory import LearnerMemoryConsent, LearnerMemoryFile
 from .ai_feedback import AiFeedback
+from .ai_assistant import AiAssistantSettingsVersion, AiModerationEvent
 from .ai_quiz_draft import AiQuizDraft
 from .analytics import UsageEvent
 from .audit import AuditLog

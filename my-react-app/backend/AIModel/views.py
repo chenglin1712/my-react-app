@@ -13,7 +13,7 @@ from dictionary_db.model import Word
 from dictionary_db.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS, TRIBE_MAP
 from core.firebase_auth import verify_firebase_token
-from config.llm import REFUSAL_MESSAGE, LLMRefusalError, get_llm_client, classify_llm_error, last_call, llm_deadline
+from config.llm import REFUSAL_MESSAGE, LLMRefusalError, get_llm_client, classify_llm_error, last_call, llm_deadline, prompt_version_var
 from adminapi.rate_limits import get_configured_rate
 from .serializers import TayalChatSerializer, ReviewTayalChatSerializer, ReviewQuestionSerializer, ReplanStudyPlanSerializer
 from . import memory_store
@@ -21,6 +21,7 @@ from . import quota as daily_quota
 from .followups import starter_suggestions
 from .feedback import FeedbackSerializer, feedback_enabled, hash_uid, purge_expired_daily, verified_call
 from .image_input import image_input_enabled
+from . import assistant_settings
 from .prompt_version import prompt_version
 from .learner_profile import load_profile
 from .services import run_tayal_chat, run_review_tayal_chat, run_study_plan_replan, stream_tayal_chat
@@ -112,6 +113,7 @@ def _reply_meta() -> dict:
 def _prepare_chat(request):
     """驗證身分、總開關、限速、請求內容並扣一次每日額度。回傳 (_ChatRequest, None) 或 (None, 錯誤回應)。
     順序與意義見各步驟；失敗的請求（格式錯誤等）不扣額度，扣了之後的失敗由呼叫端退還。"""
+    prompt_version_var.set(prompt_version())    # 這個請求之後的每一筆用量紀錄都帶上提示詞版本（#35）
     last_call.set(None)             # 工作執行緒會被重複使用：清掉上一個請求留下的呼叫紀錄，回覆只帶自己這次的
     decoded, err_resp = verify_firebase_token(request)
     if err_resp:
@@ -220,6 +222,7 @@ def _chat_stream_events(chat):
     deadline = time.monotonic() + STREAM_DEADLINE_SECONDS
     # 同一個截止時間也限制每次 LLM 呼叫的逾時（config.llm._with_deadline），這樣卡在等模型的時候也不會拖過去
     deadline_token = llm_deadline.set(deadline)
+    prompt_version_var.set(prompt_version())    # generator 可能在別的 context 被消費：自己再設一次，用量紀錄才帶得到版本
     try:
         for event in stream_tayal_chat(chat.client, chat.tribe_name, chat.user_message, **_chat_kwargs(chat)):
             if event["type"] == "done":
@@ -561,6 +564,8 @@ def ai_quota(request):
     }
     # 第一次開啟時的建議問題（#13）：依學習資料用模板挑，不呼叫模型；讀不到學習資料就是預設三句
     data["suggestions"] = starter_suggestions(load_profile(decoded.get("uid", "")))
+    # 開場白由管理者在後台設定（#35）；{tribe} 由前端換成目前選的族語名稱，族語問候詞仍由前端核對過的對照表決定
+    data["greeting"] = assistant_settings.active()["greeting"]
     return JsonResponse(data)
 
 

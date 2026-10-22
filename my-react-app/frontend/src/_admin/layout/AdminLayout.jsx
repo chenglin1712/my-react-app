@@ -50,6 +50,7 @@ const NAV_GROUPS = [
             { label: '形態分析能力', to: '/admin/system/morphology-capabilities' },
             { label: 'AI 用量', to: '/admin/system/ai-usage' },
             { label: 'AI 回饋', to: '/admin/system/ai-feedback' },
+            { label: 'AI 助手設定', to: '/admin/system/ai-assistant' },
         ],
     },
 ];

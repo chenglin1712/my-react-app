@@ -47,9 +47,19 @@ const tribeLabel = (slug) => {
     return found ? `${found.name}語` : "所選族語";
 };
 
-const greetingText = (slug) => {
+// 開場白由後台設定（/AIModel/quota/ 的 greeting，{tribe} 代表族語名稱）；讀不到就用這句預設
+const DEFAULT_GREETING = "你好！我是您的{tribe} AI 助手，有什麼我可以幫您的嗎？";
+
+const cleanGreeting = (value) => (
+    typeof value === "string" && value.trim() !== "" && value.length <= 120
+        && !/\{(?!tribe\})[^}]*\}/.test(value)
+        ? value.trim()
+        : null
+);
+
+const greetingText = (slug, template = DEFAULT_GREETING) => {
     const word = TRIBE_GREETING_WORDS[slug];
-    return `${word ? `${word} ` : ""}你好！我是您的${tribeLabel(slug)} AI 助手，有什麼我可以幫您的嗎？`;
+    return `${word ? `${word} ` : ""}${template.replace("{tribe}", tribeLabel(slug))}`;
 };
 
 // 剩餘次數 ≤ 這個數字時改用提醒樣式並讓報讀器念出來；平常不打擾
@@ -90,6 +100,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     const [tribe, setTribe] = useState("tayal");
     const tribeRef = useRef(tribe);
     useEffect(() => { tribeRef.current = tribe; }, [tribe]);
+    const greetingTemplateRef = useRef(DEFAULT_GREETING);
     // 詞條卡片的發音：整個視窗共用一個播放器，按下新的就停掉舊的
     const { playAudio, failedAudio } = useAuthorizedAudioPlayback();
     // 開場白記錄它是為哪個族語寫的（greetingFor），對話還沒開始時換族語就跟著換
@@ -150,6 +161,14 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                     setPlanReplanEnabled(data?.features?.planReplan === true);
                     const personal = cleanSuggestions(data?.suggestions);
                     if (personal.length > 0) setStarters(personal);
+                    // 後台設定的開場白：對話還只有開場白時直接換上，已經開始聊就不動畫面上的字
+                    const greeting = cleanGreeting(data?.greeting);
+                    if (greeting) {
+                        greetingTemplateRef.current = greeting;
+                        setMessages((prev) => (prev.length === 1 && prev[0].greetingFor
+                            ? [{ ...prev[0], text: greetingText(prev[0].greetingFor, greeting) }]
+                            : prev));
+                    }
                 }
             } catch {
                 quotaLoadedRef.current = false; // 下次展開再試
@@ -171,7 +190,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                 discardRef.current?.();
                 setConfirmingNew(false);                   // 上一位開著的「新對話」確認不能留到新帳號
                 touchedRef.current = false;
-                setMessages([{ id: crypto.randomUUID(), text: greetingText(tribeRef.current), role: "bot", greetingFor: tribeRef.current }]);
+                setMessages([{ id: crypto.randomUUID(), text: greetingText(tribeRef.current, greetingTemplateRef.current), role: "bot", greetingFor: tribeRef.current }]);
                 setInput("");
                 setAttachment(null);
             }
@@ -244,7 +263,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
         if (messages.length === 1 && messages[0].greetingFor) announce(`已切換為${tribeLabel(nextTribe)}`);
         setMessages((prev) => {
             if (prev.length === 1 && prev[0].greetingFor) {
-                return [{ ...prev[0], text: greetingText(nextTribe), greetingFor: nextTribe }];
+                return [{ ...prev[0], text: greetingText(nextTribe, greetingTemplateRef.current), greetingFor: nextTribe }];
             }
             return [...prev, {
                 id: crypto.randomUUID(),
@@ -520,7 +539,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     const confirmNewConversation = () => {
         clearConversation(uidRef.current);
         setConfirmingNew(false);
-        setMessages([{ id: crypto.randomUUID(), text: greetingText(tribe), role: "bot", greetingFor: tribe }]);
+        setMessages([{ id: crypto.randomUUID(), text: greetingText(tribe, greetingTemplateRef.current), role: "bot", greetingFor: tribe }]);
         setInput("");
         setAttachment(null);
         setAttachError("");
@@ -602,7 +621,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                         value={tribe}
                         onChange={handleTribeChange}
                         disabled={isPending}
-                        style={{ position: "relative", zIndex: 1, borderRadius: 6, border: "none", padding: "4px 6px" }}
+                        className="chat-tribe-select"
                         aria-label="選擇族語"
                     >
                         {TRIBES.map((t) => (

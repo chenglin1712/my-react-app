@@ -114,6 +114,7 @@
 
 .header-info {
     flex-grow: 1;
+    min-width: 0; /* 窄螢幕上標題可以縮，不把族語選單推出視窗 */
     margin-left: 10px;
 }
 
@@ -1064,6 +1065,35 @@
 .chat-new:focus-visible {
     outline: var(--yy-ui-focus-ring);
     outline-offset: var(--yy-ui-focus-offset);
+}
+
+/* 標題列的族語選單：原生 select 保留手機的系統選單；字級 16px 避免 iOS 聚焦時自動放大頁面 */
+.chat-tribe-select {
+    position: relative;
+    z-index: var(--yy-z-nav);
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 8.5rem;
+    min-height: 44px;
+    padding: 4px 8px;
+    background-color: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    color: var(--yy-calm-text);
+    font-size: 16px;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.chat-tribe-select:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+/* 標題列 overflow:hidden，外擴的焦點框會被裁掉，所以往內畫 */
+.chat-tribe-select:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: -3px;
 }
 
 /* 刪除對話前的確認列：就地出現在標題下方，不用另開對話框 */

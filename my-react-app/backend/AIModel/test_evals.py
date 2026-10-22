@@ -293,12 +293,18 @@ class PromptVersionTest(SimpleTestCase):
     def test_version_is_stable_and_changes_with_the_prompt(self):
         first = prompt_version()
         self.assertRegex(first, r"^[0-9a-f]{8}$")
-        prompt_version.cache_clear()
         self.assertEqual(prompt_version(), first)
         with patch("AIModel.services._plan_static_prompt", return_value="另一段提示詞"):
-            prompt_version.cache_clear()
             self.assertNotEqual(prompt_version(), first)
-        prompt_version.cache_clear()
+        self.assertEqual(prompt_version(), first)
+
+    def test_admin_settings_change_the_version(self):
+        from AIModel import assistant_settings
+
+        first = prompt_version()
+        with assistant_settings.override({"offtopic_policy": "gentle"}):
+            self.assertNotEqual(prompt_version(), first)
+        self.assertEqual(prompt_version(), first)
 
 
 class CommandTest(TestCase):

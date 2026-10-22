@@ -1,0 +1,160 @@
+/* 後台「AI 助手設定」頁：沿用 ai-usage.css 的總覽列與內容欄，這裡補表單區塊、試跑結果與版本紀錄。 */
+
+.ai-assistant-section {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+}
+
+.ai-assistant-section h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.ai-assistant-lede,
+.ai-assistant-muted {
+  margin: 0;
+  color: var(--admin-muted);
+  font-size: 14px;
+}
+
+/* 儲存或回滾進行中整組欄位停用，避免回應回來時蓋掉剛打的字；外層 fieldset 不要有預設邊框與最小寬度 */
+.ai-assistant-form {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ai-assistant-field {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 20px;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.ai-assistant-field legend {
+  margin-bottom: 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.ai-assistant-field .form-label {
+  margin-bottom: 0;
+  font-weight: 600;
+}
+
+.ai-assistant-field-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--admin-muted);
+  font-size: 13px;
+}
+
+.ai-assistant-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-assistant-suggestion .form-control {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ai-assistant-count {
+  flex: none;
+  min-width: 3.5em;
+  color: var(--admin-muted);
+  font-size: 13px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ai-assistant-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.ai-assistant-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-assistant-filter .form-label {
+  margin: 0;
+}
+
+.ai-assistant-filter .form-select {
+  width: auto;
+  min-width: 150px;
+}
+
+.ai-assistant-badge {
+  margin-left: 8px;
+  padding: 2px 8px;
+  background: var(--admin-accent);
+  border-radius: var(--admin-radius);
+  color: var(--admin-surface);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ai-assistant-confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ai-assistant-excerpt {
+  min-width: 220px;
+  overflow-wrap: anywhere;
+}
+
+.ai-assistant-trial-result ul {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai-assistant-trial-result li {
+  padding: 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+}
+
+.ai-assistant-trial-result p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ai-assistant-trial-q {
+  margin-bottom: 4px !important;
+  color: var(--admin-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (max-width: 575.98px) {
+  .ai-assistant-section {
+    padding: 16px;
+  }
+
+  .ai-assistant-field-meta {
+    flex-direction: column;
+    gap: 2px;
+  }
+}

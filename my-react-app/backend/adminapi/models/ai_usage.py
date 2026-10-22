@@ -30,6 +30,8 @@ class AiUsageLog(models.Model):
     cache_read_tokens = models.PositiveIntegerField(default=0)
     cache_write_tokens = models.PositiveIntegerField(default=0)
     latency_ms = models.PositiveIntegerField(default=0)
+    # 當次使用的提示詞版本（AIModel/prompt_version.py 的短雜湊；非助手功能為空字串）。路線圖 #35
+    prompt_version = models.CharField(max_length=16, blank=True, default='')
 
     class Meta:
         indexes = [
