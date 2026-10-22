@@ -183,7 +183,12 @@ class AccountDeletionTests(TestCase):
         from config.roles import OWNER
         users_doc = _fake_snapshot("uid1", {"name": "Alice"})
         client, users_doc_ref = _build_client_router(users_doc=users_doc, notes=[], recordings=[])
-        users_doc_ref.collection.return_value.stream.return_value = state_snaps
+        # 子集合依名稱各自回應：詞素學習狀態有 state_snaps，AI 助手題目紀錄（#22）預設是空的
+        def _subcollection(name):
+            sub = mock.MagicMock()
+            sub.stream.return_value = state_snaps if name == "quizRuleState" else []
+            return sub
+        users_doc_ref.collection.side_effect = _subcollection
         if users_doc_ref_configure:
             users_doc_ref_configure(users_doc_ref)
         with mock.patch("adminapi.firebase_ops.get_firebase_user", return_value=_fake_user_record("uid1", email="alice@example.com")), \
@@ -202,7 +207,9 @@ class AccountDeletionTests(TestCase):
         resp, users_doc_ref = self._delete(snaps)
         results = resp.json()["results"]
         self.assertEqual(resp.status_code, 200)
-        users_doc_ref.collection.assert_called_with("quizRuleState")
+        users_doc_ref.collection.assert_any_call("quizRuleState")
+        users_doc_ref.collection.assert_any_call("aiAskedQuestions")
+        self.assertEqual(results["ai_asked_questions"], {"deleted": 0})
         for snap in snaps:
             snap.reference.delete.assert_called_once()
         self.assertEqual(results["quiz_rule_state"], {"deleted": 2})
@@ -228,11 +235,72 @@ class AccountDeletionTests(TestCase):
 
     def test_a_failure_cleaning_rule_state_is_reported_and_does_not_stop_the_rest(self):
         def boom(ref):
-            ref.collection.return_value.stream.side_effect = RuntimeError("firestore down")
+            original = ref.collection.side_effect
+
+            def failing(name):
+                sub = original(name)
+                if name == "quizRuleState":
+                    sub.stream.side_effect = RuntimeError("firestore down")
+                return sub
+            ref.collection.side_effect = failing
         resp, users_doc_ref = self._delete([], users_doc_ref_configure=boom)
         results = resp.json()["results"]
         self.assertEqual(results["quiz_rule_state"]["deleted"], 0)
         self.assertIn("error", results["quiz_rule_state"])
+        self.assertTrue(results["firestore_user_document"]["deleted"])
+        users_doc_ref.delete.assert_called_once()
+
+    def test_ai_asked_question_records_are_deleted_and_a_failure_is_reported_without_stopping(self):
+        asked = [mock.MagicMock(), mock.MagicMock(), mock.MagicMock()]
+
+        def configure(ref):
+            original = ref.collection.side_effect
+
+            def routed(name):
+                sub = original(name)
+                if name == "aiAskedQuestions":
+                    sub.stream.return_value = asked
+                return sub
+            ref.collection.side_effect = routed
+        resp, _ = self._delete([], users_doc_ref_configure=configure)
+        self.assertEqual(resp.json()["results"]["ai_asked_questions"], {"deleted": 3})
+        for snap in asked:
+            snap.reference.delete.assert_called_once()
+
+        def boom(ref):
+            original = ref.collection.side_effect
+
+            def failing(name):
+                sub = original(name)
+                if name == "aiAskedQuestions":
+                    sub.stream.side_effect = RuntimeError("firestore down")
+                return sub
+            ref.collection.side_effect = failing
+        resp, users_doc_ref = self._delete([], users_doc_ref_configure=boom)
+        results = resp.json()["results"]
+        self.assertIn("error", results["ai_asked_questions"])
+        self.assertTrue(results["firestore_user_document"]["deleted"])
+        users_doc_ref.delete.assert_called_once()
+
+    def test_learner_memory_is_deleted_with_the_account_and_only_that_users(self):
+        from AIModel import memory_store
+        from adminapi.models import LearnerMemoryConsent, LearnerMemoryFile
+        for uid in ("uid1", "other"):
+            memory_store.grant_consent(uid)
+            memory_store.execute(uid, {"command": "create", "path": "/memories/a.txt", "file_text": "筆記"})
+
+        resp, _ = self._delete([])
+
+        self.assertEqual(resp.json()["results"]["learner_memory"], {"deleted": 1})
+        self.assertFalse(LearnerMemoryFile.objects.filter(uid="uid1").exists())
+        self.assertFalse(LearnerMemoryConsent.objects.filter(uid="uid1").exists())
+        self.assertTrue(LearnerMemoryFile.objects.filter(uid="other").exists())
+
+    def test_a_failure_deleting_learner_memory_is_reported_and_does_not_stop_the_rest(self):
+        with mock.patch("AIModel.memory_store.revoke_consent", side_effect=RuntimeError("db down")):
+            resp, users_doc_ref = self._delete([])
+        results = resp.json()["results"]
+        self.assertIn("error", results["learner_memory"])
         self.assertTrue(results["firestore_user_document"]["deleted"])
         users_doc_ref.delete.assert_called_once()
 

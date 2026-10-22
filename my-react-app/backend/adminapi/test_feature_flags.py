@@ -133,10 +133,16 @@ class SeedFeatureFlagsTest(TestCase):
         from config.tribes import TRIBES
         out = StringIO()
         call_command("seed_feature_flags", stdout=out)
-        self.assertEqual(FeatureFlag.objects.count(), len(TRIBES) + 12)
-        self.assertIn(f"共 {len(TRIBES) + 12} 筆", out.getvalue())
+        self.assertEqual(FeatureFlag.objects.count(), len(TRIBES) + 15)
+        self.assertIn(f"共 {len(TRIBES) + 15} 筆", out.getvalue())
         # 訪客翻譯試用預設關閉，要管理者手動打開
         self.assertFalse(FeatureFlag.objects.get(key="guest_translation_enabled").enabled)
+        # 單題錯題講解（#22）預設關閉：真金鑰驗收完才由管理者打開
+        self.assertFalse(FeatureFlag.objects.get(key="ai_question_review_enabled").enabled)
+        # 後台 AI 產生題目草稿（#23）預設關閉
+        self.assertFalse(FeatureFlag.objects.get(key="ai_quiz_draft_enabled").enabled)
+        # 學習記憶（#21）預設關閉
+        self.assertFalse(FeatureFlag.objects.get(key="ai_learner_memory_enabled").enabled)
         self.assertTrue(FeatureFlag.objects.get(key="ai_assistant_enabled").enabled)
         # 雲端筆記同步預設開啟（管理者可在後台關閉）
         self.assertTrue(FeatureFlag.objects.get(key="notes_cloud_sync").enabled)

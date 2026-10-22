@@ -769,6 +769,8 @@ class UserExportTest(TestCase):
         payload = json.loads(resp.content)
         self.assertEqual(payload["shared_notes"][0]["id"], "note1")
         self.assertEqual(AuditLog.objects.filter(action="export_personal_data").count(), 1)
+        # AI 學習記憶（#21）存在 Django 資料庫，匯出也要包含（沒開啟時是空的）
+        self.assertEqual(payload["ai_learner_memory"], {"consented": False, "files": []})
 
     @patch("adminapi.firebase_ops.get_firebase_user")
     def test_admin_cannot_export_owner(self, mock_get_user):

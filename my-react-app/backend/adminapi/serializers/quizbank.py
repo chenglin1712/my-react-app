@@ -95,14 +95,31 @@ class QuizClozePassageSerializer(serializers.ModelSerializer):
 
 
 class QuizSituationItemSerializer(serializers.ModelSerializer):
+    # AI 產生的草稿才有（路線圖 #23）：來源詞條、模型、產生者與辭典查無的族語詞，供審核者檢查；人工建立的題目是 None
+    ai_draft = serializers.SerializerMethodField()
+
     class Meta:
         model = QuizSituationItem
         fields = [
             'id', 'tribe', 'scenario_chinese', 'options', 'answer',
             'status', 'created_by', 'submitted_by', 'submitted_at',
-            'reviewed_by', 'reviewed_at', 'review_comment', 'created_at', 'updated_at',
+            'reviewed_by', 'reviewed_at', 'review_comment', 'created_at', 'updated_at', 'ai_draft',
         ]
         read_only_fields = _REVIEWABLE_READ_ONLY_FIELDS
+
+    def get_ai_draft(self, obj):
+        from adminapi.models import AiQuizDraft
+
+        if obj.pk is None:
+            return None
+        draft = AiQuizDraft.objects.filter(content_type='quiz_situation_item', content_id=obj.pk).first()
+        if draft is None:
+            return None
+        return {
+            'generated_by': draft.generated_by, 'generated_at': draft.generated_at.isoformat(),
+            'model': draft.model, 'source_words': draft.source_words,
+            'source_word_ids': draft.source_word_ids, 'unverified_words': draft.unverified_words,
+        }
 
     def validate(self, data):
         options = data.get('options', getattr(self.instance, 'options', None))

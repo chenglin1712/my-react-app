@@ -41,7 +41,7 @@ from ._shared import (
     write_audit_log as _write_audit_log,
 )
 from .models import (
-    IrtConfig, QuizChoiceItem, QuizClozePassage, QuizSituationItem, QuizSourceConfig,
+    AiQuizDraft, IrtConfig, QuizChoiceItem, QuizClozePassage, QuizSituationItem, QuizSourceConfig,
     QuizTrueFalseItem, QuizVocabItem,
 )
 from .revisions import cancel_stale_pending_revision, make_revision_views, pending_revision_target_ids
@@ -185,6 +185,8 @@ def _delete_content(request, pk, model, serializer_class, target_type):
             return _invalid_transition(obj.status, "delete")
         before = serializer_class(obj).data
         _write_audit_log(request, decoded, "delete", obj, before=before, target_type=target_type)
+        # AI 草稿的來源紀錄跟題目一起刪，避免殘留孤兒資料、也避免主鍵被重用時新題被誤標成 AI 草稿
+        AiQuizDraft.objects.filter(content_type=target_type, content_id=obj.pk).delete()
         obj.delete()
 
     return JsonResponse({"detail": "已刪除"}, status=200)
@@ -265,6 +267,15 @@ def _content_approve(request, pk, model, serializer_class, target_type):
         obj = _locked_content(model, pk)
         if obj.status != model.STATUS_PENDING_REVIEW:
             return _invalid_transition(obj.status, "approve")
+
+        # AI 產生的草稿不能由產生者自己核可（路線圖 #23）：owner／admin 同時是編輯者與核准者，也一樣擋
+        if AiQuizDraft.objects.filter(
+            content_type=target_type, content_id=obj.pk, generated_by=decoded.get("uid", "anon"),
+        ).exists():
+            return JsonResponse(
+                {"detail": "AI 產生的題目不能由產生者自己核可，請交給其他審核者。", "code": "cannot_approve_own_ai_draft"},
+                status=403,
+            )
 
         before = serializer_class(obj).data
         obj.status = model.STATUS_PUBLISHED

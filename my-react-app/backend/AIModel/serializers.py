@@ -44,3 +44,9 @@ class TayalChatSerializer(serializers.Serializer):
 class ReviewTayalChatSerializer(serializers.Serializer):
     message = serializers.CharField(max_length=1000, allow_blank=False, trim_whitespace=True)
     tribe = serializers.ChoiceField(choices=_TRIBE_CHOICES, required=False, default="tayal")
+
+
+class ReviewQuestionSerializer(serializers.Serializer):
+    """單題錯題講解的請求（路線圖 #22）：只收「哪一次作答的第幾題」，題目內容與使用者的答案由伺服器自己讀。"""
+    attempt_id = serializers.RegexField(r"^[A-Za-z0-9]{1,64}$")     # Firestore 自動產生的文件編號
+    index = serializers.IntegerField(min_value=0, max_value=199)

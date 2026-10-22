@@ -20,6 +20,7 @@ import { tribes as tribeEntries } from "../../../backend/config/tribes.json";
 export function buildTribeTables(rawTribes) {
   const all = rawTribes.map((t) => ({
     slug: t.slug,
+    id: t.id ?? null,
     name: t.name,
     fullName: t.fullName ?? null,
     roman: t.roman ?? null,
@@ -61,6 +62,9 @@ export const TRIBE_NAMES = TRIBES.map((t) => t.name);
 // 英文代稱 -> 中文簡稱／全名，例如 { tayal: "泰雅", ... } / { tayal: "泰雅語", ... }
 export const TRIBE_NAME_BY_SLUG = Object.fromEntries(TRIBES.map((t) => [t.slug, t.name]));
 export const TRIBE_FULL_NAME_BY_SLUG = Object.fromEntries(TRIBES.map((t) => [t.slug, t.fullName]));
+
+// 英文代稱 -> 辭典資料庫的族語 id（後台搜尋詞條的 tribe_id 參數用）
+export const TRIBE_ID_BY_SLUG = Object.fromEntries(TRIBES.map((t) => [t.slug, t.id]));
 
 // 中文簡稱 -> 英文代稱，例如頁面上選的是「泰雅」但 API 要送 "tayal"
 export const TRIBE_SLUG_BY_NAME = Object.fromEntries(TRIBES.map((t) => [t.name, t.slug]));

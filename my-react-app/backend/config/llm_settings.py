@@ -10,6 +10,7 @@ FastAPI（翻譯）兩個 process 共用，只靠環境變數與這裡的預設�
   translate  族語翻譯
   route      意圖路由：先用便宜的模型判斷訊息屬於哪一類，再決定怎麼回（路線圖 #8）
   light      閒聊的簡短回覆（意圖路由判斷為閒聊時使用，不查辭典、不讀學習資料）
+  quiz_draft 後台 AI 產生題目草稿（路線圖 #23，一律進人工審核）
 
 預設模型的優先順序：LLM_MODEL_<FEATURE> > 該功能自己的預設（route、light 是 Haiku）> LLM_MODEL > DEFAULT_MODEL。
 route、light 刻意不跟著 LLM_MODEL 走：它們存在的目的就是比主模型便宜，全域換成更大的模型時不該連帶變貴。
@@ -71,6 +72,9 @@ _FEATURE_DEFAULTS = {
     # 之後實測可以用 LLM_EFFORT_ROUTE 打開。
     "route": _FeatureDefaults(effort=None, max_tokens=256, model=LIGHT_MODEL),
     "light": _FeatureDefaults(effort=None, max_tokens=512, model=LIGHT_MODEL),
+    # 後台「AI 產生題目草稿」（路線圖 #23）：結構化輸出的情境題，產生後一律進人工審核；
+    # 要換更強的模型用 LLM_MODEL_QUIZ_DRAFT（例如 claude-opus-5-5）。
+    "quiz_draft": _FeatureDefaults(effort="medium", max_tokens=6144),
 }
 
 FEATURES = tuple(_FEATURE_DEFAULTS)

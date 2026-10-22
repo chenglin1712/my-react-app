@@ -54,6 +54,42 @@ class Command(BaseCommand):
         )
         created_count += int(created)
 
+        # 單題錯題講解（路線圖 #22）：預設【關閉】。真金鑰驗收完才從後台「功能開關」頁打開；
+        # 後端判斷是 fail-closed（查不到這一列也視為關閉）。關閉時 review 頁的「AI 助手」分頁不顯示。
+        _, created = FeatureFlag.objects.get_or_create(
+            key="ai_question_review_enabled",
+            defaults={
+                "label": "AI 單題錯題講解",
+                "description": "開啟後，複習頁選擇一題時可使用「AI 助手」針對該題講解（會呼叫付費 LLM）。預設關閉。",
+                "enabled": False,
+            },
+        )
+        created_count += int(created)
+
+        # 學習記憶（路線圖 #21）：預設【關閉】。打開後學生還要在「我的學習記憶」頁自己勾選同意才會啟用；
+        # 關閉旗標不會刪資料，學生仍可檢視與清除自己的記憶。後端 fail-closed（查不到這一列也視為關閉）。
+        _, created = FeatureFlag.objects.get_or_create(
+            key="ai_learner_memory_enabled",
+            defaults={
+                "label": "AI 學習記憶",
+                "description": "開啟後，學生可在「我的學習記憶」頁勾選同意，讓 AI 助手記住學習狀況（會增加 LLM 用量）。預設關閉。",
+                "enabled": False,
+            },
+        )
+        created_count += int(created)
+
+        # 後台 AI 產生題目草稿（路線圖 #23）：預設【關閉】（會呼叫付費 LLM）。產生的題目一律是草稿，要送審、
+        # 由另一位審核者核可才會出現在學生題庫。後端 fail-closed（查不到這一列也視為關閉）。
+        _, created = FeatureFlag.objects.get_or_create(
+            key="ai_quiz_draft_enabled",
+            defaults={
+                "label": "AI 產生題目草稿",
+                "description": "開啟後，後台編輯者可挑辭典詞條請 AI 產生情境題草稿（會呼叫付費 LLM）；草稿須送審並由其他審核者核可才會上線。預設關閉。",
+                "enabled": False,
+            },
+        )
+        created_count += int(created)
+
         # 訪客翻譯試用（C-2）：預設【關閉】。要在後台「功能開關」頁手動打開，才會讓未登入的訪客
         # 以每瀏覽器每日 10 次的額度使用翻譯。後端判斷是 fail-closed（查不到這一列也視為關閉），
         # 所以即使沒跑種子，訪客也不會被放行。需要另外設定 GUEST_TRIAL_SECRET，見 .env.example。
@@ -139,9 +175,9 @@ class Command(BaseCommand):
         )
         created_count += int(created)
 
-        total = len(TRIBES) + 12
+        total = len(TRIBES) + 15
         self.stdout.write(self.style.SUCCESS(
             f"功能開關種子完成：共 {total} 筆（族語測驗開關 {len(TRIBES)} + 族語翻譯開關 1 + AI 助手開關 1 + 訪客翻譯試用 1 + 詞形分析器 2 + 測驗詞形干擾項 1 "
-            f"+ 詞素學習 4 + 待專家驗證佇列 1 + 雲端筆記同步 1，除了族語測驗、翻譯與 AI 助手開關，其餘預設關閉（含訪客翻譯試用）），"
+            f"+ 詞素學習 4 + 待專家驗證佇列 1 + 雲端筆記同步 1 + AI 單題錯題講解 1 + AI 學習記憶 1 + AI 產生題目草稿 1，除了族語測驗、翻譯與 AI 助手開關，其餘預設關閉（含訪客翻譯試用）），"
             f"新增 {created_count} 筆，其餘已存在維持原值。"
         ))

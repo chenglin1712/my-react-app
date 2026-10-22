@@ -140,6 +140,7 @@ const Edit = () => {
                         style={{ backgroundColor: "var(--yy-cream-dim)", cursor: "not-allowed" }}
                     />
                     <Link className="forgot-pass" to="/reset">變更密碼</Link>
+                    <Link className="forgot-pass" to="/memory">我的學習記憶</Link>
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", marginTop: "24px" }}>

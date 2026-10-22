@@ -27,6 +27,7 @@ const TITLE_RULES = [
   { test: (p) => p === '/privacy', title: '隱私與資料' },
   { test: (p) => p === '/contact', title: '聯絡我們' },
   { test: (p) => p === '/edit', title: '編輯個人資料' },
+  { test: (p) => p === '/memory', title: '我的學習記憶' },
   { test: (p) => p === '/calendar', title: '行事曆' },
   { test: (p) => p === '/admin-login', title: '後台登入' },
 ];

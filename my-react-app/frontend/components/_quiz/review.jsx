@@ -5,6 +5,8 @@ import { getCurrentSituation, getQuizById } from "../../src/userServives/uploadD
 import { QUIZ_LEVEL_TYPE_BY_NAME } from "./quizLevels";
 import { buildReviewQuestions } from "./reviewQuestionModel";
 import ReviewTabs from "./ReviewTabs";
+import QuestionExplanation from "./QuestionExplanation";
+import { apiGet } from "../../utils/apiClient";
 import ReviewAttemptList from "./ReviewAttemptList";
 import ReviewAttemptDetail from "./ReviewAttemptDetail";
 import ReviewQuestionDetail from "./ReviewQuestionDetail";
@@ -19,6 +21,16 @@ const Review = () => {
 
     const [selectedQuiz, setSelectedQuiz] = useState(null);
     const [selectedQuestionIdx, setSelectedQuestionIdx] = useState(null);
+    // 「AI助手」分頁是否開放（後端功能旗標，預設關閉）；讀不到就當作沒開放
+    const [aiEnabled, setAiEnabled] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        apiGet("/AIModel/quota/")
+            .then((data) => { if (!cancelled) setAiEnabled(data?.features?.questionReview === true); })
+            .catch(() => {});
+        return () => { cancelled = true; };
+    }, []);
 
     useEffect(() => {
         const fetchSituations = async () => {
@@ -42,6 +54,7 @@ const Review = () => {
                 ...quizData,
                 // 測驗題目本身的建立時間（createdAt）跟使用者這一次作答的時間
                 // （answeredAt）是兩件事，複習頁要顯示的是後者。
+                attemptId: situation.id,      // 單題講解用：伺服器靠它讀這次作答（路線圖 #22）
                 answeredAt: situation.answeredAt,
                 results: situation.results,
                 answers: situation.answers,
@@ -97,6 +110,7 @@ const Review = () => {
                         activeIndex={navIndex}
                         onChange={setNavIndex}
                         hasSelectedQuestion={!!selectedQuestion}
+                        aiEnabled={aiEnabled}
                     />
 
                     <div className="review-table-container">
@@ -117,7 +131,19 @@ const Review = () => {
                                     />
                                 )}
                                 {navIndex === 1 && (<Comp_discussion />)}
-                                {navIndex === 2 && (<Comp_atayalAI tribe={selectedQuiz?.tribe || "tayal"} />)}
+                                {navIndex === 2 && (
+                                    <>
+                                        {selectedQuiz.attemptId && selectedQuestion && (
+                                            <QuestionExplanation
+                                                key={`${selectedQuiz.attemptId}-${selectedQuestion.idx}`}
+                                                attemptId={selectedQuiz.attemptId}
+                                                index={selectedQuestion.idx}
+                                                tribe={selectedQuiz?.tribe || "tayal"}
+                                            />
+                                        )}
+                                        <Comp_atayalAI tribe={selectedQuiz?.tribe || "tayal"} />
+                                    </>
+                                )}
                             </div>
                         )}
                     </div>

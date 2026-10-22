@@ -3,8 +3,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ReviewTabs from './ReviewTabs';
 
-describe('ReviewTabs（回歸測試：討論/AI助手目前都還沒真正可用）', () => {
-  test('討論／AI助手分頁一律 disabled 並標示「即將推出」，即使已經選了題目', async () => {
+describe('ReviewTabs（回歸測試：討論還沒真正可用；AI助手由功能旗標決定）', () => {
+  test('旗標關閉（預設）時，討論／AI助手分頁一律 disabled 並標示「即將推出」，即使已經選了題目', async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
     render(<ReviewTabs activeIndex={0} onChange={onChange} hasSelectedQuestion={true} />);
@@ -31,5 +31,24 @@ describe('ReviewTabs（回歸測試：討論/AI助手目前都還沒真正可用
 
     await user.click(screen.getByRole('button', { name: '測驗紀錄' }));
     expect(onChange).toHaveBeenCalledWith(0);
+  });
+
+  test('旗標開啟後，AI助手分頁在選了題目時可以切換，討論仍然是即將推出', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(<ReviewTabs activeIndex={0} onChange={onChange} hasSelectedQuestion={true} aiEnabled={true} />);
+
+    const aiTab = screen.getByRole('button', { name: /AI助手/ });
+    expect(aiTab).toBeEnabled();
+    expect(aiTab).not.toHaveTextContent('即將推出');
+    expect(screen.getByRole('button', { name: /討論/ })).toBeDisabled();
+
+    await user.click(aiTab);
+    expect(onChange).toHaveBeenCalledWith(2);
+  });
+
+  test('旗標開啟但沒有選題目時，AI助手分頁仍然被擋（沒有題目可以講解）', () => {
+    render(<ReviewTabs activeIndex={0} onChange={vi.fn()} hasSelectedQuestion={false} aiEnabled={true} />);
+    expect(screen.getByRole('button', { name: /AI助手/ })).toBeDisabled();
   });
 });

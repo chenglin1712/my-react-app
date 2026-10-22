@@ -484,11 +484,17 @@ def user_export(request, decoded, uid):
         for d in client.collection_group("recordings").where("uid", "==", uid).stream()
     ]
 
+    from AIModel import memory_store
+
     export_payload = {
         "auth": _merge_user(user_record, firestore_data or {}),
         "firestore_user_document": firestore_data,
         "shared_notes": notes,
         "pronunciations": recordings,
+        "ai_learner_memory": {
+            "consented": memory_store.has_consent(uid),
+            "files": memory_store.list_files(uid),
+        },
     }
 
     _safe_write_audit_log(request, decoded, "export_personal_data", uid, target_type="user")
@@ -602,6 +608,24 @@ def user_delete(request, decoded, uid):
     except Exception:
         logger.exception("刪除帳號 %s 的詞素學習狀態失敗", uid)
         results["quiz_rule_state"] = {"deleted": 0, "error": "刪除失敗，需人工複查"}
+
+    try:
+        # AI 助手記下的「問過哪一題」（users/{uid}/aiAskedQuestions，路線圖 #22）同樣在子集合，要明確刪除。
+        asked = list(doc_ref.collection("aiAskedQuestions").stream())
+        for item in asked:
+            item.reference.delete()
+        results["ai_asked_questions"] = {"deleted": len(asked)}
+    except Exception:
+        logger.exception("刪除帳號 %s 的 AI 助手題目紀錄失敗", uid)
+        results["ai_asked_questions"] = {"deleted": 0, "error": "刪除失敗，需人工複查"}
+
+    try:
+        # AI 助手的學習記憶（路線圖 #21）存在 Django 資料庫，不在 Firestore：刪除記憶檔與同意紀錄。
+        from AIModel import memory_store
+        results["learner_memory"] = {"deleted": memory_store.revoke_consent(uid)}
+    except Exception:
+        logger.exception("刪除帳號 %s 的學習記憶失敗", uid)
+        results["learner_memory"] = {"deleted": 0, "error": "刪除失敗，需人工複查"}
 
     try:
         # 經同意記錄的假名化研究事件：刪除帳號時一併清除，並把同意紀錄標記為已撤回。

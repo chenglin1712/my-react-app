@@ -3,7 +3,7 @@ from django.urls import path
 from . import (
     ai_usage_views, analytics_views, dictionary_grammar_views, dictionary_import_views, dictionary_taxonomy_views,
     dictionary_views, exam_schedule_admin_views, featured_topic_views, feature_flag_views, game_config_views,
-    homepage_config_views, moderation_views, promo_video_views, quizbank_views, site_page_views,
+    homepage_config_views, moderation_views, promo_video_views, quizbank_views, site_page_views, ai_quiz_draft_views,
     morphology_capability_views, rate_limit_views, review_queue_views, system_cache_views, user_views, verification_views, views,
 )
 
@@ -72,6 +72,7 @@ urlpatterns = [
     path('public/contact-page/', site_page_views.public_contact_page),
     *_content_urls('quiz-bank/vocab', quizbank_views.quiz_vocab_views),
     *_content_urls('quiz-bank/cloze', quizbank_views.quiz_cloze_views),
+    path('quiz-bank/situations/ai-draft/', ai_quiz_draft_views.situation_ai_draft),
     *_content_urls('quiz-bank/situations', quizbank_views.quiz_situation_views),
     *_content_urls('quiz-bank/true-false', quizbank_views.quiz_true_false_views),
     *_content_urls('quiz-bank/choice', quizbank_views.quiz_choice_views),

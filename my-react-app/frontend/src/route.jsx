@@ -16,6 +16,7 @@ const LoginPage = lazy(() => import('./_auth/login'));
 const AdminLoginPage = lazy(() => import('./_auth/AdminLoginPage'));
 const RegisterPage = lazy(() => import('./_auth/register'));
 const EditPage = lazy(() => import('../components/_auth/editProfile'));
+const LearnerMemoryPage = lazy(() => import('./_memory/index'));
 //忘記密碼、重設密碼
 const ForgotPage = lazy(() => import('../components/_auth/forgotPassword'));
 const ResetPage = lazy(() => import('../components/_auth/resetPassword'));
@@ -187,6 +188,7 @@ const AppRoutes = () => {
             <Route path='/note' element={<NotePage />} />
             <Route path='/note/share' element={<NoteShare />} />
             <Route path="/edit" element={<EditPage />} />
+            <Route path="/memory" element={<LearnerMemoryPage />} />
             <Route path="/calendar" element={<CalendarPage />} />
           </Route>
 

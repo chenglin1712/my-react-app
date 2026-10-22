@@ -1,8 +1,10 @@
-import { Alert, Button, Form, Modal, Spinner } from 'react-bootstrap';
+import { useState } from 'react';
+import { Alert, Badge, Button, Form, Modal, Spinner } from 'react-bootstrap';
 import AdminTable from '../components/AdminTable';
-import { Plus } from 'lucide-react';
+import { Plus, Sparkles } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
+import AiDraftModal from './AiDraftModal';
 import RejectReasonModal from '../reviewWorkflow/RejectReasonModal';
 import ReviewActions from '../reviewWorkflow/ReviewActions';
 import ReviewPagination from '../reviewWorkflow/ReviewPagination';
@@ -38,13 +40,31 @@ function formFrom(item) {
     };
 }
 
+// AI 產生的題目：標出來源詞條、模型與產生者，辭典查無的族語詞用醒目的標記提醒審核者
+function AiProvenance({ draft }) {
+    if (!draft) return <span className="quiz-bank-ai-manual">人工建立</span>;
+    const unverified = draft.unverified_words ?? [];
+    return (
+        <div className="quiz-bank-ai-provenance">
+            <Badge bg="info" text="dark">AI 產生</Badge>
+            <span>
+                來源詞條：{(draft.source_words ?? []).join('、') || '—'}；
+                模型：{draft.model}；產生者：{draft.generated_by}
+            </span>
+            {unverified.length > 0 && (
+                <Badge bg="warning" text="dark">辭典查無：{unverified.join('、')}</Badge>
+            )}
+        </div>
+    );
+}
+
 export default function QuizSituations() {
     const { userData } = useAuth();
     const role = userData?.role;
     const {
         items, data, loading, error, hasNext, page, setPage,
         filters, setFilters, search,
-        actionId, handleAction, reject, editor,
+        actionId, handleAction, reject, editor, reload,
     } = useReviewableContentCrud({
         endpoint: '/adminapi/quiz-bank/situations/',
         initialFilters: { tribe: '', status: '' },
@@ -54,6 +74,7 @@ export default function QuizSituations() {
     });
 
     const { target: editTarget, form, setForm } = editor;
+    const [aiOpen, setAiOpen] = useState(false);
 
     const updateOption = (index, field, value) => {
         const options = form.options.map((option, optionIndex) => (
@@ -123,6 +144,9 @@ export default function QuizSituations() {
 
             {CONTENT_EDITORS.includes(role) && (
                 <div className="quiz-bank-heading-actions">
+                    <Button variant="outline-primary" onClick={() => setAiOpen(true)}>
+                        <Sparkles size={18} aria-hidden="true" /> AI 產生草稿
+                    </Button>
                     <Button onClick={editor.openNew}>
                         <Plus size={18} /> 新增情境題
                     </Button>
@@ -141,6 +165,7 @@ export default function QuizSituations() {
                             <tr>
                                 <th>族語</th>
                                 <th>情境描述</th>
+                                <th>來源</th>
                                 <th>狀態</th>
                                 <th>建立者</th>
                                 <th>操作</th>
@@ -152,6 +177,9 @@ export default function QuizSituations() {
                                     <td>{TRIBE_FULL_NAME_BY_SLUG[item.tribe] ?? item.tribe}</td>
                                     <td className="quiz-bank-truncate-cell">
                                         {item.scenario_chinese}
+                                    </td>
+                                    <td className="quiz-bank-source-cell">
+                                        <AiProvenance draft={item.ai_draft} />
                                     </td>
                                     <td>
                                         <QuizStatusBadge item={item} />
@@ -173,7 +201,7 @@ export default function QuizSituations() {
                                 </tr>
                             )) : (
                                 <tr>
-                                    <td colSpan="5" className="quiz-bank-empty">
+                                    <td colSpan="6" className="quiz-bank-empty">
                                         沒有符合條件的情境題
                                     </td>
                                 </tr>
@@ -306,6 +334,12 @@ export default function QuizSituations() {
                     </Modal.Footer>
                 </Form>
             </Modal>
+
+            <AiDraftModal
+                show={aiOpen}
+                onHide={() => setAiOpen(false)}
+                onCreated={reload}
+            />
 
             <RejectReasonModal
                 reject={reject}

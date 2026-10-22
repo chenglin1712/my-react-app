@@ -5,21 +5,13 @@ import { TRIBE_NAME_BY_SLUG as TRIBE_NAME } from "../../src/constants/tribes";
 import { apiPost } from "../../utils/apiClient";
 import { useDialog } from "@hooks/useDialog";
 import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
-import { dictionaryHref } from "../../utils/dictionaryLink";
-
-// 補充說明的四個分欄（路線圖 #11）。後端只會回有內容的欄位，這裡照順序顯示有的那幾個。
-const SECTION_LABELS = [
-    ["grammar", "語法"],
-    ["culture", "文化背景"],
-    ["pitfalls", "常見錯誤"],
-];
+import ReviewSections from "./ReviewSections";
 
 // 一則句子補充說明：原句、參考翻譯、逐詞對照、分欄補充。
 // interactive 只在放大的對話框裡開：縮圖那一則整塊是 role="button"，裡面不能再放按鈕與連結。
 const ReviewNote = ({ msg, tribe, interactive, playAudio, failedAudio, large }) => {
     // 拒答或產生失敗時 translation 是固定說明，不是模型的翻譯，不標「參考翻譯」
     const isNotice = msg.refused || msg.failed;
-    const vocab = msg.sections?.vocab;
     return (
         <div className={`translation-block${large ? " expanded" : ""}`}>
             <p className="original">{msg.original}</p>
@@ -54,43 +46,7 @@ const ReviewNote = ({ msg, tribe, interactive, playAudio, failedAudio, large }) 
                     );
                 })}
             </div>
-            {(vocab?.length > 0 || SECTION_LABELS.some(([key]) => msg.sections?.[key])) && (
-                <dl className="review-sections">
-                    {vocab?.length > 0 && (
-                        <div className="review-section">
-                            <dt>詞彙用法</dt>
-                            <dd>
-                                <ul className="review-vocab">
-                                    {vocab.map((item, i) => (
-                                        <li key={i}>
-                                            {interactive ? (
-                                                <a
-                                                    className="review-vocab-word"
-                                                    href={dictionaryHref(item.word, tribe)}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    aria-label={`在辭典查看「${item.word}」（另開新分頁）`}
-                                                >
-                                                    {item.word}
-                                                </a>
-                                            ) : (
-                                                <strong className="review-vocab-word">{item.word}</strong>
-                                            )}
-                                            <span>{item.note}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </dd>
-                        </div>
-                    )}
-                    {SECTION_LABELS.map(([key, label]) => msg.sections?.[key] && (
-                        <div className="review-section" key={key}>
-                            <dt>{label}</dt>
-                            <dd>{msg.sections[key]}</dd>
-                        </div>
-                    ))}
-                </dl>
-            )}
+            <ReviewSections sections={msg.sections} tribe={tribe} interactive={interactive} />
             {msg.image && (
                 <img
                     decoding="async"

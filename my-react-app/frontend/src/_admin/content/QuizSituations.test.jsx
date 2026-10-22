@@ -12,6 +12,7 @@ vi.mock('../../../utils/apiClient', () => ({
 }));
 
 let mockRole = 'owner';
+vi.mock('../dictionary/WordPicker', () => ({ default: () => null }));
 vi.mock('../../userServives/authContext', () => ({
   useAuth: () => ({ userData: { role: mockRole }, loading: false }),
 }));
@@ -99,6 +100,36 @@ describe('QuizSituations', () => {
     await waitFor(() => {
       expect(apiPatch).toHaveBeenCalledWith('/adminapi/quiz-bank/situations/5/', expect.objectContaining({ answer: 3 }));
     });
+  });
+
+  test('AI 產生的題目標出來源詞條與辭典查無的詞；人工建立的標示為人工建立', async () => {
+    apiGet.mockResolvedValue({
+      results: [
+        { ...situationItem, ai_draft: { source_words: ['lokah'], model: 'claude-x', generated_by: 'editor-uid', unverified_words: ['su'] } },
+        { ...situationItem, id: 6, scenario_chinese: '人工題', ai_draft: null },
+      ],
+      count: 2, page: 1, page_size: 20,
+    });
+    render(<QuizSituations />);
+    const row = await screen.findByText(/長輩遞給你食物/).then((el) => el.closest('tr'));
+    expect(within(row).getByText('AI 產生')).toBeInTheDocument();
+    expect(within(row).getByText(/來源詞條：lokah/)).toBeInTheDocument();
+    expect(within(row).getByText('辭典查無：su')).toBeInTheDocument();
+    const manual = screen.getByText('人工題').closest('tr');
+    expect(within(manual).getByText('人工建立')).toBeInTheDocument();
+  });
+
+  test('編輯者看得到「AI 產生草稿」入口；審核者與分析者沒有', async () => {
+    mockRole = 'editor';
+    const { unmount } = render(<QuizSituations />);
+    await screen.findByText(/長輩遞給你食物/);
+    expect(screen.getByRole('button', { name: /AI 產生草稿/ })).toBeInTheDocument();
+    unmount();
+
+    mockRole = 'reviewer';
+    render(<QuizSituations />);
+    await screen.findByText(/長輩遞給你食物/);
+    expect(screen.queryByRole('button', { name: /AI 產生草稿/ })).not.toBeInTheDocument();
   });
 
   test('刪除前跳原生確認框', async () => {

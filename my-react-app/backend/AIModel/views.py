@@ -15,10 +15,13 @@ from config.tribes import TRIBE_IDS, TRIBE_MAP
 from core.firebase_auth import verify_firebase_token
 from config.llm import get_llm_client, classify_llm_error, llm_deadline
 from adminapi.rate_limits import get_configured_rate
-from .serializers import TayalChatSerializer, ReviewTayalChatSerializer
+from .serializers import TayalChatSerializer, ReviewTayalChatSerializer, ReviewQuestionSerializer
+from . import memory_store
 from . import quota as daily_quota
 from .learner_profile import load_profile
 from .services import run_tayal_chat, run_review_tayal_chat, stream_tayal_chat
+from .question_context import QuestionNotFound, load_question_context, record_asked_question
+from .question_review import run_question_review
 from .tools import SqlDictionaryLookup
 
 logger = logging.getLogger(__name__)
@@ -144,6 +147,7 @@ def _chat_kwargs(chat):
     return dict(
         profile=load_profile(chat.uid), uid=chat.uid, history=chat.history,
         lookup=SqlDictionaryLookup(TRIBE_IDS.get(chat.tribe, TRIBE_IDS["tayal"])),
+        memory=memory_store.active_for(chat.uid),     # 功能開著且本人同意才接上學習記憶（#21）
     )
 
 
@@ -296,6 +300,76 @@ def review_tayal_chat(request):
     else:
         return JsonResponse({"detail": "只接受 POST 請求"}, status=405)
 
+QUESTION_REVIEW_FLAG = "ai_question_review_enabled"
+
+
+def question_review_enabled() -> bool:
+    """單題錯題講解的功能旗標（路線圖 #22）。【預設關閉、查不到旗標也視為關閉】：要在後台「功能開關」頁
+    手動打開，等真金鑰驗收完才開放給學生。"""
+    from adminapi.models import FeatureFlag
+
+    flag = FeatureFlag.objects.filter(key=QUESTION_REVIEW_FLAG).first()
+    return bool(flag is not None and flag.enabled)
+
+
+@csrf_exempt
+def review_question(request):
+    """針對測驗裡「這一題」的講解（路線圖 #22）。請求只帶 attempt_id 與 index，
+    題目內容與學生的答案由伺服器從 Firestore 讀；不是本人的紀錄、不存在的題目一律回 404。"""
+    if request.method != "POST":
+        return JsonResponse({"detail": "只接受 POST 請求"}, status=405)
+    decoded, err_resp = verify_firebase_token(request)
+    if err_resp:
+        return err_resp
+    disabled_resp = _assistant_disabled_response()
+    if disabled_resp:
+        return disabled_resp
+    if not question_review_enabled():
+        return JsonResponse({"detail": "題目講解尚未開放。", "code": "ai_question_review_disabled"}, status=403)
+    limited_resp = _rate_limited_response(request, decoded, group="review_question")
+    if limited_resp:
+        return limited_resp
+
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"detail": "請求格式錯誤"}, status=400)
+    serializer = ReviewQuestionSerializer(data=body)
+    if not serializer.is_valid():
+        return JsonResponse({"detail": "請求參數錯誤", "errors": serializer.errors}, status=400)
+    attempt_id, index = serializer.validated_data["attempt_id"], serializer.validated_data["index"]
+    uid = decoded.get("uid", "")
+
+    try:
+        context = load_question_context(uid, attempt_id, index)
+    except QuestionNotFound as e:
+        return JsonResponse({"detail": str(e)}, status=404)
+    except Exception:
+        logger.error("[review_question] 讀取作答紀錄失敗\n%s", traceback.format_exc())
+        return JsonResponse({"detail": "暫時無法讀取作答紀錄，請稍後再試。"}, status=503)
+
+    try:
+        client = _get_client()
+    except EnvironmentError as e:
+        return JsonResponse({"detail": str(e)}, status=503)
+
+    quota = daily_quota.consume(uid)      # 找不到題目的請求不佔額度，所以放在讀完脈絡之後
+    if not quota.allowed:
+        return _quota_exceeded_response(quota)
+    try:
+        tribe = context["tribe"] if context["tribe"] in TRIBE_IDS else "tayal"
+        result = run_question_review(
+            client, TRIBE_MAP.get(tribe, "泰雅語"), context, SqlDictionaryLookup(TRIBE_IDS[tribe]), uid=uid)
+        record_asked_question(uid, attempt_id, index)
+        result["quota"] = quota.as_dict()
+        return JsonResponse(result)
+    except Exception:
+        daily_quota.refund(uid, quota.day)
+        logger.error("[review_question] 處理失敗\n%s", traceback.format_exc())
+        status, detail = classify_llm_error(sys.exc_info()[1])
+        return JsonResponse({"detail": detail}, status=status)
+
+
 @csrf_exempt
 def ai_quota(request):
     """今天還剩幾次提問（前端打開助手時顯示「今天還可以問 N 次」）。只讀取，不扣次數、不呼叫模型。"""
@@ -304,7 +378,10 @@ def ai_quota(request):
     decoded, err_resp = verify_firebase_token(request)
     if err_resp:
         return err_resp
-    return JsonResponse(daily_quota.peek(decoded.get("uid", "")).as_dict())
+    data = daily_quota.peek(decoded.get("uid", "")).as_dict()
+    # 前端用它決定要不要顯示「AI 助手」分頁（旗標預設關閉）；要和 review_question 一樣同時看助手總開關；只是顯示用，真正的檢查在 review_question 本身
+    data["features"] = {"questionReview": question_review_enabled() and _assistant_disabled_response() is None}
+    return JsonResponse(data)
 
 
 def _words_to_dicts(db, words) -> list:

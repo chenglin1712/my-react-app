@@ -43,3 +43,30 @@
   .quiz-bank-page-heading, .quiz-bank-pagination { align-items: stretch; flex-direction: column; }
   .quiz-bank-filter-panel, .quiz-bank-form-grid, .quiz-bank-blank-options-grid { grid-template-columns: 1fr; }
 }
+
+/* AI 產生情境題草稿（路線圖 #23）：沿用後台既有的 token，不另立色彩 */
+.quiz-bank-heading-actions { gap: 8px; }
+.quiz-bank-ai-note { color: var(--admin-muted); font-size: 14px; margin-bottom: 16px; }
+.quiz-bank-ai-words { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 10px 0 0; }
+.quiz-bank-ai-words li { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 10px; background: var(--admin-surface-muted); border: 1px solid var(--admin-border); border-radius: 999px; font-size: 14px; }
+.quiz-bank-ai-remove { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 0; border-radius: 50%; background: transparent; color: var(--admin-muted); transition: background-color 120ms ease-out, transform 120ms ease-out; }
+@media (hover: hover) and (pointer: fine) {
+    .quiz-bank-ai-remove:hover { background: var(--admin-border); }
+}
+.quiz-bank-ai-remove:active { transform: scale(0.94); }
+.quiz-bank-ai-result { margin-top: 4px; font-size: 14px; }
+.quiz-bank-ai-result:empty { display: none; }
+.quiz-bank-ai-result ul { padding-left: 18px; margin: 6px 0; }
+.quiz-bank-ai-submit[aria-disabled="true"] { opacity: 0.65; cursor: not-allowed; }
+.quiz-bank-ai-submit:active { transform: scale(0.97); }
+.quiz-bank-ai-submit { transition: transform 120ms ease-out; }
+.quiz-bank-ai-provenance { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--admin-muted); white-space: normal; }
+.quiz-bank-ai-result:not(:empty) { animation: quiz-bank-ai-in 160ms ease-out; }
+@keyframes quiz-bank-ai-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+    .quiz-bank-ai-result:not(:empty) { animation: none; }
+    .quiz-bank-ai-remove, .quiz-bank-ai-submit { transition: none; }
+    .quiz-bank-ai-remove:active, .quiz-bank-ai-submit:active { transform: none; }
+}
+.quiz-bank-source-cell { min-width: 200px; max-width: 280px; }
+.quiz-bank-ai-manual { font-size: 12px; color: var(--admin-muted); }

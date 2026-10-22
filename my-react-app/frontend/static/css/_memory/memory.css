@@ -1,0 +1,224 @@
+/* 我的學習記憶（路線圖 #21）：沉穩文藝風。不用卡片外框，段落以細線分隔；顏色只用 --yy-calm-* 語意色。 */
+.memory-page {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 32px 16px 64px;
+    color: var(--yy-calm-text);
+}
+
+.memory-page h1 {
+    margin: 0 0 12px;
+    font-size: 28px;
+}
+
+.memory-page h2 {
+    margin: 0 0 12px;
+    font-size: 20px;
+}
+
+.memory-lead {
+    max-width: 60ch;
+    margin: 0 0 24px;
+    line-height: 1.7;
+    color: var(--yy-calm-text-sub);
+}
+
+.memory-section {
+    padding: 24px 0;
+    border-top: 1px solid var(--yy-calm-rule);
+}
+
+.memory-muted {
+    margin: 0;
+    font-size: var(--yy-text-sm);
+    line-height: 1.6;
+    color: var(--yy-calm-text-sub);
+}
+
+.memory-details {
+    margin: 0 0 16px;
+    line-height: 1.7;
+}
+
+.memory-details summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    color: var(--yy-calm-accent);
+    font-weight: 700;
+}
+
+.memory-details p {
+    max-width: 60ch;
+    margin: 0 0 8px;
+}
+
+.memory-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+}
+
+.memory-state {
+    margin: 0 8px 0 0;
+    font-weight: 700;
+}
+
+.memory-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-height: 44px;
+    width: 100%;
+    line-height: 1.5;
+    cursor: pointer;
+}
+
+.memory-check input {
+    width: 22px;
+    height: 22px;
+    margin-top: 1px;
+    flex-shrink: 0;
+    accent-color: var(--yy-calm-accent);
+}
+
+.memory-check input:focus-visible {
+    outline: 2px solid var(--yy-calm-focus);
+    outline-offset: 2px;
+}
+
+.memory-confirm {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.memory-btn {
+    min-height: 44px;
+    padding: 0 16px;
+    border: 1.5px solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-text);
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 150ms cubic-bezier(0.23, 1, 0.32, 1), filter 150ms ease;
+}
+
+.memory-btn:active {
+    transform: scale(0.97);
+}
+
+.memory-btn:focus-visible {
+    outline: 2px solid var(--yy-calm-focus);
+    outline-offset: 2px;
+}
+
+.memory-btn-primary {
+    border-color: var(--yy-calm-accent);
+    background: var(--yy-calm-accent);
+    color: var(--yy-calm-accent-on);
+}
+
+.memory-btn-danger {
+    border-color: var(--yy-calm-danger);
+    background: var(--yy-calm-danger);
+    color: var(--yy-calm-accent-on);
+}
+
+/* 不用 disabled：焦點不會掉走；視覺上要看得出現在不能按 */
+.memory-btn[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.memory-notes {
+    margin: 0 0 16px;
+    padding: 0;
+    list-style: none;
+}
+
+.memory-note {
+    padding: 16px 0;
+    border-top: 1px solid var(--yy-calm-rule);
+}
+
+.memory-note:first-child {
+    border-top: 0;
+    padding-top: 0;
+}
+
+.memory-note-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 12px;
+    margin-bottom: 6px;
+}
+
+.memory-note-head h3 {
+    margin: 0;
+    font-size: 16px;
+    overflow-wrap: anywhere;
+}
+
+.memory-note-date {
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
+}
+
+.memory-note-body {
+    margin: 0 0 12px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.7;
+}
+
+.memory-textarea {
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border: 1.5px solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-text);
+    font: inherit;
+    line-height: 1.6;
+    resize: vertical;
+}
+
+.memory-textarea:focus-visible {
+    outline: 2px solid var(--yy-calm-focus);
+    outline-offset: 2px;
+}
+
+.memory-textarea[aria-invalid="true"] {
+    border-color: var(--yy-calm-danger);
+}
+
+.memory-error {
+    min-height: 1.5em;
+    margin: 0 0 8px;
+    color: var(--yy-calm-danger);
+    font-size: 15px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .memory-btn {
+        transition: none;
+    }
+
+    .memory-btn:active {
+        transform: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .memory-page {
+        padding-top: 20px;
+    }
+}
