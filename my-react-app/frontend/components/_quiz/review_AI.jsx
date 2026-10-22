@@ -1,5 +1,5 @@
 import "../../static/css/_quiz/review_AI.css"
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Send, Bot, X, Play } from "lucide-react";
 import { TRIBE_NAME_BY_SLUG as TRIBE_NAME } from "../../src/constants/tribes";
 import { apiPost } from "../../utils/apiClient";
@@ -7,6 +7,9 @@ import { useDialog } from "@hooks/useDialog";
 import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
 import ReviewSections from "./ReviewSections";
 import { describeChatError } from "./botErrors";
+import useChatRequest from "./chat/useChatRequest";
+import ChatComposer from "./chat/ChatComposer";
+import { ChatLog, TypingBubble } from "./chat/ChatLog";
 
 // 一則句子補充說明：原句、參考翻譯、逐詞對照、分欄補充。
 // interactive 只在放大的對話框裡開：縮圖那一則整塊是 role="button"，裡面不能再放按鈕與連結。
@@ -76,16 +79,13 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
         }
     ]);
     const [input, setInput] = useState("");
-    const [isType, setIsType] = useState(false);
     const [expanded, setExpanded] = useState(null);
     const expandedRef = useRef(null);
-    const sendingRef = useRef(false);
     const lastTextRef = useRef("");
-    const abortRef = useRef(null);
     const { playAudio, failedAudio } = useAuthorizedAudioPlayback();
-
-    // 離開頁面時，還在等的請求就不用等了：中止它，回應回來時也不會對已卸載的元件寫 state
-    useEffect(() => () => abortRef.current?.abort(), []);
+    // 送出中的狀態機（防重複送出、卸載時中止請求）與懸浮聊天視窗共用
+    const request = useChatRequest();
+    const isType = request.isPending;
 
     // 放大訊息視窗：原本連 role 都沒有（審查項 P1-5）
     useDialog(expandedRef, { active: expanded !== null, onClose: () => setExpanded(null) });
@@ -93,8 +93,9 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
     // retry：重送上一句。失敗的錯誤訊息會被拿掉，使用者的問題不重複顯示，輸入框裡正在打的新內容也不動（路線圖 #31）。
     const submit = async (text, { retry = false } = {}) => {
         // 等待回覆中不重複送出；按鈕與輸入框不用 disabled，避免焦點掉回 body（審查項 P1-6）
-        if (!text.trim() || isType || sendingRef.current) return;
-        sendingRef.current = true;
+        if (!text.trim() || isType) return;
+        const controller = request.begin();
+        if (!controller) return;
         lastTextRef.current = text;
 
         if (retry) {
@@ -110,10 +111,7 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
             setMessages((prev) => [...prev, userMsg]);
             setInput("");
         }
-        setIsType(true);
 
-        const controller = new AbortController();
-        abortRef.current = controller;
         try {
             const data = await apiPost(import.meta.env.VITE_API_REVIEW_BOT_URL, { message: text, tribe }, { signal: controller.signal });
             if (controller.signal.aborted) return;
@@ -152,8 +150,7 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
             };
             setMessages((prev) => [...prev, errorMsg]);
         } finally {
-            sendingRef.current = false;
-            if (!controller.signal.aborted) setIsType(false);
+            request.finish();
         }
     };
 
@@ -209,40 +206,28 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
                 <h4><Bot size={20} />{tribeName}AI助手</h4>
             </div>
 
-            <div className="assistant-messages" role="log" aria-live="polite" aria-relevant="additions" aria-label="對話紀錄">
+            <ChatLog className="assistant-messages">
                 {messages.map(renderMessage)}
                 {isType && (
-                    <div className="message bot">
-                        <div className="avatar-small">
-                            <Bot />
-                        </div>
-                        <div className="review-message-bubble typing">
-                            <span className="visually-hidden">助手正在輸入</span>
-                            <div className="review-typing-indicator" aria-hidden="true">
-                                <span></span>
-                                <span></span>
-                                <span></span>
-                            </div>
-                        </div>
-                    </div>
+                    <TypingBubble
+                        rowClassName="message bot"
+                        bubbleClassName="review-message-bubble typing"
+                        indicatorClassName="review-typing-indicator"
+                    />
                 )}
-            </div>
+            </ChatLog>
 
-            <div className="assistant-input">
-                <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => {
-                        // 組字中（注音、拼音）的 Enter 是選字，不是送出
-                        if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) handleSend();
-                    }}
-                    placeholder="輸入你的問題..."
-                    aria-label="輸入問題"
-                    aria-busy={isType}
-                />
+            <ChatComposer
+                className="assistant-input"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onSubmit={handleSend}
+                placeholder="輸入你的問題..."
+                label="輸入問題"
+                busy={isType}
+            >
                 <button type="button" onClick={handleSend} aria-label="傳送訊息" aria-disabled={!input.trim() || isType}><Send size={18} /></button>
-            </div>
+            </ChatComposer>
 
             {/* 放大訊息 Modal */}
             {expanded && (

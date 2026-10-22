@@ -23,6 +23,9 @@ import { describeChatError } from "./botErrors";
 import { clearConversation, hasConversation, loadConversation, saveConversation, watchUid } from "./botStorage";
 import { useDialog } from "@hooks/useDialog";
 import { announce } from "@utils/announce";
+import useChatRequest from "./chat/useChatRequest";
+import ChatComposer from "./chat/ChatComposer";
+import { ChatLog, TypingBubble } from "./chat/ChatLog";
 
 // 預設的起始建議；後端 /AIModel/quota/ 會依學習資料回傳個人化的三句（#13），讀不到就用這三句
 const SUGGESTIONS = [
@@ -108,7 +111,9 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
         { id: 1, text: greetingText("tayal"), role: "bot", greetingFor: "tayal" }
     ]);
     const [input, setInput] = useState("");
-    const [isPending, setIsPending] = useState(false);
+    // 送出中的狀態機（防重複送出、卸載時中止請求）與錯題補充說明共用（路線圖 #36）
+    const request = useChatRequest();
+    const { isPending, mountedRef } = request;
     // 對話保存（路線圖 #32）：只存在這台裝置的瀏覽器；uid 取得前（或沒登入）不保存也不還原
     const uidRef = useRef(null);
     const [storageReady, setStorageReady] = useState(false);
@@ -122,9 +127,6 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     const messagesBoxRef = useRef(null);
     const dialogRef = useRef(null);
     const inputRef = useRef(null);
-    const mountedRef = useRef(true);
-    const abortControllerRef = useRef(null);
-    const sendingRef = useRef(false);
     const quotaLoadedRef = useRef(false);
     // 今天剩餘的提問次數；null＝還不知道（尚未載入、載入失敗，或伺服器沒有可信的計數），這時不顯示也不擋送出
     const [quota, setQuota] = useState(null);
@@ -174,7 +176,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                 quotaLoadedRef.current = false; // 下次展開再試
             }
         })();
-    }, [open]);
+    }, [open, mountedRef]);
 
     // 開啟時還原這台裝置上最近一次的對話（7 天內）。使用者若已經開始送出訊息，就不覆蓋。
     useEffect(() => {
@@ -218,13 +220,9 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     }, [messages, tribe, isPending, storageReady]);
 
     useEffect(() => {
-        mountedRef.current = true;
         const previewUrls = previewUrlsRef.current;     // 同一個 Set 一直沿用，不會被換掉
         return () => {
-            mountedRef.current = false;
-            // 對話框關掉/元件卸載時，還在進行中的請求就不用等了——中止它，
-            // 避免回應回來時對著已經卸載的元件呼叫 setMessages/setIsPending。
-            abortControllerRef.current?.abort();
+            // 對話框關掉/元件卸載時，還在進行中的請求由 useChatRequest 中止；這裡只收拾自己的資源
             // 還排著的畫面更新也取消，不要對已卸載的元件寫 state
             if (frameRef.current) (window.cancelAnimationFrame ?? clearTimeout)(frameRef.current);
             // 圖片只存在這個視窗的記憶體裡：關掉視窗時釋放所有預覽網址
@@ -314,11 +312,9 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     // 換帳號／登出：作廢還在進行的請求（中止、取消排著的畫面更新、解除等待狀態）
     const discardInFlight = () => {
         accountEpochRef.current += 1;
-        abortControllerRef.current?.abort();
         cancelPendingFlush();
         streamTextRef.current = "";
-        sendingRef.current = false;
-        setIsPending(false);
+        request.discard();
     };
     /* eslint-enable react-hooks/immutability */
     useEffect(() => { discardRef.current = discardInFlight; });
@@ -393,9 +389,10 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     const send = async (text, { retry = false, regenerate = false } = {}) => {
         const resend = retry || regenerate;
         const sendingImage = resend ? lastAttachmentRef.current : attachment;
-        // isPending 是 state，同一個事件迴圈內連按兩次還看不到更新，用 ref 同步擋住重複送出
-        if ((text.trim() === "" && !sendingImage) || isPending || sendingRef.current || attachBusy || quotaUsedUp) return;
-        sendingRef.current = true;
+        if ((text.trim() === "" && !sendingImage) || isPending || attachBusy || quotaUsedUp) return;
+        // 同一個事件迴圈內連按兩次時 isPending 還看不到更新：begin() 用 ref 同步擋住重複送出
+        const controller = request.begin();
+        if (!controller) return;
         touchedRef.current = true;
 
         // 送出鈕與輸入框都不再用 disabled 擋住等待中的狀態（disabled 會讓焦點掉回 body，
@@ -426,10 +423,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
             setAttachment(null);
             setAttachError("");
         }
-        setIsPending(true);
 
-        const controller = new AbortController();
-        abortControllerRef.current = controller;
         const epoch = accountEpochRef.current;
         const streamUrl = import.meta.env.VITE_API_AI_BOT_STREAM_URL;
         const botId = crypto.randomUUID();
@@ -511,10 +505,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
             setMessages(prev => [...prev, errorResponse]);
             console.error("取得回應失敗:", error);
         } finally {
-            if (epoch === accountEpochRef.current) {
-                sendingRef.current = false;
-                if (mountedRef.current) setIsPending(false);
-            }
+            if (epoch === accountEpochRef.current) request.finish();
         }
     };
 
@@ -557,18 +548,9 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     // 停止串流：中止請求，後端偵測到連線關閉就會中止對模型的串流
     const handleStop = () => {
         stoppedRef.current = true;
-        abortControllerRef.current?.abort();
+        request.abort();
         // 「停止」鈕馬上會被「發送」鈕取代；焦點先回到輸入框，不然鍵盤使用者的焦點會掉到頁面最上面
         inputRef.current?.focus({ preventScroll: true });
-    };
-
-    const handleKeyDown = (e) => {
-        // 中文/日文注音等輸入法用 Enter 確認候選字時也會觸發 keydown 的
-        // Enter，這裡沒有排除的話，選字確認會被誤判成「送出訊息」，把還在
-        // 組字中的內容提前送出去。keyCode 229 是部分瀏覽器（Safari）組字結束後那一下 Enter 的標記。
-        if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) {
-            handleSend();
-        }
     };
 
     // 起始建議（還沒聊幾句）或上一則回覆帶來的後續建議；兩者都沒有就不顯示建議區
@@ -649,7 +631,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                 />
 
                 {/* role="log"：新訊息會被報讀器依序念出，不打斷使用者正在做的事 */}
-                <div ref={messagesBoxRef} className="messages-container" role="log" aria-live="polite" aria-relevant="additions" aria-label="對話紀錄">
+                <ChatLog ref={messagesBoxRef} className="messages-container">
                     {messages.map((message, index) => (
                         <div key={message.id} className={`bot-message ${message.role}`}>
                             {message.role === "bot" && (
@@ -726,22 +708,14 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                         </div>
                     ))}
                     {isPending && !messages.some((m) => m.streaming) && (
-                        <div className="bot-message bot">
-                            <div className="avatar-small">
-                                <Bot />
-                            </div>
-                            <div className="message-bubble typing">
-                                <span className="visually-hidden">助手正在輸入</span>
-                                <div className="typing-indicator" aria-hidden="true">
-                                    <span></span>
-                                    <span></span>
-                                    <span></span>
-                                </div>
-                            </div>
-                        </div>
+                        <TypingBubble
+                            rowClassName="bot-message bot"
+                            bubbleClassName="message-bubble typing"
+                            indicatorClassName="typing-indicator"
+                        />
                     )}
                     <div ref={messageEndRef} />
-                </div>
+                </ChatLog>
 
                 {suggestionList.length > 0 && (
                     <div className="suggestions-container">
@@ -796,8 +770,18 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                         {attachError && <span className="bot-attachment-label" role="alert">{attachError}</span>}
                     </div>
                 )}
-                <div className="input-area">
-                    {imageEnabled && (
+                <ChatComposer
+                    className="input-area"
+                    inputClassName="message-input"
+                    inputRef={inputRef}
+                    value={input}
+                    onChange={handleInputChange}
+                    onSubmit={handleSend}
+                    placeholder={quotaUsedUp ? "今天的提問次數已用完" : attachment ? "想問這張圖的什麼？（可不填）" : "輸入您的訊息..."}
+                    label="輸入訊息"
+                    describedBy={disclaimerId}
+                    busy={isPending}
+                    leading={imageEnabled && (
                         <>
                             <input
                                 ref={fileInputRef}
@@ -820,18 +804,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                             </button>
                         </>
                     )}
-                    <input
-                        ref={inputRef}
-                        type="text"
-                        value={input}
-                        onChange={handleInputChange}
-                        onKeyDown={handleKeyDown}
-                        placeholder={quotaUsedUp ? "今天的提問次數已用完" : attachment ? "想問這張圖的什麼？（可不填）" : "輸入您的訊息..."}
-                        className="message-input"
-                        aria-label="輸入訊息"
-                        aria-describedby={disclaimerId}
-                        aria-busy={isPending}
-                    />
+                >
                     {isPending ? (
                         // 回覆進行中，同一個位置變成「停止」：不必找別的按鈕，也不會誤按到發送
                         <button type="button" className="send-button stop" onClick={handleStop}>
@@ -847,7 +820,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                             發送
                         </button>
                     )}
-                </div>
+                </ChatComposer>
             </div>
         </div >
     );
