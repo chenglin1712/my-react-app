@@ -184,19 +184,26 @@ class ModerationFlowTest(TestCase):
 
 
 class UsageVersionTest(TestCase):
+    def setUp(self):
+        # 不帶標籤的 manage.py test 會順便 import fastAPI/main.py，它在匯入時把全域 recorder 換成 FastAPI 版；
+        # 這裡明確掛回 Django 的寫入端，測的才是 Django process 的行為。
+        from config import llm
+        from adminapi.ai_usage import record_ai_usage
+
+        self.addCleanup(llm.set_usage_recorder, llm._usage_recorder)
+        llm.set_usage_recorder(record_ai_usage)
+
     def test_only_assistant_features_carry_the_version(self):
         from config.llm import call_claude, prompt_version_var
 
-        prompt_version_var.set("abc12345")
-        self.addCleanup(prompt_version_var.set, "")
+        self.addCleanup(prompt_version_var.reset, prompt_version_var.set("abc12345"))
         call_claude(_client(_mock_response("好")), feature="digest", uid="u1", system="s", messages=[{"role": "user", "content": "hi"}])
         self.assertEqual(AiUsageLog.objects.get().prompt_version, "")
 
     def test_usage_rows_carry_the_prompt_version_of_the_request(self):
         from config.llm import call_claude, prompt_version_var
 
-        prompt_version_var.set("abc12345")
-        self.addCleanup(prompt_version_var.set, "")
+        self.addCleanup(prompt_version_var.reset, prompt_version_var.set("abc12345"))
         call_claude(_client(_mock_response("好")), feature="chat", uid="u1", system="s", messages=[{"role": "user", "content": "hi"}])
         self.assertEqual(AiUsageLog.objects.get().prompt_version, "abc12345")
 

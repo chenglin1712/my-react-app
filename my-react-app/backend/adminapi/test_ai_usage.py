@@ -53,6 +53,11 @@ class RecordAiUsageTest(TestCase):
         from unittest.mock import MagicMock
         from config import llm
 
+        # 不帶標籤的 manage.py test 會順便 import fastAPI/main.py，它在匯入時把全域 recorder 換成 FastAPI 版；
+        # 這裡明確掛回 Django 的寫入端，測的才是 Django process 的行為。
+        self.addCleanup(llm.set_usage_recorder, llm._usage_recorder)
+        llm.set_usage_recorder(ai_usage.record_ai_usage)
+
         client = MagicMock()
         client.messages.create.return_value = MagicMock(
             stop_reason="end_turn", _request_id="req_abc", content=[MagicMock(type="text", text="hi")],

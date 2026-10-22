@@ -47,8 +47,37 @@ def test_columns_match_the_django_model():
     assert {c.name for c in ai_usage_events._ai_usage_table.columns} == django_fields
 
 
-def test_main_registers_the_recorder():
-    from config import llm
-    from fastAPI import main  # noqa: F401  匯入即註冊
+def test_importing_main_does_not_replace_a_recorder_registered_by_another_service():
+    """Django 的測試探索會 import fastAPI.main；匯入若蓋掉 Django 的記錄器，Django 的用量測試就寫不進資料庫。
+    在乾淨的子行程裡驗證，才不會被這個行程先前匯入過的狀態影響。"""
+    import subprocess
+    import sys
+    from pathlib import Path
 
-    assert llm._usage_recorder is ai_usage_events.record_ai_usage
+    backend = Path(__file__).resolve().parents[2]
+    code = (
+        "from config import llm\n"
+        "sentinel = lambda entry: None\n"
+        "llm.set_usage_recorder(sentinel)\n"
+        "import fastAPI.main\n"
+        "assert llm._usage_recorder is sentinel, llm._usage_recorder\n"
+    )
+    result = subprocess.run([sys.executable, "-c", code], cwd=backend, capture_output=True, text=True, timeout=120)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_main_registers_the_recorder_when_the_app_starts():
+    from unittest.mock import patch
+    from fastapi.testclient import TestClient
+    from config import llm
+    from fastAPI import main
+
+    previous = llm.get_usage_recorder()
+    sentinel = lambda entry: None  # noqa: E731
+    llm.set_usage_recorder(sentinel)
+    try:
+        with patch.object(main, "_warm_caches"), TestClient(main.app):
+            assert llm.get_usage_recorder() is ai_usage_events.record_ai_usage
+        assert llm.get_usage_recorder() is sentinel  # 關閉時還原成啟動前的值
+    finally:
+        llm.set_usage_recorder(previous)

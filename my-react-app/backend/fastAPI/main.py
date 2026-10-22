@@ -20,7 +20,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from config.llm import set_usage_recorder
+from config.llm import get_usage_recorder, set_usage_recorder
 from config.logging import get_logging_config
 from .ai_usage_events import record_ai_usage
 from config.sentry_init import init_sentry
@@ -46,10 +46,6 @@ def _fastapi_sentry_integrations():
 
 
 init_sentry(_fastapi_sentry_integrations)
-
-# AI 用量紀錄：翻譯功能呼叫 Anthropic 的 token／延遲寫進同一張 AiUsageLog，
-# 後台「AI 用量」頁才看得到翻譯的費用（Django 端的註冊見 adminapi/apps.py）。
-set_usage_recorder(record_ai_usage)
 
 
 # 部署時同時起多個 instance／worker（rolling deploy、或單純多開幾個
@@ -128,6 +124,12 @@ def _warm_caches(app: FastAPI):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # AI 用量紀錄：翻譯功能呼叫 Anthropic 的 token／延遲寫進同一張 AiUsageLog，
+    # 後台「AI 用量」頁才看得到翻譯的費用（Django 端的註冊見 adminapi/apps.py）。
+    # 放在啟動階段而不是模組載入時：config.llm 的記錄器是行程內的全域值，光是 import 這個模組
+    # （例如 Django 的測試探索）就不該蓋掉別的服務註冊的版本。
+    previous_usage_recorder = get_usage_recorder()
+    set_usage_recorder(record_ai_usage)
     app.state.caches_warm = False
     app.state.pronunciation_model_ready = not _PRELOAD_PRONUNCIATION_MODEL
     warm_thread = threading.Thread(target=_warm_caches, args=(app,), daemon=True)
@@ -148,6 +150,7 @@ async def lifespan(app: FastAPI):
             logger.warning("服務關閉時快取預熱執行緒仍未完成，可能被中斷")
         # 詞素學習的背景工作（Firestore／Postgres 寫入）：不等卡住的外部呼叫，免得拖住關閉
         quiz_deadline.shutdown()
+        set_usage_recorder(previous_usage_recorder)
 
 
 app = FastAPI(lifespan=lifespan)

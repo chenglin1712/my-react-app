@@ -211,6 +211,11 @@ def set_usage_recorder(recorder):
     _usage_recorder = recorder
 
 
+def get_usage_recorder():
+    """目前註冊的用量紀錄函式（沒有就是 None），給需要在結束時還原的呼叫端使用。"""
+    return _usage_recorder
+
+
 def _error_status(exc: BaseException) -> str:
     """把失敗原因對應成用量紀錄的 status 字串（只有固定幾種，方便後台分組）。"""
     if isinstance(exc, LLMUnavailableError):
