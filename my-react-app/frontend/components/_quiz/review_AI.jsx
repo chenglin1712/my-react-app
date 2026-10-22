@@ -6,6 +6,7 @@ import { apiPost } from "../../utils/apiClient";
 import { useDialog } from "@hooks/useDialog";
 import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
 import ReviewSections from "./ReviewSections";
+import { describeChatError } from "./botErrors";
 
 // 一則句子補充說明：原句、參考翻譯、逐詞對照、分欄補充。
 // interactive 只在放大的對話框裡開：縮圖那一則整塊是 role="button"，裡面不能再放按鈕與連結。
@@ -78,28 +79,36 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
     const [isType, setIsType] = useState(false);
     const [expanded, setExpanded] = useState(null);
     const expandedRef = useRef(null);
+    const sendingRef = useRef(false);
+    const lastTextRef = useRef("");
     const { playAudio, failedAudio } = useAuthorizedAudioPlayback();
 
     // 放大訊息視窗：原本連 role 都沒有（審查項 P1-5）
     useDialog(expandedRef, { active: expanded !== null, onClose: () => setExpanded(null) });
 
-    const handleSend = async () => {
+    // retry：重送上一句。失敗的錯誤訊息會被拿掉，使用者的問題不重複顯示，輸入框裡正在打的新內容也不動（路線圖 #31）。
+    const submit = async (text, { retry = false } = {}) => {
         // 等待回覆中不重複送出；按鈕與輸入框不用 disabled，避免焦點掉回 body（審查項 P1-6）
-        if (!input.trim() || isType) return;
+        if (!text.trim() || isType || sendingRef.current) return;
+        sendingRef.current = true;
+        lastTextRef.current = text;
 
-        const userMsg = {
-            id: Date.now(),
-            sender: "user",
-            type: "text",
-            text: input,
-        };
-
-        setMessages((prev) => [...prev, userMsg]);
-        setInput("");
+        if (retry) {
+            setMessages((prev) => prev.filter((m) => !m.retryable));
+        } else {
+            const userMsg = {
+                id: Date.now(),
+                sender: "user",
+                type: "text",
+                text,
+            };
+            setMessages((prev) => [...prev, userMsg]);
+            setInput("");
+        }
         setIsType(true);
 
         try {
-            const data = await apiPost(import.meta.env.VITE_API_REVIEW_BOT_URL, { message: input, tribe });
+            const data = await apiPost(import.meta.env.VITE_API_REVIEW_BOT_URL, { message: text, tribe });
 
             // 將資料轉成前端格式
             const aiReply = {
@@ -124,17 +133,23 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
 
         } catch (err) {
             console.error("錯誤:", err);
+            const info = describeChatError(err);
             const errorMsg = {
                 id: Date.now() + 2,
                 sender: "assistant",
                 type: "text",
-                text: "伺服器錯誤，請稍後再試。",
+                text: info.kind === "quota" ? "今天的提問次數已用完。" : info.text,
+                retryable: info.retryable,
             };
             setMessages((prev) => [...prev, errorMsg]);
         } finally {
+            sendingRef.current = false;
             setIsType(false);
         }
     };
+
+    const handleSend = () => submit(input);
+    const handleRetry = () => submit(lastTextRef.current, { retry: true });
 
     const renderMessage = (msg) => {
         const isUser = msg.sender === "user";
@@ -162,6 +177,17 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
                         <ReviewNote msg={msg} tribe={tribe} />
                     ) : (
                         <p>{msg.text}</p>
+                    )}
+                    {msg.retryable && msg.id === messages[messages.length - 1]?.id && !isType && (
+                        <button
+                            type="button"
+                            className="review-retry"
+                            // 訊息整塊可點開放大；重試鈕自己的點擊與按鍵不能冒泡成「放大」
+                            onClick={(e) => { e.stopPropagation(); handleRetry(); }}
+                            onKeyDown={(e) => e.stopPropagation()}
+                        >
+                            重試
+                        </button>
                     )}
                 </div>
             </div>

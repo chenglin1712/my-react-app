@@ -944,3 +944,104 @@
         transform: none;
     }
 }
+
+/* 標題列的「新對話」：和左邊的收合鈕同一個外觀，觸控範圍至少 44px */
+.chat-new {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    margin-right: 4px;
+    background: transparent;
+    border: none;
+    border-radius: var(--yy-ui-radius);
+    color: var(--yy-calm-accent-on);
+    cursor: pointer;
+    z-index: var(--yy-z-nav);
+    transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), opacity 160ms ease;
+}
+
+.chat-new:active {
+    transform: scale(0.97);
+}
+
+.chat-new[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.chat-new:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+/* 刪除對話前的確認列：就地出現在標題下方，不用另開對話框 */
+.bot-confirm {
+    padding: 12px 16px;
+    border-bottom: var(--yy-border-width) solid var(--yy-calm-line);
+    background: var(--yy-calm-warning-bg);
+    color: var(--yy-calm-text);
+}
+
+.bot-confirm p {
+    margin: 0 0 8px;
+    font-weight: 600;
+}
+
+.bot-confirm-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.bot-confirm-danger,
+.bot-confirm-cancel {
+    min-height: 44px;
+    padding: 0 16px;
+    border-radius: var(--yy-ui-radius);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.bot-confirm-danger {
+    background: var(--yy-calm-danger);
+    color: var(--yy-calm-accent-on);
+    border: var(--yy-border-width) solid var(--yy-calm-danger);
+}
+
+.bot-confirm-cancel {
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-text);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+}
+
+.bot-confirm-danger:active,
+.bot-confirm-cancel:active {
+    transform: scale(0.97);
+}
+
+.bot-confirm button:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+.bot-feedback-row .bot-feedback-thanks {
+    margin: 0 0 0 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .chat-new,
+    .bot-confirm-danger,
+    .bot-confirm-cancel {
+        transition: none;
+    }
+
+    .chat-new:active,
+    .bot-confirm-danger:active,
+    .bot-confirm-cancel:active {
+        transform: none;
+    }
+}

@@ -1,6 +1,6 @@
 import "../../static/css/_quiz/bot.css"
 import { useId, useState, useRef, useEffect } from "react";
-import { Bot, Camera, ChevronDown, X } from "lucide-react"
+import { Bot, Camera, ChevronDown, SquarePen, X } from "lucide-react"
 import { useNavigate } from "react-router-dom";
 import StudyPlanComponent from "./bot_study_plan"
 import WordEntryCards from "./WordEntryCards"
@@ -12,6 +12,9 @@ import { TRIBES } from "../../src/constants/tribes";
 import { scrollBehavior } from "../../src/hooks/useReducedMotion";
 import { apiGet, apiPost, apiStream } from "../../utils/apiClient";
 import BotFeedback from "./BotFeedback";
+import BotReplyActions from "./BotReplyActions";
+import { describeChatError } from "./botErrors";
+import { clearConversation, hasConversation, loadConversation, resolveUid, saveConversation } from "./botStorage";
 import { useDialog } from "@hooks/useDialog";
 import { announce } from "@utils/announce";
 
@@ -82,6 +85,12 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     ]);
     const [input, setInput] = useState("");
     const [isPending, setIsPending] = useState(false);
+    // 對話保存（路線圖 #32）：只存在這台裝置的瀏覽器；uid 取得前（或沒登入）不保存也不還原
+    const uidRef = useRef(null);
+    const [storageReady, setStorageReady] = useState(false);
+    const [confirmingNew, setConfirmingNew] = useState(false);
+    const cancelNewRef = useRef(null);
+    const touchedRef = useRef(false);        // 使用者已送出訊息或換過族語：還原的舊對話不能再蓋上來
     const messageEndRef = useRef(null);
     const messagesBoxRef = useRef(null);
     const dialogRef = useRef(null);
@@ -125,6 +134,33 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
         })();
     }, [open]);
 
+    // 開啟時還原這台裝置上最近一次的對話（7 天內）。使用者若已經開始送出訊息，就不覆蓋。
+    useEffect(() => {
+        let active = true;
+        (async () => {
+            const uid = await resolveUid();
+            if (!active || !uid) return;
+            uidRef.current = uid;
+            const saved = loadConversation(uid);
+            // 還原期間使用者已經送出訊息（或換了族語）就不覆蓋，族語也不能單獨換掉
+            if (saved && !touchedRef.current) {
+                setMessages(saved.messages);
+                if (TRIBES.some((t) => t.slug === saved.tribe)) setTribe(saved.tribe);
+            }
+            setStorageReady(true);
+        })();
+        return () => { active = false; };
+    }, []);
+
+    // 視窗收合時，沒做完的「新對話」確認不留到下次打開
+    useEffect(() => { if (!open) setConfirmingNew(false); }, [open]);
+
+    // 對話有變動（且不在等待回覆）就存起來；只剩開場白時會刪除保存的內容
+    useEffect(() => {
+        if (!storageReady || isPending || !uidRef.current) return;
+        saveConversation(uidRef.current, { tribe, messages });
+    }, [messages, tribe, isPending, storageReady]);
+
     useEffect(() => {
         mountedRef.current = true;
         const previewUrls = previewUrlsRef.current;     // 同一個 Set 一直沿用，不會被換掉
@@ -143,7 +179,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
 
     // 非 modal 的懸浮視窗：不鎖背景、不困住 Tab，只在焦點位於視窗內時 Esc 才收合，
     // 開啟時焦點直接放在輸入框，收合後焦點回到右下角的啟動鈕。
-    useDialog(dialogRef, { active: open, onClose: handleClose, initialFocusRef: inputRef, modal: false, returnFocusRef });
+    useDialog(dialogRef, { active: open, onClose: () => (confirmingNew ? cancelNewConversation() : handleClose()), initialFocusRef: inputRef, modal: false, returnFocusRef });
 
     // 新訊息或「輸入中」指示器出現/消失時自動捲到底部，messageEndRef 原本宣告了
     // 卻從沒呼叫 scrollIntoView，訊息一多使用者得自己手動往下滑。
@@ -164,6 +200,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     const handleTribeChange = (e) => {
         const nextTribe = e.target.value;
         if (nextTribe === tribe) return;
+        touchedRef.current = true;
         setTribe(nextTribe);
         // 對話還沒開始時只是就地改寫開場白那一則，live region 不一定會念出文字變更，另外公告一次；
         // 已經聊過時會新增一則說明訊息，live region 會自己念，不用重複公告
@@ -285,11 +322,14 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     };
 
     // 傳送訊息。retry：重送上一句（中斷的那則回覆會被拿掉，使用者的問題不重複顯示）。
-    const send = async (text, { retry = false } = {}) => {
-        const sendingImage = retry ? lastAttachmentRef.current : attachment;
+    // regenerate：對最後一個問題重新要一次回覆，舊的回覆會被取代（不是疊在後面），也不會算進這次的對話記憶。
+    const send = async (text, { retry = false, regenerate = false } = {}) => {
+        const resend = retry || regenerate;
+        const sendingImage = resend ? lastAttachmentRef.current : attachment;
         // isPending 是 state，同一個事件迴圈內連按兩次還看不到更新，用 ref 同步擋住重複送出
         if ((text.trim() === "" && !sendingImage) || isPending || sendingRef.current || attachBusy || quotaUsedUp) return;
         sendingRef.current = true;
+        touchedRef.current = true;
 
         // 送出鈕與輸入框都不再用 disabled 擋住等待中的狀態（disabled 會讓焦點掉回 body，
         // 每則訊息都得重新點輸入框），改成 aria-disabled / aria-busy，並把焦點留在輸入框（審查項 P1-6）。
@@ -300,9 +340,16 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
         lastAttachmentRef.current = sendingImage;
         stoppedRef.current = false;
         streamTextRef.current = "";
-        const history = buildHistory(messages.filter((m) => !m.interrupted));
-        if (retry) {
-            setMessages((prev) => prev.filter((m) => !m.interrupted));
+        const lastUserIndex = messages.map((m) => m.role).lastIndexOf("user");
+        // 重新產生時，上一輪（問題與它的回覆）不能當成對話記憶送回去，否則模型會看到自己剛被否決的答案
+        const base = regenerate ? messages.slice(0, lastUserIndex) : messages;
+        const history = buildHistory(base.filter((m) => !m.interrupted));
+        if (regenerate) {
+            setMessages((prev) => prev.slice(0, prev.map((m) => m.role).lastIndexOf("user") + 1));
+        } else if (retry) {
+            setMessages((prev) => prev.filter((m) => !m.interrupted && !m.retryable));
+            // 失敗時圖片被放回輸入區；這次重試直接重送它，輸入區那份就不用留了
+            if (sendingImage) setAttachment((prev) => (prev === sendingImage ? null : prev));
         } else {
             setMessages(prev => [...prev, {
                 id: crypto.randomUUID(), text: userText, role: "user", imageUrl: sendingImage?.previewUrl ?? null,
@@ -364,40 +411,28 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
             // 串流中途斷線或後端回報失敗，而且已經顯示了一部分：保留文字並提供重試
             if (streamTextRef.current !== "") {
                 markInterrupted(botId, "failed");
+                // 串流中途收到的失敗也要照類型處理：額度用完要更新額度，重試不會有用的不再給重試鈕
+                const partial = describeChatError(error);
+                if (partial.kind === "quota") setQuota(readQuota(error.data?.quota) ?? { remaining: 0, resetsAt: null });
+                if (!partial.retryable) setMessages((prev) => prev.map((m) => (m.id === botId ? { ...m, noRetry: true } : m)));
                 console.error("串流回覆中斷:", error);
                 return;
             }
             cancelPendingFlush();
 
-            // 管理者關閉了 AI 助手（總開關）：後端用 code 明確標示，照它給的說明顯示，
-            // 不要讓人以為是自己網路的問題；其他 403（例如代理層擋下）仍走通用訊息
-            const serviceOff = error?.status === 403 && error?.data?.code === "ai_assistant_disabled";
-            // 今天的提問次數用完：後端回 429 並附上最新的額度，照它的重置時間說明
-            const quotaExceeded = error?.status === 429 && error?.data?.code === "ai_daily_quota_exceeded";
-            if (quotaExceeded) setQuota(readQuota(error.data.quota) ?? { remaining: 0, resetsAt: null });
-            // 圖片提問的專屬說明（只在這次有附圖片時）：功能被關閉、圖片不合格、圖片提問太頻繁
-            const imageOff = !!sendingImage && error?.status === 403 && error?.data?.code === "ai_image_input_disabled";
-            const imageRejected = !!sendingImage && error?.status === 400;
-            const imageTooFast = !!sendingImage && error?.status === 429 && !quotaExceeded;
-            if (imageOff) setImageEnabled(false);
+            // 依錯誤類型說明並決定要不要給「重試」（botErrors.js）。額度用完要用後端給的最新額度與重置時間說明。
+            const info = describeChatError(error, { image: !!sendingImage });
+            if (info.kind === "quota") setQuota(readQuota(error.data.quota) ?? { remaining: 0, resetsAt: null });
+            if (info.kind === "image_off") setImageEnabled(false);
             // 沒有成功送達：把圖片放回輸入區，學生補一句話或直接再送一次，不用重拍
             // （功能被關閉時不放回：留著只會讓學生一直重送一張必定被拒絕的圖）
-            if (sendingImage && !retry && !imageOff) setAttachment((prev) => prev ?? sendingImage);
+            if (sendingImage && !resend && info.kind !== "image_off") setAttachment((prev) => prev ?? sendingImage);
             const errorResponse = {
                 id: crypto.randomUUID(),
-                text: serviceOff
-                    ? (error?.data?.detail || "AI 助手目前暫停服務，請稍後再試。")
-                    : quotaExceeded
-                        ? quotaMessage(readQuota(error.data.quota))
-                        : imageOff
-                            ? "圖片提問目前沒有開放，請改用文字提問。"
-                            : imageRejected
-                                ? "這張圖片無法使用，請換一張或重新拍照。"
-                                : imageTooFast
-                                    ? "附圖片提問的次數太頻繁了，請稍候一分鐘再試。"
-                                    : "很抱歉，無法取得回應，請稍後再試。",
+                text: info.kind === "quota" ? quotaMessage(readQuota(error.data.quota)) : info.text,
                 role: "bot",
                 isError: true,
+                retryable: info.retryable,
             };
             setMessages(prev => [...prev, errorResponse]);
             console.error("取得回應失敗:", error);
@@ -409,6 +444,39 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
 
     const handleSend = () => send(input);
     const handleRetry = () => send(lastUserTextRef.current, { retry: true });
+
+    // 重新產生最後一則回覆：問題文字取自畫面上最後一個使用者訊息（重新整理還原後 ref 是空的）
+    const handleRegenerate = () => {
+        const lastUser = [...messages].reverse().find((m) => m.role === "user");
+        if (lastUser) send(lastUser.text, { regenerate: true });
+    };
+
+    // 新對話：刪除這台裝置上保存的對話並回到開場白。沒有聊過就不需要確認；聊過了先確認，因為刪除後無法復原。
+    const handleNewConversation = () => {
+        if (isPending) return;
+        if (!hasConversation(messages)) return;
+        setConfirmingNew(true);
+        announce("開始新對話會刪除目前的對話，無法復原。請確認。");
+        setTimeout(() => cancelNewRef.current?.focus({ preventScroll: true }), 0);
+    };
+
+    const confirmNewConversation = () => {
+        clearConversation(uidRef.current);
+        setConfirmingNew(false);
+        setMessages([{ id: crypto.randomUUID(), text: greetingText(tribe), role: "bot", greetingFor: tribe }]);
+        setInput("");
+        setAttachment(null);
+        setAttachError("");
+        lastUserTextRef.current = "";
+        lastAttachmentRef.current = null;
+        announce("已開始新對話，先前的對話已刪除");
+        inputRef.current?.focus({ preventScroll: true });
+    };
+
+    const cancelNewConversation = () => {
+        setConfirmingNew(false);
+        inputRef.current?.focus({ preventScroll: true });
+    };
 
     // 停止串流：中止請求，後端偵測到連線關閉就會中止對模型的串流
     const handleStop = () => {
@@ -457,6 +525,16 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                         <h2>{TRIBES.find((t) => t.slug === tribe)?.name}智慧助手</h2>
                         <p className="bot-status online">{isPending ? "回覆中…" : "可以提問"}</p>
                     </div>
+                    <button
+                        type="button"
+                        className="chat-new"
+                        onClick={handleNewConversation}
+                        aria-label="新對話"
+                        title="新對話"
+                        aria-disabled={isPending || !hasConversation(messages) || undefined}
+                    >
+                        <SquarePen size={20} aria-hidden="true" />
+                    </button>
                     <select
                         value={tribe}
                         onChange={handleTribeChange}
@@ -469,6 +547,16 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                         ))}
                     </select>
                 </div>
+
+                {confirmingNew && (
+                    <div className="bot-confirm" role="group" aria-label="確認開始新對話">
+                        <p>開始新對話會刪除目前的對話，無法復原。</p>
+                        <div className="bot-confirm-actions">
+                            <button type="button" className="bot-confirm-danger" onClick={confirmNewConversation}>刪除並開始新對話</button>
+                            <button type="button" ref={cancelNewRef} className="bot-confirm-cancel" onClick={cancelNewConversation}>取消</button>
+                        </div>
+                    </div>
+                )}
 
                 {/* role="log"：新訊息會被報讀器依序念出，不打斷使用者正在做的事 */}
                 <div ref={messagesBoxRef} className="messages-container" role="log" aria-live="polite" aria-relevant="additions" aria-label="對話紀錄">
@@ -490,10 +578,15 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                                 {/* 串流中對報讀器隱藏：文字每幾十毫秒長一點，逐段念出來只是噪音；完成後由 announce 念一次完整內容 */}
                                 <p aria-hidden={message.streaming || undefined}>{message.text}</p>
                                 {message.streaming && <span className="visually-hidden">助手正在回覆</span>}
+                                {message.isError && message.retryable && index === messages.length - 1 && !isPending && !quotaUsedUp && (
+                                    <div className="bot-interrupted">
+                                        <button type="button" className="bot-retry" onClick={handleRetry}>重試</button>
+                                    </div>
+                                )}
                                 {message.interrupted && (
                                     <div className="bot-interrupted">
                                         <span>{INTERRUPTED_TEXT[message.interrupted]}</span>
-                                        {index === messages.length - 1 && !isPending && !quotaUsedUp && (
+                                        {index === messages.length - 1 && !isPending && !quotaUsedUp && !message.noRetry && (
                                             <button type="button" className="bot-retry" onClick={handleRetry}>重試</button>
                                         )}
                                     </div>
@@ -512,15 +605,30 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                                 {message.studyPlan && (
                                     <StudyPlanComponent plan={message.studyPlan} onClose={handleClose} />
                                 )}
-                                {feedbackEnabled && message.role === "bot" && message.sig && !message.streaming && !message.interrupted && (
-                                    <BotFeedback
-                                        question={messages.slice(0, index).reverse().find((m) => m.role === "user")?.text || ""}
-                                        reply={message.text}
-                                        sig={message.sig}
-                                        meta={message.meta}
-                                        tribe={message.entriesTribe || tribe}
-                                    />
-                                )}
+                                {message.role === "bot" && message.sig && !message.streaming && !message.interrupted && (() => {
+                                    const precedingUser = messages.slice(0, index).reverse().find((m) => m.role === "user");
+                                    const actions = (
+                                        <BotReplyActions
+                                            text={message.text}
+                                            // 只有最後一則回覆能重新產生，而且那一輪不能是附過圖片的（還原後圖片已不在）
+                                            canRegenerate={index === messages.length - 1 && !!precedingUser && !precedingUser.hadImage}
+                                            onRegenerate={handleRegenerate}
+                                            disabled={isPending || quotaUsedUp}
+                                        />
+                                    );
+                                    return feedbackEnabled ? (
+                                        <BotFeedback
+                                            question={precedingUser?.text || ""}
+                                            reply={message.text}
+                                            sig={message.sig}
+                                            meta={message.meta}
+                                            tribe={message.entriesTribe || tribe}
+                                            leading={actions}
+                                        />
+                                    ) : (
+                                        <div className="bot-feedback"><div className="bot-feedback-row">{actions}</div></div>
+                                    );
+                                })()}
                             </div>
                         </div>
                     ))}
@@ -573,7 +681,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                     </p>
                 )}
                 {/* 常駐的準確度提醒：語言學習工具的 AI 可能寫錯族語詞彙與拼寫 */}
-                <p className="bot-disclaimer" id={disclaimerId}>AI 可能寫錯族語的詞彙或拼寫，學習時請以族語辭典為準。</p>
+                <p className="bot-disclaimer" id={disclaimerId}>AI 可能寫錯族語的詞彙或拼寫，學習時請以族語辭典為準。{storageReady && " 對話只暫存在這台裝置的瀏覽器 7 天，按上方「新對話」可刪除。"}</p>
                 {(attachment || attachBusy || attachError) && (
                     <div className="bot-attachment" data-state={attachError ? "error" : attachBusy ? "busy" : "ready"}>
                         {attachment && (
@@ -631,7 +739,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                         aria-describedby={disclaimerId}
                         aria-busy={isPending}
                     />
-                    {isPending && import.meta.env.VITE_API_AI_BOT_STREAM_URL ? (
+                    {isPending ? (
                         // 回覆進行中，同一個位置變成「停止」：不必找別的按鈕，也不會誤按到發送
                         <button type="button" className="send-button stop" onClick={handleStop}>
                             停止

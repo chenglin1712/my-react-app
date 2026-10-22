@@ -115,7 +115,8 @@ describe('AIAssistantOverlay（回歸測試：注音/拼音輸入法選字時的
     expect(screen.getByLabelText('輸入訊息')).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByLabelText('輸入訊息')).not.toBeDisabled();
     expect(screen.getByLabelText('輸入訊息')).toHaveFocus();
-    expect(screen.getByRole('button', { name: '發送' })).toHaveAttribute('aria-disabled', 'true');
+    // 等待中送出鈕變成「停止」（路線圖 #33），不管有沒有串流
+    expect(screen.getByRole('button', { name: '停止' })).toBeInTheDocument();
     // 等待中再送一次也不會發出第二個請求
     await user.type(screen.getByLabelText('輸入訊息'), '再問一次{Enter}');
     expect(apiPost).toHaveBeenCalledTimes(1);
@@ -131,7 +132,8 @@ describe('AIAssistantOverlay（回歸測試：注音/拼音輸入法選字時的
 
     await user.type(input, '你好{Enter}');
 
-    expect(await screen.findByText('很抱歉，無法取得回應，請稍後再試。')).toBeInTheDocument();
+    expect(await screen.findByText('連不上伺服器，請檢查網路連線後再試。')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '重試' })).toBeInTheDocument();
   });
 
   test('AI 助手被管理者關閉（403）時，顯示後端的說明，不當成網路錯誤', async () => {
@@ -152,7 +154,8 @@ describe('AIAssistantOverlay（回歸測試：注音/拼音輸入法選字時的
 
     await user.type(screen.getByLabelText('輸入訊息'), '你好{Enter}');
 
-    expect(await screen.findByText('很抱歉，無法取得回應，請稍後再試。')).toBeInTheDocument();
+    expect(await screen.findByText('目前無法使用 AI 助手，請稍後再試。')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '重試' })).not.toBeInTheDocument();   // 重試不會有用
   });
 
   test('對話框卸載時會中止還在進行中的請求，恢復回應（真的被中止）時不當成錯誤處理', async () => {
@@ -416,7 +419,7 @@ describe('AIAssistantOverlay 串流回覆（路線圖 #9）', () => {
 
     await user.type(screen.getByLabelText('輸入訊息'), '你好{Enter}');
 
-    expect(await screen.findByText('很抱歉，無法取得回應，請稍後再試。')).toBeInTheDocument();
+    expect(await screen.findByText('AI 服務暫時無法回應，請稍後再試。')).toBeInTheDocument();
     expect(screen.queryByText('回覆中斷了')).not.toBeInTheDocument();
     consoleErrorSpy.mockRestore();
   });

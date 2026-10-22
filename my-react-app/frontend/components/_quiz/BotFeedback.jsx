@@ -14,7 +14,7 @@ const COMMENT_MAX = 300;
 
 // 助手回覆下方的讚／倒讚（路線圖 #30）。讚直接送出；倒讚先選原因（必填）、可補一句話，再送出。
 // 送出的是「這一則問答」，後端用簽章確認回覆真的是助手說的；不含身分，管理者才看得到內容。
-const BotFeedback = ({ question, reply, sig, meta, tribe }) => {
+const BotFeedback = ({ question, reply, sig, meta, tribe, leading = null }) => {
     const groupId = useId();
     const commentId = useId();
     const [status, setStatus] = useState("idle"); // idle | choosing | sending | done | error
@@ -48,7 +48,14 @@ const BotFeedback = ({ question, reply, sig, meta, tribe }) => {
     };
 
     if (status === "done") {
-        return <p className="bot-feedback-thanks" role="status">謝謝你的回饋{rating === "down" ? "，我們會檢視這則回答" : ""}。</p>;
+        return (
+            <div className="bot-feedback">
+                <div className="bot-feedback-row">
+                    {leading}
+                    <p className="bot-feedback-thanks" role="status">謝謝你的回饋{rating === "down" ? "，我們會檢視這則回答" : ""}。</p>
+                </div>
+            </div>
+        );
     }
 
     const choosing = status === "choosing" || (status === "sending" && rating === "down");
@@ -56,7 +63,8 @@ const BotFeedback = ({ question, reply, sig, meta, tribe }) => {
 
     return (
         <div className="bot-feedback" data-open={choosing || undefined}>
-            <div className="bot-feedback-row" role="group" aria-label="這則回答有幫助嗎">
+            <div className="bot-feedback-row">
+                {leading}
                 <button
                     type="button"
                     className="bot-feedback-btn"

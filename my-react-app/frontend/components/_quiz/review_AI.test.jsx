@@ -172,3 +172,33 @@ describe('ReviewAIAssistant 分欄補充說明（路線圖 #11）', () => {
     expect(within(dialog).queryByRole('button', { name: '播放「lokah」的發音' })).not.toBeInTheDocument();
   });
 });
+
+describe('ReviewAIAssistant 依錯誤類型提示（路線圖 #31）', () => {
+  beforeEach(() => { apiPost.mockReset(); });
+
+  test('忙碌（503）顯示後端說明與重試鈕；重試不重複顯示問題，也不打開放大視窗', async () => {
+    apiPost.mockRejectedValueOnce(Object.assign(new Error('x'), { status: 503, data: { detail: 'AI 服務目前忙碌，請稍後再試' } }));
+    apiPost.mockResolvedValueOnce(REPLY);
+    const user = userEvent.setup();
+    render(<ReviewAIAssistant tribe="tayal" />);
+
+    await user.type(screen.getByLabelText('輸入問題'), '你好{Enter}');
+    expect(await screen.findByText('AI 服務目前忙碌，請稍後再試')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '重試' }));
+    expect(await screen.findByText('lokah su')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getAllByText('你好', { selector: 'p' })).toHaveLength(2);        // 使用者的問題一次 + 翻譯一次
+    expect(apiPost).toHaveBeenCalledTimes(2);
+    expect(apiPost.mock.calls[1][1]).toMatchObject({ message: '你好' });
+  });
+
+  test('重試不會有用的錯誤（登入過期）不顯示重試鈕', async () => {
+    apiPost.mockRejectedValue(Object.assign(new Error('x'), { status: 401 }));
+    const user = userEvent.setup();
+    render(<ReviewAIAssistant tribe="tayal" />);
+    await user.type(screen.getByLabelText('輸入問題'), '你好{Enter}');
+    expect(await screen.findByText('登入已過期，請重新登入後再試。')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '重試' })).not.toBeInTheDocument();
+  });
+});
