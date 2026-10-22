@@ -1,12 +1,13 @@
 import "../../static/css/_quiz/bot.css"
 import { useId, useState, useRef, useEffect } from "react";
-import { Bot, ChevronDown } from "lucide-react"
+import { Bot, Camera, ChevronDown, X } from "lucide-react"
 import { useNavigate } from "react-router-dom";
 import StudyPlanComponent from "./bot_study_plan"
 import WordEntryCards from "./WordEntryCards"
 import UnverifiedWordsNote from "./UnverifiedWordsNote"
 import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
 import { buildHistory } from "./botHistory"
+import { prepareChatImage, ChatImageError, DEFAULT_IMAGE_PROMPT, IMAGE_ERROR_TEXT } from "./chatImage"
 import { TRIBES } from "../../src/constants/tribes";
 import { scrollBehavior } from "../../src/hooks/useReducedMotion";
 import { apiGet, apiPost, apiStream } from "../../utils/apiClient";
@@ -92,6 +93,17 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     const [quota, setQuota] = useState(null);
     const quotaUsedUp = quota !== null && quota.remaining === 0;
 
+    // 圖片提問（路線圖 #24）：後端功能旗標開著才顯示拍照鈕；讀不到就當作沒開
+    const [imageEnabled, setImageEnabled] = useState(false);
+    // 準備送出的圖片 { media_type, data, previewUrl }；只在記憶體裡，送出後由訊息泡泡的縮圖接手預覽網址
+    const [attachment, setAttachment] = useState(null);
+    const [attachBusy, setAttachBusy] = useState(false);
+    const [attachError, setAttachError] = useState("");
+    const fileInputRef = useRef(null);
+    const attachButtonRef = useRef(null);
+    const previewUrlsRef = useRef(new Set());
+    const lastAttachmentRef = useRef(null);
+
     // 第一次展開時讀一次剩餘次數（只讀不扣）。失敗就不顯示，剩餘次數是輔助資訊，不能影響提問。
     useEffect(() => {
         if (!open || quotaLoadedRef.current) return;
@@ -99,7 +111,10 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
         (async () => {
             try {
                 const data = await apiGet("/AIModel/quota/");
-                if (mountedRef.current) setQuota(readQuota(data));
+                if (mountedRef.current) {
+                    setQuota(readQuota(data));
+                    setImageEnabled(data?.features?.imageInput === true);
+                }
             } catch {
                 quotaLoadedRef.current = false; // 下次展開再試
             }
@@ -108,6 +123,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
 
     useEffect(() => {
         mountedRef.current = true;
+        const previewUrls = previewUrlsRef.current;     // 同一個 Set 一直沿用，不會被換掉
         return () => {
             mountedRef.current = false;
             // 對話框關掉/元件卸載時，還在進行中的請求就不用等了——中止它，
@@ -115,6 +131,9 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
             abortControllerRef.current?.abort();
             // 還排著的畫面更新也取消，不要對已卸載的元件寫 state
             if (frameRef.current) (window.cancelAnimationFrame ?? clearTimeout)(frameRef.current);
+            // 圖片只存在這個視窗的記憶體裡：關掉視窗時釋放所有預覽網址
+            previewUrls.forEach((url) => URL.revokeObjectURL(url));
+            previewUrls.clear();
         };
     }, []);
 
@@ -215,25 +234,78 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
         if (text !== "" && reason !== "stopped") announce("回覆中斷，可以按重試再問一次", { assertive: true });
     };
 
+    // 預覽網址若還被某則訊息的縮圖用著就不釋放（否則那張縮圖會破掉）；視窗關閉時才統一釋放
+    const releasePreview = (url) => {
+        if (!url || messages.some((m) => m.imageUrl === url)) return;
+        URL.revokeObjectURL(url);
+        previewUrlsRef.current.delete(url);
+    };
+
+    const handleAttachClick = () => {
+        if (isPending || attachBusy || quotaUsedUp) return;
+        fileInputRef.current?.click();
+    };
+
+    // 選好檔案：在瀏覽器縮圖、轉 JPEG；失敗時說明原因，不送出任何東西
+    const handleFileChosen = async (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = ""; // 同一張圖可以再選一次
+        if (!file) return;
+        setAttachError("");
+        setAttachBusy(true);
+        try {
+            const prepared = await prepareChatImage(file);
+            if (!mountedRef.current) {
+                URL.revokeObjectURL(prepared.previewUrl);
+                return;
+            }
+            previewUrlsRef.current.add(prepared.previewUrl);
+            releasePreview(attachment?.previewUrl);
+            setAttachment(prepared);
+            announce("已附上圖片");
+        } catch (error) {
+            if (mountedRef.current) {
+                setAttachError(error instanceof ChatImageError ? error.message : IMAGE_ERROR_TEXT.decode_failed);
+            }
+        } finally {
+            if (mountedRef.current) setAttachBusy(false);
+        }
+    };
+
+    const handleRemoveAttachment = () => {
+        releasePreview(attachment?.previewUrl);
+        setAttachment(null);
+        setAttachError("");
+        announce("已移除圖片");
+        attachButtonRef.current?.focus({ preventScroll: true }); // 移除鈕會消失，焦點交還給拍照鈕
+    };
+
     // 傳送訊息。retry：重送上一句（中斷的那則回覆會被拿掉，使用者的問題不重複顯示）。
     const send = async (text, { retry = false } = {}) => {
+        const sendingImage = retry ? lastAttachmentRef.current : attachment;
         // isPending 是 state，同一個事件迴圈內連按兩次還看不到更新，用 ref 同步擋住重複送出
-        if (text.trim() === "" || isPending || sendingRef.current || quotaUsedUp) return;
+        if ((text.trim() === "" && !sendingImage) || isPending || sendingRef.current || attachBusy || quotaUsedUp) return;
         sendingRef.current = true;
 
         // 送出鈕與輸入框都不再用 disabled 擋住等待中的狀態（disabled 會讓焦點掉回 body，
         // 每則訊息都得重新點輸入框），改成 aria-disabled / aria-busy，並把焦點留在輸入框（審查項 P1-6）。
         inputRef.current?.focus({ preventScroll: true });
-        const userText = text;
+        // 只附圖片沒打字時，用預設的辨識問題（後端的 message 不能是空的）
+        const userText = text.trim() === "" ? DEFAULT_IMAGE_PROMPT : text;
         lastUserTextRef.current = userText;
+        lastAttachmentRef.current = sendingImage;
         stoppedRef.current = false;
         streamTextRef.current = "";
         const history = buildHistory(messages.filter((m) => !m.interrupted));
         if (retry) {
             setMessages((prev) => prev.filter((m) => !m.interrupted));
         } else {
-            setMessages(prev => [...prev, { id: crypto.randomUUID(), text: userText, role: "user" }]);
+            setMessages(prev => [...prev, {
+                id: crypto.randomUUID(), text: userText, role: "user", imageUrl: sendingImage?.previewUrl ?? null,
+            }]);
             setInput("");
+            setAttachment(null);
+            setAttachError("");
         }
         setIsPending(true);
 
@@ -243,7 +315,10 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
         const botId = crypto.randomUUID();
 
         try {
-            const body = { message: userText, tribe, history };
+            const body = {
+                message: userText, tribe, history,
+                ...(sendingImage && { image: { media_type: sendingImage.media_type, data: sendingImage.data } }),
+            };
             const data = streamUrl
                 ? await apiStream(streamUrl, body, { signal: controller.signal, onDelta: (piece) => pushDelta(botId, piece) })
                 : await apiPost(import.meta.env.VITE_API_AI_BOT_URL, body, { signal: controller.signal });
@@ -295,13 +370,27 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
             // 今天的提問次數用完：後端回 429 並附上最新的額度，照它的重置時間說明
             const quotaExceeded = error?.status === 429 && error?.data?.code === "ai_daily_quota_exceeded";
             if (quotaExceeded) setQuota(readQuota(error.data.quota) ?? { remaining: 0, resetsAt: null });
+            // 圖片提問的專屬說明（只在這次有附圖片時）：功能被關閉、圖片不合格、圖片提問太頻繁
+            const imageOff = !!sendingImage && error?.status === 403 && error?.data?.code === "ai_image_input_disabled";
+            const imageRejected = !!sendingImage && error?.status === 400;
+            const imageTooFast = !!sendingImage && error?.status === 429 && !quotaExceeded;
+            if (imageOff) setImageEnabled(false);
+            // 沒有成功送達：把圖片放回輸入區，學生補一句話或直接再送一次，不用重拍
+            // （功能被關閉時不放回：留著只會讓學生一直重送一張必定被拒絕的圖）
+            if (sendingImage && !retry && !imageOff) setAttachment((prev) => prev ?? sendingImage);
             const errorResponse = {
                 id: crypto.randomUUID(),
                 text: serviceOff
                     ? (error?.data?.detail || "AI 助手目前暫停服務，請稍後再試。")
                     : quotaExceeded
                         ? quotaMessage(readQuota(error.data.quota))
-                        : "很抱歉，無法取得回應，請稍後再試。",
+                        : imageOff
+                            ? "圖片提問目前沒有開放，請改用文字提問。"
+                            : imageRejected
+                                ? "這張圖片無法使用，請換一張或重新拍照。"
+                                : imageTooFast
+                                    ? "附圖片提問的次數太頻繁了，請稍候一分鐘再試。"
+                                    : "很抱歉，無法取得回應，請稍後再試。",
                 role: "bot",
                 isError: true,
             };
@@ -390,6 +479,9 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                                 data-kind={message.isRefusal ? "refusal" : message.interrupted ? "interrupted" : undefined}
                                 aria-busy={message.streaming || undefined}
                             >
+                                {message.imageUrl && (
+                                    <img className="bot-message-image" src={message.imageUrl} alt="你附上的圖片" />
+                                )}
                                 {/* 串流中對報讀器隱藏：文字每幾十毫秒長一點，逐段念出來只是噪音；完成後由 announce 念一次完整內容 */}
                                 <p aria-hidden={message.streaming || undefined}>{message.text}</p>
                                 {message.streaming && <span className="visually-hidden">助手正在回覆</span>}
@@ -468,14 +560,58 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                 )}
                 {/* 常駐的準確度提醒：語言學習工具的 AI 可能寫錯族語詞彙與拼寫 */}
                 <p className="bot-disclaimer" id={disclaimerId}>AI 可能寫錯族語的詞彙或拼寫，學習時請以族語辭典為準。</p>
+                {(attachment || attachBusy || attachError) && (
+                    <div className="bot-attachment" data-state={attachError ? "error" : attachBusy ? "busy" : "ready"}>
+                        {attachment && (
+                            <>
+                                <img className="bot-attachment-thumb" src={attachment.previewUrl} alt="準備送出的圖片預覽" />
+                                <span className="bot-attachment-label">已附上圖片，可以補充想問的問題</span>
+                                <button
+                                    type="button"
+                                    className="bot-attachment-remove"
+                                    onClick={handleRemoveAttachment}
+                                    disabled={isPending}
+                                    aria-label="移除圖片"
+                                >
+                                    <X size={18} aria-hidden="true" />
+                                </button>
+                            </>
+                        )}
+                        {attachBusy && <span className="bot-attachment-label" role="status">正在處理圖片…</span>}
+                        {attachError && <span className="bot-attachment-label" role="alert">{attachError}</span>}
+                    </div>
+                )}
                 <div className="input-area">
+                    {imageEnabled && (
+                        <>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="visually-hidden"
+                                tabIndex={-1}
+                                aria-hidden="true"
+                                onChange={handleFileChosen}
+                            />
+                            <button
+                                ref={attachButtonRef}
+                                type="button"
+                                className="attach-button"
+                                onClick={handleAttachClick}
+                                aria-label="拍照或選擇圖片"
+                                aria-disabled={isPending || attachBusy || quotaUsedUp}
+                            >
+                                <Camera size={20} aria-hidden="true" />
+                            </button>
+                        </>
+                    )}
                     <input
                         ref={inputRef}
                         type="text"
                         value={input}
                         onChange={handleInputChange}
                         onKeyDown={handleKeyDown}
-                        placeholder={quotaUsedUp ? "今天的提問次數已用完" : "輸入您的訊息..."}
+                        placeholder={quotaUsedUp ? "今天的提問次數已用完" : attachment ? "想問這張圖的什麼？（可不填）" : "輸入您的訊息..."}
                         className="message-input"
                         aria-label="輸入訊息"
                         aria-describedby={disclaimerId}
@@ -489,9 +625,9 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                     ) : (
                         <button
                             type="button"
-                            className={`send-button ${input.trim() && !isPending && !quotaUsedUp ? 'active' : ''}`}
+                            className={`send-button ${(input.trim() || attachment) && !isPending && !attachBusy && !quotaUsedUp ? 'active' : ''}`}
                             onClick={handleSend}
-                            aria-disabled={input.trim() === "" || isPending || quotaUsedUp}
+                            aria-disabled={(input.trim() === "" && !attachment) || isPending || attachBusy || quotaUsedUp}
                         >
                             發送
                         </button>

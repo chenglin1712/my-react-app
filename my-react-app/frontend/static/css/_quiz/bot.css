@@ -339,6 +339,138 @@
     cursor: pointer;
 }
 
+/* 拍照／選圖鈕（路線圖 #24）：和輸入框同邊框同圓角，觸控目標至少 44px，按下縮 0.97 */
+.attach-button {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    min-height: 44px;
+    margin-right: 8px;
+    padding: 0;
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-accent);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    cursor: pointer;
+    transition: border-color var(--dur-fast) var(--ease-out), transform 160ms var(--ease-out);
+}
+
+.attach-button:focus-visible,
+.bot-attachment-remove:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+.attach-button:active:not([aria-disabled="true"]),
+.bot-attachment-remove:active:not(:disabled) {
+    transform: scale(0.97);
+}
+
+.attach-button[aria-disabled="true"] {
+    color: var(--yy-calm-text-sub);
+    cursor: not-allowed;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .attach-button:hover:not([aria-disabled="true"]) {
+      border-color: var(--yy-calm-accent);
+  }
+}
+
+/* 已選好的圖片：縮圖＋一行說明＋移除鈕，放在輸入列上方；出錯時整列換成錯誤色塊 */
+.bot-attachment {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
+    background: var(--yy-calm-surface);
+    border-top: 1px solid var(--yy-calm-rule);
+    animation: bot-attachment-in var(--dur-fast) var(--ease-out);
+}
+
+.bot-attachment[data-state="error"] {
+    color: var(--yy-calm-danger);
+    background: var(--yy-calm-danger-bg);
+}
+
+.bot-attachment-thumb {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    object-fit: cover;
+    border: 1px solid var(--yy-calm-rule);
+    border-radius: var(--yy-ui-radius);
+}
+
+.bot-attachment-label {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.4;
+}
+
+.bot-attachment-remove {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    background: transparent;
+    color: var(--yy-calm-text-sub);
+    border: 0;
+    border-radius: var(--yy-ui-radius);
+    cursor: pointer;
+    transition: transform 160ms var(--ease-out);
+}
+
+.bot-attachment-remove:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 對話裡使用者附的圖片：在氣泡內、文字上方，限制高度避免佔滿視窗 */
+.bot-message-image {
+    display: block;
+    max-width: 100%;
+    max-height: 180px;
+    margin-bottom: 8px;
+    object-fit: contain;
+    border-radius: var(--yy-ui-radius);
+}
+
+@keyframes bot-attachment-in {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bot-attachment {
+        animation: none;
+    }
+
+    .attach-button,
+    .bot-attachment-remove {
+        transition: none;
+    }
+
+    .attach-button:active:not([aria-disabled="true"]),
+    .bot-attachment-remove:active:not(:disabled) {
+        transform: none;
+    }
+}
+
 /* 中斷的回覆：保留已顯示的文字，底下一行說明與重試 */
 .bot-interrupted {
     display: flex;

@@ -18,6 +18,7 @@ from adminapi.rate_limits import get_configured_rate
 from .serializers import TayalChatSerializer, ReviewTayalChatSerializer, ReviewQuestionSerializer
 from . import memory_store
 from . import quota as daily_quota
+from .image_input import image_input_enabled
 from .learner_profile import load_profile
 from .services import run_tayal_chat, run_review_tayal_chat, stream_tayal_chat
 from .question_context import QuestionNotFound, load_question_context, record_asked_question
@@ -94,6 +95,7 @@ class _ChatRequest:
     uid: str
     history: list
     quota: object
+    image: dict | None = None      # 已驗證的圖片（#24），只用於這一次請求，不保存
 
 
 def _prepare_chat(request):
@@ -129,6 +131,15 @@ def _prepare_chat(request):
 
     tribe = validated.get("tribe", "tayal")
     uid = decoded.get("uid", "")
+    image = validated.get("image")
+
+    if image:
+        # 圖片輸入（#24）：功能旗標預設關閉；token 成本比文字高，另有較嚴的限速，兩者都在扣每日額度之前
+        if not image_input_enabled():
+            return None, JsonResponse({"detail": "圖片提問尚未開放。", "code": "ai_image_input_disabled"}, status=403)
+        image_limited = _rate_limited_response(request, decoded, group="tayal_chat_image", rate="5/m")
+        if image_limited:
+            return None, image_limited
 
     # 通過驗證才扣額度（格式錯誤的請求不佔次數）；之後失敗會退還
     quota = daily_quota.consume(uid)
@@ -137,7 +148,7 @@ def _prepare_chat(request):
 
     return _ChatRequest(
         client=client, user_message=user_message, tribe=tribe, tribe_name=TRIBE_MAP.get(tribe, "泰雅語"),
-        uid=uid, history=validated.get("history", []), quota=quota,
+        uid=uid, history=validated.get("history", []), quota=quota, image=image,
     ), None
 
 
@@ -147,7 +158,10 @@ def _chat_kwargs(chat):
     return dict(
         profile=load_profile(chat.uid), uid=chat.uid, history=chat.history,
         lookup=SqlDictionaryLookup(TRIBE_IDS.get(chat.tribe, TRIBE_IDS["tayal"])),
-        memory=memory_store.active_for(chat.uid),     # 功能開著且本人同意才接上學習記憶（#21）
+        # 功能開著且本人同意才接上學習記憶（#21）。附圖片的這一輪【不接記憶】：圖片裡的文字是不可信的輸入，
+        # 不能讓它有機會誘導模型讀寫或刪除學生的記憶（只靠提示詞要求不照做不夠，這裡從權限上拿掉）。
+        memory=False if chat.image else memory_store.active_for(chat.uid),
+        image=chat.image,
     )
 
 
@@ -380,7 +394,11 @@ def ai_quota(request):
         return err_resp
     data = daily_quota.peek(decoded.get("uid", "")).as_dict()
     # 前端用它決定要不要顯示「AI 助手」分頁（旗標預設關閉）；要和 review_question 一樣同時看助手總開關；只是顯示用，真正的檢查在 review_question 本身
-    data["features"] = {"questionReview": question_review_enabled() and _assistant_disabled_response() is None}
+    assistant_on = _assistant_disabled_response() is None
+    data["features"] = {
+        "questionReview": question_review_enabled() and assistant_on,
+        "imageInput": image_input_enabled() and assistant_on,       # 圖片提問（#24）：沒開就不顯示拍照鈕
+    }
     return JsonResponse(data)
 
 

@@ -105,6 +105,7 @@ DJANGO_RULES = [
     ("dictionary_grammar_delete_proposal", "30/m", "文法章節刪除提案"),
     ("dictionary_grammar_reorder", "30/m", "文法章節排序"),
     ("tayal_chat", "10/m", "AI 對話（泰雅語聊天）"),
+    ("tayal_chat_image", "5/m", "AI 對話（附圖片提問，比一般對話嚴）"),
     ("review_tayal_chat", "10/m", "AI 對話（複習模式）"),
     ("review_question", "10/m", "AI 單題錯題講解"),
     ("learner_memory", "30/m", "AI 學習記憶管理（檢視、編輯、同意、清除）"),

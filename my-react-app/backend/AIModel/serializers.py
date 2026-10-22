@@ -11,6 +11,8 @@ from rest_framework import serializers
 
 from config.tribes import TRIBE_IDS
 
+from .image_input import ChatImageSerializer
+
 _TRIBE_CHOICES = list(TRIBE_IDS.keys())
 
 
@@ -34,6 +36,8 @@ class TayalChatSerializer(serializers.Serializer):
     # 前幾輪對話（較舊的在前），讓助手看得懂追問。超過筆數或單則長度上限直接 400，
     # 不默默截斷，避免呼叫端以為整段都送出去了。
     history = HistoryMessageSerializer(many=True, required=False, default=list, max_length=HISTORY_MAX_MESSAGES)
+    # 拍照／選圖（路線圖 #24）：只這一次請求使用，不保存，見 image_input.py
+    image = ChatImageSerializer(required=False)
 
     def validate_history(self, value):
         if value and value[0]["role"] != "user":
