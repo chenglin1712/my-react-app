@@ -1,7 +1,7 @@
 from django.urls import path
 
 from . import (
-    ai_usage_views, analytics_views, dictionary_grammar_views, dictionary_import_views, dictionary_taxonomy_views,
+    ai_feedback_views, ai_usage_views, analytics_views, dictionary_grammar_views, dictionary_import_views, dictionary_taxonomy_views,
     dictionary_views, exam_schedule_admin_views, featured_topic_views, feature_flag_views, game_config_views,
     homepage_config_views, moderation_views, promo_video_views, quizbank_views, site_page_views, ai_quiz_draft_views,
     morphology_capability_views, rate_limit_views, review_queue_views, system_cache_views, user_views, verification_views, views,
@@ -165,6 +165,10 @@ urlpatterns = [
 
     # AI 助手用量與成本（唯讀彙總）
     path('ai-usage/', ai_usage_views.ai_usage_summary),
+
+    # AI 助手使用者回饋（讚／倒讚）檢視與加入評測題組
+    path('ai-feedback/', ai_feedback_views.ai_feedback_list),
+    path('ai-feedback/<int:pk>/eval-candidate/', ai_feedback_views.ai_feedback_eval_candidate),
 
     # 並行項目：快取管理
     path('system/cache/', system_cache_views.system_cache_list),

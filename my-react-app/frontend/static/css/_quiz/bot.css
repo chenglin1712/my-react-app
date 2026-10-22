@@ -752,3 +752,195 @@
     outline-offset: 2px;
     border-radius: var(--yy-ui-radius);
 }
+
+/* 回覆下方的讚／倒讚（路線圖 #30）。每則回覆只用一次，所以只做按壓回饋與狀態切換，不做進場動畫。 */
+.bot-feedback {
+    margin-top: 8px;
+    padding-top: 4px;
+    border-top: var(--yy-border-width) solid var(--yy-calm-rule);
+}
+
+.bot-feedback-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.bot-feedback-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    margin: -4px 0;
+    background: transparent;
+    border: 0;
+    border-radius: var(--yy-ui-radius);
+    color: var(--yy-calm-text-sub);
+    cursor: pointer;
+    transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), color 160ms ease;
+}
+
+.bot-feedback-btn:active {
+    transform: scale(0.97);
+}
+
+.bot-feedback-btn[aria-pressed="true"] {
+    color: var(--yy-calm-accent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .bot-feedback-btn:hover {
+        color: var(--yy-calm-text);
+    }
+}
+
+.bot-feedback-btn:focus-visible,
+.bot-feedback-submit:focus-visible,
+.bot-feedback-cancel:focus-visible,
+.bot-feedback-chip:has(input:focus-visible),
+.bot-feedback-comment:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+.bot-feedback-form {
+    display: grid;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.bot-feedback-reasons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.bot-feedback-reasons legend,
+.bot-feedback-label {
+    margin-bottom: 4px;
+    padding: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--yy-calm-text);
+}
+
+.bot-feedback-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 14px;
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-text);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms ease, color 160ms ease;
+}
+
+.bot-feedback-chip:active {
+    transform: scale(0.97);
+}
+
+.bot-feedback-chip[data-checked] {
+    background: var(--yy-calm-accent);
+    color: var(--yy-calm-accent-on);
+}
+
+/* 單選鈕本身隱藏，但保留在無障礙樹與鍵盤順序中 */
+.bot-feedback-chip input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+}
+
+.bot-feedback-comment {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-ui-radius);
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-text);
+    font: inherit;
+    font-size: 1rem; /* 16px：避免 iOS 聚焦時自動放大 */
+    resize: vertical;
+}
+
+.bot-feedback-privacy {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--yy-calm-text-sub);
+}
+
+.bot-feedback-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.bot-feedback-submit,
+.bot-feedback-cancel {
+    min-height: 44px;
+    padding: 0 16px;
+    border-radius: var(--yy-ui-radius);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.bot-feedback-submit {
+    background: var(--yy-calm-accent);
+    color: var(--yy-calm-accent-on);
+    border: var(--yy-border-width) solid var(--yy-calm-accent);
+}
+
+.bot-feedback-submit[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.bot-feedback-cancel {
+    background: transparent;
+    color: var(--yy-calm-text);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+}
+
+.bot-feedback-submit:active,
+.bot-feedback-cancel:active {
+    transform: scale(0.97);
+}
+
+.bot-feedback-error {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--yy-calm-danger);
+}
+
+.bot-feedback-thanks {
+    margin: 8px 0 0;
+    font-size: 0.875rem;
+    color: var(--yy-calm-text-sub);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bot-feedback-btn,
+    .bot-feedback-chip,
+    .bot-feedback-submit,
+    .bot-feedback-cancel {
+        transition: none;
+    }
+
+    .bot-feedback-btn:active,
+    .bot-feedback-chip:active,
+    .bot-feedback-submit:active,
+    .bot-feedback-cancel:active {
+        transform: none;
+    }
+}

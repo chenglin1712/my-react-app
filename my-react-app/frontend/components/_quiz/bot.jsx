@@ -11,6 +11,7 @@ import { prepareChatImage, ChatImageError, DEFAULT_IMAGE_PROMPT, IMAGE_ERROR_TEX
 import { TRIBES } from "../../src/constants/tribes";
 import { scrollBehavior } from "../../src/hooks/useReducedMotion";
 import { apiGet, apiPost, apiStream } from "../../utils/apiClient";
+import BotFeedback from "./BotFeedback";
 import { useDialog } from "@hooks/useDialog";
 import { announce } from "@utils/announce";
 
@@ -95,6 +96,8 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
 
     // 圖片提問（路線圖 #24）：後端功能旗標開著才顯示拍照鈕；讀不到就當作沒開
     const [imageEnabled, setImageEnabled] = useState(false);
+    // 回覆下方的讚／倒讚（路線圖 #30）：後端旗標沒開就不顯示
+    const [feedbackEnabled, setFeedbackEnabled] = useState(false);
     // 準備送出的圖片 { media_type, data, previewUrl }；只在記憶體裡，送出後由訊息泡泡的縮圖接手預覽網址
     const [attachment, setAttachment] = useState(null);
     const [attachBusy, setAttachBusy] = useState(false);
@@ -114,6 +117,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                 if (mountedRef.current) {
                     setQuota(readQuota(data));
                     setImageEnabled(data?.features?.imageInput === true);
+                    setFeedbackEnabled(data?.features?.feedback === true);
                 }
             } catch {
                 quotaLoadedRef.current = false; // 下次展開再試
@@ -332,6 +336,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                 role: "bot",
                 studyPlan: data?.study_plan || null,
                 sig: data?.sig || "", // 助手回覆的簽章，下次送對話紀錄時帶回，見 botHistory.js
+                meta: data?.meta || null, // 這則回覆用的模型、提示詞版本、request id，回饋時帶回去
                 isRefusal: data?.refused === true, // 模型拒答：固定說明，不是錯誤，樣式上區分
                 // 這則回覆提到、而且辭典查到的詞條（後端 entries.py）；連結要用「提問當下」的族語，之後換族語不影響舊訊息
                 entries: Array.isArray(data?.entries) && data.entries.length > 0 ? data.entries : null,
@@ -506,6 +511,15 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                                 )}
                                 {message.studyPlan && (
                                     <StudyPlanComponent plan={message.studyPlan} onClose={handleClose} />
+                                )}
+                                {feedbackEnabled && message.role === "bot" && message.sig && !message.streaming && !message.interrupted && (
+                                    <BotFeedback
+                                        question={messages.slice(0, index).reverse().find((m) => m.role === "user")?.text || ""}
+                                        reply={message.text}
+                                        sig={message.sig}
+                                        meta={message.meta}
+                                        tribe={message.entriesTribe || tribe}
+                                    />
                                 )}
                             </div>
                         </div>

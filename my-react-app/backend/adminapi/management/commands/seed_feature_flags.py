@@ -102,6 +102,18 @@ class Command(BaseCommand):
         )
         created_count += int(created)
 
+        # AI 助手回覆的讚／倒讚（路線圖 #30）：預設【關閉】。學生按下時會把「這一則問答」傳給管理者檢視
+        # （只有 owner／admin 看得到、去識別化、保存 180 天），開放前請先在隱私政策頁補上說明。
+        _, created = FeatureFlag.objects.get_or_create(
+            key="ai_feedback_enabled",
+            defaults={
+                "label": "AI 助手意見回饋",
+                "description": "開啟後，學生可對 AI 助手的每則回覆按讚或倒讚（倒讚可選原因）。按下時會把該則問答存給管理者檢視（不含身分、保存 180 天）。預設關閉。",
+                "enabled": False,
+            },
+        )
+        created_count += int(created)
+
         # 訪客翻譯試用（C-2）：預設【關閉】。要在後台「功能開關」頁手動打開，才會讓未登入的訪客
         # 以每瀏覽器每日 10 次的額度使用翻譯。後端判斷是 fail-closed（查不到這一列也視為關閉），
         # 所以即使沒跑種子，訪客也不會被放行。需要另外設定 GUEST_TRIAL_SECRET，見 .env.example。
@@ -187,9 +199,9 @@ class Command(BaseCommand):
         )
         created_count += int(created)
 
-        total = len(TRIBES) + 16
+        total = len(TRIBES) + 17
         self.stdout.write(self.style.SUCCESS(
             f"功能開關種子完成：共 {total} 筆（族語測驗開關 {len(TRIBES)} + 族語翻譯開關 1 + AI 助手開關 1 + 訪客翻譯試用 1 + 詞形分析器 2 + 測驗詞形干擾項 1 "
-            f"+ 詞素學習 4 + 待專家驗證佇列 1 + 雲端筆記同步 1 + AI 單題錯題講解 1 + AI 學習記憶 1 + AI 產生題目草稿 1 + AI 助手圖片提問 1，除了族語測驗、翻譯與 AI 助手開關，其餘預設關閉（含訪客翻譯試用）），"
+            f"+ 詞素學習 4 + 待專家驗證佇列 1 + 雲端筆記同步 1 + AI 單題錯題講解 1 + AI 學習記憶 1 + AI 產生題目草稿 1 + AI 助手圖片提問 1 + AI 助手意見回饋 1，除了族語測驗、翻譯與 AI 助手開關，其餘預設關閉（含訪客翻譯試用）），"
             f"新增 {created_count} 筆，其餘已存在維持原值。"
         ))

@@ -11,6 +11,7 @@ INSTALLED_APPS 對應到的 app 套件路徑決定 app_label，不是看 models.
 from .ai_usage import AiUsageLog
 from .ai_quota import AiDailyUsage
 from .learner_memory import LearnerMemoryConsent, LearnerMemoryFile
+from .ai_feedback import AiFeedback
 from .ai_quiz_draft import AiQuizDraft
 from .analytics import UsageEvent
 from .audit import AuditLog

@@ -10,6 +10,7 @@ import logging
 from config.llm import REFUSAL_MESSAGE, LLMRefusalError, call_claude, extract_text
 
 from .entries import mentions
+from .output_guard import guard_field
 from .schemas import QUESTION_REVIEW_SCHEMA
 from .validators import extract_candidates, query_forms
 
@@ -22,7 +23,8 @@ FAILED_MESSAGE = "這次沒有產生講解，請再試一次。"
 
 
 def _clean(value, limit: int) -> str:
-    return " ".join(value.split())[:limit] if isinstance(value, str) else ""
+    # 輸出驗證：移除網址等（見 output_guard.py），再套欄位長度上限
+    return guard_field(" ".join(value.split()), limit) if isinstance(value, str) else ""
 
 
 def lookup_glosses(lookup, source_text: str) -> list:

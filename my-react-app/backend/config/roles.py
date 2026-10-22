@@ -39,6 +39,9 @@ CONTENT_APPROVERS = (OWNER, ADMIN, REVIEWER)
 # 故意分開命名避免呼叫端看代碼誤解成在做帳號管理判斷。
 PUBLISHERS = (OWNER, ADMIN)
 
+# 看 AI 助手使用者回饋（路線圖 #30）：內容含學生自己寫的問題與說明，可能有個資，所以只有 owner／admin。
+FEEDBACK_VIEWERS = (OWNER, ADMIN)
+
 # 「待專家驗證佇列」（adminapi/verification_*）專用的角色群組。刻意不沿用 CONTENT_APPROVERS：那組代表「內容核准權」，
 # 不代表族語專業資格；佇列裡的意見一律只稱「意見」，不是專家驗證結果（目前系統沒有任何專家身分資料）。
 VERIFICATION_READERS = STAFF_ROLES                 # 看佇列項目與意見數（不含各筆意見的審核者標籤與備註）

@@ -190,6 +190,10 @@ def classify_llm_error(exc: BaseException) -> tuple[int, str]:
 # asyncio.to_thread 會把 contextvars 複製到執行緒裡）。
 current_uid: contextvars.ContextVar[str] = contextvars.ContextVar("llm_current_uid", default="")
 
+# 這個請求最近一次成功呼叫的 {request_id, model}（路線圖 #30：回覆要帶著它，回饋才能追溯到當次的模型）。
+# contextvar 是每個執行緒／請求各自一份，不會在使用者之間混用；沒有呼叫過就是 None。
+last_call: contextvars.ContextVar = contextvars.ContextVar("llm_last_call", default=None)
+
 # 用量紀錄的寫入端，由各個 process 啟動時註冊（Django：adminapi.ai_usage；FastAPI：
 # fastAPI.ai_usage_events）。config/llm.py 同時被兩個 process import，不能直接依賴
 # 任何一邊的資料庫存取方式，所以用這個掛鉤反轉依賴。沒有註冊就不記錄。
@@ -251,6 +255,9 @@ def _record_usage(*, feature, uid, model, started, status, response=None, reques
             "cache_write_tokens": _as_count(getattr(usage, "cache_creation_input_tokens", None)),
             "latency_ms": int((time.monotonic() - started) * 1000),
         }
+        if status == "ok":
+            # 這個請求（執行緒）最近一次成功的呼叫：使用者對回覆按讚／倒讚時，要能追溯到當次的模型與 request id（#30）
+            last_call.set({"request_id": entry["request_id"], "model": model})
         logger.info(
             "[config.llm] feature=%s model=%s status=%s request_id=%s input_tokens=%s output_tokens=%s "
             "cache_read_tokens=%s latency_ms=%s",

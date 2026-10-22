@@ -49,6 +49,7 @@ const NAV_GROUPS = [
             { label: '功能開關', to: '/admin/system/feature-flags' },
             { label: '形態分析能力', to: '/admin/system/morphology-capabilities' },
             { label: 'AI 用量', to: '/admin/system/ai-usage' },
+            { label: 'AI 回饋', to: '/admin/system/ai-feedback' },
         ],
     },
 ];

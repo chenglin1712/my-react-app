@@ -33,8 +33,15 @@ class DefaultsTests(TestCase):
 class ModelResolutionTests(TestCase):
     def test_global_model_applies_to_every_feature(self):
         with _env(LLM_MODEL="claude-sonnet-5-5"):
-            heavy = [f for f in llm_settings.FEATURES if f not in ("route", "light")]
+            heavy = [f for f in llm_settings.FEATURES if f not in ("route", "light", "eval_judge")]
             self.assertEqual({get_settings(f).model for f in heavy}, {"claude-sonnet-5-5"})
+
+    def test_the_eval_judge_is_pinned_to_opus_and_ignores_the_global_model(self):
+        # 路線圖 #29：評審固定用較強的模型，被評測的模型換了評審不跟著換，前後分數才可比較
+        with _env(LLM_MODEL="claude-sonnet-5-5"):
+            self.assertEqual(get_settings("eval_judge").model, "claude-opus-5-5")
+        with _env(LLM_MODEL_EVAL_JUDGE="claude-sonnet-5-5"):
+            self.assertEqual(get_settings("eval_judge").model, "claude-sonnet-5-5")
 
     def test_routing_and_light_chat_default_to_haiku_and_ignore_the_global_model(self):
         # 路線圖 #8：這兩個功能存在的目的就是比主模型便宜，全域換大模型時不連帶變貴

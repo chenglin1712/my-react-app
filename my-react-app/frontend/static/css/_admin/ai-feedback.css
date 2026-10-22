@@ -1,0 +1,94 @@
+/* 後台「AI 回饋」頁：沿用 ai-usage.css 的總覽列與內容欄，這裡只補篩選列、表格內文與分頁。 */
+
+.ai-feedback-reasons {
+  margin: 12px 0 0;
+  color: var(--admin-muted);
+  font-size: 14px;
+}
+
+.ai-feedback-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.ai-feedback-filters .form-label {
+  margin-bottom: 4px;
+}
+
+.ai-feedback-filters .form-select {
+  min-width: 150px;
+}
+
+.ai-feedback-filters .form-check {
+  align-self: center;
+  margin-bottom: 0;
+}
+
+.ai-feedback-text {
+  min-width: 280px;
+  max-width: 520px;
+}
+
+.ai-feedback-text p {
+  display: -webkit-box;
+  margin: 0 0 6px;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+}
+
+.ai-feedback-text p span {
+  margin-right: 8px;
+  color: var(--admin-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ai-feedback-comment {
+  margin-top: 4px;
+  color: var(--admin-muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.ai-feedback-trace {
+  min-width: 180px;
+  color: var(--admin-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.ai-feedback-candidate {
+  display: grid;
+  gap: 6px;
+  min-width: 200px;
+}
+
+.ai-feedback-note {
+  margin: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.ai-feedback-note span {
+  display: block;
+  color: var(--admin-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ai-feedback-muted {
+  color: var(--admin-muted);
+  font-size: 13px;
+}
+
+.ai-feedback-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}

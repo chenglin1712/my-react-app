@@ -13,12 +13,14 @@ from dictionary_db.model import Word
 from dictionary_db.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS, TRIBE_MAP
 from core.firebase_auth import verify_firebase_token
-from config.llm import get_llm_client, classify_llm_error, llm_deadline
+from config.llm import get_llm_client, classify_llm_error, last_call, llm_deadline
 from adminapi.rate_limits import get_configured_rate
 from .serializers import TayalChatSerializer, ReviewTayalChatSerializer, ReviewQuestionSerializer
 from . import memory_store
 from . import quota as daily_quota
+from .feedback import FeedbackSerializer, feedback_enabled, hash_uid, purge_expired_daily, verified_call
 from .image_input import image_input_enabled
+from .prompt_version import prompt_version
 from .learner_profile import load_profile
 from .services import run_tayal_chat, run_review_tayal_chat, stream_tayal_chat
 from .question_context import QuestionNotFound, load_question_context, record_asked_question
@@ -98,9 +100,17 @@ class _ChatRequest:
     image: dict | None = None      # 已驗證的圖片（#24），只用於這一次請求，不保存
 
 
+def _reply_meta() -> dict:
+    """這則回覆是用哪個模型、哪一版提示詞、哪個 request id 產生的（路線圖 #30）。
+    前端原樣帶回回饋端點，倒讚才能追溯到當次的設定。固定回覆（離題、拒答）沒有呼叫模型，欄位是空字串。"""
+    call = last_call.get() or {}
+    return {"model": call.get("model", ""), "requestId": call.get("request_id", ""), "promptVersion": prompt_version()}
+
+
 def _prepare_chat(request):
     """驗證身分、總開關、限速、請求內容並扣一次每日額度。回傳 (_ChatRequest, None) 或 (None, 錯誤回應)。
     順序與意義見各步驟；失敗的請求（格式錯誤等）不扣額度，扣了之後的失敗由呼叫端退還。"""
+    last_call.set(None)             # 工作執行緒會被重複使用：清掉上一個請求留下的呼叫紀錄，回覆只帶自己這次的
     decoded, err_resp = verify_firebase_token(request)
     if err_resp:
         return None, err_resp
@@ -175,6 +185,7 @@ def tayal_chat(request):
         try:
             result = run_tayal_chat(chat.client, chat.tribe_name, chat.user_message, **_chat_kwargs(chat))
             result["quota"] = chat.quota.as_dict()
+            result["meta"] = _reply_meta()
             return JsonResponse(result)
 
         except Exception:
@@ -212,6 +223,7 @@ def _chat_stream_events(chat):
             if event["type"] == "done":
                 payload = {k: v for k, v in event.items() if k != "type"}
                 payload["quota"] = chat.quota.as_dict()
+                payload["meta"] = _reply_meta()
                 yield _sse("done", payload)
                 return
             if time.monotonic() > deadline:
@@ -385,6 +397,55 @@ def review_question(request):
 
 
 @csrf_exempt
+def ai_feedback(request):
+    """學生對某一則助手回覆按讚或倒讚（路線圖 #30）。隱私與驗證的設計見 feedback.py 與 AiFeedback 模型。
+    不呼叫模型、不扣每日額度；功能旗標預設關閉。同一個人對同一則回覆只留一筆，再送一次是更新。"""
+    if request.method != "POST":
+        return JsonResponse({"detail": "只接受 POST 請求"}, status=405)
+    decoded, err_resp = verify_firebase_token(request)
+    if err_resp:
+        return err_resp
+    disabled_resp = _assistant_disabled_response()
+    if disabled_resp:
+        return disabled_resp
+    if not feedback_enabled():
+        return JsonResponse({"detail": "意見回饋尚未開放。", "code": "ai_feedback_disabled"}, status=403)
+    limited_resp = _rate_limited_response(request, decoded, group="ai_feedback", rate="30/m")
+    if limited_resp:
+        return limited_resp
+
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"detail": "請求格式錯誤"}, status=400)
+    uid = decoded.get("uid", "")
+    serializer = FeedbackSerializer(data=body, context={"uid": uid})
+    if not serializer.is_valid():
+        return JsonResponse({"detail": "請求參數錯誤", "errors": serializer.errors}, status=400)
+    data = serializer.validated_data
+
+    from django.db import IntegrityError
+
+    from adminapi.models import AiFeedback
+
+    model, request_id = verified_call(uid, data["request_id"]) if data["request_id"] else ("", "")
+    purge_expired_daily()
+    save = lambda: AiFeedback.objects.update_or_create(  # noqa: E731
+        uid_hash=hash_uid(uid), reply_sig=data["sig"],
+        defaults={
+            "rating": data["rating"], "reason": data["reason"], "comment": data["comment"],
+            "question_text": data["question_text"], "reply_text": data["reply_text"], "tribe": data["tribe"],
+            "model": model, "prompt_version": data["prompt_version"], "request_id": request_id,
+        },
+    )
+    try:
+        save()
+    except IntegrityError:
+        save()          # 同一人同一則回覆同時送出兩次：另一個請求剛建好，這次改走更新
+    return JsonResponse({"saved": True})
+
+
+@csrf_exempt
 def ai_quota(request):
     """今天還剩幾次提問（前端打開助手時顯示「今天還可以問 N 次」）。只讀取，不扣次數、不呼叫模型。"""
     if request.method != "GET":
@@ -398,6 +459,7 @@ def ai_quota(request):
     data["features"] = {
         "questionReview": question_review_enabled() and assistant_on,
         "imageInput": image_input_enabled() and assistant_on,       # 圖片提問（#24）：沒開就不顯示拍照鈕
+        "feedback": feedback_enabled() and assistant_on,            # 讚／倒讚（#30）：沒開就不顯示按鈕
     }
     return JsonResponse(data)
 

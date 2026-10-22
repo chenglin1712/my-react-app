@@ -75,6 +75,9 @@ _FEATURE_DEFAULTS = {
     # 後台「AI 產生題目草稿」（路線圖 #23）：結構化輸出的情境題，產生後一律進人工審核；
     # 要換更強的模型用 LLM_MODEL_QUIZ_DRAFT（例如 claude-opus-5-5）。
     "quiz_draft": _FeatureDefaults(effort="medium", max_tokens=6144),
+    # 評測的模型評審（路線圖 #29）：用比被評測對象更強的模型打分數，只在離線評測指令裡使用，不在學生流程裡。
+    # 評審刻意固定用 Opus 5.5（LLM_MODEL_EVAL_JUDGE 可覆寫）；被評測的模型換了，評審不應該跟著換，分數才可比較。
+    "eval_judge": _FeatureDefaults(effort="medium", max_tokens=1024, model="claude-opus-5-5"),
 }
 
 FEATURES = tuple(_FEATURE_DEFAULTS)

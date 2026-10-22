@@ -46,6 +46,7 @@ const FeatureFlags = lazy(() => import('./system/FeatureFlags'));
 const CacheManagement = lazy(() => import('./system/CacheManagement'));
 const MorphologyCapabilities = lazy(() => import('./system/MorphologyCapabilities'));
 const AiUsage = lazy(() => import('./system/AiUsage'));
+const AiFeedback = lazy(() => import('./system/AiFeedback'));
 
 const AdminApp = () => {
     const pendingCounts = usePendingCounts();
@@ -96,6 +97,7 @@ const AdminApp = () => {
                 <Route path="system/feature-flags" element={<FeatureFlags />} />
                 <Route path="system/morphology-capabilities" element={<MorphologyCapabilities />} />
                 <Route path="system/ai-usage" element={<AiUsage />} />
+                <Route path="system/ai-feedback" element={<AiFeedback />} />
                 <Route path="*" element={<AdminNotFound />} />
             </Route>
         </Routes>
