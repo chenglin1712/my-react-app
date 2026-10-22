@@ -323,14 +323,14 @@ describe('AIAssistantOverlay 串流回覆（路線圖 #9）', () => {
     // 串流中：氣泡標示忙碌、文字對報讀器隱藏，不再另外顯示「輸入中」的三個點
     const bubble = screen.getByText('哈囉').closest('.message-bubble');
     expect(bubble).toHaveAttribute('aria-busy', 'true');
-    expect(screen.getByText('哈囉')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('哈囉').closest('.bot-md')).toHaveAttribute('aria-hidden', 'true');
     expect(screen.queryByText('助手正在輸入')).not.toBeInTheDocument();
 
     control.finish({ message: '哈囉，同學', sig });
 
     expect(await screen.findByText('哈囉，同學')).toBeInTheDocument();
     expect(screen.queryByText('哈囉')).not.toBeInTheDocument(); // 同一個氣泡被換成完整文字，沒有重複
-    expect(screen.getByText('哈囉，同學')).not.toHaveAttribute('aria-hidden');
+    expect(screen.getByText('哈囉，同學').closest('.bot-md')).not.toHaveAttribute('aria-hidden');
     expect(screen.getByText('哈囉，同學').closest('.message-bubble')).not.toHaveAttribute('aria-busy');
   });
 

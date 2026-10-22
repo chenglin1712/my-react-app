@@ -197,6 +197,27 @@
     text-align: left;
 }
 
+/* 助手回覆的輕量格式（LightMarkdown）：段落、條列、粗體；間距沿用氣泡原本的緊湊感 */
+.bot-md > * + * {
+    margin-top: 8px;
+}
+
+.bot-md ul,
+.bot-md ol {
+    margin: 0;
+    padding-left: 1.3em;
+    text-align: left;
+    line-height: 1.5;
+}
+
+.bot-md li + li {
+    margin-top: 2px;
+}
+
+.bot-md strong {
+    font-weight: 600;
+}
+
 .suggestions-container {
     padding: 10px 16px;
     background-color: var(--yy-calm-surface);
@@ -230,6 +251,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 100%;
+    min-height: 44px;
+
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -237,6 +260,10 @@
       background-color: var(--yy-calm-accent);
       color: var(--yy-calm-accent-on);
   }
+}
+
+.suggestion-pill:active:not(:disabled) {
+    transform: scale(0.97);
 }
 
 .typing-indicator {

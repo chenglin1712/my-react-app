@@ -13,16 +13,23 @@ import { scrollBehavior } from "../../src/hooks/useReducedMotion";
 import { apiGet, apiPost, apiStream } from "../../utils/apiClient";
 import BotFeedback from "./BotFeedback";
 import BotReplyActions from "./BotReplyActions";
+import LightMarkdown from "./LightMarkdown";
+import { stripLightMarkdown } from "./markdownBlocks";
 import { describeChatError } from "./botErrors";
-import { clearConversation, hasConversation, loadConversation, resolveUid, saveConversation } from "./botStorage";
+import { clearConversation, hasConversation, loadConversation, saveConversation, watchUid } from "./botStorage";
 import { useDialog } from "@hooks/useDialog";
 import { announce } from "@utils/announce";
 
+// 預設的起始建議；後端 /AIModel/quota/ 會依學習資料回傳個人化的三句（#13），讀不到就用這三句
 const SUGGESTIONS = [
     "我想了解我的學習狀況",
     "介紹這個族語的文化特色",
     "幫我排一週讀書計畫"
 ];
+
+const cleanSuggestions = (list) => (Array.isArray(list)
+    ? list.filter((s) => typeof s === "string" && s.trim() !== "" && s.length <= 60).slice(0, 3)
+    : []);
 
 // 各族語的族語問候詞。目前只有泰雅語的 "lokah su"（專案內遊戲題庫把它標成泰雅語「你好」）有依據；
 // 其他族語的問候詞還沒有對照官方來源（族語E樂園、線上辭典）核對，先不放，
@@ -77,6 +84,8 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     // 導回測驗首頁，行為可預期。
     const handleClose = onClose ?? (() => navigate("/quiz"));
     const [tribe, setTribe] = useState("tayal");
+    const tribeRef = useRef(tribe);
+    useEffect(() => { tribeRef.current = tribe; }, [tribe]);
     // 詞條卡片的發音：整個視窗共用一個播放器，按下新的就停掉舊的
     const { playAudio, failedAudio } = useAuthorizedAudioPlayback();
     // 開場白記錄它是為哪個族語寫的（greetingFor），對話還沒開始時換族語就跟著換
@@ -90,6 +99,8 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     const [storageReady, setStorageReady] = useState(false);
     const [confirmingNew, setConfirmingNew] = useState(false);
     const cancelNewRef = useRef(null);
+    const discardRef = useRef(null);         // 指向 discardInFlight（它定義在後面，登入監聽的 effect 只能經由 ref 呼叫）
+    const accountEpochRef = useRef(0);       // 登出或換帳號時加一：舊帳號還沒回來的請求，回來後不能寫進新帳號的畫面
     const touchedRef = useRef(false);        // 使用者已送出訊息或換過族語：還原的舊對話不能再蓋上來
     const messageEndRef = useRef(null);
     const messagesBoxRef = useRef(null);
@@ -101,6 +112,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     const quotaLoadedRef = useRef(false);
     // 今天剩餘的提問次數；null＝還不知道（尚未載入、載入失敗，或伺服器沒有可信的計數），這時不顯示也不擋送出
     const [quota, setQuota] = useState(null);
+    const [starters, setStarters] = useState(SUGGESTIONS);
     const quotaUsedUp = quota !== null && quota.remaining === 0;
 
     // 圖片提問（路線圖 #24）：後端功能旗標開著才顯示拍照鈕；讀不到就當作沒開
@@ -127,6 +139,8 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                     setQuota(readQuota(data));
                     setImageEnabled(data?.features?.imageInput === true);
                     setFeedbackEnabled(data?.features?.feedback === true);
+                    const personal = cleanSuggestions(data?.suggestions);
+                    if (personal.length > 0) setStarters(personal);
                 }
             } catch {
                 quotaLoadedRef.current = false; // 下次展開再試
@@ -137,19 +151,32 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     // 開啟時還原這台裝置上最近一次的對話（7 天內）。使用者若已經開始送出訊息，就不覆蓋。
     useEffect(() => {
         let active = true;
-        (async () => {
-            const uid = await resolveUid();
-            if (!active || !uid) return;
+        const stop = watchUid((uid) => {
+            if (!active || uid === uidRef.current) return;
+            const switched = uidRef.current !== null;      // 不是第一次解析出 uid：登出或換了帳號
             uidRef.current = uid;
+            setStorageReady(false);                        // 先停止寫入，避免把上一位的對話存到新帳號
+            if (switched) {
+                // 上一位的對話不能留在畫面上，也不能帶進新帳號的請求
+                discardRef.current?.();
+                setConfirmingNew(false);                   // 上一位開著的「新對話」確認不能留到新帳號
+                touchedRef.current = false;
+                setMessages([{ id: crypto.randomUUID(), text: greetingText(tribeRef.current), role: "bot", greetingFor: tribeRef.current }]);
+                setInput("");
+                setAttachment(null);
+            }
+            if (!uid) return;
             const saved = loadConversation(uid);
             // 還原期間使用者已經送出訊息（或換了族語）就不覆蓋，族語也不能單獨換掉
             if (saved && !touchedRef.current) {
                 setMessages(saved.messages);
                 if (TRIBES.some((t) => t.slug === saved.tribe)) setTribe(saved.tribe);
+                // 使用者可能已經開始打字：對話突然出現要讓他知道，輸入框裡的草稿則維持原樣
+                announce("已還原先前的對話");
             }
             setStorageReady(true);
-        })();
-        return () => { active = false; };
+        });
+        return () => { active = false; stop(); };
     }, []);
 
     // 視窗收合時，沒做完的「新對話」確認不留到下次打開
@@ -254,7 +281,18 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
             frameRef.current = 0;
         }
     };
+
+    // 換帳號／登出：作廢還在進行的請求（中止、取消排著的畫面更新、解除等待狀態）
+    const discardInFlight = () => {
+        accountEpochRef.current += 1;
+        abortControllerRef.current?.abort();
+        cancelPendingFlush();
+        streamTextRef.current = "";
+        sendingRef.current = false;
+        setIsPending(false);
+    };
     /* eslint-enable react-hooks/immutability */
+    useEffect(() => { discardRef.current = discardInFlight; });
 
     // 回覆沒有完整結束（使用者按停止，或中途斷線）：已經顯示的文字留著，但標成「中斷」。
     // 這則沒有後端的簽章，所以不會被當成對話記憶送回去（botHistory.js 只收有簽章的助手訊息）。
@@ -347,7 +385,8 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
         if (regenerate) {
             setMessages((prev) => prev.slice(0, prev.map((m) => m.role).lastIndexOf("user") + 1));
         } else if (retry) {
-            setMessages((prev) => prev.filter((m) => !m.interrupted && !m.retryable));
+            // 只拿掉這次要重試的那則（最後一則）；更早的失敗或中斷紀錄是對話歷史，不能跟著消失
+            setMessages((prev) => (prev.length > 0 && (prev[prev.length - 1].interrupted || prev[prev.length - 1].retryable) ? prev.slice(0, -1) : prev));
             // 失敗時圖片被放回輸入區；這次重試直接重送它，輸入區那份就不用留了
             if (sendingImage) setAttachment((prev) => (prev === sendingImage ? null : prev));
         } else {
@@ -362,6 +401,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
 
         const controller = new AbortController();
         abortControllerRef.current = controller;
+        const epoch = accountEpochRef.current;
         const streamUrl = import.meta.env.VITE_API_AI_BOT_STREAM_URL;
         const botId = crypto.randomUUID();
 
@@ -373,7 +413,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
             const data = streamUrl
                 ? await apiStream(streamUrl, body, { signal: controller.signal, onDelta: (piece) => pushDelta(botId, piece) })
                 : await apiPost(import.meta.env.VITE_API_AI_BOT_URL, body, { signal: controller.signal });
-            if (!mountedRef.current) return;
+            if (!mountedRef.current || epoch !== accountEpochRef.current) return;
 
             cancelPendingFlush();
             const botResponse = {
@@ -390,6 +430,8 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                 entriesTribe: tribe,
                 // 回覆裡辭典查無的詞形（後端 validators.py）；只提醒，不改回覆
                 unverified: Array.isArray(data?.unverified) && data.unverified.length > 0 ? data.unverified : null,
+                // 接著可以問的建議（後端用模板產生，#13）；只在這則是最後一則時顯示
+                followups: cleanSuggestions(data?.followups),
             };
 
             const alreadyShown = streamTextRef.current !== "";
@@ -398,9 +440,10 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                 : [...prev, botResponse]));
             // 串流中的氣泡對報讀器是隱藏的（避免每個字都被念一次），完成後念一次完整內容；
             // 沒有串流過的回覆（讀書計畫、固定說明）是新增的訊息，對話紀錄區會自己念。
-            if (alreadyShown) announce(botResponse.text);
+            if (alreadyShown) announce(stripLightMarkdown(botResponse.text));
             if (data && "quota" in data) setQuota(readQuota(data.quota));
         } catch (error) {
+            if (epoch !== accountEpochRef.current) return;      // 舊帳號的請求，結果與錯誤都不屬於現在的畫面
             if (controller.signal.aborted) {
                 // 離開頁面／卸載：不用再顯示任何東西。使用者自己按了停止：保留已經收到的文字。
                 if (mountedRef.current && stoppedRef.current) markInterrupted(botId, "stopped");
@@ -437,8 +480,10 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
             setMessages(prev => [...prev, errorResponse]);
             console.error("取得回應失敗:", error);
         } finally {
-            sendingRef.current = false;
-            if (mountedRef.current) setIsPending(false);
+            if (epoch === accountEpochRef.current) {
+                sendingRef.current = false;
+                if (mountedRef.current) setIsPending(false);
+            }
         }
     };
 
@@ -494,6 +539,12 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
             handleSend();
         }
     };
+
+    // 起始建議（還沒聊幾句）或上一則回覆帶來的後續建議；兩者都沒有就不顯示建議區
+    const lastMessage = messages[messages.length - 1];
+    const followups = lastMessage?.role === "bot" && !lastMessage.streaming && !lastMessage.interrupted && !lastMessage.isError
+        && Array.isArray(lastMessage.followups) ? lastMessage.followups : [];
+    const suggestionList = messages.length <= 2 ? starters : followups;
 
     const handleSuggestionClick = (suggestion) => {
         setInput(suggestion);
@@ -576,7 +627,9 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                                     <img className="bot-message-image" src={message.imageUrl} alt="你附上的圖片" />
                                 )}
                                 {/* 串流中對報讀器隱藏：文字每幾十毫秒長一點，逐段念出來只是噪音；完成後由 announce 念一次完整內容 */}
-                                <p aria-hidden={message.streaming || undefined}>{message.text}</p>
+                                {message.role === "bot" && !message.isError
+                                    ? <LightMarkdown text={message.text} aria-hidden={message.streaming || undefined} />
+                                    : <p aria-hidden={message.streaming || undefined}>{message.text}</p>}
                                 {message.streaming && <span className="visually-hidden">助手正在回覆</span>}
                                 {message.isError && message.retryable && index === messages.length - 1 && !isPending && !quotaUsedUp && (
                                     <div className="bot-interrupted">
@@ -609,9 +662,9 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                                     const precedingUser = messages.slice(0, index).reverse().find((m) => m.role === "user");
                                     const actions = (
                                         <BotReplyActions
-                                            text={message.text}
+                                            text={stripLightMarkdown(message.text)}
                                             // 只有最後一則回覆能重新產生，而且那一輪不能是附過圖片的（還原後圖片已不在）
-                                            canRegenerate={index === messages.length - 1 && !!precedingUser && !precedingUser.hadImage}
+                                            canRegenerate={index === messages.length - 1 && !!precedingUser && !precedingUser.hadImage && !precedingUser.imageUrl}
                                             onRegenerate={handleRegenerate}
                                             disabled={isPending || quotaUsedUp}
                                         />
@@ -650,11 +703,11 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                     <div ref={messageEndRef} />
                 </div>
 
-                {messages.length <= 2 && (
+                {suggestionList.length > 0 && (
                     <div className="suggestions-container">
                         <p className="suggestions-title">您可能想問：</p>
                         <div className="suggestion-pills">
-                            {SUGGESTIONS.map((suggestion, index) => (
+                            {suggestionList.map((suggestion, index) => (
                                 <button
                                     type="button"
                                     key={index}

@@ -1,5 +1,5 @@
 import "../../static/css/_quiz/review_AI.css"
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Send, Bot, X, Play } from "lucide-react";
 import { TRIBE_NAME_BY_SLUG as TRIBE_NAME } from "../../src/constants/tribes";
 import { apiPost } from "../../utils/apiClient";
@@ -81,7 +81,11 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
     const expandedRef = useRef(null);
     const sendingRef = useRef(false);
     const lastTextRef = useRef("");
+    const abortRef = useRef(null);
     const { playAudio, failedAudio } = useAuthorizedAudioPlayback();
+
+    // 離開頁面時，還在等的請求就不用等了：中止它，回應回來時也不會對已卸載的元件寫 state
+    useEffect(() => () => abortRef.current?.abort(), []);
 
     // 放大訊息視窗：原本連 role 都沒有（審查項 P1-5）
     useDialog(expandedRef, { active: expanded !== null, onClose: () => setExpanded(null) });
@@ -94,7 +98,8 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
         lastTextRef.current = text;
 
         if (retry) {
-            setMessages((prev) => prev.filter((m) => !m.retryable));
+            // 只拿掉這次要重試的那則（最後一則），更早的失敗紀錄留著
+            setMessages((prev) => (prev[prev.length - 1]?.retryable ? prev.slice(0, -1) : prev));
         } else {
             const userMsg = {
                 id: Date.now(),
@@ -107,8 +112,11 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
         }
         setIsType(true);
 
+        const controller = new AbortController();
+        abortRef.current = controller;
         try {
-            const data = await apiPost(import.meta.env.VITE_API_REVIEW_BOT_URL, { message: text, tribe });
+            const data = await apiPost(import.meta.env.VITE_API_REVIEW_BOT_URL, { message: text, tribe }, { signal: controller.signal });
+            if (controller.signal.aborted) return;
 
             // 將資料轉成前端格式
             const aiReply = {
@@ -132,6 +140,7 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
             setMessages((prev) => [...prev, aiReply]);
 
         } catch (err) {
+            if (controller.signal.aborted) return;
             console.error("錯誤:", err);
             const info = describeChatError(err);
             const errorMsg = {
@@ -144,7 +153,7 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
             setMessages((prev) => [...prev, errorMsg]);
         } finally {
             sendingRef.current = false;
-            setIsType(false);
+            if (!controller.signal.aborted) setIsType(false);
         }
     };
 

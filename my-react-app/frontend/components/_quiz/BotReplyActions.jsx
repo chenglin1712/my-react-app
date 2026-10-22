@@ -11,15 +11,25 @@ const BotReplyActions = ({ text, canRegenerate, onRegenerate, disabled }) => {
     const [failed, setFailed] = useState(false);
     const timerRef = useRef(0);
 
-    useEffect(() => () => clearTimeout(timerRef.current), []);
+    const mountedRef = useRef(true);
+    const attemptRef = useRef(0);       // 連點時只認最後一次複製的結果，較早送出的晚到不能蓋掉它
+
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => { mountedRef.current = false; clearTimeout(timerRef.current); };
+    }, []);
 
     const handleCopy = async () => {
+        attemptRef.current += 1;
+        const attempt = attemptRef.current;
         try {
             await navigator.clipboard.writeText(text);
+            if (!mountedRef.current || attempt !== attemptRef.current) return;
             setFailed(false);
             setCopied(true);
             announce("已複製回覆");
         } catch {
+            if (!mountedRef.current || attempt !== attemptRef.current) return;
             // 沒有剪貼簿權限或不是安全連線：請使用者自己選取（畫面上也要看得到，不只是報讀）
             setCopied(false);
             setFailed(true);

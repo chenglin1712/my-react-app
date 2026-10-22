@@ -18,6 +18,7 @@ from adminapi.rate_limits import get_configured_rate
 from .serializers import TayalChatSerializer, ReviewTayalChatSerializer, ReviewQuestionSerializer
 from . import memory_store
 from . import quota as daily_quota
+from .followups import starter_suggestions
 from .feedback import FeedbackSerializer, feedback_enabled, hash_uid, purge_expired_daily, verified_call
 from .image_input import image_input_enabled
 from .prompt_version import prompt_version
@@ -461,6 +462,8 @@ def ai_quota(request):
         "imageInput": image_input_enabled() and assistant_on,       # 圖片提問（#24）：沒開就不顯示拍照鈕
         "feedback": feedback_enabled() and assistant_on,            # 讚／倒讚（#30）：沒開就不顯示按鈕
     }
+    # 第一次開啟時的建議問題（#13）：依學習資料用模板挑，不呼叫模型；讀不到學習資料就是預設三句
+    data["suggestions"] = starter_suggestions(load_profile(decoded.get("uid", "")))
     return JsonResponse(data)
 
 

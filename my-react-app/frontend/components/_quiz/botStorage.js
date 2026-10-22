@@ -107,3 +107,21 @@ export async function resolveUid() {
         return null;
     }
 }
+
+// 持續監聽登入者：登出或換帳號時回呼新的 uid（登出為 null），回傳取消監聽的函式。
+// 無法監聽（沒有 firebase、測試環境）就退回只讀一次目前的 uid。
+export function watchUid(onChange) {
+    let stopped = false;
+    let unsubscribe = () => {};
+    (async () => {
+        try {
+            const [{ auth }, { onAuthStateChanged }] = await Promise.all([import('../../../firebase'), import('firebase/auth')]);
+            if (stopped) return;
+            unsubscribe = onAuthStateChanged(auth, (user) => { if (!stopped) onChange(user?.uid || null); });
+        } catch {
+            const uid = await resolveUid();
+            if (!stopped) onChange(uid);
+        }
+    })();
+    return () => { stopped = true; unsubscribe(); };
+}

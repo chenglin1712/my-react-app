@@ -202,3 +202,25 @@ describe('ReviewAIAssistant 依錯誤類型提示（路線圖 #31）', () => {
     expect(screen.queryByRole('button', { name: '重試' })).not.toBeInTheDocument();
   });
 });
+
+describe('ReviewAIAssistant 離開頁面時的請求', () => {
+  beforeEach(() => { apiPost.mockReset(); });
+
+  test('卸載時中止還在等的請求，之後回來的回應或錯誤都不會再更新畫面', async () => {
+    let signal;
+    let rejectPost;
+    apiPost.mockImplementation((_url, _body, options) => new Promise((_resolve, reject) => { signal = options.signal; rejectPost = reject; }));
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const user = userEvent.setup();
+    const { unmount } = render(<ReviewAIAssistant tribe="tayal" />);
+    await user.type(screen.getByLabelText('輸入問題'), '你好{Enter}');
+    expect(signal.aborted).toBe(false);
+
+    unmount();
+    expect(signal.aborted).toBe(true);
+    rejectPost(Object.assign(new Error('canceled'), { name: 'CanceledError' }));
+    await Promise.resolve();
+    expect(errorSpy).not.toHaveBeenCalled();     // 被中止的請求不當成錯誤處理
+    errorSpy.mockRestore();
+  });
+});
