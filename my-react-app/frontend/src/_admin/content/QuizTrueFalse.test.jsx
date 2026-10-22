@@ -224,9 +224,8 @@ describe('QuizTrueFalse', () => {
 
     await waitFor(() => {
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        expect.stringContaining(
-          '/image/upload/f_auto,q_auto',
-        ),
+        // 上傳端點必須乾淨：f_auto,q_auto 只對取圖網址有效，接在上傳 API 後面會 404（e50fe0b）
+        expect.stringMatching(/\/v1_1\/[^/]+\/image\/upload$/),
         expect.objectContaining({ method: 'POST' }),
       );
       expect(saveButton).not.toBeDisabled();
@@ -250,7 +249,7 @@ describe('QuizTrueFalse', () => {
           audio_url:
             'https://res.cloudinary.com/demo/video/upload/new-question.mp3',
           image_url:
-            'https://res.cloudinary.com/demo/image/upload/new-question.jpg',
+            'https://res.cloudinary.com/demo/image/upload/f_auto,q_auto/new-question.jpg',
           answer: 2,
         },
       );

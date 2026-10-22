@@ -260,7 +260,8 @@ describe('QuizChoice', () => {
     });
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/image/upload/f_auto,q_auto'),
+      // 上傳端點必須乾淨：f_auto,q_auto 只對取圖網址有效，接在上傳 API 後面會 404（e50fe0b）
+      expect.stringMatching(/\/v1_1\/[^/]+\/image\/upload$/),
       expect.objectContaining({ method: 'POST' }),
     );
 
@@ -280,11 +281,11 @@ describe('QuizChoice', () => {
           question_ab: 'Fangcal ko roma.',
           question_ch: '選出正確的圖片。',
           image_a_url:
-            'https://res.cloudinary.com/demo/image/upload/new-a.jpg',
+            'https://res.cloudinary.com/demo/image/upload/f_auto,q_auto/new-a.jpg',
           image_b_url:
-            'https://res.cloudinary.com/demo/image/upload/new-b.jpg',
+            'https://res.cloudinary.com/demo/image/upload/f_auto,q_auto/new-b.jpg',
           image_c_url:
-            'https://res.cloudinary.com/demo/image/upload/new-c.jpg',
+            'https://res.cloudinary.com/demo/image/upload/f_auto,q_auto/new-c.jpg',
           answer: 3,
         },
       );
