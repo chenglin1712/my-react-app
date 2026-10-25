@@ -14,6 +14,7 @@
 import hashlib
 import logging
 import re
+import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
@@ -229,18 +230,49 @@ def read_user_doc(db, uid: str) -> dict:
 LEASE_HOURS = 6
 
 
-def acquire_lease(db, this_week: str, now: datetime) -> bool:
+def _in_transaction(db, work):
+    """在一個 Firestore transaction 裡執行 work(transaction)；多個執行同時讀寫同一份文件時，
+    Firestore 會讓衝突的那一方整段重跑。測試會換掉這個函式。"""
+    from firebase_admin import firestore
+
+    return firestore.transactional(work)(db.transaction())
+
+
+def acquire_lease(db, this_week: str, now: datetime) -> str | None:
     """同一週同時只讓一個執行在跑（cron 重疊、人工重跑都會撞到）：租約文件 aiDigestJobs/{weekId}，
-    startedAt 在 LEASE_HOURS 內且還沒結束就拿不到。前一次當掉沒結束，過了租期也能接手。"""
+    startedAt 在 LEASE_HOURS 內且還沒結束就拿不到（回傳 None）。前一次當掉沒結束，過了租期也能接手。
+    讀與寫在同一個 transaction 裡，兩個執行不可能都拿到；拿到時回傳 owner（隨機字串），
+    釋放時要出示：接手之後，舊執行者晚到的釋放不能把新執行者的租約標成已結束。"""
     ref = db.collection("aiDigestJobs").document(this_week)
-    snap = ref.get()
-    data = (snap.to_dict() or {}) if snap.exists else {}
-    started = data.get("startedAt")
-    if snap.exists and not data.get("finishedAt") and isinstance(started, datetime)             and now - started < timedelta(hours=LEASE_HOURS):
-        return False
-    ref.set({"startedAt": now, "finishedAt": None})
-    return True
+    owner = uuid.uuid4().hex
+
+    def work(transaction):
+        snap = ref.get(transaction=transaction)
+        data = (snap.to_dict() or {}) if snap.exists else {}
+        started = data.get("startedAt")
+        if (snap.exists and not data.get("finishedAt") and isinstance(started, datetime)
+                and now - started < timedelta(hours=LEASE_HOURS)):
+            return None
+        transaction.set(ref, {"owner": owner, "startedAt": now, "finishedAt": None})
+        return owner
+
+    try:
+        return _in_transaction(db, work)
+    except ValueError:
+        # Firestore 的 transaction 衝突重試用盡（太多執行同時在搶）：沒有人保證自己拿到，視為沒拿到，寧可這晚不跑
+        logger.warning("[digest] 租約競爭太激烈，這次視為沒拿到", exc_info=True)
+        return None
 
 
-def release_lease(db, this_week: str, now: datetime) -> None:
-    db.collection("aiDigestJobs").document(this_week).set({"finishedAt": now}, merge=True)
+def release_lease(db, this_week: str, owner: str, now: datetime) -> bool:
+    """結束租約；租約已經被別的執行者接手（owner 不同）就什麼都不做，回傳 False。"""
+    ref = db.collection("aiDigestJobs").document(this_week)
+
+    def work(transaction):
+        snap = ref.get(transaction=transaction)
+        if not snap.exists or (snap.to_dict() or {}).get("owner") != owner:
+            return False
+        transaction.update(ref, {"finishedAt": now})
+        return True
+
+    return _in_transaction(db, work)

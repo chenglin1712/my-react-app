@@ -128,6 +128,8 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     const dialogRef = useRef(null);
     const inputRef = useRef(null);
     const quotaLoadedRef = useRef(false);
+    const loggedOutRef = useRef(false);      // 登入過、之後登出了：額度請求沒有身分，不必發
+    const quotaEpochRef = useRef(0);         // 登入者每變動一次加一：上一位還沒回來的額度請求，回來後不能寫進新帳號的畫面
     // 今天剩餘的提問次數；null＝還不知道（尚未載入、載入失敗，或伺服器沒有可信的計數），這時不顯示也不擋送出
     const [quota, setQuota] = useState(null);
     const [starters, setStarters] = useState(SUGGESTIONS);
@@ -150,13 +152,15 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     const lastAttachmentRef = useRef(null);
 
     // 第一次展開時讀一次剩餘次數（只讀不扣）。失敗就不顯示，剩餘次數是輔助資訊，不能影響提問。
+    // accountUid 也是依賴：額度、建議問題與功能旗標都是這個帳號的，換帳號時（見下方 watchUid）清掉並在這裡為新帳號重讀。
     useEffect(() => {
-        if (!open || quotaLoadedRef.current) return;
+        if (!open || quotaLoadedRef.current || loggedOutRef.current) return;
         quotaLoadedRef.current = true;
+        const epoch = quotaEpochRef.current;
         (async () => {
             try {
                 const data = await apiGet("/AIModel/quota/");
-                if (mountedRef.current) {
+                if (mountedRef.current && epoch === quotaEpochRef.current) {
                     setQuota(readQuota(data));
                     setImageEnabled(data?.features?.imageInput === true);
                     setFeedbackEnabled(data?.features?.feedback === true);
@@ -173,19 +177,35 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                     }
                 }
             } catch {
-                quotaLoadedRef.current = false; // 下次展開再試
+                if (epoch === quotaEpochRef.current) quotaLoadedRef.current = false; // 下次展開再試；已換帳號就不動新帳號的讀取狀態
             }
         })();
-    }, [open, mountedRef]);
+    }, [open, mountedRef, accountUid]);
 
     // 開啟時還原這台裝置上最近一次的對話（7 天內）。使用者若已經開始送出訊息，就不覆蓋。
     useEffect(() => {
         let active = true;
+        let resolvedOnce = false;
         const stop = watchUid((uid) => {
+            const firstResolution = !resolvedOnce;
+            resolvedOnce = true;
             if (!active || uid === uidRef.current) return;
             const switched = uidRef.current !== null;      // 不是第一次解析出 uid：登出或換了帳號
             uidRef.current = uid;
+            loggedOutRef.current = !uid;                  // 走到這裡的 null 一定是從有人登入變成登出
             setAccountUid(uid);
+            // 上一位的額度（用完會擋住下一位送出）、個人化建議與功能旗標都不能留給新帳號。
+            // 第一次解析出登入者不算換帳號：那之前讀到的是同一個人的資料（或沒帶身分而失敗，失敗會自己重讀）。
+            if (!firstResolution) {
+                quotaEpochRef.current += 1;
+                quotaLoadedRef.current = false;
+                greetingTemplateRef.current = DEFAULT_GREETING;      // 後台開場白是從上一位的額度回應帶來的，新帳號重讀後才會再套上
+                setQuota(null);
+                setStarters(SUGGESTIONS);
+                setImageEnabled(false);
+                setFeedbackEnabled(false);
+                setPlanReplanEnabled(false);
+            }
             setStorageReady(false);                        // 先停止寫入，避免把上一位的對話存到新帳號
             if (switched) {
                 // 上一位的對話不能留在畫面上，也不能帶進新帳號的請求
@@ -623,12 +643,16 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                 )}
 
                 <WeeklyDigestCard variant="bot" uid={accountUid} />
-                <TrackedStudyPlan
-                    refreshKey={trackedPlanKey}
-                    replanEnabled={planReplanEnabled}
-                    tribe={tribe}
-                    onQuota={(raw) => setQuota(readQuota(raw))}
-                />
+                {/* 計畫屬於登入者：等確定是誰再掛載，換帳號（key 改變）就整個重掛，舊帳號的計畫與進行中的寫入不會留到新帳號 */}
+                {accountUid && (
+                    <TrackedStudyPlan
+                        key={accountUid}
+                        refreshKey={trackedPlanKey}
+                        replanEnabled={planReplanEnabled}
+                        tribe={tribe}
+                        onQuota={(raw) => setQuota(readQuota(raw))}
+                    />
+                )}
 
                 {/* role="log"：新訊息會被報讀器依序念出，不打斷使用者正在做的事 */}
                 <ChatLog ref={messagesBoxRef} className="messages-container">

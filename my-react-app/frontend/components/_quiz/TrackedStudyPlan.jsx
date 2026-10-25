@@ -48,6 +48,9 @@ const TrackedStudyPlan = ({ refreshKey = 0, replanEnabled = false, tribe, onQuot
     const mountedRef = useRef(true);
     const writeChainRef = useRef(Promise.resolve());     // 勾選依點擊順序一筆一筆寫，最後的資料一定是最後一次點擊
     const pendingWritesRef = useRef(0);
+    const loadSeqRef = useRef(0);                        // 載入的世代：只有最新一次載入的結果可以套用
+    const editsRef = useRef(0);                          // 本機勾選的次數：載入期間有人勾選，那份載入結果就是舊的
+    const loadDroppedRef = useRef(false);                // 有載入結果因為太舊被丟掉：寫入全部結束後要重讀一次
     const controllerRef = useRef(null);
     const listId = useId();
     const availabilityId = useId();
@@ -62,11 +65,26 @@ const TrackedStudyPlan = ({ refreshKey = 0, replanEnabled = false, tribe, onQuot
     }, []);
 
     const load = useCallback(async () => {
-        try {
-            const loaded = await getTrackedPlan();
-            if (mountedRef.current) setPlan(loaded);
-        } catch {
-            if (mountedRef.current) setPlan(null);
+        // 最多重讀兩次：連續勾選時不要一直重讀；放棄時畫面維持本機的最新狀態（每次勾選寫入後也都對齊過資料庫）
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            const seq = ++loadSeqRef.current;
+            const edits = editsRef.current;
+            let loaded = null;
+            try {
+                loaded = await getTrackedPlan();
+            } catch {
+                loaded = null;
+            }
+            if (!mountedRef.current || seq !== loadSeqRef.current) return;      // 已卸載，或有較新的載入
+            if (edits === editsRef.current && pendingWritesRef.current === 0) {
+                setPlan(loaded);
+                return;
+            }
+            // 讀的是勾選前的快照：不能蓋掉畫面。寫入還在跑就等它結束後再讀（toggle 的 finally 會補讀）；已經結束了就現在重讀
+            if (pendingWritesRef.current > 0) {
+                loadDroppedRef.current = true;
+                return;
+            }
         }
     }, []);
 
@@ -79,6 +97,7 @@ const TrackedStudyPlan = ({ refreshKey = 0, replanEnabled = false, tribe, onQuot
 
     const toggle = async (task) => {
         const next = !task.done;
+        editsRef.current += 1;
         setNotice("");
         setPlan((current) => ({ ...current, tasks: withTaskDone(current.tasks, task.id, next) }));      // 先反映在畫面上
         pendingWritesRef.current += 1;
@@ -95,6 +114,10 @@ const TrackedStudyPlan = ({ refreshKey = 0, replanEnabled = false, tribe, onQuot
             }
         } finally {
             pendingWritesRef.current -= 1;
+            if (pendingWritesRef.current === 0 && loadDroppedRef.current && mountedRef.current) {
+                loadDroppedRef.current = false;
+                load();
+            }
         }
     };
 
@@ -112,6 +135,7 @@ const TrackedStudyPlan = ({ refreshKey = 0, replanEnabled = false, tribe, onQuot
             } else {
                 const tasks = await applyReplan(result);
                 if (!mountedRef.current) return;
+                editsRef.current += 1;                                  // 重排前就開始的載入結果是舊的，不能蓋掉
                 setPlan((current) => ({ ...current, tasks }));
                 setReplanOpen(false);
                 setAvailability("");
@@ -132,6 +156,9 @@ const TrackedStudyPlan = ({ refreshKey = 0, replanEnabled = false, tribe, onQuot
         try {
             await stopTracking();
             if (!mountedRef.current) return;
+            editsRef.current += 1;                                      // 結束追蹤前就開始的載入不能讓計畫重新出現
+            loadSeqRef.current += 1;
+            loadDroppedRef.current = false;
             setPlan(null);
             announce("已結束追蹤這份計畫");
         } catch {

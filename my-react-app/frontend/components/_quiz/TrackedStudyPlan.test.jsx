@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TrackedStudyPlan from './TrackedStudyPlan';
 import { apiPost } from '../../utils/apiClient';
@@ -47,6 +47,45 @@ const startReplan = async (user) => {
 };
 
 describe('TrackedStudyPlan', () => {
+  test('勾選之前開始的載入，結果回來時不蓋掉畫面，寫入結束後再重讀一次', async () => {
+    let resolveStale;
+    const { rerender } = render(<TrackedStudyPlan tribe="tayal" />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /一週讀書計畫/ }));
+    const taskB = screen.getByRole('checkbox', { name: /任務b/ });
+    // refreshKey 變動：開始一次新的載入，但它的結果拖到最後才回來
+    getTrackedPlan.mockReset()
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveStale = resolve; }))
+      .mockResolvedValue({ ...PLAN, tasks: [task('a', { done: true }), task('b', { done: true }), task('c')] });
+    setTaskDone.mockResolvedValue([task('a', { done: true }), task('b', { done: true }), task('c')]);
+    rerender(<TrackedStudyPlan tribe="tayal" refreshKey={1} />);
+    await waitFor(() => expect(getTrackedPlan).toHaveBeenCalledTimes(1));
+
+    await user.click(taskB);
+    await waitFor(() => expect(setTaskDone).toHaveBeenCalledWith('b', true));
+    await act(async () => { resolveStale(PLAN); });                           // 勾選前的快照：任務 b 還是未完成
+
+    await waitFor(() => expect(getTrackedPlan).toHaveBeenCalledTimes(2));     // 寫入結束後補讀
+    expect(screen.getByRole('checkbox', { name: /任務b/ })).toBeChecked();
+  });
+
+  test('結束追蹤之前開始的載入，結果回來時不會讓計畫重新出現', async () => {
+    let resolveStale;
+    stopTracking.mockResolvedValue(undefined);
+    const { rerender, container } = render(<TrackedStudyPlan tribe="tayal" />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /一週讀書計畫/ }));
+    getTrackedPlan.mockReset().mockImplementationOnce(() => new Promise((resolve) => { resolveStale = resolve; }));
+    rerender(<TrackedStudyPlan tribe="tayal" refreshKey={1} />);
+    await waitFor(() => expect(getTrackedPlan).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByRole('button', { name: '結束追蹤' }));
+    await user.click(screen.getByRole('button', { name: '結束追蹤' }));
+    await waitFor(() => expect(stopTracking).toHaveBeenCalled());
+    await act(async () => { resolveStale(PLAN); });
+    expect(container).toBeEmptyDOMElement();
+  });
+
   test('沒有追蹤中的計畫時整塊不顯示', async () => {
     getTrackedPlan.mockResolvedValue(null);
     const { container } = render(<TrackedStudyPlan tribe="tayal" />);

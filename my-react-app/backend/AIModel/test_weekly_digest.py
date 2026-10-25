@@ -64,7 +64,7 @@ class FakeDocRef:
     def __init__(self, db, path):
         self.db, self.path = db, path
 
-    def get(self):
+    def get(self, transaction=None):
         return FakeDoc(self.db.docs.get(self.path))
 
     def set(self, payload, merge=False):
@@ -75,6 +75,20 @@ class FakeDocRef:
 
     def collection(self, name):
         return FakeCollection(self.db, f"{self.path}/{name}")
+
+
+class FakeTransaction:
+    """只模擬讀寫介面；真正的原子性由 Firestore 保證，測試的是 transaction 裡的判斷邏輯。"""
+
+    def set(self, ref, payload):
+        ref.set(payload)
+
+    def update(self, ref, payload):
+        ref.set(payload, merge=True)
+
+
+def fake_in_transaction(db, work):
+    return work(FakeTransaction())
 
 
 class FakeDB:
@@ -228,6 +242,7 @@ class CommandTests(TestCase):
         with patch.object(cmd, "digest_enabled", return_value=enabled), \
                 patch.object(cmd, "budget_exceeded", return_value=False), \
                 patch("AIModel.weekly_digest._client", return_value=db or FakeDB()), \
+                patch("AIModel.weekly_digest._in_transaction", fake_in_transaction), \
                 patch("config.llm.get_llm_client", return_value=client or MagicMock()), \
                 patch("config.llm._record_usage"), \
                 patch("AIModel.weekly_digest._server_timestamp", return_value="ts"):
@@ -309,6 +324,85 @@ class CommandTests(TestCase):
         db.docs["aiDigestJobs/2026-W43"] = {"startedAt": datetime.now(timezone.utc) - timedelta(hours=7), "finishedAt": None}
         self._run(db=db, client=client)
         self.assertIsNotNone(db.docs["aiDigestJobs/2026-W43"]["finishedAt"])
+
+    def test_lease_records_its_owner_and_only_that_owner_can_release_it(self):
+        db = FakeDB()
+        with patch("AIModel.weekly_digest._in_transaction", fake_in_transaction):
+            first = wd.acquire_lease(db, "2026-W43", NOW)
+            self.assertTrue(first)
+            self.assertEqual(db.docs["aiDigestJobs/2026-W43"]["owner"], first)
+            self.assertIsNone(wd.acquire_lease(db, "2026-W43", NOW))             # 有效租約拿不到
+            # 租期過了被別人接手；舊執行者晚到的釋放不能把新執行者的租約標成已結束
+            later = NOW + timedelta(hours=wd.LEASE_HOURS + 1)
+            second = wd.acquire_lease(db, "2026-W43", later)
+            self.assertTrue(second)
+            self.assertNotEqual(first, second)
+            self.assertFalse(wd.release_lease(db, "2026-W43", first, later))
+            self.assertIsNone(db.docs["aiDigestJobs/2026-W43"]["finishedAt"])
+            self.assertIsNone(wd.acquire_lease(db, "2026-W43", later))           # 新租約仍有效，第三個執行者進不來
+            self.assertTrue(wd.release_lease(db, "2026-W43", second, later))
+            self.assertIsNotNone(db.docs["aiDigestJobs/2026-W43"]["finishedAt"])
+
+    def test_a_failing_lease_release_is_logged_and_does_not_fail_the_run(self):
+        db, client = FakeDB(situations=[situation("u1")]), MagicMock()
+        client.messages.batches.create.return_value = SimpleNamespace(id="b5")
+        client.messages.batches.retrieve.return_value = SimpleNamespace(id="b5", processing_status="ended")
+        client.messages.batches.results.return_value = [batch_entry("u1", json.dumps({"summary": "這週很認真練習。"}))]
+        with patch("AIModel.weekly_digest.release_lease", side_effect=ValueError("Failed to commit transaction in 5 attempts.")):
+            text = self._run(db=db, client=client)
+        self.assertIn("模型摘要 1", text)                                          # 摘要照常寫入，釋放失敗只記錄
+
+    def test_lease_contention_that_exhausts_the_retries_counts_as_not_acquired(self):
+        def exhausted(db, work):
+            raise ValueError("Failed to commit transaction in 5 attempts.")
+
+        with patch("AIModel.weekly_digest._in_transaction", exhausted):
+            self.assertIsNone(wd.acquire_lease(FakeDB(), "2026-W43", NOW))
+
+    def test_transient_poll_errors_are_retried_and_the_run_still_gets_model_summaries(self):
+        db, client = FakeDB(situations=[situation("u1")]), MagicMock()
+        client.messages.batches.create.return_value = SimpleNamespace(id="b1")
+        client.messages.batches.retrieve.side_effect = [
+            RuntimeError("429"), RuntimeError("timeout"), SimpleNamespace(id="b1", processing_status="ended"),
+        ]
+        client.messages.batches.results.return_value = [batch_entry("u1", json.dumps({"summary": "這週很認真練習。"}))]
+        with patch.object(cmd.time, "sleep"):
+            text = self._run(db=db, client=client)
+        self.assertIn("模型摘要 1", text)
+        client.messages.batches.cancel.assert_not_called()
+
+    def test_poll_errors_that_never_recover_cancel_the_batch_and_write_templates(self):
+        db, client = FakeDB(situations=[situation("u1"), situation("u2")]), MagicMock()
+        client.messages.batches.create.return_value = SimpleNamespace(id="b2")
+        client.messages.batches.retrieve.side_effect = RuntimeError("down")
+        with patch.object(cmd.time, "sleep"):
+            text = self._run(db=db, client=client)
+        client.messages.batches.cancel.assert_called_once_with("b2")
+        client.messages.batches.results.assert_not_called()
+        self.assertIn("固定樣板 2", text)
+        self.assertIsNotNone(db.docs["aiDigestJobs/2026-W43"]["finishedAt"])      # 租約仍然釋放
+
+    def test_poll_failure_and_cancel_failure_still_end_with_templates(self):
+        db, client = FakeDB(situations=[situation("u1")]), MagicMock()
+        client.messages.batches.create.return_value = SimpleNamespace(id="b3")
+        client.messages.batches.retrieve.side_effect = RuntimeError("down")
+        client.messages.batches.cancel.side_effect = RuntimeError("cancel down")
+        with patch.object(cmd.time, "sleep"):
+            text = self._run(db=db, client=client)
+        self.assertIn("固定樣板 1", text)
+
+    def test_status_errors_while_waiting_for_the_cancel_do_not_abort_the_run(self):
+        db, client = FakeDB(situations=[situation("u1")]), MagicMock()
+        client.messages.batches.create.return_value = SimpleNamespace(id="b4")
+        client.messages.batches.retrieve.side_effect = [
+            SimpleNamespace(id="b4", processing_status="in_progress"),
+            RuntimeError("a"), RuntimeError("b"), RuntimeError("c"),
+        ]
+        client.messages.batches.results.return_value = []
+        with patch.object(cmd.time, "sleep"), patch.object(cmd.time, "monotonic", side_effect=[0, 0, 10**9]):
+            text = self._run("--wait-minutes", "1", db=db, client=client)
+        client.messages.batches.cancel.assert_called_once_with("b4")
+        self.assertIn("固定樣板 1", text)
 
     def test_budget_check_failure_means_no_run(self):
         db, client = FakeDB(situations=[situation("u1")]), MagicMock()

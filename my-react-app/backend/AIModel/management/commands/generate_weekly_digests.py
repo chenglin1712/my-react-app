@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 DIGEST_FLAG = "ai_weekly_digest_enabled"
 POLL_SECONDS = 30
+RETRIEVE_ATTEMPTS = 3                 # 讀 Batch 狀態遇到暫時性錯誤（逾時、429）時的嘗試次數
+RETRIEVE_BACKOFF_SECONDS = (2, 5)     # 兩次嘗試之間的等待
 
 
 def digest_enabled() -> bool:
@@ -99,8 +101,28 @@ def fetch_summaries(client, batch_id: str, planned: list) -> dict:
     return summaries
 
 
+def retrieve_with_retry(client, batch_id: str):
+    """讀 Batch 狀態；暫時性錯誤重試幾次，用盡回傳 None（呼叫端決定怎麼收尾）。"""
+    for attempt in range(RETRIEVE_ATTEMPTS):
+        try:
+            return client.messages.batches.retrieve(batch_id)
+        except Exception:
+            logger.warning("[digest] 讀取 Batch 狀態失敗（%s/%s）", attempt + 1, RETRIEVE_ATTEMPTS, exc_info=True)
+            if attempt + 1 < RETRIEVE_ATTEMPTS:
+                time.sleep(RETRIEVE_BACKOFF_SECONDS[min(attempt, len(RETRIEVE_BACKOFF_SECONDS) - 1)])
+    return None
+
+
+def cancel_quietly(client, batch_id: str) -> None:
+    try:
+        client.messages.batches.cancel(batch_id)
+    except Exception:
+        logger.warning("[digest] 取消 Batch 失敗", exc_info=True)
+
+
 def submit_and_wait(client, planned: list, wait_minutes: int, out) -> str | None:
-    """提交 Batch 並等到結束；等太久就取消（已完成的請求仍取得到結果）。回傳 batch_id，提交失敗回傳 None。"""
+    """提交 Batch 並等到結束；等太久就取消（已完成的請求仍取得到結果）。回傳 batch_id，提交失敗回傳 None。
+    狀態一直讀不到（重試用盡）也回傳 None 並取消 Batch：遠端不能繼續花錢，學生改用固定樣板。"""
     requests = [wd.build_batch_request(uid, stats, words) for uid, stats, words in planned]
     try:
         batch = client.messages.batches.create(requests=requests)
@@ -108,22 +130,25 @@ def submit_and_wait(client, planned: list, wait_minutes: int, out) -> str | None
         logger.error("[digest] 提交 Batch 失敗，這次全部改用固定樣板", exc_info=True)
         return None
     out.write(f"已提交 Batch {batch.id}（{len(requests)} 位學生），最多等 {wait_minutes} 分鐘")
+    batch_id = batch.id
     deadline = time.monotonic() + wait_minutes * 60
     while time.monotonic() < deadline:
-        batch = client.messages.batches.retrieve(batch.id)
-        if batch.processing_status == "ended":
-            return batch.id
+        status = retrieve_with_retry(client, batch_id)
+        if status is None:
+            out.write(f"無法讀取 Batch {batch_id} 的狀態，取消並全部改用固定樣板")
+            cancel_quietly(client, batch_id)
+            return None
+        if status.processing_status == "ended":
+            return batch_id
         time.sleep(POLL_SECONDS)
-    out.write(f"Batch {batch.id} 等太久，取消並只取回已完成的部分")
-    try:
-        client.messages.batches.cancel(batch.id)
-        for _ in range(20):                       # 取消通常很快結束；最多再等約 10 分鐘
-            if client.messages.batches.retrieve(batch.id).processing_status == "ended":
-                break
-            time.sleep(POLL_SECONDS)
-    except Exception:
-        logger.warning("[digest] 取消 Batch 失敗", exc_info=True)
-    return batch.id
+    out.write(f"Batch {batch_id} 等太久，取消並只取回已完成的部分")
+    cancel_quietly(client, batch_id)
+    for _ in range(20):                           # 取消通常很快結束；最多再等約 10 分鐘
+        status = retrieve_with_retry(client, batch_id)
+        if status is None or status.processing_status == "ended":
+            break
+        time.sleep(POLL_SECONDS)
+    return batch_id
 
 
 def write_all(db, planned: list, summaries: dict, now: datetime) -> dict:
@@ -168,15 +193,18 @@ class Command(BaseCommand):
         now = datetime.now(timezone.utc)
         db = wd._client()
         this_week = wd.week_id(now)
-        if not options["dry_run"] and not wd.acquire_lease(db, this_week, now):
-            self.stdout.write(f"{this_week} 已有另一個執行在跑（或剛跑完），略過")
-            return
+        owner = None
+        if not options["dry_run"]:
+            owner = wd.acquire_lease(db, this_week, now)
+            if owner is None:
+                self.stdout.write(f"{this_week} 已有另一個執行在跑（或剛跑完），略過")
+                return
         try:
             self._run(db, now, options)
         finally:
-            if not options["dry_run"]:
+            if owner is not None:
                 try:
-                    wd.release_lease(db, this_week, datetime.now(timezone.utc))
+                    wd.release_lease(db, this_week, owner, datetime.now(timezone.utc))
                 except Exception:
                     logger.warning("[digest] 釋放租約失敗（租期過後會自動失效）", exc_info=True)
 
