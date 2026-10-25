@@ -6,6 +6,7 @@
 # 環境變數：
 #      SKIP_BACKUP=1     略過部署前備份（不建議）
 #      PROXY_BASE=...    反向代理對外位址，預設 https://127.0.0.1
+#      ALLOW_NO_REDIS=1  .env 沒有 REDIS_URL 也照常部署（限流計數會退回各 worker 的記憶體）
 #
 # 回滾範圍：前端 dist 與兩個後端 image（yuanyu-django／yuanyu-fastapi 的 :prev 標籤）。
 # 不含資料庫 schema：後端容器啟動時會自動 migrate，若新版 migration 與舊版程式不相容，
@@ -45,6 +46,11 @@ preflight() {
   fi
   if [ -z "$(env_value DJANGO_SECRET_KEY)" ]; then
     echo "!! .env 沒有 DJANGO_SECRET_KEY。部署中止。"; return 1
+  fi
+  # 沒有 REDIS_URL 時限流計數只存在各 worker 的記憶體：gunicorn 3 個 worker 的門檻變 3 倍，重啟還會歸零。
+  # 確定要這樣部署時用 ALLOW_NO_REDIS=1 明確放行。
+  if [ -z "$(env_value REDIS_URL)" ] && ! is_true "${ALLOW_NO_REDIS:-}"; then
+    echo "!! .env 沒有 REDIS_URL，限流計數會退回各 worker 的記憶體。請設定，或用 ALLOW_NO_REDIS=1 明確放行。部署中止。"; return 1
   fi
   # 等待健康檢查與回滾都依賴 `up --wait --wait-timeout`，太舊的 Docker Compose 不支援，
   # 部署到一半才失敗、連回滾也失敗最糟，所以先檢查。

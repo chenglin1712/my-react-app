@@ -69,7 +69,7 @@ chmod +x "$SB/bin/"*
 
 # ── 工具函式 ─────────────────────────────────────────────────────
 good_env() {
-  printf 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\nAUTH_DEV_BYPASS=False\nDATABASE_URL=postgresql://u:p@h/db\n' > "$SB/repo/.env"
+  printf 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\nAUTH_DEV_BYPASS=False\nDATABASE_URL=postgresql://u:p@h/db\nREDIS_URL=redis://localhost:6379/0\n' > "$SB/repo/.env"
   echo '{}' > "$SB/repo/serviceAccountKey.json"
 }
 
@@ -141,8 +141,13 @@ env_case "export 前綴的 AUTH_DEV_BYPASS=True 仍能辨識並中止" 'DJANGO_S
 env_case "等號兩邊有空白的 DJANGO_DEBUG = true 仍能辨識並中止" 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG = true\nDATABASE_URL=postgresql://u:p@h/db\n' 'DJANGO_DEBUG'
 env_case "帶引號與行尾註解的 AUTH_DEV_BYPASS=\"True\" # 開發用 仍能辨識並中止" 'DJANGO_SECRET_KEY=x\nAUTH_DEV_BYPASS="True"  # 開發用\nDATABASE_URL=postgresql://u:p@h/db\n' 'AUTH_DEV_BYPASS'
 env_case "缺少 DATABASE_URL 中止" 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\n' 'DATABASE_URL'
-good_env; printf 'DJANGO_SECRET_KEY=x\n# DJANGO_DEBUG=True\nDJANGO_DEBUG=False\nDATABASE_URL=postgresql://u:p@h/db\n' > "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+good_env; printf 'DJANGO_SECRET_KEY=x\n# DJANGO_DEBUG=True\nDJANGO_DEBUG=False\nDATABASE_URL=postgresql://u:p@h/db\nREDIS_URL=redis://localhost:6379/0\n' > "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
 check "被註解掉的 DJANGO_DEBUG=True 不算數，不會誤擋（部署成功）" "$([ $rc = 0 ]; echo $?)"
+
+env_case "缺少 REDIS_URL 中止（限流計數會退回各 worker 的記憶體）" 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\nDATABASE_URL=postgresql://u:p@h/db\n' 'REDIS_URL'
+env_case "REDIS_URL 只有空引號也算沒設定，中止" 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\nDATABASE_URL=postgresql://u:p@h/db\nREDIS_URL=""  # 沒設\n' 'REDIS_URL'
+good_env; printf 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\nDATABASE_URL=postgresql://u:p@h/db\n' > "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1 ALLOW_NO_REDIS=1; rc=$?
+check "ALLOW_NO_REDIS=1 明確放行：沒有 REDIS_URL 也能部署" "$([ $rc = 0 ]; echo $?)"
 
 # ── backup.sh ───────────────────────────────────────────────────
 echo "backup.sh"

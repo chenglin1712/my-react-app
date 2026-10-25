@@ -77,7 +77,7 @@ services:
       retries: 3
       start_period: 10s
 
-# 補充：若 .env 內 AUTH_DEV_BYPASS 不是 True（也就是要真的驗證 Firebase
-# token），FIREBASE_SERVICE_ACCOUNT_PATH 指到的服務帳戶金鑰 JSON 檔案也需要
-# 額外用 volumes 掛進容器（本檔案預設沒加，因為 .env.example 預設
-# AUTH_DEV_BYPASS=True，多數本機開發情境用不到）。
+# 補充：.env.example 預設 AUTH_DEV_BYPASS=False（不略過驗證）。要真的驗證 Firebase
+# token，FIREBASE_SERVICE_ACCOUNT_PATH 指到的服務帳戶金鑰 JSON 檔案需要額外用 volumes
+# 掛進容器（本檔案預設沒加）；沒有金鑰的本機開發，請在自己的 .env 同時設
+# DJANGO_DEBUG=True 與 AUTH_DEV_BYPASS=True 才會略過驗證。

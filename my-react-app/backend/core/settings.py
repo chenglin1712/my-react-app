@@ -270,6 +270,14 @@ if _redis_url:
             },
         }
     }
+elif not DEBUG:
+    # 正式環境沒有 Redis：限流計數退回各 worker 自己的記憶體，gunicorn 3 個 worker 就是 3 倍門檻，
+    # 重啟還會歸零。不直接中止啟動（避免只因為缺這一項就讓整站起不來），但要讓人看得到。
+    import logging as _logging
+
+    _logging.getLogger(__name__).error(
+        "REDIS_URL 沒有設定：限流計數只存在各 worker 的記憶體，實際門檻會是設定值 × worker 數。正式環境請設定 REDIS_URL。"
+    )
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field

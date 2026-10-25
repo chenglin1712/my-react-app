@@ -259,7 +259,7 @@ bash deploy.sh --force   # 強制重建（例如只改了 .env、沒有新 commi
 - `DJANGO_DEBUG=False` 時：Swagger UI（`/docs/`）不會掛載（404，只在開發環境可用）；`SECURE_SSL_REDIRECT`／`SESSION_COOKIE_SECURE`／`CSRF_COOKIE_SECURE`／HSTS 會自動開啟，反向代理需要正確設定 `X-Forwarded-Proto`（Django 透過 `SECURE_PROXY_SSL_HEADER` 讀這個標頭判斷連線是否為 HTTPS；nginx 參考設定見 `deploy/nginx.conf`）。
 - `collectstatic` 已經包在 `docker-compose.prod.yml` 的啟動指令裡，透過 `deploy.sh` 部署不用手動處理；只有不透過 Docker、直接跑 gunicorn 的情境才需要自己先跑一次（admin／DRF 頁面的 CSS/JS 由 WhiteNoise 從 `STATIC_ROOT` 提供，沒跑過這個指令樣式會跑掉）。
 - **FastAPI 辭典快取僅支援單一 process**：Django 寫入辭典／文法資料後，只會發一次 HTTP request 通知 FastAPI 清快取，只會命中其中一個 process。所以 `uvicorn` 不可加 `--workers`，也不可開多個水平 replica，否則部分 instance 會無聲地持續回傳舊辭典資料。水平擴展前要先把快取改成 Redis 等共享機制。
-- `REDIS_URL` 沒設定時限流計數會退回單一 process 的記憶體，gunicorn 多 worker 下門檻會被 worker 數量乘倍放大；正式環境的 `.env` 要記得設定。
+- `REDIS_URL` 沒設定時限流計數會退回單一 process 的記憶體，gunicorn 多 worker 下門檻會被 worker 數量乘倍放大。正式環境必須設定：兩個服務沒設定時啟動會記錄錯誤，`deploy.sh` 也會中止（確定要這樣部署時用 `ALLOW_NO_REDIS=1 bash deploy.sh`）。
 - `SENTRY_DSN` 建議設定：Django／FastAPI 都已接上 Sentry，沒設定不影響運作，但容器重啟後查不到過去的錯誤記錄，也收不到告警。
 - 健康檢查端點：Django `/health/`、FastAPI `/health`（存活探測）與 `/ready`（就緒探測），皆不需要登入。
 

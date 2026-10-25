@@ -8,11 +8,14 @@
 跟 Django 端（core/settings.py 的 CACHES）讀同一個環境變數，設定一次同時對兩個
 服務生效（先前只有 Django 端接了 REDIS_URL，FastAPI 這邊被漏掉）。
 """
+import logging
 import os
 
 from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+
+from config.debug_flag import is_debug
 
 
 def rate_limit_key(request: Request) -> str:
@@ -29,6 +32,12 @@ def rate_limit_key(request: Request) -> str:
 # 這個專案根目錄的 .env 含非 ASCII 內容，會讓 slowapi 在讀檔時直接以
 # UnicodeDecodeError 掛掉。指到不存在的檔名讓它略過讀取（Starlette Config 對不存在
 # 的 env_file 只會 warn，不會噴例外）。
+if not os.getenv("REDIS_URL") and not is_debug():
+    # 正式環境沒有 Redis：計數只在這個 process 的記憶體，重啟歸零，多開 worker 會乘倍。大聲說，但不中止啟動。
+    logging.getLogger(__name__).error(
+        "REDIS_URL 沒有設定：限流計數只存在 FastAPI process 的記憶體，重啟歸零。正式環境請設定 REDIS_URL。"
+    )
+
 limiter = Limiter(
     key_func=rate_limit_key,
     config_filename="__slowapi_no_dotenv__",
