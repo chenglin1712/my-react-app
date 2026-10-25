@@ -14,6 +14,7 @@ from django.http import JsonResponse
 from django_ratelimit.core import is_ratelimited
 
 from core.firebase_auth import verify_firebase_token
+from config.client_ip import client_ip as get_client_ip
 from config.tribes import TRIBE_IDS, TRIBE_MAP
 from adminapi.rate_limits import get_configured_rate
 
@@ -114,7 +115,7 @@ def get_tayal_imformation(request):
     """
     # 維持公開（不要求登入），但仍加 IP 限流防止匿名濫用；已有 15 分鐘快取，
     # 即使被打穿限流，實際對外部網站的請求量也有上限。
-    client_ip = request.META.get("REMOTE_ADDR", "unknown")
+    client_ip = get_client_ip(request)   # 不能直接用 REMOTE_ADDR：前面是 nginx 時會是全站共用的 127.0.0.1
     limited_resp = _rate_limited_response(
         request, client_ip, group="get_tayal_imformation", rate="60/m", method="GET"
     )
@@ -130,7 +131,7 @@ def get_tayal_imformation(request):
 
 def get_exam_schedule(request):
     # 首頁行事曆維持公開（不要求登入），比照 get_tayal_imformation 加 IP 限流 + 快取。
-    client_ip = request.META.get("REMOTE_ADDR", "unknown")
+    client_ip = get_client_ip(request)   # 不能直接用 REMOTE_ADDR：前面是 nginx 時會是全站共用的 127.0.0.1
     limited_resp = _rate_limited_response(
         request, client_ip, group="get_exam_schedule", rate="60/m", method="GET"
     )

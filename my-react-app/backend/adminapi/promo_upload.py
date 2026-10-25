@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 MAX_COVER_BYTES = 2 * 1024 * 1024
 MAX_CAPTION_BYTES = 200 * 1024
 MAX_COVER_SIDE = 4000
+# 封面只收這兩種格式，Image.open(formats=) 會把解碼器鎖在這兩種
+_COVER_FORMATS = ("JPEG", "WEBP")
 MAX_VIDEO_WIDTH = 1920
 MAX_VIDEO_HEIGHT = 4096
 FFPROBE_TIMEOUT_SECONDS = 20
@@ -276,10 +278,13 @@ def validate_and_reencode_cover(path):
     from PIL import Image, ImageOps, UnidentifiedImageError
 
     try:
-        with Image.open(path) as probe:
+        # formats= 讓其他格式（TIFF、PNG、GIF…）連檔頭都不會解析：Pillow 的解碼器有不少已知的記憶體損毀漏洞，
+        # 封面只需要這兩種。不在清單內的檔案會丟 UnidentifiedImageError，下面回覆「請改用 JPEG 或 WebP」。
+        with Image.open(path, formats=_COVER_FORMATS) as probe:
             fmt = probe.format
             width, height = probe.size
-            frames = getattr(probe, "n_frames", 1)
+            # 動圖幀數要等尺寸檢查通過再讀（讀 n_frames 會解析容器的額外資訊）
+            frames = 1 if max(width, height) > MAX_COVER_SIDE else getattr(probe, "n_frames", 1)
     except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
         raise PromoUploadError("無法讀取這張封面圖，請改用 JPEG 或 WebP 格式。", 422)
     if fmt not in ("JPEG", "WEBP"):
@@ -292,7 +297,7 @@ def validate_and_reencode_cover(path):
     ext = "jpg" if fmt == "JPEG" else "webp"
     out_path = os.path.join(staging_root(), uuid.uuid4().hex + ".part")
     try:
-        with Image.open(path) as img:
+        with Image.open(path, formats=_COVER_FORMATS) as img:
             img.load()
             img = ImageOps.exif_transpose(img)
             if img.mode not in ("RGB", "L"):

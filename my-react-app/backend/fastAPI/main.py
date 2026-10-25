@@ -160,6 +160,12 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
 
+@app.exception_handler(auth.GuestTokenError)
+async def _guest_token_error_handler(request: Request, exc: auth.GuestTokenError):
+    """訪客憑證不合格：401 加上機器可讀的 code，前端據此換領新憑證。其餘 HTTPException 維持 FastAPI 內建格式。"""
+    return JSONResponse({"detail": exc.detail, "code": auth.GUEST_TOKEN_INVALID_CODE}, status_code=401)
+
+
 @app.exception_handler(Exception)
 async def _unhandled_exception_handler(request: Request, exc: Exception):
     """P4 review BE-28：vision.py／quiz/api.py／dictionary/search.py 原本
@@ -203,6 +209,8 @@ app.include_router(
     translation.router, prefix="/api/v1/translation",
     dependencies=[Depends(auth.verify_firebase_token_or_guest)],
 )
+# 訪客憑證核發：匿名可呼叫，所以不掛上面那個依賴；端點自己檢查旗標並限流（見 translation/guest_token.py）。
+app.include_router(translation.guest_token_router, prefix="/api/v1/translation")
 # 詞形分析：輸入一個詞形，回傳可能的詞根／切分／詞綴功能／例句與信心（見 routes/morphology/）。
 # 分析器每族第一次用到時才建立並快取，不需要掛進啟動預熱。
 app.include_router(morphology.router, prefix="/api/v1/morphology", dependencies=_require_login)

@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { auth } from '../../firebase';
-import { getGuestId, GUEST_ID_HEADER } from './guestId';
+import { forgetGuestToken, getGuestToken, GUEST_TOKEN_HEADER, GUEST_TOKEN_INVALID_CODE } from './guestToken';
 
 /**
  * 統一附加 Firebase ID token、統一解析錯誤訊息的 API 呼叫工具。
@@ -29,9 +29,18 @@ export class ApiError extends Error {
 async function authHeaders(guest) {
   const token = await auth.currentUser?.getIdToken();
   if (token) return { Authorization: `Bearer ${token}` };
-  // 沒登入、且呼叫端明確標示 guest（訪客翻譯試用）才帶瀏覽器代號；其他請求不帶，避免到處送出代號
-  return guest ? { [GUEST_ID_HEADER]: getGuestId() } : {};
+  if (!guest) return {};
+  // 沒登入、且呼叫端明確標示 guest（訪客翻譯試用）才帶後端核發的訪客憑證；其他請求不帶，避免到處送出憑證。
+  // 領取失敗（這個網路今天領太多、訪客試用沒開放、連不上）時，把後端的訊息原樣交給呼叫端。
+  try {
+    return { [GUEST_TOKEN_HEADER]: await getGuestToken() };
+  } catch (err) {
+    throwNormalizedError(err);
+  }
 }
+
+const isGuestTokenRejected = (err) =>
+  err?.response?.status === 401 && err.response.data?.code === GUEST_TOKEN_INVALID_CODE;
 
 /** 預設逾時：伺服器接了連線卻一直不回應時，頁面不該永遠停在載入中。
  * 影像辨識、翻譯、AI 出題都可能跑比較久，所以抓 60 秒（nginx 的 proxy_read_timeout 是 90 秒，
@@ -64,7 +73,9 @@ function extractMessage(value) {
   return null;
 }
 
-function throwNormalizedError(err) {
+function throwNormalizedError(rawErr) {
+  // 被丟出來的不一定是物件（null、字串）：先轉成 Error，避免讀屬性時再丟 TypeError 蓋掉原始錯誤
+  const err = rawErr && typeof rawErr === 'object' ? rawErr : new Error(String(rawErr ?? '請求失敗'));
   // 呼叫端可能仍用 axios.isCancel(err) 判斷主動中斷的請求（見 _camera/label.jsx），
   // 這種情況原樣往外丟，不包成 ApiError。
   if (axios.isCancel(err)) throw err;
@@ -92,6 +103,19 @@ async function executeApi(options, request) {
     const res = await request(buildConfig(headers, options));
     return res.data;
   } catch (err) {
+    // 訪客憑證被後端拒絕（過期、簽章不符、舊版代號）：丟掉那一張、換領新的，只重送這一次。
+    // 其他 401（例如登入過期）不處理。這裡的 POST 重送是安全的：憑證驗證發生在扣額度與任何翻譯之前。
+    const rejected = headers[GUEST_TOKEN_HEADER];
+    if (rejected && isGuestTokenRejected(err)) {
+      forgetGuestToken(rejected);
+      const retryHeaders = await authHeaders(options?.guest);
+      try {
+        const res = await request(buildConfig(retryHeaders, options));
+        return res.data;
+      } catch (retryErr) {
+        throwNormalizedError(retryErr);
+      }
+    }
     throwNormalizedError(err);
   }
 }

@@ -43,6 +43,29 @@ class ChatImageSerializerTest(TestCase):
             with self.subTest(media_type):
                 self.assertIsNone(self._errors(_image(raw, media_type)))
 
+    def test_pillow_is_asked_to_open_only_the_declared_format(self):
+        """防止日後有人把 formats= 拿掉：解碼器要在 Image.open 當下就鎖定，不能是解碼後才檢查格式。"""
+        seen = []
+        real_open = Image.open
+
+        def spy(fp, mode="r", formats=None):
+            seen.append(formats)
+            return real_open(fp, mode, formats)
+
+        with patch.object(Image, "open", spy):
+            for raw, media_type, expected in (
+                (JPEG_BYTES, "image/jpeg", ("JPEG",)), (PNG_BYTES, "image/png", ("PNG",)), (WEBP_BYTES, "image/webp", ("WEBP",)),
+            ):
+                seen.clear()
+                self.assertIsNone(self._errors(_image(raw, media_type)))
+                self.assertEqual(seen, [expected, expected])   # verify 與 load 各開一次
+
+    def test_other_pillow_formats_with_a_forged_jpeg_header_are_rejected(self):
+        """TIFF 檔頭在最前面、但宣告 jpeg：開頭標記先擋；標記對得上時 formats= 仍會讓其他解碼器完全不被呼叫。"""
+        tiff = _encode("TIFF")
+        self.assertIsNotNone(self._errors(_image(tiff, "image/jpeg")))
+        self.assertIsNotNone(self._errors(_image(b"\xff\xd8\xff" + tiff, "image/jpeg")))
+
     def test_rejects_unsupported_formats_bad_base64_and_mismatched_content(self):
         cases = {
             "gif 不收": _image(b"GIF89a" + b"\x00" * 32, "image/gif"),
@@ -62,6 +85,10 @@ class ChatImageSerializerTest(TestCase):
         for name, payload in cases.items():
             with self.subTest(name):
                 self.assertIsNotNone(self._errors(payload))
+
+    def test_rejects_images_with_too_many_total_pixels(self):
+        # 單邊都沒超過 8000，但 7000x7000 = 4900 萬像素，超過總像素上限
+        self.assertIsNotNone(self._errors(_image(_encode("PNG", size=(7000, 7000)), "image/png")))
 
     def test_rejects_oversized_image(self):
         self.assertIsNotNone(self._errors(_image(JPEG_BYTES + b"\x00" * MAX_IMAGE_BYTES)))

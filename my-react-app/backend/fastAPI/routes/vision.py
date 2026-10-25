@@ -27,6 +27,12 @@ CLOUD_API_URL = os.getenv("CLOUD_API_URL")
 
 # 上傳圖片大小上限，避免超大圖片吃掉伺服器記憶體，也避免白白打一次付費的 Google Cloud Vision API
 MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
+# 只收這三種格式：Pillow 能開的格式很多（TIFF、FPX、EPS、PDF…），每一種都是一個解碼器，
+# 其中有不少已知的記憶體損毀漏洞（S-03）。Image.open 的 formats= 讓其他格式連檔頭都不會解析。
+# Google Vision 雖然也支援 GIF、BMP 等，但沒有必要為它們開放攻擊面。
+ALLOWED_IMAGE_FORMATS = ("JPEG", "PNG", "WEBP")
+# 邊長上限：與 AIModel/image_input.py 一致。這裡只讀檔頭宣告的尺寸，先擋掉「檔案很小、宣告的像素卻極大」
+MAX_IMAGE_SIDE = 8000
 if not CLOUD_API_KEY:
     _logger.warning("CLOUD_API_KEY 環境變數未設定，影像辨識功能將無法使用")
 if not CLOUD_API_URL:
@@ -159,17 +165,28 @@ async def analyze_image(request: Request):
     # 還多花一次付費 API 呼叫，這裡改成呼叫 Google 之前先用 Pillow 本地
     # 驗證能不能解成圖片，解不開就直接擋下來、給使用者看得懂的訊息。
     try:
-        Image.open(io.BytesIO(contents)).verify()
+        with Image.open(io.BytesIO(contents), formats=ALLOWED_IMAGE_FORMATS) as img:
+            width, height = img.size
+            if max(width, height) > MAX_IMAGE_SIDE or min(width, height) < 1:
+                raise HTTPException(status_code=400, detail="圖片的寬或高太大，請縮小後再上傳")
+            img.verify()
     except UnidentifiedImageError:
         _logger.warning(
-            "[vision] 檔案內容不是可辨識的圖片格式 filename=%r content_type=%r bytes=%d 開頭=%s",
+            "[vision] 檔案內容不是可辨識、或不支援的圖片格式 filename=%r content_type=%r bytes=%d 開頭=%s",
             getattr(file, "filename", None), getattr(file, "content_type", None),
             len(contents), contents[:12].hex(),
         )
         raise HTTPException(
             status_code=400,
-            detail="這個檔案看起來不是有效的圖片（可能副檔名跟實際內容不符），請重新選擇圖片再試一次",
+            detail="只支援 JPEG、PNG、WebP 圖片。這個檔案可能不是圖片（副檔名跟實際內容不符），或是其他格式，請重新選擇圖片再試一次",
         )
+    except (Image.DecompressionBombError, OSError, SyntaxError, ValueError):
+        # 檔頭看起來是圖片，但內容損毀或是解壓縮炸彈（極小的檔案宣告極大的畫面）
+        _logger.warning(
+            "[vision] 圖片損毀或過大無法處理 filename=%r bytes=%d", getattr(file, "filename", None), len(contents),
+            exc_info=True,
+        )
+        raise HTTPException(status_code=400, detail="這張圖片已損毀或無法處理，請重新選擇圖片再試一次")
 
     image_base64 = base64.b64encode(contents).decode("utf-8")
 

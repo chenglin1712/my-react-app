@@ -58,6 +58,11 @@ class GuestQuotaOut(BaseModel):
     resetsAt: str       # 下一個台灣午夜，ISO 8601（含 +08:00）
 
 
+class GuestTokenOut(BaseModel):
+    token: str
+    expiresAt: str      # ISO 8601，憑證到期時間
+
+
 class GuestQuotaStatusResponse(BaseModel):
     isGuest: bool
     limit: Optional[int] = None

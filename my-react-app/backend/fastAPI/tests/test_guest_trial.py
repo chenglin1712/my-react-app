@@ -163,3 +163,73 @@ def test_guest_id_format(value, ok):
 def test_core_table_id_is_bigint_like_the_django_migration():
     from sqlalchemy import BigInteger
     assert isinstance(G._usage_table.c.id.type, BigInteger)
+
+
+# ---------------------------------------------------------------- 網路代號與全站上限（S-01）
+
+def test_ipv6_addresses_in_the_same_slash_64_share_one_bucket(db, monkeypatch):
+    monkeypatch.setenv("GUEST_TRIAL_IP_DAILY_LIMIT", "1")
+    assert G.consume(GUEST_A, "2001:db8:1:2:aaaa:bbbb:cccc:dddd", NOON).allowed
+    other = G.consume(GUEST_B, "2001:db8:1:2:1111:2222:3333:4444", NOON)  # 同一個 /64，只換了後 64 位元
+    assert not other.allowed and other.reason == "ip"
+    assert G.consume(GUEST_B, "2001:db8:1:3::1", NOON).allowed             # 不同的 /64 是另一個網路
+
+
+def test_ipv4_mapped_ipv6_counts_as_the_ipv4_address(db, monkeypatch):
+    monkeypatch.setenv("GUEST_TRIAL_IP_DAILY_LIMIT", "1")
+    assert G.consume(GUEST_A, "203.0.113.9", NOON).allowed
+    assert not G.consume(GUEST_B, "::ffff:203.0.113.9", NOON).allowed
+
+
+def test_global_limit_zero_means_off_not_default(monkeypatch):
+    monkeypatch.setenv("GUEST_TRIAL_GLOBAL_DAILY_LIMIT", "0")
+    assert G.global_daily_limit() == 0
+    monkeypatch.setenv("GUEST_TRIAL_GLOBAL_DAILY_LIMIT", "-5")
+    assert G.global_daily_limit() == 0
+    monkeypatch.setenv("GUEST_TRIAL_GLOBAL_DAILY_LIMIT", "abc")
+    assert G.global_daily_limit() == 0
+    monkeypatch.setenv("GUEST_TRIAL_GLOBAL_DAILY_LIMIT", "300")
+    assert G.global_daily_limit() == 300
+
+
+def test_global_limit_rolls_back_the_browser_and_ip_counts(db, monkeypatch):
+    monkeypatch.setenv("GUEST_TRIAL_GLOBAL_DAILY_LIMIT", "1")
+    assert G.consume(GUEST_A, IP_1, NOON).allowed
+    blocked = G.consume(GUEST_B, IP_2, NOON)
+    assert not blocked.allowed and blocked.reason == "global"
+    assert G.status(GUEST_B, NOON).remaining == 10
+    with db.connect() as conn:
+        scopes = sorted(row.scope for row in conn.execute(select(G._usage_table)))
+    assert scopes == ["browser", "global", "ip"]  # 第二位訪客沒有留下任何一列
+
+
+def test_token_roundtrip_and_expiry_boundary(db):
+    token = G._build_token("guest-roundtrip-0123456789", NOON)
+    parsed = G.verify_token(token.token, NOON + timedelta(days=29))
+    assert parsed is not None and parsed.guest_id == "guest-roundtrip-0123456789"
+    assert G.verify_token(token.token, NOON + G.TOKEN_TTL - timedelta(seconds=1)) is not None
+    assert G.verify_token(token.token, NOON + G.TOKEN_TTL) is None   # 到期那一秒就失效
+
+
+def test_token_is_rejected_when_the_secret_is_not_ready(db, monkeypatch):
+    token = G._build_token(GUEST_A, NOON).token
+    monkeypatch.setenv("GUEST_TRIAL_SECRET", "")
+    assert G.verify_token(token, NOON) is None
+
+
+def test_issuing_does_not_write_one_row_per_token(db):
+    for _ in range(5):
+        assert G.issue_token(IP_1, NOON).ok
+    with db.connect() as conn:
+        rows = conn.execute(select(G._usage_table)).fetchall()
+    assert len(rows) == 1 and rows[0].scope == "issue" and rows[0].count == 5
+
+
+def test_token_secret_set_but_too_short_disables_guest_trial_instead_of_falling_back(db, monkeypatch):
+    assert G.is_ready()
+    monkeypatch.setenv("GUEST_TRIAL_TOKEN_SECRET", "short")
+    assert not G.is_ready()
+    monkeypatch.setenv("GUEST_TRIAL_TOKEN_SECRET", "")           # 空字串＝沒設定，回到衍生金鑰
+    assert G.is_ready()
+    monkeypatch.setenv("GUEST_TRIAL_TOKEN_SECRET_PREVIOUS", "short")
+    assert not G.is_ready()

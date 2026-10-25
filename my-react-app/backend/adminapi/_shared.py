@@ -17,6 +17,7 @@ import logging
 from django.http import JsonResponse
 from django_ratelimit.core import is_ratelimited
 
+from config.client_ip import client_ip, valid_ip_or_none
 from core.firebase_auth import require_role
 
 from .models import AuditLog
@@ -44,10 +45,11 @@ def rate_limited_response(request, decoded, group, rate="60/m", method="POST"):
 
 def ip_rate_limited_response(request, group, rate="60/m", method="GET"):
     """給匿名公開端點用（沒有登入者 uid 可綁），依 IP 限速。"""
-    client_ip = request.META.get("REMOTE_ADDR", "unknown")
+    # 不能直接用 REMOTE_ADDR：正式環境前面是 nginx，那會變成所有人共用 127.0.0.1 一份額度（見 config/client_ip.py）
+    ip = client_ip(request)
     effective_rate = get_configured_rate(group, rate)
     limited = is_ratelimited(
-        request, group=group, key=lambda g, r: client_ip,
+        request, group=group, key=lambda g, r: ip,
         rate=effective_rate, method=method, increment=True,
     )
     if limited:
@@ -85,7 +87,7 @@ def write_audit_log(request, decoded, action, target, before=None, after=None, t
         target_id=str(target_id),
         before=before,
         after=after,
-        ip_address=request.META.get("REMOTE_ADDR"),
+        ip_address=valid_ip_or_none(client_ip(request)),
         user_agent=(request.META.get("HTTP_USER_AGENT", "")[:1000] or None),
     )
 

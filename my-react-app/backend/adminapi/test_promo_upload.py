@@ -644,6 +644,36 @@ class CoverCaptionApiTest(ApiBase):
         self.assertEqual(PromoVideo.objects.get(pk=pk).cover_path, "")
         self.assertEqual(self.staging_files(), [])
 
+    def test_cover_formats_outside_jpeg_and_webp_are_rejected_by_the_decoder_whitelist(self):
+        """PNG、TIFF、BMP 即使內容是合法圖片，也不會被解碼（Pillow 的 formats= 白名單），回 422 且不留檔案。"""
+        from PIL import Image
+
+        pk = self.create()
+        for fmt in ("PNG", "TIFF", "BMP", "GIF"):
+            buffer = io.BytesIO()
+            Image.new("RGB", (32, 32), (10, 120, 200)).save(buffer, fmt)
+            response = self.post_file(pk, "cover", buffer.getvalue(), name="a.jpg", content_type="image/jpeg")
+            self.assertEqual(response.status_code, 422, fmt)
+        self.assertEqual(PromoVideo.objects.get(pk=pk).cover_path, "")
+        self.assertEqual(self.staging_files(), [])
+
+    def test_cover_open_is_locked_to_jpeg_and_webp(self):
+        from PIL import Image
+
+        seen = []
+        real_open = Image.open
+
+        def spy(fp, mode="r", formats=None):
+            seen.append(formats)
+            return real_open(fp, mode, formats)
+
+        buffer = io.BytesIO()
+        Image.new("RGB", (32, 32), (10, 120, 200)).save(buffer, "JPEG")
+        pk = self.create()
+        with patch.object(Image, "open", spy):
+            self.assertEqual(self.post_file(pk, "cover", buffer.getvalue(), name="a.jpg", content_type="image/jpeg").status_code, 200)
+        self.assertTrue(seen and all(formats == ("JPEG", "WEBP") for formats in seen), seen)
+
     def test_caption_upload_and_errors(self):
         pk = self.create()
         self.assertEqual(self.post_file(pk, "caption", VTT.encode("utf-8")).status_code, 200)

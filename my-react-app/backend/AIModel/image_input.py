@@ -33,6 +33,8 @@ _PILLOW_FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WEBP
 # 邊長範圍：太小（幾個像素）辨識不了；前端縮圖後長邊約 1568，這裡放寬到 Claude 單邊上限 8000 以內
 MIN_IMAGE_SIDE = 16
 MAX_IMAGE_SIDE = 8000
+# 總像素上限：只限單邊會放過 8000x8000（6400 萬像素，解碼後數百 MB），並行請求會拖垮 worker 記憶體
+MAX_IMAGE_PIXELS = 25_000_000
 
 
 def image_input_enabled() -> bool:
@@ -66,22 +68,27 @@ def _check_decodable(raw: bytes, media_type: str) -> None:
     """開頭標記只能擋掉明顯不對的檔案；再用 Pillow 確認它真的是一張完整、格式相符、尺寸合理的圖片，
     不合格的請求在這裡就擋下，不必送到模型才失敗。只讀檔頭與結構（verify），不把整張圖解成像素。
     Pillow 的解壓炸彈保護（DecompressionBombError）也會在這裡生效。"""
+    # formats= 把可用的解碼器鎖在宣告的那一種：其他格式連檔頭都不會解析（Pillow 的 TIFF、FPX 等解碼器有不少
+    # 已知的記憶體損毀漏洞）。宣告和實際不符時 Pillow 會丟 UnidentifiedImageError，下面轉成「格式不符」。
+    allowed = (_PILLOW_FORMATS[media_type],)
     try:
-        with Image.open(io.BytesIO(raw)) as img:
-            if img.format != _PILLOW_FORMATS[media_type]:
-                raise serializers.ValidationError("圖片內容和宣告的格式不符")
+        with Image.open(io.BytesIO(raw), formats=allowed) as img:
             width, height = img.size
             # 先看檔頭宣告的尺寸與是否動圖，不合格就不必往下驗證
             if not (MIN_IMAGE_SIDE <= min(width, height) and max(width, height) <= MAX_IMAGE_SIDE):
                 raise serializers.ValidationError("圖片尺寸不合適")
+            if width * height > MAX_IMAGE_PIXELS:
+                raise serializers.ValidationError("圖片的像素太多，請縮小後再上傳")
             if getattr(img, "is_animated", False):
                 raise serializers.ValidationError("不支援動態圖片")
             img.verify()                    # verify 之後這個物件不能再用，所以下面重新開啟
-        with Image.open(io.BytesIO(raw)) as img:
+        with Image.open(io.BytesIO(raw), formats=allowed) as img:
             img.load()                      # 真的把像素解一次：結構正常但資料損毀的圖在這裡被擋下
     except serializers.ValidationError:
         raise
-    except (UnidentifiedImageError, Image.DecompressionBombError, OSError, SyntaxError, ValueError):
+    except UnidentifiedImageError:
+        raise serializers.ValidationError("圖片內容和宣告的格式不符")
+    except (Image.DecompressionBombError, OSError, SyntaxError, ValueError):
         raise serializers.ValidationError("圖片檔案損毀或無法讀取")
 
 

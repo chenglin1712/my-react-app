@@ -83,6 +83,9 @@ def _guest_denied_response(quota: guest_trial.GuestQuota) -> JSONResponse:
     elif quota.reason == guest_trial.SCOPE_IP:
         body = {"detail": "這個網路今天的試用次數已達上限，請登入後使用。", "code": "guest_ip_capped"}
         status_code = 429
+    elif quota.reason == guest_trial.SCOPE_GLOBAL:
+        body = {"detail": "今天的訪客試用名額已滿，請登入後使用。", "code": "guest_global_capped"}
+        status_code = 429
     else:
         body = {"detail": "訪客試用暫時無法使用，請登入或稍後再試。", "code": "guest_unavailable"}
         status_code = 503

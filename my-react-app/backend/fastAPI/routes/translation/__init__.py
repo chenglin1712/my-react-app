@@ -19,9 +19,13 @@ morph.py 的詞形分析器狀態：它只在旗標打開時才會被載入（la
 """
 from fastapi import APIRouter
 
-from . import api
+from . import api, guest_token
 
 router = APIRouter()
 router.include_router(api.router)
 
-__all__ = ["router"]
+# 訪客憑證核發端點不能放在 router 裡：router 掛載時整個要求「已登入或持有訪客憑證」，
+# 還沒有憑證的訪客就領不到了。main.py 另外以不帶依賴的方式掛載它。
+guest_token_router = guest_token.router
+
+__all__ = ["router", "guest_token_router"]
