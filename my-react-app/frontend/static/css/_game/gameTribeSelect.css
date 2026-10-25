@@ -25,6 +25,9 @@
   font-weight: 600;
   cursor: pointer;
   padding: 0.3rem 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--yy-control-md);
   border-radius: var(--yy-ui-radius);
   transition: background 0.15s;
 }
@@ -132,7 +135,7 @@
 @media (max-width: 600px) {
   .vocab-back-btn {
     position: static;
-    display: block;
+    display: flex; /* 撐滿整列，文字靠左；用 flex 才能在 44px 高的框內垂直置中 */
     margin: 0 auto 1rem;
     text-align: left;
   }

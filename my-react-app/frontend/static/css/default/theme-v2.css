@@ -1248,3 +1248,9 @@ body::before {
     display: none;
   }
 }
+
+/* 手機上的 Bootstrap 按鈕預設只有 38px 高，低於專案的 44px 觸控下限（--yy-control-md）。
+   只加在需要的按鈕上（篩選／排序、載入更多），不動全站的 .btn。 */
+.yy-btn-touch {
+  min-height: var(--yy-control-md);
+}

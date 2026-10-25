@@ -259,7 +259,7 @@ export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
       >
         <div
           className="recommon-progress-fill"
-          style={{ width: `${((current + 1) / questionList.length) * 100}%` }}
+          style={{ transform: `scaleX(${(current + 1) / questionList.length})` }}
         />
       </div>
 

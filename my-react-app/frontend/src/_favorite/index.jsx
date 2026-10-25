@@ -264,7 +264,7 @@ const FavoritePage = () => {
           </div>
           {visibleCount < filteredWords.length && (
             <div className="text-center my-3">
-              <Button type="button" variant="outline-danger" onClick={() => setVisibleCount(c => c + PAGE_SIZE)}>
+              <Button type="button" variant="outline-danger" className="yy-btn-touch" onClick={() => setVisibleCount(c => c + PAGE_SIZE)}>
                 載入更多（剩 {filteredWords.length - visibleCount} 筆）
               </Button>
             </div>

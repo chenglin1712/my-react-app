@@ -40,10 +40,13 @@
   overflow: hidden;
 }
 
+/* 進度用 scaleX 表示（只動 transform，不觸發版面重算）；填色固定撐滿軌道，從左邊長出來 */
 .recommon-progress-fill {
+  width: 100%;
   height: 100%;
   background: var(--yy-calm-success);
-  transition: width .5s ease;
+  transform-origin: left center;
+  transition: transform 300ms var(--ease-out);
 }
 
 .recommon-step-label {

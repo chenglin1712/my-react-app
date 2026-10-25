@@ -63,6 +63,8 @@
 
 .plan-tracker-body {
     padding: 4px 12px 12px;
+    max-height: min(240px, 32dvh); /* 任務多的時候在區塊內捲動，不吃掉訊息區 */
+    overflow-y: auto;
     border-top: 1px solid var(--yy-calm-rule);
 }
 

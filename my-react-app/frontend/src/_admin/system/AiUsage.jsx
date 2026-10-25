@@ -209,7 +209,7 @@ function BudgetPanel({ budget }) {
                 >
                     <span
                         className="ai-usage-budget-fill"
-                        style={{ width: `${Math.min(100, Math.max(0, percentUsed))}%` }}
+                        style={{ transform: `scaleX(${Math.min(100, Math.max(0, percentUsed)) / 100})` }}
                     />
                 </div>
             )}
@@ -440,7 +440,7 @@ export default function AiUsage() {
                                             <span className="ai-usage-bar" aria-hidden="true">
                                                 <span
                                                     className="ai-usage-bar-fill"
-                                                    style={{ width: maxDailyCost > 0 ? `${Math.min(100, (safe(row.costUsd) / maxDailyCost) * 100)}%` : '0%' }}
+                                                    style={{ transform: `scaleX(${maxDailyCost > 0 ? Math.min(1, safe(row.costUsd) / maxDailyCost) : 0})` }}
                                                 />
                                             </span>
                                         </td>

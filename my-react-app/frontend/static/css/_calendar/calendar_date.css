@@ -260,3 +260,44 @@
         transform: none;
     }
 }
+
+/* 手機與平板直式：日曆與行程改成上下堆疊。桌機是固定 385px 高的左右兩欄，右欄（含輸入列）最少要 544px，
+   視窗窄於約 880px 就會被擠出畫面、日曆被壓到 224px。斷點用專案統一的 900px。
+   高度交給內容、兩欄各占整列；輸入列的文字框獨占一列，其餘控制項排第二列。日期格拉到 44px 高，手指才點得準。 */
+@media (max-width: 900px) {
+    .calendar-wrapper {
+        flex-direction: column;
+        height: auto;
+        gap: 16px;
+        padding: 16px;
+    }
+
+    .calendar-left,
+    .calendar-right {
+        flex: none;
+        min-width: 0;
+    }
+
+    .react-calendar__month-view__days button {
+        min-height: var(--yy-control-md);
+    }
+
+    .event-input-bar {
+        flex-wrap: wrap;
+    }
+
+    .event-input-bar input[type="text"] {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+
+    .event-input-bar input[type="time"] {
+        flex: 1 1 130px;
+        width: auto;
+        min-width: 0;
+    }
+
+    .event-input-bar button {
+        flex: 1 1 100%;
+    }
+}

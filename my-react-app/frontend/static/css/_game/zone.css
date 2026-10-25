@@ -25,13 +25,18 @@
 }
 
 /* ── 遊戲卡片 Grid ──────────────────────────── */
+/* 置中的 flex wrap：最後一列落單的卡片會置中，和詞彙遊戲頁的族語卡片一致（原本的 grid 會讓它靠左）。
+   卡片寬度固定 212px：桌機一排 4 張剛好放進 912px 的內容寬度。 */
 .zone-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 1.25rem;
 }
 
 .zone-card {
+  flex: 0 1 212px;
+  min-width: 0; /* 長族語詞不能把卡片撐寬 */
   background: var(--yy-calm-surface);
   border-radius: var(--yy-ui-radius);
   border: var(--yy-border-width) solid var(--yy-calm-rule);
@@ -117,7 +122,7 @@
 }
 
 @media (max-width: 600px) {
-  .zone-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .zone-card {
+    flex: 0 1 calc((100% - 1.25rem) / 2);
   }
 }

@@ -212,8 +212,8 @@ describe('AiUsage', () => {
         apiGet.mockResolvedValueOnce(summary({ budget: budget({ level: 'exceeded', spentUsd: 11, ratio: 1.1 }) }));
         render(<AiUsage />);
         expect(await screen.findByText(/需要到「功能開關」手動重新開啟/)).toBeInTheDocument();
-        // 條狀圖寬度不會超過 100%
-        expect(screen.getByRole('img', { name: /預算使用率 110%/ }).firstChild).toHaveStyle({ width: '100%' });
+        // 條狀圖的填色比例不會超過 100%（用 scaleX 表示，不動寬度）
+        expect(screen.getByRole('img', { name: /預算使用率 110%/ }).firstChild).toHaveStyle({ transform: 'scaleX(1)' });
     });
 
     test('沒設定預算時明講不會提醒也不會自動關閉', async () => {

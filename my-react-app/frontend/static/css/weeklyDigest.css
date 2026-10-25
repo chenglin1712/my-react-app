@@ -17,6 +17,8 @@
 .weekly-digest[data-variant="bot"] {
     margin: 0 12px 8px;
     padding: 10px 12px;
+    max-height: min(220px, 30dvh); /* 單詞多的時候在卡片內捲動，不吃掉訊息區 */
+    overflow-y: auto;
 }
 
 .weekly-digest[data-leaving] {

@@ -73,7 +73,7 @@ const WordResultsSection = ({
       </ListGroup>
       {remaining > 0 && (
         <div className="text-center my-3">
-          <Button type="button" variant={buttonVariant} onClick={onLoadMore} disabled={loadingMore}>
+          <Button type="button" variant={buttonVariant} className="yy-btn-touch" onClick={onLoadMore} disabled={loadingMore}>
             {loadingMore ? '載入中...' : `載入更多（剩 ${remaining} 筆）`}
           </Button>
         </div>

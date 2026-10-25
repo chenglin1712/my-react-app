@@ -62,7 +62,7 @@ export default function MobileWordFilterOffcanvas({
 
   return (
     <>
-      <Button type="button" variant="outline-dark" className="mb-3" onClick={handleOpen}>
+      <Button type="button" variant="outline-dark" className="mb-3 yy-btn-touch" onClick={handleOpen}>
         {activeCount > 0 ? <>篩選 / 排序（<span className="wf-trigger-count">{activeCount}</span>）</> : '篩選 / 排序'}
       </Button>
 

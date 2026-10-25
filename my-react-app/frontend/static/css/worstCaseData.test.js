@@ -32,7 +32,12 @@ describe("長詞不會撐破 grid／flex 欄位", () => {
   it("遊戲首頁與專區的兩欄 grid 不用裸的 1fr", () => {
     expect(rule(css("_game/index.css"), ".gamehub-grid")).toMatch(/minmax\(0,\s*1fr\)/);
     expect(css("_game/zone.css")).not.toMatch(/grid-template-columns:\s*1fr 1fr/);
-    expect(css("_game/zone.css")).toMatch(/\.zone-grid\s*\{\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+    // 專區改成置中的 flex wrap（落單的卡片置中）；手機兩欄的卡片寬度要能縮到 0，不被長字撐破
+    const zone = css("_game/zone.css");
+    expect(rule(zone, ".zone-grid")).toMatch(/justify-content:\s*center/);
+    expect(rule(zone, ".zone-card")).toMatch(/min-width:\s*0/);
+    const zoneNarrow = zone.match(/max-width:\s*600px\)\s*\{([\s\S]*)$/)?.[1] ?? "";
+    expect(rule(zoneNarrow, ".zone-card")).toMatch(/flex:\s*0 1 calc\(\(100% - 1\.25rem\) \/ 2\)/);
   });
 
   it("收藏字卡的標題可換行、中文翻譯最多兩行", () => {

@@ -65,12 +65,21 @@
 .chat-container {
     width: 100%;
     height: 100%;
-    overflow: hidden;
+    overflow-x: hidden;
+    /* 視窗極矮（橫放的手機、鍵盤彈出）時，固定區塊加訊息區的保底高度可能超過容器；
+       讓整個容器可捲動，輸入列才不會被切掉。正常高度下內容放得下，不會出現捲軸。 */
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     background-color: var(--yy-calm-info-bg);
     border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: var(--yy-ui-radius);
+}
+
+/* 固定高度的直向 flex：只有訊息區吃剩餘空間，其餘區塊維持自己的高度、不被壓縮。
+   （標頭因為 overflow: hidden，最小高度是 0，對話一長就被壓扁；追蹤計畫、摘要、建議列也有同樣風險。） */
+.chat-container > :not(.messages-container) {
+    flex: none;
 }
 
 /* 懸浮視窗只有 400px 寬：單詞庫提示與輸入列依視窗寬度縮小，不再是全螢幕的尺寸 */
@@ -95,6 +104,9 @@
     border-bottom: 3px solid var(--yy-calm-line);
     position: relative;
     overflow: hidden;
+    /* overflow: hidden 會讓 flex 項目的最小高度變成 0；對話一長（額度、免責聲明、輸入列都占高度）
+       標頭就被壓扁，標題頂端被切掉。標頭是固定高度的區塊，不參與壓縮。 */
+    flex: none;
 }
 
 .chat-header::before {
@@ -102,6 +114,14 @@
 }
 
 .chat-return {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    /* 可點範圍是 44px，但佈局只占 34px：只向標頭內距那一側延伸 10px，不搶走標題的寬度（手機上標題剛好單行放得下）。
+       另一側不能延伸，否則會蓋到旁邊的助手圖示，點圖示邊緣會誤觸收合。 */
+    margin-inline-start: -10px;
     background-color: transparent;
     border: none;
     color: var(--yy-calm-accent-on);
@@ -122,6 +142,7 @@
     margin: 0;
     font-size: 18px;
     font-weight: 600;
+    text-wrap: balance; /* 窄螢幕折行時均分，不留一個孤字 */
 }
 
 .bot-status {
@@ -141,6 +162,7 @@
 
 .messages-container {
     flex-grow: 1;
+    min-height: 96px; /* 保底，不被擠到只剩一條縫 */
     padding: 16px;
     overflow-y: auto;
     display: flex;
@@ -221,6 +243,8 @@
 
 .suggestions-container {
     padding: 10px 16px;
+    max-height: min(120px, 18dvh); /* 建議多的時候在區塊內捲動，不吃掉訊息區 */
+    overflow-y: auto;
     background-color: var(--yy-calm-surface);
     border-top: 1px solid var(--yy-calm-rule);
 }
@@ -816,7 +840,7 @@
 
 .source-links-host {
     margin-inline-start: 6px;
-    font-size: 0.85em;
+    font-size: var(--yy-text-sm);
     overflow-wrap: anywhere;
 }
 
