@@ -1,50 +1,51 @@
 # Web Frameworks
-Django==5.2.16
-djangorestframework==3.17.1
+Django==6.1.2
+djangorestframework==3.18.3
 django-cors-headers==4.9.0
 django-ratelimit==4.1.0
-drf-yasg==1.21.15
-gunicorn==26.0.0
+drf-yasg==1.21.18
+gunicorn==26.2.0
 whitenoise==6.12.0
-django-redis==6.0.0
-redis==8.0.1
+django-redis==7.0.0
+redis==8.1.0
 
 # FastAPI / ASGI
-fastapi==0.139.0
-uvicorn==0.51.0
+fastapi==0.162.0
+uvicorn==0.54.0
 python-multipart==0.0.32
-starlette==0.46.2
+starlette==1.10.0
 slowapi==0.1.10
 
 # Database
-sqlalchemy==2.0.51
-alembic==1.18.5
-dj-database-url==3.0.1
-psycopg2-binary==2.9.11
+sqlalchemy==2.1.6
+alembic==1.20.1
+dj-database-url==3.1.2
+psycopg2-binary==2.9.13
 
 # Firebase
-firebase-admin==7.5.0
+firebase-admin==7.7.0
 # 詞素診斷 token 的驗證式加密（firebase-admin 也會帶入，這裡明確列出，不要依賴間接相依）
-cryptography==46.0.5
+cryptography==50.0.2
 
 # AI / ML
-anthropic==0.122.0
+anthropic==2.3.0
 # torch/torchaudio/torchvision must be installed together from pytorch.org with matching CUDA version.
 # Example (CPU): pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cpu
-torch==2.10.0
-torchaudio==2.10.0
-torchvision==0.25.0
-ultralytics==8.4.90
+torch==2.11.0
+torchaudio==2.11.0
+torchvision==0.26.0
+ultralytics==8.4.188
 
 # Image / Vision
-Pillow==12.3.0
+Pillow==13.0.0
 opencv-python==5.0.0.93
 
 # Data Processing
-numpy==2.2.6
+numpy==2.5.4
 bottleneck==1.6.0
 
 # Audio
+# pydub 依賴 audioop，Python 3.13 已移除；專案固定用 Python 3.12，升 3.13 前要先處理這個套件
 pydub==0.25.1
 soundfile==0.14.0
 
@@ -53,10 +54,10 @@ httpx==0.28.1
 beautifulsoup4==4.15.0
 
 # Utilities
-pydantic==2.13.4
-python-dotenv==1.2.2
+pydantic==2.14.1
+python-dotenv==1.2.4
 deep_translator==1.11.4
-sentry-sdk==2.66.0
+sentry-sdk==2.73.0
 
 # Testing
 pytest==9.1.1

@@ -51,8 +51,9 @@ _PURGE_PROBABILITY = 0.01
 _GUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 
 _database_url = os.getenv("DATABASE_URL")
-if _database_url and _database_url.startswith("postgres://"):
-    _database_url = "postgresql://" + _database_url[len("postgres://"):]
+from config.db_url import sqlalchemy_url
+
+_database_url = sqlalchemy_url(_database_url)
 
 _engine = None
 if _database_url:

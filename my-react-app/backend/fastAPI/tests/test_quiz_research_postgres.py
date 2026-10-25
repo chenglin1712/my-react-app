@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 import pytest
 from sqlalchemy import create_engine, delete, func, select, text, update
 
+from config.db_url import sqlalchemy_url
 from fastAPI.routes.quiz import research_events as E
 from fastAPI.tests.test_quiz_research import UID, _event
 
@@ -45,7 +46,7 @@ def _joined(*threads, timeout=15):
 def pg(monkeypatch):
     if not _looks_like_a_scratch_database(URL):
         pytest.fail("QUIZ_TEST_POSTGRES_URL 的資料庫名稱必須含 test 或 scratch（這個測試會清空兩張表）")
-    engine = create_engine(URL)
+    engine = create_engine(sqlalchemy_url(URL))
     monkeypatch.setattr(E, "_engine", engine)
     with engine.begin() as conn:
         conn.execute(delete(E._events))

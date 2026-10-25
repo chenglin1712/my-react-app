@@ -13,7 +13,7 @@
 # docker-compose.yml 已經設定好對應的 context/dockerfile，一般不需要手動下
 # 這行指令。
 
-FROM python:3.10-slim
+FROM python:3.12-slim
 
 # 對應 requirements.txt 內套件的系統依賴：
 # - ffmpeg：pydub／fastAPI/routes/quiz.py 的語音比對功能需要 ffmpeg／ffprobe
@@ -43,7 +43,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir \
-        torch==2.10.0 torchaudio==2.10.0 torchvision==0.25.0 \
+        torch==2.11.0 torchaudio==2.11.0 torchvision==0.26.0 \
         --index-url https://download.pytorch.org/whl/cpu \
         --extra-index-url https://pypi.org/simple \
     && pip install --no-cache-dir -r requirements.txt

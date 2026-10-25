@@ -31,8 +31,9 @@ logger = logging.getLogger(__name__)
 _database_url = os.getenv("DATABASE_URL")
 # Render/Heroku 慣例給 postgres://，SQLAlchemy 2.x 只認得 postgresql://——
 # 跟 dictionary_db/connect.py 同一個理由，這裡要自己正規化一次。
-if _database_url and _database_url.startswith("postgres://"):
-    _database_url = "postgresql://" + _database_url[len("postgres://"):]
+from config.db_url import sqlalchemy_url
+
+_database_url = sqlalchemy_url(_database_url)
 
 # DATABASE_URL 沒設定時（本機開發沒接 Postgres，或這個部署從未跑過 P0 的
 # Postgres 遷移）_engine 留 None——record_event() 靜默跳過整個寫入，這不是

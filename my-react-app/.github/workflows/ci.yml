@@ -75,14 +75,14 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.12"
           cache: pip
 
       # torch/torchaudio/torchvision 需要從 PyTorch 的 CPU wheel index 安裝，
       # 直接 pip install -r requirements.txt 會嘗試抓預設 index、可能抓到不對的
       # build 或抓不到（見 requirements.txt 開頭註解）。CI 不需要 GPU，先裝 CPU 版。
       - name: Install PyTorch (CPU)
-        run: pip install torch==2.10.0 torchaudio==2.10.0 torchvision==0.25.0 --index-url https://download.pytorch.org/whl/cpu
+        run: pip install torch==2.11.0 torchaudio==2.11.0 torchvision==0.26.0 --index-url https://download.pytorch.org/whl/cpu
 
       - name: Install remaining Python dependencies
         run: pip install -r requirements.txt

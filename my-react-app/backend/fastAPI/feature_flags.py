@@ -25,8 +25,9 @@ from sqlalchemy.exc import SQLAlchemyError
 logger = logging.getLogger(__name__)
 
 _database_url = os.getenv("DATABASE_URL")
-if _database_url and _database_url.startswith("postgres://"):
-    _database_url = "postgresql://" + _database_url[len("postgres://"):]
+from config.db_url import sqlalchemy_url
+
+_database_url = sqlalchemy_url(_database_url)
 
 _engine = None
 if _database_url:

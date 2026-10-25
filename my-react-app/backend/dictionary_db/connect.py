@@ -67,8 +67,9 @@ _database_url = _dictionary_database_url or _django_database_url
 # create_engine()，SQLAlchemy 2.x 的 dialect 只認得 postgresql://，沒有這層
 # 自動轉換，字串裡如果是 postgres:// 會在 import 這個模組時就找不到 dialect
 # 而整個炸掉——必須自己在這裡正規化，不能假設兩邊的 URL parser 行為一致。
-if _database_url and _database_url.startswith("postgres://"):
-    _database_url = "postgresql://" + _database_url[len("postgres://"):]
+from config.db_url import sqlalchemy_url
+
+_database_url = sqlalchemy_url(_database_url)
 
 _is_sqlite = _database_url is None
 _engine_url = _database_url or f"sqlite:///{DB_PATH}"

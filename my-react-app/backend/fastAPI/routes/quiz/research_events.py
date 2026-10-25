@@ -26,8 +26,9 @@ from config import quiz_research as QR
 logger = logging.getLogger(__name__)
 
 _database_url = os.getenv("DATABASE_URL")
-if _database_url and _database_url.startswith("postgres://"):
-    _database_url = "postgresql://" + _database_url[len("postgres://"):]
+from config.db_url import sqlalchemy_url
+
+_database_url = sqlalchemy_url(_database_url)
 
 # DATABASE_URL 沒設定（本機開發沒接 Postgres）時 _engine 是 None：整個研究記錄功能不可用。
 _engine = None

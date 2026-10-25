@@ -33,7 +33,7 @@ my-react-app/
 ## 環境需求
 
 - Node.js（含 npm）
-- Python 3.10+
+- Python 3.12（Pillow 13、NumPy 2.5、Django 6 需要 3.11 以上；目前不支援 3.13，因為 pydub 依賴的標準函式庫 `audioop` 在 3.13 已移除）
 - ffmpeg（語音比對功能 `/quiz/compare_audio/` 需要；沒有時該功能會回錯誤訊息，其餘功能不受影響）
 - Firebase 專案（前端登入／使用者資料／收藏都存在 Firestore；後端驗證使用者身份需要 Firebase Admin SDK 服務帳戶金鑰）
 
