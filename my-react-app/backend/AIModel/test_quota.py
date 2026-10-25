@@ -1,4 +1,4 @@
-"""路線圖 #5：每人每日提問額度（資料庫計數、台灣午夜重置、退還、放行式失敗）與它在 view 的行為。"""
+"""路線圖 #5：每人每日提問額度（資料庫計數、台灣午夜重置、退還、資料庫出錯時拒絕）與它在 view 的行為。"""
 import json
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
@@ -89,15 +89,77 @@ class ConsumeTests(TestCase):
         self.assertTrue(result.allowed)
         self.assertEqual(result.remaining, 1)
 
-    def test_a_broken_database_lets_the_question_through_and_marks_the_count_untrusted(self):
+    def test_a_broken_database_refuses_the_question_instead_of_letting_it_through(self):
+        self.addCleanup(setattr, quota, "_broken_until", 0.0)
+        quota._broken_until = 0.0
         with patch.object(quota, "_model", side_effect=RuntimeError("table missing")):
             with self.assertLogs("AIModel.quota", level="ERROR"):
                 result = quota.consume("u1", BEFORE_MIDNIGHT)
-            with self.assertLogs("AIModel.quota", level="ERROR"):
-                peeked = quota.peek("u1", BEFORE_MIDNIGHT)
-        self.assertTrue(result.allowed)
+        self.assertFalse(result.allowed)
+        self.assertTrue(result.unavailable)
         self.assertFalse(result.tracked)
-        self.assertFalse(peeked.as_dict()["tracked"])
+        data = result.as_dict()
+        self.assertTrue(data["unavailable"])
+        self.assertIsNone(data["remaining"])        # 不虛構「還剩滿額」
+
+    def test_peek_on_a_broken_database_is_unavailable_not_a_made_up_balance(self):
+        self.addCleanup(setattr, quota, "_broken_until", 0.0)
+        quota._broken_until = 0.0
+        with patch.object(quota, "_model", side_effect=RuntimeError("x")), self.assertLogs("AIModel.quota", level="ERROR"):
+            peeked = quota.peek("u1", BEFORE_MIDNIGHT)
+        self.assertTrue(peeked.unavailable)
+        self.assertFalse(peeked.allowed)
+
+    def test_an_open_breaker_does_not_even_read_the_dynamic_limit_from_the_database(self):
+        self.addCleanup(setattr, quota, "_broken_until", 0.0)
+        quota._broken_until = quota.time.monotonic() + 60
+        with patch.object(quota, "daily_limit") as limit, patch.object(quota, "_model") as model:
+            self.assertTrue(quota.consume("u1", BEFORE_MIDNIGHT).unavailable)
+            self.assertTrue(quota.peek("u1", BEFORE_MIDNIGHT).unavailable)
+        limit.assert_not_called()
+        model.assert_not_called()
+
+    def test_a_failed_cleanup_never_changes_the_result_of_a_successful_count(self):
+        real_filter = AiDailyUsage.objects.filter
+
+        def filter_that_fails_on_purge(*args, **kwargs):
+            if "day__lt" in kwargs:
+                raise RuntimeError("purge failed")
+            return real_filter(*args, **kwargs)
+
+        with patch.object(quota, "_PURGE_PROBABILITY", 1.0),                 patch.object(AiDailyUsage.objects, "filter", side_effect=filter_that_fails_on_purge),                 self.assertLogs("AIModel.quota", level="ERROR"):
+            result = quota.consume("u1", BEFORE_MIDNIGHT)
+        self.assertTrue(result.allowed)
+        self.assertFalse(result.unavailable)
+
+    def test_a_failure_after_the_increment_rolls_the_count_back(self):
+        self.addCleanup(setattr, quota, "_broken_until", 0.0)
+        quota._broken_until = 0.0
+        quota.consume("u1", BEFORE_MIDNIGHT)                 # 先有一列、count=1
+        real_filter = AiDailyUsage.objects.filter
+        calls = {"n": 0}
+
+        def flaky(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 2:                              # 第 2 次呼叫是「讀回 count」
+                raise RuntimeError("readback failed")
+            return real_filter(*args, **kwargs)
+
+        with patch.object(AiDailyUsage.objects, "filter", side_effect=flaky), self.assertLogs("AIModel.quota", level="ERROR"):
+            result = quota.consume("u1", BEFORE_MIDNIGHT)
+        self.assertTrue(result.unavailable)
+        self.assertEqual(AiDailyUsage.objects.get(uid="u1").count, 1)     # 沒有白扣
+
+    def test_the_breaker_skips_the_database_for_a_few_seconds_then_recovers(self):
+        self.addCleanup(setattr, quota, "_broken_until", 0.0)
+        quota._broken_until = 0.0
+        with patch.object(quota, "_model", side_effect=RuntimeError("x")) as model, self.assertLogs("AIModel.quota", level="ERROR"):
+            quota.consume("u1", BEFORE_MIDNIGHT)
+            quota.consume("u1", BEFORE_MIDNIGHT)
+            quota.peek("u1", BEFORE_MIDNIGHT)
+        self.assertEqual(model.call_count, 1)       # 第一次出錯後，期間內不再碰資料庫
+        quota._broken_until = 0.0                   # 斷路器到期
+        self.assertTrue(quota.consume("u1", BEFORE_MIDNIGHT).allowed)
 
 
 class RefundTests(TestCase):
@@ -166,6 +228,28 @@ class QuotaInViewsTests(TestCase):
         get_client.return_value = client
         self.assertEqual(self._chat().status_code, 502)
         self.assertEqual(AiDailyUsage.objects.get(uid="u1").count, 0)
+
+    @patch("AIModel.views._get_client")
+    def test_a_broken_quota_database_gives_503_and_never_reaches_the_model_or_refunds(self, get_client):
+        client = _mock_chat_client("不該被呼叫")
+        get_client.return_value = client
+        self.addCleanup(setattr, quota, "_broken_until", 0.0)
+        quota._broken_until = 0.0
+        with patch.object(quota, "_model", side_effect=RuntimeError("table missing")),                 patch("AIModel.views.daily_quota.refund") as refund, self.assertLogs("AIModel.quota", level="ERROR"):
+            response = self._chat()
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["code"], "ai_quota_unavailable")
+        self.assertNotIn("table missing", response.content.decode("utf-8"))
+        client.messages.create.assert_not_called()
+        refund.assert_not_called()
+
+    def test_the_quota_endpoint_is_503_when_the_database_is_broken(self):
+        self.addCleanup(setattr, quota, "_broken_until", 0.0)
+        quota._broken_until = 0.0
+        with patch.object(quota, "_model", side_effect=RuntimeError("x")), self.assertLogs("AIModel.quota", level="ERROR"):
+            response = Client().get("/AIModel/quota/")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["code"], "ai_quota_unavailable")
 
     @patch("AIModel.views._get_client")
     def test_invalid_requests_do_not_use_up_a_question(self, get_client):

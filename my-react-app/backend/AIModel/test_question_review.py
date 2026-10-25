@@ -56,6 +56,12 @@ class DescribeQuestionTest(TestCase):
         self.assertEqual((d["type"], d["user_answer"], d["correct_answer"]), ("choice", "圖片 C", "圖片 A"))
         self.assertIn("看不到圖片", " ".join(d["lines"]))
 
+    def test_choice_in_the_stored_firestore_shape_is_not_mistaken_for_true_false(self):
+        """資料庫裡的選擇題是 images: {A, B, C}（不是頂層的 imageA），也要判成選擇題，不能落到是非題的 O／X 標籤。"""
+        stored = {"question_ab": "lokah su", "question_ch": "你好", "images": {"A": "a", "B": "b", "C": "c"}}
+        d = describe_question(stored, 3, 1)
+        self.assertEqual((d["type"], d["user_answer"], d["correct_answer"]), ("choice", "圖片 C", "圖片 A"))
+
     def test_cloze_shows_option_text(self):
         d = describe_question(CLOZE_ITEM, 2, 1)
         self.assertEqual((d["user_answer"], d["correct_answer"]), ("選項2「su」", "選項1「lokah」"))

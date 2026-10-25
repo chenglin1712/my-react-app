@@ -31,7 +31,7 @@ const Panel = ({ tribe = "tayal" }) => {
         data, dataLen, isLoading, quizInfo, savedQuestions, uploadFailed,
         userAnswers, userStars, currentQuestionIndex, setCurrentQuestionIndex,
         handleStar, handleAnswer, retry,
-    } = useQuizPanelData(level, tribe, level_ch);
+    } = useQuizPanelData(level, tribe);
 
     const [showIntro, setShowIntro] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);

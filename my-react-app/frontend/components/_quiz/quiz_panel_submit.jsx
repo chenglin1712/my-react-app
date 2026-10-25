@@ -239,7 +239,7 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
                             const userLabel = labels[userAnswerNum - 1];
 
                             // 正確答案不再存在 quizs 文件的 data[i].answer（見
-                            // uploadDb.jsx 的 uploadQuizDB 說明），改從本人專屬的
+                            // backend/crawler/quiz_store.py 的說明），改從本人專屬的
                             // situations 文件（getQuizSubmitById 回傳的 result.correctAnswers）
                             // 或 fallback 資料讀取。
                             const correctAnswerNum = displayData.correctAnswers?.[idx];

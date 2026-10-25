@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { uploadQuizDB } from "../../src/userServives/uploadDb";
 import { apiGet } from "../../utils/apiClient";
 
 // 依題型把後端原始題目格式整理成要存進資料庫的格式，跟畫面顯示用的欄位對應。
@@ -50,7 +49,7 @@ function formatQuestionForUpload(type, q) {
  */
 const quizKeyOf = (tribe, level) => `${tribe}:${level}`;
 
-export function useQuizPanelData(level, tribe, level_ch) {
+export function useQuizPanelData(level, tribe) {
     const quizKey = quizKeyOf(tribe, level);
 
     // 資料連同「它是為了哪一份測驗抓回來的」一起存（FE-10）。原本只存
@@ -132,43 +131,25 @@ export function useQuizPanelData(level, tribe, level_ch) {
         };
     }, [level, tribe, retryCount, quizKey]);
 
-    //測驗資料傳至資料庫
+    // 測驗題目由伺服器在出題時存進資料庫並回傳 quizId（S-06），前端不再自己寫入。
+    // 只有「這份資料是為了目前這份測驗抓回來的」才採用（FE-10）：切換等級時 dataState 還是上一份測驗的內容，
+    // 不比對 key 就會把上一份的 quizId 與答案當成新測驗的。
     useEffect(() => {
-        // 只有「這份資料是為了目前這份測驗抓回來的」才可以上傳（FE-10）。
-        //
-        // 這個 effect 會在 level_ch／tribe 改變時立刻重跑，但那個時間點
-        // dataState 還是上一份測驗的內容（fetch 還沒回來，也刻意不清空
-        // payload，否則畫面會閃一下空白）。少了這道比對，就會用舊題目搭配
-        // 新的等級／族語標籤呼叫 uploadQuizDB()；而它用的是 addDoc()——不是
-        // upsert——Firestore 會因此真的多出一份「舊題目、貼新標籤」的錯誤
-        // 文件，晚到的正確版本再補一份，兩份都留著。
         if (dataState.key !== quizKey) return;
         if (!data || !data.parts || !data.parts[0]?.questions) return;
 
-        // 這裡不能只靠 isMounted：切換等級時元件是「一直掛著」的（路由是
-        // /quiz/:level，換等級只是換 params）。要防的是「先發出的上傳比較晚
-        // 回來，把新的 quizInfo 蓋掉」，所以用一個屬於這次 effect 執行的旗標，
-        // 在 data／測驗身分改變導致 effect 重跑時作廢掉上一次的結果。
-        let cancelled = false;
-        setUploadFailed(false);
-
-        const handleUploadQuiz = async () => {
-            const type = data.parts[0].type;
-            const formatted = data.parts[0].questions.map((q) => formatQuestionForUpload(type, q));
-            setSavedQuestions(formatted);
-            const quiz = await uploadQuizDB(level_ch, formatted, tribe);
-            if (cancelled) return;
-            setQuizInfo(quiz);
-            // uploadQuizDB 內部 catch 之後回傳 null，這裡是唯一能察覺失敗的地方。
-            setUploadFailed(!quiz);
-        };
-
-        handleUploadQuiz();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [dataState, data, quizKey, level_ch, tribe]);
+        const type = data.parts[0].type;
+        const formatted = data.parts[0].questions.map((q) => formatQuestionForUpload(type, q));
+        setSavedQuestions(formatted);
+        // 伺服器沒有給 quizId（儲存失敗時整個請求會是 503，這裡是防禦）：作答結果無法儲存，要明確顯示失敗
+        if (typeof data.quizId === "string" && data.quizId) {
+            setQuizInfo({ id: data.quizId, ans: formatted.map((q) => q.answer) });
+            setUploadFailed(false);
+        } else {
+            setQuizInfo(null);
+            setUploadFailed(true);
+        }
+    }, [dataState, data, quizKey]);
 
     //在一開始先載入所有圖片，避免切換題目有延遲
     useEffect(() => {

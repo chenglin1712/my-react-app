@@ -66,7 +66,8 @@ def describe_question(item: dict, user_answer, correct_answer) -> dict:
             "source_text": f"{_text(item.get('passage_ab'))} {' '.join(options)}",
         }
 
-    if "imageA" in item:
+    # 前端存進資料庫的格式是 images: {A, B, C}；imageA 是出題 API 的原始欄位名稱，兩種都認
+    if "imageA" in item or isinstance(item.get("images"), dict):
         labels = {1: "圖片 A", 2: "圖片 B", 3: "圖片 C"}
         return {
             "type": "choice",

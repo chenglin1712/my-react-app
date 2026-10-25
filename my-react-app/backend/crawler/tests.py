@@ -21,6 +21,10 @@ class GetQuizDataTest(TestCase):
     def setUp(self):
         self.client = Client()
         cache.clear()
+        # 出題時伺服器會把題目存進 Firestore（crawler/quiz_store.py）；這裡不連真的 Firestore
+        saver = patch('crawler.views.save_quiz', return_value='quiz-doc-1')
+        self.save_quiz = saver.start()
+        self.addCleanup(saver.stop)
 
     @override_settings(AUTH_DEV_BYPASS=False)
     def test_requires_login_when_bypass_disabled(self):

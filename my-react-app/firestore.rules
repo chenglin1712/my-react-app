@@ -46,9 +46,58 @@ service cloud.firestore {
     // 學習者資料），但寫入仍然只限本人——停權、改角色這類真正的管理動作都
     // 透過後端 Admin SDK 進行（會繞過這份規則），不開放 staff 直接用前端 SDK
     // 改寫別人的 Firestore 文件，避免多一個攻擊面。
+    //
+    // 寫入限制（S-07）：本人原本可以整份覆寫，包括 email、joinDate 與任意垃圾欄位（也能塞到 1 MiB 上限，
+    // 拖慢後端每次讀學習資料）。現在拆成 create／update，各自限制可寫的欄位、型別與大小；不開放刪除
+    // （帳號刪除走後端 Admin SDK，會繞過這份規則）。email 與 joinDate 建立後不可改。
+    // 限制的是「這次改動到的欄位」，不是整份文件，所以舊文件裡有不合規的舊值也不影響其他欄位的更新。
+    // 規則無法逐一檢查 map／list 裡的每個元素，只能限制型別與筆數；user_errors 與 quiz_model 的內容
+    // 由後端讀取時再清理（AIModel/learner_profile.py 只取固定欄位、截斷並過濾控制字元）。
+    function validFavorite(fav) {
+      return fav is map
+        && fav.keys().hasOnly(['id', 'title', 'content'])
+        && fav.title is string && fav.title.size() <= 50
+        && fav.content is list && fav.content.size() <= 1000;
+    }
+    function validFavorites(favorites) {
+      return favorites is list && favorites.size() <= 10
+        && (favorites.size() < 1 || validFavorite(favorites[0]))
+        && (favorites.size() < 2 || validFavorite(favorites[1]))
+        && (favorites.size() < 3 || validFavorite(favorites[2]))
+        && (favorites.size() < 4 || validFavorite(favorites[3]))
+        && (favorites.size() < 5 || validFavorite(favorites[4]))
+        && (favorites.size() < 6 || validFavorite(favorites[5]))
+        && (favorites.size() < 7 || validFavorite(favorites[6]))
+        && (favorites.size() < 8 || validFavorite(favorites[7]))
+        && (favorites.size() < 9 || validFavorite(favorites[8]))
+        && (favorites.size() < 10 || validFavorite(favorites[9]));
+    }
+    // fields：這次要檢查的欄位名稱（建立時是整份文件的欄位，更新時只是被改動的欄位）
+    function userFieldsValid(data, fields) {
+      return (!('name' in fields) || (data.name is string && data.name.size() >= 1 && data.name.size() <= 100))
+        && (!('identity' in fields) || (data.identity is string && data.identity.size() <= 100))
+        && (!('joinDate' in fields) || (data.joinDate is string && data.joinDate.size() <= 40))
+        && (!('avatarUrl' in fields) || data.avatarUrl == null
+            || (data.avatarUrl is string && data.avatarUrl.size() <= 8192))
+        && (!('favorites' in fields) || validFavorites(data.favorites))
+        && (!('user_errors' in fields) || (data.user_errors is map && data.user_errors.size() <= 2000))
+        && (!('quiz_model' in fields) || (data.quiz_model is map && data.quiz_model.size() <= 30));
+    }
     match /users/{userId} {
       allow read: if request.auth != null && (request.auth.uid == userId || isStaff());
-      allow write: if request.auth != null && request.auth.uid == userId;
+      // email 比對轉小寫：Firebase 的 token 裡 email 是小寫，使用者註冊時打的大小寫不一定
+      allow create: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['name', 'email', 'identity', 'favorites', 'user_errors', 'joinDate', 'avatarUrl'])
+        && request.resource.data.keys().hasAll(['name', 'email', 'identity', 'favorites', 'user_errors', 'joinDate'])
+        && request.auth.token.email is string
+        && request.resource.data.email is string
+        && request.resource.data.email.lower() == request.auth.token.email.lower()
+        && userFieldsValid(request.resource.data, request.resource.data.keys());
+      allow update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['name', 'identity', 'avatarUrl', 'favorites', 'user_errors', 'quiz_model'])
+        && userFieldsValid(request.resource.data, request.resource.data.diff(resource.data).affectedKeys());
+      allow delete: if false;
     }
 
     // 詞素學習的規則熟練度狀態（backend/fastAPI/routes/quiz/rule_state_store.py）：只有本人可讀，
@@ -161,26 +210,15 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // 測驗題目：登入者可讀；登入者可建立，且限制內容形狀——原本只檢查有沒有
-    // 登入，任何已登入使用者都能寫入任意垃圾文件。uploadDb.jsx 的
-    // uploadQuizDB 固定寫入 title/tribe/createdAt/data 四個欄位，這裡驗證
-    // 型別、族語限定在已知清單、data 非空且有合理上限，createdAt 必須是
-    // 真正的伺服器時間（擋掉客戶端偽造時間戳記）。
-    // data 裡每題原本帶有正確答案（answer 欄位），任何登入使用者都能在作答
-    // 前直接用 Firestore SDK 讀到全部正確答案。uploadQuizDB 現在寫入前會先
-    // 把每題的 answer 拿掉，正確答案改存進本人才能讀的 situations 文件
-    // （見 uploadSituationDB／下方 situations 規則），這裡的 read 規則維持
-    // 「登入者可讀」不變——data 已經不含機密內容。
+    // 測驗題目：登入者可讀；前端不能建立、修改或刪除。
+    // 原本登入者可以自己建立（限制內容形狀），但規則無法限制「建立幾份」，任何登入者都能無限建立文件。
+    // 現在題目由伺服器在出題時用 Admin SDK 寫入（backend/crawler/quiz_store.py，會繞過這份規則，
+    // 並有每人每日份數上限），出題 API 回傳 quizId 給前端寫進 situations。
+    // 文件裡的 data 不含正確答案（寫入前已去除，正確答案只存在本人才能讀的 situations），所以讀取維持
+    // 「登入者可讀」；舊文件沒有 userId 欄位，不能改成只有擁有者可讀，否則歷史紀錄會打不開。
     match /quizs/{quizId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null
-        && request.resource.data.keys().hasAll(['title', 'tribe', 'createdAt', 'data'])
-        && request.resource.data.title is string
-        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 100
-        && request.resource.data.tribe in ['tayal', 'amis', 'bunun', 'kavalan', 'paiwan']
-        && request.resource.data.createdAt == request.time
-        && request.resource.data.data is list
-        && request.resource.data.data.size() > 0 && request.resource.data.data.size() <= 200;
+      allow write: if false;
     }
 
     // 答題情形：只有本人可讀；只有本人可建立

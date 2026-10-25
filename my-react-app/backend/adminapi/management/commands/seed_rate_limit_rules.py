@@ -117,6 +117,7 @@ DJANGO_RULES = [
     ("submit_ans", "30/m", "填字遊戲繳交答案"),
     ("get_situation_quiz_data", "30/m", "情境題出題"),
     ("get_quiz_data", "30/m", "官方等級測驗出題"),
+    ("get_quiz_data_daily", "300/d", "官方等級測驗出題（每人每日份數，每份都會在資料庫存一份題目）"),
     ("get_tayal_imformation", "60/m", "首頁消息（活動快訊）爬取"),
     ("get_exam_schedule", "60/m", "考試時程爬取"),
     ("game_config_update", "30/m", "遊戲參數設定更新"),

@@ -3,50 +3,8 @@ import { collection, addDoc, serverTimestamp, query, where, doc, getDoc, getDocs
 import { TRIBE_FULL_NAME_BY_SLUG as TRIBE_NAME } from "../constants/tribes";
 import { normalizeCalendarEvent } from "../../utils/calendarEvents";
 
-// 遞迴移除物件裡值為 undefined 的欄位（陣列裡的 undefined 換成 null，不能直接拿掉否則索引會位移；
-// 稀疏陣列的空洞也會變成 null）。只處理普通物件與陣列：Date、Firestore 的 Timestamp／serverTimestamp
-// 等其他型別原樣保留，不像 JSON 序列化會改變它們。
-export const stripUndefined = (value) => {
-    if (Array.isArray(value)) return Array.from(value, (item) => (item === undefined ? null : stripUndefined(item)));
-    if (value !== null && typeof value === "object") {
-        const proto = Object.getPrototypeOf(value);
-        if (proto === Object.prototype || proto === null) {
-            return Object.fromEntries(
-                Object.entries(value)
-                    .filter(([, v]) => v !== undefined)
-                    .map(([k, v]) => [k, stripUndefined(v)]),
-            );
-        }
-    }
-    return value;
-};
-
-//測驗題目存至資料庫
-export const uploadQuizDB = async (level_ch, data, tribe = "tayal") => {
-    const correctAnswers = data.map(q => q.answer);
-    // 正確答案不該進到 firestore.rules 裡任何登入使用者都能讀的 quizs 文件——
-    // 寫入前先把每題的 answer 拿掉，correctAnswers 保留在記憶體（回傳值 ans）
-    // 供這次作答流程使用；真正要長期保存的正確答案改存進 situations（見
-    // uploadSituationDB），那份文件本來就只有本人可讀。
-    // Firestore 不接受 undefined（addDoc 會直接丟 Unsupported field value: undefined）。題目欄位在
-    // 後端沒有提供時（例如選擇題沒有 audio、題目沒有圖片）整理出來就是 undefined，整份測驗會建立失敗。
-    const sanitizedData = stripUndefined(data.map(({ answer: _answer, ...rest }) => rest));
-
-    const quizSet = {
-        title: level_ch,
-        tribe,
-        createdAt: serverTimestamp(),
-        data: sanitizedData
-    };
-
-    try {
-        const docRef = await addDoc(collection(db, "quizs"), quizSet);
-        return { id: docRef.id, ans: correctAnswers };
-    } catch (e) {
-        console.error("上傳失敗", e);
-        return null;
-    }
-};
+// 測驗題目（quizs）由伺服器在出題時建立並回傳 quizId（backend/crawler/quiz_store.py），前端不再寫入：
+// firestore.rules 對 quizs 不開放 client 建立（S-06）。
 //更新答題情形至資料庫
 export const uploadSituationDB = async (quizId, correctAns, userAns, stars) => {
     const results = evaluateAnswers(correctAns, userAns);

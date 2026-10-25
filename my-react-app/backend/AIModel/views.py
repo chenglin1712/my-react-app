@@ -74,6 +74,22 @@ def _rate_limited_response(request, decoded, group, rate="10/m"):
     return None
 
 
+def _quota_unavailable_response():
+    """額度計數的資料庫出錯：不放行（見 quota.py 的說明）。只回固定訊息，不洩漏內部細節。"""
+    response = JsonResponse({
+        "detail": "AI 額度服務暫時無法使用，請稍後再試。",
+        "code": "ai_quota_unavailable",
+    }, status=503)
+    response["Retry-After"] = "15"
+    return response
+
+
+def _refund_quota(uid, quota):
+    """退還這次扣的額度。沒有成功扣到（不可用、不可信）就不退，否則會把別次的使用量減掉。"""
+    if quota.allowed and quota.tracked:
+        daily_quota.refund(uid, quota.day)
+
+
 def _quota_exceeded_response(quota):
     """每日額度用完：429，帶剩餘次數（0）與重置時間，前端可以顯示「明天 00:00 重置」。"""
     response = JsonResponse({
@@ -157,6 +173,8 @@ def _prepare_chat(request):
 
     # 通過驗證才扣額度（格式錯誤的請求不佔次數）；之後失敗會退還
     quota = daily_quota.consume(uid)
+    if quota.unavailable:
+        return None, _quota_unavailable_response()
     if not quota.allowed:
         return None, _quota_exceeded_response(quota)
 
@@ -193,7 +211,7 @@ def tayal_chat(request):
             return JsonResponse(result)
 
         except Exception:
-            daily_quota.refund(chat.uid, chat.quota.day)
+            _refund_quota(chat.uid, chat.quota)
             # 原本直接把 str(e) 回給前端，不論 DEBUG 與否都會洩漏內部例外訊息
             # （可能包含 API 回應細節、內部路徑等），且完全沒有寫 log，出錯時
             # 伺服器端反而看不到記錄。改成記錄完整 traceback，只回通用訊息。
@@ -237,7 +255,7 @@ def _chat_stream_events(chat):
     except GeneratorExit:
         raise
     except Exception as exc:
-        daily_quota.refund(chat.uid, chat.quota.day)
+        _refund_quota(chat.uid, chat.quota)
         logger.error("[tayal_chat_stream] 串流中途失敗\n%s", traceback.format_exc())
         status, detail = (504, "回覆花的時間太久，請重試。") if isinstance(exc, TimeoutError) else classify_llm_error(exc)
         yield _sse("error", {"detail": detail, "status": status})
@@ -305,6 +323,8 @@ def review_tayal_chat(request):
         uid = decoded.get("uid", "")
 
         quota = daily_quota.consume(uid)
+        if quota.unavailable:
+            return _quota_unavailable_response()
         if not quota.allowed:
             return _quota_exceeded_response(quota)
 
@@ -322,7 +342,7 @@ def review_tayal_chat(request):
             return JsonResponse(result)
 
         except Exception:
-            daily_quota.refund(uid, quota.day)
+            _refund_quota(uid, quota)
             # 原本有記 log 但仍把 str(e) 回給前端；跟 tayal_chat 一樣，例外訊息
             # 只留在伺服器端的 log，回應改成通用訊息。
             logger.error("[review_tayal_chat] 處理失敗\n%s", traceback.format_exc())
@@ -385,6 +405,8 @@ def review_question(request):
         return JsonResponse({"detail": str(e)}, status=503)
 
     quota = daily_quota.consume(uid)      # 找不到題目的請求不佔額度，所以放在讀完脈絡之後
+    if quota.unavailable:
+        return _quota_unavailable_response()
     if not quota.allowed:
         return _quota_exceeded_response(quota)
     try:
@@ -395,7 +417,7 @@ def review_question(request):
         result["quota"] = quota.as_dict()
         return JsonResponse(result)
     except Exception:
-        daily_quota.refund(uid, quota.day)
+        _refund_quota(uid, quota)
         logger.error("[review_question] 處理失敗\n%s", traceback.format_exc())
         status, detail = classify_llm_error(sys.exc_info()[1])
         return JsonResponse({"detail": detail}, status=status)
@@ -469,13 +491,13 @@ def replan_study_plan(request):
         return JsonResponse({"detail": str(e)}, status=503)
 
     quota = daily_quota.consume(uid)      # 找不到計畫、沒有未完成任務的請求不佔額度，所以放在讀完計畫之後
+    if quota.unavailable:
+        return _quota_unavailable_response()
     if not quota.allowed:
         return _quota_exceeded_response(quota)
 
     def refund():
-        # 計數系統故障而放行時（tracked=False）這次根本沒扣，不能退，否則會把別次的使用量減掉
-        if quota.tracked:
-            daily_quota.refund(uid, quota.day)
+        _refund_quota(uid, quota)
 
     try:
         result = run_study_plan_replan(client, TRIBE_MAP.get(tribe, "泰雅語"), plan, availability, uid=uid)
@@ -552,7 +574,10 @@ def ai_quota(request):
     decoded, err_resp = verify_firebase_token(request)
     if err_resp:
         return err_resp
-    data = daily_quota.peek(decoded.get("uid", "")).as_dict()
+    peeked = daily_quota.peek(decoded.get("uid", ""))
+    if peeked.unavailable:
+        return _quota_unavailable_response()
+    data = peeked.as_dict()
     # 前端用它決定要不要顯示「AI 助手」分頁（旗標預設關閉）；要和 review_question 一樣同時看助手總開關；只是顯示用，真正的檢查在 review_question 本身
     assistant_on = _assistant_disabled_response() is None
     data["features"] = {

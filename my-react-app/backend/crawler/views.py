@@ -19,6 +19,7 @@ from config.tribes import TRIBE_IDS, TRIBE_MAP
 from adminapi.rate_limits import get_configured_rate
 
 from . import quiz_bank
+from .quiz_store import QuizStoreError, save_quiz
 from .exam_site import apply_exam_schedule_overrides, get_exam_schedule_data, get_news_data
 
 
@@ -101,7 +102,23 @@ def get_quiz_data(request):
         "3": quiz_bank.build_matching_test_from_db,
         "4": quiz_bank.build_cloze_test_from_db,
     }
-    format_data = {"chapter_name": display_name, "parts": [level_builders[level](tribe)]}
+    part = level_builders[level](tribe)
+    format_data = {"chapter_name": display_name, "parts": [part]}
+
+    # 題目存進 Firestore 由伺服器負責（firestore.rules 不開放前端建立 quizs，S-06）：先限制每人每日份數，
+    # 再寫入，成功才把 quizId 一起回給前端。沒有題目（題庫不足）時不存也不帶 quizId。
+    if part.get("questions"):
+        daily_resp = _rate_limited_response(
+            request, decoded.get("uid", "anon"), group="get_quiz_data_daily", rate="300/d", method="GET"
+        )
+        if daily_resp:
+            return daily_resp
+        try:
+            format_data["quizId"] = save_quiz(decoded.get("uid", ""), tribe, level, part)
+        except QuizStoreError:
+            return JsonResponse(
+                {"detail": "測驗暫時無法建立，請稍後再試", "code": "quiz_persistence_unavailable"}, status=503
+            )
     return JsonResponse(format_data, safe=False)
 
 

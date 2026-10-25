@@ -12,7 +12,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import { readFileSync } from 'fs';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, increment, FieldPath } from 'firebase/firestore';
 import {
   saveNote, deleteNote, readNoteFromServer, subscribeNotes, classifyError, NoteLimitError,
 } from './frontend/src/_note/sync/cloudNotesRepo.js';
@@ -68,10 +68,10 @@ const validReport = (reporterUid, overrides = {}) => ({
   ...overrides,
 });
 
-describe('quizs create 規則', () => {
-  test('已登入、內容完整合法時可以建立', async () => {
+describe('quizs 規則（只有伺服器能寫，S-06）', () => {
+  test('登入者不能自己建立測驗（即使內容完整合法）', async () => {
     const alice = testEnv.authenticatedContext('alice');
-    await assertSucceeds(setDoc(doc(alice.firestore(), 'quizs/q1'), validQuiz));
+    await assertFails(setDoc(doc(alice.firestore(), 'quizs/q1'), validQuiz));
   });
 
   test('未登入不能建立', async () => {
@@ -79,20 +79,21 @@ describe('quizs create 規則', () => {
     await assertFails(setDoc(doc(anon.firestore(), 'quizs/q1'), validQuiz));
   });
 
-  test('缺少必填欄位（data）會被拒絕', async () => {
-    const alice = testEnv.authenticatedContext('alice');
-    const { data: _drop, ...incomplete } = validQuiz;
-    await assertFails(setDoc(doc(alice.firestore(), 'quizs/q1'), incomplete));
+  test('登入者可以讀（伺服器建立的文件，繞過規則寫入）；未登入不能讀', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'quizs/q1'), { ...validQuiz, createdAt: new Date(), userId: 'alice' });
+    });
+    await assertSucceeds(getDoc(doc(testEnv.authenticatedContext('bob').firestore(), 'quizs/q1')));
+    await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'quizs/q1')));
   });
 
-  test('tribe 不在白名單內會被拒絕', async () => {
+  test('登入者不能修改或刪除已存在的測驗', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'quizs/q1'), { ...validQuiz, createdAt: new Date(), userId: 'alice' });
+    });
     const alice = testEnv.authenticatedContext('alice');
-    await assertFails(setDoc(doc(alice.firestore(), 'quizs/q1'), { ...validQuiz, tribe: 'klingon' }));
-  });
-
-  test('createdAt 不是真正的伺服器時間會被拒絕（防偽造時間戳記）', async () => {
-    const alice = testEnv.authenticatedContext('alice');
-    await assertFails(setDoc(doc(alice.firestore(), 'quizs/q1'), { ...validQuiz, createdAt: new Date() }));
+    await assertFails(updateDoc(doc(alice.firestore(), 'quizs/q1'), { title: '改掉' }));
+    await assertFails(deleteDoc(doc(alice.firestore(), 'quizs/q1')));
   });
 });
 
@@ -507,9 +508,121 @@ describe('users/{uid}/quizRuleState 規則（規則熟練度狀態，只有後�
     await assertFails(setDoc(doc(staffBob.firestore(), path), state));
   });
 
-  test('users 主文件的規則不受影響：本人仍可寫自己的 users 文件', async () => {
-    const alice = testEnv.authenticatedContext('alice');
-    await assertSucceeds(setDoc(doc(alice.firestore(), 'users/alice'), { name: 'Alice' }));
+  test('users 主文件的規則不受影響：本人仍可建立格式正確的 users 文件', async () => {
+    const alice = testEnv.authenticatedContext('alice', { email: 'alice@example.com' });
+    await assertSucceeds(setDoc(doc(alice.firestore(), 'users/alice'), validUser()));
+  });
+});
+
+// ---- users 寫入限制（S-07）：欄位白名單、型別與大小、email／joinDate 不可改、不可刪 ----
+const validUser = (overrides = {}) => ({
+  name: 'Alice',
+  email: 'alice@example.com',
+  identity: '學生',
+  favorites: [
+    { id: 1, title: '基礎詞彙', content: [] },
+    { id: 2, title: '日常對話', content: [] },
+    { id: 3, title: '旅遊用語', content: [] },
+  ],
+  user_errors: {},
+  joinDate: '2026-10-26T00:00:00.000Z',
+  avatarUrl: null,
+  ...overrides,
+});
+
+describe('users 寫入限制', () => {
+  const aliceCtx = () => testEnv.authenticatedContext('alice', { email: 'alice@example.com' });
+  const aliceRef = (ctx) => doc(ctx.firestore(), 'users/alice');
+  const seed = async (data = validUser()) => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users/alice'), data);
+    });
+  };
+
+  test('建立：欄位完整且 email 與登入帳號相符才成功（大小寫不同也可以）', async () => {
+    await assertSucceeds(setDoc(aliceRef(aliceCtx()), validUser()));
+    const carol = testEnv.authenticatedContext('carol', { email: 'carol@example.com' });
+    await assertSucceeds(setDoc(doc(carol.firestore(), 'users/carol'), validUser({ email: 'Carol@Example.com', avatarUrl: 'https://res.example.com/a.jpg' })));
+  });
+
+  test('建立：別人、未登入、email 不符、token 沒有 email 都失敗', async () => {
+    const bob = testEnv.authenticatedContext('bob', { email: 'bob@example.com' });
+    await assertFails(setDoc(aliceRef(bob), validUser()));
+    await assertFails(setDoc(aliceRef(testEnv.unauthenticatedContext()), validUser()));
+    await assertFails(setDoc(aliceRef(aliceCtx()), validUser({ email: 'victim@example.com' })));
+    await assertFails(setDoc(aliceRef(testEnv.authenticatedContext('alice')), validUser()));
+  });
+
+  test('建立：缺必填欄位、多餘欄位、型別或大小錯誤都失敗', async () => {
+    const ctx = aliceCtx();
+    const { joinDate: _drop, ...noJoin } = validUser();
+    await assertFails(setDoc(aliceRef(ctx), noJoin));
+    await assertFails(setDoc(aliceRef(ctx), validUser({ role: 'owner' })));
+    await assertFails(setDoc(aliceRef(ctx), validUser({ name: '' })));
+    await assertFails(setDoc(aliceRef(ctx), validUser({ name: 'x'.repeat(101) })));
+    await assertFails(setDoc(aliceRef(ctx), validUser({ favorites: 'nope' })));
+    await assertFails(setDoc(aliceRef(ctx), validUser({ favorites: Array.from({ length: 11 }, (_, i) => ({ id: i, title: 't', content: [] })) })));
+    await assertFails(setDoc(aliceRef(ctx), validUser({ user_errors: [] })));
+    await assertFails(setDoc(aliceRef(ctx), validUser({ avatarUrl: 'x'.repeat(8193) })));
+  });
+
+  test('更新：name、identity、avatarUrl 可以改', async () => {
+    await seed();
+    const ctx = aliceCtx();
+    await assertSucceeds(updateDoc(aliceRef(ctx), { name: 'Alice2', identity: '老師', avatarUrl: 'https://res.example.com/b.jpg' }));
+  });
+
+  test('更新：email、joinDate、未知欄位不可改，也不可混在允許的欄位一起改', async () => {
+    await seed();
+    const ctx = aliceCtx();
+    await assertFails(updateDoc(aliceRef(ctx), { email: 'other@example.com' }));
+    await assertFails(updateDoc(aliceRef(ctx), { joinDate: '2000-01-01' }));
+    await assertFails(updateDoc(aliceRef(ctx), { role: 'owner' }));
+    await assertFails(updateDoc(aliceRef(ctx), { name: 'Alice2', role: 'owner' }));
+  });
+
+  test('更新：favorites 的收藏（整包寫回）與 user_errors 的 increment 都可以', async () => {
+    await seed();
+    const ctx = aliceCtx();
+    const favorites = validUser().favorites.map((fav) => (fav.id === 1 ? { ...fav, content: ['lokah'] } : fav));
+    await assertSucceeds(updateDoc(aliceRef(ctx), { favorites }));
+    await assertSucceeds(updateDoc(aliceRef(ctx), new FieldPath('user_errors', 'lokah'), increment(1)));
+    await assertSucceeds(updateDoc(aliceRef(ctx), new FieldPath('user_errors', 'lokah'), increment(1)));
+  });
+
+  test('更新：favorites 與 user_errors 超過上限、型別錯誤會失敗', async () => {
+    await seed();
+    const ctx = aliceCtx();
+    await assertFails(updateDoc(aliceRef(ctx), { favorites: [{ id: 1, title: 't', content: Array.from({ length: 1001 }, (_, i) => `w${i}`) }] }));
+    await assertFails(updateDoc(aliceRef(ctx), { favorites: [{ id: 1, title: 't', content: [], extra: 1 }] }));
+    await assertFails(updateDoc(aliceRef(ctx), { user_errors: 'x' }));
+    const many = Object.fromEntries(Array.from({ length: 2001 }, (_, i) => [`w${i}`, 1]));
+    await assertFails(updateDoc(aliceRef(ctx), { user_errors: many }));
+  });
+
+  test('更新：quiz_model 必須是 map 且頂層欄位不超過 30 個', async () => {
+    await seed();
+    const ctx = aliceCtx();
+    await assertSucceeds(updateDoc(aliceRef(ctx), { quiz_model: { ability: 0.3, type_stats: { choice: { n: 3, e: 1 } } } }));
+    await assertFails(updateDoc(aliceRef(ctx), { quiz_model: 'x' }));
+    await assertFails(updateDoc(aliceRef(ctx), { quiz_model: Object.fromEntries(Array.from({ length: 31 }, (_, i) => [`k${i}`, 1])) }));
+  });
+
+  test('更新：舊文件裡不合規的舊值，不影響其他欄位的更新', async () => {
+    await seed(validUser({ name: '' }));
+    await assertSucceeds(updateDoc(aliceRef(aliceCtx()), { identity: '老師' }));
+  });
+
+  test('刪除：本人、staff 都不能直接刪', async () => {
+    await seed();
+    await assertFails(deleteDoc(aliceRef(aliceCtx())));
+    await assertFails(deleteDoc(aliceRef(testEnv.authenticatedContext('bob', { role: 'owner' }))));
+  });
+
+  test('別人不能改本人的文件', async () => {
+    await seed();
+    const bob = testEnv.authenticatedContext('bob', { email: 'bob@example.com' });
+    await assertFails(updateDoc(aliceRef(bob), { name: 'Hacked' }));
   });
 });
 

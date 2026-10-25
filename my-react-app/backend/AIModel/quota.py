@@ -7,12 +7,15 @@
 管理者在那一頁改數字最慢 30 秒內生效（adminapi/rate_limits.py 的快取）。起始值刻意寬鬆，
 看一週的用量（後台「AI 用量」頁的前 10 名使用者）再調。
 
-失敗的方向：資料庫存取出錯（例如 migration 還沒跑）時【放行】並記錄錯誤，因為這一關擋的是
-「使用過量」，不是安全邊界；擋錯了會讓所有學生都不能用。真正的費用保護是月預算（adminapi/ai_budget.py）。
+失敗的方向：資料庫存取出錯（例如 migration 還沒跑）時【拒絕】（Quota.unavailable=True，呼叫端回 503），
+不呼叫模型、不佔額度。原本是放行，但那等於資料庫一出問題（或有人讓它出問題）每日額度就整個失效，
+費用只剩月預算擋；寧可暫時不能用，也不要變成無上限。部署時要先跑 migration（見 README）。
+資料庫持續出錯時有一個短暫的斷路器（_BREAKER_SECONDS）：期間內直接回 unavailable，不再每個請求都等資料庫逾時。
 """
 import logging
 import random
 import re
+import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 
@@ -28,6 +31,8 @@ DEFAULT_DAILY_RATE = "100/d"
 DEFAULT_DAILY_LIMIT = 100
 RETENTION_DAYS = 3
 _PURGE_PROBABILITY = 0.01
+_BREAKER_SECONDS = 10      # 計數資料庫出錯後，這段時間內不再嘗試，直接回 unavailable
+_broken_until = 0.0
 
 # 台灣沒有日光節約時間，固定 +8；與 fastAPI/guest_trial.py 相同作法，不依賴 tzdata。
 _TAIPEI = timezone(timedelta(hours=8))
@@ -41,7 +46,8 @@ class Quota:
     remaining: int
     resets_at: str
     day: date | None = None
-    tracked: bool = True       # False：計數失敗而放行，剩餘次數不可信，不顯示給學生
+    tracked: bool = True       # False：剩餘次數不可信，不顯示給學生
+    unavailable: bool = False  # True：計數資料庫出錯，這次不放行（呼叫端回 503，不是 429）
 
     def retry_after_seconds(self, now: datetime | None = None) -> int:
         """距離重置還有幾秒（Retry-After 標頭用），至少 1。"""
@@ -49,7 +55,11 @@ class Quota:
         return max(int(delta.total_seconds()), 1)
 
     def as_dict(self) -> dict:
-        return {"limit": self.limit, "remaining": self.remaining, "resetsAt": self.resets_at, "tracked": self.tracked}
+        # 不可用時沒有可信的剩餘次數：給 None，不虛構「還剩滿額」也不當成用完
+        return {
+            "limit": self.limit, "remaining": None if self.unavailable else self.remaining,
+            "resetsAt": self.resets_at, "tracked": self.tracked, "unavailable": self.unavailable,
+        }
 
 
 def taipei_today(now: datetime | None = None) -> date:
@@ -78,18 +88,35 @@ def _model():
     return AiDailyUsage
 
 
-def _unlimited_when_broken(limit: int, today: date) -> Quota:
-    return Quota(allowed=True, limit=limit, remaining=limit, resets_at=next_reset_at(today), day=today, tracked=False)
+def _unavailable(limit: int, today: date) -> Quota:
+    return Quota(
+        allowed=False, limit=limit, remaining=0, resets_at=next_reset_at(today), day=today,
+        tracked=False, unavailable=True,
+    )
+
+
+def _trip_breaker() -> None:
+    global _broken_until
+    _broken_until = time.monotonic() + _BREAKER_SECONDS
+
+
+def _breaker_open() -> bool:
+    return time.monotonic() < _broken_until
 
 
 def peek(uid: str, now: datetime | None = None) -> Quota:
     """只讀取，不扣次數（前端顯示「今天還可以問 N 次」用）。"""
-    today, limit = taipei_today(now), daily_limit()
+    today = taipei_today(now)
+    if _breaker_open():
+        # 先檢查斷路器再讀動態上限：daily_limit() 也會查資料庫，故障時不能再打
+        return _unavailable(DEFAULT_DAILY_LIMIT, today)
+    limit = daily_limit()
     try:
         used = _model().objects.filter(day=today, uid=uid).values_list("count", flat=True).first() or 0
     except Exception:
-        logger.error("[AIModel] 讀取每日額度失敗，視為未計數", exc_info=True)
-        return _unlimited_when_broken(limit, today)
+        logger.error("[AIModel] ai_quota_backend_unavailable：讀取每日額度失敗", exc_info=True)
+        _trip_breaker()
+        return _unavailable(limit, today)
     remaining = max(limit - used, 0)
     return Quota(allowed=remaining > 0, limit=limit, remaining=remaining, resets_at=next_reset_at(today), day=today)
 
@@ -99,25 +126,35 @@ def consume(uid: str, now: datetime | None = None) -> Quota:
 
     判斷與遞增在同一個 UPDATE 完成（count < limit 才加一），兩個同時送出的請求不會雙雙放行。
     今天第一次提問時這一列還不存在：先嘗試建立（INSERT），撞到唯一限制代表別的請求剛建立，再 UPDATE 一次。"""
-    today, limit = taipei_today(now), daily_limit()
+    today = taipei_today(now)
+    if _breaker_open():
+        return _unavailable(DEFAULT_DAILY_LIMIT, today)
+    limit = daily_limit()
     try:
         Usage = _model()
-        bumped =Usage.objects.filter(day=today, uid=uid, count__lt=limit).update(count=F("count") + 1)
-        if not bumped:
-            if limit <= 0:
-                return Quota(allowed=False, limit=limit, remaining=0, resets_at=next_reset_at(today), day=today)
-            try:
-                with transaction.atomic():
-                    Usage.objects.create(day=today, uid=uid, count=1)
-                bumped = 1
-            except IntegrityError:
-                bumped = Usage.objects.filter(day=today, uid=uid, count__lt=limit).update(count=F("count") + 1)
-        used = Usage.objects.filter(day=today, uid=uid).values_list("count", flat=True).first() or 0
-        if random.random() < _PURGE_PROBABILITY:
-            Usage.objects.filter(day__lt=today - timedelta(days=RETENTION_DAYS)).delete()
+        # 整段包在 transaction：加一成功但讀回失敗時一起回滾，不會留下沒人退的白扣次數
+        with transaction.atomic():
+            bumped = Usage.objects.filter(day=today, uid=uid, count__lt=limit).update(count=F("count") + 1)
+            if not bumped:
+                if limit <= 0:
+                    return Quota(allowed=False, limit=limit, remaining=0, resets_at=next_reset_at(today), day=today)
+                try:
+                    with transaction.atomic():
+                        Usage.objects.create(day=today, uid=uid, count=1)
+                    bumped = 1
+                except IntegrityError:
+                    bumped = Usage.objects.filter(day=today, uid=uid, count__lt=limit).update(count=F("count") + 1)
+            used = Usage.objects.filter(day=today, uid=uid).values_list("count", flat=True).first() or 0
     except Exception:
-        logger.error("[AIModel] 每日額度計數失敗，這次放行", exc_info=True)
-        return _unlimited_when_broken(limit, today)
+        logger.error("[AIModel] ai_quota_backend_unavailable：每日額度計數失敗，這次不放行", exc_info=True)
+        _trip_breaker()
+        return _unavailable(limit, today)
+    if random.random() < _PURGE_PROBABILITY:
+        # 清舊資料失敗只記錄，不能改變這次扣額度的結果
+        try:
+            Usage.objects.filter(day__lt=today - timedelta(days=RETENTION_DAYS)).delete()
+        except Exception:
+            logger.error("[AIModel] 清除過期的每日額度失敗", exc_info=True)
     remaining = max(limit - used, 0)
     return Quota(allowed=bool(bumped), limit=limit, remaining=remaining, resets_at=next_reset_at(today), day=today)
 

@@ -245,7 +245,9 @@ class CommandTests(TestCase):
                 patch("AIModel.weekly_digest._in_transaction", fake_in_transaction), \
                 patch("config.llm.get_llm_client", return_value=client or MagicMock()), \
                 patch("config.llm._record_usage"), \
-                patch("AIModel.weekly_digest._server_timestamp", return_value="ts"):
+                patch("AIModel.weekly_digest._server_timestamp", return_value="ts"),                 patch.object(cmd, "datetime", wraps=datetime) as fake_datetime:
+            # 指令用現在時間決定「這週」；測試的資料與租約鍵都寫死在 2026-W43，所以固定時鐘，否則換週後整組測試失效
+            fake_datetime.now.return_value = NOW
             call_command("generate_weekly_digests", *args, stdout=out)
         return out.getvalue()
 
@@ -314,14 +316,14 @@ class CommandTests(TestCase):
 
     def test_second_overlapping_run_is_skipped_by_the_lease(self):
         db, client = FakeDB(situations=[situation("u1")]), MagicMock()
-        db.docs["aiDigestJobs/2026-W43"] = {"startedAt": datetime.now(timezone.utc), "finishedAt": None}
+        db.docs["aiDigestJobs/2026-W43"] = {"startedAt": NOW, "finishedAt": None}
         text = self._run(db=db, client=client)
         self.assertIn("已有另一個執行在跑", text)
         client.messages.batches.create.assert_not_called()
 
     def test_stale_lease_can_be_taken_over_and_is_released(self):
         db, client = FakeDB(situations=[]), MagicMock()
-        db.docs["aiDigestJobs/2026-W43"] = {"startedAt": datetime.now(timezone.utc) - timedelta(hours=7), "finishedAt": None}
+        db.docs["aiDigestJobs/2026-W43"] = {"startedAt": NOW - timedelta(hours=7), "finishedAt": None}
         self._run(db=db, client=client)
         self.assertIsNotNone(db.docs["aiDigestJobs/2026-W43"]["finishedAt"])
 
