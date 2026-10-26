@@ -1,0 +1,184 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+# 預設權限收到最小：這些工作只需要讀取程式碼。沒有宣告時，token 會拿到儲存庫預設的（通常是讀寫）權限，
+# 第三方 action 被入侵時就能拿來改程式碼、發版本。
+permissions:
+  contents: read
+
+# 第三方 action 一律釘到完整的 commit SHA（後面註解寫對應的版本）：只用 @v4 這種標籤的話，
+# 標籤可以被改指到別的 commit，等於讓上游任意更換我們執行的程式碼。
+# 更新方式：.github/dependabot.yml 每週會自動開 PR 更新 SHA 與版本註解。
+
+# 儲存庫根目錄是 my-react-app 的上一層（GitHub 只讀儲存庫根目錄的 .github/），
+# 專案本身在 my-react-app/ 子資料夾，所以每個工作的指令都從那裡執行。
+# 快取檔路徑一律明寫：儲存庫根目錄另有一個空的 package-lock.json，不寫的話快取會去雜湊那個空檔。
+
+jobs:
+  frontend:
+    name: Frontend (lint / build / test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: my-react-app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: my-react-app/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+
+  firestore-rules:
+    name: Firestore rules (emulator behavior tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: my-react-app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: my-react-app/package-lock.json
+
+      # Firestore emulator 需要 Java 執行環境。
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - run: npm ci
+
+      # 原本 CI 完全沒有涵蓋 firestore.rules，規則被不小心改壞（例如 sharedNotes
+      # 的作者身份檢查被拿掉）語法上仍然合法，只有實際跑一次讀寫才抓得到。
+      # emulators:exec 會自動啟動模擬器、跑完測試後關掉，不需要額外手動起停。
+      - run: npx firebase emulators:exec --config firebase.rules-test.json --only firestore,storage --project yuanyu-app-rules-test "npm run test:rules"
+
+  deploy-scripts:
+    name: Deploy scripts (behavior tests / compose config)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: my-react-app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # deploy.sh 與 deploy/backup.sh 是正式環境唯一的部署與備份入口，改壞了只有部署當下
+      # 才會發現。test_deploy.sh 用假的 docker／git／curl／pg_dump 跑過成功、自動回滾、
+      # .env 防呆、備份失敗中止、代理檢查等每條路徑，不需要真的 docker。
+      - run: bash -n deploy.sh && bash -n deploy/backup.sh && bash -n deploy/env.sh
+      - run: bash deploy/test_deploy.sh
+
+      # compose 檔語法與變數替換是否正確。env_file 需要檔案存在，給空檔即可。
+      - run: touch .env serviceAccountKey.json && docker compose -f docker-compose.prod.yml config -q
+
+  backend:
+    name: Backend (Django + FastAPI tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: my-react-app
+    env:
+      DJANGO_SECRET_KEY: ci-test-secret-key-not-for-production
+      DJANGO_DEBUG: "True"
+      AUTH_DEV_BYPASS: "True"
+      ANTHROPIC_API_KEY: ci-dummy-token
+      AUDIO_FILE_URL: https://example.invalid/audio/
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: my-react-app/requirements-dev.lock
+
+      # torch/torchaudio 需要從 PyTorch 的 CPU wheel index 安裝，直接裝會嘗試抓預設 index、
+      # 可能抓到不對的 build 或抓不到（見 requirements.txt 開頭註解）。CI 不需要 GPU，先裝 CPU 版。
+      - name: Install PyTorch (CPU)
+        run: pip install torch==2.11.0 torchaudio==2.11.0 --index-url https://download.pytorch.org/whl/cpu
+
+      # --require-hashes：鎖定檔裡每個檔案的 SHA-256 都要對得上，套件庫上被偷換的檔案裝不進來。
+      # 鎖定檔由 scripts/compile_requirements.sh 產生（改了 requirements*.txt 要重新產生）。
+      - name: Install remaining Python dependencies (hash-verified)
+        run: pip install --require-hashes -r requirements-dev.lock && pip check
+
+      - name: Django tests (CrosswordPuzzle / crawler / AIModel)
+        working-directory: my-react-app/backend
+        run: python manage.py test
+
+      - name: FastAPI tests
+        working-directory: my-react-app/backend
+        run: pytest fastAPI/tests -v
+
+  docker-image:
+    name: Docker image (hash-verified install / pip check)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: my-react-app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # 正式環境用的映像：requirements.lock 必須能用 --require-hashes 裝起來，
+      # 而且 Dockerfile 最後的 pip check 要通過。開發機沒有 Docker，這是唯一會真的建一次映像的地方。
+      - run: docker build -f backend/Dockerfile -t yuanyu-backend:ci .
+
+      - name: pip check inside the image
+        run: docker run --rm yuanyu-backend:ci pip check
+
+      # 容器不該用 root 跑（資安 S-16）。
+      - name: Container runs as non-root
+        run: test "$(docker run --rm yuanyu-backend:ci id -u)" != "0"
+
+  nginx-config:
+    name: nginx config (nginx -t)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: my-react-app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # deploy/nginx.conf 放進 conf.d（http 層）使用，並引用憑證與 snippets。
+      # 這裡用臨時的自簽憑證與官方 nginx 映像只驗證語法與指令是否被接受；
+      # 版本與正式伺服器的 nginx 可能不同，部署前仍要在伺服器上跑一次 nginx -t。
+      - name: Generate throwaway certificate
+        run: |
+          mkdir -p "$RUNNER_TEMP/le/live/example.com"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=example.com" \
+            -keyout "$RUNNER_TEMP/le/live/example.com/privkey.pem" \
+            -out "$RUNNER_TEMP/le/live/example.com/fullchain.pem"
+
+      - name: nginx -t
+        run: |
+          docker run --rm \
+            -v "$PWD/deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
+            -v "$PWD/deploy/nginx-security-headers.conf:/etc/nginx/snippets/yuanyu-security-headers.conf:ro" \
+            -v "$RUNNER_TEMP/le:/etc/letsencrypt:ro" \
+            nginx:1.28 nginx -t

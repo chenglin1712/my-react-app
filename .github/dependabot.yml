@@ -1,0 +1,10 @@
+# 第三方 action 釘在 commit SHA 之後不會自己更新；這個設定讓 Dependabot 每週檢查新版，
+# 開 PR 同時更新 SHA 與後面註解的版本號，由人看過變更再合併。
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore(ci)"
