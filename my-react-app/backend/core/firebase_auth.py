@@ -97,7 +97,8 @@ def verify_firebase_token(request):
         # 能告警——原本這裡完全沒有 log，全站需登入端點會靜默回應，看起來像是
         # 使用者沒登入，而不是系統設定有問題。
         logger.error("Firebase 服務帳戶未設定，需登入端點將回應 503：%s", e)
-        return None, JsonResponse({"detail": str(e)}, status=503)
+        # 細節只寫進上面的 log；回給客戶端的是通用訊息，不洩漏缺哪個環境變數
+        return None, JsonResponse({"detail": "身份驗證服務暫時無法使用，請稍後再試"}, status=503)
     except Exception:
         # 憑證檔案存在但損毀／格式錯誤等其他初始化失敗，同樣代表驗證機制掛掉，
         # 記錄下來讓 Sentry 能告警，並乾淨地回 503，而不是讓例外一路往外拋。

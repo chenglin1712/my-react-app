@@ -21,6 +21,8 @@ from fastAPI import feature_flags, guest_trial
 
 logger = logging.getLogger(__name__)
 
+_AUTH_UNAVAILABLE_MESSAGE = "身份驗證服務暫時無法使用，請稍後再試"
+
 
 def _auth_dev_bypass() -> bool:
     return auth_dev_bypass("FASTAPI_AUTH_DEV_BYPASS")
@@ -48,14 +50,16 @@ async def verify_firebase_token(request: Request, authorization: str = Header(de
     try:
         ensure_firebase_initialized()
     except EnvironmentError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        # 細節（缺哪個環境變數、金鑰路徑）只寫進 log；回給客戶端的是通用訊息，不洩漏部署內部設定
+        logger.error("Firebase 服務帳戶未設定，需登入端點將回應 503：%s", e)
+        raise HTTPException(status_code=503, detail=_AUTH_UNAVAILABLE_MESSAGE)
     except Exception:
         # 憑證檔案存在但損毀／格式錯誤等其他初始化失敗，同樣代表驗證機制掛掉，
         # 記錄下來讓 Sentry 能告警，並乾淨地回 503，而不是讓例外未經處理地往外拋
         # （Django 端 core/firebase_auth.py 同一種情境曾經因為 import 順序問題
         # 直接變成 UnboundLocalError，這裡雖然不會崩潰，但同樣該給乾淨的 503）。
         logger.exception("Firebase 初始化發生非預期例外")
-        raise HTTPException(status_code=503, detail="身份驗證服務暫時無法使用，請稍後再試")
+        raise HTTPException(status_code=503, detail=_AUTH_UNAVAILABLE_MESSAGE)
     from firebase_admin import auth as firebase_auth
 
     try:

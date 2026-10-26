@@ -25,6 +25,7 @@ from config.logging import get_logging_config
 from .ai_usage_events import record_ai_usage
 from config.sentry_init import init_sentry
 from config.cors import get_allowed_origins
+from config.debug_flag import is_debug
 
 load_dotenv()
 
@@ -153,7 +154,13 @@ async def lifespan(app: FastAPI):
         set_usage_recorder(previous_usage_recorder)
 
 
-app = FastAPI(lifespan=lifespan)
+# 互動式文件（/docs、/redoc）與 /openapi.json 會把所有端點、參數與內部欄位列給任何人看，
+# 只在本機開發（DJANGO_DEBUG=True）開啟；正式環境一律關閉，這三個路徑直接 404。
+def _docs_kwargs(debug: bool) -> dict:
+    return {} if debug else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+
+
+app = FastAPI(lifespan=lifespan, **_docs_kwargs(is_debug()))
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

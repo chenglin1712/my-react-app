@@ -155,6 +155,9 @@ def test_missing_service_account_returns_503(monkeypatch):
         with pytest.raises(HTTPException) as exc_info:
             _run(auth_module.verify_firebase_token(request, authorization="Bearer sometoken"))
     assert exc_info.value.status_code == 503
+    # 缺哪個環境變數是部署內部資訊，只寫 log，不回給客戶端
+    assert "FIREBASE" not in exc_info.value.detail
+    assert "環境變數" not in exc_info.value.detail
 
 
 def test_malformed_service_account_returns_503_not_uncaught_500(monkeypatch):

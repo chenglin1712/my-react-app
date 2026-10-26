@@ -279,6 +279,8 @@ class VerifyFirebaseTokenTest(TestCase):
         self.assertIsNone(decoded)
         self.assertEqual(error.status_code, 503)
         mock_logger.error.assert_called_once()
+        # 缺哪個環境變數是部署內部資訊，只寫 log，不回給客戶端
+        self.assertNotIn("FIREBASE", error.content.decode())
 
     @override_settings(AUTH_DEV_BYPASS=False)
     def test_malformed_service_account_returns_503_instead_of_crashing(self):

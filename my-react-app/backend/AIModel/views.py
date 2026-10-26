@@ -32,6 +32,9 @@ from .tools import SqlDictionaryLookup
 
 logger = logging.getLogger(__name__)
 
+# 缺哪個環境變數是部署內部資訊，只寫 log，不回給客戶端
+_AI_UNAVAILABLE_MESSAGE = "AI 服務目前無法使用，請稍後再試"
+
 
 def _get_client():
     """搬到 config/llm.py（族語翻譯功能在 FastAPI process 裡也需要同一個
@@ -143,7 +146,8 @@ def _prepare_chat(request):
     try:
         client = _get_client()
     except EnvironmentError as e:
-        return None, JsonResponse({"detail": str(e)}, status=503)
+        logger.error("AI 服務未設定，回應 503：%s", e)
+        return None, JsonResponse({"detail": _AI_UNAVAILABLE_MESSAGE}, status=503)
 
     try:
         body = json.loads(request.body)
@@ -301,7 +305,8 @@ def review_tayal_chat(request):
         try:
             client = _get_client()
         except EnvironmentError as e:
-            return JsonResponse({"detail": str(e)}, status=503)
+            logger.error("AI 服務未設定，回應 503：%s", e)
+            return JsonResponse({"detail": _AI_UNAVAILABLE_MESSAGE}, status=503)
 
         try:
             body = json.loads(request.body)
@@ -402,7 +407,8 @@ def review_question(request):
     try:
         client = _get_client()
     except EnvironmentError as e:
-        return JsonResponse({"detail": str(e)}, status=503)
+        logger.error("AI 服務未設定，回應 503：%s", e)
+        return JsonResponse({"detail": _AI_UNAVAILABLE_MESSAGE}, status=503)
 
     quota = daily_quota.consume(uid)      # 找不到題目的請求不佔額度，所以放在讀完脈絡之後
     if quota.unavailable:
@@ -488,7 +494,8 @@ def replan_study_plan(request):
     try:
         client = _get_client()
     except EnvironmentError as e:
-        return JsonResponse({"detail": str(e)}, status=503)
+        logger.error("AI 服務未設定，回應 503：%s", e)
+        return JsonResponse({"detail": _AI_UNAVAILABLE_MESSAGE}, status=503)
 
     quota = daily_quota.consume(uid)      # 找不到計畫、沒有未完成任務的請求不佔額度，所以放在讀完計畫之後
     if quota.unavailable:

@@ -151,6 +151,7 @@ class TayalChatViewTest(TestCase):
     def test_missing_anthropic_api_key_returns_503(self, _mock_get_client):
         response = self._post({"message": "hi"})
         self.assertEqual(response.status_code, 503)
+        self.assertNotIn("ANTHROPIC", response.content.decode())
 
     @patch("AIModel.views._get_client")
     def test_valid_message_returns_200(self, mock_get_client):
