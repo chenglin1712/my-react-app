@@ -62,7 +62,7 @@ services:
       # 啟動時就載入發音比對模型，並讓 /ready 把它納入就緒條件（見 fastAPI/main.py）
       PRELOAD_PRONUNCIATION_MODEL: "true"
     network_mode: host
-    command: sh -c "cd fastAPI && alembic upgrade head && cd .. && uvicorn fastAPI.main:app --host 127.0.0.1 --port 8001 --proxy-headers --forwarded-allow-ips=127.0.0.1"
+    command: sh -c "cd fastAPI && alembic upgrade head && cd .. && uvicorn fastAPI.main:app --host 127.0.0.1 --port 8001 --no-server-header --proxy-headers --forwarded-allow-ips=127.0.0.1"
     volumes:
       - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
       - ./logs:/app/logs

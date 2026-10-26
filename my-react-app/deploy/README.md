@@ -121,6 +121,27 @@ dropdb yuanyu_restore_test
 4. **CSP 目前只是 Report-Only**（不阻擋）。在瀏覽器 Console 看過常用頁面沒有 `[Report Only] Refused to ...` 之後，才改成正式執行；改之前要先把 `index.html` 的內嵌防閃白腳本和字型 `<link>` 的 `onload` 處理掉，詳見 `nginx-security-headers.conf` 的註解。
 5. 我沒有在真實 nginx 上驗證過這些設定（開發機沒有 nginx）。部署前務必 `nginx -t`，並用瀏覽器與 `curl -I https://你的網域/` 確認標頭。
 
+### TLS、資訊揭露與後端埠口
+
+- **TLS：** `nginx.conf` 只開 TLS 1.2／1.3，加密套件採 Mozilla intermediate（只含 ECDHE 搭配 AEAD），關閉 session ticket。
+  **沒有開 OCSP stapling**：Let's Encrypt 已停止提供 OCSP，新憑證沒有 OCSP 網址，開了只會讓 nginx 每次載入都警告。
+  舊裝置（Android 4.x、Windows XP 這類不支援 TLS 1.2 的）會連不上，這是刻意的取捨。
+  上線後可用 SSL Labs（<https://www.ssllabs.com/ssltest/>）檢查成績。
+- **版本資訊：** `server_tokens off` 放在 http 層，80 埠的導向與錯誤頁也不會顯示 nginx 版本。後端的 `Server: gunicorn`／`uvicorn`
+  標頭不會外洩（nginx 預設不轉發上游的 Server），FastAPI 另外加了 `--no-server-header`。以點開頭的路徑（`.git`、`.env`）一律回 404。
+- **後端埠口只准 nginx 連：** Django 信任 `X-Forwarded-Proto`，能直接連到 gunicorn 的人可以自己宣稱是 HTTPS、偽造來源 IP、繞過 nginx 的限流。
+  `docker-compose.prod.yml` 綁 `127.0.0.1`，本機用的 `docker-compose.yml` 也只對 `127.0.0.1` 開放；`deploy.sh` 結尾用 `ss` 確認
+  8000、8001 只在本機監聽，並確認 `Server` 標頭沒有版本號。主機防火牆也建議只開 80、443。
+
+## 更新相依套件
+
+- Python 相依有鎖定檔：`requirements.lock`（正式）與 `requirements-dev.lock`（含 pytest），每個套件附 SHA-256，
+  Dockerfile 與 CI 用 `pip install --require-hashes` 安裝，套件庫上被偷換的檔案裝不進來。
+- 改了 `requirements.txt` 或 `requirements-dev.txt` 之後，執行 `bash scripts/compile_requirements.sh`（需要 [uv](https://docs.astral.sh/uv/)）重新產生，一起提交。
+- `torch`、`torchaudio` 與它們自己的相依（sympy、networkx、jinja2 等）**不在鎖定檔裡，沒有雜湊保護**（要從 PyTorch 自己的 index 安裝；Dockerfile 與 CI 裝完後會跑 `pip check` 確認沒有版本衝突）。它們的版本寫在 `requirements.txt`、`backend/Dockerfile`、`.github/workflows/ci.yml` 三處，要一起改。
+- 鎖定檔以 Linux x86_64 與 Python 3.12 解析；雜湊涵蓋該版本所有平台的安裝檔，ARM 伺服器也能用。
+- 本機開發（Windows、macOS）照常 `pip install -r requirements-dev.txt` 即可，不需要鎖定檔。
+
 ## Firebase 規則
 
 目前**沒有**變更任何線上的 Firebase 規則，Firestore、Realtime Database、Storage 都沿用現有設定。

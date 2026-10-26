@@ -26,7 +26,11 @@ services:
       # 文件裡 `gunicorn core.wsgi:application --bind 0.0.0.0:$PORT` 的 8000。
       - PORT=8000
     ports:
-      - "8000:8000"
+      # 只綁本機（127.0.0.1）：容器內的 gunicorn 綁 0.0.0.0 是為了讓 Docker 轉得進來，
+      # 但寫成 "8000:8000" 會把埠口開給這台機器所有網路介面，同一個區網的人都連得到——
+      # 而 Django 信任 X-Forwarded-Proto，任何人直接連後端就能自己宣稱是 HTTPS。
+      # 要讓別台機器連（例如手機測試），請在前面放反向代理，不要改成對外開放。
+      - "127.0.0.1:8000:8000"
     # 跟 README「正式部署」一節文件的指令完全一致：gunicorn 啟動前需先跑一次
     # collectstatic，admin／DRF/Swagger 頁面的 CSS/JS 由 WhiteNoise 從
     # STATIC_ROOT（backend/staticfiles/）提供，沒跑過這個指令樣式會跑掉。
@@ -57,7 +61,8 @@ services:
     environment:
       - PORT=8001
     ports:
-      - "8001:8001"
+      # 只綁本機，理由同上面的 django
+      - "127.0.0.1:8001:8001"
     command: uvicorn fastAPI.main:app --host 0.0.0.0 --port $$PORT
     volumes:
       # backend/dictionary_db/dictionary.db（~71MB，gitignored，schema 由

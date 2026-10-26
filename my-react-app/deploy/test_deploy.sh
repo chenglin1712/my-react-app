@@ -49,7 +49,17 @@ cat > "$SB/bin/curl" <<'EOF'
 #!/usr/bin/env bash
 echo "curl $*" >> "$SB_LOG"
 case "$*" in *"-w %{http_code}"*) printf '%s' "${ROUTE_CODE:-401}" ;; esac
+case "$*" in *-skI*) printf 'HTTP/2 200\r\nserver: %s\r\n' "${SERVER_HEADER:-nginx}" ;; esac
 exit "${CURL_RC:-0}"
+EOF
+# 假的 ss：回報後端埠口的監聽位址。LISTEN_ADDR 預設只綁本機；可用空白分隔多個位址（模擬同一埠多個監聽）；
+# 設成 0.0.0.0 模擬對外開放，none 模擬沒有輸出，fail 模擬 ss 執行失敗
+cat > "$SB/bin/ss" <<'EOF'
+#!/usr/bin/env bash
+[ "${LISTEN_ADDR:-127.0.0.1}" = "fail" ] && exit 1
+[ "${LISTEN_ADDR:-127.0.0.1}" = "none" ] && exit 0
+port="${*##*:}"
+for addr in ${LISTEN_ADDR:-127.0.0.1}; do echo "LISTEN 0 511 $addr:$port 0.0.0.0:*"; done
 EOF
 # 假的 pg_dump：記下「命令列參數」與「連線用的環境變數」，用來證明密碼只走環境變數
 cat > "$SB/bin/pg_dump" <<'EOF'
@@ -149,6 +159,34 @@ check "啟動前先建好 logs／media，且前端建置用部署者的 uid（�
 check "chown 只動 logs／media／dist／node_modules，並用數字 uid:gid" \
   "$(log_has 'sudo chown -R 1234:5678 logs' && log_has 'sudo chown -R 1234:5678 media' && log_has 'sudo chown -R 1234:5678 dist' && ! log_has 'sudo chown.* \.$'; echo $?)"
 check "deploy.sh 不再遞迴 chown 整個 repo" "$(! grep -qE 'chown -R .*\" .$|chown -R .$USER' deploy.sh; echo $?)"
+
+good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "後端埠口只綁本機時通過" "$([ $rc = 0 ] && out_has '後端埠口 8000 只對本機開放' && out_has '後端埠口 8001 只對本機開放'; echo $?)"
+
+good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1 LISTEN_ADDR=0.0.0.0; rc=$?
+check "後端埠口對外開放：報錯（只回報、不回滾容器）" \
+  "$([ $rc != 0 ] && out_has '後端埠口 8000 對外開放' && out_has '後端埠口 8001 對外開放' && dist_is new; echo $?)"
+
+good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1 LISTEN_ADDR=none; rc=$?
+check "ss 沒有列出監聽：算失敗（驗證不了就不放行）" "$([ $rc != 0 ] && out_has 'FAIL ss 沒有列出埠口 8000'; echo $?)"
+
+good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1 LISTEN_ADDR=fail; rc=$?
+check "ss 執行失敗：算失敗" "$([ $rc != 0 ] && out_has 'FAIL ss 沒有列出埠口 8000'; echo $?)"
+
+good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1 LISTEN_ADDR="127.0.0.1 0.0.0.0"; rc=$?
+check "同一埠同時有本機與萬用位址：仍判定對外開放" "$([ $rc != 0 ] && out_has '後端埠口 8000 對外開放'; echo $?)"
+
+good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1 LISTEN_ADDR="127.0.0.1 [::1] ::1"; rc=$?
+check "IPv4／IPv6 loopback 的幾種寫法都算只對本機開放" "$([ $rc = 0 ] && out_has '後端埠口 8000 只對本機開放'; echo $?)"
+
+good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1 LISTEN_ADDR=none SKIP_PORT_CHECK=1; rc=$?
+check "明確設 SKIP_PORT_CHECK=1 才能略過無法驗證的情況" "$([ $rc = 0 ]; echo $?)"
+
+good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1 SERVER_HEADER="gunicorn"; rc=$?
+check "Server 標頭洩漏 gunicorn：報錯" "$([ $rc != 0 ] && out_has 'Server 標頭洩漏版本資訊：gunicorn'; echo $?)"
+
+good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1 SERVER_HEADER="nginx/1.24.0"; rc=$?
+check "Server 標頭洩漏 nginx 版本：報錯" "$([ $rc != 0 ] && out_has 'Server 標頭洩漏版本資訊：nginx/1.24.0'; echo $?)"
 
 echo "deploy.sh：.env 防呆"
 env_case() { # 名稱 內容(printf 格式) 預期輸出關鍵字

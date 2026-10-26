@@ -61,6 +61,10 @@ AUTH_DEV_BYPASS = auth_dev_bypass()
 # 成不安全連線，導致 SECURE_SSL_REDIRECT 陷入重導迴圈、secure cookie 也不會被送出。
 # 這兩個平台都會在自己的邊緣層蓋掉用戶端送來的 X-Forwarded-Proto，不會讓外部請求
 # 偽造這個標頭，才能放心依它判斷；本機開發沒有反向代理，不會有這個標頭，不受影響。
+# 這個信任成立的前提：後端埠口只有反向代理連得到。能直接連到 gunicorn 的人可以自己帶
+# X-Forwarded-Proto: https，騙過 SECURE_SSL_REDIRECT 與 secure cookie 的判斷。所以正式環境的
+# 後端只綁 127.0.0.1（docker-compose.prod.yml），本機 docker-compose.yml 的埠口也只對 127.0.0.1 開放，
+# deploy.sh 結尾會檢查實際監聽位址。日後改成多台機器或別的部署方式時，埠口只能對代理所在的網段開放。
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 if not DEBUG:

@@ -200,11 +200,38 @@ check_route() {
   esac
 }
 
+# 後端只准 nginx 連：Django 信任 X-Forwarded-Proto（settings.py 的 SECURE_PROXY_SSL_HEADER），
+# 能直接連到後端埠口的人可以自己宣稱「這是 HTTPS」、偽造來源 IP，繞過 nginx 的限流與標頭。
+# docker-compose.prod.yml 綁 127.0.0.1；這裡確認實際監聽的位址真的只有本機。
+check_loopback_only() {
+  local port="$1" addrs bad
+  # 驗證不了就算失敗：「後端只對本機開放」是部署的安全前提，不能在沒檢查到的情況下默默放行。
+  if ! command -v ss >/dev/null 2>&1; then echo "   FAIL 找不到 ss 指令，無法確認後端埠口 $port 只對本機開放（安裝 iproute2，或手動確認後以 SKIP_PORT_CHECK=1 略過）"; [ "${SKIP_PORT_CHECK:-0}" = "1" ] || PROXY_OK=0; return; fi
+  if ! addrs=$(ss -ltnH "sport = :$port" 2>/dev/null | awk '{print $4}'); then addrs=""; fi
+  if [ -z "$addrs" ]; then echo "   FAIL ss 沒有列出埠口 $port 的監聽（服務沒起來，或 ss 不支援這個用法）"; [ "${SKIP_PORT_CHECK:-0}" = "1" ] || PROXY_OK=0; return; fi
+  bad=$(printf '%s\n' "$addrs" | grep -vE '^(127\.0\.0\.1|\[::1\]|::1):' || true)
+  if [ -z "$bad" ]; then echo "   OK   後端埠口 $port 只對本機開放"
+  else echo "   FAIL 後端埠口 $port 對外開放：$(echo $bad)（應只綁 127.0.0.1）"; PROXY_OK=0; fi
+}
+
+# 回應標頭不洩漏後端與 nginx 的名稱、版本（gunicorn／uvicorn／nginx/1.x.x）
+check_server_header() {
+  local value
+  value=$(curl -skI --max-time 15 "$PROXY_BASE/health/" 2>/dev/null | tr -d '\r' | awk -F': *' 'tolower($1)=="server"{print $2}') || true
+  case "$value" in
+    *gunicorn*|*uvicorn*|*[0-9].[0-9]*) echo "   FAIL Server 標頭洩漏版本資訊：$value"; PROXY_OK=0 ;;
+    *) echo "   OK   Server 標頭未洩漏版本資訊${value:+（$value）}" ;;
+  esac
+}
+
 echo "==> 檢查反向代理（$PROXY_BASE）"
 if curl -fsk --max-time 15 -o /dev/null "$PROXY_BASE/"; then echo "   OK   GET /"; else echo "   FAIL GET /（SPA 靜態檔沒有提供？）"; PROXY_OK=0; fi
 if curl -fsk --max-time 15 -o /dev/null "$PROXY_BASE/health/"; then echo "   OK   GET /health/"; else echo "   FAIL GET /health/（沒有轉到 Django？）"; PROXY_OK=0; fi
 check_route POST /AIModel/tayal_chat/
 check_route POST /api/v1/translation/translate
+check_loopback_only 8000
+check_loopback_only 8001
+check_server_header
 
 echo "==> 狀態"
 "${COMPOSE[@]}" ps
