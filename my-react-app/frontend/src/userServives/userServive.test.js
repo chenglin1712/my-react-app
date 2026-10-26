@@ -1,7 +1,9 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { updateDoc, runTransaction, increment, setDoc } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
-import { toggleFavoriteWord, updateUserErrors, registerWithImg } from './userServive';
+import { createUserWithEmailAndPassword, sendEmailVerification, onAuthStateChanged } from 'firebase/auth';
+import { toggleFavoriteWord, updateUserErrors, registerWithImg, signOut, authChanges } from './userServive';
+import { STORAGE_PREFIX } from '../../components/_quiz/botStorage';
+import { auth } from '../../../firebase';
 
 vi.mock('firebase/firestore', async (importOriginal) => {
   const actual = await importOriginal();
@@ -136,5 +138,82 @@ describe('registerWithImg（註冊後寄驗證信）', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     sendEmailVerification.mockRejectedValue({ code: 'auth/too-many-requests', message: 'x' });
     await expect(registerWithImg('小明', 'a@b.c', 'secret1', '學生', null)).resolves.toMatchObject({ uid: 'u1', firestoreData: { name: '小明', identity: '學生' } });
+  });
+});
+
+describe('signOut（清掉本機的 AI 對話）', () => {
+  beforeEach(() => { localStorage.clear(); });
+
+  test('clears every saved AI conversation after a successful sign-out, leaving notes alone', async () => {
+    auth.signOut = vi.fn().mockResolvedValue(undefined);
+    localStorage.setItem(`${STORAGE_PREFIX}u1`, '{}');
+    localStorage.setItem('userNotes_u1', '[]');
+    await signOut();
+    expect(localStorage.getItem(`${STORAGE_PREFIX}u1`)).toBeNull();
+    expect(localStorage.getItem('userNotes_u1')).toBe('[]');
+  });
+
+  test('keeps the conversation when sign-out fails', async () => {
+    auth.signOut = vi.fn().mockRejectedValue(new Error('network'));
+    localStorage.setItem(`${STORAGE_PREFIX}u1`, '{}');
+    await expect(signOut()).rejects.toThrow('network');
+    expect(localStorage.getItem(`${STORAGE_PREFIX}u1`)).toBe('{}');
+  });
+});
+
+describe('authChanges（被動登出與換帳號也清 AI 對話）', () => {
+  beforeEach(() => { localStorage.clear(); onAuthStateChanged.mockReset(); });
+
+  const fire = async (user) => {
+    let listener;
+    onAuthStateChanged.mockImplementation((_auth, cb) => { listener = cb; return () => {}; });
+    const callback = vi.fn();
+    authChanges(callback);
+    await listener(user);
+    return callback;
+  };
+
+  test('a signed-out event (no explicit signOut call) clears every saved conversation', async () => {
+    localStorage.setItem(`${STORAGE_PREFIX}u1`, '{}');
+    localStorage.setItem('userNotes_u1', '[]');
+    const callback = await fire(null);
+    expect(callback).toHaveBeenCalledWith(null);
+    expect(localStorage.getItem(`${STORAGE_PREFIX}u1`)).toBeNull();
+    expect(localStorage.getItem('userNotes_u1')).toBe('[]');
+  });
+
+  test('clears the other account before the slow profile and token requests finish', async () => {
+    localStorage.setItem(`${STORAGE_PREFIX}u1`, '{}');
+    let listener;
+    onAuthStateChanged.mockImplementation((_auth, cb) => { listener = cb; return () => {}; });
+    authChanges(vi.fn());
+    const pendingToken = new Promise(() => {});          // 永遠不 resolve：模擬卡住的 token 請求
+    listener({ uid: 'u2', getIdTokenResult: () => pendingToken });
+    expect(localStorage.getItem(`${STORAGE_PREFIX}u1`)).toBeNull();
+  });
+
+  test('a signed-out event while an earlier sign-in is still loading wins and leaves nothing behind', async () => {
+    localStorage.setItem(`${STORAGE_PREFIX}u1`, '{}');
+    let listener;
+    onAuthStateChanged.mockImplementation((_auth, cb) => { listener = cb; return () => {}; });
+    const callback = vi.fn();
+    authChanges(callback);
+    let release;
+    const token = new Promise((resolve) => { release = resolve; });
+    const first = listener({ uid: 'u2', getIdTokenResult: () => token });
+    await listener(null);
+    release({ claims: {} });
+    await first;
+    expect(callback).toHaveBeenCalledTimes(1);          // 只有登出那次，舊的登入結果被丟棄
+    expect(callback).toHaveBeenCalledWith(null);
+    expect(localStorage.getItem(`${STORAGE_PREFIX}u1`)).toBeNull();
+  });
+
+  test('signing in as another account removes the previous account\'s conversation only', async () => {
+    localStorage.setItem(`${STORAGE_PREFIX}u1`, '{}');
+    localStorage.setItem(`${STORAGE_PREFIX}u2`, '{}');
+    await fire({ uid: 'u2', getIdTokenResult: () => Promise.resolve({ claims: {} }) });
+    expect(localStorage.getItem(`${STORAGE_PREFIX}u1`)).toBeNull();
+    expect(localStorage.getItem(`${STORAGE_PREFIX}u2`)).toBe('{}');
   });
 });

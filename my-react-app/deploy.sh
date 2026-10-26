@@ -8,6 +8,9 @@
 #      PROXY_BASE=...    反向代理對外位址，預設 https://127.0.0.1
 #      ALLOW_NO_REDIS=1  .env 沒有 REDIS_URL 也照常部署（限流計數會退回各 worker 的記憶體）
 #
+# 請用一般使用者（不是 root）執行：容器會用這個使用者的 uid 跑，掛載的 logs／media 才不會有權限問題。
+# 第一次改成非 root 容器之前，logs／media 若還是 root 擁有，先 sudo chown -R "$USER:$USER" logs media。
+#
 # 回滾範圍：前端 dist 與兩個後端 image（yuanyu-django／yuanyu-fastapi 的 :prev 標籤）。
 # 不含資料庫 schema：後端容器啟動時會自動 migrate，若新版 migration 與舊版程式不相容，
 # 切回舊 image 也救不了，這時要用部署前備份（deploy/backup.sh）還原。程式碼本身
@@ -24,6 +27,10 @@ cd "$(dirname "$0")"
 
 FORCE="${1:-}"
 COMPOSE=(docker compose -f docker-compose.prod.yml)
+# 容器的執行身分（docker-compose.prod.yml 的 user:）。取部署者的 uid，掛載目錄才寫得進去。
+export APP_UID APP_GID
+APP_UID="$(id -u)"
+APP_GID="$(id -g)"
 IMAGES=(yuanyu-django yuanyu-fastapi)
 PROXY_BASE="${PROXY_BASE:-https://127.0.0.1}"
 MARKER=.deploy-in-progress
@@ -33,6 +40,9 @@ MARKER=.deploy-in-progress
 # backend/config/auth_flags.py），整個站台等於沒有登入。這份 .env 若是從開發機複製
 # 過來，部署前就擋下來。
 preflight() {
+  if [ "$(id -u)" = "0" ]; then
+    echo "!! 請用一般使用者執行，不要用 root：容器會用執行者的 uid 跑，root 會讓容器退回以 root 執行。部署中止。"; return 1
+  fi
   [ -f .env ] || { echo "!! 找不到 .env"; return 1; }
   [ -f serviceAccountKey.json ] || { echo "!! 找不到 serviceAccountKey.json"; return 1; }
   if is_true "$(env_value DJANGO_DEBUG)"; then
@@ -86,6 +96,17 @@ if [ "${SKIP_BACKUP:-}" != "1" ] && [ -f deploy/backup.sh ]; then
   echo "==> 部署前備份"
   bash deploy/backup.sh || { echo "!! 備份失敗，部署中止（確定要略過請用 SKIP_BACKUP=1）"; exit 1; }
 fi
+
+# ── 1.5 準備可寫的目錄 ──────────────────────────────────────────
+# 容器以部署者的 uid 執行，掛載進去的 logs／media 必須先存在且屬於這個 uid：不存在的話 Docker 會
+# 自己以 root 建立，容器就寫不進去。舊版（容器是 root）留下的 root 擁有檔案也在這裡一併修正；
+# 放在拍攝回滾點之前，dist.prev 才不會繼承 root 擁有者而在最後清不掉。
+# 只處理實際會被寫入的目錄，不遞迴改整個 repo（.git、金鑰檔的擁有者不該被動到）。
+echo "==> 準備 logs／media 目錄"
+mkdir -p logs media
+for d in logs media dist dist.prev node_modules; do
+  if [ -e "$d" ]; then sudo chown -R "$APP_UID:$APP_GID" "$d"; fi
+done
 
 # ── 2. 留下回滾點 ───────────────────────────────────────────────
 if [ -f "$MARKER" ]; then
@@ -147,7 +168,8 @@ trap rollback ERR
 
 # ── 3. 重建前端 ─────────────────────────────────────────────────
 echo "==> 重建前端"
-docker run --rm -v "$PWD":/app -w /app node:20-slim sh -c "npm ci && npm run build"
+# 用部署者的 uid 跑，產出的 node_modules、dist 才不會是 root 擁有；HOME 指到可寫的暫存目錄給 npm 用
+docker run --rm --user "$APP_UID:$APP_GID" -e HOME=/tmp -v "$PWD":/app -w /app node:20-slim sh -c "npm ci && npm run build"
 
 # ── 4. 重建並重啟後端，等到兩個服務都通過健康檢查 ──────────────────
 echo "==> 重建後端 image"
@@ -155,9 +177,6 @@ echo "==> 重建後端 image"
 
 echo "==> 重啟後端容器並等待健康檢查（django: /health/、fastapi: /ready）"
 "${COMPOSE[@]}" up -d --wait --wait-timeout 420
-
-echo "==> 修正擁有者"
-sudo chown -R "$USER:$USER" .
 
 # 到這裡新版容器已通過健康檢查，這次部署對回滾而言算成功：移除標記與舊的 dist 備份
 trap - ERR

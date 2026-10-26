@@ -3,12 +3,17 @@
 # image 名稱固定：deploy.sh 在重建前把目前的 image 標成 :prev，新版本沒通過健康檢查
 # 時用它切回上一版。沒有固定名稱的話，compose 每次重建都會讓舊 image 變成沒有標籤
 # 的懸空 image，隨即被 `docker image prune` 清掉，沒有東西可以回滾。
+#
+# 容器不用 root 執行：user 取自 APP_UID／APP_GID（deploy.sh 設成執行部署的使用者），
+# 讓掛進來的 ./logs、./media 與唯讀的 serviceAccountKey.json 都用同一個擁有者。
+# 直接用 docker compose 而不是 deploy.sh 時，要自己設：APP_UID=$(id -u) APP_GID=$(id -g) docker compose ...
 services:
   django:
     build:
       context: .
       dockerfile: backend/Dockerfile
     image: yuanyu-django:latest
+    user: "${APP_UID:-10001}:${APP_GID:-10001}"
     env_file: [.env]
     environment:
       # DATABASE_URL 漏設時啟動失敗，不要靜默退回容器內的 SQLite（見 core/settings.py）
@@ -50,6 +55,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     image: yuanyu-fastapi:latest
+    user: "${APP_UID:-10001}:${APP_GID:-10001}"
     env_file: [.env]
     environment:
       REQUIRE_DATABASE_URL: "true"

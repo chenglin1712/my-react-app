@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import {
-  RETENTION_MS, STORAGE_PREFIX, clearConversation, hasConversation, loadConversation, sanitizeMessages, saveConversation,
+  RETENTION_MS, STORAGE_PREFIX, clearAllConversations, clearConversation, clearOtherConversations, hasConversation, loadConversation, sanitizeMessages, saveConversation,
 } from './botStorage';
 
 const chat = [
@@ -14,6 +14,24 @@ const chat = [
 
 describe('botStorage', () => {
   beforeEach(() => localStorage.clear());
+
+  test('clearOtherConversations keeps only the given account\'s conversation', () => {
+    saveConversation('u1', { tribe: 'tayal', messages: chat });
+    saveConversation('u2', { tribe: 'tayal', messages: chat });
+    clearOtherConversations('u2');
+    expect(loadConversation('u1')).toBeNull();
+    expect(loadConversation('u2')).not.toBeNull();
+  });
+
+  test('clearAllConversations removes every saved conversation but nothing else', () => {
+    saveConversation('u1', { tribe: 'tayal', messages: chat });
+    saveConversation('u2', { tribe: 'tayal', messages: chat });
+    localStorage.setItem('userNotes_u1', '[]');
+    clearAllConversations();
+    expect(loadConversation('u1')).toBeNull();
+    expect(loadConversation('u2')).toBeNull();
+    expect(localStorage.getItem('userNotes_u1')).toBe('[]');
+  });
 
   test('saves only displayable messages and never an image preview url', () => {
     saveConversation('u1', { tribe: 'tayal', messages: chat });

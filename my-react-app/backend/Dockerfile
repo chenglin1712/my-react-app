@@ -13,7 +13,11 @@
 # docker-compose.yml 已經設定好對應的 context/dockerfile，一般不需要手動下
 # 這行指令。
 
-FROM python:3.12-slim
+# 基底映像固定「版本＋摘要」：同一份 Dockerfile 在不同時間建出來的是同一個系統，不會因為上游
+# 悄悄換了 Debian 版本或 Python 小版本而壞掉，也不會被上游被入侵的新映像取代。
+# 3.12.13-slim-trixie 對應本機開發的 Python 3.12.13。要升級時：到 Docker Hub 查新標籤的摘要，
+# 在預備環境 docker build 通過後，標籤與摘要一起改。
+FROM python:3.12.13-slim-trixie@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36
 
 # 對應 requirements.txt 內套件的系統依賴：
 # - ffmpeg：pydub／fastAPI/routes/quiz.py 的語音比對功能需要 ffmpeg／ffprobe
@@ -63,6 +67,15 @@ RUN python -c "import torchaudio; torchaudio.pipelines.WAV2VEC2_BASE.get_model()
 COPY backend/ /app/backend/
 
 WORKDIR /app/backend
+
+# 不用 root 執行：應用程式被攻破時，攻擊者不會直接拿到容器內的最高權限。
+# docker-compose.prod.yml 會用 user: 覆寫成部署使用者的 uid（deploy.sh 設定 APP_UID），
+# 這樣掛進來的 ./logs、./media 才寫得進去，所以這裡的 10001 只是「直接 docker run」時的預設。
+# 任意 uid 都要能寫：collectstatic 的輸出目錄與預設 log 目錄先建好並開放（1777，同 /tmp）。
+ENV HOME=/tmp
+RUN mkdir -p /app/backend/staticfiles /app/backend/logs /app/logs \
+    && chmod 1777 /app/backend/staticfiles /app/backend/logs /app/logs
+USER 10001:10001
 
 # Django 預設 8000、FastAPI 預設 8001（見 README），僅供文件用途，
 # 實際監聽 port 由啟動指令的 $PORT 決定（docker-compose.yml 逐服務設定）。

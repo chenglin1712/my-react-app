@@ -16,7 +16,8 @@ class AiModerationEvent(models.Model):
 
     隱私設計（對象可能是未成年人）：
       - 不存 uid，只存單向雜湊（與 AiFeedback 同一套），管理者只能看出「同一個人的幾則」。
-      - 只存訊息開頭的短摘錄（excerpt，最多 80 字，長數字與電子郵件已遮掉），不存整段對話與模型回覆。
+      - 安全類（unsafe）不存訊息文字；其他類型只存開頭最多 40 字的摘錄（excerpt），網址、電子郵件、長數字、
+        帳號、自報姓名、學校、含門牌的地址已遮掉（見 AIModel/moderation.py），不存整段對話與模型回覆。
       - 只有 owner／admin 看得到；保存 30 天後清除（purge_ai_moderation 指令）。
     正常通過的訊息不會有任何紀錄。
     """

@@ -50,12 +50,65 @@ class ValidateTest(TestCase):
 
 
 class ModerationExcerptTest(TestCase):
+    def _excerpt(self, text, intent="off_topic"):
+        moderation.record("u1", intent, "fixed", text)
+        return AiModerationEvent.objects.latest("id").excerpt
+
     def test_long_numbers_and_emails_are_masked(self):
-        moderation.record("u1", "unsafe", "fixed", "我的電話 0912-345-678 信箱 kid@example.com 住在某路")
-        excerpt = AiModerationEvent.objects.get().excerpt
+        excerpt = self._excerpt("我的電話 0912-345-678 信箱 kid@example.com 住在某路")
         self.assertNotIn("0912", excerpt)
         self.assertNotIn("kid@", excerpt)
         self.assertIn("住在某路", excerpt)
+
+    def test_unsafe_messages_store_no_text_at_all(self):
+        self.assertEqual(self._excerpt("我今天很難過，我住在台北市大安區", intent="unsafe"), "")
+        self.assertEqual(AiModerationEvent.objects.get().intent, "unsafe")      # 但事件本身仍記錄
+
+    def test_excerpt_is_at_most_40_characters(self):
+        self.assertEqual(len(self._excerpt("你" * 300)), 40)
+
+    def test_personal_identifiers_are_masked_before_truncation(self):
+        cases = {
+            "網址": ("看 https://example.com/u/kid123 這個", "example.com"),
+            "@帳號": ("加我 @little_kid 好嗎", "little_kid"),
+            "社群帳號": ("我的 ig 是 kid2012abc 喔", "kid2012abc"),
+            "全形電話": ("電話０９１２３４５６７８", "０９１２"),
+            "自報姓名": ("我叫王小明 今年十歲", "王小明"),
+            "學校": ("我在快樂國小 上課", "快樂國小"),
+            "含門牌的地址": ("我家在中山路12號", "中山路12"),
+            "縣市區": ("住在台北市大安區附近", "大安區"),
+        }
+        for name, (text, leaked) in cases.items():
+            with self.subTest(name):
+                self.assertNotIn(leaked, self._excerpt(text))
+
+    def test_common_evasions_are_masked(self):
+        cases = {
+            "email 有空白": ("信箱 kid @ example.com 謝謝", "example"),
+            "零寬字元": ("信箱 kid@exam\u200bple.com 謝謝", "exam"),
+            "括號電話": ("電話 09(12)345.678 謝謝", "345"),
+            "hxxp 網址": ("hxxps://evil.example/u/1", "evil"),
+            "裸網域": ("我的網站 myblog.com 來看", "myblog"),
+            "@ 後有空白": ("加我 @ little_kid", "little_kid"),
+            "@ 後有多個空白": ("加我 @   little_kid", "little_kid"),
+            "雙向控制字元": ("信箱 kid@exam\u2066ple.com 謝謝", "exam"),
+        }
+        for name, (text, leaked) in cases.items():
+            with self.subTest(name):
+                self.assertNotIn(leaked, self._excerpt(text))
+
+    def test_romanised_words_with_a_lesson_number_are_not_over_masked(self):
+        self.assertIn("lokah2", self._excerpt("lokah2 是什麼意思"))
+        self.assertIn("Python3", self._excerpt("Python3 怎麼寫"))
+
+    def test_ordinary_learning_questions_stay_readable(self):
+        self.assertEqual(self._excerpt("幫我寫 Python"), "幫我寫 Python")
+        self.assertEqual(self._excerpt("今天天氣好嗎"), "今天天氣好嗎")
+
+    def test_an_email_cut_by_the_old_80_char_limit_cannot_leak_a_fragment(self):
+        excerpt = self._excerpt("你" * 30 + "kid@example.com")
+        self.assertNotIn("kid@", excerpt)
+        self.assertNotIn("example", excerpt)
 
 
 class SettingsCacheRaceTest(TestCase):
@@ -150,7 +203,7 @@ class ModerationFlowTest(TestCase):
         result = run_tayal_chat(client, "泰雅語", "x" * 300, {}, uid="u1")
         self.assertEqual(result["message"], REFUSAL_MESSAGE)
         event = AiModerationEvent.objects.get()
-        self.assertEqual((event.intent, len(event.excerpt)), ("unsafe", 80))
+        self.assertEqual((event.intent, event.excerpt), ("unsafe", ""))        # 安全類不存文字
 
     def test_a_model_refusal_is_recorded_too(self):
         client = _client(_route_response("vocab_or_grammar"))
@@ -288,14 +341,21 @@ class AdminEndpointTest(TestCase):
                     cache.clear()          # 試跑有每分鐘次數限制；這裡測的是驗證，不是限流
                     self.assertEqual(self._post("/adminapi/ai-assistant/settings/trial/", body, headers).status_code, 400)
 
+    def test_an_old_unsafe_row_never_returns_its_text(self):
+        # migration 0034 會清掉舊資料；這是第二層防線：就算資料層還留著，API 也不回傳安全類的文字
+        AiModerationEvent.objects.create(uid_hash=hash_uid("u1"), intent="unsafe", action="fixed", excerpt="舊資料原文")
+        with self._as() as headers:
+            body = self.http.get("/adminapi/ai-assistant/moderation/", **headers).json()
+        self.assertEqual([i["excerpt"] for i in body["items"]], [""])
+
     def test_moderation_list_shows_excerpt_and_short_hash_only(self):
-        AiModerationEvent.objects.create(uid_hash=hash_uid("u1"), intent="unsafe", action="fixed", excerpt="壞問題")
+        AiModerationEvent.objects.create(uid_hash=hash_uid("u1"), intent="model_refusal", action="refused", excerpt="壞問題")
         AiModerationEvent.objects.create(uid_hash=hash_uid("u2"), intent="off_topic", action="gentle", excerpt="天氣")
         with self._as() as headers:
             body = self.http.get("/adminapi/ai-assistant/moderation/", **headers).json()
-            only = self.http.get("/adminapi/ai-assistant/moderation/?intent=unsafe", **headers).json()
+            only = self.http.get("/adminapi/ai-assistant/moderation/?intent=model_refusal", **headers).json()
             bad = self.http.get("/adminapi/ai-assistant/moderation/?intent=zzz", **headers)
-        self.assertEqual(body["summary"], {"total": 2, "byIntent": {"off_topic": 1, "unsafe": 1, "model_refusal": 0}})
+        self.assertEqual(body["summary"], {"total": 2, "byIntent": {"off_topic": 1, "unsafe": 0, "model_refusal": 1}})
         self.assertEqual(len(body["items"][0]["user"]), 8)
         self.assertEqual([i["excerpt"] for i in only["items"]], ["壞問題"])
         self.assertEqual(bad.status_code, 400)

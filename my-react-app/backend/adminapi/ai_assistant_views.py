@@ -3,7 +3,7 @@
 
 權限：只有 owner／admin（config.roles.FEEDBACK_VIEWERS）。每次儲存與回滾都新增一個版本並寫稽核紀錄，
 舊版本從不修改。試跑只用草稿內容回答管理者自己輸入的問題，不寫資料庫、不影響學生看到的設定。
-審核事件只含學生訊息開頭 120 字的摘錄與單向雜湊的使用者代號（見 models/ai_assistant.py）。
+審核事件只含學生訊息開頭 40 字的遮罩後摘錄（安全類完全不存文字）與單向雜湊的使用者代號（見 models/ai_assistant.py）。
 """
 import logging
 import math
@@ -197,7 +197,7 @@ def ai_moderation_list(request):
         "summary": _moderation_summary(),
         "items": [{
             "id": r.pk, "createdAt": r.created_at.isoformat(), "intent": r.intent, "action": r.action,
-            "excerpt": r.excerpt, "tribe": r.tribe, "user": r.uid_hash[:8],
+            "excerpt": "" if r.intent == "unsafe" else r.excerpt, "tribe": r.tribe, "user": r.uid_hash[:8],
         } for r in rows],
         "page": page, "pages": pages, "pageSize": PAGE_SIZE, "count": total,
     })

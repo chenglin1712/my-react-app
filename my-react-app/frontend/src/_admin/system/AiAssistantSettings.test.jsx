@@ -148,4 +148,24 @@ describe('AiAssistantSettings admin page', () => {
         expect(within(row).getByText('友善引導')).toBeInTheDocument();
         expect(within(row).getByText('ab12cd34')).toBeInTheDocument();
     });
+
+    test('never renders the excerpt of a safety event, even if an old row still carries one', async () => {
+        route(overview(), moderation([
+            { id: 9, createdAt: '2026-10-01T08:00:00Z', intent: 'unsafe', action: 'fixed', excerpt: '舊資料裡的原文', tribe: '泰雅語', user: 'ab12cd34' },
+        ]));
+        render(<AiAssistantSettings />);
+        expect(await screen.findByText('（安全類不保存原文）')).toBeInTheDocument();
+        expect(screen.queryByText('舊資料裡的原文')).not.toBeInTheDocument();
+    });
+
+    test('states the privacy rule and explains an empty excerpt of a safety event', async () => {
+        route(overview(), moderation([
+            { id: 1, createdAt: '2026-10-22T08:00:00Z', intent: 'unsafe', action: 'fixed', excerpt: '', tribe: '泰雅語', user: 'ab12cd34' },
+            { id: 2, createdAt: '2026-10-22T09:00:00Z', intent: 'off_topic', action: 'fixed', excerpt: '', tribe: '泰雅語', user: 'ef56ab78' },
+        ]));
+        render(<AiAssistantSettings />);
+        expect(await screen.findByText(/安全類不保存訊息文字；其他類型只存開頭 40 字/)).toBeInTheDocument();
+        expect(screen.getByText('（安全類不保存原文）')).toBeInTheDocument();
+        expect(screen.getByText('（空白）')).toBeInTheDocument();
+    });
 });

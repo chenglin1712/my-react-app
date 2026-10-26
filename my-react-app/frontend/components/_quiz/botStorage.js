@@ -1,7 +1,7 @@
 // AI 助手對話的本機保存（路線圖 #32）。
 // 隱私設計：只存在這台裝置的 localStorage，不上傳；以使用者 uid 分開（共用電腦換人登入看不到上一位的），
 // 保留 7 天，每次載入時過期就刪。只存可以重新顯示的內容：圖片只存「曾附圖」的標記（預覽網址重新整理後就失效），
-// 錯誤訊息與中斷的回覆不存。使用者按「新對話」會刪除。localStorage 不可用（私密視窗、容量滿）時靜默略過，不影響聊天。
+// 錯誤訊息與中斷的回覆不存。使用者按「新對話」或登出時會刪除（登出清掉所有帳號的，共用電腦不留痕跡）。localStorage 不可用（私密視窗、容量滿）時靜默略過，不影響聊天。
 
 export const STORAGE_PREFIX = 'yuanyu.bot.conversation.v1:';
 export const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -93,6 +93,35 @@ export function clearConversation(uid) {
     if (!store || !uid) return;
     try {
         store.removeItem(keyFor(uid));
+    } catch {
+        // 同上
+    }
+}
+
+// 登出時清掉這台裝置上所有帳號的對話（含過期與否）。對話是學生的提問，登出就是「我離開這台裝置」的明確表示。
+export function clearAllConversations() {
+    const store = storage();
+    if (!store) return;
+    try {
+        for (let i = store.length - 1; i >= 0; i -= 1) {
+            const key = store.key(i);
+            if (key && key.startsWith(STORAGE_PREFIX)) store.removeItem(key);
+        }
+    } catch {
+        // 同上
+    }
+}
+
+// 帳號切換時清掉「別的帳號」的對話：沒有走登出（被動登出、直接換帳號）時，上一位的提問也不留在共用裝置上
+export function clearOtherConversations(uid) {
+    const store = storage();
+    if (!store) return;
+    const keep = uid ? keyFor(uid) : null;
+    try {
+        for (let i = store.length - 1; i >= 0; i -= 1) {
+            const key = store.key(i);
+            if (key && key.startsWith(STORAGE_PREFIX) && key !== keep) store.removeItem(key);
+        }
     } catch {
         // 同上
     }

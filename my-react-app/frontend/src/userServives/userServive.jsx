@@ -2,6 +2,7 @@ import { doc, getDoc, setDoc, updateDoc, runTransaction, increment, FieldPath } 
 import { db, auth } from "../../../firebase";
 import { onAuthStateChanged, createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { clearAdminSession } from "../_admin/session/adminSession";
+import { clearAllConversations, clearOtherConversations } from "../../components/_quiz/botStorage";
 
 // 前端版的角色開發模式開關，對應後端 config/firebase_auth.py 的
 // AUTH_DEV_BYPASS_ROLE：後端的 AUTH_DEV_BYPASS 只影響 API 請求，完全不影響
@@ -28,6 +29,8 @@ export const authChanges = (callback) => {
     return onAuthStateChanged(auth, async (user) => {
         const myGen = ++currentGen;
         if (user) {
+            // 先清（在下面任何 await 之前）：讀 profile、token 可能很慢，這段時間上一位的 AI 對話不該還留在這台裝置上
+            clearOtherConversations(user.uid);
             // getIdTokenResult 才拿得到 custom claims（role），一般的 user 物件
             // 本身不帶這個資訊。後台管理系統的 AdminRoute 靠 role 判斷能不能進去
             // （見 backend/config/roles.py），這裡是前端唯一讀取這個 claim 的地方，
@@ -57,6 +60,8 @@ export const authChanges = (callback) => {
             // 登出（或登入狀態消失）時一併清掉「已在後台登入頁輸入過密碼」的旗標，
             // 否則同一分頁重新用前台登入同一個帳號，就會不用再輸入密碼直接進後台
             clearAdminSession();
+            // 被動登出（token 失效、其他分頁登出）也要清：AI 對話是學生的提問，不留在共用裝置上
+            clearAllConversations();
             stopPresence();
             callback(null);
         }
@@ -255,6 +260,8 @@ export const updateUserErrors = async (uid, wordTayal, incrementBy = 1) => {
 export const signOut = async () => {
     try {
         await auth.signOut();
+        // 登出成功才清：登出失敗時使用者還在這個帳號裡，不該弄丟對話
+        clearAllConversations();
     } catch (error) {
         console.error("X 登出失敗: ", error.message);
         throw error;

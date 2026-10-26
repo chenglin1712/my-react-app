@@ -31,6 +31,7 @@ if [ "$1" = "compose" ]; then
   case "$*" in
     *"up --help"*) echo "      --wait-timeout int   Maximum duration to wait for the project to be running|healthy"; exit 0 ;;
     *"up -d --wait"*)
+      echo "compose-env APP_UID=${APP_UID:-} APP_GID=${APP_GID:-}" >> "$SB_LOG"
       if [ "${FAIL_UP:-0}" = "1" ] && [ ! -f "$SB_STATE/up_failed" ]; then touch "$SB_STATE/up_failed"; exit 1; fi ;;
   esac
 fi
@@ -64,7 +65,12 @@ cat > /dev/null
 [ "${RESTORE_FAIL:-0}" = "1" ] && exit 1
 echo "TOC"
 EOF
-printf '#!/usr/bin/env bash\nexit 0\n' > "$SB/bin/sudo"
+printf '#!/usr/bin/env bash\necho "sudo $*" >> "$SB_LOG"\nexit 0\n' > "$SB/bin/sudo"
+# 假的 id：讓測試不受執行者身分影響（FAKE_UID=0 模擬用 root 執行）
+cat > "$SB/bin/id" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in -u) echo "${FAKE_UID:-1234}" ;; -g) echo "${FAKE_GID:-5678}" ;; *) /usr/bin/id "$@" ;; esac
+EOF
 chmod +x "$SB/bin/"*
 
 # ── 工具函式 ─────────────────────────────────────────────────────
@@ -129,6 +135,20 @@ check "沒有 SENTRY_DSN：只印警告，部署照常成功（非阻擋）" "$(
 good_env; printf 'SENTRY_DSN=https://example@o0.ingest.sentry.io/1
 ' >> "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
 check "有設定 SENTRY_DSN：不印警告" "$([ $rc = 0 ] && ! out_has 'SENTRY_DSN'; echo $?)"
+
+good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "容器用部署者的 uid／gid 執行（APP_UID／APP_GID 傳給 compose）" \
+  "$([ $rc = 0 ] && log_has 'compose-env APP_UID=1234 APP_GID=5678'; echo $?)"
+
+good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1 FAKE_UID=0; rc=$?
+check "用 root 執行：中止，不啟動 root 容器" "$([ $rc != 0 ] && out_has '不要用 root' && ! log_has '^docker compose.* build'; echo $?)"
+
+good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "啟動前先建好 logs／media，且前端建置用部署者的 uid（不產生 root 擁有的檔案）" \
+  "$([ $rc = 0 ] && [ -d "$SB/repo/logs" ] && [ -d "$SB/repo/media" ] && log_has 'docker run --rm --user 1234:5678'; echo $?)"
+check "chown 只動 logs／media／dist／node_modules，並用數字 uid:gid" \
+  "$(log_has 'sudo chown -R 1234:5678 logs' && log_has 'sudo chown -R 1234:5678 media' && log_has 'sudo chown -R 1234:5678 dist' && ! log_has 'sudo chown.* \.$'; echo $?)"
+check "deploy.sh 不再遞迴 chown 整個 repo" "$(! grep -qE 'chown -R .*\" .$|chown -R .$USER' deploy.sh; echo $?)"
 
 echo "deploy.sh：.env 防呆"
 env_case() { # 名稱 內容(printf 格式) 預期輸出關鍵字

@@ -7,8 +7,6 @@ import httpx
 import threading
 from dotenv import load_dotenv
 import os
-import time
-from deep_translator import GoogleTranslator
 from PIL import Image, UnidentifiedImageError
 
 from fastAPI import rate_limit_config
@@ -45,14 +43,11 @@ _translation_cache: dict[str, str | None] = {}
 _translation_cache_lock = threading.Lock()
 
 
-# deep_translator 底層是爬 Google 翻譯網頁，官方限制約每秒 5 次，伺服器（雲端共用 IP）
-# 更容易直接被擋（TooManyRequests）。以前一張圖 10 個 label 連續快速打 10 次，翻譯一失敗就
-# 回傳 None、label 被靜默丟掉，前端只看到空清單、console 完全沒有錯誤。
-# 現在：1) 優先用官方 Cloud Translation API 一次批次翻完（需在 GCP 啟用 Translation API，
-# 與 Vision 共用同一把 key）；2) 失敗才退回 deep_translator，且放慢呼叫節奏＋指數退避；
-# 3) 仍失敗就保留英文原字並記 log，而不是把 label 丟掉。
+# 翻譯只用官方 Cloud Translation API，一次批次翻完（需在 GCP 啟用 Translation API，與 Vision 共用同一把 key）。
+# 以前失敗時會退回 deep_translator（爬 Google 翻譯網頁的非官方套件）：它沒有修正版本、雲端共用 IP 容易被擋、
+# 而且是把使用者圖片的辨識結果送到一個沒有合約的網頁端點，所以移除。
+# 翻譯失敗（沒設定 key、API 沒啟用、逾時）就保留英文原字並記 log，而不是把 label 丟掉。
 CLOUD_TRANSLATE_URL = "https://translation.googleapis.com/language/translate/v2"
-_FALLBACK_MIN_INTERVAL = 0.3  # 秒，約每秒 3 次，低於 Google 5 次/秒的限制
 
 
 def _translate_batch_official(texts: list[str]) -> dict[str, str] | None:
@@ -69,31 +64,16 @@ def _translate_batch_official(texts: list[str]) -> dict[str, str] | None:
             _logger.warning("[vision] 官方 Translation API 失敗 status=%s：%s", resp.status_code, resp.text[:200].replace(CLOUD_API_KEY, "***"))
             return None
         items = resp.json()["data"]["translations"]
-        return {t: i["translatedText"] for t, i in zip(texts, items)}
+        # 只收「確實翻出非空字串」的項目；數量對不上、缺項、空字串都當成那一項失敗（呼叫端會保留英文原字）
+        out = {}
+        for text, item in zip(texts, items):
+            zh = item.get("translatedText") if isinstance(item, dict) else None
+            if isinstance(zh, str) and zh.strip():
+                out[text] = zh
+        return out
     except Exception as exc:
         _logger.warning("[vision] 官方 Translation API 例外：%s", type(exc).__name__)
         return None
-
-
-def translate_with_retry(text: str, retries=3, delay=1) -> str | None:
-    if not text.strip():
-        return text
-
-    key = text.strip().lower()
-    if key in _translation_cache:
-        return _translation_cache[key]
-
-    for i in range(retries):
-        try:
-            translated = GoogleTranslator(source='en', target='zh-TW').translate(text)
-            result = None if translated.strip().lower() == key else translated
-            with _translation_cache_lock:
-                _translation_cache[key] = result
-            return result
-        except Exception as exc:
-            _logger.warning("[vision] deep_translator 翻譯失敗（%d/%d）text=%r：%s", i + 1, retries, text, type(exc).__name__)
-            time.sleep(delay * (2 ** i))
-    return None
 
 
 def translate_labels(descriptions: list[str]) -> dict[str, str | None]:
@@ -113,16 +93,12 @@ def translate_labels(descriptions: list[str]) -> dict[str, str | None]:
             with _translation_cache_lock:
                 _translation_cache[d.strip().lower()] = zh
             out[d] = zh
-        pending = []
+        pending = [d for d in pending if d not in official]
 
-    for n, d in enumerate(pending):
-        if n:
-            time.sleep(_FALLBACK_MIN_INTERVAL)
-        zh = translate_with_retry(d)
-        if zh is None and d.strip().lower() not in _translation_cache:
-            _logger.error("[vision] 所有翻譯方式都失敗，保留英文原字 text=%r", d)
-            zh = d
-        out[d] = zh
+    # 官方 API 沒翻成（含沒設定 key）：保留英文原字，不快取，下一次請求還有機會翻成
+    for d in pending:
+        _logger.error("[vision] 翻譯失敗，保留英文原字 text=%r", d)
+        out[d] = d
     return out
 
 
@@ -219,7 +195,7 @@ async def analyze_image(request: Request):
 
     labels = result["responses"][0].get("labelAnnotations", [])
 
-    # 翻譯是同步呼叫（含 time.sleep 退避），整批丟到執行緒池，避免卡住 event loop。
+    # 翻譯是同步的 HTTP 呼叫，整批丟到執行緒池，避免卡住 event loop。
     translations = await asyncio.to_thread(translate_labels, [l["description"] for l in labels])
 
     label_data = []

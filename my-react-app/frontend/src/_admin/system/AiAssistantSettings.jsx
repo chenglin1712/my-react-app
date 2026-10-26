@@ -127,7 +127,7 @@ function ModerationSection() {
         <section className="ai-assistant-section" aria-labelledby="ai-assistant-moderation">
             <h2 id="ai-assistant-moderation">內容審核事件</h2>
             <p className="ai-assistant-lede">
-                被攔下或被引導的訊息。只存開頭 80 字的摘錄（長數字與電子郵件已遮掉）與單向雜湊的使用者代號，保存 30 天。
+                被攔下或被引導的訊息。安全類不保存訊息文字；其他類型只存開頭 40 字的摘錄（網址、電子郵件、電話、帳號、姓名、學校與地址已遮掉）與單向雜湊的使用者代號，保存 30 天。為了保護隱私寧可多遮，摘錄裡的地名與學校名可能被遮掉。
                 若發現正常的學習問題被誤攔，請調整上面的離題處理，或把案例補進評測題組。
             </p>
             {error && <Alert variant="danger">{error}</Alert>}
@@ -157,7 +157,7 @@ function ModerationSection() {
                                     <td className="ai-usage-nowrap">{formatTime(row.createdAt)}</td>
                                     <td>{INTENT_LABELS[row.intent] ?? row.intent}</td>
                                     <td>{ACTION_LABELS[row.action] ?? row.action}</td>
-                                    <td className="ai-assistant-excerpt">{row.excerpt || '（空白）'}</td>
+                                    <td className="ai-assistant-excerpt">{row.intent === 'unsafe' ? '（安全類不保存原文）' : (row.excerpt || '（空白）')}</td>
                                     <td className="ai-assistant-muted">{row.user}</td>
                                 </tr>
                             ))}
