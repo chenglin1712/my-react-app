@@ -4,9 +4,10 @@ import asyncio
 import logging
 import re
 
-from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi import APIRouter, HTTPException, Request
 
 from fastAPI import game_config, rate_limit_config
+from fastAPI.form_limits import multipart_openapi_extra, parse_bounded_form, require_text, require_upload
 from fastAPI.rate_limit import limiter
 
 from . import model
@@ -28,14 +29,31 @@ def make_error(step: str, msg: str):
     }
 
 
-@router.post("/compare_audio/")
+@router.post(
+    "/compare_audio/",
+    openapi_extra=multipart_openapi_extra(
+        file_field="user_audio", required_text=("audio_id",), optional_text=("reference_urls",),
+    ),
+)
 @limiter.limit(lambda: rate_limit_config.get_configured_rate("quiz_compare_audio", "20/minute"))  # CPU 密集的 wav2vec2 推論 + 對外下載，每位使用者每分鐘最多 20 次（後台可調）
-async def compare_audio(
-    request: Request,
-    user_audio: UploadFile = File(...),
-    audio_id: str = Form(...),
-    reference_urls: str = Form(default=""),   # 逗號分隔的 Firebase Storage 公開 URL
-):
+async def compare_audio(request: Request):
+    # 不用 File(...)／Form(...) 宣告，改手動解析表單：FastAPI 的宣告式參數沒辦法設定
+    # 欄位數與檔案數上限（S-04），攻擊者可以送大量小分段，在大小檢查前就耗掉資源。
+    # 前端只送 user_audio、audio_id，以及選填的 reference_urls（逗號分隔的 Firebase Storage 公開 URL）。
+    form = await parse_bounded_form(request, max_files=1, max_fields=2)
+    try:
+        user_audio = require_upload(form, "user_audio")
+        audio_id = require_text(form, "audio_id")
+        reference_urls = form.get("reference_urls", "")
+        if not isinstance(reference_urls, str):
+            raise HTTPException(status_code=422, detail="欄位 reference_urls 必須是文字")
+        return await _compare_uploaded_audio(user_audio, audio_id, reference_urls)
+    finally:
+        # 手動解析表單就沒有 FastAPI 自動關閉暫存檔的機制，要自己關
+        await form.close()
+
+
+async def _compare_uploaded_audio(user_audio, audio_id: str, reference_urls: str):
     if not model._ffmpeg_path:
         return make_error("ffmpeg_missing", "伺服器未安裝 ffmpeg，語音比對功能暫時無法使用")
 
@@ -60,7 +78,8 @@ async def compare_audio(
     try:
         # Step A — 讀取使用者錄音
         try:
-            user_bytes = await user_audio.read()
+            # 多讀 1 byte 就能判斷超限，不把超大檔案整個讀進記憶體
+            user_bytes = await user_audio.read(max_audio_bytes + 1)
         except Exception:
             _logger.exception("[pronunciation] 讀取使用者錄音失敗 audio_id=%r", audio_id)
             return make_error("read_user_audio", "讀取錄音內容失敗，請重新錄音再試一次")

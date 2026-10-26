@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 import asyncio
 import base64
 import io
@@ -10,6 +10,7 @@ import os
 from PIL import Image, UnidentifiedImageError
 
 from fastAPI import rate_limit_config
+from fastAPI.form_limits import is_upload, multipart_openapi_extra, parse_bounded_form
 from fastAPI.rate_limit import limiter
 
 load_dotenv()
@@ -102,7 +103,7 @@ def translate_labels(descriptions: list[str]) -> dict[str, str | None]:
     return out
 
 
-@router.post("/analyze_image/")
+@router.post("/analyze_image/", openapi_extra=multipart_openapi_extra(file_field="file"))
 @limiter.limit(lambda: rate_limit_config.get_configured_rate("vision_analyze_image", "10/minute"))  # 呼叫付費 Google Cloud Vision API，每位使用者每分鐘最多 10 次（後台可調，見 rate_limit_config.py）
 async def analyze_image(request: Request):
     # 這裡不再自己包一層 `except Exception: log + raise HTTPException(500,...)`
@@ -111,13 +112,22 @@ async def analyze_image(request: Request):
     # 沒被下面明確攔截的例外，一律交給 main.py 註冊的全域 Exception handler
     # 記 log＋回傳通用訊息；HTTPException 本身有 FastAPI 內建的 handler，
     # 兩者都不需要這支函式自己再攔一次。
-    form = await request.form()
-    file: UploadFile = form.get("file")
+    # 前端只送一個 file 欄位，沒有其他文字欄位；表單解析先設好上限（S-04），再來才檢查檔案大小。
+    form = await parse_bounded_form(request, max_files=1, max_fields=0)
+    try:
+        return await _analyze_uploaded_image(form.get("file"))
+    finally:
+        # 手動解析表單就沒有 FastAPI 自動關閉暫存檔的機制，要自己關
+        await form.close()
 
-    if not file:
+
+async def _analyze_uploaded_image(file):
+    # 不是檔案（例如把 file 當文字欄位送）也視同沒收到圖片，不然下面 read() 會直接炸成 500
+    if not is_upload(file):
         raise HTTPException(status_code=400, detail="未收到圖片")
 
-    contents = await file.read()
+    # 最多多讀 1 byte 就知道超限，不把超大檔案整個讀進記憶體
+    contents = await file.read(MAX_IMAGE_BYTES + 1)
 
     if len(contents) > MAX_IMAGE_BYTES:
         raise HTTPException(status_code=413, detail="圖片不得超過 5 MB")
