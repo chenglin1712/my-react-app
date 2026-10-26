@@ -13,6 +13,9 @@ from dictionary_db.word_data import load_audio_items_for_words
 from config.tribes import resolve_tribe_name
 from config.debug_flag import is_debug
 from config.audio_source import get_ilrdf_audio_api
+from config.bounded_download import (
+    IDENTITY_ENCODING_HEADERS, MAX_OFFICIAL_AUDIO_BYTES, MAX_RESOLVER_BODY_BYTES, DownloadLimitError, aread_capped,
+)
 from config.media_source import get_media_source_mode
 from fastAPI import rate_limit_config
 from fastAPI.rate_limit import limiter
@@ -66,12 +69,15 @@ async def proxy_audio(request: Request, file_id: str, db: Session = Depends(get_
         first_url = get_ilrdf_audio_api() + file_id
 
         async with httpx.AsyncClient(follow_redirects=False, timeout=10) as client:
-            res = await client.get(first_url)
-
-            if res.status_code in [301, 302, 303, 307, 308]:
-                final_url = res.headers.get("Location", "")
-            else:
-                final_url = res.text.strip()
+            # 第一次請求的本文只是一段網址文字，讀取時限制在幾 KB 內（見 config/bounded_download.py）
+            async with client.stream("GET", first_url, headers=IDENTITY_ENCODING_HEADERS) as res:
+                if res.status_code in [301, 302, 303, 307, 308]:
+                    final_url = res.headers.get("Location", "")
+                else:
+                    try:
+                        final_url = (await aread_capped(res, MAX_RESOLVER_BODY_BYTES)).decode("utf-8", "replace").strip()
+                    except DownloadLimitError:
+                        final_url = ""
 
             if not final_url or "http" not in final_url:
                 return Response(content="Unable to resolve audio URL", media_type="text/plain", status_code=404)
@@ -83,18 +89,23 @@ async def proxy_audio(request: Request, file_id: str, db: Session = Depends(get_
                 return Response(content="Audio URL not allowed", media_type="text/plain", status_code=502)
 
             async with httpx.AsyncClient(timeout=15) as c2:
-                audio_res = await c2.get(final_url)
-                # is_safe_redirect_target 檢查的那次 DNS 解析，跟這裡 c2.get()
-                # 實際連線時 httpx 自己重新做的 DNS 解析是兩次獨立的查詢——如果
-                # 網域在中間變更了解析結果（低 TTL、DNS rebinding），前面的檢查
-                # 就形同虛設。這裡改成檢查「實際建立連線的那個 IP」本身安不
-                # 安全（見 url_safety.py 的 assert_response_from_safe_peer），
-                # 不安全就整段內容都不回傳給呼叫端。
-                assert_response_from_safe_peer(audio_res)
-                if audio_res.status_code != 200:
-                    return Response(content="Audio file not found", media_type="text/plain", status_code=404)
-                content_type = audio_res.headers.get("content-type", "audio/mpeg")
-                return Response(content=audio_res.content, media_type=content_type)
+                # 串流下載：回應標頭一到就能檢查，本文不會先完整進記憶體。
+                async with c2.stream("GET", final_url, headers=IDENTITY_ENCODING_HEADERS) as audio_res:
+                    # is_safe_redirect_target 檢查的那次 DNS 解析，跟這裡實際連線時 httpx 自己
+                    # 重新做的 DNS 解析是兩次獨立的查詢——如果網域在中間變更了解析結果
+                    # （低 TTL、DNS rebinding），前面的檢查就形同虛設。這裡改成檢查「實際
+                    # 建立連線的那個 IP」本身安不安全（見 url_safety.py 的
+                    # assert_response_from_safe_peer），不安全就一個位元組都不讀。
+                    assert_response_from_safe_peer(audio_res)
+                    if audio_res.status_code != 200:
+                        return Response(content="Audio file not found", media_type="text/plain", status_code=404)
+                    content_type = audio_res.headers.get("content-type", "audio/mpeg")
+                    try:
+                        body = await aread_capped(audio_res, MAX_OFFICIAL_AUDIO_BYTES)
+                    except DownloadLimitError:
+                        logger.warning("官方音檔超過大小上限，拒絕轉送：%r", file_id)
+                        return Response(content="Audio file too large", media_type="text/plain", status_code=502)
+                    return Response(content=body, media_type=content_type)
 
     except UnsafeConnectionError:
         return Response(content="Audio URL not allowed", media_type="text/plain", status_code=502)

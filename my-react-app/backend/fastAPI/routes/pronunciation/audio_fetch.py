@@ -5,9 +5,11 @@
 from urllib.parse import urlparse
 
 import httpx
-import requests
 
 from config.audio_source import get_ilrdf_audio_api
+from config.bounded_download import (
+    IDENTITY_ENCODING_HEADERS, MAX_OFFICIAL_AUDIO_BYTES, MAX_RESOLVER_BODY_BYTES, DownloadLimitError, read_capped,
+)
 from config.media_source import get_media_source_mode
 from config.url_safety import UnsafeConnectionError, assert_response_from_safe_peer, is_safe_redirect_target
 from dictionary_db.connect import SessionLocal
@@ -86,11 +88,23 @@ def fetch_audio_from_id(audio_id: str):
     # ILRDF 要一次。
     public_url = _lookup_verified_audio_url(audio_id)
     if public_url:
-        with httpx.Client(timeout=15) as client:
-            resp = client.get(public_url)
-        if resp.status_code != 200:
-            raise Exception(f"下載音檔失敗 (HTTP {resp.status_code})")
-        return resp.content
+        # public_url 來自資料庫：資料被誤寫或匯入污染時，不能讓後端連去內網或 metadata 位址。
+        # 只接受 https，並在讀本文之前確認實際連線的對象（理由同下面 ILRDF 的第二次請求）。
+        if not public_url.startswith("https://") or not is_safe_redirect_target(public_url):
+            raise Exception("音檔 URL 指向不允許的位址")
+        # 串流並限制大小（見 config/bounded_download.py）：不先把整個回應讀進記憶體
+        with httpx.Client(timeout=15, follow_redirects=False) as client:
+            with client.stream("GET", public_url, headers=IDENTITY_ENCODING_HEADERS) as resp:
+                try:
+                    assert_response_from_safe_peer(resp)
+                except UnsafeConnectionError:
+                    raise Exception("音檔 URL 指向不允許的位址")
+                if resp.status_code != 200:
+                    raise Exception(f"下載音檔失敗 (HTTP {resp.status_code})")
+                try:
+                    return read_capped(resp, MAX_OFFICIAL_AUDIO_BYTES)
+                except DownloadLimitError:
+                    raise Exception("音檔過大，拒絕下載")
 
     if get_media_source_mode() == "storage_only":
         raise Exception("音檔尚未遷移完成，暫時無法比對")
@@ -102,15 +116,19 @@ def fetch_audio_from_id(audio_id: str):
     # 三處各自一份、容易改了環境變數卻漏改寫死常數那條路徑。
     api_url = get_ilrdf_audio_api() + audio_id
 
-    # 第一次請求取得重導向 URL
-    resp = requests.get(api_url, allow_redirects=False, timeout=10)
-    if resp.status_code in [301, 302, 303, 307, 308]:
-        final_url = resp.headers.get("Location")
-    else:
-        final_url = resp.text.strip()
+    # 第一次請求取得重導向 URL。回應本文只是一段網址文字，讀取時限制在幾 KB 內。
+    with httpx.Client(timeout=10, follow_redirects=False) as client:
+        with client.stream("GET", api_url, headers=IDENTITY_ENCODING_HEADERS) as resp:
+            if resp.status_code in [301, 302, 303, 307, 308]:
+                final_url = resp.headers.get("Location")
+            else:
+                try:
+                    final_url = read_capped(resp, MAX_RESOLVER_BODY_BYTES).decode("utf-8", "replace").strip()
+                except DownloadLimitError:
+                    final_url = None
 
     if not final_url or not final_url.startswith("http"):
-        raise Exception(f"無法取得真正音檔 URL: {resp.text}")
+        raise Exception("無法取得真正音檔 URL")
 
     # 第二次請求的目標網址完全由第一次請求的回應內容決定，發出前先擋掉明顯
     # 指向內網／loopback／link-local（含雲端 metadata endpoint）的位址，
@@ -126,14 +144,20 @@ def fetch_audio_from_id(audio_id: str):
     # （response.extensions["network_stream"]），藉此改成檢查「真正被拿去
     # 收發資料的那個位址」本身安全（見 url_safety.py 的
     # assert_response_from_safe_peer），不再只依賴檢查當下的解析結果。
+    #
+    # 串流下載並限制大小（見 config/bounded_download.py）：連線對象的檢查在讀取本文「之前」做，
+    # 不安全就一個位元組都不讀。
     with httpx.Client(timeout=15, follow_redirects=False) as client:
-        audio_resp = client.get(final_url)
-        try:
-            assert_response_from_safe_peer(audio_resp)
-        except UnsafeConnectionError:
-            raise Exception("音檔 URL 指向不允許的位址")
+        with client.stream("GET", final_url, headers=IDENTITY_ENCODING_HEADERS) as audio_resp:
+            try:
+                assert_response_from_safe_peer(audio_resp)
+            except UnsafeConnectionError:
+                raise Exception("音檔 URL 指向不允許的位址")
 
-    if audio_resp.status_code != 200:
-        raise Exception(f"下載音檔失敗 (HTTP {audio_resp.status_code})")
+            if audio_resp.status_code != 200:
+                raise Exception(f"下載音檔失敗 (HTTP {audio_resp.status_code})")
 
-    return audio_resp.content
+            try:
+                return read_capped(audio_resp, MAX_OFFICIAL_AUDIO_BYTES)
+            except DownloadLimitError:
+                raise Exception("音檔過大，拒絕下載")
