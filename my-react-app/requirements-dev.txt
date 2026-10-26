@@ -1,0 +1,3 @@
+# 開發與 CI 才需要的套件（正式環境不安裝）。
+-r requirements.txt
+pytest==9.1.1

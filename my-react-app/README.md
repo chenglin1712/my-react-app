@@ -43,8 +43,8 @@ my-react-app/
 # 前端
 npm install
 
-# 後端（Django + FastAPI 共用同一份 requirements.txt）
-pip install -r requirements.txt
+# 後端（Django + FastAPI 共用同一份 requirements.txt；測試工具 pytest 在 requirements-dev.txt）
+pip install -r requirements-dev.txt
 ```
 
 複製 `.env.example` 為 `.env`，依註解填入：Firebase 專案設定、Anthropic Claude API Key（AI 對話／翻譯）、Google Cloud Vision API 金鑰（影像辨識）、Cloudinary（圖片上傳）等。`.env` 已加進 `.gitignore`，不會被提交。

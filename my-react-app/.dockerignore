@@ -1,6 +1,6 @@
 # .dockerignore
 #
-# backend/Dockerfile 只會 COPY 根目錄的 requirements.txt 與 backend/ 兩樣東西
+# backend/Dockerfile 只會 COPY 根目錄的 requirements.lock 與 backend/ 兩樣東西
 # 進 image，但 .dockerignore 影響的是「送去給 Docker daemon 的整個 build
 # context」，跟這裡列出來的東西是否真的被 COPY 無關——排除用不到的東西
 # （尤其 node_modules/、.git/）可以大幅縮短 build context 的傳輸與雜湊時間。

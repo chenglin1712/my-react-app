@@ -24,14 +24,11 @@ FROM python:3.12.13-slim-trixie@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9d
 #   執行檔在 PATH 上（quiz.py 會自動偵測，找不到只在啟動時警告，呼叫
 #   /compare_audio 才會真的報錯）。
 # - libsndfile1：soundfile 需要的系統函式庫。
-# - libgl1、libglib2.0-0：opencv-python（非 headless 版）在 Debian slim 這類
-#   最小化 image 上 import 時若缺這兩個會丟出經典的 libGL.so.1 錯誤。
+# （原本還裝 libgl1、libglib2.0-0 給 opencv-python 用；程式碼沒用到 opencv，套件與這兩個函式庫都已移除）
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
         libsndfile1 \
-        libgl1 \
-        libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONUNBUFFERED=1 \
@@ -39,18 +36,22 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# 先只複製 requirements.txt 再裝依賴（善用 Docker layer cache：原始碼變動不會
-# 讓這一層重跑）。安裝順序完全比照 .github/workflows/ci.yml 已驗證可行的做法：
-# torch/torchaudio/torchvision 必須「先」從 PyTorch 的 CPU wheel index 裝，
-# 直接 `pip install -r requirements.txt` 會嘗試從預設 PyPI index 抓，可能抓到
-# 不對的 build 或抓不到（requirements.txt 開頭也有同樣的註解）。
-COPY requirements.txt .
+# 先只複製鎖定檔再裝依賴（善用 Docker layer cache：原始碼變動不會讓這一層重跑）。
+# 安裝順序完全比照 .github/workflows/ci.yml 已驗證可行的做法：
+# torch/torchaudio 必須「先」從 PyTorch 的 CPU wheel index 裝，直接裝會嘗試從預設
+# PyPI index 抓，可能抓到不對的 build 或抓不到（requirements.txt 開頭也有同樣的註解）。
+# 其餘套件用 requirements.lock 加 --require-hashes：每個檔案的 SHA-256 都要對得上，
+# 套件庫上被偷換的檔案裝不進來（鎖定檔由 scripts/compile_requirements.sh 產生）。
+# 注意：torch／torchaudio 與它們自己的相依（sympy、networkx、jinja2 等）不在鎖定檔內，沒有雜湊保護；
+# 最後的 pip check 至少確保兩次安裝之間沒有版本衝突。
+COPY requirements.lock .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir \
-        torch==2.11.0 torchaudio==2.11.0 torchvision==0.26.0 \
+        torch==2.11.0 torchaudio==2.11.0 \
         --index-url https://download.pytorch.org/whl/cpu \
         --extra-index-url https://pypi.org/simple \
-    && pip install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir --require-hashes -r requirements.lock \
+    && pip check
 
 # 發音比對的 wav2vec2 權重在 build 階段就下載進 image（TORCH_HOME 固定路徑，
 # 不隨執行身分改變）。原本是第一次請求才下載：第一位使用者要等很久，容器無外網或
