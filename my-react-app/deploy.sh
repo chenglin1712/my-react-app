@@ -28,9 +28,13 @@ cd "$(dirname "$0")"
 FORCE="${1:-}"
 COMPOSE=(docker compose -f docker-compose.prod.yml)
 # 容器的執行身分（docker-compose.prod.yml 的 user:）。取部署者的 uid，掛載目錄才寫得進去。
-export APP_UID APP_GID
+# 先指定值再 export（不是反過來）：2026-10-26 發生過一次 export 之後，底下的 docker compose
+# 呼叫沒吃到這兩個變數、退回 compose 檔裡的預設值 10001，跟 logs／media 的擁有者兜不起來而
+# 啟動失敗。沒有抓到 100% 的成因，所以後面每個會用到這兩個變數的 docker compose 呼叫都額外在
+# 那一行明確帶一次，不單靠這裡的 export。
 APP_UID="$(id -u)"
 APP_GID="$(id -g)"
+export APP_UID APP_GID
 IMAGES=(yuanyu-django yuanyu-fastapi)
 PROXY_BASE="${PROXY_BASE:-https://127.0.0.1}"
 MARKER=.deploy-in-progress
@@ -144,10 +148,11 @@ rollback() {
     for img in "${IMAGES[@]}"; do
       docker tag "$img:prev" "$img:latest" || { echo "!! 標回上一版 image 失敗：$img"; ok=0; }
     done
-    if [ "$ok" = "1" ]; then
-      "${COMPOSE[@]}" up -d --no-build --force-recreate --wait --wait-timeout 300 \
-        || { echo "!! 上一版沒有通過健康檢查，請手動檢查：docker compose -f docker-compose.prod.yml logs"; ok=0; }
-    fi
+    # 容器回滾跟上面的前端 dist 回滾是獨立的兩件事：即使 dist 還原失敗，也要繼續把容器換回
+    # 舊 image，不然會變成「:latest 標籤已經指回舊版，但容器還在跑剛剛失敗的新版」這種標籤與
+    # 實際執行不一致的狀態（2026-10-26 發生過一次，復原時才發現）。
+    APP_UID="$APP_UID" APP_GID="$APP_GID" "${COMPOSE[@]}" up -d --no-build --force-recreate --wait --wait-timeout 300 \
+      || { echo "!! 上一版沒有通過健康檢查，請手動檢查：docker compose -f docker-compose.prod.yml logs"; ok=0; }
   else
     echo "!! 沒有完整的上一版 image（第一次部署？），無法自動回滾容器。"
     ok=0
@@ -176,7 +181,7 @@ echo "==> 重建後端 image"
 "${COMPOSE[@]}" build
 
 echo "==> 重啟後端容器並等待健康檢查（django: /health/、fastapi: /ready）"
-"${COMPOSE[@]}" up -d --wait --wait-timeout 420
+APP_UID="$APP_UID" APP_GID="$APP_GID" "${COMPOSE[@]}" up -d --wait --wait-timeout 420
 
 # 到這裡新版容器已通過健康檢查，這次部署對回滾而言算成功：移除標記與舊的 dist 備份
 trap - ERR
