@@ -117,7 +117,7 @@ jobs:
       # torch/torchaudio 需要從 PyTorch 的 CPU wheel index 安裝，直接裝會嘗試抓預設 index、
       # 可能抓到不對的 build 或抓不到（見 requirements.txt 開頭註解）。CI 不需要 GPU，先裝 CPU 版。
       - name: Install PyTorch (CPU)
-        run: pip install torch==2.11.0 torchaudio==2.11.0 --index-url https://download.pytorch.org/whl/cpu
+        run: pip install torch==2.14.1 torchaudio==2.11.0 --index-url https://download.pytorch.org/whl/cpu
 
       # --require-hashes：鎖定檔裡每個檔案的 SHA-256 都要對得上，套件庫上被偷換的檔案裝不進來。
       # 鎖定檔由 scripts/compile_requirements.sh 產生（改了 requirements*.txt 要重新產生）。

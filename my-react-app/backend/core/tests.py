@@ -172,3 +172,59 @@ class CsrfTrustedOriginsBlankEnvTest(TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("localhost:5173", result.stdout)
         self.assertNotEqual(result.stdout.strip(), "[]")
+
+
+class HstsSettingsTest(TestCase):
+    """正式環境（DEBUG=False）的 HSTS 設定，同樣因為 settings.py 只載入一次，用子行程驗證。"""
+
+    def _hsts(self, extra_env):
+        env = os.environ.copy()
+        for key in ("DJANGO_HSTS_SECONDS", "DJANGO_HSTS_INCLUDE_SUBDOMAINS", "DJANGO_HSTS_PRELOAD"):
+            env.pop(key, None)
+        env.update({
+            "DJANGO_SECRET_KEY": env.get("DJANGO_SECRET_KEY", "test-secret"),
+            "DJANGO_SETTINGS_MODULE": "core.settings",
+            "DJANGO_DEBUG": "False",
+        })
+        env.update(extra_env)
+        result = subprocess.run(
+            [sys.executable, "-c",
+             "import django; django.setup(); from django.conf import settings as s; "
+             "print(s.SECURE_HSTS_SECONDS, s.SECURE_HSTS_INCLUDE_SUBDOMAINS, s.SECURE_HSTS_PRELOAD)"],
+            cwd=str(BASE_DIR), env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result.stdout.split()[-3:]
+
+    def test_defaults_match_nginx_one_year_without_subdomains_or_preload(self):
+        self.assertEqual(self._hsts({}), ["31536000", "False", "False"])
+
+    def test_blank_seconds_falls_back_to_default(self):
+        self.assertEqual(self._hsts({"DJANGO_HSTS_SECONDS": ""})[0], "31536000")
+
+    def test_env_can_shorten_for_first_rollout_and_opt_in_to_subdomains_and_preload(self):
+        got = self._hsts({
+            "DJANGO_HSTS_SECONDS": "31536000",
+            "DJANGO_HSTS_INCLUDE_SUBDOMAINS": "true",
+            "DJANGO_HSTS_PRELOAD": "1",
+        })
+        self.assertEqual(got, ["31536000", "True", "True"])
+        self.assertEqual(self._hsts({"DJANGO_HSTS_SECONDS": "3600"})[0], "3600")
+
+    def test_preload_without_subdomains_or_one_year_refuses_to_start(self):
+        for extra in (
+            {"DJANGO_HSTS_PRELOAD": "1"},
+            {"DJANGO_HSTS_PRELOAD": "1", "DJANGO_HSTS_INCLUDE_SUBDOMAINS": "1", "DJANGO_HSTS_SECONDS": "3600"},
+        ):
+            with self.subTest(extra=extra):
+                env = os.environ.copy()
+                env.update({"DJANGO_SECRET_KEY": "test-secret", "DJANGO_SETTINGS_MODULE": "core.settings", "DJANGO_DEBUG": "False"})
+                for key in ("DJANGO_HSTS_SECONDS", "DJANGO_HSTS_INCLUDE_SUBDOMAINS", "DJANGO_HSTS_PRELOAD"):
+                    env.pop(key, None)
+                env.update(extra)
+                result = subprocess.run(
+                    [sys.executable, "-c", "import django; django.setup()"],
+                    cwd=str(BASE_DIR), env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("DJANGO_HSTS_PRELOAD", result.stderr)

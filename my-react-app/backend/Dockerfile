@@ -47,7 +47,7 @@ WORKDIR /app
 COPY requirements.lock .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir \
-        torch==2.11.0 torchaudio==2.11.0 \
+        torch==2.14.1 torchaudio==2.11.0 \
         --index-url https://download.pytorch.org/whl/cpu \
         --extra-index-url https://pypi.org/simple \
     && pip install --no-cache-dir --require-hashes -r requirements.lock \
@@ -58,7 +58,9 @@ RUN pip install --no-cache-dir --upgrade pip \
 # 下載來源故障時，部署看起來成功、發音功能卻實際不可用。build 當下下載失敗會直接
 # 讓建置失敗，問題在部署前就曝光。
 ENV TORCH_HOME=/opt/torch
-RUN python -c "import torchaudio; torchaudio.pipelines.WAV2VEC2_BASE.get_model()"
+# 不只載入模型，還實際跑一次推論：torch 與 torchaudio 的版號不同（見 requirements.txt），
+# 原生介面對不上時，import 會成功、真正執行才會出錯，這一行讓它在 build 階段就失敗。
+RUN python -c "import torch, torchaudio; m = torchaudio.pipelines.WAV2VEC2_BASE.get_model().eval(); f, _ = m.extract_features(torch.zeros(1, 16000)); assert len(f) == 12 and f[-1].shape[-1] == 768 and torch.isfinite(f[-1]).all()"
 
 # 複製 backend/ 原始碼。Django 與 FastAPI 都是以 backend/ 當 Python root
 # （FastAPI 用 `from fastAPI.routes...`、`from config...` 這種絕對 import），

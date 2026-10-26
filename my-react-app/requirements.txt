@@ -34,7 +34,12 @@ anthropic==2.3.0
 # 這兩個不在 requirements.lock 裡（要從 PyTorch 自己的 index 裝）；版本改這裡時，
 # Dockerfile 與 .github/workflows/ci.yml 的 torch 安裝行要一起改。
 # torchvision、ultralytics、opencv-python、bottleneck 程式碼完全沒用到，已移除。
-torch==2.11.0
+# torch 刻意比 torchaudio 新：torch 2.11.0 有 torch.jit.script 的記憶體損毀弱點（GHSA-rrmf-rvhw-rf47，
+# 2.13.0 修正；本專案沒用 jit，所以原本碰不到，但升了就不用再解釋）。torchaudio 2.11.0 是最後一版，
+# 官方文件（docs.pytorch.org/audio 的 Installation → Compatibility Matrix）寫明它以 PyTorch stable ABI
+# 建置，支援 PyTorch 2.11 及之後所有版本，所以兩者版號不必相同（舊版 torchaudio 才要求同版號）。
+# 實測過：同一段輸入的 wav2vec2 嵌入向量與 torch 2.11.0 的最大差 8e-7；Dockerfile 每次 build 還會實際跑一次推論把關。
+torch==2.14.1
 torchaudio==2.11.0
 
 # Image / Vision

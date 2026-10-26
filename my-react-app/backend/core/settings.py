@@ -71,11 +71,22 @@ if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    # 先從 1 小時開始（Django 官方文件建議的做法）：確認正式環境 HTTPS 運作正常、
-    # 沒有把自己鎖在外面之後，再逐步拉長這個數字。
-    SECURE_HSTS_SECONDS = 3600
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
+    # HSTS 預設與 deploy/nginx-security-headers.conf 同一組：一年、不含子網域、不 preload。
+    # 原本是 3600 秒卻同時宣告 includeSubDomains 與 preload，而 nginx 那邊送的是一年且不含子網域，
+    # 兩邊互相矛盾；preload 清單要求至少一年加 includeSubDomains，3600 秒的 preload 宣告沒有意義。
+    # includeSubDomains 會讓同網域下只支援 HTTP 的子網域被鎖死，preload 幾乎無法反悔，
+    # 確認所有子網域都是 HTTPS 之後再用環境變數開。第一次上線想保守的話，可以先把
+    # DJANGO_HSTS_SECONDS 設成 3600，確認 HTTPS 運作正常再拉長。
+    # nginx 會隱藏後端送來的這個標頭、只送自己的一份（見 deploy/nginx.conf），兩邊的值要保持一致。
+    SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_HSTS_SECONDS") or 31536000)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = os.getenv("DJANGO_HSTS_INCLUDE_SUBDOMAINS", "").lower() in ("1", "true", "yes")
+    SECURE_HSTS_PRELOAD = os.getenv("DJANGO_HSTS_PRELOAD", "").lower() in ("1", "true", "yes")
+    # preload 清單要求「至少一年且含 includeSubDomains」，不符合的組合送出去只會被拒絕、
+    # 還會讓人誤以為已具備資格，所以啟動時直接報錯。
+    if SECURE_HSTS_PRELOAD and not (SECURE_HSTS_INCLUDE_SUBDOMAINS and SECURE_HSTS_SECONDS >= 31536000):
+        raise ImproperlyConfigured(
+            "DJANGO_HSTS_PRELOAD 需要同時設定 DJANGO_HSTS_INCLUDE_SUBDOMAINS=True 且 DJANGO_HSTS_SECONDS 至少 31536000"
+        )
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 # Render 會自動注入 RENDER_EXTERNAL_HOSTNAME；其他平台（Cloud Run 等）沒有這個
