@@ -121,6 +121,33 @@ dropdb yuanyu_restore_test
 4. **CSP 目前只是 Report-Only**（不阻擋）。在瀏覽器 Console 看過常用頁面沒有 `[Report Only] Refused to ...` 之後，才改成正式執行；改之前要先把 `index.html` 的內嵌防閃白腳本和字型 `<link>` 的 `onload` 處理掉，詳見 `nginx-security-headers.conf` 的註解。
 5. 我沒有在真實 nginx 上驗證過這些設定（開發機沒有 nginx）。部署前務必 `nginx -t`，並用瀏覽器與 `curl -I https://你的網域/` 確認標頭。
 
+### 受信任的 HTTPS 憑證（網域或單一 IP）
+
+瀏覽器顯示「不安全」是因為憑證是自簽的（沒有公開 CA 簽發）。PWA 的 service worker 與「安裝到主畫面」
+也只在**憑證受信任**的 HTTPS 下才會運作，所以先解決憑證。`deploy/enable-https.sh` 向 Let's Encrypt 申請並設好自動續期：
+
+```bash
+sudo STAGING=1 bash deploy/enable-https.sh 35.221.174.29   # 先演練（測試環境，不佔正式額度）
+sudo EMAIL=你的信箱 bash deploy/enable-https.sh 35.221.174.29
+```
+
+- **IP 位址**：Let's Encrypt 自 2026-01 起發行 IP 憑證，但只有 6 天效期（`shortlived` profile），靠自動續期維持；
+  需要 certbot 5.4 以上（腳本會用 snap 安裝）。IP 必須是**靜態**位址（Google Cloud 把臨時位址預留成靜態），
+  80、443 埠要在防火牆對外開放（80 是驗證用）。
+- **網域**：一般 90 天憑證，管理上更穩，也是日後正式上線的建議做法。網域指到這台 IP 後，執行 `enable-https.sh 網域`，
+  `.env` 的 `DJANGO_ALLOWED_HOSTS`、`CSRF_TRUSTED_ORIGINS`（需含 `https://`）、`CORS_ALLOWED_ORIGINS` 一起改成新網址。
+- 取得憑證後，把 nginx 443 區塊的 `server_name`、`ssl_certificate`、`ssl_certificate_key` 改成腳本印出的值，
+  `nginx -t && sudo systemctl reload nginx`。
+- 驗證：`curl -sI https://網域或IP/`（**不加 `-k`**，能通就代表憑證受信任）；`sudo certbot renew --dry-run` 驗證續期。
+
+### PWA（可安裝到主畫面）
+
+`public/manifest.webmanifest`、`public/icons/`、`public/sw.js`、`public/offline.html` 由 `npm run build` 一併放進 `dist/`。
+service worker 只做兩件事：斷線時頁面導覽顯示離線頁、快取 `/assets/` 底下帶雜湊檔名的檔案；不碰 API、登入與跨網域請求。
+`sw.js` 與 `manifest.webmanifest` 由 nginx 的 `location /`（`Cache-Control: no-cache`）提供，改版後瀏覽器每次都會檢查新版。
+要清掉所有人的舊快取時，把 `sw.js` 的 `CACHE_VERSION` 加一。安裝需求：Chrome／Edge 在網址列或選單出現「安裝」；
+iPhone 用 Safari 的「分享 → 加入主畫面」。
+
 ### TLS、資訊揭露與後端埠口
 
 - **TLS：** `nginx.conf` 只開 TLS 1.2／1.3，加密套件採 Mozilla intermediate（只含 ECDHE 搭配 AEAD），關閉 session ticket。

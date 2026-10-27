@@ -10,9 +10,11 @@ import StartupError from './StartupError'
 import { AuthProvider } from "./userServives/authContext";
 import { firebaseInitError } from '../../firebase'
 import { initTheme } from './theme/themeStore'
+import { registerServiceWorker } from './registerServiceWorker'
 
 // 套用儲存的主題偏好（index.html 的小腳本通常已經設好，這裡是保險）
 initTheme()
+registerServiceWorker()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

@@ -1,0 +1,19 @@
+{
+  "name": "源·語｜五族語言學習平台",
+  "short_name": "源·語",
+  "description": "以影像辨識、單詞查詢、翻譯、遊戲與適性測驗學習泰雅、阿美、布農、噶瑪蘭、排灣五族語言。",
+  "lang": "zh-Hant",
+  "dir": "ltr",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F3E7CF",
+  "theme_color": "#221812",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
