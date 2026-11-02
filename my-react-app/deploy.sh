@@ -99,6 +99,11 @@ preflight() {
   if [ -z "$(env_value CSRF_TRUSTED_ORIGINS)" ]; then
     echo "!! .env 沒有 CSRF_TRUSTED_ORIGINS（需含 https://），會退回本機開發來源，正式網站的表單送出會被擋。部署中止。"; return 1
   fi
+  # DJANGO_ALLOWED_HOSTS 沒設時，Django 只認 localhost／127.0.0.1：透過 nginx 以正式網域或 IP 進來的請求
+  # Host 標頭對不上，全部被拒絕（400），網站看起來整個壞掉，但健康檢查（打 127.0.0.1）還是會過。
+  if [ -z "$(env_value DJANGO_ALLOWED_HOSTS)" ]; then
+    echo "!! .env 沒有 DJANGO_ALLOWED_HOSTS（填正式網域或 IP，逗號分隔），Django 會拒絕所有從外部進來的請求。部署中止。"; return 1
+  fi
   # AI_MONTHLY_BUDGET_USD 沒設（或不是正數）時，AI 月預算保護完全不運作，費用沒有上限。
   # 確定不要預算上限時用 ALLOW_NO_AI_BUDGET=1 明確放行。
   ai_budget="$(env_value AI_MONTHLY_BUDGET_USD)"

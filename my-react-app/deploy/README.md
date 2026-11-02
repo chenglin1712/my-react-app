@@ -120,11 +120,17 @@ repo 裡的 `nginx.conf` 只是範本（網域、憑證路徑是佔位），CI �
 每次改過 nginx 或換機器後，在伺服器上逐項確認：
 
 1. 實際載入的設定與 `nginx.conf`、`nginx-security-headers.conf` 一致，沒有殘留佔位：`sudo nginx -T | grep -nE 'example\.com|TODO'` 應該沒有輸出。
-2. 預設 server 有生效（用 IP 或錯誤的 Host 連線應該被直接關閉）：
+2. **先分清楚你是網域模式還是 IP 模式。** 網站用 IP 對外（例如 `https://35.221.174.29/`）時，瀏覽器連 IP 不會送 SNI，
+   所以**不可以**留著 `nginx.conf` 裡 443 的 `ssl_reject_handshake` 預設 server，否則整個網站 TLS 握手失敗、完全連不上。
+   IP 模式的做法：刪掉那個預設 server，主站台的 443 加上 `default_server`，並啟用它裡面的 `if ($host != "你的IP") { return 444; }`
+   （註解都寫在 `nginx.conf`）。IP 模式的驗證：`curl -sI https://<伺服器 IP>/`（不加 `-k`）應回 200；
+   `curl -sk -o /dev/null -w '%{http_code}\n' -H 'Host: attacker.example' https://<伺服器 IP>/` 應失敗（連線被關閉）。
+   下面這一項只適用**網域模式**。
+3. （網域模式）預設 server 有生效（用 IP 或錯誤的 Host 連線應該被直接關閉）：
    `curl -sS -o /dev/null -w '%{http_code}
 ' -H 'Host: attacker.example' http://<伺服器 IP>/` 應該失敗（連線被關閉，curl 顯示 `Empty reply from server`），
    `curl -skI https://<伺服器 IP>/` 應該 TLS 握手失敗，不是回出本站內容。正式網域則要正常回應。
-3. GCP 防火牆規則只開 80 與 443（8000／8001 本來就只綁 127.0.0.1，`deploy.sh` 結尾也會用 `ss` 確認）。
+4. GCP 防火牆規則只開 80 與 443（8000／8001 本來就只綁 127.0.0.1，`deploy.sh` 結尾也會用 `ss` 確認）。
 
 ### 安全標頭與速率限制（S-08、S-09）
 
