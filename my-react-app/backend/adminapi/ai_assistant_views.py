@@ -126,6 +126,18 @@ def ai_assistant_settings_trial(request):
     limited = rate_limited_response(request, decoded, group="ai_assistant_trial", rate="3/m")
     if limited:
         return limited
+    # 稽核 AI-3：試跑是付費呼叫，預算用完之後也不能繼續花。判斷跟學生端一致：預算已超過、而且助手總開關
+    # 仍是關的（自動關閉後沒有人重新開啟）就擋；管理者重新開啟代表接受繼續超出，試跑也跟著放行。
+    from . import ai_budget
+    from .models import FeatureFlag
+
+    if ai_budget.enforce()["level"] == "exceeded":
+        flag = FeatureFlag.objects.filter(key=ai_budget.FLAG_KEY).first()
+        if flag is None or not flag.enabled:
+            return JsonResponse(
+                {"detail": "本月 AI 預算已用完，助手已暫停；試跑也暫停。請先到「功能開關」確認並重新開啟。", "code": "ai_budget_exceeded"},
+                status=403,
+            )
     body, err = parse_json_body(request)
     if err:
         return err

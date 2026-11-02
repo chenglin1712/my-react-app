@@ -295,7 +295,72 @@ def test_logged_in_user_is_unaffected_and_uses_no_guest_quota(client, monkeypatc
         "isGuest": False, "limit": None, "remaining": None, "resetsAt": None,
     }
     with G._engine.connect() as conn:
-        assert conn.execute(select(G._usage_table)).fetchall() == []
+        # 登入使用者不碰訪客額度；只會有自己的「每日上限」那一列（scope=user，稽核 AI-1）
+        scopes = {row.scope for row in conn.execute(select(G._usage_table)).fetchall()}
+    assert scopes == {G.SCOPE_USER}
+
+
+def _as_user(monkeypatch, uid="real-user"):
+    async def fake_verify(request, authorization=None):
+        request.state.user = {"uid": uid}
+        return request.state.user
+
+    monkeypatch.setattr(auth_module, "verify_firebase_token", fake_verify)
+
+
+def test_logged_in_user_is_blocked_after_the_daily_cap(client, monkeypatch):
+    _as_user(monkeypatch)
+    monkeypatch.setenv("TRANSLATION_USER_DAILY_LIMIT", "3")
+    headers = {"Authorization": "Bearer valid-token"}
+    with _ok():
+        for _ in range(3):
+            assert client.post("/api/v1/translation/translate", json=BODY, headers=headers).status_code == 200
+        response = client.post("/api/v1/translation/translate", json=BODY, headers=headers)
+    assert response.status_code == 429
+    assert response.json()["code"] == "user_daily_cap"
+    assert response.json()["limit"] == 3
+
+
+def test_the_daily_cap_is_per_user(client, monkeypatch):
+    monkeypatch.setenv("TRANSLATION_USER_DAILY_LIMIT", "1")
+    headers = {"Authorization": "Bearer valid-token"}
+    with _ok():
+        _as_user(monkeypatch, "user-a")
+        assert client.post("/api/v1/translation/translate", json=BODY, headers=headers).status_code == 200
+        assert client.post("/api/v1/translation/translate", json=BODY, headers=headers).status_code == 429
+        _as_user(monkeypatch, "user-b")
+        assert client.post("/api/v1/translation/translate", json=BODY, headers=headers).status_code == 200
+
+
+def test_a_zero_daily_limit_turns_the_cap_off(client, monkeypatch):
+    _as_user(monkeypatch)
+    monkeypatch.setenv("TRANSLATION_USER_DAILY_LIMIT", "0")
+    headers = {"Authorization": "Bearer valid-token"}
+    with _ok():
+        for _ in range(12):
+            assert client.post("/api/v1/translation/translate", json=BODY, headers=headers).status_code == 200
+
+
+def test_a_failure_before_the_llm_gives_the_daily_count_back(client, monkeypatch):
+    _as_user(monkeypatch)
+    monkeypatch.setenv("TRANSLATION_USER_DAILY_LIMIT", "2")
+    headers = {"Authorization": "Bearer valid-token"}
+    with patch.object(S, "translate", side_effect=EnvironmentError("no key")):
+        for _ in range(4):               # 缺金鑰 503 不佔額度
+            assert client.post("/api/v1/translation/translate", json=BODY, headers=headers).status_code == 503
+    with _ok():
+        assert client.post("/api/v1/translation/translate", json=BODY, headers=headers).status_code == 200
+
+
+def test_the_daily_cap_fails_open_when_the_counter_is_unavailable(client, monkeypatch):
+    _as_user(monkeypatch)
+    monkeypatch.setenv("TRANSLATION_USER_DAILY_LIMIT", "1")
+    headers = {"Authorization": "Bearer valid-token"}
+    with _ok(), patch.object(G, "is_ready", return_value=False), \
+            patch.object(G.logger, "error") as log_error:
+        for _ in range(3):
+            assert client.post("/api/v1/translation/translate", json=BODY, headers=headers).status_code == 200
+    assert log_error.called
 
 
 def test_invalid_token_is_401_and_never_falls_back_to_guest(client, monkeypatch):

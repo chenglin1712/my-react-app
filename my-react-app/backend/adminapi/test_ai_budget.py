@@ -108,6 +108,8 @@ class EnforceTests(TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
         self.flag = FeatureFlag.objects.create(key="ai_assistant_enabled", label="AI", enabled=True)
+        # 正式環境兩個旗標列都存在（seed_feature_flags）；翻譯的案例見 TranslationIsSwitchedOffTooTests
+        FeatureFlag.objects.create(key="translation_enabled", label="翻譯", enabled=True)
 
     def test_eighty_percent_warns_once_per_month_and_does_not_switch_anything_off(self):
         spend(8.5)
@@ -128,7 +130,7 @@ class EnforceTests(TestCase):
         self.flag.refresh_from_db()
         self.assertFalse(self.flag.enabled)
         self.assertEqual(self.flag.updated_by, "system:ai_budget")
-        audit = AuditLog.objects.get(action="ai_budget_auto_disable")
+        audit = AuditLog.objects.get(action="ai_budget_auto_disable", target_id="ai_assistant_enabled")
         self.assertEqual((audit.actor_uid, audit.target_id), ("system", "ai_assistant_enabled"))
         self.assertEqual(audit.before, {"enabled": True})
         self.assertEqual(audit.after["enabled"], False)
@@ -142,21 +144,24 @@ class EnforceTests(TestCase):
         spend(5)
         ai_budget.enforce()
         self.assertTrue(FeatureFlag.objects.get(key="ai_assistant_enabled").enabled)
-        self.assertEqual(AuditLog.objects.filter(action="ai_budget_auto_disable").count(), 1)
+        self.assertEqual(AuditLog.objects.filter(action="ai_budget_auto_disable", target_id="ai_assistant_enabled").count(), 1)
 
     def test_an_admin_who_already_switched_it_off_does_not_use_up_the_monthly_auto_disable(self):
         FeatureFlag.objects.filter(key="ai_assistant_enabled").update(enabled=False)
         spend(10.5)
-        ai_budget.enforce()
-        self.assertFalse(AuditLog.objects.filter(action="ai_budget_auto_disable").exists())
+        with self.assertLogs("adminapi.ai_budget", level="CRITICAL"):       # 翻譯旗標仍開著，會被關
+            ai_budget.enforce()
+        self.assertFalse(AuditLog.objects.filter(action="ai_budget_auto_disable", target_id="ai_assistant_enabled").exists())
 
-    def test_a_missing_flag_row_is_reported_loudly_instead_of_pretending_it_was_switched_off(self):
+    def test_a_missing_flag_row_is_created_and_switched_off_instead_of_staying_on_forever(self):
+        # 稽核 AI-3：沒有旗標列時程式把功能當作開啟；只記 log 的話，預算超過也永遠關不掉
         self.flag.delete()
         spend(10.5)
         with self.assertLogs("adminapi.ai_budget", level="ERROR") as logs:
             ai_budget.enforce()
         self.assertTrue(any("找不到旗標" in line for line in logs.output))
-        self.assertFalse(AuditLog.objects.filter(action="ai_budget_auto_disable").exists())
+        self.assertFalse(FeatureFlag.objects.get(key="ai_assistant_enabled").enabled)
+        self.assertTrue(AuditLog.objects.filter(action="ai_budget_auto_disable", target_id="ai_assistant_enabled").exists())
 
     def test_a_failure_inside_the_check_never_raises_into_the_request(self):
         with patch.object(ai_budget, "evaluate", side_effect=RuntimeError("db down")):
@@ -203,3 +208,48 @@ class BudgetGateInViewsTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()["code"], "ai_assistant_disabled")
         self.assertFalse(FeatureFlag.objects.get(key="ai_assistant_enabled").enabled)
+
+
+class TranslationIsSwitchedOffTooTests(TestCase):
+    """稽核 AI-1：翻譯也是付費的 LLM 呼叫，超過預算時要和助手一起關掉。"""
+
+    def setUp(self):
+        cache.clear()
+        patcher = patch.dict("os.environ", {"AI_MONTHLY_BUDGET_USD": "10"})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.assistant = FeatureFlag.objects.create(key="ai_assistant_enabled", label="AI", enabled=True)
+        self.translation = FeatureFlag.objects.create(key="translation_enabled", label="翻譯", enabled=True)
+
+    def test_exceeding_the_budget_switches_both_off_with_one_audit_record_each(self):
+        spend(10.5)
+        with self.assertLogs("adminapi.ai_budget", level="CRITICAL"):
+            ai_budget.enforce()
+        self.assertFalse(FeatureFlag.objects.get(key="ai_assistant_enabled").enabled)
+        self.assertFalse(FeatureFlag.objects.get(key="translation_enabled").enabled)
+        self.assertEqual(
+            sorted(AuditLog.objects.filter(action="ai_budget_auto_disable").values_list("target_id", flat=True)),
+            ["ai_assistant_enabled", "translation_enabled"],
+        )
+
+    def test_an_admin_turning_translation_back_on_is_respected_for_the_rest_of_the_month(self):
+        spend(10.5)
+        with self.assertLogs("adminapi.ai_budget", level="CRITICAL"):
+            ai_budget.enforce()
+        FeatureFlag.objects.filter(key="translation_enabled").update(enabled=True)
+        cache.clear()
+        ai_budget.enforce()
+        self.assertTrue(FeatureFlag.objects.get(key="translation_enabled").enabled)
+
+    def test_an_admin_who_already_switched_translation_off_keeps_its_monthly_slot(self):
+        FeatureFlag.objects.filter(key="translation_enabled").update(enabled=False)
+        spend(10.5)
+        with self.assertLogs("adminapi.ai_budget", level="CRITICAL"):
+            ai_budget.enforce()
+        self.assertFalse(AuditLog.objects.filter(action="ai_budget_auto_disable", target_id="translation_enabled").exists())
+        self.assertTrue(AuditLog.objects.filter(action="ai_budget_auto_disable", target_id="ai_assistant_enabled").exists())
+
+    def test_below_the_budget_nothing_is_switched_off(self):
+        spend(5)
+        ai_budget.enforce()
+        self.assertTrue(FeatureFlag.objects.get(key="translation_enabled").enabled)

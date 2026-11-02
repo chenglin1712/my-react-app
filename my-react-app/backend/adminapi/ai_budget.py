@@ -9,9 +9,11 @@
 
 兩個動作：
 - 80%：寫一筆錯誤等級的 log（有接 Sentry 的環境會變成告警），每個月只寫一次；後台「AI 用量」頁一直顯示提醒。
-- 100%：把 FeatureFlag ai_assistant_enabled 關掉並寫一筆稽核紀錄（action=ai_budget_auto_disable）。
-  【每個月只自動關一次】：管理者之後手動重新開啟，就是接受繼續超出（或已調高預算），不會下一個請求又被關掉。
-  翻譯（translation_enabled）不會被這裡關閉，但它的花費也計入總額。
+- 100%：把 FeatureFlag ai_assistant_enabled 與 translation_enabled 都關掉（翻譯也是付費的 LLM 呼叫，花費也計入總額，
+  稽核 AI-1），各寫一筆稽核紀錄（action=ai_budget_auto_disable，target_id 是旗標 key）。
+  【每個旗標每個月只自動關一次】：管理者之後手動重新開啟，就是接受繼續超出（或已調高預算），不會下一個請求又被關掉。
+  執行時機：Django 的 AI 請求會呼叫 enforce()；翻譯在 FastAPI process，由它定期呼叫 Django 的內部端點
+  （adminapi/internal_views.py）觸發同一個函式，所以只有翻譯在花錢時預算也會生效。
 
 評估結果快取 60 秒，避免每個請求都彙總一次用量表；剛超過預算的那段時間（最長約 60 秒）內仍有請求通過，
 所以這不是精確的硬上限，超出的金額上界約是「60 秒內的最大流量 × 單次費用」，預算要預留這個緩衝。
@@ -32,6 +34,9 @@ logger = logging.getLogger(__name__)
 
 WARN_RATIO = 0.8
 FLAG_KEY = "ai_assistant_enabled"
+TRANSLATION_FLAG_KEY = "translation_enabled"
+# 超過預算時要關閉的付費功能旗標
+BUDGET_FLAG_KEYS = (FLAG_KEY, TRANSLATION_FLAG_KEY)
 AUDIT_ACTION = "ai_budget_auto_disable"
 _CACHE_KEY = "adminapi:ai_budget:evaluation"
 _CACHE_SECONDS = 60
@@ -123,8 +128,8 @@ def evaluate(use_cache: bool = True) -> dict:
     return result
 
 
-def _already_disabled_this_month() -> bool:
-    return AuditLog.objects.filter(action=AUDIT_ACTION, created_at__gte=month_start()).exists()
+def _already_disabled_this_month(key: str) -> bool:
+    return AuditLog.objects.filter(action=AUDIT_ACTION, target_id=key, created_at__gte=month_start()).exists()
 
 
 def enforce() -> dict:
@@ -134,7 +139,8 @@ def enforce() -> dict:
         if status["level"] == "warning" or status["level"] == "exceeded":
             _warn_once(status)
         if status["level"] == "exceeded":
-            _disable_assistant(status)
+            for key in BUDGET_FLAG_KEYS:
+                _disable_flag(key, status)
         return status
     except Exception:
         logger.error("[AIBudget] 預算檢查失敗，這次略過", exc_info=True)
@@ -150,32 +156,35 @@ def _warn_once(status: dict) -> None:
         )
 
 
-def _disable_assistant(status: dict) -> None:
-    flag = FeatureFlag.objects.filter(key=FLAG_KEY).first()
+def _disable_flag(key: str, status: dict) -> None:
+    flag = FeatureFlag.objects.filter(key=key).first()
     if flag is None:
-        # 旗標紀錄不存在（尚未跑 seed_feature_flags）時，助手本來就沒有開關可關；明講，不要假裝已經關了
-        logger.error("[AIBudget] 月預算已超過，但找不到旗標 %s，無法自動關閉（請執行 seed_feature_flags）", FLAG_KEY)
-        return
+        # 旗標紀錄不存在（尚未跑 seed_feature_flags）：程式把「沒有紀錄」當作開啟，若這裡只記 log，
+        # 預算超過也永遠關不掉（稽核 AI-3）。所以補建一筆開啟的紀錄，下面照一般流程關閉並寫稽核。
+        logger.error("[AIBudget] 找不到旗標 %s（尚未執行 seed_feature_flags），補建後再關閉", key)
+        flag, _ = FeatureFlag.objects.get_or_create(
+            key=key, defaults={"label": key, "enabled": True, "updated_by": "system:ai_budget"},
+        )
     if not flag.enabled:
         # 管理者已經自己關了：不必動作，也不寫稽核——「每月自動關一次」的名額留給之後真的需要關的時候。
         # 先看旗標再查稽核，關閉後被擋下的每個請求只需要這一次查詢。
         return
-    if _already_disabled_this_month():
+    if _already_disabled_this_month(key):
         return
     with transaction.atomic():
         # 條件式 UPDATE：多個 worker 同時超標時只有一個能把 enabled 由 True 改成 False，只有它寫稽核，
         # 旗標與稽核在同一個交易，不會出現「已關閉卻沒有紀錄」。
-        changed = FeatureFlag.objects.filter(key=FLAG_KEY, enabled=True).update(
+        changed = FeatureFlag.objects.filter(key=key, enabled=True).update(
             enabled=False, updated_by="system:ai_budget", updated_at=timezone.now(),
         )
         if not changed:
             return
         AuditLog.objects.create(
-            actor_uid="system", actor_role=None, action=AUDIT_ACTION, target_type="feature_flag", target_id=FLAG_KEY,
+            actor_uid="system", actor_role=None, action=AUDIT_ACTION, target_type="feature_flag", target_id=key,
             before={"enabled": True},
             after={"enabled": False, "budgetUsd": status["budgetUsd"], "spentUsd": status["spentUsd"]},
         )
     logger.critical(
-        "[AIBudget] AI 月預算已超過（估算 $%.2f / 預算 $%.2f），已自動關閉 AI 助手；需管理者在「功能開關」手動重新開啟",
-        status["spentUsd"], status["budgetUsd"],
+        "[AIBudget] AI 月預算已超過（估算 $%.2f / 預算 $%.2f），已自動關閉功能 %s；需管理者在「功能開關」手動重新開啟",
+        status["spentUsd"], status["budgetUsd"], key,
     )

@@ -3,7 +3,7 @@ from django.urls import path
 from . import (
     ai_assistant_views, ai_feedback_views, ai_usage_views, analytics_views, dictionary_grammar_views, dictionary_import_views, dictionary_taxonomy_views,
     dictionary_views, exam_schedule_admin_views, featured_topic_views, feature_flag_views, game_config_views,
-    homepage_config_views, moderation_views, promo_video_views, quizbank_views, site_page_views, ai_quiz_draft_views,
+    homepage_config_views, internal_views, moderation_views, promo_video_views, quizbank_views, site_page_views, ai_quiz_draft_views,
     morphology_capability_views, rate_limit_views, review_queue_views, system_cache_views, user_views, verification_views, views,
 )
 
@@ -80,6 +80,8 @@ urlpatterns = [
     path('quiz-bank/sources/<str:tribe>/', quizbank_views.quiz_source_config_detail),
     path('irt-config/', quizbank_views.irt_config_admin),
     path('public/irt-config/', quizbank_views.public_irt_config),
+    # 服務對服務：FastAPI 通知 Django 評估 AI 月預算（nginx 對 /adminapi/internal/ 一律拒絕，只有同機直連打得到）
+    path('internal/ai-budget/enforce/', internal_views.ai_budget_enforce),
 
     # P3 使用者與審核
     path('users/', user_views.user_list),

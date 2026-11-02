@@ -332,6 +332,37 @@ class AdminEndpointTest(TestCase):
         self.assertEqual(AiAssistantSettingsVersion.objects.count(), 0)
         self.assertEqual(assistant_settings.active()["chat_extra"], "")
 
+    def test_trial_is_refused_once_the_budget_is_exceeded_and_the_assistant_is_still_off(self):
+        # 稽核 AI-3：試跑是付費呼叫，預算用完之後不能繼續花
+        from adminapi.models import FeatureFlag
+        from adminapi.test_ai_budget import spend
+
+        FeatureFlag.objects.create(key="ai_assistant_enabled", label="AI", enabled=True)
+        spend(10.5)
+        client = MagicMock()
+        with patch.dict(os.environ, {"AI_MONTHLY_BUDGET_USD": "10"}), \
+                self._as() as headers, patch("config.llm.get_llm_client", return_value=client), \
+                self.assertLogs("adminapi.ai_budget", level="CRITICAL"):
+            response = self._post("/adminapi/ai-assistant/settings/trial/", {"content": _content(), "messages": ["你好"]}, headers)
+        self.assertEqual((response.status_code, response.json()["code"]), (403, "ai_budget_exceeded"))
+        client.messages.create.assert_not_called()
+
+    def test_trial_is_allowed_again_after_an_admin_turns_the_assistant_back_on(self):
+        from adminapi.models import FeatureFlag
+        from adminapi.test_ai_budget import spend
+
+        FeatureFlag.objects.create(key="ai_assistant_enabled", label="AI", enabled=False)
+        spend(10.5)
+        client = MagicMock()
+        client.messages.create.return_value = _mock_response("ok")
+        with patch.dict(os.environ, {"AI_MONTHLY_BUDGET_USD": "10"}),                 self._as() as headers, patch("config.llm.get_llm_client", return_value=client),                 self.assertLogs("adminapi.ai_budget", level="ERROR"):
+            # 預算已超過但管理者已把助手重新開啟（接受繼續超出）：enforce 不會再關，試跑放行
+            FeatureFlag.objects.filter(key="ai_assistant_enabled").update(enabled=True)
+            AuditLog.objects.create(actor_uid="system", action="ai_budget_auto_disable", target_type="feature_flag",
+                                    target_id="ai_assistant_enabled")
+            response = self._post("/adminapi/ai-assistant/settings/trial/", {"content": _content(), "messages": ["你好"]}, headers)
+        self.assertEqual(response.status_code, 200)
+
     def test_trial_validates_questions_and_draft(self):
         with self._as() as headers:
             for body in ({"content": {}, "messages": []}, {"content": {}, "messages": ["a"] * 4},

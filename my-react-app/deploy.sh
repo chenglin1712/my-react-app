@@ -18,6 +18,7 @@
 #      PROXY_BASE=...    反向代理對外位址，預設 https://127.0.0.1
 #      ALLOW_NO_REDIS=1  .env 沒有 REDIS_URL 也照常部署（限流計數會退回各 worker 的記憶體）
 #      ALLOW_NO_AI_BUDGET=1  .env 沒有設定 AI_MONTHLY_BUDGET_USD 也照常部署（AI 月預算保護不會運作）
+#      ALLOW_NO_GUEST_GLOBAL_LIMIT=1  已啟用訪客翻譯試用卻沒有設定全站每日上限，也照常部署（訪客翻譯總花費沒有上限）
 #
 # 請用一般使用者（不是 root）執行：容器會用這個使用者的 uid 跑，掛載的 logs／media 才不會有權限問題。
 # 第一次改成非 root 容器之前，logs／media 若還是 root 擁有，先 sudo chown -R "$USER:$USER" logs media。
@@ -104,6 +105,16 @@ preflight() {
   if ! printf '%s' "$ai_budget" | grep -Eq '^[0-9]+(\.[0-9]+)?$' || ! awk -v v="$ai_budget" 'BEGIN { exit !(v + 0 > 0) }'; then
     if ! is_true "${ALLOW_NO_AI_BUDGET:-}"; then
       echo "!! .env 的 AI_MONTHLY_BUDGET_USD 沒設定或不是正數，AI 月預算保護不會運作。請設定，或用 ALLOW_NO_AI_BUDGET=1 明確放行。部署中止。"; return 1
+    fi
+  fi
+  # 訪客翻譯試用（有設定 GUEST_TRIAL_SECRET 才算啟用）沒有全站每日上限時，總花費只受「每個瀏覽器／每個 IP」限制，
+  # 換瀏覽器或換 IP 就能繞過。要求設定正整數；確定不要全站上限時用 ALLOW_NO_GUEST_GLOBAL_LIMIT=1 明確放行。
+  if [ -n "$(env_value GUEST_TRIAL_SECRET)" ]; then
+    guest_global="$(env_value GUEST_TRIAL_GLOBAL_DAILY_LIMIT)"
+    if ! printf '%s' "$guest_global" | grep -Eq '^[0-9]+$' || [ "$((10#$guest_global))" -le 0 ]; then
+      if ! is_true "${ALLOW_NO_GUEST_GLOBAL_LIMIT:-}"; then
+        echo "!! 已啟用訪客翻譯試用（GUEST_TRIAL_SECRET），但 .env 的 GUEST_TRIAL_GLOBAL_DAILY_LIMIT 沒設定或不是正整數，訪客翻譯總花費沒有上限。請設定，或用 ALLOW_NO_GUEST_GLOBAL_LIMIT=1 明確放行。部署中止。"; return 1
+      fi
     fi
   fi
   # 等待健康檢查與回滾都依賴 `up --wait --wait-timeout`，太舊的 Docker Compose 不支援，

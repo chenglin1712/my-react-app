@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from config.llm import REFUSAL_MESSAGE, LLMRefusalError, classify_llm_error, current_uid as llm_current_uid
 from config.tribes import TRIBES
 from dictionary_db.connect import get_db
-from fastAPI import feature_flags, guest_trial, rate_limit_config, usage_events
+from fastAPI import budget_guard, feature_flags, guest_trial, rate_limit_config, usage_events
 from fastAPI.rate_limit import limiter
 
 from . import retrieve as R
@@ -69,9 +69,11 @@ def _client_ip(request: Request) -> str:
     return request.client.host if request.client else ""
 
 
-async def _refund_guest(quota) -> None:
+async def _refund_guest(quota, daily=None) -> None:
     if quota is not None:
         await asyncio.to_thread(guest_trial.refund, quota)
+    if daily is not None:
+        await asyncio.to_thread(guest_trial.refund_user_daily, daily)
 
 
 def _guest_denied_response(quota: guest_trial.GuestQuota) -> JSONResponse:
@@ -124,6 +126,20 @@ async def translate_endpoint(request: Request, body: TranslateRequest, db: Sessi
         if not quota.allowed:
             return _guest_denied_response(quota)
 
+    # 已登入使用者：每人每天的上限（稽核 AI-1）。每分鐘 10 次的限流擋不住「很多帳號各自慢慢用」的總花費。
+    daily = None
+    if not (user or {}).get("guest") and uid:
+        daily = await asyncio.to_thread(guest_trial.consume_user_daily, uid)
+        if not daily.allowed:
+            return JSONResponse(
+                {"detail": "今天的翻譯次數已達上限，明天 00:00 重置。", "code": "user_daily_cap",
+                 "limit": daily.limit, "resetsAt": daily.resets_at},
+                status_code=429,
+            )
+
+    # 通知 Django 評估 AI 月預算（背景、節流、best-effort）：預算超過時會把 translation_enabled 關掉
+    budget_guard.poke()
+
     # 用量紀錄要知道是誰呼叫的；asyncio.to_thread 會把 contextvars 複製到執行緒裡。
     uid_token = llm_current_uid.set(uid)
 
@@ -133,16 +149,16 @@ async def translate_endpoint(request: Request, body: TranslateRequest, db: Sessi
         # 對 _search_multi_words 的既有作法一致。
         result = await asyncio.to_thread(service.translate, db, body.tribe, body.direction, body.text)
     except (service.UnsupportedTribeError, service.UnsupportedDirectionError) as e:
-        await _refund_guest(quota)
+        await _refund_guest(quota, daily)
         return JSONResponse({"detail": str(e)}, status_code=400)
     except R.UnsupportedDialectError as e:
-        await _refund_guest(quota)
+        await _refund_guest(quota, daily)
         logger.error("[translation] %s", e)
         return JSONResponse({"detail": "翻譯功能暫時無法使用，請稍後再試"}, status_code=503)
     except EnvironmentError as e:
         # 缺 ANTHROPIC_API_KEY，比照 AIModel/views.py 的既有處理：只讓這個功能
         # 回 503，不影響其他不相關的端點。
-        await _refund_guest(quota)
+        await _refund_guest(quota, daily)
         return JSONResponse({"detail": str(e)}, status_code=503)
     except LLMRefusalError:
         # 模型拒答：服務本身正常，回 422 與固定說明；不是服務故障，所以不退還訪客額度（模型已實際處理）
@@ -157,7 +173,9 @@ async def translate_endpoint(request: Request, body: TranslateRequest, db: Sessi
     finally:
         llm_current_uid.reset(uid_token)
 
-    usage_events.record_event(
+    # 稽核 AI-6：record_event 是同步的資料庫寫入，不能直接在 async 函式裡呼叫（會卡住 event loop）
+    await asyncio.to_thread(
+        usage_events.record_event,
         "translation_request", uid=uid, tribe=body.tribe,
         payload={
             "direction": result.direction, "matchType": result.match_type,

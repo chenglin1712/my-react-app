@@ -162,6 +162,8 @@ FASTAPI_RULES = [
     ("dictionary_favorites_summary", "30/minute", "各族語收藏數統計"),
     ("translation_translate", "10/minute", "族語翻譯（含 LLM 呼叫）"),
     ("translation_capabilities", "60/minute", "翻譯能力資訊查詢"),
+    ("listening_questions", "30/minute", "聽力題目產生"),
+    ("sentence_questions", "30/minute", "句型題目產生"),
 ]
 
 

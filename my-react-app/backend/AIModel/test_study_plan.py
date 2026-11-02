@@ -199,24 +199,79 @@ class ReplanViewTest(TestCase):
 
     @patch("AIModel.views._get_client")
     @patch("AIModel.views.load_current_plan", return_value=_plan(_task(3), _task(4)))
-    def test_unusable_result_is_422_and_refunds(self, _load, _client):
+    def test_unusable_result_is_422_and_does_not_refund(self, _load, _client):
+        # 稽核 AI-2：模型已經回覆（已計費）才發現結果不能用，額度不退
         self._enable()
         with patch("AIModel.views.run_study_plan_replan", return_value=None), \
                 patch("AIModel.views.daily_quota.refund") as refund:
             response = self._post()
         self.assertEqual((response.status_code, response.json()["code"]), (422, "study_plan_replan_failed"))
-        refund.assert_called_once()
+        refund.assert_not_called()
 
     @patch("AIModel.views._get_client")
     @patch("AIModel.views.load_current_plan", return_value=_plan(_task(3), _task(4)))
-    def test_refusal_is_200_with_fixed_message_and_refunds(self, _load, _client):
+    def test_refusal_is_200_with_fixed_message_and_does_not_refund(self, _load, _client):
         self._enable()
         with patch("AIModel.views.run_study_plan_replan", side_effect=LLMRefusalError("refused")), \
                 patch("AIModel.views.daily_quota.refund") as refund:
             response = self._post()
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["refused"])
-        refund.assert_called_once()
+        refund.assert_not_called()
+
+    @patch("AIModel.views._get_client")
+    @patch("AIModel.views.load_current_plan", return_value=_plan(_task(3), _task(4)))
+    def test_failures_where_the_request_never_reached_the_provider_refund(self, _load, _client):
+        import anthropic
+        import httpx
+        from config.llm import LLMUnavailableError
+
+        request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+        for exc in (
+            LLMUnavailableError("breaker open"),
+            anthropic.APIConnectionError(request=request),
+            anthropic.InternalServerError("boom", response=httpx.Response(529, request=request), body=None),
+            anthropic.RateLimitError("slow down", response=httpx.Response(429, request=request), body=None),
+        ):
+            with self.subTest(exc=type(exc).__name__):
+                self._enable()
+                with patch("AIModel.views.run_study_plan_replan", side_effect=exc), \
+                        patch("AIModel.views.daily_quota.refund") as refund, self.assertLogs("AIModel.views", level="ERROR"):
+                    self._post()
+                refund.assert_called_once()
+
+    @patch("AIModel.views._get_client")
+    @patch("AIModel.views.load_current_plan", return_value=_plan(_task(3), _task(4)))
+    def test_failures_that_may_already_have_been_charged_do_not_refund(self, _load, _client):
+        import anthropic
+        import httpx
+
+        request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+        for exc in (anthropic.APITimeoutError(request=request), RuntimeError("bug after the call")):
+            with self.subTest(exc=type(exc).__name__):
+                self._enable()
+                with patch("AIModel.views.run_study_plan_replan", side_effect=exc), \
+                        patch("AIModel.views.daily_quota.refund") as refund, self.assertLogs("AIModel.views", level="ERROR"):
+                    self._post()
+                refund.assert_not_called()
+
+    @patch("AIModel.views._get_client")
+    @patch("AIModel.views.load_current_plan", return_value=_plan(_task(3), _task(4)))
+    def test_a_transport_error_after_a_paid_call_does_not_refund(self, _load, _client):
+        # 第一次呼叫成功（已計費、last_call 已設定），第二次（重試）連不上：整體仍然花了錢，不能退
+        import anthropic
+        import httpx
+        from config.llm import last_call
+
+        def first_call_succeeds_then_connection_fails(*args, **kwargs):
+            last_call.set({"request_id": "req_1", "model": "m"})
+            raise anthropic.APIConnectionError(request=httpx.Request("POST", "https://api.anthropic.com/v1/messages"))
+
+        self._enable()
+        with patch("AIModel.views.run_study_plan_replan", side_effect=first_call_succeeds_then_connection_fails), \
+                patch("AIModel.views.daily_quota.refund") as refund, self.assertLogs("AIModel.views", level="ERROR"):
+            self._post()
+        refund.assert_not_called()
 
     @patch("AIModel.views._get_client")
     @patch("AIModel.views.load_current_plan", return_value=_plan(_task(3), _task(4)))
@@ -231,12 +286,12 @@ class ReplanViewTest(TestCase):
 
     @patch("AIModel.views._get_client")
     @patch("AIModel.views.load_current_plan", return_value=_plan(_task(3), _task(4)))
-    def test_refusal_reports_the_refunded_remaining_count(self, _load, _client):
+    def test_refusal_reports_the_current_remaining_count(self, _load, _client):
         self._enable()
         with patch("AIModel.views.run_study_plan_replan", side_effect=LLMRefusalError("refused")),                 patch("AIModel.views.daily_quota.peek") as peek:
             peek.return_value.as_dict.return_value = {"remaining": 42}
             body = self._post().json()
-        self.assertEqual(body["quota"], {"remaining": 42})       # 退款後的次數，不是扣款當下的
+        self.assertEqual(body["quota"], {"remaining": 42})       # 目前的剩餘次數（peek）
 
     @patch("AIModel.views._get_client")
     @patch("AIModel.views.load_current_plan", return_value=_plan(_task(3, True), _task(4)))

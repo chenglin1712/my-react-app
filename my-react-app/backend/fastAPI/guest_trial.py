@@ -48,6 +48,7 @@ SCOPE_BROWSER = "browser"
 SCOPE_IP = "ip"
 SCOPE_GLOBAL = "global"   # 全站每日總量（選用，預設關閉）
 SCOPE_ISSUE = "issue"     # 每個網路每日核發的訪客憑證張數
+SCOPE_USER = "user"       # 已登入使用者每日的翻譯次數（稽核 AI-1）
 # usage 表的 scope 欄位只有 8 個字元，新增名稱不可超過。
 
 _MIN_SECRET_LENGTH = 32
@@ -118,6 +119,22 @@ def global_daily_limit() -> int:
     except ValueError:
         return 0
     return max(value, 0)
+
+
+DEFAULT_USER_DAILY_LIMIT = 200
+
+
+def user_daily_limit() -> int:
+    """已登入使用者每人每天最多幾次翻譯（付費 LLM 呼叫）。0 代表不啟用。
+    每分鐘 10 次的限流擋不住「帳號很多、每個帳號都慢慢用」的總花費，所以另設每日上限（稽核 AI-1）。
+    不能用 _int_env：它把 0 換回預設值，會讓「0＝關閉」變成「用預設值」。"""
+    raw = os.getenv("TRANSLATION_USER_DAILY_LIMIT")
+    if raw is None or not raw.strip():
+        return DEFAULT_USER_DAILY_LIMIT
+    try:
+        return max(int(raw), 0)
+    except ValueError:
+        return DEFAULT_USER_DAILY_LIMIT
 
 
 def _secret() -> str:
@@ -379,6 +396,63 @@ def refund(quota: GuestQuota) -> None:
                 )
     except SQLAlchemyError:
         logger.warning("訪客試用額度退還失敗", exc_info=True)
+
+
+@dataclass
+class UserDaily:
+    allowed: bool
+    limit: int
+    remaining: int
+    resets_at: str
+    day: date | None = None
+    key_hash: str = ""   # 空字串＝這次沒有計次（功能關閉或計次系統不可用），退還時不動任何資料
+
+
+def consume_user_daily(uid: str, now: datetime | None = None) -> UserDaily:
+    """替已登入使用者的一次翻譯預留今天的額度（先扣再做，同時送出多個請求也不會超過上限）。
+
+    和訪客不同，這裡計次系統故障時【放行】（fail-open）：已登入使用者另有每分鐘的限流與月預算自動關閉當後盾，
+    不能因為計次表暫時連不上，讓所有登入使用者都無法翻譯。放行時會記 log，讓維運看得到。"""
+    now = now or datetime.now(timezone.utc)
+    day = taipei_today(now)
+    limit = user_daily_limit()
+    resets_at = next_reset_at(day)
+    if limit <= 0 or not uid:
+        return UserDaily(True, limit, limit, resets_at, day)
+    if not is_ready():
+        logger.error("翻譯每日上限無法計次（資料庫或 GUEST_TRIAL_SECRET 未就緒），本次放行")
+        return UserDaily(True, limit, limit, resets_at, day)
+    key_hash = _hash(SCOPE_USER, uid)
+    try:
+        with _engine.begin() as conn:
+            used = _bump(conn, day, SCOPE_USER, key_hash, limit, now)
+    except SQLAlchemyError:
+        logger.warning("翻譯每日上限計次失敗，本次放行", exc_info=True)
+        return UserDaily(True, limit, limit, resets_at, day)
+    if used is None:
+        return UserDaily(False, limit, 0, resets_at, day)
+    _maybe_purge(day)
+    return UserDaily(True, limit, max(limit - used, 0), resets_at, day, key_hash)
+
+
+def refund_user_daily(daily: UserDaily) -> None:
+    """確定沒有呼叫付費 LLM 就失敗時，把剛預留的次數還回去（best-effort）。"""
+    if not daily.allowed or daily.day is None or not daily.key_hash or _engine is None:
+        return
+    try:
+        with _engine.begin() as conn:
+            conn.execute(
+                update(_usage_table)
+                .where(
+                    _usage_table.c.day == daily.day,
+                    _usage_table.c.scope == SCOPE_USER,
+                    _usage_table.c.key_hash == daily.key_hash,
+                    _usage_table.c.count > 0,
+                )
+                .values(count=_usage_table.c.count - 1)
+            )
+    except SQLAlchemyError:
+        logger.warning("翻譯每日上限退還失敗", exc_info=True)
 
 
 def status(guest_id: str, now: datetime | None = None) -> GuestQuota:

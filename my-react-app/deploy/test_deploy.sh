@@ -309,6 +309,20 @@ check "ALLOW_NO_AI_BUDGET=1 明確放行：沒有預算也能部署" "$([ $rc = 
 set_env_line AI_MONTHLY_BUDGET_USD "AI_MONTHLY_BUDGET_USD=12.5"; run_script deploy.sh SKIP_BACKUP=1; rc=$?
 check "AI_MONTHLY_BUDGET_USD=12.5（小數）：通過" "$([ $rc = 0 ]; echo $?)"
 
+GUEST_SECRET='GUEST_TRIAL_SECRET=abcdefghijklmnopqrstuvwxyz0123456789ABCD'
+set_env_line GUEST_TRIAL_SECRET "$GUEST_SECRET"; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "啟用訪客試用但沒有全站每日上限：中止" "$([ $rc != 0 ] && out_has 'GUEST_TRIAL_GLOBAL_DAILY_LIMIT' && ! log_has '^docker run'; echo $?)"
+set_env_line GUEST_TRIAL_SECRET "$GUEST_SECRET"; echo 'GUEST_TRIAL_GLOBAL_DAILY_LIMIT=0' >> "$SB/repo/.env"; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "全站每日上限是 0：中止" "$([ $rc != 0 ] && out_has 'GUEST_TRIAL_GLOBAL_DAILY_LIMIT'; echo $?)"
+set_env_line GUEST_TRIAL_SECRET "$GUEST_SECRET"; echo 'GUEST_TRIAL_GLOBAL_DAILY_LIMIT=abc' >> "$SB/repo/.env"; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "全站每日上限不是數字：中止" "$([ $rc != 0 ] && out_has 'GUEST_TRIAL_GLOBAL_DAILY_LIMIT'; echo $?)"
+set_env_line GUEST_TRIAL_SECRET "$GUEST_SECRET"; run_script deploy.sh SKIP_BACKUP=1 ALLOW_NO_GUEST_GLOBAL_LIMIT=1; rc=$?
+check "ALLOW_NO_GUEST_GLOBAL_LIMIT=1 明確放行" "$([ $rc = 0 ]; echo $?)"
+set_env_line GUEST_TRIAL_SECRET "$GUEST_SECRET"; echo 'GUEST_TRIAL_GLOBAL_DAILY_LIMIT=500' >> "$SB/repo/.env"; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "全站每日上限 500：通過" "$([ $rc = 0 ]; echo $?)"
+good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "沒有啟用訪客試用：不要求全站每日上限" "$([ $rc = 0 ]; echo $?)"
+
 good_env; echo 'INTERNAL_API_SECRET=short' >> "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
 check "INTERNAL_API_SECRET 太短：中止（稽核 DEP-7）" "$([ $rc != 0 ] && out_has 'INTERNAL_API_SECRET' && ! log_has '^docker run'; echo $?)"
 good_env; echo 'INTERNAL_API_SECRET=0123456789012345678901234567890123456789' >> "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?

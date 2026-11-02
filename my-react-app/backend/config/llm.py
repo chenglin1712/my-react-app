@@ -186,6 +186,21 @@ def classify_llm_error(exc: BaseException) -> tuple[int, str]:
     return 502, "AI 服務暫時無法回應，請稍後再試"
 
 
+def is_uncharged_failure(exc: BaseException) -> bool:
+    """這個失敗可以確定供應商沒有計費嗎？只有「請求根本沒送達或被拒絕」才算：斷路器開啟（沒有送出）、
+    連不上（不含逾時：逾時時供應商可能已經在處理並計費）、429 限流與 5xx（供應商端拒絕，不計費）。
+    其餘一律當作可能已計費——呼叫端據此決定要不要退還使用者的額度（稽核 AI-2）。"""
+    if isinstance(exc, (LLMUnavailableError, EnvironmentError)):
+        return True
+    if isinstance(exc, anthropic.APITimeoutError):
+        return False
+    if isinstance(exc, anthropic.APIConnectionError):
+        return True
+    if isinstance(exc, anthropic.APIStatusError):
+        return exc.status_code == 429 or exc.status_code >= 500
+    return False
+
+
 # 呼叫端沒有明確傳 uid 時使用（例如翻譯：FastAPI 的 async 端點先設定，
 # asyncio.to_thread 會把 contextvars 複製到執行緒裡）。
 current_uid: contextvars.ContextVar[str] = contextvars.ContextVar("llm_current_uid", default="")

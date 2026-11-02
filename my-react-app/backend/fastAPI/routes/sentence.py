@@ -1,11 +1,12 @@
 import random
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from dictionary_db.connect import get_db
 from dictionary_db.model import Word
 from dictionary_db.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS
-from fastAPI import game_config
+from fastAPI import game_config, rate_limit_config
+from fastAPI.rate_limit import limiter
 from .keyed_cache import KeyedCache
 
 router = APIRouter()
@@ -61,7 +62,10 @@ def warm_cache(db: Session) -> None:
 
 
 @router.get("/questions")
+# 稽核 AI-6：同 listening.py，補上原本缺少的限流
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("sentence_questions", "30/minute"))
 def get_sentence_questions(
+    request: Request,
     tribe: str = 'tayal',
     count: int | None = Query(default=None, ge=1, le=20),
     db: Session = Depends(get_db)

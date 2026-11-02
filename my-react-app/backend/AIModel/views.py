@@ -13,7 +13,7 @@ from dictionary_db.model import Word
 from dictionary_db.word_data import load_explanation_items_for_words, load_audio_items_for_words
 from config.tribes import TRIBE_IDS, TRIBE_MAP
 from core.firebase_auth import verify_firebase_token
-from config.llm import REFUSAL_MESSAGE, LLMRefusalError, get_llm_client, classify_llm_error, last_call, llm_deadline, prompt_version_var
+from config.llm import REFUSAL_MESSAGE, LLMRefusalError, get_llm_client, classify_llm_error, is_uncharged_failure, last_call, llm_deadline, prompt_version_var
 from adminapi.rate_limits import get_configured_rate
 from .serializers import TayalChatSerializer, ReviewTayalChatSerializer, ReviewQuestionSerializer, ReplanStudyPlanSerializer
 from . import memory_store
@@ -54,6 +54,7 @@ def _assistant_disabled_response():
     # 月預算超過時這裡會自動把旗標關掉（見 adminapi/ai_budget.py）；評估有 60 秒快取，失敗只記錄不擋人。
     ai_budget.enforce()
     flag = FeatureFlag.objects.filter(key="ai_assistant_enabled").first()
+    # 旗標列不存在（尚未跑 seed_feature_flags）視為開啟，行為不變；預算超過時 ai_budget 會補建該列再關閉（稽核 AI-3）
     if flag is not None and not flag.enabled:
         return JsonResponse({"detail": "AI 助手目前暫停服務，請稍後再試。", "code": "ai_assistant_disabled"}, status=403)
     return None
@@ -503,22 +504,22 @@ def replan_study_plan(request):
     if not quota.allowed:
         return _quota_exceeded_response(quota)
 
-    def refund():
-        _refund_quota(uid, quota)
+    # 稽核 AI-2：供應商呼叫一旦完成就已經計費（用量照樣記入 AiUsageLog 與月預算），額度不能再退，
+    # 否則驗證不過或被拒答時，每次最多兩次付費呼叫都不佔額度。只有「請求沒送達」的失敗才退。
+    last_call.set(None)       # 這個請求有沒有任何一次成功的供應商呼叫，靠它判斷
 
     try:
         result = run_study_plan_replan(client, TRIBE_MAP.get(tribe, "泰雅語"), plan, availability, uid=uid)
     except LLMRefusalError:
-        # 拒答是模型的決定，不是服務故障：回 200 與固定說明，不佔額度（回應帶退款後的剩餘次數）
-        refund()
+        # 拒答是模型的決定（模型已實際處理並計費）：回 200 與固定說明，額度照扣
         return JsonResponse({"refused": True, "message": REFUSAL_MESSAGE, "quota": daily_quota.peek(uid).as_dict()})
-    except Exception:
-        refund()
+    except Exception as exc:
+        if last_call.get() is None and is_uncharged_failure(exc):
+            _refund_quota(uid, quota)
         logger.error("[replan_study_plan] 處理失敗\n%s", traceback.format_exc())
-        status, detail = classify_llm_error(sys.exc_info()[1])
+        status, detail = classify_llm_error(exc)
         return JsonResponse({"detail": detail}, status=status)
     if result is None:
-        refund()
         return JsonResponse({"detail": "這次沒有排出有效的新時間，請再試一次。", "code": "study_plan_replan_failed"}, status=422)
     result["quota"] = quota.as_dict()
     return JsonResponse(result)

@@ -463,7 +463,9 @@ async def allsearch_tayal_dictionary(request: Request, body: KeywordRequest):
     # 都不影響這裡的回應。fuzzy 是 {分類: [結果,...]} 的巢狀 dict，命中數
     # 用攤平後的長度計算。
     fuzzy_hit_count = sum(len(v) for v in fuzzy.values())
-    record_event(
+    # 稽核 AI-6：record_event 是同步的資料庫寫入，放到執行緒池，不卡住 event loop
+    await asyncio.to_thread(
+        record_event,
         "dictionary_search",
         tribe=_TRIBE_SLUG_BY_NAME.get(tribe_name, ""),
         payload={
