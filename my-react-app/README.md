@@ -245,11 +245,13 @@ python manage.py export_dictionary_sqlite --install   # 驗證通過後才替換
 ### 一鍵部署
 
 ```sh
-bash deploy.sh           # 沒有新 commit 就跳過，不會做任何事
-bash deploy.sh --force   # 強制重建（例如只改了 .env、沒有新 commit）
+bash deploy.sh v2026.11.02           # 部署已簽署的 tag；沒有新 commit 就跳過，不會做任何事
+bash deploy.sh v2026.11.02 --force   # 強制重建（例如只改了 .env、沒有新 commit）
 ```
 
-依序：檢查 `.env`（`DJANGO_DEBUG`／`AUTH_DEV_BYPASS`／`DATABASE_URL`／`DJANGO_SECRET_KEY` 任一項不合格直接中止，避免把開發機的 `.env` 誤部署成正式環境）→ `git pull --ff-only` → 部署前備份 PostgreSQL（Django／辭典兩個資料庫）→ 重建前端與後端 → `docker compose up -d --wait`，等到 Django（`/health/`，會實際探測資料庫與快取）與 FastAPI（`/ready`，快取與發音模型預熱完成才算）都通過健康檢查 → 冒煙測試 nginx 有沒有把 `/AIModel/`、`/api/v1/` 等路徑正確轉發到後端。**任何一步在切到新版之後失敗都會自動回滾**（前端 `dist` 與兩個後端 image 都有 `:prev` 備份點）；資料庫不在回滾範圍內——新版 migration 一旦套用，回滾容器救不了，要靠部署前的備份還原。
+部署的是**簽署過的 tag**：腳本用 `git verify-tag` 驗簽章（GPG 金鑰需標為完全信任，或 SSH 的 `allowedSignersFile`），通過才快轉到那個 commit；工作樹有未提交的修改也會中止。發版用 `git tag -s <tag> -m "..." && git push origin <tag>`。部署機還沒設定簽章驗證時，暫時用 `ALLOW_UNSIGNED=1 bash deploy.sh`（退回 `git pull --ff-only`，會印警告）。設定方式見 `deploy.sh` 開頭註解。
+
+依序：檢查 `.env`（`DJANGO_DEBUG`／`AUTH_DEV_BYPASS`／`DATABASE_URL`／`DJANGO_SECRET_KEY` 任一項不合格直接中止，避免把開發機的 `.env` 誤部署成正式環境）→ 驗證並快轉到已簽署的 tag → 部署前備份 PostgreSQL（Django／辭典兩個資料庫）→ 重建前端與後端 → `docker compose up -d --wait`，等到 Django（`/health/`，會實際探測資料庫與快取）與 FastAPI（`/ready`，快取與發音模型預熱完成才算）都通過健康檢查 → 冒煙測試 nginx 有沒有把 `/AIModel/`、`/api/v1/` 等路徑正確轉發到後端。**任何一步在切到新版之後失敗都會自動回滾**（前端 `dist` 與兩個後端 image 都有 `:prev` 備份點）；資料庫不在回滾範圍內——新版 migration 一旦套用，回滾容器救不了，要靠部署前的備份還原。
 
 完整的部署、回滾、備份／還原演練說明在 **[`deploy/README.md`](deploy/README.md)**，包含環境變數總表、nginx 參考設定、備份保留與還原演練方式、Firebase 規則的部署注意事項——那份文件才是正式環境的權威說明。這裡只整理跟本機開發者切身相關、容易搞混的幾點：
 

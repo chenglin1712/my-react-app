@@ -1,0 +1,5 @@
+# pip 本身的版本與雜湊（稽核 SUP-8）。Dockerfile 用 `pip install --require-hashes -r requirements-pip.lock`
+# 取代原本沒釘版本的 `pip install --upgrade pip`。要升級時：到 PyPI 查新版 wheel 的 SHA-256，兩者一起改。
+# 選用發佈滿一個月以上的版本，不追剛釋出的版本。
+pip==26.2.1 \
+    --hash=sha256:71138adf1f4ca900cdb7d289c21b7494329f2332b6d85f0e1c42108c0384ed3e

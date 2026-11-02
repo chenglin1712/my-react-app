@@ -1,5 +1,15 @@
-# 第三方 action 釘在 commit SHA 之後不會自己更新；這個設定讓 Dependabot 每週檢查新版，
-# 開 PR 同時更新 SHA 與後面註解的版本號，由人看過變更再合併。
+# 釘住的版本不會自己更新：這個設定讓 Dependabot 每週檢查新版並開 PR，由人看過變更再合併。
+# 涵蓋 GitHub Actions（釘在 commit SHA，PR 會同時更新 SHA 與後面註解的版本號）、npm、pip、Docker 基底映像（稽核 SUP-5）。
+#
+# 注意事項：
+# - pip：Dependabot 更新的是 requirements*.txt 裡「直接」套件的版本。合併前要在 PR 分支上跑
+#   scripts/compile_requirements.sh（只升特定套件用 UPGRADE_PACKAGES="套件名"）重編 *.lock，
+#   否則實際安裝的（帶雜湊的）鎖定檔不會變。
+#   torch／torchaudio 排除在外：實際安裝的是 PyTorch CPU index 的 +cpu 版（requirements-torch.lock），Dependabot
+#   會提議 PyPI 上的另一種版本，合併後也不會同步鎖定檔。這兩個要人工查新版，改 requirements.txt 後跑
+#   scripts/compile_requirements.sh torch，並確認 Docker 映像建得起來。
+# - Docker：只看得到 backend/Dockerfile 的 FROM（Python 基底映像，標籤加摘要一起更新）。
+#   deploy.sh 的 node 映像與 CI 的 nginx 映像寫在 shell／workflow 裡，Dependabot 看不到，要手動跟著維護。
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -8,3 +18,34 @@ updates:
       interval: weekly
     commit-message:
       prefix: "chore(ci)"
+
+  - package-ecosystem: npm
+    directory: /my-react-app
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # 開發工具（lint、測試）的小版本與修補版合併成一個 PR，減少雜訊；執行期套件仍各自一個 PR
+      dev-tooling:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  - package-ecosystem: pip
+    directory: /my-react-app
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    ignore:
+      - dependency-name: "torch"
+      - dependency-name: "torchaudio"
+
+  - package-ecosystem: docker
+    directory: /my-react-app/backend
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore(deps)"

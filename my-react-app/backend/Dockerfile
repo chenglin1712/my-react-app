@@ -37,19 +37,18 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # 先只複製鎖定檔再裝依賴（善用 Docker layer cache：原始碼變動不會讓這一層重跑）。
-# 安裝順序完全比照 .github/workflows/ci.yml 已驗證可行的做法：
-# torch/torchaudio 必須「先」從 PyTorch 的 CPU wheel index 裝，直接裝會嘗試從預設
-# PyPI index 抓，可能抓到不對的 build 或抓不到（requirements.txt 開頭也有同樣的註解）。
-# 其餘套件用 requirements.lock 加 --require-hashes：每個檔案的 SHA-256 都要對得上，
-# 套件庫上被偷換的檔案裝不進來（鎖定檔由 scripts/compile_requirements.sh 產生）。
-# 注意：torch／torchaudio 與它們自己的相依（sympy、networkx、jinja2 等）不在鎖定檔內，沒有雜湊保護；
-# 最後的 pip check 至少確保兩次安裝之間沒有版本衝突。
-COPY requirements.lock .
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir \
-        torch==2.14.1 torchaudio==2.11.0 \
-        --index-url https://download.pytorch.org/whl/cpu \
-        --extra-index-url https://pypi.org/simple \
+# 三份鎖定檔都用 --require-hashes：每個檔案的 SHA-256 都要對得上，套件庫上被偷換的檔案裝不進來
+# （鎖定檔由 scripts/compile_requirements.sh 產生）。
+# - requirements-pip.lock：pip 自己，釘版本加雜湊（稽核 SUP-8）。
+# - requirements-torch.lock：只有 torch／torchaudio 兩個檔案，只從 PyTorch 的 CPU index 安裝，不加 PyPI 當第二個索引
+#   （稽核 SUP-1：兩個索引並存時，同名套件可能被另一邊的版本取代，即相依混淆）。--no-deps 因為它們的相依
+#   （sympy、networkx、jinja2 等）在 requirements.lock，同樣帶雜湊、從 PyPI 安裝（PyTorch 的 index 只有很舊的鏡像）。
+# - requirements.lock：其餘所有套件，從預設 PyPI 安裝。
+# 最後的 pip check 確保三次安裝之間沒有版本衝突。
+COPY requirements-pip.lock requirements-torch.lock requirements.lock ./
+RUN pip install --no-cache-dir --require-hashes -r requirements-pip.lock \
+    && pip install --no-cache-dir --require-hashes --no-deps \
+        --index-url https://download.pytorch.org/whl/cpu -r requirements-torch.lock \
     && pip install --no-cache-dir --require-hashes -r requirements.lock \
     && pip check
 
@@ -58,6 +57,18 @@ RUN pip install --no-cache-dir --upgrade pip \
 # 下載來源故障時，部署看起來成功、發音功能卻實際不可用。build 當下下載失敗會直接
 # 讓建置失敗，問題在部署前就曝光。
 ENV TORCH_HOME=/opt/torch
+# 權重檔先自己下載並核對 SHA-256（稽核 SUP-8），放進 torch hub 的快取位置（檔名與網址最後一段相同），
+# 之後 torchaudio 發現檔案已在就不會再下載。這個檔案是 torch.load 要讀的 pickle，被偷換就等於在 build 階段
+# 執行任意程式碼，所以不能只信任下載來源。下載、核對與失敗處理見 scripts/fetch_verified.py（有測試）。
+# 要升級 torchaudio 且權重檔變了時：下載新檔、算 SHA-256，兩處（網址與雜湊）一起改。
+# 映像是不可變的；執行期不要把可寫的 volume 掛到 $TORCH_HOME，否則這個檔案又變成未驗證的輸入。
+COPY scripts/fetch_verified.py /tmp/fetch_verified.py
+RUN python /tmp/fetch_verified.py \
+        https://download.pytorch.org/torchaudio/models/wav2vec2_fairseq_base_ls960.pth \
+        /opt/torch/hub/checkpoints/wav2vec2_fairseq_base_ls960.pth \
+        1275f890a623b31b9915295dc01d5049c93dc6de8813406c16dfab9b6bd36056 \
+        600000000 \
+    && rm /tmp/fetch_verified.py
 # 不只載入模型，還實際跑一次推論：torch 與 torchaudio 的版號不同（見 requirements.txt），
 # 原生介面對不上時，import 會成功、真正執行才會出錯，這一行讓它在 build 階段就失敗。
 RUN python -c "import torch, torchaudio; m = torchaudio.pipelines.WAV2VEC2_BASE.get_model().eval(); f, _ = m.extract_features(torch.zeros(1, 16000)); assert len(f) == 12 and f[-1].shape[-1] == 768 and torch.isfinite(f[-1]).all()"

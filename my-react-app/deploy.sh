@@ -1,9 +1,19 @@
 #!/usr/bin/env bash
 # 更新部署：檢查環境 → git pull → （備份）→ 重建前端 → 重建／重啟後端並等健康檢查
 #          → 檢查反向代理路由；任何一步在切換後失敗，自動回滾到上一版。
-# 用法：bash deploy.sh          （沒有新 commit 就跳過）
-#      bash deploy.sh --force   （強制重建，例如只改了 .env）
+# 用法：bash deploy.sh <tag>          部署已簽署的 tag（沒有新 commit 就跳過）
+#      bash deploy.sh <tag> --force   強制重建，例如只改了 .env
+# 簽章驗證（稽核 SUP-6）：部署前用 git verify-tag 驗 tag 的簽章，通過才把工作目錄快轉到那個 commit。
+#   發版：git tag -s v2026.11.02 -m "..." && git push origin v2026.11.02
+#   部署機一次性設定（任選一種簽章方式）。「誰可以發版」就是下面這份名單，請限定在確實會發版的人：
+#     SSH（建議，名單最明確）：git config gpg.format ssh && git config gpg.ssh.allowedSignersFile <allowed_signers 檔>；
+#       該檔案與 git config 應由管理者擁有、部署帳號不可修改。
+#     GPG：把發版者的公鑰匯入部署使用者專用的 keyring（gpg --import）並標為完全信任（ultimate 或 full）；
+#       本腳本用 gpg.minTrustLevel=fully 驗證，只是「在 keyring 裡」但沒標信任的金鑰會被拒絕。
+#   只擋得住「只有推送權限、沒有簽章金鑰」的人；若簽章金鑰本身被盜，簽章仍會通過。
+#   尚未設定好時，可暫時用 ALLOW_UNSIGNED=1 bash deploy.sh（退回舊的 git pull，會印出警告）。
 # 環境變數：
+#      ALLOW_UNSIGNED=1  不驗簽章、直接 git pull（只當過渡用）
 #      SKIP_BACKUP=1     略過部署前備份（不建議）
 #      PROXY_BASE=...    反向代理對外位址，預設 https://127.0.0.1
 #      ALLOW_NO_REDIS=1  .env 沒有 REDIS_URL 也照常部署（限流計數會退回各 worker 的記憶體）
@@ -25,7 +35,15 @@ cd "$(dirname "$0")"
 # shellcheck source=deploy/env.sh
 . deploy/env.sh
 
-FORCE="${1:-}"
+FORCE=""
+TAG=""
+for arg in "$@"; do
+  case "$arg" in
+    --force) FORCE="--force" ;;
+    -*) echo "!! 不認得的參數：$arg"; exit 2 ;;
+    *) TAG="$arg" ;;
+  esac
+done
 COMPOSE=(docker compose -f docker-compose.prod.yml)
 # 容器的執行身分（docker-compose.prod.yml 的 user:）。取部署者的 uid，掛載目錄才寫得進去。
 # 先指定值再 export（不是反過來）：2026-10-26 發生過一次 export 之後，底下的 docker compose
@@ -84,7 +102,35 @@ fi
 
 BEFORE=$(git rev-parse HEAD)
 echo "==> 目前版本 $(git rev-parse --short HEAD)，拉取最新..."
-git pull --ff-only
+# 稽核 SUP-6：只部署「簽署過的 tag」。單純 git pull 的話，GitHub 推送權限被盜就等於直接上線；
+# 簽章要用部署機上信任的金鑰驗得過，光有推送權限的人做不出來。
+if [ -n "$TAG" ]; then
+  case "$TAG" in
+    *[!A-Za-z0-9._-]*) echo "!! tag 名稱只能包含英數字、點、底線、連字號：$TAG"; exit 2 ;;
+  esac
+  # 簽署的 tag 只能證明「那個 commit」被核准；工作樹若有未提交的修改，建置出來的就不是簽署的內容
+  if ! git diff --quiet HEAD --; then
+    echo "!! 工作樹有已追蹤檔案的未提交修改，部署中止（簽章只涵蓋 commit，不涵蓋本機修改）。"; exit 1
+  fi
+  # 把遠端的 tag 抓到專用的暫存 ref（不是 refs/tags/，不污染也不依賴本機舊的 tag；遠端移動過 tag 也會跟著走）
+  git fetch --force origin "refs/tags/$TAG:refs/deploy-candidates/$TAG"
+  # 先解析成 tag 物件的 id（^{tag} 也會拒絕沒有簽章資料的 lightweight tag），驗證與取 commit 都用這個 id，不再用名稱重新解析
+  TAG_OBJECT=$(git rev-parse --verify "refs/deploy-candidates/$TAG^{tag}") || { echo "!! $TAG 不是 annotated tag，部署中止。"; exit 1; }
+  # gpg.minTrustLevel=fully：GPG 金鑰只是「在 keyring 裡」不夠，要被標為完全信任（SSH 簽章看 allowedSignersFile，這個設定不影響）
+  git -c gpg.minTrustLevel=fully verify-tag "$TAG_OBJECT" || { echo "!! tag $TAG 沒有有效的簽章，部署中止。"; exit 1; }
+  VERIFIED_COMMIT=$(git rev-parse --verify "$TAG_OBJECT^{commit}")
+  # 只能「向前」到簽署的 commit：目前 HEAD 已經領先它（或在別的分支上）的話，merge 會說「已是最新」，
+  # 接著部署的就是簽章沒涵蓋的 commit。合併後再確認 HEAD 真的等於簽署的 commit。
+  git merge-base --is-ancestor HEAD "$VERIFIED_COMMIT" || { echo "!! tag $TAG 的 commit 不是目前版本的後代（降級或不同分支），部署中止。"; exit 1; }
+  git merge --ff-only "$VERIFIED_COMMIT"
+  [ "$(git rev-parse HEAD)" = "$VERIFIED_COMMIT" ] || { echo "!! 合併後的版本不等於簽署的 commit，部署中止。"; exit 1; }
+elif [ "${ALLOW_UNSIGNED:-}" = "1" ]; then
+  echo "!! 警告：ALLOW_UNSIGNED=1，這次部署沒有驗證簽章（git pull）。簽章驗證設定好之後請移除這個變數。"
+  git pull --ff-only
+else
+  echo "!! 需要指定已簽署的 tag：bash deploy.sh <tag>（尚未設定簽章驗證時才可暫時用 ALLOW_UNSIGNED=1 bash deploy.sh）。部署中止。"
+  exit 2
+fi
 AFTER=$(git rev-parse HEAD)
 
 if [ "$BEFORE" = "$AFTER" ] && [ "$FORCE" != "--force" ]; then
@@ -173,8 +219,32 @@ trap rollback ERR
 
 # ── 3. 重建前端 ─────────────────────────────────────────────────
 echo "==> 重建前端"
-# 用部署者的 uid 跑，產出的 node_modules、dist 才不會是 root 擁有；HOME 指到可寫的暫存目錄給 npm 用
-docker run --rm --user "$APP_UID:$APP_GID" -e HOME=/tmp -v "$PWD":/app -w /app node:20-slim sh -c "npm ci && npm run build"
+# 稽核 SUP-3：容器不掛整個專案目錄，只掛一份「建置需要的檔案」（從 git HEAD 取出）的副本。
+# 整個目錄裡有 .env（後端密鑰）與 serviceAccountKey.json（Firebase 管理金鑰）；npm 套件或 node 映像一旦被入侵，
+# 建置過程執行的相依程式碼就讀得到它們。副本裡沒有這些檔案，就沒有東西可讀。
+# 前端建置唯一需要的環境變數是 VITE_ 開頭的（本來就會被打包進公開的 JS），所以只抽出這幾行當 .env.production。
+# 建置在副本裡完成後，才把 dist 複製回來：建置失敗時現有的 dist 完全不動。
+# node 映像釘「標籤＋摘要」（稽核 SUP-4）：Node 24 是目前的 LTS（Node 20 已在 2026 年 4 月結束維護）。
+# 升級時：查新標籤的摘要，在預備環境確認 npm ci／npm run build 通過後，標籤與摘要一起改（CI 的 node-version 也要跟著改）。
+NODE_IMAGE="node:24-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c"
+BUILD_DIR="$(mktemp -d)"
+trap 'rm -rf "$BUILD_DIR"' EXIT
+# 建置來源用 git archive 從 HEAD 取出：只含已提交的內容（驗過簽章的版本），工作樹裡未追蹤或被忽略的檔案進不來。
+git archive --format=tar HEAD -- package.json package-lock.json vite.config.js index.html firebase.js jsconfig.json frontend public | tar -x -C "$BUILD_DIR"
+# 建置輸入裡不允許 symlink：連結可能指到專案目錄外（例如 ../.env），建置容器不該被帶去碰不該碰的檔案
+BAD_LINK="$(find "$BUILD_DIR/frontend" "$BUILD_DIR/public" -type l | head -n 1)"
+if [ -n "$BAD_LINK" ]; then
+  echo "!! frontend/ 或 public/ 裡有 symlink，前端建置中止：${BAD_LINK#"$BUILD_DIR"/}"; exit 1
+fi
+# 去掉 CR（.env 若是 CRLF 換行）；VITE_AUTH_DEV_BYPASS_* 是本機開發用的登入繞過，不論 .env 有沒有留，都不帶進正式建置
+tr -d '\r' < .env | grep -E '^VITE_[A-Za-z0-9_]*=' | grep -vE '^VITE_AUTH_DEV_BYPASS' > "$BUILD_DIR/.env.production" || true
+# 目錄維持 mktemp 預設的 0700（只有部署者讀得到）；容器以同一個 uid 執行，不需要放寬權限
+docker run --rm --user "$APP_UID:$APP_GID" -e HOME=/tmp -v "$BUILD_DIR":/app -w /app "$NODE_IMAGE" sh -c "npm ci && npm run build"
+rm -rf dist.new
+cp -r "$BUILD_DIR/dist" dist.new
+rm -rf dist
+mv dist.new dist
+rm -rf "$BUILD_DIR"
 
 # ── 4. 重建並重啟後端，等到兩個服務都通過健康檢查 ──────────────────
 echo "==> 重建後端 image"

@@ -17,6 +17,8 @@ FAIL=0
 mkdir -p "$SB/bin" "$SB/state" "$SB/repo/deploy"
 cp "$ROOT/deploy.sh" "$SB/repo/deploy.sh"
 cp "$ROOT/deploy/backup.sh" "$ROOT/deploy/env.sh" "$SB/repo/deploy/"
+for f in package.json package-lock.json vite.config.js index.html firebase.js jsconfig.json; do echo "// $f" > "$SB/repo/$f"; done
+mkdir -p "$SB/repo/frontend" "$SB/repo/public"; echo "// app" > "$SB/repo/frontend/main.jsx"; echo "{}" > "$SB/repo/public/sw.js"
 
 # ── 假的外部指令 ─────────────────────────────────────────────────
 cat > "$SB/bin/docker" <<'EOF'
@@ -35,14 +37,32 @@ if [ "$1" = "compose" ]; then
       if [ "${FAIL_UP:-0}" = "1" ] && [ ! -f "$SB_STATE/up_failed" ]; then touch "$SB_STATE/up_failed"; exit 1; fi ;;
   esac
 fi
-if [ "$1" = "run" ]; then mkdir -p dist && echo new > dist/index.html; fi
+if [ "$1" = "run" ]; then
+  mount=""; prev=""
+  for a in "$@"; do [ "$prev" = "-v" ] && mount="${a%%:*}"; prev="$a"; done
+  echo "build-mount $mount" >> "$SB_LOG"
+  ( cd "$mount" && ls -A | sed 's/^/build-file /' >> "$SB_LOG"; [ -f .env.production ] && sed 's/^/build-env /' .env.production >> "$SB_LOG" )
+  [ "${FAIL_BUILD:-0}" = "1" ] && exit 1
+  mkdir -p "$mount/dist" && echo new > "$mount/dist/index.html"
+fi
 exit 0
 EOF
 cat > "$SB/bin/git" <<'EOF'
 #!/usr/bin/env bash
+GIT_C=""
+while [ "$1" = "-c" ]; do GIT_C="$GIT_C -c $2"; shift 2; done
 case "$1" in
-  rev-parse) if [ "$2" = "--short" ]; then echo abc1234; elif [ -f "$SB_STATE/pulled" ]; then echo bbbb; else echo aaaa; fi ;;
-  pull) touch "$SB_STATE/pulled" ;;
+  rev-parse) if [ "$2" = "--short" ]; then echo abc1234
+             elif [ "$2" = "--verify" ]; then echo cccc   # tag 物件與它指向的 commit（簽署的 commit 是 cccc）
+             elif [ -s "$SB_STATE/pulled" ]; then cat "$SB_STATE/pulled"
+             elif [ -f "$SB_STATE/pulled" ]; then echo bbbb; else echo aaaa; fi ;;
+  pull) echo "git pull" >> "$SB_LOG"; touch "$SB_STATE/pulled" ;;
+  fetch) echo "git fetch ${*:2}" >> "$SB_LOG" ;;
+  diff) if [ "${DIRTY:-0}" = "1" ]; then exit 1; fi ;;
+  verify-tag) echo "git$GIT_C verify-tag ${*:2}" >> "$SB_LOG"; if [ "${BAD_SIG:-0}" = "1" ]; then exit 1; fi ;;
+  merge) echo "git merge ${*:2}" >> "$SB_LOG"; echo cccc > "$SB_STATE/pulled" ;;
+  merge-base) if [ "${NOT_ANCESTOR:-0}" = "1" ]; then exit 1; fi ;;
+  archive) shift; while [ "$1" != "--" ]; do shift; done; shift; tar -cf - "$@" ;;
 esac
 EOF
 cat > "$SB/bin/curl" <<'EOF'
@@ -93,7 +113,7 @@ good_env() {
 run_script() {
   local script="$1"; shift
   : > "$SB/log"; rm -rf "$SB/state"/*
-  ( cd "$SB/repo" && env PATH="$SB/bin:$PATH" SB_LOG="$SB/log" SB_STATE="$SB/state" USER=tester "$@" bash "$script" --force ) > "$SB/out" 2>&1
+  ( cd "$SB/repo" && env PATH="$SB/bin:$PATH" SB_LOG="$SB/log" SB_STATE="$SB/state" USER=tester ALLOW_UNSIGNED=1 "$@" bash "$script" --force ) > "$SB/out" 2>&1
 }
 
 fresh_dist() {
@@ -187,6 +207,69 @@ check "Server 標頭洩漏 gunicorn：報錯" "$([ $rc != 0 ] && out_has 'Server
 
 good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1 SERVER_HEADER="nginx/1.24.0"; rc=$?
 check "Server 標頭洩漏 nginx 版本：報錯" "$([ $rc != 0 ] && out_has 'Server 標頭洩漏版本資訊：nginx/1.24.0'; echo $?)"
+
+echo "deploy.sh：簽章驗證（稽核 SUP-6）"
+# run_tag <tag> [環境變數=值 ...]：不帶 ALLOW_UNSIGNED、指定 tag 執行
+run_tag() {
+  local tag="$1"; shift
+  : > "$SB/log"; rm -rf "$SB/state"/*
+  ( cd "$SB/repo" && env -u ALLOW_UNSIGNED PATH="$SB/bin:$PATH" SB_LOG="$SB/log" SB_STATE="$SB/state" USER=tester "$@" bash deploy.sh "$tag" --force ) > "$SB/out" 2>&1
+}
+good_env; fresh_dist; run_tag v1 SKIP_BACKUP=1; rc=$?
+check "簽章有效的 tag：驗證後快轉並部署成功" \
+  "$([ $rc = 0 ] && log_has 'git fetch --force origin refs/tags/v1:refs/deploy-candidates/v1' && log_has 'gpg.minTrustLevel=fully verify-tag' && log_has 'git merge --ff-only' && ! log_has 'git pull' && dist_is new; echo $?)"
+
+good_env; fresh_dist; run_tag v1 SKIP_BACKUP=1 BAD_SIG=1; rc=$?
+check "簽章無效：中止，不合併、不建置" \
+  "$([ $rc != 0 ] && out_has '沒有有效的簽章' && ! log_has 'git merge' && ! log_has '^docker run' && dist_is old; echo $?)"
+
+good_env; fresh_dist; : > "$SB/log"; ( cd "$SB/repo" && env -u ALLOW_UNSIGNED PATH="$SB/bin:$PATH" SB_LOG="$SB/log" SB_STATE="$SB/state" USER=tester SKIP_BACKUP=1 bash deploy.sh --force ) > "$SB/out" 2>&1; rc=$?
+check "沒指定 tag 也沒有 ALLOW_UNSIGNED：中止，不 git pull" \
+  "$([ $rc != 0 ] && out_has '需要指定已簽署的 tag' && ! log_has 'git pull' && ! log_has '^docker run'; echo $?)"
+
+good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "ALLOW_UNSIGNED=1：退回 git pull 並印出警告" \
+  "$([ $rc = 0 ] && log_has 'git pull' && out_has 'ALLOW_UNSIGNED=1' && ! log_has 'git verify-tag'; echo $?)"
+
+good_env; fresh_dist; run_tag 'v1;rm -rf x' SKIP_BACKUP=1; rc=$?
+check "tag 名稱含特殊字元：拒絕，不呼叫 git" \
+  "$([ $rc != 0 ] && out_has 'tag 名稱只能包含' && ! log_has 'git verify-tag' && ! log_has 'git fetch'; echo $?)"
+
+good_env; fresh_dist; run_tag v1 SKIP_BACKUP=1 DIRTY=1; rc=$?
+check "工作樹有未提交修改：簽章驗證前就中止，不合併、不建置" \
+  "$([ $rc != 0 ] && out_has '未提交修改' && ! log_has 'git fetch' && ! log_has 'git merge' && ! log_has '^docker run'; echo $?)"
+
+good_env; fresh_dist; run_tag v1 SKIP_BACKUP=1 NOT_ANCESTOR=1; rc=$?
+check "tag 的 commit 不是目前版本的後代（降級／別的分支）：中止，不合併、不建置" \
+  "$([ $rc != 0 ] && out_has '不是目前版本的後代' && ! log_has 'git merge' && ! log_has '^docker run'; echo $?)"
+
+echo "deploy.sh：前端建置不接觸機密（稽核 SUP-3）"
+good_env; printf 'VITE_API_URL=https://api.example\nSECRET_TOKEN=do-not-leak\nDJANGO_SECRET_KEY=x\n  VITE_INDENTED=no\n' >> "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "建置目錄不含 .env、serviceAccountKey.json、後端程式" \
+  "$([ $rc = 0 ] && ! log_has 'build-file .env$' && ! log_has 'build-file serviceAccountKey.json' && ! log_has 'build-file backend' && ! log_has 'build-file logs' && log_has 'build-file package.json' && log_has 'build-file frontend'; echo $?)"
+check "只有 VITE_ 開頭的變數被帶進建置（當作 .env.production）" \
+  "$(log_has 'build-env VITE_API_URL=https://api.example' && ! log_has 'build-env SECRET_TOKEN' && ! log_has 'build-env DJANGO_SECRET_KEY' && ! log_has 'build-env .*INDENTED'; echo $?)"
+check "不再把整個專案目錄掛進建置容器" \
+  "$(! log_has "docker run .*-v $SB/repo:/app"; echo $?)"
+check "建置映像是釘了摘要的 node:24" \
+  "$(log_has 'node:24-slim@sha256:'; echo $?)"
+
+good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1 FAIL_BUILD=1; rc=$?
+check "建置失敗：現有的 dist 完全不動" \
+  "$([ $rc != 0 ] && dist_is old; echo $?)"
+
+good_env; printf 'VITE_API_URL=https://api.example\r\nVITE_AUTH_DEV_BYPASS_ROLE=owner\r\nVITE_FIREBASE_PROJECT_ID=demo\r\n' >> "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "CRLF 的 .env：帶進建置的 VITE_ 值不含 CR" \
+  "$([ $rc = 0 ] && log_has 'build-env VITE_API_URL=https://api.example$' && ! grep -q "$(printf '\r')" "$SB/log"; echo $?)"
+check "VITE_AUTH_DEV_BYPASS_ROLE 不帶進正式建置" \
+  "$(! log_has 'build-env VITE_AUTH_DEV_BYPASS'; echo $?)"
+
+if ln -s ../outside "$SB/repo/frontend/link" 2>/dev/null && [ -L "$SB/repo/frontend/link" ]; then
+  good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+  check "frontend/ 裡有 symlink：前端建置中止，不啟動容器" \
+    "$([ $rc != 0 ] && out_has 'symlink' && ! log_has '^docker run'; echo $?)"
+  rm -f "$SB/repo/frontend/link"
+fi
 
 echo "deploy.sh：.env 防呆"
 env_case() { # 名稱 內容(printf 格式) 預期輸出關鍵字

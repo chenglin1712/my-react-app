@@ -31,8 +31,9 @@ cryptography==50.0.2
 anthropic==2.3.0
 # torch/torchaudio must be installed together from pytorch.org with matching CUDA version.
 # Example (CPU): pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-# 這兩個不在 requirements.lock 裡（要從 PyTorch 自己的 index 裝）；版本改這裡時，
-# Dockerfile 與 .github/workflows/ci.yml 的 torch 安裝行要一起改。
+# 這兩個不在 requirements.lock 裡（要從 PyTorch 自己的 index 裝）。
+# 實際安裝讀的是 requirements-torch.lock（帶雜湊，稽核 SUP-1）：改了這裡的 torch 版本後要跑
+# scripts/compile_requirements.sh torch；它們的相依（TORCH_RUNTIME_DEPS）在 requirements.lock，由同一支腳本管理。
 # torchvision、ultralytics、opencv-python、bottleneck 程式碼完全沒用到，已移除。
 # torch 刻意比 torchaudio 新：torch 2.11.0 有 torch.jit.script 的記憶體損毀弱點（GHSA-rrmf-rvhw-rf47，
 # 2.13.0 修正；本專案沒用 jit，所以原本碰不到，但升了就不用再解釋）。torchaudio 2.11.0 是最後一版，
