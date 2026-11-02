@@ -268,7 +268,9 @@ NODE_IMAGE="node:24-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc97
 BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT
 # 建置來源用 git archive 從 HEAD 取出：只含已提交的內容（驗過簽章的版本），工作樹裡未追蹤或被忽略的檔案進不來。
-git archive --format=tar HEAD -- package.json package-lock.json vite.config.js index.html firebase.js jsconfig.json frontend public | tar -x -C "$BUILD_DIR"
+# backend/config/tribes.json：frontend/src/constants/tribes.js 直接 import 這個檔案當族語資料的唯一來源
+# （跟後端 backend/config/tribes.py 共用同一份），不在 frontend/ 底下但建置時真的要讀到，要跟著取出來。
+git archive --format=tar HEAD -- package.json package-lock.json vite.config.js index.html firebase.js jsconfig.json frontend public backend/config/tribes.json | tar -x -C "$BUILD_DIR"
 # 建置輸入裡不允許 symlink：連結可能指到專案目錄外（例如 ../.env），建置容器不該被帶去碰不該碰的檔案
 BAD_LINK="$(find "$BUILD_DIR/frontend" "$BUILD_DIR/public" -type l | head -n 1)"
 if [ -n "$BAD_LINK" ]; then
