@@ -82,7 +82,7 @@ export default function ImportWizard() {
         taxonomies, tribeNames, selectedTribe, setSelectedTribe,
         jobs, job, selectedFile, parsedBundle,
         reviewComment, setReviewComment,
-        loading, pendingAction, error, setError, successMessage, setSuccessMessage,
+        loading, pendingAction, error, successMessage, setSuccessMessage,
         runJobAction, handleFileChange, upload, exportBundle,
     } = useImportWizard({ id });
 

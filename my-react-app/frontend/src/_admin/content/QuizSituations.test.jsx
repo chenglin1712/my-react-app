@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import QuizSituations from './QuizSituations';
 import { apiGet, apiPost, apiPatch, apiDelete } from '../../../utils/apiClient';
 
-import { getRowAction, queryRowAction } from '../testing/rowActions';
+import { getRowAction } from '../testing/rowActions';
 vi.mock('../../../utils/apiClient', () => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),

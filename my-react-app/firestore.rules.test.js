@@ -1565,13 +1565,13 @@ describe('users/{uid}/studyPlans/current 規則（追蹤中的讀書計畫）', 
       plan({ updatedAt: new Date(0) }),
     ];
     for (const data of bad) await assertFails(setDoc(doc(alice.firestore(), path), data));
-    const { createdAt, ...missing } = plan();
+    const { createdAt: _createdAt, ...missing } = plan();
     await assertFails(setDoc(doc(alice.firestore(), path), missing));
   });
 
   test('任務內部的形狀不對會被擋：欄位太多、缺欄位、型別錯、過長、done 不是布林、不是物件', async () => {
     const alice = testEnv.authenticatedContext('alice');
-    const { description, ...noDescription } = task();
+    const { description: _description, ...noDescription } = task();
     const bad = [
       { ...task(), a: 1, b: 2 },        // 欄位超過 7 個
       noDescription,

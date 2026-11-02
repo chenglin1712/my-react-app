@@ -2,6 +2,8 @@
 serializer（跨 Announcement 與題庫內容都會用到，見 quizbank.py 的
 QuizVocabItemSerializer 等——放在這裡是因為 Announcement 是最早、最典型
 的送審流程使用者，不是這兩個 serializer 只服務 Announcement）。"""
+from collections.abc import Mapping
+
 from config.tribes import TRIBE_IDS
 
 from rest_framework import serializers
@@ -163,6 +165,16 @@ class HomepageConfigSerializer(serializers.ModelSerializer):
     def validate_marquee_items(self, value):
         # 模型欄位的 validator 已檢查型別與長度；這裡負責儲存前正規化：每項去前後空白。
         return normalize_marquee_items(value)
+
+    def to_internal_value(self, data):
+        # 關聯欄位在 DRF 裡會把 1.5 這類值交給資料庫層轉成整數（int(1.5)=1），於是「1.5」被當成
+        # 影片 1 啟用，且結果取決於資料庫剛好有沒有 id=1 的那筆。ID 只收整數（不含布林）或 null，其他一律 400。
+        if isinstance(data, Mapping) and data.get('active_promo_video') is not None:
+            video_id = data['active_promo_video']
+            # 範圍限制：超過資料庫整數欄位上限的值（如 10**30）在某些資料庫會變成 500，不該走到查詢那一步。
+            if isinstance(video_id, bool) or not isinstance(video_id, int) or not 1 <= video_id <= 2**31 - 1:
+                raise serializers.ValidationError({'active_promo_video': ['影片 ID 必須是正整數']})
+        return super().to_internal_value(data)
 
     def validate_active_promo_video(self, value):
         # 沒有影片檔的紀錄不能啟用，否則公開首頁會拿到一個播不了的影片（可為空 = 停用）。

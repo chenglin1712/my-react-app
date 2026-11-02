@@ -19,6 +19,8 @@ cp "$ROOT/deploy.sh" "$SB/repo/deploy.sh"
 cp "$ROOT/deploy/backup.sh" "$ROOT/deploy/env.sh" "$SB/repo/deploy/"
 for f in package.json package-lock.json vite.config.js index.html firebase.js jsconfig.json; do echo "// $f" > "$SB/repo/$f"; done
 mkdir -p "$SB/repo/frontend" "$SB/repo/public"; echo "// app" > "$SB/repo/frontend/main.jsx"; echo "{}" > "$SB/repo/public/sw.js"
+# deploy.sh 建置前端時只取 backend/config/tribes.json（族語資料唯一來源），其他後端檔案不該進建置目錄。
+mkdir -p "$SB/repo/backend/config"; echo "{}" > "$SB/repo/backend/config/tribes.json"; echo "SECRET=1" > "$SB/repo/backend/settings_secret.py"; echo "SECRET=1" > "$SB/repo/backend/config/secret.json"
 
 # ── 假的外部指令 ─────────────────────────────────────────────────
 cat > "$SB/bin/docker" <<'EOF'
@@ -41,7 +43,7 @@ if [ "$1" = "run" ]; then
   mount=""; prev=""
   for a in "$@"; do [ "$prev" = "-v" ] && mount="${a%%:*}"; prev="$a"; done
   echo "build-mount $mount" >> "$SB_LOG"
-  ( cd "$mount" && ls -A | sed 's/^/build-file /' >> "$SB_LOG"; [ -f .env.production ] && sed 's/^/build-env /' .env.production >> "$SB_LOG" )
+  ( cd "$mount" && ls -A | sed 's/^/build-file /' >> "$SB_LOG"; if [ -d backend ]; then find backend ! -type d | sort | sed 's/^/build-backend-file /' >> "$SB_LOG"; fi; [ -f .env.production ] && sed 's/^/build-env /' .env.production >> "$SB_LOG" )
   [ "${FAIL_BUILD:-0}" = "1" ] && exit 1
   mkdir -p "$mount/dist" && echo new > "$mount/dist/index.html"
 fi
@@ -246,7 +248,7 @@ check "tag 的 commit 不是目前版本的後代（降級／別的分支）：�
 echo "deploy.sh：前端建置不接觸機密（稽核 SUP-3）"
 good_env; printf 'VITE_API_URL=https://api.example\nSECRET_TOKEN=do-not-leak\nDJANGO_SECRET_KEY=x\n  VITE_INDENTED=no\n' >> "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
 check "建置目錄不含 .env、serviceAccountKey.json、後端程式" \
-  "$([ $rc = 0 ] && ! log_has 'build-file .env$' && ! log_has 'build-file serviceAccountKey.json' && ! log_has 'build-file backend' && ! log_has 'build-file logs' && log_has 'build-file package.json' && log_has 'build-file frontend'; echo $?)"
+  "$([ $rc = 0 ] && ! log_has 'build-file .env$' && ! log_has 'build-file serviceAccountKey.json' && log_has 'build-backend-file backend/config/tribes.json$' && [ "$(grep -c 'build-backend-file' "$SB/log")" = 1 ] && ! log_has 'build-file logs' && log_has 'build-file package.json' && log_has 'build-file frontend'; echo $?)"
 check "只有 VITE_ 開頭的變數被帶進建置（當作 .env.production）" \
   "$(log_has 'build-env VITE_API_URL=https://api.example' && ! log_has 'build-env SECRET_TOKEN' && ! log_has 'build-env DJANGO_SECRET_KEY' && ! log_has 'build-env .*INDENTED'; echo $?)"
 check "不再把整個專案目錄掛進建置容器" \

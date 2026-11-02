@@ -257,7 +257,10 @@ class HomepageConfigPromoVideoAdminTest(MediaRootMixin, TestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_malformed_active_video_values_are_400_not_500(self):
-        for value in (True, "abc", [1], {"id": 1}, 1.5, -1):
+        # 浮點數與數字字串用「真的存在的影片 id」測：不能靠資料庫剛好沒有那筆才回 400
+        # （全新資料庫的第一筆 id 是 1，1.5 被截成 1 就會誤啟用）。
+        existing = self.with_file.pk
+        for value in (True, "abc", [1], {"id": 1}, 1.5, existing + 0.5, float(existing), str(existing), -1, 0, 10**30):
             with self.subTest(value=value):
                 with _as_role(OWNER) as headers:
                     response = _patch_json(self.client, ADMIN_URL, headers, {"active_promo_video": value})

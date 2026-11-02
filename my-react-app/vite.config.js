@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import process from 'node:process'
 
@@ -8,6 +9,26 @@ import tailwindcss from '@tailwindcss/vite'
 // index.html 的防閃白小腳本用 %VITE_ENABLE_DARK_THEME% 取得深色功能旗標（S5-3）。
 // 沒設定時 Vite 會在每次建置印出「variable is not defined」警告，先補成空字串（不是 "true" 就等於關）。
 process.env.VITE_ENABLE_DARK_THEME ??= ''
+
+// 測試用的環境變數：取自 .env.example（API 路徑），Firebase／Cloudinary 這類要填真實值的欄位用假值。
+// 不靠開發機的 .env：CI 與乾淨的 clone 沒有 .env，API 網址會是 undefined、Firebase 初始化失敗（auth 為 undefined）、
+// Cloudinary 上傳直接報錯，同一批測試在本機通過、在 CI 卻失敗。固定成同一組值，結果就不隨機器而異。
+function testEnv() {
+  const values = {}
+  const example = readFileSync(fileURLToPath(new URL('./.env.example', import.meta.url)), 'utf8')
+  for (const line of example.split(/\r?\n/)) {
+    const match = line.match(/^(VITE_[A-Z0-9_]+)=(.*)$/)
+    if (match && match[2].trim()) values[match[1]] = match[2].trim()
+  }
+  for (const key of [
+    'VITE_FIREBASE_API_KEY', 'VITE_FIREBASE_AUTH_DOMAIN', 'VITE_FIREBASE_DATABASE_URL', 'VITE_FIREBASE_PROJECT_ID',
+    'VITE_FIREBASE_STORAGE_BUCKET', 'VITE_FIREBASE_MESSAGING_SENDER_ID', 'VITE_FIREBASE_APP_ID',
+    'VITE_FIREBASE_MEASUREMENT_ID', 'VITE_CLOUDINARY_CLOUD_NAME', 'VITE_CLOUDINARY_UPLOAD_PRESET',
+  ]) {
+    values[key] ??= `test-${key.toLowerCase()}`
+  }
+  return values
+}
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -48,6 +69,8 @@ export default defineConfig({
   // dist/index.html 的 modulepreload 清單沒有跟著變長（bundlePreload.test.js 會檢查）。
   test: {
     environment: 'jsdom',
+    // 只在 vitest 執行時讀 .env.example：vite build（含 Docker 建置，不一定帶這個檔）不該因它失敗。
+    ...(process.env.VITEST ? { env: testEnv() } : {}),
     setupFiles: ['./vitest.setup.js'],
     globals: true,
     css: true,
