@@ -1,4 +1,4 @@
-import DOMPurify from "dompurify";
+import { sanitizeNoteHtml } from "./sanitizeNoteHtml";
 
 /**
  * Firestore 的 sharedNotes 建立規則要求 preview.size() <= 5000（字元數）。原本
@@ -55,5 +55,5 @@ export function buildPreview(html) {
     withoutImages.length > PREVIEW_SOURCE_TRUNCATION_LENGTH
       ? withoutImages.slice(0, PREVIEW_SOURCE_TRUNCATION_LENGTH)
       : withoutImages;
-  return DOMPurify.sanitize(truncated || "<p></p>");
+  return sanitizeNoteHtml(truncated || "<p></p>");
 }

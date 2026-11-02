@@ -1,4 +1,4 @@
-import DOMPurify from 'dompurify';
+import { sanitizeNoteHtml } from '@utils/sanitizeNoteHtml';
 
 const escapeHtml = (text) => String(text)
   .replace(/&/g, '&amp;')
@@ -17,7 +17,7 @@ export function safeFileName(title) {
 
 export function buildNoteHtml(note) {
   const title = note?.title?.trim() || '未命名筆記';
-  const body = DOMPurify.sanitize(note?.content || '');
+  const body = sanitizeNoteHtml(note?.content || '');
   return `<!doctype html>\n<html lang="zh-Hant">\n<head>\n<meta charset="utf-8">\n<title>${escapeHtml(title)}</title>\n</head>\n<body>\n<h1>${escapeHtml(title)}</h1>\n${body}\n</body>\n</html>\n`;
 }
 

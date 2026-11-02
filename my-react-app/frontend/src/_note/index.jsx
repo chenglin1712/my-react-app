@@ -8,7 +8,7 @@ import { shareNote } from "../userServives/noteService";
 import "../../static/css/_note/notestyle.css";
 import "../../static/css/_note/toolbar.css";
 import "../../static/css/_note/buttons.css";
-import DOMPurify from "dompurify";
+import { sanitizeNoteHtml } from "@utils/sanitizeNoteHtml";
 import ErrorBoundary from "../errorBoundary";
 import TabSwitch from "../../components/ui/TabSwitch";
 import { confirmAction } from "@components/ui/ConfirmDialog";
@@ -140,7 +140,7 @@ function NotePage() {
 
       const sanitizedPages = pagesToShare.map(p => ({
         ...p,
-        content: DOMPurify.sanitize(p.content || ""),
+        content: sanitizeNoteHtml(p.content || ""),
       }));
 
       const preview = buildPreview(pagesToShare[0]?.content);

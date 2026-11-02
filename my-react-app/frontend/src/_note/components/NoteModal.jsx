@@ -1,4 +1,4 @@
-import DOMPurify from "dompurify";
+import { sanitizeNoteHtml } from "@utils/sanitizeNoteHtml";
 import { useEffect, useRef, useState } from "react";
 import { useFocusTrap } from "@hooks/useFocusTrap";
 import { useOnlineStatus } from "@hooks/useOnlineStatus";
@@ -107,8 +107,9 @@ export default function NoteModal({ note, canLike, iLike, canDelete, onToggleLik
         )}
 
         {pages.map((pg, i) => {
-          // 空白與否要看消毒之後實際會顯示的內容：被 DOMPurify 整段濾掉的標籤不能算有內容
-          const safeHtml = DOMPurify.sanitize(typeof pg.content === "string" ? pg.content : "");
+          // 空白與否要看消毒之後實際會顯示的內容：被消毒器整段濾掉的標籤不能算有內容。
+          // 分享筆記是別人寫的，圖片只收 Cloudinary 與內嵌圖，擋掉外部追蹤圖（稽核 FE-1）
+          const safeHtml = sanitizeNoteHtml(typeof pg.content === "string" ? pg.content : "", { strictImages: true });
           return (
             <div key={i} className="ns-modal-page">
               <div className="ns-page-label">第 {i + 1} 頁</div>

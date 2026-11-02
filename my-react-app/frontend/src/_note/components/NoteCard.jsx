@@ -1,5 +1,5 @@
 import { Heart, User } from "lucide-react";
-import DOMPurify from "dompurify";
+import { sanitizeNoteHtml } from "@utils/sanitizeNoteHtml";
 import { timeAgo } from "../timeAgo";
 
 /**
@@ -33,7 +33,7 @@ export default function NoteCard({ note, isMyTab, isMine, iLike, onOpen, onToggl
           <div
             className="ns-preview"
             dangerouslySetInnerHTML={{
-              __html: DOMPurify.sanitize(note.preview || "<p>內容</p>"),
+              __html: sanitizeNoteHtml(note.preview || "<p>內容</p>", { strictImages: true }),
             }}
           />
         </div>

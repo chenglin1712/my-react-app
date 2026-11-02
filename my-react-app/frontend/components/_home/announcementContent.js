@@ -12,11 +12,23 @@ export const ANNOUNCEMENT_CATEGORY_LABELS = { announcement: "公告", activity: 
 const PUBLISH_DATE_FORMATTER = new Intl.DateTimeFormat("zh-TW", { dateStyle: "medium" });
 const formatPublishDate = (publishAt) => (publishAt ? PUBLISH_DATE_FORMATTER.format(new Date(publishAt)) : "");
 
+// 封面圖只收 https：後端已檢查，這裡是顯示前的第二道（稽核 FE-3），資料庫裡若有舊的或被竄改的
+// javascript:、data:、http: 網址就不顯示。連結不在這裡過濾，由 isExternalUrl／ExternalLink 把關。
+const safeCoverImage = (url) => {
+    if (typeof url !== "string" || url.includes("\\")) return null;
+    try {
+        const parsed = new URL(url);
+        return parsed.protocol === "https:" && parsed.hostname && !parsed.username && !parsed.password ? url : null;
+    } catch {
+        return null;
+    }
+};
+
 export const mapAnnouncementToNewsItem = (item) => ({
     id: item.id,
     title: item.title,
     detail: item.link_url || "",
-    image: item.cover_image_url || null,
+    image: safeCoverImage(item.cover_image_url),
     start_date: item.display_date_text || formatPublishDate(item.publish_at),
     end_date: null,
     // 三層退回都落空時（source_tag、分類標籤、category 本身皆缺）統一退回「最新消息」

@@ -5,20 +5,11 @@
   <meta charset="UTF-8" />
   <!-- 防閃白：在任何樣式表之前，同步讀取儲存的主題偏好並設定 <html data-theme>（見 DESIGN.md「深淺色政策」）。
        規則與 frontend/src/theme/themeStore.js 相同：只認 light | dark | system，其他或讀取失敗一律淺色；
-       公開深色切換的功能旗標（VITE_ENABLE_DARK_THEME）沒開時一律淺色。目前 repo 沒有 CSP；
-       日後若加 CSP，改用 nonce、雜湊或外部小檔，不開 unsafe-inline。 -->
-  <script>
-    (function () {
-      var theme = "light";
-      try {
-        if ("%VITE_ENABLE_DARK_THEME%" === "true") {
-          var saved = window.localStorage.getItem("yy-theme");
-          if (saved === "dark" || saved === "system") theme = saved;
-        }
-      } catch (e) { /* 讀不到儲存空間就當淺色 */ }
-      document.documentElement.setAttribute("data-theme", theme);
-    })();
-  </script>
+       公開深色切換的功能旗標（VITE_ENABLE_DARK_THEME）沒開時一律淺色。
+       腳本在 public/theme-init.js（外部小檔，CSP 的 script-src 不必開 unsafe-inline；稽核 FE-2），
+       旗標用 data-dark-enabled 帶進去。這裡不可再放內嵌 <script> 或 onload 之類的事件屬性
+       （themeMenuLook.test.js 會檢查）。 -->
+  <script src="/theme-init.js" data-dark-enabled="%VITE_ENABLE_DARK_THEME%"></script>
   <link rel="icon" type="image/svg+xml" href="/languages.svg" />
   <!-- PWA：可安裝到主畫面。manifest 與圖示在 public/，service worker 見 public/sw.js -->
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -48,7 +39,8 @@
        Google 依 unicode-range 切片，只有頁面用到的字元才會下載對應切片。
        用可變字型區間（400..900）而不是逐一列出字重：CSS 從約 748KB 降到約 257KB，
        也讓專案用到的 650、850 字重真的畫得出來。證據與已知缺口見 static/css/fontStack.test.js。 -->
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400..900&family=Noto+Serif+TC:wght@500..900&family=Noto+Sans:wght@400..900&family=Noto+Serif:wght@500..900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400..900&family=Noto+Serif+TC:wght@500..900&family=Noto+Sans:wght@400..900&family=Noto+Serif:wght@500..900&display=swap" rel="stylesheet" media="print" data-async-font>
+  <script src="/font-async.js" defer></script>
   <noscript><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400..900&family=Noto+Serif+TC:wght@500..900&family=Noto+Sans:wght@400..900&family=Noto+Serif:wght@500..900&display=swap" rel="stylesheet"></noscript>
   <!-- 開頁載入殼：JS 還沒下載完之前整頁是空白（慢速網路實測約 3.5 秒全白）。
        這段 CSS 與標記全部內嵌，不等任何外部檔案；React 的 createRoot().render()

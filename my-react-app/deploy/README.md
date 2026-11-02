@@ -118,7 +118,7 @@ dropdb yuanyu_restore_test
    `sudo mkdir -p /etc/nginx/snippets && sudo cp deploy/nginx-security-headers.conf /etc/nginx/snippets/yuanyu-security-headers.conf`
 2. 速率限制：`limit_req_zone` 只能放 http 層，`nginx.conf` 放在 `conf.d/` 時最上面那幾行就在 http 層；若放在 `sites-available/` 也是被 include 進 http，同樣可用。數字刻意寬鬆（一般 30 r/s、昂貴端點 5 r/s、每 IP 100 條連線），因為學校、公司可能共用一個對外 IP。上線後看 `error.log` 裡的 `limiting requests`，再調整。
 3. `X-Forwarded-For` 現在由 nginx 直接設成連線 IP，不再保留客戶端帶來的值。日後前面再加 CDN／負載平衡器時，要用 nginx 的 `real_ip` 模組只信任它們的網段，並把它們的位址加進後端的 `TRUSTED_PROXY_IPS`。
-4. **CSP 目前只是 Report-Only**（不阻擋）。在瀏覽器 Console 看過常用頁面沒有 `[Report Only] Refused to ...` 之後，才改成正式執行；改之前要先把 `index.html` 的內嵌防閃白腳本和字型 `<link>` 的 `onload` 處理掉，詳見 `nginx-security-headers.conf` 的註解。
+4. **CSP 目前只是 Report-Only**（不阻擋）。在瀏覽器 Console 看過常用頁面沒有 `[Report Only] Refused to ...` 之後，才改成正式執行；`index.html` 的內嵌防閃白腳本和字型 `<link>` 的 `onload` 已改成外部檔（`public/theme-init.js`、`public/font-async.js`），不再阻擋強制執行；升級步驟與回退方式見 `nginx-security-headers.conf` 的註解。
 5. 我沒有在真實 nginx 上驗證過這些設定（開發機沒有 nginx）。部署前務必 `nginx -t`，並用瀏覽器與 `curl -I https://你的網域/` 確認標頭。
 
 ### 受信任的 HTTPS 憑證（網域或單一 IP）

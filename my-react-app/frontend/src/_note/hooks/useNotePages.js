@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, useEffect } from "react";
-import DOMPurify from "dompurify";
+import { sanitizeNoteHtml } from "@utils/sanitizeNoteHtml";
 import { useEditor } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
 import { TextStyle } from "@tiptap/extension-text-style";
@@ -188,8 +188,8 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
     // 呼叫端才能無條件接著使用回傳值。
     if (!editor) return notes;
 
-    const sanitized = DOMPurify.sanitize(editor.getHTML());
-    const stamp = cloudSyncRef.current && touchedRef.current;
+    const sanitized = sanitizeNoteHtml(editor.getHTML());
+    const stamp =cloudSyncRef.current && touchedRef.current;
     const updatedNotes = notes.map((note, index) => (
       index === currentPage
         ? { ...note, content: sanitized, ...(stamp ? { editedAt: Date.now() } : {}) }
@@ -209,7 +209,7 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
     if (!editor || !cloudSyncRef.current || !touchedRef.current) return prev;
     const index = currentPageRef.current;
     if (!prev[index]) return prev;
-    const sanitized = DOMPurify.sanitize(editor.getHTML());
+    const sanitized = sanitizeNoteHtml(editor.getHTML());
     touchedRef.current = false;
     const updated = prev.map((note, i) => (
       i === index ? { ...note, content: sanitized, editedAt: Date.now() } : note

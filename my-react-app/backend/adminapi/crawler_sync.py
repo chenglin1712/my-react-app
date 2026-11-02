@@ -9,12 +9,14 @@ import hashlib
 import logging
 from datetime import datetime, timedelta
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 
 from crawler.views import get_news_data
 
 from .models import Announcement, AnnouncementSyncStatus
+from .validators import validate_internal_or_https_link
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +103,26 @@ def _truncate(value, max_length):
     return value
 
 
+_URL_MAX_LENGTH = 500
+
+
+def _safe_https_url(value):
+    """爬蟲回傳的網址最終會變成公開首頁的 <a href>／<img src>，上游若被入侵就能植入
+    javascript:、data: 或內部路徑（稽核 FE-3）。這裡是寫入資料庫前的最後一道檢查，
+    不依賴 crawler 端的 _safe_external_url：只收 https 開頭、有主機、不含帳密或控制字元的網址。
+    超過欄位長度的網址整個丟掉（不截斷：截斷後會變成另一個網址），回傳空字串。"""
+    if not isinstance(value, str) or len(value) > _URL_MAX_LENGTH or not value.startswith("https://"):
+        return ""
+    # 反斜線：瀏覽器（WHATWG）與 Python 的 urlsplit 對它的解讀不同，爬回來的網址不會有，直接拒絕
+    if "\\" in value:
+        return ""
+    try:
+        validate_internal_or_https_link(value)
+    except DjangoValidationError:
+        return ""
+    return value
+
+
 def _format_display_date(start_raw, end_raw):
     """把爬蟲原始的起訖日期字串轉成一行純顯示文字。tacp 給的是機讀日期，
     能解析就統一格式化成 YYYY-MM-DD；族語認證消息給的是網頁上的原始文字
@@ -148,8 +170,8 @@ def build_announcement_defaults(item):
         "title": _truncate(item.get("title") or "", 100),
         "body": "",
         "category": category,
-        "cover_image_url": _truncate(item.get("image") or "", 500),
-        "link_url": _truncate(item.get("detail") or "", 500),
+        "cover_image_url": _safe_https_url(item.get("image")),
+        "link_url": _safe_https_url(item.get("detail")),
         "display_date_text": _format_display_date(item.get("start_date"), item.get("end_date")),
         "source_tag": _truncate(item.get("tag") or "", 50),
         "publish_at": now,

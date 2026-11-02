@@ -8,7 +8,7 @@ from rest_framework import serializers
 
 from ..models import Announcement, ExamScheduleOverride, FeaturedTopic, HomepageConfig, ContactPage, PrivacyPolicy, PromoVideo
 from ..promo_media import public_media_url
-from ..validators import normalize_marquee_items
+from ..validators import normalize_marquee_items, validate_cloudinary_image_url
 
 
 class AnnouncementSerializer(serializers.ModelSerializer):
@@ -193,10 +193,11 @@ class HomepageConfigSerializer(serializers.ModelSerializer):
         raise serializers.ValidationError('連結必須是內部路徑（以 / 開頭）或 https 網址')
 
     def validate_hero_image_url(self, value):
-        # 公開首頁會直接載入這張圖；http 圖片在 https 網頁中會被瀏覽器擋下（混合內容），
-        # 也不接受 ftp 等其他 scheme（URLField 預設允許 ftp、ftps）。
-        if value and not value.startswith('https://'):
-            raise serializers.ValidationError('圖片網址必須是 https 開頭')
+        # 公開首頁會直接載入這張圖，每位訪客的瀏覽器都會連過去。只收 Cloudinary（後台上傳元件
+        # 回傳的就是這種網址），與專題圖片同一規則（稽核 FE-3）：任意 https 主機會讓第三方看到
+        # 訪客 IP，也讓 CSP 的 img-src 無法列白名單。http、ftp 等其他 scheme 也一併被擋下。
+        # 舊資料若存的是其他主機的圖片，下次儲存這個欄位時需要重新上傳。
+        validate_cloudinary_image_url(value)
         return value
 
     def validate_news_display_count(self, value):

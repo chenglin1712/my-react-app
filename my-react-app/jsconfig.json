@@ -10,7 +10,7 @@
     "checkJs": false,
     "jsx": "react-jsx",
     "module": "ESNext",
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "target": "ESNext"
   },
   "include": ["frontend/**/*.js", "frontend/**/*.jsx"],

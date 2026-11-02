@@ -102,9 +102,9 @@ describe("切換時不做整頁顏色過渡", () => {
   });
 });
 
-describe("index.html 防閃白小腳本", () => {
-  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
-  const code = scripts[0]?.[1] ?? "";
+describe("防閃白小腳本（public/theme-init.js，稽核 FE-2 改成外部檔）", () => {
+  const code = read("..", "..", "..", "public", "theme-init.js");
+  const tag = html.match(/<script\s+src="\/theme-init\.js"[^>]*><\/script>/)?.[0] ?? "";
 
   const run = ({ flag, stored, throws = false }) => {
     const attrs = {};
@@ -116,14 +116,18 @@ describe("index.html 防閃白小腳本", () => {
         },
       },
     };
-    const fakeDocument = { documentElement: { setAttribute: (k, v) => { attrs[k] = v; } } };
-    new Function("window", "document", code.replace("%VITE_ENABLE_DARK_THEME%", flag))(fakeWindow, fakeDocument);
+    const fakeDocument = {
+      documentElement: { setAttribute: (k, v) => { attrs[k] = v; } },
+      currentScript: { getAttribute: (name) => (name === "data-dark-enabled" ? flag : null) },
+    };
+    new Function("window", "document", code)(fakeWindow, fakeDocument);
     return attrs["data-theme"];
   };
 
-  it("放在 <head> 裡、任何樣式表與字型連結之前", () => {
-    expect(scripts.length).toBeGreaterThan(0);
-    const at = html.indexOf("<script>");
+  it("放在 <head> 裡、任何樣式表與字型連結之前，且旗標由 data-dark-enabled 帶入", () => {
+    expect(tag).not.toBe("");
+    expect(tag).toContain('data-dark-enabled="%VITE_ENABLE_DARK_THEME%"');
+    const at = html.indexOf(tag);
     expect(at).toBeGreaterThan(html.indexOf("<head>"));
     expect(at).toBeLessThan(html.indexOf("</head>"));
     const firstStyle = Math.min(...["<style", 'rel="stylesheet"'].map((s) => html.indexOf(s)).filter((i) => i >= 0));
@@ -131,8 +135,8 @@ describe("index.html 防閃白小腳本", () => {
   });
 
   it("旗標沒開（沒設、字面未取代、其他值）一律淺色，儲存值被忽略", () => {
-    ["%VITE_ENABLE_DARK_THEME%", "", "false", "1"].forEach((flag) => {
-      expect(run({ flag, stored: "dark" }), flag).toBe("light");
+    ["%VITE_ENABLE_DARK_THEME%", "", "false", "1", null].forEach((flag) => {
+      expect(run({ flag, stored: "dark" }), String(flag)).toBe("light");
     });
   });
 
@@ -150,5 +154,31 @@ describe("index.html 防閃白小腳本", () => {
   it("儲存鍵與 themeStore 一致", () => {
     expect(code).toContain('"yy-theme"');
     expect(readFileSync(join(ROOT, "..", "..", "src", "theme", "themeStore.js"), "utf8")).toContain('"yy-theme"');
+  });
+});
+
+describe("index.html 不含內嵌腳本與事件屬性（CSP script-src 不開 unsafe-inline，稽核 FE-2）", () => {
+  const withoutComments = html.replace(/<!--[\s\S]*?-->/g, "");
+
+  it("每個 <script> 都有 src，沒有內嵌程式碼", () => {
+    const scripts = [...withoutComments.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/g)];
+    expect(scripts.length).toBeGreaterThan(0);
+    scripts.forEach(([, attrs = "", body]) => {
+      expect(attrs).toMatch(/\ssrc="/);
+      expect(body.trim()).toBe("");
+    });
+  });
+
+  it("沒有 onload、onclick 之類的事件處理屬性，也沒有 javascript: 網址", () => {
+    expect(withoutComments).not.toMatch(/\son[a-z]+\s*=/i);
+    expect(withoutComments).not.toMatch(/javascript:/i);
+  });
+
+  it("字型連結改由 public/font-async.js 切換 media", () => {
+    expect(withoutComments).toMatch(/<link[^>]*media="print"[^>]*data-async-font/);
+    expect(withoutComments).toContain('<script src="/font-async.js" defer></script>');
+    const asyncJs = read("..", "..", "..", "public", "font-async.js");
+    expect(asyncJs).toContain("data-async-font");
+    expect(asyncJs).toContain('link.media = "all"');
   });
 });

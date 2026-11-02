@@ -815,8 +815,18 @@ class HomepageConfigAdminTest(TestCase):
             )
         self.assertEqual(response.status_code, 400)
 
-    def test_hero_image_requires_https(self):
-        for bad in ("http://example.com/a.png", "ftp://example.com/a.png"):
+    def test_hero_image_only_accepts_cloudinary_https(self):
+        # 稽核 FE-3：與專題圖片同一規則，只收 https://res.cloudinary.com
+        bad_values = (
+            "http://res.cloudinary.com/demo/a.png",
+            "ftp://res.cloudinary.com/demo/a.png",
+            "https://example.com/a.png",
+            "https://res.cloudinary.com.evil.example/demo/a.png",
+            "https://res.cloudinary.com@evil.example/a.png",
+            "https://res.cloudinary.com:8443/demo/a.png",
+            "javascript:alert(1)",
+        )
+        for bad in bad_values:
             with _as_role(OWNER) as headers:
                 response = _patch_json(
                     self.client, '/adminapi/homepage-config/', headers,
@@ -826,9 +836,15 @@ class HomepageConfigAdminTest(TestCase):
         with _as_role(OWNER) as headers:
             response = _patch_json(
                 self.client, '/adminapi/homepage-config/', headers,
-                {"hero_image_url": "https://example.com/a.png"},
+                {"hero_image_url": "https://res.cloudinary.com/demo/image/upload/a.png"},
             )
         self.assertEqual(response.status_code, 200)
+        with _as_role(OWNER) as headers:
+            response = _patch_json(
+                self.client, '/adminapi/homepage-config/', headers,
+                {"hero_image_url": ""},
+            )
+        self.assertEqual(response.status_code, 200, "清空圖片必須仍然允許")
 
     def test_news_display_count_out_of_range_rejected(self):
         with _as_role(OWNER) as headers:
