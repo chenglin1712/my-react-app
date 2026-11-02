@@ -22,6 +22,8 @@ import os
 
 import requests
 
+from config.internal_api import base_url_problem, secret_problem
+
 logger = logging.getLogger(__name__)
 
 _DEFAULT_BASE_URL = "http://127.0.0.1:8001"
@@ -40,14 +42,23 @@ def invalidate_dictionary_cache(scopes, tribes=None):
         logger.warning("INTERNAL_API_SECRET 未設定，略過辭典快取失效通知（%s／%s）", scopes, tribes)
         return
 
-    base_url = os.getenv("FASTAPI_INTERNAL_BASE_URL", _DEFAULT_BASE_URL)
+    # 稽核 DEP-7：密鑰太短、或位址是非本機的 http（密鑰會明文傳輸）就不送
+    base_url = os.getenv("FASTAPI_INTERNAL_BASE_URL") or _DEFAULT_BASE_URL
+    problem = secret_problem(secret) or base_url_problem(base_url)
+    if problem:
+        logger.error("不通知 FastAPI 清除辭典快取：%s", problem)
+        return
     try:
         resp = requests.post(
             f"{base_url}/internal/cache/invalidate",
             json={"scopes": list(scopes), "tribes": tribes},
             headers={"X-Internal-Secret": secret},
             timeout=_TIMEOUT_SECONDS,
+            # 稽核 DEP-7：不跟隨重新導向，密鑰標頭不會被帶去別的位址
+            allow_redirects=False,
         )
         resp.raise_for_status()
+        if resp.is_redirect is True:
+            raise RuntimeError(f"FastAPI 回應重新導向（{resp.status_code}），未跟隨")
     except Exception:
         logger.exception("辭典快取失效通知失敗（辭典寫入已完成，不影響本次操作結果，僅公開查詢頁面可能短暫沿用舊資料）")

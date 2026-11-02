@@ -7,6 +7,13 @@
 # 容器不用 root 執行：user 取自 APP_UID／APP_GID（deploy.sh 設成執行部署的使用者），
 # 讓掛進來的 ./logs、./media 與唯讀的 serviceAccountKey.json 都用同一個擁有者。
 # 直接用 docker compose 而不是 deploy.sh 時，要自己設：APP_UID=$(id -u) APP_GID=$(id -g) docker compose ...
+#
+# 容器加固（稽核 DEP-1）：network_mode: host 讓容器直接站在主機網路上，所以程式碼一旦被執行，能做的事要盡量少。
+# - cap_drop: [ALL]：不需要任何 Linux capability（兩個服務都綁 1024 以上的埠、以非 root 執行）。
+# - no-new-privileges：行程不能靠 setuid 之類的方式取得更多權限。
+# - read_only：根檔案系統唯讀；真正會寫入的位置用 tmpfs（記憶體，重啟清空）或掛進來的目錄（./logs、./media）。
+#   tmpfs 用 mode=1777，因為容器的 uid 由 APP_UID 決定（不固定）。
+#   若新版本多了需要寫入的路徑，會在健康檢查時失敗並自動回滾；補上對應的 tmpfs 即可。
 services:
   django:
     build:
@@ -21,6 +28,15 @@ services:
       # 後台上傳的首頁媒體（宣傳影片、封面、字幕）。必須掛持久化磁碟，否則容器重建檔案就消失
       MEDIA_ROOT: /app/media
     network_mode: host
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=256m
+      # collectstatic 的輸出（啟動時重新產生，WhiteNoise 從這裡提供靜態檔）
+      - /app/backend/staticfiles:mode=1777,size=128m
+      # 應用程式 log 預設寫在 backend/logs（沒設 LOG_DIR 時），與原本一樣隨容器重建清空；console 輸出另由 docker 保存
+      - /app/backend/logs:mode=1777,size=128m
     # --timeout 必須大於 LLM 最長等待（config/llm.py：約 55 秒），否則 gunicorn 會在 LLM
     # 逾時處理執行前就強制殺掉 worker；同時要小於 nginx 的 proxy_read_timeout（90 秒）。
     #
@@ -62,6 +78,13 @@ services:
       # 啟動時就載入發音比對模型，並讓 /ready 把它納入就緒條件（見 fastAPI/main.py）
       PRELOAD_PRONUNCIATION_MODEL: "true"
     network_mode: host
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs:
+      # 使用者上傳的錄音會在這裡暫存解碼
+      - /tmp:mode=1777,size=512m
+      - /app/backend/logs:mode=1777,size=128m
     command: sh -c "cd fastAPI && alembic upgrade head && cd .. && uvicorn fastAPI.main:app --host 127.0.0.1 --port 8001 --no-server-header --proxy-headers --forwarded-allow-ips=127.0.0.1"
     volumes:
       - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro

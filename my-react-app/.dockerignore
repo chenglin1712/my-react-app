@@ -36,9 +36,11 @@ backend/staticfiles/
 # 不放進 image：本地是否存在因人而異，打進 image 會讓建置結果不可重現；改由
 # docker-compose.yml bind mount 從本機掛進容器（見該檔案 fastapi service 的
 # volumes 說明）。-shm/-wal 是 SQLite WAL 模式的暫時性執行期檔案。
-*.db
-*.db-shm
-*.db-wal
+# 稽核 DEP-3：.dockerignore 的 `*.db` 只比對 build context 的根目錄，backend/dictionary_db/dictionary.db 原本因此被
+# COPY 進映像（內容是公開字典資料，不是機密，但違背上面「不放進 image」的意圖）。`**/` 才會比對任何深度。
+**/*.db
+**/*.db-shm
+**/*.db-wal
 
 # 環境變數與密鑰——不該出現在 image 裡的任何一層
 .env
@@ -48,8 +50,8 @@ serviceAccountKey.json
 imported_credentials_*.txt
 
 # Logs
-logs/
-*.log
+**/logs/
+**/*.log
 
 # 編輯器／系統雜項
 .vscode/*

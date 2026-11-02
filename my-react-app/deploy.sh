@@ -17,6 +17,7 @@
 #      SKIP_BACKUP=1     略過部署前備份（不建議）
 #      PROXY_BASE=...    反向代理對外位址，預設 https://127.0.0.1
 #      ALLOW_NO_REDIS=1  .env 沒有 REDIS_URL 也照常部署（限流計數會退回各 worker 的記憶體）
+#      ALLOW_NO_AI_BUDGET=1  .env 沒有設定 AI_MONTHLY_BUDGET_USD 也照常部署（AI 月預算保護不會運作）
 #
 # 請用一般使用者（不是 root）執行：容器會用這個使用者的 uid 跑，掛載的 logs／media 才不會有權限問題。
 # 第一次改成非 root 容器之前，logs／media 若還是 root 擁有，先 sudo chown -R "$USER:$USER" logs media。
@@ -83,6 +84,27 @@ preflight() {
   # 確定要這樣部署時用 ALLOW_NO_REDIS=1 明確放行。
   if [ -z "$(env_value REDIS_URL)" ] && ! is_true "${ALLOW_NO_REDIS:-}"; then
     echo "!! .env 沒有 REDIS_URL，限流計數會退回各 worker 的記憶體。請設定，或用 ALLOW_NO_REDIS=1 明確放行。部署中止。"; return 1
+  fi
+  # 稽核 DEP-7：內部 API 密鑰有設定的話至少要 32 字元（沒設定代表不啟用內部快取通知，不在這裡擋）。
+  internal_secret="$(env_value INTERNAL_API_SECRET)"
+  if [ -n "$internal_secret" ] && [ "${#internal_secret}" -lt 32 ]; then
+    echo "!! .env 的 INTERNAL_API_SECRET 太短（至少 32 字元），後端啟動會失敗。部署中止。"; return 1
+  fi
+  # 稽核 DEP-5：下面三項沒設定時程式不會報錯，而是悄悄退回開發設定或關閉保護，部署出去才發現就晚了。
+  # ALLOWED_ORIGINS／CSRF_TRUSTED_ORIGINS 沒設會退回本機來源（前端的跨來源請求與表單送出會全部失敗）。
+  if [ -z "$(env_value ALLOWED_ORIGINS)" ]; then
+    echo "!! .env 沒有 ALLOWED_ORIGINS，會退回本機開發來源，正式網站的跨來源請求會被擋。部署中止。"; return 1
+  fi
+  if [ -z "$(env_value CSRF_TRUSTED_ORIGINS)" ]; then
+    echo "!! .env 沒有 CSRF_TRUSTED_ORIGINS（需含 https://），會退回本機開發來源，正式網站的表單送出會被擋。部署中止。"; return 1
+  fi
+  # AI_MONTHLY_BUDGET_USD 沒設（或不是正數）時，AI 月預算保護完全不運作，費用沒有上限。
+  # 確定不要預算上限時用 ALLOW_NO_AI_BUDGET=1 明確放行。
+  ai_budget="$(env_value AI_MONTHLY_BUDGET_USD)"
+  if ! printf '%s' "$ai_budget" | grep -Eq '^[0-9]+(\.[0-9]+)?$' || ! awk -v v="$ai_budget" 'BEGIN { exit !(v + 0 > 0) }'; then
+    if ! is_true "${ALLOW_NO_AI_BUDGET:-}"; then
+      echo "!! .env 的 AI_MONTHLY_BUDGET_USD 沒設定或不是正數，AI 月預算保護不會運作。請設定，或用 ALLOW_NO_AI_BUDGET=1 明確放行。部署中止。"; return 1
+    fi
   fi
   # 等待健康檢查與回滾都依賴 `up --wait --wait-timeout`，太舊的 Docker Compose 不支援，
   # 部署到一半才失敗、連回滾也失敗最糟，所以先檢查。

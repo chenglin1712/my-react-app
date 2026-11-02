@@ -21,6 +21,7 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from config.internal_api import secret_problem
 from config.tribes import TRIBES, resolve_tribe_name
 from dictionary_db.connect import SessionLocal
 
@@ -59,6 +60,11 @@ def _check_internal_secret(x_internal_secret: str | None) -> None:
     secret = os.getenv("INTERNAL_API_SECRET")
     if not secret:
         raise HTTPException(status_code=503, detail="internal secret 未設定")
+    # 稽核 DEP-7：太短的密鑰等於沒有保護，同樣 fail-closed（不把原因細節回給呼叫端，寫進 log 即可）
+    problem = secret_problem(secret)
+    if problem:
+        logger.error("內部端點拒絕服務：%s", problem)
+        raise HTTPException(status_code=503, detail="internal secret 設定不合格")
     if not x_internal_secret or not hmac.compare_digest(x_internal_secret, secret):
         raise HTTPException(status_code=401, detail="unauthorized")
 

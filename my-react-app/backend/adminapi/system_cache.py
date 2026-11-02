@@ -11,6 +11,8 @@ import os
 import requests
 from django.core.cache import cache
 
+from config.internal_api import base_url_problem, secret_problem
+
 logger = logging.getLogger(__name__)
 
 _DEFAULT_FASTAPI_BASE_URL = "http://127.0.0.1:8001"
@@ -54,15 +56,25 @@ def clear_fastapi_caches():
     if not secret:
         return False, "INTERNAL_API_SECRET 未設定，無法通知 FastAPI 清除快取"
 
-    base_url = os.getenv("FASTAPI_INTERNAL_BASE_URL", _DEFAULT_FASTAPI_BASE_URL)
+    # 稽核 DEP-7：密鑰太短、或位址是非本機的 http（密鑰會明文傳輸）就不送
+    problem = secret_problem(secret)
+    base_url = os.getenv("FASTAPI_INTERNAL_BASE_URL") or _DEFAULT_FASTAPI_BASE_URL
+    problem = problem or base_url_problem(base_url)
+    if problem:
+        logger.error("不通知 FastAPI 清除快取：%s", problem)
+        return False, f"內部 API 設定不合格，未送出請求：{problem}"
     try:
         resp = requests.post(
             f"{base_url}/internal/cache/invalidate",
             json={"scopes": ["all"], "tribes": None},
             headers={"X-Internal-Secret": secret},
             timeout=_TIMEOUT_SECONDS,
+            # 稽核 DEP-7：不跟隨重新導向，密鑰標頭不會被帶去別的位址
+            allow_redirects=False,
         )
         resp.raise_for_status()
+        if resp.is_redirect is True:  # 不跟隨重新導向，但也不能把「被導去別處」當成清除成功
+            raise RuntimeError(f"FastAPI 回應重新導向（{resp.status_code}），未跟隨")
         return True, resp.json()
     except Exception as exc:
         logger.exception("清除 FastAPI 快取失敗")

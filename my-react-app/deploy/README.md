@@ -112,6 +112,18 @@ dropdb yuanyu_restore_test
 
 改完後先 `nginx -t` 檢查語法，再執行 `deploy.sh`，結尾的路由檢查會確認轉發正確。
 
+### 伺服器上的實際設定要自己核對（稽核 DEP-4）
+
+repo 裡的 `nginx.conf` 只是範本（網域、憑證路徑是佔位），CI 只驗語法；伺服器上實際跑的設定、憑證與防火牆都不在原始碼裡。
+每次改過 nginx 或換機器後，在伺服器上逐項確認：
+
+1. 實際載入的設定與 `nginx.conf`、`nginx-security-headers.conf` 一致，沒有殘留佔位：`sudo nginx -T | grep -nE 'example\.com|TODO'` 應該沒有輸出。
+2. 預設 server 有生效（用 IP 或錯誤的 Host 連線應該被直接關閉）：
+   `curl -sS -o /dev/null -w '%{http_code}
+' -H 'Host: attacker.example' http://<伺服器 IP>/` 應該失敗（連線被關閉，curl 顯示 `Empty reply from server`），
+   `curl -skI https://<伺服器 IP>/` 應該 TLS 握手失敗，不是回出本站內容。正式網域則要正常回應。
+3. GCP 防火牆規則只開 80 與 443（8000／8001 本來就只綁 127.0.0.1，`deploy.sh` 結尾也會用 `ss` 確認）。
+
 ### 安全標頭與速率限制（S-08、S-09）
 
 1. 先安裝標頭片段，`nginx.conf` 才 include 得到（少了這步 `nginx -t` 會失敗）：

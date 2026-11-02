@@ -58,7 +58,7 @@ def test_missing_secret_env_returns_503(client, monkeypatch):
 
 
 def test_missing_header_returns_401(client, monkeypatch):
-    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret")
+    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret-0123456789-0123456789-abcdef")
 
     resp = client.post(
         "/internal/cache/invalidate",
@@ -69,7 +69,7 @@ def test_missing_header_returns_401(client, monkeypatch):
 
 
 def test_wrong_secret_returns_401(client, monkeypatch):
-    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret")
+    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret-0123456789-0123456789-abcdef")
 
     resp = client.post(
         "/internal/cache/invalidate",
@@ -81,31 +81,31 @@ def test_wrong_secret_returns_401(client, monkeypatch):
 
 
 def test_unknown_scope_returns_400(client, monkeypatch):
-    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret")
+    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret-0123456789-0123456789-abcdef")
 
     resp = client.post(
         "/internal/cache/invalidate",
         json={"scopes": ["not_a_real_scope"], "tribes": ["tayal"]},
-        headers={"X-Internal-Secret": "correct-secret"},
+        headers={"X-Internal-Secret": "correct-secret-0123456789-0123456789-abcdef"},
     )
 
     assert resp.status_code == 400
 
 
 def test_unknown_tribe_returns_400(client, monkeypatch):
-    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret")
+    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret-0123456789-0123456789-abcdef")
 
     resp = client.post(
         "/internal/cache/invalidate",
         json={"scopes": ["words"], "tribes": ["not-a-real-tribe"]},
-        headers={"X-Internal-Secret": "correct-secret"},
+        headers={"X-Internal-Secret": "correct-secret-0123456789-0123456789-abcdef"},
     )
 
     assert resp.status_code == 400
 
 
 def test_correct_secret_invalidates_warmed_cache_key(client, monkeypatch):
-    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret")
+    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret-0123456789-0123456789-abcdef")
 
     # 先暖一個 key，確認 invalidate 之後這個 key 真的不見了（不是只回 200 沒有效果）。
     search._tribe_words_cache.get_or_compute("泰雅語", lambda: ["fake-word"])
@@ -128,7 +128,7 @@ def test_correct_secret_invalidates_warmed_cache_key(client, monkeypatch):
         resp = client.post(
             "/internal/cache/invalidate",
             json={"scopes": ["words"], "tribes": ["tayal"]},
-            headers={"X-Internal-Secret": "correct-secret"},
+            headers={"X-Internal-Secret": "correct-secret-0123456789-0123456789-abcdef"},
         )
 
     assert resp.status_code == 200
@@ -139,7 +139,7 @@ def test_correct_secret_invalidates_warmed_cache_key(client, monkeypatch):
 
 
 def test_scope_all_invalidates_every_cache(client, monkeypatch):
-    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret")
+    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret-0123456789-0123456789-abcdef")
 
     search._tribe_words_cache.get_or_compute("泰雅語", lambda: ["fake-word"])
     grammar._grammar_cache.get_or_compute("泰雅語", lambda: {"sections": []})
@@ -149,7 +149,7 @@ def test_scope_all_invalidates_every_cache(client, monkeypatch):
     resp = client.post(
         "/internal/cache/invalidate",
         json={"scopes": ["all"], "tribes": ["tayal"]},
-        headers={"X-Internal-Secret": "correct-secret"},
+        headers={"X-Internal-Secret": "correct-secret-0123456789-0123456789-abcdef"},
     )
 
     assert resp.status_code == 200
@@ -160,7 +160,7 @@ def test_scope_all_invalidates_every_cache(client, monkeypatch):
 
 
 def test_grammar_affixes_scope_only_clears_matching_tribe(client, monkeypatch):
-    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret")
+    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret-0123456789-0123456789-abcdef")
 
     grammar._grammar_affixes_cache.get_or_compute(("泰雅語", ""), lambda: {"affixes": []})
     grammar._grammar_affixes_cache.get_or_compute(("阿美語", ""), lambda: {"affixes": []})
@@ -168,7 +168,7 @@ def test_grammar_affixes_scope_only_clears_matching_tribe(client, monkeypatch):
     resp = client.post(
         "/internal/cache/invalidate",
         json={"scopes": ["grammar_affixes"], "tribes": ["tayal"]},
-        headers={"X-Internal-Secret": "correct-secret"},
+        headers={"X-Internal-Secret": "correct-secret-0123456789-0123456789-abcdef"},
     )
 
     assert resp.status_code == 200
@@ -178,7 +178,7 @@ def test_grammar_affixes_scope_only_clears_matching_tribe(client, monkeypatch):
 
 
 def test_omitted_tribes_targets_all_tribes(client, monkeypatch):
-    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret")
+    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret-0123456789-0123456789-abcdef")
 
     search._tribe_words_cache.get_or_compute("泰雅語", lambda: ["a"])
     search._tribe_words_cache.get_or_compute("阿美語", lambda: ["b"])
@@ -186,7 +186,7 @@ def test_omitted_tribes_targets_all_tribes(client, monkeypatch):
     resp = client.post(
         "/internal/cache/invalidate",
         json={"scopes": ["words"]},
-        headers={"X-Internal-Secret": "correct-secret"},
+        headers={"X-Internal-Secret": "correct-secret-0123456789-0123456789-abcdef"},
     )
 
     assert resp.status_code == 200
@@ -194,13 +194,13 @@ def test_omitted_tribes_targets_all_tribes(client, monkeypatch):
 
 
 def test_no_words_invalidated_skips_rewarm(client, monkeypatch):
-    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret")
+    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret-0123456789-0123456789-abcdef")
 
     with patch("threading.Thread") as mock_thread:
         resp = client.post(
             "/internal/cache/invalidate",
             json={"scopes": ["grammar"], "tribes": ["tayal"]},
-            headers={"X-Internal-Secret": "correct-secret"},
+            headers={"X-Internal-Secret": "correct-secret-0123456789-0123456789-abcdef"},
         )
 
     assert resp.status_code == 200
@@ -214,7 +214,7 @@ def test_words_scope_also_invalidates_the_morphology_analyzer_of_that_tribe_only
     from config.tribes import TRIBES
     from fastAPI.routes.translation import morph
 
-    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret")
+    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret-0123456789-0123456789-abcdef")
     tayal = next(t for t in TRIBES if t.slug == "tayal")
     amis = next(t for t in TRIBES if t.slug == "amis")
     morph._CACHE = type(morph._CACHE)()
@@ -233,7 +233,7 @@ def test_words_scope_also_invalidates_the_morphology_analyzer_of_that_tribe_only
         resp = client.post(
             "/internal/cache/invalidate",
             json={"scopes": ["words"], "tribes": ["tayal"]},
-            headers={"X-Internal-Secret": "correct-secret"},
+            headers={"X-Internal-Secret": "correct-secret-0123456789-0123456789-abcdef"},
         )
 
     assert resp.status_code == 200
@@ -246,7 +246,7 @@ def test_grammar_affixes_scope_also_invalidates_the_morphology_analyzer_of_that_
     from config.tribes import TRIBES
     from fastAPI.routes.translation import morph
 
-    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret")
+    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret-0123456789-0123456789-abcdef")
     tayal = next(t for t in TRIBES if t.slug == "tayal")
     amis = next(t for t in TRIBES if t.slug == "amis")
     morph._CACHE = type(morph._CACHE)()
@@ -256,7 +256,7 @@ def test_grammar_affixes_scope_also_invalidates_the_morphology_analyzer_of_that_
     resp = client.post(
         "/internal/cache/invalidate",
         json={"scopes": ["grammar_affixes"], "tribes": ["tayal"]},
-        headers={"X-Internal-Secret": "correct-secret"},
+        headers={"X-Internal-Secret": "correct-secret-0123456789-0123456789-abcdef"},
     )
 
     assert resp.status_code == 200
@@ -269,7 +269,7 @@ def test_words_and_affix_scopes_also_invalidate_the_quiz_distractor_kit_of_that_
     from config.tribes import TRIBES
     from fastAPI.routes.quiz import distractors
 
-    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret")
+    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret-0123456789-0123456789-abcdef")
     tayal = next(t for t in TRIBES if t.slug == "tayal")
     amis = next(t for t in TRIBES if t.slug == "amis")
 
@@ -288,8 +288,23 @@ def test_words_and_affix_scopes_also_invalidate_the_quiz_distractor_kit_of_that_
             resp = client.post(
                 "/internal/cache/invalidate",
                 json={"scopes": [scope], "tribes": ["tayal"]},
-                headers={"X-Internal-Secret": "correct-secret"},
+                headers={"X-Internal-Secret": "correct-secret-0123456789-0123456789-abcdef"},
             )
         assert resp.status_code == 200, scope
         assert tayal.id not in distractors._KITS and amis.id in distractors._KITS, scope
     distractors.invalidate()
+
+
+def test_secret_shorter_than_32_characters_is_refused_even_when_it_matches(client, monkeypatch):
+    # 稽核 DEP-7：太短的密鑰等於沒有保護，連「正確」的請求也 fail-closed，且不洩漏原因細節
+    monkeypatch.setenv("INTERNAL_API_SECRET", "short-secret")
+
+    resp = client.post(
+        "/internal/cache/invalidate",
+        json={"scopes": ["words"], "tribes": ["tayal"]},
+        headers={"X-Internal-Secret": "short-secret"},
+    )
+
+    assert resp.status_code == 503
+    assert "short-secret" not in resp.text
+    assert "太短" not in resp.text

@@ -105,7 +105,7 @@ chmod +x "$SB/bin/"*
 
 # ── 工具函式 ─────────────────────────────────────────────────────
 good_env() {
-  printf 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\nAUTH_DEV_BYPASS=False\nDATABASE_URL=postgresql://u:p@h/db\nREDIS_URL=redis://localhost:6379/0\n' > "$SB/repo/.env"
+  printf 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\nAUTH_DEV_BYPASS=False\nDATABASE_URL=postgresql://u:p@h/db\nREDIS_URL=redis://localhost:6379/0\nALLOWED_ORIGINS=https://app.example\nCSRF_TRUSTED_ORIGINS=https://app.example\nAI_MONTHLY_BUDGET_USD=50\n' > "$SB/repo/.env"
   echo '{}' > "$SB/repo/serviceAccountKey.json"
 }
 
@@ -282,21 +282,53 @@ env_case "export 前綴的 AUTH_DEV_BYPASS=True 仍能辨識並中止" 'DJANGO_S
 env_case "等號兩邊有空白的 DJANGO_DEBUG = true 仍能辨識並中止" 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG = true\nDATABASE_URL=postgresql://u:p@h/db\n' 'DJANGO_DEBUG'
 env_case "帶引號與行尾註解的 AUTH_DEV_BYPASS=\"True\" # 開發用 仍能辨識並中止" 'DJANGO_SECRET_KEY=x\nAUTH_DEV_BYPASS="True"  # 開發用\nDATABASE_URL=postgresql://u:p@h/db\n' 'AUTH_DEV_BYPASS'
 env_case "缺少 DATABASE_URL 中止" 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\n' 'DATABASE_URL'
-good_env; printf 'DJANGO_SECRET_KEY=x\n# DJANGO_DEBUG=True\nDJANGO_DEBUG=False\nDATABASE_URL=postgresql://u:p@h/db\nREDIS_URL=redis://localhost:6379/0\n' > "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+good_env; printf 'DJANGO_SECRET_KEY=x\n# DJANGO_DEBUG=True\nDJANGO_DEBUG=False\nDATABASE_URL=postgresql://u:p@h/db\nREDIS_URL=redis://localhost:6379/0\nALLOWED_ORIGINS=https://app.example\nCSRF_TRUSTED_ORIGINS=https://app.example\nAI_MONTHLY_BUDGET_USD=50\n' > "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
 check "被註解掉的 DJANGO_DEBUG=True 不算數，不會誤擋（部署成功）" "$([ $rc = 0 ]; echo $?)"
 
 env_case "缺少 REDIS_URL 中止（限流計數會退回各 worker 的記憶體）" 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\nDATABASE_URL=postgresql://u:p@h/db\n' 'REDIS_URL'
 env_case "REDIS_URL 只有空引號也算沒設定，中止" 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\nDATABASE_URL=postgresql://u:p@h/db\nREDIS_URL=""  # 沒設\n' 'REDIS_URL'
-good_env; printf 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\nDATABASE_URL=postgresql://u:p@h/db\n' > "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1 ALLOW_NO_REDIS=1; rc=$?
+good_env; printf 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\nDATABASE_URL=postgresql://u:p@h/db\nALLOWED_ORIGINS=https://app.example\nCSRF_TRUSTED_ORIGINS=https://app.example\nAI_MONTHLY_BUDGET_USD=50\n' > "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1 ALLOW_NO_REDIS=1; rc=$?
 check "ALLOW_NO_REDIS=1 明確放行：沒有 REDIS_URL 也能部署" "$([ $rc = 0 ]; echo $?)"
 
 # ── backup.sh ───────────────────────────────────────────────────
+echo "deploy.sh：缺少環境變數時中止（稽核 DEP-5）"
+# 把 .env 的某個變數換成指定的一行（空字串＝移除），再部署
+set_env_line() { good_env; grep -v "^$1=" "$SB/repo/.env" > "$SB/env.tmp"; cat "$SB/env.tmp" > "$SB/repo/.env"; [ -z "$2" ] || echo "$2" >> "$SB/repo/.env"; fresh_dist; }
+set_env_line ALLOWED_ORIGINS ""; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "缺少 ALLOWED_ORIGINS：中止" "$([ $rc != 0 ] && out_has 'ALLOWED_ORIGINS' && ! log_has '^docker run'; echo $?)"
+set_env_line CSRF_TRUSTED_ORIGINS ""; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "缺少 CSRF_TRUSTED_ORIGINS：中止" "$([ $rc != 0 ] && out_has 'CSRF_TRUSTED_ORIGINS' && ! log_has '^docker run'; echo $?)"
+set_env_line AI_MONTHLY_BUDGET_USD ""; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "缺少 AI_MONTHLY_BUDGET_USD：中止" "$([ $rc != 0 ] && out_has 'AI_MONTHLY_BUDGET_USD' && ! log_has '^docker run'; echo $?)"
+set_env_line AI_MONTHLY_BUDGET_USD "AI_MONTHLY_BUDGET_USD=abc"; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "AI_MONTHLY_BUDGET_USD 不是數字：中止" "$([ $rc != 0 ] && out_has 'AI_MONTHLY_BUDGET_USD'; echo $?)"
+set_env_line AI_MONTHLY_BUDGET_USD "AI_MONTHLY_BUDGET_USD=0"; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "AI_MONTHLY_BUDGET_USD 是 0：中止" "$([ $rc != 0 ] && out_has 'AI_MONTHLY_BUDGET_USD'; echo $?)"
+set_env_line AI_MONTHLY_BUDGET_USD ""; run_script deploy.sh SKIP_BACKUP=1 ALLOW_NO_AI_BUDGET=1; rc=$?
+check "ALLOW_NO_AI_BUDGET=1 明確放行：沒有預算也能部署" "$([ $rc = 0 ]; echo $?)"
+set_env_line AI_MONTHLY_BUDGET_USD "AI_MONTHLY_BUDGET_USD=12.5"; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "AI_MONTHLY_BUDGET_USD=12.5（小數）：通過" "$([ $rc = 0 ]; echo $?)"
+
+good_env; echo 'INTERNAL_API_SECRET=short' >> "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "INTERNAL_API_SECRET 太短：中止（稽核 DEP-7）" "$([ $rc != 0 ] && out_has 'INTERNAL_API_SECRET' && ! log_has '^docker run'; echo $?)"
+good_env; echo 'INTERNAL_API_SECRET=0123456789012345678901234567890123456789' >> "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "INTERNAL_API_SECRET 夠長：通過" "$([ $rc = 0 ]; echo $?)"
+
 echo "backup.sh"
 backup() { run_script deploy/backup.sh "$@"; }
 
 printf 'DATABASE_URL=postgresql://u:p@h/db\nDICTIONARY_DATABASE_URL=postgresql://u:p@h/db\n' > "$SB/repo/.env"; rm -rf "$SB/repo/backups"
 backup; rc=$?
 check "兩個資料庫網址相同：只備份一份" "$([ $rc = 0 ] && [ "$(grep -c '^pg_dump ARGS' "$SB/log")" = 1 ]; echo $?)"
+
+# 稽核 DEP-2：備份目錄 700、備份檔 600（Windows 的 Git Bash 不支援檔案權限位元時略過）
+probe="$SB/modeprobe"; : > "$probe"; chmod 600 "$probe"
+if [ "$(stat -c %a "$probe" 2>/dev/null)" = "600" ]; then
+  mkdir -p "$SB/repo/backups"; chmod 755 "$SB/repo/backups"; rm -f "$SB/repo/backups"/*
+  backup; rc=$?
+  dump_file="$(ls "$SB/repo/backups"/django-*.dump 2>/dev/null | head -n 1)"
+  check "備份目錄權限是 700（原本是 755 也會被收緊）、備份檔是 600"     "$([ $rc = 0 ] && [ "$(stat -c %a "$SB/repo/backups")" = "700" ] && [ "$(stat -c %a "$dump_file")" = "600" ]; echo $?)"
+fi
 
 printf 'DATABASE_URL=postgresql://u:p@h/db\nDICTIONARY_DATABASE_URL=postgresql://u:p@h/dict\n' > "$SB/repo/.env"
 backup; rc=$?

@@ -26,6 +26,7 @@ from .ai_usage_events import record_ai_usage
 from config.sentry_init import init_sentry
 from config.cors import get_allowed_origins
 from config.debug_flag import is_debug
+from config.internal_api import secret_problem
 
 load_dotenv()
 
@@ -131,6 +132,10 @@ async def lifespan(app: FastAPI):
     # （例如 Django 的測試探索）就不該蓋掉別的服務註冊的版本。
     previous_usage_recorder = get_usage_recorder()
     set_usage_recorder(record_ai_usage)
+    # 稽核 DEP-7：內部端點的密鑰太短時，端點會一律回 503；啟動時就大聲說，不要等到第一次呼叫失敗才有人發現
+    secret_issue = secret_problem(os.getenv("INTERNAL_API_SECRET", ""))
+    if secret_issue and not is_debug():
+        logger.error("%s；/internal/* 端點會拒絕所有請求", secret_issue)
     app.state.caches_warm = False
     app.state.pronunciation_model_ready = not _PRELOAD_PRONUNCIATION_MODEL
     warm_thread = threading.Thread(target=_warm_caches, args=(app,), daemon=True)

@@ -16,10 +16,16 @@ cd "$(dirname "$0")/.."
 # shellcheck source=deploy/env.sh
 . deploy/env.sh
 
+# 稽核 DEP-2：備份是整份資料庫，只給執行者本人讀。umask 077 讓這支腳本建立的檔案（pg_dump 輸出、媒體鏡像）
+# 預設權限是 0600／0700，目錄再明確收到 700（目錄已存在、當初用預設權限建立時也會被修正）。
+umask 077
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
 RETENTION_DAYS="${RETENTION_DAYS:-14}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
+# 備份目錄不接受 symlink：chmod 會跟著連結改到目標（可能是共用目錄），而且不知道備份會寫去哪裡
+[ ! -L "$BACKUP_DIR" ] || { echo "!! BACKUP_DIR（$BACKUP_DIR）是 symlink，請直接指定專用的備份目錄" >&2; exit 1; }
 mkdir -p "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
 
 # 不能只用 command -v：Windows 的 Microsoft Store 捷徑（python3.exe）找得到但執行會失敗，
 # 所以挑第一個「真的能執行」的。
@@ -136,13 +142,18 @@ if [ -d "$MEDIA_DIR/homepage" ]; then
   echo "==> 首頁媒體鏡像 $MEDIA_DIR/homepage -> $BACKUP_DIR/media/homepage"
   mkdir -p "$BACKUP_DIR/media"
   if command -v rsync >/dev/null 2>&1; then
-    rsync -a "$MEDIA_DIR/homepage" "$BACKUP_DIR/media/"
+    # --chmod：rsync -a 會照搬來源的權限，這裡明確收成只有擁有者可讀寫
+    rsync -a --chmod=Du=rwx,Dgo=,Fu=rw,Fgo= "$MEDIA_DIR/homepage" "$BACKUP_DIR/media/"
   else
     cp -a "$MEDIA_DIR/homepage" "$BACKUP_DIR/media/"
   fi
 else
   echo "==> 略過首頁媒體（$MEDIA_DIR/homepage 不存在，尚未上傳過任何檔案）"
 fi
+
+# 舊版腳本（沒有 umask 077）留下的備份檔也一併收緊；在 700 的目錄內本來就讀不到，這是多一層保險（檔案被搬走、ACL 時仍受保護）
+find "$BACKUP_DIR" -type f -exec chmod u=rw,go= {} + 2>/dev/null || true
+find "$BACKUP_DIR" -type d -exec chmod u=rwx,go= {} + 2>/dev/null || true
 
 echo "==> 清理 $RETENTION_DAYS 天前的舊備份"
 find "$BACKUP_DIR" -maxdepth 1 -name '*.dump' -type f -mtime +"$RETENTION_DAYS" -print -delete

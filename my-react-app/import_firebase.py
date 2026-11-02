@@ -190,7 +190,10 @@ else:
             print(f"  ❌ 失敗：{email} → {e}")
 
     if credentials_lines:
-        with open(CREDENTIALS_FILE, "w", encoding="utf-8") as f:
+        # 內含明文臨時密碼：以 0600 建立（只有執行者本人讀得到）。O_EXCL 讓檔案已存在（或是被預先放好的
+        # symlink）時直接失敗，不會寫進別人預先準備的位置。
+        fd = os.open(CREDENTIALS_FILE, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.writelines(credentials_lines)
         print(f"\n⚠️  臨時密碼（明文）已寫入：{CREDENTIALS_FILE}")
         print("   請盡快逐一轉交給對應使用者後刪除此檔案，切勿提交進版控或留在他人可存取的地方。")

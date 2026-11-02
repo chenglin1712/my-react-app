@@ -22,6 +22,7 @@ from config.auth_flags import auth_dev_bypass
 from config.debug_flag import is_debug
 from config.sentry_init import init_sentry
 from config.cors import get_allowed_origins
+from config.internal_api import configuration_problems as internal_api_problems
 
 load_dotenv()
 
@@ -47,6 +48,13 @@ if not SECRET_KEY:
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = is_debug()
+
+# 內部 API 密鑰太短、或 Django 呼叫 FastAPI 的位址是非本機的 http（密鑰會明文傳輸）時，正式環境直接啟動失敗，
+# 讓設定錯誤在部署當下就被發現；本機開發（DEBUG）放行。規則見 config/internal_api.py。
+if not DEBUG:
+    _internal_api_problems = internal_api_problems(os.environ)
+    if _internal_api_problems:
+        raise ImproperlyConfigured("內部 API 設定不合格：" + "；".join(_internal_api_problems))
 
 # 是否略過 Firebase token 驗證（僅限本機開發）。互鎖判斷邏輯與 FastAPI 端共用
 # （見 config/auth_flags.py），避免兩邊各自實作、修一處忘了改另一處。

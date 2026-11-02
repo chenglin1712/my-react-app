@@ -56,18 +56,18 @@ class ClearFastapiCachesTest(TestCase):
         mock_response = MagicMock()
         mock_response.raise_for_status.return_value = None
         mock_response.json.return_value = {"invalidated": {"words": 5}, "rewarm": "scheduled"}
-        with patch.dict("os.environ", {"INTERNAL_API_SECRET": "s3cret"}):
+        with patch.dict("os.environ", {"INTERNAL_API_SECRET": "s3cret-0123456789-0123456789-0123456789"}):
             with patch("adminapi.system_cache.requests.post", return_value=mock_response) as mock_post:
                 success, result = clear_fastapi_caches()
         self.assertTrue(success)
         self.assertEqual(result, {"invalidated": {"words": 5}, "rewarm": "scheduled"})
         _, kwargs = mock_post.call_args
         self.assertEqual(kwargs["json"], {"scopes": ["all"], "tribes": None})
-        self.assertEqual(kwargs["headers"], {"X-Internal-Secret": "s3cret"})
+        self.assertEqual(kwargs["headers"], {"X-Internal-Secret": "s3cret-0123456789-0123456789-0123456789"})
 
     def test_connection_failure_returns_failure_without_raising(self):
         import requests as requests_module
-        with patch.dict("os.environ", {"INTERNAL_API_SECRET": "s3cret"}):
+        with patch.dict("os.environ", {"INTERNAL_API_SECRET": "s3cret-0123456789-0123456789-0123456789"}):
             with patch(
                 "adminapi.system_cache.requests.post",
                 side_effect=requests_module.exceptions.ConnectionError("boom"),
@@ -130,3 +130,50 @@ class SystemCacheViewsTest(TestCase):
         with _as_role(EDITOR) as headers:
             response = self.client.post('/adminapi/system/cache/clear-fastapi/', **headers)
         self.assertEqual(response.status_code, 403)
+
+
+class ClearFastapiCachesInternalApiGuardTest(TestCase):
+    """稽核 DEP-7：密鑰太短、或位址是非本機的 http 時不送出請求（密鑰會明文傳輸）。"""
+
+    SECRET = "s3cret-0123456789-0123456789-0123456789"
+
+    def _call(self, env):
+        with patch.dict("os.environ", env):
+            with patch("adminapi.system_cache.requests.post") as mock_post:
+                result = clear_fastapi_caches()
+        return result, mock_post
+
+    def test_short_secret_is_not_sent(self):
+        (success, message), mock_post = self._call({"INTERNAL_API_SECRET": "short"})
+        self.assertFalse(success)
+        self.assertIn("太短", message)
+        mock_post.assert_not_called()
+
+    def test_plain_http_to_a_non_loopback_host_is_not_sent(self):
+        (success, message), mock_post = self._call(
+            {"INTERNAL_API_SECRET": self.SECRET, "FASTAPI_INTERNAL_BASE_URL": "http://10.0.0.5:8001"}
+        )
+        self.assertFalse(success)
+        self.assertIn("明文", message)
+        mock_post.assert_not_called()
+
+    def test_https_to_another_host_and_http_loopback_are_allowed(self):
+        for url in ("https://api.internal.example", "http://localhost:8001", "http://[::1]:8001"):
+            with self.subTest(url=url):
+                response = MagicMock()
+                response.json.return_value = {}
+                with patch.dict("os.environ", {"INTERNAL_API_SECRET": self.SECRET, "FASTAPI_INTERNAL_BASE_URL": url}):
+                    with patch("adminapi.system_cache.requests.post", return_value=response) as mock_post:
+                        success, _ = clear_fastapi_caches()
+                self.assertTrue(success)
+                mock_post.assert_called_once()
+
+    def test_redirect_is_not_followed_and_not_reported_as_success(self):
+        response = MagicMock()
+        response.is_redirect = True
+        response.status_code = 302
+        with patch.dict("os.environ", {"INTERNAL_API_SECRET": self.SECRET, "FASTAPI_INTERNAL_BASE_URL": ""}):
+            with patch("adminapi.system_cache.requests.post", return_value=response) as mock_post:
+                success, message = clear_fastapi_caches()
+        self.assertFalse(success)
+        self.assertIs(mock_post.call_args.kwargs["allow_redirects"], False)
