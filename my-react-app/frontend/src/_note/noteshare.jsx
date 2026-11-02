@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../src/userServives/authContext";
 import { fetchSharedNoteById, softDeleteNote, toggleNoteLike } from "../userServives/noteService";
-import { submitReport } from "../userServives/reportService";
+import { REPORT_ALREADY_OR_DENIED, submitReport } from "../userServives/reportService";
 import { useSharedNotesPager } from "./hooks/useSharedNotesPager";
 import { useToast } from "./hooks/useToast";
 import { announce } from "@utils/announce";
@@ -144,7 +144,11 @@ export default function NoteShare() {
       showToast("已送出檢舉，感謝你協助維護社群品質");
     } catch (e) {
       console.error("Report note error:", e);
-      showToast("檢舉送出失敗，請稍後再試");
+      showToast(
+        e?.code === REPORT_ALREADY_OR_DENIED
+          ? "你可能已經檢舉過這則筆記，或目前無法送出檢舉"
+          : "檢舉送出失敗，請稍後再試",
+      );
       throw e;
     }
   };

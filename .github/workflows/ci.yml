@@ -69,7 +69,7 @@ jobs:
       # 原本 CI 完全沒有涵蓋 firestore.rules，規則被不小心改壞（例如 sharedNotes
       # 的作者身份檢查被拿掉）語法上仍然合法，只有實際跑一次讀寫才抓得到。
       # emulators:exec 會自動啟動模擬器、跑完測試後關掉，不需要額外手動起停。
-      - run: npx firebase emulators:exec --config firebase.rules-test.json --only firestore,storage --project yuanyu-app-rules-test "npm run test:rules"
+      - run: npx firebase emulators:exec --config firebase.rules-test.json --only firestore,storage,database --project yuanyu-app-rules-test "npm run test:rules"
 
   deploy-scripts:
     name: Deploy scripts (behavior tests / compose config)

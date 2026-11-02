@@ -173,7 +173,7 @@ iPhone 用 Safari 的「分享 → 加入主畫面」。
 
 目前**沒有**變更任何線上的 Firebase 規則，Firestore、Realtime Database、Storage 都沿用現有設定。
 
-- `firestore.rules`、`database.rules.json`：與原本相同，沒有修改。
+- `firestore.rules`、`database.rules.json`：稽核 RUL-4 到 RUL-7 已在倉庫內收緊（共享筆記欄位白名單、檢舉去重、RTDB `status` 資料形狀等），**尚未部署**；部署前請先跑 `npm run test:rules`，再以 `firebase deploy --only firestore:rules,database` 指定範圍部署。
 - `storage.rules`：**已寫進 `firebase.json`，但尚未部署。** 專案內沒有任何指令會自動部署它；
   在 Console 確認現有規則與下方事項之前，不要執行不帶範圍的 `firebase deploy`，那會用這份規則
   覆蓋 Console 上現有的 Storage 規則。部署前 Console 上實際生效的 Storage 規則維持不變。

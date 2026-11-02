@@ -41,6 +41,13 @@ service cloud.firestore {
     function isAdmin() {
       return request.auth != null && request.auth.token.role in ['owner', 'admin'];
     }
+    // 角色 claim 的時效限制（稽核 RUL-7）：這裡讀的是 ID token 裡的 role，規則語言
+    // 無法檢查 token 是否已被撤銷，所以被降權或被盜的員工在 token 自然過期（最長約
+    // 1 小時）前，規則層級的權限仍然有效。後端降權／停權／改密碼／刪除帳號時都會
+    // revoke_sessions（讓 refresh token 失效、下次必須重新登入），把窗口縮到「手上
+    // 還沒過期的那一張 ID token」；要做到即時失效，只能讓規則每次多讀一份 Firestore
+    // 角色文件，那會讓每次判斷多一次計費讀取，目前選擇不做。
+    //
     // 內容審核（筆記上下架、檢舉結案、錄音移除）：owner／admin／editor／reviewer，
     // analyst 唯讀不含在內。要跟後端 config/roles.py 的 MODERATORS 保持一致。
     function isModerator() {
@@ -231,8 +238,20 @@ service cloud.firestore {
     match /situations/{situationId} {
       allow read: if request.auth != null && resource.data.userId == request.auth.uid;
       // answeredAt 必須是伺服器時間：每週學習摘要（#25）用它判斷「本週有沒有作答」，不能讓客戶端寫成未來時間
+      //
+      // 欄位白名單與大小上限（稽核 RUL-5）：以前可以夾帶任意欄位、塞滿 1 MiB。現在只允許
+      // uploadDb.jsx 寫入的欄位，陣列欄位限制筆數。規則無法限制「每人建立幾筆」（沒有
+      // 計數器可用），所以總量仍靠 Firestore 儲存成本與帳號層級的監控。
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid
-        && request.resource.data.answeredAt == request.time;
+        && request.resource.data.answeredAt == request.time
+        && request.resource.data.keys().hasOnly(
+          ['userId', 'quizId', 'answeredAt', 'stars', 'answers', 'correctAnswers', 'results']
+        )
+        && request.resource.data.get('stars', []) is list && request.resource.data.get('stars', []).size() <= 200
+        && request.resource.data.get('answers', []) is list && request.resource.data.get('answers', []).size() <= 200
+        && request.resource.data.get('results', []) is list && request.resource.data.get('results', []).size() <= 200
+        && (request.resource.data.get('correctAnswers', null) == null
+          || (request.resource.data.correctAnswers is list && request.resource.data.correctAnswers.size() <= 200));
     }
 
     // 使用者學習統計：本人可讀自己的資料；globalAverages 所有登入者可讀；只由後端寫入
@@ -243,8 +262,14 @@ service cloud.firestore {
     }
 
     // 個人行事曆：只有本人可讀寫
+    // 寫入只允許 events 這一個欄位，且行程最多 500 筆（稽核 RUL-5：以前可以塞滿 1 MiB
+    // 的任意欄位）；刪除不受限制。
     match /calendar/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['events'])
+        && request.resource.data.get('events', []) is list
+        && request.resource.data.get('events', []).size() <= 500;
     }
 
     // 追蹤中的讀書計畫（路線圖 #26）：users/{uid}/studyPlans/current，每人同時只有這一份，新的取代舊的。
@@ -362,6 +387,31 @@ service cloud.firestore {
     // 仍能打開已刪除的筆記。用 .get('deleted', false) 而非直接比對欄位，讓這個
     // 軟刪除功能上線之前建立、沒有 deleted 欄位的舊文件預設視為未刪除，不會被
     // 這條新規則擋掉。
+    function validSharePage(page) {
+      return page is map
+        && page.keys().hasAll(['title', 'content'])
+        && page.title is string && page.title.size() <= 500
+        && page.content is string;
+    }
+    function validSharePages(pages) {
+      return pages is list
+        && pages.size() > 0 && pages.size() <= 50
+        && validSharePage(pages[0])
+        && validSharePage(pages[pages.size() - 1]);
+    }
+    function validShareUsername(name, uid) {
+      return name is string && name.size() > 0 && name.size() <= 100
+        && (name == '匿名'
+          || (exists(/databases/$(database)/documents/users/$(uid))
+            && get(/databases/$(database)/documents/users/$(uid)).data.get('name', '') == name));
+    }
+    function validShareAvatar(url) {
+      return url == null || (url is string && url.size() <= 500 && url.matches('https://.*'));
+    }
+    function validShareImage(url) {
+      return url is string && url.size() <= 500 && (url == '' || url.matches('https://.*'));
+    }
+
     match /sharedNotes/{noteId} {
       // staff 額外可讀已下架的筆記——審核佇列跟「查看已下架內容」都需要看得到
       // deleted=true 的文件，一般使用者／未登入訪客則維持原本規則（下架後
@@ -373,15 +423,25 @@ service cloud.firestore {
       // 同一批修復替 quizs 加了必填欄位檢查與內容長度上限，這裡原本沒有套用，
       // 補上型別、長度、初始狀態（讚數／讚清單／deleted 都必須是剛建立時的值，
       // 不能一開始就偽造已經有讚或已經被標成刪除）與 createdAt 防偽造。
+      //
+      // 欄位白名單與內容檢查（稽核 RUL-4）：keys() 改成 hasOnly（可選欄位只有 image、
+      // avatarUrl），不能再夾帶任意欄位；username 必須是「匿名」或本人 users 文件的
+      // name（不能冒用別人的顯示名稱）；avatarUrl／image 必須是 https 網址且有長度上限
+      // （前端兩者都是 Cloudinary 的 secure_url）。注意 image／avatarUrl 仍可指向任何
+      // https 主機（規則無法列舉允許的網域），追蹤像素的風險只降低、沒有完全消除。
+      // pages 的元素：規則語言沒有迴圈，每次請求最多只能評估 1000 個運算式，所以只檢查
+      // 第一頁與最後一頁的形狀（title、content 為字串），其餘由 Firestore 單一文件
+      // 1 MiB 上限、前端送出前的總量估算，與讀取端的 DOMPurify 消毒把關。
       allow create: if request.auth != null
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.keys().hasAll(['pages', 'preview', 'uid', 'username', 'createdAt', 'likes', 'likedBy', 'deleted'])
-        && request.resource.data.pages is list
-        && request.resource.data.pages.size() > 0 && request.resource.data.pages.size() <= 50
+        && request.resource.data.keys().hasOnly(['pages', 'preview', 'image', 'uid', 'username', 'avatarUrl', 'createdAt', 'likes', 'likedBy', 'deleted'])
+        && validSharePages(request.resource.data.pages)
         && request.resource.data.preview is string
         && request.resource.data.preview.size() <= 5000
-        && request.resource.data.username is string
-        && request.resource.data.username.size() > 0 && request.resource.data.username.size() <= 100
+        && validShareUsername(request.resource.data.username, request.auth.uid)
+        && validShareAvatar(request.resource.data.get('avatarUrl', null))
+        && validShareImage(request.resource.data.get('image', ''))
         && request.resource.data.createdAt == request.time
         && request.resource.data.likes == 0
         && request.resource.data.likedBy is list && request.resource.data.likedBy.size() == 0
@@ -410,8 +470,7 @@ service cloud.firestore {
           resource.data.uid == request.auth.uid &&
           resource.data.get('deleted', false) == false &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pages', 'preview', 'image']) &&
-          request.resource.data.pages is list &&
-          request.resource.data.pages.size() > 0 && request.resource.data.pages.size() <= 50 &&
+          validSharePages(request.resource.data.pages) &&
           request.resource.data.preview is string &&
           request.resource.data.preview.size() <= 5000 &&
           // image 在 create 規則裡本來就是選填（noteService.jsx 的 shareNote()
@@ -419,7 +478,7 @@ service cloud.firestore {
           // 這個欄位）——用 .get(key, default) 而非直接存取，沒有這個欄位時
           // 安全地當成空字串通過型別檢查，不會讓規則對缺欄位的舊資料直接噴
           // evaluation error（獨立審查跑 emulator 測試時實際抓到的迴歸）。
-          request.resource.data.get('image', '') is string
+          validShareImage(request.resource.data.get('image', ''))
         ) ||
         (
           // 排除作者：noteshare.jsx 的 toggleLike 本來就禁止對自己的筆記按讚
@@ -444,7 +503,11 @@ service cloud.firestore {
           request.resource.data.deleted is bool
         )
       );
-      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      // 已被下架的筆記作者不能硬刪（稽核 RUL-6）：下架代表內容被檢舉並凍結，作者
+      // 刪掉整份文件等於銷毀審核證據。沒有 deleted 欄位的舊文件視為未下架。
+      allow delete: if request.auth != null
+        && resource.data.uid == request.auth.uid
+        && resource.data.get('deleted', false) == false;
     }
 
     // 檢舉：任何登入使用者可對 note／recording 建立自己名下的檢舉（targetTribe
@@ -454,8 +517,16 @@ service cloud.firestore {
     // staff 核結/駁回只能動狀態相關欄位，不能竄改原始檢舉內容本身。
     match /reports/{reportId} {
       allow read: if isStaff();
+      // 去重（稽核 RUL-5）：文件 ID 必須是 `{reporterUid}_{targetId}`，同一個人對同一個
+      // 目標只能建立一次（第二次是對既有文件的更新，只有審核角色的 update 規則能過，
+      // 檢舉人會被拒絕）。targetId 不能含 `/`，長度上限 128。代價：檢舉被駁回後，
+      // 同一個人不能再檢舉同一個目標。
       allow create: if request.auth != null
         && request.resource.data.reporterUid == request.auth.uid
+        && request.resource.data.targetId is string
+        && request.resource.data.targetId.size() > 0 && request.resource.data.targetId.size() <= 128
+        && !request.resource.data.targetId.matches('.*/.*')
+        && reportId == request.auth.uid + '_' + request.resource.data.targetId
         // hasOnly（不是 hasAll）：不能夾帶這 8 個欄位以外的任何東西進來，
         // 避免有心人塞一堆大型垃圾欄位增加 Firestore 儲存/讀取成本。
         && request.resource.data.keys().hasOnly(

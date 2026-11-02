@@ -2,6 +2,7 @@
 import contextlib
 import io
 import tempfile
+from datetime import timedelta
 from pathlib import Path
 from unittest import mock
 
@@ -331,6 +332,10 @@ class RedecisionTests(CreateBase):
         A.revert_batch(batch, dry_run=False)
         A.apply_batch("bunun", 50, with_glosses=False)
         self.assertEqual(self._words("newa"), [])                          # 還原後、沒有重新決定：不自動重做
+        # 真人會在還原之後隔一段時間才重新決定。Windows 的時鐘約 15 毫秒才跳一次，測試裡兩個動作常落在
+        # 同一個刻度，時間戳記相同會被 `reverted_at >= decided_at` 判成「還原較晚」而擋住重建，所以把還原時間
+        # 明確往前移，讓「重新決定在還原之後」成立，不依賴測試跑得多快。
+        WordlistApplyJournal.objects.filter(reverted_at__isnull=False).update(reverted_at=timezone.now() - timedelta(seconds=1))
         for f in WordlistForm.objects.filter(decision="create"):            # 人重新決定
             f.decision, f.decided_word_id, f.decided_by_uid, f.decided_at, f.decision_basis = "", "", "", None, ""
             f.save()

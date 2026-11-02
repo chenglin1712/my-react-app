@@ -21,7 +21,10 @@ vi.mock('../userServives/noteService', () => ({
   softDeleteNote: vi.fn(),
   toggleNoteLike: vi.fn(),
 }));
-vi.mock('../userServives/reportService', () => ({ submitReport: vi.fn() }));
+vi.mock('../userServives/reportService', () => ({
+  submitReport: vi.fn(),
+  REPORT_ALREADY_OR_DENIED: 'report/already-or-denied',
+}));
 vi.mock('../../src/userServives/authContext', () => ({
   useAuth: () => ({ userData: { uid: 'user-1', firestoreData: {} } }),
 }));

@@ -37,6 +37,7 @@ vi.mock('../../../../firebase', () => ({
 
 vi.mock('../../../src/userServives/reportService', () => ({
   submitReport: vi.fn(),
+  REPORT_ALREADY_OR_DENIED: 'report/already-or-denied',
 }));
 
 const timestamp = (dateString) => ({
@@ -258,6 +259,26 @@ describe('PronunciationCommunity', () => {
     );
 
     expect(await screen.findByText('送出檢舉失敗，請稍後再試。'))
+      .toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  test('submitReport 被規則拒絕（可能已檢舉過）時顯示對應說明並保留 Modal', async () => {
+    submitReport.mockRejectedValueOnce(
+      Object.assign(new Error('denied'), { code: 'report/already-or-denied' }),
+    );
+
+    renderCommunity();
+
+    const buttons = await screen.findAllByRole('button', {
+      name: '檢舉',
+    });
+    fireEvent.click(buttons[0]);
+    fireEvent.click(
+      screen.getByRole('button', { name: '送出檢舉' }),
+    );
+
+    expect(await screen.findByText('你可能已經檢舉過這筆錄音，或目前無法送出檢舉。'))
       .toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });

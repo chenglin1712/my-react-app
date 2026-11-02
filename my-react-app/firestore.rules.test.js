@@ -49,7 +49,7 @@ const validSharedNote = (uid) => ({
   pages: [{ title: '第一頁', content: '<p>內容</p>' }],
   preview: '<p>內容</p>',
   uid,
-  username: '測試使用者',
+  username: '匿名',
   createdAt: serverTimestamp(),
   likes: 0,
   likedBy: [],
@@ -101,6 +101,63 @@ describe('sharedNotes create 規則', () => {
   test('已登入、uid 是本人、內容完整合法時可以建立', async () => {
     const alice = testEnv.authenticatedContext('alice');
     await assertSucceeds(setDoc(doc(alice.firestore(), 'sharedNotes/n1'), validSharedNote('alice')));
+  });
+
+  test('夾帶白名單以外的欄位會被拒絕（稽核 RUL-4）', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'sharedNotes/n1'), { ...validSharedNote('alice'), isOfficial: true })
+    );
+  });
+
+  test('username 是本人 users 文件的 name 時可以建立，冒用別人的名字會被拒絕', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users/alice'), { name: '小愛' });
+      await setDoc(doc(ctx.firestore(), 'users/bob'), { name: '小波' });
+    });
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(
+      setDoc(doc(alice.firestore(), 'sharedNotes/n1'), { ...validSharedNote('alice'), username: '小愛' })
+    );
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'sharedNotes/n2'), { ...validSharedNote('alice'), username: '小波' })
+    );
+  });
+
+  test('avatarUrl 與 image 必須是 https 網址，null 與空字串可以', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    const url = 'https://res.cloudinary.com/demo/image/upload/a.png';
+    await assertSucceeds(
+      setDoc(doc(alice.firestore(), 'sharedNotes/ok1'), { ...validSharedNote('alice'), avatarUrl: url, image: url })
+    );
+    await assertSucceeds(
+      setDoc(doc(alice.firestore(), 'sharedNotes/ok2'), { ...validSharedNote('alice'), avatarUrl: null, image: '' })
+    );
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'sharedNotes/bad1'), { ...validSharedNote('alice'), avatarUrl: 'http://evil.example/p.gif' })
+    );
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'sharedNotes/bad2'), { ...validSharedNote('alice'), image: 'javascript:alert(1)' })
+    );
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'sharedNotes/bad3'), { ...validSharedNote('alice'), image: url + 'a'.repeat(500) })
+    );
+  });
+
+  test('pages 第一頁或最後一頁不是物件、title 超長會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    const page = { title: 't', content: '<p>x</p>' };
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'sharedNotes/bad1'), { ...validSharedNote('alice'), pages: ['字串'] })
+    );
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'sharedNotes/bad2'), { ...validSharedNote('alice'), pages: [page, 'x'] })
+    );
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'sharedNotes/bad3'), {
+        ...validSharedNote('alice'), pages: [{ title: 'x'.repeat(501), content: '' }],
+      })
+    );
   });
 
   test('uid 冒充別人會被拒絕（這波修好的作者身份驗證）', async () => {
@@ -676,6 +733,15 @@ describe('sharedNotes 規則（staff 審核）', () => {
     );
   });
 
+  test('作者可以刪除自己未下架的筆記，已被下架的不能硬刪（稽核 RUL-6）', async () => {
+    await seedNote('live', { uid: 'alice' });
+    await seedNote('taken', { uid: 'alice', deleted: true });
+    const alice = testEnv.authenticatedContext('alice');
+    const { deleteDoc } = await import('firebase/firestore');
+    await assertSucceeds(deleteDoc(doc(alice.firestore(), 'sharedNotes/live')));
+    await assertFails(deleteDoc(doc(alice.firestore(), 'sharedNotes/taken')));
+  });
+
   test('沒有 staff 角色的一般使用者不能下架別人的筆記', async () => {
     await seedNote('n1');
     const bob = testEnv.authenticatedContext('bob');
@@ -847,14 +913,14 @@ describe('pronunciations recordings create 規則', () => {
 describe('reports create 規則', () => {
   test('已登入、reporterUid 是本人、內容完整合法時可以建立', async () => {
     const alice = testEnv.authenticatedContext('alice');
-    await assertSucceeds(setDoc(doc(alice.firestore(), 'reports/r1'), validReport('alice')));
+    await assertSucceeds(setDoc(doc(alice.firestore(), 'reports/alice_note123'), validReport('alice')));
   });
 
   test('recording 類型帶 targetTribe 也可以建立', async () => {
     const alice = testEnv.authenticatedContext('alice');
     await assertSucceeds(
       setDoc(
-        doc(alice.firestore(), 'reports/r1'),
+        doc(alice.firestore(), 'reports/alice_rec1'),
         validReport('alice', { targetType: 'recording', targetId: 'rec1', targetTribe: 'tayal' }),
       )
     );
@@ -862,53 +928,53 @@ describe('reports create 規則', () => {
 
   test('未登入不能建立', async () => {
     const anon = testEnv.unauthenticatedContext();
-    await assertFails(setDoc(doc(anon.firestore(), 'reports/r1'), validReport('anyone')));
+    await assertFails(setDoc(doc(anon.firestore(), 'reports/alice_note123'), validReport('anyone')));
   });
 
   test('reporterUid 冒充別人會被拒絕', async () => {
     const alice = testEnv.authenticatedContext('alice');
-    await assertFails(setDoc(doc(alice.firestore(), 'reports/r1'), validReport('bob')));
+    await assertFails(setDoc(doc(alice.firestore(), 'reports/alice_note123'), validReport('bob')));
   });
 
   test('缺少必填欄位（reason）會被拒絕', async () => {
     const alice = testEnv.authenticatedContext('alice');
     const { reason: _drop, ...incomplete } = validReport('alice');
-    await assertFails(setDoc(doc(alice.firestore(), 'reports/r1'), incomplete));
+    await assertFails(setDoc(doc(alice.firestore(), 'reports/alice_note123'), incomplete));
   });
 
   test('targetType 不在白名單內會被拒絕', async () => {
     const alice = testEnv.authenticatedContext('alice');
-    await assertFails(setDoc(doc(alice.firestore(), 'reports/r1'), validReport('alice', { targetType: 'user' })));
+    await assertFails(setDoc(doc(alice.firestore(), 'reports/alice_note123'), validReport('alice', { targetType: 'user' })));
   });
 
   test('reason 不在白名單內會被拒絕', async () => {
     const alice = testEnv.authenticatedContext('alice');
-    await assertFails(setDoc(doc(alice.firestore(), 'reports/r1'), validReport('alice', { reason: 'because' })));
+    await assertFails(setDoc(doc(alice.firestore(), 'reports/alice_note123'), validReport('alice', { reason: 'because' })));
   });
 
   test('建立時 status 不是 pending 會被拒絕（不能一開始就自己標成已核結）', async () => {
     const alice = testEnv.authenticatedContext('alice');
-    await assertFails(setDoc(doc(alice.firestore(), 'reports/r1'), validReport('alice', { status: 'resolved' })));
+    await assertFails(setDoc(doc(alice.firestore(), 'reports/alice_note123'), validReport('alice', { status: 'resolved' })));
   });
 
   test('createdAt 不是真正的伺服器時間會被拒絕', async () => {
     const alice = testEnv.authenticatedContext('alice');
     await assertFails(
-      setDoc(doc(alice.firestore(), 'reports/r1'), validReport('alice', { createdAt: new Date() }))
+      setDoc(doc(alice.firestore(), 'reports/alice_note123'), validReport('alice', { createdAt: new Date() }))
     );
   });
 
   test('夾帶額外欄位會被拒絕（hasOnly，不是 hasAll）', async () => {
     const alice = testEnv.authenticatedContext('alice');
     await assertFails(
-      setDoc(doc(alice.firestore(), 'reports/r1'), { ...validReport('alice'), extraField: '塞垃圾' })
+      setDoc(doc(alice.firestore(), 'reports/alice_note123'), { ...validReport('alice'), extraField: '塞垃圾' })
     );
   });
 
   test('note 類型的 targetTribe 不是空字串會被拒絕', async () => {
     const alice = testEnv.authenticatedContext('alice');
     await assertFails(
-      setDoc(doc(alice.firestore(), 'reports/r1'), validReport('alice', { targetTribe: 'tayal' }))
+      setDoc(doc(alice.firestore(), 'reports/alice_note123'), validReport('alice', { targetTribe: 'tayal' }))
     );
   });
 
@@ -916,7 +982,7 @@ describe('reports create 規則', () => {
     const alice = testEnv.authenticatedContext('alice');
     await assertFails(
       setDoc(
-        doc(alice.firestore(), 'reports/r1'),
+        doc(alice.firestore(), 'reports/alice_note123'),
         validReport('alice', { targetType: 'recording', targetId: 'rec1', targetTribe: '' }),
       )
     );
@@ -926,9 +992,41 @@ describe('reports create 規則', () => {
     const alice = testEnv.authenticatedContext('alice');
     await assertFails(
       setDoc(
-        doc(alice.firestore(), 'reports/r1'),
+        doc(alice.firestore(), 'reports/alice_rec1'),
         validReport('alice', { targetType: 'recording', targetId: 'rec1', targetTribe: 'klingon' }),
       )
+    );
+  });
+});
+
+describe('reports create 規則（去重與 targetId，稽核 RUL-5）', () => {
+  test('文件 ID 不是 {reporterUid}_{targetId} 會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(setDoc(doc(alice.firestore(), 'reports/random-id'), validReport('alice')));
+    await assertFails(setDoc(doc(alice.firestore(), 'reports/bob_note123'), validReport('alice')));
+  });
+
+  test('同一個人對同一個目標不能重複檢舉', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(setDoc(doc(alice.firestore(), 'reports/alice_note123'), validReport('alice')));
+    await assertFails(setDoc(doc(alice.firestore(), 'reports/alice_note123'), validReport('alice')));
+  });
+
+  test('同一個人可以檢舉不同目標，不同人可以檢舉同一個目標', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    const bob = testEnv.authenticatedContext('bob');
+    await assertSucceeds(setDoc(doc(alice.firestore(), 'reports/alice_note123'), validReport('alice')));
+    await assertSucceeds(
+      setDoc(doc(alice.firestore(), 'reports/alice_note456'), validReport('alice', { targetId: 'note456' }))
+    );
+    await assertSucceeds(setDoc(doc(bob.firestore(), 'reports/bob_note123'), validReport('bob')));
+  });
+
+  test('targetId 超過 128 字元會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    const longId = 'x'.repeat(129);
+    await assertFails(
+      setDoc(doc(alice.firestore(), `reports/alice_${longId}`), validReport('alice', { targetId: longId }))
     );
   });
 });
@@ -1601,5 +1699,56 @@ describe('situations 規則：answeredAt 必須是伺服器時間（每週摘要
   test('替別人建立仍然不行', async () => {
     const alice = testEnv.authenticatedContext('alice');
     await assertFails(setDoc(doc(alice.firestore(), 'situations/x'), base({ userId: 'bob', answeredAt: serverTimestamp() })));
+  });
+});
+
+describe('situations 規則：欄位白名單與大小（稽核 RUL-5）', () => {
+  const base = (over = {}) => ({
+    userId: 'alice', quizId: 'q1', answeredAt: serverTimestamp(),
+    stars: [], answers: ['a'], correctAnswers: ['a'], results: [{ isCorrect: true }], ...over,
+  });
+
+  test('uploadDb.jsx 實際寫入的欄位組合可以建立（correctAnswers 為 null 也可以）', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(setDoc(doc(alice.firestore(), 'situations/s1'), base()));
+    await assertSucceeds(setDoc(doc(alice.firestore(), 'situations/s2'), base({ correctAnswers: null })));
+  });
+
+  test('夾帶白名單以外的欄位會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(setDoc(doc(alice.firestore(), 'situations/s1'), base({ junk: 'x'.repeat(5000) })));
+  });
+
+  test('陣列欄位超過 200 筆或型別不是陣列會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'situations/s1'), base({ answers: Array.from({ length: 201 }, () => 'a') }))
+    );
+    await assertFails(setDoc(doc(alice.firestore(), 'situations/s2'), base({ results: 'x'.repeat(5000) })));
+    await assertFails(setDoc(doc(alice.firestore(), 'situations/s3'), base({ correctAnswers: 'x' })));
+  });
+});
+
+describe('calendar 規則：欄位白名單與大小（稽核 RUL-5）', () => {
+  test('本人寫入 events 陣列可以（建立與更新），也可以刪除', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    const ref = doc(alice.firestore(), 'calendar/alice');
+    await assertSucceeds(setDoc(ref, { events: [{ id: 'e1', title: '複習' }] }));
+    await assertSucceeds(setDoc(ref, { events: [] }));
+    const { deleteDoc } = await import('firebase/firestore');
+    await assertSucceeds(deleteDoc(ref));
+  });
+
+  test('夾帶 events 以外的欄位、events 不是陣列、超過 500 筆都會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    const ref = doc(alice.firestore(), 'calendar/alice');
+    await assertFails(setDoc(ref, { events: [], junk: 'x' }));
+    await assertFails(setDoc(ref, { events: 'x'.repeat(5000) }));
+    await assertFails(setDoc(ref, { events: Array.from({ length: 501 }, (_, i) => ({ id: String(i) })) }));
+  });
+
+  test('別人不能讀寫', async () => {
+    const bob = testEnv.authenticatedContext('bob');
+    await assertFails(setDoc(doc(bob.firestore(), 'calendar/alice'), { events: [] }));
   });
 });

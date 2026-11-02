@@ -8,7 +8,7 @@ import {
   query,
 } from 'firebase/firestore';
 import { db } from '../../../../firebase';
-import { submitReport } from '../../../src/userServives/reportService';
+import { REPORT_ALREADY_OR_DENIED, submitReport } from '../../../src/userServives/reportService';
 import { useDialog } from '@hooks/useDialog';
 import '../../../static/css/_game/pronunciation-community.css';
 
@@ -157,7 +157,11 @@ export default function PronunciationCommunity({ tribe }) {
       setSuccessMessage('已送出檢舉，感謝您協助維護社群品質');
     } catch (err) {
       console.error('送出檢舉失敗:', err.message);
-      setReportError('送出檢舉失敗，請稍後再試。');
+      setReportError(
+        err?.code === REPORT_ALREADY_OR_DENIED
+          ? '你可能已經檢舉過這筆錄音，或目前無法送出檢舉。'
+          : '送出檢舉失敗，請稍後再試。',
+      );
     } finally {
       setSubmittingReport(false);
     }
