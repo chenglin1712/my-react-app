@@ -35,6 +35,7 @@ venv/
 # Django
 db.sqlite3
 media/
+media_staging/
 
 # 建置產物：dist/（Vite build）與 backend/staticfiles/（Django collectstatic）
 # 都是可從原始碼重新產生的輸出，不該進版控——直接進 repo 只會讓每次建置在

@@ -40,6 +40,13 @@ def _chunked_response(chunk, count, headers=None, asynchronous=False):
     return resp
 
 
+from config.url_safety import PinnedTarget, UnsafeConnectionError
+
+
+def _refuse_pin(url):
+    raise UnsafeConnectionError("test: target not allowed")
+
+
 class TestReadCapped:
     def test_returns_body_within_limit(self):
         assert bd.read_capped(_response(b"abc"), 10) == b"abc"
@@ -64,7 +71,7 @@ class TestFetchAudioFromId:
     @pytest.fixture(autouse=True)
     def _not_migrated(self, monkeypatch):
         monkeypatch.setattr("fastAPI.routes.pronunciation.audio_fetch._lookup_verified_audio_url", lambda audio_id: None)
-        monkeypatch.setattr("fastAPI.routes.pronunciation.audio_fetch.is_safe_redirect_target", lambda url: True)
+        monkeypatch.setattr("fastAPI.routes.pronunciation.audio_fetch.pin_target", lambda url: PinnedTarget(url))
 
     def test_oversized_audio_is_refused(self, monkeypatch):
         monkeypatch.setattr("fastAPI.routes.pronunciation.audio_fetch.MAX_OFFICIAL_AUDIO_BYTES", 1000)
@@ -101,7 +108,7 @@ class TestFetchAudioFromId:
 
     def test_storage_copy_pointing_at_a_private_target_is_refused_before_connecting(self, monkeypatch):
         monkeypatch.setattr("fastAPI.routes.pronunciation.audio_fetch._lookup_verified_audio_url", lambda audio_id: "https://internal.example.com/a.mp3")
-        monkeypatch.setattr("fastAPI.routes.pronunciation.audio_fetch.is_safe_redirect_target", lambda url: False)
+        monkeypatch.setattr("fastAPI.routes.pronunciation.audio_fetch.pin_target", _refuse_pin)
         with _sync_hops():                      # 一次 stream() 都不該被呼叫
             with pytest.raises(Exception, match="音檔 URL 指向不允許的位址"):
                 fetch_audio_from_id("word123")
@@ -135,7 +142,7 @@ def client():
 class TestProxyAudio:
     def _get(self, client, second):
         with patch("fastAPI.routes.dictionary.audio_proxy._lookup_verified_audio_asset", return_value=None):
-            with patch("fastAPI.routes.dictionary.audio_proxy.is_safe_redirect_target", return_value=True):
+            with patch("fastAPI.routes.dictionary.audio_proxy.pin_target", side_effect=lambda url: PinnedTarget(url)):
                 with _async_hops(_first_hop("https://cdn.example.com/a.mp3"), second):
                     return client.get("/api/v1/dictionary/audio/some-file-id")
 

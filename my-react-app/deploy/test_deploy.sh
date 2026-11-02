@@ -175,9 +175,9 @@ check "用 root 執行：中止，不啟動 root 容器" "$([ $rc != 0 ] && out_
 
 good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
 check "啟動前先建好 logs／media，且前端建置用部署者的 uid（不產生 root 擁有的檔案）" \
-  "$([ $rc = 0 ] && [ -d "$SB/repo/logs" ] && [ -d "$SB/repo/media" ] && log_has 'docker run --rm --user 1234:5678'; echo $?)"
+  "$([ $rc = 0 ] && [ -d "$SB/repo/logs" ] && [ -d "$SB/repo/media" ] && [ -d "$SB/repo/media_staging" ] && log_has 'docker run --rm --user 1234:5678'; echo $?)"
 check "chown 只動 logs／media／dist／node_modules，並用數字 uid:gid" \
-  "$(log_has 'sudo chown -R 1234:5678 logs' && log_has 'sudo chown -R 1234:5678 media' && log_has 'sudo chown -R 1234:5678 dist' && ! log_has 'sudo chown.* \.$'; echo $?)"
+  "$(log_has 'sudo chown -R 1234:5678 logs' && log_has 'sudo chown -R 1234:5678 media' && log_has 'sudo chown -R 1234:5678 media_staging' && log_has 'sudo chown -R 1234:5678 dist' && ! log_has 'sudo chown.* \.$'; echo $?)"
 check "deploy.sh 不再遞迴 chown 整個 repo" "$(! grep -qE 'chown -R .*\" .$|chown -R .$USER' deploy.sh; echo $?)"
 
 good_env; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?

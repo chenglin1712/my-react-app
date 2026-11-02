@@ -23,7 +23,45 @@ backend/config 這個 Django/FastAPI 共用層，兩邊都改成從這裡 import
 """
 import ipaddress
 import socket
+from dataclasses import dataclass, field
 from urllib.parse import urlparse
+
+# Python 的 is_private／is_global 在不同版本結果不一致，下列網段明確列為不可連線（稽核 FIL-2）：
+# 100.64.0.0/10 是 CGNAT 共享位址（雲端常把 metadata 服務放在這裡，例如 100.100.100.200），
+# 192.0.0.0/24 是 IETF 保留，198.18.0.0/15 是測試網段，240.0.0.0/4 是保留。
+_BLOCKED_NETWORKS = tuple(ipaddress.ip_network(n) for n in (
+    "0.0.0.0/8", "100.64.0.0/10", "192.0.0.0/24", "198.18.0.0/15", "240.0.0.0/4", "255.255.255.255/32",
+))
+_NAT64_PREFIX = ipaddress.ip_network("64:ff9b::/96")
+
+
+def _embedded_ipv4(ip):
+    """IPv6 位址裡內嵌的 IPv4（IPv4-mapped、6to4、Teredo、NAT64）；沒有就回傳空串列。
+    攻擊者能用這些寫法把內網位址包成「看起來像公開 IPv6」，所以要解開後用 IPv4 的規則再判斷一次。"""
+    if not isinstance(ip, ipaddress.IPv6Address):
+        return []
+    if ip.ipv4_mapped is not None:
+        return [ip.ipv4_mapped]
+    if ip.sixtofour is not None:
+        return [ip.sixtofour]
+    if ip.teredo is not None:
+        return list(ip.teredo)           # (伺服器, 客戶端) 兩個都要是公開位址
+    if ip in _NAT64_PREFIX:
+        return [ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)]
+    return []
+
+
+def is_public_ip(ip) -> bool:
+    """只有全球可路由的單播位址才算公開。用 not is_global 而不是列舉 is_private 等屬性——
+    後者會漏掉 CGNAT 這類「不算 private、也不是全球可路由」的網段。"""
+    for embedded in _embedded_ipv4(ip):
+        if not is_public_ip(embedded):
+            return False
+    if ip.is_multicast or ip.is_unspecified or ip.is_loopback or ip.is_link_local or not ip.is_global:
+        return False
+    if isinstance(ip, ipaddress.IPv4Address) and any(ip in net for net in _BLOCKED_NETWORKS):
+        return False
+    return True
 
 
 def _resolves_to_public_address(hostname: str) -> bool:
@@ -37,7 +75,7 @@ def _resolves_to_public_address(hostname: str) -> bool:
             ip = ipaddress.ip_address(ip_str)
         except ValueError:
             return False
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+        if not is_public_ip(ip):
             return False
     return True
 
@@ -87,5 +125,66 @@ def assert_response_from_safe_peer(response) -> None:
         ip = ipaddress.ip_address(peer[0])
     except ValueError:
         raise UnsafeConnectionError("無法確認連線目標，拒絕信任這個回應")
-    if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+    if not is_public_ip(ip):
         raise UnsafeConnectionError(f"連線目標位址不允許：{peer[0]}")
+
+
+@dataclass(frozen=True)
+class PinnedTarget:
+    """已固定解析結果的請求目標。url 的主機部分換成檢查過的 IP；headers 補回原本的 Host；
+    extensions 讓 httpx 用原本的網域做 TLS 的 SNI 與憑證驗證（https 才有）。"""
+    url: str
+    headers: dict = field(default_factory=dict)
+    extensions: dict = field(default_factory=dict)
+
+
+def pin_target(url: str) -> PinnedTarget:
+    """解析網域、確認【所有】解析結果都是公開位址，再回傳「直接連那個 IP」的請求目標。
+
+    發出請求前才做一次解析並直接拿結果去連線，連線時就不會再有第二次 DNS 查詢，DNS rebinding
+    沒有可以插進去的空隙（稽核 FIL-2）。assert_response_from_safe_peer 仍保留當第二層檢查。
+    不合格丟 UnsafeConnectionError。getaddrinfo 會阻塞，async 呼叫端請用 asyncio.to_thread。"""
+    try:
+        parsed = urlparse(url)
+        port = parsed.port
+    except ValueError:
+        raise UnsafeConnectionError("網址格式不合法")
+    host = parsed.hostname
+    if parsed.scheme not in ("http", "https") or not host:
+        raise UnsafeConnectionError("只允許 http／https 網址")
+    if parsed.username is not None or parsed.password is not None:
+        raise UnsafeConnectionError("網址不可帶帳號密碼")
+
+    try:
+        literal = ipaddress.ip_address(host)
+    except ValueError:
+        literal = None
+    if literal is not None:
+        if not is_public_ip(literal):
+            raise UnsafeConnectionError(f"連線目標位址不允許：{host}")
+        return PinnedTarget(url)
+
+    try:
+        infos = socket.getaddrinfo(host, port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM)
+    except (socket.gaierror, UnicodeError):
+        raise UnsafeConnectionError("無法解析網域")
+    addresses = []
+    for _family, _type, _proto, _canonname, sockaddr in infos:
+        try:
+            addresses.append(ipaddress.ip_address(sockaddr[0]))
+        except ValueError:
+            raise UnsafeConnectionError("解析結果不是有效的位址")
+    if not addresses or not all(is_public_ip(a) for a in addresses):
+        raise UnsafeConnectionError("網域解析到不允許的位址")
+
+    chosen = sorted(addresses, key=lambda a: a.version)[0]       # 優先 IPv4：許多主機沒有可用的 IPv6 路由
+    ip_text = f"[{chosen}]" if chosen.version == 6 else str(chosen)
+    netloc = ip_text + (f":{port}" if port else "")
+    host_header = host + (f":{port}" if port else "")
+    return PinnedTarget(
+        url=parsed._replace(netloc=netloc).geturl(),
+        # Connection: close：連線池是以 URL 裡的 IP 當 key，兩個網域解析到同一個 IP 時，不關閉的話
+        # 第二個網域可能重用第一個網域的 TLS 連線（憑證與 SNI 都是前一個網域的）
+        headers={"Host": host_header, "Connection": "close"},
+        extensions={"sni_hostname": host} if parsed.scheme == "https" else {},
+    )

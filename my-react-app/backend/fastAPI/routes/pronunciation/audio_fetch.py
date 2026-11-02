@@ -6,12 +6,12 @@ from urllib.parse import urlparse
 
 import httpx
 
-from config.audio_source import get_ilrdf_audio_api
+from config.audio_source import build_ilrdf_audio_url
 from config.bounded_download import (
     IDENTITY_ENCODING_HEADERS, MAX_OFFICIAL_AUDIO_BYTES, MAX_RESOLVER_BODY_BYTES, DownloadLimitError, read_capped,
 )
 from config.media_source import get_media_source_mode
-from config.url_safety import UnsafeConnectionError, assert_response_from_safe_peer, is_safe_redirect_target
+from config.url_safety import UnsafeConnectionError, assert_response_from_safe_peer, pin_target
 from dictionary_db.connect import SessionLocal
 from dictionary_db.model import MediaAsset
 
@@ -90,11 +90,17 @@ def fetch_audio_from_id(audio_id: str):
     if public_url:
         # public_url 來自資料庫：資料被誤寫或匯入污染時，不能讓後端連去內網或 metadata 位址。
         # 只接受 https，並在讀本文之前確認實際連線的對象（理由同下面 ILRDF 的第二次請求）。
-        if not public_url.startswith("https://") or not is_safe_redirect_target(public_url):
+        if not public_url.startswith("https://"):
+            raise Exception("音檔 URL 指向不允許的位址")
+        try:
+            pinned = pin_target(public_url)           # 稽核 FIL-2：解析一次後直接連那個 IP
+        except UnsafeConnectionError:
             raise Exception("音檔 URL 指向不允許的位址")
         # 串流並限制大小（見 config/bounded_download.py）：不先把整個回應讀進記憶體
         with httpx.Client(timeout=15, follow_redirects=False) as client:
-            with client.stream("GET", public_url, headers=IDENTITY_ENCODING_HEADERS) as resp:
+            with client.stream(
+                "GET", pinned.url, headers={**IDENTITY_ENCODING_HEADERS, **pinned.headers}, extensions=pinned.extensions,
+            ) as resp:
                 try:
                     assert_response_from_safe_peer(resp)
                 except UnsafeConnectionError:
@@ -114,7 +120,7 @@ def fetch_audio_from_id(audio_id: str):
     # audio_proxy.py 的 debug_audio 各自讀環境變數，audio_proxy.py 的正式路徑
     # （proxy_audio，全站辭典發音實際在走的路徑）卻是另一個寫死的 Python 常數，
     # 三處各自一份、容易改了環境變數卻漏改寫死常數那條路徑。
-    api_url = get_ilrdf_audio_api() + audio_id
+    api_url = build_ilrdf_audio_url(audio_id)
 
     # 第一次請求取得重導向 URL。回應本文只是一段網址文字，讀取時限制在幾 KB 內。
     with httpx.Client(timeout=10, follow_redirects=False) as client:
@@ -134,7 +140,9 @@ def fetch_audio_from_id(audio_id: str):
     # 指向內網／loopback／link-local（含雲端 metadata endpoint）的位址，
     # 避免被當成 SSRF 跳板（見 url_safety.py 說明，跟 compare_audio.reference_urls
     # 已經修好的白名單機制互補）。
-    if not is_safe_redirect_target(final_url):
+    try:
+        pinned = pin_target(final_url)               # 稽核 FIL-2：解析一次、檢查所有結果、直接連那個 IP
+    except UnsafeConnectionError:
         raise Exception("音檔 URL 指向不允許的位址")
 
     # 第二次請求下載真正音檔。這裡改用 httpx（而非 requests）：is_safe_redirect_target
@@ -148,7 +156,9 @@ def fetch_audio_from_id(audio_id: str):
     # 串流下載並限制大小（見 config/bounded_download.py）：連線對象的檢查在讀取本文「之前」做，
     # 不安全就一個位元組都不讀。
     with httpx.Client(timeout=15, follow_redirects=False) as client:
-        with client.stream("GET", final_url, headers=IDENTITY_ENCODING_HEADERS) as audio_resp:
+        with client.stream(
+            "GET", pinned.url, headers={**IDENTITY_ENCODING_HEADERS, **pinned.headers}, extensions=pinned.extensions,
+        ) as audio_resp:
             try:
                 assert_response_from_safe_peer(audio_resp)
             except UnsafeConnectionError:

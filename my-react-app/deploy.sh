@@ -181,13 +181,13 @@ if [ "${SKIP_BACKUP:-}" != "1" ] && [ -f deploy/backup.sh ]; then
 fi
 
 # ── 1.5 準備可寫的目錄 ──────────────────────────────────────────
-# 容器以部署者的 uid 執行，掛載進去的 logs／media 必須先存在且屬於這個 uid：不存在的話 Docker 會
+# 容器以部署者的 uid 執行，掛載進去的 logs／media／media_staging（上傳暫存，不對外公開）必須先存在且屬於這個 uid：不存在的話 Docker 會
 # 自己以 root 建立，容器就寫不進去。舊版（容器是 root）留下的 root 擁有檔案也在這裡一併修正；
 # 放在拍攝回滾點之前，dist.prev 才不會繼承 root 擁有者而在最後清不掉。
 # 只處理實際會被寫入的目錄，不遞迴改整個 repo（.git、金鑰檔的擁有者不該被動到）。
 echo "==> 準備 logs／media 目錄"
-mkdir -p logs media
-for d in logs media dist dist.prev node_modules; do
+mkdir -p logs media media_staging
+for d in logs media media_staging dist dist.prev node_modules; do
   if [ -e "$d" ]; then sudo chown -R "$APP_UID:$APP_GID" "$d"; fi
 done
 

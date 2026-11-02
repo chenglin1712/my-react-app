@@ -7,6 +7,7 @@
 所以公開檔案可以長期快取。被取代或刪除的舊檔不在請求內刪除，而是把修改時間設為「現在」
 （touch_orphan），由 cleanup_promo_media 在 14 天後才清掉，大於快照保留期 7 天。
 """
+import errno
 import json
 import logging
 import os
@@ -67,7 +68,11 @@ def media_root():
 
 def staging_root():
     configured = getattr(settings, "MEDIA_STAGING_ROOT", None)
-    return os.path.realpath(str(configured)) if configured else os.path.join(media_root(), "_staging")
+    if configured:
+        return os.path.realpath(str(configured))
+    # 沒設定時與 core/settings.py 的預設一致：放在公開目錄旁邊，不在它底下（稽核 FIL-4）
+    root = media_root()
+    return os.path.join(os.path.dirname(root), os.path.basename(root) + "_staging")
 
 
 def _human_mb(num_bytes):
@@ -84,6 +89,12 @@ def ensure_free_disk(max_bytes):
     needed = 2 * max_bytes + MIN_FREE_DISK_MARGIN
     if shutil.disk_usage(directory).free < needed:
         logger.error("PROMO_MEDIA_DISK_LOW free=%s needed=%s", shutil.disk_usage(directory).free, needed)
+        raise PromoUploadError("伺服器磁碟空間不足，暫時無法上傳，請聯絡系統管理者。", 507)
+    # 暫存與公開目錄在不同的檔案系統時，提交會多一份複製，公開目錄那邊也要有空間
+    public = media_root()
+    os.makedirs(public, exist_ok=True)
+    if os.stat(directory).st_dev != os.stat(public).st_dev and shutil.disk_usage(public).free < max_bytes + MIN_FREE_DISK_MARGIN:
+        logger.error("PROMO_MEDIA_DISK_LOW public free=%s needed=%s", shutil.disk_usage(public).free, max_bytes + MIN_FREE_DISK_MARGIN)
         raise PromoUploadError("伺服器磁碟空間不足，暫時無法上傳，請聯絡系統管理者。", 507)
 
 
@@ -361,6 +372,25 @@ def _ensure_real_directory(path_parts):
     return current
 
 
+def _copy_into_place(staged_path, final):
+    """暫存目錄與公開目錄不在同一個檔案系統（rename 回 EXDEV）時的做法：先複製成公開目錄內的隱藏暫存名、
+    寫完並 fsync，再用同一個檔案系統內的 rename 換成正式檔名。訪客永遠看不到寫到一半的檔案。"""
+    temp = os.path.join(os.path.dirname(final), f".{uuid.uuid4().hex}.tmp")
+    try:
+        with open(staged_path, "rb") as source, open(temp, "xb") as out:
+            shutil.copyfileobj(source, out, CHUNK_SIZE)
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(temp, final)
+    except BaseException:
+        try:
+            os.remove(temp)
+        except OSError:
+            pass
+        raise
+    discard(staged_path)
+
+
 def commit_staged(staged_path, kind, ext):
     """把驗證過的暫存檔原子地移到公開目錄，回傳要存進資料庫的相對路徑。"""
     subdir = KINDS[kind][0]
@@ -368,7 +398,12 @@ def commit_staged(staged_path, kind, ext):
     name = f"{uuid.uuid4().hex}.{ext}"
     final = os.path.join(directory, name)
     try:
-        os.replace(staged_path, final)
+        try:
+            os.replace(staged_path, final)
+        except OSError as exc:
+            if exc.errno != errno.EXDEV:
+                raise
+            _copy_into_place(staged_path, final)
     except OSError:
         raise PromoUploadError("儲存檔案失敗，請稍後再試；若持續發生請聯絡系統管理者。", 503)
     try:

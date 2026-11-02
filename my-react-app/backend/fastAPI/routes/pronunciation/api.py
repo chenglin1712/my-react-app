@@ -2,10 +2,10 @@
 下載）跟 model.py（音檔轉向量、相似度計算）。"""
 import asyncio
 import logging
-import re
 
 from fastapi import APIRouter, HTTPException, Request
 
+from config.audio_source import is_valid_audio_id
 from fastAPI import game_config, rate_limit_config
 from fastAPI.form_limits import multipart_openapi_extra, parse_bounded_form, require_text, require_upload
 from fastAPI.rate_limit import limiter
@@ -58,7 +58,8 @@ async def _compare_uploaded_audio(user_audio, audio_id: str, reference_urls: str
         return make_error("ffmpeg_missing", "伺服器未安裝 ffmpeg，語音比對功能暫時無法使用")
 
     # audio_id 會直接拼接進下載 URL（fetch_audio_from_id），先驗證格式避免路徑遍歷／SSRF
-    if not re.match(r'^[a-zA-Z0-9._-]+$', audio_id):
+    # 稽核 FIL-1：原本的規則放過 "." 與 ".."（接在目錄網址後會走到上一層），也放過結尾換行；改用共用的檢查
+    if not is_valid_audio_id(audio_id):
         return make_error("invalid_audio_id", "audio_id 格式不合法")
 
     game_config.refresh_game_config_if_stale()

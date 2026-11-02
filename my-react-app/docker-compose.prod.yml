@@ -27,6 +27,8 @@ services:
       REQUIRE_DATABASE_URL: "true"
       # 後台上傳的首頁媒體（宣傳影片、封面、字幕）。必須掛持久化磁碟，否則容器重建檔案就消失
       MEDIA_ROOT: /app/media
+      # 上傳暫存目錄放在公開目錄之外（稽核 FIL-4），nginx 不會、也不需要對外提供它
+      MEDIA_STAGING_ROOT: /app/media_staging
     network_mode: host
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
@@ -51,6 +53,7 @@ services:
       - ./logs:/app/logs
       # nginx 從 <repo>/media/homepage/ 直接送檔（deploy/nginx.conf），Django 寫入同一個目錄
       - ./media:/app/media
+      - ./media_staging:/app/media_staging
     # /health/ 會實際探測資料庫與 cache（見 backend/core/views.py）。X-Forwarded-Proto
     # 讓 SECURE_SSL_REDIRECT 不要把這個本機 HTTP 探測轉成 301。回 503 時 urlopen 會丟
     # 例外、指令以非 0 結束。

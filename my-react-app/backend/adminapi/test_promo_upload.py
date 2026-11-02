@@ -123,7 +123,9 @@ class MediaTestCase(TestCase):
         cache.clear()
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
-        self.media_root = self._tmp.name
+        # 暫存目錄在公開目錄「旁邊」，不在它底下（稽核 FIL-4）；兩者都放進同一個暫存根目錄，測完一起清掉
+        self.media_root = os.path.join(self._tmp.name, "media")
+        os.makedirs(self.media_root)
         override = override_settings(MEDIA_ROOT=self.media_root, MEDIA_STAGING_ROOT=None)
         override.enable()
         self.addCleanup(override.disable)
@@ -851,3 +853,116 @@ class PathSafetyTest(MediaTestCase):
             f.write(b"x")
         self.assertEqual(public_media_url(f"homepage/cover/{name}"), f"/media/homepage/cover/{name}")
         self.assertTrue(media_file_exists(f"homepage/cover/{name}"))
+
+
+class StagingLocationTest(MediaTestCase):
+    """稽核 FIL-4：上傳暫存目錄預設放在公開目錄之外，不能只靠 nginx 的攔截規則才不被公開。"""
+
+    def test_default_staging_directory_is_beside_not_inside_the_public_directory(self):
+        staging = upload.staging_root()
+        public = upload.media_root()
+        self.assertNotEqual(os.path.commonpath([staging, public]), staging)
+        self.assertFalse(staging.startswith(public + os.sep))
+        self.assertEqual(os.path.dirname(staging), os.path.dirname(public))
+        self.assertTrue(os.path.basename(staging).endswith("_staging"))
+
+    def test_settings_default_is_beside_media_root(self):
+        import importlib
+        import os as os_module
+        from pathlib import Path
+        from unittest.mock import patch as mock_patch
+
+        from core import settings as settings_module
+
+        with mock_patch.dict(os_module.environ, {"MEDIA_ROOT": "/srv/app/media"}, clear=False):
+            os_module.environ.pop("MEDIA_STAGING_ROOT", None)
+            reloaded = importlib.reload(settings_module)
+            self.assertEqual(Path(reloaded.MEDIA_STAGING_ROOT), Path("/srv/app/media_staging"))
+        importlib.reload(settings_module)
+
+    def test_explicit_environment_setting_still_wins(self):
+        import importlib
+        import os as os_module
+        from pathlib import Path
+        from unittest.mock import patch as mock_patch
+
+        from core import settings as settings_module
+
+        with mock_patch.dict(os_module.environ, {"MEDIA_ROOT": "/srv/app/media", "MEDIA_STAGING_ROOT": "/var/tmp/stage"}):
+            reloaded = importlib.reload(settings_module)
+            self.assertEqual(Path(reloaded.MEDIA_STAGING_ROOT), Path("/var/tmp/stage"))
+        importlib.reload(settings_module)
+
+    def test_nothing_is_ever_staged_inside_the_public_directory(self):
+        path = upload.stage_upload(_Chunks(b"abc"), 1024)
+        self.assertFalse(path.startswith(upload.media_root() + os.sep))
+        self.assertTrue(path.startswith(upload.staging_root() + os.sep))
+        upload.discard(path)
+
+    def test_commit_works_when_staging_is_a_different_directory(self):
+        path = upload.stage_upload(_Chunks(b"video-bytes"), 1024)
+        relative = upload.commit_staged(path, "video", "mp4")
+        with open(os.path.join(self.media_root, *relative.split("/")), "rb") as f:
+            self.assertEqual(f.read(), b"video-bytes")
+        self.assertFalse(os.path.exists(path))
+
+    def test_commit_across_filesystems_copies_then_renames_atomically(self):
+        import errno
+
+        path = upload.stage_upload(_Chunks(b"cross-device"), 1024)
+        real_replace = os.replace
+        calls = []
+
+        def replace(src, dst):
+            calls.append((src, dst))
+            if src == path:                                   # 第一次：暫存 -> 公開目錄（不同掛載點）
+                raise OSError(errno.EXDEV, "Invalid cross-device link")
+            return real_replace(src, dst)                     # 之後：公開目錄內的 rename
+
+        with patch("adminapi.promo_upload.os.replace", side_effect=replace):
+            relative = upload.commit_staged(path, "video", "mp4")
+        final = os.path.join(self.media_root, *relative.split("/"))
+        with open(final, "rb") as f:
+            self.assertEqual(f.read(), b"cross-device")
+        self.assertFalse(os.path.exists(path))                # 暫存檔已清掉
+        self.assertEqual(os.path.dirname(calls[1][0]), os.path.dirname(final))   # 第二次 rename 在公開目錄內
+        self.assertEqual(os.listdir(os.path.dirname(final)), [os.path.basename(final)])   # 沒有殘留隱藏暫存檔
+
+    def test_a_failed_cross_filesystem_copy_leaves_no_partial_public_file(self):
+        import errno
+
+        path = upload.stage_upload(_Chunks(b"data"), 1024)
+        real_replace = os.replace
+
+        def replace(src, dst):
+            if src == path:
+                raise OSError(errno.EXDEV, "Invalid cross-device link")
+            raise OSError(errno.ENOSPC, "No space left on device")
+
+        with patch("adminapi.promo_upload.os.replace", side_effect=replace):
+            with self.assertRaises(upload.PromoUploadError) as ctx:
+                upload.commit_staged(path, "video", "mp4")
+        self.assertEqual(ctx.exception.status, 503)
+        directory = os.path.join(self.media_root, "homepage", "video")
+        self.assertEqual(os.listdir(directory), [])           # 沒有半成品，也沒有隱藏暫存檔
+        self.assertTrue(os.path.exists(path))                 # 暫存檔還在，交給清理指令處理
+
+    def test_other_errors_are_not_mistaken_for_a_cross_device_move(self):
+        import errno
+
+        path = upload.stage_upload(_Chunks(b"data"), 1024)
+        with patch("adminapi.promo_upload.os.replace", side_effect=OSError(errno.EACCES, "denied")), \
+                patch("adminapi.promo_upload._copy_into_place") as copy:
+            with self.assertRaises(upload.PromoUploadError):
+                upload.commit_staged(path, "video", "mp4")
+        copy.assert_not_called()
+
+
+class _Chunks:
+    """stage_upload 需要的最小上傳物件：只要有 chunks(size)。"""
+
+    def __init__(self, data):
+        self.data = data
+
+    def chunks(self, size):
+        yield self.data

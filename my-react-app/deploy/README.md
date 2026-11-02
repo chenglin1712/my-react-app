@@ -57,8 +57,10 @@ Firestore 與 Firebase Auth 預設**沒有**被備份。要備份 Firestore，�
 nginx 直接送檔，Django 寫入同一個目錄。**第一次部署前請先做完下面幾件事：**
 
 1. **磁碟快照：** 在 Google Cloud 為開機磁碟設定每日快照，保留 7 天。**這一項是前置條件，沒做完不要上傳正式影片。**
-2. **建立目錄並限制權限：** `mkdir -p media/homepage/{video,cover,caption}`，目錄只讓部署帳號與容器寫入；
+2. **建立目錄並限制權限：** `mkdir -p media/homepage/{video,cover,caption} media_staging`，目錄只讓部署帳號與容器寫入；
    一般帳號不可修改。**不可以是符號連結**（`python manage.py check_promo_media` 會檢查）。
+   `media_staging/` 是上傳暫存目錄，放在公開的 `media/` **之外**，不需要備份、nginx 也不會送出它（`deploy.sh` 會自動建立）。
+   舊版把暫存放在 `media/_staging/`：升級後可以確認裡面沒有上傳中的檔案再刪除它。
 3. **nginx：** 套用 `deploy/nginx.conf` 新增的 `/media/homepage/` 與 `/adminapi/promo-videos/` 兩段，`nginx -t` 後重新載入。
 4. **備份：** `backup.sh` 會把 `media/homepage` 鏡像到 `$BACKUP_DIR/media/`（檔名是 uuid 且不修改，鏡像不必每天打包）。
    資料庫與媒體分開備份，**可能還原出「引用不存在檔案」的資料**，所以：

@@ -3,7 +3,7 @@ import logging
 import re
 
 import httpx
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Path, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -12,14 +12,14 @@ from dictionary_db.model import MediaAsset, Word
 from dictionary_db.word_data import load_audio_items_for_words
 from config.tribes import resolve_tribe_name
 from config.debug_flag import is_debug
-from config.audio_source import get_ilrdf_audio_api
+from config.audio_source import AUDIO_ID_MAX_LENGTH, AUDIO_ID_PATTERN, build_ilrdf_audio_url, is_valid_audio_id
 from config.bounded_download import (
     IDENTITY_ENCODING_HEADERS, MAX_OFFICIAL_AUDIO_BYTES, MAX_RESOLVER_BODY_BYTES, DownloadLimitError, aread_capped,
 )
 from config.media_source import get_media_source_mode
 from fastAPI import rate_limit_config
 from fastAPI.rate_limit import limiter
-from config.url_safety import UnsafeConnectionError, assert_response_from_safe_peer, is_safe_redirect_target
+from config.url_safety import UnsafeConnectionError, assert_response_from_safe_peer, pin_target
 
 from .schemas import SentenceAudioRequest
 from .search import _tribe_id_subquery
@@ -45,9 +45,18 @@ def _lookup_verified_audio_asset(db: Session, file_id: str):
     )
 
 
-@router.get("/audio/{file_id:path}")
+# 稽核 FIL-1：原本是 {file_id:path}，連斜線都收，file_id 直接接在 ILRDF 網址後面。改成單一路徑段並驗證格式
+# （英數、底線、連字號、點），不合格在進入函式前就是 422；"." 與 ".." 在函式內另外擋。
+@router.get("/audio/{file_id}")
 @limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_audio_proxy_proxy_audio", "60/minute"))  # 原本沒有限流，見同檔案其他端點的說明
-async def proxy_audio(request: Request, file_id: str, db: Session = Depends(get_db)):
+async def proxy_audio(
+    request: Request,
+    file_id: str = Path(..., pattern=AUDIO_ID_PATTERN, max_length=AUDIO_ID_MAX_LENGTH),
+    db: Session = Depends(get_db),
+):
+    if not is_valid_audio_id(file_id):
+        return Response(content="音檔代號格式不合法", media_type="text/plain", status_code=422)
+
     # P5 辭典媒體自主化：有自己 Storage 的已驗證副本就直接 302 過去，讓
     # Google 的 CDN 送檔，這個端點自己不用再扛流量，也不再依賴 ILRDF 存活。
     # 這是單一、有索引的查詢（media_asset 的 unique index 就是
@@ -66,7 +75,7 @@ async def proxy_audio(request: Request, file_id: str, db: Session = Depends(get_
 
     # hybrid 模式（預設）：還沒遷移到的詞條，照舊即時代理 ILRDF，行為完全不變。
     try:
-        first_url = get_ilrdf_audio_api() + file_id
+        first_url = build_ilrdf_audio_url(file_id)
 
         async with httpx.AsyncClient(follow_redirects=False, timeout=10) as client:
             # 第一次請求的本文只是一段網址文字，讀取時限制在幾 KB 內（見 config/bounded_download.py）
@@ -85,12 +94,17 @@ async def proxy_audio(request: Request, file_id: str, db: Session = Depends(get_
             # 第二次請求的目標網址完全由第一次請求的回應內容決定，發出前先擋掉
             # 明顯指向內網／loopback／link-local（含雲端 metadata endpoint）的
             # 位址，避免被當成 SSRF 跳板（見 url_safety.py 說明）。
-            if not is_safe_redirect_target(final_url):
+            # 稽核 FIL-2：解析一次、檢查所有結果、之後直接連那個 IP（pin_target），連線時不會再有第二次 DNS 查詢。
+            try:
+                pinned = await asyncio.to_thread(pin_target, final_url)
+            except UnsafeConnectionError:
                 return Response(content="Audio URL not allowed", media_type="text/plain", status_code=502)
 
             async with httpx.AsyncClient(timeout=15) as c2:
                 # 串流下載：回應標頭一到就能檢查，本文不會先完整進記憶體。
-                async with c2.stream("GET", final_url, headers=IDENTITY_ENCODING_HEADERS) as audio_res:
+                async with c2.stream(
+                    "GET", pinned.url, headers={**IDENTITY_ENCODING_HEADERS, **pinned.headers}, extensions=pinned.extensions,
+                ) as audio_res:
                     # is_safe_redirect_target 檢查的那次 DNS 解析，跟這裡實際連線時 httpx 自己
                     # 重新做的 DNS 解析是兩次獨立的查詢——如果網域在中間變更了解析結果
                     # （低 TTL、DNS rebinding），前面的檢查就形同虛設。這裡改成檢查「實際
@@ -120,10 +134,12 @@ async def proxy_audio(request: Request, file_id: str, db: Session = Depends(get_
 # 正式環境（DJANGO_DEBUG=False）不掛載這個路由，避免暴露內部資訊。
 if is_debug():
     @router.get("/debug_audio/{audio_id}")
-    async def debug_audio(audio_id: str):
+    async def debug_audio(audio_id: str = Path(..., pattern=AUDIO_ID_PATTERN, max_length=AUDIO_ID_MAX_LENGTH)):
+        if not is_valid_audio_id(audio_id):
+            return {"success": False, "step": "invalid_audio_id"}
 
         try:
-            first_url = get_ilrdf_audio_api() + audio_id
+            first_url = build_ilrdf_audio_url(audio_id)
 
             async with httpx.AsyncClient(follow_redirects=False) as client:
                 res = await client.get(first_url)
@@ -143,7 +159,9 @@ if is_debug():
 
                 # 第二次請求的目標網址完全由第一次請求的回應內容決定，發出前先
                 # 擋掉明顯指向內網／loopback／link-local 的位址（見 url_safety.py）。
-                if not is_safe_redirect_target(final_url):
+                try:
+                    pinned = await asyncio.to_thread(pin_target, final_url)
+                except UnsafeConnectionError:
                     return {
                         "success": False,
                         "step": "unsafe_redirect_target",
@@ -152,7 +170,7 @@ if is_debug():
 
             # 第二次請求真正的音檔
             async with httpx.AsyncClient() as c2:
-                audio_res = await c2.get(final_url)
+                audio_res = await c2.get(pinned.url, headers=pinned.headers, extensions=pinned.extensions)
 
                 # 跟 proxy_audio 同樣的 DNS rebinding TOCTOU 防護：確認實際
                 # 建立連線的 IP 安全，才信任這次的回應內容（見 url_safety.py）。

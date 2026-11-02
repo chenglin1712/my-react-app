@@ -8,8 +8,8 @@ import time
 
 import httpx
 
-from config.audio_source import get_ilrdf_audio_api
-from config.url_safety import UnsafeConnectionError, assert_response_from_safe_peer, is_safe_redirect_target
+from config.audio_source import build_ilrdf_audio_url
+from config.url_safety import UnsafeConnectionError, assert_response_from_safe_peer, is_safe_redirect_target, pin_target
 
 from . import sniff
 
@@ -75,10 +75,15 @@ async def _resolve_ilrdf_url(client, rate_limiter, file_id):
     先依 HTTP 狀態碼分類（跟 _fetch_bytes 一致），200 才把回應內容當純文字
     URL 解析——上游回 429/5xx 時本體不一定是有效 URL，之前的寫法會誤判成
     「沒解析出網址」而永久判死，其實應該重試。"""
+    # 稽核 FIL-1：file_id 來自資料庫，和其他入口一樣先驗證格式（quote 擋不住 ".."），不合格需要人工檢查
+    try:
+        first_url = build_ilrdf_audio_url(file_id)
+    except ValueError:
+        raise _FetchError(f"file_id 格式不合法，需要人工檢查：{file_id!r}", terminal=True)
     await rate_limiter.wait()
     try:
         res = await client.get(
-            get_ilrdf_audio_api() + file_id,
+            first_url,
             timeout=httpx.Timeout(connect=_CONNECT_TIMEOUT, read=_RESOLVE_TIMEOUT, write=_RESOLVE_TIMEOUT, pool=_RESOLVE_TIMEOUT),
         )
     except httpx.TimeoutException as exc:
@@ -110,7 +115,14 @@ async def _stream_fetch_once(client, url, *, timeout, max_bytes, family):
     後者會先把整個回應收進記憶體才給呼叫端檢查大小，上游若回傳異常大的內容，
     max_bytes 上限完全不會生效，要等整份下載完才判斷。這裡邊讀 chunk 邊累計
     大小，一超過上限立刻中止，不會把過大的內容整個吃進記憶體。"""
-    async with client.stream("GET", url, timeout=timeout, follow_redirects=False) as res:
+    # 稽核 FIL-2：解析一次、檢查所有結果、直接連那個 IP；連線時不會再有第二次 DNS 查詢
+    try:
+        pinned = await asyncio.to_thread(pin_target, url)
+    except UnsafeConnectionError as exc:
+        raise _FetchError(str(exc), terminal=True)
+    async with client.stream(
+        "GET", pinned.url, headers=pinned.headers, extensions=pinned.extensions, timeout=timeout, follow_redirects=False,
+    ) as res:
         if res.status_code in (301, 302, 303, 307, 308):
             return ("redirect", res.headers.get("Location", ""))
         if res.status_code in _RETRYABLE_STATUS_CODES:

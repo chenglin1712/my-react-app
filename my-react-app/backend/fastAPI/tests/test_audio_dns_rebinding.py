@@ -17,6 +17,13 @@ from fastAPI.routes.pronunciation.audio_fetch import fetch_audio_from_id
 from dictionary_db.connect import get_db
 
 
+from config.url_safety import PinnedTarget, UnsafeConnectionError
+
+
+def _refuse_pin(url):
+    raise UnsafeConnectionError("test: target not allowed")
+
+
 class _SyncStream:
     """`httpx.Client.stream()` 的替身：with 區塊給出一個 httpx.Response。"""
 
@@ -74,7 +81,7 @@ class TestFetchAudioFromIdRebindingProtection:
         # 的已驗證副本，這裡假設還沒遷移到（回傳 None），才會走到下面這支測試
         # 原本要測的 ILRDF fallback 路徑。
         monkeypatch.setattr("fastAPI.routes.pronunciation.audio_fetch._lookup_verified_audio_url", lambda audio_id: None)
-        monkeypatch.setattr("fastAPI.routes.pronunciation.audio_fetch.is_safe_redirect_target", lambda url: True)
+        monkeypatch.setattr("fastAPI.routes.pronunciation.audio_fetch.pin_target", lambda url: PinnedTarget(url))
 
         with _sync_hops(_first_hop("https://cdn.example.com/audio.mp3"), _second_hop("10.0.0.5")):
             with pytest.raises(Exception, match="音檔 URL 指向不允許的位址"):
@@ -82,7 +89,7 @@ class TestFetchAudioFromIdRebindingProtection:
 
     def test_allows_when_actual_connection_peer_is_public(self, monkeypatch):
         monkeypatch.setattr("fastAPI.routes.pronunciation.audio_fetch._lookup_verified_audio_url", lambda audio_id: None)
-        monkeypatch.setattr("fastAPI.routes.pronunciation.audio_fetch.is_safe_redirect_target", lambda url: True)
+        monkeypatch.setattr("fastAPI.routes.pronunciation.audio_fetch.pin_target", lambda url: PinnedTarget(url))
 
         with _sync_hops(_first_hop("https://cdn.example.com/audio.mp3"), _second_hop("93.184.216.34")):
             content = fetch_audio_from_id("word123")
@@ -118,7 +125,7 @@ class TestProxyAudioRebindingProtection:
         # （回傳 None），才會走到下面原本要測的 ILRDF fallback 路徑；client
         # fixture 的 _fake_get_db 回傳 None，不是真正能查詢的 Session。
         with patch("fastAPI.routes.dictionary.audio_proxy._lookup_verified_audio_asset", return_value=None):
-            with patch("fastAPI.routes.dictionary.audio_proxy.is_safe_redirect_target", return_value=True):
+            with patch("fastAPI.routes.dictionary.audio_proxy.pin_target", side_effect=lambda url: PinnedTarget(url)):
                 with _async_hops(first_hop, second_hop):
                     response = client.get("/api/v1/dictionary/audio/some-file-id")
 
@@ -130,7 +137,7 @@ class TestProxyAudioRebindingProtection:
         second_hop = _second_hop("93.184.216.34")
 
         with patch("fastAPI.routes.dictionary.audio_proxy._lookup_verified_audio_asset", return_value=None):
-            with patch("fastAPI.routes.dictionary.audio_proxy.is_safe_redirect_target", return_value=True):
+            with patch("fastAPI.routes.dictionary.audio_proxy.pin_target", side_effect=lambda url: PinnedTarget(url)):
                 with _async_hops(first_hop, second_hop):
                     response = client.get("/api/v1/dictionary/audio/some-file-id")
 

@@ -265,9 +265,11 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # 否則容器重建檔案就消失（見 HOMEPAGE_CONTRACT.md 第 8 節）。公開網址固定是 /media/。
 MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT") or (BASE_DIR / "media"))
 MEDIA_URL = "/media/"
-# 上傳中的檔案先放這裡，驗證通過才原子搬進公開目錄。預設在 MEDIA_ROOT 底下（同一個檔案系統，
-# rename 才是原子的）；nginx 只對外提供 /media/homepage/，所以這個目錄不會被公開。
-MEDIA_STAGING_ROOT = Path(os.getenv("MEDIA_STAGING_ROOT") or (MEDIA_ROOT / "_staging"))
+# 上傳中的檔案先放這裡，驗證通過才搬進公開目錄。預設放在 MEDIA_ROOT 的【旁邊】（<MEDIA_ROOT>_staging），
+# 不在它底下：暫存目錄不該只靠 nginx 的 /media/ 規則才不被公開（稽核 FIL-4）。
+# 兩個目錄在不同掛載點（容器內分開掛載）時 rename 會失敗，commit_staged 會改成「複製到公開目錄內的暫存名、
+# 再 rename」，結果仍是原子的（見 adminapi/promo_upload.py）。
+MEDIA_STAGING_ROOT = Path(os.getenv("MEDIA_STAGING_ROOT") or (MEDIA_ROOT.parent / f"{MEDIA_ROOT.name}_staging"))
 # 驗證上傳影片用的 ffprobe 執行檔（backend/Dockerfile 的 ffmpeg 套件已提供）
 FFPROBE_BIN = os.getenv("FFPROBE_BIN") or "ffprobe"
 STORAGES = {
