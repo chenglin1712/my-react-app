@@ -108,6 +108,32 @@ def safe_write_audit_log(*args, **kwargs):
         logger.exception("P3 稽核紀錄寫入失敗（主要操作已完成，不影響呼叫端回應結果）")
 
 
+class AuditLogUnavailable(Exception):
+    """高權限操作的稽核紀錄寫不進去，操作已中止（還沒有執行任何動作）。guarded_action 把它轉成 503。"""
+
+
+def write_audit_log_first(*args, **kwargs):
+    """高權限的帳號操作（指派角色、改密碼、停權、刪除帳號、改 email…）用：在執行動作之前寫稽核紀錄，
+    寫不進去就中止，不執行動作（稽核 FLW-4）。
+
+    safe_write_audit_log 在動作之後寫、失敗只記錄：這些動作是 Firebase 端的，不能跟 Django 交易一起回滾，
+    所以稽核資料庫一旦出問題，角色指派、改密碼、停權、刪除帳號就可能沒有任何稽核紀錄而完成。
+    這裡改成先寫後做（fail-closed）；動作之後失敗的話，用 mark_action_failed 補一筆「失敗」紀錄，
+    讓紀錄不會只留下一個沒有完成的動作。"""
+    try:
+        write_audit_log(*args, **kwargs)
+    except Exception as exc:
+        logger.exception("高權限操作的稽核紀錄寫入失敗，操作已中止（尚未執行任何動作）")
+        raise AuditLogUnavailable() from exc
+
+
+def mark_action_failed(request, decoded, action, target, *, target_type="user", reason=""):
+    """write_audit_log_first 已經寫了「要做這個動作」的紀錄，但動作本身失敗時補一筆，best-effort。"""
+    safe_write_audit_log(
+        request, decoded, f"{action}_failed", target, target_type=target_type, after={"reason": reason},
+    )
+
+
 def guarded_action(method, role, rate_limit=None):
     """view function 開頭幾乎每次都重複的「method 檢查 → require_role →
     （可選）限流」三件事，抽成一個 decorator（P4 review BE-27：原本
@@ -151,7 +177,13 @@ def guarded_action(method, role, rate_limit=None):
                 limited_resp = rate_limited_response(request, decoded, group=group, rate=rate, method=limit_method)
                 if limited_resp:
                     return limited_resp
-            return view_func(request, decoded, *args, **kwargs)
+            try:
+                return view_func(request, decoded, *args, **kwargs)
+            except AuditLogUnavailable:
+                return JsonResponse(
+                    {"detail": "目前無法寫入稽核紀錄，為了安全操作已中止，請稍後再試", "code": "audit_log_unavailable"},
+                    status=503,
+                )
         return wrapper
     return decorator
 

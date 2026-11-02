@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import MagicMock, call, patch
 
+from django.core.cache import cache
 from django.test import Client, TestCase
 from django.test.utils import override_settings
 
@@ -618,8 +619,9 @@ class UserPasswordTest(TestCase):
         # 稽核紀錄不得含明文密碼——不管是 before／after 都只能有一個布林標記。
         log_blob = json.dumps({"before": log.before, "after": log.after}, ensure_ascii=False)
         self.assertNotIn("supersecret1", log_blob)
-        self.assertEqual(log.after, {"password_changed": True, "sessions_revoked": True})
+        self.assertEqual(log.after, {"password_changed": True})
         self.assertTrue(resp.json()["sessions_revoked"])
+        self.assertFalse(AuditLog.objects.filter(action="change_password_sessions_not_revoked").exists())
 
     @patch("adminapi.firebase_ops.revoke_sessions")
     @patch("adminapi.firebase_ops.set_user_password")
@@ -643,8 +645,10 @@ class UserPasswordTest(TestCase):
         self.assertTrue(resp.json()["password_changed"])
         self.assertFalse(resp.json()["sessions_revoked"])
 
-        log = AuditLog.objects.get(action="change_password")
-        self.assertEqual(log.after, {"password_changed": True, "sessions_revoked": False})
+        # 動作前先寫的紀錄只有「要改密碼」；撤銷登入失敗另外補一筆（稽核 FLW-4）
+        self.assertEqual(AuditLog.objects.get(action="change_password").after, {"password_changed": True})
+        warning = AuditLog.objects.get(action="change_password_sessions_not_revoked")
+        self.assertEqual(warning.after, {"password_changed": True, "sessions_revoked": False})
 
 
 class UserSuspendTest(TestCase):
@@ -778,6 +782,46 @@ class UserExportTest(TestCase):
         with _as_role(ADMIN) as headers:
             resp = self.client.get('/adminapi/users/owner-uid/export/', **headers)
         self.assertEqual(resp.status_code, 403)
+
+
+class UserExportPrivilegeAndAuditTest(TestCase):
+    """稽核 FLW-3／FLW-4：匯出管理者帳號的個資只有 owner 可以；稽核紀錄寫不進去就不匯出。"""
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.client = Client()
+
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_admin_cannot_export_another_admin(self, mock_get_user):
+        mock_get_user.return_value = _fake_user_record("admin-2", email="a2@example.com", role=ADMIN)
+        with _as_role(ADMIN) as headers:
+            resp = self.client.get('/adminapi/users/admin-2/export/', **headers)
+        self.assertEqual(resp.status_code, 403)
+        self.assertFalse(AuditLog.objects.filter(action="export_personal_data").exists())
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_owner_can_export_an_admin(self, mock_get_user, mock_client_fn):
+        mock_get_user.return_value = _fake_user_record("admin-2", email="a2@example.com", role=ADMIN)
+        mock_client, _ = _build_client_router(
+            users_doc=_fake_snapshot("admin-2", {"name": "Admin Two"}), notes=[], recordings=[],
+        )
+        mock_client_fn.return_value = mock_client
+        with _as_role(OWNER) as headers:
+            resp = self.client.get('/adminapi/users/admin-2/export/', **headers)
+        self.assertEqual(resp.status_code, 200)
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_export_is_refused_when_audit_log_cannot_be_written(self, mock_get_user, mock_client_fn):
+        mock_get_user.return_value = _fake_user_record("uid1", email="alice@example.com")
+        with patch("adminapi._shared.write_audit_log", side_effect=Exception("audit db down")), \
+                _as_role(ADMIN) as headers:
+            resp = self.client.get('/adminapi/users/uid1/export/', **headers)
+        self.assertEqual(resp.status_code, 503)
+        self.assertNotIn("alice@example.com", resp.content.decode("utf-8"))
+        mock_client_fn.assert_not_called()  # 稽核失敗時連使用者資料都沒有去讀
 
 
 class UserDeleteTest(TestCase):
@@ -942,3 +986,293 @@ class UserDeleteTest(TestCase):
         self.assertFalse(data["firebase_auth"]["deleted"])
         self.assertTrue(data["firestore_user_document"]["deleted"])
         users_doc_ref.delete.assert_called_once()
+
+
+class AdminTargetsAdminTest(TestCase):
+    """稽核 FLW-3：admin 之間不能互相改密碼、改資料（含 email）、停權、解除停權、刪除，只有 owner 可以。"""
+
+    def setUp(self):
+        cache.clear()  # 限流計數存在快取；這個類別的刪除／改密碼請求不要吃掉後面測試的額度
+        self.addCleanup(cache.clear)
+        self.client = Client()
+        self.target = _fake_user_record("admin-2", email="admin2@example.com", role=ADMIN)
+
+    @patch("adminapi.firebase_ops.set_user_email")
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_admin_cannot_edit_another_admin_profile(self, mock_get_user, mock_client_fn, mock_set_email):
+        mock_get_user.return_value = self.target
+        with _as_role(ADMIN) as headers:
+            resp = _patch_json(
+                self.client, '/adminapi/users/admin-2/profile/', headers, {"email": "attacker@example.com"},
+            )
+        self.assertEqual(resp.status_code, 403)
+        mock_set_email.assert_not_called()
+
+    @patch("adminapi.firebase_ops.revoke_sessions")
+    @patch("adminapi.firebase_ops.set_user_password")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_admin_cannot_change_another_admin_password(self, mock_get_user, mock_set_password, mock_revoke):
+        mock_get_user.return_value = self.target
+        with _as_role(ADMIN) as headers:
+            resp = _post_json(self.client, '/adminapi/users/admin-2/password/', headers, {
+                "new_password": "newpass1", "confirm_email": "admin2@example.com",
+            })
+        self.assertEqual(resp.status_code, 403)
+        mock_set_password.assert_not_called()
+
+    @patch("adminapi.firebase_ops.revoke_sessions")
+    @patch("adminapi.firebase_ops.set_user_disabled")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_admin_cannot_suspend_or_unsuspend_another_admin(self, mock_get_user, mock_set_disabled, mock_revoke):
+        mock_get_user.return_value = self.target
+        for action in ("suspend", "unsuspend"):
+            with _as_role(ADMIN) as headers:
+                resp = _post_json(self.client, f'/adminapi/users/admin-2/{action}/', headers)
+            self.assertEqual(resp.status_code, 403, action)
+        mock_set_disabled.assert_not_called()
+
+    @patch("adminapi.firebase_ops.delete_firebase_user")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_admin_cannot_delete_another_admin(self, mock_get_user, mock_delete_auth):
+        mock_get_user.return_value = self.target
+        with _as_role(ADMIN) as headers:
+            resp = _post_json(
+                self.client, '/adminapi/users/admin-2/delete/', headers, {"confirm_email": "admin2@example.com"},
+            )
+        self.assertEqual(resp.status_code, 403)
+        mock_delete_auth.assert_not_called()
+
+    @patch("adminapi.firebase_ops.revoke_sessions")
+    @patch("adminapi.firebase_ops.set_user_disabled")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_owner_can_suspend_an_admin(self, mock_get_user, mock_set_disabled, mock_revoke):
+        mock_get_user.return_value = self.target
+        with _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/users/admin-2/suspend/', headers)
+        self.assertEqual(resp.status_code, 200)
+        mock_set_disabled.assert_called_once_with("admin-2", True)
+
+    @patch("adminapi.firebase_ops.delete_firebase_user")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_owner_is_not_blocked_by_the_admin_target_guard_on_delete_and_password(self, mock_get_user, mock_delete_auth):
+        # 故意帶錯誤的 confirm_email：通過階層檢查後才會走到 email 確認而回 400，不是 403
+        mock_get_user.return_value = self.target
+        with _as_role(OWNER) as headers:
+            deleted = _post_json(self.client, '/adminapi/users/admin-2/delete/', headers, {"confirm_email": "wrong@example.com"})
+            changed = _post_json(self.client, '/adminapi/users/admin-2/password/', headers, {
+                "new_password": "newpass1", "confirm_email": "wrong@example.com",
+            })
+        self.assertEqual(deleted.status_code, 400)
+        self.assertEqual(changed.status_code, 400)
+        mock_delete_auth.assert_not_called()
+
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_admin_changing_own_password_is_not_blocked_by_the_guard(self, mock_get_user):
+        # _as_role 的使用者 uid 是 test-uid；自己對自己不擋（帶錯 email 走到 400，不是 403）
+        mock_get_user.return_value = _fake_user_record("test-uid", email="me@example.com", role=ADMIN)
+        with _as_role(ADMIN) as headers:
+            resp = _post_json(self.client, '/adminapi/users/test-uid/password/', headers, {
+                "new_password": "newpass1", "confirm_email": "wrong@example.com",
+            })
+        self.assertEqual(resp.status_code, 400)
+
+    @patch("adminapi.firebase_ops.revoke_sessions")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_admin_can_still_force_logout_another_admin(self, mock_get_user, mock_revoke):
+        # 強制登出是防禦動作：發現某個 admin 帳號被盜時，其他 admin 應該能先把它踢下線
+        mock_get_user.return_value = self.target
+        with _as_role(ADMIN) as headers:
+            resp = _post_json(self.client, '/adminapi/users/admin-2/force-logout/', headers)
+        self.assertEqual(resp.status_code, 200)
+        mock_revoke.assert_called_once_with("admin-2")
+
+
+class AuditFirstFailClosedTest(TestCase):
+    """稽核 FLW-4：高權限帳號操作先寫稽核紀錄，寫不進去就中止，不會「動作完成了卻沒有紀錄」。"""
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.client = Client()
+        self.audit_down = patch("adminapi._shared.write_audit_log", side_effect=Exception("audit db down"))
+
+    def _assert_unavailable(self, resp):
+        self.assertEqual(resp.status_code, 503)
+        self.assertEqual(resp.json()["code"], "audit_log_unavailable")
+
+    @patch("adminapi.firebase_ops.revoke_sessions")
+    @patch("adminapi.firebase_ops.set_user_role")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_assign_role_aborts_when_audit_log_cannot_be_written(self, mock_get_user, mock_set_role, mock_revoke):
+        mock_get_user.return_value = _fake_user_record("uid1")
+        with self.audit_down, _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/users/uid1/role/', headers, {"role": "editor"})
+        self._assert_unavailable(resp)
+        mock_set_role.assert_not_called()
+        mock_revoke.assert_not_called()
+
+    @patch("adminapi.firebase_ops.revoke_sessions")
+    @patch("adminapi.firebase_ops.set_user_password")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_change_password_aborts_when_audit_log_cannot_be_written(self, mock_get_user, mock_set_password, mock_revoke):
+        mock_get_user.return_value = _fake_user_record("uid1", email="alice@example.com")
+        with self.audit_down, _as_role(ADMIN) as headers:
+            resp = _post_json(self.client, '/adminapi/users/uid1/password/', headers, {
+                "new_password": "supersecret1", "confirm_email": "alice@example.com",
+            })
+        self._assert_unavailable(resp)
+        mock_set_password.assert_not_called()
+
+    @patch("adminapi.firebase_ops.revoke_sessions")
+    @patch("adminapi.firebase_ops.set_user_disabled")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_suspend_aborts_when_audit_log_cannot_be_written(self, mock_get_user, mock_set_disabled, mock_revoke):
+        mock_get_user.return_value = _fake_user_record("uid1")
+        with self.audit_down, _as_role(ADMIN) as headers:
+            resp = _post_json(self.client, '/adminapi/users/uid1/suspend/', headers)
+        self._assert_unavailable(resp)
+        mock_set_disabled.assert_not_called()
+
+    @patch("adminapi.firebase_ops.delete_firebase_user")
+    @patch("adminapi.firebase_ops.revoke_sessions")
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_delete_account_aborts_when_audit_log_cannot_be_written(
+        self, mock_get_user, mock_client_fn, mock_revoke, mock_delete_auth,
+    ):
+        mock_get_user.return_value = _fake_user_record("uid1", email="alice@example.com")
+        mock_client, users_doc_ref = _build_client_router(
+            users_doc=_fake_snapshot("uid1", {"name": "Alice"}), notes=[], recordings=[],
+        )
+        mock_client_fn.return_value = mock_client
+        with self.audit_down, _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/users/uid1/delete/', headers, {"confirm_email": "alice@example.com"})
+        self._assert_unavailable(resp)
+        mock_revoke.assert_not_called()
+        mock_delete_auth.assert_not_called()
+        users_doc_ref.delete.assert_not_called()
+
+    @patch("adminapi.firebase_ops.set_user_email")
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_profile_change_aborts_when_audit_log_cannot_be_written(self, mock_get_user, mock_client_fn, mock_set_email):
+        mock_get_user.return_value = _fake_user_record("uid1", email="old@example.com")
+        before_doc = _fake_snapshot("uid1", {"name": "Alice", "email": "old@example.com"})
+        mock_client, users_doc_ref = _build_client_router(users_doc=before_doc, notes=[], recordings=[])
+        mock_client_fn.return_value = mock_client
+        with self.audit_down, _as_role(OWNER) as headers:
+            resp = _patch_json(self.client, '/adminapi/users/uid1/profile/', headers, {"email": "new@example.com"})
+        self._assert_unavailable(resp)
+        mock_set_email.assert_not_called()
+        users_doc_ref.set.assert_not_called()
+
+    @patch("adminapi.firebase_ops.revoke_sessions")
+    @patch("adminapi.firebase_ops.set_user_role")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_failed_firebase_action_leaves_a_failed_record(self, mock_get_user, mock_set_role, mock_revoke):
+        mock_get_user.return_value = _fake_user_record("uid1")
+        mock_set_role.side_effect = RuntimeError("firebase down")
+        client = Client(raise_request_exception=False)
+        with _as_role(OWNER) as headers:
+            resp = _post_json(client, '/adminapi/users/uid1/role/', headers, {"role": "editor"})
+        self.assertEqual(resp.status_code, 500)
+        self.assertTrue(AuditLog.objects.filter(action="assign_role").exists())
+        self.assertTrue(AuditLog.objects.filter(action="assign_role_failed", target_id="uid1").exists())
+
+    @patch("adminapi.firebase_ops.revoke_sessions")
+    @patch("adminapi.firebase_ops.set_user_disabled")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_audit_down_does_not_block_low_risk_force_logout(self, mock_get_user, mock_set_disabled, mock_revoke):
+        # 強制登出是防禦動作，稽核資料庫壞掉時不該連它一起擋（仍用事後 best-effort 的寫法）
+        mock_get_user.return_value = _fake_user_record("uid1")
+        with self.audit_down, _as_role(ADMIN) as headers:
+            resp = _post_json(self.client, '/adminapi/users/uid1/force-logout/', headers)
+        self.assertEqual(resp.status_code, 200)
+        mock_revoke.assert_called_once_with("uid1")
+
+
+class UserPrivacyByRoleTest(TestCase):
+    """稽核 FLW-6：不能管理帳號的員工角色（editor、reviewer、analyst）看不到 email。"""
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.client = Client()
+
+    def _setup_list(self, mock_list_users, mock_client_fn):
+        mock_list_users.return_value = [
+            _fake_user_record("uid1", email="alice@example.com"),
+            _fake_user_record("uid2", email="bob@example.com"),
+        ]
+        mock_client = MagicMock()
+        mock_client.get_all.return_value = [
+            _fake_snapshot("uid1", {"name": "Alice", "email": "alice@example.com"}),
+            _fake_snapshot("uid2", {"name": "Bob", "email": "bob@example.com"}),
+        ]
+        mock_client_fn.return_value = mock_client
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.list_all_firebase_users")
+    def test_staff_without_account_management_get_no_email_in_the_list(self, mock_list_users, mock_client_fn):
+        self._setup_list(mock_list_users, mock_client_fn)
+        for role in (EDITOR, "reviewer", "analyst"):
+            with _as_role(role) as headers:
+                resp = self.client.get('/adminapi/users/', **headers)
+            self.assertEqual(resp.status_code, 200, role)
+            self.assertNotIn("@example.com", resp.content.decode("utf-8"), role)
+            self.assertTrue(all(item["email"] is None for item in resp.json()["results"]), role)
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.list_all_firebase_users")
+    def test_keyword_search_by_email_does_not_work_for_them(self, mock_list_users, mock_client_fn):
+        self._setup_list(mock_list_users, mock_client_fn)
+        with _as_role(EDITOR) as headers:
+            resp = self.client.get('/adminapi/users/?keyword=alice@example.com', **headers)
+        self.assertEqual(resp.json()["count"], 0)
+        with _as_role(EDITOR) as headers:
+            resp = self.client.get('/adminapi/users/?keyword=alice', **headers)
+        self.assertEqual([item["uid"] for item in resp.json()["results"]], ["uid1"])  # 姓名仍可搜尋
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.list_all_firebase_users")
+    def test_owner_and_admin_still_get_email_and_can_search_by_it(self, mock_list_users, mock_client_fn):
+        self._setup_list(mock_list_users, mock_client_fn)
+        for role in (OWNER, ADMIN):
+            with _as_role(role) as headers:
+                resp = self.client.get('/adminapi/users/?keyword=bob@example.com', **headers)
+            results = resp.json()["results"]
+            self.assertEqual([item["uid"] for item in results], ["uid2"], role)
+            self.assertEqual(results[0]["email"], "bob@example.com", role)
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_detail_hides_email_from_staff_without_account_management(self, mock_get_user, mock_client_fn):
+        mock_get_user.return_value = _fake_user_record("uid1", email="alice@example.com")
+        mock_client, _ = _build_client_router(
+            users_doc=_fake_snapshot("uid1", {"name": "Alice", "email": "alice@example.com", "favorites": [1]}),
+            notes=[], recordings=[],
+        )
+        mock_client_fn.return_value = mock_client
+        with _as_role("analyst") as headers:
+            resp = self.client.get('/adminapi/users/uid1/', **headers)
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotIn("alice@example.com", resp.content.decode("utf-8"))
+        body = resp.json()
+        self.assertIsNone(body["email"])
+        self.assertEqual(body["firestore"], {"name": "Alice", "favorites": [1]})
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    @patch("adminapi.firebase_ops.get_firebase_user")
+    def test_detail_keeps_email_for_owner_and_admin(self, mock_get_user, mock_client_fn):
+        mock_get_user.return_value = _fake_user_record("uid1", email="alice@example.com")
+        mock_client, _ = _build_client_router(
+            users_doc=_fake_snapshot("uid1", {"name": "Alice", "email": "alice@example.com"}),
+            notes=[], recordings=[],
+        )
+        mock_client_fn.return_value = mock_client
+        for role in (OWNER, ADMIN):
+            with _as_role(role) as headers:
+                body = self.client.get('/adminapi/users/uid1/', **headers).json()
+            self.assertEqual(body["email"], "alice@example.com", role)
+            self.assertEqual(body["firestore"]["email"], "alice@example.com", role)

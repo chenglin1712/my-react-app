@@ -8,6 +8,7 @@ GET）仍然顯示舊內容，直到核准才切換成新內容；退件則舊�
 """
 from adminapi.auth_fixtures import fresh_auth
 import json
+import re
 from contextlib import contextmanager
 from unittest.mock import patch
 
@@ -17,6 +18,7 @@ from django.test.utils import override_settings
 from config.roles import ADMIN, ANALYST, EDITOR, OWNER, REVIEWER
 
 from .models import Announcement, AuditLog, PendingRevision, QuizVocabItem
+from .revisions import revision_version
 
 
 @contextmanager
@@ -30,8 +32,21 @@ def _as_role(role):
                 yield {"HTTP_AUTHORIZATION": "Bearer test-token"}
 
 
-def _post_json(client, url, headers, payload=None):
-    return client.post(url, data=json.dumps(payload or {}), content_type="application/json", **headers)
+_REVISION_ACTION_URL = re.compile(r"/(\d+)/pending-revision/(?:approve|reject)/$")
+
+
+def _post_json(client, url, headers, payload=None, *, with_version=True):
+    body = dict(payload or {})
+    # 核准／退件要帶審核者看到的版本（稽核 FLW-1）；既有測試不關心版本，預設帶目前的版本，
+    # 要測缺版本或舊版本時傳 with_version=False 或自己放 revision_version。
+    match = _REVISION_ACTION_URL.search(url)
+    if with_version and match and "revision_version" not in body:
+        revision = PendingRevision.objects.filter(
+            target_id=int(match.group(1)), status=PendingRevision.STATUS_PENDING_REVIEW,
+        ).first()
+        if revision:
+            body["revision_version"] = revision_version(revision)
+    return client.post(url, data=json.dumps(body), content_type="application/json", **headers)
 
 
 class QuizVocabRevisionTest(TestCase):
@@ -398,3 +413,156 @@ class AnnouncementRevisionTest(TestCase):
         self.assertEqual(self.announcement.title, "原始標題")
         revision = PendingRevision.objects.get(target_type="announcement", target_id=self.announcement.pk)
         self.assertEqual(revision.status, PendingRevision.STATUS_REJECTED)
+
+
+class RevisionVersionBindingTest(TestCase):
+    """稽核 FLW-1：核准／退件要帶上審核者看到的版本，編輯者在待審期間改掉內容後，舊版本的核准會被擋下。"""
+
+    def setUp(self):
+        self.client = Client()
+        self.announcement = Announcement.objects.create(
+            title="原標題", body="原內文", category="announcement",
+            status=Announcement.STATUS_PUBLISHED, created_by="editor-uid",
+        )
+        self.base = f"/adminapi/announcements/{self.announcement.pk}/pending-revision/"
+
+    def _propose(self, title):
+        with _as_role(EDITOR) as headers:
+            response = _post_json(self.client, self.base, headers, {"title": title})
+        self.assertIn(response.status_code, (200, 201))
+        return response.json()
+
+    def test_approve_with_stale_version_is_rejected_and_content_unchanged(self):
+        seen = self._propose("審核者看到的標題")["version"]
+        self._propose("被換掉的標題")
+        with _as_role(OWNER) as headers:
+            response = _post_json(
+                self.client, self.base + "approve/", headers,
+                {"review_comment": "", "revision_version": seen},
+            )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["code"], "revision_changed")
+        self.announcement.refresh_from_db()
+        self.assertEqual(self.announcement.title, "原標題")
+        self.assertEqual(
+            PendingRevision.objects.get(target_id=self.announcement.pk).status,
+            PendingRevision.STATUS_PENDING_REVIEW,
+        )
+
+    def test_approve_with_current_version_after_resubmit_applies_new_content(self):
+        self._propose("第一版")
+        current = self._propose("第二版")["version"]
+        with _as_role(OWNER) as headers:
+            response = _post_json(
+                self.client, self.base + "approve/", headers,
+                {"review_comment": "", "revision_version": current},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.announcement.refresh_from_db()
+        self.assertEqual(self.announcement.title, "第二版")
+
+    def test_missing_or_malformed_version_is_rejected(self):
+        self._propose("新標題")
+        for body in ({}, {"revision_version": ""}, {"revision_version": 123}, {"revision_version": ["x"]}):
+            for action in ("approve/", "reject/"):
+                with _as_role(OWNER) as headers:
+                    response = _post_json(
+                        self.client, self.base + action, headers,
+                        {"review_comment": "理由", **body}, with_version=False,
+                    )
+                self.assertEqual(response.status_code, 400, (action, body))
+                self.assertEqual(response.json()["code"], "revision_version_required")
+        self.announcement.refresh_from_db()
+        self.assertEqual(self.announcement.title, "原標題")
+
+    def test_reject_with_stale_version_is_rejected(self):
+        seen = self._propose("審核者看到的標題")["version"]
+        self._propose("被換掉的標題")
+        with _as_role(OWNER) as headers:
+            response = _post_json(
+                self.client, self.base + "reject/", headers,
+                {"review_comment": "不同意", "revision_version": seen},
+            )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            PendingRevision.objects.get(target_id=self.announcement.pk).status,
+            PendingRevision.STATUS_PENDING_REVIEW,
+        )
+
+    def test_reject_with_current_version_succeeds(self):
+        current = self._propose("新標題")["version"]
+        with _as_role(OWNER) as headers:
+            response = _post_json(
+                self.client, self.base + "reject/", headers,
+                {"review_comment": "不同意", "revision_version": current},
+            )
+        self.assertEqual(response.status_code, 200)
+
+    def test_version_is_exposed_by_get_and_list_and_changes_with_content(self):
+        first = self._propose("第一版")["version"]
+        with _as_role(OWNER) as headers:
+            got = self.client.get(self.base, **headers).json()
+            listed = self.client.get("/adminapi/announcements/", **headers).json()
+        self.assertEqual(got["version"], first)
+        row = next(item for item in listed["results"] if item["id"] == self.announcement.pk)
+        self.assertEqual(row["pending_revision_version"], first)
+        second = self._propose("第二版")["version"]
+        self.assertNotEqual(first, second)
+
+    def test_version_is_none_in_list_when_no_pending_revision(self):
+        with _as_role(OWNER) as headers:
+            listed = self.client.get("/adminapi/announcements/", **headers).json()
+        row = next(item for item in listed["results"] if item["id"] == self.announcement.pk)
+        self.assertFalse(row["has_pending_revision"])
+        self.assertIsNone(row["pending_revision_version"])
+
+
+class AiDraftRevisionApprovalTest(TestCase):
+    """稽核 FLW-2：AI 題目的產生者不能核准自己對已發布題目的修改（和新題核准是同一條規則）。"""
+
+    def setUp(self):
+        self.client = Client()
+        self.item = QuizVocabItem.objects.create(
+            tribe="tayal", category="noun", foreign_word="huzil", chinese_gloss="狗原始",
+            status=QuizVocabItem.STATUS_PUBLISHED, created_by="editor-uid",
+        )
+        self.base = f"/adminapi/quiz-bank/vocab/{self.item.pk}/pending-revision/"
+        with _as_role(EDITOR) as headers:
+            _post_json(self.client, self.base, headers, {"chinese_gloss": "狗修改版"})
+        self.revision = PendingRevision.objects.get(target_id=self.item.pk)
+
+    def _draft(self, generated_by):
+        from .models import AiQuizDraft
+        AiQuizDraft.objects.create(
+            content_type=self.revision.target_type, content_id=self.item.pk,
+            tribe="tayal", model="test-model", generated_by=generated_by,
+        )
+
+    def test_generator_cannot_approve_own_ai_item_revision(self):
+        self._draft("test-uid")  # _as_role 的使用者 uid 就是 test-uid
+        for role in (OWNER, ADMIN):
+            with _as_role(role) as headers:
+                response = _post_json(self.client, self.base + "approve/", headers, {"review_comment": ""})
+            self.assertEqual(response.status_code, 403, role)
+            self.assertEqual(response.json()["code"], "cannot_approve_own_ai_draft")
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.chinese_gloss, "狗原始")
+        self.revision.refresh_from_db()
+        self.assertEqual(self.revision.status, PendingRevision.STATUS_PENDING_REVIEW)
+
+    def test_other_reviewer_can_approve_ai_item_revision(self):
+        self._draft("someone-else")
+        with _as_role(OWNER) as headers:
+            response = _post_json(self.client, self.base + "approve/", headers, {"review_comment": ""})
+        self.assertEqual(response.status_code, 200)
+
+    def test_generator_can_still_reject_own_ai_item_revision(self):
+        self._draft("test-uid")
+        with _as_role(OWNER) as headers:
+            response = _post_json(self.client, self.base + "reject/", headers, {"review_comment": "我自己撤掉"})
+        self.assertEqual(response.status_code, 200)
+
+    def test_non_ai_item_is_unaffected(self):
+        with _as_role(OWNER) as headers:
+            response = _post_json(self.client, self.base + "approve/", headers, {"review_comment": ""})
+        self.assertEqual(response.status_code, 200)

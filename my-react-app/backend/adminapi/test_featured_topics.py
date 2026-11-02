@@ -4,6 +4,7 @@
 """
 import json
 import os
+import re
 from contextlib import contextmanager
 from unittest.mock import patch
 
@@ -17,6 +18,7 @@ from config.roles import ADMIN, ANALYST, EDITOR, OWNER, REVIEWER
 
 from . import featured_topic_service
 from .models import AuditLog, FeaturedTopic, HomepageConfig, PendingRevision
+from .revisions import revision_version
 
 ADMIN_URL = "/adminapi/featured-topics/"
 PUBLIC_URL = "/adminapi/public/featured-topics/"
@@ -48,6 +50,16 @@ class Base(TestCase):
     def call(self, method, path, payload=None, role=OWNER, uid="test-uid"):
         with _as_role(role, uid) as headers:
             fn = getattr(self.client, method)
+            # 核准／退件待審修改要帶審核者看到的版本（稽核 FLW-1）；預設帶目前的版本，
+            # 要測缺版本或舊版本時自己放 revision_version（放空字串也算「自己放」）。
+            match = re.search(r"/(\d+)/pending-revision/(?:approve|reject)/$", path)
+            if match and isinstance(payload, dict) and "revision_version" not in payload:
+                revision = PendingRevision.objects.filter(
+                    target_type="featured_topic", target_id=int(match.group(1)),
+                    status=PendingRevision.STATUS_PENDING_REVIEW,
+                ).first()
+                if revision:
+                    payload = {**payload, "revision_version": revision_version(revision)}
             if method == "get" or payload is None:
                 return fn(path, **headers)
             return fn(path, data=json.dumps(payload), content_type="application/json", **headers)

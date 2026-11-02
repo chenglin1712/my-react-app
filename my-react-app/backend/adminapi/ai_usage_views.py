@@ -5,7 +5,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from core.firebase_auth import require_role
-from config.roles import STAFF_ROLES
+from config.roles import FEEDBACK_VIEWERS, STAFF_ROLES
 
 from . import ai_usage
 
@@ -28,4 +28,6 @@ def ai_usage_summary(request):
     if not 1 <= days <= ai_usage.MAX_DAYS:
         return JsonResponse({"detail": f"days 必須介於 1 到 {ai_usage.MAX_DAYS}"}, status=400)
 
-    return JsonResponse(ai_usage.summarize(days))
+    # 原始 uid 只給 owner／admin，其他員工角色看雜湊（稽核 FLW-6）
+    reveal_uids = decoded.get("role") in FEEDBACK_VIEWERS
+    return JsonResponse(ai_usage.summarize(days, reveal_uids=reveal_uids))

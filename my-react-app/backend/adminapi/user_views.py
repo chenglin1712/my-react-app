@@ -22,12 +22,15 @@ from config.roles import ACCOUNT_MANAGERS, OWNER, ROLE_ASSIGNERS, STAFF_ROLES
 from . import firebase_ops, quiz_research_service
 from ._shared import (
     guarded_action,
+    mark_action_failed as _mark_action_failed,
     parse_json_body as _parse_json_body,
     safe_write_audit_log as _safe_write_audit_log,
+    write_audit_log_first as _write_audit_log_first,
 )
 from .user_service import (
     _default_firestore_user_doc,
     _forbidden_if_self_target,
+    _forbidden_if_target_is_privileged,
     _forbidden_if_target_outranks,
     _forbidden_if_would_remove_last_owner,
     _merge_user,
@@ -57,14 +60,17 @@ def _list_users(request, decoded):
             if doc.exists:
                 docs_by_id[doc.id] = doc.to_dict()
 
-    merged = [_merge_user(u, docs_by_id.get(u.uid, {})) for u in users]
+    # 只有能管理帳號的角色（owner、admin）看得到 email；其他員工角色不給 email，
+    # 關鍵字也不比對 email，否則可以靠搜尋結果反推某個 email 是否註冊過（稽核 FLW-6）
+    can_see_email = decoded.get("role") in ACCOUNT_MANAGERS
+    merged = [_merge_user(u, docs_by_id.get(u.uid, {}), include_email=can_see_email) for u in users]
     merged.sort(key=lambda item: item["created_at"] or 0, reverse=True)
 
     keyword = request.GET.get("keyword", "").strip().lower()
     if keyword:
         merged = [
             item for item in merged
-            if keyword in (item["email"] or "").lower()
+            if (can_see_email and keyword in (item["email"] or "").lower())
             or keyword in (item["name"] or "").lower()
             or keyword in item["uid"].lower()
         ]
@@ -213,9 +219,13 @@ def user_detail(request, decoded, uid):
         client.collection_group("recordings").where("uid", "==", uid).stream()
     ))
 
-    payload = _merge_user(user_record, firestore_data)
+    can_see_email = decoded.get("role") in ACCOUNT_MANAGERS
+    payload = _merge_user(user_record, firestore_data, include_email=can_see_email)
     payload["provider_ids"] = [p.provider_id for p in (user_record.provider_data or [])]
-    payload["firestore"] = firestore_data
+    # 整份 users 文件裡有 email；不能管理帳號的角色拿掉它（稽核 FLW-6）
+    payload["firestore"] = firestore_data if can_see_email else {
+        key: value for key, value in firestore_data.items() if key != "email"
+    }
     payload["content_counts"] = {
         "shared_notes": notes_count,
         "pronunciations": recordings_count,
@@ -250,12 +260,17 @@ def user_role(request, decoded, uid):
         forbidden_resp = _forbidden_if_would_remove_last_owner(user_record, uid)
         if forbidden_resp:
             return forbidden_resp
-    firebase_ops.set_user_role(uid, role)
-    firebase_ops.revoke_sessions(uid)
-    _safe_write_audit_log(
+    # 先寫稽核紀錄再動手（稽核 FLW-4）：寫不進去就中止，不會有「角色變了卻沒有紀錄」
+    _write_audit_log_first(
         request, decoded, "assign_role", uid, target_type="user",
         before={"role": old_role}, after={"role": role},
     )
+    try:
+        firebase_ops.set_user_role(uid, role)
+        firebase_ops.revoke_sessions(uid)
+    except Exception:
+        _mark_action_failed(request, decoded, "assign_role", uid, reason="firebase_error")
+        raise
     return JsonResponse({"uid": uid, "role": role})
 
 
@@ -276,7 +291,7 @@ def user_profile(request, decoded, uid):
         user_record = firebase_ops.get_firebase_user(uid)
     except firebase_auth.UserNotFoundError:
         return JsonResponse({"detail": "找不到這個使用者"}, status=404)
-    forbidden_resp = _forbidden_if_target_outranks(decoded, user_record)
+    forbidden_resp = _forbidden_if_target_is_privileged(decoded, user_record)
     if forbidden_resp:
         return forbidden_resp
 
@@ -296,14 +311,26 @@ def user_profile(request, decoded, uid):
     if "avatar_url" in data:
         firestore_updates["avatarUrl"] = (data.get("avatar_url") or "").strip()
 
-    email_changed = False
     original_email = user_record.email
     new_email = data.get("email")
     if new_email is not None:
         new_email = new_email.strip()
         if not new_email:
             return JsonResponse({"detail": "email 不可為空"}, status=400)
-        if new_email != user_record.email:
+    email_will_change = new_email is not None and new_email != user_record.email
+    planned_updates = {**firestore_updates, **({"email": new_email} if email_will_change else {})}
+
+    # 先寫稽核紀錄再動手（稽核 FLW-4）：改 email 等於能接管帳號，寫不進去就中止。
+    # 動作本身失敗時，apply_changes 回傳錯誤回應，下面補一筆 update_profile_failed。
+    if planned_updates:
+        _write_audit_log_first(
+            request, decoded, "update_profile", uid, target_type="user",
+            before=before_data, after={**before_data, **planned_updates},
+        )
+
+    def apply_changes():
+        email_changed = False
+        if email_will_change:
             try:
                 firebase_ops.set_user_email(uid, new_email)
             except firebase_auth.EmailAlreadyExistsError:
@@ -313,35 +340,44 @@ def user_profile(request, decoded, uid):
             email_changed = True
             firestore_updates["email"] = new_email
 
-    if firestore_updates:
-        try:
-            doc_ref.set(firestore_updates, merge=True)
-        except Exception:
-            logger.exception("更新使用者 %s 的 Firestore 資料失敗", uid)
-            if not email_changed:
-                return JsonResponse({"detail": "更新使用者資料失敗，請稍後再試"}, status=500)
-            # email 兩邊各存一份（Firebase Auth／Firestore users/{uid}），
-            # Auth 已經改成功了——這裡的 Firestore 寫入如果失敗，兩邊會
-            # 永久不一致，且下次重試時因為 Auth 那邊的 email 已經是新值，
-            # `new_email != user_record.email` 會判斷成不需要再改，
-            # Firestore 的舊 email 永遠沒有機會自動修正。失敗時嘗試把
-            # Auth email 回復成原值，讓兩邊至少維持一致（都是舊值），而
-            # 不是留下一個只有這裡才知道、事後也修不回去的不一致狀態
-            # （獨立審查找到的問題）。
+        if firestore_updates:
             try:
-                firebase_ops.set_user_email(uid, original_email)
+                doc_ref.set(firestore_updates, merge=True)
             except Exception:
-                logger.exception("回復使用者 %s 的 Auth email 也失敗，Auth 與資料庫已經不一致，需人工複查", uid)
-                return JsonResponse({
-                    "detail": "更新 email 失敗，且 Auth 與資料庫的 email 可能已經不一致，需要人工複查",
-                    "uid": uid,
-                }, status=500)
-            return JsonResponse({"detail": "更新 email 失敗，請稍後再試"}, status=500)
+                logger.exception("更新使用者 %s 的 Firestore 資料失敗", uid)
+                if not email_changed:
+                    return JsonResponse({"detail": "更新使用者資料失敗，請稍後再試"}, status=500)
+                # email 兩邊各存一份（Firebase Auth／Firestore users/{uid}），
+                # Auth 已經改成功了——這裡的 Firestore 寫入如果失敗，兩邊會
+                # 永久不一致，且下次重試時因為 Auth 那邊的 email 已經是新值，
+                # `new_email != user_record.email` 會判斷成不需要再改，
+                # Firestore 的舊 email 永遠沒有機會自動修正。失敗時嘗試把
+                # Auth email 回復成原值，讓兩邊至少維持一致（都是舊值），而
+                # 不是留下一個只有這裡才知道、事後也修不回去的不一致狀態
+                # （獨立審查找到的問題）。
+                try:
+                    firebase_ops.set_user_email(uid, original_email)
+                except Exception:
+                    logger.exception("回復使用者 %s 的 Auth email 也失敗，Auth 與資料庫已經不一致，需人工複查", uid)
+                    return JsonResponse({
+                        "detail": "更新 email 失敗，且 Auth 與資料庫的 email 可能已經不一致，需要人工複查",
+                        "uid": uid,
+                    }, status=500)
+                return JsonResponse({"detail": "更新 email 失敗，請稍後再試"}, status=500)
+        return None
 
-    _safe_write_audit_log(
-        request, decoded, "update_profile", uid, target_type="user",
-        before=before_data, after={**before_data, **firestore_updates},
-    )
+    try:
+        failed_response = apply_changes()
+    except Exception:
+        if planned_updates:
+            _mark_action_failed(request, decoded, "update_profile", uid, reason="exception")
+        raise
+    if failed_response is not None:
+        if planned_updates:
+            _mark_action_failed(
+                request, decoded, "update_profile", uid, reason=f"http_{failed_response.status_code}",
+            )
+        return failed_response
 
     updated_record = firebase_ops.get_firebase_user(uid)
     updated_doc = doc_ref.get()
@@ -371,7 +407,7 @@ def user_password(request, decoded, uid):
         user_record = firebase_ops.get_firebase_user(uid)
     except firebase_auth.UserNotFoundError:
         return JsonResponse({"detail": "找不到這個使用者"}, status=404)
-    forbidden_resp = _forbidden_if_target_outranks(decoded, user_record)
+    forbidden_resp = _forbidden_if_target_is_privileged(decoded, user_record)
     if forbidden_resp:
         return forbidden_resp
 
@@ -379,7 +415,15 @@ def user_password(request, decoded, uid):
     if not confirm_email or confirm_email != user_record.email:
         return JsonResponse({"detail": "輸入的 email 與目標帳號不符"}, status=400)
 
-    firebase_ops.set_user_password(uid, new_password)
+    # 先寫稽核紀錄再動手（稽核 FLW-4）；紀錄只有「要改密碼」這個事實，不含密碼本身
+    _write_audit_log_first(
+        request, decoded, "change_password", uid, target_type="user", after={"password_changed": True},
+    )
+    try:
+        firebase_ops.set_user_password(uid, new_password)
+    except Exception:
+        _mark_action_failed(request, decoded, "change_password", uid, reason="firebase_error")
+        raise
     # 密碼本身已經改成功——這是不可逆的既成事實，接下來的 revoke_sessions
     # 失敗不該讓整個請求變成一個誤導人的 500（管理者會以為密碼沒改成功，
     # 但實際上新密碼已經生效，舊 session 卻還沒撤銷，這在「帳號疑似被
@@ -392,10 +436,10 @@ def user_password(request, decoded, uid):
     except Exception:
         sessions_revoked = False
         logger.exception("使用者 %s 密碼已變更，但撤銷登入狀態失敗，舊登入可能仍然有效，需人工複查", uid)
-    _safe_write_audit_log(
-        request, decoded, "change_password", uid, target_type="user",
-        after={"password_changed": True, "sessions_revoked": sessions_revoked},
-    )
+        _safe_write_audit_log(
+            request, decoded, "change_password_sessions_not_revoked", uid, target_type="user",
+            after={"password_changed": True, "sessions_revoked": False},
+        )
     return JsonResponse({"uid": uid, "password_changed": True, "sessions_revoked": sessions_revoked})
 
 
@@ -421,7 +465,7 @@ def _set_suspended(request, decoded, uid, disabled):
         target_user = firebase_ops.get_firebase_user(uid)
     except firebase_auth.UserNotFoundError:
         return JsonResponse({"detail": "找不到這個使用者"}, status=404)
-    forbidden_resp = _forbidden_if_target_outranks(decoded, target_user)
+    forbidden_resp = _forbidden_if_target_is_privileged(decoded, target_user)
     if forbidden_resp:
         return forbidden_resp
     if disabled:
@@ -429,13 +473,17 @@ def _set_suspended(request, decoded, uid, disabled):
         if forbidden_resp:
             return forbidden_resp
 
-    firebase_ops.set_user_disabled(uid, disabled)
-    firebase_ops.revoke_sessions(uid)
     action = "suspend" if disabled else "unsuspend"
-    _safe_write_audit_log(
+    _write_audit_log_first(
         request, decoded, action, uid, target_type="user",
         before={"disabled": not disabled}, after={"disabled": disabled},
     )
+    try:
+        firebase_ops.set_user_disabled(uid, disabled)
+        firebase_ops.revoke_sessions(uid)
+    except Exception:
+        _mark_action_failed(request, decoded, action, uid, reason="firebase_error")
+        raise
     return JsonResponse({"uid": uid, "disabled": disabled})
 
 
@@ -467,9 +515,13 @@ def user_export(request, decoded, uid):
         user_record = firebase_ops.get_firebase_user(uid)
     except firebase_auth.UserNotFoundError:
         return JsonResponse({"detail": "找不到這個使用者"}, status=404)
-    forbidden_resp = _forbidden_if_target_outranks(decoded, user_record)
+    # 匯出管理者帳號的個資跟接管類動作同等敏感，只有 owner 可以（稽核 FLW-3）；本人與一般使用者不受限
+    forbidden_resp = _forbidden_if_target_is_privileged(decoded, user_record)
     if forbidden_resp:
         return forbidden_resp
+
+    # 先寫稽核紀錄再讀資料（稽核 FLW-4）：個資一旦交出去就收不回來，紀錄寫不進去就不匯出
+    _write_audit_log_first(request, decoded, "export_personal_data", uid, target_type="user")
 
     client = firebase_ops.get_firestore_client()
     doc = client.collection("users").document(uid).get()
@@ -496,8 +548,6 @@ def user_export(request, decoded, uid):
             "files": memory_store.list_files(uid),
         },
     }
-
-    _safe_write_audit_log(request, decoded, "export_personal_data", uid, target_type="user")
 
     import json
     from django.core.serializers.json import DjangoJSONEncoder
@@ -529,7 +579,7 @@ def user_delete(request, decoded, uid):
         user_record = firebase_ops.get_firebase_user(uid)
     except firebase_auth.UserNotFoundError:
         return JsonResponse({"detail": "找不到這個使用者"}, status=404)
-    forbidden_resp = _forbidden_if_target_outranks(decoded, user_record)
+    forbidden_resp = _forbidden_if_target_is_privileged(decoded, user_record)
     if forbidden_resp:
         return forbidden_resp
     forbidden_resp = _forbidden_if_would_remove_last_owner(user_record, uid)
@@ -551,6 +601,13 @@ def user_delete(request, decoded, uid):
         },
         "firestore_user_document": firestore_snapshot.to_dict() if firestore_snapshot.exists else None,
     }
+
+    # 先寫稽核紀錄再動手（稽核 FLW-4）：刪除是不可逆的，寫不進去就中止。動作的結果（每一段刪了多少、
+    # 哪一段失敗）要到最後才知道，另外在結尾補一筆 delete_account_result。
+    _write_audit_log_first(
+        request, decoded, "delete_account", uid, target_type="user",
+        before=before_snapshot, after={"status": "started"},
+    )
 
     results = {}
 
@@ -664,7 +721,7 @@ def user_delete(request, decoded, uid):
         results["firebase_auth"] = {"deleted": False, "error": "刪除失敗，需人工複查"}
 
     _safe_write_audit_log(
-        request, decoded, "delete_account", uid, target_type="user",
-        before=before_snapshot, after=results,
+        request, decoded, "delete_account_result", uid, target_type="user",
+        after=results,
     )
     return JsonResponse({"uid": uid, "results": results})

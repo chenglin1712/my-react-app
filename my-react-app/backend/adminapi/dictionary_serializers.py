@@ -15,7 +15,18 @@ from rest_framework import serializers
 from config.grammar_affixes import VALID_AFFIX_TYPES
 
 
-def _require_str(value, field, errors, allow_blank=False, required=True):
+# 葉節點的型別與長度上限（稽核 FLW-5）：寫入 dictionary_db 時這些值會直接綁進 SQL 欄位，
+# 型別不對（例如把物件當 file_id、把清單當 id）會在寫入時變成 500，過長或過多的內容則會撐大提案。
+# 上限抓得很寬鬆，只為擋畸形輸入，不是內容規範。
+MAX_NAME_LENGTH = 500          # 詞形、拼音、方言別、變體…
+MAX_ID_LENGTH = 255            # external_id、file_id、audio_class
+MAX_URL_LENGTH = 2000          # image_url、word_img
+MAX_TEXT_LENGTH = 10000        # 釋義、例句、辭典備註
+MAX_LIST_LENGTH = 200          # 任一層的子節點數量
+MAX_EXPLANATIONS = 100
+
+
+def _require_str(value, field, errors, allow_blank=False, required=True, max_len=None):
     if value is None:
         if required:
             errors[field] = '為必填'
@@ -24,6 +35,43 @@ def _require_str(value, field, errors, allow_blank=False, required=True):
         errors[field] = '必須是字串'
     elif not allow_blank and not value.strip():
         errors[field] = '不能空白'
+    elif max_len is not None and len(value) > max_len:
+        errors[field] = f'不可超過 {max_len} 字'
+
+
+def _optional_str(item, key, prefix, errors, max_len):
+    """選填字串：沒帶或 null 都可以，帶了就必須是字串且不超過 max_len。"""
+    _require_str(item.get(key), f'{prefix}.{key}', errors, allow_blank=True, required=False, max_len=max_len)
+
+
+def _optional_child_id(item, prefix, errors):
+    """子節點的 id（對帳用）：整數或 null。bool 不算整數；清單、物件會讓對帳用的 dict 查詢丟 TypeError。"""
+    value = item.get('id')
+    if value is not None and (isinstance(value, bool) or not isinstance(value, int)):
+        errors[f'{prefix}.id'] = '必須是整數或 null'
+
+
+def _bounded_list(value, field, errors, max_len=MAX_LIST_LENGTH):
+    if not _require_list(value, field, errors):
+        return False
+    if value is not None and len(value) > max_len:
+        errors[field] = f'最多 {max_len} 筆'
+        return False
+    return True
+
+
+def _validate_media_item(item, prefix, errors, *, kind):
+    """audios／images 的單一項目。kind='audio' 驗 file_id 等；kind='image' 驗 image_url。"""
+    if not isinstance(item, dict):
+        errors[prefix] = '格式錯誤'
+        return
+    _optional_child_id(item, prefix, errors)
+    if kind == 'audio':
+        _optional_str(item, 'external_id', prefix, errors, MAX_ID_LENGTH)
+        _optional_str(item, 'file_id', prefix, errors, MAX_ID_LENGTH)
+        _optional_str(item, 'audio_class', prefix, errors, MAX_ID_LENGTH)
+    else:
+        _optional_str(item, 'image_url', prefix, errors, MAX_URL_LENGTH)
 
 
 def _require_list(value, field, errors):
@@ -63,16 +111,19 @@ def _validate_anaphora_item(item, index, errors_prefix, errors, *, validate_ref)
     if not isinstance(item, dict):
         errors[f'{errors_prefix}[{index}]'] = '格式錯誤'
         return
+    _optional_child_id(item, f'{errors_prefix}[{index}]', errors)
     validate_ref(item, f'{errors_prefix}[{index}]', errors)
-    _require_str(item.get('name'), f'{errors_prefix}[{index}].name', errors, allow_blank=True, required=False)
+    _require_str(item.get('name'), f'{errors_prefix}[{index}].name', errors, allow_blank=True, required=False,
+                 max_len=MAX_NAME_LENGTH)
 
 
 def _validate_anaphora(item, index, errors_prefix, errors, *, validate_ref):
     if not isinstance(item, dict):
         errors[f'{errors_prefix}[{index}]'] = '格式錯誤'
         return
+    _optional_child_id(item, f'{errors_prefix}[{index}]', errors)
     items = item.get('items', [])
-    if not _require_list(items, f'{errors_prefix}[{index}].items', errors):
+    if not _bounded_list(items, f'{errors_prefix}[{index}].items', errors):
         return
     for i, sub in enumerate(items):
         _validate_anaphora_item(sub, i, f'{errors_prefix}[{index}].items', errors, validate_ref=validate_ref)
@@ -82,15 +133,17 @@ def _validate_sentence(item, index, errors_prefix, errors, *, validate_ref):
     if not isinstance(item, dict):
         errors[f'{errors_prefix}[{index}]'] = '格式錯誤'
         return
-    _require_str(item.get('original_sentence'), f'{errors_prefix}[{index}].original_sentence',
-                  errors, allow_blank=True, required=False)
+    sentence_prefix = f'{errors_prefix}[{index}]'
+    _optional_child_id(item, sentence_prefix, errors)
+    _optional_str(item, 'external_id', sentence_prefix, errors, MAX_ID_LENGTH)
+    for key in ('original_sentence', 'chinese_sentence', 'english_sentence'):
+        _optional_str(item, key, sentence_prefix, errors, MAX_TEXT_LENGTH)
     audios = item.get('audios', [])
-    if _require_list(audios, f'{errors_prefix}[{index}].audios', errors):
+    if _bounded_list(audios, f'{sentence_prefix}.audios', errors):
         for i, audio in enumerate(audios):
-            if not isinstance(audio, dict):
-                errors[f'{errors_prefix}[{index}].audios[{i}]'] = '格式錯誤'
+            _validate_media_item(audio, f'{sentence_prefix}.audios[{i}]', errors, kind='audio')
     anaphoras = item.get('anaphoras', [])
-    if _require_list(anaphoras, f'{errors_prefix}[{index}].anaphoras', errors):
+    if _bounded_list(anaphoras, f'{sentence_prefix}.anaphoras', errors):
         for i, ana in enumerate(anaphoras):
             _validate_anaphora(ana, i, f'{errors_prefix}[{index}].anaphoras', errors, validate_ref=validate_ref)
 
@@ -100,17 +153,18 @@ def _validate_explanation(item, index, errors, *, validate_ref, taxonomy_fields)
     if not isinstance(item, dict):
         errors[prefix] = '格式錯誤'
         return
+    _optional_child_id(item, prefix, errors)
+    _optional_str(item, 'external_id', prefix, errors, MAX_ID_LENGTH)
     _require_str(item.get('chinese_explanation'), f'{prefix}.chinese_explanation',
-                  errors, allow_blank=True, required=False)
+                  errors, allow_blank=True, required=False, max_len=MAX_TEXT_LENGTH)
     for field, validate_field in taxonomy_fields:
         validate_field(item.get(field, []), f'{prefix}.{field}', errors)
     images = item.get('images', [])
-    if _require_list(images, f'{prefix}.images', errors):
+    if _bounded_list(images, f'{prefix}.images', errors):
         for i, img in enumerate(images):
-            if not isinstance(img, dict):
-                errors[f'{prefix}.images[{i}]'] = '格式錯誤'
+            _validate_media_item(img, f'{prefix}.images[{i}]', errors, kind='image')
     sentences = item.get('sentences', [])
-    if _require_list(sentences, f'{prefix}.sentences', errors):
+    if _bounded_list(sentences, f'{prefix}.sentences', errors):
         for i, sent in enumerate(sentences):
             _validate_sentence(sent, i, f'{prefix}.sentences', errors, validate_ref=validate_ref)
 
@@ -159,14 +213,19 @@ def _validate_word_payload(payload, *, mode):
         validate_ref = _validate_word_name_ref
         taxonomy_fields = _TAXONOMY_NAME_FIELDS
 
-    _require_str(payload.get('name'), 'name', errors)
+    _require_str(payload.get('name'), 'name', errors, max_len=MAX_NAME_LENGTH)
 
-    for field in ('dialect', 'pinyin', 'variant', 'formation_word', 'derivative_root',
-                  'dictionary_note', 'word_img'):
-        if field in payload and payload[field] is not None and not isinstance(payload[field], str):
-            errors[field] = '必須是字串'
+    for field, max_len in (('dialect', MAX_NAME_LENGTH), ('pinyin', MAX_NAME_LENGTH), ('variant', MAX_NAME_LENGTH),
+                           ('formation_word', MAX_NAME_LENGTH), ('derivative_root', MAX_NAME_LENGTH),
+                           ('dictionary_note', MAX_TEXT_LENGTH), ('word_img', MAX_URL_LENGTH)):
+        if field in payload and payload[field] is not None:
+            if not isinstance(payload[field], str):
+                errors[field] = '必須是字串'
+            elif len(payload[field]) > max_len:
+                errors[field] = f'不可超過 {max_len} 字'
 
-    if 'frequency' in payload and payload['frequency'] is not None and not isinstance(payload['frequency'], int):
+    if 'frequency' in payload and payload['frequency'] is not None and (
+            isinstance(payload['frequency'], bool) or not isinstance(payload['frequency'], int)):
         errors['frequency'] = '必須是整數'
 
     for field in ('is_derivative_root', 'is_image', 'is_zuzucidian', 'is_other_dialect'):
@@ -179,13 +238,12 @@ def _validate_word_payload(payload, *, mode):
         _require_list(payload.get('source_names', []), 'source_names', errors)
 
     audios = payload.get('audios', [])
-    if _require_list(audios, 'audios', errors):
+    if _bounded_list(audios, 'audios', errors):
         for i, audio in enumerate(audios):
-            if not isinstance(audio, dict):
-                errors[f'audios[{i}]'] = '格式錯誤'
+            _validate_media_item(audio, f'audios[{i}]', errors, kind='audio')
 
     explanations = payload.get('explanations', [])
-    if _require_list(explanations, 'explanations', errors):
+    if _bounded_list(explanations, 'explanations', errors, max_len=MAX_EXPLANATIONS):
         for i, exp in enumerate(explanations):
             _validate_explanation(exp, i, errors, validate_ref=validate_ref, taxonomy_fields=taxonomy_fields)
 

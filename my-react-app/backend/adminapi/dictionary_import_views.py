@@ -148,8 +148,9 @@ def import_job_preflight(request, decoded, pk):
     """步驟三「預檢報告」：真的查資料庫解析名稱、判斷新建/更新，結果存回
     job.report／preflight_hash，狀態轉成 VALIDATED。UPLOADED 或已經
     VALIDATED 過的工作都可以重新預檢（例如自動建立缺漏主檔之後）。"""
+    preflight_states = (DictionaryImportJob.STATUS_UPLOADED, DictionaryImportJob.STATUS_VALIDATED)
     job = get_object_or_404(DictionaryImportJob, pk=pk)
-    if job.status not in (DictionaryImportJob.STATUS_UPLOADED, DictionaryImportJob.STATUS_VALIDATED):
+    if job.status not in preflight_states:
         return JsonResponse({"detail": f"目前狀態「{job.status}」無法預檢"}, status=409)
 
     tribe_id = _TRIBE_SLUG_TO_ID[job.tribe]
@@ -159,13 +160,18 @@ def import_job_preflight(request, decoded, pk):
     finally:
         db.close()
 
-    job.report = report
-    job.preflight_hash = import_report_hash(report)
-    job.status = DictionaryImportJob.STATUS_VALIDATED
-    job.new_count = report["new_count"]
-    job.update_count = report["update_count"]
-    job.error_count = report["error_count"]
     with transaction.atomic():
+        # 預檢要查另一個資料庫、比較慢，所以報告在鎖外面算；寫回時鎖住這一列重新確認狀態
+        # （稽核 FLW-5）：預檢期間若已被送審或核准，不能再被覆蓋成 VALIDATED。
+        job = get_object_or_404(DictionaryImportJob.objects.select_for_update(), pk=pk)
+        if job.status not in preflight_states:
+            return JsonResponse({"detail": f"目前狀態「{job.status}」無法預檢"}, status=409)
+        job.report = report
+        job.preflight_hash = import_report_hash(report)
+        job.status = DictionaryImportJob.STATUS_VALIDATED
+        job.new_count = report["new_count"]
+        job.update_count = report["update_count"]
+        job.error_count = report["error_count"]
         job.save(update_fields=["report", "preflight_hash", "status", "new_count", "update_count", "error_count"])
         _write_audit_log(
             request, decoded, "preflight_import_job", str(job.pk),
@@ -221,12 +227,12 @@ def import_job_auto_create_taxonomies(request, decoded, pk):
 @csrf_exempt
 @guarded_action(method="POST", role=CONTENT_EDITORS, rate_limit=("dictionary_import_submit", "60/m"))
 def import_job_submit(request, decoded, pk):
-    job = get_object_or_404(DictionaryImportJob, pk=pk)
-    if job.status != DictionaryImportJob.STATUS_VALIDATED:
-        return JsonResponse({"detail": f"目前狀態「{job.status}」無法送審，請先完成預檢"}, status=409)
-
-    job.status = DictionaryImportJob.STATUS_PENDING_REVIEW
     with transaction.atomic():
+        # 鎖列後再判斷狀態（稽核 FLW-5）：和核准、預檢同時發生時，狀態與報告才不會不一致
+        job = get_object_or_404(DictionaryImportJob.objects.select_for_update(), pk=pk)
+        if job.status != DictionaryImportJob.STATUS_VALIDATED:
+            return JsonResponse({"detail": f"目前狀態「{job.status}」無法送審，請先完成預檢"}, status=409)
+        job.status = DictionaryImportJob.STATUS_PENDING_REVIEW
         job.save(update_fields=["status"])
         _write_audit_log(request, decoded, "submit_import_job", str(job.pk), target_type="dictionary_import_job")
     return JsonResponse(_job_summary(job))
@@ -235,12 +241,11 @@ def import_job_submit(request, decoded, pk):
 @csrf_exempt
 @guarded_action(method="POST", role=CONTENT_EDITORS, rate_limit=("dictionary_import_withdraw", "60/m"))
 def import_job_withdraw(request, decoded, pk):
-    job = get_object_or_404(DictionaryImportJob, pk=pk)
-    if job.status != DictionaryImportJob.STATUS_PENDING_REVIEW:
-        return JsonResponse({"detail": f"目前狀態「{job.status}」無法撤回"}, status=409)
-
-    job.status = DictionaryImportJob.STATUS_VALIDATED
     with transaction.atomic():
+        job = get_object_or_404(DictionaryImportJob.objects.select_for_update(), pk=pk)
+        if job.status != DictionaryImportJob.STATUS_PENDING_REVIEW:
+            return JsonResponse({"detail": f"目前狀態「{job.status}」無法撤回"}, status=409)
+        job.status = DictionaryImportJob.STATUS_VALIDATED
         job.save(update_fields=["status"])
         _write_audit_log(request, decoded, "withdraw_import_job", str(job.pk), target_type="dictionary_import_job")
     return JsonResponse(_job_summary(job))
@@ -373,15 +378,14 @@ def import_job_reject(request, decoded, pk):
     if not serializer.is_valid():
         return JsonResponse({"detail": "請求參數錯誤", "errors": serializer.errors}, status=400)
 
-    job = get_object_or_404(DictionaryImportJob, pk=pk)
-    if job.status != DictionaryImportJob.STATUS_PENDING_REVIEW:
-        return JsonResponse({"detail": f"目前狀態「{job.status}」無法退件"}, status=409)
-
-    job.status = DictionaryImportJob.STATUS_REJECTED
-    job.reviewed_by = decoded.get("uid", "anon")
-    job.reviewed_at = timezone.now()
-    job.review_comment = serializer.validated_data["review_comment"]
     with transaction.atomic():
+        job = get_object_or_404(DictionaryImportJob.objects.select_for_update(), pk=pk)
+        if job.status != DictionaryImportJob.STATUS_PENDING_REVIEW:
+            return JsonResponse({"detail": f"目前狀態「{job.status}」無法退件"}, status=409)
+        job.status = DictionaryImportJob.STATUS_REJECTED
+        job.reviewed_by = decoded.get("uid", "anon")
+        job.reviewed_at = timezone.now()
+        job.review_comment = serializer.validated_data["review_comment"]
         job.save(update_fields=["status", "reviewed_by", "reviewed_at", "review_comment"])
         _write_audit_log(request, decoded, "reject_import_job", str(job.pk), target_type="dictionary_import_job")
     return JsonResponse(_job_summary(job))

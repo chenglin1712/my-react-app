@@ -12,7 +12,7 @@ from datetime import timezone as dt_timezone
 
 from django.http import JsonResponse
 
-from config.roles import OWNER
+from config.roles import ADMIN, OWNER
 
 from . import firebase_ops
 
@@ -26,6 +26,22 @@ def _forbidden_if_target_outranks(decoded, target_user_record):
     target_role = (target_user_record.custom_claims or {}).get("role")
     if target_role == OWNER and decoded.get("role") != OWNER:
         return JsonResponse({"detail": "沒有權限對這個帳號執行此操作"}, status=403)
+    return None
+
+
+def _forbidden_if_target_is_privileged(decoded, target_user_record):
+    """改密碼、改基本資料（含 email）、停權／解除停權、刪除帳號這類「可以直接接管帳號」的動作，
+    目標是 owner 或 admin 時只有 owner 能做（稽核 FLW-3）。
+
+    只擋 owner 不夠：被盜的 admin 帳號可以幫其他 admin 改密碼或換 email 再登入，橫向接管整批管理者。
+    對自己的帳號不擋（自己改自己的密碼與資料是正常使用；自己停權／刪除另有 _forbidden_if_self_target）。
+    強制登出與匯出資料不在這裡：強制登出是防禦動作（發現某個 admin 帳號被盜時，其他 admin 應該能先把它踢下線），
+    仍用 _forbidden_if_target_outranks 只保護 owner。"""
+    if target_user_record.uid == decoded.get("uid"):
+        return None
+    target_role = (target_user_record.custom_claims or {}).get("role")
+    if target_role in (OWNER, ADMIN) and decoded.get("role") != OWNER:
+        return JsonResponse({"detail": "只有 owner 可以對管理者帳號執行此操作"}, status=403)
     return None
 
 
@@ -72,12 +88,14 @@ def _forbidden_if_would_remove_last_owner(target_user_record, uid):
     return None
 
 
-def _merge_user(user_record, firestore_data):
+def _merge_user(user_record, firestore_data, *, include_email=True):
+    """include_email=False 給不能管理帳號的員工角色（editor、reviewer、analyst）：email 是個資，
+    他們看使用者的目的是內容與學習資料，不需要（稽核 FLW-6）。"""
     claims = user_record.custom_claims or {}
     metadata = user_record.user_metadata
     return {
         "uid": user_record.uid,
-        "email": user_record.email,
+        "email": user_record.email if include_email else None,
         "email_verified": user_record.email_verified,
         "disabled": user_record.disabled,
         "role": claims.get("role"),

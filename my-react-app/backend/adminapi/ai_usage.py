@@ -125,7 +125,19 @@ class _Bucket:
         }
 
 
-def summarize(days: int) -> dict:
+def _display_uid(uid: str, reveal_uids: bool) -> str:
+    """topUsers 顯示用的使用者代號。原始 Firebase uid 只給 owner／admin（reveal_uids=True）；
+    其他員工角色（editor、reviewer、analyst）看到的是和其他 AI 後台頁相同的 8 字元單向雜湊
+    （稽核 FLW-6）：看得出「同一個人用了幾次」，但看不出是誰。"""
+    if not uid:
+        return "（訪客）"
+    if reveal_uids:
+        return uid
+    from AIModel.feedback import hash_uid  # 函式內匯入：避免 adminapi 與 AIModel 在載入時互相依賴
+    return hash_uid(uid)[:8]
+
+
+def summarize(days: int, *, reveal_uids: bool = False) -> dict:
     """彙總最近 days 天的用量（含今天）。days 超出 1~MAX_DAYS 時夾回範圍。"""
     days = max(1, min(int(days), MAX_DAYS))
     now = timezone.now()
@@ -193,7 +205,7 @@ def summarize(days: int) -> dict:
         "byFeature": [b.as_dict(feature=k) for k, b in sorted(by_feature.items(), key=lambda kv: -kv[1].cost)],
         "byModel": [b.as_dict(model=k) for k, b in sorted(by_model.items(), key=lambda kv: -kv[1].cost)],
         "byStatus": [{"status": k, "calls": v} for k, v in sorted(by_status.items(), key=lambda kv: -kv[1])],
-        "topUsers": [b.as_dict(uid=k or "（訪客）") for k, b in top_users],
+        "topUsers": [b.as_dict(uid=_display_uid(k, reveal_uids)) for k, b in top_users],
         "priceNote": "費用依公開價目估算（快取讀取 0.1 倍、快取寫入 1.25 倍），實際金額以 Anthropic Console 為準。",
         "breaker": breaker_summary(since),
         "budget": budget_summary(),

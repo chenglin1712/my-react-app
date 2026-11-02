@@ -178,6 +178,10 @@ export default function AnnouncementList() {
             await loadAnnouncements();
             return true;
         } catch (err) {
+            // 待審修改在審核者檢視之後被改過（稽核 FLW-1）：重新載入列表，讓審核者看到新內容再決定
+            if (err?.data?.code === 'revision_changed') {
+                try { await loadAnnouncements(); } catch { /* 重新載入失敗時仍顯示原本的錯誤訊息 */ }
+            }
             setError(err.message);
             return false;
         } finally {
@@ -203,11 +207,17 @@ export default function AnnouncementList() {
             ? 'pending-revision/reject'
             : 'reject';
 
-        const succeeded = await runAction(
-            rejectTarget.item,
-            action,
-            { review_comment: rejectReason.trim() },
-        );
+        const body = { review_comment: rejectReason.trim() };
+        if (rejectTarget.type === 'pending-revision') {
+            // 帶上審核者在列表上看到的版本，編輯者之後改過內容就會被後端擋下（稽核 FLW-1）
+            const version = rejectTarget.item.pending_revision_version;
+            if (!version) {
+                setError('找不到這筆待審修改的版本，請重新載入後再試');
+                return;
+            }
+            body.revision_version = version;
+        }
+        const succeeded = await runAction(rejectTarget.item, action, body);
         // 只有真的送出成功才收掉對話框；失敗時保留使用者打好的退件理由，
         // 讓他可以直接重試，不用整段重打。
         if (succeeded) closeRejectModal();
@@ -234,7 +244,15 @@ export default function AnnouncementList() {
         if (actionKey === 'reject') return openRejectModal(item, 'reject');
         if (actionKey === 'rejectRevision') return openRejectModal(item, 'pending-revision');
         const { endpointAction } = REVIEW_ACTION_META[actionKey];
-        const body = endpointAction?.endsWith('approve') ? { review_comment: '' } : undefined;
+        let body = endpointAction?.endsWith('approve') ? { review_comment: '' } : undefined;
+        if (actionKey === 'approveRevision') {
+            // 帶上審核者在列表上看到的版本，編輯者之後改過內容就會被後端擋下（稽核 FLW-1）
+            if (!item.pending_revision_version) {
+                setError('找不到這筆待審修改的版本，請重新載入後再試');
+                return false;
+            }
+            body = { ...body, revision_version: item.pending_revision_version };
+        }
         return runAction(item, endpointAction, body);
     };
 

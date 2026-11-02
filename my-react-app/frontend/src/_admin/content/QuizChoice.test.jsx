@@ -439,6 +439,7 @@ describe('QuizChoice', () => {
         ...choiceItem,
         status: 'published',
         has_pending_revision: true,
+        pending_revision_version: 'v1',
       }],
       revision: {
         id: 101,
@@ -560,6 +561,7 @@ describe('QuizChoice', () => {
         ...choiceItem,
         status: 'published',
         has_pending_revision: true,
+        pending_revision_version: 'v1',
       }],
     });
 
@@ -589,6 +591,7 @@ describe('QuizChoice', () => {
         ...choiceItem,
         status: 'published',
         has_pending_revision: true,
+        pending_revision_version: 'v1',
       }],
     });
     apiPost.mockResolvedValueOnce({});
@@ -605,7 +608,7 @@ describe('QuizChoice', () => {
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith(
         '/adminapi/quiz-bank/choice/21/pending-revision/approve/',
-        { review_comment: '' },
+        { review_comment: '', revision_version: 'v1' },
       );
     });
   });
@@ -617,6 +620,7 @@ describe('QuizChoice', () => {
         ...choiceItem,
         status: 'published',
         has_pending_revision: true,
+        pending_revision_version: 'v1',
       }],
     });
     apiPost.mockResolvedValueOnce({
@@ -648,7 +652,7 @@ describe('QuizChoice', () => {
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith(
         '/adminapi/quiz-bank/choice/21/pending-revision/reject/',
-        { review_comment: '圖片內容需要重新確認' },
+        { review_comment: '圖片內容需要重新確認', revision_version: 'v1' },
       );
     });
   });
@@ -689,6 +693,7 @@ describe('QuizChoice', () => {
         ...choiceItem,
         status: 'published',
         has_pending_revision: true,
+        pending_revision_version: 'v1',
       }],
       missingRevision: true,
     });

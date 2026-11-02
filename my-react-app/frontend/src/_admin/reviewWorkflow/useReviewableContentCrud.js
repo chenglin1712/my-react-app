@@ -65,6 +65,10 @@ export function useReviewableContentCrud({
     // 之後應該能立刻改點另一列，不需要等第一次查詢做完；改用 generation 只
     // 接受最後一次點擊的回應。
     const editRequestGenerationRef = useRef(0);
+    // 審核者看到的待審修改版本（稽核 FLW-1）：核准／退件修改時要把它送回後端，編輯者在這之後
+    // 又改了內容就會被擋下（409）。優先用審核者打開編輯視窗時看到的版本，沒有再用列表那一列帶的。
+    const viewedRevisionRef = useRef(new Map());
+    const revisionVersionOf = (item) => viewedRevisionRef.current.get(item.id) ?? item.pending_revision_version ?? null;
 
     /**
      * 回傳「這次動作是否真的完成」——呼叫端需要據此決定要不要收掉 UI。
@@ -98,6 +102,11 @@ export function useReviewableContentCrud({
             await load();
             return true;
         } catch (err) {
+            // 待審修改在審核者檢視之後被改過：丟掉舊版本、重新載入列表，讓審核者看到新內容再決定
+            if (err?.data?.code === 'revision_changed') {
+                viewedRevisionRef.current.delete(item.id);
+                try { await load(); } catch { /* 重新載入失敗時仍顯示原本的錯誤訊息 */ }
+            }
             setError(err.message);
             return false;
         } finally {
@@ -121,11 +130,21 @@ export function useReviewableContentCrud({
     const submitReject = async () => {
         if (!rejectReason.trim() || !rejectTarget) return;
 
+        const body = { review_comment: rejectReason.trim() };
+        if (rejectingRevision) {
+            const version = revisionVersionOf(rejectTarget);
+            if (!version) {
+                setError('找不到這筆待審修改的版本，請重新載入後再試');
+                return;
+            }
+            body.revision_version = version;
+        }
         const succeeded = await runAction(
             rejectTarget,
             rejectingRevision ? 'pending-revision/reject' : 'reject',
-            { review_comment: rejectReason.trim() },
+            body,
         );
+        if (succeeded && rejectingRevision) viewedRevisionRef.current.delete(rejectTarget.id);
         // 只有真的送出成功才收掉對話框；失敗時保留使用者打好的退件理由，
         // 讓他可以直接重試，不用整段重打。
         if (succeeded) closeReject();
@@ -151,8 +170,10 @@ export function useReviewableContentCrud({
                 try {
                     const revision = await apiGet(`${endpoint}${item.id}/pending-revision/`);
                     values = { ...item, ...(revision.payload || {}) };
+                    if (revision.version) viewedRevisionRef.current.set(item.id, revision.version);
                 } catch (err) {
                     if (err.status !== 404) throw err;
+                    viewedRevisionRef.current.delete(item.id);
                 }
             }
 
@@ -210,8 +231,19 @@ export function useReviewableContentCrud({
 
         const { endpointAction } = REVIEW_ACTION_META[actionKey];
         // 核准類動作後端要求帶 review_comment（可為空字串）。
-        const body = endpointAction?.endsWith('approve') ? { review_comment: '' } : undefined;
-        return runAction(item, endpointAction, body);
+        let body = endpointAction?.endsWith('approve') ? { review_comment: '' } : undefined;
+        if (actionKey === 'approveRevision') {
+            const version = revisionVersionOf(item);
+            if (!version) {
+                setError('找不到這筆待審修改的版本，請重新載入後再試');
+                return false;
+            }
+            body = { ...body, revision_version: version };
+        }
+        return runAction(item, endpointAction, body).then((ok) => {
+            if (ok && actionKey === 'approveRevision') viewedRevisionRef.current.delete(item.id);
+            return ok;
+        });
     };
 
     return {

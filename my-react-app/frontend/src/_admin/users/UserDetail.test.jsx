@@ -32,10 +32,11 @@ vi.mock('../../../utils/apiClient', () => ({
 }));
 
 let mockRole = 'owner';
+let mockUid = 'me-uid';
 
 vi.mock('../../userServives/authContext', () => ({
   useAuth: () => ({
-    userData: { role: mockRole },
+    userData: { role: mockRole, uid: mockUid },
     loading: false,
   }),
 }));
@@ -136,6 +137,7 @@ function mockDetailApi() {
 describe('UserDetail', () => {
   beforeEach(() => {
     mockRole = 'owner';
+    mockUid = 'me-uid';
     detailUser = { ...user };
     apiGet.mockReset();
     apiPatch.mockReset();
@@ -598,6 +600,43 @@ describe('UserDetail', () => {
     expect(
       screen.queryByRole('button', { name: '變更密碼' }),
     ).not.toBeInTheDocument();
+  });
+
+  test('admin 檢視另一位 admin：不顯示編輯、變更密碼、停權、刪除，但仍可強制登出與匯出（稽核 FLW-3）', async () => {
+    mockRole = 'admin';
+    detailUser = { ...user, role: 'admin' };
+
+    renderPage();
+    await screen.findByText('王小明');
+
+    for (const name of ['編輯', '變更密碼', '停權帳號', '刪除帳號']) {
+      expect(screen.queryByRole('button', { name }), name).not.toBeInTheDocument();
+    }
+    expect(screen.getByRole('button', { name: '強制登出' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '匯出個資' })).toBeInTheDocument();
+  });
+
+  test('owner 檢視 admin 時仍可編輯、變更密碼、停權與刪除', async () => {
+    detailUser = { ...user, role: 'admin' };
+
+    renderPage();
+    await screen.findByText('王小明');
+
+    for (const name of ['編輯', '變更密碼', '停權帳號', '刪除帳號']) {
+      expect(screen.getByRole('button', { name }), name).toBeInTheDocument();
+    }
+  });
+
+  test('admin 檢視自己的帳號時編輯與變更密碼仍可用', async () => {
+    mockRole = 'admin';
+    mockUid = 'abc123';
+    detailUser = { ...user, role: 'admin' };
+
+    renderPage();
+    await screen.findByText('王小明');
+
+    expect(screen.getByRole('button', { name: '編輯' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '變更密碼' })).toBeInTheDocument();
   });
 
   test('owner 檢視 owner 時仍可編輯資料與變更密碼', async () => {

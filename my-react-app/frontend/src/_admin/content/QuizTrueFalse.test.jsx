@@ -403,6 +403,7 @@ describe('QuizTrueFalse', () => {
         ...trueFalseItem,
         status: 'published',
         has_pending_revision: true,
+        pending_revision_version: 'v1',
       }],
       revision: {
         id: 91,
@@ -515,6 +516,7 @@ describe('QuizTrueFalse', () => {
         ...trueFalseItem,
         status: 'published',
         has_pending_revision: true,
+        pending_revision_version: 'v1',
       }],
     });
 
@@ -544,6 +546,7 @@ describe('QuizTrueFalse', () => {
         ...trueFalseItem,
         status: 'published',
         has_pending_revision: true,
+        pending_revision_version: 'v1',
       }],
     });
     apiPost.mockResolvedValueOnce({});
@@ -560,7 +563,7 @@ describe('QuizTrueFalse', () => {
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith(
         '/adminapi/quiz-bank/true-false/11/pending-revision/approve/',
-        { review_comment: '' },
+        { review_comment: '', revision_version: 'v1' },
       );
     });
   });
@@ -572,6 +575,7 @@ describe('QuizTrueFalse', () => {
         ...trueFalseItem,
         status: 'published',
         has_pending_revision: true,
+        pending_revision_version: 'v1',
       }],
     });
     apiPost.mockResolvedValueOnce({
@@ -603,7 +607,7 @@ describe('QuizTrueFalse', () => {
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith(
         '/adminapi/quiz-bank/true-false/11/pending-revision/reject/',
-        { review_comment: '句意與圖片不一致' },
+        { review_comment: '句意與圖片不一致', revision_version: 'v1' },
       );
     });
   });
@@ -644,6 +648,7 @@ describe('QuizTrueFalse', () => {
         ...trueFalseItem,
         status: 'published',
         has_pending_revision: true,
+        pending_revision_version: 'v1',
       }],
       missingRevision: true,
     });

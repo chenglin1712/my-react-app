@@ -13,6 +13,11 @@ QuizClozePassage／QuizSituationItem／QuizTrueFalseItem／QuizChoiceItem）
 因為 Announcement 的核准角色是 PUBLISHERS，題庫類內容是 CONTENT_APPROVERS
 （見 quizbank_views.py 開頭說明的設計決定），兩邊不一樣。
 """
+import hashlib
+import hmac
+import json
+
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
@@ -25,7 +30,7 @@ from config.roles import CONTENT_EDITORS, STAFF_ROLES
 from ._shared import (
     invalid_transition, parse_json_body, rate_limited_response, write_audit_log,
 )
-from .models import PendingRevision
+from .models import AiQuizDraft, PendingRevision
 from .serializers import RejectSerializer
 
 
@@ -40,6 +45,68 @@ def pending_revision_target_ids(target_type, target_ids):
             status=PendingRevision.STATUS_PENDING_REVIEW,
         ).values_list("target_id", flat=True)
     )
+
+
+def pending_revision_versions(target_type, target_ids):
+    """pending_revision_target_ids 的進階版：回傳 {target_id: 版本值}，列表端點用它同時標記
+    has_pending_revision 與 pending_revision_version。審核者按核准／退件時要把「自己看到的版本」
+    送回來（見 check_revision_version）。"""
+    if not target_ids:
+        return {}
+    return {
+        revision.target_id: revision_version(revision)
+        for revision in PendingRevision.objects.filter(
+            target_type=target_type, target_id__in=target_ids,
+            status=PendingRevision.STATUS_PENDING_REVIEW,
+        )
+    }
+
+
+def revision_version(revision):
+    """待審修改的版本值：由 id、提交者與內容（payload）算出的雜湊。
+
+    編輯者在待審期間再送一次會用 update_or_create 原地覆蓋 payload 與提交者（id 不變、
+    submitted_at 也不變），審核者打開的是舊內容，核准時卻會發佈被換掉的內容。版本值隨內容與
+    提交者改變，核准／退件帶上審核者看到的版本，不符就回 409（稽核 FLW-1）。
+    用雜湊而不是新增欄位，所以不需要 migration。payload 必須是從資料庫讀回來的純 JSON 值。
+    """
+    canonical = json.dumps(
+        [revision.pk, revision.submitted_by, revision.payload],
+        sort_keys=True, ensure_ascii=False, separators=(",", ":"), cls=DjangoJSONEncoder,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:32]
+
+
+def check_revision_version(data, revision):
+    """核准／退件前比對審核者看到的版本。通過回傳 None，否則回傳要直接回給呼叫端的 JsonResponse。"""
+    provided = data.get("revision_version") if isinstance(data, dict) else None
+    if not isinstance(provided, str) or not provided:
+        return JsonResponse(
+            {"detail": "缺少 revision_version，請重新載入後再審核", "code": "revision_version_required"},
+            status=400,
+        )
+    if not hmac.compare_digest(provided.encode("utf-8"), revision_version(revision).encode("utf-8")):
+        return JsonResponse(
+            {"detail": "這筆待審修改在你檢視之後被更新了，請重新載入並確認新內容後再審核",
+             "code": "revision_changed"},
+            status=409,
+        )
+    return None
+
+
+def own_ai_draft_approval_response(target_type, target_id, uid):
+    """AI 產生的題目不能由產生者自己核可（路線圖 #23）：owner／admin 同時是編輯者與核准者，也一樣擋。
+    不是這種情況回傳 None，否則回傳要直接回給呼叫端的 403。
+
+    新題的核准（quizbank_views._content_approve）與已發布題目的修改核准（_approve_pending_revision）
+    共用這個檢查；只擋前者的話，產生者可以編輯已發布的 AI 題目再自己核准（稽核 FLW-2）。
+    """
+    if AiQuizDraft.objects.filter(content_type=target_type, content_id=target_id, generated_by=uid).exists():
+        return JsonResponse(
+            {"detail": "AI 產生的題目不能由產生者自己核可，請交給其他審核者。", "code": "cannot_approve_own_ai_draft"},
+            status=403,
+        )
+    return None
 
 
 def _locked_target(model, pk):
@@ -90,6 +157,7 @@ def _get_pending_revision(request, pk, model, target_type):
     return JsonResponse({
         "id": revision.pk, "payload": revision.payload,
         "submitted_by": revision.submitted_by, "submitted_at": revision.submitted_at.isoformat(),
+        "version": revision_version(revision),
     })
 
 
@@ -144,6 +212,7 @@ def _create_or_update_pending_revision(request, pk, model, serializer_class, tar
 
     return JsonResponse({
         "id": revision.pk, "payload": revision.payload, "submitted_by": revision.submitted_by,
+        "version": revision_version(revision),
     }, status=201 if created else 200)
 
 
@@ -168,6 +237,12 @@ def _approve_pending_revision(request, pk, model, serializer_class, target_type,
         ).first()
         if not revision:
             return invalid_transition("(無待審修改)", "approve_revision")
+        version_err = check_revision_version(data, revision)
+        if version_err:
+            return version_err
+        own_draft_err = own_ai_draft_approval_response(target_type, obj.pk, decoded.get("uid", "anon"))
+        if own_draft_err:
+            return own_draft_err
 
         # 提案送出之後、核准之前，這段時間內容有可能被別的路徑下架（見
         # cancel_stale_pending_revision 的說明）——正常情況下架時就會主動
@@ -229,6 +304,9 @@ def _reject_pending_revision(request, pk, model, target_type, approver_roles):
         ).first()
         if not revision:
             return invalid_transition("(無待審修改)", "reject_revision")
+        version_err = check_revision_version(data, revision)
+        if version_err:
+            return version_err
 
         revision.status = PendingRevision.STATUS_REJECTED
         revision.reviewed_by = decoded.get("uid", "anon")

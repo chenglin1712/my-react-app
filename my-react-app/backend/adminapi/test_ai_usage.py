@@ -7,7 +7,7 @@ from django.test import Client, TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
-from config.roles import ANALYST
+from config.roles import ADMIN, ANALYST, EDITOR, OWNER
 
 from . import ai_usage
 from .models import AiUsageLog
@@ -166,9 +166,20 @@ class SummarizeTest(TestCase):
             _log(uid="heavy")
         _log(uid="light")
         _log(uid="")
-        users = ai_usage.summarize(7)["topUsers"]
+        users = ai_usage.summarize(7, reveal_uids=True)["topUsers"]
         self.assertEqual(users[0]["uid"], "heavy")
         self.assertEqual(users[0]["calls"], 3)
+        self.assertIn("（訪客）", [u["uid"] for u in users])
+
+    def test_top_users_default_to_a_short_hash_instead_of_the_raw_uid(self):
+        # 稽核 FLW-6：預設不給原始 uid；雜湊與 AI 回饋頁（uid_hash[:8]）一致，看得出同一個人但不知道是誰
+        from AIModel.feedback import hash_uid
+        for _ in range(2):
+            _log(uid="heavy-user")
+        _log(uid="")
+        users = ai_usage.summarize(7)["topUsers"]
+        self.assertEqual(users[0]["uid"], hash_uid("heavy-user")[:8])
+        self.assertNotIn("heavy-user", str(users))
         self.assertIn("（訪客）", [u["uid"] for u in users])
 
 
@@ -216,3 +227,28 @@ class AiUsageEndpointTest(TestCase):
             text = self.client.get('/adminapi/ai-usage/', **headers).content.decode()
         for forbidden in ("prompt", "message", "content", "response_text"):
             self.assertNotIn(f'"{forbidden}"', text)
+
+
+class AiUsageUidVisibilityTest(TestCase):
+    """稽核 FLW-6：原始 uid 只給 owner／admin，其他員工角色看雜湊。"""
+
+    def setUp(self):
+        self.client = Client()
+        _log(uid="real-uid-123")
+
+    def _top_user(self, role):
+        with _as_role(role) as headers:
+            response = self.client.get('/adminapi/ai-usage/', **headers)
+        self.assertEqual(response.status_code, 200)
+        return response.json()["topUsers"][0]["uid"]
+
+    def test_owner_and_admin_see_the_raw_uid(self):
+        self.assertEqual(self._top_user(OWNER), "real-uid-123")
+        self.assertEqual(self._top_user(ADMIN), "real-uid-123")
+
+    def test_editor_and_analyst_see_only_a_hash(self):
+        from AIModel.feedback import hash_uid
+        for role in (EDITOR, ANALYST):
+            shown = self._top_user(role)
+            self.assertEqual(shown, hash_uid("real-uid-123")[:8], role)
+            self.assertNotIn("real-uid-123", shown)

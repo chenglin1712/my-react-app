@@ -766,3 +766,54 @@ class ExportTest(DictionaryDbTestCase):
         # 完全沒有 sort_order 可用的 category_ids，依 id 遞增排序（插入順序）。
         exp_a_tree = next(e for e in tree["explanations"] if e["id"] == exp_a_id)
         self.assertEqual(exp_a_tree["category_ids"], [self.category_id, category2_id])
+
+
+class ImportStateTransitionLockTest(DictionaryDbTestCase):
+    """稽核 FLW-5：預檢在鎖外面算報告，寫回前要鎖列重新確認狀態；送審／撤回／退件都在鎖內判斷狀態。"""
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.client = Client()
+        self.seed_tribe(tribe_id=_TAYAL.id, name=_TAYAL.full_name, slug=_TAYAL.slug)
+
+    def _validated_job(self):
+        bundle = _minimal_bundle([{"name": "詞A"}])
+        with _as_role(EDITOR) as headers:
+            job_id = _post_json(self.client, '/adminapi/dictionary/import/', headers,
+                                {"filename": "test.json", "bundle": bundle}).json()["id"]
+            _post_json(self.client, f'/adminapi/dictionary/import/{job_id}/preflight/', headers)
+        return job_id
+
+    def test_preflight_does_not_overwrite_a_job_submitted_while_it_was_running(self):
+        job_id = self._validated_job()
+        from .dictionary_import import resolve_import_bundle as real_resolve
+
+        def resolve_then_get_submitted(*args, **kwargs):
+            report = real_resolve(*args, **kwargs)
+            # 預檢算報告的這段時間，別人把同一份工作送審了
+            DictionaryImportJob.objects.filter(pk=job_id).update(status=DictionaryImportJob.STATUS_PENDING_REVIEW)
+            return report
+
+        with patch("adminapi.dictionary_import_views.resolve_import_bundle", side_effect=resolve_then_get_submitted):
+            with _as_role(EDITOR) as headers:
+                resp = _post_json(self.client, f'/adminapi/dictionary/import/{job_id}/preflight/', headers)
+        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(DictionaryImportJob.objects.get(pk=job_id).status, DictionaryImportJob.STATUS_PENDING_REVIEW)
+
+    def test_submit_withdraw_reject_respect_current_status(self):
+        job_id = self._validated_job()
+        with _as_role(EDITOR) as headers:
+            self.assertEqual(
+                _post_json(self.client, f'/adminapi/dictionary/import/{job_id}/withdraw/', headers).status_code, 409)
+            self.assertEqual(
+                _post_json(self.client, f'/adminapi/dictionary/import/{job_id}/submit/', headers).status_code, 200)
+            self.assertEqual(
+                _post_json(self.client, f'/adminapi/dictionary/import/{job_id}/submit/', headers).status_code, 409)
+        with _as_role(REVIEWER) as headers:
+            self.assertEqual(
+                _post_json(self.client, f'/adminapi/dictionary/import/{job_id}/reject/', headers,
+                           {"review_comment": "不行"}).status_code, 200)
+            self.assertEqual(
+                _post_json(self.client, f'/adminapi/dictionary/import/{job_id}/reject/', headers,
+                           {"review_comment": "再退一次"}).status_code, 409)

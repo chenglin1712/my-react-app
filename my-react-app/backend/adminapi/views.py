@@ -53,7 +53,10 @@ from ._shared import (
 )
 from .crawler_sync import sync_crawler_announcements
 from .models import Announcement, AnnouncementSyncStatus, AuditLog
-from .revisions import cancel_stale_pending_revision, make_revision_views, pending_revision_target_ids
+from .revisions import (
+    cancel_stale_pending_revision, make_revision_views, pending_revision_target_ids,
+    pending_revision_versions,
+)
 from .serializers import (
     AnnouncementSerializer, ApproveSerializer, AuditLogSerializer,
     PublicAnnouncementSerializer, RejectSerializer,
@@ -155,10 +158,11 @@ def _list_announcements(request, decoded):
         start = (page - 1) * page_size
         items = list(qs[start:start + page_size])
 
-    pending_ids = pending_revision_target_ids("announcement", [item.pk for item in items])
+    pending_versions = pending_revision_versions("announcement", [item.pk for item in items])
     results = AnnouncementSerializer(items, many=True).data
     for result, item in zip(results, items):
-        result["has_pending_revision"] = item.pk in pending_ids
+        result["has_pending_revision"] = item.pk in pending_versions
+        result["pending_revision_version"] = pending_versions.get(item.pk)
 
     return JsonResponse({
         "results": results,
@@ -265,7 +269,9 @@ def announcement_detail(request, pk):
 def _get_announcement(request, decoded, pk):
     announcement = get_object_or_404(Announcement.live, pk=pk)
     data = AnnouncementSerializer(announcement).data
-    data["has_pending_revision"] = bool(pending_revision_target_ids("announcement", [announcement.pk]))
+    pending_version = pending_revision_versions("announcement", [announcement.pk]).get(announcement.pk)
+    data["has_pending_revision"] = pending_version is not None
+    data["pending_revision_version"] = pending_version
     return JsonResponse(data)
 
 

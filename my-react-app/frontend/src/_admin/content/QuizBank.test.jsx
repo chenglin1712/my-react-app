@@ -285,6 +285,7 @@ describe('QuizBank', () => {
         ...vocabItem,
         status: 'published',
         has_pending_revision: true,
+        pending_revision_version: 'v1',
       }],
       vocabRevision: {
         id: 51,
@@ -370,6 +371,7 @@ describe('QuizBank', () => {
         ...vocabItem,
         status: 'published',
         has_pending_revision: true,
+        pending_revision_version: 'v1',
       }],
     });
 
@@ -395,6 +397,7 @@ describe('QuizBank', () => {
         ...vocabItem,
         status: 'published',
         has_pending_revision: true,
+        pending_revision_version: 'v1',
       }],
     });
     apiPost.mockResolvedValueOnce({});
@@ -412,7 +415,7 @@ describe('QuizBank', () => {
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith(
         '/adminapi/quiz-bank/vocab/1/pending-revision/approve/',
-        { review_comment: '' },
+        { review_comment: '', revision_version: 'v1' },
       );
     });
   });
@@ -424,6 +427,7 @@ describe('QuizBank', () => {
         ...vocabItem,
         status: 'published',
         has_pending_revision: true,
+        pending_revision_version: 'v1',
       }],
     });
     apiPost.mockResolvedValueOnce({ detail: '已退件，原內容不受影響' });
@@ -454,7 +458,7 @@ describe('QuizBank', () => {
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith(
         '/adminapi/quiz-bank/vocab/1/pending-revision/reject/',
-        { review_comment: '修改後的詞義不夠精確' },
+        { review_comment: '修改後的詞義不夠精確', revision_version: 'v1' },
       );
     });
   });
@@ -783,6 +787,7 @@ describe('QuizBank', () => {
         ...clozeItem,
         status: 'published',
         has_pending_revision: true,
+        pending_revision_version: 'v1',
       }],
     });
     apiPost.mockResolvedValue({});
@@ -807,7 +812,7 @@ describe('QuizBank', () => {
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith(
         '/adminapi/quiz-bank/cloze/2/pending-revision/approve/',
-        { review_comment: '' },
+        { review_comment: '', revision_version: 'v1' },
       );
     });
 
@@ -826,7 +831,7 @@ describe('QuizBank', () => {
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith(
         '/adminapi/quiz-bank/cloze/2/pending-revision/reject/',
-        { review_comment: '短文內容需要重新確認' },
+        { review_comment: '短文內容需要重新確認', revision_version: 'v1' },
       );
     });
   });

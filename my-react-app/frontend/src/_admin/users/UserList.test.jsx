@@ -136,6 +136,20 @@ describe('UserList', () => {
     },
   );
 
+  test.each([
+    ['owner', '搜尋 Email、姓名或 UID'],
+    ['admin', '搜尋 Email、姓名或 UID'],
+    ['editor', '搜尋姓名或 UID'],
+    ['analyst', '搜尋姓名或 UID'],
+  ])('%s 的搜尋提示是「%s」（不能管理帳號的角色看不到 Email，後端也不比對 Email；稽核 FLW-6）', async (role, placeholder) => {
+    mockRole = role;
+
+    renderPage();
+    await screen.findByText('王小明');
+
+    expect(screen.getByLabelText('關鍵字搜尋')).toHaveAttribute('placeholder', placeholder);
+  });
+
   test('送出篩選後以完整條件重新查詢', async () => {
     renderPage();
     await screen.findByText('王小明');

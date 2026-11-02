@@ -69,7 +69,7 @@ export default function UserList() {
       <Form className="user-filter-panel" onSubmit={search}>
         <Form.Control
           aria-label="關鍵字搜尋"
-          placeholder="搜尋 Email、姓名或 UID"
+          placeholder={canCreateUser ? '搜尋 Email、姓名或 UID' : '搜尋姓名或 UID'}
           value={filters.keyword}
           onChange={(event) => setFilters({
             ...filters,

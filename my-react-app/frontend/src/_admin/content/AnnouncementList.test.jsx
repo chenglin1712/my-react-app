@@ -161,6 +161,7 @@ describe('AnnouncementList', () => {
     const itemWithRevision = {
       ...publishedItem,
       has_pending_revision: true,
+      pending_revision_version: 'v1',
     };
 
     apiGet.mockResolvedValue({
@@ -187,7 +188,7 @@ describe('AnnouncementList', () => {
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith(
         '/adminapi/announcements/3/pending-revision/approve/',
-        { review_comment: '' },
+        { review_comment: '', revision_version: 'v1' },
       );
     });
 
@@ -216,7 +217,7 @@ describe('AnnouncementList', () => {
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith(
         '/adminapi/announcements/3/pending-revision/reject/',
-        { review_comment: '新內容的用字需要調整' },
+        { review_comment: '新內容的用字需要調整', revision_version: 'v1' },
       );
     });
   });
@@ -224,7 +225,7 @@ describe('AnnouncementList', () => {
   test('editor 看得到待審修改提示與編輯，但看不到 PUBLISHERS 專屬的核准修改／退件修改', async () => {
     mockRole = 'editor';
     apiGet.mockResolvedValue({
-      results: [{ ...publishedItem, has_pending_revision: true }],
+      results: [{ ...publishedItem, has_pending_revision: true, pending_revision_version: 'v1' }],
       count: 1,
       page: 1,
       page_size: 10,

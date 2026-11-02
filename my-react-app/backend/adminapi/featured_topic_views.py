@@ -21,7 +21,10 @@ from ._shared import (
     write_audit_log as _write_audit_log,
 )
 from .models import FeaturedTopic
-from .revisions import cancel_stale_pending_revision, make_revision_views, pending_revision_target_ids
+from .revisions import (
+    cancel_stale_pending_revision, make_revision_views, pending_revision_target_ids,
+    pending_revision_versions,
+)
 from .serializers import (
     ApproveSerializer, FeaturedTopicSerializer, PublicFeaturedTopicDetailSerializer, PublicFeaturedTopicSerializer,
     RejectSerializer,
@@ -72,10 +75,11 @@ def _list_topics(request, decoded):
     if status_param:
         qs = qs.filter(status=status_param)
     items = list(qs[:200])
-    pending_ids = pending_revision_target_ids(TARGET_TYPE, [item.pk for item in items])
+    pending_versions = pending_revision_versions(TARGET_TYPE, [item.pk for item in items])
     results = FeaturedTopicSerializer(items, many=True).data
     for result, item in zip(results, items):
-        result["has_pending_revision"] = item.pk in pending_ids
+        result["has_pending_revision"] = item.pk in pending_versions
+        result["pending_revision_version"] = pending_versions.get(item.pk)
     return JsonResponse({"results": results, "count": len(results)})
 
 
@@ -108,7 +112,9 @@ def featured_topic_detail(request, pk):
 def _get_topic(request, decoded, pk):
     topic = get_object_or_404(FeaturedTopic.live, pk=pk)
     data = _data(topic)
-    data["has_pending_revision"] = bool(pending_revision_target_ids(TARGET_TYPE, [topic.pk]))
+    pending_version = pending_revision_versions(TARGET_TYPE, [topic.pk]).get(topic.pk)
+    data["has_pending_revision"] = pending_version is not None
+    data["pending_revision_version"] = pending_version
     return JsonResponse(data)
 
 

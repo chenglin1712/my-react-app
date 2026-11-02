@@ -8,6 +8,7 @@ grammar_rule_affix/grammar_example_word 對帳正確、cascade 刪除整棵子�
 """
 from adminapi.auth_fixtures import fresh_auth
 import json
+import re
 from contextlib import contextmanager
 from unittest.mock import patch
 
@@ -17,6 +18,8 @@ from django.test.utils import override_settings
 from config.roles import ANALYST, EDITOR, REVIEWER
 from dictionary_db import connect as connect_module
 from dictionary_db import model as m
+
+from . import dictionary_write as dw
 
 from .dictionary_test_base import DictionaryDbTestCase
 from .models import AuditLog, DictionaryRevision
@@ -33,7 +36,28 @@ def _as_role(role):
                 yield {"HTTP_AUTHORIZATION": "Bearer test-token"}
 
 
+_PROPOSE_URL = re.compile(r"/dictionary/grammar/sections/(\d+)/propose/$")
+
+
+def _current_content_hash(section_id):
+    db = connect_module.SessionLocal()
+    try:
+        return dw.get_grammar_section_tree(db, int(section_id))["content_hash"]
+    finally:
+        db.close()
+
+
 def _post_json(client, url, headers, payload=None):
+    body = dict(payload or {})
+    # 更新提案必須帶 base_hash（稽核 FLW-5）；多數既有測試不關心它，預設帶目前真實的 content_hash，
+    # 要測缺少或過期的情況時自己放 base_hash（或用 _post_json_raw）。
+    match = _PROPOSE_URL.search(url)
+    if match and "base_hash" not in body:
+        body["base_hash"] = _current_content_hash(match.group(1))
+    return client.post(url, data=json.dumps(body), content_type="application/json", **headers)
+
+
+def _post_json_raw(client, url, headers, payload=None):
     return client.post(url, data=json.dumps(payload or {}), content_type="application/json", **headers)
 
 
@@ -456,3 +480,29 @@ class GrammarSectionReorderTest(DictionaryDbTestCase):
                 {"tribe_id": "tribe-tayal", "section_ids": self.section_ids},
             )
         self.assertEqual(resp.status_code, 403)
+
+
+class GrammarProposeRequiresBaseHashTest(DictionaryDbTestCase):
+    """稽核 FLW-5：更新既有文法章節的提案同樣必須帶 base_hash。"""
+
+    def setUp(self):
+        super().setUp()
+        self.client = Client()
+        self.seed_tribe()
+        db = connect_module.SessionLocal()
+        try:
+            section = m.GrammarSection(tribe_id="tribe-tayal", title="原標題", section_key="tense", section_order=0)
+            db.add(section)
+            db.commit()
+            self.section_id = section.id
+        finally:
+            db.close()
+        self.url = f'/adminapi/dictionary/grammar/sections/{self.section_id}/propose/'
+
+    def test_missing_or_empty_base_hash_is_rejected(self):
+        for extra in ({}, {"base_hash": ""}, {"base_hash": 5}):
+            with _as_role(EDITOR) as headers:
+                resp = _post_json_raw(self.client, self.url, headers, {**_MINIMAL_SECTION_PAYLOAD, **extra})
+            self.assertEqual(resp.status_code, 400, extra)
+            self.assertIn("base_hash", resp.json()["errors"])
+        self.assertEqual(DictionaryRevision.objects.count(), 0)

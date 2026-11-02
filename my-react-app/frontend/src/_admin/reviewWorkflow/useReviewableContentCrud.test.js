@@ -111,14 +111,88 @@ describe('useReviewableContentCrud', () => {
             expect(apiPost).toHaveBeenCalledWith('/adminapi/things/3/unpublish/', undefined);
         });
 
-        test('核准修改用 pending-revision/approve 且同樣帶 review_comment', async () => {
+        test('核准修改用 pending-revision/approve，帶 review_comment 與審核者看到的版本', async () => {
+            const { result } = setup();
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            await act(async () => {
+                await result.current.handleAction('approveRevision', { id: 5, pending_revision_version: 'v-list' });
+            });
+            expect(apiPost).toHaveBeenCalledWith(
+                '/adminapi/things/5/pending-revision/approve/', { review_comment: '', revision_version: 'v-list' },
+            );
+        });
+
+        test('沒有版本值時不送出核准修改，並提示重新載入（稽核 FLW-1）', async () => {
             const { result } = setup();
             await waitFor(() => expect(result.current.loading).toBe(false));
 
             await act(async () => { await result.current.handleAction('approveRevision', { id: 5 }); });
+            expect(apiPost).not.toHaveBeenCalled();
+            expect(result.current.error).toContain('重新載入');
+        });
+
+        test('審核者打開過編輯視窗，核准用那時看到的版本而不是列表上的版本', async () => {
+            apiGet.mockImplementation(async (url) => {
+                if (url === '/adminapi/things/5/pending-revision/') return { payload: { name: '新' }, version: 'v-viewed' };
+                return listPage();
+            });
+            const { result } = setup();
+            await waitFor(() => expect(result.current.loading).toBe(false));
+            const item = { id: 5, status: 'published', name: '舊', pending_revision_version: 'v-list' };
+
+            await act(async () => { await result.current.editor.openEdit(item); });
+            await act(async () => { await result.current.handleAction('approveRevision', item); });
+
             expect(apiPost).toHaveBeenCalledWith(
-                '/adminapi/things/5/pending-revision/approve/', { review_comment: '' },
+                '/adminapi/things/5/pending-revision/approve/', { review_comment: '', revision_version: 'v-viewed' },
             );
+        });
+
+        test('退件修改帶版本；沒有版本時不送出', async () => {
+            const { result } = setup();
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            act(() => { result.current.reject.open({ id: 5, pending_revision_version: 'v-list' }, true); });
+            act(() => { result.current.reject.setReason('不同意'); });
+            await act(async () => { await result.current.reject.submit(); });
+            expect(apiPost).toHaveBeenCalledWith(
+                '/adminapi/things/5/pending-revision/reject/', { review_comment: '不同意', revision_version: 'v-list' },
+            );
+
+            apiPost.mockClear();
+            act(() => { result.current.reject.open({ id: 6 }, true); });
+            act(() => { result.current.reject.setReason('不同意'); });
+            await act(async () => { await result.current.reject.submit(); });
+            expect(apiPost).not.toHaveBeenCalled();
+            expect(result.current.error).toContain('重新載入');
+        });
+
+        test('一般退件（非修改）不帶版本', async () => {
+            const { result } = setup();
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            act(() => { result.current.reject.open({ id: 7, status: 'pending_review' }); });
+            act(() => { result.current.reject.setReason('請修正'); });
+            await act(async () => { await result.current.reject.submit(); });
+            expect(apiPost).toHaveBeenCalledWith('/adminapi/things/7/reject/', { review_comment: '請修正' });
+        });
+
+        test('後端回 revision_changed（409）時重新載入列表並顯示錯誤，不套用', async () => {
+            apiPost.mockRejectedValueOnce(Object.assign(new Error('這筆待審修改在你檢視之後被更新了'), {
+                status: 409, data: { code: 'revision_changed' },
+            }));
+            const { result } = setup();
+            await waitFor(() => expect(result.current.loading).toBe(false));
+            const listCalls = apiGet.mock.calls.length;
+
+            let ok;
+            await act(async () => {
+                ok = await result.current.handleAction('approveRevision', { id: 5, pending_revision_version: 'v-old' });
+            });
+            expect(ok).toBe(false);
+            expect(apiGet.mock.calls.length).toBeGreaterThan(listCalls);
+            expect(result.current.error).toContain('被更新');
         });
 
         test('刪除時按取消不會呼叫 API', async () => {

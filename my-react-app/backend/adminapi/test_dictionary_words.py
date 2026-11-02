@@ -8,6 +8,7 @@ MagicMock 只能斷言「有呼叫 .filter()」，證明不了這些。
 """
 from adminapi.auth_fixtures import fresh_auth
 import json
+import re
 from contextlib import contextmanager
 from unittest.mock import patch
 
@@ -18,6 +19,7 @@ from config.roles import ADMIN, ANALYST, EDITOR, OWNER, REVIEWER
 from dictionary_db import connect as connect_module
 from dictionary_db import model as m
 
+from . import dictionary_write as dw
 from .dictionary_test_base import DictionaryDbTestCase
 from .models import AuditLog, DictionaryRevision
 
@@ -33,7 +35,28 @@ def _as_role(role):
                 yield {"HTTP_AUTHORIZATION": "Bearer test-token"}
 
 
+_PROPOSE_URL = re.compile(r"/dictionary/words/([^/]+)/propose/$")
+
+
+def _current_content_hash(word_id):
+    db = connect_module.SessionLocal()
+    try:
+        return dw.get_word_tree(db, word_id)["content_hash"]
+    finally:
+        db.close()
+
+
 def _post_json(client, url, headers, payload=None):
+    body = dict(payload or {})
+    # 更新提案必須帶 base_hash（稽核 FLW-5）；多數既有測試不關心它，預設帶目前真實的 content_hash，
+    # 要測缺少或過期的情況時自己放 base_hash（或用 _post_json_raw）。
+    match = _PROPOSE_URL.search(url)
+    if match and "base_hash" not in body:
+        body["base_hash"] = _current_content_hash(match.group(1))
+    return client.post(url, data=json.dumps(body), content_type="application/json", **headers)
+
+
+def _post_json_raw(client, url, headers, payload=None):
     return client.post(url, data=json.dumps(payload or {}), content_type="application/json", **headers)
 
 
@@ -662,3 +685,30 @@ class WordListTest(DictionaryDbTestCase):
         body = resp.json()
         self.assertEqual(body["count"], 0)
         self.assertEqual(body["results"], [])
+
+
+class WordProposeRequiresBaseHashTest(DictionaryDbTestCase):
+    """稽核 FLW-5：更新既有詞條的提案必須帶 base_hash，省略等於關掉樂觀鎖。"""
+
+    def setUp(self):
+        super().setUp()
+        self.client = Client()
+        self.seed_tribe()
+        self.word_id = self.seed_word(name="original")
+        self.url = f'/adminapi/dictionary/words/{self.word_id}/propose/'
+
+    def test_missing_empty_or_non_string_base_hash_is_rejected(self):
+        for extra in ({}, {"base_hash": ""}, {"base_hash": "   "}, {"base_hash": 123}, {"base_hash": ["x"]},
+                      {"base_hash": "sha256:" + "a" * 80}):
+            with _as_role(EDITOR) as headers:
+                resp = _post_json_raw(self.client, self.url, headers, {**_MINIMAL_WORD_PAYLOAD, **extra})
+            self.assertEqual(resp.status_code, 400, extra)
+            self.assertIn("base_hash", resp.json()["errors"])
+        self.assertEqual(DictionaryRevision.objects.count(), 0)
+
+    def test_current_content_hash_is_accepted(self):
+        with _as_role(EDITOR) as headers:
+            resp = _post_json_raw(self.client, self.url, headers, {
+                **_MINIMAL_WORD_PAYLOAD, "base_hash": _current_content_hash(self.word_id),
+            })
+        self.assertEqual(resp.status_code, 201)

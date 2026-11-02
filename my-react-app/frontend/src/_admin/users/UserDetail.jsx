@@ -247,10 +247,14 @@ export default function UserDetail() {
     );
   }
 
-  const canManageTarget = (
-    canManageAccount
-    && (user.role !== 'owner' || role === 'owner')
+  // 目標是 owner 或 admin 時，改資料、改密碼、停權、刪除只有 owner 能做（稽核 FLW-3；後端是
+  // _forbidden_if_target_is_privileged）。對自己的帳號不擋。強制登出與匯出個資不受這條限制。
+  const isPrivilegedTarget = (
+    (user.role === 'owner' || user.role === 'admin')
+    && role !== 'owner'
+    && user.uid !== userData?.uid
   );
+  const canManageTarget = canManageAccount && !isPrivilegedTarget;
 
   return (
     <main className="user-admin-page user-detail-page">
@@ -481,6 +485,7 @@ export default function UserDetail() {
                 </>
               )}
 
+              {canManageTarget && (
               <div className="user-action-section">
                 <div>
                   <h3>
@@ -513,6 +518,7 @@ export default function UserDetail() {
                   {user.disabled ? '解除停權' : '停權帳號'}
                 </Button>
               </div>
+              )}
 
               <div className="user-action-section">
                 <div>
@@ -560,6 +566,7 @@ export default function UserDetail() {
                 </Button>
               </div>
 
+              {canManageTarget && (
               <div className="user-action-section user-danger-zone">
                 <div>
                   <h3>
@@ -578,6 +585,7 @@ export default function UserDetail() {
                   刪除帳號
                 </Button>
               </div>
+              )}
             </>
           )}
         </section>

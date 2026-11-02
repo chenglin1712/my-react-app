@@ -198,6 +198,13 @@ def grammar_section_propose(request, section_id):
     if err_resp:
         return err_resp
     base_hash = data.pop("base_hash", "") if isinstance(data, dict) else ""
+    # 更新既有內容必須帶 base_hash（稽核 FLW-5）：它是核准時比對「有沒有人在你之後改過」的依據，
+    # 省略等於關掉樂觀鎖。前端的編輯器一直都有帶（取自載入時的 content_hash）。
+    if not isinstance(base_hash, str) or not base_hash.strip() or len(base_hash) > 71:
+        return JsonResponse({
+            "detail": "請求參數錯誤",
+            "errors": {"base_hash": "更新時必須帶上載入時取得的 content_hash，請重新載入後再編輯"},
+        }, status=400)
     cleaned, errors = validate_grammar_section_payload(data)
     if errors:
         return JsonResponse({"detail": "請求參數錯誤", "errors": errors}, status=400)

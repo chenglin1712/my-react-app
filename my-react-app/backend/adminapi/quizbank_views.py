@@ -44,7 +44,10 @@ from .models import (
     AiQuizDraft, IrtConfig, QuizChoiceItem, QuizClozePassage, QuizSituationItem, QuizSourceConfig,
     QuizTrueFalseItem, QuizVocabItem,
 )
-from .revisions import cancel_stale_pending_revision, make_revision_views, pending_revision_target_ids
+from .revisions import (
+    cancel_stale_pending_revision, make_revision_views, own_ai_draft_approval_response,
+    pending_revision_versions,
+)
 from .serializers import (
     ApproveSerializer, IrtConfigSerializer, PublicIrtConfigSerializer,
     QuizChoiceItemSerializer, QuizClozePassageSerializer, QuizSituationItemSerializer,
@@ -93,10 +96,11 @@ def _list_content(request, model, serializer_class, target_type, extra_filter_fi
 
     # has_pending_revision：這一列是否有一筆待審核的「編輯已發布內容」提案
     # （見 revisions.py）。一次查詢這一頁全部 id，不要每列各自查一次。
-    pending_ids = pending_revision_target_ids(target_type, [item.pk for item in items])
+    pending_versions = pending_revision_versions(target_type, [item.pk for item in items])
     results = serializer_class(items, many=True).data
     for result, item in zip(results, items):
-        result["has_pending_revision"] = item.pk in pending_ids
+        result["has_pending_revision"] = item.pk in pending_versions
+        result["pending_revision_version"] = pending_versions.get(item.pk)
 
     return JsonResponse({
         "results": results,
@@ -133,7 +137,9 @@ def _get_content(request, pk, model, serializer_class, target_type):
         return err_resp
     obj = get_object_or_404(model, pk=pk)
     data = serializer_class(obj).data
-    data["has_pending_revision"] = bool(pending_revision_target_ids(target_type, [obj.pk]))
+    pending_version = pending_revision_versions(target_type, [obj.pk]).get(obj.pk)
+    data["has_pending_revision"] = pending_version is not None
+    data["pending_revision_version"] = pending_version
     return JsonResponse(data)
 
 
@@ -269,13 +275,9 @@ def _content_approve(request, pk, model, serializer_class, target_type):
             return _invalid_transition(obj.status, "approve")
 
         # AI 產生的草稿不能由產生者自己核可（路線圖 #23）：owner／admin 同時是編輯者與核准者，也一樣擋
-        if AiQuizDraft.objects.filter(
-            content_type=target_type, content_id=obj.pk, generated_by=decoded.get("uid", "anon"),
-        ).exists():
-            return JsonResponse(
-                {"detail": "AI 產生的題目不能由產生者自己核可，請交給其他審核者。", "code": "cannot_approve_own_ai_draft"},
-                status=403,
-            )
+        own_draft_err = own_ai_draft_approval_response(target_type, obj.pk, decoded.get("uid", "anon"))
+        if own_draft_err:
+            return own_draft_err
 
         before = serializer_class(obj).data
         obj.status = model.STATUS_PUBLISHED
