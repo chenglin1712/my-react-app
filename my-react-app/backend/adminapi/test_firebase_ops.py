@@ -129,6 +129,59 @@ class DeleteStorageFileByDownloadUrlTest(SimpleTestCase):
         bucket.blob.assert_called_once_with("pronunciations/tayal/abas/123_uid1.webm")
 
     @patch("adminapi.firebase_ops.get_storage_bucket")
+    def test_object_owned_by_expected_uid_is_deleted(self, mock_get_bucket):
+        bucket = _fake_bucket()
+        mock_get_bucket.return_value = bucket
+
+        result = firebase_ops.delete_storage_file_by_download_url(
+            self.VALID_URL, expected_path_prefix="pronunciations/tayal/", expected_uid="uid1",
+        )
+
+        self.assertTrue(result)
+        bucket.blob.assert_called_once_with("pronunciations/tayal/abas/123_uid1.webm")
+
+    @patch("adminapi.firebase_ops.get_storage_bucket")
+    def test_object_owned_by_another_uid_rejected_without_deleting(self, mock_get_bucket):
+        """同一個族語資料夾底下、別人錄的音檔：錄音文件的 uid 跟檔名後綴不符，
+        不能因為前綴吻合就被刪掉（稽核 RUL-3 的核心案例）。"""
+        bucket = _fake_bucket()
+        mock_get_bucket.return_value = bucket
+
+        result = firebase_ops.delete_storage_file_by_download_url(
+            self.VALID_URL, expected_path_prefix="pronunciations/tayal/", expected_uid="uid2",
+        )
+
+        self.assertFalse(result)
+        bucket.blob.assert_not_called()
+
+    @patch("adminapi.firebase_ops.get_storage_bucket")
+    def test_uid_suffix_must_match_whole_uid(self, mock_get_bucket):
+        """uid 只是檔名後綴的一部分（例如 xuid1 對 uid1）不算符合。"""
+        bucket = _fake_bucket()
+        mock_get_bucket.return_value = bucket
+
+        result = firebase_ops.delete_storage_file_by_download_url(
+            self.VALID_URL.replace("123_uid1.webm", "123_xuid1.webm"),
+            expected_path_prefix="pronunciations/tayal/", expected_uid="uid1",
+        )
+
+        self.assertFalse(result)
+        bucket.blob.assert_not_called()
+
+    @patch("adminapi.firebase_ops.get_storage_bucket")
+    def test_empty_expected_uid_fails_closed(self, mock_get_bucket):
+        """錄音文件缺少 uid 時，呼叫端傳入空字串：必須拒絕，不能退化成略過檢查。"""
+        bucket = _fake_bucket()
+        mock_get_bucket.return_value = bucket
+
+        result = firebase_ops.delete_storage_file_by_download_url(
+            self.VALID_URL, expected_path_prefix="pronunciations/tayal/", expected_uid="",
+        )
+
+        self.assertFalse(result)
+        bucket.blob.assert_not_called()
+
+    @patch("adminapi.firebase_ops.get_storage_bucket")
     def test_blob_delete_exception_returns_false(self, mock_get_bucket):
         bucket = _fake_bucket()
         bucket.blob.return_value.delete.side_effect = Exception("not found")

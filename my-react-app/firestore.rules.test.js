@@ -650,6 +650,23 @@ describe('sharedNotes 規則（staff 審核）', () => {
     await assertSucceeds(updateDoc(doc(staffBob.firestore(), 'sharedNotes/n1'), { deleted: true }));
   });
 
+  test.each(['editor', 'reviewer'])('%s 角色可以下架別人的筆記（審核角色）', async (role) => {
+    await seedNote('n1');
+    const mod = testEnv.authenticatedContext('bob', { role });
+    const { updateDoc } = await import('firebase/firestore');
+    await assertSucceeds(updateDoc(doc(mod.firestore(), 'sharedNotes/n1'), { deleted: true }));
+  });
+
+  test.each(['analyst'])(
+    '%s 角色（唯讀）不能直接下架別人的筆記（稽核 RUL-2）',
+    async (role) => {
+      await seedNote('n1');
+      const staffBob = testEnv.authenticatedContext('bob', { role });
+      const { updateDoc } = await import('firebase/firestore');
+      await assertFails(updateDoc(doc(staffBob.firestore(), 'sharedNotes/n1'), { deleted: true }));
+    }
+  );
+
   test('staff 下架動作不能夾帶改動其他欄位（例如順便改內文）', async () => {
     await seedNote('n1');
     const staffBob = testEnv.authenticatedContext('bob', { role: 'admin' });
@@ -684,6 +701,13 @@ describe('pronunciations 規則（staff 審核）', () => {
     const staffBob = testEnv.authenticatedContext('bob', { role: 'reviewer' });
     const { deleteDoc } = await import('firebase/firestore');
     await assertSucceeds(deleteDoc(doc(staffBob.firestore(), 'pronunciations/tayal/recordings/r1')));
+  });
+
+  test('analyst（唯讀）不能刪除錄音', async () => {
+    await seedRecording('r1');
+    const analyst = testEnv.authenticatedContext('bob', { role: 'analyst' });
+    const { deleteDoc } = await import('firebase/firestore');
+    await assertFails(deleteDoc(doc(analyst.firestore(), 'pronunciations/tayal/recordings/r1')));
   });
 
   test('本人也不能刪除自己的錄音（原本就沒有開放 delete，這裡不能因為加了 staff 例外而意外放寬）', async () => {
@@ -748,6 +772,36 @@ describe('pronunciations recordings create 規則', () => {
       setDoc(
         doc(alice.firestore(), 'pronunciations/tayal/recordings/r1'),
         validRecording('tayal', { storageUrl: unrelatedUrl })
+      )
+    );
+  });
+
+  test('storageUrl 指向別人錄的音檔（檔名後綴是別人的 uid）時被拒絕（稽核 RUL-3）', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(
+        doc(alice.firestore(), 'pronunciations/tayal/recordings/r1'),
+        validRecording('tayal', { storageUrl: validRecordingUrl('tayal', 'huzil', '123_bob.webm') })
+      )
+    );
+  });
+
+  test('uid 含正規式特殊字元時一律拒絕（a.b 不能靠 . 匹配別人的 axb 檔名）', async () => {
+    const dotted = testEnv.authenticatedContext('a.b');
+    await assertFails(
+      setDoc(
+        doc(dotted.firestore(), 'pronunciations/tayal/recordings/r1'),
+        validRecording('tayal', { uid: 'a.b', storageUrl: validRecordingUrl('tayal', 'huzil', '123_axb.webm') })
+      )
+    );
+  });
+
+  test('storageUrl 的 uid 後綴只是自己 uid 的尾段時被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(
+        doc(alice.firestore(), 'pronunciations/tayal/recordings/r1'),
+        validRecording('tayal', { storageUrl: validRecordingUrl('tayal', 'huzil', '123_malice.webm') })
       )
     );
   });
@@ -955,6 +1009,53 @@ describe('reports update 規則（staff 核結/駁回）', () => {
     await assertFails(
       updateDoc(doc(staffBob.firestore(), 'reports/r1'), {
         status: 'resolved', resolvedBy: 'bob', resolvedAt: serverTimestamp(), resolutionNote: '', reasonText: '被改過',
+      })
+    );
+  });
+
+  test.each(['editor', 'reviewer'])('%s 角色可以核結檢舉（審核角色）', async (role) => {
+    await seedReport('r1');
+    const mod = testEnv.authenticatedContext('bob', { role });
+    const { updateDoc } = await import('firebase/firestore');
+    await assertSucceeds(
+      updateDoc(doc(mod.firestore(), 'reports/r1'), {
+        status: 'resolved', resolvedBy: 'bob', resolvedAt: serverTimestamp(), resolutionNote: '',
+      })
+    );
+  });
+
+  test.each(['analyst'])(
+    '%s 角色（唯讀）不能直接核結檢舉（稽核 RUL-2）',
+    async (role) => {
+      await seedReport('r1');
+      const staff = testEnv.authenticatedContext('bob', { role });
+      const { updateDoc } = await import('firebase/firestore');
+      await assertFails(
+        updateDoc(doc(staff.firestore(), 'reports/r1'), {
+          status: 'resolved', resolvedBy: 'bob', resolvedAt: serverTimestamp(), resolutionNote: '',
+        })
+      );
+    }
+  );
+
+  test('resolvedBy 填別人的 uid 會被拒絕（必須是操作者本人）', async () => {
+    await seedReport('r1');
+    const adminBob = testEnv.authenticatedContext('bob', { role: 'admin' });
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(adminBob.firestore(), 'reports/r1'), {
+        status: 'resolved', resolvedBy: 'someone-else', resolvedAt: serverTimestamp(), resolutionNote: '',
+      })
+    );
+  });
+
+  test('已結案的檢舉不能再被結案或改寫', async () => {
+    await seedReport('r1', { status: 'resolved' });
+    const adminBob = testEnv.authenticatedContext('bob', { role: 'admin' });
+    const { updateDoc } = await import('firebase/firestore');
+    await assertFails(
+      updateDoc(doc(adminBob.firestore(), 'reports/r1'), {
+        status: 'dismissed', resolvedBy: 'bob', resolvedAt: serverTimestamp(), resolutionNote: '改寫',
       })
     );
   });

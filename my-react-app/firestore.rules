@@ -41,6 +41,12 @@ service cloud.firestore {
     function isAdmin() {
       return request.auth != null && request.auth.token.role in ['owner', 'admin'];
     }
+    // 內容審核（筆記上下架、檢舉結案、錄音移除）：owner／admin／editor／reviewer，
+    // analyst 唯讀不含在內。要跟後端 config/roles.py 的 MODERATORS 保持一致。
+    function isModerator() {
+      return request.auth != null &&
+        request.auth.token.role in ['owner', 'admin', 'editor', 'reviewer'];
+    }
 
     // 使用者資料：本人可讀寫；staff 角色可讀（後台「使用者帳號」列表/詳情要查
     // 學習者資料），但寫入仍然只限本人——停權、改角色這類真正的管理動作都
@@ -336,10 +342,14 @@ service cloud.firestore {
         && request.resource.data.score is int
         && request.resource.data.score >= 0 && request.resource.data.score <= 100
         && request.resource.data.storageUrl is string
+        // uid 會被串進下面的正規式且沒有跳脫，所以先限制成不含正規式特殊字元
+        // 的字元集（Firebase 自動產生的 UID 都是英數字）；含 . + * 等字元的
+        // 自訂 UID 一律拒絕，不讓它放寬「檔名後綴必須是本人 uid」的約束。
+        && request.auth.uid.matches('[A-Za-z0-9_-]+')
         && request.resource.data.storageUrl
-          .matches('https://firebasestorage\\.googleapis\\.com/v0/b/[^/]+/o/pronunciations%2F' + tribe + '%2F.*')
+          .matches('https://firebasestorage\\.googleapis\\.com/v0/b/[^/]+/o/pronunciations%2F' + tribe + '%2F[^?]*_' + request.auth.uid + '\\.webm([?].*)?')
         && request.resource.data.createdAt == request.time;
-      allow delete: if isStaff();
+      allow delete: if isModerator();
     }
 
     // 共享筆記：任何人（含未登入）可讀，配合 /share/:id 這條公開分享連結路由
@@ -427,7 +437,9 @@ service cloud.firestore {
           // 使文件永久對一般使用者隱藏或污染後台查詢（獨立審查找到的問題）。
           // 把「作者能改什麼」跟「staff 能改什麼」的權限範圍徹底分開，即使
           // staff 帳號被盜也頂多能下架/恢復內容，改不了內容本身。
-          isStaff() &&
+          // 只開放審核角色（isModerator：不含唯讀的 analyst），跟後端
+          // moderation_views 的 MODERATORS 同一組（稽核 RUL-2）。
+          isModerator() &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted']) &&
           request.resource.data.deleted is bool
         )
@@ -466,11 +478,16 @@ service cloud.firestore {
         && request.resource.data.reasonText is string && request.resource.data.reasonText.size() <= 500
         && request.resource.data.status == 'pending'
         && request.resource.data.createdAt == request.time;
-      allow update: if isStaff()
+      // 核結／駁回與後端一致只開放審核角色（isModerator，不含唯讀的 analyst）；
+      // 原狀態必須是 pending（已結案的檢舉不能再被改寫），resolvedBy 必須是
+      // 操作者本人，不能填任意字串（稽核 RUL-2）。
+      allow update: if isModerator()
+        && resource.data.status == 'pending'
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
           ['status', 'resolvedBy', 'resolvedAt', 'resolutionNote']
         )
-        && request.resource.data.status in ['resolved', 'dismissed'];
+        && request.resource.data.status in ['resolved', 'dismissed']
+        && request.resource.data.resolvedBy == request.auth.uid;
       allow delete: if false;
     }
 

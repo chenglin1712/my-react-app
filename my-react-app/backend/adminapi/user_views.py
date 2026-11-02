@@ -589,6 +589,7 @@ def user_delete(request, decoded, uid):
             # 人工到 Storage 主控台複查，而不是被 "deleted" 數字誤導成全部乾淨。
             if storage_url and not firebase_ops.delete_storage_file_by_download_url(
                 storage_url, expected_path_prefix=f"pronunciations/{rec_tribe}/",
+                expected_uid=uid,
             ):
                 storage_failed += 1
                 logger.warning("刪除帳號 %s 的錄音 %s 時，Storage 音檔清除失敗：%s", uid, rec.id, storage_url)

@@ -22,7 +22,7 @@ import { apiPost } from '../../../utils/apiClient';
 import { useAdminListQuery } from '../hooks/useAdminListQuery';
 import { useActionLock } from '../hooks/useActionLock';
 import { AdminEmptyBody } from '../components/AdminEmpty';
-import { ACCOUNT_MANAGERS, STAFF_ROLES } from '../constants/roles';
+import { MODERATORS, STAFF_ROLES } from '../constants/roles';
 import ReviewPagination from '../reviewWorkflow/ReviewPagination';
 import { stripHtml } from './notePreviewText';
 import '../../../static/css/_admin/moderation.css';
@@ -90,7 +90,7 @@ export default function ReportsQueue() {
     const { userData } = useAuth();
     const role = userData?.role;
     const canRead = STAFF_ROLES.includes(role);
-    const canManage = ACCOUNT_MANAGERS.includes(role);
+    const canManage = MODERATORS.includes(role);
 
     const {
         items, data, loading, error, setError, page, setPage, hasNext,

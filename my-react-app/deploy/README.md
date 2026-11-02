@@ -174,8 +174,9 @@ iPhone 用 Safari 的「分享 → 加入主畫面」。
 目前**沒有**變更任何線上的 Firebase 規則，Firestore、Realtime Database、Storage 都沿用現有設定。
 
 - `firestore.rules`、`database.rules.json`：與原本相同，沒有修改。
-- `storage.rules`：**草案，尚未部署。** 只供審閱與測試，沒有寫進 `firebase.json`，所以 `firebase deploy`
-  不會把它部署出去，Firebase Console 上現有的 Storage 規則維持不變。
+- `storage.rules`：**已寫進 `firebase.json`，但尚未部署。** 專案內沒有任何指令會自動部署它；
+  在 Console 確認現有規則與下方事項之前，不要執行不帶範圍的 `firebase deploy`，那會用這份規則
+  覆蓋 Console 上現有的 Storage 規則。部署前 Console 上實際生效的 Storage 規則維持不變。
 - 規則測試用的設定放在 `firebase.rules-test.json`（只給模擬器用），CI 以
   `firebase emulators:exec --config firebase.rules-test.json` 執行，不影響 `firebase.json`。
 
@@ -190,7 +191,7 @@ iPhone 用 Safari 的「分享 → 加入主畫面」。
    `storage.rules` 開頭的〈已知限制〉）。
 2. 先在測試用的 Firebase 專案部署並實際錄音上傳一次。
 3. 部署時一定要指定範圍，避免連帶覆蓋其他規則：`firebase deploy --only storage`。
-   同時需要先在 `firebase.json` 加上 `"storage": {"rules": "storage.rules"}`。
+   `firebase.json` 已有 `"storage": {"rules": "storage.rules"}`，不需要再加。
 
 ## 環境變數（正式環境）
 

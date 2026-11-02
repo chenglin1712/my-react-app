@@ -94,7 +94,7 @@ def upload_media_object(data, object_path, content_type):
     return blob.public_url
 
 
-def delete_storage_file_by_download_url(url, expected_path_prefix=None):
+def delete_storage_file_by_download_url(url, expected_path_prefix=None, expected_uid=None):
     """從 getDownloadURL() 回傳的下載網址反解出 Storage 物件路徑並刪除。
 
     前端存進 Firestore 的是下載網址（例如 pronunciationRecordingService.js
@@ -110,8 +110,12 @@ def delete_storage_file_by_download_url(url, expected_path_prefix=None):
     (2) 網址裡的 bucket 名稱要跟目前設定的 bucket 完全一致，
     (3) 呼叫端可傳入 expected_path_prefix（例如 "pronunciations/tayal/"，
     用真正的路徑區段組出來，不是信任文件內部欄位），物件路徑必須落在這個
-    prefix 底下才會真的執行刪除——任何一項檢查沒過就直接回 False，視同
-    「刪不掉」，不會讓呼叫端誤以為刪除成功。
+    prefix 底下才會真的執行刪除，(4) 呼叫端可傳入 expected_uid（錄音文件的
+    建立者 uid），物件檔名必須以 `_{uid}.webm` 結尾（uploadRecording 的命名
+    慣例）——否則別人可以把另一位使用者的 storageUrl 填進自己的文件，讓
+    刪除流程刪到不屬於這筆錄音的檔案。傳入空字串視為檢查不通過，不會退化成
+    略過檢查——任何一項檢查沒過就直接回 False，視同「刪不掉」，不會讓呼叫端
+    誤以為刪除成功。
 
     回傳 True/False 而不是讓例外往外拋：呼叫端（帳號刪除、錄音下架）都是
     「盡量刪、刪不掉也要讓其他步驟繼續」的語意，網址格式不符預期或物件
@@ -141,6 +145,10 @@ def delete_storage_file_by_download_url(url, expected_path_prefix=None):
 
     if expected_path_prefix is not None and not object_path.startswith(expected_path_prefix):
         return False
+
+    if expected_uid is not None:
+        if not expected_uid or not object_path.endswith(f"_{expected_uid}.webm"):
+            return False
 
     try:
         bucket.blob(object_path).delete()

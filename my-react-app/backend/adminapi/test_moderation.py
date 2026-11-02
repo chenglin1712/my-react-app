@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 from django.test import Client, TestCase
 from django.test.utils import override_settings
 
-from config.roles import EDITOR, OWNER
+from config.roles import ANALYST, EDITOR, OWNER, REVIEWER
 
 from .models import AuditLog
 
@@ -146,13 +146,24 @@ class NoteToggleDeletedTest(TestCase):
         self.assertEqual(resp.status_code, 404)
 
     @patch("adminapi.firebase_ops.get_firestore_client")
-    def test_requires_account_manager(self, mock_client_fn):
+    def test_analyst_cannot_moderate(self, mock_client_fn):
         notes = FakeCollection()
         notes.set_document("note1", {"deleted": False})
         mock_client_fn.return_value = _build_client(collections={"sharedNotes": notes})
-        with _as_role(EDITOR) as headers:
+        with _as_role(ANALYST) as headers:
             resp = _post_json(self.client, '/adminapi/moderation/notes/note1/toggle-deleted/', headers)
         self.assertEqual(resp.status_code, 403)
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_editor_and_reviewer_can_moderate(self, mock_client_fn):
+        for role in (EDITOR, REVIEWER):
+            notes = FakeCollection()
+            doc_ref = notes.set_document("note1", {"deleted": False})
+            mock_client_fn.return_value = _build_client(collections={"sharedNotes": notes})
+            with _as_role(role) as headers:
+                resp = _post_json(self.client, '/adminapi/moderation/notes/note1/toggle-deleted/', headers)
+            self.assertEqual(resp.status_code, 200, role)
+            doc_ref.update.assert_called_once_with({"deleted": True})
 
     @patch("adminapi.firebase_ops.get_firestore_client")
     def test_toggles_deleted_flag(self, mock_client_fn):
@@ -258,7 +269,9 @@ class RecordingDeleteTest(TestCase):
     @patch("adminapi.firebase_ops.get_firestore_client")
     def test_deletes_storage_and_firestore(self, mock_client_fn, mock_delete_storage):
         recordings_col = FakeCollection()
-        rec_ref = recordings_col.set_document("rec1", {"word": "abas", "storageUrl": "https://x/o/path?alt=media"})
+        rec_ref = recordings_col.set_document(
+            "rec1", {"word": "abas", "uid": "uid1", "storageUrl": "https://x/o/path?alt=media"},
+        )
         tribe_ref = FakeDocRef()
         tribe_ref._subcollections["recordings"] = recordings_col
         pronunciations = FakeCollection()
@@ -275,6 +288,7 @@ class RecordingDeleteTest(TestCase):
         rec_ref.delete.assert_called_once()
         mock_delete_storage.assert_called_once_with(
             "https://x/o/path?alt=media", expected_path_prefix="pronunciations/tayal/",
+            expected_uid="uid1",
         )
         self.assertEqual(AuditLog.objects.filter(action="delete_recording").count(), 1)
 

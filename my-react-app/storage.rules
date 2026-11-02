@@ -2,10 +2,11 @@ rules_version = '2';
 
 // Firebase Storage 安全規則【草案，尚未部署】。
 //
-// 狀態：這份檔案只供審閱與測試（storage.rules.test.js，經由 firebase.rules-test.json 在
-// 模擬器執行）。它沒有寫進 firebase.json，所以 `firebase deploy` 不會把它部署出去；
-// Firebase Console 上實際生效的 Storage 規則維持不變。要啟用時必須先確認現有規則沒有
-// 其他用途會被這份規則擋掉，再由人明確決定部署（見 deploy/README.md）。
+// 狀態：已列在 firebase.json 的 storage 區段，但尚未部署（storage.rules.test.js 經由
+// firebase.rules-test.json 在模擬器執行）。Firebase Console 上實際生效的 Storage 規則
+// 在部署前維持不變。要部署時必須先到 Console 確認現有規則不是全開或限期測試模式、也沒有
+// 其他用途會被這份規則擋掉，再由人明確以 `firebase deploy --only storage` 部署
+// （見 deploy/README.md）。
 //
 // 已知限制（啟用前請知悉）：
 // 1. 規則用 file.matches() 把 request.auth.uid 串進正規表示式，沒有跳脫特殊字元。Firebase

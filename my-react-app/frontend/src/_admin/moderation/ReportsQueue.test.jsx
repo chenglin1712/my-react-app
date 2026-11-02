@@ -357,8 +357,8 @@ describe('ReportsQueue', () => {
         ).toBeInTheDocument();
     });
 
-    test('reviewer 可檢視 pending 檢舉但看不到處理按鈕', async () => {
-        mockRole = 'reviewer';
+    test('analyst 可檢視 pending 檢舉但看不到處理按鈕', async () => {
+        mockRole = 'analyst';
         renderPage();
 
         const row = await screen

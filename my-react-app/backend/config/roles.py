@@ -22,6 +22,11 @@ ROLE_ASSIGNERS = (OWNER,)
 # 可以管理「使用者帳號」（前台學習者）與「管理者帳號」（後台工作人員）的角色。
 ACCOUNT_MANAGERS = (OWNER, ADMIN)
 
+# 可以執行內容審核動作（共享筆記上下架、檢舉結案／駁回、錄音移除）的角色。
+# analyst 是唯讀角色，不在這裡。firestore.rules 的 isModerator() 與前端
+# constants/roles.js 的 MODERATORS 要跟這組保持一致。
+MODERATORS = (OWNER, ADMIN, EDITOR, REVIEWER)
+
 # 可以新增／編輯內容（公告等一般內容）的角色。reviewer 在權限矩陣裡是
 # 「僅可留審查意見」，不算能編輯內容本身，所以不含在這裡。
 CONTENT_EDITORS = (OWNER, ADMIN, EDITOR)

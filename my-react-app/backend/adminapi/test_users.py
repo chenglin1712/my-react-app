@@ -894,6 +894,7 @@ class UserDeleteTest(TestCase):
         self.assertEqual(resp.status_code, 200)
         mock_delete_storage.assert_called_once_with(
             "https://x/o/path?alt=media", expected_path_prefix="pronunciations/tayal/",
+            expected_uid="uid1",
         )
 
     @patch("adminapi.firebase_ops.delete_storage_file_by_download_url")

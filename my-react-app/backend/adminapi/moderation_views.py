@@ -15,7 +15,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from core.firebase_auth import require_role
-from config.roles import ACCOUNT_MANAGERS, STAFF_ROLES
+from config.roles import MODERATORS, STAFF_ROLES
 
 from . import firebase_ops
 from ._shared import (
@@ -110,7 +110,7 @@ def note_list(request):
 def note_toggle_deleted(request, note_id):
     if request.method != "POST":
         return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, ACCOUNT_MANAGERS)
+    decoded, err_resp = require_role(request, MODERATORS)
     if err_resp:
         return err_resp
     limited_resp = _rate_limited_response(request, decoded, group="note_toggle_deleted", rate="30/m")
@@ -205,7 +205,7 @@ def recording_list(request):
 def recording_delete(request, tribe, recording_id):
     if request.method != "DELETE":
         return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, ACCOUNT_MANAGERS)
+    decoded, err_resp = require_role(request, MODERATORS)
     if err_resp:
         return err_resp
     limited_resp = _rate_limited_response(request, decoded, group="recording_delete", rate="30/m", method="DELETE")
@@ -228,6 +228,7 @@ def recording_delete(request, tribe, recording_id):
         # 欄位），避免偽造的 storageUrl 誘使刪除同 bucket 裡不相關的物件。
         storage_deleted = firebase_ops.delete_storage_file_by_download_url(
             storage_url, expected_path_prefix=f"pronunciations/{tribe}/",
+            expected_uid=data.get("uid") or "",
         )
         if not storage_deleted:
             # Storage 刪除失敗時不能接著刪 Firestore 文件——這份文件是
@@ -342,7 +343,7 @@ def report_list(request):
 
 
 def _resolve_report(request, report_id, new_status):
-    decoded, err_resp = require_role(request, ACCOUNT_MANAGERS)
+    decoded, err_resp = require_role(request, MODERATORS)
     if err_resp:
         return err_resp
     limited_resp = _rate_limited_response(request, decoded, group="report_resolve", rate="30/m")

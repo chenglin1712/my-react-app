@@ -230,8 +230,8 @@ describe('SharedNotesModeration', () => {
         expect(apiPost).not.toHaveBeenCalled();
     });
 
-    test('reviewer 可以讀取列表，但看不到上下架操作', async () => {
-        mockRole = 'reviewer';
+    test('analyst 可以讀取列表，但看不到上下架操作', async () => {
+        mockRole = 'analyst';
         renderPage();
 
         const row = await screen

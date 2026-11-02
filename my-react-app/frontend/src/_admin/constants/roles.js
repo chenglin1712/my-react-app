@@ -25,6 +25,9 @@ export const ROLE_ASSIGNERS = [OWNER];
 /** 可以管理使用者帳號的角色。 */
 export const ACCOUNT_MANAGERS = [OWNER, ADMIN];
 
+/** 可以執行內容審核動作（筆記上下架、檢舉結案、錄音移除）的角色；analyst 唯讀。對應後端 MODERATORS。 */
+export const MODERATORS = [OWNER, ADMIN, EDITOR, REVIEWER];
+
 /** 待專家驗證佇列（對應後端 config/roles.py 的 VERIFICATION_*）：刻意不沿用「內容核准」角色群組——
  * 那代表核准權，不代表族語專業資格；佇列裡的是「意見」，不是專家驗證結果。後端才是實際判斷處。 */
 export const VERIFICATION_REVIEWERS = [OWNER, ADMIN, REVIEWER];
