@@ -51,6 +51,10 @@ def fetch_verified(url, dest, expected_sha256, max_bytes=DEFAULT_MAX_BYTES, dead
                 out.write(chunk)
         if digest.hexdigest() != expected:
             raise SystemExit(f"SHA-256 不符：預期 {expected}，實際 {digest.hexdigest()}")
+        # tempfile.mkstemp 一律用 0600（只有建立者能讀寫），改名不會跟著放寬；這支工具在
+        # Dockerfile 裡是以 root 執行（USER 指令切換身分之前），下載結果卻要給執行期的
+        # 非 root 使用者讀，不放寬權限的話會是 PermissionError（2026-11-02 發生過一次）。
+        os.chmod(tmp_path, 0o644)
         os.replace(tmp_path, dest)
     finally:
         if os.path.exists(tmp_path):
