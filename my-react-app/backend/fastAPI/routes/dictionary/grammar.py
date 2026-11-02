@@ -235,9 +235,24 @@ def get_grammar(
         return JSONResponse({"detail": "伺服器發生錯誤，請稍後再試"}, status_code=500)
 
 
+_MAX_SEARCH_QUERY_LENGTH = 100
+
+
+def _escape_like(value: str) -> str:
+    """把使用者輸入裡的 LIKE 萬用字元（%、_）跳脫掉，搭配 SQL 的 ESCAPE '!'：原本輸入 % 或 _ 會讓比對變寬。
+    跳脫字元選 !，不選反斜線——反斜線字面值在 PostgreSQL（standard_conforming_strings 開／關）與 SQLite
+    的解讀不同，!  在所有資料庫都只是一個普通字元。跳脫字元本身要先跳脫。"""
+    return value.replace("!", "!!").replace("%", "!%").replace("_", "!_")
+
+
 @router.get("/grammar/{tribe}/search")
 @limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_grammar_search_grammar", "20/minute"))  # 沒有走快取，每次呼叫都是 3 次前導萬用字元 LIKE 全表掃描，比其他 3 支端點限制更嚴
-def search_grammar(request: Request, tribe: str, q: str, db: Session = Depends(get_db)):
+def search_grammar(
+    request: Request, tribe: str,
+    # 稽核 MSC-4：q 原本沒有長度上限；它會被放進 3 次前導萬用字元 LIKE 全表掃描，長字串只會拖慢查詢
+    q: str = Query(..., min_length=1, max_length=_MAX_SEARCH_QUERY_LENGTH),
+    db: Session = Depends(get_db),
+):
     """搜尋文法規則或例句
     q: 關鍵字，可搜尋規則標題、功能說明、例句原文、中文翻譯
     """
@@ -246,7 +261,7 @@ def search_grammar(request: Request, tribe: str, q: str, db: Session = Depends(g
             tribe_name = resolve_tribe_name(tribe)
         except ValueError as e:
             return JSONResponse({"detail": str(e)}, status_code=400)
-        kw = f"%{q}%"
+        kw = f"%{_escape_like(q)}%"
 
         # 透過 JOIN grammar_section 取得 tribe，不再依賴 grammar_rule.tribe
         rule_rows = db.execute(
@@ -255,7 +270,7 @@ def search_grammar(request: Request, tribe: str, q: str, db: Session = Depends(g
                 FROM grammar_rule r
                 JOIN grammar_section s ON r.section_id = s.id
                 WHERE s.tribe_id = (SELECT id FROM tribe WHERE name = :tribe)
-                  AND (r.title LIKE :kw OR r.function LIKE :kw OR r.notes LIKE :kw OR r.structure LIKE :kw)
+                  AND (r.title LIKE :kw ESCAPE '!' OR r.function LIKE :kw ESCAPE '!' OR r.notes LIKE :kw ESCAPE '!' OR r.structure LIKE :kw ESCAPE '!')
                 ORDER BY r.rule_order
             """),
             {"tribe": tribe_name, "kw": kw}
@@ -279,13 +294,13 @@ def search_grammar(request: Request, tribe: str, q: str, db: Session = Depends(g
                 JOIN grammar_rule r  ON e.rule_id   = r.id
                 JOIN grammar_section s ON r.section_id = s.id
                 WHERE s.tribe_id = (SELECT id FROM tribe WHERE name = :tribe)
-                  AND (e.tribe_text LIKE :kw OR e.chinese_text LIKE :kw OR e.analysis LIKE :kw)
+                  AND (e.tribe_text LIKE :kw ESCAPE '!' OR e.chinese_text LIKE :kw ESCAPE '!' OR e.analysis LIKE :kw ESCAPE '!')
             """),
             {"tribe": tribe_name, "kw": kw}
         ).fetchall()
 
         affix_rows = db.execute(
-            text("SELECT id, affix, affix_type, function, example_form FROM grammar_affix WHERE tribe_id = (SELECT id FROM tribe WHERE name = :tribe) AND (affix LIKE :kw OR function LIKE :kw)"),
+            text("SELECT id, affix, affix_type, function, example_form FROM grammar_affix WHERE tribe_id = (SELECT id FROM tribe WHERE name = :tribe) AND (affix LIKE :kw ESCAPE '!' OR function LIKE :kw ESCAPE '!')"),
             {"tribe": tribe_name, "kw": kw}
         ).fetchall()
 
@@ -420,11 +435,11 @@ def _load_grammar_quiz_material(db: Session, tribe_name: str, section_key: Optio
                     FROM grammar_rule r
                     JOIN grammar_section s ON r.section_id = s.id
                     JOIN grammar_example e ON e.rule_id = r.id
-                    WHERE s.tribe_id = (SELECT id FROM tribe WHERE name = :tribe) AND s.section_key LIKE :sk
+                    WHERE s.tribe_id = (SELECT id FROM tribe WHERE name = :tribe) AND s.section_key LIKE :sk ESCAPE '!'
                       AND e.tribe_text IS NOT NULL AND e.tribe_text != ''
                     ORDER BY r.rule_order, e.example_order
                 """),
-                {"tribe": tribe_name, "sk": f"%{section_key}%"}
+                {"tribe": tribe_name, "sk": f"%{_escape_like(section_key)}%"}
             ).fetchall()
         else:
             rows = db.execute(
@@ -497,7 +512,7 @@ def _load_grammar_quiz_material(db: Session, tribe_name: str, section_key: Optio
 def get_grammar_quiz_material(
     request: Request,
     tribe: str,
-    section_key: Optional[str] = None,
+    section_key: Optional[str] = Query(default=None, max_length=_MAX_SEARCH_QUERY_LENGTH),
     limit: Optional[int] = Query(default=None, ge=1),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),

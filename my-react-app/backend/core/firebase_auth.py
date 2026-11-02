@@ -156,7 +156,9 @@ def try_verify_firebase_token(request):
 
     from firebase_admin import auth as firebase_auth
     try:
-        decoded = firebase_auth.verify_id_token(token)
+        # 稽核 MSC-1：和 verify_firebase_token 一致，檢查撤銷與停權。少了 check_revoked，被停用或撤銷的使用者
+        # 手上未過期的 token 仍能在這個匿名事件端點歸屬到自己的 uid。撤銷、停用、過期都會丟例外，落到下面變成 None（當匿名）。
+        decoded = firebase_auth.verify_id_token(token, check_revoked=True)
         return decoded.get("uid")
     except Exception:
         return None

@@ -25,6 +25,10 @@ services:
       # .env（FastAPI 也讀同一份 .env，兩服務需要的 PORT 不同），對應 README
       # 文件裡 `gunicorn core.wsgi:application --bind 0.0.0.0:$PORT` 的 8000。
       - PORT=8000
+      # 容器內的 gunicorn 必須綁 0.0.0.0（見下面 ports 的說明），但對外的埠號只發布到宿主機的 127.0.0.1。
+      # AUTH_DEV_BYPASS 為真時 Django 會拒絕綁在非本機位址（core/settings.py，稽核 MSC-3），這裡明確放行「綁定位址」這一項；
+      # ALLOWED_HOSTS 含非本機主機時仍會拒絕啟動。
+      - AUTH_DEV_BYPASS_ALLOW_NONLOOPBACK_BIND=True
     ports:
       # 只綁本機（127.0.0.1）：容器內的 gunicorn 綁 0.0.0.0 是為了讓 Docker 轉得進來，
       # 但寫成 "8000:8000" 會把埠口開給這台機器所有網路介面，同一個區網的人都連得到——

@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 import dj_database_url
 
 from config.logging import get_logging_config
-from config.auth_flags import auth_dev_bypass
+from config.auth_flags import auth_dev_bypass, dev_bypass_exposure_problem
 from config.debug_flag import is_debug
 from config.sentry_init import init_sentry
 from config.cors import get_allowed_origins
@@ -104,6 +104,14 @@ if _render_host:
     ALLOWED_HOSTS.append(_render_host)
 _extra_hosts = os.getenv("DJANGO_ALLOWED_HOSTS", "")
 ALLOWED_HOSTS += [h.strip() for h in _extra_hosts.split(",") if h.strip()]
+
+# 稽核 MSC-3：AUTH_DEV_BYPASS 會讓每個請求都當成 owner。除了 DEBUG 互鎖，啟動時再確認設定看起來只在本機使用。
+if AUTH_DEV_BYPASS:
+    _exposure_problem = dev_bypass_exposure_problem(
+        ALLOWED_HOSTS, sys.argv, allow_nonloopback_bind=os.getenv("AUTH_DEV_BYPASS_ALLOW_NONLOOPBACK_BIND") == "True",
+    )
+    if _exposure_problem:
+        raise ImproperlyConfigured(_exposure_problem)
 
 APPEND_SLASH = False
 # Application definition

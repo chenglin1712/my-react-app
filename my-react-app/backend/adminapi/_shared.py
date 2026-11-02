@@ -63,9 +63,13 @@ def parse_json_body(request):
     if not request.body:
         return {}, None
     try:
-        return json.loads(request.body), None
-    except json.JSONDecodeError:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return None, JsonResponse({"detail": "請求格式錯誤"}, status=400)
+    # 稽核 MSC-4：JSON 本文可能是 list、數字、null；呼叫端都用 body.get(...)，非 dict 會變成 500。一律當格式錯誤
+    if not isinstance(data, dict):
+        return None, JsonResponse({"detail": "請求格式錯誤"}, status=400)
+    return data, None
 
 
 def write_audit_log(request, decoded, action, target, before=None, after=None, target_type="announcement"):

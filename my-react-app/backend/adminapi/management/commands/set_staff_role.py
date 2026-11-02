@@ -22,11 +22,12 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("email", help="Firebase 帳號的 email")
+        # 稽核 MSC-2：原本省略 --role 就會授予 owner，打漏參數就多出一個最高權限帳號；改成必填，一定要明確寫出角色
         parser.add_argument(
             "--role",
-            default="owner",
+            required=True,
             choices=STAFF_ROLES,
-            help=f"要指派的角色，預設 owner。可用值：{', '.join(STAFF_ROLES)}",
+            help=f"要指派的角色（必填）。可用值：{', '.join(STAFF_ROLES)}",
         )
 
     def handle(self, *args, **options):

@@ -19,7 +19,8 @@ class CrosswordLegendItemSerializer(serializers.Serializer):
     # 不會被推翻。
     start_col = serializers.IntegerField(min_value=1)
     start_row = serializers.IntegerField(min_value=1)
-    length = serializers.IntegerField(min_value=1)
+    # 稽核 MSC-4：length 沒有上限時，判分迴圈 for i in range(word_length) 可以被拉到很長；網格最大 13x13
+    length = serializers.IntegerField(min_value=1, max_value=50)
 
 
 class SubmitAnsSerializer(serializers.Serializer):
@@ -38,4 +39,5 @@ class SubmitAnsSerializer(serializers.Serializer):
         max_length=50,
         allow_empty=False,
     )
-    crossword_legend = CrosswordLegendItemSerializer(many=True)
+    # 稽核 MSC-4：legend 原本沒有筆數上限（max_length 是 ListSerializer 的選項）
+    crossword_legend = CrosswordLegendItemSerializer(many=True, max_length=50)
