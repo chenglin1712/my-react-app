@@ -13,7 +13,7 @@
 }
 
 .summary-title {
-    font-size: 20px;
+    font-size: 1.25rem;
     font-weight: bold;
     color: var(--yy-calm-text);
     margin-bottom: 15px;
@@ -24,7 +24,7 @@
     display: flex;
     justify-content: space-between;
     margin: 8px 0;
-    font-size: 15px;
+    font-size: 0.9375rem;
 }
 
 .summary-item .label {
@@ -38,7 +38,7 @@
 
 .summary-advice {
     margin-top: 20px;
-    font-size: 14px;
+    font-size: 0.875rem;
     line-height: 1.5;
     color: var(--yy-calm-text-sub);
     background: var(--yy-calm-info-bg);

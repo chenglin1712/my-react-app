@@ -21,7 +21,7 @@
     background: var(--yy-cream);
     color: var(--yy-ink);
     font-weight: 700;
-    font-size: 15px;
+    font-size: 0.9375rem;
     cursor: pointer;
     text-align: left;
 }
@@ -50,7 +50,7 @@
     padding: 8px 12px;
     border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-control);
-    font-size: 15px;
+    font-size: 0.9375rem;
 }
 .yy-morph-input:focus-visible {
     outline: 3px solid var(--yy-blue);
@@ -72,7 +72,7 @@
 
 .yy-morph-hint {
     margin: 8px 0 0;
-    font-size: 13px;
+    font-size: 0.8125rem;
     color: var(--yy-text-muted);
 }
 
@@ -83,7 +83,7 @@
     border-radius: var(--yy-radius-control);
     background: var(--yy-danger-bg);
     color: var(--yy-red);
-    font-size: 14px;
+    font-size: 0.875rem;
 }
 
 /* ---------- 結果 ---------- */
@@ -97,7 +97,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 8px 10px;
-    font-size: 16px;
+    font-size: 1rem;
 }
 
 .yy-morph-status {
@@ -105,7 +105,7 @@
     border: 1.5px solid var(--yy-ink);
     border-radius: var(--yy-radius-control);
     background: var(--yy-surface);
-    font-size: 12px;
+    font-size: 0.75rem;
     font-weight: 700;
 }
 .yy-morph-status-headword { background: var(--yy-success-bg); }
@@ -114,7 +114,7 @@
 
 .yy-morph-token-gloss {
     color: var(--yy-text-secondary);
-    font-size: 14px;
+    font-size: 0.875rem;
 }
 
 .yy-morph-candidates {
@@ -148,7 +148,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-    font-size: 15px;
+    font-size: 0.9375rem;
 }
 
 .yy-morph-badge {
@@ -156,7 +156,7 @@
     border: 1.5px solid var(--yy-ink);
     border-radius: var(--yy-radius-control);
     background: var(--yy-surface);
-    font-size: 12px;
+    font-size: 0.75rem;
     font-weight: 700;
     cursor: help;
 }
@@ -171,7 +171,7 @@
     flex-wrap: wrap;
     margin: 10px 0 4px;
     font-family: var(--yy-font-pixel, monospace);
-    font-size: 18px;
+    font-size: 1.125rem;
 }
 .yy-morph-seg {
     padding: 2px 6px;
@@ -187,7 +187,7 @@
 
 .yy-morph-line {
     margin: 4px 0;
-    font-size: 14px;
+    font-size: 0.875rem;
     color: var(--yy-text-secondary);
 }
 .yy-morph-line code {
@@ -210,7 +210,7 @@
     margin: 8px 0 0;
     padding: 8px 0 0;
     border-top: 1px dashed var(--yy-text-muted);
-    font-size: 14px;
+    font-size: 0.875rem;
 }
 .yy-morph-examples li {
     display: flex;
@@ -224,7 +224,7 @@
 
 .yy-morph-attested {
     margin-top: 8px;
-    font-size: 14px;
+    font-size: 0.875rem;
 }
 
 .yy-morph-audio-btn {
@@ -235,7 +235,9 @@
     padding: 0 2px;
     vertical-align: middle;
 }
-.yy-morph-audio-btn:hover { color: var(--yy-red); }
+@media (hover: hover) and (pointer: fine) {
+  .yy-morph-audio-btn:hover { color: var(--yy-red); }
+}
 .yy-morph-audio-btn:focus-visible {
     outline: 2px solid var(--yy-blue);
     outline-offset: 2px;
@@ -243,12 +245,12 @@
 
 .yy-morph-note {
     margin: 10px 0 0;
-    font-size: 13px;
+    font-size: 0.8125rem;
     color: var(--yy-text-secondary);
 }
 .yy-morph-disclaimer {
     margin: 12px 0 0;
-    font-size: 12px;
+    font-size: 0.75rem;
     color: var(--yy-text-muted);
 }
 
@@ -256,7 +258,7 @@
 
 .yy-morph-compact { margin-top: 10px; }
 .yy-morph-compact .yy-morph-candidate { padding: 8px 10px; }
-.yy-morph-compact .yy-morph-segments { font-size: 16px; }
+.yy-morph-compact .yy-morph-segments { font-size: 1rem; }
 
 .yy-morph-inline-btn {
     margin-top: 8px;
@@ -264,9 +266,11 @@
     border: var(--yy-border-width) solid var(--yy-ink);
     border-radius: var(--yy-radius-control);
     background: var(--yy-surface);
-    font-size: 13px;
+    font-size: 0.8125rem;
     font-weight: 700;
     cursor: pointer;
 }
-.yy-morph-inline-btn:hover { background: var(--yy-gold); color: var(--yy-ink); }
+@media (hover: hover) and (pointer: fine) {
+  .yy-morph-inline-btn:hover { background: var(--yy-gold); color: var(--yy-ink); }
+}
 .yy-morph-inline-btn:disabled { opacity: 0.55; cursor: wait; }

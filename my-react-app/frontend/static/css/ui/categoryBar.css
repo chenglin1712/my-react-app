@@ -54,13 +54,15 @@
    名稱的是 <h5>，不是 <span>，維持原樣不強改視覺，只留這個註記。 */
 .subcategory-card span {
   display: block;
-  font-size: 13px;
+  font-size: 0.8125rem;
   margin-top: 4px;
   color: var(--yy-text-secondary);
 }
 
-.subcategory-card:hover {
-  border-color: var(--yy-gold);
+@media (hover: hover) and (pointer: fine) {
+  .subcategory-card:hover {
+    border-color: var(--yy-gold);
+  }
 }
 
 .subcategory-card.active {

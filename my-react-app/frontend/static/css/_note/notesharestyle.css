@@ -198,7 +198,7 @@
 .ns-toast{
   position: fixed;
   left: 50%;
-  bottom: 24px;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   background: var(--yy-calm-block);
   color: var(--yy-calm-block-on);

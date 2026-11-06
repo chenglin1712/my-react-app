@@ -230,6 +230,153 @@ describe("邊框粗細", () => {
   });
 });
 
+describe("hover 只給有滑鼠的裝置（階段 6-1）", () => {
+  // 含後台在內的所有樣式檔：選擇器裡有 :hover 的規則，一律要在 (hover: hover) and (pointer: fine) 之內，
+  // 觸控裝置點一下不會留下黏住的 hover 狀態。巢狀 @media（例如寬度斷點裡再包一層）也算。
+  const everyCss = walk(join(FRONTEND, "static", "css"), [".css"]).map((f) => ({ file: rel(f), css: stripCss(readFileSync(f, "utf8")) }));
+  const hoverRulesOutsideMedia = (css) => {
+    const bad = [];
+    const stack = [];
+    let buf = "";
+    let line = 1;
+    for (const ch of css) {
+      if (ch === "\n") line++;
+      if (ch === "{") { stack.push({ prelude: buf.trim(), line }); buf = ""; }
+      else if (ch === "}") {
+        const top = stack.pop();
+        if (top && !top.prelude.startsWith("@") && top.prelude.includes(":hover")) {
+          // 要求 and 串接兩個條件：逗號是「或」、not 是反向，兩者都不算保護
+          const ok = stack.some((s) => s.prelude.startsWith("@media") && !/,|\bnot\b|\bor\b/.test(s.prelude) && /\(hover:\s*hover\)/.test(s.prelude) && /\(pointer:\s*fine\)/.test(s.prelude));
+          if (!ok) bad.push(`${top.line}: ${top.prelude.replace(/\s+/g, " ").slice(0, 80)}`);
+        }
+        buf = "";
+      } else buf += ch;
+    }
+    return bad;
+  };
+
+  it("沒有任何 :hover 規則在 (hover: hover) and (pointer: fine) 之外", () => {
+    const hits = [];
+    everyCss.forEach(({ file, css }) => hoverRulesOutsideMedia(css).forEach((h) => hits.push(`${file}:${h}`)));
+    expect(hits).toEqual([]);
+  });
+
+  it("檢查本身有效：沒包的 :hover 抓得到，包好的放行，巢狀 @media 也放行", () => {
+    expect(hoverRulesOutsideMedia(".a:hover { color: red; }")).toHaveLength(1);
+    expect(hoverRulesOutsideMedia("@media (hover: hover) and (pointer: fine) { .a:hover { color: red; } }")).toEqual([]);
+    expect(hoverRulesOutsideMedia("@media (hover: hover) { .a:hover { color: red; } }")).toHaveLength(1);
+    expect(hoverRulesOutsideMedia("@media (hover: hover), (pointer: fine) { .a:hover { color: red; } }")).toHaveLength(1);
+    expect(hoverRulesOutsideMedia("@media not (hover: hover) and (pointer: fine) { .a:hover { color: red; } }")).toHaveLength(1);
+    expect(hoverRulesOutsideMedia("@media (min-width: 600px) { .a:hover { color: red; } }")).toHaveLength(1);
+    expect(hoverRulesOutsideMedia("@media (min-width: 600px) { @media (hover: hover) and (pointer: fine) { .a:hover { color: red; } } }")).toEqual([]);
+  });
+
+  it("JSX 沒有用 onMouseEnter／onMouseOver 做只在滑鼠才有意義的樣式切換以外的 hover 邏輯檢查（僅列出，供人工確認）", () => {
+    const uses = jsFiles.filter(({ js }) => /onMouse(?:Enter|Over)\s*=/.test(js)).map(({ file }) => file);
+    // 目前已知：toast 暫停倒數（後台）。新增使用時請確認有對應的 onFocus／onTouchStart 路徑。
+    expect(uses.length).toBeLessThanOrEqual(10);
+  });
+});
+
+describe("手機版（階段 6-4）", () => {
+  const everyCss = walk(join(FRONTEND, "static", "css"), [".css"]).map((f) => ({ file: rel(f), css: stripCss(readFileSync(f, "utf8")) }));
+  const ruleList = (css) => [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({ selector: m[1].trim(), body: m[2] }));
+
+  it("按鈕的最小寬度不超過 64px（筆記頁電腦版的 100px 在手機寬度另有覆蓋）", () => {
+    const hits = [];
+    everyCss.filter(({ file }) => !isAdmin(file)).forEach(({ file, css }) => {
+      ruleList(css).forEach(({ selector, body }) => {
+        const m = body.match(/min-width:\s*(\d+)px/);
+        if (m && Number(m[1]) > 64 && /(^|[\s,.])(btn|button)|button/.test(selector)) hits.push(`${file}: ${selector.replace(/\s+/g, " ").slice(0, 60)} ${m[0]}`);
+      });
+    });
+    // 例外：筆記頁（路由專屬 CSS，限縮在 .note-page 底下）電腦版 100px，手機寬度在同檔另有覆蓋；遊戲開始頁單獨一顆的開始鈕 120px
+    expect(hits.filter((h) => !/(_note\/buttons|_game\/game_start)\.css/.test(h)), hits.join(", ")).toEqual([]);
+    const note = everyCss.find(({ file }) => file.endsWith("_note/buttons.css")).css;
+    expect(note).toMatch(/@media \(max-width: 600px\)\s*\{[^}]*\.note-page \.btn\s*\{\s*min-width:\s*var\(--yy-control-md\)/);
+  });
+
+  it("貼著畫面底部的固定元素都把 safe-area-inset-bottom 算進去（瀏海機的手勢條不會蓋住）", () => {
+    // 已經由 --yy-tabbar-h、--bot-bottom 變數間接包含安全區的，列在白名單
+    const VIA_VARIABLE = [".menu-mobile", ".navbar"];
+    const hits = [];
+    everyCss.filter(({ file }) => !isAdmin(file)).forEach(({ file, css }) => {
+      ruleList(css).forEach(({ selector, body }) => {
+        if (!/position:\s*fixed/.test(body)) return;
+        const bottom = body.match(/(?:^|[;\s])bottom:\s*([^;]+);/);
+        if (!bottom) return;
+        const value = bottom[1].trim();
+        if (/^0(px)?$/.test(value) === false && !/\d/.test(value)) return;
+        if (/var\(--(yy-tabbar-h|bot-bottom)/.test(value) && !/^\d/.test(value)) return;
+        if (VIA_VARIABLE.some((s) => selector.endsWith(s))) return;
+        if (!/safe-area-inset-bottom/.test(body) && !/safe-area-inset-bottom/.test(value)) hits.push(`${file}: ${selector.replace(/\s+/g, " ").slice(0, 50)} bottom:${value}`);
+      });
+    });
+    expect(hits).toEqual([]);
+  });
+
+  it("跑馬燈暫停鈕視覺 32px，但點擊區用透明 ::after 擴成 44px", () => {
+    const css = everyCss.find(({ file }) => file.endsWith("_home/masthead.css")).css;
+    expect(css).toMatch(/\.home-ticker__toggle::after\s*\{[^}]*width:\s*max\(100%, var\(--yy-control-md\)\)/);
+  });
+});
+
+describe("字級放大支援（階段 6-5）", () => {
+  it("前台 CSS 的 font-size 沒有寫死 px：一律 rem、em、百分比或 token（瀏覽器調大字級時才會跟著放大）", () => {
+    const hits = [];
+    cssFiles.forEach(({ file, css }) => {
+      lines(css).forEach((line, i) => {
+        if (/font-size:\s*\d+(?:\.\d+)?px/.test(line)) hits.push(`${file}:${i + 1}: ${line.trim().slice(0, 60)}`);
+      });
+    });
+    expect(hits).toEqual([]);
+  });
+
+  it("字級 token 是 rem，且 1rem = 16px 的對照沒變（根字級沒有被覆寫）", () => {
+    const theme = cssFiles.find(({ file }) => file.endsWith("default/theme-v2.css")).css;
+    const expected = { xs: 0.75, sm: 0.875, base: 1, lg: 1.125, xl: 1.375, "2xl": 1.75, "3xl": 2.5 };
+    Object.entries(expected).forEach(([name, rem]) => {
+      expect(theme, name).toContain(`--yy-text-${name}: ${rem}rem;`);
+    });
+    cssFiles.forEach(({ file, css }) => {
+      expect(/(^|\n)\s*(html|:root)\s*\{[^}]*font-size\s*:\s*\d+(?:\.\d+)?(px|%)/.test(css), `${file} 不要覆寫根字級`).toBe(false);
+    });
+  });
+});
+
+describe("換頁轉場（階段 6-2）", () => {
+  const theme = () => cssFiles.find(({ file }) => file.endsWith("default/theme-v2.css")).css;
+  const block = () => {
+    const start = theme().indexOf("@media (prefers-reduced-motion: no-preference) {\n  ::view-transition-old(root)");
+    expect(start, "找不到換頁轉場區塊").toBeGreaterThan(-1);
+    return theme().slice(start, theme().indexOf("\n}\n", start));
+  };
+
+  it("舊畫面淡出、新畫面淡入，只用既有的淡入淡出關鍵影格與動態 token，曲線 ease-out", () => {
+    expect(block()).toMatch(/::view-transition-old\(root\)\s*\{[^}]*animation:\s*yy-overlay-out var\(--dur-overlay-out\) var\(--ease-out\) both/);
+    expect(block()).toMatch(/::view-transition-new\(root\)\s*\{[^}]*animation:\s*yy-overlay-in var\(--dur-base\) var\(--ease-out\) both/);
+    expect(block()).not.toMatch(/ease-in(?!-out)|transform|translate|scale/);
+  });
+
+  it("只在沒有要求減少動態時才有轉場動畫（不支援的瀏覽器不會用到這些選擇器）", () => {
+    const hits = [];
+    cssFiles.forEach(({ file, css }) => {
+      const i = css.indexOf("::view-transition");
+      if (i > -1) hits.push(file);
+    });
+    expect(hits).toEqual([expect.stringMatching(/default\/theme-v2\.css$/)]);
+    const outside = theme().replace(block(), "");
+    expect(outside).not.toContain("::view-transition");
+  });
+
+  it("前台換頁副作用與路由都吃「畫面上顯示的位置」，不是直接用真實網址", () => {
+    const read = (f) => readFileSync(join(FRONTEND, "src", f), "utf8");
+    expect(read("RouteEffects.jsx")).toContain("useDisplayedLocation()");
+    expect(read("route.jsx")).toMatch(/<Routes location=\{displayedLocation\}>/);
+    expect(read("AppShell.jsx")).toContain("<RouteTransitionProvider>");
+  });
+});
+
 describe("動態規則不退回舊寫法", () => {
   // 全站只有三種動態（見 theme-v2.css「動態語法」）。下面這些是已刪除的舊裝飾動畫，不得再出現。
   const REMOVED_MOTION = ["yy-holo", "yy-floaty", "yy-pulse-ring", "yy-marquee", "yy-logo-ring", "yy-char", "yy-pulse-glow"];

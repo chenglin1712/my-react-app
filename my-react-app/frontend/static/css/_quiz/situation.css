@@ -57,7 +57,7 @@
   margin: 20px auto;
   padding: 20px;
   text-align: center;
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 600;
   color: var(--yy-calm-text-sub);
   border: var(--yy-border-width) dashed var(--yy-calm-text);
@@ -70,7 +70,7 @@
   .situation-chart-title,
   .situation-radar-title,
   .situation-line-title {
-    font-size: 20px;
+    font-size: 1.25rem;
   }
 
   .situation-container {

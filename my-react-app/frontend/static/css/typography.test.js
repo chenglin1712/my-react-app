@@ -75,10 +75,10 @@ describe("字級", () => {
     ].forEach(([file, selector]) => {
       const body = ruleBody(fileText(file), selector);
       // 字級可以直接寫 px，或用 --yy-text-sm（14px）以上的 token
-      const px = body.match(/font-size:\s*(\d+)px/);
+      const px = body.match(/font-size:\s*(\d+(?:\.\d+)?)(px|rem)/);
       const token = body.match(/font-size:\s*var\(--yy-text-(sm|base|lg|xl|2xl|3xl)\)/);
       expect(px || token, `${file} ${selector}`).toBeTruthy();
-      if (px) expect(Number(px[1]), `${file} ${selector}`).toBeGreaterThanOrEqual(14);
+      if (px) expect(px[2] === "rem" ? Number(px[1]) * 16 : Number(px[1]), `${file} ${selector}`).toBeGreaterThanOrEqual(14);
     });
   });
 

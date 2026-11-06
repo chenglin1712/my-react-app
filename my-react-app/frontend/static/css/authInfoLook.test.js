@@ -99,8 +99,8 @@ describe("登入與註冊", () => {
   });
 
   it("輸入框字級 16px（iOS 不會自動放大），欄位整條畫焦點框", () => {
-    expect(find("_auth/loginForm.css")(".loginForm .input-field").body).toMatch(/font-size:\s*16px/);
-    expect(find("_auth/registerForm.css")(".input-field").body).toMatch(/font-size:\s*16px/);
+    expect(find("_auth/loginForm.css")(".loginForm .input-field").body).toMatch(/font-size:\s*(?:16px|1rem)/);
+    expect(find("_auth/registerForm.css")(".input-field").body).toMatch(/font-size:\s*(?:16px|1rem)/);
     expect(find("_auth/loginForm.css")(".loginForm .input-wrapper:focus-within").body).toMatch(/outline:/);
     expect(find("_auth/registerForm.css")(".register-box .input-wrapper:focus-within").body).toMatch(/outline:\s*var\(--yy-ui-focus-ring\)/);
   });
@@ -118,7 +118,7 @@ describe("登入與註冊", () => {
 
   it("忘記密碼、重設密碼：輸入框與按鈕至少 44px、字級 16px、輸入框畫焦點框", () => {
     expect(find("_auth/forgotPassword.css")(".forgot-container input").body).toMatch(/min-height:\s*var\(--yy-control-md\)/);
-    expect(find("_auth/forgotPassword.css")(".forgot-container input").body).toMatch(/font-size:\s*16px/);
+    expect(find("_auth/forgotPassword.css")(".forgot-container input").body).toMatch(/font-size:\s*(?:16px|1rem)/);
     expect(find("_auth/forgotPassword.css")(".forgot-container input:focus").body).toMatch(/outline:\s*var\(--yy-ui-focus-ring\)/);
     expect(find("_auth/forgotPassword.css")(".forgot-button button").body).toMatch(/min-height:\s*var\(--yy-control-md\)/);
     expect(find("_auth/resetPassword.css")(".reset-container input").body).toMatch(/min-height:\s*var\(--yy-control-md\)/);

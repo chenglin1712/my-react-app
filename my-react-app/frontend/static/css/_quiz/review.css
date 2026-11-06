@@ -53,7 +53,7 @@
     top: 80%;
     right: 0;
     z-index: calc(var(--yy-z-sticky) + 1);
-    font-size: 14px;
+    font-size: 0.875rem;
     display: none;
     width: 240px;
     white-space: normal;
@@ -227,7 +227,7 @@
 
 .review-quiz-header h3 {
     margin: 0;
-    font-size: 20px;
+    font-size: 1.25rem;
     color: var(--yy-calm-text);
 }
 
@@ -336,7 +336,7 @@
 }
 
 .answer-row {
-    font-size: 18px;
+    font-size: 1.125rem;
 }
 
 .answer-images {
@@ -392,14 +392,14 @@
     left: 4px;
     background: color-mix(in srgb, var(--yy-calm-block) 75%, transparent);
     color: var(--yy-calm-surface);
-    font-size: 14px;
+    font-size: 0.875rem;
     padding: 1px 4px;
     border-radius: var(--yy-radius-tag);
 }
 
 .correct-tip {
     display: block;
-    font-size: 16px;
+    font-size: 1rem;
     color: var(--yy-calm-success);
     margin-top: 4px;
     font-weight: bold;

@@ -10,7 +10,7 @@
 }
 
 .box-title {
-    font-size: 20px;
+    font-size: 1.25rem;
     font-weight: 900;
     color: var(--yy-calm-text);
     margin-bottom: 16px;
@@ -83,7 +83,7 @@
     gap: 6px;
     color: var(--yy-calm-text-sub);
     margin: 20px 0 8px 0;
-    font-size: 16px;
+    font-size: 1rem;
     font-weight: bold;
     font-variant-numeric: tabular-nums;
 }
@@ -95,7 +95,7 @@
     display: flex;
     align-items: center;
     transition: var(--transition-interactive);
-    font-size: 18px;
+    font-size: 1.125rem;
     font-weight: 700;
     cursor: pointer;
 }
@@ -116,7 +116,7 @@
     position: absolute;
     top: -10px;
     right: -8px;
-    font-size: 14px;
+    font-size: 0.875rem;
     background-color: var(--yy-calm-surface);
     border-radius: var(--yy-radius-pill);
     padding: 1px 3px;

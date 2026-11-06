@@ -15,14 +15,14 @@
 .notfound-code {
     margin: 18px 0 4px;
     font-family: var(--yy-font-heading);
-    font-size: 72px;
+    font-size: 4.5rem;
     line-height: 1;
     color: var(--yy-calm-accent);
 }
 
 .notfound-panel h1 {
     margin: 0 0 10px;
-    font-size: 26px;
+    font-size: 1.625rem;
     font-weight: 800;
 }
 

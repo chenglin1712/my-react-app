@@ -31,8 +31,10 @@
     transition: background 0.3s ease-in-out;
 }
 
-.activities-btn:hover {
-    color: rgba(0, 0, 0, 0.8);
+@media (hover: hover) and (pointer: fine) {
+  .activities-btn:hover {
+      color: rgba(0, 0, 0, 0.8);
+  }
 }
 
 .activities-btn.left {

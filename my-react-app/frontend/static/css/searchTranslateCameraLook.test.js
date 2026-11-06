@@ -126,7 +126,7 @@ describe("單詞查詢", () => {
     expect(field).toMatch(/box-shadow:\s*var\(--yy-elev-2\)/);
     expect(field).toMatch(/min-height:\s*60px/);
     expect(find.search(".spotlight-field:focus-within").body).toMatch(/outline:\s*var\(--yy-ui-focus-ring\)/);
-    expect(find.search(".spotlight-input", /max-width:\s*720px/)?.body ?? "").toMatch(/font-size:\s*16px/);
+    expect(find.search(".spotlight-input", /max-width:\s*720px/)?.body ?? "").toMatch(/font-size:\s*(?:16px|1rem)/);
     expect(find.search(".spotlight-go").body).toMatch(/min-height:\s*var\(--yy-control-md\)/);
     expect(find.search(".spotlight-go:active:not(:disabled)").body).toMatch(/scale\(var\(--yy-ui-press\)\)/);
     expect(find.search(".spotlight-go:active:not(:disabled)", /prefers-reduced-motion/).body).toMatch(/transform:\s*none/);

@@ -19,7 +19,7 @@
     padding: 0 16px;
 
     font-family: var(--yy-font-body);
-    font-size: 15px;
+    font-size: 0.9375rem;
     font-weight: 700;
     color: var(--yy-calm-olive);
 
@@ -65,7 +65,7 @@
 
 .bar-item-label {
     width: 100%;
-    font-size: 15px;
+    font-size: 0.9375rem;
     line-height: 1.45;
     font-weight: 700;
     color: var(--yy-calm-text-sub);
@@ -107,8 +107,8 @@
 
 .mobile-menu-button {
     position: fixed;
-    right: 20px;
-    bottom: 20px;
+    right: calc(20px + env(safe-area-inset-right, 0px));
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
     z-index: var(--yy-z-drawer);
 
     width: 60px;
@@ -154,8 +154,8 @@
 
 .mobile-menu {
     position: fixed;
-    right: 20px;
-    bottom: 92px;
+    right: calc(20px + env(safe-area-inset-right, 0px));
+    bottom: calc(92px + env(safe-area-inset-bottom, 0px));
     z-index: var(--yy-z-nav);
     width: 210px;
     padding: 16px;
@@ -174,7 +174,7 @@
     color: var(--yy-calm-text);
     border-bottom: 3px solid var(--yy-calm-olive);
     font-family: var(--yy-font-body);
-    font-size: 14px;
+    font-size: 0.875rem;
 }
 
 .mobile-closeBtn {

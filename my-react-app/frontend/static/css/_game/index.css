@@ -54,7 +54,7 @@
     position: relative;
     max-width: 520px;
     margin: 0 auto;
-    font-size: 16px;
+    font-size: 1rem;
     line-height: 1.8;
     color: var(--yy-calm-text-sub);
 }
@@ -208,7 +208,7 @@
 }
 
 .gamehub-card-title {
-    font-size: 19px;
+    font-size: 1.1875rem;
     margin: 0 0 4px;
     font-weight: 800;
     color: var(--yy-calm-text);
@@ -226,7 +226,7 @@
 }
 
 .gamehub-card-body p {
-    font-size: 14px;
+    font-size: 0.875rem;
     line-height: 1.8;
     color: var(--yy-calm-text-sub);
     margin: 0 0 16px;
@@ -266,7 +266,7 @@
 }
 
 .gamehub-panel-head h3 {
-    font-size: 19px;
+    font-size: 1.1875rem;
     font-weight: 800;
     margin: 0;
 }
@@ -322,7 +322,7 @@
 
 .gamehub-tribe-name {
     display: block;
-    font-size: 14px;
+    font-size: 0.875rem;
     font-weight: 700;
     color: var(--yy-calm-text);
 }
@@ -337,7 +337,7 @@
 }
 
 .gamehub-confirm h4 {
-    font-size: 17px;
+    font-size: 1.0625rem;
     font-weight: 800;
     margin: 0 0 6px;
 }

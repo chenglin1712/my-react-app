@@ -25,7 +25,7 @@
 
 .discussion-header h4 {
     margin: 0;
-    font-size: 18px;
+    font-size: 1.125rem;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -69,7 +69,7 @@
 
 .message-content .user {
     font-weight: bold;
-    font-size: 14px;
+    font-size: 0.875rem;
     margin: 0;
     color: var(--yy-calm-text);
 }
@@ -84,7 +84,7 @@
 
 .message-content .text {
     margin: 2px 0 0 0;
-    font-size: 15px;
+    font-size: 0.9375rem;
     color: var(--yy-calm-text-sub);
 }
 
@@ -144,7 +144,7 @@
     padding: 10px 12px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: var(--yy-radius-control);
-    font-size: 14px;
+    font-size: 0.875rem;
     outline: none;
 }
 

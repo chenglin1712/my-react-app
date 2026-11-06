@@ -51,7 +51,7 @@
 .game-result-card-front .correct-answer {
   color: var(--yy-calm-success);
   font-weight: 700;
-  font-size: 18px;
+  font-size: 1.125rem;
   width: 100%;
 }
 
@@ -59,7 +59,7 @@
   color: var(--yy-calm-accent);
   font-weight: 700;
   margin-top: 0.5rem;
-  font-size: 18px;
+  font-size: 1.125rem;
   width: 100%;
 }
 
@@ -102,7 +102,7 @@
 }
 
 .stats-container p {
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 
 .result-title {

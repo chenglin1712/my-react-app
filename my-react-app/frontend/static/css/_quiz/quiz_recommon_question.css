@@ -50,7 +50,7 @@
 }
 
 .recommon-step-label {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--yy-calm-text-sub);
   margin-bottom: 8px;
   text-align: center;
@@ -225,7 +225,7 @@
     min-width: 180px;
     max-width: 180px;
     padding: 12px 16px;
-    font-size: 16px;
+    font-size: 1rem;
     margin: 0 auto;
     transition: transform 0.15s ease, background-color 0.2s ease, color 0.2s ease;
   }

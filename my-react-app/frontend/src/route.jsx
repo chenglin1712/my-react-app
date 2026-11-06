@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { useDisplayedLocation } from './routeTransition';
 import { DelayedSkeleton } from '@components/ui/StateViews';
 import { useAuth } from './userServives/authContext';
 import PermissionProtect from './userServives/permissionProtect';
@@ -111,10 +112,12 @@ const RouteLoadingFallback = () => (
 );
 
 const AppRoutes = () => {
+  // 有換頁轉場時，路由先停在舊頁，等瀏覽器拍好舊畫面才換成新頁（見 routeTransition.jsx）
+  const displayedLocation = useDisplayedLocation();
   return (
     <ErrorBoundary>
       <Suspense fallback={<RouteLoadingFallback />}>
-        <Routes>
+        <Routes location={displayedLocation}>
           <Route path="/" element={<HomePage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/camera/label" element={<Navigate to="/camera" replace />} />

@@ -58,4 +58,38 @@ describe('WordDetailSheet', () => {
     fireEvent.click(screen.getByRole('button', { name: '播放「babaw」的發音' }));
     expect(playAudio).toHaveBeenCalledWith('f1');
   });
+
+  describe('標題列往下滑關閉（階段 6-3）', () => {
+    const swipeDown = (header) => {
+      const Pointer = window.PointerEvent || class extends MouseEvent {
+        constructor(type, init = {}) { super(type, init); this.pointerId = 1; this.pointerType = 'touch'; this.isPrimary = true; }
+      };
+      const fire = (type, clientY) => fireEvent(header, new Pointer(type, { bubbles: true, clientY, pointerId: 1, pointerType: 'touch', isPrimary: true }));
+      fire('pointerdown', 100);
+      fire('pointermove', 180);
+      fire('pointerup', 180);
+    };
+
+    test('手機：快速往下滑，放手就呼叫 onClose（只呼叫一次）', () => {
+      vi.useFakeTimers();
+      const onClose = vi.fn();
+      render(<WordDetailSheet {...base} onClose={onClose} isMobile detail={detail} />);
+      const header = document.querySelector('.word-sheet-head');
+      swipeDown(header);
+      expect(onClose).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(600);
+      expect(onClose).toHaveBeenCalledTimes(1);
+      vi.useRealTimers();
+    });
+
+    test('桌面（右側 sheet）：同樣的動作不會關閉', () => {
+      vi.useFakeTimers();
+      const onClose = vi.fn();
+      render(<WordDetailSheet {...base} onClose={onClose} isMobile={false} detail={detail} />);
+      swipeDown(document.querySelector('.word-sheet-head'));
+      vi.advanceTimersByTime(500);
+      expect(onClose).not.toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+  });
 });

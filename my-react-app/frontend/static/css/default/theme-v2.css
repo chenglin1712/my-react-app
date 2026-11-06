@@ -200,13 +200,14 @@
      導覽列的斷點刻意獨立（見 Navbar.css）。新增斷點要同步改 typography.test.js 的 ALLOWED。 */
 
   /* ---------- 字級與行高 ---------- */
-  --yy-text-xs: 12px;
-  --yy-text-sm: 14px;
-  --yy-text-base: 16px;
-  --yy-text-lg: 18px;
-  --yy-text-xl: 22px;
-  --yy-text-2xl: 28px;
-  --yy-text-3xl: 40px;
+  /* 字級一律用 rem（階段 6-5）：使用者在瀏覽器調大預設字級時文字才會跟著放大；px 不會。數值與原本相同（1rem = 16px）。 */
+  --yy-text-xs: 0.75rem;
+  --yy-text-sm: 0.875rem;
+  --yy-text-base: 1rem;
+  --yy-text-lg: 1.125rem;
+  --yy-text-xl: 1.375rem;
+  --yy-text-2xl: 1.75rem;
+  --yy-text-3xl: 2.5rem;
   /* 七級字級（Apple 化步驟 1-4）：顯示、H1、H2、H3、內文大、內文、說明；標題四級用 clamp 流動縮放。
      先只定義 token，數值是提案，各頁改版時套用並依畫面微調。內文不低於 16px、說明不低於 14px，最小字級仍受 typography.test.js 的 12px 下限約束。 */
   --yy-type-display: clamp(2.5rem, 1.5rem + 4vw, 4.25rem);
@@ -468,6 +469,19 @@
   to { opacity: 0; }
 }
 
+/* 換頁轉場（6-2，src/routeTransition.jsx）：整頁交叉淡入，只動 opacity，舊的退場比新的進場快。
+   不支援 View Transitions 的瀏覽器完全不會走到這裡（JS 端直接換頁）；減少動態時 JS 端也不啟動，這裡再包一層當保險。 */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root) {
+    animation: yy-overlay-out var(--dur-overlay-out) var(--ease-out) both;
+    mix-blend-mode: normal;
+  }
+  ::view-transition-new(root) {
+    animation: yy-overlay-in var(--dur-base) var(--ease-out) both;
+    mix-blend-mode: normal;
+  }
+}
+
 /* ---------- 捲動進場與載入骨架 ---------- */
 
 /* 捲到才進場（components/ui/RevealOnView.jsx）：淡入並由下往上 8px，每個區塊一次。
@@ -644,13 +658,13 @@
   background: var(--yy-calm-tag);
   color: var(--yy-calm-tag-on);
   font-family: var(--yy-font-body);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   line-height: 1.5;
   letter-spacing: 0.1em;
 }
 .yy-eyebrow--zh {
-  font-size: 14px;
+  font-size: 0.875rem;
   letter-spacing: 0.04em;
 }
 
@@ -719,7 +733,7 @@
   padding: 10px 22px;
   background: var(--yy-calm-accent);
   color: var(--yy-calm-accent-on);
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 @media (hover: hover) and (pointer: fine) {
   .yy-btn-primary:hover:not(:disabled):not([aria-disabled="true"]) {
@@ -734,7 +748,7 @@
   background: transparent;
   color: var(--yy-calm-text);
   border-color: var(--yy-calm-line);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 @media (hover: hover) and (pointer: fine) {
   .yy-btn-outline:hover:not(:disabled):not([aria-disabled="true"]) {
@@ -794,7 +808,7 @@
   border: var(--yy-border-width) solid var(--yy-calm-line);
   font-family: var(--yy-font-body);
   font-weight: 700;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.4;
   cursor: pointer;
   transition:
@@ -870,7 +884,7 @@
   justify-content: center;
   font-family: var(--yy-font-pixel);
   font-weight: 700;
-  font-size: 15px;
+  font-size: 0.9375rem;
   color: var(--yy-ink);
   transition: color var(--dur-fast) var(--ease-out);
 }
@@ -896,7 +910,7 @@
 .yy-step-diamond.active::before {
 }
 .yy-step-label {
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--yy-text-secondary);
   white-space: nowrap;
@@ -922,7 +936,7 @@
   padding: 8px 28px;
   font-family: var(--yy-font-body);
   font-weight: 700;
-  font-size: 14px;
+  font-size: 0.875rem;
   cursor: pointer;
   background: var(--yy-calm-surface);
   color: var(--yy-calm-text);
@@ -987,12 +1001,12 @@
 .yy-terminal__prompt {
   font-family: var(--yy-font-pixel);
   color: var(--yy-gold);
-  font-size: 16px;
+  font-size: 1rem;
 }
 .yy-terminal__input {
   flex: 1;
   font-family: var(--yy-font-pixel);
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--yy-cream);
   background: transparent;
   border: none;
@@ -1044,7 +1058,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 34px;
+  font-size: 2.125rem;
   color: var(--yy-ink);
   margin: 0 auto 18px;
 }
@@ -1055,7 +1069,7 @@
 }
 
 .yy-modal-text {
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 800;
   margin: 0;
 }
@@ -1237,7 +1251,7 @@
 
   /* iOS Safari 聚焦字級小於 16px 的輸入框時會自動放大整個頁面 */
   .yy-page :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="button"], [type="submit"], [type="reset"], [type="image"], [type="color"], [type="hidden"]), textarea, select) {
-    font-size: 16px;
+    font-size: 1rem;
   }
 }
 
@@ -1249,7 +1263,7 @@
 }
 
 .note-hero-title {
-  font-size: 38px;
+  font-size: 2.375rem;
   margin: 8px 0 20px;
   font-weight: 900;
   color: var(--yy-ink);
@@ -1290,7 +1304,7 @@
 
 .yy-success-card p {
     color: var(--yy-ink);
-    font-size: 15px;
+    font-size: 0.9375rem;
     font-weight: 800;
     text-align: center;
 }

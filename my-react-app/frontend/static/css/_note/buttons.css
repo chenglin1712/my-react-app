@@ -9,6 +9,12 @@
 .note-page button:active,
 .note-page .btn:active { transform: scale(var(--yy-ui-press)); }
 
+/* 手機寬度（階段 6-4）：最小寬度 100px 在窄螢幕會把並排的按鈕撐出橫向捲動。電腦版維持原樣，手機只保證 44px 觸控區，寬度跟著文字。 */
+@media (max-width: 600px) {
+  .note-page button,
+  .note-page .btn { min-width: var(--yy-control-md); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .note-page button:active,
   .note-page .btn:active { transform: none; }

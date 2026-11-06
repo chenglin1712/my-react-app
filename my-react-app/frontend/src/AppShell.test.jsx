@@ -7,6 +7,8 @@ const routerState = vi.hoisted(() => ({ pathname: '/' }));
 vi.mock('react-router-dom', () => ({ useLocation: () => ({ pathname: routerState.pathname }) }));
 vi.mock('./route', () => ({ default: () => <div>routes</div> }));
 vi.mock('./RouteEffects', () => ({ default: () => null }));
+// 換頁轉場有自己的測試（routeTransition.test.jsx）；這裡的路由是簡化過的假物件，用直通版就好
+vi.mock('./routeTransition', () => ({ RouteTransitionProvider: ({ children }) => children }));
 vi.mock('../components/navigation/navbar', () => ({
   default: ({ onOpenBot }) => <button onClick={onOpenBot}>open-bot</button>,
 }));

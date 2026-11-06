@@ -1,7 +1,7 @@
 /* 不能送出的按鈕旁邊說明原因（見 OfflineNotice） */
 .offline-notice {
     margin: 8px 0 0;
-    font-size: 13px;
+    font-size: 0.8125rem;
     font-weight: 700;
     line-height: 1.6;
     color: var(--yy-text-secondary);
@@ -10,7 +10,7 @@
 .offline-banner {
     position: fixed;
     left: 50%;
-    bottom: 20px;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
     transform: translateX(-50%);
     z-index: var(--yy-z-popover);
     max-width: calc(100vw - 32px);
@@ -19,7 +19,7 @@
     color: var(--yy-cream);
     border: var(--yy-border-width) solid var(--yy-gold);
     border-radius: var(--yy-radius-panel);
-    font-size: 14px;
+    font-size: 0.875rem;
     font-weight: 700;
     line-height: 1.6;
     text-align: center;

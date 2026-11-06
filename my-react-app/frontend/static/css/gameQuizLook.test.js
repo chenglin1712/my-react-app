@@ -170,7 +170,7 @@ describe("測驗", () => {
     expect(f(".input-area::before").body).toMatch(/display:\s*none/);
     expect(f(".user .message-bubble::after").body).toMatch(/display:\s*none/);
     expect(f(".message-input:focus").body).toMatch(/outline:\s*var\(--yy-ui-focus-ring\)/);
-    expect(f(".message-input").body).toMatch(/font-size:\s*16px/);
+    expect(f(".message-input").body).toMatch(/font-size:\s*(?:16px|1rem)/);
   });
 
   it("詞義標色除了底色還有線條樣式（底線實線／虛線／點線／雙線、頂線），每類都不同，不只靠顏色", () => {

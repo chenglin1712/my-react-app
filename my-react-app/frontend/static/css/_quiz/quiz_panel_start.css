@@ -19,7 +19,7 @@
 
 .panel-subtitle {
     margin: 0 0 24px;
-    font-size: 20px;
+    font-size: 1.25rem;
     font-weight: 900;
     text-align: center;
     color: var(--yy-calm-text);
@@ -184,7 +184,7 @@
 .scenario-entry h3 {
     margin: 8px 0 5px;
     color: var(--yy-calm-tag);
-    font-size: 19px;
+    font-size: 1.1875rem;
     font-weight: 900;
 }
 
@@ -204,7 +204,7 @@
     border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: var(--yy-radius-tag);
     font-family: var(--yy-font-body);
-    font-size: 14px;
+    font-size: 0.875rem;
     font-weight: 700;
 }
 

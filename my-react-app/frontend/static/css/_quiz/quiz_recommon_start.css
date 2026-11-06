@@ -11,14 +11,14 @@
 
 .start-title {
   font-family: var(--yy-font-body);
-  font-size: 26px;
+  font-size: 1.625rem;
   font-weight: bold;
   color: var(--yy-calm-accent);
   margin-bottom: 10px;
 }
 
 .start-subtitle {
-  font-size: 16px;
+  font-size: 1rem;
   color: var(--yy-calm-text-sub);
   margin-bottom: 30px;
 }
@@ -37,7 +37,7 @@
   padding: 14px 22px;
   border-radius: var(--yy-radius-control);
   font-weight: bold;
-  font-size: 16px;
+  font-size: 1rem;
   border: var(--yy-border-width) solid var(--yy-calm-line);
   cursor: pointer;
   transition: transform 0.15s ease, background-color 0.2s ease;

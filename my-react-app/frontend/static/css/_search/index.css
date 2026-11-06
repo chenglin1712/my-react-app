@@ -193,7 +193,7 @@
   background: transparent;
   color: var(--yy-calm-text);
   font-family: var(--yy-font-body);
-  font-size: 18px;
+  font-size: 1.125rem;
 }
 
 .spotlight-input::placeholder {
@@ -308,7 +308,7 @@
   }
 
   .spotlight-input {
-    font-size: 16px; /* 16px 以上 iOS 聚焦時才不會自動放大頁面 */
+    font-size: 1rem; /* 16px 以上 iOS 聚焦時才不會自動放大頁面 */
   }
 
   .spotlight-go {
@@ -371,7 +371,7 @@
 @media (max-width: 720px) {
   .search-terminal-input,
   .search-terminal-input.form-control {
-    font-size: 16px;
+    font-size: 1rem;
   }
 }
 

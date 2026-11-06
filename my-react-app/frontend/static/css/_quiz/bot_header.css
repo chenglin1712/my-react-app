@@ -43,7 +43,7 @@
     border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: var(--yy-radius-control);
     color: var(--yy-calm-text);
-    font-size: 16px;
+    font-size: 1rem;
     text-overflow: ellipsis;
     cursor: pointer;
 }

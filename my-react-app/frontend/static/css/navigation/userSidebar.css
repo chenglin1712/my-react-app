@@ -26,14 +26,14 @@
 
 .profile-info h3 {
     margin: 0 0 5px 0;
-    font-size: 18px;
+    font-size: 1.125rem;
     font-weight: bold;
 }
 
 .profile-info p {
     margin: 0;
     color: white;
-    font-size: 14px;
+    font-size: 0.875rem;
     opacity: 0.9;
 }
 
@@ -43,7 +43,7 @@
     margin-top: 6px;
     border-radius: var(--yy-radius-tag);
     padding: 4px 10px;
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 
 .profile-actions {
@@ -59,7 +59,7 @@
     padding: 6px 12px;
     border: none;
     border-radius: var(--yy-radius-control);
-    font-size: 14px;
+    font-size: 0.875rem;
     cursor: pointer;
     transition: background-color 0.2s;
 }
@@ -80,8 +80,10 @@
     color: var(--yy-red);
 }
 
-.edit-btn:hover {
-    background-color: var(--yy-cream-dim);
+@media (hover: hover) and (pointer: fine) {
+  .edit-btn:hover {
+      background-color: var(--yy-cream-dim);
+  }
 }
 
 .logout-btn {
@@ -89,8 +91,10 @@
     color: white;
 }
 
-.logout-btn:hover {
-    background-color: var(--yy-text-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .logout-btn:hover {
+      background-color: var(--yy-text-secondary);
+  }
 }
 
 .icon {
@@ -125,10 +129,12 @@
     transition: var(--transition-interactive);
 }
 
-.nav-button:hover {
-    background-color: var(--yy-surface);
-    color: var(--yy-red);
-    border-right: 4px solid var(--yy-red);
+@media (hover: hover) and (pointer: fine) {
+  .nav-button:hover {
+      background-color: var(--yy-surface);
+      color: var(--yy-red);
+      border-right: 4px solid var(--yy-red);
+  }
 }
 
 .nav-content {
@@ -150,7 +156,7 @@
 
 .section-title {
     font-weight: bold;
-    font-size: 18px;
+    font-size: 1.125rem;
     margin-bottom: 16px;
     color: var(--yy-text-tertiary);
 }
@@ -177,7 +183,7 @@
 .item-title {
     font-weight: 600;
     color: var(--yy-text-tertiary);
-    font-size: 16px;
+    font-size: 1rem;
 }
 
 .item-info {
@@ -218,11 +224,11 @@
 .word-term {
     font-weight: bold;
     color: var(--yy-text-tertiary);
-    font-size: 16px;
+    font-size: 1rem;
 }
 
 .word-translation {
-    font-size: 14px;
+    font-size: 0.875rem;
     color: var(--yy-text-muted);
 }
 
@@ -252,7 +258,7 @@
 
 .material-link {
     color: var(--yy-red);
-    font-size: 14px;
+    font-size: 0.875rem;
     margin-left: 8px;
     transition: color 0.2s ease;
     cursor: pointer;
@@ -260,7 +266,7 @@
 
 .empty-text {
     text-align: center;
-    font-size: 14px;
+    font-size: 0.875rem;
     color: var(--yy-text-muted);
     padding: 16px 0;
 }
@@ -268,7 +274,7 @@
 /* 登出失敗訊息位在紅色頭部上：用米白字（對紅底 7.9:1），不用 Bootstrap 的紅字（紅疊紅只有 1.79:1） */
 .sidebar-signout-error {
     margin: 8px 0 0;
-    font-size: 14px;
+    font-size: 0.875rem;
     font-weight: 700;
     color: var(--yy-cream);
 }
@@ -280,7 +286,7 @@
 .sidebar-footer {
     padding: 16px;
     text-align: center;
-    font-size: 14px;
+    font-size: 0.875rem;
     color: var(--yy-text-tertiary);
     border-top: 1px solid var(--yy-border-soft);
 }

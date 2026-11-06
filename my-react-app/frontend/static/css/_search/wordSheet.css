@@ -17,7 +17,12 @@
   border-radius: var(--yy-radius-block) 0 0 var(--yy-radius-block);
 }
 
-/* 抓取把手：只是形狀暗示「可以往下收」，真正的關閉靠右上角的關閉鈕、Esc 與點背景 */
+/* 抓取把手：暗示「可以往下收」。手機上標題列可以往下滑關閉（useSheetSwipeDismiss），所以這一列要擋掉瀏覽器自己的滑動手勢；
+   關閉鈕、Esc 與點背景仍然都在，手勢只是多一條路 */
+.word-sheet--bottom .word-sheet-head {
+  touch-action: none;
+}
+
 .word-sheet--bottom .word-sheet-head::before {
   content: "";
   position: absolute;

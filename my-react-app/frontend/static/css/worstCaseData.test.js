@@ -76,9 +76,9 @@ describe("題號面板與作答統計在窄螢幕不溢出", () => {
 describe("手機輸入框字級與全站基礎規則", () => {
   it("搜尋與翻譯輸入框在手機上是 16px，避免 iOS 自動放大", () => {
     const search = css("_search/index.css").match(/max-width:\s*720px\)\s*\{([^@]*?\.search-terminal-input[\s\S]*?\}\s*)\}/)?.[1] ?? "";
-    expect(search).toMatch(/font-size:\s*16px/);
+    expect(search).toMatch(/font-size:\s*(?:16px|1rem)/);
     const translate = css("_translate/index.css").match(/max-width:\s*720px\)\s*\{\s*\.translate-textarea\s*\{([^}]*)\}/)?.[1] ?? "";
-    expect(translate).toMatch(/font-size:\s*16px/);
+    expect(translate).toMatch(/font-size:\s*(?:16px|1rem)/);
   });
 
   it("html-reset 有 scroll-padding-top、字體平滑、touch-action 與 ::selection", () => {
@@ -95,7 +95,7 @@ describe("手機輸入框字級與全站基礎規則", () => {
     expect(src).toMatch(/\.yy-page :is\(h1, h2, h3, h4\)\s*\{\s*text-wrap:\s*balance/);
     expect(src).toMatch(/\.yy-page :is\(p, li\)\s*\{\s*text-wrap:\s*pretty/);
     // 手機輸入框 16px 的規則要排除 checkbox、radio 與各種按鈕型 input
-    const mobile = src.match(/max-width:\s*720px\)\s*\{([\s\S]*?font-size:\s*16px;[\s\S]*?)\}/)?.[1] ?? "";
+    const mobile = src.match(/max-width:\s*720px\)\s*\{([\s\S]*?font-size:\s*(?:16px|1rem);[\s\S]*?)\}/)?.[1] ?? "";
     ["checkbox", "radio", "range", "file", "button", "submit", "reset"].forEach((t) =>
       expect(mobile).toContain(`[type="${t}"]`),
     );

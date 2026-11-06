@@ -17,14 +17,14 @@
 
 .chart-figure-summary {
     margin: 8px 0 0;
-    font-size: 14px;
+    font-size: 0.875rem;
     line-height: 1.5;
     color: var(--yy-text-secondary);
 }
 
 .chart-figure-data {
     margin-top: 6px;
-    font-size: 14px;
+    font-size: 0.875rem;
 }
 
 .chart-figure-data > summary {
@@ -54,7 +54,7 @@
 .chart-figure-table-wrap table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 14px;
+    font-size: 0.875rem;
 }
 
 .chart-figure-table-wrap th,

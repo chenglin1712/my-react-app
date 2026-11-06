@@ -39,7 +39,7 @@
     background: transparent;
     flex: 1;
     min-width: 0;
-    font-size: 16px; /* 16px 以上 iOS 聚焦時才不會自動放大頁面 */
+    font-size: 1rem; /* 16px 以上 iOS 聚焦時才不會自動放大頁面 */
 }
 
 /* input-field 拿掉了瀏覽器預設的 outline（緊貼卡片圓角邊框，預設焦點框會被邊框
@@ -78,7 +78,7 @@
     min-height: var(--yy-control-md);
     background-color: var(--yy-calm-accent);
     color: var(--yy-calm-accent-on);
-    font-size: 15px;
+    font-size: 0.9375rem;
     font-weight: 700;
     border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: var(--yy-radius-control);

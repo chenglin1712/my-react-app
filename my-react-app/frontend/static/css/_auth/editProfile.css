@@ -96,7 +96,7 @@
     padding: 10px 12px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: var(--yy-radius-control);
-    font-size: 15px;
+    font-size: 0.9375rem;
     transition: border-color var(--dur-fast) var(--ease-out);
 }
 
@@ -112,7 +112,7 @@
     padding: 10px;
     min-height: var(--yy-control-md);
     border-radius: var(--yy-radius-control);
-    font-size: 15px;
+    font-size: 0.9375rem;
     transition: transform 120ms var(--ease-out), background-color var(--dur-fast) var(--ease-out);
     display: flex;
     align-items: center;

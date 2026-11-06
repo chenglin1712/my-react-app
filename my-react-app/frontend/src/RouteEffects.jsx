@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { useLocation, useNavigationType } from 'react-router-dom';
+import { useNavigationType } from 'react-router-dom';
 import { getPageTitle } from './routeMeta';
+import { useDisplayedLocation } from './routeTransition';
 
 const isTypingTarget = (element) => {
   if (!element) return false;
@@ -14,7 +15,8 @@ const isTypingTarget = (element) => {
 // 3. 把鍵盤焦點移到新頁的主要內容，螢幕報讀器才知道頁面換了
 //    （不然焦點會留在已經被卸載的導覽連結上）。使用者正在輸入時不搶焦點。
 export default function RouteEffects() {
-  const { pathname, hash } = useLocation();
+  // 用「畫面上實際顯示的位置」：有換頁轉場時，標題、捲回頂端與焦點都等新頁換上去之後才做，舊畫面不會先跳到頂端
+  const { pathname, hash } = useDisplayedLocation();
   const navigationType = useNavigationType();
   const firstRender = useRef(true);
 

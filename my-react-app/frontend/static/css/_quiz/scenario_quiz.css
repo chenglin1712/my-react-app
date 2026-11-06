@@ -16,7 +16,7 @@
 .scenario-quiz-heading h2 {
     margin: 2px 0 0;
     color: var(--yy-calm-accent);
-    font-size: 26px;
+    font-size: 1.625rem;
     font-weight: 900;
 }
 
@@ -34,7 +34,7 @@
     gap: 6px;
     padding: 4px;
     color: var(--yy-calm-text-sub);
-    font-size: 14px;
+    font-size: 0.875rem;
     text-decoration: none;
 }
 
@@ -109,7 +109,7 @@
 .scenario-quiz-question h3 {
     margin: 0;
     color: var(--yy-calm-text);
-    font-size: 21px;
+    font-size: 1.3125rem;
     font-weight: 700;
     line-height: 1.55;
 }
@@ -178,7 +178,7 @@
     background: var(--yy-calm-accent);
     border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: var(--yy-radius-round);
-    font-size: 14px;
+    font-size: 0.875rem;
     font-weight: 750;
 }
 
@@ -201,7 +201,7 @@
 }
 
 .scenario-quiz-option-copy strong {
-    font-size: 16px;
+    font-size: 1rem;
     line-height: 1.45;
     overflow-wrap: anywhere;
 }
@@ -256,7 +256,7 @@
 }
 
 .scenario-quiz-feedback strong {
-    font-size: 14px;
+    font-size: 0.875rem;
 }
 
 .scenario-quiz-feedback span {
@@ -326,7 +326,7 @@
 .scenario-quiz-state-card h2 {
     margin: 6px 0 10px;
     color: var(--yy-calm-text);
-    font-size: 26px;
+    font-size: 1.625rem;
     font-weight: 900;
 }
 
@@ -376,7 +376,7 @@
     }
 
     .scenario-quiz-question h3 {
-        font-size: 18px;
+        font-size: 1.125rem;
     }
 
     .scenario-quiz-option {

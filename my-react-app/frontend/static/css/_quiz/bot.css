@@ -10,7 +10,7 @@
     position: fixed;
     right: 20px;
     /* 離線橫幅（置底、z-index 1100）出現時，body 會設 --bot-bottom 讓視窗與啟動鈕往上讓出位置 */
-    bottom: var(--bot-bottom, 20px);
+    bottom: var(--bot-bottom, calc(20px + env(safe-area-inset-bottom, 0px)));
     z-index: var(--yy-z-float);
     width: min(400px, calc(100vw - 32px));
     height: min(620px, calc(100dvh - var(--bot-bottom, 20px) - 100px));
@@ -54,8 +54,8 @@
 
 @media (max-width: 600px) {
     .bot-overlay {
-        right: 8px;
-        bottom: var(--bot-bottom, 8px);
+        right: calc(8px + env(safe-area-inset-right, 0px));
+        bottom: var(--bot-bottom, calc(8px + env(safe-area-inset-bottom, 0px)));
         width: calc(100vw - 16px);
         /* 手機 Navbar（含跑馬燈）約 98px 高，再留 6px 空隙，視窗頂端才不會被導覽列蓋住 */
         height: calc(100dvh - var(--bot-bottom, 8px) - 104px);
@@ -140,7 +140,7 @@
 
 .header-info h2 {
     margin: 0;
-    font-size: 18px;
+    font-size: 1.125rem;
     font-weight: 600;
     text-wrap: balance; /* 窄螢幕折行時均分，不留一個孤字 */
 }
@@ -251,7 +251,7 @@
 }
 
 .suggestions-title {
-    font-size: 14px;
+    font-size: 0.875rem;
     color: var(--yy-calm-text-sub);
     margin: 0 0 8px 0;
     font-weight: 500;
@@ -337,7 +337,7 @@
     padding: 12px 16px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: var(--yy-radius-control);
-    font-size: 16px;
+    font-size: 1rem;
     transition: border-color var(--dur-fast) var(--ease-out);
     background-color: var(--yy-calm-surface);
     color: var(--yy-calm-text);
@@ -356,7 +356,7 @@
     color: var(--yy-calm-text-sub);
     border: none;
     border-radius: var(--yy-radius-block);
-    font-size: 15px;
+    font-size: 0.9375rem;
     font-weight: 500;
     cursor: not-allowed;
     transition: var(--transition-interactive);

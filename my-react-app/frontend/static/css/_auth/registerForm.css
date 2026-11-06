@@ -90,7 +90,7 @@
     background: none;
     flex: 1;
     min-width: 0;
-    font-size: 16px; /* 16px 以上 iOS 聚焦時才不會自動放大頁面 */
+    font-size: 1rem; /* 16px 以上 iOS 聚焦時才不會自動放大頁面 */
     padding: 2px;
 }
 
@@ -133,7 +133,7 @@
     border: var(--yy-border-width) solid var(--yy-calm-line);
     padding: 14px;
     min-height: var(--yy-control-md);
-    font-size: 15px;
+    font-size: 0.9375rem;
     font-weight: 700;
     border-radius: var(--yy-radius-control);
     cursor: pointer;

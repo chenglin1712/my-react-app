@@ -7,8 +7,8 @@ body:has(.offline-banner) {
 /* 右下角 AI 助手啟動鈕。z-index 900：高於頁面內容，低於 Navbar 彈窗遮罩（1000）與各種 modal。 */
 .bot-launcher {
     position: fixed;
-    right: 20px;
-    bottom: var(--bot-bottom, 20px);
+    right: calc(20px + env(safe-area-inset-right, 0px));
+    bottom: var(--bot-bottom, calc(20px + env(safe-area-inset-bottom, 0px)));
     z-index: var(--yy-z-float);
     width: 56px;
     height: 56px;
@@ -37,7 +37,7 @@ body:has(.offline-banner) {
 
 @media (max-width: 600px) {
     .bot-launcher {
-        right: 14px;
-        bottom: var(--bot-bottom, 14px);
+        right: calc(14px + env(safe-area-inset-right, 0px));
+        bottom: var(--bot-bottom, calc(14px + env(safe-area-inset-bottom, 0px)));
     }
 }

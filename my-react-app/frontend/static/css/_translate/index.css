@@ -19,7 +19,7 @@
     max-width: 640px;
     margin: 0 auto;
     color: var(--yy-calm-text-sub);
-    font-size: 15px;
+    font-size: 0.9375rem;
 }
 
 .translate-tribe-row {
@@ -76,7 +76,7 @@
     max-width: 640px;
     margin: 0 auto 14px;
     padding: 8px 12px;
-    font-size: 14px;
+    font-size: 0.875rem;
     color: var(--yy-calm-text-sub);
     border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: var(--yy-radius-panel);
@@ -166,7 +166,7 @@
 }
 @media (max-width: 720px) {
     .translate-textarea {
-        font-size: 16px;
+        font-size: 1rem;
     }
 }
 .translate-textarea:focus {
@@ -210,7 +210,7 @@
 /* ---------- GroundedText ---------- */
 
 .yy-grounded-text {
-    font-size: 18px;
+    font-size: 1.125rem;
     line-height: 2.1;
     word-break: break-word;
 }
@@ -297,7 +297,7 @@
     margin-bottom: 6px;
 }
 .yy-evidence-head strong {
-    font-size: 16px;
+    font-size: 1rem;
 }
 
 .yy-evidence-badge {
@@ -311,7 +311,7 @@
 
 .yy-evidence-body,
 .yy-evidence-note {
-    font-size: 14px;
+    font-size: 0.875rem;
     color: var(--yy-calm-text-sub);
     margin: 4px 0;
 }

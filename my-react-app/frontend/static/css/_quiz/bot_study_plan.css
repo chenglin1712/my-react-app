@@ -28,7 +28,7 @@
 
 .bot-animation-container p {
     color: var(--yy-calm-block-on);
-    font-size: 18px;
+    font-size: 1.125rem;
     text-align: center;
 }
 
@@ -60,7 +60,7 @@
 
 .study-plan-title {
     margin: 0;
-    font-size: 24px;
+    font-size: 1.5rem;
     font-weight: 700;
     color: var(--yy-calm-text);
 }
@@ -82,7 +82,7 @@
     color: var(--yy-calm-accent-on);
     border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: var(--yy-radius-control);
-    font-size: 14px;
+    font-size: 0.875rem;
     font-weight: 600;
     cursor: pointer;
 }
@@ -106,7 +106,7 @@
     color: var(--yy-calm-accent);
     border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: var(--yy-radius-control);
-    font-size: 14px;
+    font-size: 0.875rem;
     font-weight: 600;
     cursor: pointer;
 }
@@ -153,7 +153,7 @@
     background-color: var(--yy-calm-danger-bg);
     color: var(--yy-calm-accent);
     border-radius: var(--yy-radius-tag);
-    font-size: 18px;
+    font-size: 1.125rem;
     font-weight: 700;
     border: var(--yy-border-width) solid var(--yy-calm-line);
 }
@@ -165,7 +165,7 @@
 
 .event-title {
     margin: 0 0 8px 0;
-    font-size: 18px;
+    font-size: 1.125rem;
     font-weight: 600;
     color: var(--yy-calm-text);
     line-height: 1.4;
@@ -173,7 +173,7 @@
 }
 
 .event-description {
-    font-size: 14px;
+    font-size: 0.875rem;
     color: var(--yy-calm-text-sub);
     width: 95%;
 }
@@ -209,7 +209,7 @@
     color: var(--yy-calm-accent);
     border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: var(--yy-radius-control);
-    font-size: 14px;
+    font-size: 0.875rem;
     font-weight: 600;
     white-space: nowrap;
     min-width: auto;
@@ -271,11 +271,11 @@
     .event-number {
         min-width: 36px;
         height: 36px;
-        font-size: 16px;
+        font-size: 1rem;
     }
 
     .event-title {
-        font-size: 16px;
+        font-size: 1rem;
     }
 
     .add-to-calendar-btn {

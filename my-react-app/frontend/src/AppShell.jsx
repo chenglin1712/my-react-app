@@ -1,6 +1,7 @@
 import { useRef, useState, lazy, Suspense } from 'react';
 import { useLocation } from 'react-router-dom';
 import AppRoutes from './route';
+import { RouteTransitionProvider } from './routeTransition';
 import Navbar from '../components/navigation/navbar';
 import Footer from '../components/ui/Footer';
 import RouteEffects from './RouteEffects';
@@ -36,6 +37,7 @@ export default function AppShell() {
   if (isAdmin) return <AppRoutes />;
 
   return (
+    <RouteTransitionProvider>
     <HomeNavSlotProvider>
       {/* 全站沒有 skip-link 也沒有 <main> landmark，螢幕報讀器／鍵盤使用者每次
           換頁都得從頭一路跳過整個 Navbar 才能到內容。visually-hidden-focusable
@@ -79,5 +81,6 @@ export default function AppShell() {
       </ErrorBoundary>
       {!isBotOpen && !onBotRoute && <BotLauncher ref={launcherRef} onClick={openBot} />}
     </HomeNavSlotProvider>
+    </RouteTransitionProvider>
   );
 }

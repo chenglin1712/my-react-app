@@ -35,7 +35,7 @@
 
 .filter-date-input {
   padding: 6px 10px;
-  font-size: 14px;
+  font-size: 0.875rem;
   border: var(--yy-border-width) solid var(--yy-calm-line);
   border-radius: var(--yy-radius-control);
   background-color: var(--yy-calm-surface);
@@ -56,7 +56,7 @@
 
 .filter-select {
   padding: 6px 10px;
-  font-size: 14px;
+  font-size: 0.875rem;
   border: var(--yy-border-width) solid var(--yy-calm-line);
   border-radius: var(--yy-radius-control);
   background-color: var(--yy-calm-surface);
