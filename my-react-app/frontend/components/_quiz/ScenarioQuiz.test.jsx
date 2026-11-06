@@ -241,3 +241,36 @@ describe('ScenarioQuiz', () => {
     expect(apiGet).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('ScenarioQuiz 的答對答錯回饋動態（Apple 化步驟 4-6b）', () => {
+  beforeEach(() => {
+    apiGet.mockReset();
+    trackEvent.mockReset();
+    apiGet.mockResolvedValue(responseData);
+  });
+
+  test('滑鼠或觸控作答（click 的 detail > 0）：回饋與結果圖示帶 is-springy', async () => {
+    const { container } = renderQuiz();
+    fireEvent.click(await screen.findByRole('button', { name: /Mhway su balay/ }), { detail: 1 });
+    expect(container.querySelector('.scenario-quiz-feedback')).toHaveClass('is-springy');
+    expect(container.querySelector('.scenario-quiz-option.correct')).toHaveClass('is-springy');
+  });
+
+  test('鍵盤作答（Enter／空白鍵觸發的 click，detail 為 0）：不加動畫 class，但文字與圖示照常出現', async () => {
+    const { container } = renderQuiz();
+    fireEvent.click(await screen.findByRole('button', { name: /Lokah su/ }), { detail: 0 });
+    expect(container.querySelector('.scenario-quiz-feedback')).not.toHaveClass('is-springy');
+    expect(container.querySelector('.scenario-quiz-option.incorrect')).not.toHaveClass('is-springy');
+    expect(screen.getByText('再留意一下這個情境。')).toBeInTheDocument();
+    expect(screen.getByLabelText('你的答案不正確')).toBeInTheDocument();
+    expect(screen.getByLabelText('正確答案')).toBeInTheDocument();
+  });
+
+  test('下一題要重新判斷：上一題是滑鼠作答，下一題改用鍵盤，就不該延續動畫', async () => {
+    const { container } = renderQuiz();
+    fireEvent.click(await screen.findByRole('button', { name: /Mhway su balay/ }), { detail: 1 });
+    fireEvent.click(screen.getByRole('button', { name: '下一題' }), { detail: 1 });
+    fireEvent.click(await screen.findByRole('button', { name: /Musa saku qutux/ }), { detail: 0 });
+    expect(container.querySelector('.scenario-quiz-feedback')).not.toHaveClass('is-springy');
+  });
+});

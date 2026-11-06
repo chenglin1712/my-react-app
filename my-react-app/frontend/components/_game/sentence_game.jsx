@@ -6,6 +6,8 @@ import { useGameSession } from "./useGameSession";
 import { useGameAudioPlayer } from "./useGameAudioPlayer";
 import { useTimedOptionSelect } from "./useTimedOptionSelect";
 import { TRIBE_INTRO } from "./sentenceIntro";
+import CelebrationBurst from "./CelebrationBurst";
+import { shouldCelebrate } from "./celebrate";
 
 const RATING_THRESHOLDS = [
   { min: 80, className: "excellent" },
@@ -181,7 +183,8 @@ function SentenceGame({ tribe = "tayal" }) {
       <div className="sent-result">
         <h2 className="sent-result-title">句型練習結果</h2>
 
-        <div className={`sent-result-score ${ratingCls}`}>
+        <div className={`sent-result-score ${ratingCls}${shouldCelebrate(pct) ? " is-celebrating" : ""}`}>
+          {shouldCelebrate(pct) && <CelebrationBurst />}
           <span className="sent-result-num">{score}</span>
           <span className="sent-result-denom"> / {total}</span>
           <p className="sent-result-pct">{pct}%</p>

@@ -1,3 +1,5 @@
+import "../../static/css/_auth/authPage.css"
+import "../../static/css/_auth/authField.css"
 import "../../static/css/_auth/resetPassword.css"
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -54,30 +56,38 @@ const ResetPassword = () => {
     };
 
     return (
+        <div className="auth-backdrop">
         <div className="reset-container">
             <h1>變更密碼</h1>
-            {errorMsg && <Alert variant="danger" className="py-2">{errorMsg}</Alert>}
             <form onSubmit={handleChangePassword}>
-                <input
-                    type="password"
-                    placeholder="目前密碼"
-                    aria-label="目前密碼"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                />
-                <input
-                    type="password"
-                    placeholder="新密碼"
-                    aria-label="新密碼"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                />
+                <div className="auth-field">
+                    <label className="auth-field-label" htmlFor="reset-current-password">目前密碼</label>
+                    <input
+                        id="reset-current-password"
+                        type="password"
+                        placeholder="目前密碼"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                    />
+                </div>
+                <div className="auth-field">
+                    <label className="auth-field-label" htmlFor="reset-new-password">新密碼</label>
+                    <input
+                        id="reset-new-password"
+                        type="password"
+                        placeholder="新密碼"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                    />
+                </div>
 
                 <div className="reset-button">
                     <button type="button" className="reset-cancel-btn" onClick={() => navigate(-1)}>取消</button>
                     <button type="submit" className="reset-submit-btn" disabled={isSubmitting}>變更密碼</button>
                 </div>
             </form>
+
+            {errorMsg && <Alert variant="danger" className="py-2 mt-3">{errorMsg}</Alert>}
 
             {isSuccess && (
                 <div className="yy-success-overlay">
@@ -87,6 +97,7 @@ const ResetPassword = () => {
                     </div>
                 </div>
             )}
+        </div>
         </div>
     );
 };

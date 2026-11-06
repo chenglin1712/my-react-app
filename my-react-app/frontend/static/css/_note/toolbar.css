@@ -6,10 +6,13 @@
   gap: 12px;
   margin: 10px 0 14px 0;
   background: var(--yy-calm-surface);
-  border-bottom: 1px solid var(--border-rose);
-  padding: 12px 0;
+  /* 浮動工具列（Apple 化步驟 4-8）：捲動時浮在內容上方、離上緣留一段距離，圓角卡片＋第 3 級陰影（深色模式無陰影，靠細框分層） */
+  border: 1px solid var(--yy-calm-rule);
+  border-radius: var(--yy-radius-panel);
+  box-shadow: var(--yy-elev-3);
+  padding: 4px var(--yy-space-3);
   position: sticky;
-  top: 0;
+  top: 5.5rem; /* 停在全站導覽列（z-index 更高）下方，不被蓋住 */
   z-index: var(--yy-z-sticky);
 }
 .editor-toolbar .group { display: flex; align-items: center; gap: 8px; }

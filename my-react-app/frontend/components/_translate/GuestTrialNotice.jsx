@@ -72,8 +72,8 @@ const GuestTrialNotice = ({ quota }) => {
     return (
         <div className="translate-guest">
             <div className="translate-guest-strip">
-                <span className="translate-guest-label">訪客試用</span>
                 <p className="translate-guest-line" role="status">
+                    <span className="translate-guest-label">訪客試用</span>
                     今天還能翻譯 <strong className="translate-guest-count">{quota.remaining}</strong> 次
                     <span className="translate-guest-sub">（每天 {quota.limit} 次，台灣時間 00:00 重置）</span>
                 </p>

@@ -70,7 +70,6 @@ describe("字級", () => {
   it("原本用像素字搭中文的元素，字級仍不低於 14px（Silkscreen 已移除，字級下限保留）", () => {
     [
       ["static/css/_home/functionBtn.css", ".card-cta"],
-      ["static/css/_translate/index.css", ".translate-direction-label"],
       ["static/css/_quiz/quiz_panel_start.css", ".scenario-entry-badge"],
       ["static/css/default/theme-v2.css", ".yy-eyebrow--zh"],
     ].forEach(([file, selector]) => {

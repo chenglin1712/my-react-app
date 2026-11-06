@@ -6,6 +6,8 @@ import { useGameSession } from "./useGameSession";
 import { useGameAudioPlayer } from "./useGameAudioPlayer";
 import { useTimedOptionSelect } from "./useTimedOptionSelect";
 import { TRIBE_INTRO } from "./listeningIntro";
+import CelebrationBurst from "./CelebrationBurst";
+import { shouldCelebrate } from "./celebrate";
 
 function ListeningGame({ tribe = "tayal" }) {
   const config = TRIBE_INTRO[tribe] || TRIBE_INTRO.tayal;
@@ -191,7 +193,8 @@ function ListeningGame({ tribe = "tayal" }) {
       <div className="listening-result">
         <h2 className="listening-result-title">遊戲結果</h2>
 
-        <div className="listening-result-score">
+        <div className={`listening-result-score${shouldCelebrate(pct) ? " is-celebrating" : ""}`}>
+          {shouldCelebrate(pct) && <CelebrationBurst />}
           <span className="listening-result-num">{score}</span>
           <span className="listening-result-denom"> / {total}</span>
           <p className="listening-result-pct">{pct}%</p>

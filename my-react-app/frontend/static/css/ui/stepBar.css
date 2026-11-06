@@ -1,0 +1,81 @@
+/* 分段進度條（StepBar variant="segments"，Apple 化步驟 4-4）。
+   每一步一小段橫條，走過與目前這一步填滿深銅色；標籤在橫條下方，字級不低於 14px。
+   完成的步驟標籤前有勾號、目前這一步標籤加粗（形狀與字重線索，不只靠顏色）。 */
+.yy-stepbar--segments {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--yy-space-2);
+  width: min(520px, 100%);
+  margin: 0 auto;
+}
+
+.yy-segstep {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--yy-space-2);
+}
+
+.yy-segstep-bar {
+  position: relative;
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--yy-radius-pill);
+  background: var(--yy-calm-rule);
+}
+
+/* 填滿用 transform: scaleX，不動 width；從左邊長出來 */
+.yy-segstep-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--yy-radius-pill);
+  background: var(--yy-calm-accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.yy-segstep.is-active .yy-segstep-fill,
+.yy-segstep.is-done .yy-segstep-fill {
+  transform: scaleX(1);
+}
+
+.yy-segstep-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--yy-space-1);
+  font-size: var(--yy-text-sm);
+  font-weight: 400;
+  color: var(--yy-calm-text-sub);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.yy-segstep.is-active .yy-segstep-label {
+  font-weight: 700;
+  color: var(--yy-calm-text);
+}
+
+.yy-segstep.is-done .yy-segstep-label {
+  color: var(--yy-calm-text);
+}
+
+.yy-segstep-num {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 480px) {
+  .yy-segstep-label {
+    flex-direction: column;
+    gap: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yy-segstep-fill {
+    transition: none;
+  }
+}

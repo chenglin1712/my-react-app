@@ -201,6 +201,7 @@
   margin-bottom: 1.2rem;
 }
 .listening-result-score {
+  position: relative; /* 慶祝圓點從這裡的中心散開 */
   text-align: center;
   margin-bottom: 1.8rem;
   font-variant-numeric: tabular-nums;

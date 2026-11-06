@@ -1,0 +1,74 @@
+/* 作答專注模式（Apple 化步驟 4-6a）。useQuizFocusMode 在 <html> 掛 data-quiz-focus，作答期間才生效。
+   收起：全站導覽、手機 tab bar、測驗選單（桌面與手機）、頁尾。題幹放大，是非題的作答鍵釘在視窗底部。
+   不新增任何動畫：鍵盤作答的人重複操作很多次，狀態切換一律瞬間完成。 */
+html[data-quiz-focus] .navbar,
+html[data-quiz-focus] .yy-tabbar,
+html[data-quiz-focus] .yy-footer,
+html[data-quiz-focus] .quiz-body .bar-container,
+html[data-quiz-focus] .quiz-body .mobile-bar-menu {
+  display: none;
+}
+
+/* tab bar 收起後，原本替它保留的底部空間（AI 助手、離線橫幅等都靠這個變數讓位）也一起歸還 */
+html[data-quiz-focus] {
+  --yy-tabbar-h: 0px;
+}
+
+html[data-quiz-focus] .quiz-body {
+  padding-top: var(--yy-space-4);
+  min-height: 100dvh;
+}
+
+/* 題目區：作答鍵要釘在視窗底部（position: sticky），祖先不能是 overflow: hidden 的捲動容器 */
+html[data-quiz-focus] .panel-quiz-container {
+  overflow: visible;
+}
+
+/* 大題幹 */
+html[data-quiz-focus] .panel-quiz-container .title-container p {
+  font-size: var(--yy-text-2xl);
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--yy-calm-text);
+}
+
+html[data-quiz-focus] .question-container {
+  padding: var(--yy-space-5) var(--yy-space-4);
+  text-align: center;
+}
+
+html[data-quiz-focus] .question-image {
+  width: min(100%, 520px);
+}
+
+/* 底部固定作答區（是非題）：在題目區可見的範圍內黏在視窗下緣（sticky 受 .question-container 邊界限制，捲到上下題／繳交區時會跟著離開，不會遮住繳交鈕），按鍵加大、單手好按；留出 iOS 底部安全區 */
+html[data-quiz-focus] .panel-quiz-container .answers {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--yy-z-sticky);
+  display: flex;
+  justify-content: center;
+  gap: var(--yy-space-3);
+  margin: var(--yy-space-4) calc(var(--yy-space-4) * -1) calc(var(--yy-space-4) * -1);
+  padding: var(--yy-space-3) var(--yy-space-4) calc(var(--yy-space-3) + env(safe-area-inset-bottom, 0px));
+  background: var(--yy-calm-surface);
+  border-top: 1px solid var(--yy-calm-rule);
+}
+
+html[data-quiz-focus] .panel-quiz-container .answers button {
+  flex: 1 1 0;
+  max-width: 260px;
+  min-height: 56px;
+  margin: 0;
+  font-size: var(--yy-text-lg);
+}
+
+@media (max-width: 900px) {
+  html[data-quiz-focus] .quiz-body {
+    padding: var(--yy-space-3) var(--yy-space-3) var(--yy-space-5);
+  }
+
+  html[data-quiz-focus] .panel-quiz-container .title-container p {
+    font-size: var(--yy-text-xl);
+  }
+}

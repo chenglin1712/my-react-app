@@ -213,3 +213,31 @@ describe('Panel_Submit 成績摘要（E-6，P2-58）', () => {
     expect(screen.queryByRole('button', { name: '中' })).not.toBeInTheDocument();
   });
 });
+
+describe('Panel_Submit 分數環（Apple 化步驟 4-6c）', () => {
+  const fb = (answers) => ({
+    title: '初級',
+    questions: answers.map((_, i) => ({ question_ab: `w${i}`, image: `w${i}.png` })),
+    answers,
+    correctAnswers: answers.map(() => 1),
+  });
+
+  test('環的填滿比例等於答對比例（3 題對 1 題 → 33），純裝飾 aria-hidden，文字摘要照舊', async () => {
+    const { container } = renderWithFallback(fb([1, 2, 2]));
+    await screen.findByText('1 / 3 題答對');
+    const ring = container.querySelector('.score-ring');
+    expect(ring.style.getPropertyValue('--ring-pct')).toBe('33');
+    expect(ring.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(ring.querySelector('.score')).toBeInTheDocument();
+  });
+
+  test('全對 100、全錯 0', async () => {
+    const a = renderWithFallback(fb([1, 1]));
+    await screen.findByText('2 / 2 題答對');
+    expect(a.container.querySelector('.score-ring').style.getPropertyValue('--ring-pct')).toBe('100');
+    a.unmount();
+    const z = renderWithFallback(fb([2, 2]));
+    await screen.findByText('0 / 2 題答對');
+    expect(z.container.querySelector('.score-ring').style.getPropertyValue('--ring-pct')).toBe('0');
+  });
+});

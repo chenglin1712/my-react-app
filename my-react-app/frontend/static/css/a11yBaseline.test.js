@@ -52,6 +52,7 @@ const OUTLINE_NONE_ALLOWLIST = [
   ["_quiz/review_discussion.css", ".input-box input", ".input-box input"],
   ["_quiz/situation_filter.css", ".filter-date-input:focus", ".filter-date-input"],
   ["_quiz/situation_filter.css", ".filter-select:focus", ".filter-select"],
+  ["_search/index.css", ".spotlight-input", ".spotlight-field:focus-within", "_search/index.css"],
   ["_translate/index.css", ".translate-textarea", ".translate-textarea"],
   ["default/theme-v2.css", ".yy-terminal__input", ".yy-terminal:focus-within"],
 ];
@@ -96,18 +97,10 @@ describe("小圖示按鈕的 44px 點擊區", () => {
     expect(all.find((r) => r.selector === `${selector}::after`).body).toMatch(/width:\s*max\(100%,\s*var\(--yy-control-md\)\)/);
   });
 
-  it.each([
-    ["_translate/index.css", ".translate-swap-btn", "::after"],
-  ])("%s 的 %s 用 %s 把點擊區擴成 44px", (file, selector, pseudo) => {
-    const all = rules(files.find((f) => f.file === file).css);
-    const rule = all.find((r) => r.selector.split(",").map((x) => x.trim()).includes(`${selector}${pseudo}`));
-    expect(rule, `${selector}${pseudo}`).toBeTruthy();
-    expect(rule.body).toMatch(/width:\s*max\(100%,\s*var\(--yy-control-md\)\)/);
-  });
-
-  it("翻譯頁交換鈕自己是 relative", () => {
+  it("翻譯頁交換鈕本身就是 44px（步驟 4-3 起移到雙欄中間，不再靠 ::after 擴大點擊區）", () => {
     const swap = rules(files.find((f) => f.file === "_translate/index.css").css).find((r) => r.selector === ".translate-swap-btn");
-    expect(swap.body).toMatch(/position:\s*relative/);
+    expect(swap.body).toMatch(/width:\s*var\(--yy-control-md\)/);
+    expect(swap.body).toMatch(/height:\s*var\(--yy-control-md\)/);
   });
 
   it("首頁輪播的左右箭頭本身就是 44px（S6-3 起不再靠 ::before 擴大點擊區，見 newsLook.test.js）", () => {

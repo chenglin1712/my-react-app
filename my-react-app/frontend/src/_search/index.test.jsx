@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, test, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 import SearchPage from './index';
@@ -14,6 +14,13 @@ vi.mock('../../hooks/useAudioPlayback', () => ({
 vi.mock('../../hooks/useTranslateCapabilities', () => ({
   useTranslateCapabilities: () => null,
 }));
+
+// 詳情 sheet 用的 Offcanvas 內部會讀 matchMedia，jsdom 沒有，統一補一個「不符合任何查詢」的版本
+beforeAll(() => {
+  window.matchMedia = vi.fn().mockImplementation((query) => ({
+    matches: false, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(),
+  }));
+});
 
 describe('SearchPage（回歸測試：全部詞條主查詢與載入更多的競態防護）', () => {
   beforeEach(() => {
@@ -263,5 +270,113 @@ describe('SearchPage 的空狀態與字母篩選（E-2）', () => {
     expect(screen.getByText(/開頭「c」/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '清除篩選' }));
     expect(await screen.findByText('balay')).toBeInTheDocument();
+  });
+});
+
+describe('SearchPage 的詳情 sheet 與查無結果建議（Apple 化步驟 4-2）', () => {
+  const word = (name, gloss = '義') => ({ name, explanationItems: [{ chineseExplanation: gloss, partOfSpeech: '名詞' }] });
+
+  beforeEach(() => {
+    apiPost.mockReset();
+  });
+
+  test('點詞條開詳情 sheet，顯示該詞；按關閉鈕收起', async () => {
+    apiPost.mockResolvedValue({ all_results: { 0: [word('balay', '真的')] }, total: 1 });
+    render(<SearchPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /balay/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveAccessibleName('balay');
+    fireEvent.click(screen.getByRole('button', { name: '關閉詳情' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  test('查無結果時，建議可改用其他族語查同一個詞（保留關鍵字）', async () => {
+    apiPost.mockImplementation((url, body) => {
+      if (body.keyword) {
+        return Promise.resolve(body.tribe === '阿美'
+          ? { exact_match_results: [word('zzzz', '有了')], fuzzy_match_results: {} }
+          : { exact_match_results: [], fuzzy_match_results: {} });
+      }
+      return Promise.resolve({ all_results: {}, total: 0 });
+    });
+    render(<SearchPage />);
+    const input = await screen.findByLabelText('查詢關鍵字');
+    fireEvent.change(input, { target: { value: 'zzzz' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await screen.findByRole('heading', { name: '找不到「zzzz」' });
+
+    const group = screen.getByRole('group', { name: '改用其他族語查「zzzz」' });
+    expect(group).not.toHaveTextContent('改查泰雅族語');
+    fireEvent.click(screen.getByRole('button', { name: '改查阿美族語' }));
+
+    expect(await screen.findByText('有了')).toBeInTheDocument();
+    expect(screen.getByLabelText('查詢關鍵字')).toHaveValue('zzzz');
+    const lastKeywordCall = apiPost.mock.calls.filter(([, body]) => body.keyword).pop();
+    expect(lastKeywordCall[1]).toEqual({ keyword: 'zzzz', tribe: '阿美' });
+    // 改查只打一次關鍵字查詢，filter effect 不會補送一次瀏覽全部
+    const afterClick = apiPost.mock.calls.filter(([, body]) => body.tribe === '阿美');
+    expect(afterClick).toHaveLength(1);
+  });
+});
+
+describe('SearchPage 的詞類篩選（Apple 化步驟 4-2）', () => {
+  const word = (name, pos) => ({ name, explanationItems: [{ chineseExplanation: '義', partOfSpeech: pos }] });
+  beforeEach(() => { apiPost.mockReset(); });
+
+  const searchFor = async (keyword) => {
+    fireEvent.change(await screen.findByLabelText('查詢關鍵字'), { target: { value: keyword } });
+    fireEvent.keyDown(screen.getByLabelText('查詢關鍵字'), { key: 'Enter' });
+  };
+  const keywordResponse = () => (url, body) => (body.keyword
+    ? Promise.resolve({ exact_match_results: [word('balay', '名詞'), word('musa', '動詞'), word('lokah', '名詞')], fuzzy_match_results: {} })
+    : Promise.resolve({ all_results: { 0: [word('x', '名詞')] }, total: 1 }));
+
+  test('瀏覽全部詞條（後端分頁）時不顯示詞類篩選', async () => {
+    apiPost.mockImplementation(keywordResponse());
+    render(<SearchPage />);
+    await screen.findByText('x');
+    expect(screen.queryByRole('group', { name: '依詞類篩選' })).toBeNull();
+  });
+
+  test('關鍵字結果有兩種以上詞性時出現篩選；選了只留符合的，選回「全部」還原', async () => {
+    apiPost.mockImplementation(keywordResponse());
+    render(<SearchPage />);
+    await screen.findByText('x');
+    await searchFor('a');
+    await screen.findByText('musa');
+    const group = screen.getByRole('group', { name: '依詞類篩選' });
+    fireEvent.click(Array.from(group.querySelectorAll('button')).find((b) => b.textContent.startsWith('動詞')));
+    expect(screen.getByText('musa')).toBeInTheDocument();
+    expect(screen.queryByText('balay')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '全部' }));
+    expect(await screen.findByText('balay')).toBeInTheDocument();
+  });
+
+  test('新的查詢從「全部詞類」開始：舊選的詞類不會在之後的查詢裡自己復活', async () => {
+    apiPost.mockImplementation(keywordResponse());
+    render(<SearchPage />);
+    await screen.findByText('x');
+    await searchFor('a');
+    await screen.findByText('musa');
+    const first = screen.getByRole('group', { name: '依詞類篩選' });
+    fireEvent.click(Array.from(first.querySelectorAll('button')).find((btn) => btn.textContent.startsWith('動詞')));
+    expect(screen.queryByText('balay')).toBeNull();
+    await searchFor('b');
+    // 同樣的結果再來一次：沒有人重新選，所以名詞的詞條也要在
+    expect(await screen.findByText('balay')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '全部' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('切換族語會清掉詞類篩選', async () => {
+    apiPost.mockImplementation(keywordResponse());
+    render(<SearchPage />);
+    await screen.findByText('x');
+    await searchFor('a');
+    await screen.findByText('musa');
+    const group = screen.getByRole('group', { name: '依詞類篩選' });
+    fireEvent.click(Array.from(group.querySelectorAll('button')).find((b) => b.textContent.startsWith('動詞')));
+    fireEvent.click(screen.getByText('阿美族語'));
+    await screen.findByText('x');
+    expect(screen.queryByRole('group', { name: '依詞類篩選' })).toBeNull();
   });
 });

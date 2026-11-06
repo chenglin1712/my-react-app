@@ -1,0 +1,127 @@
+/* 詞條詳情 sheet（Apple 化步驟 4-2）。Offcanvas 是掛在 body 底下的，所以不在 .search-page 範圍內，自己交代外觀。 */
+.word-sheet.offcanvas {
+  background: var(--yy-calm-bg);
+  color: var(--yy-calm-text);
+  border: none;
+  box-shadow: var(--yy-elev-4);
+  z-index: var(--yy-z-overlay);
+}
+
+.word-sheet--bottom.offcanvas-bottom {
+  height: min(85dvh, 720px);
+  border-radius: var(--yy-radius-block) var(--yy-radius-block) 0 0;
+}
+
+.word-sheet--end.offcanvas-end {
+  width: min(480px, 100vw);
+  border-radius: var(--yy-radius-block) 0 0 var(--yy-radius-block);
+}
+
+/* 抓取把手：只是形狀暗示「可以往下收」，真正的關閉靠右上角的關閉鈕、Esc 與點背景 */
+.word-sheet--bottom .word-sheet-head::before {
+  content: "";
+  position: absolute;
+  top: var(--yy-space-2);
+  left: 50%;
+  width: 36px;
+  height: 4px;
+  margin-left: -18px;
+  border-radius: var(--yy-radius-pill);
+  background: var(--yy-calm-rule);
+}
+
+.word-sheet-head.offcanvas-header {
+  position: relative;
+  align-items: flex-start;
+  gap: var(--yy-space-3);
+  padding: var(--yy-space-5) var(--yy-space-4) var(--yy-space-3);
+  border-bottom: 1px solid var(--yy-calm-rule);
+}
+
+.word-sheet-titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.word-sheet-name {
+  margin: 0;
+  font-family: var(--yy-font-heading);
+  font-size: var(--yy-type-h3);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.word-sheet-gloss {
+  margin: var(--yy-space-1) 0 0;
+  color: var(--yy-calm-text-sub);
+  font-size: var(--yy-text-lg);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.word-sheet-actions {
+  display: flex;
+  align-items: center;
+}
+
+.word-sheet-actions .btn,
+.word-sheet-head .btn-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--yy-control-md);
+  min-height: var(--yy-control-md);
+  padding: 0;
+  color: var(--yy-calm-text);
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.word-sheet-actions .btn:active,
+.word-sheet-head .btn-close:active {
+  transform: scale(var(--yy-ui-press));
+}
+
+.word-sheet-actions .btn:focus-visible,
+.word-sheet-head .btn-close:focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
+}
+
+.word-sheet-body.offcanvas-body {
+  padding: var(--yy-space-2) var(--yy-space-4) var(--yy-space-6);
+}
+
+.word-sheet .list-group-item {
+  border: none;
+  border-top: 1px solid var(--yy-calm-rule);
+  border-radius: 0;
+  background: transparent;
+  color: var(--yy-calm-text);
+  padding-right: 0;
+  padding-left: 0;
+}
+
+.word-sheet .list-group-item:first-child {
+  border-top: none;
+}
+
+/* 進退場走 Bootstrap 的 .offcanvas transform；換成專案的動態 token，退場比進場快 */
+.word-sheet.offcanvas {
+  transition: transform var(--dur-overlay-in) var(--ease-out);
+}
+
+.word-sheet.offcanvas.hiding {
+  transition-duration: var(--dur-overlay-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .word-sheet.offcanvas,
+  .word-sheet.offcanvas.hiding {
+    transition: none;
+  }
+
+  .word-sheet-actions .btn:active,
+  .word-sheet-head .btn-close:active {
+    transform: none;
+  }
+}

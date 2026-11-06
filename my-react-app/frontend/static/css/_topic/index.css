@@ -314,3 +314,33 @@
         transform: none;
     }
 }
+
+/* 本文目錄（Apple 化步驟 4-9）：文章 h2 達 3 個才出現，放在內文上方；連結至少 44px，錨點跳轉留出導覽列高度 */
+.tpage-toc {
+    margin: var(--yy-space-5) 0 0;
+    padding: var(--yy-space-3) var(--yy-space-4);
+    border: var(--yy-border-width) solid var(--yy-calm-rule);
+    border-radius: var(--yy-radius-block);
+    font-size: var(--yy-text-sm);
+}
+
+.tpage-toc-title {
+    margin: 0 0 var(--yy-space-1);
+    font-weight: 700;
+}
+
+.tpage-toc ol {
+    margin: 0;
+    padding-left: 1.4em;
+}
+
+.tpage-toc a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--yy-control-md);
+    color: var(--yy-calm-text);
+}
+
+.tpage-body h2 {
+    scroll-margin-top: 5.5rem;
+}

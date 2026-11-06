@@ -71,8 +71,12 @@ export default function ScenarioQuiz({ tribe = 'tayal' }) {
         && selectedAnswer === currentQuestion?.answer
     );
 
-    const selectAnswer = (answer) => {
+    // 回饋的彈簧動態只在滑鼠或觸控作答時出現；鍵盤（Enter／空白鍵觸發的 click，detail 為 0）作答不加動畫
+    const [springFeedback, setSpringFeedback] = useState(false);
+
+    const selectAnswer = (answer, byPointer = false) => {
         if (!currentQuestion || selectedAnswer !== null) return;
+        setSpringFeedback(byPointer);
 
         const correct = answer === currentQuestion.answer;
 
@@ -99,9 +103,11 @@ export default function ScenarioQuiz({ tribe = 'tayal' }) {
 
         setCurrentIndex((value) => value + 1);
         setSelectedAnswer(null);
+        setSpringFeedback(false);
     };
 
     const retry = () => {
+        setSpringFeedback(false);
         setRequestKey((value) => value + 1);
     };
 
@@ -263,9 +269,10 @@ export default function ScenarioQuiz({ tribe = 'tayal' }) {
                                     selected ? 'selected' : '',
                                     correctOption ? 'correct' : '',
                                     wrongSelected ? 'incorrect' : '',
+                                    springFeedback && (correctOption || wrongSelected) ? 'is-springy' : '',
                                 ].filter(Boolean).join(' ')}
                                 disabled={selectedAnswer !== null}
-                                onClick={() => selectAnswer(answer)}
+                                onClick={(event) => selectAnswer(answer, event.detail > 0)}
                             >
                                 <span className="scenario-quiz-option-label">
                                     {OPTION_LABELS[index] ?? answer}
@@ -297,7 +304,7 @@ export default function ScenarioQuiz({ tribe = 'tayal' }) {
 
                 {selectedAnswer !== null && (
                     <div
-                        className={`scenario-quiz-feedback ${isCorrect ? 'correct' : 'incorrect'}`}
+                        className={`scenario-quiz-feedback ${isCorrect ? 'correct' : 'incorrect'}${springFeedback ? ' is-springy' : ''}`}
                         role="status"
                     >
                         {isCorrect ? (

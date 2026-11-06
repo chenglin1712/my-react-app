@@ -3,6 +3,7 @@
   flex: 1;
   margin: 0;
   min-width: 0;
+  color: var(--yy-calm-text);
 }
 
 .word-card-toggle {
@@ -33,7 +34,7 @@
 }
 
 /* 展開狀態用箭頭提示（形狀線索，不只靠 aria-expanded） */
-.word-card-toggle .word-card-name::after {
+.word-card-toggle[aria-expanded] .word-card-name::after {
   content: "\25B8";
   margin-left: 8px;
   font-size: 0.7em;
@@ -51,8 +52,37 @@
   outline-offset: var(--yy-ui-focus-offset);
 }
 
+/* 第二層：詞性、分類標籤與詞頻星星，字級不低於 14px */
+.word-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--yy-space-2);
+  margin-top: var(--yy-space-1);
+  padding-top: var(--yy-space-2);
+  border-top: 1px solid var(--yy-calm-rule);
+  font-size: var(--yy-text-sm);
+}
+
+.word-card-tag {
+  padding: 2px var(--yy-space-2);
+  background: var(--yy-calm-tag);
+  color: var(--yy-calm-tag-on);
+  border-radius: var(--yy-radius-tag);
+  font-weight: 700;
+}
+
 .word-card-actions {
   flex-shrink: 0;
+}
+
+/* 播放圖示與詳情裡的例句：改用語意色，深色模式自動跟著換 */
+.word-card-icon {
+  color: var(--yy-calm-accent);
+}
+
+.word-detail-sentence {
+  color: var(--yy-calm-danger);
 }
 
 /* 播放、收藏鈕是 react-bootstrap 的連結鈕：撐到 44px 見方，按下有縮放回饋 */
@@ -71,6 +101,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .word-card-toggle .word-card-name::after { transition: none; }
+  .word-card-toggle[aria-expanded] .word-card-name::after { transition: none; }
   .word-card-actions .btn:active { transform: none; }
 }

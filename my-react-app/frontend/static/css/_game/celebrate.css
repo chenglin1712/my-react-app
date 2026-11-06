@@ -1,0 +1,73 @@
+/* 結算頁慶祝動態（CelebrationBurst.jsx，Apple 化步驟 4-5）。
+   圓點只用 transform 與 opacity；一次性（不循環）；整個動態只用單一強調色（深銅與銅褐）。
+   減少動態時整組隱藏，分數數字也不彈跳。 */
+.game-celebrate {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.game-celebrate-dot {
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--yy-radius-round);
+  background: var(--yy-calm-accent);
+  opacity: 0;
+  animation: game-celebrate-burst 900ms var(--ease-out) both;
+  animation-delay: calc(var(--i) * 25ms);
+}
+
+.game-celebrate-dot:nth-child(even) {
+  background: var(--yy-calm-copper);
+  width: 8px;
+  height: 8px;
+  top: -4px;
+  left: -4px;
+}
+
+@keyframes game-celebrate-burst {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(0.4);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) scale(1);
+  }
+}
+
+/* 分數數字用彈簧彈一下（只做一次） */
+.is-celebrating .listening-result-num,
+.is-celebrating .sent-result-num {
+  display: inline-block;
+  animation: game-score-pop var(--dur-spring) var(--ease-spring) both;
+}
+
+@keyframes game-score-pop {
+  from {
+    transform: scale(0.7);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-celebrate {
+    display: none;
+  }
+
+  .is-celebrating .listening-result-num,
+  .is-celebrating .sent-result-num {
+    animation: none;
+  }
+}

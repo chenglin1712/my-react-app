@@ -14,10 +14,10 @@
 
 .notfound-code {
     margin: 18px 0 4px;
-    font-family: var(--yy-font-pixel);
+    font-family: var(--yy-font-heading);
     font-size: 72px;
     line-height: 1;
-    color: var(--yy-red);
+    color: var(--yy-calm-accent);
 }
 
 .notfound-panel h1 {
@@ -28,7 +28,7 @@
 
 .notfound-text {
     margin: 0 0 24px;
-    color: var(--yy-text-tertiary);
+    color: var(--yy-calm-text-sub);
     line-height: 1.8;
 }
 

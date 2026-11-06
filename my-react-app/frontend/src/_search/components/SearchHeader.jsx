@@ -1,4 +1,4 @@
-import { InputGroup, Form, Button } from 'react-bootstrap';
+import SearchSpotlight from './SearchSpotlight';
 import TribeSelector from './TribeSelector';
 import FilterPanel from './FilterPanel';
 import CategoryBar from '../../../components/ui/CategoryBar';
@@ -6,8 +6,6 @@ import CategoryBar from '../../../components/ui/CategoryBar';
 // 搜尋頁最上方的區塊：標題、族語選擇器、搜尋框、篩選/排序面板、分類 Tabs。
 // 這一整塊很高（桌面約 500px），所以【不】釘在畫面上，照一般流程捲走；捲出去之後由
 // CompactSearchBar（精簡搜尋列）接手。原本整塊 sticky 時，結果列表只剩一小條可看、詞條被頁首蓋住。
-const SEARCH_INPUT_MAX_LENGTH = 100;
-
 const SearchHeader = ({
   headerRef,
   query, setQuery, handleSearch,
@@ -34,26 +32,10 @@ const SearchHeader = ({
     <TribeSelector tribes={tribes} selectedTribe={selectedTribe} onTribeChange={handleTribeChange} />
 
     <div className="search-card">
-      <InputGroup className="search-terminal">
-        <span className="search-terminal-prompt">&gt;</span>
-        <Form.Control
-          className="search-terminal-input"
-          placeholder="輸入中文或族語詞彙"
-          aria-label="查詢關鍵字"
-          value={query}
-          maxLength={SEARCH_INPUT_MAX_LENGTH}
-          onChange={e => setQuery(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              handleSearch();
-            }
-          }}
-        />
-        <Button type="button" className="search-go-btn" onClick={() => handleSearch()} disabled={loading}>
-          搜尋 ▸
-        </Button>
-      </InputGroup>
+      <SearchSpotlight
+        query={query} setQuery={setQuery} handleSearch={handleSearch}
+        loading={loading} selectedTribe={selectedTribe}
+      />
 
       <div className="d-flex mb-0 align-items-center">
         <FilterPanel

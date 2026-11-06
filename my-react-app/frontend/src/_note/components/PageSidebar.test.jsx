@@ -100,3 +100,25 @@ describe('PageSidebar', () => {
         expect(screen.getByRole('button', { name: '分享中…' })).toBeDisabled();
     });
 });
+
+describe('PageSidebar 卡片與預覽（Apple 化步驟 4-8）', () => {
+    test('每頁是一張卡片，顯示內容純文字預覽，預覽用 aria-describedby 連回勾選框', () => {
+        const { container } = renderSidebar({ notes: [{ id: 'a', title: '第一篇', content: '<p>你好 <b>世界</b></p><script>x</script><img src="http://e.test/p.png">&amp;' }] });
+        const card = container.querySelector('.note-page-card');
+        expect(card).not.toBeNull();
+        const preview = container.querySelector('.note-page-preview');
+        expect(preview.textContent).toBe('你好 世界 &');
+        expect(screen.getByLabelText('第 1 頁：第一篇')).toHaveAttribute('aria-describedby', preview.id);
+        expect(container.querySelector('.note-page-preview b')).toBeNull();
+    });
+
+    test('沒有內容時不渲染預覽；目前這頁有「目前編輯」標籤；勾選的卡片有 is-selected', () => {
+        const { container } = renderSidebar({ notes: [{ id: 'a', title: 'A', content: '' }, { id: 'b', title: 'B', content: '<p>b</p>' }], currentPage: 1, selectedPageIds: ['a'] });
+        const cards = container.querySelectorAll('.note-page-card');
+        expect(cards[0].querySelector('.note-page-preview')).toBeNull();
+        expect(cards[0]).toHaveClass('is-selected');
+        expect(cards[1]).toHaveClass('is-current');
+        expect(cards[1]).toHaveTextContent('目前編輯');
+        expect(cards[0]).not.toHaveTextContent('目前編輯');
+    });
+});

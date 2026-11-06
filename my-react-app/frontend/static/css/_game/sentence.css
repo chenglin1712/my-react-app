@@ -241,6 +241,7 @@
 }
 
 .sent-result-score {
+  position: relative; /* 慶祝圓點從這裡的中心散開 */
   text-align: center;
   padding: 1rem 2.5rem;
   border-radius: var(--yy-radius-panel);

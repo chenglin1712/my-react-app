@@ -29,7 +29,7 @@ const parse = (source) => {
 const finder = (rules) => (selector, at) => rules.find((r) => r.selector === selector && (at ? r.atRules.some((a) => at.test(a)) : r.atRules.length === 0));
 
 const OLD_TOKENS = /--yy-(?:red|gold|gold-light|gold-mark|blue|blue-light|cream|cream-dim|ink|green|border|border-soft|text-muted|text-tertiary|text-secondary|radius-card|radius-btn|radius-lg|surface|font-pixel|warning-bg|warning-text|red-dark|success|success-bg|success-border|danger|danger-bg|danger-border|info-bg)(?![\w-])/;
-const NO_DECORATION = /box-shadow\s*:\s*(?!none)\S|text-shadow|gradient|backdrop-filter|rgba?\(|transition:\s*all|ease-in(?![\w-])|#[0-9a-fA-F]{3,8}\b|(?<![-\w])color:\s*(?:white|black)\b|background(?:-color)?:\s*(?:white|black)\b/;
+const NO_DECORATION = /box-shadow\s*:\s*(?!none|var\(--yy-elev-[0-4]\))\S|text-shadow|gradient|backdrop-filter|rgba?\(|transition:\s*all|ease-in(?![\w-])|#[0-9a-fA-F]{3,8}\b|(?<![-\w])color:\s*(?:white|black)\b|background(?:-color)?:\s*(?:white|black)\b/;
 
 const FILES = ["_note", "_favorite", "_calendar"].flatMap((d) => readdirSync(join(ROOT, d)).filter((f) => f.endsWith(".css")).map((f) => `${d}/${f}`));
 const css = Object.fromEntries(FILES.map((f) => [f, strip(read(f))]));
@@ -137,5 +137,23 @@ describe("行事曆", () => {
     const sel = ".go-quiz-btn:active, .event-input-bar button:active, .event-card .delete-btn:active";
     expect(find("_calendar/calendar_date.css")(sel).body).toMatch(/scale\(var\(--yy-ui-press\)\)/);
     expect(find("_calendar/calendar_date.css")(sel, /prefers-reduced-motion/).body).toMatch(/transform:\s*none/);
+  });
+});
+
+describe("筆記頁面清單卡片與浮動工具列（Apple 化步驟 4-8）", () => {
+  it("頁面清單是卡片格：面板圓角內的 block 圓角、細框、勾選的卡片換強調色框；預覽最多兩行", () => {
+    const f = find("_note/notestyle.css");
+    expect(f(".note-page-list").body).toMatch(/display:\s*grid/);
+    expect(f(".note-page-card").body).toMatch(/border-radius:\s*var\(--yy-radius-block\)/);
+    expect(f(".note-page-card.is-selected").body).toMatch(/border-color:\s*var\(--yy-calm-accent\)/);
+    expect(f(".note-page-preview").body).toMatch(/-webkit-line-clamp:\s*2/);
+  });
+
+  it("文字工具列浮動：sticky、離上緣有距離、圓角、只用 elev token 的陰影", () => {
+    const body = find("_note/toolbar.css")(".editor-toolbar").body;
+    expect(body).toMatch(/position:\s*sticky/);
+    expect(body).toMatch(/top:\s*5\.5rem/);
+    expect(body).toMatch(/border-radius:\s*var\(--yy-radius-panel\)/);
+    expect(body).toMatch(/box-shadow:\s*var\(--yy-elev-3\)/);
   });
 });

@@ -165,7 +165,7 @@ describe('AiAssistantSettings admin page', () => {
         ]));
         render(<AiAssistantSettings />);
         expect(await screen.findByText(/安全類不保存訊息文字；其他類型只存開頭 40 字/)).toBeInTheDocument();
-        expect(screen.getByText('（安全類不保存原文）')).toBeInTheDocument();
-        expect(screen.getByText('（空白）')).toBeInTheDocument();
+        expect(await screen.findByText('（安全類不保存原文）')).toBeInTheDocument();
+        expect(await screen.findByText('（空白）')).toBeInTheDocument();
     });
 });

@@ -54,9 +54,10 @@
 }
 
 .camera-dropzone {
+    position: relative;
     width: 340px;
     height: 340px;
-    border-radius: var(--yy-radius-panel);
+    border-radius: var(--yy-radius-block);
     background: var(--yy-calm-surface);
     border: var(--yy-border-width) dashed var(--yy-calm-line);
     display: flex;
@@ -77,6 +78,21 @@
     .camera-dropzone:hover {
         background: var(--yy-calm-info-bg);
     }
+}
+
+/* 取景框上的玻璃提示：貼在框的下緣，圓角跟著取景框（同心圓角：外 28、內距 12、膠囊用 pill）；材質由 .yy-glass 提供 */
+.camera-dropzone-hint {
+    position: absolute;
+    right: var(--yy-space-3);
+    bottom: var(--yy-space-3);
+    left: var(--yy-space-3);
+    padding: var(--yy-space-2) var(--yy-space-3);
+    border-radius: var(--yy-radius-pill);
+    color: var(--yy-calm-text);
+    font-size: var(--yy-text-sm);
+    font-weight: 700;
+    text-align: center;
+    pointer-events: none;
 }
 
 .camera-dropzone-img {

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import RichTextRenderer from "../../components/_topic/RichTextRenderer";
 import { hasDocContent } from "../../components/_topic/richText";
+import { useHeadingToc, TOC_MIN_ITEMS } from "../../hooks/useHeadingToc";
 import "../../static/css/_info/index.css";
 
 // 頁尾三個入口（使用說明、隱私與資料、聯絡我們）的內容頁。
@@ -9,15 +10,44 @@ import "../../static/css/_info/index.css";
 // 內容原則：只寫程式碼能證實的事。「隱私與資料」與「聯絡我們」的正文由後台各自的頁面維護
 // （/adminapi/public/privacy-policy/、/adminapi/public/contact-page/），這裡只負責頁面骨架與載入狀態。
 
-const InfoPage = ({ title, lead, children }) => (
-    <div className="yy-page info-page">
-        <article className="yy-card info-card">
-            <h1 className="info-title">{title}</h1>
-            {lead && <p className="info-lead">{lead}</p>}
-            {children}
-        </article>
-    </div>
+// 目錄（Apple 化步驟 4-9）：段落 3 個以上才出現；桌面放在正文左側（sticky），手機收進正文上方。
+// 每一項是指向段落 id 的錨點連結，沒有任何動畫。
+const InfoToc = ({ items }) => (
+    <nav className="info-toc" aria-label="本頁目錄">
+        <p className="info-toc-title">本頁目錄</p>
+        <ol>
+            {items.map((item) => (
+                <li key={item.id}><a href={`#${item.id}`}>{item.title}</a></li>
+            ))}
+        </ol>
+    </nav>
 );
+
+const InfoPage = ({ title, lead, toc, children }) => {
+    const showToc = Array.isArray(toc) && toc.length >= TOC_MIN_ITEMS;
+    return (
+        <div className="yy-page info-page">
+            <div className={`info-layout${showToc ? " has-toc" : ""}`}>
+                {showToc && <InfoToc items={toc} />}
+                <article className="yy-card info-card">
+                    <h1 className="info-title">{title}</h1>
+                    {lead && <p className="info-lead">{lead}</p>}
+                    {children}
+                </article>
+            </div>
+        </div>
+    );
+};
+
+// 使用說明的段落（目錄與內文共用同一份清單，不會漏改）
+const HELP_SECTIONS = [
+    { id: "help-search", title: "單詞查詢" },
+    { id: "help-translate", title: "翻譯" },
+    { id: "help-member", title: "需要登入的功能" },
+    { id: "help-more", title: "更多" },
+];
+
+
 
 const Section = ({ id, title, children }) => (
     <section className="info-section" aria-labelledby={id}>
@@ -27,7 +57,7 @@ const Section = ({ id, title, children }) => (
 );
 
 export const HelpPage = () => (
-    <InfoPage title="使用說明" lead="各功能怎麼用、哪些需要登入。">
+    <InfoPage title="使用說明" lead="各功能怎麼用、哪些需要登入。" toc={HELP_SECTIONS}>
         <Section id="help-search" title="單詞查詢">
             <p>不用登入就能使用。輸入族語或中文單詞，可以查看詞義、發音與例句。</p>
         </Section>
@@ -86,10 +116,13 @@ const AdminManagedPage = ({ endpoint, title, lead, label }) => {
     }, [endpoint, label, reloadKey]);
 
     const retry = useCallback(() => setReloadKey((n) => n + 1), []);
+    // 目錄直接從實際渲染出來的 h2 讀取（而不是另外解析 JSON），標題與 id 一定對得上；空標題的 h2 不列入
+    const richRef = useRef(null);
+    const toc = useHeadingToc(richRef, state === "ready", "info-sec", [page]);
     const updated = state === "ready" ? formatUpdatedAt(page?.updated_at) : "";
 
     return (
-        <InfoPage title={title} lead={lead}>
+        <InfoPage title={title} lead={lead} toc={toc}>
             {state === "loading" && <p role="status" aria-busy="true" className="info-status">載入中…</p>}
             {state === "error" && (
                 <div className="info-status" role="alert">
@@ -99,7 +132,7 @@ const AdminManagedPage = ({ endpoint, title, lead, label }) => {
             )}
             {state === "ready" && (
                 hasDocContent(page?.content)
-                    ? <div className="info-rich"><RichTextRenderer doc={page.content} /></div>
+                    ? <div className="info-rich" ref={richRef}><RichTextRenderer doc={page.content} /></div>
                     : <p className="info-status">內容籌備中。</p>
             )}
             {updated && <p className="info-updated">最後更新：{updated}</p>}

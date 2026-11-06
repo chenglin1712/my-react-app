@@ -1,4 +1,9 @@
 import "../../static/css/_quiz/bot.css"
+import "../../static/css/_quiz/bot_attachments.css"
+import "../../static/css/_quiz/bot_notices.css"
+import "../../static/css/_quiz/bot_entries.css"
+import "../../static/css/_quiz/bot_feedback.css"
+import "../../static/css/_quiz/bot_header.css"
 import { useId, useState, useRef, useEffect } from "react";
 import { Bot, Camera, ChevronDown, SquarePen, X } from "lucide-react"
 import { useNavigate } from "react-router-dom";
@@ -795,7 +800,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                     </div>
                 )}
                 <ChatComposer
-                    className="input-area"
+                    className="input-area yy-glass"
                     inputClassName="message-input"
                     inputRef={inputRef}
                     value={input}

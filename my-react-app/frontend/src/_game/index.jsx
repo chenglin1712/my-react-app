@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../../static/css/_game/index.css";
 import { TRIBES, COMING_SOON_LABEL, tribeHasFeature } from "../constants/tribes";
-import DiamondBadge from "../../components/ui/DiamondBadge";
 import { scrollBehavior } from "../hooks/useReducedMotion";
 
 const GAMES = [
@@ -13,7 +12,7 @@ const GAMES = [
     subtitle: "TNINUN",
     Icon: Spool,
     desc: "從族語詞彙中挑選正確對應，訓練詞彙記憶能力。",
-    headerBg: "linear-gradient(90deg,var(--yy-red),var(--yy-gold),var(--yy-red))",
+    featured: true, // bento 大圖卡：版面上佔左側整欄
   },
   {
     id: "listening",
@@ -21,7 +20,6 @@ const GAMES = [
     subtitle: "MISANIQ",
     Icon: Headphones,
     desc: "聆聽族語發音，辨識正確詞彙，訓練耳朵的敏銳度。",
-    headerBg: "linear-gradient(90deg,var(--yy-blue),var(--yy-blue-light),var(--yy-blue))",
   },
   {
     id: "pronunciation",
@@ -29,7 +27,6 @@ const GAMES = [
     subtitle: "QMISAN",
     Icon: Mic,
     desc: "跟著發音範本錄音，AI 即時評分你的發音準確度。",
-    headerBg: "linear-gradient(90deg,var(--yy-gold),var(--yy-red),var(--yy-gold))",
   },
   {
     id: "sentence",
@@ -37,7 +34,6 @@ const GAMES = [
     subtitle: "LMUHUW",
     Icon: BookOpen,
     desc: "閱讀族語例句，選出正確的中文意思，訓練句型理解能力。",
-    headerBg: "linear-gradient(90deg,var(--yy-green),var(--yy-gold),var(--yy-green))",
   },
 ];
 
@@ -89,9 +85,9 @@ const GameZonePage = () => {
             return (
               <div
                 key={g.id}
-                className={`yy-card yy-fade-up gamehub-card${active ? ' is-selected' : ''}`}
+                className={`yy-card yy-fade-up gamehub-card${g.featured ? ' gamehub-card--feature' : ''}${active ? ' is-selected' : ''}`}
               >
-                <div className="gamehub-card-head" style={{ "--gamehub-head-band": g.headerBg }}>
+                <div className="gamehub-card-head">
                   <div className="gamehub-card-icon" aria-hidden="true"><g.Icon size={28} strokeWidth={2.25} /></div>
                   <div>
                     {/* 真正的按鈕放在標題裡，用偽元素撐滿整張卡片，整張卡都點得到，鍵盤與報讀器看到的是一個有 aria-pressed 的按鈕 */}
@@ -109,6 +105,9 @@ const GameZonePage = () => {
                   </div>
                 </div>
                 <div className="gamehub-card-body">
+                  {g.featured && (
+                    <span className="gamehub-card-art" aria-hidden="true"><g.Icon size={160} strokeWidth={1.25} /></span>
+                  )}
                   <p>{g.desc}</p>
                   <span className={`gamehub-card-badge${active ? ' active' : ''}`} aria-hidden="true">
                     {active ? '✓ 已選擇' : '選這個'}
@@ -144,7 +143,7 @@ const GameZonePage = () => {
                     aria-disabled={soon || undefined}
                     onClick={() => { if (!soon) setActiveTribe(t.slug); }}
                   >
-                    <DiamondBadge as="span" color={t.color} textColor={t.textColor} size={40} fontSize={14} style={{ margin: '0 auto 10px' }}>{t.name}</DiamondBadge>
+                    <span className="gamehub-tribe-mark" aria-hidden="true">{t.name}</span>
                     <span className="gamehub-tribe-name">{t.name}族語{active && <span aria-hidden="true"> ✓</span>}</span>
                     {soon && <span className="gamehub-tribe-soon">{COMING_SOON_LABEL}</span>}
                   </button>
@@ -154,7 +153,7 @@ const GameZonePage = () => {
 
             {activeTribeData && (
               <div className="yy-fade-up gamehub-confirm">
-                <DiamondBadge color={activeTribeData.color} textColor={activeTribeData.textColor} size={56} fontSize={18} style={{ margin: '0 auto 12px' }}>{activeTribeData.name}</DiamondBadge>
+                <span className="gamehub-tribe-mark gamehub-tribe-mark--lg" aria-hidden="true">{activeTribeData.name}</span>
                 <h4>{activeTribeData.name}族語 {activeGameData.title}</h4>
                 <p>準備好了嗎？點擊下方開始挑戰</p>
                 <button type="button" className="yy-btn-primary" onClick={startChallenge}>開始挑戰 ▸</button>

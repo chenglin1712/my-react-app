@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from 'react-bootstrap';
 import LoadingSpinner from '@components/ui/LoadingSpinner';
 import { apiPost } from "../../utils/apiClient";
@@ -11,6 +11,7 @@ import useAudioPlayback from "../../hooks/useAudioPlayback";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import CameraFilterControls from "./components/CameraFilterControls";
 import WordResultsSection from "../_search/components/WordResultsSection";
+import WordDetailSheet from "../_search/components/WordDetailSheet";
 import EmptyState from "@components/ui/EmptyState";
 import { describeActiveFilters } from "@utils/wordFilterState";
 import { deriveInitialLetters } from "@utils/wordLetters";
@@ -27,7 +28,10 @@ const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onResta
   const [definitions, setDefinitions] = useState({ exact_match_results: {}, fuzzy_match_results: {} });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [expandedWord, setExpandedWord] = useState(null);
+  // 詞條詳情用底部 sheet（Apple 化步驟 4-4）：點詞條開、關閉後清掉；detail 直接帶資料
+  const [detail, setDetail] = useState(null);
+  const openDetail = useCallback((next) => setDetail(next), []);
+  const closeDetail = useCallback(() => setDetail(null), []);
   const [retryCount, setRetryCount] = useState(0);
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterLetter, setFilterLetter] = useState('');
@@ -50,6 +54,7 @@ const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onResta
 
   useEffect(() => {
     const myGeneration = ++requestGenerationRef.current;
+    setDetail(null); // 換詞或換族語重新查詢時，舊的詳情不留著
 
     if (selectedWords.length === 0) {
       setError("請選擇至少一個單詞！");
@@ -66,6 +71,7 @@ const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onResta
     apiPost(import.meta.env.VITE_API_SEARCH_KEYS_URL, { words: selectedWords, tribe })
       .then(data => {
         if (myGeneration !== requestGenerationRef.current) return;
+        setDetail(null); // 查詢期間舊清單還能點，新結果一寫入就把那時開的舊詳情收掉
         setDefinitions({
           exact_match_results: data.exact_match_results || {},
           fuzzy_match_results: data.fuzzy_match_results || {},
@@ -84,8 +90,6 @@ const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onResta
     // 步驟卸載（例如按「重新辨識」）時讓還在跑的查詢作廢，不再更新畫面或公告
     return () => { requestGenerationRef.current += 1; };
   }, [selectedWords, tribe, retryCount]);
-
-  const toggleExpand = (key) => setExpandedWord(prev => (prev === key ? null : key));
 
   // playAudio 改用 _search 頁面共用的 hook：原本這裡自己維護一份 playAudio，
   // 缺少 hook 版本後來補上的「取消上一次播放的請求」（避免快速連續點擊時舊音檔
@@ -190,12 +194,11 @@ const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onResta
           title="完全符合結果"
           titleColorClass="yy-text-success"
           wordsFlat={exactMatchWords}
-          expandedWord={expandedWord}
-          toggleExpand={toggleExpand}
           toggleFavorite={toggleFavorite}
           playAudio={playAudio}
           favoriteWords={favoriteWords}
           failedAudio={failedAudio}
+          onOpenDetail={openDetail}
         />
       )}
       <br />
@@ -204,14 +207,24 @@ const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onResta
           title="相關結果"
           titleColorClass="yy-text-ink"
           wordsFlat={fuzzyMatchWords}
-          expandedWord={expandedWord}
-          toggleExpand={toggleExpand}
           toggleFavorite={toggleFavorite}
           playAudio={playAudio}
           favoriteWords={favoriteWords}
           failedAudio={failedAudio}
+          onOpenDetail={openDetail}
         />
       )}
+
+      {/* 這一頁的詳情永遠從底部滑出（不分手機或桌面），像地圖的結果卡 */}
+      <WordDetailSheet
+        detail={detail}
+        onClose={closeDetail}
+        isMobile
+        isFavorited={detail ? favoriteWords.has(detail.result.name) : false}
+        toggleFavorite={toggleFavorite}
+        playAudio={playAudio}
+        failedAudio={failedAudio}
+      />
     </div>
   );
 };

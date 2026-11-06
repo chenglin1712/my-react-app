@@ -190,7 +190,12 @@ const Panel_Submit = ({ tribe = "tayal" }) => {
                         </div>
                     </div>
                     <div className="paper-score">
-                        <div className="score-circle">
+                        {/* 分數環（Apple 化步驟 4-6c）：環的填滿長度就是答對比例；中間仍是原本的分數數字，文字照舊 */}
+                        <div className="score-ring" style={{ "--ring-pct": Math.max(0, Math.min(100, totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0)) }}>
+                            <svg className="score-ring-svg" viewBox="0 0 100 100" aria-hidden="true">
+                                <circle className="score-ring-track" cx="50" cy="50" r="44" pathLength="100" />
+                                <circle className="score-ring-fill" cx="50" cy="50" r="44" pathLength="100" />
+                            </svg>
                             <span className="score">{displayScore}</span>
                         </div>
                         <p className="score-summary">

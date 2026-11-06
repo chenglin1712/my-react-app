@@ -139,3 +139,38 @@ describe('ListeningGame 答題後的操作與錯誤（E-5）', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('這個族語暫時沒有題目');
   });
 });
+
+describe('ListeningGame 結算頁的慶祝動態（Apple 化步驟 4-5）', () => {
+  beforeEach(() => {
+    apiGet.mockReset();
+    createAuthorizedAudio.mockReset();
+    createAuthorizedAudio.mockResolvedValue({
+      pause: vi.fn(), play: vi.fn().mockResolvedValue(undefined), revokeObjectUrl: vi.fn(),
+    });
+  });
+
+  const playThrough = async (user, answers) => {
+    apiGet.mockResolvedValueOnce({ questions: QUESTIONS });
+    const { container } = renderGame();
+    await startGame(user);
+    await user.click(screen.getByRole('button', { name: answers[0] }));
+    await user.click(screen.getByRole('button', { name: /下一題/ }));
+    await screen.findByText('第 2 / 2 題');
+    await user.click(screen.getByRole('button', { name: answers[1] }));
+    await user.click(screen.getByRole('button', { name: /看結果/ }));
+    await screen.findByText('遊戲結果');
+    return container;
+  };
+
+  test('全對（100%）：分數區標為 is-celebrating，並出現慶祝圓點', async () => {
+    const container = await playThrough(userEvent.setup(), ['真的', '加油']);
+    expect(container.querySelector('.listening-result-score')).toHaveClass('is-celebrating');
+    expect(container.querySelector('.game-celebrate')).not.toBeNull();
+  });
+
+  test('答對一半（50%，低於 60% 門檻）：不慶祝', async () => {
+    const container = await playThrough(userEvent.setup(), ['真的', '謝謝']);
+    expect(container.querySelector('.listening-result-score')).not.toHaveClass('is-celebrating');
+    expect(container.querySelector('.game-celebrate')).toBeNull();
+  });
+});

@@ -151,3 +151,24 @@ describe('本期專題文章頁', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('/adminapi/public/featured-topics/a%2Fb/');
   });
 });
+
+describe('本文目錄（Apple 化步驟 4-9）', () => {
+  const h2 = (t) => ({ type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: t }] });
+  const withHeadings = (n) => ({ ...ARTICLE, content: { type: 'doc', content: Array.from({ length: n }, (_, i) => h2(`小標${i + 1}`)) } });
+
+  test('h2 少於 3 個不顯示目錄', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => respond(200, withHeadings(2))));
+    renderAt();
+    await screen.findByRole('heading', { level: 2, name: '小標2' });
+    expect(screen.queryByRole('navigation', { name: '本文目錄' })).toBeNull();
+  });
+
+  test('3 個以上顯示目錄，每個連結指向真的有那個 id 的標題', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => respond(200, withHeadings(3))));
+    const { container } = renderAt();
+    const toc = await screen.findByRole('navigation', { name: '本文目錄' });
+    const links = toc.querySelectorAll('a');
+    expect(links).toHaveLength(3);
+    links.forEach((a, i) => expect(container.querySelector(a.getAttribute('href'))).toHaveTextContent(`小標${i + 1}`));
+  });
+});

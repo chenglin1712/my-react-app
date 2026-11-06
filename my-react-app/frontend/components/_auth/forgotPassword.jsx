@@ -1,3 +1,5 @@
+import "../../static/css/_auth/authPage.css"
+import "../../static/css/_auth/authField.css"
 import "../../static/css/_auth/forgotPassword.css"
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -36,18 +38,22 @@ const ForgotPassword = () => {
     };
 
     return (
+        <div className="auth-backdrop">
         <div className="forgot-container">
             <h1>忘記密碼</h1>
             <p className="instruction">請輸入您的電子郵件，我們會寄送重設密碼的連結。</p>
 
             <form onSubmit={handleReset}>
-                <input
-                    type="email"
-                    placeholder="輸入您的 Email"
-                    aria-label="電子郵件"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                />
+                <div className="auth-field">
+                    <label className="auth-field-label" htmlFor="forgot-email">電子郵件</label>
+                    <input
+                        id="forgot-email"
+                        type="email"
+                        placeholder="輸入您的 Email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                    />
+                </div>
 
                 <div className="forgot-button">
                     <button type="button" className="forgot-cancel-btn" onClick={() => navigate(-1)}>取消</button>
@@ -56,10 +62,11 @@ const ForgotPassword = () => {
             </form>
 
             {message && (
-                <div className={`forgot-message ${isSuccess ? "success" : "error"}`}>
+                <div className={`forgot-message ${isSuccess ? "success" : "error"}`} role={isSuccess ? "status" : "alert"}>
                     {message}
                 </div>
             )}
+        </div>
         </div>
     );
 };

@@ -151,3 +151,19 @@ describe('CameraWizard 的入口與說明（E-4）', () => {
     await waitFor(() => expect(screen.getByText('label-step')).toBeInTheDocument());
   });
 });
+
+describe('CameraWizard 的進度條與取景框提示（Apple 化步驟 4-4）', () => {
+  test('進度條是分段變體，第一步是目前步驟', () => {
+    const { container } = render(<CameraWizard />);
+    expect(container.querySelector('.yy-stepbar--segments')).not.toBeNull();
+    expect(container.querySelector('.yy-segstep.is-active')).toHaveTextContent('上傳圖片');
+  });
+
+  test('取景框上有玻璃提示，還沒選圖時說明要做什麼；提示不進無障礙樹（真正的標籤是上傳區的文字）', () => {
+    const { container } = render(<CameraWizard />);
+    const hint = container.querySelector('.camera-dropzone-hint');
+    expect(hint).toHaveClass('yy-glass');
+    expect(hint).toHaveAttribute('aria-hidden', 'true');
+    expect(hint).toHaveTextContent('把想辨識的物件放在框內');
+  });
+});

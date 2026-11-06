@@ -260,19 +260,6 @@ const TranslatePage = () => {
             <section className="translate-body">
                 {isGuest && <GuestTrialNotice quota={guestQuota} />}
 
-                <div className="translate-direction-bar yy-fade-up">
-                    <span className="translate-direction-label">{currentDirection.sourceLabel}</span>
-                    <button
-                        type="button"
-                        className="translate-swap-btn"
-                        aria-label="交換翻譯方向"
-                        onClick={handleSwap}
-                    >
-                        <ArrowLeftRight size={18} />
-                    </button>
-                    <span className="translate-direction-label">{currentDirection.targetLabel}</span>
-                </div>
-
                 {/* 常駐的 live region：先掛載再更新文字，報讀器才會可靠地公告 */}
                 <p className={`translate-swap-note${swapNote ? "" : " is-empty"}`} role="status">{swapNote}</p>
                 {error && <Alert variant="danger" className="translate-alert">{error}</Alert>}
@@ -306,6 +293,16 @@ const TranslatePage = () => {
                         </button>
                         <OfflineNotice online={online} id="translate-offline" action="翻譯" />
                     </div>
+
+                    {/* 互換鈕在兩張卡片中間：桌面是左右卡之間，手機是上下卡之間（圖示轉 90 度） */}
+                    <button
+                        type="button"
+                        className="translate-swap-btn"
+                        aria-label="交換翻譯方向"
+                        onClick={handleSwap}
+                    >
+                        <ArrowLeftRight size={18} aria-hidden="true" />
+                    </button>
 
                     <div className="yy-card translate-pane">
                         <div className="translate-pane-head">

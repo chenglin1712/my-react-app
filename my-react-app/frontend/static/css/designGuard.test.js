@@ -411,10 +411,9 @@ describe("寫死色碼只減不增（顏色一律走 token）", () => {
 // 使用族群色（TRIBES 的 color／textColor）的前台檔案白名單。每個都已確認是小標記：
 // 色票、徽章、膠囊、細框。新增檔案要使用族色，先確認不是大面積背景，再加進來。
 // 各頁改版（階段 S8）時，建議把這些出口收斂成單一元件（例如 TribeMark），這份白名單就會縮成一個檔案。
+// 遊戲專區（入口與選族語頁）已於 Apple 化步驟 4-5 移除族色，統一單一強調色，所以不在名單內
 const TRIBE_COLOR_CONSUMERS = [
   "components/ui/TribePill.jsx", // 選取中的小膠囊
-  "src/_game/GameTribeSelectPage.jsx", // 小徽章與細框
-  "src/_game/index.jsx", // 菱形徽章
 ];
 const TRIBE_COLOR_USE = /\b(?:tribe|t|activeTribeData|tribeData)\??\.(?:color|textColor)\b|--tribe-color/;
 // 補抓別名與解構：檔案有引入族群資料，又讀了 color／textColor（const { color } = tribe 之類）

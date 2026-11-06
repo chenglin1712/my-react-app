@@ -43,12 +43,28 @@ function createWordComparator(sortOrder) {
   };
 }
 
+// 詞類篩選（Apple 化步驟 4-2）：詞條的任一個詞義的詞性等於所選值就算符合
+const hasPartOfSpeech = (word, pos) => (word.explanationItems ?? []).some((def) => typeof def.partOfSpeech === 'string' && def.partOfSpeech.trim() === pos);
+
+/** 從已載入的詞條收集實際出現的詞性（依出現次數多到少，同次數依字串排序），給詞類篩選的選項用；不寫死詞類清單。 */
+export function collectPartsOfSpeech(words) {
+  const counts = new Map();
+  for (const w of words) {
+    const seen = new Set((w.explanationItems ?? []).map((d) => (typeof d.partOfSpeech === 'string' ? d.partOfSpeech.trim() : '')).filter(Boolean));
+    seen.forEach((pos) => counts.set(pos, (counts.get(pos) ?? 0) + 1));
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([pos, count]) => ({ pos, count }));
+}
+
 export function filterAndSortWords(words, {
   filterLetter = '',
   frequencyFilter = '',
   showOnlyFavorites = false,
   favoriteWords,
   selectedSubCategory = null,
+  partOfSpeech = '',
   sortOrder = 'asc',
 } = {}) {
   return words
@@ -65,7 +81,9 @@ export function filterAndSortWords(words, {
         (w.explanationItems?.some((def) => def.category?.includes(selectedSubCategory)) ||
           w.category === selectedSubCategory);
 
-      return matchesLetter && (!showOnlyFavorites || isFavorite) && matchesFrequency && matchesCategory;
+      const matchesPos = !partOfSpeech || hasPartOfSpeech(w, partOfSpeech);
+
+      return matchesLetter && (!showOnlyFavorites || isFavorite) && matchesFrequency && matchesCategory && matchesPos;
     })
     .sort(createWordComparator(sortOrder));
 }

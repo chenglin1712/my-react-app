@@ -131,7 +131,7 @@ describe("theme-v2 token", () => {
 
 describe("遊戲專區卡片標題對比", () => {
   const gameCss = frontCss.find(({ file }) => file.endsWith("_game/index.css")).css;
-  const head = (gameCss.match(/\.gamehub-card-head\s*\{([^}]*)\}/) || [])[1] ?? "";
+  const head = (gameCss.match(/^\.gamehub-card-head\s*\{([^}]*)\}/m) || [])[1] ?? "";
 
   it("卡片頭部底色是米白，不再把漸層直接鋪在標題後面", () => {
     expect(head).toMatch(/background:\s*var\(--yy-calm-info-bg\)/);

@@ -85,33 +85,44 @@
   margin: 0 0 var(--yy-space-4);
 }
 
-/* ── 族語選擇器 ───── */
+/* ── 族語選擇器：分段控制（Apple 化步驟 4-2）─────
+   一條淡底軌道，選取的那一段用深銅實心；窄螢幕時軌道本身可橫向捲動，不換行。 */
 .tribe-selector {
   display: flex;
-  gap: var(--yy-space-2);
-  flex-wrap: wrap;
-  justify-content: center;
-  margin: var(--yy-space-4) 0 var(--yy-space-5);
+  gap: var(--yy-space-1);
+  width: fit-content;
+  max-width: 100%;
+  margin: var(--yy-space-4) auto var(--yy-space-5);
+  padding: var(--yy-space-1);
+  background: var(--yy-calm-info-bg);
+  border-radius: var(--yy-radius-pill);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tribe-selector::-webkit-scrollbar {
+  display: none;
 }
 
 .tribe-btn {
+  flex: 0 0 auto;
   min-height: var(--yy-control-md);
   padding: 0 var(--yy-space-4);
-  border-radius: var(--yy-radius-control);
-  border: var(--yy-border-width) solid var(--yy-calm-line);
-  background: var(--yy-calm-surface);
+  border-radius: var(--yy-radius-pill);
+  border: var(--yy-border-width) solid transparent;
+  background: transparent;
   color: var(--yy-calm-text);
   font-size: var(--yy-text-base);
   font-weight: 700;
   font-family: var(--yy-font-body);
   cursor: pointer;
-  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform var(--dur-press) var(--ease-out);
   white-space: nowrap;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .tribe-btn:hover {
-    background: var(--yy-calm-info-bg);
+  .tribe-btn:hover:not(.active) {
+    background: var(--yy-calm-surface);
   }
 }
 
@@ -133,13 +144,185 @@
 
 /* 選取不只靠顏色：前面多一個勾（替代文字留空，報讀器只靠 aria-pressed） */
 .tribe-btn.active::before {
-  content: "¹3" / "";
+  content: "\2713" / "";
   margin-right: var(--yy-space-1);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .tribe-btn:active {
     transform: none;
+  }
+}
+
+/* ── Spotlight 式大搜尋框（Apple 化步驟 4-2）─────────────────────────────── */
+.spotlight {
+  position: relative;
+  margin-bottom: var(--yy-space-3);
+}
+
+.spotlight-field {
+  display: flex;
+  align-items: center;
+  gap: var(--yy-space-3);
+  min-height: 60px;
+  padding: var(--yy-space-2) var(--yy-space-2) var(--yy-space-2) var(--yy-space-4);
+  background: var(--yy-calm-surface);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-radius-panel);
+  box-shadow: var(--yy-elev-2);
+}
+
+/* 輸入框本身沒有外框，整條畫焦點框（全站焦點基線見 theme-v2.css） */
+.spotlight-field:focus-within {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
+}
+
+.spotlight-icon {
+  flex-shrink: 0;
+  color: var(--yy-calm-text-sub);
+}
+
+.spotlight-input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--yy-control-md);
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--yy-calm-text);
+  font-family: var(--yy-font-body);
+  font-size: 18px;
+}
+
+.spotlight-input::placeholder {
+  color: var(--yy-calm-text-sub);
+  opacity: 1;
+}
+
+.spotlight-go {
+  flex-shrink: 0;
+  min-height: var(--yy-control-md);
+  padding: 0 var(--yy-space-5);
+  background: var(--yy-calm-accent);
+  border: none;
+  border-radius: var(--yy-radius-control);
+  color: var(--yy-calm-accent-on);
+  font-family: var(--yy-font-body);
+  font-size: var(--yy-text-base);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform var(--dur-press) var(--ease-out);
+}
+
+.spotlight-go:active:not(:disabled) {
+  transform: scale(var(--yy-ui-press));
+}
+
+.spotlight-go:disabled {
+  background: var(--yy-calm-info-bg);
+  color: var(--yy-calm-text-sub);
+  cursor: not-allowed;
+}
+
+.spotlight-go:focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .spotlight-go:hover:not(:disabled) {
+    background: var(--yy-calm-text);
+    color: var(--yy-calm-bg);
+  }
+}
+
+/* 建議清單：浮在搜尋框下方，進場從上方淡入；退場直接收起（輸入中的清單不值得慢慢退） */
+.spotlight-list {
+  position: absolute;
+  top: calc(100% + var(--yy-space-2));
+  right: 0;
+  left: 0;
+  z-index: var(--yy-z-dropdown);
+  margin: 0;
+  padding: var(--yy-space-1);
+  list-style: none;
+  background: var(--yy-calm-surface);
+  border: var(--yy-border-width) solid var(--yy-calm-rule);
+  border-radius: var(--yy-radius-control);
+  box-shadow: var(--yy-elev-4);
+  transform-origin: top center;
+}
+
+.spotlight-list:not([hidden]) {
+  animation: spotlight-in var(--dur-overlay-in) var(--ease-out);
+}
+
+@keyframes spotlight-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+}
+
+.spotlight-option {
+  display: flex;
+  align-items: baseline;
+  gap: var(--yy-space-3);
+  min-height: var(--yy-control-md);
+  padding: var(--yy-space-2) var(--yy-space-3);
+  border-inline-start: 3px solid transparent;
+  border-radius: var(--yy-radius-tag);
+  color: var(--yy-calm-text);
+  cursor: pointer;
+}
+
+/* 作用中的選項不只靠底色：左側多一條深銅線 */
+.spotlight-option.is-active {
+  background: var(--yy-calm-info-bg);
+  border-inline-start-color: var(--yy-calm-accent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .spotlight-option:hover {
+    background: var(--yy-calm-info-bg);
+  }
+}
+
+.spotlight-option-name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.spotlight-option-gloss {
+  min-width: 0;
+  color: var(--yy-calm-text-sub);
+  font-size: var(--yy-text-sm);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .spotlight-field {
+    min-height: 56px;
+  }
+
+  .spotlight-input {
+    font-size: 16px; /* 16px 以上 iOS 聚焦時才不會自動放大頁面 */
+  }
+
+  .spotlight-go {
+    padding: 0 var(--yy-space-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotlight-go:active:not(:disabled) {
+    transform: none;
+  }
+
+  .spotlight-list:not([hidden]) {
+    animation: none;
   }
 }
 
@@ -268,15 +451,27 @@
 /* .category-bar／.category-panel／.subcategory-* 已搬到共用的
    components/ui/CategoryBar.jsx + static/css/ui/categoryBar.css。 */
 
-/* ── 查詢結果：一條一條的清單列，只有細線分隔 ──────────────────────────────── */
-.search-page .list-group-item {
-  border: none !important;
-  border-bottom: 1px solid var(--yy-calm-rule) !important;
-  border-radius: 0 !important;
-  background: transparent;
+/* ── 查詢結果：兩層卡片（Apple 化步驟 4-2）──────────────────────────────────
+   上層是詞與詞義加播放、收藏；下層是詞性、分類與詞頻。卡片只有細框，沒有陰影。 */
+.search-page .list-group {
+  display: grid;
+  gap: var(--yy-space-3);
+}
+
+.search-page .list-group > .list-group-item {
+  border: var(--yy-border-width) solid var(--yy-calm-rule) !important;
+  border-radius: var(--yy-radius-panel) !important;
+  background: var(--yy-calm-surface);
   color: var(--yy-calm-text);
   margin-bottom: 0;
-  padding: var(--yy-space-3) var(--yy-space-1);
+  padding: var(--yy-space-3) var(--yy-space-4);
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .search-page .list-group > .list-group-item:hover {
+    border-color: var(--yy-calm-copper) !important;
+  }
 }
 
 .search-page .list-group-item .list-group-item {
@@ -301,11 +496,112 @@
 
 .search-page .list-group {
   max-width: 720px;
-  margin: 0 auto;
+  margin-right: auto;
+  margin-left: auto;
 }
 
 /* 輸入框本身沒有外框，改在整個輸入列畫焦點框（全站焦點基線見 theme-v2.css） */
 .search-terminal:focus-within {
   outline: var(--yy-ui-focus-ring);
   outline-offset: var(--yy-ui-focus-offset);
+}
+
+/* ── 查無結果的建議：改用其他族語查 ─────────────────────────────── */
+.search-suggest-tribes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--yy-space-2);
+  margin-top: var(--yy-space-3);
+}
+
+.search-suggest-chip {
+  min-height: var(--yy-control-md);
+  padding: 0 var(--yy-space-4);
+  background: var(--yy-calm-surface);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-radius-pill);
+  color: var(--yy-calm-text);
+  font-family: var(--yy-font-body);
+  font-size: var(--yy-text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-out), transform var(--dur-press) var(--ease-out);
+}
+
+.search-suggest-chip:active {
+  transform: scale(var(--yy-ui-press));
+}
+
+.search-suggest-chip:focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .search-suggest-chip:hover {
+    background: var(--yy-calm-info-bg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-suggest-chip:active {
+    transform: none;
+  }
+}
+
+/* 詞類篩選（Apple 化步驟 4-2）：分段按鈕，選取的有勾號與強調框，不只靠顏色 */
+.pos-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--yy-space-2);
+    margin: var(--yy-space-3) 0;
+}
+
+.pos-filter-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--yy-space-1);
+    min-height: var(--yy-control-md);
+    padding: 0 var(--yy-space-4);
+    border: var(--yy-border-width) solid var(--yy-calm-rule);
+    border-radius: var(--yy-radius-pill);
+    background: var(--yy-calm-surface);
+    color: var(--yy-calm-text);
+    font-size: var(--yy-text-sm);
+    cursor: pointer;
+    transition: transform var(--dur-press) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.pos-filter-btn[aria-pressed="true"] {
+    border-color: var(--yy-calm-accent);
+    font-weight: 700;
+}
+
+.pos-filter-btn[aria-pressed="true"]::before {
+    content: "¹3" / "";
+}
+
+.pos-filter-btn:active {
+    transform: scale(var(--yy-ui-press));
+}
+
+.pos-filter-btn:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+.pos-filter-count {
+    color: var(--yy-calm-text-sub);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .pos-filter-btn:hover {
+        border-color: var(--yy-calm-copper);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pos-filter-btn:active {
+        transform: none;
+    }
 }

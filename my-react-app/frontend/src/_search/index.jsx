@@ -4,7 +4,8 @@ import LoadingSpinner from '@components/ui/LoadingSpinner';
 import { useFavorites } from "../../src/userServives/useFavorites";
 import { TRIBE_NAMES, TRIBE_NAME_BY_SLUG, TRIBE_SLUG_BY_NAME, TRIBE_FULL_NAME_BY_SLUG } from "../constants/tribes";
 import { apiPost } from "../../utils/apiClient";
-import { filterAndSortWords as sortWords, countMatchedWords } from "../../utils/wordFilterSort";
+import { filterAndSortWords as sortWords, countMatchedWords, collectPartsOfSpeech } from "../../utils/wordFilterSort";
+import PosFilter, { MAX_POS_OPTIONS } from "./components/PosFilter";
 import { announce } from "@utils/announce";
 import EmptyState from "@components/ui/EmptyState";
 import { describeActiveFilters } from "@utils/wordFilterState";
@@ -17,6 +18,7 @@ import SearchHeader from './components/SearchHeader';
 import WordResultsSection from './components/WordResultsSection';
 import MorphologyPanel from './components/MorphologyPanel';
 import CompactSearchBar from './components/CompactSearchBar';
+import WordDetailSheet from './components/WordDetailSheet';
 import { useScrolledPast } from '../hooks/useScrolledPast';
 import useAudioPlayback from '../../hooks/useAudioPlayback';
 
@@ -64,6 +66,7 @@ const SearchPage = () => {
   const [showCategories, setShowCategories] = useState(false);
   const [activeTab, setActiveTab] = useState('語法與功能');
   const [selectedSubCategory, setSelectedSubCategory] = useState(null);
+  const [posFilter, setPosFilter] = useState('');
   const [selectedTribe, setSelectedTribe] = useState(searchLink.tribe ?? '泰雅');
   // 開頭字母清單由後端依這個族語實際的詞條算出（見 utils/wordLetters.js），沒有時才用保底字母表
   const [availableLetters, setAvailableLetters] = useState(undefined);
@@ -84,6 +87,11 @@ const SearchPage = () => {
   }, [capabilities, selectedTribe]);
 
   const tribes = TRIBE_NAMES;
+
+  // 詳情 sheet：點詞條開、關閉後清掉。detail 是 { keyName, word, result }，直接帶資料，不用再回頭查列表
+  const [detail, setDetail] = useState(null);
+  const openDetail = useCallback((next) => setDetail(next), []);
+  const closeDetail = useCallback(() => setDetail(null), []);
 
   const toggleExpand = useCallback((key) => setExpandedWord(prev => (prev === key ? null : key)), []);
 
@@ -147,10 +155,13 @@ const SearchPage = () => {
   // 效果函式才開始載入。結果帶著它當初查詢時的簽章，簽章對不上就表示結果已經過期，不顯示空狀態。
   const filterSignature = JSON.stringify([selectedTribe, filterLetter, String(frequencyFilter), showOnlyFavorites, selectedSubCategory, sortOrder]);
 
-  const handleSearch = async (tribeOverride = null) => {
+  // queryOverride：從建議清單選詞、或「改用其他族語查」時，setQuery 還沒生效，直接帶要查的字
+  const handleSearch = async (tribeOverride = null, queryOverride = null) => {
     // 遞增 generation：任何還在跑的舊主查詢或它底下的「載入更多」都不再算數。
     const myGeneration = ++requestGenerationRef.current;
     const tribe = tribeOverride ?? selectedTribe;
+    const keyword = (queryOverride ?? query).trim();
+    setPosFilter(''); // 每次新的查詢都從「全部詞類」開始，舊的選擇不會在之後的查詢裡自己復活
     if (!TRIBES_WITH_DATA.includes(tribe)) {
       setDefinitions({ exact_match_results: {}, fuzzy_match_results: {} });
       setAllWords([]); setAllTotal(0); setAllOffset(0);
@@ -159,7 +170,7 @@ const SearchPage = () => {
     setLoading(true);
     setError('');
     try {
-      if (query.trim() === '') {
+      if (keyword === '') {
         const { pageWords, total, letters } = await fetchAllWordsPage(tribe, 0);
         if (myGeneration !== requestGenerationRef.current) return;
         if (Array.isArray(letters)) setAvailableLetters(letters);
@@ -170,16 +181,16 @@ const SearchPage = () => {
         setDefinitions({ exact_match_results: {}, fuzzy_match_results: {} });
         announceResultCount(total);
       } else {
-        const data = await apiPost(import.meta.env.VITE_API_SEARCH_KEY_URL, { keyword: query.trim(), tribe });
+        const data = await apiPost(import.meta.env.VITE_API_SEARCH_KEY_URL, { keyword, tribe });
         if (myGeneration !== requestGenerationRef.current) return;
         setDefinitions({
-          exact_match_results: Array.isArray(data.exact_match_results) ? { [query.trim()]: data.exact_match_results } : data.exact_match_results,
+          exact_match_results: Array.isArray(data.exact_match_results) ? { [keyword]: data.exact_match_results } : data.exact_match_results,
           fuzzy_match_results: data.fuzzy_match_results || {},
         });
         setAllWords([]); setAllTotal(0); setAllOffset(0);
-        setOutcome({ mode: 'keyword', keyword: query.trim() });
+        setOutcome({ mode: 'keyword', keyword });
         announceResultCount(countMatchedWords(
-          Array.isArray(data.exact_match_results) ? { [query.trim()]: data.exact_match_results } : data.exact_match_results,
+          Array.isArray(data.exact_match_results) ? { [keyword]: data.exact_match_results } : data.exact_match_results,
           data.fuzzy_match_results,
         ));
       }
@@ -221,6 +232,7 @@ const SearchPage = () => {
   // 交給下面「篩選條件變動」的 effect（已把 selectedTribe 也納入依賴）在重新
   // 渲染、狀態都確定生效之後再統一發出請求。
   const handleTribeChange = (tribe) => {
+    setDetail(null);
     setSelectedTribe(tribe);
     setAvailableLetters(undefined);
     setOutcome(null);
@@ -228,6 +240,7 @@ const SearchPage = () => {
     setFilterLetter('');
     setFrequencyFilter('');
     setSelectedSubCategory(null);
+    setPosFilter('');
     setShowCategories(false);
     setDefinitions({ exact_match_results: {}, fuzzy_match_results: {} });
     setAllWords([]); setAllTotal(0); setAllOffset(0);
@@ -268,7 +281,7 @@ const SearchPage = () => {
   }, []);
 
   const filterAndSortWords = (words) => sortWords(words, {
-    filterLetter, frequencyFilter, showOnlyFavorites, favoriteWords, selectedSubCategory, sortOrder,
+    filterLetter, frequencyFilter, showOnlyFavorites, favoriteWords, selectedSubCategory, sortOrder, partOfSpeech: activePos,
   });
 
   const clearFilters = () => {
@@ -276,17 +289,32 @@ const SearchPage = () => {
     setFrequencyFilter('');
     setShowOnlyFavorites(false);
     setSelectedSubCategory(null);
+    setPosFilter('');
   };
 
-  const activeFilterParts = describeActiveFilters({ filterLetter, frequencyFilter, showOnlyFavorites, selectedSubCategory });
   const exactWords = Object.values(definitions.exact_match_results).flat();
   const fuzzyWords = Object.values(definitions.fuzzy_match_results).flatMap(wordGroup => Object.values(wordGroup).flat());
+  const posOptions = useMemo(() => collectPartsOfSpeech([
+    ...Object.values(definitions.exact_match_results).flat(),
+    ...Object.values(definitions.fuzzy_match_results).flatMap((group) => Object.values(group).flat()),
+  ]), [definitions]);
+  const showPosFilter = outcome?.mode === 'keyword' && posOptions.length >= 2;
+  // 所選詞類已不在新的結果裡（或不是關鍵字查詢）就視為沒選，不會讓畫面莫名其妙是空的
+  const activePos = showPosFilter && posOptions.slice(0, MAX_POS_OPTIONS).some((o) => o.pos === posFilter) ? posFilter : '';
+  const activeFilterParts = describeActiveFilters({ filterLetter, frequencyFilter, showOnlyFavorites, selectedSubCategory, partOfSpeech: activePos });
   const exactVisibleTotal = filterAndSortWords(exactWords).length;
   const fuzzyVisibleTotal = filterAndSortWords(fuzzyWords).length;
   const settled = TRIBES_WITH_DATA.includes(selectedTribe) && !loading && !error;
   const keywordEmpty = settled && outcome?.mode === 'keyword' && exactVisibleTotal === 0 && fuzzyVisibleTotal === 0;
   const browseEmpty = settled && outcome?.mode === 'all' && outcome.sig === filterSignature && allWords.length === 0;
   const keywordHasLatin = outcome?.mode === 'keyword' && !/[\u4e00-\u9fff]/.test(outcome.keyword);
+
+  // 查無結果時的建議：同一個詞改用其他族語再查（保留輸入的詞，不重置成瀏覽全部）
+  const tryOtherTribe = (tribe, keyword) => {
+    handleTribeChange(tribe);
+    setQuery(keyword);
+    handleSearch(tribe, keyword);
+  };
 
   const clearFiltersButton = activeFilterParts.length > 0 && (
     <Button type="button" variant="danger" onClick={clearFilters}>清除篩選</Button>
@@ -345,6 +373,8 @@ const SearchPage = () => {
         </div>
       )}
 
+      {showPosFilter && <PosFilter options={posOptions} value={activePos} onChange={setPosFilter} />}
+
       {keywordEmpty && (
         <EmptyState
           title={`找不到「${outcome.keyword}」`}
@@ -367,6 +397,13 @@ const SearchPage = () => {
             <li>換成其他族語再查一次</li>
             {keywordHasLatin && <li>這個詞可能是變化形，詞形分析可以幫你找出它的詞根與詞綴</li>}
           </ul>
+          <div className="search-suggest-tribes" role="group" aria-label={`改用其他族語查「${outcome.keyword}」`}>
+            {tribes.filter(name => name !== selectedTribe).map(name => (
+              <button type="button" key={name} className="search-suggest-chip" onClick={() => tryOtherTribe(name, outcome.keyword)}>
+                改查{name}族語
+              </button>
+            ))}
+          </div>
         </EmptyState>
       )}
 
@@ -397,6 +434,7 @@ const SearchPage = () => {
           favoriteWords={favoriteWords}
           failedAudio={failedAudio}
           hasSentenceAudio={hasSentenceAudio}
+          onOpenDetail={openDetail}
         />
       )}
 
@@ -417,6 +455,7 @@ const SearchPage = () => {
           favoriteWords={favoriteWords}
           failedAudio={failedAudio}
           hasSentenceAudio={hasSentenceAudio}
+          onOpenDetail={openDetail}
         />
       )}
       <br />
@@ -437,8 +476,21 @@ const SearchPage = () => {
           favoriteWords={favoriteWords}
           failedAudio={failedAudio}
           hasSentenceAudio={hasSentenceAudio}
+          onOpenDetail={openDetail}
         />
       )}
+
+      <WordDetailSheet
+        detail={detail}
+        onClose={closeDetail}
+        isMobile={isMobile}
+        isFavorited={detail ? favoriteWords.has(detail.result.name) : false}
+        toggleFavorite={toggleFavorite}
+        playAudio={playAudio}
+        playSentence={playSentence}
+        hasSentenceAudio={hasSentenceAudio}
+        failedAudio={failedAudio}
+      />
 
       {/* 詞形分析放在結果下面，當作「查不到時的下一步」，不跟上面的搜尋框搶位置（審查項 P2-43） */}
       <MorphologyPanel

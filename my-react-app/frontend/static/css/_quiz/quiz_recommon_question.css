@@ -117,6 +117,19 @@
   border-color: var(--yy-calm-text);
 }
 
+/* 答對答錯不只靠顏色：前面加勾或叉（Apple 化步驟 4-6b），替代文字讓報讀器也知道結果 */
+.custom-btn.correct::before {
+  content: "¹3"; /* 不支援替代文字語法的瀏覽器仍保有勾叉 */
+  content: "¹3" / "答對";
+  margin-right: 0.4em;
+}
+
+.custom-btn.wrong::before {
+  content: "¹7";
+  content: "¹7" / "答錯";
+  margin-right: 0.4em;
+}
+
 /* ---------------- custom0-btn ---------------- */
 .custom0-btn {
   background-color: var(--yy-calm-surface);

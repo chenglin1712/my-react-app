@@ -103,3 +103,41 @@
   outline: 3px solid var(--yy-calm-accent);
   outline-offset: 2px;
 }
+
+/* ---- 頁面清單卡片（Apple 化步驟 4-8）：每頁一張卡，含內容預覽 ---- */
+.note-page-list {
+  display: grid;
+  gap: var(--yy-space-2);
+}
+
+.note-page-card {
+  position: relative;
+  padding: var(--yy-space-3);
+  border: var(--yy-border-width) solid var(--yy-calm-rule);
+  border-radius: var(--yy-radius-block);
+  background: var(--yy-calm-surface);
+}
+
+.note-page-card.is-selected {
+  border-color: var(--yy-calm-accent);
+}
+
+.note-page-badge {
+  display: inline-block;
+  margin-top: var(--yy-space-1);
+  padding: 0 var(--yy-space-2);
+  border: 1px solid var(--yy-calm-line);
+  border-radius: var(--yy-radius-tag);
+  font-size: var(--yy-text-sm);
+  color: var(--yy-calm-text);
+}
+
+.note-page-preview {
+  margin: var(--yy-space-1) 0 0;
+  font-size: var(--yy-text-sm);
+  color: var(--yy-calm-text-sub);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

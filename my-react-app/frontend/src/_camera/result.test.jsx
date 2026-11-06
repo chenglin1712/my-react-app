@@ -1,9 +1,16 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { describe, test, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import axios from 'axios';
 import CameraResultStep from './result';
 
 vi.mock('axios');
+
+// 詳情 sheet 用的 Offcanvas 內部會讀 matchMedia，jsdom 沒有，補一個「不符合任何查詢」的版本
+beforeAll(() => {
+  window.matchMedia = vi.fn().mockImplementation((query) => ({
+    matches: false, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(),
+  }));
+});
 
 // auth.currentUser 預設是 null（模擬 token 過期／尚未登入），這正是原本
 // auth.currentUser?.getIdToken().then(...).catch(...).finally(...) 會整條
@@ -143,5 +150,41 @@ describe('CameraResultStep 的導覽與族語（E-4）', () => {
     fireEvent.click(screen.getByRole('button', { name: '重試' }));
     expect(await screen.findByText('balay')).toBeInTheDocument();
     expect(axios.post).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('CameraResultStep 的詞條詳情（Apple 化步驟 4-4）', () => {
+  beforeEach(() => {
+    mockCurrentUser = null;
+    axios.post.mockReset();
+  });
+
+  test('點詞條開詳情 sheet，永遠從底部滑出；關閉後收起', async () => {
+    axios.post.mockResolvedValueOnce(FAKE_RESPONSE);
+    render(<CameraResultStep selectedWords={['balay']} tribe="tayal" onRestart={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: /balay/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveAccessibleName('balay');
+    expect(dialog).toHaveClass('word-sheet--bottom');
+    fireEvent.click(screen.getByRole('button', { name: '關閉詳情' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+  test('換族語重新查詢：詳情立刻收起；查詢期間點開舊詞條，新結果回來時也會收掉，不留舊資料', async () => {
+    axios.post.mockResolvedValueOnce(FAKE_RESPONSE);
+    const { rerender } = render(<CameraResultStep selectedWords={['balay']} tribe="tayal" onRestart={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: /balay/ }));
+    await screen.findByRole('dialog');
+
+    let resolveNext;
+    axios.post.mockReturnValueOnce(new Promise((r) => { resolveNext = r; }));
+    rerender(<CameraResultStep selectedWords={['balay']} tribe="amis" onRestart={vi.fn()} />);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    // 查詢還沒回來，舊清單還在：先點開舊詞條
+    fireEvent.click(screen.getByRole('button', { name: /balay/ }));
+    await screen.findByRole('dialog');
+    resolveNext({ data: { exact_match_results: { cyux: [{ name: 'cyux', explanationItems: [{ chineseExplanation: '看' }] }] }, fuzzy_match_results: {} } });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(await screen.findByRole('button', { name: /cyux/ })).toBeInTheDocument();
   });
 });

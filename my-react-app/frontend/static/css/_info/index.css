@@ -17,6 +17,72 @@
     padding: var(--yy-space-6);
 }
 
+/* 有目錄時：桌面左側目錄 + 右側正文（正文行寬仍由 62ch 限制）；手機目錄在正文上方 */
+.info-layout.has-toc {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 760px);
+    gap: var(--yy-space-5);
+    justify-content: center;
+    align-items: start;
+}
+
+.info-layout.has-toc .info-card {
+    margin: 0;
+}
+
+.info-toc {
+    position: sticky;
+    top: 5.5rem; /* 全站導覽列（z-index 更高）下方 */
+    font-size: var(--yy-text-sm);
+}
+
+.info-rich h2,
+.info-heading {
+    scroll-margin-top: 5.5rem; /* 錨點跳轉不被全站導覽列蓋住 */
+}
+
+.info-toc-title {
+    margin: 0 0 var(--yy-space-2);
+    font-weight: 700;
+    color: var(--yy-calm-text);
+}
+
+.info-toc ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-left: 1px solid var(--yy-calm-rule);
+}
+
+.info-toc a {
+    display: block;
+    min-height: var(--yy-control-md);
+    padding: var(--yy-space-2) var(--yy-space-3);
+    color: var(--yy-calm-text-sub);
+    text-decoration: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .info-toc a:hover {
+        color: var(--yy-calm-accent);
+    }
+}
+
+@media (max-width: 900px) {
+    .info-layout.has-toc {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .info-toc {
+        position: static;
+    }
+
+    .info-toc ol {
+        border-left: none;
+        border-top: 1px solid var(--yy-calm-rule);
+    }
+}
+
 .info-title {
     margin: 0 0 var(--yy-space-2);
     font-family: var(--yy-font-heading);

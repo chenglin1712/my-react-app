@@ -65,3 +65,36 @@ describe('遊戲專區（E-5，P2-49）', () => {
     expect(navigate).toHaveBeenCalledWith(expect.stringMatching(/^\/game\/vocabulary\//));
   });
 });
+
+describe('遊戲專區的 bento 版面與單一強調色（Apple 化步驟 4-5）', () => {
+  test('詞彙遊戲是 bento 大圖卡，其他三張是一般卡片', () => {
+    const { container } = renderPage();
+    const cards = container.querySelectorAll('.gamehub-card');
+    expect(cards).toHaveLength(4);
+    expect(container.querySelectorAll('.gamehub-card--feature')).toHaveLength(1);
+    expect(cards[0]).toHaveClass('gamehub-card--feature');
+    expect(cards[0]).toHaveTextContent('詞彙遊戲');
+    // 大圖卡的大型裝飾圖示不進無障礙樹，也只有大圖卡有
+    expect(container.querySelectorAll('.gamehub-card-art')).toHaveLength(1);
+    expect(container.querySelector('.gamehub-card-art')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  test('卡片頭部沒有各遊戲不同的寫死漸層色（舊的紅、藍、金、綠）', () => {
+    const { container } = renderPage();
+    expect(container.innerHTML).not.toMatch(/--gamehub-head-band|--yy-(?:red|gold|blue|green)/);
+    container.querySelectorAll('.gamehub-card-head').forEach((head) => expect(head.getAttribute('style')).toBeNull());
+  });
+
+  test('選了遊戲後，族語標記統一樣式，不再用各族的識別色或菱形徽章', async () => {
+    const user = userEvent.setup();
+    const { container } = renderPage();
+    await user.click(screen.getByRole('button', { name: '詞彙遊戲' }));
+    const marks = container.querySelectorAll('.gamehub-tribe-mark');
+    expect(marks.length).toBeGreaterThanOrEqual(5);
+    marks.forEach((m) => {
+      expect(m.getAttribute('style')).toBeNull();
+      expect(m).toHaveAttribute('aria-hidden', 'true');
+    });
+    expect(container.querySelector('.yy-diamond-badge')).toBeNull();
+  });
+});

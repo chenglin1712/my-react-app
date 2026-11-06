@@ -37,6 +37,18 @@ describe('EvidencePanel 的詞形分析', () => {
     expect(screen.queryByRole('button', { name: /詞形分析/ })).not.toBeInTheDocument();
   });
 
+  test('分析結果收在折疊區裡：有摘要列（帶詞形）、預設展開、可以收合；分析前沒有折疊區', async () => {
+    apiPost.mockResolvedValue(analysis());
+    const { container } = render(<EvidencePanel token={derived} onPlayAudio={vi.fn()} tribeSlug="kavalan" />);
+    expect(container.querySelector('details.yy-morph-fold')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /詞形分析/ }));
+    await screen.findByText('把握程度高');
+    const fold = container.querySelector('details.yy-morph-fold');
+    expect(fold).toHaveAttribute('open');
+    expect(fold.querySelector('summary')).toHaveTextContent('詞形分析結果：lemintun');
+    expect(fold).toContainElement(screen.getByText('把握程度高'));
+  });
+
   test('沒有 token 時整個面板不顯示', () => {
     const { container } = render(<EvidencePanel token={null} tribeSlug="kavalan" />);
     expect(container).toBeEmptyDOMElement();

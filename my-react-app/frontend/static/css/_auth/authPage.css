@@ -1,7 +1,24 @@
-.auth-hero {
+.auth-hero,
+.auth-backdrop {
     padding: 60px 24px 90px;
     display: flex;
     justify-content: center;
+    /* 背景柔漸層（Apple 化步驟 4-1）：兩團淡銅與淡石板灰的光，圓心都落在區塊內、半徑收在邊界以內，所以看不到切邊；
+       顏色全走語意 token，深色模式自動跟著換 */
+    background:
+        radial-gradient(ellipse 46% 46% at 50% 40%, var(--yy-calm-tint-copper-2), transparent 100%),
+        radial-gradient(ellipse 32% 34% at 84% 58%, var(--yy-calm-tint-slate-2), transparent 100%),
+        radial-gradient(ellipse 28% 30% at 14% 56%, var(--yy-calm-tint-olive-1), transparent 100%);
+}
+
+/* 忘記密碼、重設密碼沒有 hero，用同一層漸層背景包住單張卡 */
+.auth-backdrop {
+    padding: 30px 24px 70px;
+}
+
+.auth-backdrop > :is(.forgot-container, .reset-container) {
+    width: 100%;
+    margin: 20px 0 0;
 }
 
 /* 共用的 .yy-hero 頁首拼色圖樣與 .yy-card 在 theme-v2.css 仍是舊風格，登入頁範圍內覆蓋；彩色光暈整個拿掉 */
@@ -17,6 +34,7 @@
     background: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: var(--yy-radius-panel);
+    box-shadow: var(--yy-elev-2); /* 單張大卡浮在漸層上；深色模式此 token 為 0 層，靠細框分層 */
 }
 
 .auth-panel {

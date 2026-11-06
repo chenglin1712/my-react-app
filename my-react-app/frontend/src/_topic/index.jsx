@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import RichTextRenderer from "../../components/_topic/RichTextRenderer";
 import { formatArticleDate } from "../../components/_topic/richText";
 import { SITE_NAME } from "../routeMeta";
+import { useHeadingToc, TOC_MIN_ITEMS } from "../../hooks/useHeadingToc";
 import "../../static/css/_topic/index.css";
 
 // 本期專題文章頁：首頁專題卡片點進來看到的內容，不用登入。
@@ -46,6 +47,8 @@ const TopicPage = () => {
     }, [state, topic]);
 
     const retry = useCallback(() => setReloadKey((n) => n + 1), []);
+    const bodyRef = useRef(null);
+    const toc = useHeadingToc(bodyRef, state === "ready", "tpage-sec", [topic]);
 
     if (state === "loading") {
         return (
@@ -102,7 +105,13 @@ const TopicPage = () => {
                     </figure>
                 )}
 
-                <div className="tpage-body">
+                {toc.length >= TOC_MIN_ITEMS && (
+                    <nav className="tpage-toc" aria-label="本文目錄">
+                        <p className="tpage-toc-title">本文目錄</p>
+                        <ol>{toc.map((item) => <li key={item.id}><a href={`#${item.id}`}>{item.title}</a></li>)}</ol>
+                    </nav>
+                )}
+                <div className="tpage-body" ref={bodyRef}>
                     <RichTextRenderer doc={topic.content} />
                 </div>
 

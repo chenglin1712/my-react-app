@@ -7,11 +7,12 @@ export function countActiveFilters({ filterLetter, frequencyFilter, showOnlyFavo
 }
 
 /** 目前套用的條件，轉成給人看的短句（空狀態、「清除篩選」旁的說明用）。 */
-export function describeActiveFilters({ filterLetter, frequencyFilter, showOnlyFavorites, selectedSubCategory }) {
+export function describeActiveFilters({ filterLetter, frequencyFilter, showOnlyFavorites, selectedSubCategory, partOfSpeech }) {
   const parts = [];
   if (filterLetter) parts.push(`開頭「${filterLetter}」`);
   if (String(frequencyFilter ?? '')) parts.push(`詞頻 ${frequencyFilter} 星`);
   if (showOnlyFavorites) parts.push('只顯示收藏');
   if (selectedSubCategory) parts.push(`分類「${selectedSubCategory}」`);
+  if (partOfSpeech) parts.push(`詞類「${partOfSpeech}」`);
   return parts;
 }

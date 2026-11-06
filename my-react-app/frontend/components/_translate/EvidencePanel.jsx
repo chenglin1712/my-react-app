@@ -78,7 +78,13 @@ const EvidencePanel = ({ token, onPlayAudio, tribeSlug }) => {
                 </button>
             )}
             {morphology.error && <p className="yy-morph-error" role="alert">{morphology.error}</p>}
-            <MorphologyResult result={morphology.result} onPlayAudio={onPlayAudio} compact lang={tribeLangCode(tribeSlug)} />
+            {morphology.result && (
+                // 第一層是「這個詞做過詞形分析」，展開才是詞根、詞綴等細節；預設展開，因為使用者剛剛主動按了分析
+                <details className="yy-morph-fold" open>
+                    <summary>詞形分析結果：{token.surface}</summary>
+                    <MorphologyResult result={morphology.result} onPlayAudio={onPlayAudio} compact lang={tribeLangCode(tribeSlug)} />
+                </details>
+            )}
         </div>
     );
 };

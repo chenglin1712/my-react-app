@@ -1,6 +1,7 @@
 import "../../static/css/_quiz/quiz_panel.css"
+import "../../static/css/_quiz/quiz_focus.css"
 import { useParams, useNavigate } from "react-router-dom";
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import AnswerBox from "./quiz_answerBox"
 import QuizAudioButton from "./quiz_audio_button"
 import MatchingQuestion from "./quiz_matching_question"
@@ -19,6 +20,7 @@ import { useOnlineStatus } from "@hooks/useOnlineStatus";
 import OfflineNotice from "@components/ui/OfflineNotice";
 import { confirmAction } from "@components/ui/ConfirmDialog";
 import { QUIZ_LEVEL_NAME_BY_ID } from "./quizLevels";
+import { useQuizFocusMode } from "./useQuizFocusMode";
 
 const Panel = ({ tribe = "tayal" }) => {
     const { level } = useParams();
@@ -32,6 +34,17 @@ const Panel = ({ tribe = "tayal" }) => {
         userAnswers, userStars, currentQuestionIndex, setCurrentQuestionIndex,
         handleStar, handleAnswer, retry,
     } = useQuizPanelData(level, tribe);
+
+    // 作答專注模式：只在「題目真的載入、可以作答」之後才收起全站導覽與測驗選單。
+    // 載入中、資料無效、建立失敗這幾個畫面沒有「離開測驗」按鈕，導覽必須留著當出口。
+    const quizReady = !isLoading && !uploadFailed && Boolean(data?.parts?.[0]?.questions?.length);
+    useQuizFocusMode(quizReady);
+
+    // 導覽被收起時，原本在導覽上的焦點會掉到 body；進入作答時把焦點移到測驗標題，鍵盤使用者從這裡接著 Tab
+    const titleRef = useRef(null);
+    useEffect(() => {
+        if (quizReady) titleRef.current?.focus({ preventScroll: true });
+    }, [quizReady]);
 
     const [showIntro, setShowIntro] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -210,7 +223,7 @@ const Panel = ({ tribe = "tayal" }) => {
                             }}
                         >離開測驗</button>
 
-                        <h2>{level_ch}</h2>
+                        <h2 ref={titleRef} tabIndex={-1}>{level_ch}</h2>
 
                         <div className="intro-container">
                             <button

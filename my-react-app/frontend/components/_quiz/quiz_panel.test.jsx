@@ -205,3 +205,38 @@ describe('Panel 作答頁細節（E-6，P2-59）', () => {
     expect(container.querySelector('audio')).toBeNull();
   });
 });
+
+describe('Panel 的作答專注模式（Apple 化步驟 4-6a）', () => {
+  test('作答畫面掛載時 <html> 帶 data-quiz-focus，卸載（離開作答）後一定移除', () => {
+    useQuizPanelData.mockReturnValue(baseHookState());
+    const { unmount } = render(<Panel tribe="tayal" />);
+    expect(document.documentElement).toHaveAttribute('data-quiz-focus', 'true');
+    unmount();
+    expect(document.documentElement).not.toHaveAttribute('data-quiz-focus');
+  });
+
+  test('專注模式下仍有離開測驗的出口與題目導覽', () => {
+    useQuizPanelData.mockReturnValue(baseHookState());
+    render(<Panel tribe="tayal" />);
+    expect(screen.getByRole('button', { name: '離開測驗' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '下一題' })).toBeInTheDocument();
+  });
+});
+
+describe('Panel 專注模式只在題目可作答時啟用（審查補強：載入與錯誤畫面沒有離開鈕，導覽必須留著）', () => {
+  test.each([
+    ['載入中', { isLoading: true }],
+    ['題目資料無效', { data: { parts: [{ questions: [] }] } }],
+    ['測驗建立失敗', { uploadFailed: true }],
+  ])('%s：不掛 data-quiz-focus', (_name, overrides) => {
+    useQuizPanelData.mockReturnValue(baseHookState(overrides));
+    render(<Panel tribe="tayal" />);
+    expect(document.documentElement).not.toHaveAttribute('data-quiz-focus');
+  });
+
+  test('進入作答時焦點移到測驗標題（導覽收起後不讓焦點掉到 body）', () => {
+    useQuizPanelData.mockReturnValue(baseHookState());
+    render(<Panel tribe="tayal" />);
+    expect(document.activeElement).toBe(screen.getByRole('heading', { level: 2, name: /.*/ }));
+  });
+});

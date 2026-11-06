@@ -43,6 +43,48 @@
     vertical-align: middle;
 }
 
+/* 分數環：SVG 圓環，用 pathLength=100 讓 stroke-dasharray 直接等於百分比；靜態呈現，沒有動畫 */
+.paper-score .score-ring {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 112px;
+    height: 112px;
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--yy-calm-accent);
+    font-family: var(--yy-font-body);
+}
+
+.score-ring-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg); /* 從十二點鐘方向開始填 */
+}
+
+.score-ring-track,
+.score-ring-fill {
+    fill: none;
+    stroke-width: 8;
+}
+
+.score-ring-track {
+    stroke: var(--yy-calm-rule);
+}
+
+.score-ring-fill {
+    stroke: var(--yy-calm-accent);
+    stroke-linecap: butt; /* round 在 0% 會殘留小圓點、100% 頂端會有接縫 */
+    stroke-dasharray: var(--ring-pct, 0) 100;
+}
+
+.paper-score .score {
+    position: relative;
+}
+
 .paper-score .score-circle {
     display: inline-block;
     padding: 8px 16px;

@@ -41,26 +41,13 @@
     padding: 36px 24px 64px;
 }
 
-.translate-direction-bar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    margin-bottom: 22px;
-}
-
-.translate-direction-label {
-    font-family: var(--yy-font-body);
-    font-size: 14px;
-    color: var(--yy-calm-text-sub);
-    min-width: 88px;
-    text-align: center;
-}
-
 .translate-swap-btn {
     position: relative;
-    width: 40px;
-    height: 40px;
+    align-self: center;
+    justify-self: center;
+    flex-shrink: 0;
+    width: var(--yy-control-md);
+    height: var(--yy-control-md);
     border-radius: var(--yy-radius-round);
     border: var(--yy-border-width) solid var(--yy-calm-line);
     background: var(--yy-calm-surface);
@@ -69,7 +56,8 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: transform 120ms var(--ease-out);
+    box-shadow: var(--yy-elev-2);
+    transition: transform var(--dur-press) var(--ease-out);
 }
 .translate-swap-btn:active {
     transform: scale(var(--yy-ui-press));
@@ -77,16 +65,6 @@
 .translate-swap-btn:focus-visible {
     outline: var(--yy-ui-focus-ring);
     outline-offset: var(--yy-ui-focus-offset);
-}
-/* 按鈕 40px：用透明 ::after 把點擊區擴成 44px，不改變外觀（共用寫法見 theme-v2.css） */
-.translate-swap-btn::after {
-    content: "";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: max(100%, var(--yy-control-md));
-    height: max(100%, var(--yy-control-md));
-    transform: translate(-50%, -50%);
 }
 @media (hover: hover) and (pointer: fine) {
   .translate-swap-btn:hover {
@@ -127,24 +105,30 @@
 
 .translate-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: var(--yy-space-4);
+    align-items: stretch;
 }
 @media (max-width: 900px) {
     .translate-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* 上下排列時互換鈕夾在兩張卡片之間，箭頭轉成上下向 */
+    .translate-swap-btn svg {
+        transform: rotate(90deg);
     }
 }
 
 .translate-page .yy-card.translate-pane {
-    background: transparent;
-    border: none;
-    border-top: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: 0;
+    background: var(--yy-calm-surface);
+    border: var(--yy-border-width) solid var(--yy-calm-rule);
+    border-radius: var(--yy-radius-panel);
+    box-shadow: var(--yy-elev-2);
 }
 
 .translate-pane {
-    padding: var(--yy-space-4) 0 0;
+    padding: var(--yy-space-4);
     display: flex;
     flex-direction: column;
     min-height: 280px;
@@ -404,40 +388,37 @@
 }
 
 .translate-guest-placeholder {
-    height: 52px;
+    height: 28px;
 }
 
 .translate-guest-strip {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: var(--yy-space-2) var(--yy-space-3);
-    padding: var(--yy-space-3) var(--yy-space-4);
-    background: var(--yy-calm-surface);
-    border: 1px solid var(--yy-calm-line);
-    border-radius: var(--yy-radius-panel);
+    justify-content: center;
+    gap: var(--yy-space-1) var(--yy-space-3);
 }
 
 .translate-guest-label {
+    margin-right: var(--yy-space-2);
     font-family: var(--yy-font-body);
     font-size: var(--yy-text-sm);
-    padding: 2px var(--yy-space-2);
-    background: var(--yy-calm-tag);
-    border-radius: var(--yy-radius-tag);
-    color: var(--yy-calm-tag-on);
+    font-weight: 700;
+    color: var(--yy-calm-text);
 }
 
 .translate-guest-line {
     margin: 0;
-    flex: 1 1 260px;
+    flex: 0 1 auto;
+    text-align: center;
     font-size: var(--yy-text-sm);
     line-height: var(--yy-leading-normal);
     color: var(--yy-calm-text-sub);
 }
 
 .translate-guest-count {
-    font-size: var(--yy-text-lg);
-    font-weight: 900;
+    font-size: var(--yy-text-base);
+    font-weight: 700;
     color: var(--yy-calm-text);
     font-variant-numeric: tabular-nums;
 }
@@ -556,5 +537,66 @@
     }
     .translate-guest-callout {
         padding: var(--yy-space-4);
+    }
+}
+
+/* ===== 形態分析結果：折疊層次（Apple 化步驟 4-3）===== */
+.yy-morph-fold {
+    margin-top: var(--yy-space-3);
+    border-top: var(--yy-border-width) solid var(--yy-calm-rule);
+}
+
+.yy-morph-fold > summary {
+    display: flex;
+    align-items: center;
+    gap: var(--yy-space-2);
+    min-height: var(--yy-control-md);
+    font-size: var(--yy-text-sm);
+    font-weight: 700;
+    color: var(--yy-calm-text);
+    cursor: pointer;
+    list-style: none;
+}
+
+.yy-morph-fold > summary::-webkit-details-marker {
+    display: none;
+}
+
+/* 展開狀態用箭頭提示（形狀線索，不只靠顏色） */
+.yy-morph-fold > summary::before {
+    content: "\25B8";
+    display: inline-block;
+    transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.yy-morph-fold[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+.yy-morph-fold > summary:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .yy-morph-fold > summary::before {
+        transition: none;
+    }
+}
+
+/* 減少動態：互換鈕不旋轉、不縮放（狀態改變仍靠焦點框與按下時的外框回饋） */
+@media (prefers-reduced-motion: reduce) {
+    .translate-swap-btn {
+        transition: none;
+    }
+
+    .translate-swap-btn:active {
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) and (hover: hover) and (pointer: fine) {
+    .translate-swap-btn:hover {
+        transform: none;
     }
 }

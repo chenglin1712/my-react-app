@@ -30,6 +30,7 @@ const WordResultsSection = ({
   serverPaginated = false,
   totalCount,
   loadingMore = false,
+  onOpenDetail,
 }) => {
   const filteredSorted = serverPaginated ? wordsFlat : filterAndSortWords(wordsFlat);
   const visibleWords = serverPaginated ? wordsFlat : filteredSorted.slice(0, visibleCount);
@@ -66,6 +67,7 @@ const WordResultsSection = ({
                 hasSentenceAudio={hasSentenceAudio}
                 isFavorited={favoriteWords.has(wordData.name)}
                 failedAudio={failedAudio}
+                onOpenDetail={onOpenDetail}
               />
             </ErrorBoundary>
           );

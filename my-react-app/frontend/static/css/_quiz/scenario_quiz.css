@@ -398,3 +398,33 @@
         justify-content: center;
     }
 }
+
+/* 答對答錯回饋的輕微彈簧（Apple 化步驟 4-6b）：只動 transform 與 opacity，只在滑鼠或觸控作答時加上 .is-springy；
+   鍵盤作答不加動畫。文字（「答對了！」「再留意一下這個情境。」）與圖示（勾、叉）一直都在，所以狀態不只靠顏色與動態。 */
+.scenario-quiz-feedback.is-springy {
+    animation: scenario-feedback-in var(--dur-spring) var(--ease-spring) both;
+}
+
+.scenario-quiz-option.is-springy .scenario-quiz-option-result {
+    animation: scenario-icon-pop var(--dur-spring) var(--ease-spring) both;
+}
+
+@keyframes scenario-feedback-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px) scale(0.97);
+    }
+}
+
+@keyframes scenario-icon-pop {
+    from {
+        transform: scale(0.5);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .scenario-quiz-feedback.is-springy,
+    .scenario-quiz-option.is-springy .scenario-quiz-option-result {
+        animation: none;
+    }
+}

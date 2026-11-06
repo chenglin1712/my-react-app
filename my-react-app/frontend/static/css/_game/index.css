@@ -64,12 +64,70 @@
     padding: 50px 56px 90px;
 }
 
+/* bento 版面（Apple 化步驟 4-5）：左側一張大圖卡（詞彙遊戲）佔三列高，右側三張小卡直排 */
 .gamehub-grid {
-    max-width: 900px;
+    max-width: 960px;
     margin: 0 auto;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 26px;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: var(--yy-space-4);
+}
+
+.gamehub-card--feature {
+    grid-row: span 3;
+    display: flex;
+    flex-direction: column;
+    background: var(--yy-calm-tint-copper-2) !important;
+}
+
+.gamehub-card--feature .gamehub-card-head {
+    flex-direction: column;
+    gap: var(--yy-space-4);
+    padding: 44px 32px 20px;
+    background: transparent;
+    border-bottom: none;
+}
+
+.gamehub-card--feature .gamehub-card-icon {
+    width: 96px;
+    height: 96px;
+    border-radius: var(--yy-radius-block);
+}
+
+.gamehub-card--feature .gamehub-card-icon svg {
+    width: 44px;
+    height: 44px;
+}
+
+.gamehub-card--feature .gamehub-card-title {
+    font-family: var(--yy-font-heading);
+    font-size: var(--yy-text-3xl);
+}
+
+.gamehub-card--feature .gamehub-card-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 0 32px 32px;
+}
+
+/* 大圖卡中間的大型裝飾圖示：純裝飾，用銅褐色，不搶標題與說明 */
+.gamehub-card-art {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    color: var(--yy-calm-copper);
+}
+
+.gamehub-card--feature .gamehub-card-body p {
+    font-size: var(--yy-text-base);
+    min-height: 0;
+}
+
+.gamehub-card--feature .gamehub-card-badge {
+    align-self: flex-start;
 }
 
 .gamehub-card {
@@ -133,7 +191,7 @@
     gap: 18px;
     align-items: flex-start;
     background: var(--yy-calm-info-bg);
-    border-bottom: 3px solid var(--yy-calm-line);
+    border-bottom: 1px solid var(--yy-calm-rule);
 }
 
 .gamehub-card-icon {
@@ -172,7 +230,6 @@
     line-height: 1.8;
     color: var(--yy-calm-text-sub);
     margin: 0 0 16px;
-    min-height: 64px;
 }
 
 .gamehub-card-badge {
@@ -291,8 +348,52 @@
     margin: 0 0 18px;
 }
 
+/* 族語標記：不再各族一色，統一石板灰底、象牙白字 */
+.gamehub-tribe-mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 10px;
+    border-radius: var(--yy-radius-control);
+    background: var(--yy-calm-block);
+    color: var(--yy-calm-block-on);
+    font-size: var(--yy-text-sm);
+    font-weight: 700;
+}
+
+.gamehub-tribe-mark--lg {
+    width: 60px;
+    height: 60px;
+    margin-bottom: 12px;
+    font-size: var(--yy-text-lg);
+}
+
 @media (max-width: 720px) {
     .gamehub-grid {
         grid-template-columns: 1fr;
+    }
+
+    .gamehub-card--feature {
+        grid-row: auto;
+    }
+
+    .gamehub-card--feature .gamehub-card-head {
+        flex-direction: row;
+        padding: 28px 24px 20px;
+    }
+
+    .gamehub-card-art {
+        display: none;
+    }
+
+    .gamehub-card--feature .gamehub-card-icon {
+        width: 64px;
+        height: 64px;
+    }
+
+    .gamehub-card--feature .gamehub-card-title {
+        font-size: var(--yy-text-xl);
     }
 }

@@ -92,7 +92,7 @@ const CameraWizard = () => {
                 </div>
 
                 <div className="yy-fade-up camera-stepbar-wrap">
-                    <StepBar steps={STEP_LABELS} current={step} />
+                    <StepBar steps={STEP_LABELS} current={step} variant="segments" />
                 </div>
             </section>
 
@@ -110,6 +110,10 @@ const CameraWizard = () => {
                                     <span>點此選擇圖片</span>
                                 </div>
                             )}
+                            {/* 取景框上的玻璃提示：浮在圖片或空框之上，說明這一步要做什麼（文字對比由毛玻璃材質的守門測試把關） */}
+                            <span className="camera-dropzone-hint yy-glass" aria-hidden="true">
+                                {image ? "點擊可更換圖片" : "把想辨識的物件放在框內"}
+                            </span>
                         </label>
 
                         <div className="camera-step1-panel">

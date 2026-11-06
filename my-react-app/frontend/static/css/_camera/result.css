@@ -39,14 +39,26 @@
   margin-bottom: 14px;
 }
 
-.camera-step3 .list-group-item {
-  border: none !important;
-  border-bottom: 1px solid var(--yy-calm-rule) !important;
-  border-radius: 0 !important;
-  background: transparent;
+/* 結果是兩層卡片（Apple 化步驟 4-4，與單詞查詢同一套）：細框、面板圓角、沒有陰影 */
+.camera-step3 .list-group {
+  display: grid;
+  gap: var(--yy-space-3);
+}
+
+.camera-step3 .list-group > .list-group-item {
+  border: var(--yy-border-width) solid var(--yy-calm-rule) !important;
+  border-radius: var(--yy-radius-panel) !important;
+  background: var(--yy-calm-surface);
   color: var(--yy-calm-text);
   margin-bottom: 0;
-  padding: var(--yy-space-3) var(--yy-space-1);
+  padding: var(--yy-space-3) var(--yy-space-4);
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .camera-step3 .list-group > .list-group-item:hover {
+    border-color: var(--yy-calm-copper) !important;
+  }
 }
 
 .camera-step3 .list-group-item .list-group-item {

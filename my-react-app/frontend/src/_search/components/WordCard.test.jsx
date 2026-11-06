@@ -165,3 +165,43 @@ describe('WordCard', () => {
     });
   });
 });
+
+describe('WordCard 的詳情 sheet 模式（Apple 化步驟 4-2）', () => {
+  const result = {
+    name: 'babaw',
+    frequency: 3,
+    explanationItems: [{ chineseExplanation: '上面', partOfSpeech: '名詞', category: '空間' }],
+  };
+  const props = { word: '上面', keyName: 'k1', isExpanded: false, toggleExpand: vi.fn(), toggleFavorite: vi.fn(), wordName: 'babaw', playAudio: vi.fn(), isFavorited: false };
+
+  test('傳 onOpenDetail 時，點標題開 sheet（帶 keyName、word、result），不呼叫 toggleExpand，也不是 disclosure', () => {
+    const onOpenDetail = vi.fn();
+    const toggleExpand = vi.fn();
+    render(<WordCard {...props} result={result} toggleExpand={toggleExpand} onOpenDetail={onOpenDetail} />);
+    const title = screen.getByRole('button', { name: /babaw/ });
+    expect(title).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(title).not.toHaveAttribute('aria-expanded');
+    fireEvent.click(title);
+    expect(onOpenDetail).toHaveBeenCalledWith({ keyName: 'k1', word: '上面', result });
+    expect(toggleExpand).not.toHaveBeenCalled();
+  });
+
+  test('第二層顯示詞性、分類標籤與詞頻；字卡本身不展開詳情', () => {
+    render(<WordCard {...props} result={result} onOpenDetail={vi.fn()} />);
+    expect(screen.getByText('名詞')).toBeInTheDocument();
+    expect(screen.getByText('空間')).toBeInTheDocument();
+    expect(screen.queryByText('詞頻：')).not.toBeInTheDocument();
+  });
+
+  test('詞頻是 0、也沒有詞性時，不會印出一個孤單的「0」，第二層整個不出現', () => {
+    const { container } = render(<WordCard {...props} result={{ name: 'x', frequency: 0, explanationItems: [{ chineseExplanation: '義' }] }} onOpenDetail={vi.fn()} />);
+    expect(container.querySelector('.word-card-meta')).toBeNull();
+    expect(container).not.toHaveTextContent(/(^|\s)0(\s|$)/);
+  });
+
+  test('沒有 onOpenDetail（影像辨識頁）時維持原地展開，沒有第二層', () => {
+    const { container } = render(<WordCard {...props} result={result} isExpanded />);
+    expect(container.querySelector('.word-card-meta')).toBeNull();
+    expect(screen.getByText('詞頻：')).toBeInTheDocument();
+  });
+});
