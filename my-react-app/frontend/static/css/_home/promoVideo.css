@@ -21,7 +21,7 @@
   inset: 0;
   z-index: -1;
   border: var(--yy-border-width) solid var(--yy-calm-copper);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-panel);
   transform: translate(12px, 12px);
   transition: transform 380ms var(--ease-out);
 }
@@ -38,7 +38,7 @@
   overflow: hidden;
   background: linear-gradient(135deg, var(--yy-calm-block) 0%, var(--yy-calm-olive) 100%);
   border: var(--yy-border-width) solid var(--yy-calm-line);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-block);
 }
 
 .home-promo__video,
@@ -63,7 +63,7 @@
   background: var(--yy-calm-surface);
   color: var(--yy-calm-text);
   border: var(--yy-border-width) solid var(--yy-calm-line);
-  border-radius: 50%;
+  border-radius: var(--yy-radius-round);
   cursor: pointer;
   transition: transform 120ms var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
@@ -93,7 +93,7 @@
   background: transparent;
   color: var(--yy-calm-text);
   border: var(--yy-border-width) solid var(--yy-calm-line);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-control);
   font: inherit;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -193,7 +193,7 @@
   background: var(--yy-calm-bg);
   color: var(--yy-calm-text);
   border: var(--yy-border-width) solid var(--yy-calm-line);
-  border-radius: 999px;
+  border-radius: var(--yy-radius-pill);
   font-size: var(--yy-text-sm);
   font-weight: 700;
 }

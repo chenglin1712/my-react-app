@@ -24,11 +24,11 @@
     box-sizing: border-box;
 }
 
-/* 文字標誌：實色字、襯線標題字型（--yy-font-heading，D9 決定後跟著換）。
+/* 文字標誌：實色字、品牌字標宋體（--yy-font-brand，只載入字標用字的子集；標題其餘已改無襯線）。
    D6（logo 位置）還沒決定，所以只保留原本的小菱形，改成銅褐色。 */
 .logo {
-    font-family: var(--yy-font-heading);
-    font-weight: 700;
+    font-family: var(--yy-font-brand);
+    font-weight: 900;
     font-size: 22px;
     letter-spacing: 0.04em;
     cursor: pointer;
@@ -38,7 +38,7 @@
     min-height: var(--yy-control-md);
     color: var(--yy-calm-text);
     position: relative;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-tag);
 }
 
 .logo::before {
@@ -81,7 +81,7 @@
     color: var(--yy-calm-text);
     min-height: var(--yy-control-md);
     padding: 0 14px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     border: var(--yy-border-width) solid transparent;
     font-size: var(--yy-text-sm);
     font-weight: 600;
@@ -175,7 +175,7 @@
     gap: 8px;
     min-height: var(--yy-control-md);
     padding: 4px 14px 4px 6px;
-    border-radius: 22px;
+    border-radius: var(--yy-radius-control);
     cursor: pointer;
     font-size: var(--yy-text-sm);
     font-family: var(--yy-font-body);
@@ -206,7 +206,7 @@
 .auth-container-user img.auth-image {
     width: 32px;
     height: 32px;
-    border-radius: 50%;
+    border-radius: var(--yy-radius-round);
     object-fit: cover;
     flex-shrink: 0;
     border: var(--yy-border-width) solid var(--yy-calm-copper);
@@ -270,7 +270,7 @@
     font-weight: 600;
     min-height: var(--yy-control-lg);
     padding: 0 16px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     border: var(--yy-border-width) solid transparent;
     transition: background-color 160ms var(--ease-out), transform 120ms var(--ease-out);
 }
@@ -304,7 +304,7 @@
     color: var(--yy-calm-text);
     background-color: transparent;
     border: none;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     min-width: var(--yy-control-md);
     min-height: var(--yy-control-md);
     padding: 0 8px;
@@ -330,7 +330,7 @@
     gap: 10px;
     min-height: var(--yy-control-lg);
     padding: 0 16px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     cursor: pointer;
     font-size: var(--yy-text-base);
     font-family: var(--yy-font-body);
@@ -360,7 +360,7 @@
 .mobile-container-user img.mobile-image {
     width: 32px;
     height: 32px;
-    border-radius: 50%;
+    border-radius: var(--yy-radius-round);
     object-fit: cover;
     flex-shrink: 0;
     border: var(--yy-border-width) solid var(--yy-calm-copper);
@@ -374,7 +374,7 @@
     width: 350px;
     height: 100%;
     background-color: var(--yy-surface);
-    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--yy-elev-4), var(--yy-edge-4);
     z-index: var(--yy-z-drawer);
     visibility: hidden;
     /* 用 transform 位移而不是動 right（審查項 P2-85）：不觸發版面重算。
@@ -427,7 +427,7 @@
     margin: 0 12px 0 0;
     min-width: var(--yy-control-md);
     min-height: var(--yy-control-md);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -452,10 +452,10 @@
     margin-top: 0;
     background-color: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    box-shadow: var(--yy-shadow-overlay);
+    box-shadow: var(--yy-elev-4);
     min-width: 160px;
     z-index: var(--yy-z-dropdown);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     flex-direction: column;
     overflow: hidden;
     opacity: 0;
@@ -555,8 +555,8 @@
     min-width: 176px;
     background-color: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    box-shadow: var(--yy-shadow-overlay);
-    border-radius: var(--yy-ui-radius);
+    box-shadow: var(--yy-elev-4);
+    border-radius: var(--yy-radius-panel);
     z-index: var(--yy-z-dropdown);
     overflow: hidden;
     opacity: 0;
@@ -791,7 +791,7 @@
     background: var(--yy-calm-text);
     color: var(--yy-calm-bg);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     font-weight: 700;
 }
 
@@ -811,10 +811,31 @@
     }
 }
 
-/* 筆記下拉：細框、3px 圓角、柔和的下緣陰影，從按鈕左上角展開 */
+/* 筆記下拉：細框、20px 圓角、浮層高度 4 的柔和陰影，從按鈕左上角展開 */
 .navbar--magazine .dropdown-content {
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
-    box-shadow: 0 14px 22px -16px color-mix(in srgb, var(--yy-calm-text) 55%, transparent);
+    border-radius: var(--yy-radius-panel);
+    box-shadow: var(--yy-elev-4);
     transform-origin: top left;
 }
+
+/* 導覽毛玻璃（Apple 化步驟 1-6 套用）。模糊放在 ::before：直接在 .navbar 上寫 backdrop-filter 會讓裡面 position:fixed 的
+   側欄與遮罩改以導覽列為定位基準。雜誌版（--magazine，非 sticky）不套用。降級規則沿用 token（reduced-transparency／不支援時純色）。 */
+.navbar:not(.navbar--magazine) { background-color: transparent; }
+.navbar:not(.navbar--magazine)::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--yy-glass-bg);
+    -webkit-backdrop-filter: saturate(var(--yy-glass-saturate)) blur(var(--yy-glass-blur));
+    backdrop-filter: saturate(var(--yy-glass-saturate)) blur(var(--yy-glass-blur));
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .navbar:not(.navbar--magazine)::before { background: var(--yy-glass-bg-solid); }
+}
+@media (prefers-reduced-transparency: reduce) {
+    .navbar:not(.navbar--magazine)::before { background: var(--yy-glass-bg-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+.navbar:not(.navbar--magazine) :focus-visible { box-shadow: 0 0 0 calc(var(--yy-ui-focus-offset) + 2px) var(--yy-glass-halo); }

@@ -16,7 +16,7 @@
 
 .formTitle {
     font-family: var(--yy-font-heading);
-    font-size: var(--yy-text-xl);
+    font-size: var(--yy-type-h3);
     font-weight: 700;
     color: var(--yy-calm-text);
     margin-bottom: 8px;
@@ -65,7 +65,7 @@
     align-items: center;
     gap: 10px;
     background: var(--yy-calm-surface);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     padding: 10px 16px;
     width: 100%;
     border: var(--yy-border-width) solid var(--yy-calm-line);
@@ -135,7 +135,7 @@
     min-height: var(--yy-control-md);
     font-size: 15px;
     font-weight: 700;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     cursor: pointer;
     transition: transform 120ms var(--ease-out), background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }

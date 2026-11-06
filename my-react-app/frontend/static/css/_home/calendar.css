@@ -7,7 +7,7 @@
     background: var(--yy-calm-block);
     color: var(--yy-calm-block-on);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
 }
 
 .exam-header {
@@ -178,7 +178,7 @@ a.exam-link:focus-visible {
 
 .exam-card[data-state="current"] .exam-status {
     padding: 1px 10px;
-    border-radius: 999px;
+    border-radius: var(--yy-radius-pill);
     background: var(--yy-calm-block-accent);
     color: var(--yy-calm-block-deep);
     font-weight: 700;
@@ -207,7 +207,7 @@ a.exam-link:focus-visible {
     margin: 0 0 8px;
     padding: 24px 10px;
     border: var(--yy-border-width) dashed var(--yy-calm-block-on);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     text-align: center;
     font-weight: 700;
 }
@@ -220,7 +220,7 @@ a.exam-link:focus-visible {
     min-height: var(--yy-control-md);
     padding: 0 var(--yy-space-4);
     border: var(--yy-border-width) solid var(--yy-calm-block-on);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     background: transparent;
     color: var(--yy-calm-block-on);
     font: inherit;
@@ -255,7 +255,7 @@ a.exam-link:focus-visible {
 .exam-skeleton__row {
     display: block;
     height: 56px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-tag);
 }
 
 @media (max-width: 480px) {

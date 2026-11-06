@@ -14,7 +14,7 @@
 
     background: var(--yy-calm-info-bg);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
 }
 
 .panel-subtitle {
@@ -40,7 +40,7 @@
 
     background: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
 
     display: flex;
     flex-direction: column;
@@ -69,7 +69,7 @@
 .level-icon-text {
     width: 72px;
     height: 72px;
-    border-radius: 50%;
+    border-radius: var(--yy-radius-round);
     border: var(--yy-border-width) solid var(--yy-calm-line);
     display: flex;
     align-items: center;
@@ -125,7 +125,7 @@
     padding: 2px 8px;
     color: var(--yy-calm-accent);
     border: 1px solid var(--yy-calm-accent);
-    border-radius: 3px;
+    border-radius: var(--yy-radius-tag);
     font-weight: 700;
 }
 
@@ -137,7 +137,7 @@
     color: var(--yy-calm-info-bg);
     background: var(--yy-calm-accent);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     font-weight: 700;
     cursor: pointer;
     transition: transform .15s ease, background .15s ease;
@@ -178,7 +178,7 @@
     background: var(--yy-calm-accent);
     border: var(--yy-border-width) solid var(--yy-calm-line);
     border-left: 10px solid var(--yy-calm-olive);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
 }
 
 .scenario-entry h3 {
@@ -202,7 +202,7 @@
     color: var(--yy-calm-text);
     background: var(--yy-calm-olive);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: 3px;
+    border-radius: var(--yy-radius-tag);
     font-family: var(--yy-font-body);
     font-size: 14px;
     font-weight: 700;
@@ -214,7 +214,7 @@
     color: var(--yy-calm-info-bg);
     background: var(--yy-calm-accent);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     font-weight: 700;
     cursor: pointer;
     transition: transform .15s ease, background .15s ease;

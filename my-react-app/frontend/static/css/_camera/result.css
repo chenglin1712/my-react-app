@@ -30,7 +30,7 @@
 
 .camera-step3-title {
   font-family: var(--yy-font-heading);
-  font-size: var(--yy-text-xl);
+  font-size: var(--yy-type-h3);
   font-weight: 700;
   margin: 0;
 }

@@ -12,7 +12,7 @@
 
 .zone-title {
   font-family: var(--yy-font-heading);
-  font-size: var(--yy-text-3xl);
+  font-size: var(--yy-type-h1);
   font-weight: 700;
   color: var(--yy-calm-text);
   margin-bottom: 0.4rem;
@@ -38,7 +38,7 @@
   flex: 0 1 212px;
   min-width: 0; /* 長族語詞不能把卡片撐寬 */
   background: var(--yy-calm-surface);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-panel);
   border: var(--yy-border-width) solid var(--yy-calm-rule);
   padding: 1.5rem 1.25rem 1.25rem;
   display: flex;
@@ -107,7 +107,7 @@
   font-size: var(--yy-text-sm);
   font-weight: 700;
   padding: 0.3rem 0.9rem;
-  border-radius: 999px;
+  border-radius: var(--yy-radius-pill);
   margin-top: auto;
 }
 

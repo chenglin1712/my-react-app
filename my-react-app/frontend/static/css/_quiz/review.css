@@ -2,7 +2,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     margin-bottom: 16px;
     position: relative;
 }
@@ -20,13 +20,13 @@
 
     background: var(--yy-calm-accent);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-tag);
 }
 
 .review-intro-btn {
     background: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     color: var(--yy-calm-text);
     padding: 6px 12px;
     display: flex;
@@ -47,7 +47,7 @@
     color: var(--yy-calm-text);
     border: var(--yy-border-width) solid var(--yy-calm-line);
     padding: 10px 14px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     margin-top: 10px;
     position: absolute;
     top: 80%;
@@ -110,7 +110,7 @@
 
 .nav-item {
     padding: 5px 10px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     cursor: pointer;
     background: none;
     border: none;
@@ -137,7 +137,7 @@
 .nav-item-badge {
     margin-left: 6px;
     padding: 1px 6px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-tag);
     font-size: var(--yy-text-sm);
     background-color: var(--yy-calm-accent);
     color: var(--yy-calm-surface);
@@ -155,7 +155,7 @@
     border-collapse: collapse;
     background-color: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     overflow: hidden;
 }
 
@@ -180,7 +180,7 @@
     border: var(--yy-border-width) solid var(--yy-calm-line);
     background: var(--yy-calm-surface);
     color: var(--yy-calm-text);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     font-weight: 600;
     cursor: pointer;
 }
@@ -221,7 +221,7 @@
     background: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-line);
     padding: 6px 12px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     cursor: pointer;
 }
 
@@ -245,14 +245,14 @@
     flex: 1.5;
     border: var(--yy-border-width) solid var(--yy-calm-line);
     padding: 12px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     background: var(--yy-calm-surface);
 }
 
 .review-q {
     background: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     padding: 16px 20px;
     height: 85%;
     color: var(--yy-calm-text);
@@ -261,7 +261,7 @@
 .review-q-btn {
     margin-top: 8px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-calm-accent);
     color: var(--yy-calm-surface);
     font-weight: bold;
@@ -314,7 +314,7 @@
     align-items: center;
     transition: var(--transition-interactive);
     min-width: auto;
-    border-radius: 50%;
+    border-radius: var(--yy-radius-round);
     padding: 10px;
     cursor: pointer;
 }
@@ -331,7 +331,7 @@
 }
 
 .review-question-body img {
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     border: var(--yy-border-width) solid var(--yy-calm-line);
 }
 
@@ -372,7 +372,7 @@
 .option-img-wrapper {
     position: relative;
     border: var(--yy-border-width) solid transparent;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     padding: 2px;
 }
 
@@ -394,7 +394,7 @@
     color: var(--yy-calm-surface);
     font-size: 14px;
     padding: 1px 4px;
-    border-radius: 3px;
+    border-radius: var(--yy-radius-tag);
 }
 
 .correct-tip {

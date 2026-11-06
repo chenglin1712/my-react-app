@@ -31,7 +31,7 @@
     display: inline-block;
     padding: 1px 10px;
     border: var(--yy-border-width) solid transparent;
-    border-radius: 2px;
+    border-radius: var(--yy-radius-tag);
     background: var(--yy-calm-block);
     color: var(--yy-calm-block-on);
     font-size: var(--yy-text-sm);
@@ -64,7 +64,7 @@
     overflow: hidden;
     background: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-block);
 }
 
 .news-carousel {
@@ -165,7 +165,7 @@
     margin: 0;
     padding: 0;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: 50%;
+    border-radius: var(--yy-radius-round);
     background: var(--yy-calm-bg);
     color: var(--yy-calm-text);
     font: inherit;
@@ -327,7 +327,7 @@ a.news-text-item:active {
     gap: var(--yy-space-3);
     padding: 28px 12px;
     border: var(--yy-border-width) dashed var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     text-align: center;
     font-weight: 700;
 }
@@ -341,7 +341,7 @@ a.news-text-item:active {
     min-height: var(--yy-control-md);
     padding: 0 var(--yy-space-4);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     background: transparent;
     color: var(--yy-calm-text);
     font: inherit;

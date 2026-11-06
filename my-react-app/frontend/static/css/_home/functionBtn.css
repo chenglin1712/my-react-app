@@ -18,7 +18,7 @@
 .function-section-title {
     margin: 0;
     font-family: var(--yy-font-heading);
-    font-size: var(--yy-text-2xl);
+    font-size: var(--yy-type-h2);
     font-weight: 700;
     line-height: 1.3;
     letter-spacing: 0.06em;
@@ -41,7 +41,7 @@
     color: inherit;
     text-decoration: none;
     border-top: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     transition: transform 120ms var(--ease-out);
 }
 
@@ -74,7 +74,7 @@
     font-weight: 700;
     color: var(--yy-calm-text);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
 }
 
 /* 需要登入的功能，訪客看到的標記（文字，不只靠顏色） */
@@ -85,13 +85,13 @@
     letter-spacing: 0.04em;
     color: var(--yy-calm-tag-on);
     background: var(--yy-calm-tag);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
 }
 
 .home-func-card h3 {
     margin: 0 0 var(--yy-space-2);
     font-family: var(--yy-font-heading);
-    font-size: var(--yy-text-xl);
+    font-size: var(--yy-type-h3);
     font-weight: 700;
     line-height: 1.4;
     color: var(--yy-calm-text);

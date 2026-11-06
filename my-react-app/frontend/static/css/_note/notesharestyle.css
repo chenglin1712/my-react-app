@@ -24,7 +24,7 @@
 .ns-search{
   display:flex; align-items:center; gap:.5rem;
   border:1px solid var(--rose-700);
-  padding:.25rem 1rem; min-height:var(--yy-control-md); border-radius:var(--yy-ui-radius); background:var(--yy-calm-surface);
+  padding:.25rem 1rem; min-height:var(--yy-control-md); border-radius:var(--yy-radius-control); background:var(--yy-calm-surface);
 }
 .ns-search-icon{color:var(--yy-calm-text-sub);}
 .ns-search-input{
@@ -39,7 +39,7 @@
 .ns-tabs{display:flex; align-items:center; gap:.5rem;}
 .ns-tab{
   border:1px solid var(--rose-700); color:var(--rose-700);
-  background:var(--yy-calm-surface); padding:.5rem 1rem; min-height:var(--yy-control-md); border-radius:var(--yy-ui-radius);
+  background:var(--yy-calm-surface); padding:.5rem 1rem; min-height:var(--yy-control-md); border-radius:var(--yy-radius-control);
   transition:background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
 }
 .ns-tab.active{background:var(--rose-700); color:var(--yy-calm-accent-on);}
@@ -47,7 +47,7 @@
 .ns-tab.active::before{content:"\2713"; margin-right:var(--yy-space-1);}
 .ns-refresh{
   border:1px solid var(--rose-700); color:var(--rose-700);
-  background:var(--yy-calm-surface); padding:.5rem .75rem; min-width:var(--yy-control-md); min-height:var(--yy-control-md); border-radius:var(--yy-ui-radius); cursor:pointer;
+  background:var(--yy-calm-surface); padding:.5rem .75rem; min-width:var(--yy-control-md); min-height:var(--yy-control-md); border-radius:var(--yy-radius-control); cursor:pointer;
   transition:background-color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
 }
 @media (hover: hover) and (pointer: fine) {
@@ -73,7 +73,7 @@
   min-width:0; /* grid 項目預設 min-width:auto，會被超長內容撐開；這裡讓卡片可以比內容窄 */
   background:var(--yy-calm-surface);
   border:1px solid var(--border);
-  border-radius:var(--yy-ui-radius);
+  border-radius:var(--yy-radius-panel);
   cursor:pointer; overflow:hidden; transition:transform .2s;
 }
 @media (hover: hover) and (pointer: fine) {
@@ -92,7 +92,7 @@
   padding:1.25rem 1.25rem 0 1.25rem;
 }
 .ns-avatar{
-  width:40px; height:40px; border-radius:999px; object-fit:cover; border:1px solid var(--yy-calm-rule); flex:0 0 auto;
+  width:40px; height:40px; border-radius:var(--yy-radius-pill); object-fit:cover; border:1px solid var(--yy-calm-rule); flex:0 0 auto;
 }
 .ns-avatar-fallback{
   display:flex; align-items:center; justify-content:center; background:var(--yy-calm-block); color:var(--yy-calm-block-on);
@@ -136,7 +136,7 @@
 }
 .ns-pager-btns{ display:flex; gap:.75rem; }
 .ns-page-btn{
-  border:1px solid var(--yy-calm-text-sub); background:var(--yy-calm-surface); border-radius:var(--yy-ui-radius);
+  border:1px solid var(--yy-calm-text-sub); background:var(--yy-calm-surface); border-radius:var(--yy-radius-control);
   padding:.5rem 1rem; min-height:var(--yy-control-md); cursor:pointer;
   transition:transform 120ms var(--ease-out);
 }
@@ -151,7 +151,7 @@
 }
 .ns-modal{
   background:var(--yy-calm-surface); width:95%; max-width:720px; max-height:90vh; max-height: 90dvh; overflow:auto;
-  border:var(--yy-border-width) solid var(--yy-calm-line); border-radius:var(--yy-ui-radius); padding:1.25rem 1.25rem 1rem;
+  border:var(--yy-border-width) solid var(--yy-calm-line); border-radius:var(--yy-radius-panel); padding:1.25rem 1.25rem 1rem;
 }
 .ns-modal-title{ font-size:1.25rem; font-weight:600; margin-bottom:.25rem; }
 .ns-modal-sub{ font-size:.9rem; color:var(--yy-calm-text-sub); margin-bottom:.75rem; }
@@ -165,7 +165,7 @@
   display:flex; justify-content:flex-end; gap:.5rem; margin-top:.5rem;
 }
 .ns-btn{
-  background:var(--yy-calm-info-bg); border:none; border-radius:var(--yy-ui-radius);
+  background:var(--yy-calm-info-bg); border:none; border-radius:var(--yy-radius-control);
   padding:.4rem .8rem; min-height:var(--yy-control-md); cursor:pointer;
   transition:background-color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
 }
@@ -188,7 +188,7 @@
 }
 .ns-report-text{
   width:100%; margin-top:.5rem; padding:.5rem; border:1px solid var(--yy-calm-rule);
-  border-radius:var(--yy-ui-radius); font:inherit; resize:vertical; box-sizing:border-box;
+  border-radius:var(--yy-radius-control); font:inherit; resize:vertical; box-sizing:border-box;
 }
 .ns-report-actions{
   display:flex; justify-content:flex-end; gap:.5rem; margin-top:.6rem;
@@ -203,7 +203,7 @@
   background: var(--yy-calm-block);
   color: var(--yy-calm-block-on);
   padding: .6rem .9rem;
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-panel);
   font-size: .95rem;
   z-index: var(--yy-z-toast);
   animation: ns-fadein var(--dur-fast) var(--ease-out);

@@ -23,7 +23,7 @@
 .fullscreen-notebook {
   background-color: var(--yy-calm-surface);
   border: 1px solid var(--yy-calm-rule);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-panel);
   padding: 40px 60px;
   margin: 40px auto 80px auto;
   max-width: 800px;
@@ -35,7 +35,7 @@
   width: 100%;
   padding: 12px 14px;
   border: var(--yy-border-width) solid var(--brand-red);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-control);
   background: var(--yy-calm-surface);
   font-size: 1.1rem;
   margin: 10px 0 14px 0;
@@ -51,7 +51,7 @@
   height: 60vh;
   height: 60dvh;
   background-color: var(--yy-calm-surface);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-control);
   overflow-y: auto;
 }
 

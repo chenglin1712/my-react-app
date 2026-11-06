@@ -34,7 +34,7 @@
   width: 190px;
   height: 190px;
   text-align: center;
-  border-radius: var(--yy-radius-card);
+  border-radius: var(--yy-radius-panel);
   padding: 6px;
   background-color: var(--yy-surface);
   cursor: pointer;

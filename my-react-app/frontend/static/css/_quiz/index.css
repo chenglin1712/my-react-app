@@ -22,7 +22,7 @@
 
     background: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
 }
 
 /* FE-4：測驗內容區的 scoped error boundary fallback（見 src/_quiz/index.jsx）。
@@ -53,7 +53,7 @@
     color: var(--yy-calm-info-bg);
     background: var(--yy-calm-accent);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     font-weight: 700;
     cursor: pointer;
     transition: transform .15s ease, background .15s ease;

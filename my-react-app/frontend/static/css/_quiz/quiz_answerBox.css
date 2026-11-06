@@ -2,7 +2,7 @@
     padding: 20px;
     background-color: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     /* 固定 280px 在小於 320px 的手機會溢出（審查項 P1-32） */
     width: min(280px, 100%);
     height: fit-content;
@@ -34,7 +34,7 @@
     -webkit-user-select: none;
     user-select: none;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     padding: 8px;
     transition: var(--transition-interactive);
     min-width: 20%;
@@ -118,6 +118,6 @@
     right: -8px;
     font-size: 14px;
     background-color: var(--yy-calm-surface);
-    border-radius: 50%;
+    border-radius: var(--yy-radius-pill);
     padding: 1px 3px;
 }

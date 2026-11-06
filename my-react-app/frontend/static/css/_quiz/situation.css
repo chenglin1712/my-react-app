@@ -20,7 +20,7 @@
 
   background: var(--yy-calm-accent);
   border: var(--yy-border-width) solid var(--yy-calm-line);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-panel);
   width: fit-content;
 }
 
@@ -61,7 +61,7 @@
   font-weight: 600;
   color: var(--yy-calm-text-sub);
   border: var(--yy-border-width) dashed var(--yy-calm-text);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-panel);
   background-color: var(--yy-calm-info-bg);
 }
 

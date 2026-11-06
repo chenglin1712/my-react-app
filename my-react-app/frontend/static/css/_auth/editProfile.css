@@ -4,13 +4,13 @@
     background: var(--yy-calm-surface);
     padding: 32px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     font-family: var(--yy-font-body);
 }
 
 .edit-title {
     font-family: var(--yy-font-heading);
-    font-size: var(--yy-text-2xl);
+    font-size: var(--yy-type-h2);
     font-weight: 700;
     margin-bottom: 24px;
     color: var(--yy-calm-text);
@@ -25,7 +25,7 @@
     width: 120px;
     height: 120px;
     margin: 0 auto 24px;
-    border-radius: 50%;
+    border-radius: var(--yy-radius-round);
     overflow: hidden;
     position: relative;
     cursor: pointer;
@@ -95,7 +95,7 @@
 .edit-container input {
     padding: 10px 12px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     font-size: 15px;
     transition: border-color var(--dur-fast) var(--ease-out);
 }
@@ -111,7 +111,7 @@
     flex: 1;
     padding: 10px;
     min-height: var(--yy-control-md);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     font-size: 15px;
     transition: transform 120ms var(--ease-out), background-color var(--dur-fast) var(--ease-out);
     display: flex;

@@ -99,7 +99,7 @@
     min-height: 44px;
     padding: 0 16px;
     border: 1.5px solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-calm-surface);
     color: var(--yy-calm-text);
     font-size: 15px;
@@ -183,7 +183,7 @@
     padding: 10px 12px;
     margin-bottom: 8px;
     border: 1.5px solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-calm-surface);
     color: var(--yy-calm-text);
     font: inherit;

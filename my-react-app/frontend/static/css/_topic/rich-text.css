@@ -17,7 +17,7 @@
 .rt-mark {
     padding: 0 0.15em;
     color: inherit;
-    border-radius: 0.2em;
+    border-radius: var(--yy-radius-tag);
 }
 .rt-mark-yellow { background: var(--rt-mark-yellow); }
 .rt-mark-green { background: var(--rt-mark-green); }
@@ -92,7 +92,7 @@
     padding: 12px 16px;
     border: var(--yy-border-width) solid var(--rt-callout-info-line);
     border-left-width: 5px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     background: var(--rt-callout-info-bg);
 }
 .rt-callout--success { border-color: var(--rt-callout-success-line); background: var(--rt-callout-success-bg); }
@@ -111,7 +111,7 @@
     aspect-ratio: 16 / 9;
     overflow: hidden;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-block);
     background: var(--yy-calm-line);
 }
 .rt-video-frame iframe {

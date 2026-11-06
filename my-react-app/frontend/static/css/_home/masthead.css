@@ -53,7 +53,7 @@
   font-family: var(--yy-font-heading);
   font-size: var(--yy-text-sm);
   font-weight: 500;
-  letter-spacing: 0.35em;
+  letter-spacing: 0.08em;
   white-space: nowrap;
 }
 
@@ -164,7 +164,7 @@
   display: flex;
   gap: 0.06em;
   margin: 0;
-  font-family: var(--yy-font-heading);
+  font-family: var(--yy-font-brand);
   font-size: clamp(3.4rem, 8vw, 5rem);
   font-weight: 900;
   line-height: 1.02;
@@ -234,9 +234,9 @@
 }
 
 .home-mast__en-name {
-  font-family: var(--yy-font-heading);
+  font-family: var(--yy-font-brand);
   font-size: clamp(0.9rem, 1.8vw, 1.1rem);
-  font-weight: 700;
+  font-weight: 900;
   letter-spacing: 0.3em;
 }
 

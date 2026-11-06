@@ -47,7 +47,7 @@
     overflow: hidden;
     background: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     transition: transform 220ms var(--ease-out), box-shadow 220ms var(--ease-out);
 }
 
@@ -81,7 +81,7 @@
     display: inline-block;
     padding: 1px 10px;
     border: var(--yy-border-width) solid transparent;
-    border-radius: 2px;
+    border-radius: var(--yy-radius-tag);
     background: var(--yy-calm-block);
     color: var(--yy-calm-block-on);
     font-size: var(--yy-text-sm);
@@ -146,7 +146,7 @@
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
     .topic-card:has(.topic-link):hover {
         transform: translateY(-3px);
-        box-shadow: 0 14px 22px -16px color-mix(in srgb, var(--yy-calm-text) 55%, transparent);
+        box-shadow: var(--yy-elev-3);
     }
 }
 

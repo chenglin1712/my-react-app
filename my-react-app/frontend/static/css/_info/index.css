@@ -8,7 +8,7 @@
 .info-card.yy-card {
     background: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
 }
 
 .info-card {
@@ -20,7 +20,7 @@
 .info-title {
     margin: 0 0 var(--yy-space-2);
     font-family: var(--yy-font-heading);
-    font-size: var(--yy-text-2xl);
+    font-size: var(--yy-type-h2);
     font-weight: 700;
     color: var(--yy-calm-text);
 }
@@ -36,7 +36,7 @@
     padding: var(--yy-space-3) var(--yy-space-4);
     background: var(--yy-calm-warning-bg);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     color: var(--yy-calm-text);
     font-size: var(--yy-text-sm);
     line-height: var(--yy-leading-normal);
@@ -181,7 +181,7 @@
     padding: 0 var(--yy-space-4);
     background: transparent;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     color: var(--yy-calm-text);
     font-weight: 700;
     cursor: pointer;

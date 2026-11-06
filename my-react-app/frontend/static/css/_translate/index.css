@@ -8,7 +8,7 @@
 
 .translate-title {
     font-family: var(--yy-font-heading);
-    font-size: var(--yy-text-3xl);
+    font-size: var(--yy-type-h1);
     margin: var(--yy-space-2) 0;
     font-weight: 700;
     letter-spacing: 0.06em;
@@ -61,7 +61,7 @@
     position: relative;
     width: 40px;
     height: 40px;
-    border-radius: 50%;
+    border-radius: var(--yy-radius-round);
     border: var(--yy-border-width) solid var(--yy-calm-line);
     background: var(--yy-calm-surface);
     color: var(--yy-calm-text);
@@ -101,7 +101,7 @@
     font-size: 14px;
     color: var(--yy-calm-text-sub);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     background: var(--yy-calm-surface);
 }
 
@@ -172,7 +172,7 @@
     min-height: 140px;
     resize: vertical;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     padding: 12px;
     font-family: var(--yy-font-body);
     font-size: var(--yy-text-base);
@@ -238,7 +238,7 @@
 .yy-gt-token {
     cursor: pointer;
     padding: 1px 2px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-tag);
     transition: background-color var(--dur-fast) var(--ease-out);
 }
 .yy-gt-token.yy-gt-active {
@@ -263,7 +263,7 @@
     text-decoration: underline wavy var(--yy-calm-danger);
     text-decoration-thickness: 1.5px;
     background: var(--yy-calm-danger-bg);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
 }
 @supports not (text-decoration-style: wavy) {
     .yy-gt-unsupported {
@@ -303,7 +303,7 @@
     padding: 14px;
     background: var(--yy-calm-info-bg);
     border: 1px solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
 }
 
 .yy-evidence-head {
@@ -320,7 +320,7 @@
     font-size: var(--yy-text-sm);
     font-weight: 700;
     padding: 2px 8px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-tag);
     background: var(--yy-calm-surface);
     border: 1px solid var(--yy-calm-line);
 }
@@ -415,7 +415,7 @@
     padding: var(--yy-space-3) var(--yy-space-4);
     background: var(--yy-calm-surface);
     border: 1px solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
 }
 
 .translate-guest-label {
@@ -423,7 +423,7 @@
     font-size: var(--yy-text-sm);
     padding: 2px var(--yy-space-2);
     background: var(--yy-calm-tag);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-tag);
     color: var(--yy-calm-tag-on);
 }
 
@@ -475,7 +475,7 @@
     padding: var(--yy-space-5);
     background: var(--yy-calm-warning-bg);
     border: 1px solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
 }
 
 .translate-guest-title {

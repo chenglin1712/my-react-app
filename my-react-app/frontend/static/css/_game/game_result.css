@@ -17,7 +17,7 @@
   height: 100%;
   transition: transform var(--dur-flip) var(--ease-in-out);
   transform-style: preserve-3d;
-  border-radius: 1rem;
+  border-radius: var(--yy-radius-panel);
 }
 
 .game-result-card-front {
@@ -29,7 +29,7 @@
   flex-direction: column;
   justify-content: center;
   padding: 1rem;
-  border-radius: 1rem;
+  border-radius: var(--yy-radius-panel);
 }
 
 .game-result-card-front {
@@ -80,7 +80,7 @@
   padding: 10px 20px;
   margin: 0 10px;
   border: 1px solid var(--yy-calm-rule);
-  border-radius: 5px;
+  border-radius: var(--yy-radius-tag);
 }
 
 .result-total {

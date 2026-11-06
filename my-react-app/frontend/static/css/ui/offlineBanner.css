@@ -18,7 +18,7 @@
     background: var(--yy-ink);
     color: var(--yy-cream);
     border: var(--yy-border-width) solid var(--yy-gold);
-    border-radius: var(--yy-radius-card);
+    border-radius: var(--yy-radius-panel);
     font-size: 14px;
     font-weight: 700;
     line-height: 1.6;

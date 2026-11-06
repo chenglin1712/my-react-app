@@ -11,5 +11,5 @@
 
     background: var(--yy-calm-accent);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-tag);
 }

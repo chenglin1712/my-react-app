@@ -57,7 +57,7 @@
   border: 0;
   background: transparent;
   cursor: pointer;
-  border-radius: 50%;
+  border-radius: var(--yy-radius-round);
   flex: none;
   min-width: 44px; /* 蓋掉全域 button min-width:100px（B-1 遺留的問題） */
 }
@@ -65,7 +65,7 @@
   content: "";
   position: absolute;
   inset: 6px;
-  border-radius: 50%;
+  border-radius: var(--yy-radius-round);
   background: var(--swatch);
   border: var(--yy-border-width) solid var(--yy-calm-line);
   box-sizing: border-box;

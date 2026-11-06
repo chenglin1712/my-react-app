@@ -19,7 +19,7 @@ body:has(.offline-banner) {
     color: var(--yy-calm-info-bg);
     background: var(--yy-calm-accent);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: 50%;
+    border-radius: var(--yy-radius-round);
     cursor: pointer;
     transition: transform 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
         background-color 160ms ease;

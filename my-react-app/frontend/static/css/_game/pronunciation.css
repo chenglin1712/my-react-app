@@ -54,7 +54,7 @@
   background: var(--yy-calm-accent);
   color: var(--yy-calm-surface);
   border: none;
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-control);
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
@@ -81,7 +81,7 @@
   background: var(--yy-calm-surface);
   color: var(--yy-calm-accent);
   border: var(--yy-border-width) solid var(--yy-calm-accent);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-control);
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
@@ -112,7 +112,7 @@
   color: var(--yy-calm-accent);
   text-decoration: none;
   border: var(--yy-border-width) solid var(--yy-calm-accent);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-control);
   font-size: 0.9rem;
   font-weight: 700;
   transition: background 0.18s, transform 0.15s;
@@ -133,7 +133,7 @@
   background: var(--yy-calm-surface);
   color: var(--yy-calm-text-sub);
   border: 1.5px solid var(--yy-calm-text-sub);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-control);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -152,7 +152,7 @@
   max-width: 480px;
   height: 6px;
   background: var(--yy-calm-info-bg);
-  border-radius: 999px;
+  border-radius: var(--yy-radius-pill);
   overflow: hidden;
   margin-bottom: 0.6rem;
 }
@@ -177,7 +177,7 @@
   align-items: center;
   background: var(--yy-calm-danger-bg);
   border: 1.5px solid var(--yy-calm-danger-bg);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-panel);
   padding: 1.5rem 2rem;
   width: 100%;
   max-width: 460px;
@@ -202,7 +202,7 @@
   background: var(--yy-calm-accent);
   color: var(--yy-calm-surface);
   border: none;
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-control);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -234,7 +234,7 @@
   gap: 0.4rem;
   width: 90px;
   height: 90px;
-  border-radius: 50%;
+  border-radius: var(--yy-radius-round);
   background: var(--yy-calm-accent);
   color: var(--yy-calm-surface);
   border: none;
@@ -279,7 +279,7 @@
   align-items: baseline;
   gap: 0.5rem;
   padding: 0.75rem 2rem;
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-panel);
   margin-bottom: 0.5rem;
   animation: pron-fade-in var(--dur-base) var(--ease-out);
 }
@@ -320,7 +320,7 @@
   justify-content: center;
   gap: 0.3rem;
   padding: 1rem 2.5rem;
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-panel);
   margin-bottom: 1.8rem;
   font-variant-numeric: tabular-nums;
 }
@@ -346,7 +346,7 @@
   align-items: center;
   gap: 0.6rem;
   padding: 0.6rem 0.9rem;
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-panel);
   font-size: 0.9rem;
   background: var(--yy-calm-info-bg);
   border: 1px solid var(--yy-calm-rule);
@@ -355,7 +355,7 @@
 .pron-result-meaning { color: var(--yy-calm-text-sub); flex: 1; }
 .pron-result-tag {
   padding: 0.2rem 0.6rem;
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-tag);
   font-size: var(--yy-text-sm);
   font-weight: 700;
   white-space: nowrap;

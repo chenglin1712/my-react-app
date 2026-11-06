@@ -3,7 +3,7 @@
   margin: 24px 0;
   padding: 24px 20px;
   border: var(--yy-border-width) solid var(--yy-ink);
-  border-radius: var(--yy-radius-card, 12px);
+  border-radius: var(--yy-radius-panel);
   background: var(--yy-surface);
 }
 

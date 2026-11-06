@@ -2,7 +2,7 @@
     display: flex;
     flex-direction: column;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     background: var(--yy-calm-surface);
     height: calc(100vh - 170px);
     height: calc(100dvh - 170px);
@@ -62,13 +62,13 @@
 .chat-message.user .bubble {
     background: var(--yy-calm-accent);
     color: var(--yy-calm-surface);
-    border-radius: 12px 12px 0 12px;
+    border-radius: var(--yy-radius-control) var(--yy-radius-control) 0 var(--yy-radius-control);
 }
 
 .chat-message.assistant .bubble {
     background: var(--yy-calm-info-bg);
     color: var(--yy-calm-text);
-    border-radius: 12px 12px 12px 0;
+    border-radius: var(--yy-radius-control) var(--yy-radius-control) var(--yy-radius-control) 0;
 }
 
 .bubble p {
@@ -78,7 +78,7 @@
 .highlight {
     background: var(--yy-calm-warning-bg);
     padding: 2px 4px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-tag);
     font-weight: bold;
     color: var(--yy-calm-text);
 }
@@ -86,7 +86,7 @@
 .reply-image {
     margin-top: 8px;
     max-width: 150px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-tag);
     border: var(--yy-border-width) solid var(--yy-calm-line);
 }
 
@@ -103,7 +103,7 @@
     flex: 1;
     padding: 10px 12px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: 20px;
+    border-radius: var(--yy-radius-control);
     font-size: 14px;
     outline: none;
 }
@@ -116,7 +116,7 @@
     border: var(--yy-border-width) solid var(--yy-calm-line);
     background: var(--yy-calm-accent);
     color: var(--yy-calm-accent-on);
-    border-radius: 50%;
+    border-radius: var(--yy-radius-round);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -160,7 +160,7 @@
 .translation-block .translation {
     font-size: 15px;
     color: var(--yy-calm-text-sub);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     display: inline-block;
     margin: 0;
 }
@@ -192,7 +192,7 @@
     background: var(--yy-calm-surface);
     padding: 20px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     max-width: 80%;
     max-height: 80%;
     overflow-y: auto;
@@ -243,7 +243,7 @@
     font-size: 14px;
     font-weight: 500;
     padding: 2px 6px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-tag);
     line-height: 1.4;
 }
 
@@ -289,7 +289,7 @@
 
 .review-message-bubble {
     padding: 12px 16px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     max-width: 70%;
     word-wrap: break-word;
 }
@@ -297,7 +297,7 @@
 .bot .review-message-bubble {
     background-color: var(--yy-calm-success-bg);
     color: var(--yy-calm-text);
-    border-top-left-radius: 4px;
+    border-top-left-radius: var(--yy-radius-min);
     border-left: 3px solid var(--yy-calm-success);
 }
 
@@ -311,7 +311,7 @@
     width: 8px;
     height: 8px;
     background-color: var(--yy-calm-success);
-    border-radius: 50%;
+    border-radius: var(--yy-radius-round);
     margin: 0 2px;
     animation: review-ai-bounce 1.2s infinite;
     opacity: 0.6;
@@ -411,7 +411,7 @@ a.review-vocab-word:focus-visible,
 .review-word-play:focus-visible {
     outline: 2px solid var(--yy-calm-accent);
     outline-offset: 2px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
 }
 
 .review-word-muted {
@@ -440,7 +440,7 @@ a.review-vocab-word:focus-visible,
     width: 28px;
     height: 28px;
     border: 1px solid var(--yy-calm-accent);
-    border-radius: 50%;
+    border-radius: var(--yy-radius-round);
     transition: transform 150ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
         background-color 150ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
 }
@@ -490,7 +490,7 @@ a.review-vocab-word:focus-visible,
     min-height: 44px;
     padding: 0 18px;
     border: 1px solid var(--yy-calm-accent);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-calm-accent);
     color: var(--yy-calm-accent-on);
     font-size: 15px;

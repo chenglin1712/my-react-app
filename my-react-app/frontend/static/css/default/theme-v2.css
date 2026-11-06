@@ -30,7 +30,10 @@
   /* 兩個 TC 字型都沒有族語字母（ʼ ŋ ɨ ʉ ʔ ʾ 等），所以 TC 之後固定接不帶 TC 的 Noto 字型，
      再接系統 CJK 字型（字型還沒載入時的畫面）。順序不要調換，fontStack.test.js 會檢查。 */
   --yy-font-body: 'Noto Sans TC', 'Noto Sans', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
-  --yy-font-heading: 'Noto Serif TC', 'Noto Serif', 'Songti TC', 'PMingLiU', serif;
+  /* 2026-11-06 使用者批准全站無襯線（Apple 化步驟 1-4）：標題與內文同為 Noto Sans TC，標題靠字重（700 到 900）與字級分層。
+     只有品牌字標「原語」「YUAN・YU」保留宋體，用 --yy-font-brand；它只載入字標用字的子集（見 index.html）。 */
+  --yy-font-heading: 'Noto Sans TC', 'Noto Sans', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  --yy-font-brand: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
   /* 舊的像素字 token。Silkscreen 已移除（沉穩文藝風格不用像素字），這裡保留名稱當別名指向內文字型，
      避免一次改動約 30 個既有選擇器；各頁改版時（S1-3、S8）逐步換成 --yy-font-body 或 --yy-font-heading，
      全部換完再刪除這個 token。 */
@@ -40,20 +43,42 @@
      全形間隔點「・」縮成小圓點、破折號變粗，中文標點全部退化。所以全站內文維持 TC 在前，
      只有顯示族語詞彙的元素才用這兩個 token（各頁改版時套用）。 */
   --yy-font-tribal: 'Noto Sans', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
-  --yy-font-tribal-heading: 'Noto Serif', 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
-  --yy-radius-card: 10px;
-  --yy-radius-lg: 16px;
+  --yy-font-tribal-heading: 'Noto Sans', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  /* 圓角四階（2026-11-06 使用者批准 8／12／20／28，Apple 化步驟 1-2）：
+     tag 8 標籤、徽章、小縮圖；control 12 按鈕、輸入框、下拉、頁籤；panel 20 卡片、面板、彈窗；block 28 bento 大塊、hero、影片。
+     pill 膠囊與 round 圓形維持（chip、分段控制、頭像、圓形圖示鈕）。
+     同心圓角規則：內層圓角 = 外層圓角 − 內距，最小 4px。前台新增樣式只能用這幾個 token，不要寫單一 px。舊名 --yy-radius-card／-btn／-lg 已刪除（各 *Look 測試把它們列為舊風格 token）。 */
+  --yy-radius-tag: 8px;
+  --yy-radius-control: 12px;
+  --yy-radius-panel: 20px;
+  --yy-radius-block: 28px;
+  --yy-radius-min: 4px; /* 同心圓角的下限，只給聊天泡泡尖角這類刻意的小圓角 */
+  --yy-radius-pill: 999px;
+  --yy-radius-round: 50%;
   /* 次要分隔線、停用底色、進度條軌道；比 --yy-border 淡，不用在需要 3:1 對比的控制項邊框 */
   --yy-border-soft: #DDD0C4;
-  --yy-radius-btn: 6px;
-  /* 舊的硬偏移陰影（Y2K 風格）。沉穩文藝風格沒有這種陰影（S1-3）：前台樣式已全部不再引用下面三個 token，
-     只剩後台登入頁還在用，後台不在這一階段範圍，所以值先原封不動，後台改版（階段 G）時連同 token 一起刪除。
-     前台新增樣式不要用它們。 */
-  --yy-shadow-sm: 3px 3px 0 var(--yy-ink);
-  --yy-shadow-md: 5px 5px 0 var(--yy-ink);
-  --yy-shadow-lg: 7px 7px 0 var(--yy-ink);
-  /* 全站唯一的陰影：只給浮在頁面上的容器（彈窗、下拉選單、提示），色相取自深石板，不用純黑 */
-  --yy-shadow-overlay: 0 10px 30px rgba(41, 45, 49, 0.18);
+  /* 高度層級 0 到 4（2026-11-06 使用者批准，Apple 化步驟 1-3）。舊的 3、5、7px 硬偏移陰影 token 與單一柔影
+     --yy-shadow-overlay 已刪除；元件只能引用下面的 --yy-elev-*，不要在元件裡手寫陰影。
+     0 頁底；1 小元件與列表卡（只有 1.5px 細框，沒有陰影）；2 大卡；3 hover 抬起的卡片、毛玻璃導覽；4 下拉、彈窗、提示。
+     陰影色相取自深石板 rgba(41, 45, 49, …)，不用純黑。深色模式不畫陰影，改用「越高越亮」的表面色階加 1px 內描邊 --yy-edge-*（見深色區塊）。
+     各層實際套用到哪些元件，隨各頁改版步驟（階段 2 到 4）逐頁決定。 */
+  --yy-elev-0: none;
+  --yy-elev-1: none;
+  --yy-elev-2: 0 1px 2px rgba(41, 45, 49, 0.05), 0 4px 12px rgba(41, 45, 49, 0.07);
+  --yy-elev-3: 0 2px 4px rgba(41, 45, 49, 0.06), 0 12px 28px -4px rgba(41, 45, 49, 0.13);
+  --yy-elev-4: 0 4px 8px rgba(41, 45, 49, 0.07), 0 24px 48px -8px rgba(41, 45, 49, 0.22);
+  /* 描邊 --yy-edge-*：淺色是空的（淺色靠陰影分層）；深色是 1px 內描邊，「越高越亮」。只給「沒有自己 border」的元件，
+     有 border 的元件只用 --yy-elev-*，否則深色下會疊成雙層邊框。用法：box-shadow: var(--yy-elev-4), var(--yy-edge-4); */
+  --yy-edge-2: 0 0 0 0 transparent;
+  --yy-edge-3: 0 0 0 0 transparent;
+  --yy-edge-4: 0 0 0 0 transparent;
+  /* 毛玻璃材質 token（Apple 化步驟 1-6）。只能透過 .yy-glass 使用；套用位置（導覽、sticky 工具列、浮層）隨各頁改版決定。 */
+  --yy-glass-blur: 18px;
+  --yy-glass-saturate: 180%;
+  --yy-glass-bg: rgba(255, 249, 237, 0.78);
+  --yy-glass-bg-solid: #FFF9ED; /* 降級用純色（prefers-reduced-transparency 或不支援 backdrop-filter） */
+  --yy-glass-border: rgba(41, 45, 49, 0.12);
+  --yy-glass-halo: rgba(255, 249, 237, 0.9); /* 焦點環外圈的淺色光暈，讓焦點環在任何被模糊的底圖上都看得見 */
   /* 細框一律 1.5px（DESIGN.md）。色塊分隔用的粗邊（border-left 4px 以上的強調條）不受影響 */
   --yy-border-width: 1.5px;
 
@@ -102,6 +127,21 @@
   --yy-calm-block-deep: #33383D;   /* 頁尾：比石板灰區塊再深一階 */
   --yy-calm-block-accent: #D7A98B; /* 石板灰上的淺銅，小字也可用（對比 4.51）；原淺銅 #C9976F 只有 3.70，不放進語意層 */
   --yy-calm-info-bg: #EFE6DA;
+  /* 表面層級 0 到 3（Apple 化步驟 1-5）：0 頁底、1 卡片、2 浮起卡、3 浮層。淺色靠陰影分層，三層同為白；深色「越高越亮」。 */
+  --yy-calm-layer-0: #FFF9ED;
+  --yy-calm-layer-1: #FFFFFF;
+  --yy-calm-layer-2: #FFFFFF;
+  --yy-calm-layer-3: #FFFFFF;
+  --yy-calm-tint-copper-1: #FAF2E5;
+  --yy-calm-tint-copper-2: #F5EBDD;
+  --yy-calm-tint-copper-3: #F0E3D5;
+  --yy-calm-tint-olive-1: #F9F2E5;
+  --yy-calm-tint-olive-2: #F3ECDD;
+  --yy-calm-tint-olive-3: #EDE5D5;
+  --yy-calm-tint-slate-1: #F6F0E5;
+  --yy-calm-tint-slate-2: #ECE7DD;
+  --yy-calm-tint-slate-3: #E3DED5;
+  /* 三主色淡階（使用者選定 C 柔：5%、10%、15%）：三主色混入象牙白，只當分區底色，不當強調色、不放小字強調。 */
   --yy-calm-success: #2F6F4B;
   --yy-calm-success-bg: #E3F0E8;
   --yy-calm-warning: #7D5B0E;
@@ -125,14 +165,33 @@
   --yy-ui-press: 0.97;             /* 按下回饋的縮放比例，所有可按元件共用 */
 
   /* ---------- 間距（4px 基準）---------- */
-  --yy-space-1: 4px;
-  --yy-space-2: 8px;
-  --yy-space-3: 12px;
-  --yy-space-4: 16px;
-  --yy-space-5: 24px;
-  --yy-space-6: 32px;
-  --yy-space-7: 48px;
-  --yy-space-8: 64px;
+  /* 2026-11-06 建立完整 4 點基準階 step-01 到 step-12（Apple 化步驟 1-1，使用者選定的命名）。
+     新增的樣式一律用 --yy-space-step-*；日後插階只要換號碼，不必改名。
+     舊的 --yy-space-1 到 -8 保留為別名（數值不變，不改動現有畫面），逐步遷移後再移除。 */
+  --yy-space-step-01: 4px;
+  --yy-space-step-02: 8px;
+  --yy-space-step-03: 12px;
+  --yy-space-step-04: 16px;
+  --yy-space-step-05: 20px;
+  --yy-space-step-06: 24px;
+  --yy-space-step-07: 32px;
+  --yy-space-step-08: 40px;
+  --yy-space-step-09: 48px;
+  --yy-space-step-10: 64px;
+  --yy-space-step-11: 80px;
+  --yy-space-step-12: 96px;
+  --yy-space-1: var(--yy-space-step-01);
+  --yy-space-2: var(--yy-space-step-02);
+  --yy-space-3: var(--yy-space-step-03);
+  --yy-space-4: var(--yy-space-step-04);
+  --yy-space-5: var(--yy-space-step-06);
+  --yy-space-6: var(--yy-space-step-07);
+  --yy-space-7: var(--yy-space-step-09);
+  --yy-space-8: var(--yy-space-step-10);
+
+  /* ---------- 斷點表（只能寫在 @media 裡，CSS 變數不能當斷點，所以這裡只做文件）----------
+     480 小手機；600、720 手機；900 平板直式；1100 小桌機；1200 寬螢幕。
+     導覽列的斷點刻意獨立（見 Navbar.css）。新增斷點要同步改 typography.test.js 的 ALLOWED。 */
 
   /* ---------- 字級與行高 ---------- */
   --yy-text-xs: 12px;
@@ -142,6 +201,15 @@
   --yy-text-xl: 22px;
   --yy-text-2xl: 28px;
   --yy-text-3xl: 40px;
+  /* 七級字級（Apple 化步驟 1-4）：顯示、H1、H2、H3、內文大、內文、說明；標題四級用 clamp 流動縮放。
+     先只定義 token，數值是提案，各頁改版時套用並依畫面微調。內文不低於 16px、說明不低於 14px，最小字級仍受 typography.test.js 的 12px 下限約束。 */
+  --yy-type-display: clamp(2.5rem, 1.5rem + 4vw, 4.25rem);
+  --yy-type-h1: clamp(2rem, 1.4rem + 2.4vw, 3rem);
+  --yy-type-h2: clamp(1.625rem, 1.3rem + 1.3vw, 2.25rem);
+  --yy-type-h3: clamp(1.25rem, 1.1rem + 0.6vw, 1.625rem);
+  --yy-type-body-lg: 1.125rem;
+  --yy-type-body: 1rem;
+  --yy-type-caption: 0.875rem;
   /* 字級用上面的 --yy-text-*，最小 12px；半階值（12.5、13.5…）不要再出現。
      行高：tight 給單行或英數大標、heading 給繁中標題（中文字高，1.25 會偏擠）、normal 給一般內文、loose 給長篇閱讀。
      Silkscreen 像素字型搭中文時字級不低於 14px（中文會落到後備字型，小字筆畫會黏在一起）。 */
@@ -149,6 +217,8 @@
   --yy-leading-heading: 1.35;
   --yy-leading-normal: 1.6;
   --yy-leading-loose: 1.8;
+
+  --yy-icon-stroke: 2;             /* lucide 圖示線寬，見 .yy-icon */
 
   /* ---------- 控制項高度（觸控區至少 44px）---------- */
   --yy-control-sm: 36px;
@@ -182,6 +252,12 @@
   --dur-base: 220ms;
   --dur-flip: 400ms;
   --dur-reveal: 220ms;
+  /* 動態語言（Apple 化步驟 1-7，使用者選定：全站基準 = 強度 6，強度 9 只用在精緻設計的敘事段落）。
+     強度 6 = 上面的 --dur-fast/base 加 --ease-out；以下是彈簧與捲動敘事用的 token，只有明確標示的元件才使用。 */
+  --ease-spring: linear(0, 0.34 6%, 0.72 13%, 0.95 20%, 1.06 27%, 1.08 33%, 1.04 41%, 0.99 52%, 1.005 66%, 1); /* 舊瀏覽器不支援 linear() 時整條宣告失效，退回元件自己寫的 --ease-out 後備 */
+  --dur-spring: 550ms;
+  --dur-press: 120ms;
+  --yy-lift: -3px; /* hover 抬起量（強度 6） */
   /* 取代 transition: all：只過渡顏色、陰影、位移與透明度，不會連版面屬性一起動畫 */
   --transition-interactive:
     background-color var(--dur-base) var(--ease-out),
@@ -230,6 +306,20 @@
     --yy-calm-block-deep: #262A2E;
     --yy-calm-block-accent: #D7A98B;
     --yy-calm-info-bg: #343A3E;
+    /* 深色表面與淡階：同上，值取三主色的深色對應色混入深色頁底 */
+    --yy-calm-layer-0: #24282C;
+    --yy-calm-layer-1: #2E3338;
+    --yy-calm-layer-2: #343A3E;
+    --yy-calm-layer-3: #3A4047;
+    --yy-calm-tint-copper-1: #2C2D30;
+    --yy-calm-tint-copper-2: #353333;
+    --yy-calm-tint-copper-3: #3D3837;
+    --yy-calm-tint-olive-1: #2B2E2F;
+    --yy-calm-tint-olive-2: #323432;
+    --yy-calm-tint-olive-3: #393A35;
+    --yy-calm-tint-slate-1: #282D31;
+    --yy-calm-tint-slate-2: #2D3136;
+    --yy-calm-tint-slate-3: #31363B;
     --yy-calm-success: #8CCFA9;
     --yy-calm-success-bg: #22372D;
     --yy-calm-warning: #E3C377;
@@ -258,6 +348,19 @@
   --yy-calm-block-deep: #262A2E;
   --yy-calm-block-accent: #D7A98B;
   --yy-calm-info-bg: #343A3E;
+  --yy-calm-layer-0: #24282C;
+  --yy-calm-layer-1: #2E3338;
+  --yy-calm-layer-2: #343A3E;
+  --yy-calm-layer-3: #3A4047;
+  --yy-calm-tint-copper-1: #2C2D30;
+  --yy-calm-tint-copper-2: #353333;
+  --yy-calm-tint-copper-3: #3D3837;
+  --yy-calm-tint-olive-1: #2B2E2F;
+  --yy-calm-tint-olive-2: #323432;
+  --yy-calm-tint-olive-3: #393A35;
+  --yy-calm-tint-slate-1: #282D31;
+  --yy-calm-tint-slate-2: #2D3136;
+  --yy-calm-tint-slate-3: #31363B;
   --yy-calm-success: #8CCFA9;
   --yy-calm-success-bg: #22372D;
   --yy-calm-warning: #E3C377;
@@ -266,6 +369,49 @@
   --yy-calm-danger-bg: #40262E;
   --yy-calm-focus: #D7A98B;
   --yy-calm-focus-on-block: #D7A98B;
+}
+
+/* 深色模式的高度（Apple 化步驟 1-3）：不畫陰影，用 1px 內描邊，越高越亮；表面色階本身的「越高越亮」於步驟 1-5 的表面 0 到 3 補上。
+   這裡刻意與上面的 --yy-calm-* 色盤分開寫，避免動到那組「名稱與色值逐一對照」的守門測試。 */
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    --yy-elev-2: 0 0 0 0 transparent;
+    --yy-edge-2: inset 0 0 0 1px rgba(242, 238, 227, 0.06);
+    --yy-elev-3: 0 0 0 0 transparent;
+    --yy-edge-3: inset 0 0 0 1px rgba(242, 238, 227, 0.09);
+    --yy-elev-4: 0 0 0 0 transparent;
+    --yy-edge-4: inset 0 0 0 1px rgba(242, 238, 227, 0.12);
+    --yy-glass-bg: rgba(36, 40, 44, 0.78);
+    --yy-glass-bg-solid: #24282C;
+    --yy-glass-border: rgba(242, 238, 227, 0.14);
+    --yy-glass-halo: rgba(36, 40, 44, 0.9);
+    /* Bootstrap 狀態色的 rgb 三元組（深色）：淺色的在檔尾 :root，深色在這裡跟著換（步驟 1-9） */
+    --bs-primary-rgb: 215, 169, 139;
+    --bs-success-rgb: 140, 207, 169;
+    --bs-warning-rgb: 227, 195, 119;
+    --bs-danger-rgb: 237, 164, 181;
+    --bs-info-rgb: 46, 51, 56;
+    --bs-secondary-rgb: 211, 206, 193;
+  }
+}
+:root[data-theme="dark"] {
+  --yy-elev-2: 0 0 0 0 transparent;
+  --yy-edge-2: inset 0 0 0 1px rgba(242, 238, 227, 0.06);
+  --yy-elev-3: 0 0 0 0 transparent;
+  --yy-edge-3: inset 0 0 0 1px rgba(242, 238, 227, 0.09);
+  --yy-elev-4: 0 0 0 0 transparent;
+  --yy-edge-4: inset 0 0 0 1px rgba(242, 238, 227, 0.12);
+  --yy-glass-bg: rgba(36, 40, 44, 0.78);
+  --yy-glass-bg-solid: #24282C;
+  --yy-glass-border: rgba(242, 238, 227, 0.14);
+  --yy-glass-halo: rgba(36, 40, 44, 0.9);
+  /* Bootstrap 狀態色的 rgb 三元組（深色）：淺色的在檔尾 :root，深色在這裡跟著換（步驟 1-9） */
+  --bs-primary-rgb: 215, 169, 139;
+  --bs-success-rgb: 140, 207, 169;
+  --bs-warning-rgb: 227, 195, 119;
+  --bs-danger-rgb: 237, 164, 181;
+  --bs-info-rgb: 46, 51, 56;
+  --bs-secondary-rgb: 211, 206, 193;
 }
 
 /* 動態語法（S2-2）：全站只有三種動態，其他一律不加。
@@ -328,7 +474,7 @@
 .yy-skeleton {
   display: block;
   background: var(--yy-cream-dim);
-  border-radius: var(--yy-radius-btn);
+  border-radius: var(--yy-radius-control);
   animation: yy-skeleton-pulse 1.5s ease-in-out infinite;
 }
 @keyframes yy-skeleton-pulse {
@@ -462,7 +608,7 @@
 }
 .yy-blob {
   position: absolute;
-  border-radius: 50%;
+  border-radius: var(--yy-radius-round);
   filter: blur(28px);
   pointer-events: none;
 }
@@ -472,7 +618,7 @@
 .yy-eyebrow {
   display: inline-block;
   padding: 4px 12px;
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-tag);
   background: var(--yy-calm-tag);
   color: var(--yy-calm-tag-on);
   font-family: var(--yy-font-body);
@@ -496,7 +642,7 @@
 .yy-card {
   background: var(--yy-surface);
   border: var(--yy-border-width) solid var(--yy-ink);
-  border-radius: var(--yy-radius-card);
+  border-radius: var(--yy-radius-panel);
 }
 .yy-card--hover {
   transition: transform .2s ease, box-shadow .2s ease;
@@ -521,7 +667,7 @@
   justify-content: center;
   gap: 8px;
   min-height: var(--yy-control-md);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-control);
   border: var(--yy-border-width) solid var(--yy-calm-accent);
   font-family: var(--yy-font-body);
   font-weight: 700;
@@ -620,7 +766,7 @@
   justify-content: center;
   min-height: var(--yy-control-md);
   padding: 8px 18px;
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-tag);
   background: var(--yy-calm-surface);
   color: var(--yy-calm-text);
   border: var(--yy-border-width) solid var(--yy-calm-line);
@@ -711,7 +857,7 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  border-radius: var(--yy-radius-btn);
+  border-radius: var(--yy-radius-control);
   border: var(--yy-border-width) solid var(--yy-ink);
   background: var(--yy-surface);
   transform: rotate(45deg);
@@ -746,7 +892,7 @@
 .yy-tabswitch {
   display: inline-flex;
   border: var(--yy-border-width) solid var(--yy-calm-line);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-control);
   overflow: hidden;
 }
 .yy-tabswitch__tab {
@@ -799,7 +945,7 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  border-radius: var(--yy-radius-btn);
+  border-radius: var(--yy-radius-control);
   border: var(--yy-border-width) solid var(--yy-ink);
   background: var(--yy-diamond-color, var(--yy-red));
   transform: rotate(45deg);
@@ -813,7 +959,7 @@
   align-items: center;
   background: linear-gradient(160deg, #264C73, #1B3452);
   border: var(--yy-border-width) solid var(--yy-gold);
-  border-radius: var(--yy-radius-btn);
+  border-radius: var(--yy-radius-control);
   padding: 14px 18px;
 }
 .yy-terminal__prompt {
@@ -854,8 +1000,8 @@
   animation: yy-pop 240ms var(--ease-out) both;
   background: var(--yy-surface);
   border: var(--yy-border-width) solid var(--yy-ink);
-  border-radius: var(--yy-radius-lg);
-  box-shadow: var(--yy-shadow-overlay);
+  border-radius: var(--yy-radius-panel);
+  box-shadow: var(--yy-elev-4);
   padding: 40px 50px;
   text-align: center;
   max-width: 90vw;
@@ -870,7 +1016,7 @@
 .yy-modal-icon {
   width: 70px;
   height: 70px;
-  border-radius: 50%;
+  border-radius: var(--yy-radius-round);
   background: var(--yy-gold-light);
   border: var(--yy-border-width) solid var(--yy-ink);
   display: flex;
@@ -941,7 +1087,7 @@
   flex: none;
   width: 10px;
   height: 10px;
-  border-radius: 50%;
+  border-radius: var(--yy-radius-round);
   background: var(--yy-calm-block-accent);
 }
 .yy-footer__sub {
@@ -1007,7 +1153,7 @@
   align-items: center;
   min-height: var(--yy-control-md);
   padding: 0 var(--yy-space-4);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-control);
   background: var(--yy-calm-accent);
   color: var(--yy-calm-accent-on);
   font-weight: 700;
@@ -1067,8 +1213,8 @@
     align-items: center;
     background-color: var(--yy-surface);
     border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-lg);
-    box-shadow: var(--yy-shadow-overlay);
+    border-radius: var(--yy-radius-panel);
+    box-shadow: var(--yy-elev-4);
     padding: 30px 24px;
     width: 260px;
 }
@@ -1183,6 +1329,10 @@
 .yy-text-muted { color: var(--yy-text-muted); }
 .yy-text-blue { color: var(--yy-blue); }
 
+/* 圖示線寬（Apple 化步驟 1-8）：lucide 圖示統一用 --yy-icon-stroke。
+   只套在加了 .yy-icon 的圖示；個別圖示刻意寫的 strokeWidth（例如勾號 3）不受影響。 */
+.yy-icon { stroke-width: var(--yy-icon-stroke); }
+
 /* ---------- Bootstrap 狀態色換成品牌色（只限前台） ----------
    react-bootstrap 的 <Button variant="danger">、<Alert variant="danger|warning"> 預設是 Bootstrap 的紅與黃。
    後台（.admin-shell 內）留到階段 G，所以這裡用 :not(.admin-shell *) 排除。 */
@@ -1254,3 +1404,156 @@ body::before {
 .yy-btn-touch {
   min-height: var(--yy-control-md);
 }
+
+/* ---------- 毛玻璃（Apple 化步驟 1-6）----------
+   規則：一律附 prefers-reduced-transparency 純色降級；不支援 backdrop-filter 時也退回純色；
+   文字對比在「最壞底圖」下仍須 4.5:1（glass.test.js 以全黑與全白底圖各算一次）。
+   焦點環：沿用 --yy-ui-focus-ring，輪廓跟著元件自己的圓角走（outline 會依 border-radius 彎曲）；
+   玻璃面上另加淺色光暈（--yy-glass-halo），避免焦點環被模糊的底圖吃掉。 */
+.yy-glass {
+  background: var(--yy-glass-bg);
+  -webkit-backdrop-filter: saturate(var(--yy-glass-saturate)) blur(var(--yy-glass-blur));
+  backdrop-filter: saturate(var(--yy-glass-saturate)) blur(var(--yy-glass-blur));
+  border: 1px solid var(--yy-glass-border);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .yy-glass { background: var(--yy-glass-bg-solid); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .yy-glass {
+    background: var(--yy-glass-bg-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+.yy-glass :focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
+  box-shadow: 0 0 0 calc(var(--yy-ui-focus-offset) + 2px) var(--yy-glass-halo);
+}
+
+/* ---------- Bootstrap 變數橋接（Apple 化步驟 1-9，第一步）----------
+   把 Bootstrap 的主色、狀態色、圓角、字型接到我們的 token，消除藍色載入圖示（.text-primary）與其他漏出的預設色。
+   顏色引用 --yy-calm-*（深淺色自動跟著換）；rgb 三元組 Bootstrap 用來做 rgba()，淺色寫在這裡、深色寫在深色區塊。
+   後台也會跟著套用（後台只換 token，已批准）。Bootstrap 的 .btn-* 等元件另有各自的 --bs-btn-* 變數，不在這一步。 */
+:root {
+  --bs-body-font-family: var(--yy-font-body);
+  --bs-font-sans-serif: var(--yy-font-body);
+  --bs-primary: var(--yy-calm-accent);
+  --bs-success: var(--yy-calm-success);
+  --bs-warning: var(--yy-calm-warning);
+  --bs-danger: var(--yy-calm-danger);
+  --bs-info: var(--yy-calm-block);
+  --bs-secondary: var(--yy-calm-text-sub);
+  --bs-primary-rgb: 126, 82, 57;
+  --bs-success-rgb: 47, 111, 75;
+  --bs-warning-rgb: 125, 91, 14;
+  --bs-danger-rgb: 138, 58, 78;
+  --bs-info-rgb: 65, 70, 75;
+  --bs-secondary-rgb: 65, 70, 75;
+  --bs-link-color: var(--yy-calm-accent);
+  --bs-link-hover-color: var(--yy-calm-accent);
+  --bs-link-color-rgb: var(--bs-primary-rgb);
+  --bs-link-hover-color-rgb: var(--bs-primary-rgb);
+  --bs-border-radius: var(--yy-radius-control);
+  --bs-border-radius-sm: var(--yy-radius-tag);
+  --bs-border-radius-lg: var(--yy-radius-panel);
+  --bs-border-radius-xl: var(--yy-radius-block);
+  --bs-border-radius-xxl: var(--yy-radius-block);
+  --bs-border-radius-pill: var(--yy-radius-pill);
+  --bs-focus-ring-color: rgba(var(--bs-primary-rgb), 0.25);
+}
+
+/* ---------- 按壓與抬起回饋（步驟 1-7，強度 6）----------
+   可按的卡片與列表列：觸控／滑鼠按下縮到 --yy-ui-press；只有真的有 hover 的裝置才抬起，觸控不會黏在 hover 狀態。
+   只動 transform 與 opacity／陰影；減少動態時全部停掉。鍵盤操作不加動畫（焦點環即是回饋）。 */
+@media (prefers-reduced-motion: no-preference) {
+  .yy-press, .topic-card, a.news-text-item {
+    transition: transform var(--dur-press) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+  }
+  .yy-press:active, .topic-card:active, a.news-text-item:active { transform: scale(var(--yy-ui-press)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yy-press, .topic-card, a.news-text-item { transition: none; }
+  .yy-press:active, .topic-card:active, a.news-text-item:active { transform: none; }
+}
+
+/* ---------- Bootstrap 元件接 token（Apple 化步驟 1-9，第二步）----------
+   Bootstrap 的 .btn-primary、輸入框焦點、勾選、分頁、進度條在類別裡寫死 #0d6efd／#86b7fe，--bs-primary 改了也不會變。
+   這裡逐一把元件變數接到 --yy-calm-*。success／warning／danger 的實底色對白字對比不足處，沿用上面既有的 .btn-danger 覆寫。 */
+.btn-primary {
+  --bs-btn-color: var(--yy-calm-accent-on); --bs-btn-bg: var(--yy-calm-accent); --bs-btn-border-color: var(--yy-calm-accent);
+  --bs-btn-hover-color: var(--yy-calm-accent-on); --bs-btn-hover-bg: var(--yy-calm-accent); --bs-btn-hover-border-color: var(--yy-calm-accent);
+  --bs-btn-active-color: var(--yy-calm-accent-on); --bs-btn-active-bg: var(--yy-calm-accent); --bs-btn-active-border-color: var(--yy-calm-accent);
+  --bs-btn-disabled-color: var(--yy-calm-accent-on); --bs-btn-disabled-bg: var(--yy-calm-accent); --bs-btn-disabled-border-color: var(--yy-calm-accent);
+  --bs-btn-focus-shadow-rgb: var(--bs-primary-rgb);
+}
+.btn-secondary {
+  --bs-btn-color: var(--yy-calm-bg); --bs-btn-bg: var(--yy-calm-text-sub); --bs-btn-border-color: var(--yy-calm-text-sub);
+  --bs-btn-hover-color: var(--yy-calm-bg); --bs-btn-hover-bg: var(--yy-calm-text); --bs-btn-hover-border-color: var(--yy-calm-text);
+  --bs-btn-active-color: var(--yy-calm-bg); --bs-btn-active-bg: var(--yy-calm-text); --bs-btn-active-border-color: var(--yy-calm-text);
+  --bs-btn-disabled-color: var(--yy-calm-bg); --bs-btn-disabled-bg: var(--yy-calm-text-sub); --bs-btn-disabled-border-color: var(--yy-calm-text-sub);
+  --bs-btn-focus-shadow-rgb: var(--bs-secondary-rgb);
+}
+.btn-success {
+  --bs-btn-color: var(--yy-calm-bg); --bs-btn-bg: var(--yy-calm-success); --bs-btn-border-color: var(--yy-calm-success);
+  --bs-btn-hover-color: var(--yy-calm-bg); --bs-btn-hover-bg: var(--yy-calm-success); --bs-btn-hover-border-color: var(--yy-calm-success);
+  --bs-btn-active-color: var(--yy-calm-bg); --bs-btn-active-bg: var(--yy-calm-success); --bs-btn-active-border-color: var(--yy-calm-success);
+  --bs-btn-disabled-color: var(--yy-calm-bg); --bs-btn-disabled-bg: var(--yy-calm-success); --bs-btn-disabled-border-color: var(--yy-calm-success);
+  --bs-btn-focus-shadow-rgb: var(--bs-success-rgb);
+}
+.btn-info {
+  --bs-btn-color: var(--yy-calm-block-on); --bs-btn-bg: var(--yy-calm-block); --bs-btn-border-color: var(--yy-calm-block);
+  --bs-btn-hover-color: var(--yy-calm-block-on); --bs-btn-hover-bg: var(--yy-calm-block-deep); --bs-btn-hover-border-color: var(--yy-calm-block-deep);
+  --bs-btn-active-color: var(--yy-calm-block-on); --bs-btn-active-bg: var(--yy-calm-block-deep); --bs-btn-active-border-color: var(--yy-calm-block-deep);
+  --bs-btn-disabled-color: var(--yy-calm-block-on); --bs-btn-disabled-bg: var(--yy-calm-block); --bs-btn-disabled-border-color: var(--yy-calm-block);
+  --bs-btn-focus-shadow-rgb: var(--bs-info-rgb);
+}
+.btn-warning {
+  --bs-btn-color: var(--yy-calm-bg); --bs-btn-bg: var(--yy-calm-warning); --bs-btn-border-color: var(--yy-calm-warning);
+  --bs-btn-hover-color: var(--yy-calm-bg); --bs-btn-hover-bg: var(--yy-calm-warning); --bs-btn-hover-border-color: var(--yy-calm-warning);
+  --bs-btn-active-color: var(--yy-calm-bg); --bs-btn-active-bg: var(--yy-calm-warning); --bs-btn-active-border-color: var(--yy-calm-warning);
+  --bs-btn-disabled-color: var(--yy-calm-bg); --bs-btn-disabled-bg: var(--yy-calm-warning); --bs-btn-disabled-border-color: var(--yy-calm-warning);
+  --bs-btn-focus-shadow-rgb: var(--bs-warning-rgb);
+}
+.btn-outline-primary {
+  --bs-btn-color: var(--yy-calm-accent); --bs-btn-border-color: var(--yy-calm-accent);
+  --bs-btn-hover-color: var(--yy-calm-accent-on); --bs-btn-hover-bg: var(--yy-calm-accent); --bs-btn-hover-border-color: var(--yy-calm-accent);
+  --bs-btn-active-color: var(--yy-calm-accent-on); --bs-btn-active-bg: var(--yy-calm-accent); --bs-btn-active-border-color: var(--yy-calm-accent);
+  --bs-btn-disabled-color: var(--yy-calm-accent); --bs-btn-disabled-border-color: var(--yy-calm-accent);
+  --bs-btn-focus-shadow-rgb: var(--bs-primary-rgb);
+}
+.btn-outline-secondary {
+  --bs-btn-color: var(--yy-calm-text-sub); --bs-btn-border-color: var(--yy-calm-text-sub);
+  --bs-btn-hover-color: var(--yy-calm-accent-on); --bs-btn-hover-bg: var(--yy-calm-text-sub); --bs-btn-hover-border-color: var(--yy-calm-text-sub);
+  --bs-btn-active-color: var(--yy-calm-accent-on); --bs-btn-active-bg: var(--yy-calm-text-sub); --bs-btn-active-border-color: var(--yy-calm-text-sub);
+  --bs-btn-disabled-color: var(--yy-calm-text-sub); --bs-btn-disabled-border-color: var(--yy-calm-text-sub);
+  --bs-btn-focus-shadow-rgb: var(--bs-secondary-rgb);
+}
+.btn-outline-success {
+  --bs-btn-color: var(--yy-calm-success); --bs-btn-border-color: var(--yy-calm-success);
+  --bs-btn-hover-color: var(--yy-calm-accent-on); --bs-btn-hover-bg: var(--yy-calm-success); --bs-btn-hover-border-color: var(--yy-calm-success);
+  --bs-btn-active-color: var(--yy-calm-accent-on); --bs-btn-active-bg: var(--yy-calm-success); --bs-btn-active-border-color: var(--yy-calm-success);
+  --bs-btn-disabled-color: var(--yy-calm-success); --bs-btn-disabled-border-color: var(--yy-calm-success);
+  --bs-btn-focus-shadow-rgb: var(--bs-success-rgb);
+}
+.btn-outline-danger {
+  --bs-btn-color: var(--yy-calm-danger); --bs-btn-border-color: var(--yy-calm-danger);
+  --bs-btn-hover-color: var(--yy-calm-accent-on); --bs-btn-hover-bg: var(--yy-calm-danger); --bs-btn-hover-border-color: var(--yy-calm-danger);
+  --bs-btn-active-color: var(--yy-calm-accent-on); --bs-btn-active-bg: var(--yy-calm-danger); --bs-btn-active-border-color: var(--yy-calm-danger);
+  --bs-btn-disabled-color: var(--yy-calm-danger); --bs-btn-disabled-border-color: var(--yy-calm-danger);
+  --bs-btn-focus-shadow-rgb: var(--bs-danger-rgb);
+}
+.form-control:focus, .form-select:focus {
+  border-color: var(--yy-calm-accent);
+  box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.25);
+}
+.form-check-input:checked, .form-check-input[type="checkbox"]:indeterminate {
+  background-color: var(--yy-calm-accent);
+  border-color: var(--yy-calm-accent);
+}
+.form-check-input:focus { border-color: var(--yy-calm-accent); box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.25); }
+.progress { --bs-progress-bar-bg: var(--yy-calm-accent); --bs-progress-border-radius: var(--yy-radius-pill); }
+.page-link { --bs-pagination-color: var(--yy-calm-accent); --bs-pagination-hover-color: var(--yy-calm-accent); --bs-pagination-focus-color: var(--yy-calm-accent); --bs-pagination-active-bg: var(--yy-calm-accent); --bs-pagination-active-border-color: var(--yy-calm-accent); --bs-pagination-active-color: var(--yy-calm-accent-on); }
+.nav-pills { --bs-nav-pills-link-active-bg: var(--yy-calm-accent); --bs-nav-pills-link-active-color: var(--yy-calm-accent-on); }
+.nav-link { --bs-nav-link-color: var(--yy-calm-accent); --bs-nav-link-hover-color: var(--yy-calm-accent); }

@@ -1,7 +1,7 @@
 .exam-info-card {
     position: relative;
     overflow: hidden;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     background: var(--yy-calm-surface);
     color: var(--yy-calm-text);
     border: var(--yy-border-width) solid var(--yy-calm-line);
@@ -25,7 +25,7 @@
 .countdown-box {
     background: var(--yy-calm-info-bg);
     border: 1px solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     padding: 1rem;
     font-variant-numeric: tabular-nums;
 }
@@ -69,7 +69,7 @@
 .schedule-item {
     text-align: center;
     padding: 0.5rem;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     font-size: 0.875rem;
     background: var(--yy-calm-bg);
     color: var(--yy-calm-text-sub);
@@ -127,7 +127,7 @@
   color: var(--yy-calm-text);
   border: var(--yy-border-width) solid var(--yy-calm-line);
   padding: 1rem 1.5rem;
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-panel);
   z-index: var(--yy-z-toast);
   width: fixed;
 }

@@ -32,7 +32,7 @@
     height: 100%;
     backface-visibility: hidden;
     border: 1px solid var(--yy-calm-rule);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     background: var(--yy-calm-surface);
     overflow: hidden;
     display: flex;
@@ -75,7 +75,7 @@
     right: 8px;
     background: var(--yy-calm-surface);
     border: 1px solid var(--yy-calm-rule);
-    border-radius: 50%;
+    border-radius: var(--yy-radius-round);
     min-width: fit-content;
     width: 32px;
     height: 32px;
@@ -200,7 +200,7 @@
 .example-item {
     background: var(--yy-calm-info-bg);
     padding: 0.75rem;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     border-left: 3px solid var(--yy-calm-accent);
     margin-bottom: 0.75rem;
 }
@@ -297,7 +297,7 @@
 .word-category-label {
     background: var(--yy-calm-info-bg);
     padding: 0.2rem 0.5rem;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-tag);
     width: fit-content;
 }
 
@@ -314,7 +314,7 @@
 .favorite-title {
     margin: 0 0 8px;
     font-family: var(--yy-font-heading);
-    font-size: var(--yy-text-3xl);
+    font-size: var(--yy-type-h1);
     font-weight: 700;
 }
 .favorite-desc {

@@ -114,7 +114,7 @@
     flex-wrap: wrap;
     justify-content: center;
     border: 0px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     width:100%;
     margin: 25px 0;
     place-items: center;

@@ -4,7 +4,7 @@
 
 /* 基本按鈕尺寸（保留你原本的寫法） */
 .note-page button,
-.note-page .btn { min-width: 100px; border-radius: var(--yy-ui-radius); padding: 10px 16px; min-height: var(--yy-control-md); cursor: pointer; transition: transform 120ms var(--ease-out), background-color var(--dur-fast) var(--ease-out); }
+.note-page .btn { min-width: 100px; border-radius: var(--yy-radius-control); padding: 10px 16px; min-height: var(--yy-control-md); cursor: pointer; transition: transform 120ms var(--ease-out), background-color var(--dur-fast) var(--ease-out); }
 
 .note-page button:active,
 .note-page .btn:active { transform: scale(var(--yy-ui-press)); }

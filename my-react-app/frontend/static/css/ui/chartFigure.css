@@ -47,7 +47,7 @@
     max-height: 280px;
     overflow: auto;
     border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-surface);
 }
 

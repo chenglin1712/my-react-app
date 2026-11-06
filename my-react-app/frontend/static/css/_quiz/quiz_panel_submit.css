@@ -47,7 +47,7 @@
     display: inline-block;
     padding: 8px 16px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: 50%;
+    border-radius: var(--yy-radius-pill);
     font-size: 32px;
     font-weight: bold;
     color: var(--yy-calm-accent);
@@ -67,7 +67,7 @@
     justify-content: space-between;
     background-color: var(--yy-calm-accent);
     padding: 8px 12px;
-    border-radius: var(--yy-ui-radius) var(--yy-ui-radius) 0 0;
+    border-radius: var(--yy-radius-control) var(--yy-radius-control) 0 0;
     font-weight: 700;
     color: var(--yy-calm-info-bg);
     margin-bottom: 12px;
@@ -121,7 +121,7 @@
 .quiz-user-answer {
     font-weight: 600;
     padding: 2px 6px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     width: 24px;
 }
 
@@ -148,7 +148,7 @@
 .quiz-correct-answer-text {
     font-weight: 600;
     padding: 2px 8px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     white-space: nowrap;
 }
 
@@ -183,7 +183,7 @@
     color: var(--yy-calm-surface);
     border: none;
     padding: 4px 8px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     font-size: 14px;
     min-width: auto;
 }
@@ -199,7 +199,7 @@
     width: 100px;
     height: 100px;
     object-fit: cover;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     border: var(--yy-border-width) solid transparent;
 }
 
@@ -233,7 +233,7 @@
     color: var(--yy-calm-info-bg);
     border: var(--yy-border-width) solid var(--yy-calm-line);
     padding: 12px 20px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     font-size: 16px;
     font-weight: 700;
     cursor: pointer;
@@ -256,7 +256,7 @@
     color: var(--yy-calm-accent);
     border: var(--yy-border-width) solid var(--yy-calm-line);
     padding: 12px 20px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     font-size: 16px;
     font-weight: 700;
     cursor: pointer;
@@ -308,7 +308,7 @@
     margin-bottom: 12px;
     padding: 10px 12px;
     border: var(--yy-border-width) solid var(--yy-calm-accent);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-calm-surface);
     font-size: 15px;
 }

@@ -7,7 +7,7 @@
     padding: 24px;
     background-color: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     font-family: var(--yy-font-body);
 }
 
@@ -47,7 +47,7 @@
 
 .react-calendar__month-view__days button {
     min-width: 100% !important;
-    border-radius: var(--yy-ui-radius) !important;
+    border-radius: var(--yy-radius-control) !important;
     padding: 10px 6px;
 }
 
@@ -68,7 +68,7 @@
     background-color: var(--yy-calm-surface);
     border: 1px solid var(--yy-calm-rule);
     padding: 10px var(--yy-control-md); /* 左右各留 44px，右上角的刪除鈕才不會蓋到標題 */
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     margin-bottom: 8px;
     display: flex;
     flex-direction: column;
@@ -138,7 +138,7 @@
     font-size: var(--yy-text-sm);
     font-weight: 500;
     border: none;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -165,7 +165,7 @@
     padding: 10px;
     border: 1px solid var(--yy-calm-text-sub);
     min-height: var(--yy-control-md);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     font-size: 16px;
 }
 
@@ -181,7 +181,7 @@
     color: var(--yy-calm-accent-on);
     border: none;
     min-height: var(--yy-control-md);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     font-weight: 500;
     cursor: pointer;
 }
@@ -198,7 +198,7 @@
     width: 6px;
     height: 6px;
     background-color: var(--yy-calm-accent);
-    border-radius: 50%;
+    border-radius: var(--yy-radius-round);
     margin-left: auto;
     margin-right: auto;
 }
@@ -211,7 +211,7 @@
 .calendar-title {
     margin: 0;
     font-family: var(--yy-font-heading);
-    font-size: var(--yy-text-2xl);
+    font-size: var(--yy-type-h2);
     font-weight: 700;
 }
 .calendar-page .calendar-wrapper {
@@ -228,7 +228,7 @@
     flex: 0 0 auto;
     padding: 10px;
     border: 1px solid var(--yy-calm-text-sub);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     min-height: var(--yy-control-md);
     font-size: 16px;
     background: var(--yy-calm-surface);

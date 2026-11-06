@@ -4,7 +4,7 @@
   background: var(--yy-calm-surface);
   padding: 30px;
   border: var(--yy-border-width) solid var(--yy-calm-line);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-panel);
   text-align: center;
   animation: recommon-result-fade-in var(--dur-base) var(--ease-out);
 }
@@ -35,7 +35,7 @@
 .stat-card {
   background: var(--yy-calm-info-bg);
   border: var(--yy-border-width) solid var(--yy-calm-line);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-panel);
   padding: 15px 25px;
   flex: 1;
   margin: 0 10px;
@@ -63,7 +63,7 @@
   background: var(--yy-calm-info-bg);
   border: var(--yy-border-width) solid var(--yy-calm-line);
   border-left: 6px solid var(--yy-calm-accent);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-panel);
 }
 
 .result-analysis h3,
@@ -93,7 +93,7 @@
   gap: 6px;
   padding: 12px 20px;
   border: var(--yy-border-width) solid var(--yy-calm-line);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-control);
   font-weight: bold;
   cursor: pointer;
   transition: transform 0.15s ease;
@@ -141,7 +141,7 @@
   background: var(--yy-calm-info-bg);
   border: var(--yy-border-width) solid var(--yy-calm-line);
   border-left: 6px solid var(--yy-calm-accent);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-panel);
 }
 
 .result-rules h3 {

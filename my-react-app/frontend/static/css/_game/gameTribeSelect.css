@@ -28,7 +28,7 @@
   display: inline-flex;
   align-items: center;
   min-height: var(--yy-control-md);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-control);
   transition: background 0.15s;
 }
 
@@ -67,7 +67,7 @@
   align-items: center;
   gap: 0.6rem;
   padding: 1.25rem 0.75rem 1rem;
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-panel);
   border: var(--yy-border-width) solid var(--tribe-color);
   cursor: pointer;
   transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
@@ -92,7 +92,7 @@
 .vocab-tribe-badge {
   width: 64px;
   height: 64px;
-  border-radius: 50%;
+  border-radius: var(--yy-radius-round);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -112,7 +112,7 @@
   font-size: var(--yy-text-sm);
   font-weight: 700;
   padding: 0.2rem 0.6rem;
-  border-radius: 999px;
+  border-radius: var(--yy-radius-pill);
 }
 
 .vocab-tribe-tag.available {

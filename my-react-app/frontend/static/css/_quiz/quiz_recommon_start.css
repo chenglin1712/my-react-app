@@ -4,7 +4,7 @@
   background: var(--yy-calm-surface);
   padding: 40px 30px;
   border: var(--yy-border-width) solid var(--yy-calm-line);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-panel);
   text-align: center;
   animation: recommon-start-fade-in var(--dur-base) var(--ease-out);
 }
@@ -35,7 +35,7 @@
   justify-content: center;
   gap: 8px;
   padding: 14px 22px;
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-control);
   font-weight: bold;
   font-size: 16px;
   border: var(--yy-border-width) solid var(--yy-calm-line);

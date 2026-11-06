@@ -6,7 +6,7 @@
 .yy-morph-panel {
     margin: 16px 0;
     border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-surface);
 }
 
@@ -49,7 +49,7 @@
     min-width: 0;
     padding: 8px 12px;
     border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-radius-control);
     font-size: 15px;
 }
 .yy-morph-input:focus-visible {
@@ -59,7 +59,7 @@
 .yy-morph-go {
     padding: 8px 18px;
     border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-gold);
     color: var(--yy-ink);
     font-weight: 700;
@@ -80,7 +80,7 @@
     margin: 10px 0 0;
     padding: 8px 12px;
     border: var(--yy-border-width) solid var(--yy-red);
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-danger-bg);
     color: var(--yy-red);
     font-size: 14px;
@@ -103,7 +103,7 @@
 .yy-morph-status {
     padding: 2px 8px;
     border: 1.5px solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-surface);
     font-size: 12px;
     font-weight: 700;
@@ -130,7 +130,7 @@
     padding: 12px 14px;
     border: var(--yy-border-width) solid var(--yy-ink);
     border-left-width: 6px;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-cream);
 }
 .yy-morph-conf-dictionary { border-left-color: var(--yy-blue); }
@@ -154,7 +154,7 @@
 .yy-morph-badge {
     padding: 2px 8px;
     border: 1.5px solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-surface);
     font-size: 12px;
     font-weight: 700;
@@ -192,7 +192,7 @@
 }
 .yy-morph-line code {
     padding: 1px 6px;
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-surface);
     border: 1px solid var(--yy-text-muted);
     color: var(--yy-ink);
@@ -262,7 +262,7 @@
     margin-top: 8px;
     padding: 4px 12px;
     border: var(--yy-border-width) solid var(--yy-ink);
-    border-radius: var(--yy-radius-btn);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-surface);
     font-size: 13px;
     font-weight: 700;

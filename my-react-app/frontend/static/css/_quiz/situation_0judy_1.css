@@ -8,7 +8,7 @@
     flex: 1;
     background: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     padding: 20px;
 }
 
@@ -43,7 +43,7 @@
     color: var(--yy-calm-text-sub);
     background: var(--yy-calm-info-bg);
     padding: 12px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
 }
 
 .summary-radar {

@@ -23,7 +23,7 @@
     color: rgba(0, 0, 0, 0.5);
     border: none;
     padding: 8px;
-    border-radius: 50%;
+    border-radius: var(--yy-radius-round);
     cursor: pointer;
     position: absolute;
     top: 50%;

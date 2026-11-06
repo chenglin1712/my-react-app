@@ -81,7 +81,7 @@ const SituationLine = ({ data }) => {
               <Tooltip
                 contentStyle={{
                   backgroundColor: "#ffffff",
-                  borderRadius: 8,
+                  borderRadius: 'var(--yy-radius-tag)',
                   border: "1.5px solid #221812",
                   boxShadow: "0 10px 30px rgba(41, 45, 49, 0.18)",
                   fontSize: 13,

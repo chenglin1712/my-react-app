@@ -3,7 +3,7 @@
 .plan-tracker {
     margin: 0 12px 8px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     background: var(--yy-calm-surface);
     color: var(--yy-calm-text);
 }
@@ -17,7 +17,7 @@
     min-height: 44px;
     padding: 6px 12px 10px;
     border: 0;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     background: transparent;
     color: inherit;
     font: inherit;
@@ -55,7 +55,7 @@
     bottom: 4px;
     left: 12px;
     height: 3px;
-    border-radius: 2px;
+    border-radius: var(--yy-radius-pill);
     background: var(--yy-calm-copper);
     transform-origin: left center;
     transition: transform 220ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
@@ -102,7 +102,7 @@
     width: 24px;
     height: 24px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     background: var(--yy-calm-surface);
     color: transparent;
     transition: background-color 120ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
@@ -155,7 +155,7 @@
     min-height: 44px;
     padding: 0 12px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-calm-surface);
     color: var(--yy-calm-text);
     font: inherit;
@@ -186,7 +186,7 @@
 .track-plan-cancel {
     min-height: 44px;
     padding: 0 16px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     font: inherit;
     font-weight: 600;
     cursor: pointer;

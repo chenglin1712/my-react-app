@@ -50,7 +50,7 @@
     padding: 28px;
     background: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
 }
 
 .scenario-quiz-progress-header {
@@ -68,7 +68,7 @@
     margin-bottom: 22px;
     background: var(--yy-calm-info-bg);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: 999px;
+    border-radius: var(--yy-radius-pill);
 }
 
 /* 填滿的長度用 transform: scaleX 表示（審查項 P2-86）：動 width 會每幀重排版面 */
@@ -86,7 +86,7 @@
     color: var(--yy-calm-text-sub);
     background: var(--yy-calm-info-bg);
     border-left: 4px solid var(--yy-calm-olive);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     font-size: var(--yy-text-sm);
     line-height: 1.65;
 }
@@ -101,7 +101,7 @@
     padding: 3px 9px;
     color: var(--yy-calm-surface);
     background: var(--yy-calm-accent);
-    border-radius: 999px;
+    border-radius: var(--yy-radius-pill);
     font-size: var(--yy-text-sm);
     font-weight: 700;
 }
@@ -128,7 +128,7 @@
     color: var(--yy-calm-text);
     background: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     text-align: left;
     transition:
         border-color .15s ease,
@@ -177,7 +177,7 @@
     color: var(--yy-calm-surface);
     background: var(--yy-calm-accent);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: 50%;
+    border-radius: var(--yy-radius-round);
     font-size: 14px;
     font-weight: 750;
 }
@@ -231,7 +231,7 @@
     margin-top: 18px;
     padding: 13px 15px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
 }
 
 .scenario-quiz-feedback.correct {
@@ -272,7 +272,7 @@
 .scenario-quiz-navigation .btn {
     min-width: 120px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-calm-accent);
     font-weight: 700;
 }
@@ -319,7 +319,7 @@
     color: var(--yy-calm-success);
     background: var(--yy-calm-success-bg);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: 50%;
+    border-radius: var(--yy-radius-round);
 }
 
 .scenario-quiz-summary h2,
@@ -354,7 +354,7 @@
     align-items: center;
     gap: 7px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     font-weight: 700;
 }
 

@@ -41,7 +41,7 @@
     font-size: var(--yy-text-sm);
     font-weight: 700;
     letter-spacing: 0.08em;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-tag);
 }
 
 .tpage-title {
@@ -87,7 +87,7 @@
     max-height: 460px;
     object-fit: cover;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
 }
 
 .tpage-figure figcaption {
@@ -161,7 +161,7 @@
     width: 100%;
     height: auto;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
 }
 
 .tpage-body .rt-figure figcaption {
@@ -214,7 +214,7 @@
 .tpage-btn {
     padding: 0 var(--yy-space-5);
     border: var(--yy-border-width) solid var(--yy-calm-text);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-calm-text);
     color: var(--yy-calm-bg);
     font: inherit;
@@ -257,7 +257,7 @@
     margin-top: 24px;
     padding: 56px 16px;
     border: var(--yy-border-width) dashed var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     text-align: center;
 }
 
@@ -291,7 +291,7 @@
 .tpage-skeleton__line {
     display: block;
     height: 20px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-tag);
 }
 
 .tpage-skeleton__line--short {
@@ -306,7 +306,7 @@
     display: block;
     height: 280px;
     margin: 12px 0;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-tag);
 }
 
 @media (prefers-reduced-motion: reduce) {

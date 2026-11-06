@@ -22,7 +22,7 @@
 
 .wf-chip {
   border: var(--yy-border-width) solid var(--yy-ink);
-  border-radius: var(--yy-radius-btn);
+  border-radius: var(--yy-radius-control);
   background: var(--yy-surface);
   color: var(--yy-ink);
   font-weight: 700;
@@ -52,7 +52,7 @@
   padding: 0;
   font-size: var(--yy-text-sm);
   font-family: var(--yy-font-pixel);
-  border-radius: var(--yy-radius-btn);
+  border-radius: var(--yy-radius-control);
 }
 
 .wf-chip.is-selected {

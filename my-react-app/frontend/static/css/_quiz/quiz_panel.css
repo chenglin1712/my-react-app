@@ -25,14 +25,14 @@
     padding: 3%;
     margin: 0 auto;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     overflow: hidden;
 }
 
 .panel-quiz-container button {
     padding: 8px 16px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-calm-surface);
     color: var(--yy-calm-text);
     min-width: fit-content;
@@ -105,7 +105,7 @@
     color: var(--yy-calm-text);
     padding: 10px 14px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     z-index: calc(var(--yy-z-sticky) + 1);
     font-size: 14px;
     width: 240px;
@@ -123,7 +123,7 @@
     padding: 16px;
     background-color: var(--yy-calm-info-bg);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     margin-bottom: 10px;
 }
 
@@ -256,7 +256,7 @@ audio {
     font: inherit;
     position: relative;
     cursor: pointer;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     overflow: hidden;
     border: var(--yy-border-width) solid var(--yy-calm-line);
     min-width: 0;
@@ -302,7 +302,7 @@ audio {
     font-weight: 900;
     color: var(--yy-calm-surface);
     background: var(--yy-calm-accent);
-    border-radius: 50%;
+    border-radius: var(--yy-radius-round);
 }
 
 .quiz-label {
@@ -313,7 +313,7 @@ audio {
     color: var(--yy-calm-surface);
     font-weight: bold;
     padding: 4px 8px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-tag);
     font-size: 16px;
 }
 
@@ -322,7 +322,7 @@ audio {
     border: var(--yy-border-width) solid var(--yy-calm-line);
     padding: 8px 18px;
     font-size: 18px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     cursor: pointer;
     transition: var(--transition-interactive);
     font-weight: bold;
@@ -357,7 +357,7 @@ audio {
 .match-btn {
     padding: 10px 14px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-calm-surface);
     font-size: 16px;
     cursor: pointer;
@@ -447,7 +447,7 @@ audio {
     line-height: 1.8;
     background: var(--yy-calm-surface);
     padding: 14px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     border: var(--yy-border-width) solid var(--yy-calm-line);
 }
 
@@ -476,7 +476,7 @@ audio {
     gap: 10px;
     padding: 10px 14px;
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     background: var(--yy-calm-surface);
     font-size: 16px;
     text-align: left;
@@ -505,7 +505,7 @@ audio {
     justify-content: center;
     width: 24px;
     height: 24px;
-    border-radius: 50%;
+    border-radius: var(--yy-radius-round);
     background: var(--yy-calm-accent);
     color: var(--yy-calm-surface);
     font-weight: bold;
@@ -564,7 +564,7 @@ audio {
     background: var(--yy-calm-surface);
     color: var(--yy-calm-text);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     font-weight: 700;
     cursor: pointer;
     transition: var(--transition-interactive);

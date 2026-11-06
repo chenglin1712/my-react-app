@@ -62,7 +62,7 @@
     min-height: var(--yy-control-md);
     padding: 0 var(--yy-space-4);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-tag);
     background: transparent;
     color: var(--yy-calm-text);
     font: inherit;
@@ -173,7 +173,7 @@ a.ann-item:focus-visible {
     min-height: var(--yy-control-md);
     padding: 0 var(--yy-space-5);
     border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-control);
     background: transparent;
     color: var(--yy-calm-text);
     font: inherit;
@@ -206,7 +206,7 @@ a.ann-item:focus-visible {
     margin-top: 12px;
     padding: 40px 12px;
     border: var(--yy-border-width) dashed var(--yy-calm-line);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-panel);
     text-align: center;
     font-weight: 700;
 }
@@ -232,7 +232,7 @@ a.ann-item:focus-visible {
 .ann-skeleton__row {
     display: block;
     height: 64px;
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--yy-radius-tag);
 }
 
 @media (prefers-reduced-motion: reduce) {
