@@ -11,19 +11,35 @@ import '../../../static/css/_admin/homepage-config.css';
 const PUBLISHERS = ['owner', 'admin'];
 
 // 上限與後端 HOMEPAGE_CONTRACT.md 一致；後端仍會再驗證一次，這裡只是讓錯誤在送出前就看得到。
-const LIMITS = { marqueeItems: 10, marqueeItemChars: 40, tagline: 60, quote: 120 };
+const LIMITS = { marqueeItems: 10, marqueeItemChars: 40, tagline: 60, quote: 120, notice: 120 };
 
 const EMPTY_FORM = {
     hero_image_url: '', hero_link_url: '', hero_title_override: '',
     marquee_items: '', show_marquee: true,
     tagline: '', show_tagline: true,
     quote_text: '', show_quote: true,
+    notice_enabled: false, notice_text: '', notice_link_url: '', notice_starts_at: '', notice_ends_at: '',
     show_news_section: true, show_calendar_section: true, news_display_count: 6,
     button1_enabled: true, button2_enabled: true, button3_enabled: true,
 };
 const FORM_FIELDS = Object.keys(EMPTY_FORM);
 
 const countChars = (text) => Array.from(text ?? '').length;
+
+// 通知條的開始、結束時間：API 用 ISO 時間，表單用 <input type="datetime-local">（本地時間、沒有時區）。
+const pad = (n) => String(n).padStart(2, '0');
+const isoToLocalInput = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+const localInputToIso = (value) => {
+    if (!value) return null;
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+};
+const NOTICE_TIME_FIELDS = ['notice_starts_at', 'notice_ends_at'];
 
 // 跑馬燈在表單裡是「一行一則」的文字，送出時才轉成清單；空白行與前後空白會被整理掉。
 const parseMarquee = (text) => text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
@@ -34,6 +50,9 @@ const formFrom = (item, fallback = EMPTY_FORM) => Object.fromEntries(
     FORM_FIELDS.map((key) => {
         if (key === 'marquee_items') {
             return [key, Array.isArray(item?.marquee_items) ? item.marquee_items.join('\n') : fallback[key]];
+        }
+        if (NOTICE_TIME_FIELDS.includes(key)) {
+            return [key, item && key in item ? isoToLocalInput(item[key]) : fallback[key]];
         }
         return [key, item?.[key] ?? fallback[key]];
     }),
@@ -50,6 +69,18 @@ function validate(form) {
     }
     if (countChars(form.tagline.trim()) > LIMITS.tagline) errors.tagline = `標語最多 ${LIMITS.tagline} 字`;
     if (countChars(form.quote_text.trim()) > LIMITS.quote) errors.quote_text = `引言最多 ${LIMITS.quote} 字`;
+    const noticeText = form.notice_text.trim();
+    if (countChars(noticeText) > LIMITS.notice) errors.notice_text = `通知文字最多 ${LIMITS.notice} 字`;
+    else if (form.notice_enabled && !noticeText) errors.notice_text = '啟用通知條時必須填寫文字';
+    const link = form.notice_link_url.trim();
+    // 反斜線先換成斜線再判斷，與後端同一規則（瀏覽器會把「斜線加反斜線」開頭的網址當成協定相對網址）
+    const normalizedLink = link.replace(/\\/g, '/');
+    if (link && !(link.startsWith('https://') || (normalizedLink.startsWith('/') && !normalizedLink.startsWith('//')))) {
+        errors.notice_link_url = '連結必須是站內路徑（以 / 開頭）或 https 網址';
+    }
+    const start = localInputToIso(form.notice_starts_at);
+    const end = localInputToIso(form.notice_ends_at);
+    if (start && end && new Date(end) <= new Date(start)) errors.notice_ends_at = '結束時間必須晚於開始時間';
     return errors;
 }
 
@@ -145,6 +176,10 @@ export default function HomepageConfig() {
                     marquee_items: parseMarquee(form.marquee_items),
                     tagline: form.tagline.trim(),
                     quote_text: form.quote_text.trim(),
+                    notice_text: form.notice_text.trim(),
+                    notice_link_url: form.notice_link_url.trim(),
+                    notice_starts_at: localInputToIso(form.notice_starts_at),
+                    notice_ends_at: localInputToIso(form.notice_ends_at),
                     news_display_count: Number(form.news_display_count),
                 });
                 // 儲存期間使用者若又改了欄位，不拿回應蓋掉他的新輸入
@@ -323,6 +358,74 @@ export default function HomepageConfig() {
                         disabled={!editable}
                         onChange={(value) => update('show_quote', value)}
                     />
+                </section>
+
+                <section className="homepage-config-section" aria-labelledby="homepage-config-notice">
+                    <div className="homepage-config-section-heading">
+                        <h2 id="homepage-config-notice">頂部通知條</h2>
+                        <p>首頁最上方的一行通知，訪客可以關閉。沒有啟用、沒有文字或不在有效期間內時不會出現。</p>
+                    </div>
+                    <SwitchField
+                        id="homepage-notice-enabled"
+                        label="啟用通知條"
+                        hint="關閉後內容仍會保留，重新開啟即再次公開。"
+                        checked={form.notice_enabled}
+                        disabled={!editable}
+                        onChange={(value) => update('notice_enabled', value)}
+                    />
+                    <Form.Group className="homepage-config-field" controlId="homepage-notice-text">
+                        <Form.Label>通知文字</Form.Label>
+                        <Form.Control
+                            disabled={!editable}
+                            value={form.notice_text}
+                            onChange={(e) => update('notice_text', e.target.value)}
+                            isInvalid={Boolean(fieldError('notice_text'))}
+                            aria-invalid={Boolean(fieldError('notice_text'))}
+                            aria-describedby={describedBy('homepage-notice-text', 'notice_text')}
+                        />
+                        <Form.Control.Feedback type="invalid" id="homepage-notice-text-error">{fieldError('notice_text')}</Form.Control.Feedback>
+                        <Form.Text id="homepage-notice-text-hint">
+                            單行，最多 {LIMITS.notice} 字（目前 {countChars(form.notice_text.trim())} 字）。
+                        </Form.Text>
+                    </Form.Group>
+                    <Form.Group className="homepage-config-field" controlId="homepage-notice-link">
+                        <Form.Label>連結（選填）</Form.Label>
+                        <Form.Control
+                            disabled={!editable}
+                            value={form.notice_link_url}
+                            onChange={(e) => update('notice_link_url', e.target.value)}
+                            isInvalid={Boolean(fieldError('notice_link_url'))}
+                            aria-invalid={Boolean(fieldError('notice_link_url'))}
+                            aria-describedby={describedBy('homepage-notice-link', 'notice_link_url')}
+                        />
+                        <Form.Control.Feedback type="invalid" id="homepage-notice-link-error">{fieldError('notice_link_url')}</Form.Control.Feedback>
+                        <Form.Text id="homepage-notice-link-hint">站內路徑（以 / 開頭，例如 /announcements）或 https 網址。留空則只顯示文字。</Form.Text>
+                    </Form.Group>
+                    <Form.Group className="homepage-config-field" controlId="homepage-notice-start">
+                        <Form.Label>開始時間（選填）</Form.Label>
+                        <Form.Control
+                            type="datetime-local"
+                            disabled={!editable}
+                            value={form.notice_starts_at}
+                            onChange={(e) => update('notice_starts_at', e.target.value)}
+                            aria-describedby="homepage-notice-start-hint"
+                        />
+                        <Form.Text id="homepage-notice-start-hint">留空表示立刻開始。時間以你這台電腦的時區為準（{Intl.DateTimeFormat().resolvedOptions().timeZone}）。</Form.Text>
+                    </Form.Group>
+                    <Form.Group className="homepage-config-field" controlId="homepage-notice-end">
+                        <Form.Label>結束時間（選填）</Form.Label>
+                        <Form.Control
+                            type="datetime-local"
+                            disabled={!editable}
+                            value={form.notice_ends_at}
+                            onChange={(e) => update('notice_ends_at', e.target.value)}
+                            isInvalid={Boolean(fieldError('notice_ends_at'))}
+                            aria-invalid={Boolean(fieldError('notice_ends_at'))}
+                            aria-describedby={describedBy('homepage-notice-end', 'notice_ends_at')}
+                        />
+                        <Form.Control.Feedback type="invalid" id="homepage-notice-end-error">{fieldError('notice_ends_at')}</Form.Control.Feedback>
+                        <Form.Text id="homepage-notice-end-hint">留空表示不自動結束。</Form.Text>
+                    </Form.Group>
                 </section>
 
                 <section className="homepage-config-section" aria-labelledby="homepage-config-switches">

@@ -158,9 +158,33 @@ class HomepageConfigSerializer(serializers.ModelSerializer):
             'button1_enabled', 'button2_enabled', 'button3_enabled',
             'active_promo_video',
             'marquee_items', 'show_marquee', 'tagline', 'show_tagline', 'quote_text', 'show_quote',
+            'notice_enabled', 'notice_text', 'notice_link_url', 'notice_starts_at', 'notice_ends_at',
             'updated_by', 'updated_at',
         ]
         read_only_fields = ['updated_by', 'updated_at']
+
+    def validate_notice_link_url(self, value):
+        # 通知條連結最終是公開首頁的 <a href>：與主打圖連結同一規則（內部路徑或 https）
+        return self.validate_hero_link_url(value)
+
+    def validate(self, attrs):
+        # 通知條的跨欄位規則：結束時間必須晚於開始時間；啟用時一定要有文字。
+        # PATCH 只帶部分欄位時，用資料庫現值補齊再檢查。
+        attrs = super().validate(attrs)
+        current = self.instance
+        def pick(name):
+            if name in attrs:
+                return attrs[name]
+            return getattr(current, name, None) if current is not None else None
+        starts, ends = pick('notice_starts_at'), pick('notice_ends_at')
+        errors = {}
+        if starts and ends and ends <= starts:
+            errors['notice_ends_at'] = ['結束時間必須晚於開始時間']
+        if pick('notice_enabled') and not (pick('notice_text') or '').strip():
+            errors['notice_text'] = ['啟用通知條時必須填寫文字']
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
 
     def validate_marquee_items(self, value):
         # 模型欄位的 validator 已檢查型別與長度；這裡負責儲存前正規化：每項去前後空白。
@@ -222,6 +246,9 @@ class PublicHomepageConfigSerializer(serializers.ModelSerializer):
     # 啟用中的宣傳影片：沒有啟用時是 null；有啟用就輸出物件，即使檔案不見了也不變成 null，
     # 這樣前台仍拿得到封面與逐字稿（HOMEPAGE_CONTRACT.md 4.1）。URL 一律是同網域相對路徑或 null。
     promo_video = serializers.SerializerMethodField()
+    # 頂部通知條：只在已啟用、有文字、目前在有效期間內時輸出 {text, link_url}，其餘 null；
+    # 不輸出啟用旗標與時間窗，公開端點不洩漏還沒到期的排程內容
+    notice = serializers.SerializerMethodField()
 
     class Meta:
         model = HomepageConfig
@@ -230,9 +257,12 @@ class PublicHomepageConfigSerializer(serializers.ModelSerializer):
             'hero_image_url', 'hero_link_url', 'hero_title_override',
             'show_news_section', 'show_calendar_section', 'news_display_count',
             'button1_enabled', 'button2_enabled', 'button3_enabled',
-            'promo_video',
+            'promo_video', 'notice',
             'marquee_items', 'show_marquee', 'tagline', 'show_tagline', 'quote_text', 'show_quote',
         ]
+
+    def get_notice(self, obj):
+        return obj.active_notice()
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

@@ -206,3 +206,74 @@ describe('HomepageConfig', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 });
+
+describe("HomepageConfig 頂部通知條", () => {
+  beforeEach(() => {
+    mockRole = "owner";
+    apiGet.mockReset();
+    apiPatch.mockReset();
+    apiGet.mockResolvedValue({ ...baseConfig, notice_enabled: false, notice_text: "", notice_link_url: "", notice_starts_at: null, notice_ends_at: null });
+  });
+
+  test("有通知條區塊：開關、文字、連結、開始與結束時間", async () => {
+    renderPage();
+    expect(await screen.findByLabelText("啟用通知條")).not.toBeChecked();
+    expect(screen.getByLabelText("通知文字")).toHaveValue("");
+    expect(screen.getByLabelText("連結（選填）")).toHaveValue("");
+    expect(screen.getByLabelText("開始時間（選填）")).toHaveAttribute("type", "datetime-local");
+    expect(screen.getByLabelText("結束時間（選填）")).toHaveAttribute("type", "datetime-local");
+  });
+
+  test("儲存：文字去空白、時間轉 ISO、空時間送 null", async () => {
+    apiPatch.mockResolvedValueOnce({ ...baseConfig, notice_enabled: true });
+    renderPage();
+    fireEvent.click(await screen.findByLabelText("啟用通知條"));
+    fireEvent.change(screen.getByLabelText("通知文字"), { target: { value: "  系統維護  " } });
+    fireEvent.change(screen.getByLabelText("連結（選填）"), { target: { value: " /announcements " } });
+    fireEvent.change(screen.getByLabelText("結束時間（選填）"), { target: { value: "2030-01-02T03:04" } });
+    fireEvent.click(screen.getByRole("button", { name: /儲存/ }));
+    await waitFor(() => expect(apiPatch).toHaveBeenCalled());
+    const body = apiPatch.mock.calls[0][1];
+    expect(body.notice_enabled).toBe(true);
+    expect(body.notice_text).toBe("系統維護");
+    expect(body.notice_link_url).toBe("/announcements");
+    expect(body.notice_starts_at).toBeNull();
+    expect(body.notice_ends_at).toBe(new Date("2030-01-02T03:04").toISOString());
+  });
+
+  test("啟用卻沒填文字、連結不安全、結束早於開始：不送出並標示欄位", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByLabelText("啟用通知條"));
+    fireEvent.change(screen.getByLabelText("連結（選填）"), { target: { value: "javascript:alert(1)" } });
+    fireEvent.change(screen.getByLabelText("開始時間（選填）"), { target: { value: "2030-01-02T03:04" } });
+    fireEvent.change(screen.getByLabelText("結束時間（選填）"), { target: { value: "2030-01-02T03:00" } });
+    fireEvent.click(screen.getByRole("button", { name: /儲存/ }));
+    expect(await screen.findByText("啟用通知條時必須填寫文字")).toBeInTheDocument();
+    expect(screen.getByText("連結必須是站內路徑（以 / 開頭）或 https 網址")).toBeInTheDocument();
+    expect(screen.getByText("結束時間必須晚於開始時間")).toBeInTheDocument();
+    expect(apiPatch).not.toHaveBeenCalled();
+  });
+
+  test("後端時間（UTC ISO）帶入表單時轉成本地時間格式", async () => {
+    apiGet.mockResolvedValue({ ...baseConfig, notice_enabled: true, notice_text: "公告", notice_link_url: "", notice_starts_at: "2030-01-02T03:04:00Z", notice_ends_at: null });
+    renderPage();
+    const expected = (() => { const d = new Date("2030-01-02T03:04:00Z"); const p = (n) => String(n).padStart(2, "0"); return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":" + p(d.getMinutes()); })();
+    expect(await screen.findByLabelText("開始時間（選填）")).toHaveValue(expected);
+    expect(screen.getByLabelText("結束時間（選填）")).toHaveValue("");
+  });
+
+  test("連結用斜線加反斜線開頭的協定相對寫法，前端就擋下", async () => {
+    renderPage();
+    fireEvent.change(await screen.findByLabelText("連結（選填）"), { target: { value: "/\\evil.example" } });
+    fireEvent.click(screen.getByRole("button", { name: /儲存/ }));
+    expect(await screen.findByText("連結必須是站內路徑（以 / 開頭）或 https 網址")).toBeInTheDocument();
+    expect(apiPatch).not.toHaveBeenCalled();
+  });
+
+  test("唯讀角色看得到但不能改", async () => {
+    mockRole = "editor";
+    renderPage();
+    expect(await screen.findByLabelText("通知文字")).toBeDisabled();
+    expect(screen.getByLabelText("啟用通知條")).toBeDisabled();
+  });
+});

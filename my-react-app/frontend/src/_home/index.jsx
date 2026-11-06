@@ -5,6 +5,7 @@ import { pickExamSchedule } from "../../components/_home/examScheduleContent"
 import { useEffect, useState } from 'react';
 import RevealOnView from "../../components/ui/RevealOnView";
 import HomeTicker from "../../components/_home/Ticker";
+import NoticeBar from "../../components/_home/NoticeBar";
 import HomeMasthead from "../../components/_home/Masthead";
 import HomePromoVideo, { HomePromoPlaceholder } from "../../components/_home/PromoVideo";
 import FeaturedTopics from "../../components/_home/FeaturedTopics";
@@ -29,6 +30,8 @@ const DEFAULT_HOMEPAGE_CONFIG = {
     quote_text: '', show_quote: true,
     // 宣傳影片（S6-2）：沒有啟用中的影片就是 null，宣傳區不輸出
     promo_video: null,
+    // 頂部通知條（步驟 2-6）：後端只在已啟用、有文字、在有效期間內時給 {text, link_url}，其餘 null
+    notice: null,
 };
 
 // 後台公告（backend/adminapi 的 Announcement，見 /adminapi/public/announcements/）
@@ -177,6 +180,7 @@ const HomePage = () => {
 
     return (
         <div className="yy-page homepage">
+            <NoticeBar notice={homepageConfig.notice} />
             {marqueeItems.length > 0 && <HomeTicker items={marqueeItems} />}
             <HomeMasthead quote={quote} tagline={tagline} />
 

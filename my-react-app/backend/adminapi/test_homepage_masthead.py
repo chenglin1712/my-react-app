@@ -254,7 +254,7 @@ class MastheadPublicApiTest(TestCase):
     def test_defaults_keep_every_legacy_key_and_add_empty_masthead_fields(self):
         data = self.client.get(PUBLIC_URL).json()
         self.assertTrue(LEGACY_PUBLIC_KEYS.issubset(data.keys()))
-        self.assertEqual(set(data.keys()), LEGACY_PUBLIC_KEYS | MASTHEAD_KEYS | {"promo_video"})
+        self.assertEqual(set(data.keys()), LEGACY_PUBLIC_KEYS | MASTHEAD_KEYS | {"promo_video", "notice"})
         self.assertEqual(data["marquee_items"], [])
         self.assertEqual(data["tagline"], "")
         self.assertEqual(data["quote_text"], "")

@@ -590,3 +590,29 @@ describe('首頁 · 本期專題（S7-1）', () => {
     expect(await screen.findByRole('heading', { level: 2, name: '本期專題' })).toBeInTheDocument();
   });
 });
+
+describe("首頁 · 頂部通知條（步驟 2-6）", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    window.localStorage.clear();
+  });
+
+  test("設定帶 notice 才輸出通知條；沒有 notice 或設定端點失敗時不輸出", async () => {
+    mockFetchOk([], { ...DEFAULT_CONFIG, notice: { text: "系統維護公告", link_url: "/announcements" } });
+    const first = renderHome();
+    expect(await screen.findByRole("link", { name: "系統維護公告" })).toHaveAttribute("href", "/announcements");
+    first.unmount();
+
+    mockFetchOk([], { ...DEFAULT_CONFIG, notice: null });
+    renderHome();
+    await screen.findByTestId("news-mock");
+    expect(screen.queryByRole("complementary", { name: "網站通知" })).toBeNull();
+  });
+
+  test("按關閉後通知條消失", async () => {
+    mockFetchOk([], { ...DEFAULT_CONFIG, notice: { text: "公告", link_url: "" } });
+    renderHome();
+    fireEvent.click(await screen.findByRole("button", { name: "關閉通知" }));
+    expect(screen.queryByRole("complementary", { name: "網站通知" })).toBeNull();
+  });
+});

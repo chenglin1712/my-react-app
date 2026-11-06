@@ -1,0 +1,86 @@
+/* 首頁頂部通知條：銅色淡階底、細框、一行文字加關閉鈕。顏色走 --yy-calm-* 語意層。 */
+.home-notice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--yy-space-2);
+    min-height: var(--yy-control-md);
+    margin-top: var(--yy-space-2);
+    padding: 0 var(--yy-space-1) 0 var(--yy-space-4);
+    box-sizing: border-box;
+    border: var(--yy-border-width) solid var(--yy-calm-rule);
+    border-radius: var(--yy-radius-panel);
+    background: var(--yy-calm-tint-copper-2);
+    color: var(--yy-calm-text);
+    font-size: var(--yy-text-sm);
+    font-weight: 600;
+    text-align: center;
+}
+
+.home-notice__text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: inherit;
+    padding-block: var(--yy-space-2);
+}
+
+/* 連結用底線標示，不只靠顏色；hover 換成強調色 */
+.home-notice__link {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1.5px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .home-notice__link:hover {
+        color: var(--yy-calm-accent);
+    }
+}
+
+.home-notice__link:focus-visible,
+.home-notice__close:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+    border-radius: var(--yy-radius-tag);
+}
+
+.home-notice__close {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--yy-control-md);
+    height: var(--yy-control-md);
+    border: 0;
+    border-radius: var(--yy-radius-round);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-base) var(--ease-out);
+}
+
+.home-notice__close:active {
+    transform: scale(var(--yy-ui-press));
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .home-notice__close:hover {
+        background: var(--yy-calm-tint-copper-3);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .home-notice__close {
+        transition-property: background-color;
+    }
+
+    .home-notice__close:active {
+        transform: none;
+    }
+}
+
+/* 首頁的直屬子元素被 .homepage > * 設成 width:100%（貼邊）；通知條要和第一屏一樣留 16px 左右邊 */
+.homepage > .home-notice {
+    width: calc(100% - 32px);
+}

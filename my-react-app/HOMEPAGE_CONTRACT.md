@@ -62,6 +62,22 @@
 
 **驗證寫在模型欄位的 `validators`**（集中在一個共用模組），不是只寫在 serializer：DRF 的 ModelSerializer 會自動套用，管理命令與測試也走同一份，不會因為換寫入路徑就繞過。`marquee_items` 的型別（必須是字串清單）、項數、每項長度與「去空白後不得為空」都在這裡檢查。所有文字一律拒絕 NUL 與控制字元（單行欄位另外拒絕換行）。
 
+### 3.1.1 頂部通知條欄位（Apple 化步驟 2-6，全部加法，migration `0035_homepage_notice_bar`）
+
+| 欄位 | 型別 | 限制 | 預設 | 備註 |
+| --- | --- | --- | --- | --- |
+| `notice_enabled` | 布林 | | 否 | 總開關；啟用時 `notice_text` 必須有內容（前後端都檢查） |
+| `notice_text` | 單行字串 | 最多 120 字，去前後空白；規則同標語（拒絕控制字元、換行、零寬與雙向控制字元） | 空 | 純文字，前台不渲染 HTML |
+| `notice_link_url` | 字串 | 最多 500 字；內部路徑（`/` 開頭但不是 `//`）或 https，規則同 `validate_internal_or_https_link` | 空 | 選填；空則只顯示文字 |
+| `notice_starts_at` | 日期時間（含時區），可空 | | 空 | 空 = 立刻開始；開始時間**含** |
+| `notice_ends_at` | 日期時間（含時區），可空 | 必須晚於開始時間（兩者都有時） | 空 | 空 = 不自動結束；結束時間**不含** |
+
+- 時間窗以**伺服器時間**判斷（`HomepageConfig.active_notice()`），公開端點每次請求都重算（`Cache-Control: no-cache`），到期後不必重新部署。已開啟首頁的分頁不會自動消失，下次載入才生效。
+- 寫入權限同其他首頁設定：只有 owner、admin（PUBLISHERS）；editor 與以下角色 403。
+- PATCH 只帶部分欄位時，跨欄位規則（結束晚於開始、啟用需有文字）以資料庫現值補齊後檢查。
+- 後台表單的日期時間用瀏覽器本地時間（`datetime-local`），送出前轉成 ISO（UTC）。
+- 前台訪客可以關閉通知條：關閉狀態記在該裝置的 localStorage（鍵 `yy-notice-dismissed`，值為「文字|連結」），**內容或連結一換就是新通知，會再出現**。儲存空間不可用時（無痕模式）仍能顯示與關閉，只是不記住。
+
 ### 3.2 `PromoVideo`（新資料表，S3-1）
 
 | 欄位 | 型別 | 限制 | 備註 |
@@ -151,6 +167,7 @@
   "button1_enabled": true, "button2_enabled": true, "button3_enabled": true,
 
   "promo_video": null,
+  "notice": null,
   "marquee_items": [], "show_marquee": true,
   "tagline": "", "show_tagline": true,
   "quote_text": "", "show_quote": true
@@ -178,6 +195,8 @@
 - 不輸出 `created_by`、檔案大小等後台資訊。
 - **開關關閉時，公開端點不輸出對應內容：** `show_marquee`、`show_tagline`、`show_quote` 為 `false` 時，`marquee_items` 回 `[]`、`tagline` 與 `quote_text` 回 `""`（開關本身照常輸出）。管理者可能先存了還沒要公開的文案再關掉開關，內容留在資料庫、後台仍看得到，重新開啟即發布，但不能從公開端點被讀走。
 
+**`notice`（步驟 2-6）：** 只在「已啟用、有文字、目前在有效期間內」時輸出 `{ "text": "…", "link_url": "/announcements" }`（`link_url` 沒填是 `""`），其餘一律 `null`。**不輸出**啟用旗標與開始、結束時間：還沒到的排程內容不能從公開端點被讀走。舊前端忽略這個未知欄位，新前台缺少時視為 `null`。
+
 ### 4.2 `GET /adminapi/public/featured-topics/`（新，S3-3）
 
 回傳 `{ "items": [ { "id", "title", "summary", "image_url", "link_url", "category_label" } ] }`，只含已發布，依 `sort_order`、`id` 排序，最多 3 筆；免登入，依 IP 限流 120/m。**獨立端點**，與設定端點各自失敗、各自快取，專題讀取失敗不影響設定。
@@ -193,6 +212,8 @@
 | 宣傳影片 | `available` 為 `false`，或播放請求失敗 | 顯示封面、文字錯誤與重試，並顯示 `transcript`（見下一列） |
 | 宣傳影片 | 載入或播放失敗 | 顯示文字錯誤與重試，並顯示 `transcript`；不退回只有封面 |
 | 宣傳影片 | 使用者減少動態 | 不自動播放，顯示封面與播放鈕（決定 D3） |
+| 頂部通知條 | `notice` 為 null、缺欄位或設定端點失敗 | 不輸出通知條，不留空位 |
+| 頂部通知條 | 連結不是內部路徑或 https（後端已擋，前台第二道防線） | 只顯示文字，不渲染成連結 |
 | 本期專題 | 0 筆 | 整個區段隱藏 |
 | 本期專題 | 1 到 2 筆 | 只畫現有張數，版面依張數調整，不放空卡 |
 | 本期專題 | 無 `image_url` | 純文字卡，不放破圖 |

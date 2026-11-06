@@ -345,11 +345,30 @@ class HomepageConfig(SingletonModel):
     show_tagline = models.BooleanField(default=True)
     quote_text = models.CharField(max_length=120, blank=True, validators=[validate_single_line])
     show_quote = models.BooleanField(default=True)
+    # 頂部通知條（Apple 化步驟 2-6，HOMEPAGE_CONTRACT.md 3.4）：預設關閉、全部可為空，純加法。
+    # 公開端點只在「已啟用、有文字、目前在有效期間內」時輸出 notice，其餘一律 null。
+    notice_enabled = models.BooleanField(default=False)
+    notice_text = models.CharField(max_length=120, blank=True, validators=[validate_single_line])
+    notice_link_url = models.CharField(max_length=500, blank=True, validators=[validate_internal_or_https_link])
+    notice_starts_at = models.DateTimeField(null=True, blank=True)
+    notice_ends_at = models.DateTimeField(null=True, blank=True)
     updated_by = models.CharField(max_length=128, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return "首頁版位設定"
+
+    def active_notice(self, now=None):
+        """目前該顯示的通知條內容（沒有就回 None）。時間窗用伺服器時間判斷：開始時間含、結束時間不含。"""
+        now = now or timezone.now()
+        text = (self.notice_text or "").strip()
+        if not self.notice_enabled or not text:
+            return None
+        if self.notice_starts_at and now < self.notice_starts_at:
+            return None
+        if self.notice_ends_at and now >= self.notice_ends_at:
+            return None
+        return {"text": text, "link_url": self.notice_link_url or ""}
 
 
 class LiveFeaturedTopicManager(models.Manager):
