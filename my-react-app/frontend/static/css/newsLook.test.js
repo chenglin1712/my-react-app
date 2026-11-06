@@ -63,7 +63,7 @@ describe("最新消息樣式", () => {
     [arrows.body, toggle ? toggle.body : ""].forEach((b) => expect(b).toMatch(/border-radius|right:/));
     expect(arrows.body).toMatch(/width:\s*var\(--yy-control-md\)/);
     expect(arrows.body).toMatch(/height:\s*var\(--yy-control-md\)/);
-    expect(arrows.body).toMatch(/border-radius:\s*50%/);
+    expect(arrows.body).toMatch(/border-radius:\s*var\(--yy-radius-round\)/);
     expect(arrows.body).toMatch(/bottom:\s*8px/);
     expect(find(".news-stage .news-carousel .swiper-button-prev").body).toMatch(/right:\s*calc\(/);
     expect(find(".news-stage .news-carousel .swiper-button-next").body).toMatch(/right:\s*calc\(/);

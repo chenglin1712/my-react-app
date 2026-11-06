@@ -89,7 +89,7 @@ describe("筆記", () => {
 
   it("分享區：卡片扁平、分頁籤與按鈕至少 44px、目前分頁有勾", () => {
     const f = find("_note/notesharestyle.css");
-    expect(f(".ns-card").body).toMatch(/border-radius:var\(--yy-ui-radius\)/);
+    expect(f(".ns-card").body).toMatch(/border-radius:var\(--yy-radius-panel\)/);
     expect(f(".ns-tab").body).toMatch(/min-height:var\(--yy-control-md\)/);
     expect(f(".ns-btn").body).toMatch(/min-height:var\(--yy-control-md\)/);
     expect(f(".ns-page-btn").body).toMatch(/min-height:var\(--yy-control-md\)/);

@@ -106,6 +106,19 @@ describe("theme-v2 token", () => {
     ].forEach((name) => expect(theme, name).toContain(`${name}:`));
     // 觸控區至少 44px
     expect(theme).toMatch(/--yy-control-md:\s*44px/);
+    // 4 點基準階 4 到 96：每一階都存在，且數值都是 4 的倍數、由小到大
+    // 每個名稱只能定義一次（重複定義時，後面的值才是生效的，只驗第一個會漏看）
+    const steps = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"].map((n) => {
+      const all = [...theme.matchAll(new RegExp(`--yy-space-step-${n}:\\s*(\\d+)px`, "g"))];
+      expect(all.length, `--yy-space-step-${n} 應定義一次`).toBe(1);
+      return Number(all[0][1]);
+    });
+    expect(steps).toEqual([4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96]);
+    // 舊的 --yy-space-1 到 -8 是別名，必須指向對應的 step（數值不變）
+    const alias = { 1: "01", 2: "02", 3: "03", 4: "04", 5: "06", 6: "07", 7: "09", 8: "10" };
+    Object.entries(alias).forEach(([old, step]) => {
+      expect(theme, `--yy-space-${old}`).toMatch(new RegExp(`--yy-space-${old}:\\s*var\\(--yy-space-step-${step}\\)`));
+    });
     // 層級必須由低到高
     const z = ["raised", "sticky", "nav", "overlay", "popover", "top"].map((n) => Number(theme.match(new RegExp(`--yy-z-${n}:\\s*(\\d+)`))[1]));
     expect([...z].sort((a, b) => a - b)).toEqual(z);

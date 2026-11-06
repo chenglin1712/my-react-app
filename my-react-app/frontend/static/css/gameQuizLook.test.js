@@ -68,7 +68,7 @@ describe("遊戲專區", () => {
     expect(find("_game/index.css")(".gamehub-page .yy-hero::before").body).toMatch(/display:\s*none/);
     const card = find("_game/index.css")(".gamehub-page .yy-card").body;
     expect(card).toMatch(/border:\s*var\(--yy-border-width\) solid var\(--yy-calm-line\)/);
-    expect(card).toMatch(/border-radius:\s*var\(--yy-ui-radius\)/);
+    expect(card).toMatch(/border-radius:\s*var\(--yy-radius-panel\)/);
   });
 
   it("選中的族語不放大位移，改靠底色、框色與勾", () => {

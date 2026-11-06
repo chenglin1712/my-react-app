@@ -97,12 +97,12 @@ describe("硬偏移陰影", () => {
     expect(hits).toEqual([]);
   });
 
-  it("前台 CSS 不再引用 --yy-shadow-sm／md／lg，浮層用 --yy-shadow-overlay", () => {
+  it("舊的 --yy-shadow-sm／md／lg／overlay 已刪除：不再定義也不再引用，一律用 --yy-elev-*（Apple 化步驟 1-3）", () => {
     const hits = [];
     cssFiles.forEach(({ file, css }) =>
       lines(css).forEach((line, i) => {
-        if (LEGACY_SHADOW_TOKEN_DEF.test(line)) return;
-        if (/var\(--yy-shadow-(?:sm|md|lg)\b/.test(line)) hits.push(`${file}:${i + 1}`);
+        if (LEGACY_SHADOW_TOKEN_DEF.test(line) || /^\s*--yy-shadow-overlay\s*:/.test(line)) hits.push(`${file}:${i + 1} 仍有定義`);
+        if (/var\(--yy-shadow-(?:sm|md|lg|overlay)\b/.test(line)) hits.push(`${file}:${i + 1} 仍有引用`);
       }),
     );
     expect(hits).toEqual([]);
@@ -129,12 +129,73 @@ describe("硬偏移陰影", () => {
     expect(hardShadows('const s = { boxShadow: "3px 3px 0 #221812" }', true)).toHaveLength(1);
   });
 
-  it("全站只有一種柔和陰影 --yy-shadow-overlay，色相取自深石板、不是純黑", () => {
+  it("高度層級 --yy-elev-0 到 4：0、1 無陰影；2 到 4 是兩層柔影、色相取自深石板、不是純黑，且由低到高越來越深", () => {
     const theme = cssFiles.find(({ file }) => file.endsWith("default/theme-v2.css")).css;
-    const m = theme.match(/--yy-shadow-overlay:\s*([^;]+);/);
-    expect(m).not.toBeNull();
-    expect(m[1]).toMatch(/rgba\(41,\s*45,\s*49,/);
-    expect(m[1]).not.toMatch(/rgba?\(0,\s*0,\s*0/);
+    const get = (n) => {
+      const all = [...theme.matchAll(new RegExp(`^\\s*--yy-elev-${n}:\\s*([^;]+);`, "gm"))];
+      expect(all.length, `--yy-elev-${n} 淺色定義`).toBeGreaterThanOrEqual(1);
+      return all[0][1].trim();
+    };
+    expect(get(0)).toBe("none");
+    expect(get(1)).toBe("none");
+    const alphaSum = [2, 3, 4].map((n) => {
+      const v = get(n);
+      const layers = v.split(/,(?![^(]*\))/);
+      expect(layers.length, `elev-${n} 應為兩層`).toBe(2);
+      expect(v).toMatch(/rgba\(41,\s*45,\s*49,/);
+      expect(v).not.toMatch(/rgba?\(0,\s*0,\s*0/);
+      return [...v.matchAll(/rgba\(41,\s*45,\s*49,\s*([\d.]+)\)/g)].reduce((t, x) => t + Number(x[1]), 0);
+    });
+    expect(alphaSum[0]).toBeLessThan(alphaSum[1]);
+    expect(alphaSum[1]).toBeLessThan(alphaSum[2]);
+  });
+
+  it("深色模式：--yy-elev-2 到 4 不畫陰影，1px 內描邊獨立成 --yy-edge-*，跟隨裝置與手動深色一致；淺色的 --yy-edge-* 是空的", () => {
+    const theme = cssFiles.find(({ file }) => file.endsWith("default/theme-v2.css")).css;
+    [2, 3, 4].forEach((n) => {
+      const elev = [...theme.matchAll(new RegExp(`^\\s*--yy-elev-${n}:\\s*(0 0 0 0 transparent);`, "gm"))];
+      expect(elev.length, `--yy-elev-${n} 深色定義（system 與 dark 各一）`).toBe(2);
+      const edge = [...theme.matchAll(new RegExp(`^\\s*--yy-edge-${n}:\\s*(inset 0 0 0 1px rgba\\(242, 238, 227, [\\d.]+\\));`, "gm"))].map((m) => m[1]);
+      expect(edge.length, `--yy-edge-${n} 深色定義`).toBe(2);
+      expect(edge[0]).toBe(edge[1]);
+      expect(theme, `--yy-edge-${n} 淺色為空`).toMatch(new RegExp(`^  --yy-edge-${n}: 0 0 0 0 transparent;`, "m"));
+    });
+  });
+
+  it("元件不手寫柔影：前台 CSS 的 box-shadow 每一層只能是 none、--yy-elev-*／--yy-edge-*，或模糊為 0 的細框、焦點圈、內描邊（含多行、inset、多層；登入頁 adminLogin 與後台除外）", () => {
+    // 依最外層的逗號或空白切開（括號內不切）
+    const splitTop = (v, sep) => {
+      const out = [];
+      let depth = 0;
+      let cur = "";
+      for (const ch of v) {
+        if (ch === "(") depth++;
+        if (ch === ")") depth--;
+        const isSep = depth === 0 && (sep === "," ? ch === "," : /\s/.test(ch));
+        if (isSep) {
+          if (cur) out.push(cur);
+          cur = "";
+        } else cur += ch;
+      }
+      if (cur) out.push(cur);
+      return out;
+    };
+    const LEN = /^(?:-?\d*\.?\d+(?:px|rem|em)?|calc\(.*\))$/;
+    const bad = [];
+    cssFiles.forEach(({ file, css }) => {
+      if (file.endsWith("adminLogin.css")) return;
+      for (const m of css.matchAll(/(^|[;{\s])box-shadow\s*:\s*([^;{}]+)/g)) {
+        const line = css.slice(0, m.index).split("\n").length;
+        splitTop(m[2].replace(/!important/, "").trim(), ",").forEach((layer) => {
+          const l = layer.trim();
+          if (l === "none" || /^var\(--yy-(?:elev|edge)-[0-4]\)$/.test(l)) return;
+          const lens = splitTop(l, " ").filter((t) => LEN.test(t));
+          if (lens.length >= 3 && /^0(?:px)?$/.test(lens[2])) return; // 模糊為 0：細框、焦點圈、內描邊
+          bad.push(`${file}:${line} ${l.slice(0, 70)}`);
+        });
+      }
+    });
+    expect(bad).toEqual([]);
   });
 });
 
@@ -198,6 +259,64 @@ describe("動態規則不退回舊寫法", () => {
     expect(theme).toMatch(/@keyframes yy-enter\s*\{\s*from\s*\{\s*opacity:\s*0;\s*transform:\s*translateY\(8px\);\s*\}/);
     expect(theme).toMatch(/\.yy-fade-up\s*\{\s*animation:\s*yy-enter var\(--dur-base\) var\(--ease-out\) backwards;/);
     expect(theme).toMatch(/\.yy-reveal:not\(\.is-visible\)\s*\{\s*opacity:\s*0;\s*transform:\s*translateY\(8px\);/);
+  });
+
+  // 去掉 @media (prefers-reduced-motion: reduce) { ... } 區塊（括號配對），剩下的是「一般模式」的規則
+  const stripReduced = (css) => {
+    let out = "";
+    let i = 0;
+    const marker = /@media[^{]*prefers-reduced-motion:\s*reduce[^{]*\{/g;
+    for (let m = marker.exec(css); m; m = marker.exec(css)) {
+      out += css.slice(i, m.index);
+      let depth = 1;
+      let j = marker.lastIndex;
+      while (j < css.length && depth > 0) {
+        if (css[j] === "{") depth++;
+        else if (css[j] === "}") depth--;
+        j++;
+      }
+      i = j;
+      marker.lastIndex = j;
+    }
+    return out + css.slice(i);
+  };
+  const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  it("按壓回饋（步驟 1-7）：導覽項、功能卡、專題卡、消息與公告列表列在一般模式按下都縮放（--yy-ui-press 或 0.99 級的列表列），只動 transform", () => {
+    const PRESS = /^transform:\s*scale\((?:var\(--yy-ui-press\)|0\.99\d*)\);?$/;
+    const REQUIRED = [".menu-item", ".home-func-card", "a.ann-item", ".topic-card", "a.news-text-item"];
+    const missing = [];
+    REQUIRED.forEach((sel) => {
+      const re = new RegExp(`(?:^|[\\s,}])${escRe(sel)}:active(?:\\s*,[^{]*)?\\s*\\{([^}]*)\\}`, "gm");
+      let ok = false;
+      cssFiles.forEach(({ css }) => {
+        const normal = stripReduced(css);
+        for (const m of normal.matchAll(re)) {
+          const body = m[1].trim();
+          if (PRESS.test(body)) ok = true;
+          else missing.push(`${sel}:active 一般模式的內容不是縮放：${body.slice(0, 50)}`);
+        }
+      });
+      if (!ok) missing.push(`${sel} 在一般模式缺少 :active 縮放`);
+    });
+    expect(missing).toEqual([]);
+  });
+
+  it("動態語言 token（步驟 1-7）：彈簧用 linear()、數值與文件一致、按壓有 reduced-motion 停用版、沒有 transition: all（含多行）", () => {
+    const theme = cssFiles.find(({ file }) => file.endsWith("default/theme-v2.css")).css;
+    expect(theme).toMatch(/--ease-spring:\s*linear\([^;]+\);/);
+    expect(theme).toMatch(/--dur-spring:\s*550ms;/);
+    expect(theme).toMatch(/--dur-press:\s*120ms;/);
+    expect(theme).toMatch(/--yy-lift:\s*-3px;/);
+    expect(theme).toMatch(/@media \(prefers-reduced-motion: no-preference\)\s*\{\s*\.yy-press[^{]*\{[^}]*transition:/);
+    expect(theme).toMatch(/\.yy-press:active[^{]*\{\s*transform:\s*scale\(var\(--yy-ui-press\)\);/);
+    expect(theme).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.yy-press[^{]*\{\s*transition:\s*none;/);
+    expect(theme).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{[^@]*\.yy-press:active[^{]*\{\s*transform:\s*none;/);
+    const all = [];
+    cssFiles.forEach(({ file, css }) => {
+      for (const m of css.matchAll(/transition(?:-property)?\s*:\s*all\b/g)) all.push(`${file}:${css.slice(0, m.index).split("\n").length}`);
+    });
+    expect(all).toEqual([]);
   });
 
   it("前台 CSS 沒有 ease-in（UI 動畫用 ease-out 系列，ease-in-out 與 ease-out 不受影響）", () => {

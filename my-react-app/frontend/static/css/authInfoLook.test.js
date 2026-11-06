@@ -117,7 +117,7 @@ describe("登入與註冊", () => {
 describe("說明、隱私、聯絡", () => {
   it("說明頁範圍內卡片用細框小圓角，標題用標題字型", () => {
     const f = find("_info/index.css");
-    expect(f(".info-card.yy-card").body).toMatch(/border-radius:\s*var\(--yy-ui-radius\)/);
+    expect(f(".info-card.yy-card").body).toMatch(/border-radius:\s*var\(--yy-radius-panel\)/);
     expect(f(".info-title").body).toMatch(/font-family:\s*var\(--yy-font-heading\)/);
     expect(f(".info-heading").body).toMatch(/font-family:\s*var\(--yy-font-heading\)/);
   });

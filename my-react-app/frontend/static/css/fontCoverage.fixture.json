@@ -1,19 +1,13 @@
 {
  "note": "涵蓋上界：官方《原住民族語言書寫系統》113年修正對照表出現的全部非中日韓字元（含音標，未區分書寫符號與音標）加上專案程式碼實際出現的字元。coveredBy = 字型檔有字形（fontTools 讀完整字型檔的字元對照表）；deliveredBy = 同時 Google 送出的 unicode-range 切片也包含該碼位。由 scripts/build_font_coverage_fixture.py 產生，不要手動修改。",
- "generatedAt": "2026-10-16",
- "fontsUrl": "https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400..900&family=Noto+Serif+TC:wght@500..900&family=Noto+Sans:wght@400..900&family=Noto+Serif:wght@500..900&display=swap",
+ "generatedAt": "2026-11-06",
+ "fontsUrl": "https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400..900&family=Noto+Sans:wght@400..900&display=swap",
  "fonts": {
   "Noto Sans": {
    "url": "https://fonts.gstatic.com/s/notosans/v42/o-0mIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjcz6L1SoM-jCpoiyBUBN9d.ttf"
   },
   "Noto Sans TC": {
    "url": "https://fonts.gstatic.com/s/notosanstc/v40/-nFuOG829Oofr2wohFbTp9ifNAn722rq0MXz7wm1_Co.ttf"
-  },
-  "Noto Serif": {
-   "url": "https://fonts.gstatic.com/s/notoserif/v33/ga6iaw1J5X9T9RW6j9bNVls-hfgvz8JcMofYTa32J4wsL2JAlAhZAVejwA.ttf"
-  },
-  "Noto Serif TC": {
-   "url": "https://fonts.gstatic.com/s/notoseriftc/v37/XLYzIZb5bJNDGYxLBibeHZ0BnHwmuanx8cUaGX_zN-pD.ttf"
   }
  },
  "chars": [
@@ -25,15 +19,11 @@
    ],
    "coveredBy": [
     "Noto Sans",
-    "Noto Sans TC",
-    "Noto Serif",
-    "Noto Serif TC"
+    "Noto Sans TC"
    ],
    "deliveredBy": [
     "Noto Sans",
-    "Noto Sans TC",
-    "Noto Serif",
-    "Noto Serif TC"
+    "Noto Sans TC"
    ]
   },
   {
@@ -44,15 +34,11 @@
    ],
    "coveredBy": [
     "Noto Sans",
-    "Noto Sans TC",
-    "Noto Serif",
-    "Noto Serif TC"
+    "Noto Sans TC"
    ],
    "deliveredBy": [
     "Noto Sans",
-    "Noto Sans TC",
-    "Noto Serif",
-    "Noto Serif TC"
+    "Noto Sans TC"
    ]
   },
   {
@@ -63,15 +49,11 @@
    ],
    "coveredBy": [
     "Noto Sans",
-    "Noto Sans TC",
-    "Noto Serif",
-    "Noto Serif TC"
+    "Noto Sans TC"
    ],
    "deliveredBy": [
     "Noto Sans",
-    "Noto Sans TC",
-    "Noto Serif",
-    "Noto Serif TC"
+    "Noto Sans TC"
    ]
   },
   {
@@ -82,15 +64,11 @@
    ],
    "coveredBy": [
     "Noto Sans",
-    "Noto Sans TC",
-    "Noto Serif",
-    "Noto Serif TC"
+    "Noto Sans TC"
    ],
    "deliveredBy": [
     "Noto Sans",
-    "Noto Sans TC",
-    "Noto Serif",
-    "Noto Serif TC"
+    "Noto Sans TC"
    ]
   },
   {
@@ -100,12 +78,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -115,12 +91,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -131,15 +105,11 @@
    ],
    "coveredBy": [
     "Noto Sans",
-    "Noto Sans TC",
-    "Noto Serif",
-    "Noto Serif TC"
+    "Noto Sans TC"
    ],
    "deliveredBy": [
     "Noto Sans",
-    "Noto Sans TC",
-    "Noto Serif",
-    "Noto Serif TC"
+    "Noto Sans TC"
    ]
   },
   {
@@ -149,12 +119,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -164,12 +132,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -179,12 +145,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -194,12 +158,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -209,12 +171,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -224,12 +184,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -239,12 +197,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -254,12 +210,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -269,12 +223,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -284,12 +236,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -299,12 +249,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -314,12 +262,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -329,12 +275,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -344,12 +288,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -359,12 +301,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -374,12 +314,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -389,12 +327,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -404,12 +340,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -419,12 +353,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -434,12 +366,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -449,12 +379,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -464,12 +392,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -479,12 +405,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -494,12 +418,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -509,12 +431,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -524,12 +444,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -539,12 +457,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -554,12 +470,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -569,12 +483,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -584,12 +496,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -599,12 +509,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -615,15 +523,11 @@
    ],
    "coveredBy": [
     "Noto Sans",
-    "Noto Sans TC",
-    "Noto Serif",
-    "Noto Serif TC"
+    "Noto Sans TC"
    ],
    "deliveredBy": [
     "Noto Sans",
-    "Noto Sans TC",
-    "Noto Serif",
-    "Noto Serif TC"
+    "Noto Sans TC"
    ]
   },
   {
@@ -633,12 +537,10 @@
     "repo-code"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -648,12 +550,10 @@
     "repo-code"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -663,12 +563,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -679,15 +577,11 @@
    ],
    "coveredBy": [
     "Noto Sans",
-    "Noto Sans TC",
-    "Noto Serif",
-    "Noto Serif TC"
+    "Noto Sans TC"
    ],
    "deliveredBy": [
     "Noto Sans",
-    "Noto Sans TC",
-    "Noto Serif",
-    "Noto Serif TC"
+    "Noto Sans TC"
    ]
   },
   {
@@ -698,14 +592,10 @@
    ],
    "coveredBy": [
     "Noto Sans",
-    "Noto Sans TC",
-    "Noto Serif",
-    "Noto Serif TC"
+    "Noto Sans TC"
    ],
    "deliveredBy": [
-    "Noto Sans TC",
-    "Noto Serif",
-    "Noto Serif TC"
+    "Noto Sans TC"
    ]
   },
   {
@@ -715,12 +605,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -730,12 +618,9 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
-   "deliveredBy": [
-    "Noto Serif"
-   ]
+   "deliveredBy": []
   },
   {
    "cp": "U+03B2",
@@ -745,13 +630,10 @@
    ],
    "coveredBy": [
     "Noto Sans",
-    "Noto Sans TC",
-    "Noto Serif",
-    "Noto Serif TC"
+    "Noto Sans TC"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -762,13 +644,10 @@
    ],
    "coveredBy": [
     "Noto Sans",
-    "Noto Sans TC",
-    "Noto Serif",
-    "Noto Serif TC"
+    "Noto Sans TC"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -779,13 +658,10 @@
    ],
    "coveredBy": [
     "Noto Sans",
-    "Noto Sans TC",
-    "Noto Serif",
-    "Noto Serif TC"
+    "Noto Sans TC"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -795,12 +671,10 @@
     "official-writing-system-pdf"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   },
   {
@@ -810,12 +684,10 @@
     "repo-code"
    ],
    "coveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ],
    "deliveredBy": [
-    "Noto Sans",
-    "Noto Serif"
+    "Noto Sans"
    ]
   }
  ]

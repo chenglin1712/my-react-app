@@ -41,7 +41,9 @@ const loadedFamilies = () =>
 // U+0332 組合底線出現在官方《原住民族語言書寫系統》對照表（泰雅語用底線區分 ng 與 n、g），
 // 但真實字典資料有沒有用它還不確定。補上之前要先有族語老師或字典資料佐證，並在字符預覽頁用人眼看過。
 // 若日後修好，這個清單必須同步清掉（下面有檢查）。
-const KNOWN_GAPS = { body: ["U+0332"], heading: [] };
+// 2026-11-06 全站無襯線後，標題堆疊與內文堆疊相同，所以標題也有同一個缺口（原本標題用 Noto Serif，Google 送得出 U+0332）。
+// 這是改無襯線的代價：若族語標題需要 U+0332，要先有字典資料佐證，再決定補哪個字型。
+const KNOWN_GAPS = { body: ["U+0332"], heading: ["U+0332"] };
 
 describe("字型載入（index.html）", () => {
   it("用 <link> 載入，並有 preconnect；不用 CSS @import", () => {
@@ -52,13 +54,28 @@ describe("字型載入（index.html）", () => {
     expect(imports).toEqual([]);
   });
 
-  it("載入四個家族：兩個 TC，加上族語字母用的 Noto Sans / Noto Serif", () => {
-    expect(loadedFamilies().sort()).toEqual(["Noto Sans", "Noto Sans TC", "Noto Serif", "Noto Serif TC"]);
+  it("主要字型連結載入兩個家族：Noto Sans TC，加上族語字母用的 Noto Sans（標題已改無襯線，不再整段載入宋體）", () => {
+    expect(loadedFamilies().sort()).toEqual(["Noto Sans", "Noto Sans TC"]);
+  });
+
+  it("品牌字標的宋體只載入字標用字的子集（text 參數），且字標用字都在子集內", () => {
+    const m = htmlWithoutNoscript.match(/<link[^>]*href="(https:\/\/fonts\.googleapis\.com\/css2\?family=Noto\+Serif\+TC[^"]+)"[^>]*>/);
+    expect(m, "找不到字標宋體的 <link>").not.toBeNull();
+    const url = new URL(m[1]);
+    expect(url.searchParams.get("family")).toBe("Noto Serif TC:wght@900");
+    expect(url.searchParams.get("display")).toBe("swap");
+    const subset = url.searchParams.get("text");
+    // 字標用字：品牌名「原語」與英文刊名 YUAN・YU（全形中點 U+30FB）
+    [..."原語YUAN・YU"].forEach((ch) => expect(subset, ch).toContain(ch));
+    // 子集要小：不可變成「整個字型」。字數上限 30 字，日後想加字先評估傳輸量
+    expect([...subset].length).toBeLessThanOrEqual(30);
+    // noscript 備援載入同一個網址
+    expect(indexHtml).toContain(`<noscript><link href="${m[1]}" rel="stylesheet"></noscript>`);
   });
 
   it("每個家族都用可變字型區間，且 display=swap（不阻擋文字顯示）", () => {
     const url = fontLink[1];
-    expect([...url.matchAll(/wght@\d+\.\.\d+/g)]).toHaveLength(4);
+    expect([...url.matchAll(/wght@\d+\.\.\d+/g)]).toHaveLength(2);
     expect(url).toMatch(/display=swap/);
   });
 
@@ -100,18 +117,38 @@ describe("字型堆疊 token（theme-v2.css）", () => {
     expect(f.at(-1)).toBe("sans-serif");
   });
 
-  it("標題：Noto Serif TC → Noto Serif → 系統宋體 → 通用 serif", () => {
+  it("標題：與內文同為無襯線 Noto Sans TC → Noto Sans → 系統 CJK → 通用 sans-serif（2026-11-06 全站無襯線）", () => {
     const f = families(token("heading"));
-    expect(f.slice(0, 2)).toEqual(["Noto Serif TC", "Noto Serif"]);
+    expect(f.slice(0, 2)).toEqual(["Noto Sans TC", "Noto Sans"]);
+    expect(f.at(-1)).toBe("sans-serif");
+    expect(f).not.toContain("Noto Serif TC");
+  });
+
+  it("品牌字標：Noto Serif TC → 系統宋體 → 通用 serif，是全站唯一的襯線", () => {
+    const f = families(token("brand"));
+    expect(f[0]).toBe("Noto Serif TC");
     expect(f.at(-1)).toBe("serif");
+    // 全站其他字型 token 都不能再含襯線
+    ["body", "heading", "tribal", "tribal-heading"].forEach((k) => expect(families(token(k)), k).not.toContain("serif"));
+  });
+
+  it("只有字標用 --yy-font-brand：前台 CSS 套用它的選擇器限於報頭字標與導覽字標", () => {
+    const hits = [];
+    walkCss(ROOT).forEach((f) => {
+      stripComments(readFileSync(f, "utf8")).split("\n").forEach((line, i) => {
+        if (/var\(--yy-font-brand\)/.test(line)) hits.push(`${f.split(/[\\/]/).slice(-2).join("/")}:${i + 1}`);
+      });
+    });
+    expect(hits.map((h) => h.replace(/:\d+$/, "")).sort()).toEqual(["_home/masthead.css", "_home/masthead.css", "navigation/Navbar.css"]);
   });
 
   it("族語詞彙專用 token：Noto 在前（同一個詞不換字型），TC 在後；全站內文則必須 TC 在前（保住中文標點）", () => {
     expect(families(token("tribal")).slice(0, 2)).toEqual(["Noto Sans", "Noto Sans TC"]);
-    expect(families(token("tribal-heading")).slice(0, 2)).toEqual(["Noto Serif", "Noto Serif TC"]);
+    expect(families(token("tribal-heading")).slice(0, 2)).toEqual(["Noto Sans", "Noto Sans TC"]);
     // 實測 Noto 在前會讓「⋯」「・」變成拉丁樣式，所以內文與標題 token 不可把 Noto 放在 TC 前面
     expect(families(token("body")).indexOf("Noto Sans TC")).toBeLessThan(families(token("body")).indexOf("Noto Sans"));
-    expect(families(token("heading")).indexOf("Noto Serif TC")).toBeLessThan(families(token("heading")).indexOf("Noto Serif"));
+    expect(families(token("heading")).indexOf("Noto Sans TC")).toBeLessThan(families(token("heading")).indexOf("Noto Sans"));
+    expect(families(token("tribal-heading")).indexOf("Noto Sans")).toBeLessThan(families(token("tribal-heading")).indexOf("Noto Sans TC"));
   });
 
   it("舊的像素字 token 只是內文字型的別名", () => {
@@ -119,9 +156,9 @@ describe("字型堆疊 token（theme-v2.css）", () => {
   });
 
   it("堆疊裡的網路字型都有被 index.html 載入", () => {
-    const loaded = new Set(loadedFamilies());
+    const loaded = new Set([...htmlWithoutNoscript.matchAll(/family=([^:&]+)/g)].map((m) => decodeURIComponent(m[1].replace(/\+/g, " "))));
     const web = (stack) => families(stack).filter((f) => f.startsWith("Noto "));
-    [...web(token("body")), ...web(token("heading"))].forEach((f) => expect(loaded.has(f), f).toBe(true));
+    [...web(token("body")), ...web(token("heading")), ...web(token("tribal")), ...web(token("tribal-heading")), ...web(token("brand"))].forEach((f) => expect(loaded.has(f), f).toBe(true));
   });
 });
 
@@ -132,7 +169,7 @@ describe("族語字母涵蓋（fontCoverage.fixture.json）", () => {
     expect(glottal?.sources).toContain("repo-code");
   });
 
-  it("兩個 TC 字型涵蓋不了大部分候選字元，這就是要補 Noto Sans / Noto Serif 的原因", () => {
+  it("TC 字型涵蓋不了大部分候選字元，這就是要補 Noto Sans 的原因", () => {
     const tcCovered = fixture.chars.filter((c) => c.coveredBy.some((f) => f.endsWith(" TC"))).length;
     expect(tcCovered / fixture.chars.length).toBeLessThan(0.5);
   });

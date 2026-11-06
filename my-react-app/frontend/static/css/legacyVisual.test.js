@@ -118,6 +118,33 @@ describe("圓角、邊框與陰影", () => {
     expect(hits).toEqual([]);
   });
 
+  it("圓角四階 token 與數值（Apple 化步驟 1-2，使用者批准 8／12／20／28）", () => {
+    const theme = read(join(ROOT, "default/theme-v2.css"));
+    [["tag", "8px"], ["control", "12px"], ["panel", "20px"], ["block", "28px"], ["min", "4px"], ["pill", "999px"], ["round", "50%"]].forEach(([name, value]) => {
+      const all = [...theme.matchAll(new RegExp(`^\\s*--yy-radius-${name}:\\s*${value};`, "gm"))];
+      expect(all.length, `--yy-radius-${name} 只能定義一次，值為 ${value}`).toBe(1);
+    });
+    // 舊名（被各 *Look 測試列為舊風格 token）不可以再定義
+    expect(theme).not.toMatch(/^\s*--yy-radius-(?:card|btn|lg)\s*:/m);
+  });
+
+  it("前台 CSS 的 border-radius 只能是 0 或圓角 token，不寫 px、rem、%，也不再用舊的 3px --yy-ui-radius（登入頁 adminLogin 屬後台範圍除外）", () => {
+    const bad = [];
+    css.forEach(({ file, text }) => {
+      if (file.endsWith("adminLogin.css")) return;
+      text.split("\n").forEach((line, i) => {
+        if (isTokenDefinition(line)) return;
+        if (line.includes("var(--yy-ui-radius)")) bad.push(`${file}:${i + 1} 舊 --yy-ui-radius`);
+        // 簡寫與四個單角寫法（border-top-left-radius…）都檢查，同一行有多個宣告也逐一檢查，屬性名不分大小寫
+        for (const m of line.matchAll(/border(?:-(?:top|bottom)-(?:left|right))?-radius\s*:\s*([^;}]+)/gi)) {
+          const stripped = m[1].replace(/var\(--yy-radius-(?:tag|control|panel|block|min|pill|round)\)/g, "").replace(/!important/g, "").replace(/\b0\b/g, "").trim();
+          if (stripped) bad.push(`${file}:${i + 1} ${m[0].trim()}`);
+        }
+      });
+    });
+    expect(bad).toEqual([]);
+  });
+
   it("輸入框、下拉、答題選項、外框按鈕的邊框不用 --yy-border-soft（對白底只有約 1.5:1，不到 WCAG 1.4.11 的 3:1）", () => {
     // --yy-border-soft 只給純分隔線與卡片外框；邊框是控制項唯一可見輪廓時要用 --yy-text-muted 或 --yy-ink
     const CONTROL = /(input|select|textarea|option|cancel|outline|page-btn)/i;
@@ -139,7 +166,7 @@ describe("圓角、邊框與陰影", () => {
     expect(hits).toEqual([]);
   });
 
-  it("陰影 token 為硬陰影；一般卡片不再用柔和的 rgba 模糊陰影", () => {
+  it("一般卡片不手寫柔和的 rgba 模糊陰影，要用 --yy-elev-* 高度 token（舊的硬陰影 token 已刪除）", () => {
     // 例外：焦點環／脈動光環（模糊 0）、方向性陰影（負偏移）、0 0 光暈，這些不是卡片陰影
     const hits = scanLines(css, (line) => {
       if (isTokenDefinition(line)) return false;
@@ -174,5 +201,20 @@ describe("菱形與圖示", () => {
 
   it("CategoryBar 不再混用 react-icons，圖示統一用 lucide-react", () => {
     expect(read(join(FRONTEND, "components/ui/CategoryBar.jsx"))).not.toMatch(/react-icons/);
+  });
+
+  it("全站（含後台）的 JS／JSX 都不再引入 react-icons，圖示統一用 lucide-react（Apple 化步驟 1-8）", () => {
+    // 不限定前面是 from：靜態 import、side-effect import、require、字面量 dynamic import 都會抓到
+    const offenders = walk(FRONTEND, [".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"])
+      .filter((f) => !isTest(f) && !f.includes("node_modules"))
+      .filter((f) => /["']react-icons(?:\/|["'])/.test(read(f)))
+      .map(rel);
+    expect(offenders).toEqual([]);
+  });
+
+  it("lucide 圖示的線寬由 --yy-icon-stroke 統一，.yy-icon 套用它", () => {
+    const theme = read(join(ROOT, "default/theme-v2.css"));
+    expect(theme).toMatch(/--yy-icon-stroke:\s*2;/);
+    expect(theme).toMatch(/\.yy-icon\s*\{[^}]*stroke-width:\s*var\(--yy-icon-stroke\)/);
   });
 });

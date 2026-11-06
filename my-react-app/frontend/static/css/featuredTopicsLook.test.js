@@ -35,8 +35,8 @@ describe("本期專題樣式", () => {
     expect(css).not.toMatch(/text-shadow|@keyframes|animation\s*:|transition:\s*all|ease-in(?![\w-])/);
   });
 
-  it("陰影只有 hover 時一道柔和的下緣（有模糊，不是硬偏移）", () => {
-    [...css.matchAll(/box-shadow:\s*([^;]+);/g)].forEach((m) => expect(m[1]).toMatch(/^(?:0 14px 22px -16px|none$)/));
+  it("陰影只有 hover 時用高度 3 的柔影 --yy-elev-3（有模糊，不是硬偏移）", () => {
+    [...css.matchAll(/box-shadow:\s*([^;]+);/g)].forEach((m) => expect(m[1]).toMatch(/^(?:var\(--yy-elev-3\)|none$)/));
   });
 
   it("標題下雙線；字級至少 14px", () => {
@@ -53,7 +53,7 @@ describe("本期專題樣式", () => {
     const card = find(".topic-card").body;
     expect(card).toMatch(/border:\s*var\(--yy-border-width\) solid var\(--yy-calm-line\)/);
     expect(card).toMatch(/background:\s*var\(--yy-calm-surface\)/);
-    expect(card).toMatch(/border-radius:\s*var\(--yy-ui-radius\)/);
+    expect(card).toMatch(/border-radius:\s*var\(--yy-radius-panel\)/);
   });
 
   it("整張卡可點（標題連結伸展），圖片寬高比固定避免版面跳動；沒圖時三款圖樣", () => {

@@ -88,9 +88,11 @@ describe("按鈕", () => {
 });
 
 describe("標籤、晶片、頁籤", () => {
-  it("三者都用 3px 圓角 token，不是膠囊", () => {
-    expect(tokenValue("--yy-ui-radius")).toBe("3px");
-    [".yy-eyebrow", ".yy-pill", ".yy-tabswitch"].forEach((sel) => expect(blocks(sel), sel).toMatch(/border-radius:\s*var\(--yy-ui-radius\)/));
+  it("三者都用圓角階層 token（標籤與晶片 8px、頁籤 12px），目前不是膠囊（晶片是否改膠囊待使用者另行決定）", () => {
+    expect(tokenValue("--yy-radius-tag")).toBe("8px");
+    expect(tokenValue("--yy-radius-control")).toBe("12px");
+    [[".yy-eyebrow", "tag"], [".yy-pill", "tag"], [".yy-tabswitch", "control"]].forEach(([sel, tier]) =>
+      expect(blocks(sel), sel).toMatch(new RegExp(`border-radius:\\s*var\\(--yy-radius-${tier}\\)`)));
   });
 
   it("標籤字色對底色達 4.5:1 且不是按鈕（沒有 cursor: pointer）", () => {

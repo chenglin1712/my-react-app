@@ -127,6 +127,15 @@ describe("斷點", () => {
     expect(bad).toEqual([]);
   });
 
+  it("theme-v2.css 的斷點表文件列出每一個允許的斷點（新增斷點時兩邊要一起改）", () => {
+    // 斷點表寫在註解裡，而 fileText 已去掉註解，所以直接讀原始檔
+    const theme = readFileSync(join(ROOT, "default/theme-v2.css"), "utf8");
+    const doc = (theme.match(/斷點表[\s\S]*?\*\//) || [""])[0];
+    // 取出註解裡所有完整的數字（480、600…），與 ALLOWED 雙向精確比對；不會被 1600 誤滿足 600，也抓得到多寫的值
+    const listed = [...new Set([...doc.matchAll(/(?<![\d.])(\d{3,4})(?![\d.])/g)].map((m) => Number(m[1])))].sort((a, b) => a - b);
+    expect(listed).toEqual([...ALLOWED].sort((a, b) => a - b));
+  });
+
   it("導覽列的斷點是刻意獨立的（桌面導覽列塞不下才收合），改動前要實機看 1024／1180／1200", () => {
     const widths = [...fileText("static/css/navigation/Navbar.css").matchAll(/@media[^{]*(?:max|min)-width:\s*(\d+)px/g)].map((m) => Number(m[1]));
     expect(widths.length).toBeGreaterThan(0);

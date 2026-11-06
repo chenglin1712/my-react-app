@@ -57,6 +57,16 @@ const PAIRS = [
   ["copper", "bg", 3, "銅褐原色（大字、邊框、圖示）"],
   ["block-accent", "block", 4.5, "石板灰上的淺銅（小字也可用）"],
 ];
+// 三主色淡階（步驟 1-5，使用者選 C 柔：5%、10%、15%）：內文、次要文字、強調連結放在每一階上都要 4.5:1。
+// 淡階只當分區底色；銅褐與橄欖原色不放小字的限制不變（見下面 KNOWN_SMALL_TEXT_FAILS）。
+["copper", "olive", "slate"].forEach((c) => [1, 2, 3].forEach((n) => {
+  PAIRS.push(["text", `tint-${c}-${n}`, 4.5, `內文放在 ${c} 淡階 ${n}`]);
+  PAIRS.push(["text-sub", `tint-${c}-${n}`, 4.5, `次要文字放在 ${c} 淡階 ${n}`]);
+  PAIRS.push(["accent", `tint-${c}-${n}`, 4.5, `強調連結放在 ${c} 淡階 ${n}`]);
+}));
+// 表面層級：文字放在 0 到 3 每一層都要 4.5:1
+[0, 1, 2, 3].forEach((n) => PAIRS.push(["text", `layer-${n}`, 4.5, `內文放在表面 ${n}`]));
+
 // 原色不可當小字：淺色模式的銅褐與橄欖對象牙白低於 4.5（DESIGN.md 記錄為 4.49、4.29）
 const KNOWN_SMALL_TEXT_FAILS = { light: [["copper", "bg"], ["olive", "bg"]], dark: [] };
 
@@ -96,6 +106,31 @@ describe("語意色 token 結構", () => {
     expect(darkAuto["--yy-calm-bg"]).not.toBe(light["--yy-calm-bg"]);
     expect(lum(darkAuto["--yy-calm-bg"])).toBeLessThan(lum(darkAuto["--yy-calm-text"]));
     expect(lum(light["--yy-calm-bg"])).toBeGreaterThan(lum(light["--yy-calm-text"]));
+  });
+});
+
+describe("表面層級與淡階（步驟 1-5）", () => {
+  it("深色表面 0 到 3 越高越亮；淺色三層浮起卡與浮層同為白，由陰影分層", () => {
+    const L = [0, 1, 2, 3].map((n) => lum(darkAuto[`--yy-calm-layer-${n}`]));
+    expect(L).toEqual([...L].sort((x, y) => x - y));
+    expect(new Set(L).size).toBe(4);
+    expect(light["--yy-calm-layer-0"]).toBe(light["--yy-calm-bg"]);
+    expect(light["--yy-calm-layer-1"]).toBe(light["--yy-calm-surface"]);
+    expect(darkAuto["--yy-calm-layer-0"]).toBe(darkAuto["--yy-calm-bg"]);
+    expect(darkAuto["--yy-calm-layer-1"]).toBe(darkAuto["--yy-calm-surface"]);
+  });
+
+  it("三主色淡階每一色三階，淺色越深色越多（對象牙白漸深）、深色越亮；值取自使用者選定的 C 組", () => {
+    const C = { copper: ["#FAF2E5", "#F5EBDD", "#F0E3D5"], olive: ["#F9F2E5", "#F3ECDD", "#EDE5D5"], slate: ["#F6F0E5", "#ECE7DD", "#E3DED5"] };
+    Object.entries(C).forEach(([name, expected]) => {
+      const got = [1, 2, 3].map((n) => light[`--yy-calm-tint-${name}-${n}`].toUpperCase());
+      expect(got, name).toEqual(expected);
+      const l = got.map(lum);
+      expect(l[0]).toBeGreaterThan(l[1]);
+      expect(l[1]).toBeGreaterThan(l[2]);
+      // 淡階仍比頁面底（象牙白）暗一點點，才看得出分區
+      expect(l[0]).toBeLessThan(lum(light["--yy-calm-bg"]));
+    });
   });
 });
 
