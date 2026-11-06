@@ -119,17 +119,53 @@
     color: var(--yy-calm-text-sub);
 }
 
-.toast-notification {
+/* 多則提示垂直堆疊（原本每則都 fixed 在同一個角落，會互相蓋住）；容器不攔截點擊，只有每則本身可點 */
+.toast-stack {
   position: fixed;
   top: 20px;
   right: 20px;
+  z-index: var(--yy-z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--yy-space-3);
+  max-width: calc(100vw - 40px);
+  pointer-events: none;
+}
+
+.toast-notification {
+  pointer-events: auto;
+  /* 進場用 @starting-style（不用另外的 mounted 狀態），退場加 is-leaving；
+     進 220ms、退 160ms，transition 可被打斷 */
+  opacity: 1;
+  translate: 0 0;
+  transition: opacity var(--dur-overlay-in) var(--ease-out), translate var(--dur-overlay-in) var(--ease-out);
   background-color: var(--yy-calm-info-bg);
   color: var(--yy-calm-text);
   border: var(--yy-border-width) solid var(--yy-calm-line);
   padding: 1rem 1.5rem;
   border-radius: var(--yy-radius-panel);
-  z-index: var(--yy-z-toast);
-  width: fixed;
+}
+
+@starting-style {
+  .toast-notification {
+    opacity: 0;
+    translate: 16px 0;
+  }
+}
+
+.toast-notification.is-leaving {
+  opacity: 0;
+  translate: 16px 0;
+  pointer-events: none;
+  transition-duration: var(--dur-overlay-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-notification,
+  .toast-notification.is-leaving {
+    translate: 0 0;
+    transition-property: opacity;
+  }
 }
 
 .toast-header {

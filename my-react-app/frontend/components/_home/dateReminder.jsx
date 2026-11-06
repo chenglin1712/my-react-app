@@ -139,8 +139,22 @@ const DateReminder = () => {
 
     const nextEvent = getNextEvent();
 
+    // 退場動畫期間先標 leaving（CSS 淡出 160ms），結束後才真的移除。計時器依 phase 記錄：
+    // 重設提醒或同一個 phase 重新出現時要取消舊計時器，不然舊的會把新出現的提示移掉；元件卸載時全部清掉。
+    const leaveTimers = useRef(new Map());
+    const cancelLeaveTimer = (phase) => {
+        clearTimeout(leaveTimers.current.get(phase));
+        leaveTimers.current.delete(phase);
+    };
+    useEffect(() => () => { leaveTimers.current.forEach(clearTimeout); }, []);
+
     const handleCloseToast = (phase) => {
-        setToastList(prev => prev.filter(toast => toast.phase !== phase));
+        setToastList(prev => prev.map(toast => (toast.phase === phase ? { ...toast, leaving: true } : toast)));
+        cancelLeaveTimer(phase);
+        leaveTimers.current.set(phase, setTimeout(() => {
+            leaveTimers.current.delete(phase);
+            setToastList(prev => prev.filter(toast => toast.phase !== phase));
+        }, 160));
 
         if (doNotRemindMap[phase]) {
             setDismissedPhasesBySession(prev => {
@@ -170,6 +184,8 @@ const DateReminder = () => {
     const handleResetNotifications = () => {
         localStorage.removeItem(DISMISSED_PHASES_KEY);
         setDismissedPhasesBySession({});
+        leaveTimers.current.forEach(clearTimeout);
+        leaveTimers.current.clear();
         setToastList([]);
         notifiedRef.current = {};
     };
@@ -184,9 +200,11 @@ const DateReminder = () => {
                 {/* aria-live 包在這個常駐的外層容器上（而不是各自的 toast-notification
                     div），content 變動（toast 出現/消失）才會可靠地被螢幕報讀器唸出來——
                     原本完全沒有，畫面上彈出通知但螢幕報讀器不會有任何提示。 */}
-                <div aria-live="polite" role="status">
+                <div className="toast-stack">
                     {toastList.map((toast) => (
-                        <div className="toast-notification" key={toast.phase}>
+                        // 每則提示各自是一個 status 區域（容器整個當 live region 的話，增減任何一則都會把其餘的再唸一遍）；
+                        // 退場中的提示 inert：不能再被聚焦或點擊，焦點不會留在即將卸載的按鈕上
+                        <div className={`toast-notification${toast.leaving ? " is-leaving" : ""}`} key={toast.phase} role="status" aria-live="polite" inert={toast.leaving}>
                             <div className="toast-header">
                                 📢 {toast.phase} 今日開始！
                                 <button className="close-btn" onClick={() => handleCloseToast(toast.phase)} aria-label="關閉">✕</button>

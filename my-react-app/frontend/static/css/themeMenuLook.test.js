@@ -47,14 +47,14 @@ describe("顯示設定選單樣式（S5-3）", () => {
     expect(find(".theme-option").body).toMatch(/min-height:\s*var\(--yy-control-md\)/);
   });
 
-  it("面板從按鈕右上角長出來，展開 160ms、收合 120ms，visibility 等退場結束才切換", () => {
+  it("面板從按鈕右上角長出來，展開 220ms、收合 160ms（--dur-overlay-in／out），visibility 等退場結束才切換", () => {
     const closed = find(".theme-panel").body;
     expect(closed).toMatch(/transform-origin:\s*top right/);
     expect(closed).toMatch(/opacity:\s*0/);
     expect(closed).toMatch(/visibility:\s*hidden/);
-    expect(closed).toMatch(/opacity 120ms[^;]*transform 120ms[^;]*visibility 0s linear 120ms/);
+    expect(closed).toMatch(/opacity var\(--dur-overlay-out\)[^;]*transform var\(--dur-overlay-out\)[^;]*visibility 0s linear var\(--dur-overlay-out\)/);
     const open = find(".theme-panel.active").body;
-    expect(open).toMatch(/opacity 160ms[^;]*transform 160ms[^;]*visibility 0s linear 0s/);
+    expect(open).toMatch(/opacity var\(--dur-overlay-in\)[^;]*transform var\(--dur-overlay-in\)[^;]*visibility 0s linear 0s/);
     expect(closed).not.toMatch(/scale\(0\)|ease-in\b|transition:\s*all/);
   });
 

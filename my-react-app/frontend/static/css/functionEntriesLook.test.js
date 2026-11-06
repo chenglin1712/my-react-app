@@ -75,7 +75,17 @@ describe("行事曆（DateReminder）樣式", () => {
   it("沒有舊風格 token、陰影、動畫，沒有用透明度壓低文字", () => {
     expect(reminderCss).not.toMatch(OLD_TOKENS);
     expect(reminderCss).not.toMatch(NO_DECORATION);
-    expect(reminderCss).not.toMatch(/opacity\s*:/);
+    // 透明度只准用在提示（toast）的進出場過渡；其他地方不能用它壓低文字
+    const withoutToast = reminderCss.replace(/@starting-style\s*\{[\s\S]*?\}\s*\}/g, "").replace(/\.toast-notification[^{]*\{[^}]*\}/g, "").replace(/@media[^{]*prefers-reduced-motion[^{]*\{[\s\S]*?\}\s*\}/g, "");
+    expect(withoutToast).not.toMatch(/opacity\s*:/);
+  });
+
+  it("提示（toast）堆疊、用 transition 進出：進場 --dur-overlay-in、退場 --dur-overlay-out，reduced-motion 不位移", () => {
+    expect(findRem(".toast-stack").body).toMatch(/display:\s*flex;[\s\S]*flex-direction:\s*column;/);
+    expect(findRem(".toast-notification").body).toMatch(/transition:\s*opacity var\(--dur-overlay-in\) var\(--ease-out\), translate var\(--dur-overlay-in\)/);
+    expect(findRem(".toast-notification.is-leaving").body).toMatch(/transition-duration:\s*var\(--dur-overlay-out\)/);
+    expect(reminderCss).toMatch(/@starting-style\s*\{\s*\.toast-notification\s*\{[^}]*opacity:\s*0;/);
+    expect(reminderCss).toMatch(/prefers-reduced-motion: reduce\)\s*\{[\s\S]*translate:\s*0 0;/);
   });
 
   it("沒有裝飾圓形；倒數數字仍用等寬數字", () => {

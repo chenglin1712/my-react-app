@@ -464,9 +464,9 @@
     transform: translateY(-6px) scale(0.97);
     transform-origin: top left;
     transition:
-        opacity 120ms var(--ease-out) 100ms,
-        transform 120ms var(--ease-out) 100ms,
-        visibility 0s linear 220ms;
+        opacity var(--dur-overlay-out) var(--ease-out) 100ms,
+        transform var(--dur-overlay-out) var(--ease-out) 100ms,
+        visibility 0s linear calc(var(--dur-overlay-out) + 100ms);
 }
 
 .dropdown-item {
@@ -501,8 +501,8 @@
     pointer-events: auto;
     transform: none;
     transition:
-        opacity 160ms var(--ease-out),
-        transform 160ms var(--ease-out),
+        opacity var(--dur-overlay-in) var(--ease-out),
+        transform var(--dur-overlay-in) var(--ease-out),
         visibility 0s linear 0s;
 }
 
@@ -515,8 +515,8 @@
         pointer-events: auto;
         transform: none;
         transition:
-            opacity 160ms var(--ease-out),
-            transform 160ms var(--ease-out),
+            opacity var(--dur-overlay-in) var(--ease-out),
+            transform var(--dur-overlay-in) var(--ease-out),
             visibility 0s linear 0s;
     }
 }
@@ -565,9 +565,9 @@
     transform: translateY(-6px) scale(0.97);
     transform-origin: top right;
     transition:
-        opacity 120ms var(--ease-out),
-        transform 120ms var(--ease-out),
-        visibility 0s linear 120ms;
+        opacity var(--dur-overlay-out) var(--ease-out),
+        transform var(--dur-overlay-out) var(--ease-out),
+        visibility 0s linear var(--dur-overlay-out);
 }
 
 .theme-panel.active {
@@ -576,8 +576,8 @@
     pointer-events: auto;
     transform: none;
     transition:
-        opacity 160ms var(--ease-out),
-        transform 160ms var(--ease-out),
+        opacity var(--dur-overlay-in) var(--ease-out),
+        transform var(--dur-overlay-in) var(--ease-out),
         visibility 0s linear 0s;
 }
 

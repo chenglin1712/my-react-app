@@ -257,6 +257,8 @@
   --ease-spring: linear(0, 0.34 6%, 0.72 13%, 0.95 20%, 1.06 27%, 1.08 33%, 1.04 41%, 0.99 52%, 1.005 66%, 1); /* 舊瀏覽器不支援 linear() 時整條宣告失效，退回元件自己寫的 --ease-out 後備 */
   --dur-spring: 550ms;
   --dur-press: 120ms;
+  --dur-overlay-in: 220ms; /* 浮層（彈窗、下拉、提示）進場；退場用下一行，比進場快 */
+  --dur-overlay-out: 160ms;
   --yy-lift: -3px; /* hover 抬起量（強度 6） */
   /* 取代 transition: all：只過渡顏色、陰影、位移與透明度，不會連版面屬性一起動畫 */
   --transition-interactive:
@@ -994,10 +996,10 @@
   align-items: center;
   justify-content: center;
   z-index: var(--yy-z-overlay);
-  animation: yy-overlay-in var(--dur-base) var(--ease-out) both;
+  animation: yy-overlay-in var(--dur-overlay-in) var(--ease-out) both;
 }
 .yy-modal-box {
-  animation: yy-pop 240ms var(--ease-out) both;
+  animation: yy-pop var(--dur-overlay-in) var(--ease-out) both;
   background: var(--yy-surface);
   border: var(--yy-border-width) solid var(--yy-ink);
   border-radius: var(--yy-radius-panel);
@@ -1008,10 +1010,10 @@
 }
 .yy-modal-overlay.is-leaving {
   pointer-events: none;
-  animation: yy-overlay-out 160ms var(--ease-out) both;
+  animation: yy-overlay-out var(--dur-overlay-out) var(--ease-out) both;
 }
 .yy-modal-overlay.is-leaving .yy-modal-box {
-  animation: yy-pop-out 160ms var(--ease-out) both;
+  animation: yy-pop-out var(--dur-overlay-out) var(--ease-out) both;
 }
 .yy-modal-icon {
   width: 70px;

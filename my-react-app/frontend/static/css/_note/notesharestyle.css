@@ -206,12 +206,27 @@
   border-radius: var(--yy-radius-panel);
   font-size: .95rem;
   z-index: var(--yy-z-toast);
-  animation: ns-fadein var(--dur-fast) var(--ease-out);
+  /* 常駐元素用 transition 進出：可被打斷（中途又來新訊息從目前狀態接續），進 220ms、退 160ms。
+     translate 是獨立屬性，不與置中用的 transform 衝突 */
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  translate: 0 8px;
+  transition:
+    opacity var(--dur-overlay-out) var(--ease-out),
+    translate var(--dur-overlay-out) var(--ease-out),
+    visibility 0s linear var(--dur-overlay-out);
 }
-@keyframes ns-fadein {
-  from { opacity: 0; transform: translateX(-50%) translateY(6px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+.ns-toast.is-visible {
+  opacity: 1;
+  visibility: visible;
+  translate: 0 0;
+  transition:
+    opacity var(--dur-overlay-in) var(--ease-out),
+    translate var(--dur-overlay-in) var(--ease-out),
+    visibility 0s linear 0s;
 }
+.ns-toast:empty { display: none; }
 
 /* 搜尋框外層：內部的 input 沒有外框，改在整個搜尋框畫焦點框（全站焦點基線見 theme-v2.css） */
 .ns-search:focus-within{
@@ -231,7 +246,7 @@
   .ns-refresh:active,
   .ns-page-btn:active:not(:disabled),
   .ns-btn:active { transform: none; }
-  .ns-toast { animation: none; }
+  .ns-toast, .ns-toast.is-visible { translate: 0 0; transition-property: opacity, visibility; }
 }
 
 @media (prefers-reduced-motion: reduce) and (hover: hover) and (pointer: fine) {

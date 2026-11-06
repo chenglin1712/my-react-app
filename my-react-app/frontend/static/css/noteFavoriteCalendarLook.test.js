@@ -98,7 +98,12 @@ describe("筆記", () => {
 
   it("彈窗遮罩用主題色混色；提示訊息減少動態時不動", () => {
     expect(find("_note/notesharestyle.css")(".ns-modal-mask").body).toMatch(/color-mix\(in srgb, var\(--yy-calm-block\)/);
-    expect(find("_note/notesharestyle.css")(".ns-toast", /prefers-reduced-motion/).body).toMatch(/animation:\s*none/);
+    // 提示訊息用 transition 進出（可被打斷）；減少動態時不位移，只留透明度
+    const reducedToast = find("_note/notesharestyle.css")(".ns-toast, .ns-toast.is-visible", /prefers-reduced-motion/).body;
+    expect(reducedToast).toMatch(/translate:\s*0 0;/);
+    expect(reducedToast).toMatch(/transition-property:\s*opacity, visibility;/);
+    expect(find("_note/notesharestyle.css")(".ns-toast").body).toMatch(/opacity:\s*0;[\s\S]*visibility:\s*hidden;/);
+    expect(find("_note/notesharestyle.css")(".ns-toast.is-visible").body).toMatch(/opacity:\s*1;[\s\S]*opacity var\(--dur-overlay-in\)/);
   });
 });
 

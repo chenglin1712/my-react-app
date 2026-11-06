@@ -322,11 +322,10 @@ export default function NoteShare() {
       )}
 
       {/* Toast */}
-      {toast.show && (
-        <div className="ns-toast" role="status" aria-live="polite">
-          {toast.text}
-        </div>
-      )}
+      {/* 常駐的 live region（內容變動才會被可靠地唸出來），顯示與否由 is-visible 的 transition 決定 */}
+      <div className={`ns-toast${toast.show ? " is-visible" : ""}`} role="status" aria-live="polite">
+        {toast.text}
+      </div>
     </div>
     </div>
   );

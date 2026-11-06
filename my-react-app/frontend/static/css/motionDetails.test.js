@@ -65,13 +65,15 @@ describe("選取狀態與過渡", () => {
 });
 
 describe("彈窗進退場與逐字進場", () => {
-  it("成功彈窗從 scale(.94) 進場 240ms、overlay 淡入、退場 160ms", () => {
+  it("成功彈窗從 scale(.94) 進場（--dur-overlay-in 220ms）、overlay 淡入、退場 160ms（--dur-overlay-out）", () => {
     const theme = read("default/theme-v2.css");
     expect(theme).toMatch(/@keyframes yy-pop \{\s*from \{ transform: scale\(0\.94\); opacity: 0; \}/);
-    expect(rule(theme, ".yy-modal-box")).toMatch(/animation:\s*yy-pop 240ms var\(--ease-out\)/);
+    expect(theme).toMatch(/--dur-overlay-in:\s*220ms;/);
+    expect(theme).toMatch(/--dur-overlay-out:\s*160ms;/);
+    expect(rule(theme, ".yy-modal-box")).toMatch(/animation:\s*yy-pop var\(--dur-overlay-in\) var\(--ease-out\)/);
     expect(rule(theme, ".yy-modal-overlay")).toMatch(/animation:\s*yy-overlay-in/);
-    expect(rule(theme, ".yy-modal-overlay.is-leaving")).toMatch(/yy-overlay-out 160ms/);
-    expect(rule(theme, ".yy-modal-overlay.is-leaving .yy-modal-box")).toMatch(/yy-pop-out 160ms/);
+    expect(rule(theme, ".yy-modal-overlay.is-leaving")).toMatch(/yy-overlay-out var\(--dur-overlay-out\)/);
+    expect(rule(theme, ".yy-modal-overlay.is-leaving .yy-modal-box")).toMatch(/yy-pop-out var\(--dur-overlay-out\)/);
   });
 
   it("降低動態時退場也只淡出，不位移", () => {
