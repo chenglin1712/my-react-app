@@ -1,0 +1,309 @@
+/* 首頁捲動敘事「一個詞的旅程」（HomeStory.jsx，首頁設計稿，動態強度 9）。
+   桌面：區塊高 240dvh，裡面的舞台 sticky 釘住，捲動時 JS 換步；手機改成一般堆疊。
+   位移類動態只動 transform 與 opacity；顏色一律取 --yy-calm-*，圖樣用語意色混色，深色模式自動跟著換。 */
+
+.home-story {
+    --story-top: 80px; /* 釘住時離視窗上緣的距離，要比貼頂的選單列高（與 HomeStory.jsx 的 STORY_TOP 一致） */
+    --story-pad: clamp(24px, 4vw, 52px);
+    /* 左側圖樣用的兩個銅色：深一點的底與原色，條紋才有層次 */
+    --story-a: color-mix(in srgb, var(--yy-calm-copper) 85%, var(--yy-calm-block));
+    --story-b: var(--yy-calm-copper);
+    position: relative;
+    height: calc(100dvh * 2.4);
+    margin-top: var(--yy-space-6);
+    padding-inline: 16px;
+    font-family: var(--yy-font-body);
+}
+
+.home-story__stage {
+    position: sticky;
+    top: var(--story-top);
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    height: calc(100dvh - var(--story-top) - 24px);
+    min-height: 520px;
+    max-height: 720px;
+    overflow: hidden;
+    background: var(--yy-calm-tint-copper-3);
+    border: var(--yy-border-width) solid var(--yy-calm-rule);
+    border-radius: var(--yy-radius-block);
+    box-shadow: var(--yy-elev-3);
+}
+
+/* ---------- 左：圖樣層與大字 ---------- */
+
+.home-story__art {
+    position: relative;
+    overflow: hidden;
+}
+
+/* 底部加深，大字壓在上面才讀得清楚 */
+.home-story__art::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 55%, color-mix(in srgb, var(--yy-calm-block) 55%, transparent));
+    pointer-events: none;
+}
+
+/* 四層圖樣：第一層一開始就在，其餘依序從下往上蓋上來（只動 transform） */
+.home-story__layer {
+    position: absolute;
+    inset: 0;
+    transform: translateY(100%);
+    transition: transform 900ms var(--ease-out);
+}
+
+.home-story__layer.is-on {
+    transform: none;
+}
+
+.home-story__layer--0 {
+    background: repeating-linear-gradient(135deg, var(--story-a) 0 16px, var(--story-b) 16px 32px);
+}
+
+.home-story__layer--1 {
+    background: repeating-linear-gradient(90deg, var(--yy-calm-block) 0 13px, var(--yy-calm-olive) 13px 26px);
+}
+
+.home-story__layer--2 {
+    background:
+        radial-gradient(circle, var(--yy-calm-bg) 0 8px, transparent 9px) 0 0 / 34px 34px,
+        var(--yy-calm-olive);
+}
+
+.home-story__layer--3 {
+    background:
+        repeating-linear-gradient(0deg, color-mix(in srgb, var(--yy-calm-bg) 32%, transparent) 0 3px, transparent 3px 22px),
+        repeating-linear-gradient(90deg, color-mix(in srgb, var(--yy-calm-bg) 32%, transparent) 0 3px, transparent 3px 22px),
+        var(--yy-calm-accent);
+}
+
+.home-story__glyph {
+    position: absolute;
+    left: 28px;
+    bottom: 22px;
+    z-index: 2;
+    font-size: clamp(80px, 11vw, 150px);
+    font-weight: 900;
+    line-height: 0.95;
+    letter-spacing: -0.04em;
+    color: var(--yy-calm-block-on);
+    transition: transform var(--dur-spring) var(--ease-spring), opacity 180ms var(--ease-out);
+}
+
+.home-story__glyph.is-swapping {
+    opacity: 0;
+    transform: translateY(24px) scale(0.94);
+}
+
+/* 四段進度條：貼在左側上緣，填滿用 scaleX（只動 transform），第幾段由 --story-f 減去自己的序號決定 */
+.home-story__progress {
+    position: absolute;
+    top: 22px;
+    right: 28px;
+    left: 28px;
+    z-index: 2;
+    display: flex;
+    gap: var(--yy-space-2);
+}
+
+.home-story__progress i {
+    flex: 1;
+    height: 3px;
+    overflow: hidden;
+    border-radius: var(--yy-radius-pill);
+    background: color-mix(in srgb, var(--yy-calm-block-on) 35%, transparent);
+}
+
+.home-story__progress b {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: var(--yy-calm-block-on);
+    transform: scaleX(clamp(0, calc(var(--story-f, 0) - var(--i)), 1));
+    transform-origin: left center;
+}
+
+/* ---------- 右：四步清單 ---------- */
+
+.home-story__copy {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--yy-space-4);
+    padding: var(--story-pad);
+}
+
+.home-story__kicker {
+    margin: 0;
+    font-size: var(--yy-text-sm);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: var(--yy-calm-accent);
+}
+
+.home-story__steps {
+    display: grid;
+    gap: var(--yy-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.home-story__step {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px var(--yy-space-4);
+    align-items: baseline;
+    padding: 12px 14px;
+    border-radius: var(--yy-radius-panel);
+    opacity: 0.6; /* 不是目前這一步：退到後面，但仍維持大字 3:1 以上的對比 */
+    transition: opacity 450ms var(--ease-out), background-color 450ms var(--ease-out), transform var(--dur-spring) var(--ease-spring);
+}
+
+.home-story__num {
+    grid-row: span 2;
+    font-size: var(--yy-text-sm);
+    letter-spacing: 0.1em;
+    color: var(--yy-calm-text-sub);
+}
+
+.home-story__step b {
+    font-size: clamp(22px, 3vw, 34px);
+    font-weight: 900;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    color: var(--yy-calm-text);
+}
+
+/* 說明預設收起（高度 0），只有目前這一步展開；文字仍在 DOM 裡，報讀器讀得到 */
+.home-story__step p {
+    max-height: 0;
+    margin: 0;
+    overflow: hidden;
+    opacity: 0;
+    font-size: var(--yy-text-base);
+    line-height: 1.6;
+    color: var(--yy-calm-text-sub);
+    transition: max-height 550ms var(--ease-out), opacity 400ms var(--ease-out);
+}
+
+.home-story__step.is-on {
+    opacity: 1;
+    background: var(--yy-calm-surface);
+    box-shadow: var(--yy-elev-2);
+    transform: translateX(8px);
+}
+
+.home-story__step.is-on p {
+    max-height: 96px;
+    opacity: 1;
+}
+
+/* 提示：一條線隨進度縮短，捲到最後淡出 */
+.home-story__cue {
+    display: flex;
+    align-items: center;
+    gap: var(--yy-space-2);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
+    transition: opacity 300ms var(--ease-out);
+}
+
+.home-story__cue::before {
+    content: "";
+    width: 22px;
+    height: 2px;
+    background: var(--yy-calm-text-sub);
+    transform: scaleX(calc(1 - var(--story-p, 0)));
+    transform-origin: left center;
+}
+
+.home-story__cue[data-done="true"] {
+    opacity: 0;
+}
+
+.home-story__skip {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    min-height: var(--yy-control-md);
+    font-size: var(--yy-text-sm);
+    font-weight: 700;
+    color: var(--yy-calm-accent);
+    text-underline-offset: 4px;
+}
+
+.home-story__skip:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+/* ---------- 窄螢幕：不釘住，四步全部展開 ---------- */
+
+@media (max-width: 900px) {
+    .home-story {
+        height: auto;
+    }
+
+    .home-story__stage {
+        position: static;
+        grid-template-columns: minmax(0, 1fr);
+        height: auto;
+        min-height: 0;
+        max-height: none;
+    }
+
+    .home-story__art {
+        min-height: 230px;
+    }
+
+    .home-story__layer {
+        transform: none;
+        transition: none;
+    }
+
+    .home-story__layer:not(.home-story__layer--0) {
+        display: none;
+    }
+
+    .home-story__progress,
+    .home-story__cue {
+        display: none;
+    }
+
+    .home-story__glyph {
+        font-size: 76px;
+    }
+
+    .home-story__step {
+        opacity: 1;
+    }
+
+    .home-story__step p {
+        max-height: 96px;
+        opacity: 1;
+    }
+}
+
+/* 減少動態：仍隨捲動換步，但所有轉場關閉，位移歸零 */
+@media (prefers-reduced-motion: reduce) {
+    .home-story__layer,
+    .home-story__glyph,
+    .home-story__step,
+    .home-story__step p,
+    .home-story__cue {
+        transition: none;
+    }
+
+    .home-story__step.is-on {
+        transform: none;
+    }
+
+    .home-story__glyph.is-swapping {
+        opacity: 1;
+        transform: none;
+    }
+}

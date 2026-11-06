@@ -1,4 +1,5 @@
 import News from "../../components/_home/news"
+import HomeStory from "../../components/_home/HomeStory"
 import "../../static/css/_home/index.css"
 import CertificationSection from "../../components/_home/calendar"
 import { pickExamSchedule } from "../../components/_home/examScheduleContent"
@@ -228,9 +229,12 @@ const HomePage = () => {
                 </div>
             )}
 
+            {/* 捲動敘事「一個詞的旅程」（首頁設計稿）：第一屏之後、本期專題之前；桌面釘住隨捲動換步，手機堆疊 */}
+            <HomeStory skipTo="#home-topics" />
+
             {/* 本期專題：沒有已發布的專題就放三張示意卡（設計稿的版面），發布後自動換成真的 */}
             {topicsSettled && (
-                <RevealOnView><FeaturedTopics topics={featuredTopics.length > 0 ? featuredTopics : DEMO_TOPICS} /></RevealOnView>
+                <div id="home-topics"><RevealOnView><FeaturedTopics topics={featuredTopics.length > 0 ? featuredTopics : DEMO_TOPICS} /></RevealOnView></div>
             )}
         </div>
     );
