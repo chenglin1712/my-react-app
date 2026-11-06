@@ -839,3 +839,333 @@
     .navbar:not(.navbar--magazine)::before { background: var(--yy-glass-bg-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 .navbar:not(.navbar--magazine) :focus-visible { box-shadow: 0 0 0 calc(var(--yy-ui-focus-offset) + 2px) var(--yy-glass-halo); }
+
+/* ======== 步驟 2-3：目前頁膠囊、下拉彈簧、首頁雜誌版 sticky 玻璃與小字標 ======== */
+
+/* 目前頁：膠囊底（銅色淡階）＋ 粗體 ＋ 下方細線，不只靠顏色；hover 用更淡的一階 */
+.menu-item.active {
+    background-color: var(--yy-calm-tint-copper-2);
+    border-radius: var(--yy-radius-pill);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .menu-item:hover {
+        background-color: var(--yy-calm-tint-copper-1);
+        border-radius: var(--yy-radius-pill);
+    }
+
+    .menu-item.active:hover {
+        background-color: var(--yy-calm-tint-copper-2);
+    }
+}
+
+/* 下拉選單彈簧展開：位移與縮放用 --ease-spring（linear()，不支援的瀏覽器退回上面的 ease-out），透明度維持快速淡入。
+   收合不用彈簧，維持原本 120ms。 */
+@supports (transition-timing-function: linear(0, 1)) {
+    .dropdown-content.active {
+        transition:
+            opacity var(--dur-overlay-in) var(--ease-out),
+            transform var(--dur-spring) var(--ease-spring),
+            visibility 0s linear 0s;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+        .note-dropdown-wrap:hover .dropdown-content {
+            transition:
+                opacity var(--dur-overlay-in) var(--ease-out),
+                transform var(--dur-spring) var(--ease-spring),
+                visibility 0s linear 0s;
+        }
+    }
+}
+
+/* 首頁雜誌版：選單列貼頂時（data-stuck="true"）才出現滿版玻璃底與細線；未貼頂維持原本的紙面樣式 */
+.navbar--magazine {
+    position: relative;
+    isolation: isolate;
+    border-bottom: 0;
+    --mini-logo-w: 72px;
+}
+
+.navbar--magazine .navbar-container {
+    position: relative;
+    max-width: 1200px;
+    margin-inline: auto;
+    border-bottom: 1px solid var(--yy-calm-line);
+    transition: border-color var(--dur-base) var(--ease-out);
+}
+
+.navbar--magazine::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0;
+    border-bottom: 1px solid var(--yy-calm-line);
+    background: var(--yy-glass-bg);
+    -webkit-backdrop-filter: saturate(var(--yy-glass-saturate)) blur(var(--yy-glass-blur));
+    backdrop-filter: saturate(var(--yy-glass-saturate)) blur(var(--yy-glass-blur));
+    transition: opacity var(--dur-base) var(--ease-out);
+}
+
+.navbar--magazine[data-stuck="true"]::before {
+    opacity: 1;
+}
+
+.navbar--magazine[data-stuck="true"] .navbar-container {
+    border-bottom-color: transparent;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .navbar--magazine::before { background: var(--yy-glass-bg-solid); }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    .navbar--magazine::before { background: var(--yy-glass-bg-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+.navbar--magazine :focus-visible {
+    box-shadow: 0 0 0 calc(var(--yy-ui-focus-offset) + 2px) var(--yy-glass-halo);
+}
+
+/* 雜誌版的膠囊：圓角 pill、底線縮進膠囊內 */
+.navbar--magazine .menu-item {
+    border-radius: var(--yy-radius-pill);
+}
+
+.navbar--magazine .menu-item::after {
+    left: 16px;
+    right: 16px;
+    bottom: 6px;
+}
+
+/* 小字標「原語」：平常 visibility:hidden（不佔焦點、不佔版面，絕對定位在左側），貼頂時淡入並從左滑入 */
+.navbar--magazine .logo--mini {
+    display: flex;
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    margin-top: calc(var(--yy-control-md) / -2);
+    font-size: 20px;
+    visibility: hidden;
+    opacity: 0;
+    translate: -8px 0;
+    transition: opacity var(--dur-base) var(--ease-out), translate var(--dur-base) var(--ease-out), visibility 0s linear var(--dur-base);
+}
+
+.navbar--magazine .logo--mini::before {
+    display: none;
+}
+
+.navbar--magazine[data-stuck="true"] .logo--mini {
+    visibility: visible;
+    opacity: 1;
+    translate: 0 0;
+    transition: opacity var(--dur-base) var(--ease-out), translate var(--dur-base) var(--ease-out), visibility 0s;
+}
+
+/* 左側項目讓出小字標的位置：.menu 的左內距從 0 長到 --mini-logo-w。右側的主題與登入靠 margin-left:auto 留在原位，
+   佈局自己分配空間，不會重疊。只有這一條小列在轉場時重排，成本很小。 */
+@media (min-width: 1201px) {
+    .navbar--magazine .menu {
+        transition: padding-left var(--dur-spring) var(--ease-spring);
+    }
+
+    .navbar--magazine[data-stuck="true"] .menu {
+        padding-left: var(--mini-logo-w);
+    }
+}
+
+/* 1200px 以下是漢堡選單，沒有左側選單列可讓位：小字標直接不顯示 */
+@media (max-width: 1200px) {
+    .navbar--magazine .logo--mini {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .navbar--magazine .logo--mini {
+        transition-property: opacity, visibility;
+        translate: none;
+    }
+
+    .navbar--magazine .menu {
+        transition: none;
+    }
+}
+
+/* ======== 步驟 2-4：手機底部 tab bar（≤768px） ========
+   四個主入口（首頁、單詞查詢、測驗、遊戲專區）加「更多」。「更多」開關手機選單面板，面板在這個寬度貼在 tab bar 上方。
+   --yy-tabbar-h 是 tab bar 高度（含底部安全區）；其他置底的元素（AI 助手、離線橫幅、錯誤提示）用它往上讓位。 */
+:root {
+    --yy-tabbar-h: 0px;
+}
+
+.yy-tabbar {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    :root {
+        --yy-tabbar-h: calc(60px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .yy-tabbar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: var(--yy-z-nav);
+        display: flex;
+        height: var(--yy-tabbar-h);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        box-sizing: border-box;
+        isolation: isolate;
+        border-top: 1px solid var(--yy-calm-line);
+        color: var(--yy-calm-text);
+    }
+
+    /* 玻璃底放 ::before，原因同上方 .navbar（直接寫 backdrop-filter 會改變 fixed 子孫的定位基準） */
+    .yy-tabbar::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        background: var(--yy-glass-bg);
+        -webkit-backdrop-filter: saturate(var(--yy-glass-saturate)) blur(var(--yy-glass-blur));
+        backdrop-filter: saturate(var(--yy-glass-saturate)) blur(var(--yy-glass-blur));
+    }
+
+    .yy-tabbar__item {
+        position: relative;
+        flex: 1 1 0;
+        min-width: 0;
+        min-height: 44px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        padding: 6px 2px 4px;
+        border: 0;
+        background: transparent;
+        color: var(--yy-calm-text-sub);
+        font: inherit;
+        font-size: var(--yy-text-xs);
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition: color 160ms var(--ease-out), transform var(--dur-press) var(--ease-out);
+    }
+
+    .yy-tabbar__item svg {
+        flex-shrink: 0;
+    }
+
+    .yy-tabbar__item span {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* 目前頁：深色字＋粗體＋上緣一條銅色短線，不只靠顏色 */
+    .yy-tabbar__item.active {
+        color: var(--yy-calm-text);
+        font-weight: 700;
+    }
+
+    .yy-tabbar__item.active::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 50%;
+        width: 28px;
+        height: 3px;
+        margin-left: -14px;
+        border-radius: 0 0 var(--yy-radius-min) var(--yy-radius-min);
+        background: var(--yy-calm-accent);
+    }
+
+    .yy-tabbar__item:active {
+        transform: scale(var(--yy-ui-press));
+    }
+
+    .yy-tabbar__item:focus-visible {
+        outline: var(--yy-ui-focus-ring);
+        outline-offset: -4px;
+        border-radius: var(--yy-radius-control);
+    }
+
+    @media (prefers-reduced-transparency: reduce) {
+        .yy-tabbar::before { background: var(--yy-glass-bg-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+    }
+
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        .yy-tabbar::before { background: var(--yy-glass-bg-solid); }
+    }
+
+    /* 頁面底部留出 tab bar 的高度，頁尾最後一行才不會被蓋住 */
+    body:has(.yy-tabbar) {
+        padding-bottom: var(--yy-tabbar-h);
+        --bot-bottom: calc(var(--yy-tabbar-h) + 16px);
+    }
+
+    body:has(.yy-tabbar):has(.offline-banner) {
+        --bot-bottom: calc(var(--yy-tabbar-h) + 96px);
+    }
+
+    body:has(.yy-tabbar) .offline-banner {
+        bottom: calc(var(--yy-tabbar-h) + 12px);
+    }
+
+    /* 漢堡鈕由「更多」取代；已在 tab bar 的四個入口不在面板重複 */
+    .menu-toggle {
+        display: none;
+    }
+
+    .menu-mobile-item--in-tabbar {
+        display: none;
+    }
+
+    /* 「更多」面板：貼在 tab bar 上方的底部面板，從下方滑入；可捲動，不超過可視高度的 70% */
+    .menu-mobile {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: var(--yy-tabbar-h);
+        width: auto;
+        max-height: 70dvh;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        z-index: var(--yy-z-nav);
+        transform: translateY(12px);
+        border-radius: var(--yy-radius-block) var(--yy-radius-block) 0 0;
+        box-shadow: var(--yy-elev-4), var(--yy-edge-4);
+    }
+
+    .menu-mobile.active {
+        transform: none;
+        border-top: 1px solid var(--yy-calm-line);
+        padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px) * 0);
+    }
+
+    @starting-style {
+        .menu-mobile.active {
+            transform: translateY(12px);
+        }
+    }
+}
+
+@media (max-width: 768px) and (prefers-reduced-motion: reduce) {
+    .yy-tabbar__item {
+        transition-property: color;
+    }
+
+    .yy-tabbar__item:active {
+        transform: none;
+    }
+}

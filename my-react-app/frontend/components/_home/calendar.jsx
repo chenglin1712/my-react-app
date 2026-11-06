@@ -1,6 +1,7 @@
 import { useId } from "react";
 import "../../static/css/_home/calendar.css";
 import ExternalLink from "../ui/ExternalLink";
+import { SkeletonBlocks, ErrorState } from "../ui/StateViews";
 import { formatMonthDay, phaseStatus } from "./examScheduleContent";
 
 /**
@@ -28,12 +29,7 @@ const CertificationSection = ({ schedule, loading = false, error = false, onRetr
         return (
             <section className="exam-section" aria-labelledby={titleId} aria-busy="true">
                 {header}
-                <div className="exam-skeleton" role="status">
-                    <span className="visually-hidden">認證時程載入中…</span>
-                    {[0, 1, 2].map((index) => (
-                        <span className="yy-skeleton exam-skeleton__row" aria-hidden="true" key={index} />
-                    ))}
-                </div>
+                <SkeletonBlocks className="exam-skeleton" label="認證時程載入中…" rows={[56, 56, 56]} />
             </section>
         );
     }
@@ -42,10 +38,7 @@ const CertificationSection = ({ schedule, loading = false, error = false, onRetr
         return (
             <section className="exam-section" aria-labelledby={titleId}>
                 {header}
-                <div className="exam-empty" role="alert">
-                    <p>目前無法載入認證時程，請稍後再試。</p>
-                    {onRetry && <button type="button" className="exam-retry" onClick={onRetry}>重新載入</button>}
-                </div>
+                <ErrorState className="exam-empty" buttonClassName="exam-retry" title="目前無法載入認證時程，請稍後再試。" onRetry={onRetry} />
             </section>
         );
     }

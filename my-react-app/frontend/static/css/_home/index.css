@@ -17,6 +17,16 @@
     display: none;
 }
 
+/* 選單 slot 貼頂（sticky）：整頁寬、不受 1200px 欄限制，玻璃底才能滿版；導覽內容在 Navbar.css 再收回 1200px。
+   .yy-page 用 overflow-x: clip，不會讓 sticky 失效。 */
+.homepage > .home-nav-slot {
+    position: sticky;
+    top: 0;
+    /* 比 --yy-z-nav 低 1：個人側欄的遮罩（--yy-z-nav）要蓋得住貼頂的選單，側欄（--yy-z-drawer）再蓋過遮罩 */
+    z-index: calc(var(--yy-z-nav) - 1);
+    max-width: none;
+}
+
 /* ---------- 第一屏 ---------- */
 
 .home-first {

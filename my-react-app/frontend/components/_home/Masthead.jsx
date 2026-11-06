@@ -63,6 +63,25 @@ const HomeMasthead = ({ quote = "", tagline = "" }) => {
         };
     }, [reduced]);
 
+    // 往下捲時大字標跟著縮小淡出：進度 0～1 寫進 --mast-p（CSS 用 scale／opacity 讀它），不經過 React state
+    useEffect(() => {
+        const mast = mastRef.current;
+        if (reduced || !mast) return undefined;
+        let raf = 0;
+        const update = () => {
+            raf = 0;
+            const p = Math.max(0, Math.min(1, window.scrollY / Math.max(1, mast.offsetHeight)));
+            mast.style.setProperty("--mast-p", p.toFixed(3));
+        };
+        const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
+        update();
+        window.addEventListener("scroll", onScroll, { passive: true });
+        return () => {
+            window.removeEventListener("scroll", onScroll);
+            if (raf) cancelAnimationFrame(raf);
+        };
+    }, [reduced]);
+
     return (
         <header ref={mastRef} className={`home-mast${quote ? "" : " home-mast--no-quote"}`}>
             <h1 ref={nameRef} className="home-mast__name" aria-label="原語">

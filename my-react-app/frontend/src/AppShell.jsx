@@ -14,7 +14,7 @@ import { HomeNavSlotProvider } from './homeNavSlot';
 const OverlayAdvice = lazy(() => import('../components/_quiz/bot'));
 
 const BOT_ERROR_STYLE = {
-  position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)',
+  position: 'fixed', left: '50%', bottom: 'var(--bot-bottom, 24px)', transform: 'translateX(-50%)',
   zIndex: 'var(--yy-z-popover)', padding: '12px 16px', background: '#fff', border: '1.5px solid #221812',
   borderRadius: 'var(--yy-radius-control)', boxShadow: '0 10px 30px rgba(41, 45, 49, 0.18)',
 };

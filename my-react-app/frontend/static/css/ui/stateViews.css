@@ -1,0 +1,72 @@
+/* 三態共用樣式：骨架（載入）與錯誤（附重試）。空狀態見 emptyState.css。 */
+
+.yy-skeleton-group {
+  display: grid;
+  gap: var(--yy-space-3);
+}
+
+.yy-skeleton-group__block {
+  width: 100%;
+}
+
+/* 延遲期間：不畫任何東西，只佔掉最小高度避免內容下方跳動 */
+.yy-skeleton-wait {
+  min-height: 60vh;
+  min-height: 60dvh;
+}
+
+.yy-state {
+  display: grid;
+  place-items: center;
+  gap: var(--yy-space-3);
+  padding: var(--yy-space-6) var(--yy-space-3);
+  border: var(--yy-border-width) dashed var(--yy-calm-line);
+  border-radius: var(--yy-radius-panel);
+  text-align: center;
+}
+
+.yy-state__title {
+  margin: 0;
+  font-weight: 700;
+  font-size: var(--yy-text-lg);
+  color: var(--yy-calm-text);
+}
+
+.yy-state__btn {
+  min-height: var(--yy-control-md);
+  padding: 0 var(--yy-space-4);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-radius-control);
+  background: transparent;
+  color: var(--yy-calm-text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-base) var(--ease-out), color var(--dur-base) var(--ease-out);
+}
+
+.yy-state__btn:active {
+  transform: scale(var(--yy-ui-press));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .yy-state__btn:hover {
+    background: var(--yy-calm-text);
+    color: var(--yy-calm-bg);
+  }
+}
+
+.yy-state__btn:focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yy-state__btn {
+    transition-property: color, background-color;
+  }
+
+  .yy-state__btn:active {
+    transform: none;
+  }
+}

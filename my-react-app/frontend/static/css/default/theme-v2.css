@@ -1049,26 +1049,43 @@
   transition: none !important;
 }
 
-/* ---------- Footer（雜誌版，對齊首頁設計稿）----------
-   和頁面同樣收在 1200px 的欄裡的深色石板灰塊（--yy-calm-block-deep）。
-   上排：左邊品牌（原語＋標語），右邊頁尾連結；下排隔一條細線，放版權聲明。
-   所有顏色走語意層，深色主題會自動換。 */
+/* ---------- Footer（雜誌版，全寬）----------
+   全寬的深色石板灰塊（--yy-calm-block-deep），內容收在 1200px 的欄裡。
+   上排：左邊品牌（原語＋標語），右邊三欄入口（學習、資源、平台）；下排隔一條細線放版權聲明。
+   背後一個淡的超大「原語」浮水印（裝飾，aria-hidden，不攔截點擊）。所有顏色走語意層，深色主題會自動換。 */
 
 .yy-footer {
-  max-width: 1200px;
-  margin: 120px auto 0;
-  padding: 36px 32px 24px;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  margin: 120px 0 0;
+  padding: 56px 32px 24px;
   background: var(--yy-calm-block-deep);
   color: var(--yy-calm-block-on);
   /* 深色主題裡石板灰區塊和卡片底色很接近，頂端留一條邊界，頁尾才分得出來 */
   border-top: 1px solid var(--yy-calm-line);
 }
+.yy-footer__mark {
+  position: absolute;
+  right: -0.04em;
+  bottom: -0.2em;
+  z-index: -1;
+  font-family: var(--yy-font-brand);
+  font-weight: 900;
+  font-size: clamp(9rem, 32vw, 24rem);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--yy-calm-block-on) 7%, transparent);
+  pointer-events: none;
+  user-select: none;
+}
 .yy-footer__inner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px 48px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 40px 64px;
+  align-items: start;
+  max-width: 1200px;
+  margin-inline: auto;
 }
 .yy-footer__brand {
   --yy-footer-brand-size: clamp(1.25rem, 4vw, 1.625rem);
@@ -1102,9 +1119,23 @@
   color: var(--yy-calm-block-accent);
 }
 .yy-footer__links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 var(--yy-space-6);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--yy-space-5) var(--yy-space-6);
+}
+.yy-footer__col-title {
+  margin: 0 0 var(--yy-space-2);
+  font-family: var(--yy-font-body);
+  font-size: var(--yy-text-sm);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--yy-calm-block-accent);
+}
+.yy-footer__col ul {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 .yy-footer__links a {
   display: inline-flex;
@@ -1116,6 +1147,7 @@
   text-decoration: none;
   /* 平常就有一條淡底線，連結不只靠位置辨識；hover 換成銅色 */
   border-bottom: 2px solid color-mix(in srgb, var(--yy-calm-block-on) 35%, transparent);
+  align-self: start;
   transition: border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
 }
 .yy-footer__links a:active {
@@ -1128,7 +1160,8 @@
   }
 }
 .yy-footer__legal {
-  margin: 28px 0 0;
+  max-width: 1200px;
+  margin: 40px auto 0;
   padding-top: 16px;
   /* 淺色主題的 --yy-calm-line 在深石板灰上幾乎看不見，改用象牙白的淡色 */
   border-top: 1px solid color-mix(in srgb, var(--yy-calm-block-on) 28%, transparent);
@@ -1142,6 +1175,12 @@
   }
   .yy-footer__links a:active {
     transform: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .yy-footer__links {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1170,6 +1209,10 @@
 
   .yy-footer {
     margin-top: 80px;
+    padding-inline: 20px;
+  }
+  .yy-footer__inner {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   /* iOS Safari 聚焦字級小於 16px 的輸入框時會自動放大整個頁面 */

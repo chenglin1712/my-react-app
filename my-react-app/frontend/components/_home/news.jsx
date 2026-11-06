@@ -10,6 +10,7 @@ import "swiper/css/navigation";
 import "swiper/css/a11y";
 import { useReducedMotion } from "../../src/hooks/useReducedMotion";
 import ExternalLink from "../ui/ExternalLink";
+import { SkeletonBlocks, ErrorState } from "../ui/StateViews";
 import { isExternalUrl } from "../ui/externalUrl";
 
 // 沒有圖片的消息（含圖片載入失敗）圖區畫的圖樣有三款，依序輪替
@@ -90,13 +91,7 @@ const News = ({ withImage = [], withoutImage = [], loading = false, error = fals
         return (
             <section className="news-section" aria-labelledby={titleId} aria-busy="true">
                 {header}
-                <div className="news-skeleton" role="status">
-                    <span className="visually-hidden">最新消息載入中…</span>
-                    <span className="yy-skeleton news-skeleton__tall" aria-hidden="true" />
-                    {[0, 1, 2].map((index) => (
-                        <span className="yy-skeleton news-skeleton__row" aria-hidden="true" key={index} />
-                    ))}
-                </div>
+                <SkeletonBlocks className="news-skeleton" label="最新消息載入中…" rows={[200, 44, 44, 44]} />
             </section>
         );
     }
@@ -105,10 +100,7 @@ const News = ({ withImage = [], withoutImage = [], loading = false, error = fals
         return (
             <section className="news-section" aria-labelledby={titleId}>
                 {header}
-                <div className="news-state" role="alert">
-                    <p>目前無法載入最新消息，請稍後再試。</p>
-                    {onRetry && <button type="button" className="news-state__btn" onClick={onRetry}>重新載入</button>}
-                </div>
+                <ErrorState className="news-state" buttonClassName="news-state__btn" title="目前無法載入最新消息，請稍後再試。" onRetry={onRetry} />
             </section>
         );
     }

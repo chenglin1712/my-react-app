@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
-import LoadingSpinner from '@components/ui/LoadingSpinner';
+import { DelayedSkeleton } from '@components/ui/StateViews';
 import { useAuth } from './userServives/authContext';
 import PermissionProtect from './userServives/permissionProtect';
 import ErrorBoundary from './errorBoundary';
@@ -103,9 +103,10 @@ const OpenLayout = () => {
   );
 };
 
+// 路由載入：超過約 1 秒才畫骨架（很快載好的頁面不閃），取代整頁置中的轉圈
 const RouteLoadingFallback = () => (
-  <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
-    <LoadingSpinner label="頁面載入中…" />
+  <div className="container py-4">
+    <DelayedSkeleton label="頁面載入中…" rows={[40, 200, 56, 56]} />
   </div>
 );
 

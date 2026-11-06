@@ -33,7 +33,8 @@ const footerRules = rules.filter((r) => /\.yy-footer/.test(r.selector));
 describe("頁尾（雜誌版，對齊 Artifact）", () => {
   it("收在 1200px 的欄裡的深色石板灰塊、象牙白字，沒有寫死色碼或舊風格色", () => {
     const body = find(".yy-footer").body;
-    expect(body).toMatch(/max-width:\s*1200px/);
+    expect(body).not.toMatch(/max-width/);
+    expect(find(".yy-footer__inner").body).toMatch(/max-width:\s*1200px/);
     expect(body).toMatch(/background:\s*var\(--yy-calm-block-deep\)/);
     expect(body).toMatch(/color:\s*var\(--yy-calm-block-on\)/);
     // 深色主題裡深石板灰與卡片底色很接近，頂端邊界讓頁尾分得出來
@@ -51,7 +52,10 @@ describe("頁尾（雜誌版，對齊 Artifact）", () => {
   });
 
   it("品牌、連結與標語並排；窄螢幕自動換行，手機上方留白縮小", () => {
-    expect(find(".yy-footer__inner").body).toMatch(/flex-wrap:\s*wrap/);
+    expect(find(".yy-footer__inner").body).toMatch(/display:\s*grid/);
+    expect(find(".yy-footer__links").body).toMatch(/grid-template-columns:\s*repeat\(3,/);
+    expect(find(".yy-footer__inner", /max-width:\s*720px/).body).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\)/);
+    expect(find(".yy-footer__links", /max-width:\s*480px/).body).toMatch(/repeat\(2,/);
     expect(find(".yy-footer__name").body).toMatch(/font-size:\s*var\(--yy-footer-brand-size\)/);
     expect(find(".yy-footer", /max-width:\s*720px/).body).toMatch(/margin-top:\s*80px/);
   });
@@ -81,6 +85,25 @@ describe("頁尾（雜誌版，對齊 Artifact）", () => {
   it("深石板灰底的焦點框用象牙白；導覽列不再套金色焦點框", () => {
     expect(find(".yy-footer :where(a, button):focus-visible").body).toMatch(/outline-color:\s*var\(--yy-calm-focus-on-block\)/);
     expect(css).not.toMatch(/\.navbar\s+:where\(a, button\):focus-visible/);
+  });
+});
+
+describe("頁尾浮水印與欄標題（步驟 2-5）", () => {
+  it("超大「原語」浮水印：淡（7% 混合）、置於內容之後、不攔截點擊、不可選取，用品牌字標", () => {
+    const body = find(".yy-footer__mark").body;
+    expect(body).toMatch(/color:\s*color-mix\(in srgb, var\(--yy-calm-block-on\) 7%, transparent\)/);
+    expect(body).toMatch(/z-index:\s*-1;/);
+    expect(body).toMatch(/pointer-events:\s*none;/);
+    expect(body).toMatch(/user-select:\s*none;/);
+    expect(body).toMatch(/font-family:\s*var\(--yy-font-brand\)/);
+    expect(find(".yy-footer").body).toMatch(/isolation:\s*isolate;/);
+    expect(find(".yy-footer").body).toMatch(/overflow:\s*hidden;/);
+  });
+
+  it("欄標題用銅色強調，字級 sm", () => {
+    const body = find(".yy-footer__col-title").body;
+    expect(body).toMatch(/font-size:\s*var\(--yy-text-sm\)/);
+    expect(body).toMatch(/color:\s*var\(--yy-calm-block-accent\)/);
   });
 });
 

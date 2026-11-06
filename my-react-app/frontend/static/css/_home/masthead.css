@@ -171,6 +171,10 @@
   letter-spacing: 0.04em;
   /* 疊影留 1px 的模糊：全站禁止硬偏移陰影（designGuard） */
   text-shadow: calc(var(--sx) * 0.6em) calc(var(--sy) * 0.6em) 1px color-mix(in srgb, var(--yy-calm-copper) 65%, transparent);
+  /* 往下捲：Masthead.jsx 把進度 0～1 寫進 --mast-p；只動 scale 與 opacity（獨立屬性，不與疊影的 transform 衝突）。最多縮到 88%、淡到 30% */
+  transform-origin: left center;
+  scale: calc(1 - var(--mast-p, 0) * 0.12);
+  opacity: calc(1 - var(--mast-p, 0) * 0.7);
 }
 
 .home-mast__ch {
