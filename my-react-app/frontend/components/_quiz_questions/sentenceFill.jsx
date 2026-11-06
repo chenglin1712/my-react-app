@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { RectangleEllipsis, Volume2, Check, CircleCheck, CircleX } from "lucide-react";
-import { FaPlayCircle } from 'react-icons/fa';
+import { CirclePlay } from 'lucide-react';
 import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
 import { playCorrectSound } from "../../utils/correctSound";
 
@@ -55,7 +55,7 @@ export default function SentenceFill({ question, selected, checked, onSelect, on
             onClick={() => playAudio(question.tayal.audio)}
             aria-label="播放句子語音"
           >
-            <FaPlayCircle size={20} className="yy-text-blue" />
+            <CirclePlay size={20} className="yy-icon yy-text-blue" aria-hidden="true" />
           </button>
         )}
       </h2>

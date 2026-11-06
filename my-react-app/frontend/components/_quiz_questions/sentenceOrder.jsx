@@ -1,6 +1,6 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import { ArrowDownUp, Volume2, Check, CircleCheck, CircleX } from "lucide-react";
-import { FaPlayCircle } from 'react-icons/fa';
+import { CirclePlay } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -232,7 +232,7 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
             onClick={() => playAudio(question.tayal.audio)}
             aria-label="播放句子語音"
           >
-            <FaPlayCircle size={20} className="yy-text-blue" />
+            <CirclePlay size={20} className="yy-icon yy-text-blue" aria-hidden="true" />
           </button>
         )}
       </h2>

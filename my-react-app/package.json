@@ -35,7 +35,6 @@
     "react-bootstrap": "^2.10.10",
     "react-calendar": "^6.0.1",
     "react-dom": "^19.2.7",
-    "react-icons": "^5.7.0",
     "react-router-dom": "^7.18.4",
     "react-sketch-canvas": "^8.0.0",
     "recharts": "^3.9.2",

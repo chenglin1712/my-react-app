@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { FaPlayCircle } from "react-icons/fa";
+import { CirclePlay } from "lucide-react";
 import { useMorphologyAnalysis } from "../../hooks/useMorphologyAnalysis";
 import MorphologyResult from "../_morphology/MorphologyResult";
 import { tribeLangCode } from "../../src/constants/tribes";
@@ -51,7 +51,7 @@ const EvidencePanel = ({ token, onPlayAudio, tribeSlug }) => {
                             aria-label={`播放 ${token.lemma} 的發音`}
                             onClick={() => onPlayAudio?.(token.audioFileId)}
                         >
-                            <FaPlayCircle />
+                            <CirclePlay size="1em" className="yy-icon" aria-hidden="true" />
                         </button>
                     )}
                 </p>

@@ -1,6 +1,6 @@
 import { memo, useCallback, useId } from 'react';
 import { ListGroup, Button } from 'react-bootstrap';
-import { FaHeart, FaRegHeart, FaPlayCircle } from 'react-icons/fa';
+import { Heart, CirclePlay } from 'lucide-react';
 import StarRating from '../../../components/ui/StarRating';
 import '../../../static/css/_search/wordCard.css';
 
@@ -33,11 +33,11 @@ const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggle
       <div className="d-flex align-items-center word-card-actions">
         {hasWordAudio && (
           <Button type="button" variant="link" aria-label={`播放「${result.name}」的發音`} onClick={() => playAudio(result.audioItems[0].fileId)}>
-            <FaPlayCircle size={20} className="yy-text-blue" />
+            <CirclePlay size={20} className="yy-icon yy-text-blue" aria-hidden="true" />
           </Button>
         )}
         <Button type="button" variant="link" aria-label={isFavorited ? "取消收藏" : "加入收藏"} aria-pressed={isFavorited} onClick={handleToggleFavorite}>
-          {isFavorited ? <FaHeart color="var(--yy-red)" /> : <FaRegHeart color="var(--yy-ink)" />}
+          {isFavorited ? <Heart size="1em" className="yy-icon" color="var(--yy-red)" fill="var(--yy-red)" aria-hidden="true" /> : <Heart size="1em" className="yy-icon" color="var(--yy-ink)" aria-hidden="true" />}
         </Button>
       </div>
     </div>
@@ -70,11 +70,11 @@ const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggle
                       {ex.originalSentence}
                       {hasNativeAudio ? (
                         <Button type="button" variant="link" aria-label="播放例句發音" onClick={() => playAudio(ex.audioItems[0].fileId)}>
-                          <FaPlayCircle size={20} className="yy-text-blue" />
+                          <CirclePlay size={20} className="yy-icon yy-text-blue" aria-hidden="true" />
                         </Button>
                       ) : showTtsFallback ? (
                         <Button type="button" variant="link" aria-label="播放例句發音" onClick={() => playSentence(ex.originalSentence)}>
-                          <FaPlayCircle size={20} className="yy-text-blue" />
+                          <CirclePlay size={20} className="yy-icon yy-text-blue" aria-hidden="true" />
                         </Button>
                       ) : null}
                     </p>

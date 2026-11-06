@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Mic, Check, CircleCheck, CircleX } from "lucide-react";
-import { FaMicrophone, FaStop, FaPlayCircle, FaRedo } from 'react-icons/fa';
+import { Square, CirclePlay, RotateCw } from 'lucide-react';
 import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
 import { apiPost } from "../../utils/apiClient";
 import { announce } from "@utils/announce";
@@ -164,7 +164,7 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
   return (
    <div className="text-center" style={{ minHeight: "400px" }}>
       <h5 className="fw-bolder mb-4" style={{ display: 'flex', alignItems: 'center', justifyContent: "center" }}>
-        <Mic />&nbsp; 口說練習
+        <Mic className="yy-icon" aria-hidden="true" />&nbsp; 口說練習
       </h5>
 
       <h2 className="fw-bolder mb-4" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
@@ -176,7 +176,7 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
             onClick={() => playAudio(question.tayal.audio)}
             aria-label="播放句子語音"
           >
-            <FaPlayCircle size={20} className="yy-text-blue" />
+            <CirclePlay size={20} className="yy-icon yy-text-blue" aria-hidden="true" />
           </button>
         )}
       </h2>
@@ -188,21 +188,21 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
       {/* 錄音按鈕 */}
       {!recording ? (
         <button type="button" className="yy-btn-primary mb-3" onClick={startRecording} disabled={!!audioBlob || starting} style={{padding: "20px"}} aria-label="開始錄音">
-          <FaMicrophone size={60}/>
+          <Mic size={60} className="yy-icon" aria-hidden="true" />
         </button>
       ) : (
         <button type="button" className="yy-btn-outline mb-3" onClick={stopRecording} style={{padding: "30px"}} aria-label="停止錄音">
-          <FaStop size={30}/>
+          <Square size={30} fill="currentColor" className="yy-icon" aria-hidden="true" />
         </button>
       )}
        {audioBlob && !recording &&(
         <div className="mb-3">
           <button type="button" className="yy-btn-primary me-2" onClick={playUserAudio}>
-            <FaPlayCircle /> 重聽你的錄音
+            <CirclePlay size="1em" className="yy-icon" aria-hidden="true" /> 重聽你的錄音
           </button>
 
           <button type="button" className="yy-btn-outline me-2" onClick={redoRecording}>
-            <FaRedo /> 重新錄音
+            <RotateCw size="1em" className="yy-icon" aria-hidden="true" /> 重新錄音
           </button>
         </div>
         )}

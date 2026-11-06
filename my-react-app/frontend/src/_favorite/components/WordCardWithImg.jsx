@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from 'react-bootstrap';
-import { FaHeart, FaRegHeart, FaPlayCircle, FaImage } from 'react-icons/fa';
+import { Heart, CirclePlay, Image as ImageIcon } from 'lucide-react';
 import StarRating from '../../../components/ui/StarRating';
 
 const AudioButton = ({ audioUrl, onPlay, size, failedAudio }) => {
@@ -16,7 +16,7 @@ const AudioButton = ({ audioUrl, onPlay, size, failedAudio }) => {
         onPlay(audioUrl);
       }}
     >
-      <FaPlayCircle size={size} className="yy-text-blue" />
+      <CirclePlay size={size} className="yy-icon yy-text-blue" aria-hidden="true" />
     </Button>
   );
 };
@@ -33,7 +33,7 @@ const WordCardImage = ({ imageUrl, word, isFavorited, onToggleFavorite }) => {
     <div className="word-image-wrapper">
       {showPlaceholder ? (
         <div className="word-image word-image-placeholder" aria-hidden="true">
-          <FaImage />
+          <ImageIcon size="1em" className="yy-icon" aria-hidden="true" />
         </div>
       ) : (
         <img decoding="async"
@@ -55,7 +55,7 @@ const WordCardImage = ({ imageUrl, word, isFavorited, onToggleFavorite }) => {
           onToggleFavorite();
         }}
       >
-        {isFavorited ? <FaHeart color="#dc2626" /> : <FaRegHeart color="#6b7280" />}
+        <Heart size="1em" className="yy-icon" style={{ color: isFavorited ? "#dc2626" : "#6b7280" }} fill={isFavorited ? "currentColor" : "none"} aria-hidden="true" />
       </Button>
     </div>
   );

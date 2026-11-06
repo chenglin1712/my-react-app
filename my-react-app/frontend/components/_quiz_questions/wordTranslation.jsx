@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Languages, Check, CircleCheck, CircleX } from "lucide-react";
-import { FaPlayCircle } from 'react-icons/fa';
+import { CirclePlay } from 'lucide-react';
 import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
 import { playCorrectSound } from "../../utils/correctSound";
 
@@ -52,7 +52,7 @@ export default function WordTranslation({ question, selected, checked, onSelect,
             onClick={() => playAudio(question.tayal.audio)}
             aria-label="播放語音"
           >
-            <FaPlayCircle size={20} className="yy-text-blue" />
+            <CirclePlay size={20} className="yy-icon yy-text-blue" aria-hidden="true" />
           </button>
         )}
       </h2>

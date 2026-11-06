@@ -1,4 +1,4 @@
-import { FaPlayCircle } from "react-icons/fa";
+import { CirclePlay } from "lucide-react";
 import "../../static/css/_morphology/index.css";
 
 // 每個分析結果都明確標示「來源與把握程度」（原本寫「信心」，對學習者太抽象），不把把握程度低的結果包裝成事實：
@@ -34,7 +34,7 @@ const SegmentRow = ({ segments }) => (
 const AudioButton = ({ fileId, label, onPlayAudio }) =>
     fileId && onPlayAudio ? (
         <button type="button" className="yy-morph-audio-btn" aria-label={label} onClick={() => onPlayAudio(fileId)}>
-            <FaPlayCircle />
+            <CirclePlay size="1em" className="yy-icon" aria-hidden="true" />
         </button>
     ) : null;
 
