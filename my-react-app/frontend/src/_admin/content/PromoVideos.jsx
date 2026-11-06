@@ -8,6 +8,7 @@ import { useGuardedSelection } from '../hooks/useGuardedSelection';
 import { countChars, formatApiError, isAborted, isOutcomeUnknown } from '../apiErrors';
 import { AdminEmptyStage } from '../components/AdminEmpty';
 import '../../../static/css/_admin/promo-videos.css';
+import { SuccessNotice } from '../components/AdminToast';
 
 const PUBLISHERS = ['owner', 'admin'];
 const LIMITS = { title: 60, description: 300, transcript: 6000 };
@@ -237,7 +238,7 @@ function Editor({ video, editable, activeId, onSaved, onCreated, onDeleted, onAc
         <section className={`promo-videos-editor${isNew ? '' : ' has-files'}`} id="promo-editor" aria-labelledby="promo-editor-title">
             <h2 id="promo-editor-title">{isNew ? '新增宣傳影片' : video.title}</h2>
             {error && <Alert variant="danger" role="alert">{error}</Alert>}
-            {success && <Alert variant="success" role="status">{success}</Alert>}
+            <SuccessNotice message={success} role="status" />
 
             <Form noValidate className="promo-videos-text" onSubmit={(event) => { event.preventDefault(); save(); }}>
                 <h3 className="promo-videos-subhead">文字內容</h3>

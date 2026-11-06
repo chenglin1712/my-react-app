@@ -129,7 +129,7 @@
     min-width: 72px;
     height: 48px;
     padding: 8px;
-    border-radius: 5px;
+    border-radius: var(--yy-radius-tag);
     font-size: 12px;
     font-variant-numeric: tabular-nums;
     font-weight: 700;
@@ -173,19 +173,19 @@
     height: 16px;
     background: var(--admin-border);
     border: 1px solid color-mix(in srgb, var(--yy-calm-accent) 10%, transparent);
-    border-radius: 3px;
+    border-radius: var(--yy-radius-min);
 }
 
 .retention-analysis-legend-low {
-    background: color-mix(in srgb, var(--yy-calm-accent) 20%, transparent);
+    background: color-mix(in srgb, var(--yy-data-1) 12%, var(--yy-calm-surface));
 }
 
 .retention-analysis-legend-medium {
-    background: color-mix(in srgb, var(--yy-calm-accent) 52%, transparent);
+    background: color-mix(in srgb, var(--yy-data-1) 28%, var(--yy-calm-surface));
 }
 
 .retention-analysis-legend-high {
-    background: color-mix(in srgb, var(--yy-calm-accent) 90%, transparent);
+    background: color-mix(in srgb, var(--yy-data-1) 45%, var(--yy-calm-surface));
 }
 
 .retention-analysis-legend-pending .retention-analysis-legend-swatch {

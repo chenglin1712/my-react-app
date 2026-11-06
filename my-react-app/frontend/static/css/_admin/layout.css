@@ -30,9 +30,16 @@
   --admin-warning-bg: var(--yy-calm-warning-bg);
 
   /* 形狀與陰影 */
-  --admin-radius: var(--yy-ui-radius);
-  --admin-radius-sm: var(--yy-ui-radius);
-  --admin-shadow: none; /* 沉穩外觀不用陰影，卡片靠細框分隔 */
+  /* 與前台同一組圓角與高度層級（Apple 化 5-1）：卡片與面板 20px、按鈕輸入框 12px、標籤與小縮圖 8px。
+     平放的卡片靠細框分隔（elev-1 = 無陰影，維持表格密度）；只有浮起的東西（批次操作列、下拉選單、彈窗）才用 elev-2 以上，
+     深色模式由 token 自動換成描邊。後台不使用毛玻璃。 */
+  --admin-radius: var(--yy-radius-panel);
+  --admin-radius-sm: var(--yy-radius-control);
+  --admin-shadow: var(--yy-elev-1);
+  --admin-shadow-raised: var(--yy-elev-2);
+  --admin-shadow-overlay: var(--yy-elev-4);
+  --admin-edge-raised: var(--yy-edge-2);
+  --admin-edge-overlay: var(--yy-edge-4);
 
   /* 版面 */
   --admin-page-padding: 32px;
@@ -40,11 +47,13 @@
   --admin-sidebar-width: 244px;
   --admin-topbar-height: 64px;
   --admin-control-height: 38px;
+  --admin-row-height: 52px; /* 表格列高：38px 控制項加上下各 7px 留白 */
 
   /* 層級表：之後新增 overlay 一律從這裡取，不要自己寫數字 */
   --admin-z-topbar: 10;
   --admin-z-dropdown: 15;
   --admin-z-sidebar: 20;
+  --admin-z-toast: 30; /* 儲存成功提示：在側欄之上，在 Bootstrap 彈窗（1055）之下 */
 
   background: var(--admin-bg);
   color: var(--admin-text);
@@ -62,7 +71,7 @@
 .admin-nav-group { margin: 0 0 6px; }
 .admin-nav-group h2 { display: flex; align-items: center; gap: 8px; margin: 0; padding: 12px 12px 6px; color: color-mix(in srgb, var(--yy-calm-block-on) 50%, transparent); font-size: 12px; font-weight: 600; letter-spacing: .1em; }
 .admin-nav-group ul { margin: 0; padding: 0; list-style: none; }
-.admin-nav-link { display: flex; align-items: center; justify-content: space-between; min-height: 36px; margin: 1px 0; padding: 7px 10px 7px 34px; color: color-mix(in srgb, var(--yy-calm-block-on) 84%, transparent); border-radius: 8px; font-size: 14px; text-decoration: none; transition: background-color .15s ease, color .15s ease; }
+.admin-nav-link { display: flex; align-items: center; justify-content: space-between; min-height: 36px; margin: 1px 0; padding: 7px 10px 7px 34px; color: color-mix(in srgb, var(--yy-calm-block-on) 84%, transparent); border-radius: var(--yy-radius-tag); font-size: 14px; text-decoration: none; transition: background-color .15s ease, color .15s ease; }
 @media (hover: hover) and (pointer: fine) {
   .admin-nav-link:hover { color: var(--yy-calm-block-on); background: color-mix(in srgb, var(--yy-calm-block-on) 8%, transparent); }
 }
@@ -75,7 +84,7 @@
   .admin-sidebar-user .admin-logout:hover { text-decoration: underline; }
 }
 .admin-sidebar-user .admin-logout:focus-visible { outline: 2px solid var(--yy-calm-tag); outline-offset: 2px; }
-.admin-count-badge { min-width: 20px; padding: 1px 7px; color: var(--yy-calm-accent-on); background: var(--yy-calm-accent); border-radius: 999px; font-size: 12px; font-weight: 700; text-align: center; }
+.admin-count-badge { min-width: 20px; padding: 1px 7px; color: var(--yy-calm-accent-on); background: var(--yy-calm-accent); border-radius: var(--yy-radius-pill); font-size: 12px; font-weight: 700; text-align: center; }
 .admin-sidebar-user { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 20px; border-top: 1px solid color-mix(in srgb, var(--yy-calm-block-on) 10%, transparent); }
 .admin-sidebar-user div { display: flex; flex-direction: column; }
 .admin-sidebar-user span { color: color-mix(in srgb, var(--yy-calm-block-on) 50%, transparent); font-size: 12px; }
@@ -96,7 +105,7 @@
 .admin-topbar-user > div { display: flex; flex-direction: column; line-height: 1.25; }
 .admin-topbar-user strong { color: var(--yy-calm-text); font-size: 14px; }
 .admin-topbar-user small { margin-top: 1px; color: var(--yy-calm-text-sub); font-size: 12px; }
-.admin-user-avatar { display: grid; width: 36px; height: 36px; place-items: center; color: var(--yy-calm-accent-on); background: var(--yy-calm-accent); border-radius: 50%; font-size: 14px; font-weight: 700; }
+.admin-user-avatar { display: grid; width: 36px; height: 36px; place-items: center; color: var(--yy-calm-accent-on); background: var(--yy-calm-accent); border-radius: var(--yy-radius-round); font-size: 14px; font-weight: 700; }
 .admin-route-content { min-width: 0; }
 /* FE-4：後台內容區的 scoped error boundary fallback（見 AdminLayout.jsx）。
    刻意做得比整頁錯誤畫面收斂——側邊欄與麵包屑都還在，使用者可以直接切到
@@ -109,7 +118,7 @@
     margin: 32px;
     padding: 2rem;
     border: var(--yy-border-width) solid var(--yy-calm-danger);
-    border-radius: var(--yy-ui-radius);
+    border-radius: var(--admin-radius);
     background: var(--yy-calm-danger-bg);
 }
 .admin-route-error h2 { font-size: 1.125rem; font-weight: 700; margin: 0; }

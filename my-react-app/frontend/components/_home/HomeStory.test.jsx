@@ -96,7 +96,46 @@ describe('HomeStory 內容（對照首頁設計稿）', () => {
     vi.useRealTimers();
   });
 
-  test('窄螢幕（不符合 min-width: 821px）不依捲動換步', async () => {
+  test('步驟、小標、織紋由 props 決定：3 到 6 步都照畫，每層的織紋 class 跟著設定', () => {
+    const custom = [
+      { glyph: '甲', title: '第一', text: '說明一', pattern: 'grid' },
+      { glyph: '乙', title: '第二', text: '說明二', pattern: 'dots' },
+      { glyph: '丙', title: '第三', text: '說明三', pattern: 'vertical' },
+      { glyph: '丁', title: '第四', text: '說明四', pattern: 'stripe' },
+      { glyph: '戊', title: '第五', text: '說明五', pattern: 'grid' },
+      { glyph: '己', title: '第六', text: '說明六', pattern: 'dots' },
+    ];
+    [3, 4, 5, 6].forEach((n) => {
+      const { container, unmount } = render(<HomeStory kicker="自訂小標" steps={custom.slice(0, n)} />);
+      expect(screen.getByRole('region', { name: '自訂小標' })).toHaveAttribute('data-count', String(n));
+      expect(screen.getAllByRole('listitem')).toHaveLength(n);
+      expect(container.querySelectorAll('.home-story__layer')).toHaveLength(n);
+      expect(container.querySelectorAll('.home-story__progress i')).toHaveLength(n);
+      expect(container.querySelector('.home-story')).toHaveStyle({ '--story-n': String(n) });
+      const layers = [...container.querySelectorAll('.home-story__layer')];
+      expect(layers.map((l) => l.className.match(/layer--(\w+)/)[1])).toEqual(custom.slice(0, n).map((s) => s.pattern));
+      expect(layers[0]).toHaveClass('is-first');
+      expect(layers.filter((l) => l.classList.contains('is-first'))).toHaveLength(1);
+      expect(container.querySelector('.home-story__glyph')).toHaveTextContent('甲');
+      unmount();
+    });
+  });
+
+  test('預設內容的四層織紋依序是斜紋、直紋、圓點、格紋', () => {
+    const { container } = render(<HomeStory />);
+    const names = [...container.querySelectorAll('.home-story__layer')].map((l) => l.className.match(/layer--(\w+)/)[1]);
+    expect(names).toEqual(['stripe', 'vertical', 'dots', 'grid']);
+  });
+
+  test('步數縮短時，停留的步驟不會超出範圍（不會讀到不存在的那一步而壞掉）', () => {
+    const six = Array.from({ length: 6 }, (_, i) => ({ glyph: `字${i}`, title: `標${i}`, text: `說${i}`, pattern: 'stripe' }));
+    const { rerender, container } = render(<HomeStory steps={six} />);
+    rerender(<HomeStory steps={six.slice(0, 3)} />);
+    expect(container.querySelectorAll('.home-story__step')).toHaveLength(3);
+    expect(container.querySelector('.home-story__glyph')).toHaveTextContent('字0');
+  });
+
+  test('窄螢幕（不符合 min-width: 901px）不依捲動換步', async () => {
     window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
     const { container } = render(<HomeStory />);
     const section = container.querySelector('.home-story');

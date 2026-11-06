@@ -1,6 +1,8 @@
 /*
- * 後台入口載入畫面（AdminEntryFallback.jsx）。
+ * 後台入口載入畫面（AdminEntryFallback.jsx）。與前台啟動畫面（index.html 的 .boot-shell）同一語言：
+ * 象牙白底、置中的宋體字標、底部一條細線來回滑動；深色模式跟著主題換成石板底。
  * 顯示時 .admin-shell 還不存在，所以這裡不能用 --admin-* 設計變數，改用前台的 --yy-* 變數（theme-v2.css 全站載入）。
+ * 動畫只動 transform／opacity；不假造百分比。降低動態偏好由 theme-v2.css 的全域規則處理（動畫直接到終態）。
  */
 .admin-entry {
   position: fixed;
@@ -10,131 +12,109 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 24px;
-  color: var(--yy-calm-info-bg);
-  background: var(--yy-calm-block);
+  gap: var(--yy-space-2);
+  padding: var(--yy-space-6);
+  color: var(--yy-calm-text);
+  background: var(--yy-calm-bg);
   font-family: var(--yy-font-body);
   /* 延遲 120ms 才淡入：頁面載入很快時使用者完全看不到這個畫面 */
-  animation: admin-entry-in .24s ease-out .12s both;
+  animation: admin-entry-in 240ms var(--ease-out) 120ms both;
 }
 
-.admin-entry-core {
-  position: relative;
-  width: 112px;
-  height: 112px;
-  margin-bottom: 14px;
-}
-
-.admin-entry-ring {
-  width: 100%;
-  height: 100%;
-  animation: admin-entry-spin 3.2s linear infinite;
-}
-
-.admin-entry-segment {
-  fill: none;
-  stroke-width: 7;
-  stroke-linecap: butt;
-  stroke-dasharray: 38 188.2;
-  /* 描線：每一段從起點「畫」出來（dashoffset 38→0），五段依序，像手一筆一筆畫圓環 */
-  stroke-dashoffset: 38;
-  animation: admin-entry-segment .55s cubic-bezier(.55, .08, .35, 1) both;
-}
-.admin-entry-segment-red { stroke: var(--yy-calm-accent); }
-.admin-entry-segment-gold { stroke: var(--yy-calm-olive); }
-.admin-entry-segment-blue { stroke: var(--yy-calm-copper); }
-.admin-entry-segment-teal { stroke: var(--yy-calm-copper); }
-.admin-entry-segment-cream { stroke: var(--yy-calm-info-bg); }
-
-.admin-entry-mark {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: var(--yy-calm-info-bg);
-  font-size: 34px;
-  font-weight: 700;
+/* 字標：與前台啟動畫面同一組字與字距，進場同樣是淡入加輕微放大 */
+.admin-entry-name {
+  margin: 0;
+  padding-left: 0.32em; /* 抵銷字距讓字標視覺置中 */
+  font-family: var(--yy-font-brand);
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 0.32em;
+  color: var(--yy-calm-text);
+  animation: admin-entry-name-in 600ms var(--ease-out) both;
 }
 
 .admin-entry-brand {
   margin: 0;
-  color: var(--yy-calm-tag);
-  font-family: var(--yy-font-body);
-  font-size: 13px;
-  letter-spacing: .24em;
+  padding-left: 0.24em;
+  font-size: var(--yy-text-sm);
+  letter-spacing: 0.24em;
+  color: var(--yy-calm-text-sub);
 }
-
-/* 略過：進場儀式每個分頁只播一次，但仍然讓人可以直接跳過（Esc 也可以） */
-.admin-entry-skip {
-  margin-top: 18px;
-  padding: 6px 16px;
-  color: color-mix(in srgb, var(--yy-calm-block-on) 85%, transparent);
-  background: none;
-  border: 1px solid color-mix(in srgb, var(--yy-calm-block-on) 45%, transparent);
-  border-radius: 6px;
-  font-size: 13px;
-}
-@media (hover: hover) and (pointer: fine) {
-  .admin-entry-skip:hover { color: var(--admin-surface); border-color: color-mix(in srgb, var(--yy-calm-block-on) 80%, transparent); }
-}
-.admin-entry-skip:focus-visible { outline: 2px solid var(--yy-calm-tag); outline-offset: 3px; }
 
 .admin-entry-message {
-  margin: 0;
-  color: color-mix(in srgb, var(--yy-calm-block-on) 78%, transparent);
-  font-size: 14px;
-  letter-spacing: .08em;
+  margin: var(--yy-space-4) 0 0;
+  font-size: var(--yy-text-sm);
+  letter-spacing: 0.08em;
+  color: var(--yy-calm-text-sub);
 }
 
-/* 不確定進度帶：織紋色塊循環位移，不顯示百分比 */
+/* 不確定進度的細線：貼在畫面最下緣，一段亮線來回滑過，不顯示百分比 */
 .admin-entry-bar {
-  width: min(240px, 60vw);
-  height: 10px;
-  margin-top: 14px;
-  border: 2px solid var(--yy-calm-info-bg);
-  background: var(--yy-calm-block-accent);
-  animation: admin-entry-pulse 1.4s ease-in-out infinite;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  overflow: hidden;
 }
 
-@keyframes admin-entry-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: .4; }
+.admin-entry-bar b {
+  display: block;
+  width: 35%;
+  height: 100%;
+  background: var(--yy-calm-copper);
+  animation: admin-entry-slide 1.4s cubic-bezier(0.45, 0, 0.25, 1) infinite;
 }
+
+/* 略過：進場儀式每個分頁只播一次，但仍然讓人可以直接跳過（Esc 也可以）。44px 高的觸控區 */
+.admin-entry-skip {
+  min-height: var(--yy-control-md);
+  margin-top: var(--yy-space-4);
+  padding: 0 var(--yy-space-4);
+  color: var(--yy-calm-text-sub);
+  background: none;
+  border: var(--yy-border-width) solid var(--yy-calm-rule);
+  border-radius: var(--yy-radius-control);
+  font-size: var(--yy-text-sm);
+  transition: transform 120ms var(--ease-out), border-color 160ms var(--ease-out), color 160ms var(--ease-out);
+}
+.admin-entry-skip:active { transform: scale(var(--yy-ui-press)); }
+@media (hover: hover) and (pointer: fine) {
+  .admin-entry-skip:hover { color: var(--yy-calm-text); border-color: var(--yy-calm-text-sub); }
+}
+.admin-entry-skip:focus-visible { outline: var(--yy-ui-focus-ring); outline-offset: var(--yy-ui-focus-offset); }
+
+/* 入口儀式版：一開始就顯示（最短可見時間由 AdminEntryGate 控制） */
+.admin-entry--instant { animation: none; }
+
+/* 收合：整個畫面淡出，字標稍微放大，露出底下的後台（時間與 AdminEntryGate 的 LEAVE_MS 一致） */
+.admin-entry.is-leaving { animation: admin-entry-out 300ms var(--ease-out) forwards; }
+.admin-entry.is-leaving .admin-entry-name { animation: admin-entry-name-out 300ms var(--ease-out) forwards; }
+.admin-entry.is-leaving .admin-entry-brand,
+.admin-entry.is-leaving .admin-entry-message,
+.admin-entry.is-leaving .admin-entry-skip,
+.admin-entry.is-leaving .admin-entry-bar { opacity: 0; transition: opacity 150ms var(--ease-out); }
 
 @keyframes admin-entry-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-@keyframes admin-entry-spin {
-  to { transform: rotate(360deg); }
+@keyframes admin-entry-name-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
 }
 
-@keyframes admin-entry-segment {
-  from { stroke-dashoffset: 38; }
-  to { stroke-dashoffset: 0; }
+@keyframes admin-entry-slide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
 }
 
-/* 入口儀式版：一開始就顯示（最短可見時間由 AdminEntryGate 控制） */
-.admin-entry--instant { animation: none; }
+@keyframes admin-entry-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
 
-/* 收合：光圈從畫面外往中心縮小，露出底下的後台；訊號環同時放大淡出，像「門」打開 */
-.admin-entry.is-leaving {
-  animation: admin-entry-iris .65s cubic-bezier(.7, 0, .3, 1) forwards;
-}
-.admin-entry.is-leaving .admin-entry-core { animation: admin-entry-core-out .65s cubic-bezier(.7, 0, .3, 1) forwards; }
-.admin-entry.is-leaving .admin-entry-brand,
-.admin-entry.is-leaving .admin-entry-message,
-.admin-entry.is-leaving .admin-entry-bar { animation: admin-entry-text-out .3s ease-out forwards; }
-
-@keyframes admin-entry-iris {
-  from { clip-path: circle(150% at 50% 45%); }
-  to { clip-path: circle(0% at 50% 45%); }
-}
-@keyframes admin-entry-core-out {
-  to { transform: scale(2.2); opacity: 0; }
-}
-@keyframes admin-entry-text-out {
-  to { opacity: 0; transform: translateY(8px); }
+@keyframes admin-entry-name-out {
+  to { transform: scale(1.04); }
 }

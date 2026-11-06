@@ -1,5 +1,6 @@
 import News from "../../components/_home/news"
 import HomeStory from "../../components/_home/HomeStory"
+import { resolveStory } from "../../components/_home/storyContent"
 import "../../static/css/_home/index.css"
 import CertificationSection from "../../components/_home/calendar"
 import { pickExamSchedule } from "../../components/_home/examScheduleContent"
@@ -33,6 +34,8 @@ const DEFAULT_HOMEPAGE_CONFIG = {
     promo_video: null,
     // 頂部通知條（步驟 2-6）：後端只在已啟用、有文字、在有效期間內時給 {text, link_url}，其餘 null
     notice: null,
+    // 捲動敘事（步驟 5-5）：null = 用前台內建的預設文案，見 storyContent.js 的 resolveStory
+    story: null,
 };
 
 // 後台公告（backend/adminapi 的 Announcement，見 /adminapi/public/announcements/）
@@ -61,6 +64,8 @@ const HomePage = () => {
     const [newsError, setNewsError] = useState(false);
     const [newsLoading, setNewsLoading] = useState(true);
     const [homepageConfig, setHomepageConfig] = useState(DEFAULT_HOMEPAGE_CONFIG);
+    // 設定回來（或失敗）之前不輸出捲動敘事：它占 2 個螢幕以上的高度，後台若關掉它，先出現再消失會讓下方內容大跳一次
+    const [configSettled, setConfigSettled] = useState(false);
     // 重新載入最新消息：換一個 key 讓公告的 effect 重跑
     const [reloadKey, setReloadKey] = useState(0);
     // 主選單放在報頭下方（雜誌版）：登記這個空位，Navbar 會把自己畫進來
@@ -78,12 +83,14 @@ const HomePage = () => {
                 // 後端回傳整包直接覆蓋、沒跟預設值 merge 的話，未來後端漏帶
                 // 某個欄位時，那個欄位會變成 undefined 而不是退回預設值。
                 setHomepageConfig({ ...DEFAULT_HOMEPAGE_CONFIG, ...data });
+                setConfigSettled(true);
             })
             .catch((err) => {
                 if (cancelled) return;
                 // 抓不到就維持預設值——首頁不能因為這個設定端點掛掉就整頁壞掉，
                 // 預設值本身就是「後台從沒動過設定」時的正確畫面。
                 console.error("載入首頁版位設定失敗：", err);
+                setConfigSettled(true);
             });
         return () => { cancelled = true; };
     }, []);
@@ -170,6 +177,7 @@ const HomePage = () => {
 
     const { marqueeItems, tagline, quote } = pickMastheadContent(homepageConfig);
     const promoVideo = pickPromoVideo(homepageConfig.promo_video);
+    const story = resolveStory(homepageConfig.story);
     // 第一屏左欄：宣傳影片（沒設定就放示意卡）加大標題與說明，永遠佔欄
     const hasLead = true;
     // 第一屏各欄的相對寬度（左欄 5、消息 4、公告 3），沒有的區塊不佔欄
@@ -230,7 +238,7 @@ const HomePage = () => {
             )}
 
             {/* 捲動敘事「一個詞的旅程」（首頁設計稿）：第一屏之後、本期專題之前；桌面釘住隨捲動換步，手機堆疊 */}
-            <HomeStory skipTo="#home-topics" />
+            {configSettled && story.enabled && <HomeStory skipTo="#home-topics" kicker={story.kicker} steps={story.steps} />}
 
             {/* 本期專題：沒有已發布的專題就放三張示意卡（設計稿的版面），發布後自動換成真的 */}
             {topicsSettled && (

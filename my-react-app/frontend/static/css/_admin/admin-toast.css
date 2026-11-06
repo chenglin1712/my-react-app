@@ -1,0 +1,70 @@
+/* 後台儲存成功提示（AdminToast.jsx）。浮在畫面右下角，進場只動 transform／opacity。
+   Toast 在 .admin-shell 之內渲染（AdminLayout 包住 Provider），所以可以用 --admin-* 變數。 */
+.admin-shell .admin-toast-region {
+  position: fixed;
+  right: var(--yy-space-step-06);
+  bottom: var(--yy-space-step-06);
+  z-index: var(--admin-z-toast, 30);
+  display: flex;
+  flex-direction: column;
+  gap: var(--yy-space-step-02);
+  width: min(380px, calc(100vw - 2 * var(--yy-space-step-04)));
+  pointer-events: none; /* 空的時候不擋住底下的操作；每張卡自己恢復 */
+}
+
+.admin-shell .admin-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--yy-space-step-03);
+  padding: var(--yy-space-step-03) var(--yy-space-step-03) var(--yy-space-step-03) var(--yy-space-step-04);
+  color: var(--admin-text-strong);
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  box-shadow: var(--admin-shadow-overlay), var(--admin-edge-overlay);
+  pointer-events: auto;
+  animation: admin-toast-in 220ms var(--ease-out) both;
+}
+
+.admin-shell .admin-toast-icon {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--admin-success);
+}
+
+.admin-shell .admin-toast-text {
+  flex: 1;
+  margin: 0;
+  padding-top: 2px;
+  font-size: var(--yy-text-sm);
+  line-height: 1.5;
+}
+
+.admin-shell .admin-toast-close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--yy-control-md);
+  height: var(--yy-control-md);
+  margin: -8px 0;
+  color: var(--admin-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--yy-radius-round);
+  transition: background-color 120ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.admin-shell .admin-toast-close:active { transform: scale(var(--yy-ui-press)); }
+@media (hover: hover) and (pointer: fine) {
+  .admin-shell .admin-toast-close:hover { background: var(--admin-surface-muted); }
+}
+.admin-shell .admin-toast-close:focus-visible { outline: var(--admin-focus-ring); outline-offset: var(--admin-focus-offset); }
+
+@keyframes admin-toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-shell .admin-toast { animation: none; }
+}

@@ -24,7 +24,7 @@
   overflow: hidden;
   color: var(--yy-calm-info-bg);
   background: var(--yy-calm-block);
-  border-right: 3px double var(--yy-calm-line);
+  border-right: var(--yy-border-width) solid var(--yy-calm-line);
 }
 
 .admin-login-weave {
@@ -102,7 +102,7 @@
   padding: 34px 32px 28px;
   background: var(--admin-surface);
   border: var(--yy-border-width) solid var(--yy-calm-line);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-panel);
   /* 由下方 48px 帶一點回彈落下，落地後硬陰影才「蓋」出來 */
   animation: admin-login-card-in .3s var(--ease-out) .1s both;
 }
@@ -131,7 +131,7 @@
   color: var(--yy-calm-info-bg);
   background: var(--yy-calm-accent);
   border: var(--yy-border-width) solid var(--yy-calm-line);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-control);
   font-size: 22px;
   font-weight: 900;
 }
@@ -169,7 +169,7 @@
   color: var(--yy-calm-text-sub);
   background: var(--yy-calm-warning-bg);
   border: var(--yy-border-width) solid var(--yy-calm-line);
-  border-radius: var(--yy-ui-radius);
+  border-radius: var(--yy-radius-control);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -226,7 +226,7 @@
     align-items: center;
     padding: 18px 24px;
     border-right: 0;
-    border-bottom: 3px double var(--yy-calm-line);
+    border-bottom: var(--yy-border-width) solid var(--yy-calm-line);
   }
   .admin-login-weave,
   .admin-login-slogan { display: none; }

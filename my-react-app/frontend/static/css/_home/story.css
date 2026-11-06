@@ -9,7 +9,8 @@
     --story-a: color-mix(in srgb, var(--yy-calm-copper) 85%, var(--yy-calm-block));
     --story-b: var(--yy-calm-copper);
     position: relative;
-    height: calc(100dvh * 2.4);
+    /* 高度隨步數：每多一步多 0.35 個螢幕高（4 步 = 2.4 個螢幕高，3 步 2.05、6 步 3.1） */
+    height: calc(100dvh * (1 + 0.35 * var(--story-n, 4)));
     margin-top: var(--yy-space-6);
     padding-inline: 16px;
     font-family: var(--yy-font-body);
@@ -46,7 +47,8 @@
     pointer-events: none;
 }
 
-/* 四層圖樣：第一層一開始就在，其餘依序從下往上蓋上來（只動 transform） */
+/* 圖樣層：每一步一層，第一層一開始就在，其餘依序從下往上蓋上來（只動 transform）。
+   織紋種類由後台為每一步指定：斜紋 stripe、直紋 vertical、圓點 dots、格紋 grid */
 .home-story__layer {
     position: absolute;
     inset: 0;
@@ -58,21 +60,21 @@
     transform: none;
 }
 
-.home-story__layer--0 {
+.home-story__layer--stripe {
     background: repeating-linear-gradient(135deg, var(--story-a) 0 16px, var(--story-b) 16px 32px);
 }
 
-.home-story__layer--1 {
+.home-story__layer--vertical {
     background: repeating-linear-gradient(90deg, var(--yy-calm-block) 0 13px, var(--yy-calm-olive) 13px 26px);
 }
 
-.home-story__layer--2 {
+.home-story__layer--dots {
     background:
         radial-gradient(circle, var(--yy-calm-bg) 0 8px, transparent 9px) 0 0 / 34px 34px,
         var(--yy-calm-olive);
 }
 
-.home-story__layer--3 {
+.home-story__layer--grid {
     background:
         repeating-linear-gradient(0deg, color-mix(in srgb, var(--yy-calm-bg) 32%, transparent) 0 3px, transparent 3px 22px),
         repeating-linear-gradient(90deg, color-mix(in srgb, var(--yy-calm-bg) 32%, transparent) 0 3px, transparent 3px 22px),
@@ -97,7 +99,7 @@
     transform: translateY(24px) scale(0.94);
 }
 
-/* 四段進度條：貼在左側上緣，填滿用 scaleX（只動 transform），第幾段由 --story-f 減去自己的序號決定 */
+/* 進度條（一步一段）：貼在左側上緣，填滿用 scaleX（只動 transform），第幾段由 --story-f 減去自己的序號決定 */
 .home-story__progress {
     position: absolute;
     top: 22px;
@@ -161,6 +163,17 @@
     border-radius: var(--yy-radius-panel);
     opacity: 0.6; /* 不是目前這一步：退到後面，但仍維持大字 3:1 以上的對比 */
     transition: opacity 450ms var(--ease-out), background-color 450ms var(--ease-out), transform var(--dur-spring) var(--ease-spring);
+}
+
+/* 5 步以上：右側清單縮一級，舞台高度不變也放得下（6 步 + 展開的一步 + 小標與連結） */
+.home-story[data-count="5"] .home-story__step b,
+.home-story[data-count="6"] .home-story__step b {
+    font-size: clamp(18px, 2.2vw, 26px);
+}
+
+.home-story[data-count="5"] .home-story__step,
+.home-story[data-count="6"] .home-story__step {
+    padding-block: 8px;
 }
 
 .home-story__num {
@@ -241,7 +254,7 @@
     outline-offset: var(--yy-ui-focus-offset);
 }
 
-/* ---------- 窄螢幕：不釘住，四步全部展開 ---------- */
+/* ---------- 窄螢幕：不釘住，所有步驟全部展開 ---------- */
 
 @media (max-width: 900px) {
     .home-story {
@@ -265,7 +278,7 @@
         transition: none;
     }
 
-    .home-story__layer:not(.home-story__layer--0) {
+    .home-story__layer:not(.is-first) {
         display: none;
     }
 

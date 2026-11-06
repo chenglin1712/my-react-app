@@ -14,6 +14,7 @@ import { TRIBES } from '../../constants/tribes';
 import { useMediaUpload } from '../hooks/useMediaUpload';
 import { useActionLock } from '../hooks/useActionLock';
 import '../../../static/css/_admin/announcements.css';
+import { SuccessNotice } from '../components/AdminToast';
 
 const CONTENT_EDITORS = ['owner', 'admin', 'editor'];
 const CATEGORIES = [
@@ -327,7 +328,7 @@ export default function AnnouncementEditor() {
             )}
 
             {(error || media.error) && <Alert variant="danger">{error || media.error}</Alert>}
-            {success && <Alert variant="success">{success}</Alert>}
+            <SuccessNotice message={success} />
 
             <Form
                 className="announcement-editor-card"

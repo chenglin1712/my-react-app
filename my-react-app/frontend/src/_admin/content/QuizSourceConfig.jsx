@@ -8,6 +8,7 @@ import { apiGet, apiPatch } from '../../../utils/apiClient';
 import { useActionLock } from '../hooks/useActionLock';
 import { formatDateTime } from '../adminFormat';
 import '../../../static/css/_admin/quiz-bank.css';
+import { SuccessNotice } from '../components/AdminToast';
 
 const CONTENT_EDITORS = ['owner', 'admin', 'editor'];
 
@@ -91,7 +92,7 @@ export default function QuizSourceConfig() {
             </div>
             {!editable && <Alert variant="info">你可以檢視目前的外部題源設定；只有內容編輯以上的角色可以變更。</Alert>}
             {error && <Alert variant="danger">{error}</Alert>}
-            {success && <Alert variant="success">{success}</Alert>}
+            <SuccessNotice message={success} />
 
             <div className="quiz-bank-table-card">
                 <AdminTable label="外部題源列表" hover className="quiz-bank-table quiz-bank-sources-table">

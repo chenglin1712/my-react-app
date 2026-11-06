@@ -85,7 +85,7 @@
   flex: 0 0 auto;
   object-fit: cover;
   background: var(--admin-border);
-  border-radius: 50%;
+  border-radius: var(--yy-radius-round);
 }
 
 .user-avatar {
@@ -192,7 +192,7 @@
   padding: 24px;
   background: var(--admin-surface-muted);
   border: 1px solid var(--admin-border);
-  border-radius: 9px;
+  border-radius: var(--admin-radius);
 }
 
 .user-count-card strong {
@@ -225,7 +225,7 @@
   overflow: auto;
   color: var(--admin-text-strong);
   background: var(--admin-surface-muted);
-  border-radius: 7px;
+  border-radius: var(--yy-radius-tag);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 13px;
   white-space: pre-wrap;
@@ -276,7 +276,7 @@
   padding: 20px;
   background: var(--admin-danger-bg);
   border: 1px solid var(--admin-danger-border);
-  border-radius: 9px;
+  border-radius: var(--admin-radius);
 }
 
 .user-danger-zone h3 {
@@ -294,7 +294,7 @@
   gap: 11px;
   padding: 15px;
   border: 1px solid;
-  border-radius: 8px;
+  border-radius: var(--yy-radius-tag);
 }
 
 .user-delete-result > div {
@@ -372,7 +372,7 @@
   gap: 16px;
   padding: 14px;
   border: 1px dashed var(--admin-border-strong);
-  border-radius: 8px;
+  border-radius: var(--yy-radius-tag);
   background: var(--admin-surface-muted);
 }
 
@@ -381,7 +381,7 @@
   flex: 0 0 auto;
   width: 72px;
   height: 72px;
-  border-radius: 50%;
+  border-radius: var(--yy-radius-round);
   object-fit: cover;
   background: var(--admin-border);
 }

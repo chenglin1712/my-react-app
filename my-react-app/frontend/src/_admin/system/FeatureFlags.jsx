@@ -8,6 +8,7 @@ import AdminTable from '../components/AdminTable';
 import { useAuth } from '../../userServives/authContext';
 import { apiGet, apiPatch } from '../../../utils/apiClient';
 import '../../../static/css/_admin/system.css';
+import { SuccessNotice } from '../components/AdminToast';
 
 const PUBLISHERS = ['owner', 'admin'];
 const STAFF_ROLES = ['owner', 'admin', 'editor', 'reviewer', 'analyst'];
@@ -104,7 +105,7 @@ export default function FeatureFlags() {
                 </Alert>
             )}
             {error && <Alert variant="danger">{error}</Alert>}
-            {success && <Alert variant="success">{success}</Alert>}
+            <SuccessNotice message={success} />
 
             <div className="admin-table-card">
                 <AdminTable label="功能開關列表" hover className="admin-table system-feature-table">

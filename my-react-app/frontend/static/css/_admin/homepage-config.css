@@ -10,14 +10,14 @@
 .homepage-config-field { margin-bottom: 22px; }
 .homepage-config-field > .form-label { margin-bottom: 8px; font-size: 15px; font-weight: 650; }
 .homepage-config-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
-.homepage-config-uploader { display: grid; grid-template-columns: 260px 1fr; align-items: center; gap: 20px; padding: 16px; background: var(--admin-surface-muted); border: 1px dashed var(--admin-border-strong); border-radius: 8px; }
-.homepage-config-uploader img, .homepage-config-placeholder { width: 260px; height: 150px; border-radius: 7px; object-fit: cover; background: var(--admin-border); }
+.homepage-config-uploader { display: grid; grid-template-columns: 260px 1fr; align-items: center; gap: 20px; padding: 16px; background: var(--admin-surface-muted); border: 1px dashed var(--admin-border-strong); border-radius: var(--yy-radius-tag); }
+.homepage-config-uploader img, .homepage-config-placeholder { width: 260px; height: 150px; border-radius: var(--yy-radius-tag); object-fit: cover; background: var(--admin-border); }
 .homepage-config-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--admin-muted); }
 .homepage-config-uploader .form-text { display: block; margin-top: 10px; }
 .homepage-config-upload-status { display: inline-flex; align-items: center; gap: 7px; margin-top: 10px; color: var(--admin-muted); font-size: 14px; }
 .homepage-config-count { max-width: 320px; }
 /* 開關列：整列至少 44px 高，標籤可點擊；說明文字放在開關下方 */
-.homepage-config-switch { margin-bottom: 22px; padding: 12px 14px; background: var(--admin-surface-muted); border: 1px solid var(--admin-border); border-radius: 8px; }
+.homepage-config-switch { margin-bottom: 22px; padding: 12px 14px; background: var(--admin-surface-muted); border: 1px solid var(--admin-border); border-radius: var(--yy-radius-tag); }
 .homepage-config-switch .form-check { display: flex; align-items: center; gap: 12px; min-height: 44px; margin: 0; padding-left: 0; }
 .homepage-config-switch .form-check-input { flex: none; float: none; margin: 0; }
 .homepage-config-switch .form-check-label { flex: 1; cursor: pointer; }

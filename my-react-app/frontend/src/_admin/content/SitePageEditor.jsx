@@ -10,6 +10,7 @@ import { formatDateTime } from '../adminFormat';
 import RichTextEditor from '../components/RichTextEditor';
 import { countDocText, hasDocContent } from '../../../components/_topic/richText';
 import '../../../static/css/_admin/site-page-editor.css';
+import { SuccessNotice } from '../components/AdminToast';
 
 const PUBLISHERS = ['owner', 'admin'];
 const MAX_CHARS = 50000;
@@ -89,7 +90,7 @@ export default function SitePageEditor({ endpoint, title, publicPath, tip }) {
                 <Alert variant="info">你可以檢視目前公開中的內容；只有擁有者或管理員可以修改並儲存。</Alert>
             )}
             {(error || media.error) && <Alert variant="danger" role="alert">{error || media.error}</Alert>}
-            {success && <Alert variant="success" role="status">{success}</Alert>}
+            <SuccessNotice message={success} role="status" />
 
             <Form
                 className="site-page-card"

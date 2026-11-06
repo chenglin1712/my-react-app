@@ -89,8 +89,8 @@ function QualityDot({
             cx={cx}
             cy={cy}
             r={7}
-            fill="#1f3a5c"
-            stroke="#fff"
+            fill="var(--yy-data-1)"
+            stroke="var(--yy-calm-surface)"
             strokeWidth={2}
             role="button"
             tabIndex="0"
@@ -305,7 +305,7 @@ export default function QuizQualityAnalysis() {
                                         }}
                                     >
                                         <CartesianGrid
-                                            stroke="#dfe3e6"
+                                            stroke="var(--yy-calm-rule)"
                                             strokeDasharray="3 3"
                                         />
 
@@ -314,7 +314,7 @@ export default function QuizQualityAnalysis() {
                                             x2={0.5}
                                             y1={0}
                                             y2={1}
-                                            fill="#fff5d9"
+                                            fill="var(--yy-calm-warning-bg)"
                                             fillOpacity={0.55}
                                         />
                                         <ReferenceArea
@@ -322,7 +322,7 @@ export default function QuizQualityAnalysis() {
                                             x2={1}
                                             y1={0}
                                             y2={1}
-                                            fill="#eaf6ee"
+                                            fill="var(--yy-calm-success-bg)"
                                             fillOpacity={0.6}
                                         />
                                         <ReferenceArea
@@ -330,7 +330,7 @@ export default function QuizQualityAnalysis() {
                                             x2={0.5}
                                             y1={-1}
                                             y2={0}
-                                            fill="#fdebed"
+                                            fill="var(--yy-calm-danger-bg)"
                                             fillOpacity={0.65}
                                         />
                                         <ReferenceArea
@@ -338,18 +338,18 @@ export default function QuizQualityAnalysis() {
                                             x2={1}
                                             y1={-1}
                                             y2={0}
-                                            fill="#fff2e2"
+                                            fill="var(--yy-calm-info-bg)"
                                             fillOpacity={0.6}
                                         />
 
                                         <ReferenceLine
                                             x={0.5}
-                                            stroke="#68717a"
+                                            stroke="var(--yy-calm-text-sub)"
                                             strokeDasharray="5 4"
                                         />
                                         <ReferenceLine
                                             y={0}
-                                            stroke="#68717a"
+                                            stroke="var(--yy-calm-text-sub)"
                                             strokeDasharray="5 4"
                                         />
 
@@ -359,7 +359,7 @@ export default function QuizQualityAnalysis() {
                                             domain={[0, 1]}
                                             ticks={[0, 0.25, 0.5, 0.75, 1]}
                                             tickFormatter={(value) => `${value * 100}%`}
-                                            stroke="#6b5a47"
+                                            stroke="var(--yy-calm-text-sub)"
                                             fontSize={12}
                                         >
                                             <Label
@@ -374,7 +374,7 @@ export default function QuizQualityAnalysis() {
                                             dataKey="discrimination"
                                             domain={[-1, 1]}
                                             ticks={[-1, -0.5, 0, 0.5, 1]}
-                                            stroke="#6b5a47"
+                                            stroke="var(--yy-calm-text-sub)"
                                             fontSize={12}
                                         >
                                             <Label

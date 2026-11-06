@@ -339,7 +339,20 @@ components:
 | 宣傳影片 | 後台頁面已存在（`promo-videos`）；自架上傳、封面、啟用的完整度以程式為準，改版時逐項核對 |
 | 通知條（取代跑馬燈）、第一屏標題與引言 | **待新增**（現有 `HomepageConfig` 已含跑馬燈、標語、引言欄位；通知條欄位為步驟 2-6） |
 | 本期專題（三張卡） | 後台頁面已存在（`featured-topics`，獨立模型，不重用公告） |
+| 捲動敘事「一個詞的旅程」 | 步驟 5-5：`HomepageConfig` 的 `story_enabled`、`story_kicker`、`story_steps`（3 到 6 步，每步大字、標題、說明、織紋四選一），後台「首頁顯示設定」頁編輯並即時預覽；欄位與限制見 HOMEPAGE_CONTRACT.md 3.1.2 |
 | 導覽列、頁尾 | 不開放後台編輯（避免打錯路由） |
+
+## 後台管理系統（階段 5，2026-11-06 起）
+
+後台沿用前台 token，**只換 token、不重做版型，維持資訊密度**，不使用毛玻璃。
+
+- **圓角與陰影：** `--admin-radius` = `--yy-radius-panel`（卡片與面板 20px）、`--admin-radius-sm` = `--yy-radius-control`（按鈕、輸入框 12px）；標籤與小縮圖 8px、膠囊與圓形照舊。`--yy-ui-radius`（3px）已刪除。平放的卡片靠細框分隔（`--admin-shadow` = `--yy-elev-1`，無陰影）；只有浮起的東西（儲存成功提示、批次操作列、彈窗）才用 `--admin-shadow-raised`／`-overlay`，深色模式自動換成描邊。
+- **表格：** 表頭在捲動區內固定（區高度上限為視窗高減頂欄與留白），列高統一為 `--admin-row-height`（52px）。觸控裝置上導覽項、選單項、編輯器工具鈕與移除鈕的點擊區補到 44px，桌面維持緊湊。
+- **儲存成功：** 一律用 `SuccessNotice`（`AdminToast.jsx`）：後台外殼內是右下角的 toast（最多 3 張、5 秒、游標停留暫停、`role="status"`），不在外殼內退回行內 Alert。
+- **清單小元件：** `AdminFilterChips`（已套用的篩選一條件一顆可移除的 chip，目前用在公告管理）與 `AdminBulkBar`（批次操作列；後台尚無多選頁面，先備好）。
+- **彈窗：** 危險操作加 `dialogClassName="admin-modal admin-modal--danger"`（標題與分隔線換危險色，且文字說明「無法復原」），刪除帳號另需輸入帳號 email 確認。
+- **圖表：** 資料色取 `--yy-data-1` 到 `-5`（藍、橙、綠、紫、橄欖；淺色與深色各一組，在卡片表面上都 ≥ 3:1，`adminChart.test.js` 鎖定）。圖上不靠顏色單獨傳達資訊（線型、標記、資料表、格內數字）。圖表程式不得寫死色碼。熱力圖格子的底色是資料色混表面（最多 45%），字永遠是主文字色。
+- **載入畫面：** `AdminEntryFallback` 與前台啟動畫面同一語言（象牙底、宋體「原語」字標、底部細線）。
 
 ## Do's and Don'ts
 

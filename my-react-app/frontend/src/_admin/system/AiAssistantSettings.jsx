@@ -6,6 +6,7 @@ import { apiGet, apiPost } from '../../../utils/apiClient';
 import '../../../static/css/_admin/system.css';
 import '../../../static/css/_admin/ai-usage.css';
 import '../../../static/css/_admin/ai-assistant-settings.css';
+import { SuccessNotice } from '../components/AdminToast';
 
 // 設定與審核事件都只開放 owner／admin（後端同步檢查）；前端先擋，省得其他角色看到必定 403 的頁面。
 const VIEWER_ROLES = ['owner', 'admin'];
@@ -291,7 +292,7 @@ export default function AiAssistantSettings() {
 
             {!canView && !authLoading && <Alert variant="danger">只有擁有者與管理員可以調整 AI 助手設定。</Alert>}
             {canView && error && <Alert variant="danger" role="alert">{error}</Alert>}
-            {canView && notice && <Alert variant="success" role="status">{notice}</Alert>}
+            {canView && <SuccessNotice message={notice} role="status" />}
 
             {canView && error && !overview && !loading && (
                 <Button variant="outline-primary" onClick={() => setReloadKey((k) => k + 1)}>重新載入</Button>

@@ -1,11 +1,11 @@
-.rte { border: 1px solid var(--admin-border-strong); border-radius: 8px; background: var(--admin-surface); }
+.rte { border: 1px solid var(--admin-border-strong); border-radius: var(--yy-radius-tag); background: var(--admin-surface); }
 .rte:focus-within { border-color: var(--admin-accent); outline: var(--admin-focus-ring); outline-offset: 2px; }
 .rte.is-disabled { background: var(--admin-surface-muted); }
 
-.rte-toolbar { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 8px; border-bottom: 1px solid var(--admin-border); position: sticky; top: 0; z-index: 2; background: var(--admin-surface); border-radius: 8px 8px 0 0; }
+.rte-toolbar { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 8px; border-bottom: 1px solid var(--admin-border); position: sticky; top: 0; z-index: 2; background: var(--admin-surface); border-radius: var(--yy-radius-tag) var(--yy-radius-tag) 0 0; }
 .rte-group { display: flex; gap: 2px; }
 .rte-group + .rte-group { padding-left: 12px; border-left: 1px solid var(--admin-border); }
-.rte-tool { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; color: var(--admin-text, inherit); background: transparent; border: 1px solid transparent; border-radius: 6px; transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 140ms ease; }
+.rte-tool { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; color: var(--admin-text, inherit); background: transparent; border: 1px solid transparent; border-radius: var(--yy-radius-tag); transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 140ms ease; }
 .rte-tool:active:not(:disabled) { transform: scale(0.95); }
 .rte-tool.is-active { background: var(--admin-surface-muted); border-color: var(--admin-border-strong); color: var(--admin-accent); }
 .rte-tool:disabled { opacity: 0.4; }
@@ -31,7 +31,7 @@
 .rte-content blockquote { padding: 4px 0 4px 16px; border-left: 4px solid var(--admin-border-strong); color: var(--admin-muted); }
 .rte-content hr { border: 0; border-top: 1px solid var(--admin-border-strong); opacity: 1; }
 .rte-content a { color: var(--admin-accent); text-decoration: underline; text-underline-offset: 3px; }
-.rte-content img { display: block; max-width: 100%; height: auto; border-radius: 6px; }
+.rte-content img { display: block; max-width: 100%; height: auto; border-radius: var(--yy-radius-tag); }
 .rte-content img.ProseMirror-selectednode { outline: 3px solid var(--admin-accent); outline-offset: 2px; }
 
 /* 有文字標籤的按鈕（連結、圖片、影片、表格、提示框、預覽、全螢幕） */
@@ -42,7 +42,7 @@
 .rte-select--size { min-width: 80px; }
 
 /* 色票 */
-.rte-swatch { width: 40px; height: 40px; padding: 0; font-weight: 700; background: var(--admin-surface); border: 1px solid var(--admin-border-strong); border-radius: 6px; transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1); }
+.rte-swatch { width: 40px; height: 40px; padding: 0; font-weight: 700; background: var(--admin-surface); border: 1px solid var(--admin-border-strong); border-radius: var(--yy-radius-tag); transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1); }
 .rte-swatch:active { transform: scale(0.95); }
 .rte-swatch[aria-pressed="true"] { border-color: var(--admin-accent); outline: 2px solid var(--admin-accent); outline-offset: 1px; }
 .rte-swatch:focus-visible { outline: 2px solid var(--admin-accent); outline-offset: 1px; }
@@ -61,7 +61,7 @@
 /* 選項按鈕列（提示框種類、圖片對齊與大小） */
 .rte-seg { display: inline-flex; align-items: center; gap: 4px; }
 .rte-seg-label { margin-right: 4px; color: var(--admin-muted); font-size: 14px; }
-.rte-seg-btn { min-height: 32px; padding: 0 10px; font-size: 14px; color: var(--admin-text); background: var(--admin-surface); border: 1px solid var(--admin-border-strong); border-radius: 6px; }
+.rte-seg-btn { min-height: 32px; padding: 0 10px; font-size: 14px; color: var(--admin-text); background: var(--admin-surface); border: 1px solid var(--admin-border-strong); border-radius: var(--yy-radius-tag); }
 .rte-seg-btn.is-active { color: var(--admin-accent); border-color: var(--admin-accent); background: var(--admin-surface-muted); }
 .rte-seg-btn:focus-visible { outline: 2px solid var(--admin-accent); outline-offset: 1px; }
 @media (hover: hover) and (pointer: fine) {
@@ -74,7 +74,7 @@
 .rte-shortcuts > div { display: flex; justify-content: space-between; gap: 12px; }
 .rte-shortcuts dt { font-weight: 400; }
 .rte-shortcuts dd { margin: 0; }
-.rte-shortcuts kbd { padding: 1px 6px; font-size: 13px; color: var(--admin-text); background: var(--admin-surface); border: 1px solid var(--admin-border-strong); border-radius: 4px; }
+.rte-shortcuts kbd { padding: 1px 6px; font-size: 13px; color: var(--admin-text); background: var(--admin-surface); border: 1px solid var(--admin-border-strong); border-radius: var(--yy-radius-min); }
 
 .rte-notice { margin: 0; padding: 8px 12px; color: var(--admin-muted); font-size: 14px; background: var(--admin-surface-muted); border-bottom: 1px solid var(--admin-border); }
 .rte-status { padding: 6px 12px; color: var(--admin-muted); font-size: 13px; text-align: right; border-top: 1px solid var(--admin-border); }
@@ -88,7 +88,7 @@
 .rte-preview ul, .rte-preview ol { padding-left: 1.6em; }
 .rte-preview blockquote { padding: 4px 0 4px 16px; border-left: 4px solid var(--admin-border-strong); color: var(--admin-muted); }
 .rte-preview a { color: var(--admin-accent); text-decoration: underline; text-underline-offset: 3px; }
-.rte-preview img { display: block; max-width: 100%; height: auto; border-radius: 6px; }
+.rte-preview img { display: block; max-width: 100%; height: auto; border-radius: var(--yy-radius-tag); }
 
 /* 全螢幕 */
 .rte.is-fullscreen { position: fixed; inset: 0; z-index: 1050; display: flex; flex-direction: column; border-radius: 0; border: 0; }
@@ -109,7 +109,7 @@
 .rte-content span[data-text-color="blue"] { color: var(--rt-color-blue); }
 .rte-content span[data-text-color="purple"] { color: var(--rt-color-purple); }
 .rte-content span[data-text-color="gray"] { color: var(--rt-color-gray); }
-.rte-content mark[data-highlight] { color: inherit; border-radius: 0.2em; }
+.rte-content mark[data-highlight] { color: inherit; border-radius: var(--yy-radius-min); }
 .rte-content mark[data-highlight="yellow"] { background: var(--rt-mark-yellow); }
 .rte-content mark[data-highlight="green"] { background: var(--rt-mark-green); }
 .rte-content mark[data-highlight="blue"] { background: var(--rt-mark-blue); }
@@ -125,7 +125,7 @@
 .rte-content ul[data-type="taskList"] li > label { flex: none; margin-top: 0.55em; }
 .rte-content ul[data-type="taskList"] li > div { flex: 1; min-width: 0; }
 
-.rte-callout { padding: 12px 16px; border: 1px solid var(--rt-callout-info-line); border-left-width: 5px; border-radius: 6px; background: var(--rt-callout-info-bg); }
+.rte-callout { padding: 12px 16px; border: 1px solid var(--rt-callout-info-line); border-left-width: 5px; border-radius: var(--yy-radius-tag); background: var(--rt-callout-info-bg); }
 .rte-callout[data-tone="success"] { border-color: var(--rt-callout-success-line); background: var(--rt-callout-success-bg); }
 .rte-callout[data-tone="warning"] { border-color: var(--rt-callout-warning-line); background: var(--rt-callout-warning-bg); }
 .rte-callout[data-tone="danger"] { border-color: var(--rt-callout-danger-line); background: var(--rt-callout-danger-bg); }
@@ -137,7 +137,7 @@
 .rte-content td > p, .rte-content th > p { margin: 0; }
 .rte-content .selectedCell { background: var(--admin-surface-muted); }
 
-.rte-youtube { display: flex; flex-direction: column; gap: 2px; padding: 16px; text-align: center; background: var(--admin-surface-muted); border: 1px dashed var(--admin-border-strong); border-radius: 6px; }
+.rte-youtube { display: flex; flex-direction: column; gap: 2px; padding: 16px; text-align: center; background: var(--admin-surface-muted); border: 1px dashed var(--admin-border-strong); border-radius: var(--yy-radius-tag); }
 .rte-youtube.ProseMirror-selectednode { outline: 3px solid var(--admin-accent); outline-offset: 2px; }
 .rte-youtube-label { font-weight: 700; }
 .rte-youtube-id { color: var(--admin-muted); font-size: 13px; }

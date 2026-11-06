@@ -7,7 +7,7 @@ import { AdminEntryContext } from './adminEntryContext';
 const ENTERED_KEY = 'yy-admin-entered';
 const MIN_VISIBLE_MS = 800;          // 最短可見時間：太快就換掉的載入畫面等於沒做
 const MIN_VISIBLE_REDUCED_MS = 250;  // 要求降低動態的人只留一個極短的過場，不拖他們
-const LEAVE_MS = 650;                // 光圈收合的時間，要和 admin-entry.css 的 admin-entry-iris 一致
+const LEAVE_MS = 300;                // 淡出收合的時間，要和 admin-entry.css 的 admin-entry-out 一致
 
 const readEntered = () => {
     try {
@@ -63,7 +63,7 @@ export default function AdminEntryGate({ children }) {
         const done = setTimeout(() => {
             writeEntered();
             setPhase('done');
-        }, skipped ? 0 : LEAVE_MS);
+        }, skipped || prefersReducedMotion() ? 0 : LEAVE_MS); // 降低動態時 CSS 動畫已壓成近 0，不留透明攔截層
         return () => clearTimeout(done);
     }, [phase, skipped]);
 
@@ -76,7 +76,7 @@ export default function AdminEntryGate({ children }) {
         <AdminEntryContext.Provider value={value}>
             {children}
             {phase !== 'done' && (
-                <AdminEntryFallback instant leaving={phase === 'leaving'} message={phase === 'leaving' ? '歡迎回來' : '正在校準管理訊號'} onSkip={skip} />
+                <AdminEntryFallback instant leaving={phase === 'leaving'} message={phase === 'leaving' ? '歡迎回來' : '正在載入管理後台'} onSkip={skip} />
             )}
         </AdminEntryContext.Provider>
     );

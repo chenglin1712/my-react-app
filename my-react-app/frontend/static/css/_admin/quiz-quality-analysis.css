@@ -19,7 +19,7 @@
     padding: 10px 14px;
     background: var(--admin-surface);
     border: 1px solid var(--admin-border);
-    border-radius: 8px;
+    border-radius: var(--yy-radius-tag);
 }
 
 .quiz-quality-respondents strong {
@@ -135,7 +135,7 @@
 .quiz-quality-quadrant-key span {
     padding: 4px 9px;
     border: 1px solid transparent;
-    border-radius: 999px;
+    border-radius: var(--yy-radius-pill);
     font-size: 12px;
 }
 
@@ -195,7 +195,7 @@
     padding: 11px 13px;
     background: var(--admin-surface);
     border: 1px solid var(--yy-calm-rule);
-    border-radius: 7px;
+    border-radius: var(--yy-radius-tag);
 }
 
 .quiz-quality-tooltip strong {
@@ -250,7 +250,7 @@
     padding: 4px 8px;
     color: var(--yy-calm-warning);
     background: var(--yy-calm-warning-bg);
-    border-radius: 999px;
+    border-radius: var(--yy-radius-pill);
     font-size: 12px;
     white-space: nowrap;
 }

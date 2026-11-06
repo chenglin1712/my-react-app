@@ -5,6 +5,7 @@ import {
 import { Save } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { apiGet, apiPatch } from '../../../utils/apiClient';
+import { SuccessNotice } from '../components/AdminToast';
 
 const PUBLISHERS = ['owner', 'admin'];
 const STAFF_ROLES = ['owner', 'admin', 'editor', 'reviewer', 'analyst'];
@@ -160,7 +161,7 @@ export default function GameSettings() {
                 </Alert>
             )}
             {error && <Alert variant="danger">{error}</Alert>}
-            {success && <Alert variant="success">{success}</Alert>}
+            <SuccessNotice message={success} />
 
             <Form
                 className="admin-config-card"

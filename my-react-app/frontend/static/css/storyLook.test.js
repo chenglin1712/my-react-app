@@ -33,7 +33,7 @@ describe("首頁捲動敘事樣式", () => {
   });
 
   it("桌面釘住：區塊 240dvh、舞台 sticky、離上緣 80px（與 HomeStory 的 STORY_TOP 一致）、高度有上下限", () => {
-    expect(find(".home-story").body).toMatch(/height:\s*calc\(100dvh \* 2\.4\)/);
+    expect(find(".home-story").body).toMatch(/height:\s*calc\(100dvh \* \(1 \+ 0\.35 \* var\(--story-n, 4\)\)\)/);
     expect(find(".home-story").body).toMatch(/--story-top:\s*80px/);
     const s = find(".home-story__stage").body;
     expect(s).toMatch(/position:\s*sticky/);
@@ -76,7 +76,7 @@ describe("首頁捲動敘事樣式", () => {
     expect(s).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\)/);
     expect(find(".home-story__step", /max-width:\s*900px/).body).toMatch(/opacity:\s*1/);
     expect(find(".home-story__step p", /max-width:\s*900px/).body).toMatch(/max-height:\s*96px/);
-    expect(find(".home-story__layer:not(.home-story__layer--0)", /max-width:\s*900px/).body).toMatch(/display:\s*none/);
+    expect(find(".home-story__layer:not(.is-first)", /max-width:\s*900px/).body).toMatch(/display:\s*none/);
   });
 
   it("減少動態：所有轉場關閉，目前步驟與換字不位移", () => {
@@ -84,5 +84,21 @@ describe("首頁捲動敘事樣式", () => {
     expect(find(".home-story__layer, .home-story__glyph, .home-story__step, .home-story__step p, .home-story__cue", r).body).toMatch(/transition:\s*none/);
     expect(find(".home-story__step.is-on", r).body).toMatch(/transform:\s*none/);
     expect(find(".home-story__glyph.is-swapping", r).body).toMatch(/transform:\s*none/);
+  });
+
+  it("織紋由後台為每一步指定：四種代號各有一個圖樣，圖樣只用語意色", () => {
+    ["stripe", "vertical", "dots", "grid"].forEach((name) => {
+      const rule = find(`.home-story__layer--${name}`);
+      expect(rule, name).toBeTruthy();
+      expect(rule.body).toMatch(/gradient\(/);
+      expect(rule.body).not.toMatch(/#[0-9a-fA-F]{3,8}|rgba?\(/);
+    });
+    expect(css).not.toMatch(/home-story__layer--\d/);
+  });
+
+  it("5、6 步時右側清單縮一級，放得進同樣高度的舞台", () => {
+    ["5", "6"].forEach((n) => expect(css).toContain(`.home-story[data-count="${n}"] .home-story__step b`));
+    const rule = rules.find((r) => r.selector.includes('[data-count="6"] .home-story__step b'));
+    expect(rule.body).toMatch(/font-size:\s*clamp\(18px/);
   });
 });

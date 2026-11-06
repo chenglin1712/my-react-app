@@ -78,6 +78,29 @@
 - 後台表單的日期時間用瀏覽器本地時間（`datetime-local`），送出前轉成 ISO（UTC）。
 - 前台訪客可以關閉通知條：關閉狀態記在該裝置的 localStorage（鍵 `yy-notice-dismissed`，值為「文字|連結」），**內容或連結一換就是新通知，會再出現**。儲存空間不可用時（無痕模式）仍能顯示與關閉，只是不記住。
 
+### 3.1.2 捲動敘事「一個詞的旅程」欄位（Apple 化步驟 5-5，全部加法，migration `0036_homepage_story`）
+
+| 欄位 | 型別 | 限制 | 預設 | 備註 |
+| --- | --- | --- | --- | --- |
+| `story_enabled` | 布林 | | 是 | 整段的顯示開關；關閉時前台整段不輸出 |
+| `story_kicker` | 單行字串 | 最多 20 字，去前後空白；規則同標語 | 空 | 空 = 前台用內建小標「一個詞的旅程」 |
+| `story_steps` | JSON 清單 | **空清單，或 3 到 6 步**；每步恰好四個欄位（多餘欄位拒絕） | `[]` | 空清單 = 前台用內建預設四步，整段不會消失 |
+
+每一步：
+
+| 欄位 | 限制 |
+| --- | --- |
+| `glyph`（左側大字） | 1 到 4 字，去前後空白，單行 |
+| `title`（標題） | 1 到 16 字，單行 |
+| `text`（說明） | 1 到 80 字，單行 |
+| `pattern`（左側織紋） | 只能是 `stripe`（斜紋）、`vertical`（直紋）、`dots`（圓點）、`grid`（格紋） |
+
+- 全部是純文字，前台不渲染 HTML；單行規則同標語（拒絕控制字元、換行、零寬與雙向控制字元）。驗證寫在模型欄位的 validator（`validate_story_steps`），管理命令與測試走同一份。
+- 寫入權限同其他首頁設定：只有 owner、admin（PUBLISHERS）；稽核紀錄照常寫入前後值。
+- 步驟順序就是前台畫面順序；步數決定捲動區段的高度（每步約 0.35 個螢幕高）與進度條段數。
+- **前台防線：** 步數不在 3 到 6、任何一步格式不對、或沒有 `story` 欄位（舊後端、設定抓不到）時，整組退回內建預設，不混用。設定尚未回來之前不輸出這一段（避免先出現再消失頂開下方內容）。
+- 前台內建預設文案在 `frontend/components/_home/storyContent.js`；後台表單內容完全等於預設時送空清單，這樣日後預設文案更新，首頁會跟著更新。
+
 ### 3.2 `PromoVideo`（新資料表，S3-1）
 
 | 欄位 | 型別 | 限制 | 備註 |
@@ -168,6 +191,7 @@
 
   "promo_video": null,
   "notice": null,
+  "story": { "enabled": true, "kicker": "", "steps": [] },
   "marquee_items": [], "show_marquee": true,
   "tagline": "", "show_tagline": true,
   "quote_text": "", "show_quote": true
@@ -196,6 +220,8 @@
 - **開關關閉時，公開端點不輸出對應內容：** `show_marquee`、`show_tagline`、`show_quote` 為 `false` 時，`marquee_items` 回 `[]`、`tagline` 與 `quote_text` 回 `""`（開關本身照常輸出）。管理者可能先存了還沒要公開的文案再關掉開關，內容留在資料庫、後台仍看得到，重新開啟即發布，但不能從公開端點被讀走。
 
 **`notice`（步驟 2-6）：** 只在「已啟用、有文字、目前在有效期間內」時輸出 `{ "text": "…", "link_url": "/announcements" }`（`link_url` 沒填是 `""`），其餘一律 `null`。**不輸出**啟用旗標與開始、結束時間：還沒到的排程內容不能從公開端點被讀走。舊前端忽略這個未知欄位，新前台缺少時視為 `null`。
+
+**`story`（步驟 5-5）：** 一律輸出物件 `{ "enabled", "kicker", "steps" }`。`enabled` 為 `false` 時 `kicker` 回 `""`、`steps` 回 `[]`（內容留在資料庫、重新開啟即公開，但不能從公開端點被讀走）；`enabled` 為 `true` 時 `steps` 是後台儲存的清單，**空清單代表前台使用內建預設文案**。每步只輸出 `glyph`、`title`、`text`、`pattern` 四個欄位。舊前端忽略這個未知欄位，新前台缺少時視為「啟用、用預設」。
 
 ### 4.2 `GET /adminapi/public/featured-topics/`（新，S3-3）
 

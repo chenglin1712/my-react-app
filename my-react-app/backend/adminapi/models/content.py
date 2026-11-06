@@ -14,6 +14,8 @@ from ..validators import (
     validate_promo_cover_path,
     validate_promo_video_path,
     validate_single_line,
+    validate_story_steps,
+    STORY_KICKER_MAX,
 )
 from ..article_doc import validate_article_doc
 from ._singleton import SingletonModel
@@ -352,6 +354,11 @@ class HomepageConfig(SingletonModel):
     notice_link_url = models.CharField(max_length=500, blank=True, validators=[validate_internal_or_https_link])
     notice_starts_at = models.DateTimeField(null=True, blank=True)
     notice_ends_at = models.DateTimeField(null=True, blank=True)
+    # 捲動敘事「一個詞的旅程」（Apple 化步驟 5-5，HOMEPAGE_CONTRACT.md 3.5）：預設開、全部可為空，純加法。
+    # story_steps 空清單 = 前台用內建預設文案（不會整段消失）；有內容時 3 到 6 步，只收純文字與固定的織紋代號。
+    story_enabled = models.BooleanField(default=True)
+    story_kicker = models.CharField(max_length=STORY_KICKER_MAX, blank=True, validators=[validate_single_line])
+    story_steps = models.JSONField(default=list, blank=True, validators=[validate_story_steps])
     updated_by = models.CharField(max_length=128, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 

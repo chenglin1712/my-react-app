@@ -42,6 +42,9 @@ export default function DeleteAccountModal({ show, user, uid, onClose, onDeleted
         });
     };
 
+    // 帳號還沒載入、或關閉後被清空時沒有可刪的對象：不輸出（react-bootstrap 的 show=false 仍會渲染子元件）
+    if (!user) return null;
+
     return (
         <Modal
             show={show}
@@ -49,6 +52,7 @@ export default function DeleteAccountModal({ show, user, uid, onClose, onDeleted
             centered
             backdrop={deleting ? 'static' : true}
             keyboard={!deleting}
+            dialogClassName="admin-modal admin-modal--danger"
         >
             <Modal.Header closeButton={!deleting}>
                 <Modal.Title>確認刪除帳號</Modal.Title>

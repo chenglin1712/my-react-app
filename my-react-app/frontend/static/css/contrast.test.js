@@ -94,8 +94,8 @@ describe("後台共用基礎層（G-1）", () => {
     ["--admin-danger-bg", "var(--yy-calm-danger-bg)"],
     ["--admin-warning-text", "var(--yy-calm-warning)"],
     ["--admin-warning-bg", "var(--yy-calm-warning-bg)"],
-    ["--admin-radius", "var(--yy-ui-radius)"],
-    ["--admin-radius-sm", "var(--yy-ui-radius)"],
+    ["--admin-radius", "var(--yy-radius-panel)"],
+    ["--admin-radius-sm", "var(--yy-radius-control)"],
     ["--admin-focus-ring", "var(--yy-ui-focus-ring)"],
   ])("%s 取自 %s", (name, value) => {
     const escaped = value.replace(/[()]/g, "\\$&");

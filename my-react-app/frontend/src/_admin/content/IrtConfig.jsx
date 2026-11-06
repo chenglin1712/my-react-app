@@ -6,6 +6,7 @@ import { apiGet, apiPatch } from '../../../utils/apiClient';
 import { useActionLock } from '../hooks/useActionLock';
 import { formatDateTime } from '../adminFormat';
 import '../../../static/css/_admin/quiz-bank.css';
+import { SuccessNotice } from '../components/AdminToast';
 
 const PUBLISHERS = ['owner', 'admin'];
 const EMPTY_FORM = {
@@ -148,7 +149,7 @@ export default function IrtConfig() {
                 <Alert variant="warning">你可以檢視目前的 IRT 參數；只有擁有者或管理員可以變更並儲存。</Alert>
             )}
             {error && <Alert variant="danger">{error}</Alert>}
-            {success && <Alert variant="success">{success}</Alert>}
+            <SuccessNotice message={success} />
 
             <Form className="quiz-bank-config-card" onSubmit={save}>
                 {FIELD_GROUPS.map((group) => (

@@ -10,7 +10,7 @@ from rest_framework import serializers
 
 from ..models import Announcement, ExamScheduleOverride, FeaturedTopic, HomepageConfig, ContactPage, PrivacyPolicy, PromoVideo
 from ..promo_media import public_media_url
-from ..validators import normalize_marquee_items, validate_cloudinary_image_url
+from ..validators import normalize_marquee_items, normalize_story_steps, validate_cloudinary_image_url
 
 
 class AnnouncementSerializer(serializers.ModelSerializer):
@@ -159,6 +159,7 @@ class HomepageConfigSerializer(serializers.ModelSerializer):
             'active_promo_video',
             'marquee_items', 'show_marquee', 'tagline', 'show_tagline', 'quote_text', 'show_quote',
             'notice_enabled', 'notice_text', 'notice_link_url', 'notice_starts_at', 'notice_ends_at',
+            'story_enabled', 'story_kicker', 'story_steps',
             'updated_by', 'updated_at',
         ]
         read_only_fields = ['updated_by', 'updated_at']
@@ -185,6 +186,10 @@ class HomepageConfigSerializer(serializers.ModelSerializer):
         if errors:
             raise serializers.ValidationError(errors)
         return attrs
+
+    def validate_story_steps(self, value):
+        # 模型欄位的 validator 負責型別、步數與長度；這裡只做儲存前正規化（文字去前後空白、丟掉順序外的雜訊）
+        return normalize_story_steps(value)
 
     def validate_marquee_items(self, value):
         # 模型欄位的 validator 已檢查型別與長度；這裡負責儲存前正規化：每項去前後空白。
@@ -249,6 +254,9 @@ class PublicHomepageConfigSerializer(serializers.ModelSerializer):
     # 頂部通知條：只在已啟用、有文字、目前在有效期間內時輸出 {text, link_url}，其餘 null；
     # 不輸出啟用旗標與時間窗，公開端點不洩漏還沒到期的排程內容
     notice = serializers.SerializerMethodField()
+    # 捲動敘事：{enabled, kicker, steps}。關閉時不輸出內容（內容留在資料庫，重新開啟即可）；
+    # steps 為空陣列代表「前台用內建預設文案」，前台不能因此整段消失（HOMEPAGE_CONTRACT.md 3.5）
+    story = serializers.SerializerMethodField()
 
     class Meta:
         model = HomepageConfig
@@ -257,12 +265,21 @@ class PublicHomepageConfigSerializer(serializers.ModelSerializer):
             'hero_image_url', 'hero_link_url', 'hero_title_override',
             'show_news_section', 'show_calendar_section', 'news_display_count',
             'button1_enabled', 'button2_enabled', 'button3_enabled',
-            'promo_video', 'notice',
+            'promo_video', 'notice', 'story',
             'marquee_items', 'show_marquee', 'tagline', 'show_tagline', 'quote_text', 'show_quote',
         ]
 
     def get_notice(self, obj):
         return obj.active_notice()
+
+    def get_story(self, obj):
+        if not obj.story_enabled:
+            return {'enabled': False, 'kicker': '', 'steps': []}
+        return {
+            'enabled': True,
+            'kicker': (obj.story_kicker or '').strip(),
+            'steps': obj.story_steps or [],
+        }
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

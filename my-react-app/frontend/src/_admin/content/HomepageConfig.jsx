@@ -7,6 +7,8 @@ import { useMediaUpload } from '../hooks/useMediaUpload';
 import { useActionLock } from '../hooks/useActionLock';
 import { formatDateTime } from '../adminFormat';
 import '../../../static/css/_admin/homepage-config.css';
+import { SuccessNotice } from '../components/AdminToast';
+import StoryEditor, { hasStoryErrors, storyPayloadFrom, storyRowsFrom, validateStory } from './StoryEditor';
 
 const PUBLISHERS = ['owner', 'admin'];
 
@@ -19,6 +21,8 @@ const EMPTY_FORM = {
     tagline: '', show_tagline: true,
     quote_text: '', show_quote: true,
     notice_enabled: false, notice_text: '', notice_link_url: '', notice_starts_at: '', notice_ends_at: '',
+    // 捲動敘事（5-5）：story_steps 在表單裡是帶 uid 的列；API 的空清單 = 預設文案，載入時展開成預設的列
+    story_enabled: true, story_kicker: '', story_steps: storyRowsFrom([]),
     show_news_section: true, show_calendar_section: true, news_display_count: 6,
     button1_enabled: true, button2_enabled: true, button3_enabled: true,
 };
@@ -51,6 +55,9 @@ const formFrom = (item, fallback = EMPTY_FORM) => Object.fromEntries(
         if (key === 'marquee_items') {
             return [key, Array.isArray(item?.marquee_items) ? item.marquee_items.join('\n') : fallback[key]];
         }
+        if (key === 'story_steps') {
+            return [key, Array.isArray(item?.story_steps) ? storyRowsFrom(item.story_steps) : fallback[key]];
+        }
         if (NOTICE_TIME_FIELDS.includes(key)) {
             return [key, item && key in item ? isoToLocalInput(item[key]) : fallback[key]];
         }
@@ -81,6 +88,8 @@ function validate(form) {
     const start = localInputToIso(form.notice_starts_at);
     const end = localInputToIso(form.notice_ends_at);
     if (start && end && new Date(end) <= new Date(start)) errors.notice_ends_at = '結束時間必須晚於開始時間';
+    const story = validateStory(form);
+    if (hasStoryErrors(story)) errors.story = story;
     return errors;
 }
 
@@ -181,6 +190,7 @@ export default function HomepageConfig() {
                     notice_starts_at: localInputToIso(form.notice_starts_at),
                     notice_ends_at: localInputToIso(form.notice_ends_at),
                     news_display_count: Number(form.news_display_count),
+                    ...storyPayloadFrom(form),
                 });
                 // 儲存期間使用者若又改了欄位，不拿回應蓋掉他的新輸入
                 setForm((current) => (current === submitted ? formFrom(saved, current) : current));
@@ -212,7 +222,7 @@ export default function HomepageConfig() {
             {(error || media.error || validationSummary) && (
                 <Alert variant="danger" role="alert">{error || media.error || validationSummary}</Alert>
             )}
-            {success && <Alert variant="success" role="status">{success}</Alert>}
+            <SuccessNotice message={success} role="status" />
 
             <Form
                 ref={formRef}
@@ -427,6 +437,14 @@ export default function HomepageConfig() {
                         <Form.Text id="homepage-notice-end-hint">留空表示不自動結束。</Form.Text>
                     </Form.Group>
                 </section>
+
+                <StoryEditor
+                    value={form}
+                    onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+                    disabled={!editable}
+                    errors={errors.story ?? { rows: {} }}
+                    showErrors={showErrors}
+                />
 
                 <section className="homepage-config-section" aria-labelledby="homepage-config-switches">
                     <div className="homepage-config-section-heading">

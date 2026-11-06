@@ -41,6 +41,7 @@ import {
 import { REVISION_STATUS_META as STATUS_META, revisionFromSave } from './revisionMeta';
 import { useActionLock } from '../hooks/useActionLock';
 import { confirmAction } from '@components/ui/ConfirmDialog';
+import { SuccessNotice } from '../components/AdminToast';
 
 const emptySection = (tribeId = '') => ({
     tribe_id: tribeId,
@@ -731,7 +732,7 @@ export default function GrammarNodePanel({
 
             {pageError && <Alert variant="danger">{pageError}</Alert>}
             {revisionActions.error && <Alert variant="danger">{revisionActions.error}</Alert>}
-            {success && <Alert variant="success">{success}</Alert>}
+            <SuccessNotice message={success} />
 
             <Form
                 className="dictionary-editor-card"

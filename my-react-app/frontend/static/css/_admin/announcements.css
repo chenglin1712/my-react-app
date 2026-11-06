@@ -4,7 +4,7 @@
 
 .announcement-filter-panel { display: grid; grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr)) auto; gap: 12px; max-width: 1440px; margin: 0 auto 20px; }
 .announcement-table-card, .announcement-editor-card { max-width: 1440px; margin: 0 auto; }
-.announcement-editor-card { background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: 12px; }
+.announcement-editor-card { background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); }
 .announcement-title-cell { min-width: 220px; max-width: 360px; font-weight: 600; }
 .announcement-cell-note { display: block; margin-top: 3px; color: var(--admin-muted); font-size: 12px; white-space: nowrap; }
 .announcement-row-actions { display: flex; flex-wrap: wrap; gap: 6px; min-width: 150px; }
@@ -19,9 +19,9 @@
 .announcement-field > .form-label, .announcement-field > legend { margin-bottom: 8px; font-size: 15px; font-weight: 650; }
 .announcement-field > legend { float: none; width: auto; }
 .announcement-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
-.announcement-tribe-options { display: flex; flex-wrap: wrap; gap: 12px 28px; padding: 14px; background: var(--admin-surface-muted); border: 1px solid var(--admin-border); border-radius: 8px; }
-.announcement-cover-uploader { display: grid; grid-template-columns: 260px 1fr; align-items: center; gap: 20px; padding: 16px; border: 1px dashed var(--admin-border-strong); border-radius: 8px; background: var(--admin-surface-muted); }
-.announcement-cover-uploader img, .announcement-cover-placeholder { width: 260px; height: 150px; border-radius: 7px; object-fit: cover; background: var(--admin-border); }
+.announcement-tribe-options { display: flex; flex-wrap: wrap; gap: 12px 28px; padding: 14px; background: var(--admin-surface-muted); border: 1px solid var(--admin-border); border-radius: var(--yy-radius-tag); }
+.announcement-cover-uploader { display: grid; grid-template-columns: 260px 1fr; align-items: center; gap: 20px; padding: 16px; border: 1px dashed var(--admin-border-strong); border-radius: var(--yy-radius-tag); background: var(--admin-surface-muted); }
+.announcement-cover-uploader img, .announcement-cover-placeholder { width: 260px; height: 150px; border-radius: var(--yy-radius-tag); object-fit: cover; background: var(--admin-border); }
 .announcement-cover-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--admin-muted); }
 .announcement-upload-status { display: inline-flex; align-items: center; gap: 7px; margin-top: 10px; color: var(--admin-muted); font-size: 14px; }
 .announcement-switch-field { display: flex; align-items: center; padding-top: 30px; }

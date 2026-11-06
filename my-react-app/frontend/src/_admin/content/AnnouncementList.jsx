@@ -5,6 +5,7 @@ import AdminTable from '../components/AdminTable';
 import { Plus, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
+import AdminFilterChips from '../components/AdminFilterChips';
 import { apiDelete, apiGet, apiPost } from '../../../utils/apiClient';
 import ReviewActions from '../reviewWorkflow/ReviewActions';
 import { confirmAction } from '@components/ui/ConfirmDialog';
@@ -132,6 +133,27 @@ export default function AnnouncementList() {
         setPage(1);
         setQuery(filters);
     };
+
+    // 已套用的篩選（以送出後的 query 為準，不是還在編輯的下拉選單）：一個條件一顆 chip，點叉就移除並重新查詢
+    const clearFilter = (key) => {
+        const next = { ...query, [key]: '' };
+        setFilters(next);
+        setQuery(next);
+        setPage(1);
+    };
+    const clearAllFilters = () => {
+        const empty = { keyword: '', status: '', category: '', tribe: '', source: '' };
+        setFilters(empty);
+        setQuery(empty);
+        setPage(1);
+    };
+    const activeFilters = [
+        query.keyword.trim() && { key: 'keyword', label: '關鍵字', value: query.keyword.trim() },
+        query.status && { key: 'status', label: '狀態', value: STATUSES[query.status]?.label ?? query.status },
+        query.category && { key: 'category', label: '分類', value: CATEGORIES[query.category] ?? query.category },
+        query.tribe && { key: 'tribe', label: '族語', value: TRIBE_FULL_NAME_BY_SLUG[query.tribe] ?? query.tribe },
+        query.source && { key: 'source', label: '來源', value: SOURCES[query.source] ?? query.source },
+    ].filter(Boolean).map((chip) => ({ ...chip, onClear: () => clearFilter(chip.key) }));
 
     // 回傳「這次動作是否真的完成」——呼叫端（submitReject）要靠這個決定
     // 該不該收掉退件 Modal；原本沒有回傳值時，submitReject 不管成功失敗
@@ -348,6 +370,7 @@ export default function AnnouncementList() {
                 </Form.Select>
                 <Button type="submit">搜尋</Button>
             </Form>
+            <AdminFilterChips filters={activeFilters} onClearAll={clearAllFilters} />
 
             <div className="announcement-table-card">
                 {loading ? (

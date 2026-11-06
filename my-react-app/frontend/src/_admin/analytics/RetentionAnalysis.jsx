@@ -22,11 +22,13 @@ function formatPercent(rate) {
 
 function getRetentionCellStyle(rate) {
     const normalizedRate = Math.min(Math.max(rate, 0), 1);
-    const opacity = 0.12 + (normalizedRate * 0.78);
+    // 底色深淺 12%～45%，字永遠是同一個主文字色：不再依深淺切換白字或黑字，兩種主題下對比都 ≥ 4.5:1
+    // （格子內也印出百分比數字，不只靠顏色深淺表達留存率）
+    const percent = Math.round(12 + (normalizedRate * 33));
 
     return {
-        backgroundColor: `rgba(31, 58, 92, ${opacity})`,
-        color: normalizedRate >= 0.55 ? '#fff' : '#221812',
+        backgroundColor: `color-mix(in srgb, var(--yy-data-1) ${percent}%, var(--yy-calm-surface))`,
+        color: 'var(--yy-calm-text)',
     };
 }
 

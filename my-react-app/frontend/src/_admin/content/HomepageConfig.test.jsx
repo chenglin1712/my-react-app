@@ -276,4 +276,53 @@ describe("HomepageConfig 頂部通知條", () => {
     expect(await screen.findByLabelText("通知文字")).toBeDisabled();
     expect(screen.getByLabelText("啟用通知條")).toBeDisabled();
   });
+
+  test('捲動敘事：沒改就送空清單（沿用預設文案）；改了才送完整步驟；關掉開關會送出', async () => {
+    apiPatch.mockResolvedValue(baseConfig);
+    renderPage();
+    await screen.findByLabelText('顯示最新消息區塊');
+    fireEvent.click(screen.getByRole('button', { name: /儲存設定/ }));
+    await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(1));
+    expect(apiPatch.mock.calls[0][1]).toEqual(expect.objectContaining({ story_enabled: true, story_kicker: '', story_steps: [] }));
+    expect(apiPatch.mock.calls[0][1]).not.toHaveProperty('story_steps.0.uid');
+
+    fireEvent.change(screen.getAllByLabelText('標題')[0], { target: { value: '我改的標題' } });
+    fireEvent.click(screen.getByLabelText('顯示捲動敘事'));
+    fireEvent.click(screen.getByRole('button', { name: /儲存設定/ }));
+    await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(2));
+    const sent = apiPatch.mock.calls[1][1];
+    expect(sent.story_enabled).toBe(false);
+    expect(sent.story_steps).toHaveLength(4);
+    expect(sent.story_steps[0].title).toBe('我改的標題');
+    sent.story_steps.forEach((s) => expect(Object.keys(s).sort()).toEqual(['glyph', 'pattern', 'text', 'title']));
+  });
+
+  test('捲動敘事：後端已有自訂步驟時帶入表單；步驟超過字數上限時不送出並標示欄位', async () => {
+    apiGet.mockResolvedValue({
+      ...baseConfig,
+      story_enabled: true,
+      story_kicker: '自訂小標',
+      story_steps: [
+        { glyph: '甲', title: '標題甲', text: '說明甲', pattern: 'grid' },
+        { glyph: '乙', title: '標題乙', text: '說明乙', pattern: 'dots' },
+        { glyph: '丙', title: '標題丙', text: '說明丙', pattern: 'stripe' },
+      ],
+    });
+    renderPage();
+    expect(await screen.findByDisplayValue('標題乙')).toBeInTheDocument();
+    expect(screen.getByLabelText('小標')).toHaveValue('自訂小標');
+    expect(screen.getAllByRole('heading', { level: 3, name: /^第 \d 步$/ })).toHaveLength(3);
+
+    fireEvent.change(screen.getAllByLabelText('大字')[0], { target: { value: '一二三四五' } });
+    fireEvent.click(screen.getByRole('button', { name: /儲存設定/ }));
+    expect(await screen.findByText('第 1 步的大字最多 4 字')).toBeInTheDocument();
+    expect(apiPatch).not.toHaveBeenCalled();
+  });
+
+  test('捲動敘事：唯讀角色看得到內容但不能改', async () => {
+    mockRole = 'editor';
+    renderPage();
+    expect(await screen.findByLabelText('小標')).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /新增一步/ })).toBeNull();
+  });
 });

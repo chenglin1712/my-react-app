@@ -29,7 +29,7 @@ const parse = (source) => {
 const finder = (rules) => (selector, at) => rules.find((r) => r.selector === selector && (at ? r.atRules.some((a) => at.test(a)) : r.atRules.length === 0));
 
 const OLD_TOKENS = /--yy-(?:red|gold|gold-light|gold-mark|blue|blue-light|cream|cream-dim|ink|green|border|border-soft|text-muted|text-tertiary|text-secondary|radius-card|radius-btn|radius-lg|surface|font-pixel|warning-bg|warning-text|red-dark|success|success-bg|success-border|danger|danger-bg|danger-border|info-bg)(?![\w-])/;
-const NO_DECORATION = /box-shadow\s*:\s*(?!none)\S|text-shadow|gradient|rgba?\(|transition:\s*all|ease-in(?![\w-])|#[0-9a-fA-F]{3,8}\b|(?<![-\w])color:\s*(?:white|black)\b|background(?:-color)?:\s*(?:white|black)\b/;
+const NO_DECORATION = /box-shadow\s*:\s*(?!none|var\(--admin-(?:shadow|edge)|var\(--yy-elev-\d\))\S|text-shadow|gradient|rgba?\(|transition:\s*all|ease-in(?![\w-])|#[0-9a-fA-F]{3,8}\b|(?<![-\w])color:\s*(?:white|black)\b|background(?:-color)?:\s*(?:white|black)\b/;
 
 const FILES = [
   ...readdirSync(join(ROOT, "_admin")).filter((f) => f.endsWith(".css")).map((f) => `_admin/${f}`),
@@ -48,6 +48,16 @@ describe("後台：所有樣式檔", () => {
   it.each(FILES)("%s：沒有舊風格 token、寫死色碼、陰影、漸層、transition: all", (f) => {
     expect(css[f]).not.toMatch(OLD_TOKENS);
     expect(css[f]).not.toMatch(NO_DECORATION);
+  });
+
+  it.each(FILES)("%s：border-radius 只能是 0 或圓角 token（卡片 20、控制項 12、標籤 8），不寫 px、rem、%、em，也不用已刪除的 --yy-ui-radius", (f) => {
+    const bad = [];
+    for (const m of css[f].matchAll(/border(?:-(?:top|bottom)-(?:left|right))?-radius\s*:\s*([^;}]+)/gi)) {
+      const stripped = m[1].replace(/var\(--(?:admin-radius(?:-sm)?|yy-radius-(?:tag|control|panel|block|min|pill|round))\)/g, "").replace(/!important/g, "").replace(/\b0\b/g, "").trim();
+      if (stripped) bad.push(m[0].trim());
+    }
+    expect(bad).toEqual([]);
+    expect(css[f]).not.toMatch(/--yy-ui-radius/);
   });
 
   it.each(FILES)("%s：hover 只給有滑鼠的裝置", (f) => {
@@ -76,7 +86,7 @@ describe("後台外殼", () => {
     const shell = css["_admin/layout.css"];
     expect(shell).toMatch(/--admin-bg:\s*var\(--yy-calm-bg\)/);
     expect(shell).toMatch(/--admin-border:\s*var\(--yy-calm-rule\)/);
-    expect(shell).toMatch(/--admin-shadow:\s*none/);
+    expect(shell).toMatch(/--admin-shadow:\s*var\(--yy-elev-1\)/);
   });
 
   it("側欄是單色底、啟用項目用左側實線標記，不靠漸層與陰影", () => {
@@ -94,14 +104,70 @@ describe("後台外殼", () => {
     expect(find("_admin/layout.css")(".admin-nav-backdrop", /prefers-reduced-motion/).body).toMatch(/animation:\s*none/);
   });
 
-  it("入口載入條不再用拼色漸層，動畫只動透明度", () => {
-    const bar = find("_admin/admin-entry.css")(".admin-entry-bar").body;
-    expect(bar).toMatch(/background:\s*var\(--yy-calm-block-accent\)/);
-    expect(css["_admin/admin-entry.css"]).toMatch(/@keyframes admin-entry-pulse\s*\{[^@]*opacity/);
+  it("入口載入畫面與前台啟動畫面同一語言：象牙底、宋體字標、底部細線，動畫只動 transform 與 opacity", () => {
+    const entry = find("_admin/admin-entry.css");
+    expect(entry(".admin-entry").body).toMatch(/background:\s*var\(--yy-calm-bg\)/);
+    expect(entry(".admin-entry-name").body).toMatch(/font-family:\s*var\(--yy-font-brand\)/);
+    expect(entry(".admin-entry-bar").body).toMatch(/height:\s*2px/);
+    expect(entry(".admin-entry-bar b").body).toMatch(/animation:\s*admin-entry-slide/);
+    const keyframes = [...css["_admin/admin-entry.css"].matchAll(/@keyframes\s+([\w-]+)\s*\{([\s\S]*?)\}\s*\}/g)];
+    expect(keyframes.length).toBeGreaterThanOrEqual(5);
+    keyframes.forEach(([, name, body]) => {
+      [...body.matchAll(/([\w-]+)\s*:/g)].map((m) => m[1]).filter((p) => !/^(from|to)$/.test(p)).forEach((prop) => {
+        expect(["opacity", "transform"], `${name} 動了 ${prop}`).toContain(prop);
+      });
+    });
+    expect(entry(".admin-entry-skip").body).toMatch(/min-height:\s*var\(--yy-control-md\)/);
+    // 所有 transition 與 animation 宣告：轉場只准動 transform／opacity／border-color／color，animation 只准指向上面檢查過的 keyframes
+    const names = new Set(keyframes.map((k) => k[1]));
+    [...css["_admin/admin-entry.css"].matchAll(/transition:\s*([^;]+);/g)].forEach(([, v]) => {
+      v.split(",").forEach((part) => expect(["transform", "opacity", "border-color", "color"], v).toContain(part.trim().split(/\s+/)[0]));
+    });
+    [...css["_admin/admin-entry.css"].matchAll(/animation:\s*([\w-]+)/g)].forEach(([, n]) => {
+      expect(n === "none" || names.has(n), n).toBe(true);
+    });
   });
 });
 
 describe("後台共用規則", () => {
+  it("儲存成功提示：浮在右下角、疊在側欄之上，進場只動 transform 與 opacity，深色模式用描邊", () => {
+    const region = find("_admin/admin-toast.css")(".admin-shell .admin-toast-region").body;
+    expect(region).toMatch(/position:\s*fixed/);
+    expect(region).toMatch(/z-index:\s*var\(--admin-z-toast/);
+    const toast = find("_admin/admin-toast.css")(".admin-shell .admin-toast").body;
+    expect(toast).toMatch(/box-shadow:\s*var\(--admin-shadow-overlay\),\s*var\(--admin-edge-overlay\)/);
+    expect(css["_admin/admin-toast.css"]).toMatch(/@keyframes admin-toast-in\s*\{\s*from\s*\{\s*opacity:\s*0;\s*transform:/);
+    expect(find("_admin/admin-toast.css")(".admin-shell .admin-toast", /prefers-reduced-motion/).body).toMatch(/animation:\s*none/);
+    expect(find("_admin/admin-toast.css")(".admin-shell .admin-toast-close").body).toMatch(/width:\s*var\(--yy-control-md\)/);
+  });
+
+  it("表頭固定與列高統一：捲動區有高度上限，thead th sticky，td 取列高 token", () => {
+    expect(find("_admin/admin-base.css")(".admin-shell .admin-table-scroll").body).toMatch(/max-height:\s*max\(360px,/);
+    expect(find("_admin/admin-base.css")(".admin-shell .admin-table-scroll thead th").body).toMatch(/position:\s*sticky/);
+    expect(css["_admin/admin-base.css"]).toMatch(/height:\s*var\(--admin-row-height\)/);
+    expect(css["_admin/layout.css"]).toMatch(/--admin-row-height:\s*52px/);
+  });
+
+  it("批次操作列浮起：sticky 貼底，用 raised 陰影；篩選 chip 的移除鈕點擊區 44px", () => {
+    const bar = find("_admin/admin-collection.css")(".admin-shell .admin-bulk-bar").body;
+    expect(bar).toMatch(/position:\s*sticky/);
+    expect(bar).toMatch(/box-shadow:\s*var\(--admin-shadow-raised\),\s*var\(--admin-edge-raised\)/);
+    const x = find("_admin/admin-collection.css")(".admin-shell .admin-filter-chip-remove").body;
+    expect(x).toMatch(/width:\s*var\(--yy-control-md\)/);
+    expect(x).toMatch(/height:\s*var\(--yy-control-md\)/);
+  });
+
+  it("危險彈窗：標題與分隔線換危險色；彈窗圓角與陰影取 token", () => {
+    expect(find("_admin/admin-base.css")(".admin-modal .modal-content").body).toMatch(/border-radius:\s*var\(--yy-radius-panel\)/);
+    expect(find("_admin/admin-base.css")(".admin-modal--danger .modal-title").body).toMatch(/color:\s*var\(--yy-calm-danger\)/);
+  });
+
+  it("觸控裝置的點擊區至少 44px", () => {
+    const block = find("_admin/admin-base.css")(".admin-shell .rte-tool", /pointer:\s*coarse/) ?? rules["_admin/admin-base.css"].find((r) => r.atRules.some((a) => /pointer:\s*coarse/.test(a)) && /rte-tool/.test(r.selector));
+    expect(block.body).toMatch(/width:\s*var\(--yy-control-md\)/);
+    expect(block.body).toMatch(/height:\s*var\(--yy-control-md\)/);
+  });
+
   it("輸入框有焦點框，表單與按鈕至少 38px 高", () => {
     expect(css["_admin/admin-base.css"]).toMatch(/:is\(\.form-control, \.form-select\):focus\s*\{[^}]*outline:\s*var\(--admin-focus-ring\)/);
     expect(css["_admin/admin-base.css"]).toMatch(/min-height:\s*var\(--admin-control-height\)/);
@@ -116,10 +182,10 @@ describe("後台共用規則", () => {
     expect(f(".quiz-quality-dot:focus-visible").body).toMatch(/outline:\s*var\(--admin-focus-ring\)/);
   });
 
-  it("留存熱圖：待計算格用虛線框而不只靠顏色，資料深淺用 accent 的百分比", () => {
+  it("留存熱圖：待計算格用虛線框而不只靠顏色，資料深淺用資料色混表面的百分比", () => {
     const pending = find("_admin/retention-analysis.css")(".retention-analysis-cell-pending").body;
     expect(pending).toMatch(/border:\s*1px dashed/);
-    expect(css["_admin/retention-analysis.css"]).toMatch(/color-mix\(in srgb, var\(--yy-calm-accent\) 90%/);
+    expect(css["_admin/retention-analysis.css"]).toMatch(/color-mix\(in srgb, var\(--yy-data-1\) 45%/);
   });
 
   it("狀態標籤各自有不同的框色，不只靠底色", () => {

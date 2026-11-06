@@ -36,6 +36,7 @@ import WordEditorExplanation, {
     emptySentence,
 } from './WordEditorExplanation';
 import '../../../static/css/_admin/dictionary.css';
+import { SuccessNotice } from '../components/AdminToast';
 
 const EMPTY_TAXONOMIES = {
     tribes: [],
@@ -349,7 +350,7 @@ export default function WordEditor() {
                     {revisionActions.error}
                 </Alert>
             )}
-            {success && <Alert variant="success">{success}</Alert>}
+            <SuccessNotice message={success} />
 
             <Form
                 className="dictionary-editor-card"

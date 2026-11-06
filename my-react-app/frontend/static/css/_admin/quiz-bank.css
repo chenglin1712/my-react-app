@@ -14,7 +14,7 @@
 
 .quiz-bank-field { margin-bottom: 18px; }
 .quiz-bank-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 18px; }
-.quiz-bank-blank-card { padding: 14px; margin-bottom: 14px; background: var(--admin-surface-muted); border: 1px solid var(--admin-border); border-radius: 8px; }
+.quiz-bank-blank-card { padding: 14px; margin-bottom: 14px; background: var(--admin-surface-muted); border: 1px solid var(--admin-border); border-radius: var(--yy-radius-tag); }
 .quiz-bank-blank-card-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .quiz-bank-blank-options-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .quiz-bank-option-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
@@ -22,16 +22,16 @@
 /* 選擇題的三張選項圖片：原本是 QuizChoice.jsx／QuizTrueFalse.jsx 內嵌的
    style={{}}，跟這個檔案其他版面規則一樣是固定不變的，不是依資料動態算的。 */
 .quiz-bank-choice-images { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
-.quiz-bank-choice-option-card { border: 1px solid var(--admin-border); border-radius: 8px; padding: 1rem; }
-.quiz-bank-option-image-preview { width: 100%; height: 140px; object-fit: cover; border-radius: 8px; }
-.quiz-bank-single-image-preview { width: 180px; height: 120px; object-fit: cover; border-radius: 8px; }
+.quiz-bank-choice-option-card { border: 1px solid var(--admin-border); border-radius: var(--yy-radius-tag); padding: 1rem; }
+.quiz-bank-option-image-preview { width: 100%; height: 140px; object-fit: cover; border-radius: var(--yy-radius-tag); }
+.quiz-bank-single-image-preview { width: 180px; height: 120px; object-fit: cover; border-radius: var(--yy-radius-tag); }
 .quiz-bank-option-row .form-control { flex: 1; }
 
 /* 外部題源設定：5 個族語一列一列直接編輯，不需要另開 Modal */
 .quiz-bank-sources-table input { max-width: 220px; }
 
 /* IRT 參數：單一設定表單，比照 homepage-config.css 的 section 分組排版邏輯 */
-.quiz-bank-config-card { max-width: 1440px; margin: 0 auto; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: 12px; padding: 28px; }
+.quiz-bank-config-card { max-width: 1440px; margin: 0 auto; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); padding: 28px; }
 .quiz-bank-config-section { padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--admin-border); }
 .quiz-bank-config-section:last-of-type { border-bottom: none; margin-bottom: 0; }
 .quiz-bank-config-section-heading h2 { margin: 0 0 4px; font-size: 18px; font-weight: 700; color: var(--admin-accent); }
@@ -48,8 +48,8 @@
 .quiz-bank-heading-actions { gap: 8px; }
 .quiz-bank-ai-note { color: var(--admin-muted); font-size: 14px; margin-bottom: 16px; }
 .quiz-bank-ai-words { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 10px 0 0; }
-.quiz-bank-ai-words li { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 10px; background: var(--admin-surface-muted); border: 1px solid var(--admin-border); border-radius: 999px; font-size: 14px; }
-.quiz-bank-ai-remove { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 0; border-radius: 50%; background: transparent; color: var(--admin-muted); transition: background-color 120ms ease-out, transform 120ms ease-out; }
+.quiz-bank-ai-words li { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 10px; background: var(--admin-surface-muted); border: 1px solid var(--admin-border); border-radius: var(--yy-radius-pill); font-size: 14px; }
+.quiz-bank-ai-remove { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 0; border-radius: var(--yy-radius-round); background: transparent; color: var(--admin-muted); transition: background-color 120ms ease-out, transform 120ms ease-out; }
 @media (hover: hover) and (pointer: fine) {
     .quiz-bank-ai-remove:hover { background: var(--admin-border); }
 }

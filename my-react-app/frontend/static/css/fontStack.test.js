@@ -132,14 +132,14 @@ describe("字型堆疊 token（theme-v2.css）", () => {
     ["body", "heading", "tribal", "tribal-heading"].forEach((k) => expect(families(token(k)), k).not.toContain("serif"));
   });
 
-  it("只有字標用 --yy-font-brand：前台 CSS 套用它的選擇器限於報頭字標、導覽字標與頁尾浮水印字標", () => {
+  it("只有字標用 --yy-font-brand：前台 CSS 套用它的選擇器限於報頭字標、導覽字標、頁尾浮水印字標與後台載入畫面的「原語」字標", () => {
     const hits = [];
     walkCss(ROOT).forEach((f) => {
       stripComments(readFileSync(f, "utf8")).split("\n").forEach((line, i) => {
         if (/var\(--yy-font-brand\)/.test(line)) hits.push(`${f.split(/[\\/]/).slice(-2).join("/")}:${i + 1}`);
       });
     });
-    expect(hits.map((h) => h.replace(/:\d+$/, "")).sort()).toEqual(["_home/masthead.css", "_home/masthead.css", "default/theme-v2.css", "navigation/Navbar.css"]);
+    expect(hits.map((h) => h.replace(/:\d+$/, "")).sort()).toEqual(["_admin/admin-entry.css", "_home/masthead.css", "_home/masthead.css", "default/theme-v2.css", "navigation/Navbar.css"]);
   });
 
   it("族語詞彙專用 token：Noto 在前（同一個詞不換字型），TC 在後；全站內文則必須 TC 在前（保住中文標點）", () => {

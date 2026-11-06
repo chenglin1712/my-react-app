@@ -124,6 +124,13 @@
   --yy-calm-tag-on: #FFF9ED;
   --yy-calm-block: #41464B;        /* 石板灰區塊（最新消息、公告） */
   --yy-calm-block-on: #FFF9ED;
+  /* 圖表資料色（後台儀表板與分析頁，Apple 化 5-4）：色盲友善（藍、橙、綠、紫、橄欖），在表面色上都 ≥ 3:1；同一張圖不靠顏色單獨傳達資訊（另有線型、標記或文字）。--yy-data-on 是實心資料色上的字。 */
+  --yy-data-1: #1F5F99;
+  --yy-data-2: #B34700;
+  --yy-data-3: #00775E;
+  --yy-data-4: #7A3E8E;
+  --yy-data-5: #7A6200;
+  --yy-data-on: #FFFFFF;
   --yy-calm-block-deep: #33383D;   /* 頁尾：比石板灰區塊再深一階 */
   --yy-calm-block-accent: #D7A98B; /* 石板灰上的淺銅，小字也可用（對比 4.51）；原淺銅 #C9976F 只有 3.70，不放進語意層 */
   --yy-calm-info-bg: #EFE6DA;
@@ -159,7 +166,6 @@
   --yy-focus-offset: 2px;
   /* 沉穩文藝的互動元件尺寸（S2-1）。舊的 --yy-radius-btn、--yy-focus-ring 後台還在用，所以另立新名，不改舊值。
      焦點框 2px 以上、距離邊緣 3px，不被相鄰元件遮住；顏色取 --yy-calm-focus，隨深淺色主題切換。 */
-  --yy-ui-radius: 3px;
   --yy-ui-focus-ring: 2px solid var(--yy-calm-focus);
   --yy-ui-focus-offset: 3px;
   --yy-ui-press: 0.97;             /* 按下回饋的縮放比例，所有可按元件共用 */
@@ -305,6 +311,13 @@
     --yy-calm-tag-on: #24282C;
     --yy-calm-block: #2E3338;
     --yy-calm-block-on: #F2EEE3;
+    /* 圖表資料色（深色）：與淺色同序，亮度提高以對比深色表面。 */
+    --yy-data-1: #6FB1E8;
+    --yy-data-2: #F0A060;
+    --yy-data-3: #5CC9A7;
+    --yy-data-4: #D49BD4;
+    --yy-data-5: #E3C377;
+    --yy-data-on: #1B2024;
     --yy-calm-block-deep: #262A2E;
     --yy-calm-block-accent: #D7A98B;
     --yy-calm-info-bg: #343A3E;
@@ -347,6 +360,13 @@
   --yy-calm-tag-on: #24282C;
   --yy-calm-block: #2E3338;
   --yy-calm-block-on: #F2EEE3;
+  /* 圖表資料色（深色）：與淺色同序，亮度提高以對比深色表面。 */
+  --yy-data-1: #6FB1E8;
+  --yy-data-2: #F0A060;
+  --yy-data-3: #5CC9A7;
+  --yy-data-4: #D49BD4;
+  --yy-data-5: #E3C377;
+  --yy-data-on: #1B2024;
   --yy-calm-block-deep: #262A2E;
   --yy-calm-block-accent: #D7A98B;
   --yy-calm-info-bg: #343A3E;

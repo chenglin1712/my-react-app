@@ -616,3 +616,77 @@ describe("首頁 · 頂部通知條（步驟 2-6）", () => {
     expect(screen.queryByRole("complementary", { name: "網站通知" })).toBeNull();
   });
 });
+
+describe('首頁 · 捲動敘事「一個詞的旅程」（後台可設定）', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+  });
+
+  const customStory = {
+    enabled: true,
+    kicker: '我的旅程',
+    steps: [
+      { glyph: '甲', title: '第一件事', text: '說明一', pattern: 'grid' },
+      { glyph: '乙', title: '第二件事', text: '說明二', pattern: 'dots' },
+      { glyph: '丙', title: '第三件事', text: '說明三', pattern: 'stripe' },
+    ],
+  };
+
+  test('後台沒填（steps 空清單）：用內建預設四步', async () => {
+    mockFetchOk([], { ...DEFAULT_CONFIG, story: { enabled: true, kicker: '', steps: [] } });
+    renderHome();
+    expect(await screen.findByRole('region', { name: '一個詞的旅程' })).toHaveAttribute('data-count', '4');
+    expect(screen.getByText('查一個詞')).toBeInTheDocument();
+  });
+
+  test('後台自訂：照後台的小標與步驟顯示', async () => {
+    mockFetchOk([], { ...DEFAULT_CONFIG, story: customStory });
+    renderHome();
+    expect(await screen.findByRole('region', { name: '我的旅程' })).toHaveAttribute('data-count', '3');
+    expect(screen.getByText('第二件事')).toBeInTheDocument();
+    expect(screen.queryByText('查一個詞')).toBeNull();
+  });
+
+  test('後台關閉：整段不輸出', async () => {
+    mockFetchOk([], { ...DEFAULT_CONFIG, story: { enabled: false, kicker: '', steps: [] } });
+    renderHome();
+    await waitFor(() => expect(screen.getByTestId('calendar-mock')).toBeInTheDocument());
+    await waitFor(() => expect(globalThis.fetch.mock.calls.some(([u]) => u.includes('homepage-config'))).toBe(true));
+    // 設定回來之後仍然沒有這一段
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByText('略過這一段 →')).toBeNull();
+  });
+
+  test('舊版後端沒有 story 欄位：用預設內容', async () => {
+    mockFetchOk([], DEFAULT_CONFIG);
+    renderHome();
+    expect(await screen.findByRole('region', { name: '一個詞的旅程' })).toBeInTheDocument();
+  });
+
+  test('設定端點掛掉：仍顯示預設內容（不因設定失敗讓整段消失）', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn((url) => {
+      if (url.includes('/adminapi/public/announcements/')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [] }) });
+      if (url.includes('/adminapi/public/homepage-config/')) return Promise.reject(new Error('設定端點掛了'));
+      if (url.includes('/adminapi/public/featured-topics/')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [] }) });
+      if (url.includes('/crawler/exam_schedule/')) return Promise.resolve({ ok: true, json: () => Promise.resolve(EXAM_SCHEDULE) });
+      return Promise.reject(new Error(`unexpected url: ${url}`));
+    }));
+    renderHome();
+    expect(await screen.findByRole('region', { name: '一個詞的旅程' })).toBeInTheDocument();
+  });
+
+  test('設定還沒回來之前不輸出這一段（避免先出現再消失、把下方內容頂開）', async () => {
+    vi.stubGlobal('fetch', vi.fn((url) => {
+      if (url.includes('/adminapi/public/homepage-config/')) return new Promise(() => {});
+      if (url.includes('/adminapi/public/announcements/')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [] }) });
+      if (url.includes('/adminapi/public/featured-topics/')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [] }) });
+      if (url.includes('/crawler/exam_schedule/')) return Promise.resolve({ ok: true, json: () => Promise.resolve(EXAM_SCHEDULE) });
+      return Promise.reject(new Error(`unexpected url: ${url}`));
+    }));
+    renderHome();
+    await waitFor(() => expect(screen.getByTestId('calendar-mock')).toBeInTheDocument());
+    expect(screen.queryByRole('region', { name: '一個詞的旅程' })).toBeNull();
+  });
+});

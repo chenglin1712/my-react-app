@@ -131,10 +131,9 @@ describe("圓角、邊框與陰影", () => {
   it("前台 CSS 的 border-radius 只能是 0 或圓角 token，不寫 px、rem、%，也不再用舊的 3px --yy-ui-radius（登入頁 adminLogin 屬後台範圍除外）", () => {
     const bad = [];
     css.forEach(({ file, text }) => {
-      if (file.endsWith("adminLogin.css")) return;
       text.split("\n").forEach((line, i) => {
         if (isTokenDefinition(line)) return;
-        if (line.includes("var(--yy-ui-radius)")) bad.push(`${file}:${i + 1} 舊 --yy-ui-radius`);
+        if (line.includes("var(--yy-ui-radius)")) bad.push(`${file}:${i + 1} 已刪除的 --yy-ui-radius`);
         // 簡寫與四個單角寫法（border-top-left-radius…）都檢查，同一行有多個宣告也逐一檢查，屬性名不分大小寫
         for (const m of line.matchAll(/border(?:-(?:top|bottom)-(?:left|right))?-radius\s*:\s*([^;}]+)/gi)) {
           const stripped = m[1].replace(/var\(--yy-radius-(?:tag|control|panel|block|min|pill|round)\)/g, "").replace(/!important/g, "").replace(/\b0\b/g, "").trim();

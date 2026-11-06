@@ -1,0 +1,145 @@
+/* 首頁捲動敘事的後台編輯區塊（StoryEditor.jsx，Apple 化 5-5）。
+   預覽直接使用前台 story.css 的樣式（織紋、大字、清單），這裡只把「釘住捲動」的版面改成靜態卡片。 */
+
+.admin-story-rows {
+  display: grid;
+  gap: var(--yy-space-step-04);
+  margin: 0 0 var(--yy-space-step-04);
+  padding: 0;
+  list-style: none;
+}
+
+.admin-story-row {
+  display: grid;
+  gap: var(--yy-space-step-03);
+  padding: var(--yy-space-step-04);
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  transition: border-color 160ms var(--ease-out);
+}
+
+/* 目前預覽的就是這一步：邊框換強調色，並用左側粗線再標一次（不只靠顏色） */
+.admin-story-row.is-previewing {
+  border-color: var(--admin-accent);
+  border-left-width: 4px;
+}
+
+.admin-story-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--yy-space-step-03);
+}
+
+.admin-story-row-head h3 {
+  margin: 0;
+  color: var(--admin-text-strong);
+  font-size: var(--yy-text-base);
+  font-weight: 700;
+}
+
+.admin-story-row-actions {
+  display: flex;
+  gap: var(--yy-space-step-01);
+}
+
+.admin-story-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--yy-control-md);
+  height: var(--yy-control-md);
+  color: var(--admin-muted);
+  background: transparent;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  transition: transform 120ms var(--ease-out), background-color 160ms var(--ease-out);
+}
+.admin-story-icon-btn:active:not(:disabled) { transform: scale(var(--yy-ui-press)); }
+.admin-story-icon-btn:disabled { opacity: 0.4; }
+@media (hover: hover) and (pointer: fine) {
+  .admin-story-icon-btn:hover:not(:disabled) { color: var(--admin-text-strong); background: var(--admin-surface-muted); }
+}
+.admin-story-icon-btn:focus-visible { outline: var(--admin-focus-ring); outline-offset: var(--admin-focus-offset); }
+
+.admin-story-row-grid {
+  display: grid;
+  grid-template-columns: minmax(96px, 120px) minmax(0, 1fr) minmax(140px, 180px);
+  gap: var(--yy-space-step-03);
+}
+
+@media (max-width: 720px) {
+  .admin-story-row-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.admin-story-count-error {
+  margin: 0 0 var(--yy-space-step-03);
+  color: var(--admin-danger);
+  font-weight: 600;
+}
+
+.admin-story-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--yy-space-step-03);
+  margin-bottom: var(--yy-space-step-06);
+}
+
+.admin-story-toolbar-hint {
+  color: var(--admin-muted);
+  font-size: var(--yy-text-sm);
+}
+
+/* ---------- 預覽 ---------- */
+.admin-story-preview-wrap { margin-top: var(--yy-space-step-04); }
+
+.admin-story-preview-title {
+  margin: 0 0 var(--yy-space-step-01);
+  color: var(--admin-text-strong);
+  font-size: var(--yy-text-base);
+  font-weight: 700;
+}
+
+.admin-story-preview-hint {
+  margin: 0 0 var(--yy-space-step-03);
+  color: var(--admin-muted);
+  font-size: var(--yy-text-sm);
+}
+
+/* 前台的 .home-story 是 240dvh 高、舞台 sticky 的捲動區段；預覽拿掉這些，變成一張靜態卡片 */
+.admin-shell .admin-story-preview.home-story {
+  height: auto;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-shell .admin-story-preview .home-story__stage {
+  position: static;
+  grid-template-columns: 1.05fr 1fr;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+}
+
+.admin-shell .admin-story-preview .home-story__art { min-height: 300px; }
+.admin-shell .admin-story-preview .home-story__glyph { font-size: 72px; }
+
+/* 前台窄螢幕版會把所有織紋層擠成一層、所有步驟全展開；預覽永遠照桌面版的行為（只展開目前這一步） */
+.admin-shell .admin-story-preview .home-story__layer { display: block; transform: translateY(100%); }
+.admin-shell .admin-story-preview .home-story__layer.is-on { transform: none; }
+.admin-shell .admin-story-preview .home-story__step { opacity: 0.6; }
+.admin-shell .admin-story-preview .home-story__step.is-on { opacity: 1; }
+.admin-shell .admin-story-preview .home-story__step p { max-height: 0; opacity: 0; }
+.admin-shell .admin-story-preview .home-story__step.is-on p { max-height: 96px; opacity: 1; }
+
+@media (max-width: 900px) {
+  .admin-shell .admin-story-preview .home-story__stage { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-story-row,
+  .admin-story-icon-btn { transition: none; }
+  .admin-story-icon-btn:active:not(:disabled) { transform: none; }
+}

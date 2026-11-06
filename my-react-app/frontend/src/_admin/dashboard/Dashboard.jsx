@@ -49,7 +49,8 @@ const DATE_RANGE_OPTIONS = [
     { value: 'custom', label: '自訂' },
 ];
 
-const FEATURE_COLORS = ['#1f3a5c', '#2c6e7f', '#4b6b3a', '#d9a227'];
+// 圖表資料色取自 --yy-data-*（theme-v2.css），深淺色主題各有一組，色盲友善
+const FEATURE_COLORS = ['var(--yy-data-1)', 'var(--yy-data-2)', 'var(--yy-data-3)', 'var(--yy-data-4)'];
 
 const formatDateTime = (value) => value
     ? new Intl.DateTimeFormat('zh-TW', {
@@ -65,7 +66,7 @@ const formatChartDate = (value) => {
 };
 
 const getTribeColor = (slug) => (
-    TRIBES.find((tribe) => tribe.slug === slug)?.color ?? '#6b7280'
+    TRIBES.find((tribe) => tribe.slug === slug)?.color ?? 'var(--yy-calm-text-sub)'
 );
 
 const ComingSoonStat = ({ icon: Icon, title }) => (
@@ -84,6 +85,7 @@ const AnalyticsStat = ({
     title,
     value,
     detail,
+    source,
     loading,
     error,
 }) => (
@@ -97,6 +99,7 @@ const AnalyticsStat = ({
                     ? <small className="dashboard-inline-error">{error}</small>
                     : <strong>{value}</strong>}
             <span className="admin-stat-detail">{detail}</span>
+            {source && <span className="admin-stat-source">資料來源：{source}</span>}
         </div>
     </article>
 );
@@ -271,6 +274,7 @@ export default function Dashboard() {
                                 ? <small className="dashboard-inline-error">{pendingError}</small>
                                 : <strong>{pendingCount}</strong>}
                         <span className="admin-stat-detail">前往公告管理</span>
+                        <span className="admin-stat-source">資料來源：公告審核佇列</span>
                     </div>
                 </Link>
 
@@ -279,6 +283,7 @@ export default function Dashboard() {
                     title="今日活躍使用者"
                     value={todayActiveCount}
                     detail="今日不重複活躍人數"
+                    source="使用者活動紀錄"
                     loading={todayActiveLoading}
                     error={todayActiveError}
                 />
@@ -288,6 +293,7 @@ export default function Dashboard() {
                     title="本週新註冊"
                     value={weeklyRegistrationCount}
                     detail="最近 7 天註冊總數"
+                    source="使用者活動紀錄"
                     loading={weeklyRegistrationLoading}
                     error={weeklyRegistrationError}
                 />
@@ -392,16 +398,16 @@ export default function Dashboard() {
                                         data={activityChartData}
                                         margin={{ top: 8, right: 12, left: -12, bottom: 0 }}
                                     >
-                                        <CartesianGrid stroke="#edf0f2" strokeDasharray="3 3" />
+                                        <CartesianGrid stroke="var(--yy-calm-rule)" strokeDasharray="3 3" />
                                         <XAxis
                                             dataKey="dateLabel"
-                                            stroke="#6b5a47"
+                                            stroke="var(--yy-calm-text-sub)"
                                             fontSize={12}
                                             tickLine={false}
                                         />
                                         <YAxis
                                             allowDecimals={false}
-                                            stroke="#6b5a47"
+                                            stroke="var(--yy-calm-text-sub)"
                                             fontSize={12}
                                             tickLine={false}
                                         />
@@ -413,7 +419,7 @@ export default function Dashboard() {
                                             type="monotone"
                                             dataKey="activeUsers"
                                             name="活躍使用者"
-                                            stroke="#1f3a5c"
+                                            stroke="var(--yy-data-1)"
                                             strokeWidth={2}
                                             dot={{ r: 3 }}
                                             activeDot={{ r: 5 }}
@@ -422,7 +428,7 @@ export default function Dashboard() {
                                             type="monotone"
                                             dataKey="newRegistrations"
                                             name="新註冊"
-                                            stroke="#2c6e7f"
+                                            stroke="var(--yy-data-2)"
                                             strokeWidth={2}
                                             strokeDasharray="6 4"
                                             dot={{ r: 3 }}
@@ -460,11 +466,11 @@ export default function Dashboard() {
                                         layout="vertical"
                                         margin={{ top: 8, right: 18, left: 8, bottom: 0 }}
                                     >
-                                        <CartesianGrid stroke="#edf0f2" strokeDasharray="3 3" />
+                                        <CartesianGrid stroke="var(--yy-calm-rule)" strokeDasharray="3 3" />
                                         <XAxis
                                             type="number"
                                             allowDecimals={false}
-                                            stroke="#6b5a47"
+                                            stroke="var(--yy-calm-text-sub)"
                                             fontSize={12}
                                             tickLine={false}
                                         />
@@ -472,7 +478,7 @@ export default function Dashboard() {
                                             type="category"
                                             dataKey="label"
                                             width={70}
-                                            stroke="#6b5a47"
+                                            stroke="var(--yy-calm-text-sub)"
                                             fontSize={12}
                                             tickLine={false}
                                         />
@@ -516,16 +522,16 @@ export default function Dashboard() {
                                         data={featureChartData}
                                         margin={{ top: 8, right: 12, left: -12, bottom: 0 }}
                                     >
-                                        <CartesianGrid stroke="#edf0f2" strokeDasharray="3 3" />
+                                        <CartesianGrid stroke="var(--yy-calm-rule)" strokeDasharray="3 3" />
                                         <XAxis
                                             dataKey="label"
-                                            stroke="#6b5a47"
+                                            stroke="var(--yy-calm-text-sub)"
                                             fontSize={12}
                                             tickLine={false}
                                         />
                                         <YAxis
                                             allowDecimals={false}
-                                            stroke="#6b5a47"
+                                            stroke="var(--yy-calm-text-sub)"
                                             fontSize={12}
                                             tickLine={false}
                                         />

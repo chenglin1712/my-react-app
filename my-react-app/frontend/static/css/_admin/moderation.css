@@ -54,7 +54,7 @@
   flex: 0 0 auto;
   width: 64px;
   height: 48px;
-  border-radius: 6px;
+  border-radius: var(--yy-radius-tag);
   background: var(--admin-border);
   object-fit: cover;
 }

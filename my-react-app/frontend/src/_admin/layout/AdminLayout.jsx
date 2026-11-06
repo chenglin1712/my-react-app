@@ -7,6 +7,7 @@ import ErrorBoundary from '../../errorBoundary';
 import { ROLE_LABELS } from '../constants/roles';
 import AdminRouteSkeleton from './AdminRouteSkeleton';
 import AdminReauthModal from '../session/AdminReauthModal';
+import { AdminToastProvider } from '../components/AdminToast';
 import { useAdminEntry } from '../entry/adminEntryContext';
 import '../../../static/css/_admin/layout.css';
 import '../../../static/css/_admin/admin-base.css';
@@ -216,6 +217,7 @@ export default function AdminLayout({ pendingCounts = {} }) {
     return (
         <div className={`admin-shell${navOpen ? ' is-nav-open' : ''}${ceremony === 'hold' ? ' admin-shell--hold' : ''}${ceremony === 'play' ? ' admin-shell--play' : ''}`}>
             <a href="#admin-main" className="visually-hidden-focusable" inert={navOpen || undefined}>跳到後台主要內容</a>
+            <AdminToastProvider>
             <AdminReauthModal />
             <aside className="admin-sidebar" id="admin-sidebar">
                 <button type="button" className="admin-nav-close" ref={closeRef} onClick={() => closeNav(true)} aria-label="關閉主選單">
@@ -313,6 +315,7 @@ export default function AdminLayout({ pendingCounts = {} }) {
                     </ErrorBoundary>
                 </div>
             </div>
+            </AdminToastProvider>
         </div>
     );
 }

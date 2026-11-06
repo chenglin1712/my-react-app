@@ -142,6 +142,77 @@ def validate_marquee_items(value):
         validate_single_line(text)
 
 
+# ---------------------------------------------------------------------------
+# 首頁捲動敘事「一個詞的旅程」（Apple 化 5-5，HOMEPAGE_CONTRACT.md 3.5）
+# 空清單 = 用前台內建的預設文案；有內容時 3 到 6 步，每步四個欄位，全部純文字、單行。
+# ---------------------------------------------------------------------------
+STORY_MIN_STEPS = 3
+STORY_MAX_STEPS = 6
+STORY_GLYPH_MAX = 4      # 左側大字，超過會擠出版面
+STORY_TITLE_MAX = 16
+STORY_TEXT_MAX = 80
+STORY_KICKER_MAX = 20
+# 左側織紋：斜紋、直紋、圓點、格紋（值是英文代號，樣式在前台 story.css）
+STORY_PATTERNS = ("stripe", "vertical", "dots", "grid")
+_STORY_KEYS = ("glyph", "title", "text", "pattern")
+
+
+def normalize_story_steps(value):
+    """捲動敘事步驟的正規形：只留已知的四個欄位，文字去前後空白（單一入口，serializer 與驗證共用）。
+
+    不是 list 或項目不是 dict 時原樣回傳，交給 validate_story_steps 報錯。
+    不做 Unicode NFC 正規化（理由同 normalize_marquee_items）。
+    """
+    if not isinstance(value, list):
+        return value
+    out = []
+    for item in value:
+        if not isinstance(item, dict):
+            out.append(item)
+            continue
+        out.append({
+            key: (item[key].strip() if isinstance(item.get(key), str) else item.get(key))
+            for key in _STORY_KEYS if key in item
+        } | {k: v for k, v in item.items() if k not in _STORY_KEYS})
+    return out
+
+
+def validate_story_steps(value):
+    """捲動敘事步驟：空清單，或 3 到 6 步；每步 glyph（1 到 4 字）、title、text、pattern 四個欄位。
+
+    多餘的欄位一律拒絕（不能把任意資料塞進公開端點）。
+    """
+    if not isinstance(value, list):
+        raise ValidationError("捲動敘事步驟必須是清單")
+    if not value:
+        return
+    if not STORY_MIN_STEPS <= len(value) <= STORY_MAX_STEPS:
+        raise ValidationError(f"捲動敘事必須是 {STORY_MIN_STEPS} 到 {STORY_MAX_STEPS} 步（或留空使用預設文案）")
+    limits = {"glyph": STORY_GLYPH_MAX, "title": STORY_TITLE_MAX, "text": STORY_TEXT_MAX}
+    labels = {"glyph": "大字", "title": "標題", "text": "說明"}
+    for index, raw in enumerate(value, start=1):
+        if not isinstance(raw, dict):
+            raise ValidationError(f"第 {index} 步格式不正確")
+        extra = set(raw) - set(_STORY_KEYS)
+        if extra:
+            raise ValidationError(f"第 {index} 步有不支援的欄位")
+        for key in _STORY_KEYS:
+            if key not in raw:
+                raise ValidationError(f"第 {index} 步缺少{labels.get(key, '織紋')}")
+        for key, limit in limits.items():
+            text = raw[key]
+            if not isinstance(text, str):
+                raise ValidationError(f"第 {index} 步的{labels[key]}必須是文字")
+            text = text.strip()
+            if not text:
+                raise ValidationError(f"第 {index} 步的{labels[key]}不可為空白")
+            if len(text) > limit:
+                raise ValidationError(f"第 {index} 步的{labels[key]}最多 {limit} 字")
+            validate_single_line(text)
+        if raw["pattern"] not in STORY_PATTERNS:
+            raise ValidationError(f"第 {index} 步的織紋不在可選範圍內")
+
+
 def validate_plain_text(value):
     if value and _MULTI_LINE_BAD.search(value):
         raise ValidationError("不可包含控制字元")

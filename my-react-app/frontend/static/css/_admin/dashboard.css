@@ -26,13 +26,18 @@
 }
 
 .admin-stat-link {
-    transition: border-color .15s ease, transform .15s ease;
+    transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease;
+}
+
+.admin-stat-link:active {
+    transform: scale(var(--yy-ui-press));
 }
 
 @media (hover: hover) and (pointer: fine) {
   .admin-stat-link:hover {
       color: inherit;
       border-color: color-mix(in srgb, var(--yy-calm-accent) 38%, transparent);
+      box-shadow: var(--admin-shadow-raised), var(--admin-edge-raised);
       transform: translateY(-1px);
   }
 }
@@ -45,7 +50,7 @@
     place-items: center;
     color: var(--admin-accent);
     background: var(--yy-calm-info-bg);
-    border-radius: 9px;
+    border-radius: var(--yy-radius-tag);
 }
 
 .admin-stat-card > div:last-child {
@@ -61,15 +66,24 @@
     font-size: 13px;
 }
 
+/* 層次：標題（小、次要色）→ 數字（大、主文字色）→ 說明（小、次要色）→ 資料來源（最小、次要色） */
 .admin-stat-card strong {
-    color: var(--admin-accent);
-    font-size: 28px;
+    color: var(--admin-text-strong);
+    font-size: 32px;
+    font-variant-numeric: tabular-nums;
     line-height: 1.1;
 }
 
 .admin-stat-detail {
     margin-top: 7px;
-    color: var(--admin-accent);
+    color: var(--admin-muted);
+    font-size: var(--yy-text-sm);
+}
+
+.admin-stat-source {
+    display: block;
+    margin-top: 2px;
+    color: var(--admin-muted);
     font-size: 12px;
 }
 

@@ -139,6 +139,7 @@
 ) td {
   padding: 12px 14px;
   border-color: var(--admin-border);
+  height: var(--admin-row-height); /* 列高統一：內容少的列不比別列矮；td 的 height 等同最小高度 */
 }
 @media (hover: hover) and (pointer: fine) {
   .admin-shell :is(
@@ -153,8 +154,26 @@
 /* 表格比容器寬時才可左右捲動並成為可聚焦的 region（見 AdminTable.jsx）；被藏起來的那一側顯示淡陰影 */
 .admin-shell .admin-table-scroll-wrap { position: relative; }
 .admin-shell .admin-table-scroll {
-  overflow-x: auto;
+  overflow: auto;
   scroll-padding-inline: 16px;
+  /* 表頭固定：表格區自己有高度上限（視窗高減頂欄與上下留白），列多時在區內捲動，表頭貼在區頂。
+     這個容器本身就是捲動容器，sticky 只認它，不能貼頁面頂端。 */
+  max-height: max(360px, calc(100dvh - var(--admin-topbar-height) - 220px));
+}
+.admin-shell .admin-table-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+/* sticky 的格子邊框會跟著捲走，底線改用偽元素畫在格子內側 */
+.admin-shell .admin-table-scroll thead th::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  background: var(--admin-border);
 }
 .admin-shell .admin-table-scroll > .table { margin-bottom: 0; }
 .admin-shell .admin-table-scroll:focus-visible {
@@ -306,7 +325,7 @@
 }
 .admin-shell .badge {
   padding: .35em .7em;
-  border-radius: 999px;
+  border-radius: var(--yy-radius-pill);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: .01em;
@@ -390,7 +409,7 @@
 .admin-shell .admin-skeleton-filter { display: flex; gap: 12px; }
 .admin-shell .admin-skeleton-row { display: grid; grid-template-columns: 3fr 2fr 2fr 1fr; gap: 24px; padding: 14px 0; border-bottom: 1px solid var(--admin-border); }
 .admin-shell .admin-skeleton-row:last-child { border-bottom: 0; }
-.admin-shell .admin-skeleton-bar { display: block; height: 14px; background: var(--admin-border); border-radius: 6px; animation: admin-skeleton-pulse 1.4s ease-in-out infinite; }
+.admin-shell .admin-skeleton-bar { display: block; height: 14px; background: var(--admin-border); border-radius: var(--yy-radius-tag); animation: admin-skeleton-pulse 1.4s ease-in-out infinite; }
 .admin-shell .admin-skeleton-title { width: 180px; height: 26px; }
 .admin-shell .admin-skeleton-subtitle { width: 320px; max-width: 70%; }
 .admin-shell .admin-skeleton-field { flex: 1; height: var(--admin-control-height); }
@@ -415,7 +434,7 @@
   padding: 56px 24px 52px;
   background: var(--admin-surface);
   border: 1px dashed var(--admin-border-strong);
-  border-radius: 8px;
+  border-radius: var(--yy-radius-tag);
   text-align: center;
 }
 .admin-shell .admin-empty-stage__icon {
@@ -426,7 +445,7 @@
   margin-bottom: 18px;
   color: var(--admin-accent);
   background: var(--admin-surface-muted);
-  border-radius: 50%;
+  border-radius: var(--yy-radius-round);
 }
 .admin-shell .admin-empty-stage__title {
   margin: 0 0 8px;
@@ -471,7 +490,7 @@
   font-size: var(--yy-text-sm);
   font-weight: 700;
   border: 1px solid var(--admin-border-strong);
-  border-radius: 50%;
+  border-radius: var(--yy-radius-round);
 }
 .admin-shell .admin-empty-stage__action {
   margin-top: 28px;
@@ -482,3 +501,24 @@
   .admin-shell .admin-empty-stage__action { transition: none; }
   .admin-shell .admin-empty-stage__action:active:not(:disabled) { transform: none; }
 }
+
+/* 觸控裝置：密集後台在桌面維持緊湊，但手指操作的點擊區至少 44px（外觀尺寸不變的元件用寬高撐開） */
+@media (pointer: coarse) {
+  .admin-shell .admin-nav-link,
+  .admin-shell .admin-row-menu-item,
+  .admin-shell .admin-row-menu-toggle,
+  .admin-shell .rte-seg-btn { min-height: var(--yy-control-md); }
+  .admin-shell .admin-row-menu-toggle { min-width: var(--yy-control-md); }
+  .admin-shell .quiz-bank-ai-remove,
+  .admin-shell .rte-tool { width: var(--yy-control-md); height: var(--yy-control-md); }
+}
+
+/* ------------------------------------------------------------------ 彈窗（Apple 化 5-3）
+   Bootstrap 彈窗掛在 body 底下、不在 .admin-shell 之內，所以用 dialogClassName 的 .admin-modal 當入口。
+   危險操作（刪除帳號）再加 .admin-modal--danger：標題與頂端分隔線換成危險色，並由文字說明「無法復原」，不只靠顏色。 */
+.admin-modal .modal-content {
+  border-radius: var(--yy-radius-panel);
+  box-shadow: var(--yy-elev-4), var(--yy-edge-4);
+}
+.admin-modal--danger .modal-header { border-bottom-color: var(--yy-calm-danger); }
+.admin-modal--danger .modal-title { color: var(--yy-calm-danger); }

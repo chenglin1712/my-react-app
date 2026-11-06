@@ -76,6 +76,19 @@ describe('AnnouncementList', () => {
     });
   });
 
+  test('已套用的篩選以 chip 列在表格上方：網址帶狀態時有一顆「狀態 送審中」，點叉就移除並用空狀態重新查詢', async () => {
+    renderList(['/?status=pending_review']);
+    await screen.findByText('待審公告');
+    // 初始 filters 就是 query，所以一進來 chip 就在
+    const remove = await screen.findByRole('button', { name: '移除篩選：狀態 送審中' });
+    apiGet.mockClear();
+    fireEvent.click(remove);
+    await waitFor(() => expect(apiGet).toHaveBeenCalled());
+    expect(apiGet.mock.calls[0][0]).not.toContain('status=pending_review');
+    expect(screen.queryByRole('button', { name: /移除篩選/ })).toBeNull();
+    expect(screen.getByLabelText('狀態')).toHaveValue('');
+  });
+
   test('置頂到期日（純日期欄位）顯示不會因時區換算跨日', async () => {
     // 回歸測試：formatDate 過去用 new Date("2026-09-01") 解析（UTC 午夜）
     // 再用本地時區格式化，在 UTC 負偏移地區會顯示成 2026/8/31。
