@@ -12,8 +12,9 @@
     /* 離線橫幅（置底、z-index 1100）出現時，body 會設 --bot-bottom 讓視窗與啟動鈕往上讓出位置 */
     bottom: var(--bot-bottom, calc(20px + env(safe-area-inset-bottom, 0px)));
     z-index: var(--yy-z-float);
-    width: min(400px, calc(100vw - 32px));
-    height: min(620px, calc(100dvh - var(--bot-bottom, 20px) - 100px));
+    /* 使用者調整後的大小記在 --bot-w／--bot-h（BotResizeHandle）；不論記了多大，都再用目前視窗夾一次 */
+    width: min(var(--bot-w, 400px), calc(100vw - 32px));
+    height: min(var(--bot-h, 620px), calc(100dvh - var(--bot-bottom, 20px) - 100px));
     transform-origin: bottom right;
     opacity: 1;
     transform: none;
@@ -57,7 +58,7 @@
         right: calc(8px + env(safe-area-inset-right, 0px));
         bottom: var(--bot-bottom, calc(8px + env(safe-area-inset-bottom, 0px)));
         width: calc(100vw - 16px);
-        /* 手機 Navbar（含跑馬燈）約 98px 高，再留 6px 空隙，視窗頂端才不會被導覽列蓋住 */
+        /* 手機固定全寬，不套用使用者調整的大小；手機 Navbar（含跑馬燈）約 98px 高，再留 6px 空隙，視窗頂端才不會被導覽列蓋住 */
         height: calc(100dvh - var(--bot-bottom, 8px) - 104px);
     }
 }
@@ -71,9 +72,15 @@
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    background-color: var(--yy-calm-info-bg);
-    border: var(--yy-border-width) solid var(--yy-calm-line);
+    /* 材質來自 JSX 的 .yy-glass.yy-glass--liquid（背景、模糊、細框、降級純色）；這裡只管外形與浮起的陰影 */
     border-radius: var(--yy-radius-panel);
+    box-shadow: var(--yy-elev-4);
+}
+
+/* 玻璃面上的區塊不鋪實色底，才看得到玻璃；氣泡、建議膠囊、輸入框各自有實色底，文字不受底圖影響 */
+.chat-container .messages-container,
+.chat-container .suggestions-container {
+    background: transparent;
 }
 
 /* 固定高度的直向 flex：只有訊息區吃剩餘空間，其餘區塊維持自己的高度、不被壓縮。
@@ -84,7 +91,8 @@
 
 /* 懸浮視窗只有 400px 寬：單詞庫提示與輸入列依視窗寬度縮小，不再是全螢幕的尺寸 */
 .chat-container .chat-header {
-    padding: 12px;
+    /* 上方多留 8px：左上角的調整把手（24×20）不蓋到收合鈕的 44px 點擊區 */
+    padding: 20px 12px 12px;
 }
 
 .chat-container .message-bubble {
@@ -168,7 +176,6 @@
     display: flex;
     flex-direction: column;
     gap: 14px;
-    background: var(--yy-calm-surface);
 }
 
 .bot-message {
@@ -244,9 +251,8 @@
 
 .suggestions-container {
     padding: 10px 16px;
-    max-height: min(120px, 18dvh); /* 建議多的時候在區塊內捲動，不吃掉訊息區 */
+    max-height: min(152px, 24dvh); /* 建議多的時候在區塊內捲動，不吃掉訊息區 */
     overflow-y: auto;
-    background-color: var(--yy-calm-surface);
     border-top: 1px solid var(--yy-calm-rule);
 }
 

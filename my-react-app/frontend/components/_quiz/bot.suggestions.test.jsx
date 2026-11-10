@@ -49,9 +49,33 @@ describe('AI chat suggestions and light formatting', () => {
     apiPost.mockResolvedValue(reply({ followups: ['「lokah」還有其他意思嗎？', '出一題關於「lokah」的小測驗'] }));
     const user = await open();
     await ask(user);
+    // 聊起來之後追問建議預設收起，點「您可能想問」才展開
+    expect(screen.queryByRole('button', { name: '出一題關於「lokah」的小測驗' })).not.toBeInTheDocument();
+    const toggle = await screen.findByRole('button', { name: /您可能想問（2）/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
     await user.click(await screen.findByRole('button', { name: '出一題關於「lokah」的小測驗' }));
     expect(screen.getByRole('textbox')).toHaveValue('出一題關於「lokah」的小測驗');
     expect(screen.queryByRole('button', { name: '幫我排一週讀書計畫' })).not.toBeInTheDocument();
+    // 選了一則之後自動收回去
+    expect(screen.queryByRole('button', { name: '出一題關於「lokah」的小測驗' })).not.toBeInTheDocument();
+  });
+
+  test('before the chat starts the starters stay visible (no toggle)', async () => {
+    await open();
+    expect(screen.queryByRole('button', { name: /您可能想問（/ })).not.toBeInTheDocument();
+  });
+
+  test('the accuracy note is one line until the info button expands it, and stays in the accessible description', async () => {
+    await open();
+    const toggle = screen.getByRole('button', { name: '展開說明' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(document.querySelector('.bot-note-row')).toHaveAttribute('data-open', 'false');
+    await userEvent.click(toggle);
+    expect(screen.getByRole('button', { name: '收合說明' })).toHaveAttribute('aria-expanded', 'true');
+    expect(document.querySelector('.bot-note-row')).toHaveAttribute('data-open', 'true');
+    expect(screen.getByLabelText('輸入訊息')).toHaveAccessibleDescription(/請以族語辭典為準/);
   });
 
   test('a reply without follow-ups leaves no empty suggestions block', async () => {

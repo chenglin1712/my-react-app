@@ -78,7 +78,8 @@
   --yy-glass-bg: rgba(255, 249, 237, 0.78);
   --yy-glass-bg-solid: #FFF9ED; /* 降級用純色（prefers-reduced-transparency 或不支援 backdrop-filter） */
   --yy-glass-border: rgba(41, 45, 49, 0.12);
-  --yy-glass-halo: rgba(255, 249, 237, 0.9); /* 焦點環外圈的淺色光暈，讓焦點環在任何被模糊的底圖上都看得見 */
+  --yy-glass-halo: rgba(255, 249, 237, 0.9);
+  --yy-glass-specular: rgba(255, 255, 255, 0.55); /* Liquid Glass 頂緣高光：只在 .yy-glass--liquid 用，亮色可放心加亮 */ /* 焦點環外圈的淺色光暈，讓焦點環在任何被模糊的底圖上都看得見 */
   /* 細框一律 1.5px（DESIGN.md）。色塊分隔用的粗邊（border-left 4px 以上的強調條）不受影響 */
   --yy-border-width: 1.5px;
 
@@ -408,6 +409,7 @@
     --yy-glass-bg-solid: #24282C;
     --yy-glass-border: rgba(242, 238, 227, 0.14);
     --yy-glass-halo: rgba(36, 40, 44, 0.9);
+  --yy-glass-specular: rgba(255, 255, 255, 0.07); /* 深色玻璃上的高光要很淡，否則會拉低淺色字的對比 */
     /* Bootstrap 狀態色的 rgb 三元組（深色）：淺色的在檔尾 :root，深色在這裡跟著換（步驟 1-9） */
     --bs-primary-rgb: 215, 169, 139;
     --bs-success-rgb: 140, 207, 169;
@@ -428,6 +430,7 @@
   --yy-glass-bg-solid: #24282C;
   --yy-glass-border: rgba(242, 238, 227, 0.14);
   --yy-glass-halo: rgba(36, 40, 44, 0.9);
+  --yy-glass-specular: rgba(255, 255, 255, 0.07); /* 深色玻璃上的高光要很淡，否則會拉低淺色字的對比 */
   /* Bootstrap 狀態色的 rgb 三元組（深色）：淺色的在檔尾 :root，深色在這裡跟著換（步驟 1-9） */
   --bs-primary-rgb: 215, 169, 139;
   --bs-success-rgb: 140, 207, 169;
@@ -1504,6 +1507,16 @@ body::before {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
+}
+.yy-glass.yy-glass--liquid {
+  /* Liquid Glass：頂緣一道由亮漸隱的高光（像光從上方打在厚玻璃邊緣），再疊在原本的玻璃底上。降級時（不支援／減少透明度）整個拿掉，回到純色。 */
+  background: linear-gradient(180deg, var(--yy-glass-specular) 0, transparent 64px), var(--yy-glass-bg);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .yy-glass.yy-glass--liquid { background: var(--yy-glass-bg-solid); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .yy-glass.yy-glass--liquid { background: var(--yy-glass-bg-solid); }
 }
 .yy-glass :focus-visible {
   outline: var(--yy-ui-focus-ring);

@@ -7,7 +7,6 @@
     line-height: 1.5;
     font-variant-numeric: tabular-nums;
     color: var(--yy-calm-text-sub);
-    background: var(--yy-calm-surface);
     border-top: 1px solid var(--yy-calm-rule);
 }
 
@@ -23,7 +22,7 @@
 }
 
 /* 同時有剩餘次數時，兩行提示合成一個區塊，只保留上方的分隔線 */
-.bot-quota + .bot-disclaimer {
+.bot-quota + .bot-note-row {
     border-top: 0;
 }
 
@@ -33,14 +32,102 @@
     border: 1px dashed var(--yy-calm-line);
 }
 
-/* 準確度提醒：常駐在輸入框上方，文字色在白底上 4.5:1 以上 */
+/* 準確度提醒：常駐在輸入框上方，預設只顯示一行（整段文字仍在頁面裡，報讀器與輸入框的說明都讀得到），
+   點右側 ⓘ 展開全文。文字色在玻璃最壞底圖下 4.5:1 以上（沿用 --yy-calm-text-sub）。 */
+.bot-note-row {
+    display: flex;
+    align-items: flex-start;
+    border-top: 1px solid var(--yy-calm-rule);
+    padding-bottom: 10px; /* 下方留白放在外層：clamp 的 overflow 會連 padding 一起露出第二行 */
+}
+
 .bot-disclaimer {
+    flex: 1 1 auto;
+    min-width: 0;
     margin: 0;
-    padding: 6px 16px;
+    padding: 10px 0 0 16px;
     font-size: var(--yy-text-sm);
     line-height: 1.5;
     color: var(--yy-calm-text-sub);
-    background: var(--yy-calm-surface);
-    border-top: 1px solid var(--yy-calm-rule);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    overflow: hidden;
 }
 
+.bot-note-row[data-open="true"] .bot-disclaimer {
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+}
+
+.bot-note-toggle {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    margin: -4px 0 -14px 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--yy-radius-control);
+    background: transparent;
+    color: var(--yy-calm-text-sub);
+    cursor: pointer;
+    transition: background-color 160ms var(--ease-out), transform 160ms var(--ease-out);
+}
+
+.bot-note-toggle:active {
+    transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .bot-note-toggle:hover {
+        background-color: var(--yy-calm-tint-copper-1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bot-note-toggle:active {
+        transform: none;
+    }
+}
+
+/* 聊起來之後，追問建議收成這顆小按鈕（點開才看），把空間還給對話 */
+.suggestions-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    min-height: 44px;
+    padding: 0 16px;
+    border: 0;
+    border-top: 1px solid var(--yy-calm-rule);
+    background: transparent;
+    color: var(--yy-calm-text-sub);
+    font-size: var(--yy-text-sm);
+    cursor: pointer;
+    transition: background-color 160ms var(--ease-out);
+}
+
+.suggestions-toggle svg {
+    transition: transform 160ms var(--ease-out);
+}
+
+.suggestions-toggle[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .suggestions-toggle:hover {
+        background-color: var(--yy-calm-tint-copper-1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .suggestions-toggle svg {
+        transition: none;
+    }
+}

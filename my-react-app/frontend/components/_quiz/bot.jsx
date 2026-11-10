@@ -5,7 +5,7 @@ import "../../static/css/_quiz/bot_entries.css"
 import "../../static/css/_quiz/bot_feedback.css"
 import "../../static/css/_quiz/bot_header.css"
 import { useId, useState, useRef, useEffect } from "react";
-import { Bot, Camera, ChevronDown, SquarePen, X } from "lucide-react"
+import { Bot, Camera, ChevronDown, Info, SquarePen, X } from "lucide-react"
 import { useNavigate } from "react-router-dom";
 import StudyPlanComponent from "./bot_study_plan"
 import TrackedStudyPlan from "./TrackedStudyPlan";
@@ -30,6 +30,8 @@ import { useDialog } from "@hooks/useDialog";
 import { announce } from "@utils/announce";
 import useChatRequest from "./chat/useChatRequest";
 import ChatComposer from "./chat/ChatComposer";
+import BotResizeHandle from "./BotResizeHandle";
+import { loadBotSize, saveBotSize } from "./botSize";
 import { ChatLog, TypingBubble } from "./chat/ChatLog";
 
 // 預設的起始建議；後端 /AIModel/quota/ 會依學習資料回傳個人化的三句（#13），讀不到就用這三句
@@ -101,6 +103,13 @@ const quotaMessage = (quota) => `今天的提問次數已用完，${resetTimeTex
 const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => {
     const navigate = useNavigate();
     const disclaimerId = useId();
+    const suggestionsId = useId();
+    const overlayRef = useRef(null);
+    // 視窗大小（使用者拖曳或選預設後記在這台瀏覽器；null＝CSS 預設）
+    const [size, setSize] = useState(() => loadBotSize());
+    const commitSize = (next) => { setSize(next); saveBotSize(next); };
+    const [followupsOpenFor, setFollowupsOpenFor] = useState(null); // 追問建議預設收起；點開後只對當次的建議有效
+    const [noteOpen, setNoteOpen] = useState(false);               // 準確度提醒預設只顯示一行
     // 直接從網址進到 /bot（沒有帶 onClose）時用 navigate(-1) 可能把使用者導到
     // 應用程式以外的頁面（例如瀏覽器歷史紀錄的上一頁是外部網站），改成固定
     // 導回測驗首頁，行為可預期。
@@ -582,18 +591,26 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     const lastMessage = messages[messages.length - 1];
     const followups = lastMessage?.role === "bot" && !lastMessage.streaming && !lastMessage.interrupted && !lastMessage.isError
         && Array.isArray(lastMessage.followups) ? lastMessage.followups : [];
-    const suggestionList = messages.length <= 2 ? starters : followups;
+    // 對話還沒開始：開場建議直接顯示（版面空）；聊起來之後，追問建議收成一個小按鈕，把空間還給對話
+    const conversationStarted = messages.length > 2;
+    const suggestionList = conversationStarted ? followups : starters;
+    const followupsKey = lastMessage?.id ?? null; // 用訊息 id 當依據，不靠陣列物件身分（重新整理資料也不會無預警收合）
+    const suggestionsVisible = !conversationStarted || followupsOpenFor === followupsKey;
 
     const handleSuggestionClick = (suggestion) => {
         setInput(suggestion);
+        setFollowupsOpenFor(null);
     };
 
+    const overlayStyle = size ? { "--bot-w": `${size.w}px`, "--bot-h": `${size.h}px` } : undefined;
+
     return (
-        <div className="bot-overlay" data-open={open} inert={!open}>
+        <div ref={overlayRef} className="bot-overlay" data-open={open} inert={!open} style={overlayStyle}>
+            <BotResizeHandle overlayRef={overlayRef} size={size} onCommit={commitSize} />
             <div
                 ref={dialogRef}
                 tabIndex={-1}
-                className="chat-container"
+                className="chat-container yy-glass yy-glass--liquid"
                 role="dialog"
                 aria-modal="false"
                 aria-label="族語 AI 助手"
@@ -746,14 +763,26 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                     <div ref={messageEndRef} />
                 </ChatLog>
 
-                {suggestionList.length > 0 && (
-                    <div className="suggestions-container">
-                        <p className="suggestions-title">您可能想問：</p>
+                {conversationStarted && suggestionList.length > 0 && (
+                    <button
+                        type="button"
+                        className="suggestions-toggle"
+                        aria-expanded={suggestionsVisible}
+                        aria-controls={suggestionsVisible ? suggestionsId : undefined}
+                        onClick={() => setFollowupsOpenFor(suggestionsVisible ? null : followupsKey)}
+                    >
+                        您可能想問（{suggestionList.length}）
+                        <ChevronDown size={16} aria-hidden="true" />
+                    </button>
+                )}
+                {suggestionList.length > 0 && suggestionsVisible && (
+                    <div className="suggestions-container" id={suggestionsId}>
+                        {!conversationStarted && <p className="suggestions-title">您可能想問：</p>}
                         <div className="suggestion-pills">
-                            {suggestionList.map((suggestion, index) => (
+                            {suggestionList.map((suggestion) => (
                                 <button
                                     type="button"
-                                    key={index}
+                                    key={`${lastMessage?.id ?? "starter"}:${suggestion}`}
                                     className="suggestion-pill"
                                     onClick={() => handleSuggestionClick(suggestion)}
                                     disabled={isPending}
@@ -777,7 +806,20 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                     </p>
                 )}
                 {/* 常駐的準確度提醒：語言學習工具的 AI 可能寫錯族語詞彙與拼寫 */}
-                <p className="bot-disclaimer" id={disclaimerId}>AI 可能寫錯族語的詞彙或拼寫，學習時請以族語辭典為準。{storageReady && " 對話只暫存在這台裝置的瀏覽器 7 天，按上方「新對話」可刪除。"}</p>
+                {/* 提醒文字整段都在 DOM（輸入框的 aria-describedby 讀得到）；畫面上預設只顯示第一行，點「說明」展開 */}
+                <div className="bot-note-row" data-open={noteOpen}>
+                    <p className="bot-disclaimer" id={disclaimerId}>AI 可能寫錯族語的詞彙或拼寫，學習時請以族語辭典為準。{storageReady && " 對話只暫存在這台裝置的瀏覽器 7 天，按上方「新對話」可刪除。"}</p>
+                    <button
+                        type="button"
+                        className="bot-note-toggle"
+                        aria-expanded={noteOpen}
+                        aria-controls={disclaimerId}
+                        aria-label={noteOpen ? "收合說明" : "展開說明"}
+                        onClick={() => setNoteOpen((v) => !v)}
+                    >
+                        <Info size={16} aria-hidden="true" />
+                    </button>
+                </div>
                 {(attachment || attachBusy || attachError) && (
                     <div className="bot-attachment" data-state={attachError ? "error" : attachBusy ? "busy" : "ready"}>
                         {attachment && (
