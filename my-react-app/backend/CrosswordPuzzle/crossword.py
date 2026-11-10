@@ -259,6 +259,15 @@ class Crossword(object):
     def set_word(self, col, row, vertical, word, force=False):
         """Set word in the grid, and adds word to word list."""
         if force:
+            # 先確認整個字都在盤面內，再改任何狀態：寫到一半才丟錯會留下半成品。
+            # （一般排字路徑已先經 check_fit_score，這裡是 force=True 直接呼叫時的保護。）
+            length = len(word.word)
+            if length:
+                last_col = col if vertical else col + length - 1
+                last_row = row + length - 1 if vertical else row
+                for c, r in ((col, row), (last_col, last_row)):
+                    if not (1 <= c <= self.cols and 1 <= r <= self.rows):
+                        raise IndexError(f"word {word.word!r} does not fit inside the {self.cols}x{self.rows} grid")
             word.col = col
             word.row = row
             word.vertical = vertical
@@ -274,19 +283,25 @@ class Crossword(object):
         return
 
     def set_cell(self, col, row, value):
+        if not (1 <= col <= self.cols and 1 <= row <= self.rows):
+            raise IndexError(f"cell ({col}, {row}) is outside the {self.cols}x{self.rows} grid")
         self.grid[row-1][col-1] = value
 
     def get_cell(self, col, row):
+        # 座標是 1-based。必須主動檢查四個方向：Python 的 -1 不會丟 IndexError，
+        # 座標 0 會悄悄讀到對面那一側的格子。
+        if not (1 <= col <= self.cols and 1 <= row <= self.rows):
+            raise IndexError(f"cell ({col}, {row}) is outside the {self.cols}x{self.rows} grid")
         return self.grid[row-1][col-1]
 
     def check_if_cell_clear(self, col, row):
         try:
             cell = self.get_cell(col, row)
-            if cell == self.empty:
-                return True
+            return cell == self.empty
         except IndexError:
-            pass
-        return False
+            # 盤面外不會有字，所以貼邊的字，盤外那一側的鄰格算「乾淨」。
+            # （字本身超出盤面由 check_fit_score 對 get_cell 的 IndexError 擋下。）
+            return True
 
     def solution(self):
         """Return solution grid."""
@@ -298,7 +313,9 @@ class Crossword(object):
 
     def order_number_words(self):
         """Orders words and applies numbering system to them."""
-        self.current_word_list.sort(key=lambda i: (i.col + i.row))
+        # 一般填字的編號順序：由上而下、由左而右。起點相同的字排序後必定相鄰，
+        # 下面「只比相鄰兩個字」的共用題號邏輯才成立（col+row 做不到這點）。
+        self.current_word_list.sort(key=lambda i: (i.row, i.col))
         count, icount = 1, 1
         for word in self.current_word_list:
             word.number = count

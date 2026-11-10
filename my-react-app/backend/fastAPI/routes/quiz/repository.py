@@ -25,8 +25,11 @@ def load_all_words(db: Optional[Session] = None, tribe_id: Optional[str] = None)
     word id 在 words 表裡全域唯一，不同族語不會撞號，所以 explanation/audio 快取
     繼續當成單一全域字典累加即可，只有 _words_cache（出題用的候選單字清單）需要
     依族語分開存，避免出題時把不同族語的單字混在同一份候選池裡。"""
-    if tribe_id in _words_cache:
-        return _words_cache.get(tribe_id)
+    # 單一次 get()：先 `in` 再 get() 夾到快取失效時會回 None，後面對 None 迴圈會 TypeError。
+    # KeyedCache 不會存 None（compute() 回 None 不入快取），所以 None 就代表「沒有快取」。
+    cached = _words_cache.get(tribe_id)
+    if cached is not None:
+        return cached
     if not db:
         return []
 

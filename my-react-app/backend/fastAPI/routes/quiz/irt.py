@@ -182,21 +182,40 @@ def compute_normalized_freq_map(words: List[WordDTO]) -> Dict[str, float]:
     if max_log == 0: max_log = 1.0
     return {w.name: math.log(1 + (w.frequency or 0)) / max_log for w in words}
 
-def compute_smoothed_error_rate(e_w: int, n_w: int, alpha0=ALPHA0, beta0=BETA0) -> float:
+def compute_smoothed_error_rate(e_w: int, n_w: int, alpha0=None, beta0=None) -> float:
+    # 預設值不能寫成 alpha0=ALPHA0：那會在 import 當下就把數值複製進函式，
+    # 之後 _refresh_irt_config_if_stale() 改模組全域，預設值不會跟著變。
+    # 用 `is None` 判斷（不用 `or`），0.0 是合法的明確輸入。
+    if alpha0 is None:
+        alpha0 = ALPHA0
+    if beta0 is None:
+        beta0 = BETA0
     return ((e_w or 0) + alpha0) / ((n_w or 0) + alpha0 + beta0)
 
-def compute_Dq_and_bw(Dw: float, Dt: float, fprime: float, alpha=DQ_ALPHA, beta=DQ_BETA, gamma=DQ_GAMMA):
+def compute_Dq_and_bw(Dw: float, Dt: float, fprime: float, alpha=None, beta=None, gamma=None):
+    # 同上：預設值在呼叫時才讀目前的模組全域（後台可調的 dq_alpha／dq_beta／dq_gamma）。
+    if alpha is None:
+        alpha = DQ_ALPHA
+    if beta is None:
+        beta = DQ_BETA
+    if gamma is None:
+        gamma = DQ_GAMMA
     Dq = alpha * Dw + beta * Dt + gamma * (1 - fprime)
     eps = 1e-6
     Dq_clipped = min(max(Dq, eps), 1 - eps)
     bw = math.log(Dq_clipped / (1 - Dq_clipped))
     return Dq_clipped, bw
 
-def compute_P_theta(theta: float, bw: float, a_q: float = 1.0, C: float = DEFAULT_GUESS) -> float:
+def compute_P_theta(theta: float, bw: float, a_q: float = 1.0, C=None) -> float:
+    # 預設值在呼叫時才讀目前的全域猜題機率（同 compute_smoothed_error_rate 的說明）。
+    if C is None:
+        C = DEFAULT_GUESS
     ex = math.exp(-a_q * (theta - bw))
     return C + (1 - C) / (1 + ex)
 
-def update_theta(theta_old: float, correct: bool, Ptheta: float, gamma: float = LEARNING_RATE) -> float:
+def update_theta(theta_old: float, correct: bool, Ptheta: float, gamma=None) -> float:
+    if gamma is None:
+        gamma = LEARNING_RATE
     theta_new = theta_old + gamma * ((1 if correct else 0) - Ptheta)
     return max(0.0, min(1.0, theta_new))
 

@@ -18,12 +18,18 @@ from typing import Callable, Dict, Generic, Hashable, Optional, TypeVar
 K = TypeVar("K", bound=Hashable)
 V = TypeVar("V")
 
+# get_or_compute() 用來分辨「key 不存在」與「存在但值是 None」的哨兵。
+_MISSING = object()
+
 
 class KeyedCache(Generic[K, V]):
     def __init__(self):
         self._values: Dict[K, V] = {}
         self._locks: Dict[K, threading.Lock] = {}
         self._meta_lock = threading.Lock()
+        # clear() 每次加 1。get_or_compute() 在算之前先記下目前的世代，算完只有世代沒變才存，
+        # 避免「clear() 之後，正在算的舊結果又被寫回快取」。
+        self._generation = 0
 
     def _lock_for(self, key: K) -> threading.Lock:
         if key not in self._locks:
@@ -43,14 +49,22 @@ class KeyedCache(Generic[K, V]):
         """key 已經算過就直接回傳；否則用該 key 專屬的鎖算一次、存起來、回傳。
         compute() 回傳 None 時不會被存進快取（代表「這次沒算出東西」，例如
         查無資料，讓下一次呼叫可以重新嘗試，而不是把 None 永久當成快取結果）。"""
-        if key in self._values:
-            return self._values[key]
+        # 「先 in 再 []」是兩個步驟：夾在中間時另一個執行緒若剛好 invalidate／
+        # clear，第二步會 KeyError。改成單一次 get()，用 _MISSING 區分「沒有」
+        # 與「值剛好是 None」（雖然目前 compute() 回傳 None 不會被存進來）。
+        value = self._values.get(key, _MISSING)
+        if value is not _MISSING:
+            return value
         with self._lock_for(key):
-            if key in self._values:
-                return self._values[key]
+            value = self._values.get(key, _MISSING)
+            if value is not _MISSING:
+                return value
+            generation = self._generation
             value = compute()
             if value is not None:
-                self._values[key] = value
+                with self._meta_lock:
+                    if generation == self._generation:
+                        self._values[key] = value
             return value
 
     def keys(self) -> list:
@@ -76,6 +90,7 @@ class KeyedCache(Generic[K, V]):
     def clear(self) -> int:
         """清空全部已快取的值，回傳清掉的筆數。同理不清 self._locks。"""
         with self._meta_lock:
+            self._generation += 1
             count = len(self._values)
             self._values.clear()
             return count

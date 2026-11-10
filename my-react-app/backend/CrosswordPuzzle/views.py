@@ -256,8 +256,9 @@ def submit_ans(request):
             if word_direction == 'across':
                 for i in range(word_length):
                     row, col = start_row - 1, start_col - 1 + i
-                    if (row < len(user_answers) and col < len(user_answers[row]) and
-                            row < len(cleaned_solution) and col < len(cleaned_solution[row])):
+                    # 0 <= row/col：序列化器已擋 start_* < 1，這裡再守一次，避免負索引繞到尾端。
+                    if (0 <= row < len(user_answers) and 0 <= col < len(user_answers[row]) and
+                            0 <= row < len(cleaned_solution) and 0 <= col < len(cleaned_solution[row])):
 
                         user_char = user_answers[row][col].lower()
                         user_word_chars.append(user_char)
@@ -276,8 +277,9 @@ def submit_ans(request):
             elif word_direction == 'down':
                 for i in range(word_length):
                     row, col = start_row - 1 + i, start_col - 1
-                    if (row < len(user_answers) and col < len(user_answers[row]) and
-                            row < len(cleaned_solution) and col < len(cleaned_solution[row])):
+                    # 0 <= row/col：序列化器已擋 start_* < 1，這裡再守一次，避免負索引繞到尾端。
+                    if (0 <= row < len(user_answers) and 0 <= col < len(user_answers[row]) and
+                            0 <= row < len(cleaned_solution) and 0 <= col < len(cleaned_solution[row])):
 
                         user_char = user_answers[row][col].lower()
                         user_word_chars.append(user_char)

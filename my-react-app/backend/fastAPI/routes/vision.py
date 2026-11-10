@@ -41,6 +41,7 @@ if not CLOUD_API_URL:
 # 用一個簡單的 dict 快取翻譯結果，避免對同一個字重複呼叫 Google Translate。
 # 只在翻譯成功時寫入快取，重試全部失敗時不快取，避免暫時性錯誤永久污染快取。
 _translation_cache: dict[str, str | None] = {}
+_MISSING = object()  # translate_labels 用來區分「快取沒有這個鍵」與「快取值是 None」
 _translation_cache_lock = threading.Lock()
 
 
@@ -83,8 +84,10 @@ def translate_labels(descriptions: list[str]) -> dict[str, str | None]:
     pending = []
     for d in descriptions:
         k = d.strip().lower()
-        if k in _translation_cache:
-            out[d] = _translation_cache[k]
+        # 單次 get()：快取值可能是 None（翻譯與原文相同），所以用哨兵區分「沒有」。
+        cached = _translation_cache.get(k, _MISSING)
+        if cached is not _MISSING:
+            out[d] = cached
         elif d not in pending:
             pending.append(d)
 

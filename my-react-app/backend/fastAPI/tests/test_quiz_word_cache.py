@@ -58,3 +58,35 @@ def test_cached_dto_survives_after_db_session_is_gone(monkeypatch):
     # 第二次呼叫直接吃快取，不需要 db，也不會因為 db 不見了而出錯。
     cached = load_all_words(None, tribe_id="tribe-1")
     assert cached == [WordDTO(id="w1", name="balay", frequency=50)]
+
+
+def test_load_all_words_cache_hit_does_not_use_contains_then_get(monkeypatch):
+    """回歸測試（E4）：快取命中時只做一次 get()。這份快取在被問 `in` 的瞬間會清空自己，
+    模擬別的執行緒剛好失效快取；舊寫法會回傳 None（呼叫端再對 None 迴圈就 TypeError）。"""
+    class _ClearsWhenAskedContains(KeyedCache):
+        def __contains__(self, key):
+            self._values.clear()
+            return True
+
+    cache = _ClearsWhenAskedContains()
+    cache._values["tribe-1"] = [WordDTO(id="w1", name="balay", frequency=50)]
+    monkeypatch.setattr(quiz_module, "_words_cache", cache)
+
+    assert load_all_words(None, tribe_id="tribe-1") == [WordDTO(id="w1", name="balay", frequency=50)]
+
+
+def test_empty_word_list_is_a_valid_cache_hit(monkeypatch):
+    """該族語沒有詞時，空清單也是合法快取結果：之後（連 db 都沒有）仍要回傳空清單，不能重查。"""
+    monkeypatch.setattr(quiz_module, "_words_cache", KeyedCache())
+    monkeypatch.setattr(quiz_module, "_word_explanations_cache", {})
+    monkeypatch.setattr(quiz_module, "_word_audios_cache", {})
+    monkeypatch.setattr(quiz_module, "load_explanation_items_for_words", lambda db, tribe_id=None: {})
+    monkeypatch.setattr(quiz_module, "load_audio_items_for_words", lambda db, tribe_id=None: {})
+    fake_db = MagicMock()
+    fake_db.query.return_value.filter.return_value.all.return_value = []
+
+    assert load_all_words(fake_db, tribe_id="tribe-empty") == []
+    queries_after_first = fake_db.query.call_count
+    assert load_all_words(fake_db, tribe_id="tribe-empty") == []
+    assert load_all_words(None, tribe_id="tribe-empty") == []
+    assert fake_db.query.call_count == queries_after_first

@@ -39,22 +39,23 @@ class CrosswordDeterministicOutputTest(SimpleTestCase):
         )
 
     def test_display_matches_locked_snapshot(self):
+        # E3 之後題號依「由上而下、由左而右」編排（舊快照是 col+row 的斜對角順序），盤面字母不變。
         crossword = self._build()
         self.assertEqual(
             crossword.display(),
             [
-                "1-2     6----",
+                "1-2     3----",
                 " ------- ----",
-                " ---5       -",
-                " -4- --- ----",
-                " - - ----7---",
-                "3         ---",
+                " ---4       -",
+                " -5- --- ----",
+                " - - ----6---",
+                "7         ---",
                 " - - ---- ---",
                 " - - -8     -",
                 " - - ---- ---",
-                " - - -10     -",
+                " - - -9     -",
                 " - ------ ---",
-                "-- -9       -",
+                "-- -10       -",
                 "-------------",
             ],
         )

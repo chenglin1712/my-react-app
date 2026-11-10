@@ -78,3 +78,18 @@ def test_empty_or_malformed_items_are_failures_not_cached_blanks():
         out = V.translate_labels(["dog", "cat"])
     assert out == {"dog": "dog", "cat": "cat"}
     assert V._translation_cache == {}
+
+
+def test_cached_translation_is_read_with_a_single_lookup_even_if_the_value_is_none():
+    """快取值可以是 None（翻譯與原文相同）。命中時不能再走「先 in 再 []」，
+    這個 dict 在被問 `in` 的瞬間清空自己，模擬別的執行緒剛好清掉快取。"""
+    class _ClearsWhenAskedContains(dict):
+        def __contains__(self, key):
+            self.clear()
+            return True
+
+    V._translation_cache = _ClearsWhenAskedContains({"dog": "狗", "same": None})
+    with patch.object(V.httpx, "post") as post:
+        out = V.translate_labels(["dog", "same"])
+    assert out == {"dog": "狗", "same": None}
+    post.assert_not_called()

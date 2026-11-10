@@ -175,3 +175,65 @@ def test_keys_lists_currently_cached_keys():
     cache.get_or_compute("amis", lambda: "B")
 
     assert set(cache.keys()) == {"tayal", "amis"}
+
+
+def test_get_or_compute_reads_cached_value_with_a_single_lookup():
+    """回歸測試（E4）：快取命中時不能是「先 in 再 []」兩個步驟。
+    這個 dict 在被問 `in` 的瞬間把自己清空，模擬另一個執行緒剛好 invalidate／clear；
+    舊寫法會在第二步 KeyError，單次 get() 不會碰到 `in`。"""
+    class _ClearsWhenAskedContains(dict):
+        def __contains__(self, key):
+            self.clear()
+            return True
+
+    cache = KeyedCache()
+    cache._values = _ClearsWhenAskedContains({"tayal": "cached"})
+
+    assert cache.get_or_compute("tayal", lambda: "recomputed") == "cached"
+
+
+def test_falsy_cached_values_are_returned_without_recomputing():
+    # 單次 get() + 哨兵：False／0／""／[] 都是合法的快取值，不能被當成「沒有」。
+    cache = KeyedCache()
+    calls = []
+    for key, value in (("a", False), ("b", 0), ("c", ""), ("d", [])):
+        cache.get_or_compute(key, lambda v=value: v)
+    for key in "abcd":
+        assert cache.get_or_compute(key, lambda: calls.append(1) or "recomputed") != "recomputed"
+    assert calls == []
+
+
+def test_none_result_is_not_cached_and_is_recomputed_next_time():
+    cache = KeyedCache()
+    calls = []
+
+    def compute():
+        calls.append(1)
+        return None
+
+    assert cache.get_or_compute("k", compute) is None
+    assert cache.get_or_compute("k", compute) is None
+    assert len(calls) == 2
+
+
+def test_clear_during_compute_does_not_let_the_stale_result_back_into_the_cache():
+    """clear() 發生在 compute() 進行中：算完的舊結果不能被寫回快取（下一次要重新算）。"""
+    cache = KeyedCache()
+    calls = []
+
+    def compute():
+        calls.append(1)
+        if len(calls) == 1:
+            cache.clear()  # 模擬另一個執行緒在這個時間點失效整個快取
+        return f"value-{len(calls)}"
+
+    assert cache.get_or_compute("k", compute) == "value-1"  # 這次呼叫仍拿到剛算出的值
+    assert "k" not in cache  # 但舊結果沒有被存起來
+    assert cache.get_or_compute("k", compute) == "value-2"
+    assert "k" in cache
+
+
+def test_result_is_cached_when_no_clear_happens_during_compute():
+    cache = KeyedCache()
+    assert cache.get_or_compute("k", lambda: "v") == "v"
+    assert cache.get_or_compute("k", lambda: "other") == "v"

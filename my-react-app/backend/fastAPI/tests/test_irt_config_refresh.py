@@ -131,3 +131,43 @@ def test_failed_fetch_still_updates_last_fetch_timestamp_to_avoid_hammering():
         quiz._refresh_irt_config_if_stale()
 
     mock_get.assert_called_once()
+
+
+def test_refreshed_coefficients_are_used_by_default_arguments():
+    """回歸測試（E1）：後台改了 alpha0／beta0／dq_*，省略參數的呼叫必須跟著用新值。
+    原本預設值在 import 當下就被複製，後台調整永遠不會生效。"""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = _fake_config_payload(
+        alpha0=9.0, beta0=1.0, dq_alpha=0.9, dq_beta=0.05, dq_gamma=0.05,
+    )
+    with patch("fastAPI.routes.quiz.irt.requests.get", return_value=mock_response):
+        quiz._refresh_irt_config_if_stale()
+
+    # (1 + 9) / (3 + 9 + 1)
+    assert quiz.compute_smoothed_error_rate(1, 3) == pytest.approx(10 / 13)
+    dq, _ = quiz.compute_Dq_and_bw(0.5, 0.4, 0.3)
+    assert dq == pytest.approx(0.9 * 0.5 + 0.05 * 0.4 + 0.05 * (1 - 0.3))
+
+
+def test_explicit_arguments_still_override_and_zero_is_respected():
+    # 明確傳入的值優先，0.0 不能被當成「沒給」。
+    assert quiz.compute_smoothed_error_rate(1, 3, alpha0=0.0, beta0=0.0) == pytest.approx(1 / 3)
+    dq, _ = quiz.compute_Dq_and_bw(0.5, 0.4, 0.3, alpha=1.0, beta=0.0, gamma=0.0)
+    assert dq == pytest.approx(0.5)
+
+
+def test_theta_helpers_follow_refreshed_guess_and_learning_rate_by_default():
+    """compute_P_theta／update_theta 的預設參數也要在呼叫時才讀目前的全域值（和 E1 同一類問題）。"""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = _fake_config_payload(default_guess=0.5, learning_rate=0.5)
+    with patch("fastAPI.routes.quiz.irt.requests.get", return_value=mock_response):
+        quiz._refresh_irt_config_if_stale()
+
+    # theta == bw 時 1/(1+e^0) = 0.5：P = C + (1-C)*0.5 = 0.5 + 0.25
+    assert quiz.compute_P_theta(0.4, 0.4) == pytest.approx(0.75)
+    assert quiz.update_theta(0.4, True, 0.75) == pytest.approx(0.4 + 0.5 * 0.25)
+    # 明確傳入的值（含 0.0）優先。
+    assert quiz.compute_P_theta(0.4, 0.4, C=0.0) == pytest.approx(0.5)
+    assert quiz.update_theta(0.4, True, 0.75, gamma=0.0) == pytest.approx(0.4)
