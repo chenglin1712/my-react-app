@@ -109,3 +109,32 @@ describe("毛玻璃對比（最壞底圖）", () => {
     expect(darkBg.a).toBeGreaterThanOrEqual(0.7);
   });
 });
+
+describe("個人資料側欄用到的其他顏色（最壞底圖）", () => {
+  const lightBg = parseRgba(tokenAll("--yy-glass-bg")[0]);
+  const darkBg = parseRgba(tokenAll("--yy-glass-bg")[1]);
+  const worst = [["全黑", [0, 0, 0]], ["全白", [255, 255, 255]]];
+  const pick = (name, i) => hexToRgb(tokenAll(name)[i]);
+
+  worst.forEach(([label, under]) => {
+    it(`次要文字（--yy-calm-text-sub）在 ${label}底圖的玻璃上，淺色與深色都至少 4.5:1`, () => {
+      expect(ratio(pick("--yy-calm-text-sub", 0), over(lightBg, under)), `淺色 ${label}`).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(pick("--yy-calm-text-sub", 1), over(darkBg, under)), `深色 ${label}`).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it(`登出失敗的圖示（--yy-calm-danger，非文字；文字用 --yy-calm-text）在 ${label}底圖的玻璃上至少 3:1`, () => {
+      expect(ratio(pick("--yy-calm-danger", 0), over(lightBg, under)), `淺色 ${label}`).toBeGreaterThanOrEqual(3);
+      expect(ratio(pick("--yy-calm-danger", 1), over(darkBg, under)), `深色 ${label}`).toBeGreaterThanOrEqual(3);
+    });
+
+    it(`選項圖示（--yy-calm-accent，非文字）在 ${label}底圖的玻璃上至少 3:1`, () => {
+      expect(ratio(pick("--yy-calm-accent", 0), over(lightBg, under)), `淺色 ${label}`).toBeGreaterThanOrEqual(3);
+      expect(ratio(pick("--yy-calm-accent", 1), over(darkBg, under)), `深色 ${label}`).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  it("深銅文字只出現在不透明的淡銅底上（登出的懸停）：在 --yy-calm-tint-copper-1 上至少 4.5:1", () => {
+    expect(ratio(pick("--yy-calm-accent", 0), pick("--yy-calm-tint-copper-1", 0))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(pick("--yy-calm-accent", 1), pick("--yy-calm-tint-copper-1", 1))).toBeGreaterThanOrEqual(4.5);
+  });
+});

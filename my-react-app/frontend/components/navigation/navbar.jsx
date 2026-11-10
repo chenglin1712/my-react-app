@@ -316,7 +316,7 @@ const Navbar = ({ onOpenBot }) => {
           aria-modal="true"
           aria-labelledby="user-sidebar-title"
           inert={!isUserOpen}
-          className={`sidebar ${isUserOpen ? 'open' : ''}`}
+          className={`sidebar yy-glass ${isUserOpen ? 'open' : ''}`}
         >
           <div className="sidebar-header">
             <h3 id="user-sidebar-title">個人資料</h3>

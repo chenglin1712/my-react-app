@@ -1,70 +1,92 @@
-/* 頂部個人資料 */
-.sidebar-container {
-    border-left: 1px solid var(--yy-border-soft);
-}
+/* 個人資料側欄的內容（外殼、毛玻璃材質與標題列在 Navbar.css 的 .sidebar）。
+   材質是毛玻璃，所以內容不鋪實色底，只用細分隔線與淡銅色的互動底色分層；
+   一頁只有一個強調色（深銅），沒有紅色。文字只用 --yy-calm-text／--yy-calm-text-sub，
+   這兩個在最壞底圖下仍達 4.5:1（見 glass.test.js 的算法）。 */
 
+/* 頂部個人資料 */
 .sidebar-profile {
-    background-color: var(--yy-red);
-    padding: 10px 20px;
-    color: white;
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--yy-calm-rule);
+    color: var(--yy-calm-text);
 }
 
 .profile-avatar-container {
     display: flex;
     align-items: center;
-    gap: 15px;
-    margin-bottom: 10px;
+    gap: 16px;
+    margin-bottom: 16px;
 }
 
 .profile-avatar-container img {
-    width: 70px;
-    height: 70px;
+    flex-shrink: 0;
+    width: 64px;
+    height: 64px;
     border-radius: var(--yy-radius-round);
     object-fit: cover;
-    border: var(--yy-border-width) solid var(--yy-border-soft);
+    border: var(--yy-border-width) solid var(--yy-calm-copper);
+}
+
+.profile-info {
+    min-width: 0;
 }
 
 .profile-info h3 {
-    margin: 0 0 5px 0;
+    margin: 0 0 2px;
     font-size: 1.125rem;
-    font-weight: bold;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--yy-calm-text);
+    overflow-wrap: anywhere;
 }
 
 .profile-info p {
     margin: 0;
-    color: white;
     font-size: 0.875rem;
-    opacity: 0.9;
+    color: var(--yy-calm-text-sub);
+    overflow-wrap: anywhere;
 }
 
+/* 身分標籤：深橄欖底、象牙白字（不是按鈕，沒有互動） */
 .profile-info span {
-    background-color: var(--yy-ink);
     display: inline-block;
-    margin-top: 6px;
+    margin-top: 8px;
+    padding: 2px 10px;
     border-radius: var(--yy-radius-tag);
-    padding: 4px 10px;
-    font-size: 0.75rem;
+    background-color: var(--yy-calm-tag);
+    color: var(--yy-calm-tag-on);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    line-height: 1.5;
 }
 
 .profile-actions {
     display: flex;
-    gap: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 .profile-btn {
     position: relative;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
-    border: none;
+    min-height: var(--yy-control-md);
+    padding: 8px 14px;
+    border: var(--yy-border-width) solid transparent;
     border-radius: var(--yy-radius-control);
+    background-color: transparent;
     font-size: 0.875rem;
+    font-weight: 700;
     cursor: pointer;
-    transition: background-color 0.2s;
+    /* 只動會變的屬性（不用 all）；按下去縮到 0.97 讓人知道有按到 */
+    transition:
+        background-color 160ms var(--ease-out),
+        border-color 160ms var(--ease-out),
+        color 160ms var(--ease-out),
+        transform 160ms var(--ease-out);
 }
 
-/* 按鈕約 33px 高：用透明 ::after 把點擊區擴成 44px，不改變外觀（共用規則見 theme-v2.css） */
+/* 按鈕本身就是 44px 高；::after 只在內容比 44px 窄時補寬（共用規則見 theme-v2.css） */
 .profile-btn::after {
     content: "";
     position: absolute;
@@ -75,66 +97,92 @@
     transform: translate(-50%, -50%);
 }
 
+.profile-btn:active {
+    transform: scale(0.97);
+}
+
+/* 次要按鈕：細框、白底 */
 .edit-btn {
-    background-color: var(--yy-cream);
-    color: var(--yy-red);
+    background-color: var(--yy-calm-surface);
+    border-color: var(--yy-calm-line);
+    color: var(--yy-calm-text);
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .edit-btn:hover {
-      background-color: var(--yy-cream-dim);
-  }
-}
-
+/* 登出：不是危險動作，用無底色的文字按鈕，不搶眼 */
 .logout-btn {
-    background-color: var(--yy-ink);
-    color: white;
+    color: var(--yy-calm-text-sub);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .logout-btn:hover {
-      background-color: var(--yy-text-secondary);
-  }
+    .edit-btn:hover {
+        background-color: var(--yy-calm-tint-copper-2);
+    }
+
+    .logout-btn:hover {
+        background-color: var(--yy-calm-tint-copper-1);
+        color: var(--yy-calm-accent);
+    }
 }
 
 .icon {
-    margin-right: 4px;
     color: currentColor;
 }
 
-.profile-details {
-    margin-bottom: 30px;
+/* 導覽選項 */
+.sidebar-nav-wrap {
+    padding: 4px 12px 8px;
 }
 
-/* 導航列-選項 */
 .sidebar-nav {
-    padding: 8px;
     display: flex;
     flex-direction: column;
 }
 
 .nav-button {
+    position: relative;
     width: 100%;
-    padding: 12px 16px;
-    margin-bottom: 8px;
+    min-height: 52px;
+    padding: 12px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     background: transparent;
-    color: var(--yy-text-tertiary);
+    color: var(--yy-calm-text);
     border: none;
     border-radius: var(--yy-radius-control);
-    border-right: 4px solid transparent;
+    font-size: 1rem;
+    text-align: left;
     cursor: pointer;
-    transition: var(--transition-interactive);
+    transition: background-color 160ms var(--ease-out);
+}
+
+/* 內縮的細分隔線（放在偽元素上：懸停時底色有圓角，線不會跟著彎；最後一列與懸停中的列不畫） */
+.nav-button::after {
+    content: "";
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 0;
+    height: 1px;
+    background-color: var(--yy-calm-rule);
+}
+
+.nav-button:last-child::after {
+    display: none;
+}
+
+.nav-button:active {
+    background-color: var(--yy-calm-tint-copper-2);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .nav-button:hover {
-      background-color: var(--yy-surface);
-      color: var(--yy-red);
-      border-right: 4px solid var(--yy-red);
-  }
+    .nav-button:hover {
+        background-color: var(--yy-calm-tint-copper-1);
+    }
+
+    .nav-button:hover::after {
+        background-color: transparent;
+    }
 }
 
 .nav-content {
@@ -143,150 +191,52 @@
     gap: 12px;
 }
 
-.nav-icon svg,
+/* 圖示用深銅（對毛玻璃最壞底圖也有 3:1），選項文字維持深石板 */
+.nav-icon {
+    display: flex;
+    align-items: center;
+    color: var(--yy-calm-accent);
+}
+
 .nav-chevron {
-    color: inherit;
+    color: var(--yy-calm-text-sub);
 }
 
-/* 導覽列-個人詞語庫 */
-.content-panel {
-    padding: 16px;
-    border-radius: var(--yy-radius-panel);
-}
-
-.section-title {
-    font-weight: bold;
-    font-size: 1.125rem;
-    margin-bottom: 16px;
-    color: var(--yy-text-tertiary);
-}
-
-.favorites-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.favorite-item {
-    background-color: var(--yy-cream);
-    padding: 16px;
-    border-radius: var(--yy-radius-panel);
-    border-right: 3px solid var(--yy-red);
-}
-
-.item-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.item-title {
-    font-weight: 600;
-    color: var(--yy-text-tertiary);
-    font-size: 1rem;
-}
-
-.item-info {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.toggle-icon {
-    cursor: pointer;
-}
-
-.word-list {
-    margin-top: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    background-color: var(--yy-cream);
-    padding-top: 4px;
-    border-radius: var(--yy-radius-control);
-}
-
-.word-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-radius: var(--yy-radius-control);
-    padding: 12px 16px;
-    background-color: var(--yy-surface);
-}
-
-.word-info {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.word-term {
-    font-weight: bold;
-    color: var(--yy-text-tertiary);
-    font-size: 1rem;
-}
-
-.word-translation {
-    font-size: 0.875rem;
-    color: var(--yy-text-muted);
-}
-
-.word-actions {
-    display: flex;
-    align-items: center;
-}
-
-.audio-player {
-    width: 20px;
-    height: 20px;
-    color: var(--yy-red);
-    cursor: pointer;
-    transition: transform 0.2s ease, color 0.2s ease;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .audio-player:hover {
-      color: var(--yy-red);
-      transform: scale(1.1);
-  }
-}
-
-.audio-player:active {
-  transform: scale(0.97);
-}
-
-.material-link {
-    color: var(--yy-red);
-    font-size: 0.875rem;
-    margin-left: 8px;
-    transition: color 0.2s ease;
-    cursor: pointer;
-}
-
-.empty-text {
-    text-align: center;
-    font-size: 0.875rem;
-    color: var(--yy-text-muted);
-    padding: 16px 0;
-}
-
-/* 登出失敗訊息位在紅色頭部上：用米白字（對紅底 7.9:1），不用 Bootstrap 的紅字（紅疊紅只有 1.79:1） */
+/* 登出失敗訊息：文字用深石板（莓紅當小字在玻璃最壞底圖上不到 4.5:1），只有圖示用莓紅（非文字 3:1）；狀態是文字加圖示 */
 .sidebar-signout-error {
-    margin: 8px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 12px 0 0;
     font-size: 0.875rem;
     font-weight: 700;
-    color: var(--yy-cream);
+    color: var(--yy-calm-text);
 }
 
-.sidebar-nav-wrap {
-    background: var(--yy-cream);
+.sidebar-signout-error svg {
+    flex-shrink: 0;
+    color: var(--yy-calm-danger);
 }
 
 .sidebar-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
     padding: 16px;
-    text-align: center;
-    font-size: 0.875rem;
-    color: var(--yy-text-tertiary);
-    border-top: 1px solid var(--yy-border-soft);
+    border-top: 1px solid var(--yy-calm-rule);
+    font-size: 0.8125rem;
+    color: var(--yy-calm-text-sub);
+}
+
+/* 減少動態：不縮放，只留底色變化 */
+@media (prefers-reduced-motion: reduce) {
+    .profile-btn,
+    .nav-button {
+        transition-property: background-color, border-color, color;
+    }
+
+    .profile-btn:active {
+        transform: none;
+    }
 }

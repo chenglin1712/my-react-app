@@ -367,14 +367,16 @@
 }
 
 /* userSidebar */
+/* 材質是毛玻璃（.yy-glass，見 theme-v2.css）：背景、模糊、降級純色與焦點光暈都由它提供。
+   .yy-glass 自己有細框，所以這裡只用高度 4 的陰影，不再加 --yy-edge-4（避免深色下疊成雙框）；
+   側欄貼右邊，只畫左邊那一條框。 */
 .sidebar {
     position: fixed;
     top: 0;
     right: 0;
     width: 350px;
     height: 100%;
-    background-color: var(--yy-surface);
-    box-shadow: var(--yy-elev-4), var(--yy-edge-4);
+    box-shadow: var(--yy-elev-4);
     z-index: var(--yy-z-drawer);
     visibility: hidden;
     /* 用 transform 位移而不是動 right（審查項 P2-85）：不觸發版面重算。
@@ -382,6 +384,10 @@
     transform: translateX(100%);
     transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 280ms;
     overflow-y: auto;
+}
+
+.sidebar.yy-glass {
+    border-width: 0 0 0 1px;
 }
 
 .sidebar.open {
@@ -406,8 +412,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 12px 5px;
-    border-bottom: var(--yy-border-width) solid var(--yy-calm-line);
-    background: var(--yy-calm-bg);
+    border-bottom: 1px solid var(--yy-calm-rule);
 }
 
 .sidebar-header h3 {
@@ -434,6 +439,10 @@
     .close-btn:hover {
         color: var(--yy-calm-accent);
     }
+}
+
+.sidebar-header .close-btn:active {
+    transform: scale(0.95);
 }
 
 /* 筆記專區下拉選單 */
@@ -684,6 +693,24 @@
 @media screen and (max-width: 768px) {
     .sidebar {
         width: 100vw;
+    }
+}
+
+/* 減少動態：側欄不從右邊滑進來，改成原地淡入淡出（收起時 visibility 等淡出結束才隱藏） */
+@media (prefers-reduced-motion: reduce) {
+    .sidebar {
+        transform: none;
+        opacity: 0;
+        transition: opacity 160ms var(--ease-out), visibility 0s linear 160ms;
+    }
+
+    .sidebar.open {
+        opacity: 1;
+        transition: opacity 160ms var(--ease-out), visibility 0s;
+    }
+
+    .sidebar-header .close-btn:active {
+        transform: none;
     }
 }
 
