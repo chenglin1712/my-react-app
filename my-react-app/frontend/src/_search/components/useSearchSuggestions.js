@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiPost } from '../../../utils/apiClient';
+import { apiUrl } from "../../../utils/apiUrls";
 
 // 單詞查詢的「即時建議」（Apple 化步驟 4-2）：沒有專用的建議 API，所以停止輸入一小段時間後，
 // 用現有的關鍵字查詢取前幾筆（先完全符合、再相關符合）。每次查詢都帶一個請求序號，
@@ -39,7 +40,7 @@ export default function useSearchSuggestions(query, tribe, enabled = true) {
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
-        const data = await apiPost(import.meta.env.VITE_API_SEARCH_KEY_URL, { keyword, tribe });
+        const data = await apiPost(apiUrl('SEARCH_KEY'), { keyword, tribe });
         if (!cancelled) setResult({ key, items: extractSuggestions(data) });
       } catch {
         // 建議只是輔助：失敗就不顯示，不打擾使用者（按搜尋時的錯誤另外處理）

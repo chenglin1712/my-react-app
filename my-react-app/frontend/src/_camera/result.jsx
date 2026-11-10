@@ -18,6 +18,7 @@ import { deriveInitialLetters } from "@utils/wordLetters";
 import { Button } from "react-bootstrap";
 import TribePill from "../../components/ui/TribePill";
 import { TRIBES } from "../constants/tribes";
+import { apiUrl } from "../../utils/apiUrls";
 
 const WORD_FAVORITES_CATEGORY_ID = 1;
 
@@ -68,7 +69,7 @@ const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onResta
     // apiPost 內部一定會回傳 Promise（即使 auth.currentUser 是 null，token 只影響
     // 要不要帶 Authorization header），不會有「未登入時整條 .then/.catch/.finally
     // 都不執行、loading 卡住」的問題。
-    apiPost(import.meta.env.VITE_API_SEARCH_KEYS_URL, { words: selectedWords, tribe })
+    apiPost(apiUrl('SEARCH_KEYS'), { words: selectedWords, tribe })
       .then(data => {
         if (myGeneration !== requestGenerationRef.current) return;
         setDetail(null); // 查詢期間舊清單還能點，新結果一寫入就把那時開的舊詳情收掉

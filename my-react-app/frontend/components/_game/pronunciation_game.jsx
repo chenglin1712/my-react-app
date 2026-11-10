@@ -10,6 +10,7 @@ import IntroScreen from "./pronunciation/IntroScreen";
 import PlayingScreen from "./pronunciation/PlayingScreen";
 import ResultScreen from "./pronunciation/ResultScreen";
 import "../../static/css/_game/pronunciation.css";
+import { apiUrl } from "../../utils/apiUrls";
 
 const MAX_RECORDING_BYTES = 10 * 1024 * 1024;
 
@@ -28,12 +29,12 @@ function getRating(score, thresholds = DEFAULT_RATING_THRESHOLDS) {
 function PronunciationGame({ tribe = "tayal" }) {
   const { userData } = useAuth();
   const config = TRIBE_INTRO[tribe] || TRIBE_INTRO.tayal;
-  const audioBaseUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL;
+  const audioBaseUrl = apiUrl('SEARCH_AUDIO');
 
   const {
     status, questions, current, answers, setAnswers, loading, error, setError,
     start, restart, goToNext, progressPct,
-  } = useGameSession({ endpoint: import.meta.env.VITE_API_LISTENING_QUESTIONS_URL, tribe, count: 5 });
+  } = useGameSession({ endpoint: apiUrl('LISTENING_QUESTIONS'), tribe, count: 5 });
   const { play: playRefAudio, stop: stopRefAudio } = useGameAudioPlayer(audioBaseUrl);
 
   const {
@@ -102,7 +103,7 @@ function PronunciationGame({ tribe = "tayal" }) {
         formData.append("reference_urls", refUrls.join(","));
       }
 
-      const data = await apiPost(import.meta.env.VITE_API_QUIZ_AUDIO_URL, formData);
+      const data = await apiPost(apiUrl('QUIZ_AUDIO'), formData);
       if (myGeneration !== submissionGenerationRef.current || !mountedRef.current) return;
 
       if (!data.success) {

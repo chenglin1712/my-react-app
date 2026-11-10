@@ -6,6 +6,7 @@ import LoadingSpinner from "@components/ui/LoadingSpinner";
 import EmptyState from "@components/ui/EmptyState";
 import { apiPost } from "../../utils/apiClient";
 import { announce } from "@utils/announce";
+import { apiUrl } from "../../utils/apiUrls";
 
 // vision.py 自己的註解就寫明「圖片辨識同一批 label 常常出現重複的英文單字
 // （例如同一物件被偵測到多次）」，回傳前沒有去重。同一段中文翻譯出現兩筆時
@@ -67,7 +68,7 @@ const CameraLabelStep = ({ image, file, saved, onSave, onConfirm, onBack }) => {
         // 還是會繼續跑到底，回來時對已經卸載的元件 setState、也白白浪費一次
         // 按用量計費的 Google Cloud Vision API 呼叫。用 AbortController 取消。
         const controller = new AbortController();
-        const analyze = () => apiPost(import.meta.env.VITE_API_VISION_URL, formData, { signal: controller.signal });
+        const analyze = () => apiPost(apiUrl('VISION'), formData, { signal: controller.signal });
 
         // vision.py 成功時（2xx）從不在回應內帶 error 欄位，錯誤一律走
         // HTTPException／下面的 .catch，不需要另外檢查 response.data.error。

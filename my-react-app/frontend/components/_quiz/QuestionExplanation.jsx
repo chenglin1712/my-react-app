@@ -5,8 +5,9 @@ import { Play } from "lucide-react";
 import { apiPost } from "../../utils/apiClient";
 import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
 import ReviewSections from "./ReviewSections";
+import { apiUrl } from "../../utils/apiUrls";
 
-const EXPLAIN_URL = import.meta.env.VITE_API_REVIEW_QUESTION_URL || "/AIModel/review_question/";
+const EXPLAIN_URL = apiUrl('REVIEW_QUESTION');
 
 // 依錯誤類型給學生看得懂的說明與下一步（不顯示後端的原始訊息）
 const errorMessage = (err) => {

@@ -2,8 +2,9 @@ import "../../static/css/_memory/memory.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiDelete, apiGet, apiPost, apiPut } from "../../utils/apiClient";
+import { apiUrl } from "../../utils/apiUrls";
 
-const MEMORY_URL = import.meta.env.VITE_API_LEARNER_MEMORY_URL || "/AIModel/memory/";
+const MEMORY_URL = apiUrl('LEARNER_MEMORY');
 
 // 同意說明的版本，必須跟後端 backend/AIModel/memory_store.py 的 CONSENT_VERSION 一致。
 // 不一致（後端改了記錄內容、這裡的文字還沒更新）時不讓人按同意，避免同意到跟實際不符的說明。

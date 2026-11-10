@@ -8,10 +8,9 @@ import { getAuth, updatePassword, EmailAuthProvider, reauthenticateWithCredentia
 import { loadSuccessAnimation } from "../../src/animations/loaders";
 import { useLottieAnimation } from "@hooks/useLottieAnimation";
 import { authErrorMessage } from "@utils/firebaseAuthErrors";
+import { waitForAuthReady } from "@utils/authReady";
 
 const ResetPassword = () => {
-    const auth = getAuth();
-    const user = auth.currentUser;
     const navigate = useNavigate();
 
     const [currentPassword, setCurrentPassword] = useState("");
@@ -28,6 +27,14 @@ const ResetPassword = () => {
         setErrorMsg("");
         setIsSubmitting(true);
         try {
+            // 重新整理後 Firebase 要一下子才還原登入狀態：在送出時才讀 currentUser（不在 render 時讀，那時常常還是 null）
+            await waitForAuthReady();
+            const user = getAuth().currentUser;
+            if (!user) {
+                // 等不到登入狀態有兩種可能（真的過期、或網路慢還沒還原完），文字不下定論
+                setErrorMsg("目前無法確認登入狀態，請重新整理頁面，必要時重新登入後再變更密碼。");
+                return;
+            }
             // 驗證使用者
             const credential = EmailAuthProvider.credential(user.email, currentPassword);
             await reauthenticateWithCredential(user, credential);

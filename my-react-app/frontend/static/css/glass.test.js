@@ -73,7 +73,7 @@ describe(".yy-glass 規則", () => {
     expect(m, "找不到玻璃焦點環規則").not.toBeNull();
     expect(m[1]).toMatch(/outline:\s*var\(--yy-ui-focus-ring\)/);
     expect(m[1]).toMatch(/outline-offset:\s*var\(--yy-ui-focus-offset\)/);
-    expect(m[1]).toMatch(/box-shadow:\s*0 0 0 calc\(var\(--yy-ui-focus-offset\) \+ 2px\) var\(--yy-glass-halo\)/);
+    expect(m[1]).toMatch(/box-shadow:\s*var\(--yy-keep-shadow,\s*0 0 0 0 transparent\),\s*0 0 0 calc\(var\(--yy-ui-focus-offset\) \+ 2px\) var\(--yy-glass-halo\)/);
   });
 
   it("焦點環不寫死圓角：輪廓跟元件自己的圓角走", () => {
@@ -136,5 +136,52 @@ describe("個人資料側欄用到的其他顏色（最壞底圖）", () => {
   it("深銅文字只出現在不透明的淡銅底上（登出的懸停）：在 --yy-calm-tint-copper-1 上至少 4.5:1", () => {
     expect(ratio(pick("--yy-calm-accent", 0), pick("--yy-calm-tint-copper-1", 0))).toBeGreaterThanOrEqual(4.5);
     expect(ratio(pick("--yy-calm-accent", 1), pick("--yy-calm-tint-copper-1", 1))).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe("Liquid Glass 頂緣高光疊上去後的對比（最壞底圖、最亮的頂端那一列）", () => {
+  // 疊色順序：底圖 → 玻璃底 → 高光（高光在最上面，頂端 alpha 最高）。逐一算全黑與全白底圖
+  const specular = tokenAll("--yy-glass-specular");
+  const glass = [parseRgba(tokenAll("--yy-glass-bg")[0]), parseRgba(tokenAll("--yy-glass-bg")[1])];
+  const texts = [
+    { name: "--yy-calm-text", light: hexToRgb(tokenAll("--yy-calm-text")[0]), dark: hexToRgb(tokenAll("--yy-calm-text")[1]) },
+    { name: "--yy-calm-text-sub", light: hexToRgb(tokenAll("--yy-calm-text-sub")[0]), dark: hexToRgb(tokenAll("--yy-calm-text-sub")[1]) },
+  ];
+  const top = (mode, under) => {
+    const spec = parseRgba(specular[mode === "light" ? 0 : 1]);
+    return over(spec, over(glass[mode === "light" ? 0 : 1], under));
+  };
+
+  it("高光 token：淺色一個、深色兩個（一致）", () => {
+    expect(specular).toHaveLength(3);
+    expect(specular[1]).toBe(specular[2]);
+  });
+
+  texts.forEach(({ name, light, dark }) => {
+    [["全黑", [0, 0, 0]], ["全白", [255, 255, 255]]].forEach(([label, under]) => {
+      it(`淺色：${name} 在${label}底圖＋高光上至少 4.5:1`, () => {
+        expect(ratio(light, top("light", under)), `${name} ${label}`).toBeGreaterThanOrEqual(4.5);
+      });
+      it(`深色：${name} 在${label}底圖＋高光上至少 4.5:1`, () => {
+        expect(ratio(dark, top("dark", under)), `${name} ${label}`).toBeGreaterThanOrEqual(4.5);
+      });
+    });
+  });
+});
+
+describe("玻璃內的焦點光暈是疊加（不蓋掉子元素自己的陰影）", () => {
+  const nav = readFileSync(join(ROOT, "navigation", "Navbar.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const KEEP = /box-shadow:\s*var\(--yy-keep-shadow,\s*0 0 0 0 transparent\),\s*0 0 0 calc\(var\(--yy-ui-focus-offset\) \+ 2px\) var\(--yy-glass-halo\)/;
+
+  it("三處光暈規則（.yy-glass、一般導覽列、雜誌版導覽列）都把 --yy-keep-shadow 放在前面", () => {
+    expect(css.match(/\.yy-glass :focus-visible\s*\{([^}]*)\}/)[1]).toMatch(KEEP);
+    expect(nav.match(/\.navbar:not\(\.navbar--magazine\) :focus-visible\s*\{([^}]*)\}/)[1]).toMatch(KEEP);
+    expect(nav.match(/\.navbar--magazine :focus-visible\s*\{([^}]*)\}/)[1]).toMatch(KEEP);
+  });
+
+  it("導覽列裡有自己 box-shadow 的可聚焦元素（手機選單目前頁的強調條）把它同時寫進 --yy-keep-shadow", () => {
+    const rule = nav.match(/\.menu-mobile-item\.active\s*\{([^}]*)\}/)[1];
+    expect(rule).toMatch(/--yy-keep-shadow:\s*inset 3px 0 0 var\(--yy-calm-accent\)/);
+    expect(rule).toMatch(/box-shadow:\s*var\(--yy-keep-shadow\)/);
   });
 });

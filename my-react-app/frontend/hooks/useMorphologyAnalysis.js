@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { apiPost } from "../utils/apiClient";
+import { apiUrl } from "../utils/apiUrls";
 
 // 沒設定環境變數時退回預設路徑（跟 .env.example 的值相同），本機沒更新 .env 也能用。
-const ANALYZE_URL = import.meta.env.VITE_API_MORPHOLOGY_ANALYZE_URL || "/api/v1/morphology/analyze";
+const ANALYZE_URL = apiUrl('MORPHOLOGY_ANALYZE');
 
 /**
  * 詞形分析：輸入一個族語詞形，取得可能的詞根、詞綴切分、詞綴功能、辭典例句與信心。

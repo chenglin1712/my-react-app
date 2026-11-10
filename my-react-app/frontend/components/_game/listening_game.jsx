@@ -8,10 +8,11 @@ import { useTimedOptionSelect } from "./useTimedOptionSelect";
 import { TRIBE_INTRO } from "./listeningIntro";
 import CelebrationBurst from "./CelebrationBurst";
 import { shouldCelebrate } from "./celebrate";
+import { apiUrl } from "../../utils/apiUrls";
 
 function ListeningGame({ tribe = "tayal" }) {
   const config = TRIBE_INTRO[tribe] || TRIBE_INTRO.tayal;
-  const audioBaseUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL;
+  const audioBaseUrl = apiUrl('SEARCH_AUDIO');
 
   const {
     status, questions, current, answers, setAnswers, loading, error,
@@ -20,7 +21,7 @@ function ListeningGame({ tribe = "tayal" }) {
     // 當預設值（後台可調），跟 pronunciation_game.jsx 刻意固定傳 count=5 不同：
     // 那邊是借用同一個出題端點的詞彙池，但發音練習每輪題數是獨立的遊戲設計，
     // 不該被「聽力遊戲每輪題數」這個設定連動改變。
-  } = useGameSession({ endpoint: import.meta.env.VITE_API_LISTENING_QUESTIONS_URL, tribe });
+  } = useGameSession({ endpoint: apiUrl('LISTENING_QUESTIONS'), tribe });
   const { isPlaying, play: playAudio, stop: stopAudio } = useGameAudioPlayer(audioBaseUrl);
 
   const q = questions[current];

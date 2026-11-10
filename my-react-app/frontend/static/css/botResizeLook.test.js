@@ -22,7 +22,9 @@ describe("AI 助手：可調整大小", () => {
 
   it("手機固定全寬，不套用自訂大小，也不顯示把手", () => {
     const mobile = bot.slice(bot.indexOf("@media (max-width: 600px)"));
-    expect(mobile).toMatch(/width:\s*calc\(100vw - 16px\)/);
+    expect(mobile).toMatch(/left:\s*calc\(8px \+ env\(safe-area-inset-left,\s*0px\)\)/);
+    expect(mobile).toMatch(/right:\s*calc\(8px \+ env\(safe-area-inset-right,\s*0px\)\)/);
+    expect(mobile).toMatch(/width:\s*auto/);
     expect(header).toMatch(/@media \(max-width: 600px\)\s*\{\s*\.bot-resize\s*\{\s*display:\s*none/);
   });
 
@@ -58,9 +60,9 @@ describe("AI 助手：Liquid Glass 材質", () => {
     expect(theme).toMatch(/prefers-reduced-transparency: reduce\)\s*\{\s*\.yy-glass\.yy-glass--liquid\s*\{\s*background:\s*var\(--yy-glass-bg-solid\)/);
   });
 
-  it("深色的高光很淡（≤ 0.1），不拉低淺色字的對比", () => {
-    const darks = [...theme.matchAll(/--yy-glass-specular:\s*rgba\(255, 255, 255, ([\d.]+)\)/g)].map((m) => Number(m[1]));
-    expect(darks.filter((a) => a <= 0.1)).toHaveLength(2);
+  it("深色不加高光（alpha 0）：任何高光都會讓次要文字在全白底圖的深色玻璃上掉到 4.5:1 以下（glass.test.js 有算）", () => {
+    const darks = [...theme.matchAll(/--yy-glass-specular:\s*(rgba\(255, 255, 255, 0\))\s*;/g)];
+    expect(darks).toHaveLength(2);
   });
 });
 

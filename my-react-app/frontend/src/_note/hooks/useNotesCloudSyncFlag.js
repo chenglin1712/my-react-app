@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { apiGet } from '../../../utils/apiClient';
+import { apiUrl } from "../../../utils/apiUrls";
 
-const FEATURES_URL = import.meta.env.VITE_API_FEATURES_URL || '/api/v1/features';
+const FEATURES_URL = apiUrl('FEATURES');
 
 /**
  * 雲端筆記同步（notes_cloud_sync）是否開啟，由後台「功能開關」控制，後端用 GET /api/v1/features 回報。

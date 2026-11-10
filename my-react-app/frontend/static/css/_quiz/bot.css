@@ -55,9 +55,11 @@
 
 @media (max-width: 600px) {
     .bot-overlay {
+        /* 左右各留 8px 再加各自的瀏海內距；用 left＋right 決定寬度（固定寬度會在橫放時被推出畫面） */
+        left: calc(8px + env(safe-area-inset-left, 0px));
         right: calc(8px + env(safe-area-inset-right, 0px));
         bottom: var(--bot-bottom, calc(8px + env(safe-area-inset-bottom, 0px)));
-        width: calc(100vw - 16px);
+        width: auto;
         /* 手機固定全寬，不套用使用者調整的大小；手機 Navbar（含跑馬燈）約 98px 高，再留 6px 空隙，視窗頂端才不會被導覽列蓋住 */
         height: calc(100dvh - var(--bot-bottom, 8px) - 104px);
     }

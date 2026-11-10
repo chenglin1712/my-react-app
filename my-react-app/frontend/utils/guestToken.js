@@ -14,6 +14,7 @@
  * 只是每次重新整理都要重領（核發上限仍然有效）。
  */
 import axios from 'axios';
+import { apiUrl, configuredApiUrl } from "./apiUrls";
 
 export const GUEST_TOKEN_HEADER = 'X-Guest-Token';
 export const GUEST_TOKEN_INVALID_CODE = 'guest_token_invalid';
@@ -24,8 +25,8 @@ const RENEW_WITHIN_MS = 3 * 24 * 60 * 60 * 1000;
 const ISSUE_TIMEOUT_MS = 15000;
 
 // 沒設定環境變數時，從翻譯網址推出核發網址（同一個 router 底下的 /guest-token）。
-const TRANSLATE_URL = import.meta.env.VITE_API_TRANSLATE_URL || '/api/v1/translation/translate';
-const ISSUE_URL = import.meta.env.VITE_API_TRANSLATE_GUEST_TOKEN_URL
+const TRANSLATE_URL = apiUrl('TRANSLATE');
+const ISSUE_URL = configuredApiUrl('TRANSLATE_GUEST_TOKEN')
   || TRANSLATE_URL.replace(/\/translate\/?$/, '/guest-token');
 
 let memoryToken = null;

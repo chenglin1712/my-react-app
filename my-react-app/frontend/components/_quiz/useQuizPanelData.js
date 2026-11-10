@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiGet } from "../../utils/apiClient";
+import { apiUrl } from "../../utils/apiUrls";
 
 // 依題型把後端原始題目格式整理成要存進資料庫的格式，跟畫面顯示用的欄位對應。
 function formatQuestionForUpload(type, q) {
@@ -92,7 +93,7 @@ export function useQuizPanelData(level, tribe) {
         async function fetchData() {
             setIsLoading(true);
             try {
-                const responseData = await apiGet(import.meta.env.VITE_API_QUIZ_URL, { params: { level, tribe } });
+                const responseData = await apiGet(apiUrl('QUIZ'), { params: { level, tribe } });
                 if (isMounted) {
                     setDataState({ key: quizKey, payload: responseData });
                     if (responseData && responseData.parts &&

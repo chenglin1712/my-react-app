@@ -21,6 +21,7 @@ import CompactSearchBar from './components/CompactSearchBar';
 import WordDetailSheet from './components/WordDetailSheet';
 import { useScrolledPast } from '../hooks/useScrolledPast';
 import useAudioPlayback from '../../hooks/useAudioPlayback';
+import { apiUrl } from "../../utils/apiUrls";
 
 const PAGE_SIZE = 50;
 const WORD_FAVORITES_CATEGORY_ID = 1;
@@ -118,7 +119,7 @@ const SearchPage = () => {
       body.favorites_only = true;
       body.favorite_names = Array.from(favoriteWords);
     }
-    const data = await apiPost(import.meta.env.VITE_API_SEARCH_ALL_URL, body);
+    const data = await apiPost(apiUrl('SEARCH_ALL'), body);
     const pageWords = Object.values(data.all_results || {}).flat();
     return { pageWords, total: data.total ?? pageWords.length, letters: data.available_letters };
   };
@@ -181,7 +182,7 @@ const SearchPage = () => {
         setDefinitions({ exact_match_results: {}, fuzzy_match_results: {} });
         announceResultCount(total);
       } else {
-        const data = await apiPost(import.meta.env.VITE_API_SEARCH_KEY_URL, { keyword, tribe });
+        const data = await apiPost(apiUrl('SEARCH_KEY'), { keyword, tribe });
         if (myGeneration !== requestGenerationRef.current) return;
         setDefinitions({
           exact_match_results: Array.isArray(data.exact_match_results) ? { [keyword]: data.exact_match_results } : data.exact_match_results,

@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { createAuthorizedAudio } from '../utils/authAudio';
+import { apiUrl } from "../utils/apiUrls";
 
 // 播放單一授權音檔（單字/句子發音）的最小共用邏輯，從 useAudioPlayback.js 抽出來，
 // 讓不需要 playSentence／apiPost 的呼叫端（_quiz_questions 的 5 個題型元件，
@@ -24,7 +25,7 @@ function stopAndRelease(audio) {
 }
 
 export default function useAuthorizedAudioPlayback({
-  audioBaseUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL,
+  audioBaseUrl = apiUrl('SEARCH_AUDIO'),
   rememberFailures = true,
 } = {}) {
   const generationRef = useRef(0);

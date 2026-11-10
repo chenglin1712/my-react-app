@@ -18,6 +18,7 @@ import HomeIntro from "../../components/_home/HomeIntro";
 import WeeklyDigestCard from "../../components/WeeklyDigestCard";
 import { pickMastheadContent, HOME_LEDE } from "../../components/_home/mastheadContent";
 import { mapAnnouncementToNewsItem, HOME_NEWS_MAX } from "../../components/_home/announcementContent";
+import { apiUrl } from "../../utils/apiUrls";
 
 // 後台首頁版位設定（見 backend/adminapi 的 HomepageConfig）還沒抓回來之前
 // 就先用這組預設值渲染——刻意跟後端 model 的欄位預設值一致，這樣設定還沒
@@ -145,7 +146,7 @@ const HomePage = () => {
         let cancelled = false;
         setScheduleError(false);
         setScheduleLoading(true);
-        fetch(import.meta.env.VITE_API_EXAM_SCHEDULE_URL || '/crawler/exam_schedule/')
+        fetch(apiUrl('EXAM_SCHEDULE'))
             .then((res) => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return res.json();

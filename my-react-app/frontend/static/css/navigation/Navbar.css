@@ -295,7 +295,9 @@
     background-color: var(--yy-calm-info-bg);
     color: var(--yy-calm-accent);
     font-weight: 700;
-    box-shadow: inset 3px 0 0 var(--yy-calm-accent);
+    /* 玻璃內的焦點光暈會疊在這條強調條後面（--yy-keep-shadow），聚焦時強調條不消失 */
+    --yy-keep-shadow: inset 3px 0 0 var(--yy-calm-accent);
+    box-shadow: var(--yy-keep-shadow);
 }
 
 .menu-toggle {
@@ -879,7 +881,7 @@
 @media (prefers-reduced-transparency: reduce) {
     .navbar:not(.navbar--magazine)::before { background: var(--yy-glass-bg-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
-.navbar:not(.navbar--magazine) :focus-visible { box-shadow: 0 0 0 calc(var(--yy-ui-focus-offset) + 2px) var(--yy-glass-halo); }
+.navbar:not(.navbar--magazine) :focus-visible { box-shadow: var(--yy-keep-shadow, 0 0 0 0 transparent), 0 0 0 calc(var(--yy-ui-focus-offset) + 2px) var(--yy-glass-halo); }
 
 /* ======== 步驟 2-3：目前頁膠囊、下拉彈簧、首頁雜誌版 sticky 玻璃與小字標 ======== */
 
@@ -967,7 +969,7 @@
 }
 
 .navbar--magazine :focus-visible {
-    box-shadow: 0 0 0 calc(var(--yy-ui-focus-offset) + 2px) var(--yy-glass-halo);
+    box-shadow: var(--yy-keep-shadow, 0 0 0 0 transparent), 0 0 0 calc(var(--yy-ui-focus-offset) + 2px) var(--yy-glass-halo);
 }
 
 /* 雜誌版的膠囊：圓角 pill、底線縮進膠囊內 */
@@ -1061,6 +1063,9 @@
         display: flex;
         height: var(--yy-tabbar-h);
         padding-bottom: env(safe-area-inset-bottom, 0px);
+        /* 橫放時避開瀏海（viewport-fit=cover）；它貼著 left/right 0，吃不到 body 的內距 */
+        padding-left: env(safe-area-inset-left, 0px);
+        padding-right: env(safe-area-inset-right, 0px);
         box-sizing: border-box;
         isolation: isolate;
         border-top: 1px solid var(--yy-calm-line);

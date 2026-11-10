@@ -5,8 +5,9 @@ import { apiGet } from "../../utils/apiClient";
 import ResearchConsentCard from "./ResearchConsentCard";
 import RuleFeedback from "./RuleFeedback";
 import "../../static/css/_quiz/quiz_recommon_result.css";
+import { apiUrl } from "../../utils/apiUrls";
 
-const RULE_SUMMARY_URL = import.meta.env.VITE_API_RULE_SUMMARY_URL || "/api/v1/quiz/rule_summary";
+const RULE_SUMMARY_URL = apiUrl('RULE_SUMMARY');
 
 function RecommendedQuizResult() {
   const { state } = useLocation();

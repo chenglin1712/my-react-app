@@ -6,6 +6,7 @@ import { loadQuizModel, saveQuizModel } from "./quizModelService";
 import { getWordNameForQuestion, buildResultAnalysis } from "./quizResultAnalysis";
 import QuestionRenderer, { QUESTION_COMPONENTS } from "./quiz_recommon_question_renderer";
 import "../../static/css/_quiz/quiz_recommon_question.css";
+import { apiUrl } from "../../utils/apiUrls";
 
 export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
   const { userData, loading: authLoading } = useAuth();
@@ -67,7 +68,7 @@ export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
         userModelRef.current = storedModel;
 
         const data = await apiPost(
-          import.meta.env.VITE_API_GENERATE_QUIZ_URL,
+          apiUrl('GENERATE_QUIZ'),
           storedModel,
           { params: { tribe } }
         );
@@ -145,7 +146,7 @@ export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
       // 下一次 generate_quiz_frontend（不論是這次測驗還是下一次）都會依最新結果出題
       try {
         const data = await apiPost(
-          import.meta.env.VITE_API_SUBMIT_QUIZ_ANSWER_URL,
+          apiUrl('SUBMIT_QUIZ_ANSWER'),
           {
             user_data: userModelRef.current,
             answer: {

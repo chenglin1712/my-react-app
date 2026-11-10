@@ -10,6 +10,7 @@ import { describeChatError } from "./botErrors";
 import useChatRequest from "./chat/useChatRequest";
 import ChatComposer from "./chat/ChatComposer";
 import { ChatLog, TypingBubble } from "./chat/ChatLog";
+import { apiUrl } from "../../utils/apiUrls";
 
 // 一則句子補充說明：原句、參考翻譯、逐詞對照、分欄補充。
 // interactive 只在放大的對話框裡開：縮圖那一則整塊是 role="button"，裡面不能再放按鈕與連結。
@@ -113,7 +114,7 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
         }
 
         try {
-            const data = await apiPost(import.meta.env.VITE_API_REVIEW_BOT_URL, { message: text, tribe }, { signal: controller.signal });
+            const data = await apiPost(apiUrl('REVIEW_BOT'), { message: text, tribe }, { signal: controller.signal });
             if (controller.signal.aborted) return;
 
             // 將資料轉成前端格式

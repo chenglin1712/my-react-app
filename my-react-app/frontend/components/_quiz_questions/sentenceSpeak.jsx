@@ -5,6 +5,7 @@ import useAuthorizedAudioPlayback from "../../hooks/useAuthorizedAudioPlayback";
 import { apiPost } from "../../utils/apiClient";
 import { announce } from "@utils/announce";
 import { playCorrectSound } from "../../utils/correctSound";
+import { apiUrl } from "../../utils/apiUrls";
 
 export default function SentenceSpeak({ question, _selected, checked, onSelect, onConfirm }) {
   const [audioBlob, setAudioBlob] = useState(null);
@@ -127,7 +128,7 @@ export default function SentenceSpeak({ question, _selected, checked, onSelect, 
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const data = await apiPost(import.meta.env.VITE_API_QUIZ_AUDIO_URL, formData);
+      const data = await apiPost(apiUrl('QUIZ_AUDIO'), formData);
 
       // compare_audio 失敗（ffmpeg 缺失、下載失敗、解碼錯誤等）時 HTTP 狀態碼仍是 200，
       // 只有 body 的 success 欄位是 false，這是 app 層的失敗，不是 HTTP 錯誤，

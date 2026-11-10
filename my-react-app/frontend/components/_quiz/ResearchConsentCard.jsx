@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { apiGet, apiPut } from "../../utils/apiClient";
+import { apiUrl } from "../../utils/apiUrls";
 
 // 同意說明文字的版本，必須跟後端 backend/config/quiz_research.py 的 CONSENT_VERSION 一致。
 // 兩邊版本不同（後端改了記錄的內容、這裡的文字還沒更新）時整張卡片不顯示，
 // 避免使用者「同意」了一段跟實際記錄內容不符的說明。
 export const CONSENT_TEXT_VERSION = "2026-10-v2";
 
-const CONSENT_URL = import.meta.env.VITE_API_RESEARCH_CONSENT_URL || "/api/v1/quiz/research_consent";
+const CONSENT_URL = apiUrl('RESEARCH_CONSENT');
 
 /**
  * 「協助改善詞綴練習」的選填同意。預設不記錄；只有按下同意才會開始記錄匿名資料，

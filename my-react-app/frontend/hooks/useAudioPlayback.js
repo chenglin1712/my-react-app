@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { createAuthorizedAudio } from "../utils/authAudio";
 import { apiPost } from "../utils/apiClient";
 import useAuthorizedAudioPlayback from './useAuthorizedAudioPlayback';
+import { apiUrl } from "../utils/apiUrls";
 
 // 單詞發音／整句發音的播放狀態與邏輯，原本在 _search/index.jsx 裡，抽出來讓頁面
 // 元件不用管音檔播放的細節（generation token 取消機制、失敗記錄等）。原本住在
@@ -17,12 +18,12 @@ export default function useAudioPlayback(selectedTribe, onError) {
   const playSentence = useCallback(async (sentence) => {
     const myGen = beginPlayback();
     try {
-      const data = await apiPost(import.meta.env.VITE_API_SENTENCE_AUDIO_URL, { sentence, tribe: selectedTribe });
+      const data = await apiPost(apiUrl('SENTENCE_AUDIO'), { sentence, tribe: selectedTribe });
       const tokens = data.audioTokens || [];
       if (tokens.length === 0 || !isCurrent(myGen)) return;
       for (const { fileId } of tokens) {
         if (!isCurrent(myGen)) break;
-        const proxyUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL + fileId;
+        const proxyUrl = apiUrl('SEARCH_AUDIO') + fileId;
         let a;
         try {
           a = await createAuthorizedAudio(proxyUrl);

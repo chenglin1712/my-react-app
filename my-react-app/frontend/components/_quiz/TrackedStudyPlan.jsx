@@ -7,8 +7,9 @@ import { formatEventTime, TAIPEI_TIME_ZONE } from "../../utils/calendarEvents";
 import { progressOf, withTaskDone } from "../../utils/studyPlan";
 import { applyReplan, getTrackedPlan, ReplanConflictError, setTaskDone, stopTracking } from "../../src/userServives/studyPlanService";
 import { announce } from "@utils/announce";
+import { apiUrl } from "../../utils/apiUrls";
 
-const REPLAN_URL = import.meta.env.VITE_API_REPLAN_STUDY_PLAN_URL || "/AIModel/replan_study_plan/";
+const REPLAN_URL = apiUrl('REPLAN_STUDY_PLAN');
 
 // 依錯誤類型給學生看得懂的說明與下一步（不顯示後端的原始訊息）
 const replanErrorMessage = (err) => {

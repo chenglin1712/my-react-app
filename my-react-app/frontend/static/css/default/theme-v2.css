@@ -409,7 +409,7 @@
     --yy-glass-bg-solid: #24282C;
     --yy-glass-border: rgba(242, 238, 227, 0.14);
     --yy-glass-halo: rgba(36, 40, 44, 0.9);
-  --yy-glass-specular: rgba(255, 255, 255, 0.07); /* 深色玻璃上的高光要很淡，否則會拉低淺色字的對比 */
+  --yy-glass-specular: rgba(255, 255, 255, 0); /* 深色不加高光：淺色次要字在「全白底圖上的深色玻璃」本來就只有 4.6:1，任何高光都會掉到 4.5 以下（glass.test.js） */
     /* Bootstrap 狀態色的 rgb 三元組（深色）：淺色的在檔尾 :root，深色在這裡跟著換（步驟 1-9） */
     --bs-primary-rgb: 215, 169, 139;
     --bs-success-rgb: 140, 207, 169;
@@ -430,7 +430,7 @@
   --yy-glass-bg-solid: #24282C;
   --yy-glass-border: rgba(242, 238, 227, 0.14);
   --yy-glass-halo: rgba(36, 40, 44, 0.9);
-  --yy-glass-specular: rgba(255, 255, 255, 0.07); /* 深色玻璃上的高光要很淡，否則會拉低淺色字的對比 */
+  --yy-glass-specular: rgba(255, 255, 255, 0); /* 深色不加高光：淺色次要字在「全白底圖上的深色玻璃」本來就只有 4.6:1，任何高光都會掉到 4.5 以下（glass.test.js） */
   /* Bootstrap 狀態色的 rgb 三元組（深色）：淺色的在檔尾 :root，深色在這裡跟著換（步驟 1-9） */
   --bs-primary-rgb: 215, 169, 139;
   --bs-success-rgb: 140, 207, 169;
@@ -1177,6 +1177,9 @@
 .yy-footer__links a {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  /* 兩個字的連結（測驗、翻譯、聯絡…）寬度只有約 29px，補到 44px 才好點 */
+  min-width: var(--yy-control-md);
   min-height: var(--yy-control-md);
   color: var(--yy-calm-block-on);
   font-size: var(--yy-text-sm);
@@ -1454,6 +1457,9 @@ body {
   background: var(--yy-calm-bg);
   color: var(--yy-calm-text);
   letter-spacing: 0.02em;
+  /* viewport-fit=cover（index.html）讓頁面延伸到瀏海下；手機橫放時左右兩側要自己避開（直放與電腦都是 0） */
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
 }
 body::before {
   content: "";
@@ -1491,7 +1497,9 @@ body::before {
    規則：一律附 prefers-reduced-transparency 純色降級；不支援 backdrop-filter 時也退回純色；
    文字對比在「最壞底圖」下仍須 4.5:1（glass.test.js 以全黑與全白底圖各算一次）。
    焦點環：沿用 --yy-ui-focus-ring，輪廓跟著元件自己的圓角走（outline 會依 border-radius 彎曲）；
-   玻璃面上另加淺色光暈（--yy-glass-halo），避免焦點環被模糊的底圖吃掉。 */
+   玻璃面上另加淺色光暈（--yy-glass-halo），避免焦點環被模糊的底圖吃掉。
+   光暈是「疊加」：元件自己有 box-shadow 又要在玻璃內保留時，把它同時寫進 --yy-keep-shadow（見 Navbar.css 的 .menu-mobile-item.active），
+   焦點時光暈會疊在它後面，不會把它蓋掉。 */
 .yy-glass {
   background: var(--yy-glass-bg);
   -webkit-backdrop-filter: saturate(var(--yy-glass-saturate)) blur(var(--yy-glass-blur));
@@ -1521,7 +1529,7 @@ body::before {
 .yy-glass :focus-visible {
   outline: var(--yy-ui-focus-ring);
   outline-offset: var(--yy-ui-focus-offset);
-  box-shadow: 0 0 0 calc(var(--yy-ui-focus-offset) + 2px) var(--yy-glass-halo);
+  box-shadow: var(--yy-keep-shadow, 0 0 0 0 transparent), 0 0 0 calc(var(--yy-ui-focus-offset) + 2px) var(--yy-glass-halo);
 }
 
 /* ---------- Bootstrap 變數橋接（Apple 化步驟 1-9，第一步）----------

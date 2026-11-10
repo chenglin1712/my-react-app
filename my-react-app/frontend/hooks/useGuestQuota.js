@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { apiGet } from '../utils/apiClient';
+import { apiUrl, configuredApiUrl } from "../utils/apiUrls";
 
 // 沒設定環境變數時，從翻譯網址推出額度查詢網址（同一個 router 底下的 /guest-quota）。
-const TRANSLATE_URL = import.meta.env.VITE_API_TRANSLATE_URL || '/api/v1/translation/translate';
-const QUOTA_URL = import.meta.env.VITE_API_TRANSLATE_GUEST_QUOTA_URL
+const TRANSLATE_URL = apiUrl('TRANSLATE');
+const QUOTA_URL = configuredApiUrl('TRANSLATE_GUEST_QUOTA')
   || TRANSLATE_URL.replace(/\/translate\/?$/, '/guest-quota');
 
 const IDLE = { status: 'idle', limit: null, remaining: null, deniedReason: null };

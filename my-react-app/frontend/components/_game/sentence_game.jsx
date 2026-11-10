@@ -8,6 +8,7 @@ import { useTimedOptionSelect } from "./useTimedOptionSelect";
 import { TRIBE_INTRO } from "./sentenceIntro";
 import CelebrationBurst from "./CelebrationBurst";
 import { shouldCelebrate } from "./celebrate";
+import { apiUrl } from "../../utils/apiUrls";
 
 const RATING_THRESHOLDS = [
   { min: 80, className: "excellent" },
@@ -21,14 +22,14 @@ function getRatingClass(pct) {
 
 function SentenceGame({ tribe = "tayal" }) {
   const config = TRIBE_INTRO[tribe] || TRIBE_INTRO.tayal;
-  const audioBaseUrl = import.meta.env.VITE_API_SEARCH_AUDIO_URL;
+  const audioBaseUrl = apiUrl('SEARCH_AUDIO');
 
   const {
     status, questions, current, answers, setAnswers, loading, error,
     start, restart, goToNext, progressPct,
     // count 不在這裡寫死——省略時後端用 GameConfig.sentence_questions_per_round
     // 當預設值（後台可調）。
-  } = useGameSession({ endpoint: import.meta.env.VITE_API_SENTENCE_QUESTIONS_URL, tribe });
+  } = useGameSession({ endpoint: apiUrl('SENTENCE_QUESTIONS'), tribe });
   const { isPlaying, play: playAudio, stop: stopAudio } = useGameAudioPlayer(audioBaseUrl);
 
   const q = questions[current];

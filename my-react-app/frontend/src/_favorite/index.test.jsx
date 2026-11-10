@@ -156,7 +156,7 @@ describe('FavoritePage 各族語收藏數（後端統計）', () => {
     expect(screen.getByText('1 個詞')).toBeInTheDocument();
   });
 
-  test('統計請求的網址一定是字串路徑（沒設環境變數的情況見 summaryUrl.test.js）', async () => {
+  test('統計請求的網址一定是字串路徑（沒設環境變數的情況見 utils/apiUrls.test.js）', async () => {
     mockApi({ tayal: 2, amis: 3, bunun: 0, kavalan: 0, paiwan: 1 });
     renderPage();
     await screen.findByText(/其他族語：阿美 3、排灣 1/);

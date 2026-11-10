@@ -79,11 +79,10 @@ describe('ResetPassword (resetPassword)', () => {
       fireEvent.click(screen.getByRole('button', { name: '變更密碼' }));
     });
 
-    // user 為 null，存取 user.email 會同步丟出例外，被 try/catch 接住，
-    // 不會呼叫任何 Firebase API，也不會讓畫面卡住不給任何提示。
+    // 還原後仍然沒有使用者：不呼叫任何 Firebase API，也不讓畫面卡住；訊息不下定論（可能真的過期，也可能是網路慢）。
     expect(reauthenticateWithCredential).not.toHaveBeenCalled();
     expect(updatePassword).not.toHaveBeenCalled();
-    expect(screen.getByText('密碼更新失敗')).toBeInTheDocument();
+    expect(screen.getByText('目前無法確認登入狀態，請重新整理頁面，必要時重新登入後再變更密碼。')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '變更密碼' })).not.toBeDisabled();
   });
 
@@ -100,8 +99,8 @@ describe('ResetPassword (resetPassword)', () => {
 
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: '變更密碼' }));
-        await Promise.resolve();
-        await Promise.resolve();
+        // 送出時先等登入狀態還原，再重新驗證、更新密碼：多讓幾輪 microtask 跑完
+        for (let i = 0; i < 10; i += 1) await Promise.resolve();
       });
 
       expect(screen.getByText(/密碼更新成功！將移至編輯資料頁面/)).toBeInTheDocument();
@@ -115,6 +114,25 @@ describe('ResetPassword (resetPassword)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  test('畫面一開始 currentUser 還是 null、送出時才還原：用送出當下的使用者（重新整理後 render 時讀不到）', async () => {
+    const auth = { currentUser: null };
+    getAuth.mockImplementation(() => auth);
+    reauthenticateWithCredential.mockResolvedValueOnce();
+    updatePassword.mockResolvedValueOnce();
+
+    render(<ResetPassword />);
+    fillPasswords('oldpass', 'newpass123');
+    auth.currentUser = { email: 'late@b.com' }; // render 之後 Firebase 才還原完
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '變更密碼' }));
+    });
+
+    expect(EmailAuthProvider.credential).toHaveBeenCalledWith('late@b.com', 'oldpass');
+    expect(updatePassword).toHaveBeenCalledWith({ email: 'late@b.com' }, 'newpass123');
+    getAuth.mockReset();
   });
 
   test('點擊取消會導向上一頁', () => {

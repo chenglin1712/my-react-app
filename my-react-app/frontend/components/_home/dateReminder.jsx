@@ -7,6 +7,7 @@ import { Calendar, User, FileText, Award, Mail, Bell} from 'lucide-react';
 import {
   Button
 } from 'react-bootstrap';
+import { apiUrl } from "../../utils/apiUrls";
 
 // phase（後端 /crawler/exam_schedule/ 回傳的簡短期程代稱）-> 圖示，純前端呈現用，
 // 不影響資料本身；後端未對到的新期程名稱就沿用 FileText 當預設圖示。
@@ -65,7 +66,7 @@ const DateReminder = () => {
     // 早就過期的假資料（見 backend/crawler/views.py 的 get_exam_schedule）。
     useEffect(() => {
         let cancelled = false;
-        fetch(`${import.meta.env.VITE_API_EXAM_SCHEDULE_URL}`)
+        fetch(apiUrl('EXAM_SCHEDULE'))
             .then((res) => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return res.json();

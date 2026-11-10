@@ -189,6 +189,7 @@ describe("硬偏移陰影", () => {
         splitTop(m[2].replace(/!important/, "").trim(), ",").forEach((layer) => {
           const l = layer.trim();
           if (l === "none" || /^var\(--yy-(?:elev|edge)-[0-4]\)$/.test(l)) return;
+          if (/^var\(--yy-keep-shadow(?:,\s*0 0 0 0 transparent)?\)$/.test(l)) return; // 玻璃焦點光暈「疊加」用的承接變數（值本身另由 glass.test.js 檢查）
           const lens = splitTop(l, " ").filter((t) => LEN.test(t));
           if (lens.length >= 3 && /^0(?:px)?$/.test(lens[2])) return; // 模糊為 0：細框、焦點圈、內描邊
           bad.push(`${file}:${line} ${l.slice(0, 70)}`);

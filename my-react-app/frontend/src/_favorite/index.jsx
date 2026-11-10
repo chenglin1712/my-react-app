@@ -9,7 +9,6 @@ import useAudioPlayback from "../../hooks/useAudioPlayback";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { useTabState } from "./hooks/useTabState";
 import { filterFavoriteWords } from "./filterFavoriteWords";
-import { resolveFavoritesSummaryUrl } from "./summaryUrl";
 import { chunkNames, collectFavoriteNames } from "./favoriteNames";
 import WordCardWithImg from "./components/WordCardWithImg";
 import SearchAndFilterControls from "./components/SearchAndFilterControls";
@@ -18,13 +17,14 @@ import LoadingSpinner from "@components/ui/LoadingSpinner";
 import { describeActiveFilters } from "@utils/wordFilterState";
 import { deriveInitialLetters } from "@utils/wordLetters";
 import "../../static/css/_favorite/index.css"
+import { apiUrl } from "../../utils/apiUrls";
 
 const PAGE_SIZE = 50;
 // 後端 FavoriteCountsRequest.names 的筆數上限
 const MAX_SUMMARY_NAMES = 2000;
 // 使用者連續取消收藏時等一下再問後端，避免每點一次就打一次（後端每分鐘 30 次）
 const SUMMARY_DEBOUNCE_MS = 400;
-const FAVORITES_SUMMARY_URL = resolveFavoritesSummaryUrl(import.meta.env.VITE_API_FAVORITES_SUMMARY_URL);
+const FAVORITES_SUMMARY_URL = apiUrl('FAVORITES_SUMMARY');
 
 const FavoritePage = () => {
   // /favorite 已經在 route.jsx 的 <ProtectedLayout> 底下，未登入會由它統一導去
@@ -87,7 +87,7 @@ const FavoritePage = () => {
     // 要不要帶 Authorization header），不會有「未登入時整條 .then/.catch 都不執行、
     // loading 卡住」的問題。
     Promise.all(chunkNames(names).map(chunk => apiPost(
-      import.meta.env.VITE_API_SEARCH_ALL_URL,
+      apiUrl('SEARCH_ALL'),
       { tribe: selectedTribe, favorites_only: true, favorite_names: chunk },
     )))
       .then(results => {

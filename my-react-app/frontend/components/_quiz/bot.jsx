@@ -33,6 +33,7 @@ import ChatComposer from "./chat/ChatComposer";
 import BotResizeHandle from "./BotResizeHandle";
 import { loadBotSize, saveBotSize } from "./botSize";
 import { ChatLog, TypingBubble } from "./chat/ChatLog";
+import { apiUrl } from "../../utils/apiUrls";
 
 // 預設的起始建議；後端 /AIModel/quota/ 會依學習資料回傳個人化的三句（#13），讀不到就用這三句
 const SUGGESTIONS = [
@@ -469,7 +470,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
             };
             const data = streamUrl
                 ? await apiStream(streamUrl, body, { signal: controller.signal, onDelta: (piece) => pushDelta(botId, piece) })
-                : await apiPost(import.meta.env.VITE_API_AI_BOT_URL, body, { signal: controller.signal });
+                : await apiPost(apiUrl('AI_BOT'), body, { signal: controller.signal });
             if (!mountedRef.current || epoch !== accountEpochRef.current) return;
 
             cancelPendingFlush();

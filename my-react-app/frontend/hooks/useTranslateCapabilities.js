@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiGet } from "../utils/apiClient";
+import { apiUrl } from "../utils/apiUrls";
 
 /**
  * 各族語的翻譯/語料能力（例句數、詞條數、有沒有整句真人原音）。原本只有
@@ -20,7 +21,7 @@ export function useTranslateCapabilities({ guest = false, enabled = true, refres
         let active = true;
         (async () => {
             try {
-                const data = await apiGet(import.meta.env.VITE_API_TRANSLATE_CAPABILITIES_URL, { guest });
+                const data = await apiGet(apiUrl('TRANSLATE_CAPABILITIES'), { guest });
                 if (active) setCapabilities(data.tribes ?? []);
             } catch {
                 // 能力資訊只是輔助顯示，拿不到不影響主要功能。

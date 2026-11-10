@@ -18,6 +18,7 @@ import OfflineNotice from "@components/ui/OfflineNotice";
 import { useAuth } from "../userServives/authContext";
 import PermissionProtect from "../userServives/permissionProtect";
 import { apiPost } from "../../utils/apiClient";
+import { apiUrl } from "../../utils/apiUrls";
 
 const MAX_LEN = 300;
 
@@ -135,7 +136,7 @@ const TranslatePage = () => {
         setActiveTokenIndex(null);
         try {
             const data = await apiPost(
-                import.meta.env.VITE_API_TRANSLATE_URL,
+                apiUrl('TRANSLATE'),
                 { text, tribe, direction },
                 { signal: controller.signal, guest: isGuest },
             );
