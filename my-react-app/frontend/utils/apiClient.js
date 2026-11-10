@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { auth } from '../../firebase';
+import { waitForAuthReady } from './authReady';
 import { forgetGuestToken, getGuestToken, GUEST_TOKEN_HEADER, GUEST_TOKEN_INVALID_CODE } from './guestToken';
 
 /**
@@ -27,6 +28,7 @@ export class ApiError extends Error {
 }
 
 async function authHeaders(guest) {
+  await waitForAuthReady();
   const token = await auth.currentUser?.getIdToken();
   if (token) return { Authorization: `Bearer ${token}` };
   if (!guest) return {};

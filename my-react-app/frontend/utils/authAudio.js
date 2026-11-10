@@ -1,4 +1,5 @@
 import { auth } from "../../firebase";
+import { waitForAuthReady } from "./authReady";
 
 /**
  * <audio src> 和 `new Audio(url)` 都無法附加 Authorization header，
@@ -7,6 +8,7 @@ import { auth } from "../../firebase";
  * 並在播放結束或發生錯誤時自動 revoke，避免 blob URL 累積造成記憶體洩漏。
  */
 export async function createAuthorizedAudio(url) {
+  await waitForAuthReady();
   const token = await auth.currentUser?.getIdToken();
   const res = await fetch(url, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},

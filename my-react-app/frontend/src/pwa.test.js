@@ -102,5 +102,11 @@ describe('index.html 與 service worker', () => {
     fetchImpl = async () => ok
     expect(await dispatch('https://site.test/assets/editProfile-abc.js')).toBe(ok)
     expect(store.has('https://site.test/assets/editProfile-abc.js')).toBe(true)
+
+    // 缺檔時伺服器回 index.html（200、text/html）：照常回給頁面，但不能存進快取
+    const html = { status: 200, type: 'basic', redirected: false, headers: new Headers({ 'content-type': 'text/html' }), clone() { return this } }
+    fetchImpl = async () => html
+    expect(await dispatch('https://site.test/assets/gone-abc.js')).toBe(html)
+    expect(store.has('https://site.test/assets/gone-abc.js')).toBe(false)
   })
 })

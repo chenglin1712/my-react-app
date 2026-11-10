@@ -62,7 +62,10 @@ self.addEventListener('fetch', (event) => {
           return Response.error();
         }
         // 只存「同源、沒被導向、狀態 200」的回應：避免把登入導向頁或錯誤頁當成資源永久存起來
-        if (response.status === 200 && response.type === 'basic' && !response.redirected) {
+        // 也不存 text/html：檔案不存在（例如換版後舊檔被清掉）時，伺服器可能把 index.html 當 200 回來，
+        // 存下來就會讓這個網址永遠回 HTML、script 載入失敗。
+        const type = (response.headers?.get?.('content-type') || '').toLowerCase();
+        if (response.status === 200 && response.type === 'basic' && !response.redirected && !type.includes('text/html')) {
           // 存不進去（儲存空間滿等）只是少了快取，不該讓 service worker 報錯
           event.waitUntil(cache.put(request, response.clone()).catch(() => {}));
         }

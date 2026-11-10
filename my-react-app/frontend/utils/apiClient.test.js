@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import axios from 'axios';
 import { apiGet, apiPost, apiPatch, apiPut, apiDelete, trackEvent, ApiError, DEFAULT_TIMEOUT_MS } from './apiClient';
 import { forgetGuestToken, resetGuestTokenForTests } from './guestToken';
@@ -9,6 +9,26 @@ let mockCurrentUser = null;
 vi.mock('../../firebase', () => ({
   auth: { get currentUser() { return mockCurrentUser; } },
 }));
+
+describe('登入狀態還原前不送請求（重新整理後 401 的根因）', () => {
+  afterEach(async () => { delete (await import('../../firebase')).auth.authStateReady; });
+
+  test('authStateReady 完成後才讀 currentUser 並帶上 Bearer 憑證', async () => {
+    mockCurrentUser = null;
+    axios.post.mockReset();
+    axios.post.mockResolvedValue({ data: {} });
+    const firebase = await import('../../firebase');
+    let finish;
+    firebase.auth.authStateReady = () => new Promise((resolve) => { finish = resolve; });
+    const call = apiPost('/x', {});
+    await Promise.resolve();
+    expect(axios.post).not.toHaveBeenCalled();
+    mockCurrentUser = { getIdToken: async () => 'tok-1' };
+    finish();
+    await call;
+    expect(axios.post.mock.calls[0][2].headers).toEqual({ Authorization: 'Bearer tok-1' });
+  });
+});
 
 describe('normalizeError（透過 apiPost 間接測試，函式本身沒有 export）', () => {
   beforeEach(() => {
