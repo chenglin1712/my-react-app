@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Alert, Container, Button, Dropdown } from 'react-bootstrap';
 import { Link, useLocation } from 'react-router-dom';
 import { useFavorites } from "../../src/userServives/useFavorites";
@@ -10,6 +10,7 @@ import { useIsMobile } from "../../hooks/useIsMobile";
 import { useTabState } from "./hooks/useTabState";
 import { filterFavoriteWords } from "./filterFavoriteWords";
 import { resolveFavoritesSummaryUrl } from "./summaryUrl";
+import { chunkNames, collectFavoriteNames } from "./favoriteNames";
 import WordCardWithImg from "./components/WordCardWithImg";
 import SearchAndFilterControls from "./components/SearchAndFilterControls";
 import EmptyState from "@components/ui/EmptyState";
@@ -63,18 +64,35 @@ const FavoritePage = () => {
     }
   }, [location.state]);
 
-  // 依目前選擇的族語重新查詢單字，避免一次載入不相關族語的全部資料
+  // 只向後端要「收藏的那幾個詞」，不再下載整個族語的全部詞條（泰雅語六千多筆含釋義與音檔，冷快取時會拖到逾時）。
+  // 詞名是所有收藏分類的聯集：切換分類不必重新查詢。取消收藏後名單縮小，也不需要重查（畫面本來就會把它濾掉）。
+  const favoriteNames = useMemo(() => collectFavoriteNames(favorites), [favorites]);
+  const favoriteNamesRef = useRef(favoriteNames);
+  useEffect(() => { favoriteNamesRef.current = favoriteNames; }, [favoriteNames]);
+  // 收藏資料可能比頁面晚到：從「沒有收藏」變成「有收藏」時要查一次，之後的增減不重查
+  const hasFavorites = favoriteNames.length > 0;
+
+  // 依目前選擇的族語重新查詢單字
   useEffect(() => {
     const myGeneration = ++requestGenerationRef.current;
-    setLoading(true);
     setLoadError(false);
+    const names = favoriteNamesRef.current;
+    if (names.length === 0) {
+      setAllWords([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     // apiPost 內部一定會回傳 Promise（即使 auth.currentUser 是 null，token 只影響
     // 要不要帶 Authorization header），不會有「未登入時整條 .then/.catch 都不執行、
     // loading 卡住」的問題。
-    apiPost(import.meta.env.VITE_API_SEARCH_ALL_URL, { tribe: selectedTribe })
-      .then(data => {
+    Promise.all(chunkNames(names).map(chunk => apiPost(
+      import.meta.env.VITE_API_SEARCH_ALL_URL,
+      { tribe: selectedTribe, favorites_only: true, favorite_names: chunk },
+    )))
+      .then(results => {
         if (myGeneration !== requestGenerationRef.current) return;
-        setAllWords(Object.values(data.all_results || {}).flat());
+        setAllWords(results.flatMap(data => Object.values(data.all_results || {}).flat()));
         setLoading(false);
       })
       .catch(err => {
@@ -83,7 +101,7 @@ const FavoritePage = () => {
         setLoadError(true);
         setLoading(false);
       });
-  }, [selectedTribe, loadAttempt]);
+  }, [selectedTribe, loadAttempt, hasFavorites]);
 
   const currentTab = favorites.find(t => t.id === activeTab);
   const currentState = tabStates[activeTab] || {};

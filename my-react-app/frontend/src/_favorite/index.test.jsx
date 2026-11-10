@@ -104,14 +104,20 @@ describe('FavoritePage 頁首與載入失敗（E-7，P1-14、P2-64）', () => {
   });
 
   test('載入失敗：顯示人話訊息與重試鈕，按重試會重新查詢', async () => {
-    apiPost.mockRejectedValueOnce(new Error('boom'));
-    apiPost.mockResolvedValueOnce({ all_results: { balay: [{ name: 'balay', explanationItems: [{ chineseExplanation: '真的' }] }] } });
+    // 依請求內容回應（不依呼叫順序）：機器忙時 400ms 後的收藏統計請求可能插在中間，不能吃掉查詢的回應
+    let searchAttempts = 0;
+    apiPost.mockImplementation((url, body) => {
+      if (body && Array.isArray(body.names)) return Promise.resolve({ counts: {} });
+      searchAttempts += 1;
+      if (searchAttempts === 1) return Promise.reject(new Error('boom'));
+      return Promise.resolve({ all_results: { balay: [{ name: 'balay', explanationItems: [{ chineseExplanation: '真的' }] }] } });
+    });
     renderPage();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('單字資料暫時載入失敗，請稍後再試。');
     fireEvent.click(screen.getByRole('button', { name: '重試' }));
     await waitFor(() => expect(screen.getAllByText('真的').length).toBeGreaterThan(0));
-    expect(apiPost).toHaveBeenCalledTimes(2);
+    expect(searchAttempts).toBe(2);
   });
 });
 
@@ -179,5 +185,63 @@ describe('FavoritePage 各族語收藏數：超過後端上限', () => {
     renderPage();
     await new Promise((r) => setTimeout(r, 600));
     expect(apiPost.mock.calls.some(([, body]) => body && Array.isArray(body.names))).toBe(false);
+  });
+});
+
+describe('FavoritePage 只向後端要收藏的詞（不下載整個族語）', () => {
+  const searchCalls = () => apiPost.mock.calls.filter(([, body]) => body && body.tribe);
+
+  beforeEach(() => {
+    apiPost.mockReset();
+    apiPost.mockResolvedValue({ all_results: {} });
+  });
+
+  test('請求帶 favorites_only 與收藏詞名（所有分類的聯集），不是整個族語', async () => {
+    favoritesHolder.current = [{ id: 1, content: ['balay', 'cyux'] }, { id: 2, content: ['cyux', 'qutux'] }];
+    renderPage();
+    await waitFor(() => expect(searchCalls()).toHaveLength(1));
+    expect(searchCalls()[0][1]).toEqual({ tribe: '泰雅', favorites_only: true, favorite_names: ['balay', 'cyux', 'qutux'] });
+  });
+
+  test('收藏超過後端單次上限（500）時分批請求，結果合併', async () => {
+    const names = Array.from({ length: 501 }, (_, i) => `w${i}`);
+    favoritesHolder.current = [{ id: 1, content: names }];
+    apiPost.mockImplementation((url, body) => Promise.resolve({
+      all_results: Object.fromEntries(body.favorite_names.slice(0, 1).map((n) => [n, [{ name: n, explanationItems: [{ chineseExplanation: `義-${n}` }] }]])),
+    }));
+    renderPage();
+    await waitFor(() => expect(searchCalls()).toHaveLength(2));
+    expect(searchCalls().map(([, body]) => body.favorite_names.length)).toEqual([500, 1]);
+    await waitFor(() => expect(screen.getAllByText('義-w0').length).toBeGreaterThan(0));
+    expect(screen.getAllByText('義-w500').length).toBeGreaterThan(0);
+  });
+
+  test('沒有任何收藏時不發查詢請求（只有收藏統計那支另計）', async () => {
+    favoritesHolder.current = EMPTY_FAVORITES;
+    renderPage();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(searchCalls()).toHaveLength(0);
+  });
+
+  test('離開頁面再回來（重新掛載）：用最新的收藏名單重新查詢', async () => {
+    favoritesHolder.current = [{ id: 1, content: ['balay'] }];
+    const first = renderPage();
+    await waitFor(() => expect(searchCalls()).toHaveLength(1));
+    first.unmount();
+    favoritesHolder.current = [{ id: 1, content: ['balay', 'cyux'] }];
+    renderPage();
+    await waitFor(() => expect(searchCalls()).toHaveLength(2));
+    expect(searchCalls()[1][1].favorite_names).toEqual(['balay', 'cyux']);
+  });
+
+  test('收藏資料比頁面晚到：從沒有變成有時補查一次', async () => {
+    favoritesHolder.current = EMPTY_FAVORITES;
+    const { rerender } = renderPage();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(searchCalls()).toHaveLength(0);
+    favoritesHolder.current = [{ id: 1, content: ['balay'] }];
+    rerender(<MemoryRouter><FavoritePage /></MemoryRouter>);
+    await waitFor(() => expect(searchCalls()).toHaveLength(1));
+    expect(searchCalls()[0][1].favorite_names).toEqual(['balay']);
   });
 });
