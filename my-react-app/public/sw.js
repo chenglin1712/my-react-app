@@ -52,10 +52,19 @@ self.addEventListener('fetch', (event) => {
       caches.open(ASSET_CACHE).then(async (cache) => {
         const cached = await cache.match(request);
         if (cached) return cached;
-        const response = await fetch(request);
+        // 網路失敗（請求被瀏覽器中途取消、換頁、斷線）時自己接住，回傳標準的網路錯誤回應；
+        // 不接的話 respondWith 的 promise 會 reject，console 出現紅字「Uncaught (in promise) TypeError: Failed to fetch」。
+        // 頁面端的 import() 仍會照常收到載入失敗並由前端的重試機制處理。
+        let response;
+        try {
+          response = await fetch(request);
+        } catch {
+          return Response.error();
+        }
         // 只存「同源、沒被導向、狀態 200」的回應：避免把登入導向頁或錯誤頁當成資源永久存起來
         if (response.status === 200 && response.type === 'basic' && !response.redirected) {
-          event.waitUntil(cache.put(request, response.clone()));
+          // 存不進去（儲存空間滿等）只是少了快取，不該讓 service worker 報錯
+          event.waitUntil(cache.put(request, response.clone()).catch(() => {}));
         }
         return response;
       }),

@@ -60,4 +60,47 @@ describe('index.html 與 service worker', () => {
     expect(sw).toContain("url.pathname.startsWith('/assets/')")
     expect(sw).not.toMatch(/\/api\/|adminapi|AIModel/)
   })
+
+  it('/assets/ 抓取失敗時不丟出未處理的錯誤，回傳網路錯誤回應；成功的 200 仍會快取', async () => {
+    const listeners = {}
+    const store = new Map()
+    const cache = {
+      match: async (req) => store.get(req.url),
+      put: async (req, res) => { store.set(req.url, res) },
+    }
+    const fakeSelf = {
+      location: { origin: 'https://site.test' },
+      addEventListener: (type, fn) => { listeners[type] = fn },
+      skipWaiting: () => {},
+      clients: { claim: async () => {} },
+    }
+    let fetchImpl
+    const fakeCaches = { open: async () => cache, match: async () => undefined, keys: async () => [], delete: async () => true }
+    const run = new Function('self', 'caches', 'fetch', 'Request', 'Response', 'URL', read('public/sw.js'))
+    run(fakeSelf, fakeCaches, (req) => fetchImpl(req), class {}, class FakeResponse {
+      static error() { const r = new FakeResponse(); r.type = 'error'; return r }
+    }, URL)
+
+    const dispatch = async (url) => {
+      let responded
+      const waits = []
+      listeners.fetch({
+        request: { method: 'GET', url, mode: 'no-cors', headers: new Headers() },
+        respondWith: (p) => { responded = p },
+        waitUntil: (p) => waits.push(p),
+      })
+      const result = await responded
+      await Promise.all(waits)
+      return result
+    }
+
+    fetchImpl = () => Promise.reject(new TypeError('Failed to fetch'))
+    const failed = await dispatch('https://site.test/assets/shield-abc.js')
+    expect(failed.type).toBe('error')
+
+    const ok = { status: 200, type: 'basic', redirected: false, clone() { return this } }
+    fetchImpl = async () => ok
+    expect(await dispatch('https://site.test/assets/editProfile-abc.js')).toBe(ok)
+    expect(store.has('https://site.test/assets/editProfile-abc.js')).toBe(true)
+  })
 })
