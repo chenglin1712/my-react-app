@@ -37,14 +37,27 @@ MAX_VIEW_LINES = 999_999
 _SEGMENT = re.compile(r"^[\w一-鿿][\w一-鿿 .\-]*$")
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 # 不該進記憶的內容：網址、電子郵件、長數字（電話、證號）、疑似金鑰
+_LONG_NUMBER = re.compile(r"(?<!\d)\d[\d\s\-]{7,}\d(?!\d)")
+# 年-月-日（或 日-月-年），分隔符號 - / .；月 1–12、日 1–31、年 19xx／20xx，其餘長數字不算日期。
+_DATE = re.compile(
+    r"(?<![\d\-/.])(?:(?:19|20)\d{2}([-/.])(?:0?[1-9]|1[0-2])\1(?:0?[1-9]|[12]\d|3[01])"
+    r"|(?:0?[1-9]|[12]\d|3[01])([-/.])(?:0?[1-9]|1[0-2])\2(?:19|20)\d{2})(?![\d\-/.])"
+)
 _SENSITIVE = [
     (re.compile(r"https?://|www\.", re.I), "網址"),
     (re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+"), "電子郵件"),
-    (re.compile(r"(?<!\d)\d[\d\s\-]{7,}\d(?!\d)"), "長串數字（像電話或證號）"),
+    (_LONG_NUMBER, "長串數字（像電話或證號）"),
     (re.compile(r"\b(sk|pk|key|token|secret)[-_][A-Za-z0-9_\-]{8,}", re.I), "疑似金鑰"),
     # 記憶會在之後的對話被讀回模型，所以擋掉明顯想對模型下指令的文字（只是輔助防線，主要防線是把讀回的內容當資料）
     (re.compile(r"ignore\s+(all\s+|the\s+)?(previous|above|prior)|system\s+prompt|忽略(以上|之前|先前|上述|所有)|系統提示|無視(以上|之前|規則)", re.I), "給模型的指令"),
 ]
+
+
+def _has_long_number(text: str) -> bool:
+    """有沒有「像電話或證號」的長數字。學習記憶本來就會寫「2026-11-10 考了詞彙」這種日期，所以：
+    先在原文找出長數字片段，把片段裡合法的日期拿掉，剩下的部分仍構成長數字才算。
+    這樣單獨的日期放行；被日期隔開的電話（0912 2026-11-10 345678）拿掉日期後仍是長數字，照擋。"""
+    return any(_LONG_NUMBER.search(_DATE.sub("", match.group())) for match in _LONG_NUMBER.finditer(text))
 
 
 class MemoryError_(Exception):
@@ -95,7 +108,8 @@ def check_content(text) -> str:
     if _CONTROL.search(text):
         raise MemoryError_("內容含有不允許的字元")
     for pattern, label in _SENSITIVE:
-        if pattern.search(text):
+        found = _has_long_number(text) if pattern is _LONG_NUMBER else pattern.search(text)
+        if found:
             raise MemoryError_(f"記憶只能記學習相關內容，不能包含{label}")
     return text
 

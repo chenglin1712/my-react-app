@@ -28,7 +28,7 @@ from .services import run_tayal_chat, run_review_tayal_chat, run_study_plan_repl
 from .study_plan_store import PlanNotFound, load_current_plan
 from .question_context import QuestionNotFound, load_question_context, record_asked_question
 from .question_review import run_question_review
-from .tools import SqlDictionaryLookup
+from .tools import SqlDictionaryLookup, candidate_forms
 
 logger = logging.getLogger(__name__)
 
@@ -635,19 +635,33 @@ def _query_word_dicts(query_fn) -> list:
 
 def search_tayal_words_bulk(keywords: list, tribe_id: str = TRIBE_IDS["tayal"]) -> dict:
     """查詢多個關鍵詞，一次開啟連線，回傳 {keyword: word_dict} 映射。"""
+    # 切詞後的重複詞只查一次；每個詞試 candidate_forms 的各種寫法（去頭尾標點、小寫、
+    # 詞尾多一個空白——辭典裡有些詞條名稱帶尾端空白），全部合成一次 IN 查詢，再對回原詞。
+    keywords = list(dict.fromkeys(k for k in (keywords or []) if k))
     if not keywords:
         return {}
+    forms_by_keyword = {k: candidate_forms(k) for k in keywords}
+    all_forms = list(dict.fromkeys(f for forms in forms_by_keyword.values() for f in forms))
 
+    # 同拼寫有多筆時依 id 排序，取哪一筆才是固定的（沒有 ORDER BY 時順序由資料庫決定）。
     word_dicts = _query_word_dicts(
         lambda db: db.query(Word)
-        .filter(Word.name.in_(keywords), Word.tribe_id == tribe_id)
+        .filter(Word.name.in_(all_forms), Word.tribe_id == tribe_id)
+        .order_by(Word.id)
         .all()
     )
 
-    result_map = {}
+    by_name = {}
     for wd in word_dicts:
-        if wd["tayal"] not in result_map:
-            result_map[wd["tayal"]] = wd
+        by_name.setdefault(wd["tayal"], wd)
+
+    result_map = {}
+    for keyword, forms in forms_by_keyword.items():
+        for form in forms:
+            if form in by_name:
+                # 名稱本身若帶多餘空白（資料建檔瑕疵）顯示時去掉，與 dictionary_source 的作法一致。
+                result_map[keyword] = {**by_name[form], "tayal": by_name[form]["tayal"].strip()}
+                break
     return result_map
 
 

@@ -22,6 +22,7 @@ import WordDetailSheet from './components/WordDetailSheet';
 import { useScrolledPast } from '../hooks/useScrolledPast';
 import useAudioPlayback from '../../hooks/useAudioPlayback';
 import { apiUrl } from "../../utils/apiUrls";
+import { MAX_NAMES_PER_REQUEST, chunkNames } from "../_favorite/favoriteNames";
 
 const PAGE_SIZE = 50;
 const WORD_FAVORITES_CATEGORY_ID = 1;
@@ -106,19 +107,42 @@ const SearchPage = () => {
   // 用 ref 而不是 state，兩次點擊在同一個 tick 內也擋得住。
   const requestGenerationRef = useRef(0);
   const loadingMoreLockRef = useRef(false);
+  // 收藏超過後端單次上限（MAX_NAMES_PER_REQUEST）時，「只顯示收藏」改成分批查完、合併排序後放在這裡，
+  // 「載入更多」直接從這份清單切下一頁（名單分批後後端的 offset 分頁不能沿用）。
+  const favoriteBatchRef = useRef(null);
 
   // 「全部詞條」瀏覽（沒有輸入關鍵字）：字母／詞頻／分類／收藏篩選與排序都交給後端做，
   // 這裡只帶目前的篩選條件 + limit/offset 向 /dictionary/all/ 要一頁資料。純粹負責
   // 查詢，不自己碰 state——generation 檢查與 setState 都交給呼叫端。
   const fetchAllWordsPage = async (tribe, offset) => {
-    const body = { tribe, limit: PAGE_SIZE, offset, sort_order: sortOrder };
+    const body = { tribe, sort_order: sortOrder };
     if (filterLetter) body.letter = filterLetter;
     if (frequencyFilter) body.frequency = parseInt(frequencyFilter, 10);
     if (selectedSubCategory) body.category = selectedSubCategory;
     if (showOnlyFavorites) {
       body.favorites_only = true;
-      body.favorite_names = Array.from(favoriteWords);
+      const names = Array.from(favoriteWords);
+      if (names.length > MAX_NAMES_PER_REQUEST) {
+        // 後端一次最多收 MAX_NAMES_PER_REQUEST 個詞名，超過會 422：分批查完再合併。
+        const batchSig = `${filterSignature}|${names.join('\u0000')}`; // 含實際詞名：換掉一筆（總數不變）也要重抓
+        if (offset === 0 || favoriteBatchRef.current?.sig !== batchSig) {
+          const results = await Promise.all(chunkNames(names).map(chunk => apiPost(
+            apiUrl('SEARCH_ALL'), { ...body, favorite_names: chunk },
+          )));
+          const merged = results.flatMap(data => Object.values(data.all_results || {}).flat());
+          favoriteBatchRef.current = {
+            sig: batchSig,
+            words: sortWords(merged, { sortOrder }), // 各批各自排序過，合併後要整份重排
+            letters: results[0]?.available_letters,
+          };
+        }
+        const { words, letters } = favoriteBatchRef.current;
+        return { pageWords: words.slice(offset, offset + PAGE_SIZE), total: words.length, letters };
+      }
+      body.favorite_names = names;
     }
+    body.limit = PAGE_SIZE;
+    body.offset = offset;
     const data = await apiPost(apiUrl('SEARCH_ALL'), body);
     const pageWords = Object.values(data.all_results || {}).flat();
     return { pageWords, total: data.total ?? pageWords.length, letters: data.available_letters };

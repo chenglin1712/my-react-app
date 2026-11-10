@@ -24,7 +24,10 @@ export async function fetchReferenceUrls(tribe, word) {
     );
     const snap = await getDocs(q);
     return snap.docs.map((d) => d.data().storageUrl).filter(Boolean);
-  } catch {
+  } catch (error) {
+    // 參考音檔只是輔助，失敗時仍回空陣列讓遊戲繼續；但要留紀錄——缺複合索引
+    // （FAILED_PRECONDITION）之類的設定問題不能再靜默消失。
+    console.error("取得參考真人音檔失敗:", error);
     return [];
   }
 }

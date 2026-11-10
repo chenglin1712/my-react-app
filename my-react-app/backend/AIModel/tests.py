@@ -86,6 +86,35 @@ class SearchTayalWordsTest(TestCase):
         self.assertIn("mami", result)
         self.assertEqual(result["mami"]["chinese"], "mother")
 
+    @patch("AIModel.views.load_audio_items_for_words")
+    @patch("AIModel.views.load_explanation_items_for_words")
+    @patch("AIModel.views.SessionLocal")
+    def test_bulk_search_matches_case_punctuation_and_trailing_space(self, mock_session_local, mock_explanations, mock_audios):
+        # E8：句子裡帶標點、大小寫不同的詞，以及辭典名稱尾端帶空白的詞都要查得到。
+        mock_db = self._mock_session(mock_session_local, [_FakeWord("w1", "lokah "), _FakeWord("w2", "mami")])
+        mock_explanations.return_value = {"w1": [{"chineseExplanation": "好"}], "w2": [{"chineseExplanation": "媽媽"}]}
+        mock_audios.return_value = {}
+
+        result = search_tayal_words_bulk(["Lokah,", "mami", "mami", "nothere"])
+
+        self.assertEqual(result["Lokah,"]["chinese"], "好")
+        self.assertEqual(result["Lokah,"]["tayal"], "lokah")  # 多餘的尾端空白顯示時去掉
+        self.assertEqual(result["mami"]["chinese"], "媽媽")
+        self.assertNotIn("nothere", result)
+        # 重複的詞只查一次，所有寫法一次 IN 查完，並且有 ORDER BY（同拼寫多筆時取哪一筆才固定）。
+        self.assertEqual(mock_db.query.call_count, 1)
+        mock_db.query.return_value.order_by.assert_called_once()
+
+    @patch("AIModel.views.load_audio_items_for_words")
+    @patch("AIModel.views.load_explanation_items_for_words")
+    @patch("AIModel.views.SessionLocal")
+    def test_bulk_search_same_spelling_takes_the_first_row_in_query_order(self, mock_session_local, mock_explanations, mock_audios):
+        self._mock_session(mock_session_local, [_FakeWord("a1", "su"), _FakeWord("a2", "su")])
+        mock_explanations.return_value = {"a1": [{"chineseExplanation": "第一筆"}], "a2": [{"chineseExplanation": "第二筆"}]}
+        mock_audios.return_value = {}
+
+        self.assertEqual(search_tayal_words_bulk(["su"])["su"]["chinese"], "第一筆")
+
     def test_bulk_search_empty_input(self):
         result = search_tayal_words_bulk([])
         self.assertEqual(result, {})

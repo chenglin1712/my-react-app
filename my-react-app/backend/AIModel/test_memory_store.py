@@ -116,6 +116,21 @@ class ContentLimitsTest(_ConsentedCase):
                 run("u1", command="create", path="/memories/n.txt", file_text=text)
         self.assertEqual(LearnerMemoryFile.objects.count(), 0)
 
+    def test_dates_are_accepted_but_phone_and_id_numbers_are_still_refused(self):
+        # E9：長數字規則是為了擋電話與證號，合法日期不能被誤擋。
+        for ok in ("2026-11-10 考了詞彙", "2026/11/10 複習", "2026.11.10 小考", "10/11/2026 小考",
+                   "2026-1-5 到 2026-12-31 這段時間複習"):
+            with self.subTest(ok=ok):
+                self.assertEqual(ms.check_content(ok), ok)
+        for bad in ("電話 0912 345 678", "0912-345-678", "0912345678", "身分證 123456789",
+                    "2026-11-10 電話 0912345678",  # 日期旁邊的電話仍要擋
+                    "0912 2026-11-10 345678",      # 被日期隔開的電話：拿掉日期後仍是長數字
+                    "2026-11-10-0912345678",       # 日期緊鄰長數字
+                    "2026-13-45",                  # 月日不合理，不算日期
+                    "2026111012"):                   # 沒有分隔符號的長數字
+            with self.subTest(bad=bad), self.assertRaises(ms.MemoryError_):
+                ms.check_content(bad)
+
     def test_learning_notes_are_accepted(self):
         run("u1", command="create", path="/memories/n.txt", file_text="常把 su 當成動詞；每週練習 3 次，目標 20 個詞")
         self.assertEqual(LearnerMemoryFile.objects.count(), 1)

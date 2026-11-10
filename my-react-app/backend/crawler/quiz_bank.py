@@ -32,15 +32,35 @@ MATCHING_PAIRS_PER_BOARD = 4
 CLOZE_PASSAGE_COUNT = 3
 
 
+def _dedupe_key(text):
+    """去重用的比對值：去前後空白、大小寫不分（辭典資料有些拼寫帶多餘空白）。"""
+    return (text or "").strip().casefold()
+
+
 def _pick_matching_vocab_from_db(tribe):
     """依 MATCHING_CATEGORY_QUOTA 對每個類別做不放回抽樣，只從 status=published
     （已通過族語老師審定）的 QuizVocabItem 抽——草稿／待審核／已退件的內容
     不能被學生抽到，這是這次把題庫搬進資料庫、接上審定流程的核心目的。"""
     picked = []
+    # 同一次測驗裡，同一個外語拼寫或同一個中文詞義不能出現在兩張配對卡上：
+    # 否則配對遊戲會有重複卡片（React key 重複），同中文詞義時前端 find() 永遠回第一筆，
+    # 第二個詞怎麼配都不會對。舊版 sample_matching_vocab 有這層保護，搬進資料庫時漏掉了。
+    used_words, used_glosses = set(), set()
     for category, quota in MATCHING_CATEGORY_QUOTA.items():
         pool = get_published_vocab_items(tribe, category)
-        quota = min(quota, len(pool))
-        picked.extend(random.sample(pool, quota))
+        chosen = 0
+        # 先把整個池子打散，再依序挑；遇到重複就略過、往後補，直到湊滿配額或池子用完。
+        for item in random.sample(list(pool), len(pool)):
+            if chosen >= quota:
+                break
+            word_key = _dedupe_key(item.foreign_word)
+            gloss_key = _dedupe_key(item.chinese_gloss)
+            if (word_key and word_key in used_words) or (gloss_key and gloss_key in used_glosses):
+                continue
+            used_words.add(word_key)
+            used_glosses.add(gloss_key)
+            picked.append(item)
+            chosen += 1
     random.shuffle(picked)
     return picked
 
