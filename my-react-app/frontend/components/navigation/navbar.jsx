@@ -39,6 +39,23 @@ function useSlotStuck(slot, enabled) {
   return stuck;
 }
 
+// 一般頁（非首頁雜誌版）：捲離頁面頂端後，導覽列才出現細邊線與浮起的陰影，內容從玻璃底下滑過時看得出厚度。
+// 只在「是否捲動過」改變時才 setState。
+function useScrolled(enabled) {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    if (!enabled) {
+      setScrolled(false);
+      return undefined;
+    }
+    const check = () => setScrolled(window.scrollY > 0);
+    check();
+    window.addEventListener("scroll", check, { passive: true });
+    return () => window.removeEventListener("scroll", check);
+  }, [enabled]);
+  return scrolled;
+}
+
 // 靜態的導覽路由設定，不依賴 props/state，搬到元件外，不用每次 render 重建。
 const MENU_ITEMS = [
   { id: 'home', label: '首頁', icon: <House size={20} />, route: '/' },
@@ -73,6 +90,7 @@ const Navbar = ({ onOpenBot }) => {
   const homeSlot = useHomeNavSlot()?.slot ?? null;
   const magazine = location.pathname === "/" && homeSlot !== null;
   const stuck = useSlotStuck(homeSlot, magazine);
+  const scrolled = useScrolled(!magazine);
 
   const [isUserOpen, setIsUserOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -115,7 +133,7 @@ const Navbar = ({ onOpenBot }) => {
   };
 
   const navElement = (
-    <nav aria-label="網站導覽" className={`navbar${location.pathname === "/" ? " navbar--home" : ""}${magazine ? " navbar--magazine" : ""}`} data-stuck={magazine ? String(stuck) : undefined}>
+    <nav aria-label="網站導覽" className={`navbar${location.pathname === "/" ? " navbar--home" : ""}${magazine ? " navbar--magazine" : ""}`} data-stuck={magazine ? String(stuck) : undefined} data-scrolled={magazine ? undefined : String(scrolled)}>
       <div className="navbar-container">
         {/* 首頁雜誌版：吸附後左側浮出小字標「原語」（未吸附時 visibility:hidden，不能被 Tab 聚焦）；aria-label 以可見文字開頭 */}
         {magazine

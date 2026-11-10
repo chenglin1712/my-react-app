@@ -853,11 +853,25 @@
     content: "";
     position: absolute;
     inset: 0;
+    bottom: calc(-1 * var(--yy-border-width)); /* 玻璃底也蓋住 1px 的底框區（邊線透明時不漏出下面的內容） */
     z-index: -1;
     pointer-events: none;
-    background: var(--yy-glass-bg);
+    /* Liquid Glass：頂緣一道由亮漸隱的高光，疊在玻璃底上（降級規則在下面，會整個換回純色） */
+    background: linear-gradient(180deg, var(--yy-glass-specular) 0, transparent 32px), var(--yy-glass-bg);
     -webkit-backdrop-filter: saturate(var(--yy-glass-saturate)) blur(var(--yy-glass-blur));
     backdrop-filter: saturate(var(--yy-glass-saturate)) blur(var(--yy-glass-blur));
+}
+/* 邊線與陰影：在頁面最上方時安靜（沒有線），捲動後才出現，表示內容正從玻璃底下滑過 */
+.navbar:not(.navbar--magazine) {
+    border-bottom-color: transparent;
+    transition: border-color var(--dur-base) var(--ease-out); /* 陰影直接切換：box-shadow 過渡要重繪 */
+}
+.navbar:not(.navbar--magazine)[data-scrolled="true"] {
+    border-bottom-color: var(--yy-glass-border);
+    box-shadow: var(--yy-elev-2);
+}
+@media (prefers-reduced-motion: reduce) {
+    .navbar:not(.navbar--magazine) { transition: none; }
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .navbar:not(.navbar--magazine)::before { background: var(--yy-glass-bg-solid); }

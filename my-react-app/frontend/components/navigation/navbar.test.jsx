@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Navbar from './navbar';
 
@@ -182,5 +182,27 @@ describe('顯示設定（S5-3，深色功能旗標）', () => {
     const mobileGroup = container.querySelector('#mobile-menu .theme-group--mobile');
     expect(mobileGroup).not.toBeNull();
     expect(within(mobileGroup).getAllByRole('radio', { hidden: true }).map((r) => r.value)).toEqual(['light', 'dark', 'system']);
+  });
+});
+
+describe('Navbar 捲動後才出現邊線（Liquid Glass）', () => {
+  afterEach(() => { Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 }); });
+
+  test('一般頁：最上方 data-scrolled=false，捲離頂端變 true，回到頂端變回 false', () => {
+    const { container } = render(<Navbar />);
+    const nav = container.querySelector('nav.navbar');
+    expect(nav).toHaveAttribute('data-scrolled', 'false');
+    act(() => { Object.defineProperty(window, 'scrollY', { configurable: true, value: 120 }); fireEvent.scroll(window); });
+    expect(nav).toHaveAttribute('data-scrolled', 'true');
+    act(() => { Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 }); fireEvent.scroll(window); });
+    expect(nav).toHaveAttribute('data-scrolled', 'false');
+  });
+
+  test('卸載後不再監聽捲動', () => {
+    const remove = vi.spyOn(window, 'removeEventListener');
+    const { unmount } = render(<Navbar />);
+    unmount();
+    expect(remove).toHaveBeenCalledWith('scroll', expect.any(Function));
+    remove.mockRestore();
   });
 });
