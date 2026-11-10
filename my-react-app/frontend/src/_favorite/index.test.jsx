@@ -150,6 +150,15 @@ describe('FavoritePage 各族語收藏數（後端統計）', () => {
     expect(screen.getByText('1 個詞')).toBeInTheDocument();
   });
 
+  test('統計請求的網址一定是字串路徑（沒設環境變數的情況見 summaryUrl.test.js）', async () => {
+    mockApi({ tayal: 2, amis: 3, bunun: 0, kavalan: 0, paiwan: 1 });
+    renderPage();
+    await screen.findByText(/其他族語：阿美 3、排灣 1/);
+    const summaryCall = apiPost.mock.calls.find(([, body]) => body && Array.isArray(body.names));
+    expect(typeof summaryCall[0]).toBe('string');
+    expect(summaryCall[0].trim()).not.toBe('');
+  });
+
   test('統計失敗時不影響收藏頁：沒有其他族語的數字，目前族語照常顯示', async () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockApi(new Error('boom'));

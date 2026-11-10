@@ -9,6 +9,7 @@ import useAudioPlayback from "../../hooks/useAudioPlayback";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { useTabState } from "./hooks/useTabState";
 import { filterFavoriteWords } from "./filterFavoriteWords";
+import { resolveFavoritesSummaryUrl } from "./summaryUrl";
 import WordCardWithImg from "./components/WordCardWithImg";
 import SearchAndFilterControls from "./components/SearchAndFilterControls";
 import EmptyState from "@components/ui/EmptyState";
@@ -22,6 +23,7 @@ const PAGE_SIZE = 50;
 const MAX_SUMMARY_NAMES = 2000;
 // 使用者連續取消收藏時等一下再問後端，避免每點一次就打一次（後端每分鐘 30 次）
 const SUMMARY_DEBOUNCE_MS = 400;
+const FAVORITES_SUMMARY_URL = resolveFavoritesSummaryUrl(import.meta.env.VITE_API_FAVORITES_SUMMARY_URL);
 
 const FavoritePage = () => {
   // /favorite 已經在 route.jsx 的 <ProtectedLayout> 底下，未登入會由它統一導去
@@ -129,7 +131,7 @@ const FavoritePage = () => {
     if (!Array.isArray(summaryNames) || summaryNames.length > MAX_SUMMARY_NAMES) return undefined;
     let cancelled = false;
     const timer = setTimeout(() => {
-      apiPost(import.meta.env.VITE_API_FAVORITES_SUMMARY_URL, { names: summaryNames })
+      apiPost(FAVORITES_SUMMARY_URL, { names: summaryNames })
         .then(data => {
           if (cancelled || !data?.counts) return;
           setTribeCountsState({
