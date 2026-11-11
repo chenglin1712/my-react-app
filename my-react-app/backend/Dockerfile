@@ -15,8 +15,9 @@
 
 # 基底映像固定「版本＋摘要」：同一份 Dockerfile 在不同時間建出來的是同一個系統，不會因為上游
 # 悄悄換了 Debian 版本或 Python 小版本而壞掉，也不會被上游被入侵的新映像取代。
-# 3.12.13-slim-trixie 對應本機開發的 Python 3.12.13。要升級時：到 Docker Hub 查新標籤的摘要，
-# 在預備環境 docker build 通過後，標籤與摘要一起改。
+# 用 Python 3.12 系列，與 CI（setup-python 3.12）和本機開發的 Python 3.12 同一系列。Dependabot 只會提議 3.12.x 的
+# 修補版（見 .github/dependabot.yml）；要換到其他 Python 版本，requirements*.lock、CI、本機環境都要一起換。
+# 升級修補版時：到 Docker Hub 查新標籤的摘要，在預備環境 docker build 通過後，標籤與摘要一起改。
 FROM python:3.12.13-slim-trixie@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36
 
 # 對應 requirements.txt 內套件的系統依賴：
