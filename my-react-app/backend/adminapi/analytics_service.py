@@ -508,13 +508,16 @@ def build_retention_analytics():
     for uid, cohort_start in cohort_start_by_uid.items():
         cohort_uids[cohort_start].add(uid)
 
-    active_weeks_by_uid = defaultdict(set)
+    # 週 -> 那一週有活動的使用者集合。後面每個世代、每一週只需要跟這個集合做交集，
+    # 不必對世代裡的每個人各掃一次（世代數 × 週數 × 世代人數）。
+    active_uids_by_week = defaultdict(set)
     events = (
         UsageEvent.objects.filter(uid__in=cohort_start_by_uid.keys())
         .values_list("uid", "created_at")
     )
     for uid, created_at in events:
-        active_weeks_by_uid[uid].add(_week_start(timezone.localtime(created_at).date()))
+        active_uids_by_week[_week_start(timezone.localtime(created_at).date())].add(uid)
+    no_activity = frozenset()
 
     today_week_start = _week_start(timezone.localdate())
 
@@ -533,7 +536,7 @@ def build_retention_analytics():
         retention = []
         for week_offset in range(included_weeks):
             target_week = cohort_start + timedelta(weeks=week_offset)
-            active_count = sum(1 for uid in uids if target_week in active_weeks_by_uid.get(uid, ()))
+            active_count = len(uids & active_uids_by_week.get(target_week, no_activity))
             retention.append({
                 "week_offset": week_offset,
                 "active_count": active_count,

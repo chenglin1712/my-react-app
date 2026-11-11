@@ -17,25 +17,21 @@ import string
 
 def solution(crossword) -> str:
     """回傳解答網格。"""
-    out_str = ""
-    for r in range(crossword.rows):
-        for c in crossword.grid[r]:
-            out_str += "%s " % c
-        out_str += "\n"
-    return out_str
+    # 每列收集成片段、最後一次 join（不在迴圈裡用 += 一直產生新字串）
+    return "".join("".join("%s " % c for c in crossword.grid[r]) + "\n" for r in range(crossword.rows))
 
 
 def word_find(crossword) -> str:
     """回傳解答網格，但空格用隨機字母填滿（給玩家看的「找字」版本）。"""
-    out_str = ""
+    parts = []
     for r in range(crossword.rows):
         for c in crossword.grid[r]:
             if c == crossword.empty:
-                out_str += "%s " % string.ascii_lowercase[random.randint(0, len(string.ascii_lowercase) - 1)]
+                parts.append("%s " % string.ascii_lowercase[random.randint(0, len(string.ascii_lowercase) - 1)])
             else:
-                out_str += "%s " % c
-        out_str += "\n"
-    return out_str
+                parts.append("%s " % c)
+        parts.append("\n")
+    return "".join(parts)
 
 
 def display(crossword, order=True) -> list:
@@ -46,7 +42,7 @@ def display(crossword, order=True) -> list:
     # 建立一個新的網格，用來顯示數字和空格
     # 從現有的網格複製，但只保留數字和 '-'
     display_grid = [
-        [' ' if cell not in ('-') else '-' for cell in row]
+        [' ' if cell != '-' else '-' for cell in row]  # 原本 `cell not in ('-')` 是字串子字串測試（括號不是 tuple），格子只有一個字元所以結果相同
         for row in crossword.grid
     ]
 
@@ -72,18 +68,15 @@ def word_bank(crossword) -> str:
     """回傳打亂順序的單字列表（純文字，一行一個字）。"""
     from copy import copy as duplicate
 
-    out_str = ''
     temp_list = duplicate(crossword.current_word_list)
     random.shuffle(temp_list)
-    for word in temp_list:
-        out_str += '%s\n' % word.word
-    return out_str
+    return ''.join('%s\n' % word.word for word in temp_list)
 
 
 def legend(crossword) -> str:
     """回傳題號＋座標＋方向＋線索的清單。呼叫前必須先排過號（見
     Crossword.order_number_words()）。"""
-    out_str = ''
-    for word in crossword.current_word_list:
-        out_str += '%d. (%d,%d) %s: %s\n' % (word.number, word.col, word.row, word.down_across(), word.clue)
-    return out_str
+    return ''.join(
+        '%d. (%d,%d) %s: %s\n' % (word.number, word.col, word.row, word.down_across(), word.clue)
+        for word in crossword.current_word_list
+    )

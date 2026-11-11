@@ -191,10 +191,9 @@ def submit_answer_frontend(
     ue = user_errors.get(word_name, {"attempts":0,"errors":0,"recent_results":[],"recent_times":[],"avg_time":0.0})
     ue["attempts"] += 1
     if not answer.get("correct"): ue["errors"] += 1
-    ue["recent_results"].append(0 if answer.get("correct") else 1)
-    if len(ue["recent_results"])>5: ue["recent_results"].pop(0)
-    ue["recent_times"].append(answer.get("time_spent",0.0))
-    if len(ue["recent_times"])>5: ue["recent_times"].pop(0)
+    # 只保留最近 5 筆：用切片取尾端，不用 list.pop(0)（頭部刪除要搬動其餘元素）。
+    ue["recent_results"] = (ue["recent_results"] + [0 if answer.get("correct") else 1])[-5:]
+    ue["recent_times"] = (ue["recent_times"] + [answer.get("time_spent",0.0)])[-5:]
     ue["avg_time"] = sum(ue["recent_times"])/len(ue["recent_times"])
     user_errors[word_name] = ue
 

@@ -83,17 +83,27 @@ def _collect_submissions():
 def _collect_revisions():
     content_type_map = {t: (m, f, l) for t, m, f, l in _CONTENT_TYPES}
     items = []
-    for rev in PendingRevision.objects.filter(status=PendingRevision.STATUS_PENDING_REVIEW):
+    revisions = list(PendingRevision.objects.filter(status=PendingRevision.STATUS_PENDING_REVIEW))
+    # 依 target_type 分組、每種內容類型只查一次（in_bulk），不要每筆修訂各查一次（1+N 次往返）。
+    ids_by_type = {}
+    for rev in revisions:
+        if rev.target_type in content_type_map:
+            ids_by_type.setdefault(rev.target_type, set()).add(rev.target_id)
+    objects_by_type = {
+        target_type: content_type_map[target_type][0].objects.in_bulk(ids)
+        for target_type, ids in ids_by_type.items()
+    }
+    for rev in revisions:
         model, title_fn, link = content_type_map.get(rev.target_type, (None, None, None))
         if model is None:
             # 未知的 target_type（理論上不會發生，PendingRevision 只由
             # make_revision_views 這條路徑建立，target_type 一定是上面列出的
             # 6 種之一）——防禦性略過而不是讓整個佇列因為一筆髒資料掛掉。
             continue
-        try:
-            obj = model.objects.get(pk=rev.target_id)
+        obj = objects_by_type[rev.target_type].get(rev.target_id)
+        if obj is not None:
             title = title_fn(obj)
-        except model.DoesNotExist:
+        else:
             title = f"{rev.target_type}#{rev.target_id}（原始內容已刪除）"
         items.append({
             "type": "revision",

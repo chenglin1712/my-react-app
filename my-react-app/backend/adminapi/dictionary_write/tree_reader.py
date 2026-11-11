@@ -334,6 +334,15 @@ def get_word_trees_for_tribe(db: Session, tribe_id: str) -> dict:
     return trees
 
 
+_IN_CHUNK = 500   # SQLite 舊版單一查詢的參數上限是 999，IN 清單分批查
+
+
+def _chunks(values, size=_IN_CHUNK):
+    values = list(values)
+    for i in range(0, len(values), size):
+        yield values[i:i + size]
+
+
 def get_grammar_section_tree(db: Session, section_id) -> dict:
     section = db.query(m.GrammarSection).filter(m.GrammarSection.id == section_id).one_or_none()
     if section is None:
@@ -346,30 +355,46 @@ def get_grammar_section_tree(db: Session, section_id) -> dict:
         .order_by(m.GrammarRule.rule_order)
         .all()
     )
+    # 規則的詞綴、例句、例句連結的詞、詞名各一次查詢（再依規則／例句分組），
+    # 原本每個規則、每個例句都各查一次（1 + 規則數 + 例句數 × 2 次往返）。
+    rule_ids = [rule.id for rule in rule_rows]
+    affix_ids_by_rule = {}
+    example_rows_by_rule = {}
+    word_ids_by_example = {}
+    name_map = {}
+    if rule_ids:
+        all_examples = []
+        for chunk in _chunks(rule_ids):
+            for link in db.query(m.GrammarRuleAffix).filter(m.GrammarRuleAffix.rule_id.in_(chunk)).all():
+                affix_ids_by_rule.setdefault(link.rule_id, []).append(link.affix_id)
+            all_examples.extend(
+                db.query(m.GrammarExample)
+                .filter(m.GrammarExample.rule_id.in_(chunk))
+                .order_by(m.GrammarExample.example_order, m.GrammarExample.id)
+                .all()
+            )
+        # 分批查回後，依（規則內）例句順序重排，與單一查詢的排序一致
+        all_examples.sort(key=lambda ex: (ex.example_order if ex.example_order is not None else -1, ex.id))
+        for example in all_examples:
+            example_rows_by_rule.setdefault(example.rule_id, []).append(example)
+        if all_examples:
+            example_ids = [example.id for example in all_examples]
+            for chunk in _chunks(example_ids):
+                for link in db.query(m.GrammarExampleWord).filter(m.GrammarExampleWord.example_id.in_(chunk)).all():
+                    word_ids_by_example.setdefault(link.example_id, []).append(link.word_id)
+            every_word_id = {wid for ids in word_ids_by_example.values() for wid in ids}
+            for chunk in _chunks(every_word_id):
+                name_map.update({
+                    w.id: w.name for w in
+                    db.query(m.Word.id, m.Word.name).filter(m.Word.id.in_(chunk)).all()
+                })
+
     for rule in rule_rows:
-        affix_ids = [
-            r.affix_id for r in
-            db.query(m.GrammarRuleAffix).filter(m.GrammarRuleAffix.rule_id == rule.id).all()
-        ]
+        affix_ids = affix_ids_by_rule.get(rule.id, [])
 
         examples = []
-        example_rows = (
-            db.query(m.GrammarExample)
-            .filter(m.GrammarExample.rule_id == rule.id)
-            .order_by(m.GrammarExample.example_order)
-            .all()
-        )
-        for example in example_rows:
-            word_ids = [
-                w.word_id for w in
-                db.query(m.GrammarExampleWord).filter(m.GrammarExampleWord.example_id == example.id).all()
-            ]
-            name_map = {}
-            if word_ids:
-                name_map = {
-                    w.id: w.name for w in
-                    db.query(m.Word.id, m.Word.name).filter(m.Word.id.in_(word_ids)).all()
-                }
+        for example in example_rows_by_rule.get(rule.id, []):
+            word_ids = word_ids_by_example.get(example.id, [])
             examples.append({
                 "id": example.id, "tribe_text": example.tribe_text or "",
                 "chinese_text": example.chinese_text or "", "analysis": example.analysis or "",

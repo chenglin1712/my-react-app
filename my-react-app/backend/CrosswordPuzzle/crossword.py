@@ -66,11 +66,15 @@ class Crossword(object):
             copy.clear_grid()
 
             x = 0
+            placed = set()  # 已放進盤面的字（用物件 id；只有 fit_and_add 會把這個字放進 current_word_list）
             # spins; 2 seems to be plenty
             while x < spins:
                 for word in copy.available_words:
-                    if word not in copy.current_word_list:
+                    if id(word) not in placed:
+                        before = len(copy.current_word_list)
                         copy.fit_and_add(word)
+                        if len(copy.current_word_list) > before:
+                            placed.add(id(word))
                 x += 1
             #print(copy.solution())
             #print(len(copy.current_word_list), len(self.current_word_list), self.debug)
@@ -86,38 +90,33 @@ class Crossword(object):
         coordlist = []
         glc = -1
 
+        # 字母 -> 它在盤面上的位置們（列優先、由上而下由左而右）。盤面只掃一次，
+        # 而不是每個字母各掃一遍整個盤面；候選座標加入的順序與原本逐字母掃描完全相同
+        # （先依單字的字母順序，同一個字母再依盤面位置順序），後面的亂數與排序結果不變。
+        positions = {}
+        for rowc, row in enumerate(self.grid, start=1):
+            for colc, cell in enumerate(row, start=1):
+                if cell != self.empty:
+                    positions.setdefault(cell, []).append((colc, rowc))
+
         # cycle through letters in word
         for given_letter in word.word:
             glc += 1
-            rowc = 0
-            # cycle through rows
-            for row in self.grid:
-                rowc += 1
-                colc = 0
-                # cycle through letters in rows
-                for cell in row:
-                    colc += 1
-                    # check match letter in word to letters in row
-                    if given_letter == cell:
-                        # suggest vertical placement
-                        try:
-                            # make sure we're not suggesting a starting point off the grid
-                            if rowc - glc > 0:
-                                # make sure word doesn't go off of grid
-                                if ((rowc - glc) + word.length) <= self.rows:
-                                    coordlist.append([colc, rowc-glc, 1, colc+(rowc-glc),0])
-                        except Exception:
-                            pass
+            # 盤面上有這個字母的每個位置
+            for colc, rowc in positions.get(given_letter, ()):
+                # suggest vertical placement
+                # make sure we're not suggesting a starting point off the grid
+                if rowc - glc > 0:
+                    # make sure word doesn't go off of grid
+                    if ((rowc - glc) + word.length) <= self.rows:
+                        coordlist.append([colc, rowc-glc, 1, colc+(rowc-glc),0])
 
-                        # suggest horizontal placement
-                        try:
-                            # make sure we're not suggesting a starting point off the grid
-                            if colc - glc > 0:
-                                # make sure word doesn't go off of grid
-                                if ((colc - glc) + word.length) <= self.cols:
-                                    coordlist.append([colc-glc, rowc, 0, rowc+(colc-glc),0])
-                        except Exception:
-                            pass
+                # suggest horizontal placement
+                # make sure we're not suggesting a starting point off the grid
+                if colc - glc > 0:
+                    # make sure word doesn't go off of grid
+                    if ((colc - glc) + word.length) <= self.cols:
+                        coordlist.append([colc-glc, rowc, 0, rowc+(colc-glc),0])
 
         # example: coordlist[0] = [col, row, vertical, col + row, score]
         #print(word.word)
@@ -147,45 +146,38 @@ class Crossword(object):
         """Doesn't really check fit except for the first word;
         otherwise just adds if score is good.
         """
+        # maxloops 是嘗試次數的上限；< 1 代表一次都不試（原本的 while 迴圈進不去），第一個字也一樣。
+        if self.maxloops < 1:
+            return
+
         fit = False
         count = 0
         coordlist = self.suggest_coord(word)
 
+        # 第一個字（種子）固定從左上角出發、只有「橫」「直」兩種放法：先試隨機選到的方向，
+        # 不行再試另一個，兩個都放不下就直接放棄（以前會在這裡空轉到 maxloops 次，每次都是
+        # 同樣的兩種答案）。第一次抽到的方向就放得下時，行為與亂數用量跟原本完全相同。
+        if len(self.current_word_list) == 0:
+            first_direction = self._rng.randrange(0, 2)
+            for vertical in (first_direction, 1 - first_direction):
+                if self.check_fit_score(1, 1, vertical, word):
+                    self.set_word(1, 1, vertical, word, force=True)
+                    break
+            return
+
+        # 第二個字起：依分數排好的候選座標，由最好的開始試，第一個可放的就放。
+        # （原本在這個迴圈裡還有處理「第一個字」的分支，現在已搬到上面，這裡不會再遇到。）
         while not fit and count < self.maxloops:
-            # this is the first word: the seed
-            if len(self.current_word_list) == 0:
-                # top left seed of longest word yields best results (maybe override)
-                vertical, col, row = self._rng.randrange(0, 2), 1, 1
+            try:
+                col, row, vertical = coordlist[count][0], coordlist[count][1], coordlist[count][2]
+            # no more cordinates, stop trying to fit
+            except IndexError:
+                return
 
-                """
-                # optional center seed method, slower and less keyword placement
-                if vertical:
-                    col = int(round((self.cols+1)/2, 0))
-                    row = int(round((self.rows+1)/2, 0)) - int(round((word.length+1)/2, 0))
-                else:
-                    col = int(round((self.cols+1)/2, 0)) - int(round((word.length+1)/2, 0))
-                    row = int(round((self.rows+1)/2, 0))
-                # completely random seed method
-                col = random.randrange(1, self.cols + 1)
-                row = random.randrange(1, self.rows + 1)
-                """
-
-                if self.check_fit_score(col, row, vertical, word):
-                    fit = True
-                    self.set_word(col, row, vertical, word, force=True)
-
-            # a subsquent words have scores calculated
-            else:
-                try:
-                    col, row, vertical = coordlist[count][0], coordlist[count][1], coordlist[count][2]
-                # no more cordinates, stop trying to fit
-                except IndexError:
-                    return
-
-                # already filtered these out, but double check
-                if coordlist[count][4]:
-                    fit = True
-                    self.set_word(col, row, vertical, word, force=True)
+            # already filtered these out, but double check
+            if coordlist[count][4]:
+                fit = True
+                self.set_word(col, row, vertical, word, force=True)
 
             count += 1
 

@@ -91,11 +91,19 @@ def _is_word_char(ch: str) -> bool:
     return unicodedata.category(ch)[0] in "LMN" or ch in "'’ʼ`"
 
 
+def _fold(text: str) -> str:
+    # 先統一成 NFC：預組字元與「字母＋組合符號」看起來一樣，不統一會漏比對
+    return unicodedata.normalize("NFC", text).casefold()
+
+
 def mentions(text: str, word: str) -> bool:
     """word 是否以完整詞的形式出現在 text 裡（不分大小寫；前後不能緊貼著其他字母）。"""
-    # 先統一成 NFC：預組字元與「字母＋組合符號」看起來一樣，不統一會漏比對
-    haystack = unicodedata.normalize("NFC", text).casefold()
-    needle = unicodedata.normalize("NFC", word).casefold()
+    return _mentions_folded(_fold(text), word)
+
+
+def _mentions_folded(haystack: str, word: str) -> bool:
+    """同 mentions，但 haystack 已經是 _fold() 過的文字——同一段回覆要比對很多個詞時只需正規化一次。"""
+    needle = _fold(word)
     if not needle:
         return False
     start = haystack.find(needle)
@@ -111,9 +119,10 @@ def mentions(text: str, word: str) -> bool:
 def cards_for_reply(entries: list, reply_text: str) -> list:
     """從記下的詞條裡，挑出回覆文字有提到的，做成前端卡片：{word_id, word, chinese, audio}。"""
     cards = []
+    haystack = _fold(reply_text)  # 回覆文字只正規化一次（原本每個詞條都重做一次 NFC 與 casefold）
     for entry in entries:
         word = " ".join(entry["name"].split())  # 辭典裡有些詞尾多一個空白
-        if len(word) < _MIN_WORD_LEN or not mentions(reply_text, word):
+        if len(word) < _MIN_WORD_LEN or not _mentions_folded(haystack, word):
             continue
         cards.append({"word_id": entry["word_id"], "word": word, "chinese": entry["chinese"], "audio": entry["audio"]})
         if len(cards) == MAX_CARDS:

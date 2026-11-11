@@ -155,6 +155,24 @@ def plan(tribe: str | None, with_glosses: bool) -> tuple[list, Counter]:
     db = SessionLocal()
     try:
         snaps = _snapshots(db, sorted({f.entry.tribe for f in forms}))
+        tribe_id_by_slug = {t.slug: t.id for t in TRIBES}
+        # 「新增」決定要檢查的三件事（曾被還原？目標詞條已存在？有我們建立的紀錄？）整批先查好，
+        # 不要每個詞形各查三次。判斷條件與原本逐筆查詢完全相同。
+        create_forms = [f for f in forms if f.decision == DECISION_CREATE]
+        targets = {f.pk: WM.create_target_id(f.entry.tribe, f.form) for f in create_forms}
+        latest_revert = {}
+        for form_id, reverted_at in WordlistApplyJournal.objects.filter(
+                form__in=[f.pk for f in create_forms], action=JOURNAL_CREATE_WORD, status=JOURNAL_REVERTED,
+                reverted_at__isnull=False).values_list("form_id", "reverted_at"):
+            if form_id not in latest_revert or reverted_at > latest_revert[form_id]:
+                latest_revert[form_id] = reverted_at
+        existing_words = {}
+        if targets:
+            for wid, wtribe, wname in db.query(Word.id, Word.tribe_id, Word.name).filter(Word.id.in_(set(targets.values()))).all():
+                existing_words[wid] = (wtribe, wname)
+        created_by_us = set(WordlistApplyJournal.objects.filter(
+            word_id__in=set(targets.values()), action=JOURNAL_CREATE_WORD, status=JOURNAL_APPLIED,
+            details__created=True).values_list("word_id", flat=True))
         for f in forms:
             slug = f.entry.tribe
             if f.decision_stale:
@@ -164,22 +182,21 @@ def plan(tribe: str | None, with_glosses: bool) -> tuple[list, Counter]:
                 skipped["決定依據與對照表不符"] += 1
                 continue
             if f.decision == DECISION_CREATE:
-                target = WM.create_target_id(slug, f.form)
+                target = targets[f.pk]
                 if f.decided_word_id != target or slug not in WM.CREATE_TRIBES:
                     skipped["新增決定的詞條 id 或族語不符規則"] += 1
                     continue
                 # 只擋『還原發生在這個決定之後』的情況；人重新決定（decided_at 較新）之後就可以再建立
-                if WordlistApplyJournal.objects.filter(form=f, action=JOURNAL_CREATE_WORD, status=JOURNAL_REVERTED,
-                                                       reverted_at__gte=f.decided_at).exists():
+                # decided_at 缺值時保守處理：只要曾被還原就擋下（原本逐筆查詢用 None 當條件會直接丟例外）
+                if f.pk in latest_revert and (f.decided_at is None or latest_revert[f.pk] >= f.decided_at):
                     skipped["這個新增曾被還原，需人工重新決定"] += 1
                     continue
-                row = db.query(Word.tribe_id, Word.name).filter(Word.id == target).first()
+                row = existing_words.get(target)
                 already = row is not None
                 if already:
                     # 目標 id 已存在：必須是同一族、同一詞形，而且有『我們建立』的 applied 紀錄，否則轉人工（不信任來路不明的既有詞條）
-                    trusted = (row[0] == {t.slug: t.id for t in TRIBES}[slug] and WM.nfc(row[1] or "") == WM.nfc(f.form)
-                               and WordlistApplyJournal.objects.filter(word_id=target, action=JOURNAL_CREATE_WORD,
-                                                                       status=JOURNAL_APPLIED, details__created=True).exists())
+                    trusted = (row[0] == tribe_id_by_slug[slug] and WM.nfc(row[1] or "") == WM.nfc(f.form)
+                               and target in created_by_us)
                     if not trusted:
                         skipped["新增目標詞條已存在，但族語、詞形或建立紀錄不符，需人工"] += 1
                         continue
@@ -229,6 +246,11 @@ def apply_batch(tribe: str | None, limit: int, with_glosses: bool) -> dict:
     batch_id = str(uuid.uuid4())
     done = Counter()
     touched = set()
+    # 這批詞形「已經套用過（沒有被還原）」的 (詞形, 動作) 整批先查；同一個 (詞形, 動作) 在一次執行裡
+    # 只會出現一次，所以開頭查好的結果在迴圈中不會過期。
+    applied_before = set(WordlistApplyJournal.objects.filter(form__in=[f.pk for f, _ in todo])
+                         .exclude(status=JOURNAL_REVERTED).values_list("form_id", "action"))
+    source_id = None   # 資料來源 id 整批不變，第一次需要時查一次
     try:
         for f, actions in todo:
             if done["forms"] >= limit:
@@ -237,14 +259,15 @@ def apply_batch(tribe: str | None, limit: int, with_glosses: bool) -> dict:
             acted = False      # 只有真的嘗試寫入的詞形才算進 --limit；已套用過的不佔額度
             for action in actions:
                 kind = {"source": JOURNAL_APPEND_SOURCE, "gloss": JOURNAL_APPEND_EXPLANATION, "create": JOURNAL_CREATE_WORD}[action]
-                if WordlistApplyJournal.objects.filter(form=f, action=kind).exclude(status=JOURNAL_REVERTED).exists():
+                if (f.pk, kind) in applied_before:
                     done["已套用過（略過）"] += 1
                     continue
                 acted = True
                 with SessionLocal() as rdb:
                     exists = rdb.query(Word.id).filter(Word.id == word_id).first() is not None
                     before = wa.tree_hash(rdb, word_id) if (exists or action != "create") else "none"
-                    source_id = _source_id(rdb)
+                    if source_id is None:
+                        source_id = _source_id(rdb)
                 details = {"source_id": source_id} if action == "source" else (
                     {"text": f.entry.zh} if action == "gloss" else {
                         "source_id": source_id, "name": f.form, "zh": f.entry.zh, "intent": "verify_existing" if exists else "create"})

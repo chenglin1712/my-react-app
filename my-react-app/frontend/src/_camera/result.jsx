@@ -97,14 +97,14 @@ const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onResta
   // 蓋掉新音檔）與「失敗音檔追蹤」（播放失敗過的 fileId 不再顯示播放鈕）。
   const { playAudio, failedAudio } = useAudioPlayback(tribe, setError);
 
-  const filterAndSortWords = (words) => sortWords(words, {
+  // 展平＋篩選＋排序只在資料或篩選條件變動時算一次（原本每次 render 都重做，連打開選單也算）
+  const exactMatchWords = useMemo(() => sortWords(Object.values(definitions.exact_match_results).flat(), {
     filterLetter, frequencyFilter, showOnlyFavorites, favoriteWords, selectedSubCategory, sortOrder,
-  });
-
-  const exactMatchWords = filterAndSortWords(Object.values(definitions.exact_match_results).flat());
-  const fuzzyMatchWords = filterAndSortWords(
-    Object.values(definitions.fuzzy_match_results).flatMap(wordGroup => Object.values(wordGroup).flat())
-  );
+  }), [definitions, filterLetter, frequencyFilter, showOnlyFavorites, favoriteWords, selectedSubCategory, sortOrder]);
+  const fuzzyMatchWords = useMemo(() => sortWords(
+    Object.values(definitions.fuzzy_match_results).flatMap(wordGroup => Object.values(wordGroup).flat()),
+    { filterLetter, frequencyFilter, showOnlyFavorites, favoriteWords, selectedSubCategory, sortOrder },
+  ), [definitions, filterLetter, frequencyFilter, showOnlyFavorites, favoriteWords, selectedSubCategory, sortOrder]);
 
   // 開頭字母只列出這批辨識結果裡真的出現過的字母（見 utils/wordLetters.js）
   const alphabet = useMemo(() => deriveInitialLetters([

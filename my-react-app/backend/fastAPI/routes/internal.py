@@ -31,6 +31,7 @@ from .quiz import distractors as quiz_distractors
 from .quiz import repository as quiz
 from . import morphology
 from .translation import morph
+from .translation import service as translation_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -184,6 +185,7 @@ def invalidate_cache(
                 morph.invalidate(tribe_id)
                 quiz_distractors.invalidate(tribe_id)
                 morphology.service.invalidate(tribe_id)
+                translation_service.invalidate_strip_rules(tribe_id)
         for key in grammar._grammar_affixes_cache.keys():
             tribe_name, _affix_type = key
             if tribe_name in target_tribes and grammar._grammar_affixes_cache.invalidate(key):

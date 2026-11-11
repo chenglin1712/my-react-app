@@ -261,7 +261,10 @@ describe('useNotePages 的存檔時間（D-5）', () => {
 
         vi.setSystemTime(1_760_000_002_000);
         act(() => { result.current.handleTitleChange({ target: { value: '新標題' } }); });
-        expect(result.current.lastSavedAt).toBe(1_760_000_002_000);
+        // 標題的寫入延後 300 毫秒（見下面「標題輸入的延後寫入」）：停止輸入後才記下儲存時間
+        expect(result.current.lastSavedAt).toBe(1_760_000_001_000);
+        act(() => { vi.advanceTimersByTime(300); });
+        expect(result.current.lastSavedAt).toBe(1_760_000_002_300);
 
         vi.setSystemTime(1_760_000_003_000);
         act(() => { result.current.handleAdd(); });
@@ -448,5 +451,107 @@ describe('useNotePages 的雲端同步支援（D-2）', () => {
         const { result } = renderHook(() => useNotePages(UID, { cloudSync: true, onNoteDeleted }));
         await act(async () => { await result.current.handleDelete(); });
         expect(onNoteDeleted).toHaveBeenCalledWith('a');
+    });
+});
+
+describe('useNotePages 標題輸入的延後寫入（O20）', () => {
+    const storedTitle = () => JSON.parse(localStorage.getItem(LOCAL_KEY))[0].title;
+    const type = (result, value) => act(() => { result.current.handleTitleChange({ target: { value } }); });
+
+    beforeEach(() => {
+        localStorage.clear();
+        vi.useFakeTimers();
+        vi.setSystemTime(1_760_000_000_000);
+        seedNotes([{ id: 'a', title: '舊', content: '<p>A</p>' }, { id: 'b', title: '二', content: '<p>B</p>' }]);
+    });
+    afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); localStorage.clear(); });
+
+    test('畫面（notes）立刻更新，localStorage 要等停止輸入約 300 毫秒才寫，連續輸入只寫一次', () => {
+        const { result } = renderHook(() => useNotePages(UID));
+        const setItem = vi.spyOn(Storage.prototype, 'setItem');
+        setItem.mockClear();
+
+        type(result, '新');
+        type(result, '新標');
+        type(result, '新標題');
+        expect(result.current.notes[0].title).toBe('新標題');
+        expect(setItem).not.toHaveBeenCalled();
+        expect(storedTitle()).toBe('舊');
+
+        act(() => { vi.advanceTimersByTime(299); });
+        expect(setItem).not.toHaveBeenCalled();
+        act(() => { vi.advanceTimersByTime(1); });
+        expect(setItem).toHaveBeenCalledTimes(1);
+        expect(storedTitle()).toBe('新標題');
+    });
+
+    test('失焦（flushPendingWrite）會立刻寫入，之後不會再重複寫', () => {
+        const { result } = renderHook(() => useNotePages(UID));
+        type(result, '新標題');
+        act(() => { result.current.flushPendingWrite(); });
+        expect(storedTitle()).toBe('新標題');
+
+        const setItem = vi.spyOn(Storage.prototype, 'setItem');
+        setItem.mockClear();
+        act(() => { vi.advanceTimersByTime(1000); result.current.flushPendingWrite(); });
+        expect(setItem).not.toHaveBeenCalled();
+    });
+
+    test('換頁、存檔、新增頁都會連同還沒寫的標題一起寫入，並取消排程', () => {
+        const { result } = renderHook(() => useNotePages(UID));
+        type(result, '新標題');
+        act(() => { result.current.handleChangePage(1); });
+        expect(storedTitle()).toBe('新標題');
+
+        type(result, '第二頁新標題');
+        act(() => { result.current.handleAdd(); });
+        expect(JSON.parse(localStorage.getItem(LOCAL_KEY))[1].title).toBe('第二頁新標題');
+
+        const setItem = vi.spyOn(Storage.prototype, 'setItem');
+        setItem.mockClear();
+        act(() => { vi.advanceTimersByTime(1000); });
+        expect(setItem).not.toHaveBeenCalled();   // 排程已被取消，沒有多餘的第二次寫入
+    });
+
+    test('元件卸載時，還沒寫的標題不會掉', () => {
+        const { result, unmount } = renderHook(() => useNotePages(UID));
+        type(result, '離開前的標題');
+        expect(storedTitle()).toBe('舊');
+        unmount();
+        expect(storedTitle()).toBe('離開前的標題');
+    });
+
+    test('頁面隱藏（pagehide、切到背景）時立刻寫入', () => {
+        const { result } = renderHook(() => useNotePages(UID));
+        type(result, '標題一');
+        act(() => { window.dispatchEvent(new Event('pagehide')); });
+        expect(storedTitle()).toBe('標題一');
+
+        type(result, '標題二');
+        const original = Object.getOwnPropertyDescriptor(Document.prototype, 'visibilityState');
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+        act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+        delete document.visibilityState;
+        if (original) Object.defineProperty(Document.prototype, 'visibilityState', original);
+        expect(storedTitle()).toBe('標題二');
+    });
+
+    test('延後的寫入失敗時，維持「尚未儲存」並顯示儲存失敗訊息（與一般儲存相同）', () => {
+        const { result } = renderHook(() => useNotePages(UID));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('QuotaExceededError'); });
+
+        type(result, '寫不進去的標題');
+        act(() => { vi.advanceTimersByTime(300); });
+
+        expect(result.current.lastSavedAt).toBeNull();
+        expect(result.current.storageError).toMatch(/沒有儲存成功/);
+        expect(result.current.notes[0].title).toBe('寫不進去的標題');   // 畫面上的標題不會被丟掉
+    });
+
+    test('getNotes（雲端同步讀的來源）在延後寫入期間就已經是最新標題', () => {
+        const { result } = renderHook(() => useNotePages(UID));
+        type(result, '同步要看到的標題');
+        expect(result.current.getNotes()[0].title).toBe('同步要看到的標題');
     });
 });

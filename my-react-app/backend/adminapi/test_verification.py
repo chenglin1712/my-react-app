@@ -539,6 +539,15 @@ class ApplyImportTests(TestCase):
             svc.apply_import(_Req(), self.decoded, report, text)
         self.assertEqual(VerificationReview.objects.count(), 0)
 
+    def test_preview_counts_uses_a_fixed_number_of_queries_regardless_of_row_count(self):
+        # O12：預覽時既有審核整批查回（項目一次、審核一次），不是每一列各查一次。
+        text = self.text((self.a.key, "agree", "A", "", ""), (self.b.key, "agree", "A", "", ""),
+                         (self.a.key, "disagree", "C", "", ""), (self.b.key, "agree", "D", "", ""))
+        report = svc.parse_import(text)
+        self.assertEqual(len(report.rows), 4)
+        with self.assertNumQueries(2):
+            svc.preview_counts(report)
+
     def test_preview_counts_match_what_apply_then_does(self):
         text = self.text((self.a.key, "agree", "A", "", ""))
         self.run_import(text)

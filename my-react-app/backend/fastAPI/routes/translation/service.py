@@ -20,6 +20,7 @@ from dictionary_db.model import GrammarAffix
 from config import translation_lexicon as lexicon
 from fastAPI import feature_flags
 
+from ..keyed_cache import KeyedCache
 from . import morph as MORPH
 from . import prompts
 from . import retrieve as R
@@ -29,11 +30,20 @@ from . import retrieve as R
 # 嚴格更高（直接是人工編纂的句子，不是模型改寫過的版本）。
 _EXACT_CORPUS_THRESHOLD = 0.85
 
-# grammar_affix 每族只有 12~23 筆，查詢成本可忽略，這裡做行程內快取純粹是
-# 避免同一個請求內對每個 unsupported token 都重查一次；不需要 KeyedCache
-# 那套失效機制——詞綴表幾乎不會變動，真的改了，process 重啟後自然會拿到
-# 新值，不值得為此另外接一條快取失效路徑。
-_STRIP_RULES_CACHE: dict[str, lexicon.StripRules] = {}
+# grammar_affix 每族只有 12~23 筆，查詢成本可忽略，這裡做行程內快取是為了避免同一個
+# 請求內對每個 unsupported token 都重查一次。後台可以編輯詞綴表，所以這份快取跟其他
+# 辭典衍生快取（詞形分析、干擾項）一樣接上 /internal/cache/invalidate（grammar_affixes
+# scope，見 routes/internal.py），改完詞綴不必重啟服務。
+_STRIP_RULES_CACHE: KeyedCache[str, lexicon.StripRules] = KeyedCache()
+
+
+def invalidate_strip_rules(tribe_id: str | None = None) -> None:
+    """詞綴表有異動時呼叫。None＝全部族語。"""
+    if tribe_id is None:
+        for key in _STRIP_RULES_CACHE.keys():
+            _STRIP_RULES_CACHE.invalidate(key)
+    else:
+        _STRIP_RULES_CACHE.invalidate(tribe_id)
 
 
 logger = logging.getLogger(__name__)
@@ -90,16 +100,15 @@ class TranslationResult:
 
 
 def _get_strip_rules(db: Session, tribe_id: str) -> lexicon.StripRules:
-    if tribe_id not in _STRIP_RULES_CACHE:
+    def build():
         rows = (
             db.query(GrammarAffix.affix, GrammarAffix.function)
             .filter(GrammarAffix.tribe_id == tribe_id)
             .all()
         )
-        _STRIP_RULES_CACHE[tribe_id] = lexicon.build_strip_rules(
-            [{"affix": a, "function": f} for a, f in rows]
-        )
-    return _STRIP_RULES_CACHE[tribe_id]
+        return lexicon.build_strip_rules([{"affix": a, "function": f} for a, f in rows])
+
+    return _STRIP_RULES_CACHE.get_or_compute(tribe_id, build)
 
 
 def _resolve_morph(db: Session, tribe_id: str):

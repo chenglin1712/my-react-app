@@ -209,6 +209,7 @@ def retrieve_zh_gloss_words(db: Session, tribe_id: str, query_zh: str, k: int = 
         FROM word_explanation e
         JOIN words w ON w.id = e.word_id
         WHERE w.tribe_id = :tribe_id AND e.chinese_explanation = :q
+        ORDER BY w.id
         LIMIT :k
     """)
     exact_rows = db.execute(exact_sql, {"tribe_id": tribe_id, "q": query_zh, "k": k}).fetchall()
@@ -264,12 +265,13 @@ def lookup_headwords_batch(db: Session, tribe_id: str, normalized_forms: list[st
         SELECT {_NORM_EXPR_NAME} AS norm_name, w.id, w.name, {_FIRST_GLOSS} AS gloss, {_FIRST_WORD_AUDIO} AS audio_file_id
         FROM words w
         WHERE w.tribe_id = :tribe_id AND {_NORM_EXPR_NAME} = ANY(:forms)
+        ORDER BY w.id
     """)
     rows = db.execute(sql, {"tribe_id": tribe_id, "forms": forms}).fetchall()
     result: dict[str, WordMatch] = {}
     for r in rows:
         if r.norm_name in result:
-            continue  # 同一個正規化詞形有多筆詞條（異體字/多詞性）時取第一筆
+            continue  # 同一個正規化詞形有多筆詞條（異體字/多詞性）時取第一筆（上面 ORDER BY w.id，所以每次取的是同一筆）
         result[r.norm_name] = WordMatch(id=r.id, name=r.name, gloss=r.gloss, audio_file_id=r.audio_file_id)
     return result
 
@@ -327,9 +329,12 @@ def corroborate_tokens(db: Session, tribe_id: str, raw_tokens: list[str],
     window = min(max_window, n) if n else 0
 
     candidate_phrases: set[str] = set()
+    phrase_at: dict[tuple[int, int], str] = {}  # (起點, 視窗長度) -> 正規化片語；下面貪婪比對直接用，不再算第二次
     for w in range(window, 0, -1):
         for start in range(0, n - w + 1):
-            candidate_phrases.add(lexicon.normalize_phrase(raw_tokens[start:start + w]))
+            phrase = lexicon.normalize_phrase(raw_tokens[start:start + w])
+            phrase_at[(start, w)] = phrase
+            candidate_phrases.add(phrase)
 
     headword_map = lookup_headwords_batch(db, tribe_id, list(candidate_phrases)) if candidate_phrases else {}
     attested_map = lookup_attested_batch(db, tribe_id, list(candidate_phrases)) if candidate_phrases else {}
@@ -343,7 +348,7 @@ def corroborate_tokens(db: Session, tribe_id: str, raw_tokens: list[str],
         for w in range(window, 0, -1):
             if i + w > n:
                 continue
-            phrase = lexicon.normalize_phrase(raw_tokens[i:i + w])
+            phrase = phrase_at[(i, w)]
             if phrase in headword_map:
                 provisional.append((" ".join(raw_tokens[i:i + w]), w, "headword", phrase))
                 i += w

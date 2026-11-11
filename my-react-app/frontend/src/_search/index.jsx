@@ -305,10 +305,6 @@ const SearchPage = () => {
     handleSearchRef.current();
   }, []);
 
-  const filterAndSortWords = (words) => sortWords(words, {
-    filterLetter, frequencyFilter, showOnlyFavorites, favoriteWords, selectedSubCategory, sortOrder, partOfSpeech: activePos,
-  });
-
   const clearFilters = () => {
     setFilterLetter('');
     setFrequencyFilter('');
@@ -317,18 +313,27 @@ const SearchPage = () => {
     setPosFilter('');
   };
 
-  const exactWords = Object.values(definitions.exact_match_results).flat();
-  const fuzzyWords = Object.values(definitions.fuzzy_match_results).flatMap(wordGroup => Object.values(wordGroup).flat());
-  const posOptions = useMemo(() => collectPartsOfSpeech([
-    ...Object.values(definitions.exact_match_results).flat(),
-    ...Object.values(definitions.fuzzy_match_results).flatMap((group) => Object.values(group).flat()),
-  ]), [definitions]);
+  // 展平只在查詢結果（definitions）變動時做一次；原本每次 render（連打開選單也算）都重新 flat()
+  const exactWords = useMemo(() => Object.values(definitions.exact_match_results).flat(), [definitions]);
+  const fuzzyWords = useMemo(
+    () => Object.values(definitions.fuzzy_match_results).flatMap(wordGroup => Object.values(wordGroup).flat()),
+    [definitions],
+  );
+  const posOptions = useMemo(() => collectPartsOfSpeech([...exactWords, ...fuzzyWords]), [exactWords, fuzzyWords]);
   const showPosFilter = outcome?.mode === 'keyword' && posOptions.length >= 2;
   // 所選詞類已不在新的結果裡（或不是關鍵字查詢）就視為沒選，不會讓畫面莫名其妙是空的
   const activePos = showPosFilter && posOptions.slice(0, MAX_POS_OPTIONS).some((o) => o.pos === posFilter) ? posFilter : '';
   const activeFilterParts = describeActiveFilters({ filterLetter, frequencyFilter, showOnlyFavorites, selectedSubCategory, partOfSpeech: activePos });
-  const exactVisibleTotal = filterAndSortWords(exactWords).length;
-  const fuzzyVisibleTotal = filterAndSortWords(fuzzyWords).length;
+  // 篩選＋排序各算一次，同一份結果同時給「筆數」與列表用（原本算兩次：一次取 .length，
+  // 一次在 WordResultsSection 裡再排）。只有資料或篩選條件變動才重算。
+  const exactSorted = useMemo(() => sortWords(exactWords, {
+    filterLetter, frequencyFilter, showOnlyFavorites, favoriteWords, selectedSubCategory, sortOrder, partOfSpeech: activePos,
+  }), [exactWords, filterLetter, frequencyFilter, showOnlyFavorites, favoriteWords, selectedSubCategory, sortOrder, activePos]);
+  const fuzzySorted = useMemo(() => sortWords(fuzzyWords, {
+    filterLetter, frequencyFilter, showOnlyFavorites, favoriteWords, selectedSubCategory, sortOrder, partOfSpeech: activePos,
+  }), [fuzzyWords, filterLetter, frequencyFilter, showOnlyFavorites, favoriteWords, selectedSubCategory, sortOrder, activePos]);
+  const exactVisibleTotal = exactSorted.length;
+  const fuzzyVisibleTotal = fuzzySorted.length;
   const settled = TRIBES_WITH_DATA.includes(selectedTribe) && !loading && !error;
   const keywordEmpty = settled && outcome?.mode === 'keyword' && exactVisibleTotal === 0 && fuzzyVisibleTotal === 0;
   const browseEmpty = settled && outcome?.mode === 'all' && outcome.sig === filterSignature && allWords.length === 0;
@@ -468,10 +473,9 @@ const SearchPage = () => {
           title="完全符合結果"
           titleColorClass="yy-text-success"
           buttonVariant="outline-success"
-          wordsFlat={exactWords}
+          wordsFlat={exactSorted}
           visibleCount={visibleExactCount}
           onLoadMore={() => setVisibleExactCount(c => c + PAGE_SIZE)}
-          filterAndSortWords={filterAndSortWords}
           expandedWord={expandedWord}
           toggleExpand={toggleExpand}
           toggleFavorite={toggleFavorite}
@@ -489,10 +493,9 @@ const SearchPage = () => {
           title="相關結果"
           titleColorClass="yy-text-ink"
           buttonVariant="outline-warning"
-          wordsFlat={fuzzyWords}
+          wordsFlat={fuzzySorted}
           visibleCount={visibleFuzzyCount}
           onLoadMore={() => setVisibleFuzzyCount(c => c + PAGE_SIZE)}
-          filterAndSortWords={filterAndSortWords}
           expandedWord={expandedWord}
           toggleExpand={toggleExpand}
           toggleFavorite={toggleFavorite}

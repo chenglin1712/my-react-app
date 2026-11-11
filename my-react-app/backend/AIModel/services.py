@@ -357,23 +357,27 @@ def build_messages(history: list, user_message: str) -> list:
       否則多則連續使用者訊息可以繞過字數預算）。
     - 歷史加當前問題的總字數超過 HISTORY_CHAR_BUDGET 時，由舊到新丟棄歷史，
       且丟完之後第一則一定是 user（Messages API 的對話要從使用者開始）。"""
-    kept = []
+    # 相鄰同角色的訊息先收集成片段、最後一次 join（不要在迴圈裡用 += 一直產生新字串）
+    grouped = []   # [role, [text, ...]]
     for m in history:
-        if kept and kept[-1]["role"] == m["role"]:
-            kept[-1]["content"] += "\n" + m["text"]
+        if grouped and grouped[-1][0] == m["role"]:
+            grouped[-1][1].append(m["text"])
         else:
-            kept.append({"role": m["role"], "content": m["text"]})
+            grouped.append([m["role"], [m["text"]]])
+    kept = [{"role": role, "content": "\n".join(parts)} for role, parts in grouped]
     while kept and kept[-1]["role"] == "user":
         kept.pop()
 
-    def total():
-        return len(user_message) + sum(len(m["content"]) for m in kept)
-
-    while kept and total() > HISTORY_CHAR_BUDGET:
-        kept.pop(0)
-    while kept and kept[0]["role"] != "user":
-        kept.pop(0)
-    return [*kept, {"role": "user", "content": user_message}]
+    # 總長度只加總一次，再由舊到新逐則扣掉、用索引找出切點，最後切一次
+    # （原本每丟一則就重新加總一遍，且 list.pop(0) 每次都要搬動其餘元素）。
+    total = len(user_message) + sum(len(m["content"]) for m in kept)
+    start = 0
+    while start < len(kept) and total > HISTORY_CHAR_BUDGET:
+        total -= len(kept[start]["content"])
+        start += 1
+    while start < len(kept) and kept[start]["role"] != "user":
+        start += 1
+    return [*kept[start:], {"role": "user", "content": user_message}]
 
 
 def _parse_event_time(value, field: str) -> datetime.datetime:
@@ -883,9 +887,9 @@ def run_review_tayal_chat(client, tribe_name: str, user_message: str, relevant_w
     """組 prompt、呼叫 LLM，回傳可以直接塞進 JsonResponse 的 dict。relevant_words
     由呼叫端先用既有的 search_tayal_words_bulk 查好（DB 查詢邏輯不搬進這裡，
     這裡只負責拿現成的詞彙資料組 prompt）。"""
-    words_context = f"{tribe_name}詞彙庫：\n"
-    for w in relevant_words:
-        words_context += f"- {w['tayal']}：{(w['chinese'] or '').strip() or '〔查無中文釋義〕'}\n"
+    # 每個詞一行，收集後一次 join（迴圈裡的 += 每次都會重新建一份字串）
+    lines = [f"- {w['tayal']}：{(w['chinese'] or '').strip() or '〔查無中文釋義〕'}\n" for w in relevant_words]
+    words_context = f"{tribe_name}詞彙庫：\n" + "".join(lines)
 
     prompt = build_review_prompt(tribe_name, words_context)
 

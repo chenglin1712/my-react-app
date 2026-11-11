@@ -48,7 +48,7 @@ function NotePage() {
   const {
     editor, notes, currentPage, selectedPageIds, loading, isDirty, storageError, lastSavedAt,
     execStyle, handleAdd, handleDelete, handleSave, handleChangePage,
-    handleToggleSelect, handleTitleChange, handleSelectAll, handleClearSelect,
+    handleToggleSelect, handleTitleChange, handleSelectAll, handleClearSelect, flushPendingWrite,
     flushEditor, applyExternalChange, subscribeEdit, getNotes,
   } = useNotePages(uid, {
     cloudSync: cloudSyncOn,
@@ -240,6 +240,7 @@ function NotePage() {
             type="text"
             value={currentNote.title}
             onChange={handleTitleChange}
+            onBlur={flushPendingWrite}
             placeholder="請輸入筆記標題"
             aria-label="筆記標題"
             maxLength={cloudSyncOn ? NOTE_LIMITS.TITLE_CHARS : undefined}

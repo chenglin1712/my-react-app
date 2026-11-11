@@ -515,6 +515,29 @@ def _submit(client, ctx, selected, user_data=None, **answer_overrides):
                            json={"user_data": user_data or {}, "answer": answer})
 
 
+class TestRecentHistoryWindow:
+    """O17：每個詞只保留最近 5 筆作答結果與耗時（改用切片取尾端，不用 pop(0)）。"""
+
+    def test_history_keeps_only_the_latest_five_entries_and_drops_the_oldest(self, client, store):
+        _, _, ctx = _context()
+        prior = {"user_errors": {"mafilo": {"attempts": 9, "errors": 3, "recent_results": [1, 1, 0, 0, 1],
+                                            "recent_times": [1.0, 2.0, 3.0, 4.0, 5.0], "avg_time": 3.0}}}
+        with _flags():
+            body = _submit(client, ctx, "mafilo", user_data=prior, time_spent=9.0).json()
+        ue = body["updated_user_errors"]["mafilo"]
+        assert ue["recent_results"] == [1, 0, 0, 1, 0]            # 最舊的一筆被丟掉，新的（答對=0）接在尾端
+        assert ue["recent_times"] == [2.0, 3.0, 4.0, 5.0, 9.0]
+        assert ue["avg_time"] == pytest.approx(sum([2.0, 3.0, 4.0, 5.0, 9.0]) / 5)
+
+    def test_history_shorter_than_five_just_grows(self, client, store):
+        _, _, ctx = _context()
+        prior = {"user_errors": {"mafilo": {"attempts": 2, "errors": 1, "recent_results": [1, 0],
+                                            "recent_times": [1.0, 2.0], "avg_time": 1.5}}}
+        with _flags():
+            ue = _submit(client, ctx, "mafilo", user_data=prior, time_spent=4.0).json()["updated_user_errors"]["mafilo"]
+        assert ue["recent_results"] == [1, 0, 0] and ue["recent_times"] == [1.0, 2.0, 4.0]
+
+
 class TestSubmitEndpoint:
     def test_flags_off_response_is_unchanged_and_nothing_is_stored(self, client, store):
         _, _, ctx = _context()

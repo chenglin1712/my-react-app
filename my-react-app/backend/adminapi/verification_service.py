@@ -504,9 +504,15 @@ def preview_counts(report: ImportReport) -> dict:
     """dry-run 用：這批列如果現在寫入，會新增幾筆、更新幾筆、幾筆沒變（只是預覽，寫入時會重新判斷）。"""
     created = updated = unchanged = 0
     by_key = {i.key: i for i in VerificationItem.objects.filter(key__in={r.key for r in report.rows})}
+    # 這批列涉及的既有外部審核一次查回，以 (項目, 審核者) 當 key；不要每一列各查一次（最多 2000 列）。
+    existing = {
+        (rv.item_id, rv.reviewer_subject): rv
+        for rv in VerificationReview.objects.filter(
+            item__in=list(by_key.values()), reviewer_type=REVIEWER_EXTERNAL,
+            reviewer_subject__in={r.subject for r in report.rows})
+    }
     for r in report.rows:
-        review = VerificationReview.objects.filter(
-            item=by_key[r.key], reviewer_type=REVIEWER_EXTERNAL, reviewer_subject=r.subject).first()
+        review = existing.get((by_key[r.key].pk, r.subject))
         if review is None:
             created += 1
         elif any(getattr(review, k) != v for k, v in r.fields.items()) or review.reviewer_label != r.label:

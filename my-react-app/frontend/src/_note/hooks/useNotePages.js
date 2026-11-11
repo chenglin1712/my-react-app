@@ -8,6 +8,9 @@ import { Image as ImageExtension } from "@tiptap/extension-image";
 import FontSize from "../fontSizeExtension";
 import { confirmAction } from "@components/ui/ConfirmDialog";
 
+// 標題輸入停止多久後才把整份筆記寫進 localStorage（毫秒）
+const TITLE_WRITE_DELAY_MS = 300;
+
 function createEmptyNote(title = "") {
   return { id: crypto.randomUUID(), title, content: "<p></p>" };
 }
@@ -85,11 +88,9 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
    * 封鎖等原因丟例外（不只是讀取時的 JSON.parse 可能壞掉），沒有集中處理的話，
    * 每個呼叫端都要各自補一份 try/catch。
    */
-  const persistNotes = useCallback((updatedNotes, { track = true } = {}) => {
-    notesRef.current = updatedNotes;
-    setNotes(updatedNotes);
+  const writeToStorage = useCallback((notesToWrite, { track = true } = {}) => {
     try {
-      localStorage.setItem(LOCAL_KEY, JSON.stringify(updatedNotes));
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(notesToWrite));
       persistOkRef.current = true;
       setStorageError(null);
       // 只有真的寫進這台裝置才記下時間；載入時補 id、建立預設空白頁不算使用者的儲存（track: false）
@@ -99,8 +100,49 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
       console.error("儲存筆記到本機失敗:", e);
       setStorageError("筆記可能因為裝置儲存空間不足而沒有儲存成功，請清理瀏覽器儲存空間後再試一次。");
     }
-    return updatedNotes;
   }, [LOCAL_KEY]);
+
+  // 標題每打一個字都會走 persistNotes；整份筆記序列化＋寫入 localStorage 的成本跟全部筆記的大小成正比
+  // （上限 200 頁、每頁 100 KB）。標題輸入改成：畫面與 notesRef 立刻更新，寫入延後到停止輸入約 300 毫秒，
+  // 或失焦、換頁、存檔、新增／刪除頁、頁面隱藏／卸載時（flushPendingWrite）一定寫入。
+  const pendingWriteRef = useRef(null);
+
+  const persistNotes = useCallback((updatedNotes, { track = true, deferWrite = false } = {}) => {
+    notesRef.current = updatedNotes;
+    setNotes(updatedNotes);
+    if (pendingWriteRef.current != null) {
+      clearTimeout(pendingWriteRef.current);
+      pendingWriteRef.current = null;
+    }
+    if (deferWrite) {
+      pendingWriteRef.current = setTimeout(() => {
+        pendingWriteRef.current = null;
+        writeToStorage(notesRef.current); // 寫的是當下最新的筆記，不是排程當時的那一份
+      }, TITLE_WRITE_DELAY_MS);
+      return updatedNotes;
+    }
+    writeToStorage(updatedNotes, { track });
+    return updatedNotes;
+  }, [writeToStorage]);
+
+  /** 有延後的寫入就立刻寫（沒有就什麼都不做）。寫入失敗時的處理與一般儲存相同（維持「尚未儲存」）。 */
+  const flushPendingWrite = useCallback(() => {
+    if (pendingWriteRef.current == null) return;
+    clearTimeout(pendingWriteRef.current);
+    pendingWriteRef.current = null;
+    writeToStorage(notesRef.current);
+  }, [writeToStorage]);
+
+  useEffect(() => {
+    const onHidden = () => { if (document.visibilityState === "hidden") flushPendingWrite(); };
+    window.addEventListener("pagehide", flushPendingWrite);
+    document.addEventListener("visibilitychange", onHidden);
+    return () => {
+      window.removeEventListener("pagehide", flushPendingWrite);
+      document.removeEventListener("visibilitychange", onHidden);
+      flushPendingWrite(); // 元件卸載（或換了使用者）時，還沒寫的標題不能掉
+    };
+  }, [flushPendingWrite]);
 
   useEffect(() => { notesRef.current = notes; }, [notes]);
   useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
@@ -339,7 +381,7 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
         ? { ...note, title, ...(cloudSyncRef.current ? { editedAt: Date.now() } : {}) }
         : note
     ));
-    persistNotes(updatedNotes);
+    persistNotes(updatedNotes, { deferWrite: true });
     if (cloudSyncRef.current) editListenersRef.current.forEach((listener) => listener());
   };
 
@@ -354,6 +396,8 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
     editor, notes, currentPage, selectedPageIds, loading, isDirty, storageError, lastSavedAt,
     execStyle, handleAdd, handleDelete, handleSave, handleChangePage,
     handleToggleSelect, handleTitleChange, handleSelectAll, handleClearSelect,
+    // 標題輸入失焦時呼叫：把延後的寫入立刻完成
+    flushPendingWrite,
     // 雲端同步（D-2）用
     flushEditor, applyExternalChange, subscribeEdit,
     getNotes: () => notesRef.current,
