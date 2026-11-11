@@ -30,7 +30,7 @@
     "dompurify": "^3.4.17",
     "firebase": "^12.16.0",
     "lottie-web": "^5.13.0",
-    "lucide-react": "^1.24.0",
+    "lucide-react": "^1.70.0",
     "react": "^19.2.7",
     "react-bootstrap": "^2.10.10",
     "react-calendar": "^6.0.1",
