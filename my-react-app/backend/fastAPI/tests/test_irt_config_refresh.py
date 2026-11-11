@@ -19,11 +19,14 @@ def _reset_irt_config_state():
         "BETA1": quiz.BETA1, "BETA2": quiz.BETA2, "BETA3": quiz.BETA3,
         "BETA4": quiz.BETA4, "BETA5": quiz.BETA5, "TOTAL_QUESTIONS": quiz.TOTAL_QUESTIONS,
     }
-    quiz._irt_config_last_fetch = 0.0
+    # 用 -inf 而不是 0.0：函式判斷「距離上次抓取是否超過 TTL」用 time.monotonic()，
+    # Linux 的 monotonic() 是開機後的秒數，剛開機的 CI 虛擬機比 TTL 小，設成 0.0 會被當成「還沒過期」而不抓取。
+    original_last_fetch = quiz._irt_config_last_fetch
+    quiz._irt_config_last_fetch = float("-inf")
     yield
     for key, value in original.items():
         setattr(quiz, key, value)
-    quiz._irt_config_last_fetch = 0.0
+    quiz._irt_config_last_fetch = original_last_fetch
 
 
 def _fake_config_payload(**overrides):

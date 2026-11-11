@@ -3,7 +3,8 @@
 file_id 會被接在固定的 ILRDF 下載網址後面。沒有格式限制時，登入使用者能放進斜線、問號、%2e%2e 等，
 讓伺服器對固定主機發出路徑或查詢字串不同的 GET。
 """
-from unittest.mock import AsyncMock, patch
+from contextlib import asynccontextmanager
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -85,10 +86,19 @@ def test_proxy_rejects_dot_segments(client, path):
 
 
 def test_proxy_still_serves_an_ordinary_id(client):
+    # 代理的第一次請求已改成 client.stream()（串流讀取），所以攔截 stream 而不是 get；
+    # 上游回 404 且沒有網址時，端點回 404「Unable to resolve audio URL」，代表 id 通過了格式檢查、走到了上游。
+    calls = []
+
+    @asynccontextmanager
+    async def fake_stream(self, method, url, **kwargs):
+        calls.append((method, url))
+        yield httpx.Response(status_code=404, request=httpx.Request("GET", "http://x"))
+
     with patch("fastAPI.routes.dictionary.audio_proxy._lookup_verified_audio_asset", return_value=None):
-        with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = httpx.Response(status_code=404, request=httpx.Request("GET", "http://x"))
+        with patch("httpx.AsyncClient.stream", new=fake_stream):
             response = client.get("/api/v1/dictionary/audio/7f3e9c1a-0b2d-4e5f-8a6b-1c2d3e4f5a6b")
+    assert [c[0] for c in calls] == ["GET"]   # 只打了一次上游；404 是上游回的，不是別條路徑產生的
     assert response.status_code == 404
     assert response.text != "音檔代號格式不合法"
 

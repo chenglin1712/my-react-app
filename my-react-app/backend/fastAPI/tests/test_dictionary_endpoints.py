@@ -11,7 +11,8 @@ request: Request，這裡直接用 TestClient 驗證整條路徑不會噴例外�
 用 fastAPI.routes.dictionary.search._load_tribe_words 直接回傳假資料，避免依賴
 本機是否真的有那個 71MB、被 .gitignore 排除的 dictionary.db（CI 環境不會有）。
 """
-from unittest.mock import AsyncMock, patch
+from contextlib import asynccontextmanager
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -96,10 +97,18 @@ def test_audio_endpoint_has_request_param_and_does_not_crash(client):
     # 自有副本，這裡的 file_id 假設還沒遷移到（回傳 None），才會走到下面
     # 這支測試原本要測的 ILRDF fallback 路徑；client fixture 的 _fake_get_db
     # 回傳 None，不是真正能查詢的 Session，所以要 patch 掉這次查詢本身。
+    # 代理的第一次請求已改成 client.stream()（串流讀取），所以攔截 stream 而不是 get。
+    calls = []
+
+    @asynccontextmanager
+    async def fake_stream(self, method, url, **kwargs):
+        calls.append((method, url))
+        yield httpx.Response(status_code=404, request=httpx.Request("GET", "http://x"))
+
     with patch("fastAPI.routes.dictionary.audio_proxy._lookup_verified_audio_asset", return_value=None):
-        with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = httpx.Response(status_code=404, request=httpx.Request("GET", "http://x"))
+        with patch("httpx.AsyncClient.stream", new=fake_stream):
             response = client.get("/api/v1/dictionary/audio/some-file-id")
+    assert [c[0] for c in calls] == ["GET"]   # 只打了一次上游；404 是上游回的，不是別條路徑產生的
     assert response.status_code == 404
 
 
