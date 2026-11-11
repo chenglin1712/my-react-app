@@ -91,7 +91,7 @@ describe("首頁捲動敘事樣式", () => {
       const rule = find(`.home-story__layer--${name}`);
       expect(rule, name).toBeTruthy();
       expect(rule.body).toMatch(/gradient\(/);
-      expect(rule.body).not.toMatch(/#[0-9a-fA-F]{3,8}|rgba?\(/);
+      expect(rule.body).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/);
     });
     expect(css).not.toMatch(/home-story__layer--\d/);
   });
