@@ -28,7 +28,7 @@
     "axios": "^1.21.0",
     "bootstrap": "^5.3.8",
     "dompurify": "^3.4.17",
-    "firebase": "^12.16.0",
+    "firebase": "^13.2.0",
     "lottie-web": "^5.13.0",
     "lucide-react": "^1.70.0",
     "react": "^19.2.7",
