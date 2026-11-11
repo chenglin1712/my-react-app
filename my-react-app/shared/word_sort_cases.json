@@ -1,0 +1,30 @@
+{
+  "說明": "前後端共用的詞條名稱排序規則樣本（升冪的預期順序）。後端 _sort_key_name 與前端 wordFilterSort 都用它驗證，改規則時兩邊一起改；降冪是升冪整個反過來。",
+  "ascending": [
+    "a",
+    "a b",
+    "a'ba",
+    "a-b",
+    "aa",
+    "ab",
+    "Aba",
+    "abb",
+    "aʼba",
+    "b",
+    "kaku'",
+    "kaku-",
+    "maku",
+    "maku3",
+    "na",
+    "ngaw",
+    "Ngaw2",
+    "z",
+    "zu",
+    "'a",
+    "3a",
+    "ʼa",
+    "-an",
+    "áb",
+    "-suffix"
+  ]
+}

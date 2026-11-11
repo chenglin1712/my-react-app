@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { countMatchedWords, filterAndSortWords, collectPartsOfSpeech } from './wordFilterSort';
+/* global process */
+import { describe, expect, it, test } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { countMatchedWords, filterAndSortWords, collectPartsOfSpeech, sortWordsByName } from './wordFilterSort';
 
 describe('countMatchedWords', () => {
   it('完全符合（詞 -> 條目陣列）與相關符合（詞 -> 分類 -> 條目陣列）都算進總筆數', () => {
@@ -28,24 +31,20 @@ describe('詞類篩選（Apple 化步驟 4-2）', () => {
   });
 });
 
-describe('排序（O9）：預先算排序鍵＋共用 Collator，結果必須與舊的逐次比較寫法完全相同', () => {
-  // 舊寫法原樣保留，當對照基準。
+describe('排序（O9）：預先算排序鍵，結果必須與逐次比較（每次比較才算鍵）的寫法完全相同', () => {
+  // 逐次比較的參考寫法（比較規則同後端：碼點比較，見 V1）。
   const getKey = (s) => s.replace(/^[^a-z]+/, '') || s;
-  const oldComparator = (sortOrder) => (a, b) => {
+  const referenceAscending = (a, b) => {
     const aFirst = (a.name || '').toLowerCase();
     const bFirst = (b.name || '').toLowerCase();
     const aKey = getKey(aFirst);
     const bKey = getKey(bFirst);
     const aIsPrefix = /^[^a-z]/.test(aFirst);
     const bIsPrefix = /^[^a-z]/.test(bFirst);
-    if (sortOrder === 'asc') {
-      if (aIsPrefix && !bIsPrefix) return 1;
-      if (!aIsPrefix && bIsPrefix) return -1;
-      return aKey.localeCompare(bKey, undefined, { sensitivity: 'base' }) || aFirst.localeCompare(bFirst, undefined, { sensitivity: 'base' });
-    }
-    if (aIsPrefix && !bIsPrefix) return -1;
-    if (!aIsPrefix && bIsPrefix) return 1;
-    return bKey.localeCompare(aKey, undefined, { sensitivity: 'base' }) || bFirst.localeCompare(aFirst, undefined, { sensitivity: 'base' });
+    if (aIsPrefix && !bIsPrefix) return 1;
+    if (!aIsPrefix && bIsPrefix) return -1;
+    const cmp = (x, y) => (x < y ? -1 : x > y ? 1 : 0);
+    return cmp(aKey, bKey) || cmp(aFirst, bFirst);
   };
 
   // 簡單的可重現亂數（避免測試每次不同）
@@ -60,10 +59,11 @@ describe('排序（O9）：預先算排序鍵＋共用 Collator，結果必須�
     });
   };
 
-  it.each(['asc', 'desc'])('%s：隨機詞條（含前綴、大小寫、重音、重複、空名稱）排序結果與舊寫法逐筆相同', (sortOrder) => {
+  it.each(['asc', 'desc'])('%s：隨機詞條（含前綴、大小寫、重音、重複、空名稱）排序結果與參考寫法逐筆相同', (sortOrder) => {
     for (const seed of [1, 2, 3, 4, 5]) {
       const words = randomWords(seed, 400);
-      const want = [...words].sort(oldComparator(sortOrder));
+      const ascending = [...words].sort(referenceAscending);
+      const want = sortOrder === 'desc' ? ascending.reverse() : ascending;   // desc＝asc 整個反過來（與後端相同）
       const got = filterAndSortWords(words, { sortOrder });
       expect(got.map((w) => w.id)).toEqual(want.map((w) => w.id));
     }
@@ -86,5 +86,36 @@ describe('排序（O9）：預先算排序鍵＋共用 Collator，結果必須�
     filterAndSortWords(words, { sortOrder: 'asc' });
     // 舊寫法：每次比較讀 2 次 name（約 N·log N ≈ 1500 次比較 → 3000+ 次）；現在每個詞只讀一次。
     expect(reads).toBeLessThanOrEqual(words.length * 2); // 篩選階段與排序鍵各讀一次
+  });
+});
+
+// V1：前後端共用的排序樣本（shared/word_sort_cases.json，後端測試也用同一份）
+describe('詞條名稱排序與後端一致（共用樣本）', () => {
+  const cases = JSON.parse(readFileSync(resolve(process.cwd(), 'shared/word_sort_cases.json'), 'utf-8')).ascending;
+  const toWords = (names) => names.map((name) => ({ name }));
+  const shuffled = (names, seed) => {
+    const arr = [...names];
+    let x = seed;
+    for (let i = arr.length - 1; i > 0; i -= 1) {
+      x = (x * 1103515245 + 12345) % 2147483648;
+      const j = x % (i + 1);
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  };
+
+  test.each([1, 2, 3, 4, 5])('升冪結果等於共用樣本的順序（洗牌種子 %i）', (seed) => {
+    const sorted = sortWordsByName(toWords(shuffled(cases, seed)), 'asc').map((w) => w.name);
+    expect(sorted).toEqual(cases);
+  });
+
+  test('降冪是升冪整個反過來', () => {
+    const sorted = sortWordsByName(toWords(shuffled(cases, 9)), 'desc').map((w) => w.name);
+    expect(sorted).toEqual([...cases].reverse());
+  });
+
+  test("名稱中間的標點依碼點排序：a'ba 在 a-b 之前（舊的語系排序相反）", () => {
+    const sorted = sortWordsByName(toWords(['a-b', "a'ba"]), 'asc').map((w) => w.name);
+    expect(sorted).toEqual(["a'ba", 'a-b']);
   });
 });

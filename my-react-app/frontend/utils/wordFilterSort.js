@@ -13,16 +13,18 @@ import { frequencyToStarCount } from './frequencyStars';
 const getAlphabeticSortKey = (s) => s.replace(/^[^a-z]+/, '') || s;
 
 /**
- * 建立詞條名稱的排序 comparator。
+ * 詞條名稱的排序規則。
  *
  * 非字母開頭的詞條（如 -a、-an）在 asc（由 A 到 Z）時排在最後；desc 是 asc
- * 的完整反轉（包含這些前綴詞的位置），不是「前綴詞永遠固定在最後」——目前
- * 唯一呼叫端（wordFilterSort 本身的排序流程）就是靠反轉整個比較結果做到 desc，
- * 這裡沿用同一份既有行為，沒有另外變更。
+ * 的完整反轉（包含這些前綴詞的位置），不是「前綴詞永遠固定在最後」。
  */
-// 共用一個 Collator：localeCompare(b, undefined, 選項) 每次呼叫都要依選項建立比對器，
-// 排幾千筆時比較次數是 N·log N，重複建立的成本明顯；Intl.Collator.compare 的結果與它相同。
-const collator = new Intl.Collator(undefined, { sensitivity: 'base' });
+// 排序規則與後端 backend/fastAPI/routes/dictionary/search.py 的 _sort_key_name 完全相同：
+// 排序鍵是 (是否非字母開頭, 去掉前綴後的字母部分, 小寫全名)，字串依字元碼點逐一比較，
+// 不使用 localeCompare／Intl.Collator——語系排序會把標點、重音符號另外處理，
+// 與後端的碼點排序在名稱中間有標點時會不同（例如 a-b 與 a'ba）。
+// 兩邊共用的樣本在 shared/word_sort_cases.json，前後端測試都用它驗證，改規則時要一起改。
+// （名稱只含基本多文種平面的字元，JS 字串的 UTF-16 單元比較與 Python 的碼點比較結果相同。）
+const compareCodePoints = (x, y) => (x < y ? -1 : x > y ? 1 : 0);
 
 // 排序鍵（小寫名稱、去前綴的字母部分、是否非字母開頭）每個詞只算一次，
 // 不要在 comparator 裡每次比較都對兩邊重算一遍（decorate-sort-undecorate）。
@@ -31,23 +33,15 @@ function toSortEntry(word) {
   return { word, first, key: getAlphabeticSortKey(first), isPrefix: /^[^a-z]/.test(first) };
 }
 
-function createEntryComparator(sortOrder) {
-  return (a, b) => {
-    if (sortOrder === 'asc') {
-      if (a.isPrefix && !b.isPrefix) return 1;
-      if (!a.isPrefix && b.isPrefix) return -1;
-      return collator.compare(a.key, b.key) || collator.compare(a.first, b.first);
-    }
-
-    if (a.isPrefix && !b.isPrefix) return -1;
-    if (!a.isPrefix && b.isPrefix) return 1;
-    return collator.compare(b.key, a.key) || collator.compare(b.first, a.first);
-  };
+function compareAscending(a, b) {
+  if (a.isPrefix !== b.isPrefix) return a.isPrefix ? 1 : -1;
+  return compareCodePoints(a.key, b.key) || compareCodePoints(a.first, b.first);
 }
 
-/** 依詞條名稱排序（回傳新陣列，不改動輸入）；排序結果與逐次比較時才算鍵的舊寫法完全相同。 */
-function sortWordsByName(words, sortOrder) {
-  return words.map(toSortEntry).sort(createEntryComparator(sortOrder)).map((entry) => entry.word);
+/** 依詞條名稱排序（回傳新陣列，不改動輸入）。desc 是 asc 結果整個反過來（與後端 _sort_words 相同）。 */
+export function sortWordsByName(words, sortOrder) {
+  const ascending = words.map(toSortEntry).sort(compareAscending).map((entry) => entry.word);
+  return sortOrder === 'desc' ? ascending.reverse() : ascending;
 }
 
 // 詞類篩選（Apple 化步驟 4-2）：詞條的任一個詞義的詞性等於所選值就算符合

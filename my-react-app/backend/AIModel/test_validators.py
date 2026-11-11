@@ -67,7 +67,7 @@ class FindUnverifiedWordsTest(TestCase):
         lookup = MagicMock()
         lookup.names.return_value = set()
         text = "Please open the app and review these notes carefully, then check zzzq"
-        self.assertIn("zzzq", find_unverified_words(text, set(), lookup) + ["zzzq"])
+        find_unverified_words(text, set(), lookup)
         sent = lookup.names.call_args.args[0]
         self.assertIn("zzzq", sent)       # 在 MAX_CHECKED 之內，會一起查
 

@@ -50,7 +50,9 @@ class Crossword(object):
         temp_list.sort(key=lambda i: len(i.word), reverse=True)
         self.available_words = temp_list
 
-    def compute_crossword(self, time_permitted=1.00, spins=2):
+    def compute_crossword(self, time_permitted=1.00, spins=2, max_rounds=None):
+        """隨機重開搜尋，保留放進最多字的盤面。預設跑 time_permitted 秒（正式環境的行為）；
+        給 max_rounds 時改成固定跑這麼多輪、忽略時間——結果只由亂數種子決定，與機器快慢無關（測試用）。"""
         copy = Crossword(self.cols, self.rows, self.empty,
                          self.maxloops, self.available_words, rng=self._rng)
 
@@ -59,7 +61,7 @@ class Crossword(object):
         start_full = float(time.time())
 
         # only run for x seconds
-        while (float(time.time()) - start_full) < time_permitted or count == 0:
+        while (count < max_rounds) if max_rounds is not None else ((float(time.time()) - start_full) < time_permitted or count == 0):
             self.debug += 1
             copy.randomize_word_list()
             copy.current_word_list = []

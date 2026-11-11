@@ -111,3 +111,19 @@ def test_available_initial_letters_comes_from_real_words(mock_load):
     # balay、cyux、Zzz（轉小寫）、'abc、ʼxyz；empty-explanation 沒有釋義、-suffix 開頭是符號都不收
     assert letters == sorted(["b", "c", "z", "'", "ʼ"])
     assert "e" not in letters and "-" not in letters
+
+
+# V1：前後端共用的排序樣本（shared/word_sort_cases.json，前端測試也用同一份）
+def test_sort_order_matches_the_shared_cases_used_by_the_frontend():
+    import json
+    import random
+    from pathlib import Path
+
+    from fastAPI.routes.dictionary.search import _sort_key_name
+
+    path = Path(__file__).resolve().parents[3] / "shared" / "word_sort_cases.json"
+    expected = json.loads(path.read_text(encoding="utf-8"))["ascending"]
+    for seed in range(5):
+        names = list(expected)
+        random.Random(seed).shuffle(names)
+        assert sorted(names, key=_sort_key_name) == expected

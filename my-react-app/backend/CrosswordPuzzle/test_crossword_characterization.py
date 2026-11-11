@@ -14,7 +14,9 @@ class CrosswordDeterministicOutputTest(SimpleTestCase):
     def _build(self):
         random.seed(12345)
         crossword = Crossword(13, 13, "-", 5000, word_list)
-        crossword.compute_crossword(time_permitted=0.3)
+        # 固定輪數而不是固定秒數：「跑到時間到」的搜尋在不同速度的機器上會跑不同輪數，快照就可能不同。
+        # 100 輪＝原本 0.3 秒在開發機上實際跑的輪數；第 21 輪起最佳盤面就不再改變。
+        crossword.compute_crossword(max_rounds=100)
         crossword.order_number_words()
         return crossword
 

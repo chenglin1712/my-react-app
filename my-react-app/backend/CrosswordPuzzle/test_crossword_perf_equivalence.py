@@ -3,6 +3,8 @@
 import random
 import string
 
+from unittest.mock import patch
+
 from django.test import SimpleTestCase
 
 from CrosswordPuzzle import crossword_display
@@ -176,3 +178,37 @@ class MaxLoopsZeroTest(SimpleTestCase):
             cw = Crossword(8, 8, "-", loops, [], rng=random.Random(1))
             cw.fit_and_add(Word("balay", ""))
             self.assertEqual(cw.current_word_list, [])
+
+
+class ComputeCrosswordMaxRoundsTest(SimpleTestCase):
+    """V8：給 max_rounds 時固定跑這麼多輪、忽略時間，結果只由亂數種子決定。"""
+
+    def _run(self, **kwargs):
+        words = [(w, f"clue-{w}") for w in ["balay", "cyux", "mami", "baki", "laqi", "utux", "yaya", "hola", "ngi", "lokah"]]
+        cw = Crossword(9, 9, "-", 200, words, rng=random.Random(5))
+        cw.compute_crossword(**kwargs)
+        return cw
+
+    def test_same_seed_and_rounds_give_the_same_board_regardless_of_time(self):
+        a = self._run(max_rounds=30, time_permitted=0.0)
+        b = self._run(max_rounds=30, time_permitted=5.0)      # 時間設定被忽略
+        self.assertEqual(a.solution(), b.solution())
+
+    def test_runs_exactly_the_requested_number_of_rounds(self):
+        # 建構子會打散一次字表；先建好再開始計數。
+        words = [(w, f"clue-{w}") for w in ["balay", "cyux", "mami", "baki", "laqi"]]
+        cw = Crossword(9, 9, "-", 200, words, rng=random.Random(5))
+        calls = []
+        original = Crossword.randomize_word_list
+
+        def counting(self_):
+            calls.append(1)
+            return original(self_)
+
+        with patch.object(Crossword, "randomize_word_list", counting):
+            cw.compute_crossword(max_rounds=7)
+        self.assertEqual(len(calls), 7 + 1)   # 7 輪各打散一次，加上建立工作複本時建構子的一次
+
+    def test_default_still_runs_for_the_time_budget_with_at_least_one_round(self):
+        cw = self._run(time_permitted=0.0)
+        self.assertGreater(len(cw.current_word_list), 0)       # time 為 0 也至少跑一輪

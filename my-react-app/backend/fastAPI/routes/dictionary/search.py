@@ -236,7 +236,8 @@ def _matches_category(word_result: "WordResult", category: Optional[str]) -> boo
 
 def _sort_key_name(name: Optional[str]):
     """跟前端排序邏輯一致：忽略非字母開頭（-、ʼ 等）取字母部分排序，
-    純非字母開頭的詞條一律排在最後。"""
+    純非字母開頭的詞條一律排在最後。字串依字元碼點比較；前端 frontend/utils/wordFilterSort.js
+    用同一套規則，兩邊共用的樣本在 shared/word_sort_cases.json，改規則時要一起改。"""
     lowered = (name or '').lower()
     stripped = re.sub(r'^[^a-z]+', '', lowered) or lowered
     is_prefixed = bool(re.match(r'^[^a-z]', lowered))

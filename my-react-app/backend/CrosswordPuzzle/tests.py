@@ -292,3 +292,52 @@ class SubmitAnsTest(TestCase):
             content_type='application/json',
         )
         self.assertEqual(response.status_code, 400)
+
+
+class SubmitAnsDefenseInDepthTest(TestCase):
+    """E5：序列化器已擋 start_* < 1；views.py 的 0 <= row／col 檢查是第二道防線。
+    這裡繞過序列化器直接餵 0 或負數起點，確認不會因為 Python 的負索引而比對到對面（尾端）的格子。"""
+
+    def setUp(self):
+        self.client = Client()
+        cache.clear()
+
+    def _post_bypassing_serializer(self, direction, start_row, start_col):
+        # 盤面只有最後一列/欄有 "cyux"，使用者也填了 "cyux"：若負索引繞到尾端，就會被誤判成答對。
+        if direction == "across":
+            solution, answers = ["----", "----", "cyux"], [list("----"), list("----"), list("cyux")]
+        else:
+            solution, answers = ["---c", "---y", "---u", "---x"], [list("---c"), list("---y"), list("---u"), list("---x")]
+        validated = {
+            "user_answers": answers,
+            "crossword_solution": solution,
+            "crossword_legend": [{
+                "number": 1, "clue": "高興", "direction": direction,
+                "length": 4, "start_col": start_col, "start_row": start_row, "word": "cyux",
+            }],
+        }
+        fake = MagicMock()
+        fake.is_valid.return_value = True
+        fake.validated_data = validated
+        with patch("CrosswordPuzzle.views.SubmitAnsSerializer", return_value=fake):
+            return self.client.post("/CrosswordPuzzle/submit/", data=json.dumps({"x": 1}), content_type="application/json")
+
+    def test_across_with_zero_row_is_not_matched_against_the_last_row(self):
+        response = self._post_bypassing_serializer("across", start_row=0, start_col=1)
+        self.assertEqual(response.status_code, 200)
+        detail = response.json()["word_details"][0]
+        self.assertFalse(detail["is_correct"])
+        self.assertEqual(response.json()["correct_words_count"], 0)
+
+    def test_across_with_zero_col_is_not_matched_against_the_last_col(self):
+        # start_col=0 → 第一個字母落在 col -1（尾端），其餘字母落在 0..2；整個字要被判錯
+        response = self._post_bypassing_serializer("across", start_row=3, start_col=0)
+        self.assertFalse(response.json()["word_details"][0]["is_correct"])
+
+    def test_down_with_zero_col_is_not_matched_against_the_last_col(self):
+        response = self._post_bypassing_serializer("down", start_row=1, start_col=0)
+        self.assertFalse(response.json()["word_details"][0]["is_correct"])
+
+    def test_down_with_negative_row_is_not_matched(self):
+        response = self._post_bypassing_serializer("down", start_row=-1, start_col=4)
+        self.assertFalse(response.json()["word_details"][0]["is_correct"])
