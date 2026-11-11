@@ -270,8 +270,11 @@ class FfprobeHardeningTest(TestCase):
         self.assertEqual(limits["as"], (upload.FFPROBE_MAX_ADDRESS_SPACE,) * 2)
         self.assertEqual(limits["fsize"], (0, 0))
 
+    # shutil.which 要固定成「有 ffprobe」：_run_ffprobe 一開始會先檢查，機器沒裝（例如 CI）就會直接回 503，
+    # 根本走不到下面要測的程式碼（本機有裝 ffprobe 時才會剛好通過）。
+    @patch("adminapi.promo_upload.shutil.which", return_value="/usr/bin/ffprobe")
     @patch("adminapi.promo_upload.subprocess.run")
-    def test_stdin_is_closed_and_errors_never_leak_ffprobe_output_to_the_user(self, run):
+    def test_stdin_is_closed_and_errors_never_leak_ffprobe_output_to_the_user(self, run, _which):
         run.return_value = subprocess.CompletedProcess([], 1, b"", b"/srv/secret/path ffprobe version 6.1 error")
         with self.assertLogs("adminapi.promo_upload", level="WARNING"):
             with self.assertRaises(upload.PromoUploadError) as ctx:
@@ -306,8 +309,9 @@ class FfprobeAvailabilityTest(TestCase):
                 upload._run_ffprobe("whatever")
         self.assertEqual(ctx.exception.status, 503)
 
+    @patch("adminapi.promo_upload.shutil.which", return_value="/usr/bin/ffprobe")
     @patch("adminapi.promo_upload.subprocess.run")
-    def test_timeout_and_failure_and_garbage_output(self, run):
+    def test_timeout_and_failure_and_garbage_output(self, run, _which):
         run.side_effect = subprocess.TimeoutExpired("ffprobe", 20)
         with self.assertRaises(upload.PromoUploadError):
             upload._run_ffprobe("x")

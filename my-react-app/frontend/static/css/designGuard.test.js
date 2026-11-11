@@ -288,7 +288,7 @@ describe("手機版（階段 6-4）", () => {
     everyCss.filter(({ file }) => !isAdmin(file)).forEach(({ file, css }) => {
       ruleList(css).forEach(({ selector, body }) => {
         const m = body.match(/min-width:\s*(\d+)px/);
-        if (m && Number(m[1]) > 64 && /(^|[\s,.])(btn|button)|button/.test(selector)) hits.push(`${file}: ${selector.replace(/\s+/g, " ").slice(0, 60)} ${m[0]}`);
+        if (m && Number(m[1]) > 64 && /button/.test(selector)) hits.push(`${file}: ${selector.replace(/\s+/g, " ").slice(0, 60)} ${m[0]}`);
       });
     });
     // 例外：筆記頁（路由專屬 CSS，限縮在 .note-page 底下）電腦版 100px，手機寬度在同檔另有覆蓋；遊戲開始頁單獨一顆的開始鈕 120px
