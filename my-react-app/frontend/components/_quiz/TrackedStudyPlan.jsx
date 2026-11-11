@@ -70,7 +70,7 @@ const TrackedStudyPlan = ({ refreshKey = 0, replanEnabled = false, tribe, onQuot
         for (let attempt = 0; attempt < 3; attempt += 1) {
             const seq = ++loadSeqRef.current;
             const edits = editsRef.current;
-            let loaded = null;
+            let loaded;
             try {
                 loaded = await getTrackedPlan();
             } catch {
