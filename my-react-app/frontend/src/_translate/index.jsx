@@ -39,7 +39,7 @@ function legacyCopy(text) {
     area.style.opacity = "0";
     document.body.appendChild(area);
     area.select();
-    let ok = false;
+    let ok;
     try { ok = document.execCommand("copy"); } catch { ok = false; }
     document.body.removeChild(area);
     // select() 會把焦點搬到暫時的 textarea，移除後要還給原本的按鈕，鍵盤使用者才不會失去位置

@@ -282,7 +282,6 @@ export function useCloudNoteSync({
     const migrating = !meta.migrated && pushIds.length > 0;
     if (migrating && alive(ctx)) setProgress({ done: 0, total: pushIds.length });
 
-    let allDone = false;
     try {
       for (const id of deleteIds) {
         assertAlive(ctx);
@@ -306,14 +305,14 @@ export function useCloudNoteSync({
         done += 1;
         if (migrating && alive(ctx)) setProgress({ done, total: pushIds.length });
       }
-      allDone = true;
     } finally {
       // 這一輪過期了（換帳號、旗標關閉）就不再碰任何狀態；同步紀錄屬於當時的帳號，照實存回去。
       commitMeta(ctx);
       if (alive(ctx)) setProgress(null);
     }
 
-    if (allDone && alive(ctx)) {
+    // 上面的 try 沒有 catch：中途丟出例外就不會走到這裡，所以能執行到這一行就代表這一輪的刪除與推送都做完了
+    if (alive(ctx)) {
       // 已經不存在的頁，失敗紀錄也一併清掉
       const liveIds = new Set(deps.current.getNotes().map((n) => n.id));
       Object.keys(meta.failed).forEach((id) => { if (!liveIds.has(id)) delete meta.failed[id]; });
