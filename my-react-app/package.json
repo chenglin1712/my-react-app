@@ -19,7 +19,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@tiptap/core": "3.32.2",
     "@tiptap/extension-color": "3.32.2",
-    "@tiptap/extension-image": "3.32.2",
+    "@tiptap/extension-image": "3.33.0",
     "@tiptap/extension-table": "3.32.2",
     "@tiptap/extension-text-style": "3.32.2",
     "@tiptap/pm": "3.32.2",
