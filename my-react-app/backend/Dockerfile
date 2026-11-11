@@ -18,7 +18,7 @@
 # 用 Python 3.12 系列，與 CI（setup-python 3.12）和本機開發的 Python 3.12 同一系列。Dependabot 只會提議 3.12.x 的
 # 修補版（見 .github/dependabot.yml）；要換到其他 Python 版本，requirements*.lock、CI、本機環境都要一起換。
 # 升級修補版時：到 Docker Hub 查新標籤的摘要，在預備環境 docker build 通過後，標籤與摘要一起改。
-FROM python:3.12.13-slim-trixie@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36
+FROM python:3.12.16-slim-trixie@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
 
 # 對應 requirements.txt 內套件的系統依賴：
 # - ffmpeg：pydub／fastAPI/routes/quiz.py 的語音比對功能需要 ffmpeg／ffprobe
