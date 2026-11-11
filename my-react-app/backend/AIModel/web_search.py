@@ -36,12 +36,11 @@ _MAX_DOMAINS = 10
 _DOMAIN_RE = re.compile(r"^(?=.{4,100}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$")
 
 
-def web_search_enabled() -> bool:
+def web_search_enabled(flags=None) -> bool:
     """功能旗標（預設關閉、查不到也視為關閉）。"""
-    from adminapi.models import FeatureFlag
+    from .flags import enabled_fail_closed
 
-    flag = FeatureFlag.objects.filter(key=FLAG_KEY).first()
-    return bool(flag is not None and flag.enabled)
+    return enabled_fail_closed(FLAG_KEY, flags)
 
 
 def official_domains() -> tuple:

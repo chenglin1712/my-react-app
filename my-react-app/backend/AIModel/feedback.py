@@ -20,12 +20,11 @@ from .services import sign_reply
 FLAG_KEY = "ai_feedback_enabled"
 
 
-def feedback_enabled() -> bool:
+def feedback_enabled(flags=None) -> bool:
     """功能旗標（預設關閉、查不到也視為關閉）。"""
-    from adminapi.models import FeatureFlag
+    from .flags import enabled_fail_closed
 
-    flag = FeatureFlag.objects.filter(key=FLAG_KEY).first()
-    return bool(flag is not None and flag.enabled)
+    return enabled_fail_closed(FLAG_KEY, flags)
 
 
 def hash_uid(uid: str) -> str:

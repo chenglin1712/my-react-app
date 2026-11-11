@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Heart, User } from "lucide-react";
 import { sanitizeNoteHtml } from "@utils/sanitizeNoteHtml";
 import { timeAgo } from "../timeAgo";
@@ -8,6 +9,11 @@ import { timeAgo } from "../timeAgo";
  * 平行的 button，不是外層 div 包內層 button（也讓整張卡片能用鍵盤操作）。
  */
 export default function NoteCard({ note, isMyTab, isMine, iLike, onOpen, onToggleLike }) {
+  // 預覽只在 preview 內容變動時才重新消毒；列表上按一個讚時，其他卡片的預覽不必再處理一遍。
+  const previewHtml = useMemo(
+    () => sanitizeNoteHtml(note.preview || "<p>內容</p>", { strictImages: true }),
+    [note.preview],
+  );
   return (
     <article className="ns-card">
       <button type="button" className="ns-card-open" onClick={() => onOpen(note)}>
@@ -32,9 +38,7 @@ export default function NoteCard({ note, isMyTab, isMine, iLike, onOpen, onToggl
           </div>
           <div
             className="ns-preview"
-            dangerouslySetInnerHTML={{
-              __html: sanitizeNoteHtml(note.preview || "<p>內容</p>", { strictImages: true }),
-            }}
+            dangerouslySetInnerHTML={{ __html: previewHtml }}
           />
         </div>
       </button>

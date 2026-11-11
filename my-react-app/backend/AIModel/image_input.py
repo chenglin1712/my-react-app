@@ -37,12 +37,11 @@ MAX_IMAGE_SIDE = 8000
 MAX_IMAGE_PIXELS = 25_000_000
 
 
-def image_input_enabled() -> bool:
+def image_input_enabled(flags=None) -> bool:
     """圖片輸入的功能旗標。【預設關閉、查不到旗標也視為關閉】：真金鑰驗收完才在後台「功能開關」開放。"""
-    from adminapi.models import FeatureFlag
+    from .flags import enabled_fail_closed
 
-    flag = FeatureFlag.objects.filter(key=IMAGE_FLAG).first()
-    return bool(flag is not None and flag.enabled)
+    return enabled_fail_closed(IMAGE_FLAG, flags)
 
 
 class ChatImageSerializer(serializers.Serializer):

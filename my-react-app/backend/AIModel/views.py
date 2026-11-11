@@ -43,19 +43,23 @@ def _get_client():
     路徑不用跟著改。"""
     return get_llm_client()
 
-def _assistant_disabled_response():
+def _assistant_disabled_response(flags=None):
     """AI 助手總開關（FeatureFlag ai_assistant_enabled，後台「功能開關」頁可切換）。
     兩個 view 都會呼叫付費的 LLM，是翻譯以外另一條費用出口，所以需要同樣能一鍵關閉。
     找不到旗標紀錄（尚未跑 seed_feature_flags）視為未關閉，維持原本行為。
     在限速計數之前檢查，關閉期間被擋下的請求不佔用使用者的限速額度。"""
     from adminapi import ai_budget
-    from adminapi.models import FeatureFlag
 
-    # 月預算超過時這裡會自動把旗標關掉（見 adminapi/ai_budget.py）；評估有 60 秒快取，失敗只記錄不擋人。
-    ai_budget.enforce()
-    flag = FeatureFlag.objects.filter(key="ai_assistant_enabled").first()
+    # flags 有給＝呼叫端已經先 enforce() 並一次讀回所有旗標（ai_quota），這裡不重複；沒給就照舊自己做。
+    if flags is None:
+        # 月預算超過時這裡會自動把旗標關掉（見 adminapi/ai_budget.py）；評估有 60 秒快取，失敗只記錄不擋人。
+        ai_budget.enforce()
+        from .flags import load_flags
+
+        flags = load_flags(["ai_assistant_enabled"])
+    assistant_enabled = flags.get("ai_assistant_enabled")
     # 旗標列不存在（尚未跑 seed_feature_flags）視為開啟，行為不變；預算超過時 ai_budget 會補建該列再關閉（稽核 AI-3）
-    if flag is not None and not flag.enabled:
+    if assistant_enabled is False:
         return JsonResponse({"detail": "AI 助手目前暫停服務，請稍後再試。", "code": "ai_assistant_disabled"}, status=403)
     return None
 
@@ -360,13 +364,12 @@ def review_tayal_chat(request):
 QUESTION_REVIEW_FLAG = "ai_question_review_enabled"
 
 
-def question_review_enabled() -> bool:
+def question_review_enabled(flags=None) -> bool:
     """單題錯題講解的功能旗標（路線圖 #22）。【預設關閉、查不到旗標也視為關閉】：要在後台「功能開關」頁
     手動打開，等真金鑰驗收完才開放給學生。"""
-    from adminapi.models import FeatureFlag
+    from .flags import enabled_fail_closed
 
-    flag = FeatureFlag.objects.filter(key=QUESTION_REVIEW_FLAG).first()
-    return bool(flag is not None and flag.enabled)
+    return enabled_fail_closed(QUESTION_REVIEW_FLAG, flags)
 
 
 @csrf_exempt
@@ -433,24 +436,22 @@ def review_question(request):
 PLAN_REPLAN_FLAG = "ai_plan_replan_enabled"
 
 
-def plan_replan_enabled() -> bool:
+def plan_replan_enabled(flags=None) -> bool:
     """讀書計畫重排的功能旗標（路線圖 #26）。【預設關閉、查不到旗標也視為關閉】：重排會呼叫付費 LLM。"""
-    from adminapi.models import FeatureFlag
+    from .flags import enabled_fail_closed
 
-    flag = FeatureFlag.objects.filter(key=PLAN_REPLAN_FLAG).first()
-    return bool(flag is not None and flag.enabled)
+    return enabled_fail_closed(PLAN_REPLAN_FLAG, flags)
 
 
 WEEKLY_DIGEST_FLAG = "ai_weekly_digest_enabled"
 
 
-def weekly_digest_enabled() -> bool:
+def weekly_digest_enabled(flags=None) -> bool:
     """每週學習摘要的功能旗標（路線圖 #25）。預設關閉、查不到也視為關閉。
     前端只用它決定要不要讀並顯示摘要；摘要本身由排程指令產生（generate_weekly_digests）。"""
-    from adminapi.models import FeatureFlag
+    from .flags import enabled_fail_closed
 
-    flag = FeatureFlag.objects.filter(key=WEEKLY_DIGEST_FLAG).first()
-    return bool(flag is not None and flag.enabled)
+    return enabled_fail_closed(WEEKLY_DIGEST_FLAG, flags)
 
 
 @csrf_exempt
@@ -587,13 +588,23 @@ def ai_quota(request):
         return _quota_unavailable_response()
     data = peeked.as_dict()
     # 前端用它決定要不要顯示「AI 助手」分頁（旗標預設關閉）；要和 review_question 一樣同時看助手總開關；只是顯示用，真正的檢查在 review_question 本身
-    assistant_on = _assistant_disabled_response() is None
+    # 六個旗標一次讀回（原本各查一次）。先 enforce()：預算超標會在這裡把旗標關掉，讀旗標要在它之後。
+    from adminapi import ai_budget
+    from .feedback import FLAG_KEY as FEEDBACK_FLAG
+    from .flags import load_flags
+    from .image_input import IMAGE_FLAG
+
+    ai_budget.enforce()
+    flags = load_flags((
+        "ai_assistant_enabled", QUESTION_REVIEW_FLAG, IMAGE_FLAG, FEEDBACK_FLAG, PLAN_REPLAN_FLAG, WEEKLY_DIGEST_FLAG,
+    ))
+    assistant_on = _assistant_disabled_response(flags) is None
     data["features"] = {
-        "questionReview": question_review_enabled() and assistant_on,
-        "imageInput": image_input_enabled() and assistant_on,       # 圖片提問（#24）：沒開就不顯示拍照鈕
-        "feedback": feedback_enabled() and assistant_on,            # 讚／倒讚（#30）：沒開就不顯示按鈕
-        "planReplan": plan_replan_enabled() and assistant_on,       # 計畫重排（#26）：沒開就不顯示「重排」按鈕
-        "weeklyDigest": weekly_digest_enabled() and assistant_on,   # 每週學習摘要（#25）：沒開就不讀、不顯示
+        "questionReview": question_review_enabled(flags) and assistant_on,
+        "imageInput": image_input_enabled(flags) and assistant_on,       # 圖片提問（#24）：沒開就不顯示拍照鈕
+        "feedback": feedback_enabled(flags) and assistant_on,            # 讚／倒讚（#30）：沒開就不顯示按鈕
+        "planReplan": plan_replan_enabled(flags) and assistant_on,       # 計畫重排（#26）：沒開就不顯示「重排」按鈕
+        "weeklyDigest": weekly_digest_enabled(flags) and assistant_on,   # 每週學習摘要（#25）：沒開就不讀、不顯示
     }
     # 第一次開啟時的建議問題（#13）：依學習資料用模板挑，不呼叫模型；讀不到學習資料就是預設三句
     data["suggestions"] = starter_suggestions(load_profile(decoded.get("uid", "")))

@@ -44,6 +44,8 @@ MAX_COUNT = 100_000
 ID_VERSION = "v1"
 RULE_KINDS = ("P", "S", "I", "C")      # 重疊（R）目前不支援診斷
 _TRIBE_SLUGS = ("tayal", "amis", "bunun", "kavalan", "paiwan")
+# 公開名稱：其他模組（例如 quiz/rule_state_store）要用族語清單時引用這個，不要碰底線開頭的名稱。
+TRIBE_SLUGS = _TRIBE_SLUGS
 _MAX_AFFIX_LEN = 32
 _MAX_POSITION = 16
 

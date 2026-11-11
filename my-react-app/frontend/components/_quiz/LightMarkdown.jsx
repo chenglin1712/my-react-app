@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, memo } from "react";
 import { BOLD, parseBlocks } from "./markdownBlocks";
 
 // AI 助手回覆的輕量格式（路線圖 #14）。只認三種語法：換行／段落、條列（- * •）與編號（1.）、**粗體**。
@@ -40,4 +40,6 @@ const LightMarkdown = ({ text, ...rest }) => (
     </div>
 );
 
-export default LightMarkdown;
+// 串流時每個畫面更新都會重新渲染整份對話；已完成的訊息 text 不變，memo 讓它們跳過
+// parseBlocks（逐行跑 regex）與整棵 React 元素的重建，只有正在串流的那一則會重新解析。
+export default memo(LightMarkdown);

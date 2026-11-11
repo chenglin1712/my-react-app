@@ -1,5 +1,5 @@
 import { sanitizeNoteHtml } from "@utils/sanitizeNoteHtml";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFocusTrap } from "@hooks/useFocusTrap";
 import { useOnlineStatus } from "@hooks/useOnlineStatus";
 import OfflineNotice from "@components/ui/OfflineNotice";
@@ -51,7 +51,15 @@ export default function NoteModal({ note, canLike, iLike, canDelete, onToggleLik
     }
   };
 
-  const pages = Array.isArray(note.pages) ? note.pages.filter(Boolean) : [];
+  const pages = useMemo(() => (Array.isArray(note.pages) ? note.pages.filter(Boolean) : []), [note.pages]);
+  // 消毒只依筆記內容算一次。檢舉說明每打一個字都會重新 render，若在 render 裡逐頁消毒，
+  // 整份筆記（最大約 900 KB）每個按鍵都要再處理一遍。
+  // 空白與否要看消毒之後實際會顯示的內容：被消毒器整段濾掉的標籤不能算有內容。
+  // 分享筆記是別人寫的，圖片只收 Cloudinary 與內嵌圖，擋掉外部追蹤圖（稽核 FE-1）
+  const safePages = useMemo(() => pages.map((pg) => {
+    const safeHtml = sanitizeNoteHtml(typeof pg.content === "string" ? pg.content : "", { strictImages: true });
+    return { safeHtml, blank: isBlankNote({ title: "", content: safeHtml }) };
+  }), [pages]);
   const modalTitleId = "note-modal-title";
 
   const handleMaskClick = () => {
@@ -106,21 +114,16 @@ export default function NoteModal({ note, canLike, iLike, canDelete, onToggleLik
           <p className="ns-modal-empty">這則筆記沒有可顯示的內容</p>
         )}
 
-        {pages.map((pg, i) => {
-          // 空白與否要看消毒之後實際會顯示的內容：被消毒器整段濾掉的標籤不能算有內容。
-          // 分享筆記是別人寫的，圖片只收 Cloudinary 與內嵌圖，擋掉外部追蹤圖（稽核 FE-1）
-          const safeHtml = sanitizeNoteHtml(typeof pg.content === "string" ? pg.content : "", { strictImages: true });
-          return (
-            <div key={i} className="ns-modal-page">
-              <div className="ns-page-label">第 {i + 1} 頁</div>
-              {isBlankNote({ title: "", content: safeHtml }) ? (
-                <p className="ns-modal-empty">這一頁沒有內容</p>
-              ) : (
-                <div className="ns-modal-content" dangerouslySetInnerHTML={{ __html: safeHtml }} />
-              )}
-            </div>
-          );
-        })}
+        {safePages.map(({ safeHtml, blank }, i) => (
+          <div key={i} className="ns-modal-page">
+            <div className="ns-page-label">第 {i + 1} 頁</div>
+            {blank ? (
+              <p className="ns-modal-empty">這一頁沒有內容</p>
+            ) : (
+              <div className="ns-modal-content" dangerouslySetInnerHTML={{ __html: safeHtml }} />
+            )}
+          </div>
+        ))}
 
         <div className="ns-modal-actions">
           {canDelete && (

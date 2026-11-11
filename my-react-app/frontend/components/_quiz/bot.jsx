@@ -4,7 +4,7 @@ import "../../static/css/_quiz/bot_notices.css"
 import "../../static/css/_quiz/bot_entries.css"
 import "../../static/css/_quiz/bot_feedback.css"
 import "../../static/css/_quiz/bot_header.css"
-import { useId, useState, useRef, useEffect } from "react";
+import { useId, useState, useRef, useEffect, useMemo } from "react";
 import { Bot, Camera, ChevronDown, Info, SquarePen, X } from "lucide-react"
 import { useNavigate } from "react-router-dom";
 import StudyPlanComponent from "./bot_study_plan"
@@ -99,13 +99,28 @@ const resetTimeText = (iso) => {
 
 const quotaMessage = (quota) => `今天的提問次數已用完，${resetTimeText(quota?.resetsAt)}重置。`;
 
-// 這則訊息之前最近的一則使用者訊息（重新產生／回饋要對照它）。從這則往前找、找到就停，
-// 不要為每則訊息都 slice + reverse 整個陣列（那會讓整段對話的渲染變成 O(訊息數²)）。
-const findPrecedingUserMessage = (messages, index) => {
-  for (let i = index - 1; i >= 0; i -= 1) {
-    if (messages[i].role === "user") return messages[i];
+// 每則訊息「之前最近的一則使用者訊息」（重新產生／回饋要對照它），一趟掃完整份對話就全部算好，
+// 不要在渲染每則訊息時各自往前找（整段對話的渲染會變成 O(訊息數²)）。
+const precedingUserMessages = (messages) => {
+  const result = new Array(messages.length);
+  let lastUser;
+  for (let i = 0; i < messages.length; i += 1) {
+    result[i] = lastUser;
+    if (messages[i].role === "user") lastUser = messages[i];
   }
-  return undefined;
+  return result;
+};
+
+// 已完成訊息的「去掉 Markdown 記號的純文字」（複製／朗讀用）。訊息物件在串流中是不可變更新
+// （只有正在串流的那一則會換成新物件），所以以物件為 key 快取，串流時不必為每則舊訊息重跑 regex。
+const strippedTextCache = new WeakMap();
+const strippedTextOf = (message) => {
+  let stripped = strippedTextCache.get(message);
+  if (stripped === undefined) {
+    stripped = stripLightMarkdown(message.text);
+    strippedTextCache.set(message, stripped);
+  }
+  return stripped;
 };
 
 // 右下角懸浮聊天視窗（類似 Messenger）：非 modal，背景頁面仍可操作。
@@ -614,6 +629,8 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
 
     const overlayStyle = size ? { "--bot-w": `${size.w}px`, "--bot-h": `${size.h}px` } : undefined;
 
+    const precedingUsers = useMemo(() => precedingUserMessages(messages), [messages]);
+
     return (
         <div ref={overlayRef} className="bot-overlay" data-open={open} inert={!open} style={overlayStyle}>
             <BotResizeHandle overlayRef={overlayRef} size={size} onCommit={commitSize} />
@@ -737,10 +754,10 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                                     <StudyPlanComponent plan={message.studyPlan} onClose={handleClose} onTracked={() => setTrackedPlanKey((key) => key + 1)} />
                                 )}
                                 {message.role === "bot" && message.sig && !message.streaming && !message.interrupted && (() => {
-                                    const precedingUser = findPrecedingUserMessage(messages, index);
+                                    const precedingUser = precedingUsers[index];
                                     const actions = (
                                         <BotReplyActions
-                                            text={stripLightMarkdown(message.text)}
+                                            text={strippedTextOf(message)}
                                             // 只有最後一則回覆能重新產生，而且那一輪不能是附過圖片的（還原後圖片已不在）
                                             canRegenerate={index === messages.length - 1 && !!precedingUser && !precedingUser.hadImage && !precedingUser.imageUrl}
                                             onRegenerate={handleRegenerate}

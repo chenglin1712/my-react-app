@@ -7,6 +7,8 @@ Request/Response——parse_date_range() 原本直接吃 `request` 讀
 request.GET 取值再傳進來，邏輯完全不變，只是換了個取值的位置。
 """
 import re
+import threading
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone as dt_timezone
 
@@ -170,24 +172,58 @@ def _join_date_to_local_date(raw):
     return timezone.localtime(dt).date()
 
 
-def daily_new_registrations(start_date, end_date):
-    """依 joinDate（Firestore users/{uid} 的 ISO 字串）分組計算每日新註冊
-    數——沿用 P3 user_views.py 已經接受的務實選擇：即時全量掃描 Firebase
-    Auth + Firestore，不建影子索引/快取表（見規劃文件 P5「已知限制」）。"""
+# 全量掃描 Firebase Auth + Firestore 取得每位使用者的 joinDate 很貴（使用者數 × 往返），
+# 而儀表板與留存分析都要用，且「新註冊」不需要秒級即時。結果在行程內快取 5 分鐘：
+# 同一段時間內任何一個分析端點、任何一位管理者開頁，只付一次全量掃描的成本。
+# 代價：剛註冊的人最多 5 分鐘後才會出現在新註冊與世代分析裡。拉取失敗不會被快取。
+JOIN_DATES_TTL_SECONDS = 300
+_join_dates_cache = {"at": 0.0, "data": None, "generation": 0}
+_join_dates_lock = threading.Lock()   # 只保護快取欄位的讀寫，不會在網路呼叫期間持有
+
+
+def clear_join_date_cache():
+    with _join_dates_lock:
+        _join_dates_cache["data"] = None
+        _join_dates_cache["at"] = 0.0
+        _join_dates_cache["generation"] += 1
+
+
+def _load_join_dates():
+    """{uid: joinDate 原始字串}：只含「在 Firebase Auth 且 users/{uid} 文件有 joinDate」的使用者。
+    回傳的 dict 被快取共用，呼叫端只能讀、不能改。"""
+    with _join_dates_lock:
+        cached = _join_dates_cache["data"]
+        if cached is not None and time.monotonic() - _join_dates_cache["at"] < JOIN_DATES_TTL_SECONDS:
+            return cached
+        generation = _join_dates_cache["generation"]
+    # 網路呼叫不在鎖內：Firebase 變慢或逾時時不會把同一個 worker 的其他分析請求（與清除操作）一起卡住。
+    # 代價是快取過期的瞬間若同時有幾個請求，可能各掃一次；管理後台的分析頁流量很低，可以接受。
     users = firebase_ops.list_all_firebase_users()
     client = firebase_ops.get_firestore_client()
     refs = [client.collection("users").document(u.uid) for u in users]
-    join_dates_by_uid = {}
+    data = {}
     if refs:
         for doc in client.get_all(refs):
-            if doc.exists:
-                join_dates_by_uid[doc.id] = doc.to_dict().get("joinDate")
+            if not doc.exists:
+                continue
+            raw = doc.to_dict().get("joinDate")
+            if raw:
+                data[doc.id] = raw
+    with _join_dates_lock:
+        # 掃描期間若被 clear_join_date_cache() 清過，這份結果就不存（本次呼叫仍回傳它）
+        if _join_dates_cache["generation"] == generation:
+            _join_dates_cache["data"] = data
+            _join_dates_cache["at"] = time.monotonic()
+    return data
 
+
+def daily_new_registrations(start_date, end_date):
+    """依 joinDate（Firestore users/{uid} 的 ISO 字串）分組計算每日新註冊
+    數——沿用 P3 user_views.py 已經接受的務實選擇：全量掃描 Firebase
+    Auth + Firestore，不建影子索引表（見規劃文件 P5「已知限制」）；
+    掃描結果在行程內快取 5 分鐘（見 _load_join_dates）。"""
     counts = {}
-    for user in users:
-        raw = join_dates_by_uid.get(user.uid)
-        if not raw:
-            continue
+    for raw in _load_join_dates().values():
         day = _join_date_to_local_date(raw)
         if day is None:
             continue
@@ -485,21 +521,12 @@ def build_retention_analytics():
     再裁切）——本週剛註冊的世代還沒有機會產生第 1 週的留存資料，不該顯示
     成 0%（那是「還沒發生」不是「發生了但沒留住人」），前端看不到的欄位
     就是還沒到那個時間點，不是資料缺漏。"""
-    users = firebase_ops.list_all_firebase_users()
-    client = firebase_ops.get_firestore_client()
-    refs = [client.collection("users").document(u.uid) for u in users]
     cohort_start_by_uid = {}
-    if refs:
-        for doc in client.get_all(refs):
-            if not doc.exists:
-                continue
-            raw = doc.to_dict().get("joinDate")
-            if not raw:
-                continue
-            join_date = _join_date_to_local_date(raw)
-            if join_date is None:
-                continue
-            cohort_start_by_uid[doc.id] = _week_start(join_date)
+    for uid, raw in _load_join_dates().items():
+        join_date = _join_date_to_local_date(raw)
+        if join_date is None:
+            continue
+        cohort_start_by_uid[uid] = _week_start(join_date)
 
     if not cohort_start_by_uid:
         return {"cohorts": [], "max_weeks": _RETENTION_MAX_WEEKS}
@@ -511,12 +538,21 @@ def build_retention_analytics():
     # 週 -> 那一週有活動的使用者集合。後面每個世代、每一週只需要跟這個集合做交集，
     # 不必對世代裡的每個人各掃一次（世代數 × 週數 × 世代人數）。
     active_uids_by_week = defaultdict(set)
+    # 資料庫端先依（使用者, 當地日期）去重，只傳回這些組合，不把每一筆事件都載進記憶體；
+    # 也不再把全部世代的 uid 塞進一個 IN 清單（人數多時超過資料庫的參數上限），改在這裡過濾。
+    # TruncDate 用目前時區取日期，與 timezone.localtime(created_at).date() 同一套規則。
+    # 日期下界：比最早世代的加入週還早的事件不可能被算進任何世代，不必掃整張表。
+    earliest_week = min(cohort_start_by_uid.values())
     events = (
-        UsageEvent.objects.filter(uid__in=cohort_start_by_uid.keys())
-        .values_list("uid", "created_at")
+        UsageEvent.objects.exclude(uid="")
+        .filter(created_at__gte=timezone.make_aware(datetime.combine(earliest_week, datetime.min.time())))
+        .annotate(day=TruncDate("created_at"))
+        .values_list("uid", "day")
+        .distinct()
     )
-    for uid, created_at in events:
-        active_uids_by_week[_week_start(timezone.localtime(created_at).date())].add(uid)
+    for uid, day in events:
+        if uid in cohort_start_by_uid:
+            active_uids_by_week[_week_start(day)].add(uid)
     no_activity = frozenset()
 
     today_week_start = _week_start(timezone.localdate())

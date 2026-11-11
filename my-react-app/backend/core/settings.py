@@ -34,6 +34,10 @@ if "test" in sys.argv[1:2]:
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# 功能旗標表的快取秒數（見 adminapi/flag_cache.py）。跑測試時關閉：測試之間資料庫會還原，
+# 但 cache 不會，開著會讓前一個測試讀到的旗標值殘留到下一個測試；專門測快取的測試用 override_settings 打開。
+FEATURE_FLAG_CACHE_SECONDS = 0 if "test" in sys.argv[1:2] else 30
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/

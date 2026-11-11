@@ -202,6 +202,10 @@ if is_debug():
             }
 
 
+# IN 清單分批大小（SQLite 舊版單一查詢最多 999 個參數）
+_LOOKUP_CHUNK = 500
+
+
 @router.post("/sentence-audio/")
 @limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_audio_proxy_get_sentence_audio", "60/minute"))  # 原本沒有限流，見同檔案其他端點的說明
 async def get_sentence_audio(request: Request, body: SentenceAudioRequest, db: Session = Depends(get_db)):
@@ -230,17 +234,33 @@ async def get_sentence_audio(request: Request, body: SentenceAudioRequest, db: S
             seen_file_ids: set = set()
             tribe_id_subq = _tribe_id_subquery(tribe_name)
 
-            for token in tokens:
-                token_lower = token.lower()
-                word = db.query(Word).filter(
-                    Word.tribe_id == tribe_id_subq,
-                    sa_func.lower(Word.name) == token_lower
-                ).first()
+            # 全部不重複的小寫詞形一次（分批）查回，再整批載入音檔；
+            # 原本每個 token 各查兩次（詞條、音檔），重複出現的詞也重複查。
+            distinct_lowers = list(dict.fromkeys(t.lower() for t in tokens))
+            word_id_by_lower: dict = {}
+            for start in range(0, len(distinct_lowers), _LOOKUP_CHUNK):
+                chunk = distinct_lowers[start:start + _LOOKUP_CHUNK]
+                lowered = sa_func.lower(Word.name)
+                rows = (
+                    db.query(lowered, Word.id)
+                    .filter(Word.tribe_id == tribe_id_subq, lowered.in_(chunk))
+                    .order_by(Word.id)          # 同名詞條固定取 id 最小的那筆（原本沒有排序，取到哪筆不確定）
+                    .all()
+                )
+                for name_lower, word_id in rows:
+                    word_id_by_lower.setdefault(name_lower, word_id)
 
-                if not word:
+            audios_by_word: dict = {}
+            matched_ids = list(dict.fromkeys(word_id_by_lower.values()))
+            for start in range(0, len(matched_ids), _LOOKUP_CHUNK):
+                audios_by_word.update(load_audio_items_for_words(db, word_ids=matched_ids[start:start + _LOOKUP_CHUNK]))
+
+            for token in tokens:
+                word_id = word_id_by_lower.get(token.lower())
+                if word_id is None:
                     continue
 
-                audios = load_audio_items_for_words(db, word_ids=[word.id]).get(word.id, [])
+                audios = audios_by_word.get(word_id, [])
                 if not audios:
                     continue
 

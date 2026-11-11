@@ -119,13 +119,12 @@ def check_content(text) -> str:
 FEATURE_FLAG = "ai_learner_memory_enabled"
 
 
-def feature_enabled() -> bool:
+def feature_enabled(flags=None) -> bool:
     """學習記憶的功能旗標。【預設關閉、查不到旗標也視為關閉】（fail-closed）；旗標只決定能不能新開始使用與是否注入聊天，
     關閉時學生仍可檢視、清除自己已存的記憶。"""
-    from adminapi.models import FeatureFlag
+    from .flags import enabled_fail_closed
 
-    flag = FeatureFlag.objects.filter(key=FEATURE_FLAG).first()
-    return bool(flag is not None and flag.enabled)
+    return enabled_fail_closed(FEATURE_FLAG, flags)
 
 
 def active_for(uid: str) -> bool:

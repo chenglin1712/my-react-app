@@ -14,140 +14,17 @@ from .exceptions import GrammarSectionNotFoundError, WordNotFoundError
 
 def get_word_tree(db: Session, word_id: str) -> dict:
     """組出單一詞條的完整巢狀 JSON（見規劃文件 P4 §2 的回應形狀）。給後台
-    編輯器 GET 用；資料量以「單一詞條」為界，本機最極端的詞條（9 解釋／
-    129 例句／1,265 標註項目）仍在合理範圍內，不需要另外分頁或延遲載入。
+    編輯器 GET 用，也給 expected_hash 比對（word_service／wordlist_append）用。
+
+    內部直接用 get_word_trees_for_tribe() 同一份整批查詢實作（_build_word_trees），
+    只是詞條清單只有這一筆：兩條路徑共用同一份排序規則與組裝邏輯，內容雜湊不可能
+    因為兩份程式的排序鍵不同而算出不同結果（原本維護兩份，註解還記錄過一次這種
+    不一致）；查詢次數也固定，不再隨解釋、例句、標註數量逐層增加（N+1）。
     """
     word = db.query(m.Word).filter(m.Word.id == word_id).one_or_none()
     if word is None:
         raise WordNotFoundError(f"詞條不存在：{word_id}")
-
-    # 以下每個 .order_by() 都在 sort_order 之後加上 .id 當次要排序鍵——
-    # sort_order 相同或為 NULL 時，資料庫不保證原本的順序，單筆查詢跟批次
-    # 查詢（get_word_trees_for_tribe）可能因為執行計畫不同而排出不同順序，
-    # 導致同一棵樹在兩個查詢路徑算出不同的 content_hash（獨立審查找到的
-    # 問題）。.id 是遞增主鍵，順序穩定且跟兩個函式共用同一份排序規則。
-    source_ids = [
-        row.source_id for row in
-        db.query(m.WordSource).filter(m.WordSource.word_id == word_id)
-        .order_by(m.WordSource.sort_order, m.WordSource.id).all()
-    ]
-    audios = [
-        {"id": a.id, "external_id": a.external_id, "file_id": a.file_id, "audio_class": a.audio_class}
-        for a in db.query(m.WordAudio).filter(m.WordAudio.word_id == word_id)
-        .order_by(m.WordAudio.sort_order, m.WordAudio.id).all()
-    ]
-
-    explanations = []
-    explanation_rows = (
-        db.query(m.WordExplanation)
-        .filter(m.WordExplanation.word_id == word_id)
-        .order_by(m.WordExplanation.sort_order, m.WordExplanation.id)
-        .all()
-    )
-    for exp in explanation_rows:
-        category_ids = [r.category_id for r in db.query(m.WordExplanationCategory)
-                         .filter(m.WordExplanationCategory.explanation_id == exp.id)
-                         .order_by(m.WordExplanationCategory.id).all()]
-        pos_ids = [r.pos_id for r in db.query(m.WordExplanationPos)
-                   .filter(m.WordExplanationPos.explanation_id == exp.id)
-                   .order_by(m.WordExplanationPos.id).all()]
-        focus_ids = [r.focus_id for r in db.query(m.WordExplanationFocus)
-                     .filter(m.WordExplanationFocus.explanation_id == exp.id)
-                     .order_by(m.WordExplanationFocus.id).all()]
-        images = [
-            {"id": img.id, "image_url": img.image_url}
-            for img in db.query(m.WordExplanationImage)
-            .filter(m.WordExplanationImage.explanation_id == exp.id)
-            .order_by(m.WordExplanationImage.sort_order, m.WordExplanationImage.id).all()
-        ]
-
-        sentences = []
-        sentence_rows = (
-            db.query(m.WordExplanationSentence)
-            .filter(m.WordExplanationSentence.explanation_id == exp.id)
-            .order_by(m.WordExplanationSentence.sort_order, m.WordExplanationSentence.id)
-            .all()
-        )
-        for sent in sentence_rows:
-            sent_audios = [
-                {"id": a.id, "external_id": a.external_id, "file_id": a.file_id, "audio_class": a.audio_class}
-                for a in db.query(m.WordExplanationSentenceAudio)
-                .filter(m.WordExplanationSentenceAudio.sentence_id == sent.id)
-                .order_by(m.WordExplanationSentenceAudio.sort_order, m.WordExplanationSentenceAudio.id).all()
-            ]
-
-            anaphoras = []
-            anaphora_rows = (
-                db.query(m.WordExplanationAnaphora)
-                .filter(m.WordExplanationAnaphora.sentence_id == sent.id)
-                .order_by(m.WordExplanationAnaphora.sort_order, m.WordExplanationAnaphora.id)
-                .all()
-            )
-            for ana in anaphora_rows:
-                item_rows = (
-                    db.query(m.WordExplanationAnaphoraItem)
-                    .filter(m.WordExplanationAnaphoraItem.anaphora_id == ana.id)
-                    .order_by(m.WordExplanationAnaphoraItem.sort_order, m.WordExplanationAnaphoraItem.id)
-                    .all()
-                )
-                linked_ids = [i.word_id for i in item_rows if i.word_id]
-                name_map = {}
-                if linked_ids:
-                    name_map = {
-                        w.id: w.name for w in
-                        db.query(m.Word.id, m.Word.name).filter(m.Word.id.in_(linked_ids)).all()
-                    }
-                anaphoras.append({
-                    "id": ana.id, "is_highlight": bool(ana.is_highlight), "is_symbol": bool(ana.is_symbol),
-                    "items": [
-                        {
-                            "id": item.id, "word_id": item.word_id, "name": item.name,
-                            "word_name": name_map.get(item.word_id) if item.word_id else None,
-                        }
-                        for item in item_rows
-                    ],
-                })
-
-            sentences.append({
-                "id": sent.id, "external_id": sent.external_id,
-                "original_sentence": sent.original_sentence,
-                "chinese_sentence": sent.chinese_sentence, "english_sentence": sent.english_sentence,
-                "audios": sent_audios, "anaphoras": anaphoras,
-            })
-
-        explanations.append({
-            "id": exp.id, "external_id": exp.external_id,
-            "chinese_explanation": exp.chinese_explanation, "english_explanation": exp.english_explanation,
-            "category_ids": category_ids, "pos_ids": pos_ids, "focus_ids": focus_ids,
-            "images": images, "sentences": sentences,
-        })
-
-    anaphora_item_refs = (
-        db.query(m.WordExplanationAnaphoraItem)
-        .filter(m.WordExplanationAnaphoraItem.word_id == word_id).count()
-    )
-    grammar_example_refs = (
-        db.query(m.GrammarExampleWord)
-        .filter(m.GrammarExampleWord.word_id == word_id).count()
-    )
-
-    tree = {
-        "id": word.id, "tribe_id": word.tribe_id,
-        "dialect": word.dialect or "", "name": word.name or "", "pinyin": word.pinyin or "",
-        "variant": word.variant or "", "formation_word": word.formation_word or "",
-        "derivative_root": word.derivative_root or "",
-        "frequency": word.frequency or 0, "hit": word.hit or 0,
-        "dictionary_note": word.dictionary_note or "", "word_img": word.word_img or "",
-        "is_derivative_root": bool(word.is_derivative_root), "is_image": bool(word.is_image),
-        "is_zuzucidian": bool(word.is_zuzucidian), "is_other_dialect": bool(word.is_other_dialect),
-        "source_ids": source_ids, "audios": audios, "explanations": explanations,
-    }
-    tree["content_hash"] = word_content_hash(tree)
-    tree["meta"] = {
-        "referenced_by_anaphora_items": anaphora_item_refs,
-        "referenced_by_grammar_examples": grammar_example_refs,
-    }
-    return tree
+    return _build_word_trees(db, [word])[word.id]
 
 
 def get_word_trees_for_tribe(db: Session, tribe_id: str) -> dict:
@@ -165,12 +42,20 @@ def get_word_trees_for_tribe(db: Session, tribe_id: str) -> dict:
     ORDER BY 查詢後依序從這個字典取值，這裡不預設排序。
     """
     words = db.query(m.Word).filter(m.Word.tribe_id == tribe_id).all()
+    return _build_word_trees(db, words)
+
+
+def _build_word_trees(db: Session, words: list) -> dict:
+    """給定詞條列（Word ORM 物件），整批查詢並組出 {word_id: 完整巢狀 JSON}。
+    get_word_tree()（單筆）與 get_word_trees_for_tribe()（整個族語）共用這一份。"""
     word_ids = [w.id for w in words]
     if not word_ids:
         return {}
 
-    # 跟 get_word_tree()（單筆版本）用同一份「sort_order 之後加 .id」排序
-    # 規則——理由見該函式對應段落的說明。
+    # 以下每個 .order_by() 都在 sort_order 之後加上 .id 當次要排序鍵——
+    # sort_order 相同或為 NULL 時，資料庫不保證原本的順序，沒有次要排序鍵的話
+    # 同一棵樹可能在不同的執行計畫下排出不同順序，導致 content_hash 不穩定
+    # （獨立審查找到的問題）。.id 是遞增主鍵，順序穩定。
     source_ids_by_word = {}
     for row in (
         db.query(m.WordSource).filter(m.WordSource.word_id.in_(word_ids))

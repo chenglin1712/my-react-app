@@ -19,6 +19,7 @@ from django.utils import timezone
 
 from config.roles import ANALYST, EDITOR
 
+from . import analytics_service as svc
 from .analytics_views import _join_date_to_local_date
 
 from .models import (
@@ -235,6 +236,8 @@ def _make_event(event_type, days_ago, uid="", tribe="", payload=None):
 class DashboardAnalyticsTest(TestCase):
     def setUp(self):
         self.client = Client()
+        svc.clear_join_date_cache()   # joinDate 掃描結果有 5 分鐘快取，各測試要從乾淨狀態開始
+        self.addCleanup(svc.clear_join_date_cache)
 
     def _get(self, query="", headers=None):
         url = f'/adminapi/analytics/dashboard/{query}'
@@ -758,6 +761,8 @@ def _monday_of(day):
 class RetentionAnalyticsTest(TestCase):
     def setUp(self):
         self.client = Client()
+        svc.clear_join_date_cache()
+        self.addCleanup(svc.clear_join_date_cache)
 
     def _get(self, query="", headers=None):
         url = f'/adminapi/analytics/retention/{query}'

@@ -184,6 +184,9 @@ def _disable_flag(key: str, status: dict) -> None:
             before={"enabled": True},
             after={"enabled": False, "budgetUsd": status["budgetUsd"], "spentUsd": status["spentUsd"]},
         )
+    # queryset.update() 不會觸發 post_save，要自己清旗標快取，關閉才會立刻生效
+    from . import flag_cache
+    flag_cache.invalidate()
     logger.critical(
         "[AIBudget] AI 月預算已超過（估算 $%.2f / 預算 $%.2f），已自動關閉功能 %s；需管理者在「功能開關」手動重新開啟",
         status["spentUsd"], status["budgetUsd"], key,

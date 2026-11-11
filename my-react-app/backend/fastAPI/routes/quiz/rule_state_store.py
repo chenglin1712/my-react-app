@@ -97,7 +97,7 @@ def _apply_to_state(state: RuleState, nonce: str, mutate: Callable[[RuleState], 
 
 
 def _check_key(uid: str, tribe: str) -> None:
-    if not uid or "/" in uid or len(uid) > 128 or tribe not in R._TRIBE_SLUGS:
+    if not uid or "/" in uid or len(uid) > 128 or tribe not in R.TRIBE_SLUGS:
         raise StoreError("invalid uid or tribe")
 
 
@@ -168,7 +168,8 @@ class FirestoreStore:
                     transaction.set(ref, state_to_doc(state))
                 return applied, result
 
-            # 最多嘗試 3 次（預設 5 次）：爭用時最壞等待約 6 秒；同一位使用者的作答是依序送出的，
+            # 最多嘗試 MAX_TRANSACTION_ATTEMPTS（5）次；爭用時這些重試只佔背景執行緒，呼叫端另有
+            # 3 秒等待上限（deadline.py），不會拖慢作答回應。同一位使用者的作答是依序送出的，
             # 只有多分頁／多裝置同時作答才會爭用，失敗就當這次沒有更新（StoreError），不影響作答。
             return run(self._db().transaction(max_attempts=MAX_TRANSACTION_ATTEMPTS))
         except StoreError:
