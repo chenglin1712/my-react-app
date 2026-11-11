@@ -10,14 +10,14 @@ django-redis==7.0.0
 redis==8.1.0
 
 # FastAPI / ASGI
-fastapi==0.162.0
+fastapi==0.162.2
 uvicorn==0.54.0
 python-multipart==0.0.33
 starlette==1.10.0
 slowapi==0.1.10
 
 # Database
-sqlalchemy==2.1.6
+sqlalchemy==2.1.8
 alembic==1.20.1
 dj-database-url==3.1.2
 psycopg2-binary==2.9.13
@@ -28,7 +28,7 @@ firebase-admin==7.7.0
 cryptography==50.0.2
 
 # AI / ML
-anthropic==2.3.0
+anthropic==2.6.0
 # torch/torchaudio must be installed together from pytorch.org with matching CUDA version.
 # Example (CPU): pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 # 這兩個不在 requirements.lock 裡（要從 PyTorch 自己的 index 裝）。
