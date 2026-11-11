@@ -116,12 +116,23 @@ const FavoritePage = () => {
     currentState.activeQuery, currentState.sortOrder, currentState.filterLetter, currentState.frequencyFilter,
   ]);
 
-  const filteredWords = currentTab
-    ? filterFavoriteWords(allWords, currentTab.content, currentState, selectedSubCategory)
-    : [];
+  // 收藏分類的內容轉成 Set：下面篩選、開頭字母、字卡的「已收藏」判斷都是成員查詢，
+  // 陣列的 includes 在迴圈裡會變成 O(詞數 × 收藏數)。
+  const currentContent = currentTab?.content;
+  const currentContentSet = useMemo(() => new Set(currentContent ?? []), [currentContent]);
+  // 這個分類裡、目前族語載入到的詞條
+  const tabWords = useMemo(() => allWords.filter(w => currentContentSet.has(w.name)), [allWords, currentContentSet]);
+
+  // 只在真正影響結果的條件變動時才重算（打搜尋字時 inputValue 每個字都變，但套用的是 activeQuery）
+  const { activeQuery, sortOrder, filterLetter, frequencyFilter } = currentState;
+  const hasCurrentTab = Boolean(currentTab);
+  const filteredWords = useMemo(() => (hasCurrentTab
+    ? filterFavoriteWords(allWords, currentContentSet, { activeQuery, sortOrder, filterLetter, frequencyFilter }, selectedSubCategory)
+    : []),
+  [hasCurrentTab, allWords, currentContentSet, activeQuery, sortOrder, filterLetter, frequencyFilter, selectedSubCategory]);
 
   // 開頭字母只列出這個收藏分類裡真的有的字母
-  const alphabet = deriveInitialLetters(currentTab ? allWords.filter(w => currentTab.content.includes(w.name)) : []);
+  const alphabet = useMemo(() => deriveInitialLetters(hasCurrentTab ? tabWords : []), [hasCurrentTab, tabWords]);
   const activeFilterParts = describeActiveFilters({
     filterLetter: currentState.filterLetter,
     frequencyFilter: currentState.frequencyFilter,
@@ -137,9 +148,7 @@ const FavoritePage = () => {
   };
 
   // 目前族語裡屬於這個收藏分類的詞數：切換族語後使用者容易以為收藏不見了，所以直接寫出來
-  const tribeFavoriteCount = currentTab
-    ? allWords.filter(w => currentTab.content.includes(w.name)).length
-    : 0;
+  const tribeFavoriteCount = currentTab ? tabWords.length : 0;
 
   // 其他族語各收藏幾個詞：收藏只存詞名、不分族語，要請後端對照各族語詞條。
   // 目前選的族語用畫面上實際的字卡數（即時、不必等後端）。
@@ -276,7 +285,7 @@ const FavoritePage = () => {
                   categoryId={currentTab.id}
                   playAudio={playAudio}
                   failedAudio={failedAudio}
-                  isFavorited={currentTab.content.includes(wordData.name)}
+                  isFavorited={currentContentSet.has(wordData.name)}
                 />
               </ErrorBoundary>
               </div>

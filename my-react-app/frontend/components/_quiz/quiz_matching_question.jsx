@@ -90,11 +90,13 @@ const MatchingQuestion = ({ question, answered, resultValue, onAnswer }) => {
         }
     };
 
+    // 已配對的外語詞先收成 Set：getButtonClass 每個按鈕都會問一次，不要每次重做 Object.values().includes()
+    const matchedWords = new Set(Object.values(matches));
     const getButtonClass = (word, isCn) => {
         if (isCn && selectedWord?.word === word && selectedWord.isCn) return "match-btn selected";
         if (!isCn && selectedWord?.word === word && !selectedWord.isCn) return "match-btn selected";
         if (isCn && matches[word]) return "match-btn matched";
-        if (!isCn && Object.values(matches).includes(word)) return "match-btn matched";
+        if (!isCn && matchedWords.has(word)) return "match-btn matched";
         return "match-btn";
     };
 

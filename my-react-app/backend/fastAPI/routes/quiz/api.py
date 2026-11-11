@@ -32,8 +32,8 @@ from .irt import (
     _refresh_irt_config_if_stale,
     compute_Dq_and_bw,
     compute_P_theta,
-    compute_normalized_freq_map,
     compute_smoothed_error_rate,
+    normalized_freq_map_for,
     update_theta,
 )
 from .repository import load_all_words, warm_cache
@@ -116,7 +116,7 @@ def generate_quiz_frontend(
         raise HTTPException(status_code=500, detail="No words in DB")
 
     user_model = _build_user_model(user_data.model_dump())
-    fprime_map = compute_normalized_freq_map(all_words)
+    fprime_map = normalized_freq_map_for(tribe_id, all_words)
     t_avg_all = _compute_avg_time(user_model)
     theta = user_model.get("ability", 0.5)
 
@@ -179,7 +179,7 @@ def submit_answer_frontend(
     # 研究事件要的「作答前預測」：必須在下面更新 type_stats／user_errors【之前】，用尚未包含這一題的統計算出來；
     # 下面計算 theta 用的 Ptheta 是更新之後的統計，含有這題的答案，不能拿來當前瞻預測。
     all_words = load_all_words(db, tribe_id)
-    fprime = compute_normalized_freq_map(all_words).get(word_name, 0.0)
+    fprime = normalized_freq_map_for(tribe_id, all_words).get(word_name, 0.0)
     pred_ability = _ability_prediction(user_model, word_name, t, fprime)
 
     # 更新 type_stats

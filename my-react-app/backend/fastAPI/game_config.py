@@ -47,13 +47,42 @@ _game_config_last_fetch = 0.0
 _game_config_lock = threading.Lock()
 
 
+# 後台回應的欄位名稱 → 本模組的全域變數名稱。
+_FIELD_TO_GLOBAL = {
+    "listening_questions_per_round": "LISTENING_QUESTIONS_PER_ROUND",
+    "listening_options_per_question": "LISTENING_OPTIONS_PER_QUESTION",
+    "sentence_questions_per_round": "SENTENCE_QUESTIONS_PER_ROUND",
+    "sentence_options_per_question": "SENTENCE_OPTIONS_PER_QUESTION",
+    "pronunciation_max_audio_mb": "PRONUNCIATION_MAX_AUDIO_MB",
+    "pronunciation_excellent_threshold": "PRONUNCIATION_EXCELLENT_THRESHOLD",
+    "pronunciation_good_threshold": "PRONUNCIATION_GOOD_THRESHOLD",
+    "pronunciation_fair_threshold": "PRONUNCIATION_FAIR_THRESHOLD",
+    "pronunciation_pass_threshold": "PRONUNCIATION_PASS_THRESHOLD",
+    "crossword_grid_size": "CROSSWORD_GRID_SIZE",
+    "crossword_min_word_length": "CROSSWORD_MIN_WORD_LENGTH",
+    "crossword_max_word_length": "CROSSWORD_MAX_WORD_LENGTH",
+    "crossword_words_per_round": "CROSSWORD_WORDS_PER_ROUND",
+    "crossword_compute_time_limit_seconds": "CROSSWORD_COMPUTE_TIME_LIMIT_SECONDS",
+}
+
+
+def _parse_game_config(data) -> dict:
+    """把後台回應整份解析成 {全域變數名稱: 數值}；缺欄位、不是整數（含 None、布林、小數）就丟 ValueError，
+    呼叫端因此一個全域變數都不會改——不能先改前幾個、再在中間失敗而留下「半新半舊」的設定。"""
+    if not isinstance(data, dict):
+        raise ValueError("game-config 回應不是物件")
+    parsed = {}
+    for field, name in _FIELD_TO_GLOBAL.items():
+        value = data.get(field)
+        # 後台每個欄位都是整數（PositiveSmallIntegerField）；題數、格數會拿去當 random.sample／range 的參數，
+        # 所以小數、NaN、Infinity、布林、字串、None 一律整份拒絕。
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(f"game-config 欄位 {field} 缺少或不是整數")
+        parsed[name] = value
+    return parsed
+
+
 def refresh_game_config_if_stale() -> None:
-    global LISTENING_QUESTIONS_PER_ROUND, LISTENING_OPTIONS_PER_QUESTION
-    global SENTENCE_QUESTIONS_PER_ROUND, SENTENCE_OPTIONS_PER_QUESTION
-    global PRONUNCIATION_MAX_AUDIO_MB, PRONUNCIATION_EXCELLENT_THRESHOLD
-    global PRONUNCIATION_GOOD_THRESHOLD, PRONUNCIATION_FAIR_THRESHOLD, PRONUNCIATION_PASS_THRESHOLD
-    global CROSSWORD_GRID_SIZE, CROSSWORD_MIN_WORD_LENGTH, CROSSWORD_MAX_WORD_LENGTH
-    global CROSSWORD_WORDS_PER_ROUND, CROSSWORD_COMPUTE_TIME_LIMIT_SECONDS
     global _game_config_last_fetch
 
     if time.monotonic() - _game_config_last_fetch < _GAME_CONFIG_TTL_SECONDS:
@@ -65,22 +94,8 @@ def refresh_game_config_if_stale() -> None:
         try:
             resp = requests.get(_GAME_CONFIG_URL, timeout=5, headers=DJANGO_INTERNAL_HEADERS)
             resp.raise_for_status()
-            data = resp.json()
-
-            LISTENING_QUESTIONS_PER_ROUND = data["listening_questions_per_round"]
-            LISTENING_OPTIONS_PER_QUESTION = data["listening_options_per_question"]
-            SENTENCE_QUESTIONS_PER_ROUND = data["sentence_questions_per_round"]
-            SENTENCE_OPTIONS_PER_QUESTION = data["sentence_options_per_question"]
-            PRONUNCIATION_MAX_AUDIO_MB = data["pronunciation_max_audio_mb"]
-            PRONUNCIATION_EXCELLENT_THRESHOLD = data["pronunciation_excellent_threshold"]
-            PRONUNCIATION_GOOD_THRESHOLD = data["pronunciation_good_threshold"]
-            PRONUNCIATION_FAIR_THRESHOLD = data["pronunciation_fair_threshold"]
-            PRONUNCIATION_PASS_THRESHOLD = data["pronunciation_pass_threshold"]
-            CROSSWORD_GRID_SIZE = data["crossword_grid_size"]
-            CROSSWORD_MIN_WORD_LENGTH = data["crossword_min_word_length"]
-            CROSSWORD_MAX_WORD_LENGTH = data["crossword_max_word_length"]
-            CROSSWORD_WORDS_PER_ROUND = data["crossword_words_per_round"]
-            CROSSWORD_COMPUTE_TIME_LIMIT_SECONDS = data["crossword_compute_time_limit_seconds"]
+            parsed = _parse_game_config(resp.json())  # 整份驗證完才動全域變數
+            globals().update(parsed)
         except Exception:
             logger.warning("[game_config] 無法從後台讀取遊戲參數，沿用目前值", exc_info=True)
         finally:

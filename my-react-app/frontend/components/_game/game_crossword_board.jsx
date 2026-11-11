@@ -71,6 +71,16 @@ const Game_crossword_board = forwardRef(({ tribe, disabled, onReadyChange }, ref
     () => (crosswordData ? crosswordData.grid_solution.map((row) => row.replace(/\s/g, "")) : []),
     [crosswordData],
   );
+  // 「列-欄」→ 該格起點的題目（取第一個符合的，與原本逐格 legend.find 的結果相同）；
+  // 原本每個格子都掃一遍 legend，格子數 × 題數次比較。
+  const numberLabels = useMemo(() => {
+    const labels = new Map();
+    for (const word of crosswordData?.legend ?? []) {
+      const key = `${word.start_row - 1}-${word.start_col - 1}`;
+      if (!labels.has(key)) labels.set(key, word);
+    }
+    return labels;
+  }, [crosswordData]);
   const cellClues = useMemo(
     () => (crosswordData ? buildCellClueMap(rows, crosswordData.legend) : new Map()),
     [crosswordData, rows],
@@ -217,9 +227,7 @@ const Game_crossword_board = forwardRef(({ tribe, disabled, onReadyChange }, ref
               const isNonInputCell = cell === "-";
 
               // 尋找此格子的數字
-              const numberLabel = crosswordData.legend.find(
-                (word) => word.start_row - 1 === rowIndex && word.start_col - 1 === colIndex,
-              );
+              const numberLabel = numberLabels.get(`${rowIndex}-${colIndex}`);
 
               return (
                 <div

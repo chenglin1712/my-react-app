@@ -113,6 +113,52 @@ def _load_tribe_words(db: Session, tribe: str) -> List[WordResult]:
     return _tribe_words_cache.get_or_compute(tribe, _compute)
 
 
+class _TribeIndex:
+    """某個族語的詞條清單（族語級快取）衍生出來的查詢索引，清單不變就只建一次：
+    - by_name：名稱 → 詞條（精確查詢 O(1)，原本每次掃全部）
+    - by_chinese：中文釋義 → 詞條（每個詞對同一個釋義只算一次）
+    - simple_names：與 words 一一對應的「去掉數字結尾」名稱（原本每次查詢對每個詞都重跑 regex）
+    - sorted_asc：依 _sort_key_name 升冪排好的清單（原本每個請求都重排；篩選不會改變相對順序）
+    - letters：開頭字母集合（原本每個請求都掃一遍）
+    所有結構的順序都與原本逐筆走訪 words 的順序一致，查詢結果不變。"""
+
+    def __init__(self, words: List[WordResult]):
+        self.words = words
+        self.simple_names = [simplify_tayal(w.name) for w in words]
+        self.by_name: Dict[Optional[str], List[WordResult]] = {}
+        self.by_chinese: Dict[str, List[WordResult]] = {}
+        letters = set()
+        for w in words:
+            self.by_name.setdefault(w.name, []).append(w)
+            seen = set()
+            for defin in (w.explanationItems or []):
+                gloss = defin.chineseExplanation
+                if gloss not in seen:
+                    seen.add(gloss)
+                    self.by_chinese.setdefault(gloss, []).append(w)
+            if w.explanationItems:  # 沒有釋義的詞不列入開頭字母（與 available_initial_letters 的規則一致）
+                first = (w.name or '')[:1].lower()
+                if first and (first.isalpha() or first in ("'", "’", "ʼ")):
+                    letters.add(first)
+        self.letters = sorted(letters)
+        self.sorted_asc = sorted(words, key=lambda w: _sort_key_name(w.name))
+
+
+# 每個族語一份 (建索引時用的清單, 索引)。清單快取失效重載時會是新的清單物件，
+# 「不是同一個清單物件」就重建，不需要另外通知失效。
+_tribe_index_cache: Dict[str, Tuple[List[WordResult], "_TribeIndex"]] = {}
+
+
+def _index_for(db: Session, tribe: str) -> "_TribeIndex":
+    words = _load_tribe_words(db, tribe)
+    entry = _tribe_index_cache.get(tribe)
+    if entry is not None and entry[0] is words:
+        return entry[1]
+    index = _TribeIndex(words)
+    _tribe_index_cache[tribe] = (words, index)  # 單一賦值
+    return index
+
+
 def warm_cache(db: Session) -> None:
     """在 app 啟動時預先為每個族語跑一次 _load_tribe_words，
     把全表掃描＋JSON parse 的成本放在部署當下，而不是留給第一批使用者的查詢請求承擔。"""
@@ -122,29 +168,21 @@ def warm_cache(db: Session) -> None:
 
 def search_by_chinese(db: Session, keyword: str, tribe: str = '泰雅語') -> Tuple[List[WordResult], List[str]]:
     """完全比對中文解釋"""
-    words = sorted(_load_tribe_words(db, tribe), key=lambda w: (w.name or "").lower())
-
-    results = []
-    matched_names = []
-
-    for word in words:
-        for defin in (word.explanationItems or []):
-            if defin.chineseExplanation == keyword:
-                matched_names.append(simplify_tayal(word.name))
-                results.append(word)
-                break
-
+    # 先用索引取出命中的幾筆，再只排這幾筆（以前是先排完整個族語、再逐詞逐釋義比較）。
+    # sorted 是穩定排序，命中的子集合排序結果與「先全排再篩選」相同。
+    results = sorted(_index_for(db, tribe).by_chinese.get(keyword, []), key=lambda w: (w.name or "").lower())
+    matched_names = [simplify_tayal(word.name) for word in results]
     return results, matched_names
 
 
 def fuzzy_search_by_chinese(db: Session, keyword: str, exclude_names: List[str], tribe: str = '泰雅語') -> Dict[str, List[WordResult]]:
     """模糊搜尋中文解釋"""
-    words = _load_tribe_words(db, tribe)
+    index = _index_for(db, tribe)
+    excluded = set(exclude_names)  # list 成員測試是 O(m)，轉成 set
     fuzzy_content = {}
 
-    for word in words:
-        name_simple = simplify_tayal(word.name)
-        if name_simple in exclude_names:
+    for word, name_simple in zip(index.words, index.simple_names):
+        if name_simple in excluded:
             continue
 
         for defin in (word.explanationItems or []):
@@ -155,27 +193,19 @@ def fuzzy_search_by_chinese(db: Session, keyword: str, exclude_names: List[str],
 
 def search(db: Session, keyword: str, tribe: str = '泰雅語') -> Tuple[List[WordResult], List[str]]:
     """完全比對族語"""
-    words = _load_tribe_words(db, tribe)
-
-    results = []
-    matched_names = []
-
-    for word in words:
-        if word.name == keyword:
-            matched_names.append(simplify_tayal(word.name))
-            results.append(word)
-
+    results = list(_index_for(db, tribe).by_name.get(keyword, []))
+    matched_names = [simplify_tayal(word.name) for word in results]
     return results, matched_names
 
 
 def fuzzy_search(db: Session, keyword: str, exclude_names: List[str], tribe: str = '泰雅語') -> Dict[str, List[WordResult]]:
     """模糊搜尋族語"""
-    words = _load_tribe_words(db, tribe)
+    index = _index_for(db, tribe)
+    excluded = set(exclude_names)
     fuzzy_content = {}
 
-    for word in words:
-        name_simple = simplify_tayal(word.name)
-        if name_simple in exclude_names:
+    for word, name_simple in zip(index.words, index.simple_names):
+        if name_simple in excluded:
             continue
 
         if keyword in (word.name or ""):
@@ -243,18 +273,19 @@ def search_all(
     tribe 級快取（見上方、app 啟動時已由 warm_cache() 預熱）的查詢路徑。改成沿用
     同一份快取後，篩選/排序/分頁全部改在這份已經解析好的清單上做，DB 查詢與逐詞
     組裝 WordResult 的成本只會在該 tribe 第一次被用到時付一次。"""
-    all_word_results = _load_tribe_words(db, tribe)
+    # 用已排好序的清單做篩選：篩選不會改變相對順序，所以不必每個請求都重排整個族語。
+    index = _index_for(db, tribe)
 
     favorite_names_set = set(favorite_names or [])
     filtered = [
-        wr for wr in all_word_results
+        wr for wr in index.sorted_asc
         if wr.explanationItems  # 沿用原本「沒有釋義的詞不列入查詢結果」的行為
         and (not letter or (wr.name or '').lower().startswith(letter.lower()))
         and (not frequency or _frequency_bucket(wr.frequency) == frequency)
         and _matches_category(wr, category)
         and (not favorites_only or wr.name in favorite_names_set)
     ]
-    ordered = _sort_words(filtered, sort_order)
+    ordered = list(reversed(filtered)) if sort_order == 'desc' else filtered
     total = len(ordered)
     page = ordered[offset:offset + limit] if limit is not None else ordered[offset:]
 
@@ -277,14 +308,7 @@ def available_initial_letters(db: Session, tribe: str = '泰雅語') -> List[str
     tribe 級快取）算出來，所以每一個字母點下去都一定有結果，也不需要我們替每個族語手寫字母表。
     只收字母與喉塞音撇號；開頭是連字號（詞綴）等符號的詞條不列入。注意只看第一個字元，
     ng、lj 這類雙字母拼寫的開頭會歸在 n、l 底下。"""
-    letters = set()
-    for wr in _load_tribe_words(db, tribe):
-        if not wr.explanationItems:  # 跟 search_all 一致：沒有釋義的詞不列入
-            continue
-        first = (wr.name or '')[:1].lower()
-        if first and (first.isalpha() or first in ("'", "’", "ʼ")):
-            letters.add(first)
-    return sorted(letters)
+    return list(_index_for(db, tribe).letters)  # 索引建立時已算好（族語清單不變就不重算）
 
 
 def count_words_by_tribe(db: Session, names: List[str]) -> Dict[str, int]:

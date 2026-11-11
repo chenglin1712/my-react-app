@@ -20,27 +20,34 @@ const getAlphabeticSortKey = (s) => s.replace(/^[^a-z]+/, '') || s;
  * 唯一呼叫端（wordFilterSort 本身的排序流程）就是靠反轉整個比較結果做到 desc，
  * 這裡沿用同一份既有行為，沒有另外變更。
  */
-function createWordComparator(sortOrder) {
+// 共用一個 Collator：localeCompare(b, undefined, 選項) 每次呼叫都要依選項建立比對器，
+// 排幾千筆時比較次數是 N·log N，重複建立的成本明顯；Intl.Collator.compare 的結果與它相同。
+const collator = new Intl.Collator(undefined, { sensitivity: 'base' });
+
+// 排序鍵（小寫名稱、去前綴的字母部分、是否非字母開頭）每個詞只算一次，
+// 不要在 comparator 裡每次比較都對兩邊重算一遍（decorate-sort-undecorate）。
+function toSortEntry(word) {
+  const first = (word.name || '').toLowerCase();
+  return { word, first, key: getAlphabeticSortKey(first), isPrefix: /^[^a-z]/.test(first) };
+}
+
+function createEntryComparator(sortOrder) {
   return (a, b) => {
-    const aFirst = (a.name || '').toLowerCase();
-    const bFirst = (b.name || '').toLowerCase();
-
-    const aKey = getAlphabeticSortKey(aFirst);
-    const bKey = getAlphabeticSortKey(bFirst);
-
-    const aIsPrefix = /^[^a-z]/.test(aFirst);
-    const bIsPrefix = /^[^a-z]/.test(bFirst);
-
     if (sortOrder === 'asc') {
-      if (aIsPrefix && !bIsPrefix) return 1;
-      if (!aIsPrefix && bIsPrefix) return -1;
-      return aKey.localeCompare(bKey, undefined, { sensitivity: 'base' }) || aFirst.localeCompare(bFirst, undefined, { sensitivity: 'base' });
+      if (a.isPrefix && !b.isPrefix) return 1;
+      if (!a.isPrefix && b.isPrefix) return -1;
+      return collator.compare(a.key, b.key) || collator.compare(a.first, b.first);
     }
 
-    if (aIsPrefix && !bIsPrefix) return -1;
-    if (!aIsPrefix && bIsPrefix) return 1;
-    return bKey.localeCompare(aKey, undefined, { sensitivity: 'base' }) || bFirst.localeCompare(aFirst, undefined, { sensitivity: 'base' });
+    if (a.isPrefix && !b.isPrefix) return -1;
+    if (!a.isPrefix && b.isPrefix) return 1;
+    return collator.compare(b.key, a.key) || collator.compare(b.first, a.first);
   };
+}
+
+/** 依詞條名稱排序（回傳新陣列，不改動輸入）；排序結果與逐次比較時才算鍵的舊寫法完全相同。 */
+function sortWordsByName(words, sortOrder) {
+  return words.map(toSortEntry).sort(createEntryComparator(sortOrder)).map((entry) => entry.word);
 }
 
 // 詞類篩選（Apple 化步驟 4-2）：詞條的任一個詞義的詞性等於所選值就算符合
@@ -67,7 +74,7 @@ export function filterAndSortWords(words, {
   partOfSpeech = '',
   sortOrder = 'asc',
 } = {}) {
-  return words
+  const matched = words
     .filter((w) => {
       const wordName = (w.name || '').toLowerCase();
       const matchesLetter = !filterLetter || wordName.startsWith(filterLetter);
@@ -84,8 +91,8 @@ export function filterAndSortWords(words, {
       const matchesPos = !partOfSpeech || hasPartOfSpeech(w, partOfSpeech);
 
       return matchesLetter && (!showOnlyFavorites || isFavorite) && matchesFrequency && matchesCategory && matchesPos;
-    })
-    .sort(createWordComparator(sortOrder));
+    });
+  return sortWordsByName(matched, sortOrder);
 }
 
 // 完全符合與相關符合的總筆數（結果結構：完全符合 { 詞: [條目] }，相關符合 { 詞: { 分類: [條目] } }），

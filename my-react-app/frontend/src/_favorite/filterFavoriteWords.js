@@ -21,8 +21,10 @@ function matchSearchCriteria(wordObj, query) {
 // 交給 utils/wordFilterSort.js 的共用函式處理開頭字母／詞頻／分類篩選與排序，
 // 跟搜尋頁、相機頁使用同一套排序規則（含 -、ʼ 前綴修正）。
 export function filterFavoriteWords(allWords, contentIds, state, selectedSubCategory) {
+  // 用 Set 查成員是 O(1)；contentIds 是陣列時（舊呼叫端）轉一次，不要在 filter 迴圈裡對陣列 includes。
+  const ids = contentIds instanceof Set ? contentIds : new Set(contentIds);
   const inTab = allWords.filter(
-    (w) => contentIds.includes(w.name) && matchSearchCriteria(w, state.activeQuery)
+    (w) => ids.has(w.name) && matchSearchCriteria(w, state.activeQuery)
   );
   return filterAndSortWords(inTab, {
     filterLetter: state.filterLetter,

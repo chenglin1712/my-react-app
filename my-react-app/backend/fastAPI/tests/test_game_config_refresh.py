@@ -105,3 +105,47 @@ def test_failed_fetch_still_updates_last_fetch_timestamp_to_avoid_hammering():
         game_config.refresh_game_config_if_stale()
 
     mock_get.assert_called_once()
+
+
+def _all_globals():
+    return {name: getattr(game_config, name) for name in game_config._FIELD_TO_GLOBAL.values()}
+
+
+def _refresh_with(payload):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = payload
+    with patch("fastAPI.game_config.requests.get", return_value=mock_response):
+        game_config.refresh_game_config_if_stale()
+
+
+def test_response_missing_a_field_changes_no_global_at_all():
+    """回歸測試（E11）：缺最後一個欄位時，前面欄位的新值也不能被套用（不能半新半舊）。"""
+    before = _all_globals()
+    payload = _fake_config_payload(listening_questions_per_round=99, crossword_grid_size=99)
+    del payload["crossword_compute_time_limit_seconds"]
+
+    _refresh_with(payload)
+
+    assert _all_globals() == before
+
+
+def test_response_with_wrong_types_changes_no_global_at_all():
+    before = _all_globals()
+    for bad in (None, "20", True, [20], 1.5, float("nan"), float("inf")):
+        game_config._game_config_last_fetch = 0.0
+        _refresh_with(_fake_config_payload(listening_questions_per_round=99, crossword_compute_time_limit_seconds=bad))
+        assert _all_globals() == before, f"bad={bad!r}"
+
+
+def test_response_that_is_not_an_object_changes_no_global():
+    before = _all_globals()
+    _refresh_with(["not", "an", "object"])
+    assert _all_globals() == before
+
+
+def test_complete_response_updates_every_field():
+    values = {field: 50 + i for i, field in enumerate(game_config._FIELD_TO_GLOBAL)}
+    _refresh_with(values)
+    for i, name in enumerate(game_config._FIELD_TO_GLOBAL.values()):
+        assert getattr(game_config, name) == 50 + i

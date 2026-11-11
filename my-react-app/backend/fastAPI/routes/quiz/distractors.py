@@ -28,7 +28,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import random
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Mapping
 
 from sqlalchemy.orm import Session
@@ -80,6 +80,17 @@ class TribeKit:
     # 這份詞庫的指紋（規則、採用的詞綴組合、詞庫大小）；出題當下記進題目 token，之後才知道
     # 一筆作答是依哪一版詞庫診斷的。測試手工組的 kit 可以不給。
     version: str = ""
+    # 每種規則（kind）支持度最高的前 MAX_SWAP_POOL 條。規則表建好之後不會變，不必每次造干擾項都重排；
+    # 第一次用到時才算、之後直接取。不參與比較／雜湊／repr，所以不影響 replace() 與測試手工組的 kit。
+    _swap_pools: dict = field(default_factory=dict, init=False, repr=False, compare=False)
+
+    def swap_pool(self, kind: str) -> tuple:
+        pool = self._swap_pools.get(kind)
+        if pool is None:
+            pool = tuple(sorted((r for r in self.rules if r.kind == kind),
+                                key=lambda r: (-self.rules[r], r))[:MAX_SWAP_POOL])
+            self._swap_pools[kind] = pool
+        return pool
 
     def is_known(self, norm: str) -> bool:
         return norm in self.lexicon or norm in self.attested
@@ -93,7 +104,9 @@ class TribeKit:
         return n >= MIN_PAIR_SAMPLES and wilson_upper(known, n) <= MAX_PAIR_HIT_UPPER
 
 
-_KITS: KeyedCache[str, TribeKit | None] = KeyedCache()
+# 資料不足、造不出詞庫的族語記成 _NO_KIT（KeyedCache 不快取 None，否則每次出題都會再全表掃描一遍）。
+_NO_KIT = object()
+_KITS: KeyedCache[str, "TribeKit | object"] = KeyedCache()
 
 
 def invalidate(tribe_id: str | None = None) -> None:
@@ -167,9 +180,15 @@ def _measure_pairs(kit: TribeKit) -> dict[tuple[M.MorphRule, M.MorphRule], tuple
 
 
 def get_kit(db: Session, tribe) -> TribeKit | None:
-    """每族語第一次用到時建立並快取。None＝這個族語資料不足、不出這種干擾項
-    （None 不會被快取，下次請求會重試——資料不足的族語重試成本是一次 words 查詢）。"""
-    return _KITS.get_or_compute(tribe.id, lambda: _build_kit(db, tribe.id, tribe.full_name))
+    """每族語第一次用到時建立並快取。None＝這個族語資料不足、不出這種干擾項。
+    「資料不足」也會被快取（負快取）：_build_kit 要掃全部詞條、建詞根配對與歸納規則才發現不夠，
+    不能每次出題都重做一遍；辭典或語料異動時 invalidate() 會一併清掉，下次再重新判斷。"""
+    def build():
+        built = _build_kit(db, tribe.id, tribe.full_name)
+        return _NO_KIT if built is None else built
+
+    kit = _KITS.get_or_compute(tribe.id, build)
+    return None if kit is _NO_KIT else kit
 
 
 # ---------------------------------------------------------------------------
@@ -210,10 +229,8 @@ def recover_rule_detail(kit: TribeKit, norm: str) -> tuple[str, M.MorphRule, boo
 
 
 def _swap_candidates(kit: TribeKit, root: str, rule0: M.MorphRule) -> list[tuple[str, M.MorphRule]]:
-    same_kind = sorted((r for r in kit.rules if r.kind == rule0.kind),
-                       key=lambda r: (-kit.rules[r], r))[:MAX_SWAP_POOL]
     out: list[tuple[str, M.MorphRule]] = []
-    for r in same_kind:
+    for r in kit.swap_pool(rule0.kind):
         # 中綴只換詞綴本身、位置沿用正確答案的位置（位置不同是另一種錯法，見 _shift_candidates）；
         # 否則會同時換了詞綴與位置，也可能套用超出這個詞根長度的位置（那樣 generate 出來其實是後綴形）。
         # 換成自己（造出的就是答案）或同一個中綴出現在不同位置，都由 _acceptable／take() 的去重處理。

@@ -30,10 +30,33 @@ class TokenOptions:
     policy: str = diagnosis.POLICY_BASELINE
 
 
+def _sample_others(all_words_list, exclude_names, k):
+    """從詞庫裡不放回地隨機抽 k 個名字不在 exclude_names 的詞（不足 k 個就回傳全部符合的）。
+    以前是先建出 N 個元素的新清單再整份洗牌、只取前 k 個，每題 O(N)；詞庫大時改成隨機取索引、
+    遇到被排除或重複的就略過，期望 O(k)。被排除的詞很多（異常情況）時退回完整做法，結果仍正確。"""
+    if k <= 0:
+        return []
+    n = len(all_words_list)
+    picked, tried = [], set()
+    attempts = 0
+    while len(picked) < k and len(tried) < n and attempts < 20 * k + 20:
+        attempts += 1
+        i = random.randrange(n)
+        if i in tried:
+            continue
+        tried.add(i)
+        candidate = all_words_list[i]
+        if candidate.name not in exclude_names:
+            picked.append(candidate)
+    if len(picked) < k:
+        pool = [o for o in all_words_list if o.name not in exclude_names]
+        picked = random.sample(pool, min(k, len(pool)))
+    return picked
+
+
 def _build_translate_options(w, all_words_list):
-    others = [o for o in all_words_list if o.name != w.name]
-    random.shuffle(others)
-    distractors = [_get_cn(o) for o in others[:3]]
+    others = _sample_others(all_words_list, {w.name}, 3)
+    distractors = [_get_cn(o) for o in others]
     correct_cn = _get_cn(w)
     opts = [correct_cn] + distractors
     random.shuffle(opts)
@@ -78,10 +101,9 @@ def _build_sentence_fill(w, all_words_list, distractor_source=None):
             sent_audio = sent_audios[0].get("fileId") if sent_audios else None
             engine = distractor_source.for_word(w.name, 3) if distractor_source is not None else []
             engine_words = {d.word for d in engine}
-            pool = [o for o in all_words_list if o.name != w.name and o.name not in engine_words]
-            random.shuffle(pool)
+            extra = _sample_others(all_words_list, {w.name} | engine_words, 3 - len(engine))
             distractors = [{"word": d.word, "audio": None} for d in engine]
-            distractors += [{"word": o.name, "audio": _get_audio(o)} for o in pool[:3 - len(engine)]]
+            distractors += [{"word": o.name, "audio": _get_audio(o)} for o in extra]
             options = [{"word": w.name, "audio": _get_audio(w)}] + distractors
             if engine:
                 # 引擎造的詞形沒有音檔；只要有任何一個，整題都不附音檔，免得「有沒有喇叭圖示」洩漏答案。
@@ -177,18 +199,20 @@ def _compute_avg_time(user_model: dict) -> float:
 
 def _score_candidates(all_words: List[WordDTO], user_model: dict, theta: float, t_avg_all: float, fprime_map: Dict[str, float]) -> list:
     candidates = []
+    # 題型統計只跟使用者有關、跟單詞無關：算一次就好（原本每個詞都重算一次，O(N·T)）。
+    # 各候選共用同一個 Dt_map 物件；下游只讀不改。
+    type_stats = user_model.get("type_stats", {})
+    Dt_map = {tname: compute_smoothed_error_rate(st.get("e",0), st.get("n",0)) for tname, st in type_stats.items()}
+    Dt_example = Dt_map.get("word-translate", 0.5)
+    a_q = irt.TYPE_AQ.get("word-translate",1.0)
     for w in all_words:
         name = w.name
         ue = user_model.get("user_errors", {}).get(name, {})
         e_w, n_w = ue.get("errors",0), ue.get("attempts",0)
         recent_results, recent_times = ue.get("recent_results", []), ue.get("recent_times", [])
         Dw = compute_smoothed_error_rate(e_w, n_w)
-        type_stats = user_model.get("type_stats", {})
-        Dt_map = {tname: compute_smoothed_error_rate(st.get("e",0), st.get("n",0)) for tname, st in type_stats.items()}
         fprime = fprime_map.get(name, 0.0)
-        Dt_example = Dt_map.get("word-translate", 0.5)
         Dq_example, bw_example = compute_Dq_and_bw(Dw, Dt_example, fprime)
-        a_q = irt.TYPE_AQ.get("word-translate",1.0)
         Ptheta_example = compute_P_theta(theta, bw_example, a_q, irt.DEFAULT_GUESS)
         Delta_w = compute_delta_w(recent_results, e_w, n_w)
         T_w = compute_Tw(recent_times, t_avg_all)

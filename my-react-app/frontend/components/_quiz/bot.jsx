@@ -99,6 +99,15 @@ const resetTimeText = (iso) => {
 
 const quotaMessage = (quota) => `今天的提問次數已用完，${resetTimeText(quota?.resetsAt)}重置。`;
 
+// 這則訊息之前最近的一則使用者訊息（重新產生／回饋要對照它）。從這則往前找、找到就停，
+// 不要為每則訊息都 slice + reverse 整個陣列（那會讓整段對話的渲染變成 O(訊息數²)）。
+const findPrecedingUserMessage = (messages, index) => {
+  for (let i = index - 1; i >= 0; i -= 1) {
+    if (messages[i].role === "user") return messages[i];
+  }
+  return undefined;
+};
+
 // 右下角懸浮聊天視窗（類似 Messenger）：非 modal，背景頁面仍可操作。
 // open=false 時視窗收合但保持掛載，對話內容與進行中的請求都不會遺失。
 const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => {
@@ -728,7 +737,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                                     <StudyPlanComponent plan={message.studyPlan} onClose={handleClose} onTracked={() => setTrackedPlanKey((key) => key + 1)} />
                                 )}
                                 {message.role === "bot" && message.sig && !message.streaming && !message.interrupted && (() => {
-                                    const precedingUser = messages.slice(0, index).reverse().find((m) => m.role === "user");
+                                    const precedingUser = findPrecedingUserMessage(messages, index);
                                     const actions = (
                                         <BotReplyActions
                                             text={stripLightMarkdown(message.text)}

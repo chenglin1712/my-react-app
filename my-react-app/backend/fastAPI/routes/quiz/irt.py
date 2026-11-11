@@ -180,7 +180,22 @@ def compute_normalized_freq_map(words: List[WordDTO]) -> Dict[str, float]:
     log_vals = [math.log(1 + (w.frequency or 0)) for w in words]
     max_log = max(log_vals) if log_vals else 1.0
     if max_log == 0: max_log = 1.0
-    return {w.name: math.log(1 + (w.frequency or 0)) / max_log for w in words}
+    # log 值上面已經算過一次，不要再算第二次（zip 與 words 一一對應）。
+    return {w.name: log_val / max_log for w, log_val in zip(words, log_vals)}
+
+# 每個族語一份：(算出這張表時用的詞庫清單, 結果)。load_all_words() 在詞庫快取失效重載時會回傳新的
+# 清單物件，所以只要「清單物件不是同一個」就重算，不需要另外通知失效。
+_freq_map_cache: Dict[object, tuple] = {}
+
+def normalized_freq_map_for(tribe_id, words: List[WordDTO]) -> Dict[str, float]:
+    """同 compute_normalized_freq_map，但同一份詞庫清單只算一次。每次作答原本都要對整個族語
+    （泰雅語約 6 千詞）重算一次，現在第一次之後是 O(1) 的字典查詢。"""
+    entry = _freq_map_cache.get(tribe_id)
+    if entry is not None and entry[0] is words:
+        return entry[1]
+    freq_map = compute_normalized_freq_map(words)
+    _freq_map_cache[tribe_id] = (words, freq_map)  # 單一賦值；同時有兩個請求各算一次也只是結果相同
+    return freq_map
 
 def compute_smoothed_error_rate(e_w: int, n_w: int, alpha0=None, beta0=None) -> float:
     # 預設值不能寫成 alpha0=ALPHA0：那會在 import 當下就把數值複製進函式，
