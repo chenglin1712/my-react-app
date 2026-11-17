@@ -206,6 +206,7 @@ describe('SearchPage 的空狀態與字母篩選（E-2）', () => {
     apiPost.mockResolvedValue({ all_results: { 0: [word('balay')] }, total: 1, available_letters: ['b', 'd', 'f'] });
     render(<SearchPage />);
     await screen.findByText('balay');
+    fireEvent.click(screen.getByRole('button', { name: /進階篩選/ }));
     const group = screen.getByRole('group', { name: '開頭字母' });
     expect(Array.from(group.querySelectorAll('button')).map((b) => b.textContent)).toEqual(['b', 'd', 'f']);
   });
@@ -214,6 +215,7 @@ describe('SearchPage 的空狀態與字母篩選（E-2）', () => {
     apiPost.mockResolvedValue({ all_results: { 0: [word('balay')] }, total: 1 });
     render(<SearchPage />);
     await screen.findByText('balay');
+    fireEvent.click(screen.getByRole('button', { name: /進階篩選/ }));
     const group = screen.getByRole('group', { name: '開頭字母' });
     ['d', 'f', 'j', 'v'].forEach((l) => expect(group.textContent).toContain(l));
   });
@@ -226,6 +228,7 @@ describe('SearchPage 的空狀態與字母篩選（E-2）', () => {
     ));
     render(<SearchPage />);
     await screen.findByText('balay');
+    fireEvent.click(screen.getByRole('button', { name: /進階篩選/ }));
     fireEvent.click(screen.getByRole('button', { name: 'b' }));
     await searchFor('zzzz');
 
@@ -256,6 +259,25 @@ describe('SearchPage 的空狀態與字母篩選（E-2）', () => {
     expect(call[1]).toEqual({ tribe: 'tayal', word: 'mafiloo' });
   });
 
+  test('查無結果：有以前段開頭的詞就列出「開頭相近的詞」，說明只是拼寫相近，點了就搜尋那個詞（P2-8）', async () => {
+    apiPost.mockImplementation((url, body) => {
+      if (body.keyword === 'zzzz') return Promise.resolve({ exact_match_results: [], fuzzy_match_results: {} });
+      // 前段「zzz」與點下去之後的完整詞「zzzab」都是關鍵字查詢，回應形狀要跟真實 API 一樣（有 exact／fuzzy 兩欄）
+      if (body.keyword === 'zzz' || body.keyword === 'zzzab') return Promise.resolve({ exact_match_results: [word('zzzab')], fuzzy_match_results: {} });
+      return Promise.resolve({ all_results: { 0: [word('balay')] }, total: 1, available_letters: ['b'] });
+    });
+    render(<SearchPage />);
+    await screen.findByText('balay');
+    await searchFor('zzzz');
+    expect(await screen.findByText(/以「zzz」開頭的詞/)).toBeInTheDocument();
+    expect(screen.getByText(/只是拼寫開頭相近，意思不一定相同/)).toBeInTheDocument();
+    // 換族語與（有篩選時的）清除篩選仍在：三種出路並存
+    expect(screen.getByRole('group', { name: /改用其他族語查/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /zzzab/ }));
+    await waitFor(() => expect(apiPost).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ keyword: 'zzzab' })));
+    expect(await screen.findByText('zzzab', { selector: '.word-card-toggle *, .list-group-item *' })).toBeInTheDocument();
+  });
+
   test('瀏覽全部詞條時篩選後 0 筆：說明目前條件，清除篩選後重新載入', async () => {
     apiPost.mockImplementation((url, body) => (
       body.letter
@@ -264,10 +286,11 @@ describe('SearchPage 的空狀態與字母篩選（E-2）', () => {
     ));
     render(<SearchPage />);
     await screen.findByText('balay');
+    fireEvent.click(screen.getByRole('button', { name: /進階篩選/ }));
     fireEvent.click(screen.getByRole('button', { name: 'c' }));
 
     expect(await screen.findByRole('heading', { name: '目前的條件下沒有符合的詞' })).toBeInTheDocument();
-    expect(screen.getByText(/開頭「c」/)).toBeInTheDocument();
+    expect(screen.getByText(/目前的篩選條件：開頭「c」/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '清除篩選' }));
     expect(await screen.findByText('balay')).toBeInTheDocument();
   });

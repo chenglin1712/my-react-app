@@ -4,13 +4,23 @@
 .yy-sk-list {
   display: grid;
   gap: var(--yy-space-3);
+  /* 跟真正的結果清單同寬同欄數（P2-2）；在查詢頁以外沒有 --search-list-max 就維持原本寬度 */
+  max-width: var(--search-list-max, none);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+@media (min-width: 1100px) {
+  .yy-sk-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .yy-sk-wordcard {
   display: grid;
   gap: var(--yy-space-2);
   align-content: start;
-  min-height: 124px;
+  min-height: 148px; /* 真實詞卡含一行例句預覽（P2-5）後的高度 */
   padding: var(--yy-space-4);
   background: var(--yy-calm-surface);
   border: var(--yy-border-width) solid var(--yy-calm-rule);
@@ -19,6 +29,7 @@
 .yy-sk-wordcard__name { width: 38%; height: 28px; }
 .yy-sk-wordcard__gloss { width: 24%; height: 20px; }
 .yy-sk-wordcard__meta { width: 16%; height: 16px; margin-top: var(--yy-space-2); }
+.yy-sk-wordcard__example { width: 72%; height: 14px; }
 
 .yy-sk-line { width: 100%; height: 14px; }
 .yy-sk-line--title { width: 62%; height: 20px; }

@@ -412,10 +412,11 @@ describe("動態規則不退回舊寫法", () => {
     expect(hits).toEqual([]);
   });
 
-  // 持續循環的動畫只允許「正在進行」的狀態指示：載入佔位、錄音中、等待回覆的跳動點、轉圈、游標閃爍。
+  // 持續循環的動畫只允許「正在進行」的狀態指示：載入佔位、錄音中、等待回覆的跳動點、轉圈、游標閃爍、發音播放中的波形
+  // （yy-audio-wave：只在播放中那一顆存在，播完即消失，減少動態時凍結成靜態波形）。
   // home-ticker-scroll 是例外：首頁跑馬燈是契約要求的內容（HOMEPAGE_CONTRACT.md 4.3），
   // 有可見的暫停鈕、滑過與聚焦暫停、減少動態時改靜態（見 Ticker.jsx 與 mastheadLook.test.js）。
-  const INFINITE_ALLOWED = ["home-ticker-scroll", "yy-skeleton-pulse", "yy-blink", "pron-pulse", "sentPulse", "listening-pulse", "pron-community-spin", "bot-bounce", "review-ai-bounce"];
+  const INFINITE_ALLOWED = ["home-ticker-scroll", "yy-skeleton-pulse", "yy-blink", "pron-pulse", "sentPulse", "listening-pulse", "pron-community-spin", "bot-bounce", "review-ai-bounce", "yy-audio-wave"];
 
   it("前台 CSS 的無限循環動畫只限狀態指示（白名單）", () => {
     const found = new Set();
@@ -659,5 +660,48 @@ describe("P1 新增動態規則", () => {
     expect(read("static", "css", "default", "theme-v2.css")).toMatch(/@keyframes yy-pop\s*\{\s*from\s*\{\s*transform:\s*scale\(0\.94\)/);
     // 說明視窗是鍵盤與按鈕直接觸發的，不加任何進出動畫
     expect(read("static", "css", "ui", "shortcutHelp.css")).not.toMatch(/animation|@keyframes/);
+  });
+});
+
+// P2：單詞詳情浮出與查詢頁的守門（DESIGN.md「單詞詳情浮出與查詢頁」）
+describe("P2 查詢頁規則", () => {
+  const read = (...p) => unify(readFileSync(join(FRONTEND, ...p), "utf8"));
+
+  it("背板 scrim 與模糊是 token，詳情背板直接覆寫 Bootstrap 的 background-color 與 .show 不透明度", () => {
+    const theme = read("static", "css", "default", "theme-v2.css");
+    expect(theme).toMatch(/--yy-scrim:/);
+    expect(theme).toMatch(/--yy-scrim-blur:/);
+    expect(theme).toMatch(/--yy-scrim-solid:/);
+    const sheet = read("static", "css", "_search", "wordSheet.css");
+    expect(sheet).toMatch(/\.word-sheet-backdrop[^{]*\{[^}]*background-color:\s*var\(--yy-scrim\)/);
+    expect(sheet).toMatch(/prefers-reduced-transparency/);
+  });
+
+  it("詳情：桌面是置中卡片（Modal），進場用彈簧加淡入、從 scale(0.9) 起、不從 0 起；減少動態時不位移", () => {
+    const sheet = read("static", "css", "_search", "wordSheet.css");
+    expect(sheet).toMatch(/\.word-sheet--center\.modal\.fade \.modal-dialog\s*\{[^}]*transform:\s*translateY\(24px\) scale\(0\.9\)/);
+    expect(sheet).toMatch(/\.word-sheet--center\.modal\.show \.modal-dialog\s*\{[^}]*var\(--ease-spring\)/);
+    expect(sheet.replace(/\/\*[\s\S]*?\*\//g, "")).not.toMatch(/scale\(0\)/);
+    expect(sheet).toMatch(/prefers-reduced-motion: reduce\)\s*\{\s*\.word-sheet--center\.modal\.fade,/);
+    expect(read("src", "_search", "components", "WordDetailSheet.jsx")).toMatch(/word-sheet word-sheet--center/);
+  });
+
+  it("結果清單兩欄只在 1100px 以上；詞卡上浮 3px 只在滑鼠（hover + fine pointer）", () => {
+    const css = read("static", "css", "_search", "index.css");
+    expect(css).toMatch(/@media \(min-width: 1100px\)\s*\{\s*\.search-page \.list-group\s*\{\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+    expect(css).toMatch(/@media \(hover: hover\) and \(pointer: fine\)\s*\{[^@]*translateY\(-3px\)/);
+  });
+
+  it("收藏愛心只動 transform 且一次性；減少動態時沒有彈跳", () => {
+    const css = read("static", "css", "ui", "favoriteButton.css");
+    expect(css).toMatch(/@keyframes yy-heart-pop[^}]*transform/);
+    expect(css).not.toMatch(/animation:[^;]*infinite/);
+    expect(css).toMatch(/prefers-reduced-motion: reduce\)\s*\{\s*\.yy-fav-heart\.is-pop\s*\{\s*animation:\s*none/);
+  });
+
+  it("詳情快捷鍵都登記在 shortcuts.js，近似詞畫面不宣稱語意相近", () => {
+    const sc = read("hooks", "shortcuts.js");
+    ["← →", "空白鍵", "Esc"].forEach((k) => expect(sc).toContain(`key: '${k}'`));
+    expect(read("src", "_search", "index.jsx")).toMatch(/只是拼寫開頭相近，意思不一定相同/);
   });
 });

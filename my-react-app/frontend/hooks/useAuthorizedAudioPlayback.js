@@ -32,12 +32,17 @@ export default function useAuthorizedAudioPlayback({
   const currentAudioRef = useRef(null);
   const [failedAudio, setFailedAudio] = useState(new Set());
   const [isPlaying, setIsPlaying] = useState(false);
+  // 正在播的是哪一個音檔、多長（秒；未知為 0）。詞卡與詳情面板用它畫「播放中」，只有那一顆會變
+  const [playingId, setPlayingId] = useState(null);
+  const [playingDuration, setPlayingDuration] = useState(0);
 
   const beginPlayback = useCallback(() => {
     generationRef.current += 1;
     stopAndRelease(currentAudioRef.current);
     currentAudioRef.current = null;
     setIsPlaying(false);
+    setPlayingId(null);
+    setPlayingDuration(0);
     return generationRef.current;
   }, []);
 
@@ -51,18 +56,23 @@ export default function useAuthorizedAudioPlayback({
     stopAndRelease(currentAudioRef.current);
     currentAudioRef.current = null;
     setIsPlaying(false);
+    setPlayingId(null);
+    setPlayingDuration(0);
   }, []);
 
   useEffect(() => {
-    // unmount 時比照手動停止的路徑，停止並釋放目前音檔，不留下未釋放的 blob URL。
+    // unmount 時比照手動停止的路徑，停止並釋放目前音檔，不留下未釋放的 blob URL；
+    // 世代也一併作廢，還在路上的請求回來後不會再播放或更新狀態。
     return () => {
+      generationRef.current += 1;
       stopAndRelease(currentAudioRef.current);
       currentAudioRef.current = null;
     };
   }, []);
 
-  const playAudio = useCallback(async (fileId) => {
-    if (!fileId || (rememberFailures && failedAudio.has(fileId))) return;
+  // force：重試時使用，略過「這個音檔曾經失敗」的記錄
+  const playAudio = useCallback(async (fileId, { force = false } = {}) => {
+    if (!fileId || (!force && rememberFailures && failedAudio.has(fileId))) return;
 
     const myGen = beginPlayback();
     const proxyUrl = audioBaseUrl + fileId;
@@ -83,15 +93,28 @@ export default function useAuthorizedAudioPlayback({
       return;
     }
 
+    const syncDuration = () => {
+      if (isCurrent(myGen)) setPlayingDuration(Number.isFinite(newAudio.duration) ? newAudio.duration : 0);
+    };
+    newAudio.onloadedmetadata = syncDuration;
     newAudio.onplay = () => {
-      if (isCurrent(myGen)) setIsPlaying(true);
+      if (isCurrent(myGen)) {
+        syncDuration();
+        setPlayingId(fileId);
+        setIsPlaying(true);
+      }
     };
     newAudio.onended = () => {
-      if (isCurrent(myGen)) setIsPlaying(false);
+      if (isCurrent(myGen)) {
+        setIsPlaying(false);
+        setPlayingId(null);
+        setPlayingDuration(0);
+      }
     };
     newAudio.onerror = () => {
       if (isCurrent(myGen)) {
         setIsPlaying(false);
+        setPlayingId(null);
         if (rememberFailures) setFailedAudio(prev => new Set([...prev, fileId]));
       }
     };
@@ -102,10 +125,22 @@ export default function useAuthorizedAudioPlayback({
       // reject 這個 promise——那不是真正的播放失敗，只有這次呼叫仍是最新一次時才算數。
       if (isCurrent(myGen)) {
         setIsPlaying(false);
+        setPlayingId(null);
         if (rememberFailures) setFailedAudio(prev => new Set([...prev, fileId]));
       }
     });
   }, [failedAudio, rememberFailures, audioBaseUrl, beginPlayback, isCurrent]);
 
-  return { playAudio, stopAudio, isPlaying, failedAudio, beginPlayback, isCurrent, currentAudioRef };
+  // 重試：先把這個音檔從失敗記錄拿掉，再強制播一次（失敗的話會重新被記錄）
+  const retryAudio = useCallback((fileId) => {
+    setFailedAudio((prev) => {
+      if (!prev.has(fileId)) return prev;
+      const next = new Set(prev);
+      next.delete(fileId);
+      return next;
+    });
+    return playAudio(fileId, { force: true });
+  }, [playAudio]);
+
+  return { playAudio, stopAudio, retryAudio, isPlaying, playingId, playingDuration, failedAudio, beginPlayback, isCurrent, currentAudioRef };
 }

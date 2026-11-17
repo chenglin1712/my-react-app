@@ -290,6 +290,17 @@
   }
 }
 
+/* 最近搜尋（P2-4）：圖示只是輔助，選項文字本身就說明了是什麼 */
+.spotlight-option-icon {
+  flex: none;
+  color: var(--yy-calm-text-sub);
+}
+
+.spotlight-option--clear {
+  border-top: 1px solid var(--yy-calm-rule);
+  color: var(--yy-calm-text-sub);
+}
+
 .spotlight-option-name {
   font-weight: 700;
   overflow-wrap: anywhere;
@@ -453,9 +464,27 @@
 
 /* ── 查詢結果：兩層卡片（Apple 化步驟 4-2）──────────────────────────────────
    上層是詞與詞義加播放、收藏；下層是詞性、分類與詞頻。卡片只有細框，沒有陰影。 */
+.search-page {
+  /* 結果區寬度（P2-2）：手機與窄螢幕維持 720px 單欄；桌面放寬並改兩欄，1366 與 1920 都不空曠也不擠 */
+  --search-list-max: 720px;
+}
+
+@media (min-width: 1100px) {
+  .search-page {
+    --search-list-max: 1040px;
+  }
+}
+
 .search-page .list-group {
   display: grid;
   gap: var(--yy-space-3);
+}
+
+/* DOM 順序即閱讀與 Tab 順序（逐列由左到右），不用 CSS order 重排 */
+@media (min-width: 1100px) {
+  .search-page .list-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .search-page .list-group > .list-group-item {
@@ -465,12 +494,41 @@
   color: var(--yy-calm-text);
   margin-bottom: 0;
   padding: var(--yy-space-3) var(--yy-space-4);
-  transition: border-color var(--dur-fast) var(--ease-out);
+  transition: border-color var(--dur-fast) var(--ease-out), transform var(--dur-press) var(--ease-out);
 }
 
+/* 詞卡手感（P2-5）：有滑鼠時 hover 輕浮 3px；按下詞卡本體（標題鈕）時 scale 0.97。觸控沒有 hover，所以不浮。 */
 @media (hover: hover) and (pointer: fine) {
   .search-page .list-group > .list-group-item:hover {
     border-color: var(--yy-calm-copper) !important;
+    transform: translateY(-3px);
+  }
+
+  /* 卡片抬起 3px 後，原本的下緣會露出卡片外；補一條同高的感應帶，指標停在下緣時不會因為卡片移開而來回抖動 */
+  .search-page .list-group > .list-group-item:hover::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    height: 3px;
+  }
+}
+
+.search-page .list-group > .list-group-item:has(.word-card-toggle:active) {
+  transform: scale(var(--yy-ui-press));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-page .list-group > .list-group-item,
+  .search-page .list-group > .list-group-item:has(.word-card-toggle:active) {
+    transform: none;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: reduce) {
+  .search-page .list-group > .list-group-item:hover {
+    transform: none;
   }
 }
 
@@ -488,14 +546,15 @@
 .search-page h2.h4.fw-bold {
   font-family: var(--yy-font-heading);
   font-size: var(--yy-text-lg);
-  max-width: 720px;
+  max-width: var(--search-list-max);
   margin: var(--yy-space-5) auto var(--yy-space-2);
   padding-bottom: var(--yy-space-1);
   border-bottom: 3px double var(--yy-calm-line);
 }
 
+/* 只有結果清單加寬；上面的搜尋框 .search-card 仍是 720px，視線集中在輸入處 */
 .search-page .list-group {
-  max-width: 720px;
+  max-width: var(--search-list-max);
   margin-right: auto;
   margin-left: auto;
 }
@@ -512,6 +571,12 @@
   flex-wrap: wrap;
   gap: var(--yy-space-2);
   margin-top: var(--yy-space-3);
+}
+
+.search-suggest-note {
+  margin: var(--yy-space-3) 0 0;
+  color: var(--yy-calm-text-sub);
+  font-size: var(--yy-text-sm);
 }
 
 .search-suggest-chip {

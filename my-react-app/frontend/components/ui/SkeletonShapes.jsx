@@ -18,6 +18,7 @@ export function WordCardSkeleton({ count = 4, label = "搜尋中…" }) {
           <Bar className="yy-sk-wordcard__name" />
           <Bar className="yy-sk-wordcard__gloss" />
           <Bar className="yy-sk-wordcard__meta" />
+          <Bar className="yy-sk-wordcard__example" />
         </div>
       ))}
     </div>

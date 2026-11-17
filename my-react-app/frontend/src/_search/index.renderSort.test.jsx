@@ -74,6 +74,7 @@ describe('SearchPage：完全符合／相關符合的展平與排序只在資料
     await waitFor(() => expect(screen.getByText('cyux')).toBeInTheDocument());
 
     const before = filterAndSortWords.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: /進階篩選/ }));
     fireEvent.click(screen.getByRole('button', { name: /排序/ }));
     await waitFor(() => expect(filterAndSortWords.mock.calls.length).toBeGreaterThan(before));
   });

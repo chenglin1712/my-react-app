@@ -47,6 +47,7 @@ describe('SearchPage「只顯示收藏」：收藏超過後端單次上限時分
     await waitFor(() => expect(apiPost).toHaveBeenCalled());
     apiPost.mockClear();
 
+    fireEvent.click(screen.getByRole('button', { name: /進階篩選/ }));
     fireEvent.click(screen.getByRole('button', { name: /只顯示收藏/ }));
 
     await waitFor(() => expect(screen.getByText('n1000')).toBeInTheDocument());

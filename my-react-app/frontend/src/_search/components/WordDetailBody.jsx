@@ -4,20 +4,25 @@ import StarRating from '../../../components/ui/StarRating';
 
 // 詞條詳情內容：詞頻、來源、異體、構詞、備註、各義項與例句（含音檔）。
 // 兩個地方共用：字卡原地展開（_camera 結果頁仍是這種）、單詞查詢的詳情 sheet。
-const WordDetailBody = ({ result, playAudio, playSentence, hasSentenceAudio, failedAudio }) => (
+// summary 為 true 時只畫例句（不畫詞頻、來源與義項標題）。
+const WordDetailBody = ({ result, playAudio, playSentence, hasSentenceAudio, failedAudio, summary = false }) => (
   <ListGroup variant="flush">
-    {Number(result.frequency) > 0 && <ListGroup.Item><strong>詞頻：</strong><StarRating frequency={result.frequency} /></ListGroup.Item>}
-    {result.sources?.length > 0 && <ListGroup.Item><strong>收錄來源：</strong>{Array.isArray(result.sources) ? result.sources.join('、') : result.sources}</ListGroup.Item>}
-    {result.variant && <ListGroup.Item><strong>異體詞：</strong>{result.variant}</ListGroup.Item>}
-    {result.formationWord && <ListGroup.Item><strong>構詞：</strong>{result.formationWord}</ListGroup.Item>}
-    {result.derivativeRoot && <ListGroup.Item><strong>衍生詞根：</strong>{result.derivativeRoot}</ListGroup.Item>}
-    {result.dictionaryNote?.replace(/[\r\n]+/g, '') && <ListGroup.Item><strong>備註：</strong>{result.dictionaryNote}</ListGroup.Item>}
+    {!summary && Number(result.frequency) > 0 && <ListGroup.Item><strong>詞頻：</strong><StarRating frequency={result.frequency} /></ListGroup.Item>}
+    {!summary && result.sources?.length > 0 && <ListGroup.Item><strong>收錄來源：</strong>{Array.isArray(result.sources) ? result.sources.join('、') : result.sources}</ListGroup.Item>}
+    {!summary && result.variant && <ListGroup.Item><strong>異體詞：</strong>{result.variant}</ListGroup.Item>}
+    {!summary && result.formationWord && <ListGroup.Item><strong>構詞：</strong>{result.formationWord}</ListGroup.Item>}
+    {!summary && result.derivativeRoot && <ListGroup.Item><strong>衍生詞根：</strong>{result.derivativeRoot}</ListGroup.Item>}
+    {!summary && result.dictionaryNote?.replace(/[\r\n]+/g, '') && <ListGroup.Item><strong>備註：</strong>{result.dictionaryNote}</ListGroup.Item>}
     {result.explanationItems?.map((def, i) => (
       <ListGroup.Item key={i}>
-        <p className="fw-bolder fs-5 mb-1">{def.chineseExplanation || ''}  {def.englishExplanation || ''}</p>
-        {def.category && def.category.length > 0 && <p className="mb-1"><strong>分類：</strong>{def.category}</p>}
-        {def.partOfSpeech && def.partOfSpeech.length > 0 && <p className="mb-1"><strong>詞性：</strong>{def.partOfSpeech}</p>}
-        {def.focus && def.focus.length > 0 && <p className="mb-1"><strong>焦點：</strong>{def.focus}</p>}
+        {!summary && (
+          <>
+            <p className="fw-bolder fs-5 mb-1">{def.chineseExplanation || ''}  {def.englishExplanation || ''}</p>
+            {def.category && def.category.length > 0 && <p className="mb-1"><strong>分類：</strong>{def.category}</p>}
+            {def.partOfSpeech && def.partOfSpeech.length > 0 && <p className="mb-1"><strong>詞性：</strong>{def.partOfSpeech}</p>}
+            {def.focus && def.focus.length > 0 && <p className="mb-1"><strong>焦點：</strong>{def.focus}</p>}
+          </>
+        )}
         {def.sentenceItems?.map((ex, ei) => {
           const hasText = ex.originalSentence?.trim() || ex.chineseSentence?.trim();
           if (!hasText) return null;

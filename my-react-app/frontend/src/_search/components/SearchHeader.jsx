@@ -2,6 +2,7 @@ import SearchSpotlight from './SearchSpotlight';
 import TribeSelector from './TribeSelector';
 import FilterPanel from './FilterPanel';
 import CategoryBar from '../../../components/ui/CategoryBar';
+import ActiveFilterChips from './ActiveFilterChips';
 
 // 搜尋頁最上方的區塊：標題、族語選擇器、搜尋框、篩選/排序面板、分類 Tabs。
 // 這一整塊很高（桌面約 500px），所以【不】釘在畫面上，照一般流程捲走；捲出去之後由
@@ -21,6 +22,7 @@ const SearchHeader = ({
   showCategories, setShowCategories,
   activeTab, setActiveTab,
   selectedSubCategory, setSelectedSubCategory,
+  activeFilterItems = [], onClearAllFilters,
 }) => (
   <div className="search-header-block" ref={headerRef}>
     <div className="search-hero-head yy-fade-up">
@@ -50,6 +52,8 @@ const SearchHeader = ({
         />
       </div>
     </div>
+
+    <ActiveFilterChips items={activeFilterItems} onClearAll={onClearAllFilters} />
 
     {/* 📂 分類Bar */}
     <CategoryBar

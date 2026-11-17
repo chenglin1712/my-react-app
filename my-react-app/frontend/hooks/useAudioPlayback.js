@@ -13,7 +13,7 @@ import { apiUrl } from "../utils/apiUrls";
 // 單一音檔的播放（generation token 取消機制、失敗記錄、unmount 清理）交給
 // useAuthorizedAudioPlayback；這裡只再疊加 playSentence 的整句多段播放邏輯。
 export default function useAudioPlayback(selectedTribe, onError) {
-  const { playAudio, failedAudio, beginPlayback, isCurrent, currentAudioRef } = useAuthorizedAudioPlayback();
+  const { playAudio, stopAudio, retryAudio, playingId, playingDuration, failedAudio, beginPlayback, isCurrent, currentAudioRef } = useAuthorizedAudioPlayback();
 
   const playSentence = useCallback(async (sentence) => {
     const myGen = beginPlayback();
@@ -50,5 +50,5 @@ export default function useAudioPlayback(selectedTribe, onError) {
     }
   }, [selectedTribe, onError, beginPlayback, isCurrent, currentAudioRef]);
 
-  return { playAudio, playSentence, failedAudio };
+  return { playAudio, playSentence, stopAudio, retryAudio, playingId, playingDuration, failedAudio };
 }
