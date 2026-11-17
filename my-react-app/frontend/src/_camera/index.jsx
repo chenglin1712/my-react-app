@@ -1,9 +1,9 @@
 import { Camera } from "lucide-react";
-import { useState, useRef, useCallback, lazy, Suspense } from "react";
+import { useState, useRef, useCallback, useEffect, lazy, Suspense } from "react";
 import { Alert } from "react-bootstrap";
 import LoadingSpinner from "@components/ui/LoadingSpinner";
 import "../../static/css/_camera/wizard.css";
-import StepBar from "../../components/ui/StepBar";
+import CameraPrivacyNote from "./components/CameraPrivacyNote";
 import { useOnlineStatus } from "@hooks/useOnlineStatus";
 import OfflineNotice from "@components/ui/OfflineNotice";
 
@@ -13,8 +13,10 @@ import OfflineNotice from "@components/ui/OfflineNotice";
 const CameraLabelStep = lazy(() => import("./label"));
 const CameraResultStep = lazy(() => import("./result"));
 
-const STEP_LABELS = ["上傳圖片", "選擇單詞", "查詢結果"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+// 部分 Android／HEIC 的檔案 MIME type 是空字串，這時用副檔名做初步判斷，不能因為沒有 type 就當成不是圖片
+const IMAGE_EXT_RE = /\.(avif|heic|heif|jpe?g|png|webp|gif|bmp)$/i;
+const isImageFile = (f) => (f.type ? f.type.startsWith("image/") : IMAGE_EXT_RE.test(f.name || ""));
 
 const StepLoading = () => (
     <div className="camera-step-loading d-flex justify-content-center py-5">
@@ -31,6 +33,7 @@ const CameraWizard = () => {
     const [inputKey, setInputKey] = useState(Date.now());
     const [fileName, setFileName] = useState("請選擇圖片");
     const [errorMsg, setErrorMsg] = useState("");
+    const [dragging, setDragging] = useState(false);
     const [selectedWords, setSelectedWords] = useState([]);
     // 第 2 步辨識出的候選詞與勾選狀態：辨識是一次付費的 Vision 呼叫，從結果頁「回到選詞」時
     // 直接沿用，不重新辨識。換圖或重新上傳時清掉。
@@ -42,10 +45,10 @@ const CameraWizard = () => {
     // 沒有這個 generation 的話，晚到的 onloadend 會把預覽蓋回已經不對的那張圖。
     const fileReadGenerationRef = useRef(0);
 
-    const handleImageChange = (event) => {
-        const newFile = event.target.files.length > 0 ? event.target.files[0] : null;
-        if (newFile == null) {
-            setFileName(file ? file.name : "請選擇圖片");
+    // 選圖、拖放、貼上三種來源共用同一套驗證：只收圖片、上限 5MB，不合格都用文字說明原因
+    const acceptFile = (newFile) => {
+        if (!isImageFile(newFile)) {
+            setErrorMsg("不支援這個檔案格式，請選擇圖片檔（例如 JPG、PNG、WebP）。");
             return;
         }
         if (newFile.size > MAX_IMAGE_BYTES) {
@@ -64,6 +67,50 @@ const CameraWizard = () => {
         setFileName(newFile.name);
         setLabelState(null);
     };
+
+    const handleImageChange = (event) => {
+        const newFile = event.target.files.length > 0 ? event.target.files[0] : null;
+        if (newFile == null) {
+            setFileName(file ? file.name : "請選擇圖片");
+            return;
+        }
+        acceptFile(newFile);
+    };
+
+    // 拖放：dragover 要 preventDefault 才會收到 drop；離開時（含拖到子元素）只在真的離開取景框才取消高亮
+    const handleDragOver = (event) => {
+        if (!Array.from(event.dataTransfer?.types || []).includes("Files")) return;
+        event.preventDefault();
+        setDragging(true);
+    };
+    const handleDragLeave = (event) => {
+        if (event.currentTarget.contains(event.relatedTarget)) return;
+        setDragging(false);
+    };
+    const handleDrop = (event) => {
+        event.preventDefault();
+        setDragging(false);
+        const dropped = event.dataTransfer?.files?.[0];
+        if (dropped) acceptFile(dropped);
+    };
+
+    // 貼上圖片（截圖後直接 Ctrl／⌘ + V）：只在第 1 步、剪貼簿裡真的有檔案時處理，文字貼上不受影響
+    const acceptFileRef = useRef(acceptFile);
+    useEffect(() => { acceptFileRef.current = acceptFile; });
+    useEffect(() => {
+        if (step !== 1) return undefined;
+        const onPaste = (event) => {
+            // 焦點在輸入框或可編輯區時，貼上屬於那個欄位，不攔截
+            const target = event.target;
+            if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable) return;
+            const pasted = Array.from(event.clipboardData?.files || []).find(isImageFile);
+            if (!pasted) return;
+            event.preventDefault();
+            acceptFileRef.current(pasted);
+        };
+        document.addEventListener("paste", onPaste);
+        return () => document.removeEventListener("paste", onPaste);
+    }, [step]);
 
     const handleCancel = () => {
         fileReadGenerationRef.current += 1; // 還沒讀完的舊 FileReader 不再更新預覽
@@ -90,10 +137,6 @@ const CameraWizard = () => {
                     <h1 className="camera-title">影像辨識</h1>
                     <p className="camera-desc">拍下身邊的物件，讓 AI 找出對應的族語詞彙，打造專屬你的族語單字卡。</p>
                 </div>
-
-                <div className="yy-fade-up camera-stepbar-wrap">
-                    <StepBar steps={STEP_LABELS} current={step} variant="segments" />
-                </div>
             </section>
 
             <div className="yy-divider" />
@@ -101,9 +144,18 @@ const CameraWizard = () => {
             <section className="camera-body">
                 {step === 1 && (
                     <div className="yy-fade-up camera-step1">
-                        <label htmlFor="camera-file-input" className="camera-dropzone">
+                        <label
+                            htmlFor="camera-file-input"
+                            className={`camera-dropzone${dragging ? " is-dragging" : ""}`}
+                            tabIndex={0}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleAlbumClick(); } }}
+                            onDragOver={handleDragOver}
+                            onDragEnter={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                        >
                             {image ? (
-                                <img decoding="async" src={image} alt="預覽圖片" className="camera-dropzone-img" />
+                                <img key={fileName} decoding="async" src={image} alt="預覽圖片" className="camera-dropzone-img" />
                             ) : (
                                 <div className="camera-dropzone-placeholder">
                                     <Camera size={44} strokeWidth={2} aria-hidden="true" />
@@ -112,7 +164,7 @@ const CameraWizard = () => {
                             )}
                             {/* 取景框上的玻璃提示：浮在圖片或空框之上，說明這一步要做什麼（文字對比由毛玻璃材質的守門測試把關） */}
                             <span className="camera-dropzone-hint yy-glass" aria-hidden="true">
-                                {image ? "點擊可更換圖片" : "把想辨識的物件放在框內"}
+                                {dragging ? "放開就會使用這張圖片" : image ? "點擊可更換圖片" : "把想辨識的物件放在框內，或貼上圖片"}
                             </span>
                         </label>
 
@@ -148,14 +200,14 @@ const CameraWizard = () => {
                                 />
                                 {errorMsg && <Alert variant="danger" className="py-2 mt-2 mb-0">{errorMsg}</Alert>}
                                 <p className="camera-hint">支援常見圖片格式，檔案大小上限 5MB。</p>
-                                <p className="camera-privacy">
-                                    按下「提交辨識」後，圖片會上傳到本站伺服器，並送到 Google Cloud Vision 辨識圖中的物件。請避免上傳含有人臉、證件或個人資料的照片。
-                                </p>
+                                <CameraPrivacyNote />
                             </div>
                             <div className="camera-step1-actions">
                                 <button type="button" className="yy-btn-primary" disabled={!image || !online} aria-describedby={online ? undefined : "camera-offline"} onClick={() => setStep(2)}>提交辨識 ▸</button>
                                 <button type="button" className="yy-btn-outline" disabled={!image} onClick={handleCancel}>移除圖片</button>
                             </div>
+                            {/* 提交鈕旁永遠留一行簡短揭露：說明卡看過後會收起，但送出前資料的去向仍要看得到 */}
+                            <p className="camera-hint">提交後圖片會送到第三方（Google）辨識，詳見上方隱私說明。</p>
                             <OfflineNotice online={online} id="camera-offline" action="辨識圖片" />
                         </div>
                     </div>
@@ -180,6 +232,7 @@ const CameraWizard = () => {
                             selectedWords={selectedWords}
                             tribe={tribe}
                             onTribeChange={setTribe}
+                            image={image}
                             onBack={() => setStep(2)}
                             onRestart={restart}
                         />

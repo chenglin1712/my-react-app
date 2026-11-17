@@ -12,11 +12,15 @@ const STATUS_LABEL = {
 };
 
 // lang：族語文字的 HTML lang（ISO 639-3，由呼叫端依族群帶入，見 tribeLangCode）
-const GroundedText = ({ tokens = [], onTokenClick, activeIndex, lang = "und" }) => (
-    <p className="yy-grounded-text" lang={lang}>
+// reveal：結果剛出來時讓詞一個接一個淡入（P3-1）。後端是一次回完整結果，這只是畫面上的逐詞出現，不是真的串流；
+// 每個詞的延遲有上限（--gt-i 最多算到 24），再長的句子後半段一起出現，總時間不超過約 0.7 秒；減少動態時沒有動畫（見 CSS）。
+const MAX_STAGGER = 24;
+const GroundedText = ({ tokens = [], onTokenClick, activeIndex, lang = "und", reveal = false }) => (
+    <p className={`yy-grounded-text${reveal ? " is-revealing" : ""}`} lang={lang}>
         {tokens.map((t, i) => {
+            const stagger = reveal ? { "--gt-i": Math.min(i, MAX_STAGGER) } : undefined;
             if (t.status === "punct") {
-                return <span key={i} className="yy-gt-punct">{t.surface}</span>;
+                return <span key={i} className="yy-gt-punct" style={stagger}>{t.surface}</span>;
             }
             // 任何非標點的 token 都可以點開 EvidencePanel 查看細節（有佐證的看
             // 是哪個詞條/例句，無佐證的也能看到「查無佐證」的明確說明）。
@@ -29,6 +33,7 @@ const GroundedText = ({ tokens = [], onTokenClick, activeIndex, lang = "und" }) 
                     aria-pressed={activeIndex === i}
                     aria-label={t.status === "unsupported" ? `${t.surface}：${STATUS_LABEL.unsupported}` : undefined}
                     title={t.gloss || STATUS_LABEL[t.status] || undefined}
+                    style={stagger}
                     onClick={() => onTokenClick?.(i)}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTokenClick?.(i); } }}
                 >

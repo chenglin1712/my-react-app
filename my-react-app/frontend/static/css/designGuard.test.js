@@ -586,6 +586,9 @@ describe("寫死色碼只減不增（顏色一律走 token）", () => {
 // 遊戲專區（入口與選族語頁）已於 Apple 化步驟 4-5 移除族色，統一單一強調色，所以不在名單內
 const TRIBE_COLOR_CONSUMERS = [
   "components/ui/TribePill.jsx", // 選取中的小膠囊
+  "components/ui/TribeSegmented.jsx", // 族語分段控制：只用在字前面 8px 的小圓點（P3-2）
+  "src/_camera/result.jsx", // 把族色交給 TribeSegmented 當小圓點（P3）
+  "src/_translate/index.jsx", // 把族色交給 TribeSegmented 當小圓點（P3-1）
 ];
 const TRIBE_COLOR_USE = /\b(?:tribe|t|activeTribeData|tribeData)\??\.(?:color|textColor)\b|--tribe-color/;
 // 補抓別名與解構：檔案有引入族群資料，又讀了 color／textColor（const { color } = tribe 之類）
@@ -703,5 +706,52 @@ describe("P2 查詢頁規則", () => {
     const sc = read("hooks", "shortcuts.js");
     ["← →", "空白鍵", "Esc"].forEach((k) => expect(sc).toContain(`key: '${k}'`));
     expect(read("src", "_search", "index.jsx")).toMatch(/只是拼寫開頭相近，意思不一定相同/);
+  });
+});
+
+// P3：翻譯與影像辨識的守門（DESIGN.md「翻譯與影像辨識」）
+describe("P3 翻譯與影像辨識規則", () => {
+  const readCss = (rel) => stripCss(readFileSync(join(FRONTEND, "static/css", rel), "utf8"));
+  const readSrc = (rel) => readFileSync(join(FRONTEND, rel), "utf8");
+
+  it("分段控制：指示塊只用 transform 位移，過衝被裁切層擋住，減少動態不過場", () => {
+    const css = readCss("ui/tribeSegmented.css");
+    expect(css).toMatch(/\.yy-seg__thumb\s*\{[^}]*transform:\s*translateX\(/);
+    expect(css).not.toMatch(/\.yy-seg__thumb\s*\{[^}]*transition:[^;]*\b(width|left)\b/);
+    expect(css).toMatch(/\.yy-seg__clip\s*\{[^}]*overflow:\s*hidden/);
+    expect(css).toMatch(/prefers-reduced-motion:\s*reduce\)\s*\{\s*\.yy-seg__thumb\s*\{\s*transition:\s*none/);
+  });
+
+  it("辨識光帶：只掃一次、不無限循環、減少動態時不顯示；標籤依序浮現的總延遲有上限", () => {
+    const css = readCss("_camera/stage.css");
+    expect(css).toMatch(/camera-scan-once[^;]*\b1 forwards/);
+    expect(css).not.toMatch(/infinite/);
+    expect(css).toMatch(/prefers-reduced-motion:\s*reduce\)\s*\{\s*\.camera-scan\s*\{\s*display:\s*none/);
+    expect(css).toMatch(/min\(var\(--i, 0\), 8\)/);
+  });
+
+  it("舞台只用 transform／opacity 做動態，不動 top／left／width／height", () => {
+    const css = readCss("_camera/stage.css");
+    for (const m of css.matchAll(/@keyframes[^{]+\{([\s\S]*?\n\})/g)) {
+      expect(m[1]).not.toMatch(/\b(top|left|right|bottom|width|height|margin|padding)\s*:/);
+    }
+  });
+
+  it("影像辨識不假裝有定位：舞台元件不用座標、不畫框", () => {
+    const stage = readSrc("src/_camera/components/CameraStage.jsx");
+    expect(stage).not.toMatch(/boundingPoly|bbox|boundingBox|vertices/i);
+    expect(readCss("_camera/stage.css")).not.toMatch(/camera-box|bounding/);
+  });
+
+  it("隱私說明全文保留 Google Cloud Vision，提交鈕旁永遠有簡短揭露", () => {
+    expect(readSrc("src/_camera/components/CameraPrivacyNote.jsx")).toMatch(/Google Cloud Vision/);
+    expect(readSrc("src/_camera/index.jsx")).toMatch(/圖片會送到第三方（Google）辨識/);
+  });
+
+  it("翻譯輸入：維持 300 字上限、組字中不送出", () => {
+    const src = readSrc("src/_translate/index.jsx");
+    expect(src).toMatch(/const MAX_LEN = 300/);
+    expect(src).toMatch(/composingRef\.current/);
+    expect(src).toMatch(/keyCode === 229/);
   });
 });

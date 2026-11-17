@@ -162,7 +162,7 @@ describe("等寬數字", () => {
       ["_game/pronunciation-community.css", ".pron-community-score"],
       ["_game/listening.css", ".listening-result-score"],
       ["_game/sentence.css", ".sent-result-score"],
-      ["_camera/wizard.css", ".camera-label-score"],
+      ["_camera/stage.css", ".camera-chip-score"],
     ];
     owners.forEach(([file, selector]) => {
       const found = allFiles.find((f) => f.file === file);

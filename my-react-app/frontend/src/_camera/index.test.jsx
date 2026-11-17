@@ -152,11 +152,10 @@ describe('CameraWizard 的入口與說明（E-4）', () => {
   });
 });
 
-describe('CameraWizard 的進度條與取景框提示（Apple 化步驟 4-4）', () => {
-  test('進度條是分段變體，第一步是目前步驟', () => {
+describe('CameraWizard 的取景框提示（Apple 化步驟 4-4、P3-5）', () => {
+  test('不再有分頁式的步驟條：狀態改由舞台上的文字提示說明', () => {
     const { container } = render(<CameraWizard />);
-    expect(container.querySelector('.yy-stepbar--segments')).not.toBeNull();
-    expect(container.querySelector('.yy-segstep.is-active')).toHaveTextContent('上傳圖片');
+    expect(container.querySelector('.yy-stepbar')).toBeNull();
   });
 
   test('取景框上有玻璃提示，還沒選圖時說明要做什麼；提示不進無障礙樹（真正的標籤是上傳區的文字）', () => {

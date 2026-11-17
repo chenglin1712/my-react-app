@@ -1,0 +1,189 @@
+/* 影像辨識舞台（P3-5～P3-8）。只用 token；動態只動 transform 與 opacity，減少動態時全部關掉。 */
+
+.camera-stage {
+    position: relative;
+    width: 100%;
+    max-width: 560px;
+    aspect-ratio: 4 / 3;
+    margin: 0 auto;
+    overflow: hidden;
+    border-radius: var(--yy-radius-block);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    background: var(--yy-calm-info-bg);
+}
+
+.camera-stage.is-compact {
+    aspect-ratio: 16 / 9;
+    max-width: 420px;
+    margin-bottom: var(--yy-space-4);
+}
+
+.camera-stage-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* 舞台上方的狀態提示：玻璃膠囊，不遮住圖片主體（貼在上緣、單行） */
+.camera-stage-hint {
+    position: absolute;
+    top: var(--yy-space-3);
+    right: var(--yy-space-3);
+    left: var(--yy-space-3);
+    z-index: 2;
+    margin: 0;
+    padding: var(--yy-space-2) var(--yy-space-3);
+    border-radius: var(--yy-radius-pill);
+    color: var(--yy-calm-text);
+    font-size: var(--yy-text-sm);
+    font-weight: 700;
+    text-align: center;
+    pointer-events: none;
+}
+
+/* 浮在圖上的標籤：排在下緣，標籤多時往上長、超過一半高度就在這層裡捲動，不會把圖蓋滿 */
+.camera-stage-layer {
+    position: absolute;
+    right: var(--yy-space-3);
+    bottom: var(--yy-space-3);
+    left: var(--yy-space-3);
+    z-index: 2;
+    max-height: 45%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.camera-chips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--yy-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.camera-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--yy-space-2);
+    min-height: var(--yy-control-md);
+    padding: 0 var(--yy-space-4);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
+    border-radius: var(--yy-radius-pill);
+    color: var(--yy-calm-text);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+}
+
+.camera-chip:active {
+    transform: scale(var(--yy-ui-press));
+}
+
+.camera-chip:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+.camera-chip.is-active {
+    background: var(--yy-calm-accent);
+    border-color: var(--yy-calm-accent);
+    color: var(--yy-calm-accent-on);
+}
+
+.camera-chip-score {
+    font-size: var(--yy-text-sm);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.8;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .camera-chip:not(.is-active):hover {
+        background: var(--yy-calm-info-bg);
+    }
+}
+
+/* 辨識中：光帶由上掃到下，只掃一次（iteration-count 1），掃完停在畫面外。光帶只有一條細線，不蓋住圖片內容 */
+.camera-scan {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.camera-scan-beam {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 100%;
+    border-bottom: 3px solid var(--yy-calm-accent);
+    transform: translateY(-100%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .camera-scan-beam {
+        animation: camera-scan-once 1600ms var(--ease-drawer) 1 forwards;
+    }
+
+    /* 標籤依序浮現：每個標籤晚 40ms，最多算到第 8 個（總共不到 0.35 秒，之後的一起出現）；
+       等待期間標籤還看不見但已在畫面上，所以延遲要短 */
+    .camera-chips > li {
+        animation: camera-chip-in 240ms var(--ease-out) both;
+        animation-delay: calc(min(var(--i, 0), 8) * 40ms);
+    }
+}
+
+/* 減少動態：不掃，只留文字提示；光帶整個不顯示，不留任何細線 */
+@media (prefers-reduced-motion: reduce) {
+    .camera-scan {
+        display: none;
+    }
+}
+
+/* 掃完淡出，不會停在舞台底部變成一條固定的框線；之後由文字提示說明進度 */
+@keyframes camera-scan-once {
+    0% {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    10% {
+        opacity: 1;
+    }
+    88% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 0;
+    }
+}
+
+@keyframes camera-chip-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .camera-chip:active {
+        transform: none;
+    }
+}
+
+@media (forced-colors: active) {
+    .camera-chip.is-active {
+        outline: 2px solid Highlight;
+    }
+}

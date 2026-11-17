@@ -38,6 +38,8 @@ const FILES = {
   translate: "_translate/index.css",
   wizard: "_camera/wizard.css",
   result: "_camera/result.css",
+  seg: "ui/tribeSegmented.css", // 族語分段控制（P3-2）：查詢頁與翻譯頁共用
+  stage: "_camera/stage.css", // 影像辨識舞台（P3-5～P3-8）
 };
 const css = Object.fromEntries(Object.entries(FILES).map(([k, f]) => [k, strip(read(f))]));
 const rules = Object.fromEntries(Object.entries(css).map(([k, v]) => [k, parse(v)]));
@@ -60,25 +62,26 @@ describe("三頁共通", () => {
 });
 
 describe("單詞查詢", () => {
-  it("族語選擇器是分段控制：淡底圓角軌道、窄螢幕可橫向捲動不換行", () => {
-    const track = find.search(".tribe-selector").body;
-    expect(track).toMatch(/background:\s*var\(--yy-calm-info-bg\)/);
-    expect(track).toMatch(/border-radius:\s*var\(--yy-radius-pill\)/);
-    expect(track).toMatch(/overflow-x:\s*auto/);
-    expect(track).not.toMatch(/flex-wrap:\s*wrap/);
-    expect(find.search(".tribe-btn").body).toMatch(/flex:\s*0 0 auto/);
+  it("族語選擇器：外層只置中；分段控制是共用元件，軌道是圓角、窄螢幕可橫向捲動不換行", () => {
+    expect(find.search(".tribe-selector").body).toMatch(/justify-content:\s*center/);
+        expect(find.seg(".yy-seg").body).toMatch(/overflow-x:\s*auto/);
+    expect(find.seg(".yy-seg__track").body).toMatch(/border-radius:\s*var\(--yy-radius-pill\)/);
+    expect(find.seg(".yy-seg__track").body).toMatch(/grid-template-columns:\s*repeat\(var\(--seg-n\),\s*minmax\(var\(--seg-min\),\s*1fr\)\)/);
+    expect(find.seg(".yy-seg__track").body).not.toMatch(/flex-wrap:\s*wrap/);
   });
 
-  it("族語按鈕至少 44px 高、選取靠底色不位移、按下縮放、有焦點框", () => {
-    expect(find.search(".tribe-btn").body).toMatch(/min-height:\s*var\(--yy-control-md\)/);
-    expect(find.search(".tribe-btn.active").body).not.toMatch(/transform/);
-    expect(find.search(".tribe-btn.active").body).toMatch(/background:\s*var\(--yy-calm-accent\)/);
-    expect(find.search(".tribe-btn:active").body).toMatch(/scale\(var\(--yy-ui-press\)\)/);
-    expect(find.search(".tribe-btn:focus-visible").body).toMatch(/outline:\s*var\(--yy-ui-focus-ring\)/);
+  it("族語分段：至少 44px 高、指示塊只用 transform 位移（不動 width／left）、按下縮放、有焦點框", () => {
+        expect(find.seg(".yy-seg__item").body).toMatch(/min-height:\s*var\(--yy-control-md\)/);
+    expect(find.seg(".yy-seg__thumb").body).toMatch(/transform:\s*translateX\(calc\(var\(--seg-i\) \* 100%\)\)/);
+    expect(find.seg(".yy-seg__thumb").body).toMatch(/transition:\s*transform /);
+    expect(find.seg(".yy-seg__thumb").body).toMatch(/background:\s*var\(--yy-calm-accent\)/);
+    expect(find.seg(".yy-seg__item:active").body).toMatch(/scale\(var\(--yy-ui-press\)\)/);
+    expect(find.seg(".yy-seg__item:focus-visible").body).toMatch(/outline:\s*var\(--yy-ui-focus-ring\)/);
   });
 
-  it("選取的族語前面有勾，不只靠顏色", () => {
-    expect(find.search(".tribe-btn.active::before").body).toMatch(/content:\s*"\\2713" \/ ""/);
+  it("選取的族語有勾（元件內的 Check 圖示），高對比模式改用系統色框線", () => {
+    expect(readFileSync(join(ROOT, "..", "..", "components", "ui", "TribeSegmented.jsx"), "utf8")).toMatch(/<Check /);
+    expect(css.seg).toMatch(/forced-colors: active\)\s*\{[\s\S]*Highlight/);
   });
 
   it("各族語不再各自上色", () => {
@@ -163,7 +166,7 @@ describe("單詞查詢", () => {
 
   it("減少動態：精簡搜尋列不位移、按下不縮放", () => {
     expect(find.search(".search-compact-bar", /prefers-reduced-motion/).body).toMatch(/transform:\s*none/);
-    expect(find.search(".tribe-btn:active", /prefers-reduced-motion/).body).toMatch(/transform:\s*none/);
+    expect(find.seg(".yy-seg__thumb", /prefers-reduced-motion/).body).toMatch(/transition:\s*none/);
     expect(find.wordCard(".word-card-actions .btn:active", /prefers-reduced-motion/).body).toMatch(/transform:\s*none/);
   });
 });
@@ -178,10 +181,13 @@ describe("族語翻譯", () => {
     expect(pane).toMatch(/box-shadow:\s*var\(--yy-elev-2\)/);
   });
 
-  it("互換鈕在雙欄中間：三欄網格（左卡、鈕、右卡），窄螢幕疊成單欄、鈕夾在上下卡之間且箭頭轉 90 度；鈕至少 44px", () => {
-    expect(find.translate(".translate-grid").body).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\) auto minmax\(0, 1fr\)/);
+  it("雙欄：桌面左右各一張卡，窄螢幕疊成單欄；互換鈕搬到頂部語言列（箭頭一律左右向），鈕至少 44px；語言列桌面貼在導覽列下面、手機不固定", () => {
+    expect(find.translate(".translate-grid").body).toMatch(/grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
     expect(find.translate(".translate-grid", /max-width:\s*900px/).body).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\)/);
-    expect(find.translate(".translate-swap-btn svg", /max-width:\s*900px/).body).toMatch(/rotate\(90deg\)/);
+    expect(find.translate(".translate-swap-btn svg", /max-width:\s*900px/)).toBeUndefined();
+    expect(find.translate(".translate-langbar", /min-width:\s*900px/).body).toMatch(/position:\s*sticky/);
+    expect(find.translate(".translate-langbar", /min-width:\s*900px/).body).toMatch(/top:\s*var\(--translate-nav-h, 83px\)/);
+    expect(find.translate(".translate-langbar").body).not.toMatch(/position:\s*sticky/);
     expect(find.translate(".translate-swap-btn").body).toMatch(/width:\s*var\(--yy-control-md\)/);
     expect(find.translate(".translate-swap-btn").body).toMatch(/height:\s*var\(--yy-control-md\)/);
     expect(css.translate).not.toMatch(/translate-direction-bar/);
@@ -226,14 +232,14 @@ describe("影像辨識", () => {
   });
 
   it("標籤選項至少 44px 高，有按下縮放、焦點框，減少動態不縮放", () => {
-    expect(find.wizard(".camera-label-item").body).toMatch(/min-height:\s*var\(--yy-control-md\)/);
-    expect(find.wizard(".camera-label-item:active").body).toMatch(/scale\(var\(--yy-ui-press\)\)/);
-    expect(find.wizard(".camera-label-item:focus-visible").body).toMatch(/outline:\s*var\(--yy-ui-focus-ring\)/);
-    expect(find.wizard(".camera-label-item:active", /prefers-reduced-motion/).body).toMatch(/transform:\s*none/);
+    expect(find.stage(".camera-chip").body).toMatch(/min-height:\s*var\(--yy-control-md\)/);
+    expect(find.stage(".camera-chip:active").body).toMatch(/scale\(var\(--yy-ui-press\)\)/);
+    expect(find.stage(".camera-chip:focus-visible").body).toMatch(/outline:\s*var\(--yy-ui-focus-ring\)/);
+    expect(find.stage(".camera-chip:active", /prefers-reduced-motion/).body).toMatch(/transform:\s*none/);
   });
 
   it("信心分數仍用等寬數字", () => {
-    expect(find.wizard(".camera-label-score").body).toMatch(/font-variant-numeric:\s*tabular-nums/);
+    expect(find.stage(".camera-chip-score").body).toMatch(/font-variant-numeric:\s*tabular-nums/);
   });
 
   it("查詢結果頁與單詞查詢同為兩層卡片：細框、面板圓角、沒有陰影；卡片內展開的項目仍是細線列", () => {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { Check } from "lucide-react";
 import { Alert, Button } from "react-bootstrap";
 import { Link } from "react-router-dom";
 import LoadingSpinner from "@components/ui/LoadingSpinner";
@@ -7,6 +8,10 @@ import EmptyState from "@components/ui/EmptyState";
 import { apiPost } from "../../utils/apiClient";
 import { announce } from "@utils/announce";
 import { apiUrl } from "../../utils/apiUrls";
+import CameraStage from "./components/CameraStage";
+
+// 辨識超過這麼久還沒回來，舞台上的提示改成「還在辨識」的文字說明（光帶只掃一次，不會無限循環）
+const SLOW_AFTER_MS = 6000;
 
 // vision.py 自己的註解就寫明「圖片辨識同一批 label 常常出現重複的英文單字
 // （例如同一物件被偵測到多次）」，回傳前沒有去重。同一段中文翻譯出現兩筆時
@@ -49,6 +54,16 @@ const CameraLabelStep = ({ image, file, saved, onSave, onConfirm, onBack }) => {
     const [loading, setLoading] = useState(false);
     const [loaded, setLoaded] = useState(Boolean(reuse));
     const [attempt, setAttempt] = useState(0);
+    const [slow, setSlow] = useState(false);
+
+    useEffect(() => {
+        if (!loading) {
+            setSlow(false);
+            return undefined;
+        }
+        const timer = setTimeout(() => setSlow(true), SLOW_AFTER_MS);
+        return () => clearTimeout(timer);
+    }, [loading]);
 
     useEffect(() => {
         if (!file) {
@@ -107,11 +122,39 @@ const CameraLabelStep = ({ image, file, saved, onSave, onConfirm, onBack }) => {
         });
     };
 
+    // 舞台上的狀態提示：取代原本分頁式的步驟條，每個狀態都有文字（光帶只是輔助）
+    let stageHint = "";
+    if (loading) stageHint = slow ? "還在辨識中，圖片較大或網路較慢時會久一點，請再等一下" : "辨識中，請稍候…";
+    else if (error) stageHint = "辨識沒有成功，請看下方說明";
+    else if (loaded && labels.length === 0) stageHint = "沒有辨識出可以查的物件";
+    else if (loaded) stageHint = "點選想查的詞，可以複選";
+
     return (
         <div className="yy-fade-up camera-step2">
-            <div className="camera-step2-preview">
-                {image && <img decoding="async" src={image} alt="預覽圖片" />}
-            </div>
+            <CameraStage image={image} scanning={loading} hint={stageHint}>
+                {!error && labels.length > 0 && (
+                    // 標籤只代表「圖裡有這類東西」，沒有在圖上的位置（辨識服務不回座標），所以排在圖的下緣，不指著某個物件
+                    <ul className="camera-chips" aria-label="辨識出的候選單詞">
+                        {labels.map((label, index) => {
+                            const active = selectedLabels.has(label.description);
+                            return (
+                                <li key={index} style={{ "--i": Math.min(index, 12) }}>
+                                    <button
+                                        type="button"
+                                        className={`camera-chip yy-glass${active ? " is-active" : ""}`}
+                                        aria-pressed={active}
+                                        onClick={() => toggleLabelSelection(label.description)}
+                                    >
+                                        {active && <Check size={16} className="yy-icon" aria-hidden="true" />}
+                                        <span className="camera-label-name">{label.description}</span>
+                                        <span className="camera-chip-score">{(label.score * 100).toFixed(0)}%</span>
+                                    </button>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
+            </CameraStage>
 
             <div className="camera-step2-panel">
                 <h3 className="camera-step2-title">選擇欲查看之單詞</h3>
@@ -151,26 +194,6 @@ const CameraLabelStep = ({ image, file, saved, onSave, onConfirm, onBack }) => {
                         </ul>
                         <p>也可以直接到單詞查詢，用中文輸入想找的詞。</p>
                     </EmptyState>
-                )}
-                {!error && labels.length > 0 && (
-                    <div className="camera-label-list">
-                        {labels.map((label, index) => {
-                            const active = selectedLabels.has(label.description);
-                            return (
-                <button
-                                    type="button"
-                                    key={index}
-                                    className="camera-label-item"
-                                    aria-pressed={active}
-                                    style={active ? { background: 'var(--yy-red)', color: 'var(--yy-cream)' } : undefined}
-                                    onClick={() => toggleLabelSelection(label.description)}
-                                >
-                                    <span className="camera-label-name">{label.description}</span>
-                                    <span className="camera-label-score">{(label.score * 100).toFixed(0)}%</span>
-                                </button>
-                            );
-                        })}
-                    </div>
                 )}
 
                 <div className="camera-step2-actions">

@@ -92,15 +92,17 @@ describe('TranslatePage 的交換方向與文字（E-3）', () => {
     apiGet.mockResolvedValue({ tribes: [] });
   });
 
-  test('互換鈕在 DOM 裡夾在來源卡與結果卡之間（鍵盤與讀屏的閱讀順序），方向由兩張卡的標題列表達，按下後焦點回到輸入框', () => {
+  test('互換鈕在頂部語言列的方向區（來源標籤與目標標籤之間），在兩張卡片之前；方向由方向區與兩張卡的標題列表達，按下後焦點回到輸入框', () => {
     const { container } = renderPage();
     const source = screen.getByLabelText('輸入繁體中文原文').closest('.translate-pane');
     const swap = screen.getByRole('button', { name: '交換翻譯方向' });
+    const direction = screen.getByRole('group', { name: '翻譯方向' });
     const panes = container.querySelectorAll('.translate-pane');
     expect(panes).toHaveLength(2);
     expect(panes[0]).toBe(source);
-    expect(panes[0].compareDocumentPosition(swap) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(swap.compareDocumentPosition(panes[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(direction).toContainElement(swap);
+    expect(direction.textContent).toMatch(/繁體中文.*族語/);
+    expect(swap.compareDocumentPosition(panes[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(panes[0].querySelector('.translate-pane-head')).toHaveTextContent('繁體中文');
     expect(panes[1].querySelector('.translate-pane-head')).toHaveTextContent('族語');
 

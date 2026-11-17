@@ -16,16 +16,17 @@ import EmptyState from "@components/ui/EmptyState";
 import { describeActiveFilters } from "@utils/wordFilterState";
 import { deriveInitialLetters } from "@utils/wordLetters";
 import { Button } from "react-bootstrap";
-import TribePill from "../../components/ui/TribePill";
+import TribeSegmented from "../../components/ui/TribeSegmented";
 import { TRIBES } from "../constants/tribes";
 import { apiUrl } from "../../utils/apiUrls";
+import CameraStage from "./components/CameraStage";
 
 const WORD_FAVORITES_CATEGORY_ID = 1;
 
 // 影像辨識精靈第 3 步：查詢辨識出的單詞並顯示完整詞典結果。
 // selectedWords/tribe 由 index.jsx（精靈容器）傳入，取代原本從路由 state 讀取；
 // onRestart 取代原本「返回 /camera」的導頁，改成重置精靈狀態回到第 1 步。
-const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onRestart }) => {
+const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onRestart, image = null }) => {
   const [definitions, setDefinitions] = useState({ exact_match_results: {}, fuzzy_match_results: {} });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -115,6 +116,20 @@ const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onResta
   const activeFilterParts = describeActiveFilters({ filterLetter, frequencyFilter, showOnlyFavorites, selectedSubCategory });
   const hasRawResults = Object.keys(definitions.exact_match_results).length > 0 || Object.keys(definitions.fuzzy_match_results).length > 0;
   const noVisibleResults = exactMatchWords.length === 0 && fuzzyMatchWords.length === 0;
+  // 舞台上的詞標籤（P3-8）：點了就開這個詞的詞卡（和下面清單同一個詳情元件：可播放、可收藏、可加入單字卡）。
+  // 辭典裡找不到這個詞（沒有完全符合）就用文字說明，不是什麼都不發生。
+  const [chipNote, setChipNote] = useState("");
+  const openWordFromChip = (word) => {
+    const first = definitions.exact_match_results[word]?.[0];
+    if (!first) {
+      setChipNote(`辭典裡找不到「${word}」的詞條。`);
+      announce(`辭典裡找不到${word}`);
+      return;
+    }
+    setChipNote("");
+    const label = first.explanationItems?.[0]?.chineseExplanation || first.chineseExplanation || "";
+    openDetail({ keyName: `chip-${word}`, word: label, result: first, siblings: [] });
+  };
   const clearFilters = () => {
     setFilterLetter('');
     setFrequencyFilter('');
@@ -132,11 +147,27 @@ const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onResta
         </div>
       </div>
 
+      <CameraStage image={image} compact hint={loading ? "查詢中，請稍候…" : "點圖上的詞，可以看詞卡"}>
+        <ul className="camera-chips" aria-label="你選的單詞">
+          {selectedWords.map((word, index) => (
+            <li key={word} style={{ "--i": Math.min(index, 12) }}>
+              <button type="button" className="camera-chip yy-glass" disabled={loading} onClick={() => openWordFromChip(word)}>
+                <span className="camera-label-name">{word}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </CameraStage>
+      {chipNote && <p className="camera-chip-note" role="status">{chipNote}</p>}
+
       {/* 族語在這一步才有作用（查詢結果用哪個族語），所以放在這裡，切換會立刻重新查詢 */}
-      <div className="camera-tribe-row" role="group" aria-label="查詢的族語">
-        {TRIBES.map((t) => (
-          <TribePill key={t.slug} tribe={t} active={tribe === t.slug} onClick={() => onTribeChange(t.slug)} />
-        ))}
+      <div className="camera-tribe-row">
+        <TribeSegmented
+          label="查詢的族語"
+          items={TRIBES.map((t) => ({ value: t.slug, label: `${t.name}族語`, color: t.color }))}
+          value={tribe}
+          onChange={(slug) => onTribeChange?.(slug)}
+        />
       </div>
 
       <CameraFilterControls
