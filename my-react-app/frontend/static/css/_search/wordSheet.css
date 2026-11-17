@@ -118,6 +118,14 @@
   transition-duration: var(--dur-overlay-out);
 }
 
+/* 手機底部抽屜：進場用抽屜曲線，退場維持 --ease-out（P1-3） */
+.word-sheet--bottom.offcanvas {
+  transition-timing-function: var(--ease-drawer);
+}
+.word-sheet--bottom.offcanvas.hiding {
+  transition-timing-function: var(--ease-out);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .word-sheet.offcanvas,
   .word-sheet.offcanvas.hiding {

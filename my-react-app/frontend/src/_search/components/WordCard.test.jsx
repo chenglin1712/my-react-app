@@ -182,7 +182,7 @@ describe('WordCard 的詳情 sheet 模式（Apple 化步驟 4-2）', () => {
     expect(title).toHaveAttribute('aria-haspopup', 'dialog');
     expect(title).not.toHaveAttribute('aria-expanded');
     fireEvent.click(title);
-    expect(onOpenDetail).toHaveBeenCalledWith({ keyName: 'k1', word: '上面', result });
+    expect(onOpenDetail).toHaveBeenCalledWith({ keyName: 'k1', word: '上面', result }, expect.anything());
     expect(toggleExpand).not.toHaveBeenCalled();
   });
 

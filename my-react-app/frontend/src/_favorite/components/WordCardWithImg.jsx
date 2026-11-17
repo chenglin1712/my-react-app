@@ -1,7 +1,11 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from 'react-bootstrap';
-import { Heart, CirclePlay, Image as ImageIcon } from 'lucide-react';
+import { Heart, CirclePlay } from 'lucide-react';
 import StarRating from '../../../components/ui/StarRating';
+import AbstractCover from '../../../components/ui/AbstractCover';
+
+// 沒有圖片時的抽象封面：依單詞固定挑一個色調（同一個詞每次都一樣），清單看起來有變化但不閃動
+const placeholderTone = (word = '') => ([...String(word)].reduce((n, c) => n + c.charCodeAt(0), 0) % 4) + 1;
 
 const AudioButton = ({ audioUrl, onPlay, size, failedAudio }) => {
   if (!audioUrl || failedAudio?.has(audioUrl)) return null;
@@ -32,9 +36,7 @@ const WordCardImage = ({ imageUrl, word, isFavorited, onToggleFavorite }) => {
   return (
     <div className="word-image-wrapper">
       {showPlaceholder ? (
-        <div className="word-image word-image-placeholder" aria-hidden="true">
-          <ImageIcon size="1em" className="yy-icon" aria-hidden="true" />
-        </div>
+        <AbstractCover layout="keep" tone={placeholderTone(word)} lite entrance={false} className="word-image word-image-placeholder" />
       ) : (
         <img decoding="async"
           src={imageUrl}

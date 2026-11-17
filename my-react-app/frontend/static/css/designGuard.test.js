@@ -211,7 +211,7 @@ describe("硬偏移陰影", () => {
         const line = css.slice(0, m.index).split("\n").length;
         splitTop(m[2].replace(/!important/, "").trim(), ",").forEach((layer) => {
           const l = layer.trim();
-          if (l === "none" || /^var\(--yy-(?:elev|edge)-[0-4]\)$/.test(l) || l === "var(--yy-lit)") return; // --yy-lit：卡片上緣高光（P1-1），值由下面的專屬測試檢查
+          if (l === "none" || /^var\(--yy-(?:elev|edge)-[0-4]\)$/.test(l) || l === "var(--yy-lit)" || l === "var(--yy-cover-edge)" || l === "var(--yy-cover-drop)") return; // --yy-lit：卡片上緣高光（P1-1），值由下面的專屬測試檢查；--yy-cover-edge／-drop：抽象封面玻璃的亮邊與投影（P1-5），只定義在 abstractCover.css
           if (/^var\(--yy-keep-shadow(?:,\s*0 0 0 0 transparent)?\)$/.test(l)) return; // 玻璃焦點光暈「疊加」用的承接變數（值本身另由 glass.test.js 檢查）
           const lens = splitTop(l, " ").filter((t) => LEN.test(t));
           if (lens.length >= 3 && /^0(?:px)?$/.test(lens[2])) return; // 模糊為 0：細框、焦點圈、內描邊
@@ -627,5 +627,37 @@ describe("五族色只能當小標記", () => {
       }),
     );
     expect(hits).toEqual([]);
+  });
+});
+
+// P1-3 / P1-6 / P1-8：新增動態的守門（DESIGN.md「動態語法」與「骨架、空狀態、提示與快捷鍵」）
+describe("P1 新增動態規則", () => {
+  const read = (...p) => unify(readFileSync(join(FRONTEND, ...p), "utf8"));
+
+  it("抽屜曲線 --ease-drawer 在 :root 定義，手機底部抽屜進場用它、退場用 --ease-out（不過衝，底緣不露縫）", () => {
+    expect(read("static", "css", "default", "theme-v2.css")).toMatch(/--ease-drawer:\s*cubic-bezier\(0\.32,\s*0\.72,\s*0,\s*1\)/);
+    const sheet = read("static", "css", "_search", "wordSheet.css");
+    expect(sheet).toMatch(/\.word-sheet--bottom\.offcanvas\s*\{\s*transition-timing-function:\s*var\(--ease-drawer\);/);
+    expect(sheet).toMatch(/\.word-sheet--bottom\.offcanvas\.hiding\s*\{\s*transition-timing-function:\s*var\(--ease-out\);/);
+  });
+
+  it("詳情面板：鍵盤開啟（click 的 detail 為 0）不加動畫", () => {
+    expect(read("src", "_search", "index.jsx")).toMatch(/setSheetAnimated\(event\?\.detail !== 0\)/);
+    expect(read("src", "_search", "components", "WordDetailSheet.jsx")).toMatch(/animation=\{animated\}/);
+  });
+
+  it("共享元素轉場：只在滑鼠觸發、瀏覽器支援、非減少動態時啟動，其餘直接更新", () => {
+    const js = read("utils", "viewTransition.js");
+    expect(js).toMatch(/trigger !== 'pointer'/);
+    expect(js).toMatch(/supportsViewTransition\(\)/);
+    expect(js).toMatch(/reduced\(\)/);
+  });
+
+  it("toast 與快捷鍵說明視窗：減少動態時 CSS 取消動畫，且 toast 從 scale(.94) 起、不從 0 起", () => {
+    const toast = read("static", "css", "ui", "toast.css");
+    expect(toast).toMatch(/prefers-reduced-motion: reduce\)\s*\{\s*\.yy-toast,\s*\.yy-toast\.is-leaving\s*\{\s*animation:\s*none;/);
+    expect(read("static", "css", "default", "theme-v2.css")).toMatch(/@keyframes yy-pop\s*\{\s*from\s*\{\s*transform:\s*scale\(0\.94\)/);
+    // 說明視窗是鍵盤與按鈕直接觸發的，不加任何進出動畫
+    expect(read("static", "css", "ui", "shortcutHelp.css")).not.toMatch(/animation|@keyframes/);
   });
 });

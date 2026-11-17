@@ -75,6 +75,20 @@
   /* 卡片上緣高光 --yy-lit（P1-1）：淺色是 1px 白色內描邊，讓卡片像有一道受光的頂緣；跟 --yy-elev-* 並列使用：
      box-shadow: var(--yy-elev-2), var(--yy-lit)。深色模式是空的：深色靠 --yy-edge-* 或元件自己的 border 分層，再加高光會變雙框。 */
   --yy-lit: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  /* 抽象封面（P1-5）：四個低飽和色斑與玻璃的亮邊、投影，亮暗各一組 */
+  --yy-cover-1: #C9AE7A;
+  --yy-cover-2: #6FA08C;
+  --yy-cover-3: #A58DB0;
+  --yy-cover-4: #CC8F86;
+  --yy-cover-glass: rgba(255, 255, 255, 0.16);
+  --yy-cover-rim-hi: rgba(255, 255, 255, 0.95);
+  --yy-cover-rim-lo: rgba(255, 255, 255, 0.18);
+  --yy-cover-inner: rgba(41, 45, 49, 0.16);
+  --yy-cover-shadow: rgba(60, 44, 30, 0.28);
+  --yy-cover-solid: #F7EFDD;
+  --yy-cover-disp-a: rgba(0, 190, 255, 0.45);
+  --yy-cover-disp-b: rgba(255, 60, 150, 0.4);
+  --yy-cover-spec: rgba(255, 255, 255, 0.55);
   /* 頁面頂部的環境光 --yy-ambient（P1-1）：極淡的銅色徑向光，底色仍是象牙白；只用在 .yy-page 的背景最上層，隨頁面捲走。 */
   --yy-ambient: radial-gradient(ellipse 70% 100% at 50% 0%, rgba(152, 105, 76, 0.1), rgba(152, 105, 76, 0) 70%);
   /* 毛玻璃材質 token（Apple 化步驟 1-6）。只能透過 .yy-glass 使用；套用位置（導覽、sticky 工具列、浮層）隨各頁改版決定。 */
@@ -267,6 +281,7 @@
   --dur-reveal: 220ms;
   /* 動態語言（Apple 化步驟 1-7，使用者選定：全站基準 = 強度 6，強度 9 只用在精緻設計的敘事段落）。
      強度 6 = 上面的 --dur-fast/base 加 --ease-out；以下是彈簧與捲動敘事用的 token，只有明確標示的元件才使用。 */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1); /* iOS 式抽屜曲線：先快後慢、不過衝，底部抽屜用它才不會在底緣露出縫（P1-3） */
   --ease-spring: linear(0, 0.34 6%, 0.72 13%, 0.95 20%, 1.06 27%, 1.08 33%, 1.04 41%, 0.99 52%, 1.005 66%, 1); /* 舊瀏覽器不支援 linear() 時整條宣告失效，退回元件自己寫的 --ease-out 後備 */
   --dur-spring: 550ms;
   --dur-press: 120ms;
@@ -411,6 +426,19 @@
     --yy-elev-4: 0 0 0 0 transparent;
     --yy-edge-4: inset 0 0 0 1px rgba(242, 238, 227, 0.12);
     --yy-lit: 0 0 0 0 transparent;
+    --yy-cover-1: #B59A62;
+    --yy-cover-2: #4F8C78;
+    --yy-cover-3: #8C72A0;
+    --yy-cover-4: #B8736A;
+    --yy-cover-glass: rgba(255, 255, 255, 0.07);
+    --yy-cover-rim-hi: rgba(255, 255, 255, 0.55);
+    --yy-cover-rim-lo: rgba(255, 255, 255, 0.08);
+    --yy-cover-inner: rgba(0, 0, 0, 0.35);
+    --yy-cover-shadow: rgba(0, 0, 0, 0.55);
+    --yy-cover-solid: #33393F;
+    --yy-cover-disp-a: rgba(0, 190, 255, 0.35);
+    --yy-cover-disp-b: rgba(255, 60, 150, 0.3);
+    --yy-cover-spec: rgba(255, 255, 255, 0.3);
     --yy-ambient: radial-gradient(ellipse 70% 100% at 50% 0%, rgba(215, 169, 139, 0.06), rgba(215, 169, 139, 0) 70%);
     --yy-glass-bg: rgba(36, 40, 44, 0.78);
     --yy-glass-bg-solid: #24282C;
@@ -434,6 +462,19 @@
   --yy-elev-4: 0 0 0 0 transparent;
   --yy-edge-4: inset 0 0 0 1px rgba(242, 238, 227, 0.12);
   --yy-lit: 0 0 0 0 transparent;
+  --yy-cover-1: #B59A62;
+  --yy-cover-2: #4F8C78;
+  --yy-cover-3: #8C72A0;
+  --yy-cover-4: #B8736A;
+  --yy-cover-glass: rgba(255, 255, 255, 0.07);
+  --yy-cover-rim-hi: rgba(255, 255, 255, 0.55);
+  --yy-cover-rim-lo: rgba(255, 255, 255, 0.08);
+  --yy-cover-inner: rgba(0, 0, 0, 0.35);
+  --yy-cover-shadow: rgba(0, 0, 0, 0.55);
+  --yy-cover-solid: #33393F;
+  --yy-cover-disp-a: rgba(0, 190, 255, 0.35);
+  --yy-cover-disp-b: rgba(255, 60, 150, 0.3);
+  --yy-cover-spec: rgba(255, 255, 255, 0.3);
   --yy-ambient: radial-gradient(ellipse 70% 100% at 50% 0%, rgba(215, 169, 139, 0.06), rgba(215, 169, 139, 0) 70%);
   --yy-glass-bg: rgba(36, 40, 44, 0.78);
   --yy-glass-bg-solid: #24282C;

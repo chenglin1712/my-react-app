@@ -7,7 +7,9 @@ export const DEFAULT_DURATION = 4000; // 3–5 秒之間
 let seq = 0;
 let toasts = [];
 const listeners = new Set();
-const emit = () => listeners.forEach((fn) => fn(toasts));
+const emit = () => [...listeners].forEach((fn) => {
+  try { fn(toasts); } catch { /* 單一訂閱者出錯不影響其他人 */ }
+});
 
 export const subscribeToasts = (fn) => {
   listeners.add(fn);

@@ -30,7 +30,7 @@ const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggle
           {...(onOpenDetail
             ? { 'aria-haspopup': 'dialog' }
             : { 'aria-expanded': isExpanded, 'aria-controls': panelId })}
-          onClick={() => (onOpenDetail ? onOpenDetail({ keyName, word, result }) : toggleExpand(keyName))}
+          onClick={(e) => (onOpenDetail ? onOpenDetail({ keyName, word, result }, e) : toggleExpand(keyName))}
         >
           <span className="word-card-name">{result.name || '無資料'}</span>
           <span className="word-card-gloss">{word}</span>
