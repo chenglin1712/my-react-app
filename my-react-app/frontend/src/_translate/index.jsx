@@ -4,10 +4,13 @@ import { Alert } from "react-bootstrap";
 import LoadingSpinner from "@components/ui/LoadingSpinner";
 import { TranslateResultSkeleton } from "@components/ui/SkeletonShapes";
 import { Link } from "react-router-dom";
-import { ArrowLeftRight, Copy, Volume2 } from "lucide-react";
+import { ArrowLeftRight, Copy, Volume2, X } from "lucide-react";
 import "../../static/css/_translate/index.css";
 import { TRIBES, tribeLangCode } from "../constants/tribes";
-import TribePill from "../../components/ui/TribePill";
+import TribeSegmented from "../../components/ui/TribeSegmented";
+import CharRing from "../../components/ui/CharRing";
+import GroundedLegend from "../../components/_translate/GroundedLegend";
+import { announce } from "@utils/announce";
 import GroundedText from "../../components/_translate/GroundedText";
 import GuestTrialNotice from "../../components/_translate/GuestTrialNotice";
 import EvidencePanel from "../../components/_translate/EvidencePanel";
@@ -22,6 +25,8 @@ import { apiPost } from "../../utils/apiClient";
 import { apiUrl } from "../../utils/apiUrls";
 
 const MAX_LEN = 300;
+// 接近上限時才顯示「還可以輸入 N 字」，並在越過這條線與到達上限時各公告一次（不是每敲一個字都唸）
+const LIMIT_WARN = 270;
 
 const DIRECTIONS = [
     { key: "zh2tribe", sourceLabel: "繁體中文", targetLabel: "族語" },
@@ -66,7 +71,15 @@ const TranslatePage = () => {
     const [activeTokenIndex, setActiveTokenIndex] = useState(null);
     const [swapNote, setSwapNote] = useState("");
     const textareaRef = useRef(null);
+    const pageRef = useRef(null);
     const hintId = useId();
+    const countId = useId();
+    const limitId = useId();
+    const introId = useId();
+    const [introOpen, setIntroOpen] = useState(false);
+    // Safari 在組字結束的那個 keydown 上 isComposing 已是 false、keyCode 也不是 229，所以另外記組字狀態
+    const composingRef = useRef(false);
+    const composedJustNowRef = useRef(false);
     const capabilities = useTranslateCapabilities({ guest: true, enabled: !authLoading, refreshKey: userData?.uid ?? null });
 
     // abortRef 是「目前這一次請求」的 controller；requestGenerationRef 每次取消/
@@ -116,6 +129,18 @@ const TranslatePage = () => {
         if (prevUid && !uid) setSourceText("");
     }, [uid]);
 
+    // 頂部語言列貼在導覽列下面：導覽列高度會隨寬度改變，所以量出來存成變數（見 index.css 的 .translate-langbar）
+    useEffect(() => {
+        const nav = document.querySelector("nav.navbar");
+        const page = pageRef.current;
+        if (!nav || !page || typeof ResizeObserver === "undefined") return undefined;
+        const sync = () => page.style.setProperty("--translate-nav-h", `${Math.round(nav.getBoundingClientRect().height)}px`);
+        sync();
+        const observer = new ResizeObserver(sync);
+        observer.observe(nav);
+        return () => observer.disconnect();
+    }, [authLoading]);
+
     const currentTribe = TRIBES.find((t) => t.slug === tribe);
     const currentCapability = capabilities?.find((c) => c.tribeSlug === tribe);
     const currentDirection = DIRECTIONS.find((d) => d.key === direction);
@@ -157,11 +182,42 @@ const TranslatePage = () => {
         }
     };
 
+    // Ctrl／⌘ + Enter 送出。輸入法組字中（選字用的 Enter）不當成送出，不然選字會直接把半句話送出去
     const handleKeyDown = (e) => {
+        if (composingRef.current || composedJustNowRef.current || e.nativeEvent?.isComposing || e.isComposing || e.keyCode === 229) return;
         if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
             e.preventDefault();
             handleSubmit();
         }
+    };
+
+    const handleCompositionStart = () => { composingRef.current = true; };
+    const handleCompositionEnd = () => {
+        composingRef.current = false;
+        composedJustNowRef.current = true;
+        setTimeout(() => { composedJustNowRef.current = false; }, 0);
+    };
+
+    const handleSourceChange = (e) => {
+        const next = e.target.value;
+        // 越過「快到上限」與「到達上限」這兩條線時各公告一次
+        if (sourceText.length < LIMIT_WARN && next.length >= LIMIT_WARN && next.length < MAX_LEN) announce(`還可以輸入 ${MAX_LEN - next.length} 字`);
+        else if (sourceText.length < MAX_LEN && next.length >= MAX_LEN) announce(`已達 ${MAX_LEN} 字上限`);
+        setSourceText(next);
+        setSwapNote("");
+    };
+
+    // 清除輸入：連同結果、錯誤與還在等的那次翻譯一起清掉，焦點回到輸入框
+    const handleClear = () => {
+        cancelTranslation();
+        setLoading(false);
+        setSourceText("");
+        setResult(null);
+        setError("");
+        setGuestNote("");
+        setSwapNote("");
+        setActiveTokenIndex(null);
+        textareaRef.current?.focus();
     };
 
     // 交換方向前先取消目前這一輪翻譯：不然中途交換方向，舊方向的回應晚一步
@@ -234,20 +290,54 @@ const TranslatePage = () => {
     if (isGuest && guestQuota.status === "closed") return <PermissionProtect />;
 
     return (
-        <div className="yy-page translate-page">
+        <div className="yy-page translate-page" ref={pageRef}>
             <section className="yy-hero translate-hero">
                 <div className="yy-fade-up">
                     <h1 className="translate-title">族語翻譯</h1>
+                    {/* 說明收成一行；完整內容用「了解更多」展開，沒有刪減 */}
                     <p className="translate-desc">
-                        以辭典語料為依據，逐詞標示有沒有語料佐證。有佐證只代表這個詞在資料庫裡查得到，不代表整句翻譯一定正確。
+                        以辭典語料為依據，逐詞標示有沒有語料佐證。{" "}
+                        <button
+                            type="button"
+                            className="translate-more"
+                            aria-expanded={introOpen}
+                            aria-controls={introId}
+                            onClick={() => setIntroOpen((open) => !open)}
+                        >
+                            {introOpen ? "收起" : "了解更多"}
+                        </button>
+                    </p>
+                    <p id={introId} className="translate-desc translate-desc-more" hidden={!introOpen}>
+                        有佐證只代表這個詞在資料庫裡查得到，不代表整句翻譯一定正確。
                     </p>
                 </div>
+            </section>
 
-                <div className="yy-fade-up translate-tribe-row">
-                    {TRIBES.map((t) => (
-                        <TribePill key={t.slug} tribe={t} active={tribe === t.slug} onClick={() => setTribe(t.slug)} />
-                    ))}
+            {/* 頂部語言列：族語分段控制加翻譯方向與互換鈕。桌面貼在導覽列下面；手機不固定（垂直空間不夠） */}
+            <div className="translate-langbar yy-glass">
+                <div className="translate-langbar-in">
+                    <TribeSegmented
+                        label="選擇族語"
+                        items={TRIBES.map((t) => ({ value: t.slug, label: `${t.name}族語`, color: t.color }))}
+                        value={tribe}
+                        onChange={setTribe}
+                    />
+                    <div className="translate-direction" role="group" aria-label="翻譯方向">
+                        <span className="translate-dir-label">{currentDirection.sourceLabel}</span>
+                        <button
+                            type="button"
+                            className="translate-swap-btn"
+                            aria-label="交換翻譯方向"
+                            onClick={handleSwap}
+                        >
+                            <ArrowLeftRight size={18} aria-hidden="true" />
+                        </button>
+                        <span className="translate-dir-label">{currentDirection.targetLabel}</span>
+                    </div>
                 </div>
+            </div>
+
+            <section className="yy-hero translate-hero translate-hero--note">
                 {currentCapability && (
                     <p className="translate-capability-note yy-fade-up">
                         {currentTribe?.fullName}：辭典收錄 {currentCapability.pairCount.toLocaleString()} 組對照例句、
@@ -267,22 +357,37 @@ const TranslatePage = () => {
                 {error && <Alert variant="danger" className="translate-alert">{error}</Alert>}
 
                 <div className="translate-grid">
-                    <div className="yy-card translate-pane">
+                    <div className="yy-card translate-pane translate-pane--in">
                         <div className="translate-pane-head">
                             <span>{currentDirection.sourceLabel}</span>
-                            <span className="translate-char-count">{sourceText.length}/{MAX_LEN}</span>
+                            <span className="translate-pane-tools">
+                                {sourceText && (
+                                    <button type="button" className="translate-clear" aria-label="清除輸入" onClick={handleClear}>
+                                        <X size={16} aria-hidden="true" />
+                                    </button>
+                                )}
+                                <CharRing value={sourceText.length} max={MAX_LEN} />
+                            </span>
                         </div>
                         <textarea
                             ref={textareaRef}
                             className="translate-textarea"
                             aria-label={`輸入${currentDirection.sourceLabel}原文`}
-                            aria-describedby={hintId}
+                            aria-describedby={`${hintId} ${countId}${sourceText.length >= LIMIT_WARN ? ` ${limitId}` : ""}`}
                             value={sourceText}
                             maxLength={MAX_LEN}
                             placeholder={direction === "zh2tribe" ? "輸入要翻譯的中文句子…" : `輸入要翻譯的${currentTribe?.fullName}句子…`}
-                            onChange={(e) => { setSourceText(e.target.value); setSwapNote(""); }}
+                            onChange={handleSourceChange}
                             onKeyDown={handleKeyDown}
+                            onCompositionStart={handleCompositionStart}
+                            onCompositionEnd={handleCompositionEnd}
                         />
+                        <span id={countId} className="visually-hidden">已輸入 {sourceText.length} 字，上限 {MAX_LEN} 字</span>
+                        {sourceText.length >= LIMIT_WARN && (
+                            <p id={limitId} className={`translate-limit${sourceText.length >= MAX_LEN ? " is-full" : ""}`}>
+                                {sourceText.length >= MAX_LEN ? `已達 ${MAX_LEN} 字上限` : `還可以輸入 ${MAX_LEN - sourceText.length} 字`}
+                            </p>
+                        )}
                         <p id={hintId} className="translate-submit-hint">按 {SUBMIT_HINT} 也可以送出</p>
                         <button
                             type="button"
@@ -296,17 +401,7 @@ const TranslatePage = () => {
                         <OfflineNotice online={online} id="translate-offline" action="翻譯" />
                     </div>
 
-                    {/* 互換鈕在兩張卡片中間：桌面是左右卡之間，手機是上下卡之間（圖示轉 90 度） */}
-                    <button
-                        type="button"
-                        className="translate-swap-btn"
-                        aria-label="交換翻譯方向"
-                        onClick={handleSwap}
-                    >
-                        <ArrowLeftRight size={18} aria-hidden="true" />
-                    </button>
-
-                    <div className="yy-card translate-pane">
+                    <div className="yy-card translate-pane translate-pane--out">
                         <div className="translate-pane-head">
                             <span>{currentDirection.targetLabel}</span>
                             {result?.matchType === "exact_corpus" && (
@@ -323,6 +418,7 @@ const TranslatePage = () => {
                                 <GroundedText
                                     lang={tribeLangCode(result.tribeSlug ?? tribe)}
                                     tokens={result.tokens}
+                                    reveal
                                     activeIndex={activeTokenIndex}
                                     onTokenClick={(i) => setActiveTokenIndex((cur) => (cur === i ? null : i))}
                                 />
@@ -339,6 +435,7 @@ const TranslatePage = () => {
                                         <Copy size={15} /> {copyStatus === "copied" ? "已複製 ✓" : copyStatus === "error" ? "複製失敗" : "複製"}
                                     </button>
                                 </div>
+                                <GroundedLegend />
                                 <p className="translate-coverage-summary">
                                     {result.warning ?? `${result.coverage.total - (result.coverage.unsupported ?? 0)}/${result.coverage.total} 個詞有辭典語料佐證`}
                                 </p>

@@ -89,8 +89,8 @@ describe('CameraResultStep', () => {
       });
     });
 
-    const { rerender } = render(<CameraResultStep selectedWords={['balay']} tribe="tayal" onRestart={vi.fn()} />);
-    rerender(<CameraResultStep selectedWords={['balay']} tribe="bunun" onRestart={vi.fn()} />);
+    const { rerender } = render(<CameraResultStep selectedWords={['好']} tribe="tayal" onRestart={vi.fn()} />);
+    rerender(<CameraResultStep selectedWords={['好']} tribe="bunun" onRestart={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText('cyux')).toBeInTheDocument());
 
@@ -135,9 +135,9 @@ describe('CameraResultStep 的導覽與族語（E-4）', () => {
     render(<CameraResultStep selectedWords={['balay']} tribe="tayal" onTribeChange={onTribeChange} onBack={vi.fn()} onRestart={vi.fn()} />);
     await screen.findByText('balay');
 
-    const group = screen.getByRole('group', { name: '查詢的族語' });
+    const group = screen.getByRole('radiogroup', { name: '查詢的族語' });
     fireEvent.click(group.querySelectorAll('button')[1]);
-    expect(onTribeChange).toHaveBeenCalled();
+    expect(onTribeChange).toHaveBeenCalledWith('amis');
   });
 
   test('查詢失敗可以重試，重試會再送一次', async () => {
@@ -171,13 +171,13 @@ describe('CameraResultStep 的詞條詳情（Apple 化步驟 4-4）', () => {
   });
   test('換族語重新查詢：詳情立刻收起；查詢期間點開舊詞條，新結果回來時也會收掉，不留舊資料', async () => {
     axios.post.mockResolvedValueOnce(FAKE_RESPONSE);
-    const { rerender } = render(<CameraResultStep selectedWords={['balay']} tribe="tayal" onRestart={vi.fn()} />);
+    const { rerender } = render(<CameraResultStep selectedWords={['好']} tribe="tayal" onRestart={vi.fn()} />);
     fireEvent.click(await screen.findByRole('button', { name: /balay/ }));
     await screen.findByRole('dialog');
 
     let resolveNext;
     axios.post.mockReturnValueOnce(new Promise((r) => { resolveNext = r; }));
-    rerender(<CameraResultStep selectedWords={['balay']} tribe="amis" onRestart={vi.fn()} />);
+    rerender(<CameraResultStep selectedWords={['好']} tribe="amis" onRestart={vi.fn()} />);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
     // 查詢還沒回來，舊清單還在：先點開舊詞條
@@ -186,5 +186,23 @@ describe('CameraResultStep 的詞條詳情（Apple 化步驟 4-4）', () => {
     resolveNext({ data: { exact_match_results: { cyux: [{ name: 'cyux', explanationItems: [{ chineseExplanation: '看' }] }] }, fuzzy_match_results: {} } });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(await screen.findByRole('button', { name: /cyux/ })).toBeInTheDocument();
+  });
+
+  test('舞台上的詞標籤（P3-8）：點了開那個詞的詞卡；辭典裡沒有就用文字說明', async () => {
+    axios.post.mockResolvedValueOnce({
+      data: { exact_match_results: { 好: [{ name: 'balay', explanationItems: [{ chineseExplanation: '好' }] }] }, fuzzy_match_results: {} },
+    });
+    render(<CameraResultStep selectedWords={['好', '桌']} tribe="tayal" image="data:image/png;base64,A" onRestart={vi.fn()} />);
+    const list = screen.getByRole('list', { name: '你選的單詞' });
+    expect(list.querySelectorAll('li')).toHaveLength(2);
+    await screen.findByText('balay');
+
+    fireEvent.click(screen.getByRole('button', { name: '桌' }));
+    expect(screen.getByRole('status')).toHaveTextContent('辭典裡找不到「桌」');
+
+    fireEvent.click(screen.getByRole('button', { name: '好' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveAccessibleName('balay');
+    expect(screen.queryByRole('status', { name: /找不到/ })).not.toBeInTheDocument();
   });
 });

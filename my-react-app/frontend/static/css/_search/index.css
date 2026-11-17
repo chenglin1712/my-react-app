@@ -85,73 +85,12 @@
   margin: 0 0 var(--yy-space-4);
 }
 
-/* ── 族語選擇器：分段控制（Apple 化步驟 4-2）─────
-   一條淡底軌道，選取的那一段用深銅實心；窄螢幕時軌道本身可橫向捲動，不換行。 */
+/* ── 族語選擇器（Apple 化步驟 4-2、P3-2）─────
+   分段控制本身在 components/ui/TribeSegmented（static/css/ui/tribeSegmented.css）；這裡只負責置中與上下間距。 */
 .tribe-selector {
   display: flex;
-  gap: var(--yy-space-1);
-  width: fit-content;
-  max-width: 100%;
+  justify-content: center;
   margin: var(--yy-space-4) auto var(--yy-space-5);
-  padding: var(--yy-space-1);
-  background: var(--yy-calm-info-bg);
-  border-radius: var(--yy-radius-pill);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.tribe-selector::-webkit-scrollbar {
-  display: none;
-}
-
-.tribe-btn {
-  flex: 0 0 auto;
-  min-height: var(--yy-control-md);
-  padding: 0 var(--yy-space-4);
-  border-radius: var(--yy-radius-pill);
-  border: var(--yy-border-width) solid transparent;
-  background: transparent;
-  color: var(--yy-calm-text);
-  font-size: var(--yy-text-base);
-  font-weight: 700;
-  font-family: var(--yy-font-body);
-  cursor: pointer;
-  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform var(--dur-press) var(--ease-out);
-  white-space: nowrap;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .tribe-btn:hover:not(.active) {
-    background: var(--yy-calm-surface);
-  }
-}
-
-.tribe-btn:active {
-  transform: scale(var(--yy-ui-press));
-}
-
-.tribe-btn:focus-visible {
-  outline: var(--yy-ui-focus-ring);
-  outline-offset: var(--yy-ui-focus-offset);
-}
-
-/* 選取靠底色與文字反白，所有族語同一個色，不再各給一種顏色 */
-.tribe-btn.active {
-  background: var(--yy-calm-accent);
-  border-color: var(--yy-calm-accent);
-  color: var(--yy-calm-accent-on);
-}
-
-/* 選取不只靠顏色：前面多一個勾（替代文字留空，報讀器只靠 aria-pressed） */
-.tribe-btn.active::before {
-  content: "\2713" / "";
-  margin-right: var(--yy-space-1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .tribe-btn:active {
-    transform: none;
-  }
 }
 
 /* ── Spotlight 式大搜尋框（Apple 化步驟 4-2）─────────────────────────────── */

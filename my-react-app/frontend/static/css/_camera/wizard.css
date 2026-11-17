@@ -32,10 +32,6 @@
     flex-wrap: wrap;
 }
 
-.camera-stepbar-wrap {
-    margin-top: 36px;
-}
-
 .camera-body {
     position: relative;
     padding: 44px 56px 90px;
@@ -80,6 +76,13 @@
     }
 }
 
+/* 拖著檔案經過取景框（P3-6）：邊框變實線加深、底色變淡藍，只用顏色與邊框，不位移 */
+.camera-dropzone.is-dragging {
+    border-style: solid;
+    border-color: var(--yy-calm-accent);
+    background: var(--yy-calm-info-bg);
+}
+
 /* 取景框上的玻璃提示：貼在框的下緣，圓角跟著取景框（同心圓角：外 28、內距 12、膠囊用 pill）；材質由 .yy-glass 提供 */
 .camera-dropzone-hint {
     position: absolute;
@@ -99,6 +102,22 @@
     width: 100%;
     height: 100%;
     object-fit: contain;
+}
+
+/* 縮圖淡入（P3-6）：換圖時 key 變了會重播；減少動態時沒有動畫 */
+@media (prefers-reduced-motion: no-preference) {
+    .camera-dropzone-img {
+        animation: camera-thumb-in 260ms var(--ease-out) both;
+    }
+}
+
+@keyframes camera-thumb-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
 .camera-dropzone-placeholder {
@@ -175,23 +194,9 @@
     align-items: flex-start;
 }
 
-.camera-step2-preview {
-    width: 300px;
-    height: 300px;
-    border-radius: var(--yy-radius-panel);
-    border: var(--yy-border-width) solid var(--yy-calm-line);
-    overflow: hidden;
-    background: var(--yy-calm-info-bg);
-}
-
-.camera-step2-preview img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
 .camera-step2-panel {
     width: 360px;
+    max-width: 100%;
 }
 
 .camera-step2-title {
@@ -239,6 +244,32 @@
     margin: 8px 0 0;
 }
 
+/* 隱私說明卡（P3-9）：第一次是完整說明加「我知道了」；之後收成一顆資訊鈕 */
+.camera-privacy-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--yy-space-2);
+    min-height: var(--yy-control-md);
+    padding: 0 var(--yy-space-2);
+    background: transparent;
+    border: 0;
+    border-radius: var(--yy-radius-tag);
+    color: var(--yy-calm-text-sub);
+    font: inherit;
+    font-size: var(--yy-text-sm);
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.camera-privacy-toggle:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+.camera-privacy-ack {
+    margin-top: var(--yy-space-2);
+}
+
 /* 拍照鈕只在觸控裝置出現：桌機沒有相機，點了也只會開檔案對話框 */
 .camera-capture-btn {
     display: none;
@@ -249,62 +280,16 @@
     }
 }
 
-.camera-label-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    max-height: 280px;
-    overflow-y: auto;
-}
-
-.camera-label-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    min-height: var(--yy-control-md);
-    padding: 12px 16px;
-    border-radius: var(--yy-radius-tag);
-    border: var(--yy-border-width) solid var(--yy-calm-line);
-    background: var(--yy-calm-surface);
-    color: var(--yy-calm-text);
-    font: inherit;
-    text-align: inherit;
-    cursor: pointer;
-    transition: background-color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
-}
-
-.camera-label-item:active {
-    transform: scale(var(--yy-ui-press));
-}
-
-.camera-label-item:focus-visible {
-    outline: var(--yy-ui-focus-ring);
-    outline-offset: var(--yy-ui-focus-offset);
-}
-
-@media (hover: hover) and (pointer: fine) {
-    .camera-label-item:hover {
-        background: var(--yy-calm-info-bg);
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .camera-label-item:active {
-        transform: none;
-    }
-}
-
 .camera-label-name {
     font-weight: 700;
     font-size: var(--yy-text-base);
 }
 
-.camera-label-score {
-    font-family: var(--yy-font-body);
-    font-size: var(--yy-text-sm);
+.camera-chip-note {
+    margin: calc(-1 * var(--yy-space-2)) 0 var(--yy-space-4);
+    text-align: center;
     color: var(--yy-calm-text-sub);
-    font-variant-numeric: tabular-nums;
+    font-size: var(--yy-text-sm);
 }
 
 .camera-step2-actions {
@@ -325,7 +310,6 @@
 
     .camera-dropzone,
     .camera-step1-panel,
-    .camera-step2-preview,
     .camera-step2-panel {
         width: 100%;
     }

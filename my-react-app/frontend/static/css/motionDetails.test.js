@@ -53,7 +53,6 @@ describe("選取狀態與過渡", () => {
     expect(rule(theme, ".yy-pill.active")).not.toMatch(/scale\(1\.06\)/);
     expect(rule(theme, ".yy-pill.active")).not.toMatch(/transform/);
     expect(rule(theme, ".yy-pill.active")).toMatch(/background:\s*var\(--yy-calm-accent\)/);
-    expect(rule(read("_search/index.css"), ".tribe-btn.active")).not.toMatch(/scale\(1\.06\)/);
   });
 
   it("TabSwitch 與 StepBar 切換有 150ms 的顏色過渡", () => {

@@ -1,0 +1,142 @@
+/* 族語分段控制（P3-2）。等寬分段，指示塊只用 transform 位移，不動 width/left。 */
+.yy-seg {
+  max-width: 100%;
+  overflow-x: auto;
+  /* 手機橫向捲動：不顯示捲軸佔位，但保留手指可滑 */
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.yy-seg::-webkit-scrollbar {
+  display: none;
+}
+
+.yy-seg__track {
+  --seg-min: 96px;
+  --seg-pad: var(--yy-space-1);
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--seg-n), minmax(var(--seg-min), 1fr));
+  min-width: calc(var(--seg-n) * var(--seg-min));
+  padding: var(--seg-pad);
+  background: var(--yy-calm-surface);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-radius-pill);
+}
+
+/* 裁切層：和內容區同大。彈簧過衝時指示塊會超出最後一格，裁在這裡，才不會撐出橫向捲動範圍 */
+.yy-seg__clip {
+  position: absolute;
+  inset: var(--seg-pad);
+  overflow: hidden;
+  border-radius: var(--yy-radius-pill);
+  pointer-events: none;
+}
+
+/* 指示塊：寬度是內容區的 1/n，位置是第 i 格，只用 transform 位移 */
+.yy-seg__thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: calc(100% / var(--seg-n));
+  background: var(--yy-calm-accent);
+  border-radius: var(--yy-radius-pill);
+  transform: translateX(calc(var(--seg-i) * 100%));
+  transition: transform 360ms var(--ease-out);
+}
+
+@supports (transition-timing-function: linear(0, 1)) {
+  .yy-seg__thumb {
+    transition-timing-function: var(--ease-spring);
+  }
+}
+
+.yy-seg__track[data-empty] .yy-seg__clip {
+  visibility: hidden;
+}
+
+.yy-seg__item {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--yy-space-2);
+  min-height: var(--yy-control-md);
+  padding: 0 var(--yy-space-3);
+  background: transparent;
+  border: 0;
+  border-radius: var(--yy-radius-pill);
+  color: var(--yy-calm-text);
+  font-family: var(--yy-font-body);
+  font-size: var(--yy-text-sm);
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out), transform var(--dur-press) var(--ease-out);
+}
+
+.yy-seg__item.is-checked {
+  color: var(--yy-calm-accent-on);
+}
+
+.yy-seg__item:active {
+  transform: scale(var(--yy-ui-press));
+}
+
+.yy-seg__item:focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
+}
+
+.yy-seg__check {
+  flex: none;
+}
+
+.yy-seg__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--yy-radius-round);
+  background: var(--tribe-color);
+  opacity: 0.62;
+}
+
+@supports (background: color-mix(in srgb, red, white)) {
+  .yy-seg__dot {
+    background: color-mix(in srgb, var(--tribe-color) 62%, var(--yy-calm-surface));
+    opacity: 1;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .yy-seg__item:not(.is-checked):hover {
+    color: var(--yy-calm-accent);
+  }
+}
+
+/* 減少動態：指示塊直接跳過去，不滑動 */
+@media (prefers-reduced-motion: reduce) {
+  .yy-seg__thumb {
+    transition: none;
+  }
+
+  .yy-seg__item:active {
+    transform: none;
+  }
+}
+
+/* Windows 高對比模式會移除背景色：選取的那一格改用系統色框線，不靠填色辨識 */
+@media (forced-colors: active) {
+  .yy-seg__item.is-checked {
+    outline: 3px solid Highlight;
+    outline-offset: -3px;
+  }
+
+  .yy-seg__thumb {
+    display: none;
+  }
+}

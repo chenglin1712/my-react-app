@@ -1,0 +1,30 @@
+/* 字數環（P3-4）：只用語意色 token；進度靠 stroke-dashoffset 直接更新，不做動畫（每敲一個字都會變）。 */
+.yy-countring {
+  flex: none;
+}
+
+.yy-countring__track {
+  stroke: var(--yy-calm-rule);
+}
+
+.yy-countring__bar {
+  stroke: var(--yy-calm-accent);
+}
+
+.yy-countring.is-warn .yy-countring__bar {
+  stroke: var(--yy-calm-warning);
+}
+
+.yy-countring.is-full .yy-countring__bar {
+  stroke: var(--yy-calm-danger);
+}
+
+@media (forced-colors: active) {
+  .yy-countring__track {
+    stroke: GrayText;
+  }
+
+  .yy-countring__bar {
+    stroke: Highlight;
+  }
+}

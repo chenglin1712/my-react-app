@@ -22,12 +22,71 @@
     font-size: 0.9375rem;
 }
 
-.translate-tribe-row {
+.translate-desc-more {
+    margin-top: var(--yy-space-2);
+}
+
+/* 「了解更多」：說明裡的文字連結，自己的盒子就有 44px 高（點擊區與排版一致，不靠負 margin 去蓋到相鄰行） */
+.translate-more {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--yy-control-md);
+    padding: 0 var(--yy-space-2);
+    vertical-align: middle;
+    background: transparent;
+    border: 0;
+    color: var(--yy-calm-accent);
+    font: inherit;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    cursor: pointer;
+}
+
+.translate-more:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+/* ---------- 頂部語言列（P3-1）：族語分段控制加翻譯方向。桌面貼在導覽列下面，手機不固定 ---------- */
+.translate-langbar {
+    z-index: var(--yy-z-sticky);
+    padding: var(--yy-space-2) var(--yy-space-4);
+    border-bottom: var(--yy-border-width) solid var(--yy-calm-rule);
+}
+
+.translate-langbar-in {
     display: flex;
-    justify-content: center;
-    gap: 10px;
     flex-wrap: wrap;
-    margin: 22px 0 10px;
+    align-items: center;
+    justify-content: center;
+    gap: var(--yy-space-2) var(--yy-space-5);
+    max-width: 980px;
+    margin: 0 auto;
+}
+
+@media (min-width: 900px) {
+    .translate-langbar {
+        position: sticky;
+        top: var(--translate-nav-h, 83px);
+    }
+}
+
+.translate-direction {
+    display: flex;
+    align-items: center;
+    gap: var(--yy-space-2);
+    color: var(--yy-calm-text);
+    font-weight: 700;
+}
+
+.translate-dir-label {
+    min-width: 4.5em;
+    text-align: center;
+}
+
+.translate-hero--note {
+    padding-top: var(--yy-space-2);
 }
 
 .translate-capability-note {
@@ -105,18 +164,13 @@
 
 .translate-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--yy-space-4);
     align-items: stretch;
 }
 @media (max-width: 900px) {
     .translate-grid {
         grid-template-columns: minmax(0, 1fr);
-    }
-
-    /* 上下排列時互換鈕夾在兩張卡片之間，箭頭轉成上下向 */
-    .translate-swap-btn svg {
-        transform: rotate(90deg);
     }
 }
 
@@ -125,6 +179,13 @@
     border: var(--yy-border-width) solid var(--yy-calm-rule);
     border-radius: var(--yy-radius-panel);
     box-shadow: var(--yy-elev-2), var(--yy-lit);
+}
+
+/* 輸入卡是主角（白底、有層次）；輸出卡是結果區，淡底、不加陰影，退一階（P3-1） */
+.translate-page .yy-card.translate-pane--out {
+    background: var(--yy-calm-info-bg);
+    border-color: transparent;
+    box-shadow: none;
 }
 
 .translate-pane {
@@ -144,11 +205,53 @@
     margin-bottom: 10px;
 }
 
-.translate-char-count {
-    font-weight: 400;
+/* 輸入卡標題列右側：清除鈕加字數環（P3-4） */
+.translate-pane-tools {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--yy-space-2);
+}
+
+.translate-clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--yy-control-md);
+    height: var(--yy-control-md);
+    margin: calc((var(--yy-control-md) - 26px) / -2) 0;
+    background: transparent;
+    border: 0;
+    border-radius: var(--yy-radius-round);
     color: var(--yy-calm-text-sub);
+    cursor: pointer;
+    transition: transform var(--dur-press) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.translate-clear:active {
+    transform: scale(var(--yy-ui-press));
+}
+
+.translate-clear:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .translate-clear:hover {
+        color: var(--yy-calm-text);
+    }
+}
+
+/* 快到字數上限時的文字提示（環只是輔助，文字才是提示） */
+.translate-limit {
+    margin: var(--yy-space-2) 0 0;
+    color: var(--yy-calm-warning);
     font-size: var(--yy-text-sm);
-    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+}
+
+.translate-limit.is-full {
+    color: var(--yy-calm-danger);
 }
 
 .translate-textarea {
@@ -253,6 +356,58 @@
     .yy-gt-unsupported {
         text-decoration: underline dotted var(--yy-calm-danger);
     }
+}
+
+/* 結果剛出來時逐詞淡入（P3-1）：每個詞依序延遲，延遲上限 24 格 × 28ms；只動 opacity 與 transform */
+@media (prefers-reduced-motion: no-preference) {
+    .yy-grounded-text.is-revealing > span {
+        animation: yy-gt-in 220ms var(--ease-out) both;
+        animation-delay: calc(var(--gt-i, 0) * 28ms);
+    }
+}
+
+@keyframes yy-gt-in {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* ---------- 圖例（P3-3）---------- */
+.yy-gt-legend {
+    margin-top: var(--yy-space-3);
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
+}
+
+.yy-gt-legend-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--yy-space-2) var(--yy-space-4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.yy-gt-legend-list li {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--yy-space-2);
+}
+
+.yy-gt-legend-mark {
+    padding: 1px 2px;
+    border-radius: var(--yy-radius-tag);
+    color: var(--yy-calm-text);
+    font-weight: 700;
+}
+
+.yy-gt-legend-note {
+    margin: var(--yy-space-2) 0 0;
 }
 
 .translate-result-actions {
