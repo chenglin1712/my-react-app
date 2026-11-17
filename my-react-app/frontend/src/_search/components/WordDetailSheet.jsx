@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react';
-import { Offcanvas, Button } from 'react-bootstrap';
+import { Offcanvas, Modal, Button } from 'react-bootstrap';
 import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import FavoriteButton from '../../../components/ui/FavoriteButton';
 import AudioPlayButton from '../../../components/ui/AudioPlayButton';
@@ -9,8 +9,9 @@ import { announce } from '@utils/announce';
 import useSheetSwipeDismiss from '../../hooks/useSheetSwipeDismiss';
 import '../../../static/css/_search/wordSheet.css';
 
-// 詞條詳情 sheet（Apple 化步驟 4-2）：手機從底部滑出、桌面從右側滑入。
-// 用 react-bootstrap 的 Offcanvas，焦點圈住、Esc 關閉、點背景關閉、關閉後焦點回到原本的詞條鈕都由它處理。
+// 詞條詳情（Apple 化步驟 4-2、P2-1）：手機是底部 sheet（Offcanvas），桌面是畫面中央的卡片（Modal），
+// 進場像通知一樣從小一點淡入彈出（F9 浮層彈出、Z2 強度 7，見 wordSheet.css）。
+// 焦點圈住、Esc 關閉、點背景關閉、關閉後焦點回到原本的詞條鈕都由 react-bootstrap 處理。
 // 手機另外支援標題列往下滑關閉（階段 6-3，hooks/useSheetSwipeDismiss.js）。
 // 內容區：預設只顯示摘要，「看完整內容」展開其餘。用 key 綁詞條，換詞時自動收回摘要。
 const SheetContent = ({ result, ...audioProps }) => {
@@ -106,21 +107,16 @@ const WordDetailSheet = ({
     if (stepped && stepName && stepTotal) announce(`${stepName}，第 ${stepIndex + 1} 個，共 ${stepTotal} 個`);
   }, [stepped, stepKey, stepName, stepIndex, stepTotal]);
 
-  return (
-    <Offcanvas
-      show={Boolean(detail)}
-      onHide={onClose}
-      animation={animated}
-      backdropClassName="word-sheet-backdrop"
-      placement={isMobile ? 'bottom' : 'end'}
-      className={`word-sheet yy-glass word-sheet--${isMobile ? 'bottom' : 'end'}`}
-      aria-labelledby="word-sheet-title"
-    >
-      {result && (
+  // 手機與桌面共用同一份內容，只有外殼不同
+  const Header = isMobile ? Offcanvas.Header : Modal.Header;
+  const Title = isMobile ? Offcanvas.Title : Modal.Title;
+  const Body = isMobile ? Offcanvas.Body : Modal.Body;
+
+  const content = result && (
         <>
-          <Offcanvas.Header closeButton closeLabel="關閉詳情" className="word-sheet-head" {...swipe}>
+          <Header closeButton closeLabel="關閉詳情" className="word-sheet-head" {...swipe}>
             <div className="word-sheet-titles">
-              <Offcanvas.Title as="h2" id="word-sheet-title" className="word-sheet-name">{result.name || '無資料'}</Offcanvas.Title>
+              <Title as="h2" id="word-sheet-title" className="word-sheet-name">{result.name || '無資料'}</Title>
               {detail.word && <p className="word-sheet-gloss">{detail.word}</p>}
             </div>
             <div className="word-sheet-actions">
@@ -139,8 +135,8 @@ const WordDetailSheet = ({
               )}
               <FavoriteButton name={result.name} isFavorited={isFavorited} onToggle={() => toggleFavorite(result.name)} size={22} />
             </div>
-          </Offcanvas.Header>
-          <Offcanvas.Body className="word-sheet-body">
+          </Header>
+          <Body className="word-sheet-body">
             <div key={detail.keyName} className={detail.stepFade ? 'word-sheet-swap' : undefined}>
               <SheetContent
                 result={result}
@@ -150,7 +146,7 @@ const WordDetailSheet = ({
                 failedAudio={failedAudio}
               />
             </div>
-          </Offcanvas.Body>
+          </Body>
           {onStep && stepInfo && (
             <nav className="word-sheet-nav" aria-label="切換詞條">
               <Button type="button" variant="link" aria-disabled={!canPrev} onClick={() => canPrev && onStep(-1, false)}>
@@ -163,8 +159,37 @@ const WordDetailSheet = ({
             </nav>
           )}
         </>
-      )}
-    </Offcanvas>
+  );
+
+  if (isMobile) {
+    return (
+      <Offcanvas
+        show={Boolean(detail)}
+        onHide={onClose}
+        animation={animated}
+        backdropClassName="word-sheet-backdrop"
+        placement="bottom"
+        className="word-sheet yy-glass word-sheet--bottom"
+        aria-labelledby="word-sheet-title"
+      >
+        {content}
+      </Offcanvas>
+    );
+  }
+  // word-sheet 這個 class 放在 .modal（role=dialog、取得焦點的那一層）上，鍵盤處理才認得出焦點在詳情裡
+  return (
+    <Modal
+      show={Boolean(detail)}
+      onHide={onClose}
+      animation={animated}
+      centered
+      backdropClassName="word-sheet-backdrop"
+      className="word-sheet word-sheet--center"
+      contentClassName="yy-glass word-sheet-card"
+      aria-labelledby="word-sheet-title"
+    >
+      {content}
+    </Modal>
   );
 };
 

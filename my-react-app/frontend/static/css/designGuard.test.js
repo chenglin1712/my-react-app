@@ -677,6 +677,15 @@ describe("P2 查詢頁規則", () => {
     expect(sheet).toMatch(/prefers-reduced-transparency/);
   });
 
+  it("詳情：桌面是置中卡片（Modal），進場用彈簧加淡入、從 scale(0.9) 起、不從 0 起；減少動態時不位移", () => {
+    const sheet = read("static", "css", "_search", "wordSheet.css");
+    expect(sheet).toMatch(/\.word-sheet--center\.modal\.fade \.modal-dialog\s*\{[^}]*transform:\s*translateY\(24px\) scale\(0\.9\)/);
+    expect(sheet).toMatch(/\.word-sheet--center\.modal\.show \.modal-dialog\s*\{[^}]*var\(--ease-spring\)/);
+    expect(sheet.replace(/\/\*[\s\S]*?\*\//g, "")).not.toMatch(/scale\(0\)/);
+    expect(sheet).toMatch(/prefers-reduced-motion: reduce\)\s*\{\s*\.word-sheet--center\.modal\.fade,/);
+    expect(read("src", "_search", "components", "WordDetailSheet.jsx")).toMatch(/word-sheet word-sheet--center/);
+  });
+
   it("結果清單兩欄只在 1100px 以上；詞卡上浮 3px 只在滑鼠（hover + fine pointer）", () => {
     const css = read("static", "css", "_search", "index.css");
     expect(css).toMatch(/@media \(min-width: 1100px\)\s*\{\s*\.search-page \.list-group\s*\{\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);

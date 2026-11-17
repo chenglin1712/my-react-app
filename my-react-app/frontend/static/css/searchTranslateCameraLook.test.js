@@ -103,10 +103,12 @@ describe("單詞查詢", () => {
     expect(css.wordCard).not.toMatch(/\.word-card-toggle \.word-card-name::after/);
   });
 
-  it("詳情 sheet：掛在 body 底下所以自己交代外觀；手機底部大圓角、桌面右側；陰影 elev-4；關閉鈕與動作鈕至少 44px；減少動態不位移", () => {
+  it("詳情：掛在 body 底下所以自己交代外觀；手機底部大圓角、桌面置中卡片；陰影 elev-4；關閉鈕與動作鈕至少 44px；減少動態不位移", () => {
     expect(find.wordSheet(".word-sheet.offcanvas").body).toMatch(/box-shadow:\s*var\(--yy-elev-4\)/);
     expect(find.wordSheet(".word-sheet--bottom.offcanvas-bottom").body).toMatch(/border-radius:\s*var\(--yy-radius-block\) var\(--yy-radius-block\) 0 0/);
-    expect(find.wordSheet(".word-sheet--end.offcanvas-end").body).toMatch(/width:\s*min\(480px, 100vw\)/);
+    expect(find.wordSheet(".word-sheet--center.modal").body).toMatch(/--bs-modal-width:\s*min\(560px, calc\(100vw - 32px\)\)/);
+    expect(find.wordSheet(".word-sheet--center .modal-content").body).toMatch(/border-radius:\s*var\(--yy-radius-block\)/);
+    expect(find.wordSheet(".word-sheet--center .modal-content").body).toMatch(/box-shadow:\s*var\(--yy-elev-4\)/);
     expect(find.wordSheet(".word-sheet-actions .btn, .word-sheet-head .btn-close").body).toMatch(/min-width:\s*var\(--yy-control-md\)/);
     expect(find.wordSheet(".word-sheet-actions .btn, .word-sheet-head .btn-close").body).toMatch(/min-height:\s*var\(--yy-control-md\)/);
     expect(find.wordSheet(".word-sheet.offcanvas, .word-sheet.offcanvas.hiding", /prefers-reduced-motion/).body).toMatch(/transition:\s*none/);

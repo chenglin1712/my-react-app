@@ -38,7 +38,7 @@ describe('WordDetailSheet', () => {
 
   test('手機從底部、桌面從右側', () => {
     const { rerender } = render(<WordDetailSheet {...base} detail={detail} isMobile={false} />);
-    expect(screen.getByRole('dialog')).toHaveClass('word-sheet--end');
+    expect(screen.getByRole('dialog')).toHaveClass('word-sheet--center');
     rerender(<WordDetailSheet {...base} detail={detail} isMobile />);
     expect(screen.getByRole('dialog')).toHaveClass('word-sheet--bottom');
   });

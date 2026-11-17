@@ -11,9 +11,22 @@
   border-radius: var(--yy-radius-block) var(--yy-radius-block) 0 0;
 }
 
-.word-sheet--end.offcanvas-end {
-  width: min(480px, 100vw);
-  border-radius: var(--yy-radius-block) 0 0 var(--yy-radius-block);
+/* 桌面：畫面中央的卡片（P2-1，F9 浮層彈出）。Modal 的 .modal 是外層（取得焦點、role=dialog），卡片是 .modal-content */
+.word-sheet--center.modal {
+  --bs-modal-width: min(560px, calc(100vw - 32px));
+  z-index: var(--yy-z-overlay);
+  color: var(--yy-calm-text);
+}
+
+.word-sheet--center .modal-content {
+  max-height: min(82dvh, 720px);
+  border-radius: var(--yy-radius-block);
+  box-shadow: var(--yy-elev-4), var(--yy-lit);
+}
+
+.word-sheet--center .modal-body {
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /* 抓取把手：暗示「可以往下收」。手機上標題列可以往下滑關閉（useSheetSwipeDismiss），所以這一列要擋掉瀏覽器自己的滑動手勢；
@@ -34,7 +47,8 @@
   background: var(--yy-calm-rule);
 }
 
-.word-sheet-head.offcanvas-header {
+.word-sheet-head.offcanvas-header,
+.word-sheet-head.modal-header {
   position: relative;
   align-items: flex-start;
   gap: var(--yy-space-3);
@@ -91,12 +105,15 @@
   outline-offset: var(--yy-ui-focus-offset);
 }
 
-.word-sheet-body.offcanvas-body {
+.word-sheet-body.offcanvas-body,
+.word-sheet-body.modal-body {
   padding: var(--yy-space-2) var(--yy-space-4) var(--yy-space-6);
 }
 
 /* 背景變暗加模糊（P2-1）：只用 token；減少透明度或不支援模糊時改成較深的實色遮罩 */
-.word-sheet-backdrop.offcanvas-backdrop {
+
+.word-sheet-backdrop.offcanvas-backdrop,
+.word-sheet-backdrop.modal-backdrop {
   /* Bootstrap 的 offcanvas 遮罩把黑色與 .5 透明度寫死（不像 modal 有 --bs-backdrop-* 變數），所以直接覆寫屬性 */
   background-color: var(--yy-scrim);
   -webkit-backdrop-filter: blur(var(--yy-scrim-blur));
@@ -104,12 +121,14 @@
 }
 
 /* 遮罩本身的淡入淡出由 .fade 的 opacity 負責，顯示時要是完整的 1（Bootstrap 預設是 .5） */
-.word-sheet-backdrop.offcanvas-backdrop.show {
+.word-sheet-backdrop.offcanvas-backdrop.show,
+.word-sheet-backdrop.modal-backdrop.show {
   opacity: 1;
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .word-sheet-backdrop.offcanvas-backdrop {
+  .word-sheet-backdrop.offcanvas-backdrop,
+  .word-sheet-backdrop.modal-backdrop {
     background-color: var(--yy-scrim-solid);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
@@ -117,7 +136,8 @@
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .word-sheet-backdrop.offcanvas-backdrop {
+  .word-sheet-backdrop.offcanvas-backdrop,
+  .word-sheet-backdrop.modal-backdrop {
     background-color: var(--yy-scrim-solid);
   }
 }
@@ -218,7 +238,44 @@
   transition-timing-function: var(--ease-out);
 }
 
+/* 桌面卡片的進退場（F9 浮層彈出、Z2 強度 7）：像通知一樣從小一點、低一點淡入彈出，不從 scale(0) 起。
+   進場 220ms 淡入、位移與縮放用輕微彈簧（起點拉大一些，過衝才看得出來）；退場 160ms 直接收，不彈。
+   透明度只放在外層 .modal（react-bootstrap 等的就是它的 transitionend，退場才不會被截掉或卡住），
+   裡面的 .modal-dialog 只做位移與縮放，不再疊一層透明度。
+   鍵盤開啟時 Modal 不帶 .fade（animation=false），這些規則不會作用，直接出現 */
+.word-sheet--center.modal.fade {
+  transition: opacity var(--dur-overlay-out) var(--ease-out);
+}
+
+.word-sheet--center.modal.fade.show {
+  transition-duration: var(--dur-overlay-in);
+}
+
+.word-sheet--center.modal.fade .modal-dialog {
+  transform: translateY(24px) scale(0.9);
+  transition: transform var(--dur-overlay-out) var(--ease-out);
+}
+
+.word-sheet--center.modal.show .modal-dialog {
+  transform: none;
+  transition: transform 360ms var(--ease-out);
+}
+
+@supports (transition-timing-function: linear(0, 1)) {
+  .word-sheet--center.modal.show .modal-dialog {
+    transition: transform 420ms var(--ease-spring);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .word-sheet--center.modal.fade,
+  .word-sheet--center.modal.fade.show,
+  .word-sheet--center.modal.fade .modal-dialog,
+  .word-sheet--center.modal.show .modal-dialog {
+    transform: none;
+    transition: none;
+  }
+
   .word-sheet.offcanvas,
   .word-sheet.offcanvas.hiding {
     transition: none;
