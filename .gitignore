@@ -3,3 +3,6 @@ my-react-app/.env
 
 # 稽核 DEP-6：模擬器與工具的 log（firestore-debug.log 等）可能含測試時寫入的文件資料，不進版控
 *.log
+
+# 專案根目錄的 node_modules（測試快取等），不進版控
+node_modules/
