@@ -27,7 +27,13 @@ describe('WordDetailSheet', () => {
     const dialog = screen.getByRole('dialog');
     expect(dialog).toHaveAccessibleName('babaw');
     expect(screen.getByText('上面', { selector: '.word-sheet-gloss' })).toBeInTheDocument();
+    // 漸進揭露：詞性在「看完整內容」後面
+    expect(screen.queryByText('名詞')).not.toBeInTheDocument();
+    const more = screen.getByRole('button', { name: /看完整內容/ });
+    expect(more).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(more);
     expect(screen.getByText('名詞')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /看完整內容/ })).not.toBeInTheDocument();
   });
 
   test('手機從底部、桌面從右側', () => {
@@ -57,6 +63,128 @@ describe('WordDetailSheet', () => {
     expect(toggleFavorite).toHaveBeenCalledWith('babaw');
     fireEvent.click(screen.getByRole('button', { name: '播放「babaw」的發音' }));
     expect(playAudio).toHaveBeenCalledWith('f1');
+  });
+
+  describe('摘要與漸進揭露（P2-1）', () => {
+    const rich = {
+      keyName: 'r1',
+      word: '上面',
+      result: {
+        name: 'babaw', frequency: 2, sources: ['A 書'],
+        explanationItems: [
+          { chineseExplanation: '上面', partOfSpeech: '名詞', sentenceItems: [
+            { originalSentence: 'S-one', chineseSentence: '第一句' },
+            { originalSentence: 'S-two', chineseSentence: '第二句' },
+          ] },
+        ],
+      },
+    };
+
+    test('預設只顯示第一句例句，看完整內容後才有其餘', () => {
+      render(<WordDetailSheet {...base} detail={rich} />);
+      expect(screen.getByText('S-one')).toBeInTheDocument();
+      expect(screen.queryByText('S-two')).not.toBeInTheDocument();
+      expect(screen.queryByText('收錄來源：')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /看完整內容/ }));
+      expect(screen.getByText('S-two')).toBeInTheDocument();
+      expect(screen.getByText('收錄來源：')).toBeInTheDocument();
+    });
+
+    test('沒有更多內容就不放「看完整內容」', () => {
+      const tiny = { keyName: 't', word: '字', result: { name: 'x', explanationItems: [{ sentenceItems: [{ originalSentence: 'only', chineseSentence: '一句' }] }] } };
+      render(<WordDetailSheet {...base} detail={tiny} />);
+      expect(screen.getByText('only')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /看完整內容/ })).not.toBeInTheDocument();
+    });
+
+    test('背景遮罩有專用 class（變暗加模糊由 CSS token 提供）', () => {
+      render(<WordDetailSheet {...base} detail={rich} />);
+      expect(document.querySelector('.word-sheet-backdrop')).not.toBeNull();
+    });
+  });
+
+  describe('上一個、下一個（P2-1）', () => {
+    const stepProps = { onStep: vi.fn(), stepInfo: { index: 1, total: 3 } };
+
+    test('按鈕以滑鼠換詞（viaKeyboard 為 false），顯示位置', () => {
+      const onStep = vi.fn();
+      render(<WordDetailSheet {...base} {...stepProps} onStep={onStep} detail={detail} />);
+      expect(screen.getByText('2 / 3')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /下一個/ }));
+      expect(onStep).toHaveBeenLastCalledWith(1, false);
+      fireEvent.click(screen.getByRole('button', { name: /上一個/ }));
+      expect(onStep).toHaveBeenLastCalledWith(-1, false);
+    });
+
+    test('左右鍵換詞（viaKeyboard 為 true）', () => {
+      const onStep = vi.fn();
+      render(<WordDetailSheet {...base} {...stepProps} onStep={onStep} detail={detail} />);
+      fireEvent.keyDown(screen.getByRole('dialog'), { key: 'ArrowRight' });
+      expect(onStep).toHaveBeenLastCalledWith(1, true);
+      fireEvent.keyDown(screen.getByRole('dialog'), { key: 'ArrowLeft' });
+      expect(onStep).toHaveBeenLastCalledWith(-1, true);
+    });
+
+    test('第一個不能再往前、最後一個不能再往後，用 aria-disabled 保住焦點', () => {
+      const onStep = vi.fn();
+      const { rerender } = render(<WordDetailSheet {...base} onStep={onStep} stepInfo={{ index: 0, total: 3 }} detail={detail} />);
+      const prev = screen.getByRole('button', { name: /上一個/ });
+      expect(prev).toHaveAttribute('aria-disabled', 'true');
+      expect(prev).not.toBeDisabled();
+      fireEvent.click(prev);
+      fireEvent.keyDown(screen.getByRole('dialog'), { key: 'ArrowLeft' });
+      expect(onStep).not.toHaveBeenCalled();
+      rerender(<WordDetailSheet {...base} onStep={onStep} stepInfo={{ index: 2, total: 3 }} detail={detail} />);
+      fireEvent.keyDown(screen.getByRole('dialog'), { key: 'ArrowRight' });
+      expect(onStep).not.toHaveBeenCalled();
+    });
+
+    test('輸入框、輸入法組字、修飾鍵時不攔截左右鍵', () => {
+      const onStep = vi.fn();
+      render(<><input aria-label="x" /><WordDetailSheet {...base} {...stepProps} onStep={onStep} detail={detail} /></>);
+      fireEvent.keyDown(screen.getByLabelText('x'), { key: 'ArrowRight' });
+      const dialog = screen.getByRole('dialog');
+      fireEvent.keyDown(dialog, { key: 'ArrowRight', isComposing: true });
+      fireEvent.keyDown(dialog, { key: 'ArrowRight', altKey: true });
+      fireEvent.keyDown(dialog, { key: 'ArrowRight', shiftKey: true });
+      expect(onStep).not.toHaveBeenCalled();
+    });
+
+    test('焦點在 sheet 外、或在單選群組／分頁上時不攔截左右鍵', () => {
+      const onStep = vi.fn();
+      render(<><button type="button">外面</button><WordDetailSheet {...base} {...stepProps} onStep={onStep} detail={detail} /></>);
+      fireEvent.keyDown(screen.getByText('外面'), { key: 'ArrowRight' });
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+      const radio = document.createElement('div');
+      radio.setAttribute('role', 'radio');
+      radio.tabIndex = 0;
+      screen.getByRole('dialog').appendChild(radio);
+      fireEvent.keyDown(radio, { key: 'ArrowRight' });
+      expect(onStep).not.toHaveBeenCalled();
+    });
+
+    test('沒有清單（沒有 onStep）就沒有切換列', () => {
+      render(<WordDetailSheet {...base} detail={detail} />);
+      expect(screen.queryByRole('navigation', { name: '切換詞條' })).not.toBeInTheDocument();
+    });
+
+    test('只有滑鼠換詞才有淡入 class，鍵盤換詞沒有', () => {
+      const { rerender } = render(<WordDetailSheet {...base} {...stepProps} detail={{ ...detail, stepFade: true }} />);
+      expect(document.querySelector('.word-sheet-swap')).not.toBeNull();
+      rerender(<WordDetailSheet {...base} {...stepProps} detail={{ ...detail, keyName: 'k2', stepFade: false }} />);
+      expect(document.querySelector('.word-sheet-swap')).toBeNull();
+    });
+
+    test('換詞後展開狀態收回摘要', () => {
+      const a = { keyName: 'a', word: '甲', result: { name: 'aa', frequency: 3, explanationItems: [{ sentenceItems: [{ originalSentence: 'A1', chineseSentence: '一' }] }] } };
+      const b = { keyName: 'b', word: '乙', result: { name: 'bb', frequency: 3, explanationItems: [{ sentenceItems: [{ originalSentence: 'B1', chineseSentence: '二' }] }] } };
+      const { rerender } = render(<WordDetailSheet {...base} {...stepProps} detail={a} />);
+      fireEvent.click(screen.getByRole('button', { name: /看完整內容/ }));
+      expect(screen.getByText('詞頻：')).toBeInTheDocument();
+      rerender(<WordDetailSheet {...base} {...stepProps} detail={b} />);
+      expect(screen.queryByText('詞頻：')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /看完整內容/ })).toBeInTheDocument();
+    });
   });
 
   describe('標題列往下滑關閉（階段 6-3）', () => {
@@ -91,5 +219,72 @@ describe('WordDetailSheet', () => {
       expect(onClose).not.toHaveBeenCalled();
       vi.useRealTimers();
     });
+  });
+});
+
+describe('詳情內的空白鍵播放（P2-9）', () => {
+  const withAudio = { keyName: 'a', word: '上面', result: { name: 'babaw', audioItems: [{ fileId: 'f1' }], explanationItems: [{ chineseExplanation: '上面' }] } };
+  const noAudio = { keyName: 'n', word: '字', result: { name: 'x', explanationItems: [{ chineseExplanation: '字' }] } };
+  const props = { ...base, onStep: vi.fn(), stepInfo: { index: 1, total: 3 } };
+
+  test('焦點在 sheet 內（不是按鈕）時，空白鍵播放發音並擋掉預設（內容不捲動）', () => {
+    const playAudio = vi.fn();
+    render(<WordDetailSheet {...props} playAudio={playAudio} detail={withAudio} />);
+    const notPrevented = fireEvent.keyDown(screen.getByRole('dialog'), { key: ' ', code: 'Space' });
+    expect(playAudio).toHaveBeenCalledWith('f1');
+    expect(notPrevented).toBe(false);
+  });
+
+  test('播放中再按一次停止；失敗時按空白鍵就是重試', () => {
+    const stopAudio = vi.fn();
+    const retryAudio = vi.fn();
+    const { rerender } = render(<WordDetailSheet {...props} stopAudio={stopAudio} playingId="f1" detail={withAudio} />);
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: ' ', code: 'Space' });
+    expect(stopAudio).toHaveBeenCalled();
+    rerender(<WordDetailSheet {...props} retryAudio={retryAudio} failedAudio={new Set(['f1'])} detail={withAudio} />);
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: ' ', code: 'Space' });
+    expect(retryAudio).toHaveBeenCalledWith('f1');
+  });
+
+  test('焦點在按鈕或輸入框上不攔截；沒有音檔、按住重複、修飾鍵、輸入法組字時也不', () => {
+    const playAudio = vi.fn();
+    const { rerender } = render(<WordDetailSheet {...props} playAudio={playAudio} detail={withAudio} />);
+    const dialog = screen.getByRole('dialog');
+    fireEvent.keyDown(screen.getByRole('button', { name: '加入收藏' }), { key: ' ', code: 'Space' });
+    const input = document.createElement('input');
+    dialog.appendChild(input);
+    fireEvent.keyDown(input, { key: ' ', code: 'Space' });
+    fireEvent.keyDown(dialog, { key: ' ', code: 'Space', repeat: true });
+    fireEvent.keyDown(dialog, { key: ' ', code: 'Space', ctrlKey: true });
+    fireEvent.keyDown(dialog, { key: ' ', code: 'Space', isComposing: true });
+    expect(playAudio).not.toHaveBeenCalled();
+    rerender(<WordDetailSheet {...props} playAudio={playAudio} detail={noAudio} />);
+    const notPrevented = fireEvent.keyDown(screen.getByRole('dialog'), { key: ' ', code: 'Space' });
+    expect(playAudio).not.toHaveBeenCalled();
+    expect(notPrevented).toBe(true);
+  });
+
+  test('焦點在 sheet 外時空白鍵不播放', () => {
+    const playAudio = vi.fn();
+    render(<><button type="button">外面</button><WordDetailSheet {...props} playAudio={playAudio} detail={withAudio} /></>);
+    fireEvent.keyDown(document.body, { key: ' ', code: 'Space' });
+    expect(playAudio).not.toHaveBeenCalled();
+  });
+
+  test('沒有 onStep（沒有清單）時空白鍵仍然能播放', () => {
+    const playAudio = vi.fn();
+    render(<WordDetailSheet {...base} playAudio={playAudio} detail={withAudio} />);
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: ' ', code: 'Space' });
+    expect(playAudio).toHaveBeenCalledWith('f1');
+  });
+
+  test('說明清單有這三個快捷鍵，而且每一個都有畫面上的按鈕', async () => {
+    const { SHORTCUTS } = await import('../../../hooks/shortcuts');
+    ['← →', '空白鍵', 'Esc'].forEach((k) => expect(SHORTCUTS.map((s) => s.key)).toContain(k));
+    render(<WordDetailSheet {...props} detail={withAudio} />);
+    expect(screen.getByRole('button', { name: /上一個/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /下一個/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '播放「babaw」的發音' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '關閉詳情' })).toBeInTheDocument();
   });
 });

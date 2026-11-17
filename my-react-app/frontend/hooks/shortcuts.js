@@ -2,11 +2,16 @@
 // 每個快捷鍵都有對應的可點按鈕或可見控制項，鍵盤只是捷徑，不是唯一入口：
 //   ?  → 頁尾的「鍵盤快捷鍵」按鈕
 //   /  → 搜尋框本身（直接點它）
+//   ← → → 詳情裡的「上一個」「下一個」按鈕；空白鍵 → 發音鈕；Esc → 關閉鈕
 export const HELP_EVENT = 'yy:open-shortcut-help';
 
 export const SHORTCUTS = [
   { key: '/', label: '跳到搜尋框', scope: '有搜尋框的頁面（單詞查詢）' },
   { key: '?', label: '開啟這份快捷鍵說明', scope: '全站' },
+  // 單詞詳情開啟時（P2-9）。每一個在畫面上都有對應的按鈕：上一個／下一個、發音鈕、關閉鈕
+  { key: '← →', label: '上一個、下一個詞', scope: '單詞詳情開啟時' },
+  { key: '空白鍵', label: '播放或停止發音', scope: '單詞詳情開啟時（焦點在按鈕或輸入框時不觸發）' },
+  { key: 'Esc', label: '關閉詳情', scope: '單詞詳情開啟時' },
 ];
 
 export const openShortcutHelp = () => document.dispatchEvent(new CustomEvent(HELP_EVENT));

@@ -1,0 +1,96 @@
+/* 進階篩選的折疊按鈕與「已套用的篩選」chip 列（P2-3） */
+.wf-disclosure {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--yy-space-2);
+  min-height: var(--yy-control-md);
+  padding: 0 var(--yy-space-3);
+  border: 0;
+  background: transparent;
+  color: var(--yy-calm-text);
+  font-size: var(--yy-text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.wf-disclosure:active {
+  transform: scale(var(--yy-ui-press));
+}
+
+.wf-disclosure:focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
+  border-radius: var(--yy-radius-control);
+}
+
+/* 狀態用文字說明（展開／收起、已套用幾項），不只靠顏色或箭頭 */
+.wf-disclosure-state {
+  color: var(--yy-calm-text-sub);
+  font-weight: 400;
+}
+
+.wf-disclosure-count {
+  padding: 2px var(--yy-space-2);
+  border: var(--yy-border-width) solid var(--yy-calm-rule);
+  border-radius: var(--yy-radius-pill);
+  font-weight: 700;
+}
+
+.af-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--yy-space-2);
+  max-width: 720px;
+  margin: var(--yy-space-2) auto 0;
+}
+
+.af-chip,
+.af-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--yy-space-1);
+  min-height: var(--yy-control-md);
+  padding: 0 var(--yy-space-3);
+  border: var(--yy-border-width) solid var(--yy-calm-rule);
+  border-radius: var(--yy-radius-pill);
+  background: var(--yy-calm-surface);
+  color: var(--yy-calm-text);
+  font-size: var(--yy-text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.af-clear {
+  border-color: transparent;
+  background: transparent;
+  color: var(--yy-calm-text-sub);
+  text-decoration: underline;
+}
+
+.af-chip:active,
+.af-clear:active {
+  transform: scale(var(--yy-ui-press));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .af-chip:hover {
+    border-color: var(--yy-calm-copper);
+  }
+}
+
+.af-chip:focus-visible,
+.af-clear:focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wf-disclosure:active,
+  .af-chip:active,
+  .af-clear:active {
+    transform: none;
+  }
+}

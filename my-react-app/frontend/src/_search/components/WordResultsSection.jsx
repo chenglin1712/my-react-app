@@ -1,3 +1,4 @@
+import { useCallback, useLayoutEffect, useRef } from 'react';
 import { ListGroup, Button } from 'react-bootstrap';
 import WordCard from './WordCard';
 import ErrorBoundary from '../../errorBoundary';
@@ -31,11 +32,27 @@ const WordResultsSection = ({
   totalCount,
   loadingMore = false,
   onOpenDetail,
+  stopAudio,
+  retryAudio,
+  playingId = null,
+  playingDuration = 0,
 }) => {
   const filteredSorted = serverPaginated ? wordsFlat : filterAndSortWords(wordsFlat);
   const visibleWords = serverPaginated ? wordsFlat : filteredSorted.slice(0, visibleCount);
   const total = serverPaginated ? (totalCount ?? wordsFlat.length) : filteredSorted.length;
   const remaining = Math.max(0, total - visibleWords.length);
+
+  const items = visibleWords.map((wordData, idx) => {
+    const word = wordData.explanationItems?.[0]?.chineseExplanation || wordData.chineseExplanation || '';
+    return { keyName: `${word}-${idx}-${wordData.name || ''}`, word, result: wordData };
+  });
+  // 點開詳情那一刻才讀最新清單（ref 只在事件裡讀），並讓交給字卡的函式保持穩定，不破壞 WordCard 的 memo
+  const itemsRef = useRef(items);
+  useLayoutEffect(() => { itemsRef.current = items; });
+  const handleOpenDetail = useCallback(
+    (item, event) => onOpenDetail?.({ ...item, siblings: itemsRef.current }, event),
+    [onOpenDetail],
+  );
 
   // 篩選後一筆都沒有就整塊不顯示，不要留下「完全符合結果 (0)」這種空標題
   if (total === 0) return null;
@@ -44,9 +61,7 @@ const WordResultsSection = ({
     <>
       <h2 className={`h4 fw-bold ${titleColorClass}`}>{title} ({total})</h2>
       <ListGroup>
-        {visibleWords.map((wordData, idx) => {
-          const word = wordData.explanationItems?.[0]?.chineseExplanation || wordData.chineseExplanation || '';
-          const key = `${word}-${idx}-${wordData.name || ''}`;
+        {items.map(({ keyName: key, word, result: wordData }) => {
           return (
             // 單張字卡的資料若有缺陷導致渲染出錯，只讓這一張卡片顯示錯誤提示，
             // 不要讓整個搜尋結果列表跟著消失。
@@ -67,7 +82,11 @@ const WordResultsSection = ({
                 hasSentenceAudio={hasSentenceAudio}
                 isFavorited={favoriteWords.has(wordData.name)}
                 failedAudio={failedAudio}
-                onOpenDetail={onOpenDetail}
+                stopAudio={stopAudio}
+                retryAudio={retryAudio}
+                isPlayingWord={Boolean(playingId) && playingId === wordData.audioItems?.[0]?.fileId}
+                playingDuration={playingId && playingId === wordData.audioItems?.[0]?.fileId ? playingDuration : 0}
+                onOpenDetail={onOpenDetail ? handleOpenDetail : undefined}
               />
             </ErrorBoundary>
           );

@@ -19,6 +19,8 @@ import WordResultsSection from './components/WordResultsSection';
 import MorphologyPanel from './components/MorphologyPanel';
 import CompactSearchBar from './components/CompactSearchBar';
 import WordDetailSheet from './components/WordDetailSheet';
+import AlphabetRail from './components/AlphabetRail';
+import useSimilarWords from './components/useSimilarWords';
 import { useScrolledPast } from '../hooks/useScrolledPast';
 import useAudioPlayback from '../../hooks/useAudioPlayback';
 import { apiUrl } from "../../utils/apiUrls";
@@ -58,6 +60,11 @@ const SearchPage = () => {
     () => new Set(favorites.find(fav => fav.id === WORD_FAVORITES_CATEGORY_ID)?.content || []),
     [favorites]
   );
+  // 單詞查詢頁加／取消收藏都附「復原」提示（P2-7）；其他頁面直接用 toggleFavorite，沒有提示
+  const toggleFavoriteWithUndo = useCallback(
+    (word) => toggleFavorite(word, WORD_FAVORITES_CATEGORY_ID, { undo: true }),
+    [toggleFavorite],
+  );
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const [frequencyFilter, setFrequencyFilter] = useState('');
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -78,7 +85,8 @@ const SearchPage = () => {
   const [morphPrefill, setMorphPrefill] = useState(null);
   const morphPrefillCountRef = useRef(0);
 
-  const { playAudio, playSentence, failedAudio } = useAudioPlayback(selectedTribe, setError);
+  const { playAudio, playSentence, stopAudio, retryAudio, playingId, playingDuration, failedAudio } = useAudioPlayback(selectedTribe, setError);
+  const audioState = { stopAudio, retryAudio, playingId, playingDuration };
 
   // 句子 TTS 備用播放鈕只在這個族語沒有整句真人原音時才需要，跟 _translate
   // 頁面用同一份後端能力資料判斷（見 WordCard.jsx），不再寫死「布農語／排灣語」。
@@ -100,6 +108,16 @@ const SearchPage = () => {
     setDetail(next);
   }, []);
   const closeDetail = useCallback(() => setDetail(null), []);
+  // 詳情內換詞：照「點開那一區」目前的清單順序。鍵盤換詞不加動畫，滑鼠按鈕才淡入（P2-1）
+  const stepDetail = useCallback((offset, viaKeyboard) => {
+    setDetail((prev) => {
+      const list = prev?.siblings;
+      const current = list ? list.findIndex((it) => it.keyName === prev.keyName) : -1;
+      const next = current < 0 ? null : list[current + offset];
+      return next ? { ...next, siblings: list, stepFade: !viaKeyboard } : prev;
+    });
+  }, []);
+  const detailIndex = detail?.siblings ? detail.siblings.findIndex((it) => it.keyName === detail.keyName) : -1;
 
   const toggleExpand = useCallback((key) => setExpandedWord(prev => (prev === key ? null : key)), []);
 
@@ -311,6 +329,26 @@ const SearchPage = () => {
     handleSearchRef.current();
   }, []);
 
+  // A 到 Z 捷徑列：目前已載入的詞裡有該字母就捲過去（鍵盤操作時把焦點交給那個詞）；
+  // 「全部詞條」是後端分頁、該字母還沒載入時，改套用開頭字母篩選；其餘情況用公告說明沒有。
+  const jumpToLetter = (letter, { focus = false, commit = true } = {}) => {
+    const card = [...document.querySelectorAll('.search-page [data-letter]')].find((el) => el.dataset.letter === letter);
+    if (card) {
+      const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      card.scrollIntoView({ block: 'start', behavior: focus && !reduce ? 'smooth' : 'auto' });
+      if (focus) card.querySelector('.word-card-toggle')?.focus({ preventScroll: true });
+      return;
+    }
+    // 滑動預覽（commit:false）不改查詢條件，免得手指一掃就連發好幾次後端請求
+    if (!commit) return;
+    if (allWords.length > 0 && filterLetter !== letter) {
+      setFilterLetter(letter);
+      announce(`已篩選開頭字母 ${letter}`);
+      return;
+    }
+    announce(`目前結果中沒有以 ${letter} 開頭的詞`);
+  };
+
   const clearFilters = () => {
     setFilterLetter('');
     setFrequencyFilter('');
@@ -318,6 +356,15 @@ const SearchPage = () => {
     setSelectedSubCategory(null);
     setPosFilter('');
   };
+
+  // 已套用的篩選 chip（P2-3）：每一個都可個別移除；排序只有在非預設（Z → A）時才列出
+  const activeFilterItems = [
+    filterLetter && { key: 'letter', label: `開頭「${filterLetter}」`, onRemove: () => setFilterLetter('') },
+    String(frequencyFilter ?? '') && { key: 'freq', label: `詞頻 ${frequencyFilter} 星`, onRemove: () => setFrequencyFilter('') },
+    showOnlyFavorites && { key: 'fav', label: '只顯示收藏', onRemove: () => setShowOnlyFavorites(false) },
+    selectedSubCategory && { key: 'cat', label: `分類「${selectedSubCategory}」`, onRemove: () => setSelectedSubCategory(null) },
+    sortOrder === 'desc' && { key: 'sort', label: '排序：Z → A', onRemove: () => setSortOrder('asc') },
+  ].filter(Boolean);
 
   // 展平只在查詢結果（definitions）變動時做一次；原本每次 render（連打開選單也算）都重新 flat()
   const exactWords = useMemo(() => Object.values(definitions.exact_match_results).flat(), [definitions]);
@@ -344,7 +391,10 @@ const SearchPage = () => {
   const hasCurrentResults = Object.keys(definitions.exact_match_results || {}).length + Object.keys(definitions.fuzzy_match_results || {}).length > 0;
   const keywordEmpty = settled && outcome?.mode === 'keyword' && exactVisibleTotal === 0 && fuzzyVisibleTotal === 0;
   const browseEmpty = settled && outcome?.mode === 'all' && outcome.sig === filterSignature && allWords.length === 0;
+  const showAlphabetRail = TRIBES_WITH_DATA.includes(selectedTribe) && alphabet.length > 0 && (allWords.length > 0 || exactVisibleTotal > 0 || fuzzyVisibleTotal > 0);
   const keywordHasLatin = outcome?.mode === 'keyword' && !/[\u4e00-\u9fff]/.test(outcome.keyword);
+  // 查無結果時才找「開頭相近的詞」（P2-8）；只對拉丁字母的關鍵字，來源與限制見 useSimilarWords.js
+  const similar = useSimilarWords(outcome?.keyword, selectedTribe, keywordEmpty && keywordHasLatin);
 
   // 查無結果時的建議：同一個詞改用其他族語再查（保留輸入的詞，不重置成瀏覽全部）
   const tryOtherTribe = (tribe, keyword) => {
@@ -375,6 +425,7 @@ const SearchPage = () => {
         showCategories={showCategories} setShowCategories={setShowCategories}
         activeTab={activeTab} setActiveTab={setActiveTab}
         selectedSubCategory={selectedSubCategory} setSelectedSubCategory={setSelectedSubCategory}
+        activeFilterItems={activeFilterItems} onClearAllFilters={clearFilters}
       />
 
       <CompactSearchBar
@@ -435,6 +486,20 @@ const SearchPage = () => {
             <li>換成其他族語再查一次</li>
             {keywordHasLatin && <li>這個詞可能是變化形，詞形分析可以幫你找出它的詞根與詞綴</li>}
           </ul>
+          {similar.items.length > 0 && (
+            <div className="search-suggest-group">
+              <p className="search-suggest-note" id="search-similar-note">
+                以「{similar.prefix}」開頭的詞，只是拼寫開頭相近，意思不一定相同：
+              </p>
+              <div className="search-suggest-tribes" role="group" aria-labelledby="search-similar-note">
+                {similar.items.map((item) => (
+                  <button type="button" key={item.name} className="search-suggest-chip" onClick={() => { setQuery(item.name); handleSearch(null, item.name); }}>
+                    {item.name}{item.gloss ? `（${item.gloss}）` : ''}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="search-suggest-tribes" role="group" aria-label={`改用其他族語查「${outcome.keyword}」`}>
             {tribes.filter(name => name !== selectedTribe).map(name => (
               <button type="button" key={name} className="search-suggest-chip" onClick={() => tryOtherTribe(name, outcome.keyword)}>
@@ -454,6 +519,8 @@ const SearchPage = () => {
         </EmptyState>
       )}
 
+      <div className={`search-results-area${showAlphabetRail ? ' has-rail' : ''}`}>
+      <div className="search-results-main">
       {TRIBES_WITH_DATA.includes(selectedTribe) && allWords.length > 0 && (
         <WordResultsSection
           title="全部詞條"
@@ -466,13 +533,14 @@ const SearchPage = () => {
           onLoadMore={handleLoadMoreAll}
           expandedWord={expandedWord}
           toggleExpand={toggleExpand}
-          toggleFavorite={toggleFavorite}
+          toggleFavorite={toggleFavoriteWithUndo}
           playAudio={playAudio}
           playSentence={playSentence}
           favoriteWords={favoriteWords}
           failedAudio={failedAudio}
           hasSentenceAudio={hasSentenceAudio}
           onOpenDetail={openDetail}
+          {...audioState}
         />
       )}
 
@@ -486,13 +554,14 @@ const SearchPage = () => {
           onLoadMore={() => setVisibleExactCount(c => c + PAGE_SIZE)}
           expandedWord={expandedWord}
           toggleExpand={toggleExpand}
-          toggleFavorite={toggleFavorite}
+          toggleFavorite={toggleFavoriteWithUndo}
           playAudio={playAudio}
           playSentence={playSentence}
           favoriteWords={favoriteWords}
           failedAudio={failedAudio}
           hasSentenceAudio={hasSentenceAudio}
           onOpenDetail={openDetail}
+          {...audioState}
         />
       )}
       <br />
@@ -506,27 +575,34 @@ const SearchPage = () => {
           onLoadMore={() => setVisibleFuzzyCount(c => c + PAGE_SIZE)}
           expandedWord={expandedWord}
           toggleExpand={toggleExpand}
-          toggleFavorite={toggleFavorite}
+          toggleFavorite={toggleFavoriteWithUndo}
           playAudio={playAudio}
           playSentence={playSentence}
           favoriteWords={favoriteWords}
           failedAudio={failedAudio}
           hasSentenceAudio={hasSentenceAudio}
           onOpenDetail={openDetail}
+          {...audioState}
         />
       )}
+      </div>
+      {showAlphabetRail && <AlphabetRail letters={alphabet} onJump={jumpToLetter} />}
+      </div>
 
       <WordDetailSheet
         detail={detail}
         animated={sheetAnimated}
         onClose={closeDetail}
+        onStep={detail?.siblings ? stepDetail : undefined}
+        stepInfo={detailIndex >= 0 ? { index: detailIndex, total: detail.siblings.length } : null}
         isMobile={isMobile}
         isFavorited={detail ? favoriteWords.has(detail.result.name) : false}
-        toggleFavorite={toggleFavorite}
+        toggleFavorite={toggleFavoriteWithUndo}
         playAudio={playAudio}
         playSentence={playSentence}
         hasSentenceAudio={hasSentenceAudio}
         failedAudio={failedAudio}
+        {...audioState}
       />
 
       {/* 詞形分析放在結果下面，當作「查不到時的下一步」，不跟上面的搜尋框搶位置（審查項 P2-43） */}

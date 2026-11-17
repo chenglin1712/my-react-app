@@ -95,6 +95,98 @@
   padding: var(--yy-space-2) var(--yy-space-4) var(--yy-space-6);
 }
 
+/* 背景變暗加模糊（P2-1）：只用 token；減少透明度或不支援模糊時改成較深的實色遮罩 */
+.word-sheet-backdrop.offcanvas-backdrop {
+  /* Bootstrap 的 offcanvas 遮罩把黑色與 .5 透明度寫死（不像 modal 有 --bs-backdrop-* 變數），所以直接覆寫屬性 */
+  background-color: var(--yy-scrim);
+  -webkit-backdrop-filter: blur(var(--yy-scrim-blur));
+  backdrop-filter: blur(var(--yy-scrim-blur));
+}
+
+/* 遮罩本身的淡入淡出由 .fade 的 opacity 負責，顯示時要是完整的 1（Bootstrap 預設是 .5） */
+.word-sheet-backdrop.offcanvas-backdrop.show {
+  opacity: 1;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .word-sheet-backdrop.offcanvas-backdrop {
+    background-color: var(--yy-scrim-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .word-sheet-backdrop.offcanvas-backdrop {
+    background-color: var(--yy-scrim-solid);
+  }
+}
+
+/* 摘要下方的「看完整內容」與底部上一個／下一個 */
+.word-sheet-more.btn,
+.word-sheet-nav .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--yy-space-1);
+  min-height: var(--yy-control-md);
+  padding: 0 var(--yy-space-3);
+  color: var(--yy-calm-text);
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.word-sheet-more.btn {
+  margin-top: var(--yy-space-2);
+  padding-left: 0;
+}
+
+.word-sheet-more.btn:active,
+.word-sheet-nav .btn:active {
+  transform: scale(var(--yy-ui-press));
+}
+
+.word-sheet-more.btn:focus-visible,
+.word-sheet-nav .btn:focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
+}
+
+.word-sheet-empty {
+  margin: var(--yy-space-3) 0 0;
+  color: var(--yy-calm-text-sub);
+}
+
+.word-sheet-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--yy-space-2);
+  padding: var(--yy-space-2) var(--yy-space-3) calc(var(--yy-space-2) + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--yy-calm-rule);
+}
+
+.word-sheet-nav .btn[aria-disabled="true"] {
+  color: var(--yy-calm-text-sub);
+  opacity: 0.55;
+  cursor: default;
+}
+
+.word-sheet-pos {
+  color: var(--yy-calm-text-sub);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 滑鼠按鈕換詞才淡入（約 120ms）；鍵盤換詞沒有這個 class，直接換 */
+.word-sheet-swap {
+  animation: yy-sheet-swap var(--dur-press) var(--ease-out);
+}
+
+@keyframes yy-sheet-swap {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .word-sheet .list-group-item {
   border: none;
   border-top: 1px solid var(--yy-calm-rule);
@@ -133,7 +225,13 @@
   }
 
   .word-sheet-actions .btn:active,
-  .word-sheet-head .btn-close:active {
+  .word-sheet-head .btn-close:active,
+  .word-sheet-more.btn:active,
+  .word-sheet-nav .btn:active {
     transform: none;
+  }
+
+  .word-sheet-swap {
+    animation: none;
   }
 }

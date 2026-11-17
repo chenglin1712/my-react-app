@@ -98,6 +98,9 @@
   --yy-glass-bg-solid: #FFF9ED; /* 降級用純色（prefers-reduced-transparency 或不支援 backdrop-filter） */
   --yy-glass-border: rgba(41, 45, 49, 0.12);
   --yy-glass-halo: rgba(255, 249, 237, 0.9);
+  --yy-scrim: rgba(41, 45, 49, 0.42); /* 浮層背後的遮罩（P2-1）：變暗加約 10px 模糊，不做背景微縮 */
+  --yy-scrim-solid: rgba(41, 45, 49, 0.6); /* 減少透明度或不支援模糊時改用更深的實色遮罩 */
+  --yy-scrim-blur: 10px;
   --yy-glass-specular: rgba(255, 255, 255, 0.55); /* Liquid Glass 頂緣高光：只在 .yy-glass--liquid 用，亮色可放心加亮 */ /* 焦點環外圈的淺色光暈，讓焦點環在任何被模糊的底圖上都看得見 */
   /* 細框一律 1.5px（DESIGN.md）。色塊分隔用的粗邊（border-left 4px 以上的強調條）不受影響 */
   --yy-border-width: 1.5px;
@@ -444,6 +447,8 @@
     --yy-glass-bg-solid: #24282C;
     --yy-glass-border: rgba(242, 238, 227, 0.14);
     --yy-glass-halo: rgba(36, 40, 44, 0.9);
+    --yy-scrim: rgba(8, 10, 12, 0.6);
+    --yy-scrim-solid: rgba(8, 10, 12, 0.75);
   --yy-glass-specular: rgba(255, 255, 255, 0); /* 深色不加高光：淺色次要字在「全白底圖上的深色玻璃」本來就只有 4.6:1，任何高光都會掉到 4.5 以下（glass.test.js） */
     /* Bootstrap 狀態色的 rgb 三元組（深色）：淺色的在檔尾 :root，深色在這裡跟著換（步驟 1-9） */
     --bs-primary-rgb: 215, 169, 139;
@@ -480,6 +485,8 @@
   --yy-glass-bg-solid: #24282C;
   --yy-glass-border: rgba(242, 238, 227, 0.14);
   --yy-glass-halo: rgba(36, 40, 44, 0.9);
+  --yy-scrim: rgba(8, 10, 12, 0.6);
+  --yy-scrim-solid: rgba(8, 10, 12, 0.75);
   --yy-glass-specular: rgba(255, 255, 255, 0); /* 深色不加高光：淺色次要字在「全白底圖上的深色玻璃」本來就只有 4.6:1，任何高光都會掉到 4.5 以下（glass.test.js） */
   /* Bootstrap 狀態色的 rgb 三元組（深色）：淺色的在檔尾 :root，深色在這裡跟著換（步驟 1-9） */
   --bs-primary-rgb: 215, 169, 139;

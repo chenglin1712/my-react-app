@@ -1,0 +1,120 @@
+/* 發音鈕的三種狀態（P2-5、P2-6）：閒置、播放中（波形＋環形進度）、失敗（文字＋重試）。 */
+.yy-audio-btn.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--yy-space-1);
+  min-width: var(--yy-control-md);
+  min-height: var(--yy-control-md);
+  padding: 0 var(--yy-space-1);
+  color: var(--yy-calm-text);
+  text-decoration: none;
+}
+
+.yy-audio-control {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--yy-space-1);
+  min-width: 0;
+}
+
+.yy-audio-failed-text {
+  color: var(--yy-calm-danger);
+  font-size: var(--yy-text-sm);
+  font-weight: 700;
+}
+
+.yy-audio-retry-text {
+  font-size: var(--yy-text-sm);
+  font-weight: 700;
+}
+
+.yy-audio-glyph {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+
+.yy-audio-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.yy-audio-ring circle {
+  fill: none;
+  stroke-width: 2.5;
+}
+
+.yy-audio-ring-track {
+  stroke: var(--yy-calm-rule);
+}
+
+.yy-audio-ring-fill {
+  stroke: var(--yy-calm-copper);
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+}
+
+/* 進度環：長度跟音檔一樣（--yy-audio-dur），線性走完；不知道長度時環保持空的，只靠波形表示播放中 */
+.yy-audio-ring-fill.has-duration {
+  animation: yy-audio-ring var(--yy-audio-dur) linear forwards;
+}
+
+@keyframes yy-audio-ring {
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* 波形：四條只動 transform 的細柱，只在「正在播放」這個狀態存在，播完就消失 */
+.yy-audio-wave {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 14px;
+}
+
+.yy-audio-wave i {
+  display: block;
+  width: 2px;
+  height: 100%;
+  border-radius: var(--yy-radius-pill);
+  background: var(--yy-calm-text);
+  transform-origin: center;
+  animation: yy-audio-wave 900ms var(--ease-out) infinite alternate;
+}
+
+.yy-audio-wave i:nth-child(1) { animation-delay: -300ms; }
+.yy-audio-wave i:nth-child(2) { animation-delay: -150ms; }
+.yy-audio-wave i:nth-child(3) { animation-delay: -450ms; }
+.yy-audio-wave i:nth-child(4) { animation-delay: -50ms; }
+
+@keyframes yy-audio-wave {
+  from { transform: scaleY(0.3); }
+  to { transform: scaleY(1); }
+}
+
+.yy-audio-btn.btn:focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
+}
+
+/* 減少動態：波形凍結成固定高度的靜態波形，環直接顯示為滿的 */
+@media (prefers-reduced-motion: reduce) {
+  .yy-audio-wave i {
+    animation: none;
+    transform: scaleY(0.65);
+  }
+
+  .yy-audio-wave i:nth-child(odd) {
+    transform: scaleY(1);
+  }
+
+  /* 環不再走動，保持空的：不能把「靜止」誤看成「已播完」；播放中由按鈕名稱與靜態波形表示 */
+  .yy-audio-ring-fill.has-duration {
+    animation: none;
+  }
+}

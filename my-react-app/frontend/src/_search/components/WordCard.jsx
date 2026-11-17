@@ -1,14 +1,16 @@
 import { memo, useCallback, useId } from 'react';
-import { ListGroup, Button } from 'react-bootstrap';
-import { Heart, CirclePlay } from 'lucide-react';
+import { ListGroup } from 'react-bootstrap';
 import StarRating from '../../../components/ui/StarRating';
+import AudioPlayButton from '../../../components/ui/AudioPlayButton';
+import FavoriteButton from '../../../components/ui/FavoriteButton';
 import WordDetailBody from './WordDetailBody';
+import { pickFirstSentence } from './wordDetailSummary';
 import '../../../static/css/_search/wordCard.css';
 
 // 字卡的展開／收合用 disclosure 模式（審查項 P2-40）：標題（h3）裡放一顆真正的按鈕，帶 aria-expanded 與
 // aria-controls；播放、收藏是標題旁邊獨立的按鈕，不再巢狀放在另一個 role=button 的 div 裡。
 // 展開內容裡原本拿 h5／h6 當樣式用，會讓標題層級亂跳（頁面 h1 → h2 區塊標題 → h3 詞條 → 其餘都是純文字），改用段落。
-const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggleFavorite, wordName, playAudio, playSentence, hasSentenceAudio, isFavorited, failedAudio, onOpenDetail }) => {
+const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggleFavorite, wordName, playAudio, playSentence, hasSentenceAudio, isFavorited, failedAudio, onOpenDetail, stopAudio, retryAudio, isPlayingWord = false, playingDuration = 0 }) => {
   const handleToggleFavorite = useCallback(() => {
     toggleFavorite(wordName);
   }, [toggleFavorite, wordName]);
@@ -18,10 +20,15 @@ const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggle
   const firstDef = result.explanationItems?.[0];
   const metaTags = [firstDef?.partOfSpeech, firstDef?.category].filter((t) => typeof t === 'string' && t.trim());
 
-  const hasWordAudio = result.audioItems?.length > 0 && !failedAudio?.has(result.audioItems[0].fileId);
+  const wordFileId = result.audioItems?.[0]?.fileId;
+  const wordAudioFailed = Boolean(wordFileId && failedAudio?.has(wordFileId));
+  const hasWordAudio = Boolean(wordFileId);
+  // 一行例句預覽：只在查詢頁（有詳情面板）顯示，原文加華語一起排在一行，太長就截斷
+  const sentence = onOpenDetail ? pickFirstSentence(result) : null;
+  const preview = sentence ? [sentence.originalSentence?.trim(), sentence.chineseSentence?.trim()].filter(Boolean).join('　') : '';
 
   return (
-  <ListGroup.Item className="d-flex flex-column">
+  <ListGroup.Item className="d-flex flex-column" data-letter={(result.name || '').slice(0, 1).toLowerCase()}>
     <div className="d-flex justify-content-between align-items-center word-card-head">
       <h3 className="fw-bolder word-card-heading">
         <button
@@ -38,13 +45,17 @@ const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggle
       </h3>
       <div className="d-flex align-items-center word-card-actions">
         {hasWordAudio && (
-          <Button type="button" variant="link" aria-label={`播放「${result.name}」的發音`} onClick={() => playAudio(result.audioItems[0].fileId)}>
-            <CirclePlay size={20} className="yy-icon word-card-icon" aria-hidden="true" />
-          </Button>
+          <AudioPlayButton
+            name={result.name}
+            playing={isPlayingWord}
+            duration={playingDuration}
+            failed={wordAudioFailed}
+            onPlay={() => playAudio(wordFileId)}
+            onStop={stopAudio}
+            onRetry={() => retryAudio?.(wordFileId)}
+          />
         )}
-        <Button type="button" variant="link" aria-label={isFavorited ? "取消收藏" : "加入收藏"} aria-pressed={isFavorited} onClick={handleToggleFavorite}>
-          {isFavorited ? <Heart size="1em" className="yy-icon" color="var(--yy-calm-danger)" fill="var(--yy-calm-danger)" aria-hidden="true" /> : <Heart size="1em" className="yy-icon" color="var(--yy-calm-text)" aria-hidden="true" />}
-        </Button>
+        <FavoriteButton name={result.name} isFavorited={isFavorited} onToggle={handleToggleFavorite} size={20} />
       </div>
     </div>
     {onOpenDetail && (metaTags.length > 0 || Number(result.frequency) > 0) && (
@@ -53,6 +64,7 @@ const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggle
         {Number(result.frequency) > 0 && <StarRating frequency={result.frequency} />}
       </div>
     )}
+    {preview && <p className="word-card-example">{preview}</p>}
     {!onOpenDetail && isExpanded && (
       <div className="mt-2 pt-2 border-top" id={panelId}>
         <WordDetailBody

@@ -1,0 +1,87 @@
+/* A 到 Z 捷徑列（P2-3）：清單旁的窄欄，捲動時貼在畫面上，只在清單區出現。 */
+.alpha-rail {
+  position: sticky;
+  top: 6rem;
+  align-self: start;
+  height: min(70dvh, 640px);
+  width: var(--yy-control-md);
+}
+
+.alpha-list {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  /* 手指在上面滑動時不要帶動整頁捲動 */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.alpha-btn {
+  flex: 1 1 0;
+  min-height: 0;
+  width: var(--yy-control-md);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--yy-calm-text-sub);
+  font-size: var(--yy-text-xs);
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .alpha-btn:hover {
+    color: var(--yy-calm-text);
+  }
+}
+
+.alpha-btn:focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: calc(var(--yy-ui-focus-offset) * -1);
+  border-radius: var(--yy-radius-tag);
+  color: var(--yy-calm-text);
+}
+
+/* 滑動時在列的左側浮出目前的字母（視覺回饋，aria-hidden） */
+.alpha-bubble {
+  position: absolute;
+  top: 50%;
+  right: calc(100% + var(--yy-space-2));
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-top: -28px;
+  border-radius: var(--yy-radius-panel);
+  background: var(--yy-calm-text);
+  color: var(--yy-calm-bg);
+  font-size: var(--yy-text-2xl);
+  font-weight: 700;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+/* 結果區：清單 + 捷徑列。DOM 順序是清單在前，鍵盤與閱讀順序不受影響。 */
+.search-results-area {
+  max-width: var(--search-list-max);
+  margin: 0 auto;
+}
+
+.search-results-area.has-rail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--yy-control-md);
+  gap: var(--yy-space-2);
+  max-width: calc(var(--search-list-max) + var(--yy-control-md) + var(--yy-space-2));
+}
+
+.search-results-main {
+  min-width: 0;
+}
+
+/* 跳到某個字母時，不要被上方的固定導覽蓋住 */
+.search-page [data-letter] {
+  scroll-margin-top: 6rem;
+}

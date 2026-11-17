@@ -72,6 +72,16 @@
   font-weight: 700;
 }
 
+/* 一行例句預覽（P2-5）：單行、太長截斷，不讓長例句撐破版 */
+.word-card-example {
+  margin: var(--yy-space-1) 0 0;
+  overflow: hidden;
+  color: var(--yy-calm-text-sub);
+  font-size: var(--yy-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .word-card-actions {
   flex-shrink: 0;
 }

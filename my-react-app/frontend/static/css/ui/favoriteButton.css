@@ -1,0 +1,35 @@
+/* 收藏愛心鈕（P2-7）：已收藏用語意色填滿；加入時彈跳一次（只動 transform，一次性，不循環） */
+.yy-fav-btn.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--yy-control-md);
+  min-height: var(--yy-control-md);
+  padding: 0;
+  color: var(--yy-calm-text);
+}
+
+.yy-fav-btn.btn.is-favorited {
+  color: var(--yy-calm-danger);
+}
+
+.yy-fav-btn.btn:focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
+}
+
+.yy-fav-heart.is-pop {
+  animation: yy-heart-pop 360ms var(--ease-out);
+}
+
+@keyframes yy-heart-pop {
+  0% { transform: scale(0.8); }
+  45% { transform: scale(1.28); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yy-fav-heart.is-pop {
+    animation: none;
+  }
+}
