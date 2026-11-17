@@ -10,7 +10,7 @@ django-redis==7.0.0
 redis==8.1.0
 
 # FastAPI / ASGI
-fastapi==0.162.2
+fastapi==0.162.7
 uvicorn==0.54.0
 python-multipart==0.0.33
 starlette==1.10.0
@@ -23,12 +23,12 @@ dj-database-url==3.1.2
 psycopg2-binary==2.9.13
 
 # Firebase
-firebase-admin==7.7.0
+firebase-admin==7.8.0
 # 詞素診斷 token 的驗證式加密（firebase-admin 也會帶入，這裡明確列出，不要依賴間接相依）
 cryptography==50.0.2
 
 # AI / ML
-anthropic==2.6.0
+anthropic==2.8.0
 # torch/torchaudio must be installed together from pytorch.org with matching CUDA version.
 # Example (CPU): pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 # 這兩個不在 requirements.lock 裡（要從 PyTorch 自己的 index 裝）。
@@ -61,4 +61,4 @@ beautifulsoup4==4.15.0
 # Utilities
 pydantic==2.14.3
 python-dotenv==1.2.4
-sentry-sdk==2.74.0
+sentry-sdk==2.75.0
