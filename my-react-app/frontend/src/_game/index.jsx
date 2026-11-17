@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import "../../static/css/_game/index.css";
 import { TRIBES, COMING_SOON_LABEL, tribeHasFeature } from "../constants/tribes";
 import { scrollBehavior } from "../hooks/useReducedMotion";
+import AbstractCover from "@components/ui/AbstractCover";
 
 const GAMES = [
   {
@@ -12,6 +13,7 @@ const GAMES = [
     subtitle: "TNINUN",
     Icon: Spool,
     desc: "從族語詞彙中挑選正確對應，訓練詞彙記憶能力。",
+    cover: { layout: "pairs", tone: 1 },
     featured: true, // bento 大圖卡：版面上佔左側整欄
   },
   {
@@ -20,6 +22,7 @@ const GAMES = [
     subtitle: "MISANIQ",
     Icon: Headphones,
     desc: "聆聽族語發音，辨識正確詞彙，訓練耳朵的敏銳度。",
+    cover: { layout: "voice", tone: 2 },
   },
   {
     id: "pronunciation",
@@ -27,6 +30,7 @@ const GAMES = [
     subtitle: "QMISAN",
     Icon: Mic,
     desc: "跟著發音範本錄音，AI 即時評分你的發音準確度。",
+    cover: { layout: "voice", tone: 3 },
   },
   {
     id: "sentence",
@@ -34,6 +38,7 @@ const GAMES = [
     subtitle: "LMUHUW",
     Icon: BookOpen,
     desc: "閱讀族語例句，選出正確的中文意思，訓練句型理解能力。",
+    cover: { layout: "cross", tone: 4 },
   },
 ];
 
@@ -86,7 +91,9 @@ const GameZonePage = () => {
               <div
                 key={g.id}
                 className={`yy-card yy-fade-up gamehub-card${g.featured ? ' gamehub-card--feature' : ''}${active ? ' is-selected' : ''}`}
+                data-cover-host
               >
+                <AbstractCover layout={g.cover.layout} tone={g.cover.tone} className="gamehub-card-cover" />
                 <div className="gamehub-card-head">
                   <div className="gamehub-card-icon" aria-hidden="true"><g.Icon size={28} strokeWidth={2.25} /></div>
                   <div>

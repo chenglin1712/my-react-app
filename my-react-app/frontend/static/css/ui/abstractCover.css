@@ -1,0 +1,110 @@
+/* 自繪抽象封面（P1-5）。顏色全部取自 theme-v2 的 --yy-cover-*（亮暗各一組），這裡不寫死色碼。
+   層次靠玻璃的亮邊、投影與色斑視差（2D 分層，沒有 perspective，所以不用 translateZ）。
+   動態只動 transform、opacity 與玻璃模糊；減少動態是靜態平面，減少透明度是實色玻璃。 */
+@property --lx { syntax: "<number>"; inherits: true; initial-value: 0; }
+@property --ly { syntax: "<number>"; inherits: true; initial-value: 0; }
+
+.yy-cover {
+  --lx: 0;
+  --ly: 0;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  isolation: isolate;
+  pointer-events: none; /* 純裝飾，點擊與游標都交給外面的卡片 */
+  border-radius: var(--yy-radius-panel);
+  background: var(--yy-calm-tint-copper-1);
+  transition: --lx 260ms var(--ease-out), --ly 260ms var(--ease-out);
+  /* 玻璃的亮邊（上亮下暗、細微色散、內側暗角）與隨光源移動的投影，各收成一個 token，designGuard 只放行這兩個 */
+  --yy-cover-edge: inset 0 1.5px 0 var(--yy-cover-rim-hi), inset 0 -1.5px 0 var(--yy-cover-rim-lo), inset 1.5px 0 1px -1px var(--yy-cover-disp-a), inset -1.5px 0 1px -1px var(--yy-cover-disp-b), inset 0 -14px 18px -12px var(--yy-cover-inner);
+  --yy-cover-drop: calc(var(--lx) * -5px) calc(9px + var(--ly) * -4px) 22px -8px var(--yy-cover-shadow);
+}
+.yy-cover--tone1 { --a: var(--yy-cover-1); --b: var(--yy-cover-2); --c: var(--yy-cover-3); --d: var(--yy-cover-4); }
+.yy-cover--tone2 { --a: var(--yy-cover-2); --b: var(--yy-cover-3); --c: var(--yy-cover-4); --d: var(--yy-cover-1); }
+.yy-cover--tone3 { --a: var(--yy-cover-3); --b: var(--yy-cover-4); --c: var(--yy-cover-1); --d: var(--yy-cover-2); }
+.yy-cover--tone4 { --a: var(--yy-cover-4); --b: var(--yy-cover-1); --c: var(--yy-cover-2); --d: var(--yy-cover-3); }
+
+/* 底圖：四個色斑慢慢漂移，玻璃折射的就是它們 */
+.yy-cover__bk {
+  position: absolute;
+  inset: -12%;
+  z-index: 0;
+  transform: translate3d(calc(var(--lx) * -8px), calc(var(--ly) * -8px), 0);
+  transition: transform 260ms var(--ease-out);
+}
+.yy-cover__bk i {
+  position: absolute;
+  border-radius: var(--yy-radius-round);
+  /* 色斑只在載入時慢慢落定一次（約 4 秒，不循環）；超過 5 秒的自動動態需要暫停控制（WCAG 2.2.2），所以不做常駐漂移 */
+  animation: yy-cover-drift 4s var(--ease-out) both;
+  opacity: 0.72; /* 色斑壓淡一些：沉穩的站上，封面不能比標題與內容更吵 */
+}
+.yy-cover__bk i:nth-child(1) { left: 6%; top: 12%; width: 46%; aspect-ratio: 1; background: var(--a); }
+.yy-cover__bk i:nth-child(2) { left: 46%; top: 30%; width: 44%; aspect-ratio: 1; background: var(--b); animation-delay: 80ms; }
+.yy-cover__bk i:nth-child(3) { left: 24%; top: 58%; width: 36%; aspect-ratio: 1; background: var(--c); animation-delay: 160ms; }
+.yy-cover__bk i:nth-child(4) { left: 62%; top: -6%; width: 30%; aspect-ratio: 1; background: var(--d); animation-delay: 240ms; }
+@keyframes yy-cover-drift {
+  from { translate: -5% -4%; }
+  to { translate: 0 0; }
+}
+
+/* 玻璃：半透明填色、模糊並加深色斑飽和度、上亮下暗的邊緣亮邊、內側暗角、細微色散，高光隨光源移動 */
+.yy-cover__gl {
+  position: absolute;
+  z-index: 1;
+  background: var(--yy-cover-glass);
+  -webkit-backdrop-filter: blur(7px) saturate(1.2) brightness(1.04);
+  backdrop-filter: blur(7px) saturate(1.2) brightness(1.04);
+  box-shadow: var(--yy-cover-edge), var(--yy-cover-drop);
+}
+.yy-cover__gl::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* 圓角在下面依形狀各自指定 */
+  pointer-events: none;
+  background:
+    radial-gradient(70% 55% at calc(30% + var(--lx) * -18%) calc(18% + var(--ly) * -16%), var(--yy-cover-spec), transparent 62%),
+    linear-gradient(135deg, var(--yy-cover-rim-lo), transparent 38%);
+}
+/* 玻璃與它的高光層用同一個圓角 token，各寫一次 */
+.yy-cover__gl--o, .yy-cover__gl--o::before { border-radius: var(--yy-radius-round); }
+.yy-cover__gl--r, .yy-cover__gl--r::before { border-radius: var(--yy-radius-control); }
+.yy-cover__gl--p, .yy-cover__gl--p::before { border-radius: var(--yy-radius-pill); }
+.yy-cover__gl.is-key { background: color-mix(in srgb, var(--yy-calm-accent) 62%, transparent); }
+
+/* 進場：玻璃從後方、帶一點模糊浮上來，後層先、前層後，只播一次 */
+.yy-cover--enter .yy-cover__gl {
+  animation: yy-cover-form 560ms var(--ease-out) both;
+  animation-delay: calc(var(--i) * 90ms);
+}
+@keyframes yy-cover-form {
+  from { opacity: 0; filter: blur(8px); transform: translateY(12px) scale(0.94); }
+  to { opacity: 1; filter: blur(0); transform: none; }
+}
+
+/* 清單用的輕量版：不模糊，玻璃改成較不透明的色塊加亮邊，也沒有漂移與進場 */
+.yy-cover--lite .yy-cover__gl {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: color-mix(in srgb, var(--yy-cover-glass) 100%, var(--yy-cover-solid) 55%);
+}
+.yy-cover--lite .yy-cover__bk i,
+.yy-cover--lite .yy-cover__gl { animation: none; }
+
+/* 減少透明度：玻璃改為實色 */
+@media (prefers-reduced-transparency: reduce) {
+  .yy-cover__gl { background: var(--yy-cover-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .yy-cover__gl.is-key { background: var(--yy-calm-accent); }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .yy-cover__gl { background: var(--yy-cover-solid); }
+  .yy-cover__gl.is-key { background: var(--yy-calm-accent); }
+}
+/* 減少動態：靜態平面，不漂移、不進場、不跟游標 */
+@media (prefers-reduced-motion: reduce) {
+  .yy-cover { transition: none; }
+  .yy-cover__bk, .yy-cover__bk i { animation: none; transform: none; transition: none; }
+  .yy-cover__gl, .yy-cover--enter .yy-cover__gl { animation: none; transform: none; }
+}

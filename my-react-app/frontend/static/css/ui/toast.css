@@ -2,7 +2,8 @@
 .yy-toasts {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--yy-space-4) + env(safe-area-inset-bottom, 0px));
+  /* 手機有底部選單時，--yy-tabbar-h 已含安全區；桌機是 0，退回自己的安全區 */
+  bottom: calc(var(--yy-space-4) + var(--yy-tabbar-h, env(safe-area-inset-bottom, 0px)));
   transform: translateX(-50%);
   z-index: var(--yy-z-toast);
   display: grid;

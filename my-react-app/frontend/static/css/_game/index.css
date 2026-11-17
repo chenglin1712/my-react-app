@@ -73,6 +73,15 @@
     gap: var(--yy-space-4);
 }
 
+/* 抽象封面（P1-5）：每張卡片最上方一條 4:3 裁成寬幅的封面，比例固定所以不造成版面位移 */
+.gamehub-card-cover {
+    aspect-ratio: 16 / 7;
+    border-radius: 0;
+}
+.gamehub-card--feature .gamehub-card-cover {
+    aspect-ratio: 4 / 3;
+}
+
 .gamehub-card--feature {
     grid-row: span 3;
     display: flex;

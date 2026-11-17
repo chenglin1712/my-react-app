@@ -49,6 +49,37 @@ describe('ToastHost（P1-6）', () => {
     expect(screen.getByText('焦點測試')).toBeInTheDocument();
   });
 
+  test('復原連按只會執行一次', () => {
+    const undo = vi.fn();
+    render(<ToastHost />);
+    act(() => { showToast({ message: '連按測試', actionLabel: '復原', onAction: undo }); });
+    const btn = screen.getByRole('button', { name: '復原' });
+    fireEvent.click(btn);
+    fireEvent.click(btn);
+    expect(undo).toHaveBeenCalledTimes(1);
+  });
+
+  test('onAction 丟錯時不往上冒，提示保留', () => {
+    render(<ToastHost />);
+    act(() => { showToast({ message: '出錯測試', actionLabel: '復原', onAction() { throw new Error('x'); } }); });
+    fireEvent.click(screen.getByRole('button', { name: '復原' }));
+    act(() => { vi.advanceTimersByTime(300); });
+    expect(screen.getByText('出錯測試')).toBeInTheDocument();
+  });
+
+  test('分頁在背景時暫停計時，回到前景才繼續', () => {
+    render(<ToastHost />);
+    act(() => { showToast({ message: '背景測試' }); });
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+    act(() => { vi.advanceTimersByTime(10000); });
+    expect(screen.getByText('背景測試')).toBeInTheDocument();
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+    act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+    act(() => { vi.advanceTimersByTime(4000 + 200); });
+    expect(screen.queryByText('背景測試')).toBeNull();
+  });
+
   test('最多同時 3 則，最舊的被擠掉', () => {
     render(<ToastHost />);
     act(() => { for (let i = 1; i <= MAX_TOASTS + 2; i += 1) showToast({ message: `訊息${i}` }); });

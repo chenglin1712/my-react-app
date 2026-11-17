@@ -77,6 +77,28 @@ describe('useHotkeys（P1-8）', () => {
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
+  test('隱藏或 aria-hidden 的 aria-modal 殘留節點不會讓快捷鍵失效', () => {
+    const fn = vi.fn();
+    render(<Probe bindings={{ '/': fn }} />);
+    const modal = document.createElement('div');
+    modal.setAttribute('aria-modal', 'true');
+    modal.style.display = 'none';
+    document.body.appendChild(modal);
+    fireEvent.keyDown(document.body, { key: '/' });
+    expect(fn).toHaveBeenCalledTimes(1);
+    modal.remove();
+  });
+
+  test('輸入法 keyCode 229 不觸發；searchbox 角色視為輸入', () => {
+    const fn = vi.fn();
+    render(<Probe bindings={{ '/': fn }} />);
+    fireEvent.keyDown(document.body, { key: '/', keyCode: 229 });
+    expect(fn).not.toHaveBeenCalled();
+    const sb = document.createElement('div');
+    sb.setAttribute('role', 'searchbox');
+    expect(isTypingTarget(sb)).toBe(true);
+  });
+
   test('isTypingTarget 判斷', () => {
     expect(isTypingTarget(null)).toBe(false);
     expect(isTypingTarget(document.createElement('input'))).toBe(true);

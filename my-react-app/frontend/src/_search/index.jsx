@@ -92,7 +92,13 @@ const SearchPage = () => {
 
   // 詳情 sheet：點詞條開、關閉後清掉。detail 是 { keyName, word, result }，直接帶資料，不用再回頭查列表
   const [detail, setDetail] = useState(null);
-  const openDetail = useCallback((next) => setDetail(next), []);
+  // 鍵盤開啟（Enter／空白鍵產生的 click，detail 為 0）不加動畫：鍵盤觸發的動作一律立即生效
+  const [sheetAnimated, setSheetAnimated] = useState(true);
+  const openDetail = useCallback((next, event) => {
+    // click 的 detail 為 0 通常是鍵盤或程式化觸發，只是經驗判斷；同時，減少動態由 CSS 另外處理
+    setSheetAnimated(event?.detail !== 0);
+    setDetail(next);
+  }, []);
   const closeDetail = useCallback(() => setDetail(null), []);
 
   const toggleExpand = useCallback((key) => setExpandedWord(prev => (prev === key ? null : key)), []);
@@ -512,6 +518,7 @@ const SearchPage = () => {
 
       <WordDetailSheet
         detail={detail}
+        animated={sheetAnimated}
         onClose={closeDetail}
         isMobile={isMobile}
         isFavorited={detail ? favoriteWords.has(detail.result.name) : false}

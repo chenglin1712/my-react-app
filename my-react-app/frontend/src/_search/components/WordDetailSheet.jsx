@@ -8,7 +8,7 @@ import '../../../static/css/_search/wordSheet.css';
 // 用 react-bootstrap 的 Offcanvas，焦點圈住、Esc 關閉、點背景關閉、關閉後焦點回到原本的詞條鈕都由它處理。
 // 手機另外支援標題列往下滑關閉（階段 6-3，hooks/useSheetSwipeDismiss.js）。
 const WordDetailSheet = ({
-  detail, onClose, isMobile,
+  detail, onClose, isMobile, animated = true,
   isFavorited, toggleFavorite,
   playAudio, playSentence, hasSentenceAudio, failedAudio,
 }) => {
@@ -21,6 +21,7 @@ const WordDetailSheet = ({
     <Offcanvas
       show={Boolean(detail)}
       onHide={onClose}
+      animation={animated}
       placement={isMobile ? 'bottom' : 'end'}
       className={`word-sheet yy-glass word-sheet--${isMobile ? 'bottom' : 'end'}`}
       aria-labelledby="word-sheet-title"

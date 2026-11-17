@@ -8,7 +8,16 @@ export function isTypingTarget(el) {
   const tag = el.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
   if (el.isContentEditable) return true;
-  return Boolean(el.closest?.('[contenteditable=""],[contenteditable="true"],[role="textbox"],[role="listbox"],[data-hotkeys-ignore]'));
+  return Boolean(el.closest?.('[contenteditable=""],[contenteditable="true"],[role="textbox"],[role="searchbox"],[role="spinbutton"],[role="listbox"],[data-hotkeys-ignore]'));
+}
+
+// 彈窗只算「看得見」的：隱藏或殘留在 DOM 裡的 aria-modal 節點不會讓快捷鍵永久失效
+function modalIsOpen() {
+  return [...document.querySelectorAll('[aria-modal="true"], .modal.show, .offcanvas.show')].some((node) => {
+    if (node.closest('[hidden],[aria-hidden="true"],[inert]')) return false;
+    const st = getComputedStyle(node);
+    return st.display !== 'none' && st.visibility !== 'hidden';
+  });
 }
 
 /**
@@ -27,11 +36,11 @@ export default function useHotkeys(bindings, { enabled = true } = {}) {
   useEffect(() => {
     if (!enabled) return undefined;
     const onKeyDown = (event) => {
-      if (event.defaultPrevented || event.isComposing || event.repeat) return;
+      if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || event.repeat) return;
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       if (isTypingTarget(event.target)) return;
       // 有彈窗或側欄開著（含說明視窗自己、Bootstrap Modal／Offcanvas）時暫停頁面級快捷鍵，焦點不會被拉到背景
-      if (document.querySelector('[aria-modal="true"], .modal.show, .offcanvas.show')) return;
+      if (modalIsOpen()) return;
       const handler = ref.current[event.key];
       if (typeof handler !== 'function') return;
       if (handler(event) !== false) event.preventDefault();
