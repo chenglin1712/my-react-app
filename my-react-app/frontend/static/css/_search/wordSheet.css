@@ -1,9 +1,8 @@
-/* 詞條詳情 sheet（Apple 化步驟 4-2）。Offcanvas 是掛在 body 底下的，所以不在 .search-page 範圍內，自己交代外觀。 */
+/* 詞條詳情 sheet（Apple 化步驟 4-2、P1-7）。Offcanvas 是掛在 body 底下的，所以不在 .search-page 範圍內，自己交代外觀。
+   材質是毛玻璃（.yy-glass，見 theme-v2.css）：背景、模糊、細框、降級純色與焦點光暈都由它提供，這裡不再自己鋪底色。 */
 .word-sheet.offcanvas {
-  background: var(--yy-calm-bg);
   color: var(--yy-calm-text);
-  border: none;
-  box-shadow: var(--yy-elev-4);
+  box-shadow: var(--yy-elev-4), var(--yy-lit);
   z-index: var(--yy-z-overlay);
 }
 

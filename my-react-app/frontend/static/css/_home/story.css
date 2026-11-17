@@ -206,7 +206,7 @@
 .home-story__step.is-on {
     opacity: 1;
     background: var(--yy-calm-surface);
-    box-shadow: var(--yy-elev-2);
+    box-shadow: var(--yy-elev-2), var(--yy-lit);
     transform: translateX(8px);
 }
 

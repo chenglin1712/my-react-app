@@ -82,9 +82,10 @@ describe("筆記", () => {
     expect(css["_note/buttons.css"]).not.toMatch(/background:\s*gray/);
   });
 
-  it("文字顏色色票選中時用外框環，不用陰影；底部工具列用雙線頂框", () => {
+  it("文字顏色色票選中時用外框環，不用陰影；底部工具列改用毛玻璃（P1-7）", () => {
     expect(find("_note/toolbar.css")('.editor-toolbar .color-box[aria-pressed="true"]::before').body).toMatch(/outline:\s*2px solid/);
-    expect(find("_note/toolbar.css")(".bottom-toolbar").body).toMatch(/border-top:\s*3px double var\(--yy-calm-line\)/);
+    expect(find("_note/toolbar.css")(".bottom-toolbar").body).not.toMatch(/background/);
+    expect(read("../../src/_note/index.jsx")).toMatch(/className="bottom-toolbar yy-glass /);
   });
 
   it("分享區：卡片扁平、分頁籤與按鈕至少 44px、目前分頁有勾", () => {

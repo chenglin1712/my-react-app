@@ -162,6 +162,29 @@ describe("硬偏移陰影", () => {
     });
   });
 
+  it("卡片上緣高光 --yy-lit 與環境光 --yy-ambient（P1-1）：淺色是 1px 白色內描邊，深色是空的（避免雙框）；環境光是極淡的銅色徑向光，深色更淡；--yy-lit 只准跟 --yy-elev-* 並列", () => {
+    const theme = cssFiles.find(({ file }) => file.endsWith("default/theme-v2.css")).css;
+    const lit = [...theme.matchAll(/^\s*--yy-lit:\s*([^;]+);/gm)].map((m) => m[1].trim());
+    expect(lit.length, "--yy-lit 淺色一組、深色（system 與 dark）兩組").toBe(3);
+    expect(lit[0]).toMatch(/^inset 0 1px 0 rgba\(255, 255, 255, 0?\.\d+\)$/);
+    expect(lit[1]).toBe("0 0 0 0 transparent");
+    expect(lit[2]).toBe("0 0 0 0 transparent");
+    const amb = [...theme.matchAll(/^\s*--yy-ambient:\s*radial-gradient\([^;]*?rgba\((\d+), (\d+), (\d+), ([\d.]+)\)/gm)].map((m) => Number(m[4]));
+    expect(amb.length, "--yy-ambient 三組").toBe(3);
+    expect(amb[0], "淺色環境光要極淡").toBeLessThanOrEqual(0.12);
+    expect(amb[1]).toBeLessThan(amb[0]);
+    expect(amb[2]).toBe(amb[1]);
+    expect(theme, "環境光畫在 .yy-page 背景最上層、底色仍是象牙白 --yy-calm-bg").toMatch(/\.yy-page\s*\{[^}]*background:\s*var\(--yy-ambient\)[^;]*,\s*var\(--yy-calm-bg\);/);
+    expect(theme, "不再有獨立的環境光偽元素").not.toMatch(/body::after/);
+    const bad = [];
+    cssFiles.forEach(({ file, css }) => {
+      for (const m of css.matchAll(/box-shadow\s*:\s*([^;{}]*var\(--yy-lit\)[^;{}]*)/g)) {
+        if (!/var\(--yy-elev-[2-4]\)\s*,\s*var\(--yy-lit\)/.test(m[1])) bad.push(`${file}: ${m[1].trim().slice(0, 60)}`);
+      }
+    });
+    expect(bad, "--yy-lit 必須緊接在 --yy-elev-2 到 4 後面").toEqual([]);
+  });
+
   it("元件不手寫柔影：前台 CSS 的 box-shadow 每一層只能是 none、--yy-elev-*／--yy-edge-*，或模糊為 0 的細框、焦點圈、內描邊（含多行、inset、多層；登入頁 adminLogin 與後台除外）", () => {
     // 依最外層的逗號或空白切開（括號內不切）
     const splitTop = (v, sep) => {
@@ -188,7 +211,7 @@ describe("硬偏移陰影", () => {
         const line = css.slice(0, m.index).split("\n").length;
         splitTop(m[2].replace(/!important/, "").trim(), ",").forEach((layer) => {
           const l = layer.trim();
-          if (l === "none" || /^var\(--yy-(?:elev|edge)-[0-4]\)$/.test(l)) return;
+          if (l === "none" || /^var\(--yy-(?:elev|edge)-[0-4]\)$/.test(l) || l === "var(--yy-lit)") return; // --yy-lit：卡片上緣高光（P1-1），值由下面的專屬測試檢查
           if (/^var\(--yy-keep-shadow(?:,\s*0 0 0 0 transparent)?\)$/.test(l)) return; // 玻璃焦點光暈「疊加」用的承接變數（值本身另由 glass.test.js 檢查）
           const lens = splitTop(l, " ").filter((t) => LEN.test(t));
           if (lens.length >= 3 && /^0(?:px)?$/.test(lens[2])) return; // 模糊為 0：細框、焦點圈、內描邊
@@ -594,11 +617,12 @@ describe("五族色只能當小標記", () => {
     expect(usesTribeColor("const a = other.size;")).toBe(false);
   });
 
-  it("CSS 的 --tribe-color 只用在細框，不當背景或文字色", () => {
+  it("CSS 的 --tribe-color 只用在細框，或 .yy-pill__dot 8px 小圓點的降飽和底色（color-mix 混入表面色），不當大面積背景或文字色", () => {
     const hits = [];
     cssFiles.forEach(({ file, css }) =>
       lines(css).forEach((line, i) => {
         if (!/var\(--tribe-color/.test(line)) return;
+        if (/^\s*background:\s*(?:var\(--tribe-color\);|color-mix\(in srgb, var\(--tribe-color\) \d+%, var\(--yy-calm-(?:surface|accent-on)\)\);)/.test(line)) return; // P1-2：小圓點
         if (!/^\s*border(?:-(?:top|right|bottom|left))?(?:-color)?\s*:/.test(line)) hits.push(`${file}:${i + 1}: ${line.trim()}`);
       }),
     );

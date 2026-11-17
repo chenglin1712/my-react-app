@@ -22,7 +22,7 @@ const WordDetailSheet = ({
       show={Boolean(detail)}
       onHide={onClose}
       placement={isMobile ? 'bottom' : 'end'}
-      className={`word-sheet word-sheet--${isMobile ? 'bottom' : 'end'}`}
+      className={`word-sheet yy-glass word-sheet--${isMobile ? 'bottom' : 'end'}`}
       aria-labelledby="word-sheet-title"
     >
       {result && (

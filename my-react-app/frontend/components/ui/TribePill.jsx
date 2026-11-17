@@ -1,12 +1,14 @@
-// 族語切換膠囊：選中時背景變族語識別色 + 放大 1.05-1.06 倍（YUAN・YU v2 設計系統）。
+// 族語切換膠囊：選取狀態是共用的深銅底象牙字加勾（見 theme-v2.css 的 .yy-pill.active），
+// 族語識別色降飽和後只當字前面的小圓點，不做大面積色塊（P1-2）。
 const TribePill = ({ tribe, active, onClick, children }) => (
   <button
     type="button"
     className={`yy-pill${active ? ' active' : ''}`}
-    style={active ? { background: tribe.color, color: tribe.textColor } : undefined}
+    style={tribe.color ? { '--tribe-color': tribe.color } : undefined}
     aria-pressed={active}
     onClick={onClick}
   >
+    {tribe.color && <span className="yy-pill__dot" aria-hidden="true" />}
     {children ?? `${tribe.name}族語`}
   </button>
 );

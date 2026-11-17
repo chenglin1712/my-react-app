@@ -9,7 +9,7 @@
   /* 浮動工具列（Apple 化步驟 4-8）：捲動時浮在內容上方、離上緣留一段距離，圓角卡片＋第 3 級陰影（深色模式無陰影，靠細框分層） */
   border: 1px solid var(--yy-calm-rule);
   border-radius: var(--yy-radius-panel);
-  box-shadow: var(--yy-elev-3);
+  box-shadow: var(--yy-elev-3), var(--yy-lit);
   padding: 4px var(--yy-space-3);
   position: sticky;
   top: 5.5rem; /* 停在全站導覽列（z-index 更高）下方，不被蓋住 */
@@ -22,12 +22,10 @@
 .editor-toolbar .colorbar { display:flex; align-items:center; gap:10px; height:4px; }
 .editor-toolbar .colorbar span { display:block; width:120px; height:4px; background:var(--yy-calm-text); }
 
-/* 底部工具列（上一頁 / 下一頁 / 分享等） */
+/* 底部工具列（上一頁 / 下一頁 / 分享等）。材質是毛玻璃（.yy-glass，P1-7）：背景、模糊、細框與降級純色都由它提供。 */
 .bottom-toolbar {
   position: fixed;
   bottom: 0; left: 0; right: 0;
-  background-color: var(--yy-calm-surface);
-  border-top: 3px double var(--yy-calm-line);
   display: flex;
   flex-wrap: wrap;
   justify-content: center;

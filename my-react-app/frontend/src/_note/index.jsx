@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Container, Button, Row, Col, Form, Alert } from "react-bootstrap";
-import LoadingSpinner from "@components/ui/LoadingSpinner";
+import { NoteEditorSkeleton } from "@components/ui/SkeletonShapes";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../src/userServives/authContext";
 import { db } from "../../../firebase";
@@ -208,9 +208,7 @@ function NotePage() {
 
   if (loading) {
     return (
-      <div className="d-flex justify-content-center align-items-center" style={{ height: "70vh" }}>
-        <LoadingSpinner label="載入筆記中…" />
-      </div>
+      <NoteEditorSkeleton label="載入筆記中…" />
     );
   }
 
@@ -282,7 +280,7 @@ function NotePage() {
       </Row>
 
       {/* 底部固定工具列：按鈕改新色系 */}
-      <div className="bottom-toolbar mt-3 d-flex align-items-center gap-2 flex-wrap">
+      <div className="bottom-toolbar yy-glass mt-3 d-flex align-items-center gap-2 flex-wrap">
         <Button type="button" onClick={handleAdd} className="btn-add">新增</Button>
         <Button type="button" onClick={handleSave} className="btn-primary">儲存</Button>
         <Button type="button" onClick={() => handleChangePage(-1)} className="btn-page" disabled={currentPage === 0}>上一頁</Button>

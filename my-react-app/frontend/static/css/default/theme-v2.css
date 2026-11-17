@@ -72,6 +72,11 @@
   --yy-edge-2: 0 0 0 0 transparent;
   --yy-edge-3: 0 0 0 0 transparent;
   --yy-edge-4: 0 0 0 0 transparent;
+  /* 卡片上緣高光 --yy-lit（P1-1）：淺色是 1px 白色內描邊，讓卡片像有一道受光的頂緣；跟 --yy-elev-* 並列使用：
+     box-shadow: var(--yy-elev-2), var(--yy-lit)。深色模式是空的：深色靠 --yy-edge-* 或元件自己的 border 分層，再加高光會變雙框。 */
+  --yy-lit: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  /* 頁面頂部的環境光 --yy-ambient（P1-1）：極淡的銅色徑向光，底色仍是象牙白；只用在 .yy-page 的背景最上層，隨頁面捲走。 */
+  --yy-ambient: radial-gradient(ellipse 70% 100% at 50% 0%, rgba(152, 105, 76, 0.1), rgba(152, 105, 76, 0) 70%);
   /* 毛玻璃材質 token（Apple 化步驟 1-6）。只能透過 .yy-glass 使用；套用位置（導覽、sticky 工具列、浮層）隨各頁改版決定。 */
   --yy-glass-blur: 18px;
   --yy-glass-saturate: 180%;
@@ -405,6 +410,8 @@
     --yy-edge-3: inset 0 0 0 1px rgba(242, 238, 227, 0.09);
     --yy-elev-4: 0 0 0 0 transparent;
     --yy-edge-4: inset 0 0 0 1px rgba(242, 238, 227, 0.12);
+    --yy-lit: 0 0 0 0 transparent;
+    --yy-ambient: radial-gradient(ellipse 70% 100% at 50% 0%, rgba(215, 169, 139, 0.06), rgba(215, 169, 139, 0) 70%);
     --yy-glass-bg: rgba(36, 40, 44, 0.78);
     --yy-glass-bg-solid: #24282C;
     --yy-glass-border: rgba(242, 238, 227, 0.14);
@@ -426,6 +433,8 @@
   --yy-edge-3: inset 0 0 0 1px rgba(242, 238, 227, 0.09);
   --yy-elev-4: 0 0 0 0 transparent;
   --yy-edge-4: inset 0 0 0 1px rgba(242, 238, 227, 0.12);
+  --yy-lit: 0 0 0 0 transparent;
+  --yy-ambient: radial-gradient(ellipse 70% 100% at 50% 0%, rgba(215, 169, 139, 0.06), rgba(215, 169, 139, 0) 70%);
   --yy-glass-bg: rgba(36, 40, 44, 0.78);
   --yy-glass-bg-solid: #24282C;
   --yy-glass-border: rgba(242, 238, 227, 0.14);
@@ -526,6 +535,11 @@
    只是不再位移）、無限循環的裝飾動畫（漂浮、流光、脈動、跑馬燈、游標閃爍）只播一次就停。
    JS 驅動的動態（輪播自動播放、平滑捲動）在各自的元件裡用 hooks/useReducedMotion 判斷。 */
 @media (prefers-reduced-motion: reduce) {
+  /* P1-4：骨架直接靜止、不透明度固定，不依賴下面把動畫縮成 0.01ms 的全站規則 */
+  .yy-skeleton {
+    animation: none;
+    opacity: 1;
+  }
   *,
   *::before,
   *::after {
@@ -575,7 +589,9 @@
 .yy-page {
   font-family: var(--yy-font-body);
   color: var(--yy-calm-text);
-  background: var(--yy-calm-bg);
+  /* 頁面頂部環境光（P1-1）：畫在 .yy-page 自己的背景最上層、貼著頁面頂部，所以不會被這個不透明外殼蓋住，
+     也不需要額外圖層或動畫：隨頁面往上捲走，漸層本身由中心往外淡出。底色仍是象牙白。減少透明度、列印、強制色彩模式不受影響（純背景圖）。 */
+  background: var(--yy-ambient) top center / 100% min(70svh, 560px) no-repeat, var(--yy-calm-bg);
   min-height: 100vh;
   min-height: 100dvh;
   /* 擋住橫向溢出，但不能用 hidden：overflow-x: hidden 會讓 overflow-y 自動變成 auto，.yy-page 就成了自己的
@@ -796,9 +812,9 @@
 
 /* ---------- 族語切換膠囊 (TribePill) ---------- */
 
-/* 晶片（族語切換）：3px 圓角，不是膠囊形狀，類名 pill 是沿用舊名。
-   選取狀態不只靠顏色：加深邊框（內縮 1.5px 的石板色環）並在字前面加勾，灰階與色盲都看得出來。
-   選取時的底色由元件以內聯樣式帶入族色（族色只當小標記，白名單見 designGuard.test.js）。 */
+/* 晶片（族語切換）：圓角用 --yy-radius-tag，類名 pill 是沿用舊名。
+   共用「選取狀態」（P1-2）：深銅底、象牙字、字前加勾，不只靠顏色，灰階與色盲都看得出來；.yy-is-selected 給其他元件沿用。
+   族語識別色降飽和，只當字前面的小圓點（--tribe-color 由元件帶入，白名單見 designGuard.test.js），不做大面積色塊。 */
 .yy-pill {
   display: inline-flex;
   align-items: center;
@@ -828,10 +844,38 @@
 .yy-pill:active {
   transform: scale(var(--yy-ui-press));
 }
+.yy-is-selected,
 .yy-pill.active {
-  box-shadow: inset 0 0 0 var(--yy-border-width) var(--yy-calm-text);
+  background: var(--yy-calm-accent);
+  color: var(--yy-calm-accent-on);
+  border-color: var(--yy-calm-accent);
 }
-.yy-pill.active::before {
+.yy-pill__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: var(--yy-radius-round);
+  /* 降飽和：族色混入 38% 的表面色，只剩一點辨識色相。不支援 color-mix 的瀏覽器退回「原色加 62% 不透明度」。 */
+  background: var(--tribe-color);
+  opacity: 0.62;
+}
+@supports (background: color-mix(in srgb, red, white)) {
+  .yy-pill__dot {
+    background: color-mix(in srgb, var(--tribe-color) 62%, var(--yy-calm-surface));
+    opacity: 1;
+  }
+  .yy-pill.active .yy-pill__dot {
+    /* 選取時底色是深銅，圓點改混入象牙色，才不會糊進底色 */
+    background: color-mix(in srgb, var(--tribe-color) 62%, var(--yy-calm-accent-on));
+  }
+}
+.yy-pill.active .yy-pill__dot {
+  /* 深銅底上加一圈象牙描邊（模糊為 0），圓點形狀才清楚 */
+  box-shadow: 0 0 0 1.5px var(--yy-calm-accent-on);
+}
+.yy-pill.active::before,
+.yy-is-selected::before {
   content: "\2713";
   content: "\2713" / "";   /* 後半是替代文字：空字串＝報讀器略過，狀態由 aria-pressed 負責 */
   margin-right: 6px;
@@ -1192,6 +1236,38 @@
 }
 .yy-footer__links a:active {
   transform: scale(var(--yy-ui-press));
+}
+/* 頁尾裡開啟視窗的按鈕（鍵盤快捷鍵說明）：外觀與連結一致，仍是 button（P1-8） */
+.yy-footer__linkbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--yy-control-md);
+  min-height: var(--yy-control-md);
+  padding: 0;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid color-mix(in srgb, var(--yy-calm-block-on) 35%, transparent);
+  color: var(--yy-calm-block-on);
+  font: inherit;
+  font-size: var(--yy-text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  align-self: start;
+  transition: border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
+}
+.yy-footer__linkbtn:active {
+  transform: scale(var(--yy-ui-press));
+}
+.yy-footer__linkbtn:focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
+}
+@media (hover: hover) and (pointer: fine) {
+  .yy-footer__linkbtn:hover {
+    border-bottom-color: var(--yy-calm-block-accent);
+    color: var(--yy-calm-block-accent);
+  }
 }
 @media (hover: hover) and (pointer: fine) {
   .yy-footer__links a:hover {

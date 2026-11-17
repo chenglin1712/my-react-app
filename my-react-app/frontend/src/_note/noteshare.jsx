@@ -1,8 +1,10 @@
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useState, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../src/userServives/authContext";
 import { fetchSharedNoteById, softDeleteNote, toggleNoteLike } from "../userServives/noteService";
+import { NoteCardSkeleton } from "@components/ui/SkeletonShapes";
+import EmptyState from "@components/ui/EmptyState";
 import { REPORT_ALREADY_OR_DENIED, submitReport } from "../userServives/reportService";
 import { useSharedNotesPager } from "./hooks/useSharedNotesPager";
 import { useToast } from "./hooks/useToast";
@@ -258,11 +260,26 @@ export default function NoteShare() {
       </div>
 
       {/* 未發布筆記狀態 */}
-      {isMyTab && !myUid && <div className="ns-empty">請先登入以查看你曾發布的筆記。</div>}
+      {isMyTab && !myUid && (
+        <EmptyState title="請先登入以查看你曾發布的筆記">
+          <p>登入後，你在「寫筆記」分享出去的筆記會列在這裡。</p>
+        </EmptyState>
+      )}
       {pageError && <div className="ns-empty">{pageError}</div>}
-      {!pageError && !loadingPage && filteredNotes.length === 0 && <div className="ns-empty">目前沒有可顯示的分享筆記。</div>}
+      {!pageError && !loadingPage && pageNotes.length === 0 && !(isMyTab && !myUid) && (
+        <EmptyState title={isMyTab ? "你還沒有分享過筆記" : "目前沒有可顯示的分享筆記"}
+          actions={<Link to="/note" className="yy-btn-outline">前往寫筆記</Link>}>
+          <p>{isMyTab ? "在「寫筆記」寫好一篇後按分享，就會出現在這裡。" : "到「寫筆記」寫好一篇後按分享，第一篇就會出現在這裡。"}</p>
+        </EmptyState>
+      )}
+      {!pageError && !loadingPage && pageNotes.length > 0 && filteredNotes.length === 0 && (
+        <EmptyState title="沒有符合的筆記">
+          <p>目前頁面已載入的筆記裡找不到這個關鍵字，換個關鍵字，或清除搜尋框再看看。</p>
+        </EmptyState>
+      )}
 
-      {/* 卡片 */}
+      {/* 卡片：第一次載入（還沒有任何筆記）時用貼合版面的骨架，不留空白 */}
+      {loadingPage && filteredNotes.length === 0 && !pageError && <NoteCardSkeleton />}
       <div className="ns-grid">
         {filteredNotes.map((note) => (
           <NoteCard

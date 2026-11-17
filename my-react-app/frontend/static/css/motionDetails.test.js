@@ -48,11 +48,11 @@ describe("側欄與進度條只動 transform", () => {
 });
 
 describe("選取狀態與過渡", () => {
-  it("選取中的族語膠囊不放大、不位移（S2-1：選取靠內縮環與勾，不靠動作）", () => {
+  it("選取中的族語膠囊不放大、不位移（S2-1、P1-2：選取靠深銅底、象牙字與勾，不靠動作）", () => {
     const theme = read("default/theme-v2.css");
     expect(rule(theme, ".yy-pill.active")).not.toMatch(/scale\(1\.06\)/);
     expect(rule(theme, ".yy-pill.active")).not.toMatch(/transform/);
-    expect(rule(theme, ".yy-pill.active")).toMatch(/box-shadow:\s*inset 0 0 0 /);
+    expect(rule(theme, ".yy-pill.active")).toMatch(/background:\s*var\(--yy-calm-accent\)/);
     expect(rule(read("_search/index.css"), ".tribe-btn.active")).not.toMatch(/scale\(1\.06\)/);
   });
 

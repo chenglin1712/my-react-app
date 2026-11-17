@@ -1,0 +1,54 @@
+/* 鍵盤快捷鍵說明視窗（P1-8）。沒有進出動畫：鍵盤與按鈕直接觸發的視窗不加動畫。 */
+.yy-shortcuts__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--yy-z-overlay);
+  display: grid;
+  place-items: center;
+  padding: var(--yy-space-4);
+  background: color-mix(in srgb, var(--yy-calm-text) 42%, transparent);
+}
+.yy-shortcuts {
+  width: min(440px, 100%);
+  padding: var(--yy-space-5);
+  background: var(--yy-calm-surface);
+  color: var(--yy-calm-text);
+  border: var(--yy-border-width) solid var(--yy-calm-rule);
+  border-radius: var(--yy-radius-panel);
+  box-shadow: var(--yy-elev-4), var(--yy-lit);
+}
+.yy-shortcuts__title { margin: 0 0 var(--yy-space-2); font-size: var(--yy-text-lg); font-weight: 800; }
+.yy-shortcuts__hint { margin: 0 0 var(--yy-space-4); color: var(--yy-calm-text-sub); font-size: var(--yy-text-sm); line-height: 1.7; }
+.yy-shortcuts__list { margin: 0 0 var(--yy-space-4); display: grid; gap: var(--yy-space-3); }
+.yy-shortcuts__row { display: flex; align-items: flex-start; gap: var(--yy-space-3); }
+.yy-shortcuts__row dt { flex: none; min-width: 44px; margin: 0; }
+.yy-shortcuts__row dd { margin: 0; display: grid; gap: 2px; }
+.yy-shortcuts kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 var(--yy-space-2);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-radius-tag);
+  background: var(--yy-calm-bg);
+  color: var(--yy-calm-text);
+  font-family: inherit;
+  font-weight: 700;
+}
+.yy-shortcuts__label { font-weight: 700; }
+.yy-shortcuts__scope { color: var(--yy-calm-text-sub); font-size: var(--yy-text-sm); }
+.yy-shortcuts__close {
+  min-height: var(--yy-control-md);
+  padding: 0 var(--yy-space-4);
+  border: var(--yy-border-width) solid var(--yy-calm-accent);
+  border-radius: var(--yy-radius-control);
+  background: var(--yy-calm-accent);
+  color: var(--yy-calm-accent-on);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.yy-shortcuts__close:active { transform: scale(var(--yy-ui-press)); }
+.yy-shortcuts__close:focus-visible { outline: var(--yy-ui-focus-ring); outline-offset: var(--yy-ui-focus-offset); }

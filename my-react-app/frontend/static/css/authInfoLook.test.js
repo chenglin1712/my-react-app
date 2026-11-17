@@ -74,7 +74,7 @@ describe("登入與註冊", () => {
     expect(f(".auth-card.yy-card").body).toMatch(/border:\s*var\(--yy-border-width\) solid var\(--yy-calm-line\)/);
   });
 
-  it("單卡置中，背景有柔漸層層次：只准 radial-gradient、每層只用語意 token、圓心在區塊內；大卡陰影恰好是 --yy-elev-2", () => {
+  it("單卡置中，背景有柔漸層層次：只准 radial-gradient、每層只用語意 token、圓心在區塊內；大卡陰影恰好是 --yy-elev-2 加上緣高光 --yy-lit", () => {
     const f = find("_auth/authPage.css");
     const bg = f(".auth-hero, .auth-backdrop").body;
     expect(bg).toMatch(/justify-content:\s*center/);
@@ -93,9 +93,9 @@ describe("登入與註冊", () => {
       });
     });
     const shadow = (file, sel) => find(file)(sel).body.match(/box-shadow:\s*([^;]+);/)?.[1].replace(/\/\*[\s\S]*?\*\//g, "").trim();
-    expect(shadow("_auth/authPage.css", ".auth-card.yy-card")).toBe("var(--yy-elev-2)");
-    expect(shadow("_auth/forgotPassword.css", ".forgot-container")).toBe("var(--yy-elev-2)");
-    expect(shadow("_auth/resetPassword.css", ".reset-container")).toBe("var(--yy-elev-2)");
+    expect(shadow("_auth/authPage.css", ".auth-card.yy-card")).toBe("var(--yy-elev-2), var(--yy-lit)");
+    expect(shadow("_auth/forgotPassword.css", ".forgot-container")).toBe("var(--yy-elev-2), var(--yy-lit)");
+    expect(shadow("_auth/resetPassword.css", ".reset-container")).toBe("var(--yy-elev-2), var(--yy-lit)");
   });
 
   it("輸入框字級 16px（iOS 不會自動放大），欄位整條畫焦點框", () => {
