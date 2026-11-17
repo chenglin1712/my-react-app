@@ -1,0 +1,55 @@
+/* 貼合最終版面的骨架（P1-4）。尺寸取自對應元件：詞卡約 124px、筆記卡約 168px。
+   塊的底色與脈動動畫沿用 theme-v2.css 的 .yy-skeleton（減少動態偏好下由全站規則停住）。 */
+
+.yy-sk-list {
+  display: grid;
+  gap: var(--yy-space-3);
+}
+
+.yy-sk-wordcard {
+  display: grid;
+  gap: var(--yy-space-2);
+  align-content: start;
+  min-height: 124px;
+  padding: var(--yy-space-4);
+  background: var(--yy-calm-surface);
+  border: var(--yy-border-width) solid var(--yy-calm-rule);
+  border-radius: var(--yy-radius-panel);
+}
+.yy-sk-wordcard__name { width: 38%; height: 28px; }
+.yy-sk-wordcard__gloss { width: 24%; height: 20px; }
+.yy-sk-wordcard__meta { width: 16%; height: 16px; margin-top: var(--yy-space-2); }
+
+.yy-sk-line { width: 100%; height: 14px; }
+.yy-sk-line--title { width: 62%; height: 20px; }
+.yy-sk-line--short { width: 55%; }
+.yy-sk-line--xshort { width: 30%; }
+
+/* 欄數與 .ns-grid 一致：手機 1、600px 起 2、900px 起 3 */
+.yy-sk-notegrid {
+  display: grid;
+  gap: var(--yy-space-3);
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 600px) { .yy-sk-notegrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 900px) { .yy-sk-notegrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+.yy-sk-notecard {
+  display: grid;
+  gap: var(--yy-space-2);
+  align-content: start;
+  min-height: 168px;
+  padding: var(--yy-space-3) var(--yy-space-4);
+  background: var(--yy-calm-surface);
+  border: var(--yy-border-width) solid var(--yy-calm-rule);
+  border-radius: var(--yy-radius-panel);
+}
+.yy-sk-notecard__head { display: flex; align-items: center; gap: var(--yy-space-3); margin-bottom: var(--yy-space-2); }
+.yy-sk-notecard__avatar { flex: none; width: 36px; height: 36px; border-radius: var(--yy-radius-round); }
+.yy-sk-notecard__who { display: grid; gap: 6px; flex: 1; }
+
+.yy-sk-editor { display: grid; gap: var(--yy-space-3); min-height: 70vh; min-height: 70dvh; align-content: start; }
+.yy-sk-editor__toolbar { height: 52px; border-radius: var(--yy-radius-panel); }
+.yy-sk-editor__page { height: 60vh; height: 60dvh; border-radius: var(--yy-radius-panel); }
+
+.yy-sk-translate { display: grid; gap: var(--yy-space-3); align-content: start; width: 100%; padding: var(--yy-space-2) 0; }

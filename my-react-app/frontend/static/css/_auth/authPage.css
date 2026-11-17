@@ -34,7 +34,7 @@
     background: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: var(--yy-radius-panel);
-    box-shadow: var(--yy-elev-2); /* 單張大卡浮在漸層上；深色模式此 token 為 0 層，靠細框分層 */
+    box-shadow: var(--yy-elev-2), var(--yy-lit); /* 單張大卡浮在漸層上；深色模式此 token 為 0 層，靠細框分層 */
 }
 
 .auth-panel {

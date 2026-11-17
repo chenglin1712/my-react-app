@@ -58,6 +58,7 @@ const SearchSpotlight = ({ query, setQuery, handleSearch, loading, selectedTribe
         <input
           type="text"
           role="combobox"
+          data-hotkey-search
           className="spotlight-input"
           placeholder="輸入中文或族語詞彙"
           aria-label="查詢關鍵字"

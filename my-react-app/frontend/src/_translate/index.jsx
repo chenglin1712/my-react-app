@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import axios from "axios";
 import { Alert } from "react-bootstrap";
 import LoadingSpinner from "@components/ui/LoadingSpinner";
+import { TranslateResultSkeleton } from "@components/ui/SkeletonShapes";
 import { Link } from "react-router-dom";
 import { ArrowLeftRight, Copy, Volume2 } from "lucide-react";
 import "../../static/css/_translate/index.css";
@@ -315,12 +316,7 @@ const TranslatePage = () => {
                             )}
                         </div>
 
-                        {loading && (
-                            <div className="translate-result-loading">
-                                <LoadingSpinner size="sm" decorative />
-                                <span>翻譯中…</span>
-                            </div>
-                        )}
+                        {loading && <TranslateResultSkeleton label="翻譯中…" />}
 
                         {!loading && result && (
                             <>

@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { openShortcutHelp } from "../../hooks/shortcuts";
 
 // 頁尾：全寬深色，左邊品牌（原語＋標語），右邊三欄入口（學習、資源、平台），下方一行版權聲明，背後一個淡的超大「原語」浮水印。
 // 連結全部對照現有路由，沒有自創項目：學習與資源的項目和導覽列一致（2026-11-06 定案的分組），
@@ -30,6 +31,7 @@ const FOOTER_COLUMNS = [
       { to: "/help", label: "關於我們" },
       { to: "/privacy", label: "隱私權" },
       { to: "/contact", label: "聯絡" },
+      { action: openShortcutHelp, label: "鍵盤快捷鍵" }, // 「?」快捷鍵的按鈕入口（P1-8）
     ],
   },
 ];
@@ -52,7 +54,11 @@ const Footer = () => {
               <h2 className="yy-footer__col-title">{column.title}</h2>
               <ul>
                 {column.links.map((link) => (
-                  <li key={link.to}><Link to={link.to}>{link.label}</Link></li>
+                  <li key={link.to ?? link.label}>
+                    {link.action
+                      ? <button type="button" className="yy-footer__linkbtn" onClick={link.action}>{link.label}</button>
+                      : <Link to={link.to}>{link.label}</Link>}
+                  </li>
                 ))}
               </ul>
             </div>

@@ -100,9 +100,9 @@ describe("標籤、晶片、頁籤", () => {
     expect(ratio(tokenValue("--yy-calm-tag"), tokenValue("--yy-calm-tag-on"))).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("晶片最小高度 44px；選取狀態不只靠顏色（有內縮環與勾）", () => {
+  it("晶片最小高度 44px；選取狀態不只靠顏色（深銅底象牙字加勾，P1-2）", () => {
     expect(blocks(".yy-pill")).toMatch(/min-height:\s*var\(--yy-control-md\)/);
-    expect(blocks(".yy-pill.active")).toMatch(/box-shadow:\s*inset 0 0 0 var\(--yy-border-width\)/);
+    expect(blocks(".yy-pill.active")).toMatch(/background:\s*var\(--yy-calm-accent\)[\s\S]*color:\s*var\(--yy-calm-accent-on\)/);
     expect(blocks(".yy-pill.active::before")).toMatch(/content:\s*"\\2713"/);
   });
 

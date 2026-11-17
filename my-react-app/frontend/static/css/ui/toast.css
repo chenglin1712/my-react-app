@@ -1,0 +1,52 @@
+/* 前台共用 toast（P1-6）。進場沿用浮層的 220ms 彈出，退場 160ms；從 scale(.94) 起、不從 0 起。 */
+.yy-toasts {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--yy-space-4) + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: var(--yy-z-toast);
+  display: grid;
+  gap: var(--yy-space-2);
+  width: min(440px, calc(100vw - 2 * var(--yy-space-4)));
+  pointer-events: none;
+}
+.yy-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--yy-space-3);
+  padding: var(--yy-space-2) var(--yy-space-2) var(--yy-space-2) var(--yy-space-4);
+  background: var(--yy-calm-text);
+  color: var(--yy-calm-bg);
+  border-radius: var(--yy-radius-control);
+  box-shadow: var(--yy-elev-3);
+  transform-origin: bottom center;
+  animation: yy-pop var(--dur-overlay-in) var(--ease-out) both;
+}
+.yy-toast.is-leaving {
+  animation: yy-pop-out var(--dur-overlay-out) var(--ease-out) both;
+}
+.yy-toast__msg { flex: 1; font-size: var(--yy-text-sm); line-height: 1.5; }
+.yy-toast__action,
+.yy-toast__close {
+  flex: none;
+  min-width: var(--yy-control-md);
+  min-height: var(--yy-control-md);
+  padding: 0 var(--yy-space-3);
+  background: none;
+  border: 0;
+  border-radius: var(--yy-radius-tag);
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 120ms var(--ease-out);
+}
+.yy-toast__action { text-decoration: underline; text-underline-offset: 3px; }
+.yy-toast__action:active,
+.yy-toast__close:active { transform: scale(var(--yy-ui-press)); }
+.yy-toast__action:focus-visible,
+.yy-toast__close:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .yy-toast, .yy-toast.is-leaving { animation: none; }
+}

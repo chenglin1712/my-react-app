@@ -1,3 +1,8 @@
+/* 404 不要全站 hero 的三色織紋底（P1-4：清除棋盤格殘留），只留乾淨的象牙白 */
+.notfound-hero::before {
+    content: none;
+}
+
 .notfound-hero {
     padding: 70px 24px 100px;
     display: flex;

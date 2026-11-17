@@ -169,7 +169,7 @@
   background: var(--yy-calm-surface);
   border: var(--yy-border-width) solid var(--yy-calm-line);
   border-radius: var(--yy-radius-panel);
-  box-shadow: var(--yy-elev-2);
+  box-shadow: var(--yy-elev-2), var(--yy-lit);
 }
 
 /* 輸入框本身沒有外框，整條畫焦點框（全站焦點基線見 theme-v2.css） */
@@ -251,7 +251,7 @@
   background: var(--yy-calm-surface);
   border: var(--yy-border-width) solid var(--yy-calm-rule);
   border-radius: var(--yy-radius-control);
-  box-shadow: var(--yy-elev-4);
+  box-shadow: var(--yy-elev-4), var(--yy-lit);
   transform-origin: top center;
 }
 

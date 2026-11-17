@@ -29,7 +29,7 @@ const parse = (source) => {
 const finder = (rules) => (selector, at) => rules.find((r) => r.selector === selector && (at ? r.atRules.some((a) => at.test(a)) : r.atRules.length === 0));
 
 const OLD_TOKENS = /--yy-(?:red|gold|gold-light|blue|blue-light|cream|cream-dim|ink|green|border|text-muted|text-tertiary|text-secondary|radius-card|radius-btn|surface|font-pixel|warning-bg|red-dark)(?![\w-])/;
-const NO_DECORATION = /box-shadow\s*:\s*(?!none|var\(--yy-elev-[0-4]\)\s*;)\S|text-shadow|linear-gradient|repeating-conic-gradient|transition:\s*all|ease-in(?![\w-])|rgba?\(|#[0-9a-fA-F]{3,8}\b/;
+const NO_DECORATION = /box-shadow\s*:\s*(?!none|var\(--yy-elev-[0-4]\)(?:\s*,\s*var\(--yy-lit\))?\s*;)\S|text-shadow|linear-gradient|repeating-conic-gradient|transition:\s*all|ease-in(?![\w-])|rgba?\(|#[0-9a-fA-F]{3,8}\b/;
 
 const FILES = {
   search: "_search/index.css",

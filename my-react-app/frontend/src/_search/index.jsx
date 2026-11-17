@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Container, Alert, Button } from 'react-bootstrap';
-import LoadingSpinner from '@components/ui/LoadingSpinner';
+import { WordCardSkeleton } from '@components/ui/SkeletonShapes';
 import { useFavorites } from "../../src/userServives/useFavorites";
 import { TRIBE_NAMES, TRIBE_NAME_BY_SLUG, TRIBE_SLUG_BY_NAME, TRIBE_FULL_NAME_BY_SLUG } from "../constants/tribes";
 import { apiPost } from "../../utils/apiClient";
@@ -335,6 +335,7 @@ const SearchPage = () => {
   const exactVisibleTotal = exactSorted.length;
   const fuzzyVisibleTotal = fuzzySorted.length;
   const settled = TRIBES_WITH_DATA.includes(selectedTribe) && !loading && !error;
+  const hasCurrentResults = Object.keys(definitions.exact_match_results || {}).length + Object.keys(definitions.fuzzy_match_results || {}).length > 0;
   const keywordEmpty = settled && outcome?.mode === 'keyword' && exactVisibleTotal === 0 && fuzzyVisibleTotal === 0;
   const browseEmpty = settled && outcome?.mode === 'all' && outcome.sig === filterSignature && allWords.length === 0;
   const keywordHasLatin = outcome?.mode === 'keyword' && !/[\u4e00-\u9fff]/.test(outcome.keyword);
@@ -379,7 +380,8 @@ const SearchPage = () => {
       />
 
       <br />
-      {loading && <LoadingSpinner label="搜尋中…" />}
+      {/* 已經有結果（載入更多或重新搜尋）時不插入整片骨架，避免把既有結果往下擠 */}
+      {loading && !hasCurrentResults && <WordCardSkeleton label="搜尋中…" />}
       {error && (
         <Alert variant="danger" className="d-flex justify-content-between align-items-center">
           <span>{error}</span>

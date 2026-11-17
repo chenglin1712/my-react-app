@@ -56,7 +56,7 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: var(--yy-elev-2);
+    box-shadow: var(--yy-elev-2), var(--yy-lit);
     transition: transform var(--dur-press) var(--ease-out);
 }
 .translate-swap-btn:active {
@@ -124,7 +124,7 @@
     background: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-rule);
     border-radius: var(--yy-radius-panel);
-    box-shadow: var(--yy-elev-2);
+    box-shadow: var(--yy-elev-2), var(--yy-lit);
 }
 
 .translate-pane {

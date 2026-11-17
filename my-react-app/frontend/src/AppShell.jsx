@@ -8,6 +8,8 @@ import RouteEffects from './RouteEffects';
 import OfflineBanner from '../components/ui/OfflineBanner';
 import LiveAnnouncer from '../components/ui/LiveAnnouncer';
 import BotLauncher from '../components/_quiz/BotLauncher';
+import ShortcutHelp from '../components/ui/ShortcutHelp';
+import ToastHost from '../components/ui/ToastHost';
 
 import ErrorBoundary from './errorBoundary';
 import { HomeNavSlotProvider } from './homeNavSlot';
@@ -52,6 +54,8 @@ export default function AppShell() {
         <AppRoutes />
       </main>
       <Footer />
+      <ShortcutHelp />
+      <ToastHost />
       {/* AI 助手 overlay 原本由 UserSidebar（導覽層的基礎元件）直接 lazy import
           _quiz/bot 並自己管理開關狀態——基礎共用層反過來依賴一個功能模組，
           方向是反的。所有權移到這裡：Navbar／UserSidebar 只呼叫 onOpenBot()。 */}
