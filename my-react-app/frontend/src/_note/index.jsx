@@ -21,6 +21,7 @@ import { exportNoteAsHtml } from "./sync/exportNote";
 import { NOTE_LIMITS } from "./sync/noteSyncCore";
 import EditorToolbar from "./components/EditorToolbar";
 import PageSidebar from "./components/PageSidebar";
+import SelectionBubble from "./components/SelectionBubble";
 import SaveStatus from "./components/SaveStatus";
 import {
   buildPreview, estimateSharePayload, formatKb, SHARE_MAX_PAGES, SHARE_MAX_PAYLOAD_BYTES,
@@ -47,7 +48,7 @@ function NotePage() {
 
   const {
     editor, notes, currentPage, selectedPageIds, loading, isDirty, storageError, lastSavedAt,
-    execStyle, handleAdd, handleDelete, handleSave, handleChangePage,
+    execStyle, handleAdd, handleDelete, handleSave, handleChangePage, handleSelectPage,
     handleToggleSelect, handleTitleChange, handleSelectAll, handleClearSelect, flushPendingWrite,
     flushEditor, applyExternalChange, subscribeEdit, getNotes,
   } = useNotePages(uid, {
@@ -230,9 +231,26 @@ function NotePage() {
       <EditorToolbar execStyle={execStyle} onImageFileSelected={handleImageFileSelected} isUploadingImage={isUploadingImage} />
 
       <Row>
-        {/* 左：編輯區 */}
+        {/* 左：頁面縮圖列（P5-3）。電腦版固定在左邊；手機收成抽屜，按鈕在編輯區上方 */}
+        <Col md={3} className="note-rail-col sticky-md-top">
+          <PageSidebar
+            notes={notes}
+            currentPage={currentPage}
+            isDirty={isDirty}
+            selectedPageIds={selectedPageIds}
+            maxSelectable={SHARE_MAX_PAGES}
+            onToggleSelect={handleToggleSelect}
+            onSelectAll={handleSelectAll}
+            onClearSelect={handleClearSelect}
+            onSelectPage={handleSelectPage}
+            onShare={handleShare}
+            isSharing={isSharing}
+            unsyncedIds={cloudSyncOn ? sync.failures.map((failure) => failure.id) : undefined}
+          />
+        </Col>
+        {/* 右：編輯區 */}
         <Col md={9}>
-          {/* 標題：紅色圓角邊框 */}
+          {/* 標題（P5-4：細線框、字級加大） */}
           <Form.Control
             className="note-title mb-1"
             type="text"
@@ -254,6 +272,8 @@ function NotePage() {
               包一層 ErrorBoundary，避免 TipTap 出錯時把整個筆記頁清空。 */}
           <ErrorBoundary fallback={<Alert variant="warning" className="mt-2">編輯器發生錯誤，請重新整理頁面再試一次。</Alert>}>
             <EditorContent editor={editor} className="note-text" />
+            {/* 選取文字時浮出的格式列（粗斜體、字級、顏色）；固定工具列只留粗斜體與上傳圖片 */}
+            <SelectionBubble editor={editor} execStyle={execStyle} />
           </ErrorBoundary>
 
           {error && <Alert variant="danger" className="mt-3">{error}</Alert>}
@@ -261,26 +281,11 @@ function NotePage() {
           <SyncStatus sync={sync} notes={notes} onExport={handleExportNote} />
         </Col>
 
-        {/* 右：分享頁面選擇（移到右側，且 sticky） */}
-        <Col md={3} className="sticky-top" style={{ top: 80, height: "calc(100vh - 70px)", zIndex: "100" }}>
-          <PageSidebar
-            notes={notes}
-            currentPage={currentPage}
-            isDirty={isDirty}
-            selectedPageIds={selectedPageIds}
-            maxSelectable={SHARE_MAX_PAGES}
-            onToggleSelect={handleToggleSelect}
-            onSelectAll={handleSelectAll}
-            onClearSelect={handleClearSelect}
-            onShare={handleShare}
-            isSharing={isSharing}
-            unsyncedIds={cloudSyncOn ? sync.failures.map((failure) => failure.id) : undefined}
-          />
-        </Col>
       </Row>
 
       {/* 底部固定工具列：按鈕改新色系 */}
       <div className="bottom-toolbar yy-glass mt-3 d-flex align-items-center gap-2 flex-wrap">
+        {/* 主要動作只有「儲存」一顆實心銅褐；其餘外框；刪除是危險色外框（handleDelete 會先確認） */}
         <Button type="button" onClick={handleAdd} className="btn-add">新增</Button>
         <Button type="button" onClick={handleSave} className="btn-primary">儲存</Button>
         <Button type="button" onClick={() => handleChangePage(-1)} className="btn-page" disabled={currentPage === 0}>上一頁</Button>

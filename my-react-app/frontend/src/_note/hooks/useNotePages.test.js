@@ -497,6 +497,19 @@ describe('useNotePages 標題輸入的延後寫入（O20）', () => {
         expect(setItem).not.toHaveBeenCalled();
     });
 
+    test('P5-3：handleSelectPage 直接跳到指定頁，並先把目前頁的內容與還沒寫的標題存下；同一頁或超出範圍不動', () => {
+        seedNotes([{ id: 'a', title: '一', content: '<p>A</p>' }, { id: 'b', title: '二', content: '<p>B</p>' }, { id: 'c', title: '三', content: '<p>C</p>' }]);
+        const { result } = renderHook(() => useNotePages(UID));
+        act(() => { result.current.handleSelectPage(2); });
+        expect(result.current.notes[result.current.currentPage].id).toBe('c');
+        act(() => { result.current.handleSelectPage(2); });   // 同一頁：不動
+        expect(result.current.currentPage).toBe(2);
+        act(() => { result.current.handleSelectPage(9); result.current.handleSelectPage(-1); });
+        expect(result.current.currentPage).toBe(2);
+        act(() => { result.current.handleSelectPage(0); });
+        expect(result.current.notes[result.current.currentPage].id).toBe('a');
+    });
+
     test('換頁、存檔、新增頁都會連同還沒寫的標題一起寫入，並取消排程', () => {
         const { result } = renderHook(() => useNotePages(UID));
         type(result, '新標題');

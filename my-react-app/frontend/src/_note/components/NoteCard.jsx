@@ -1,7 +1,8 @@
-import { useMemo } from "react";
-import { Heart, User } from "lucide-react";
+import { useMemo, useState } from "react";
+import { FileText, Heart, User } from "lucide-react";
 import { sanitizeNoteHtml } from "@utils/sanitizeNoteHtml";
 import { timeAgo } from "../timeAgo";
+import { firstImageSrc, stripImages } from "../noteCover";
 
 /**
  * 分享筆記格線裡的單張卡片。整張卡片可點擊開啟詳情，但裡面還有一顆獨立的
@@ -10,13 +11,29 @@ import { timeAgo } from "../timeAgo";
  */
 export default function NoteCard({ note, isMyTab, isMine, iLike, onOpen, onToggleLike }) {
   // 預覽只在 preview 內容變動時才重新消毒；列表上按一個讚時，其他卡片的預覽不必再處理一遍。
-  const previewHtml = useMemo(
-    () => sanitizeNoteHtml(note.preview || "<p>內容</p>", { strictImages: true }),
-    [note.preview],
-  );
+  const { previewHtml, coverSrc } = useMemo(() => {
+    const raw = note.preview || "<p>內容</p>";
+    // 兩份都要經過消毒器：封面從消毒後的結果取圖；預覽文字是「先去掉圖片再消毒」，
+    // 不在消毒之後再改寫 HTML（改寫過的結果不保證還是安全的）
+    return {
+      previewHtml: sanitizeNoteHtml(stripImages(raw), { strictImages: true }),
+      coverSrc: firstImageSrc(sanitizeNoteHtml(raw, { strictImages: true })),
+    };
+  }, [note.preview]);
+  // 記下「哪一個網址載入失敗」而不是單一布林值：同一張卡片換成另一則筆記或新封面時，不會被舊的失敗狀態卡住
+  const [failedSrc, setFailedSrc] = useState(null);
+  const coverFailed = coverSrc !== null && failedSrc === coverSrc;
   return (
     <article className="ns-card">
       <button type="button" className="ns-card-open" onClick={() => onOpen(note)}>
+        {/* 封面（16:9）：筆記裡第一張圖；沒有圖或載入失敗就畫預設封面，每張卡片的封面高度一律相同 */}
+        <div className="ns-cover" aria-hidden="true">
+          {coverSrc && !coverFailed ? (
+            <img decoding="async" src={coverSrc} alt="" loading="lazy" onError={() => setFailedSrc(coverSrc)} />
+          ) : (
+            <span className="ns-cover-fallback"><FileText size={28} /></span>
+          )}
+        </div>
         <div className="ns-card-head">
           {note.avatarUrl ? (
             <img decoding="async" src={note.avatarUrl} alt="" className="ns-avatar" loading="lazy" />

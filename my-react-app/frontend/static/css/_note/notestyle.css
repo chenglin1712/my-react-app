@@ -16,7 +16,8 @@
    其他頁都受影響（審查項 P1-9）。body 的背景圖設定在整個專案找不到對應的背景圖，
    margin 由 Bootstrap reboot 負責，字型由 .yy-page 負責，所以只保留底部留白。 */
 .note-page {
-  padding-bottom: 100px; /* 預留底部工具列 */
+  /* 預留底部浮動操作列：電腦版一列約 64px 加離底 12px；手機寬度按鈕會換成兩到三列，留多一點，編輯區最後一行才不會被蓋住 */
+  padding-bottom: 7rem;
 }
 
 /* ---- 筆記本外框（保留非卡片化需求） ---- */
@@ -30,24 +31,31 @@
   min-height: 600px;
 }
 
-/* ---- 標題輸入框：紅色圓角邊框 ---- */
+/* ---- 標題輸入框（P5-4 紙感）：字級加大、粗體，邊框改成安靜的細線，不再是強調色的紅框 ---- */
 .note-title {
   width: 100%;
   padding: 12px 14px;
-  border: var(--yy-border-width) solid var(--brand-red);
+  border: var(--yy-border-width) solid var(--yy-calm-rule);
   border-radius: var(--yy-radius-control);
   background: var(--yy-calm-surface);
-  font-size: 1.1rem;
+  color: var(--yy-calm-text);
+  font-size: var(--yy-text-2xl);
+  font-weight: 700;
+  line-height: 1.4;
   margin: 10px 0 14px 0;
+}
+.note-title::placeholder {
+  color: var(--yy-calm-text-sub);
+  font-weight: 400;
 }
 .note-title:focus {
   outline: var(--yy-ui-focus-ring);
   outline-offset: var(--yy-ui-focus-offset);
 }
 
-/* ---- 編輯區：紅色圓角邊框（非卡片） ---- */
+/* ---- 編輯區（非卡片）：一張安靜的紙，邊框是細線，取得焦點時才畫強調色的焦點框 ---- */
 .note-text {
-  border: var(--yy-border-width) solid var(--brand-red);
+  border: var(--yy-border-width) solid var(--yy-calm-rule);
   height: 60vh;
   height: 60dvh;
   background-color: var(--yy-calm-surface);
@@ -61,14 +69,56 @@
   outline-offset: var(--yy-ui-focus-offset);
 }
 
-/* TipTap 實際可編輯的節點是 .note-text 內的 .ProseMirror */
+/* TipTap 實際可編輯的節點是 .note-text 內的 .ProseMirror。
+   紙感（P5-4）：欄寬約 65 字元、置中、兩側留白，行高 1.8，長字詞與網址會折行而不是撐破版面。 */
 .note-text .ProseMirror {
-  padding: 12px 14px;
+  box-sizing: border-box;
+  max-width: 65ch;
   min-height: 100%;
+  margin-inline: auto;
+  padding: var(--yy-space-5) var(--yy-space-4);
   font-size: 1.5rem;
   line-height: 1.8;
   white-space: pre-wrap;
+  overflow-wrap: break-word;
   outline: none;
+}
+
+/* 連結與行內程式碼常有很長、不能斷的字串，這些才允許在任意位置折行；一般正文維持正常斷字 */
+.note-text .ProseMirror a,
+.note-text .ProseMirror code { overflow-wrap: anywhere; }
+
+.note-text .ProseMirror > * + * { margin-top: var(--yy-space-3); }
+
+/* 標題層級：StarterKit 的 h1～h3 在筆記裡要看得出層次（瀏覽器預設的字級壓在 1.5rem 的內文旁邊太小） */
+.note-text .ProseMirror h1,
+.note-text .ProseMirror h2,
+.note-text .ProseMirror h3 {
+  line-height: 1.35;
+  font-weight: 700;
+  color: var(--yy-calm-text);
+}
+.note-text .ProseMirror h1 { font-size: 2.25rem; }
+.note-text .ProseMirror h2 { font-size: 1.875rem; }
+.note-text .ProseMirror h3 { font-size: 1.625rem; }
+
+.note-text .ProseMirror ul,
+.note-text .ProseMirror ol { padding-left: 1.5em; }
+
+/* 圖片不超出欄寬（匯入的舊圖片可能比欄寬大；新插入的圖片本來就帶 max-width: 30%） */
+.note-text .ProseMirror img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* 空白時的引導文字：Placeholder 擴充套件在整篇為空時，替第一個段落加上 is-editor-empty 與 data-placeholder。
+   不去解析編輯器內部的 DOM 形狀，所以輸入法組字、協作游標等狀況不會讓提示不見或錯位。 */
+.note-text .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--yy-calm-text-sub);
+  pointer-events: none;
 }
 
 /* ---- 分享頁的內容樣式（純排版） ---- */
@@ -104,27 +154,104 @@
   outline-offset: 2px;
 }
 
-/* ---- 頁面清單卡片（Apple 化步驟 4-8）：每頁一張卡，含內容預覽 ---- */
+/* ---- 左側頁面縮圖列（P5-3）----
+   電腦版固定在編輯區左邊，跟著捲動（sticky-md-top，top 在全站導覽列加文字工具列的下面）；
+   手機寬度由 Offcanvas 收成抽屜（元件裡處理），這裡只管清單本身。 */
+.note-rail-col.sticky-md-top {
+  top: var(--note-rail-top, 10rem);
+  align-self: flex-start;
+}
+
+/* 清單自己捲動，這樣分享按鈕永遠在視野內；200 頁時整欄不會比視窗還高。
+   不寫斷點：電腦版（固定欄）和手機（抽屜）都適用，max() 保證矮螢幕至少還有 12rem，不會算出負的高度 */
+.note-rail .note-page-list {
+  max-height: max(12rem, calc(100dvh - 21rem));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.note-rail-inner {
+  width: 100%;
+  min-width: 0;
+}
+
+.note-rail-toggle {
+  margin-bottom: var(--yy-space-3);
+}
+
+.note-rail-share {
+  margin-top: var(--yy-space-3);
+}
+
 .note-page-list {
   display: grid;
   gap: var(--yy-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
+/* 一頁一張卡。長清單（上限 200 頁）：不在畫面內的卡片瀏覽器不排版、不繪製（content-visibility），
+   contain-intrinsic-size 先給一個大約的高度，捲軸長度才不會亂跳 */
 .note-page-card {
   position: relative;
-  padding: var(--yy-space-3);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--yy-space-2);
+  padding: var(--yy-space-2) var(--yy-space-3) var(--yy-space-2) var(--yy-space-2);
   border: var(--yy-border-width) solid var(--yy-calm-rule);
   border-radius: var(--yy-radius-block);
   background: var(--yy-calm-surface);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 5.5rem;
 }
 
 .note-page-card.is-selected {
   border-color: var(--yy-calm-accent);
 }
 
+/* 目前編輯的那頁：左側一條強調色粗邊＋「目前編輯」標籤（不只靠顏色） */
+.note-page-card.is-current {
+  border-left: 4px solid var(--yy-calm-accent);
+  background: var(--yy-calm-info-bg);
+}
+
+/* 勾選方框：觸控區 44px，視覺仍是一個小方框 */
+.note-page-check {
+  width: 20px;
+  height: 20px;
+  margin: calc((var(--yy-control-md) - 20px) / 2) calc((var(--yy-control-md) - 20px) / 2) 0;
+  accent-color: var(--yy-calm-accent);
+  cursor: pointer;
+}
+
+/* 整塊可按的「切換到這一頁」 */
+.note-page .note-page-main {
+  display: grid;
+  gap: var(--yy-space-1);
+  justify-items: start;
+  min-width: 0;
+  min-height: var(--yy-control-md);
+  padding: var(--yy-space-1) var(--yy-space-1);
+  text-align: left;
+  font: inherit;
+  color: var(--yy-calm-text);
+  background: transparent;
+  border: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .note-page .note-page-main:hover { background: var(--yy-calm-info-bg); }
+}
+
+.note-page-title {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
 .note-page-badge {
   display: inline-block;
-  margin-top: var(--yy-space-1);
   padding: 0 var(--yy-space-2);
   border: 1px solid var(--yy-calm-line);
   border-radius: var(--yy-radius-tag);
@@ -133,11 +260,11 @@
 }
 
 .note-page-preview {
-  margin: var(--yy-space-1) 0 0;
   font-size: var(--yy-text-sm);
   color: var(--yy-calm-text-sub);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: anywhere;
 }

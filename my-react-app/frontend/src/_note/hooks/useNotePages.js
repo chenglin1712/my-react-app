@@ -5,6 +5,7 @@ import { StarterKit } from "@tiptap/starter-kit";
 import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import { Image as ImageExtension } from "@tiptap/extension-image";
+import { Placeholder } from "@tiptap/extensions";
 import FontSize from "../fontSizeExtension";
 import { confirmAction } from "@components/ui/ConfirmDialog";
 
@@ -153,6 +154,8 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
       TextStyle,
       Color,
       FontSize,
+      // 空白筆記的引導文字（P5-4）：TipTap 官方做法，只在整篇是空的時候給第一個段落加 is-editor-empty
+      Placeholder.configure({ placeholder: "從這裡開始寫，選取文字可以調整粗體、字級和顏色…" }),
       ImageExtension.configure({
         HTMLAttributes: { style: "max-width: 30%; height: auto;" },
       }),
@@ -314,6 +317,9 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
       case "foreColor":
         chain.setColor(value).run();
         break;
+      case "unsetColor":
+        chain.unsetColor().run();
+        break;
       case "insertImage":
         if (value) chain.setImage({ src: value }).run();
         break;
@@ -365,6 +371,13 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
     setCurrentPage(newPage);
   };
 
+  /** 點左側頁面清單的某一頁：先把目前編輯中的內容存回，再切過去（跟上一頁／下一頁同一套流程）。 */
+  const handleSelectPage = (index) => {
+    if (index === currentPage || index < 0 || index >= notes.length) return;
+    updateCurrentContent();
+    setCurrentPage(index);
+  };
+
   const handleToggleSelect = (noteId) => {
     setSelectedPageIds((prev) =>
       prev.includes(noteId) ? prev.filter((id) => id !== noteId) : [...prev, noteId]
@@ -394,7 +407,7 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
 
   return {
     editor, notes, currentPage, selectedPageIds, loading, isDirty, storageError, lastSavedAt,
-    execStyle, handleAdd, handleDelete, handleSave, handleChangePage,
+    execStyle, handleAdd, handleDelete, handleSave, handleChangePage, handleSelectPage,
     handleToggleSelect, handleTitleChange, handleSelectAll, handleClearSelect,
     // 標題輸入失焦時呼叫：把延後的寫入立刻完成
     flushPendingWrite,

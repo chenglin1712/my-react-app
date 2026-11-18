@@ -1,24 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import SaveStatus from './SaveStatus';
-import { formatSavedAgo } from '../sync/formatSavedAgo';
 
-const NOW = 1_760_000_000_000;
-
-describe('formatSavedAgo', () => {
-  test.each([
-    [0, '剛剛'],
-    [59_000, '剛剛'],
-    [60_000, '1 分鐘前'],
-    [5 * 60_000, '5 分鐘前'],
-    [60 * 60_000, '1 小時前'],
-    [23 * 60 * 60_000, '23 小時前'],
-    [48 * 60 * 60_000, '2 天前'],
-    [-5000, '剛剛'], // 時鐘微調造成的負數不顯示怪字
-  ])('%i 毫秒前 → %s', (elapsed, text) => {
-    expect(formatSavedAgo(NOW - elapsed, NOW)).toBe(text);
-  });
-});
+const NOW = new Date(2026, 10, 18, 12, 3, 40).getTime();   // 本地時間 12:03
 
 describe('SaveStatus（D-5）', () => {
   beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(NOW); });
@@ -37,15 +21,21 @@ describe('SaveStatus（D-5）', () => {
     expect(screen.getByRole('status')).toHaveTextContent('尚未儲存');
   });
 
-  test('本機模式儲存後：「已儲存於這台裝置 · 剛剛」', () => {
-    const { container } = render(<SaveStatus {...base} lastSavedAt={NOW} />);
-    expect(screen.getByRole('status')).toHaveTextContent('已儲存於這台裝置');
-    expect(container.querySelector('.note-save__status')).toHaveTextContent('已儲存於這台裝置 · 剛剛');
+  test('本機模式儲存後：「已儲存於 12:03（這台裝置）」，是固定的時間點', () => {
+    render(<SaveStatus {...base} lastSavedAt={NOW} />);
+    expect(screen.getByRole('status')).toHaveTextContent('已儲存於 12:03（這台裝置）');
+  });
+
+  test('時間是 24 小時制，下午是 15:07、深夜是 00:05', () => {
+    const { rerender } = render(<SaveStatus {...base} lastSavedAt={new Date(2026, 10, 18, 15, 7).getTime()} />);
+    expect(screen.getByRole('status')).toHaveTextContent('已儲存於 15:07');
+    rerender(<SaveStatus {...base} lastSavedAt={new Date(2026, 10, 18, 0, 5).getTime()} />);
+    expect(screen.getByRole('status')).toHaveTextContent('已儲存於 00:05');
   });
 
   test('雲端同步開啟：儲存文字一樣只講這台裝置（雲端狀態由 SyncStatus 負責），但不再提醒只存在瀏覽器', () => {
-    const { container } = render(<SaveStatus {...base} lastSavedAt={NOW} cloudSyncOn />);
-    expect(container.querySelector('.note-save__status')).toHaveTextContent('已儲存於這台裝置 · 剛剛');
+    render(<SaveStatus {...base} lastSavedAt={NOW} cloudSyncOn />);
+    expect(screen.getByRole('status')).toHaveTextContent('已儲存於 12:03（這台裝置）');
     expect(screen.queryByText(/換裝置或清除瀏覽器資料/)).not.toBeInTheDocument();
   });
 
@@ -61,21 +51,9 @@ describe('SaveStatus（D-5）', () => {
     expect(screen.queryByText(/已儲存/)).not.toBeInTheDocument();
   });
 
-  test('相對時間每 30 秒更新一次，而且只有時間文字更新（報讀器唸的狀態文字不變）', () => {
-    const { container } = render(<SaveStatus {...base} lastSavedAt={NOW} />);
-    const hidden = container.querySelector('[aria-hidden="true"]');
-    expect(hidden).toHaveTextContent('剛剛');
-
-    act(() => { vi.advanceTimersByTime(30_000); });
-    expect(hidden).toHaveTextContent('剛剛');
-    act(() => { vi.advanceTimersByTime(60_000); });
-    expect(hidden).toHaveTextContent('1 分鐘前');
-    expect(screen.getByRole('status')).toHaveTextContent(/^已儲存於這台裝置$/);
-  });
-
-  test('卸載後清掉計時器', () => {
+  test('不再有計時器（時間點固定，不會自己跳動）', () => {
     const { unmount } = render(<SaveStatus {...base} lastSavedAt={NOW} />);
-    unmount();
     expect(vi.getTimerCount()).toBe(0);
+    unmount();
   });
 });

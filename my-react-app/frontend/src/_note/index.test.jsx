@@ -6,6 +6,8 @@ import { MemoryRouter } from 'react-router-dom';
 import NotePage from './index';
 import { shareNote } from '../userServives/noteService';
 import { uploadToCloudinary } from '@utils/uploadToCloudinary';
+import { mockViewport } from './testDesktopMatchMedia';
+mockViewport(true);   // 電腦版寬度：頁面清單直接顯示
 
 // 站內確認視窗（原本是瀏覽器原生 window.confirm）：測試直接替換成可控制回傳值的 mock
 const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
@@ -38,6 +40,7 @@ vi.mock('@tiptap/extension-text-style', () => ({ TextStyle: {} }));
 vi.mock('@tiptap/extension-color', () => ({ Color: {} }));
 vi.mock('@tiptap/extension-image', () => ({ Image: { configure: () => ({}) } }));
 vi.mock('./fontSizeExtension', () => ({ default: {} }));
+vi.mock('./components/SelectionBubble', () => ({ default: () => null }));
 
 vi.mock('../userServives/noteService', () => ({ shareNote: vi.fn() }));
 vi.mock('@utils/uploadToCloudinary', () => ({ uploadToCloudinary: vi.fn() }));

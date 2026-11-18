@@ -1,0 +1,159 @@
+/* 選取文字時浮出的格式工具列（P5-1）。材質是毛玻璃（.yy-glass），浮在內容上的東西才用玻璃（F2 B）。
+   不做進出場動畫：選字是每天幾十次的動作，氣泡又會跟著選取範圍移動，加動畫只會讓它看起來慢半拍（Emil：高頻不動）。
+   z-index 取 popover 層，要壓過編輯區的 sticky 工具列與頁面側欄。 */
+.sel-bubble {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--yy-space-1);
+  max-width: min(92vw, 560px);
+  padding: var(--yy-space-1);
+  border-radius: var(--yy-radius-panel);
+  box-shadow: var(--yy-elev-3);
+  z-index: var(--yy-z-popover);
+}
+
+.sel-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* 群組之間用細線分隔，不靠顏色區分 */
+.sel-group + .sel-group {
+  padding-left: var(--yy-space-1);
+  border-left: var(--yy-border-width) solid var(--yy-calm-rule);
+}
+
+/* 比 .note-page button 更高的優先度：氣泡的按鈕有自己的尺寸（桌面 36px、觸控 44px） */
+.sel-bubble .sel-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0 var(--yy-space-2);
+  font: inherit;
+  font-size: var(--yy-text-sm);
+  font-weight: 700;
+  color: var(--yy-calm-text);
+  background: transparent;
+  border: 0;
+  border-radius: var(--yy-radius-control);
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+}
+
+/* 觸控時按鈕放大到 44px（手指點得到） */
+@media (pointer: coarse) {
+  .sel-bubble .sel-btn {
+    min-width: var(--yy-control-md);
+    min-height: var(--yy-control-md);
+  }
+}
+
+.sel-bubble .sel-btn:active {
+  transform: scale(var(--yy-ui-press));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sel-bubble .sel-btn:hover {
+    background: var(--yy-calm-info-bg);
+  }
+}
+
+.sel-bubble .sel-btn:focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
+}
+
+/* 目前狀態：淡底加下方一條短實線，不只靠顏色 */
+.sel-bubble .sel-btn[aria-pressed="true"],
+.sel-bubble .sel-btn[aria-expanded="true"] {
+  background: var(--yy-calm-info-bg);
+  color: var(--yy-calm-accent);
+}
+
+.sel-bubble .sel-btn[aria-pressed="true"]::after,
+.sel-bubble .sel-btn[aria-expanded="true"]::after {
+  content: "";
+  position: absolute;
+  left: 25%;
+  right: 25%;
+  bottom: 3px;
+  height: 2px;
+  background: var(--yy-calm-accent);
+}
+
+/* 色盤按鈕右下角的小圓點：游標所在文字的顏色 */
+.sel-bubble .sel-current {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--yy-radius-round);
+  background: var(--swatch, transparent);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+}
+
+.sel-colors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding-left: var(--yy-space-1);
+  border-left: var(--yy-border-width) solid var(--yy-calm-rule);
+}
+
+/* 窄螢幕放不下一列時，色盤換到下一列（手機的氣泡放在選取範圍下方，往下長不會蓋住文字） */
+@media (max-width: 720px) {
+  .sel-colors {
+    flex-basis: 100%;
+    padding-left: 0;
+    padding-top: var(--yy-space-1);
+    border-left: 0;
+    border-top: var(--yy-border-width) solid var(--yy-calm-rule);
+  }
+}
+
+/* 色票：圓形色塊，選中時外環加勾（不只靠顏色） */
+.sel-bubble .sel-swatch::before {
+  content: "";
+  width: 22px;
+  height: 22px;
+  border-radius: var(--yy-radius-round);
+  background: var(--swatch);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  box-sizing: border-box;
+}
+
+.sel-bubble .sel-swatch[aria-pressed="true"]::before {
+  outline: 2px solid var(--yy-calm-text);
+  outline-offset: 2px;
+}
+
+.sel-bubble .sel-swatch[aria-pressed="true"]::after {
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  top: 50%;
+  width: 5px;
+  height: 10px;
+  background: transparent;
+  border: solid var(--yy-calm-surface);
+  border-width: 0 2px 2px 0;
+  transform: translate(-50%, -62%) rotate(45deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sel-bubble .sel-btn {
+    transition: none;
+  }
+
+  .sel-bubble .sel-btn:active {
+    transform: none;
+  }
+}

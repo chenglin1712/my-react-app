@@ -82,8 +82,8 @@ describe("筆記", () => {
     expect(css["_note/buttons.css"]).not.toMatch(/background:\s*gray/);
   });
 
-  it("文字顏色色票選中時用外框環，不用陰影；底部工具列改用毛玻璃（P1-7）", () => {
-    expect(find("_note/toolbar.css")('.editor-toolbar .color-box[aria-pressed="true"]::before').body).toMatch(/outline:\s*2px solid/);
+  it("文字顏色色票（現在在選取氣泡裡）選中時用外框環，不用陰影；底部工具列改用毛玻璃（P1-7）", () => {
+    expect(find("_note/bubble.css")('.sel-bubble .sel-swatch[aria-pressed="true"]::before').body).toMatch(/outline:\s*2px solid/);
     expect(find("_note/toolbar.css")(".bottom-toolbar").body).not.toMatch(/background/);
     expect(read("../../src/_note/index.jsx")).toMatch(/className="bottom-toolbar yy-glass /);
   });
@@ -91,10 +91,10 @@ describe("筆記", () => {
   it("分享區：卡片扁平、分頁籤與按鈕至少 44px、目前分頁有勾", () => {
     const f = find("_note/notesharestyle.css");
     expect(f(".ns-card").body).toMatch(/border-radius:var\(--yy-radius-panel\)/);
-    expect(f(".ns-tab").body).toMatch(/min-height:var\(--yy-control-md\)/);
+    expect(f(".ns-seg").body).toMatch(/min-height:var\(--yy-control-md\)/);
     expect(f(".ns-btn").body).toMatch(/min-height:var\(--yy-control-md\)/);
     expect(f(".ns-page-btn").body).toMatch(/min-height:var\(--yy-control-md\)/);
-    expect(f(".ns-tab.active::before").body).toMatch(/content:\s*"\\2713"/);
+    expect(f(".ns-seg-item.is-active .ns-seg-label::before").body).toMatch(/content:\s*"\\2713"/);
   });
 
   it("彈窗遮罩用主題色混色；提示訊息減少動態時不動", () => {

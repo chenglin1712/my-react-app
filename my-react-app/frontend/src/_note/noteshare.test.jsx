@@ -122,7 +122,7 @@ describe('NoteShare', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByRole('button', { name: '我的' }));
+    await user.click(screen.getByRole('radio', { name: '我的' }));
     await screen.findByText('筆記1');
 
     await user.click(screen.getByRole('button', { name: '下一頁' }));

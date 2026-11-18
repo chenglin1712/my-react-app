@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import NoteCard from './NoteCard';
@@ -63,5 +63,35 @@ describe('NoteCard', () => {
     const title = screen.getByText(long);
     expect(title).toHaveClass('ns-title');
     expect(title).toHaveAttribute('title', long);
+  });
+
+  test('P5-5：有圖就用第一張圖當 16:9 封面，圖不再重複出現在預覽文字裡', () => {
+    const { container } = renderCard({ note: { ...NOTE, preview: '<p>文字</p><img src="https://res.cloudinary.com/demo/image/upload/a.png">' } });
+    expect(container.querySelector('.ns-cover img')).toHaveAttribute('src', 'https://res.cloudinary.com/demo/image/upload/a.png');
+    expect(container.querySelector('.ns-preview img')).toBeNull();
+  });
+
+  test('P5-5：沒有圖或圖載入失敗，都改畫預設封面（封面區塊一律存在，卡片高度一致）', () => {
+    const { container } = renderCard();
+    expect(container.querySelector('.ns-cover')).not.toBeNull();
+    expect(container.querySelector('.ns-cover img')).toBeNull();
+    expect(container.querySelector('.ns-cover-fallback')).not.toBeNull();
+  });
+
+  test('P5-5：封面圖載入失敗時退回預設封面', () => {
+    const { container } = renderCard({ note: { ...NOTE, preview: '<img src="https://res.cloudinary.com/demo/image/upload/a.png">' } });
+    fireEvent.error(container.querySelector('.ns-cover img'));
+    expect(container.querySelector('.ns-cover img')).toBeNull();
+    expect(container.querySelector('.ns-cover-fallback')).not.toBeNull();
+  });
+
+  test('P5-5：同一張卡片換成另一則有效封面時，不會被先前的載入失敗卡住', () => {
+    const a = { ...NOTE, preview: '<img src="https://res.cloudinary.com/demo/image/upload/a.png">' };
+    const b = { ...NOTE, preview: '<img src="https://res.cloudinary.com/demo/image/upload/b.png">' };
+    const { container, rerender } = renderCard({ note: a });
+    fireEvent.error(container.querySelector('.ns-cover img'));
+    expect(container.querySelector('.ns-cover img')).toBeNull();
+    rerender(<NoteCard note={b} isMyTab={false} isMine={false} iLike={false} onOpen={vi.fn()} onToggleLike={vi.fn()} />);
+    expect(container.querySelector('.ns-cover img')).toHaveAttribute('src', 'https://res.cloudinary.com/demo/image/upload/b.png');
   });
 });

@@ -181,6 +181,17 @@
   --yy-calm-focus: #7E5239;        /* 焦點外框，用在 bg／surface 上，要 3:1 */
   --yy-calm-focus-on-block: #FFF9ED; /* 焦點外框，用在石板灰區塊（block）內的控制項；按鈕自己的焦點框畫在外側，用 --yy-calm-focus */
 
+  /* ---------- 筆記文字顏色色盤（P5-1）----------
+     這六個色碼會被「寫進使用者的筆記內容」（分享出去、別人用淺色底讀），所以是資料色，不是介面色：
+     深色模式不重新定義（下面的深色區塊刻意沒有它們），否則同一篇筆記在不同模式下會變色。
+     同一個調性：深而不黑、彩度壓低，白底對比 6:1 以上（墨黑 13.9、深銅 6.7、橄欖 7.8、森綠 6.0、靛藍 9.1、酒紅 7.5）。 */
+  --yy-note-ink-ink: #292D31;
+  --yy-note-ink-copper: #7E5239;
+  --yy-note-ink-olive: #5C5230;
+  --yy-note-ink-green: #2F6F4B;
+  --yy-note-ink-indigo: #2F4A6D;
+  --yy-note-ink-wine: #8A3A4E;
+
   /* ---------- 表面與焦點（審查項 P2-12、P2-19）---------- */
   --yy-surface: #FFFFFF;          /* 卡片、輸入框、彈窗的底色 */
   --yy-surface-page: var(--yy-cream);
