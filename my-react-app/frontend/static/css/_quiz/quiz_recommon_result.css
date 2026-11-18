@@ -172,3 +172,94 @@
     align-items: center;
     font-weight: 700;
 }
+
+
+/* 詞綴熟練度條形圖（P4-9）：長條只用資料色 1 與細線底色；數字直接寫在格子裡，另有資料表，不靠顏色或長度單獨傳達。 */
+.rule-bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yy-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rule-bar-row {
+  display: grid;
+  grid-template-columns: 4.5em minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--yy-space-2) var(--yy-space-3);
+}
+
+.rule-bar-track {
+  height: 14px;
+  background: var(--yy-calm-rule);
+  border-radius: var(--yy-radius-pill);
+  overflow: hidden;
+}
+
+.rule-bar-fill {
+  display: block;
+  width: var(--rule-pct, 0%);
+  min-width: 4px;
+  height: 100%;
+  background: var(--yy-data-1);
+}
+
+.rule-bar-num {
+  font-weight: 700;
+  color: var(--yy-calm-text);
+}
+
+.rule-bar-num small {
+  margin-left: 0.4em;
+  font-size: var(--yy-text-sm);
+  font-weight: 400;
+  color: var(--yy-calm-text-sub);
+}
+
+.rule-practice-btn {
+  grid-column: 2 / -1;
+  justify-self: start;
+  min-height: var(--yy-control-md);
+  padding: 0 var(--yy-space-4);
+  font: inherit;
+  font-weight: 700;
+  color: var(--yy-calm-accent);
+  background: transparent;
+  border: var(--yy-border-width) solid var(--yy-calm-accent);
+  border-radius: var(--yy-radius-pill);
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+}
+
+.rule-practice-btn:focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
+}
+
+.rule-practice-btn:active {
+  transform: scale(var(--yy-ui-press));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .rule-practice-btn:hover {
+    background: var(--yy-calm-info-bg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rule-practice-btn {
+    transition: none;
+  }
+
+  .rule-practice-btn:active {
+    transform: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .rule-bar-fill {
+    background: Highlight;
+  }
+}

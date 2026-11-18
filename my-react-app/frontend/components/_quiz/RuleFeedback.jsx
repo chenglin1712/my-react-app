@@ -1,5 +1,6 @@
 import { Puzzle } from "lucide-react";
-import { describeDiagnosis, roundedPercent, ruleLabel } from "./ruleSkillView";
+import ChartFigure from "../ui/ChartFigure";
+import { describeDiagnosis, parseRuleId, roundedPercent, ruleLabel } from "./ruleSkillView";
 
 /**
  * 測驗結束頁的「詞綴診斷」：
@@ -24,7 +25,7 @@ const confusionRows = (value) => rows(value)
   }))
   .filter((row) => row.target && row.selected && row.count !== null);
 
-export default function RuleFeedback({ entries = [], summary = null }) {
+export default function RuleFeedback({ entries = [], summary = null, onPractice = null }) {
   const lines = rows(entries)
     .map((entry, index) => ({ key: index, text: describeDiagnosis(entry.diagnosis) }))
     .filter((line) => line.text);
@@ -52,13 +53,38 @@ export default function RuleFeedback({ entries = [], summary = null }) {
         <>
           <p className="fw-bold mb-1">你的詞綴熟練度（估計）</p>
           {weakest.length > 0 ? (
-            <ul className="result-rule-list">
-              {weakest.map((row) => (
-                <li key={row.key}>
-                  <strong>{row.label}</strong>：答 {row.n} 次、對 {row.c} 次，熟練度約 {roundedPercent(row.p)}%
-                </li>
-              ))}
-            </ul>
+            <ChartFigure
+              className="rule-chart"
+              interactive
+              title="詞綴熟練度（估計）條形圖"
+              summary={`熟練度由低到高：${weakest.map((row) => `${row.label} ${roundedPercent(row.p)}%`).join("、")}。長條越短表示越需要加強。`}
+              columns={[
+                { key: "label", label: "詞綴" },
+                { key: "pct", label: "熟練度（估計）" },
+                { key: "n", label: "作答次數" },
+                { key: "c", label: "答對次數" },
+              ]}
+              rows={weakest.map((row) => ({ label: row.label, pct: `${roundedPercent(row.p)}%`, n: row.n, c: row.c }))}
+            >
+              <ul className="rule-bars">
+                {weakest.map((row) => {
+                  const pct = roundedPercent(row.p);
+                  return (
+                    <li key={row.key} className="rule-bar-row">
+                      <strong className="rule-bar-label">{row.label}</strong>
+                      {/* 長條只是視覺；數字（熟練度與作答次數）直接寫在格子裡，不靠長度或顏色單獨傳達 */}
+                      <span className="rule-bar-track" aria-hidden="true"><span className="rule-bar-fill" style={{ "--rule-pct": `${pct}%` }} /></span>
+                      <span className="rule-bar-num">{pct}%<small>（答 {row.n} 次、對 {row.c} 次）</small></span>
+                      {onPractice && parseRuleId(row.key) && (
+                        <button type="button" className="rule-practice-btn" aria-label={`練這條：${row.label}`} onClick={() => onPractice(row.key)}>
+                          練這條
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </ChartFigure>
           ) : (
             <p className="result-rule-note">
               目前沒有明顯待加強的詞綴。每條詞綴要累積{minObservations === null ? "足夠" : `至少 ${minObservations} 次`}作答，才會列出熟練度估計。
@@ -79,6 +105,9 @@ export default function RuleFeedback({ entries = [], summary = null }) {
         </>
       )}
 
+      {onPractice && weakest.length > 0 && (
+        <p className="result-rule-note">按「練這條」會開始新的測驗，並優先安排這條詞綴的句子填空題；其他題型照原本出題。</p>
+      )}
       <p className="result-rule-note">
         這是依你的作答次數算出的估計，不是正式評量；作答次數少的時候誤差會很大。
       </p>

@@ -224,6 +224,37 @@ class TestRulePolicy:
         assert rule_selection.RulePolicy(kit, "amis", {}, random.Random(1)).pick(picker) is None
         assert len(picker.peek(100)) == 10                              # 什麼都沒被取走
 
+    def test_focus_policy_picks_only_the_requested_rule(self):
+        # 「練這條」：指定規則時，只挑測得到那條規則的詞，政策名稱標成 focus-rule
+        words, kit = _world()
+        picker = _picker_for(words)
+        policy = rule_selection.FocusRulePolicy(kit, "amis", {}, ID["pa"], random.Random(1))
+        cand, rule, name = policy.pick(picker)
+        assert cand["word"].name == "patala" and rule == ID["pa"] and name == rule_selection.POLICY_FOCUS
+        assert cand not in picker.peek(100)                              # 被取走了
+        assert policy.pick(picker) is None                               # pa- 只有一個詞：用完就退回原本排序
+
+    def test_focus_policy_returns_none_for_an_unknown_rule(self):
+        words, kit = _world()
+        picker = _picker_for(words)
+        policy = rule_selection.FocusRulePolicy(kit, "amis", {}, "v1|amis|P|zz||0", random.Random(1))
+        assert policy.pick(picker) is None
+        assert len(picker.peek(100)) == len(words)                       # 什麼都沒被取走
+
+    def test_rule_policy_builds_the_focus_variant_only_when_asked(self):
+        words, kit = _world()
+        src = type("Src", (), {"kit": kit})()
+        store = type("Store", (), {"load": lambda self, uid, tribe: type("S", (), {"skills": {}})()})()
+        with patch.object(flags, "enabled", return_value=True), patch.object(rule_state_store, "get_store", return_value=store):
+            from fastAPI.routes.quiz import api
+            assert type(api._rule_policy(src, "amis", "u1")) is rule_selection.RulePolicy
+            assert isinstance(api._rule_policy(src, "amis", "u1", ID["pa"]), rule_selection.FocusRulePolicy)
+            assert type(api._rule_policy(src, "amis", "u1", "亂寫")) is rule_selection.RulePolicy   # 格式不對：當作沒指定
+            assert type(api._rule_policy(src, "amis", "u1", G.rule_id_for("bunun", MA))) is rule_selection.RulePolicy   # 別的族語的規則：當作沒指定
+        with patch.object(flags, "enabled", return_value=False):
+            from fastAPI.routes.quiz import api
+            assert api._rule_policy(src, "amis", "u1", ID["pa"]) is None  # 旗標關閉時指定規則也不啟用
+
     def test_commit_counts_toward_the_cap(self):
         words, kit = _world()
         policy = rule_selection.RulePolicy(kit, "amis", {}, random.Random(1))

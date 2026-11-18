@@ -4,40 +4,63 @@ body:has(.offline-banner) {
     --bot-bottom: 96px;
 }
 
-/* 右下角 AI 助手啟動鈕。z-index 900：高於頁面內容，低於 Navbar 彈窗遮罩（1000）與各種 modal。 */
+/* 右下角 AI 助手啟動鈕（P4-8）：玻璃膠囊（材質由 .yy-glass 提供，降級與對比由 glass.test.js 把關）。
+   z-index 900：高於頁面內容，低於 Navbar 彈窗遮罩（1000）與各種 modal。 */
 .bot-launcher {
     position: fixed;
     right: calc(20px + env(safe-area-inset-right, 0px));
     bottom: var(--bot-bottom, calc(20px + env(safe-area-inset-bottom, 0px)));
     z-index: var(--yy-z-float);
-    width: 56px;
-    height: 56px;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    padding: 0;
-    color: var(--yy-calm-info-bg);
-    background: var(--yy-calm-accent);
-    border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-radius-round);
+    gap: var(--yy-space-2);
+    min-height: var(--yy-control-md);
+    padding: 0 var(--yy-space-4) 0 var(--yy-space-3);
+    color: var(--yy-calm-text);
+    border-radius: var(--yy-radius-pill);
+    font: inherit;
+    font-size: var(--yy-text-sm);
+    font-weight: 700;
     cursor: pointer;
-    transition: transform 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
-        background-color 160ms ease;
+    transition: transform var(--dur-press) var(--ease-out), opacity var(--dur-fast) var(--ease-out), visibility 0s;
 }
 
-@media (hover: hover) and (pointer: fine) {
-    .bot-launcher:hover {
-        background: var(--yy-calm-accent);
-    }
+.bot-launcher-icon {
+    color: var(--yy-calm-accent);
+}
+
+.bot-launcher:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
 }
 
 .bot-launcher:active {
-    transform: scale(0.97);
+    transform: scale(var(--yy-ui-press));
+}
+
+/* 詳情浮卡、彈窗、抽屜開著時整顆隱藏，不會疊在浮層上或蓋住浮層裡的操作。
+   用 visibility 一起收掉，隱藏後鍵盤與報讀器也到不了；浮層一關就回來。 */
+body:has(.modal.show, .offcanvas.show, .modal-backdrop.show) .bot-launcher {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    /* 先淡出再 visibility:hidden，不然淡出看不到 */
+    transition: opacity var(--dur-fast) var(--ease-out), visibility 0s linear var(--dur-fast);
 }
 
 @media (max-width: 600px) {
     .bot-launcher {
         right: calc(14px + env(safe-area-inset-right, 0px));
         bottom: var(--bot-bottom, calc(14px + env(safe-area-inset-bottom, 0px)));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bot-launcher {
+        transition: none;
+    }
+
+    .bot-launcher:active {
+        transform: none;
     }
 }

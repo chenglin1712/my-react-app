@@ -1,5 +1,6 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import RuleFeedback from './RuleFeedback';
 
 const MA = 'v1|amis|P|ma||0';
@@ -38,7 +39,9 @@ describe('RuleFeedback', () => {
       weakest: [{ rule: MA, label: 'ma-', p: 0.3123, n: 8, c: 2 }],
     }} />);
     expect(screen.getByText('你的詞綴熟練度（估計）')).toBeInTheDocument();
-    expect(screen.getByRole('listitem')).toHaveTextContent('ma-：答 8 次、對 2 次，熟練度約 30%');
+    const row = screen.getByRole('listitem');
+    expect(row).toHaveTextContent('ma-');
+    expect(row).toHaveTextContent('30%（答 8 次、對 2 次）');
     expect(screen.getByText(/不是正式評量/)).toBeInTheDocument();
   });
 
@@ -103,7 +106,8 @@ describe('RuleFeedback', () => {
   test('label 型別不對時改由規則 ID 推出標籤，不會丟錯', () => {
     render(<RuleFeedback summary={{ available: true, minObservations: 5, confusions: [],
       weakest: [{ rule: MA, label: {}, p: 0.2, n: 9, c: 1 }] }} />);
-    expect(screen.getByRole('listitem')).toHaveTextContent('ma-：答 9 次、對 1 次，熟練度約 20%');
+    expect(screen.getByRole('listitem')).toHaveTextContent('ma-');
+    expect(screen.getByRole('listitem')).toHaveTextContent('20%（答 9 次、對 1 次）');
   });
 
   test.each([
@@ -127,5 +131,26 @@ describe('RuleFeedback', () => {
   test('列資料裡混有 null 時略過該列', () => {
     render(<RuleFeedback summary={{ available: true, minObservations: 5, confusions: [], weakest: [null, { rule: MA, label: 'ma-', p: 0.2, n: 9, c: 1 }] }} />);
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
+  });
+
+  test('P4-9：熟練度條形圖——數字寫在格子裡、有資料表、長條本身隱藏於報讀器（不靠顏色或長度傳達）', () => {
+    const { container } = render(<RuleFeedback summary={{ available: true, minObservations: 5, confusions: [], weakest: [
+      { rule: MA, label: 'ma-', p: 0.3, n: 8, c: 2 }, { rule: PA, label: 'pa-', p: 0.6, n: 5, c: 3 },
+    ] }} />);
+    expect(screen.getByRole('group', { name: '詞綴熟練度（估計）條形圖' })).toBeInTheDocument();
+    expect(container.querySelector('.rule-bar-fill')).toHaveStyle('--rule-pct: 30%');
+    expect(container.querySelector('.rule-bar-track')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByRole('table', { name: '詞綴熟練度（估計）條形圖資料表' })).toBeInTheDocument();
+    expect(screen.getByText(/熟練度由低到高：ma- 30%、pa- 60%/)).toBeInTheDocument();
+  });
+
+  test('P4-9：給了 onPractice 才有「練這條」，按下去帶的是那一列的規則 ID', async () => {
+    const onPractice = vi.fn();
+    const summary = { available: true, minObservations: 5, confusions: [], weakest: [{ rule: MA, label: 'ma-', p: 0.3, n: 8, c: 2 }] };
+    const { rerender } = render(<RuleFeedback summary={summary} />);
+    expect(screen.queryByRole('button', { name: /練這條/ })).not.toBeInTheDocument();
+    rerender(<RuleFeedback summary={summary} onPractice={onPractice} />);
+    await userEvent.click(screen.getByRole('button', { name: '練這條：ma-' }));
+    expect(onPractice).toHaveBeenCalledWith(MA);
   });
 });

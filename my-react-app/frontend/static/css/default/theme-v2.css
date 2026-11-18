@@ -943,79 +943,12 @@
   }
 }
 
-/* ---------- 步驟流程條 (StepBar) ---------- */
-
-.yy-stepbar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.yy-step-item {
-  display: flex;
-  align-items: center;
-}
+/* ---------- 步驟流程條 (StepBar) ----------
+   圓點、連線、分段三種都在 components/ui/StepBar.jsx 引入的 static/css/ui/stepBar.css（P4-6）。
+   這裡只留 .yy-loading（與步驟條無關，但歷史上放在這一段）。 */
 .yy-loading {
   display: inline-flex;
   align-items: center;
-}
-.yy-step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-/* 菱形只旋轉背景層（::before），文字層維持原方向：旋轉 45° 再反轉 -45° 的文字在部分瀏覽器會模糊（審查項 P3-23） */
-.yy-step-diamond {
-  position: relative;
-  isolation: isolate;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--yy-font-pixel);
-  font-weight: 700;
-  font-size: 0.9375rem;
-  color: var(--yy-ink);
-  transition: color var(--dur-fast) var(--ease-out);
-}
-.yy-step-diamond::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: var(--yy-radius-control);
-  border: var(--yy-border-width) solid var(--yy-ink);
-  background: var(--yy-surface);
-  transform: rotate(45deg);
-  transition: background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
-}
-.yy-step-diamond.active,
-.yy-step-diamond.done {
-  color: var(--yy-cream);
-}
-.yy-step-diamond.active::before,
-.yy-step-diamond.done::before {
-  background: var(--yy-red);
-}
-.yy-step-diamond.active::before {
-}
-.yy-step-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--yy-text-secondary);
-  white-space: nowrap;
-  transition: color var(--dur-fast) var(--ease-out);
-}
-.yy-step-connector {
-  width: 60px;
-  height: 3px;
-  background: repeating-linear-gradient(90deg, var(--yy-ink) 0 6px, transparent 6px 11px);
-  margin: 0 10px 22px;
 }
 
 /* ---------- 切換頁籤 (TabSwitch: 登入/註冊、寫筆記/分享區) ---------- */

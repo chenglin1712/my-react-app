@@ -6,8 +6,10 @@ import { useGameSession } from "./useGameSession";
 import { useGameAudioPlayer } from "./useGameAudioPlayer";
 import { useTimedOptionSelect } from "./useTimedOptionSelect";
 import { TRIBE_INTRO } from "./listeningIntro";
+import GameIntro from "./GameIntro";
 import CelebrationBurst from "./CelebrationBurst";
 import { shouldCelebrate } from "./celebrate";
+import GameResultRecorder from "./GameResultRecorder";
 import { apiUrl } from "../../utils/apiUrls";
 
 function ListeningGame({ tribe = "tayal" }) {
@@ -81,18 +83,7 @@ function ListeningGame({ tribe = "tayal" }) {
   if (status === "intro") {
     return (
       <div className="listening-intro">
-        {config.lines.map((line, i) => (
-          <p key={i} className="listening-intro-line">{line}</p>
-        ))}
-        {error && <p className="listening-error" role="alert">{error}</p>}
-        <button
-          type="button"
-          className="listening-btn-primary"
-          onClick={handleStart}
-          disabled={loading}
-        >
-          {loading ? "載入中..." : error ? "重試" : "開始"}
-        </button>
+        <GameIntro lines={config.lines} onStart={handleStart} loading={loading} error={error} />
       </div>
     );
   }
@@ -192,6 +183,7 @@ function ListeningGame({ tribe = "tayal" }) {
 
     return (
       <div className="listening-result">
+        <GameResultRecorder gameId="listening" tribe={tribe} pct={pct} />
         <h2 className="listening-result-title">遊戲結果</h2>
 
         <div className={`listening-result-score${shouldCelebrate(pct) ? " is-celebrating" : ""}`}>

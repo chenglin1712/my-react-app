@@ -1,9 +1,10 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
 import GameZonePage from './index';
+import { recordGameResult } from './gameProgress';
 
 const navigate = vi.hoisted(() => vi.fn());
 vi.mock('react-router-dom', async (importOriginal) => ({
@@ -17,6 +18,7 @@ function renderPage() {
 
 describe('遊戲專區（E-5，P2-49）', () => {
   beforeEach(() => {
+    localStorage.clear();
     navigate.mockReset();
     Element.prototype.scrollIntoView = vi.fn();
   });
@@ -96,5 +98,89 @@ describe('遊戲專區的 bento 版面與單一強調色（Apple 化步驟 4-5�
       expect(m).toHaveAttribute('aria-hidden', 'true');
     });
     expect(container.querySelector('.yy-diamond-badge')).toBeNull();
+  });
+});
+
+describe('遊戲專區的個人進度與微傾斜（P4-1）', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    navigate.mockReset();
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  test('新使用者：顯示空狀態說明，卡片上沒有任何進度欄位（不用 0 充數），也沒有連續天數', () => {
+    const { container } = renderPage();
+    expect(screen.getByText(/還沒有遊戲紀錄/)).toBeInTheDocument();
+    expect(container.querySelector('.gamehub-card-progress')).toBeNull();
+    expect(container.querySelector('.gamehub-streak')).toBeNull();
+  });
+
+  test('一律說明進度只存在這台裝置、不會上傳', () => {
+    renderPage();
+    expect(screen.getByText(/只存在這台裝置的瀏覽器，不會上傳或同步到伺服器/)).toBeInTheDocument();
+  });
+
+  test('有紀錄時：該遊戲顯示最高分與上次玩的族語；沒玩過的遊戲仍沒有進度；顯示連續天數', () => {
+    const now = new Date();
+    recordGameResult('listening', { tribe: 'amis', pct: 85, now });
+    const { container } = renderPage();
+    expect(screen.queryByText(/還沒有遊戲紀錄/)).not.toBeInTheDocument();
+    expect(screen.getByText('已連續 1 天有玩遊戲')).toBeInTheDocument();
+    const rows = container.querySelectorAll('.gamehub-card-progress');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent('最高分 85%');
+    expect(rows[0]).toHaveTextContent('上次玩 阿美族語');
+    expect(rows[0].closest('.gamehub-card')).toHaveTextContent('聽力遊戲');
+  });
+
+  test('「清除我的遊戲進度」：沒紀錄時不顯示；有紀錄時按下去清空，回到空狀態', async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderPage();
+    expect(screen.queryByRole('button', { name: '清除我的遊戲進度' })).not.toBeInTheDocument();
+    unmount();
+    recordGameResult('listening', { tribe: 'amis', pct: 85, now: new Date() });
+    renderPage();
+    await user.click(screen.getByRole('button', { name: '清除我的遊戲進度' }));
+    expect(screen.getByText(/還沒有遊戲紀錄/)).toBeInTheDocument();
+    expect(localStorage.getItem('yy.game.progress.v1')).toBeNull();
+  });
+
+  test('發音練習的最高分單位是「分」，不是百分比', () => {
+    recordGameResult('pronunciation', { pct: 72, now: new Date() });
+    renderPage();
+    expect(screen.getByText('最高分 72 分')).toBeInTheDocument();
+  });
+
+  test('微傾斜：只有滑鼠移動才寫入傾斜角度，離開後清除；觸控不傾斜', () => {
+    const original = window.matchMedia;
+    window.matchMedia = (q) => ({ matches: /hover: hover|pointer: fine/.test(q), addEventListener() {}, removeEventListener() {} });
+    try {
+      const { container } = renderPage();
+      const card = container.querySelector('.gamehub-card');
+      card.getBoundingClientRect = () => ({ left: 0, top: 0, width: 200, height: 100 });
+      fireEvent.pointerMove(card, { pointerType: 'touch', clientX: 200, clientY: 0 });
+      expect(card.style.getPropertyValue('--tilt-y')).toBe('');
+      fireEvent.pointerMove(card, { pointerType: 'mouse', clientX: 200, clientY: 0 });
+      expect(parseFloat(card.style.getPropertyValue('--tilt-y'))).toBeCloseTo(3, 1);   // 最大 3 度
+      expect(parseFloat(card.style.getPropertyValue('--tilt-x'))).toBeCloseTo(3, 1);
+      fireEvent.pointerLeave(card, { pointerType: 'mouse' });
+      expect(card.style.getPropertyValue('--tilt-y')).toBe('');
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
+  test('微傾斜：使用者開了「減少動態」就不傾斜', () => {
+    const original = window.matchMedia;
+    window.matchMedia = (q) => ({ matches: true, addEventListener() {}, removeEventListener() {}, media: q });
+    try {
+      const { container } = renderPage();
+      const card = container.querySelector('.gamehub-card');
+      card.getBoundingClientRect = () => ({ left: 0, top: 0, width: 200, height: 100 });
+      fireEvent.pointerMove(card, { pointerType: 'mouse', clientX: 200, clientY: 0 });
+      expect(card.style.getPropertyValue('--tilt-y')).toBe('');
+    } finally {
+      window.matchMedia = original;
+    }
   });
 });

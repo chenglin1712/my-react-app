@@ -85,10 +85,13 @@ describe('Game_Start 的開始頁與結算頁（E-5）', () => {
     apiPost.mockReset();
   });
 
-  test('開始頁：標題加兩段文字，開始鈕使用共用的主要按鈕樣式', () => {
+  test('開始頁：標題加預設 3 行的介紹，開始鈕使用共用的主要按鈕樣式，且排在「了解更多」之後', () => {
     render(<MemoryRouter><Game_Start tribe="tayal" /></MemoryRouter>);
     expect(screen.getByRole('heading', { name: /Tninun TAYAL/ })).toBeInTheDocument();
-    expect(document.querySelectorAll('.crossword-intro-para')).toHaveLength(2);
+    expect(document.querySelectorAll('.game-intro-body')).toHaveLength(1);
+    const more = screen.getByRole('button', { name: '了解更多' });
+    const start = screen.getByRole('button', { name: '開始' });
+    expect(more.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole('button', { name: '開始' })).toHaveClass('yy-btn-primary');
   });
 

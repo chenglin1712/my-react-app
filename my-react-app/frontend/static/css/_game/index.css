@@ -17,8 +17,10 @@
     font-family: var(--yy-font-body);
 }
 
+/* 遊戲面板（P4-2）：粉紅大面板改象牙底加細框。深色模式 layer-0 會跟著變深，不用另外寫 */
 .game-background {
-    background-color: var(--yy-calm-danger-bg);
+    background-color: var(--yy-calm-layer-0);
+    border: var(--yy-border-width) solid var(--yy-calm-line);
     width: 60%;
     border-radius: var(--yy-radius-panel);
 }
@@ -405,4 +407,75 @@
     .gamehub-card--feature .gamehub-card-title {
         font-size: var(--yy-text-xl);
     }
+}
+
+/* 個人進度（P4-1）：只顯示有資料的欄位；進度存在本機瀏覽器，頁面上有說明 */
+.gamehub-streak {
+    display: inline-block;
+    margin: var(--yy-space-3) 0 0;
+    padding: 2px var(--yy-space-3);
+    font-weight: 700;
+    color: var(--yy-calm-accent);
+    border: var(--yy-border-width) solid var(--yy-calm-accent);
+    border-radius: var(--yy-radius-pill);
+}
+
+.gamehub-empty {
+    margin: var(--yy-space-3) 0 0;
+    font-size: var(--yy-text-sm);
+    color: var(--yy-calm-text-sub);
+}
+
+.gamehub-card-progress {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--yy-space-1) var(--yy-space-3);
+    margin: var(--yy-space-2) 0 0;
+    font-size: var(--yy-text-sm);
+    font-weight: 700;
+    color: var(--yy-calm-text);
+}
+
+.gamehub-card-progress span + span {
+    font-weight: 400;
+    color: var(--yy-calm-text-sub);
+}
+
+.gamehub-privacy {
+    max-width: 900px;
+    margin: var(--yy-space-4) auto 0;
+    font-size: var(--yy-text-sm);
+    text-align: center;
+    color: var(--yy-calm-text-sub);
+}
+
+/* 微傾斜（P4-1，純裝飾）：只有滑鼠、沒開減少動態時才有；角度由 useCardTilt 寫入 --tilt-x／--tilt-y（最大 3 度） */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    .gamehub-card {
+        transform: perspective(900px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+    }
+
+    .gamehub-card:active {
+        transform: perspective(900px) scale(var(--yy-ui-press));
+    }
+}
+
+.gamehub-privacy-clear {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--yy-control-md);
+    margin-left: var(--yy-space-2);
+    padding: 0 var(--yy-space-2);
+    font: inherit;
+    color: var(--yy-calm-accent);
+    background: transparent;
+    border: 0;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.gamehub-privacy-clear:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
 }

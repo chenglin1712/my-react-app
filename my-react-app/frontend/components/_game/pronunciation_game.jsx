@@ -236,6 +236,7 @@ function PronunciationGame({ tribe = "tayal" }) {
 
     return (
       <ResultScreen
+        tribe={tribe}
         avg={avg}
         avgRating={avgRating}
         answers={answers}

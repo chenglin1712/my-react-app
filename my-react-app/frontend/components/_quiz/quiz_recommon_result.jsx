@@ -27,6 +27,8 @@ function RecommendedQuizResult() {
   if (!state) {
     return <p>沒有測驗結果，請重新測驗。</p>;
   }
+  // 「練這條」：回到題目頁，並指定要練的詞綴；題目頁會把它帶給出題 API，句子填空優先出這條規則的題
+  const practiceRule = (rule) => navigate("../question", { state: { focusRule: rule } });
   return (
     <div className="result-container fade-in">
       <h2 className="result-title"><ChartColumn /> 測驗結算</h2>
@@ -62,7 +64,7 @@ function RecommendedQuizResult() {
         <p>{state.suggestion}</p>
       </div>
 
-      <RuleFeedback entries={state.ruleFeedback || []} summary={ruleSummary} />
+      <RuleFeedback entries={state.ruleFeedback || []} summary={ruleSummary} onPractice={practiceRule} />
       <ResearchConsentCard />
 
       {/* 動作按鈕 */}
