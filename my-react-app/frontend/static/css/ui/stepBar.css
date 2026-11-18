@@ -1,3 +1,149 @@
+/* 步驟條（預設變體，P4-6）：銅褐圓點加實線。
+   - 目前這一步：實心銅褐圓點加數字；完成：實心加勾；還沒到：空心圓點加數字（形狀與符號不只靠顏色）。
+   - 連線是實線；走過的連線由左往右填滿（transform: scaleX，只動 transform）。
+   - 減少動態：連線直接填滿，沒有過程。 */
+.yy-stepbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap; /* 連線屬於前一步，換行會讓連線掉在行尾；窄螢幕改縮短連線 */
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.yy-step-item {
+  display: flex;
+  align-items: center;
+}
+
+.yy-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--yy-space-2);
+}
+
+.yy-step-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-radius-round);
+  background: var(--yy-calm-surface);
+  color: var(--yy-calm-text-sub);
+  font-weight: 700;
+  font-size: var(--yy-text-base);
+  font-variant-numeric: tabular-nums;
+  transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.yy-step-dot.active,
+.yy-step-dot.done {
+  border-color: var(--yy-calm-accent);
+  background: var(--yy-calm-accent);
+  color: var(--yy-calm-accent-on);
+}
+
+.yy-step-item {
+  min-width: 0;
+}
+
+/* 目前這一步多一圈外環：和「完成」同為實心，靠外環與數字（完成是勾）分辨，不只靠顏色 */
+.yy-step-dot.active {
+  outline: var(--yy-border-width) solid var(--yy-calm-accent);
+  outline-offset: 3px;
+}
+
+.yy-step-label {
+  font-size: var(--yy-text-sm);
+  font-weight: 700;
+  color: var(--yy-calm-text-sub);
+  white-space: nowrap;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+.yy-step-item[aria-current="step"] .yy-step-label,
+.yy-step-item.is-done .yy-step-label {
+  color: var(--yy-calm-text);
+}
+
+.yy-step-connector {
+  position: relative;
+  flex: 0 1 60px;
+  width: 60px;
+  min-width: 14px;
+  height: 3px;
+  margin: 0 var(--yy-space-3) 22px;
+  overflow: hidden;
+  border-radius: var(--yy-radius-pill);
+  background: var(--yy-calm-rule);
+}
+
+.yy-step-connector-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--yy-calm-accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+/* 走過的連線填滿。有動態時用動畫（換頁重新掛載時也會播），減少動態時直接是滿的 */
+.yy-step-item.is-done .yy-step-connector-fill {
+  transform: scaleX(1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .yy-step-item.is-done .yy-step-connector-fill {
+    animation: yy-step-fill 420ms var(--ease-out) both;
+  }
+}
+
+@keyframes yy-step-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yy-step-dot,
+  .yy-step-label {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .yy-step-dot {
+    border-color: CanvasText;
+  }
+
+  .yy-step-dot.active,
+  .yy-step-dot.done {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  .yy-step-dot.active {
+    outline-color: CanvasText;
+  }
+
+  .yy-step-connector {
+    background: GrayText;
+  }
+
+  .yy-step-connector-fill {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+}
+
 /* 分段進度條（StepBar variant="segments"，Apple 化步驟 4-4）。
    每一步一小段橫條，走過與目前這一步填滿深銅色；標籤在橫條下方，字級不低於 14px。
    完成的步驟標籤前有勾號、目前這一步標籤加粗（形狀與字重線索，不只靠顏色）。 */

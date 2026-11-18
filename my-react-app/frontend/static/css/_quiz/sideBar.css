@@ -1,30 +1,17 @@
+/* 測驗導覽（P4-5，components/_quiz/sideBar.jsx）。
+   桌面：淺色側欄（面板底、細框），選取項是銅褐底象牙字加「目前」字樣，沒有紅色三角。
+   手機（≤900px）：同一組 button 變成頂部橫向頁籤，選取項底下一條銅褐線加粗體字。 */
 .bar-container {
     flex: 0 0 254px;
     width: 254px;
     min-width: 254px;
     height: fit-content;
     margin: 0;
+    padding: var(--yy-space-2) 0;
 
-    overflow: hidden;
     background: var(--yy-calm-surface);
     border: var(--yy-border-width) solid var(--yy-calm-line);
     border-radius: var(--yy-radius-panel);
-}
-
-.bar-title {
-    display: flex;
-    align-items: center;
-    height: 52px;
-    margin: 0;
-    padding: 0 16px;
-
-    font-family: var(--yy-font-body);
-    font-size: 0.9375rem;
-    font-weight: 700;
-    color: var(--yy-calm-olive);
-
-    background: var(--yy-calm-accent);
-    border-bottom: 3px solid var(--yy-calm-line);
 }
 
 .bar-items {
@@ -32,208 +19,176 @@
     flex-direction: column;
 }
 
-.bar-item {
-    width: 100%;
-    font: inherit;
-    color: inherit;
-    text-align: left;
+.bar-group {
     display: flex;
-    align-items: center;
-    gap: 12px;
-    min-height: 52px;
-    height: auto;
-    padding: 12px 14px;
-
-    background: var(--yy-calm-surface);
-    border: 0;
-    border-bottom: 2px solid var(--yy-calm-line);
-    cursor: pointer;
-    transition: transform .15s ease, background .15s ease;
+    flex-direction: column;
 }
 
-.bar-item:last-child {
-    border-bottom: 0;
-}
+.bar-title {
+    margin: 0;
+    padding: var(--yy-space-3) var(--yy-space-4) var(--yy-space-1);
 
-.bar-item-chart {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 10%;
-    border-radius: var(--yy-radius-pill);
-}
-
-.bar-item-label {
-    width: 100%;
-    font-size: 0.9375rem;
-    line-height: 1.45;
+    font-family: var(--yy-font-body);
+    font-size: var(--yy-text-sm);
     font-weight: 700;
+    letter-spacing: 0.04em;
     color: var(--yy-calm-text-sub);
 }
 
-.bar-item.active {
-    background: var(--yy-calm-tag);
-    border-left: 7px solid var(--yy-calm-accent);
-    padding-left: 7px;
-}
+.bar-item {
+    display: flex;
+    align-items: center;
+    gap: var(--yy-space-3);
+    width: calc(100% - 2 * var(--yy-space-2));
+    min-height: var(--yy-control-md);
+    margin: 2px var(--yy-space-2);
+    padding: var(--yy-space-2) var(--yy-space-3);
 
-.bar-item.active .bar-item-label {
+    font: inherit;
+    text-align: left;
     color: var(--yy-calm-text);
+    background: transparent;
+    border: 0;
+    border-radius: var(--yy-radius-control);
+    cursor: pointer;
+    transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform var(--dur-press) var(--ease-out);
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .bar-item:hover {
-      transform: translateX(3px);
-      background: var(--yy-calm-info-bg);
-  }
+.bar-item-icon {
+    display: flex;
+    flex: none;
+    color: var(--yy-calm-accent);
+}
+
+.bar-item-label {
+    flex: 1;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+.bar-item-current {
+    flex: none;
+    padding: 0 var(--yy-space-2);
+    border: var(--yy-border-width) solid currentColor;
+    border-radius: var(--yy-radius-pill);
+    font-size: var(--yy-text-sm);
+    font-weight: 700;
+}
+
+.bar-item.active {
+    color: var(--yy-calm-accent-on);
+    background: var(--yy-calm-accent);
+}
+
+.bar-item.active .bar-item-icon {
+    color: inherit;
+}
+
+.bar-item:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
 }
 
 .bar-item:active {
-  transform: scale(0.97);
-}
-
-.func-hint {
-    display: none;
-    color: var(--yy-calm-accent);
-}
-
-.func-hint.active {
-    display: block;
-}
-
-.mobile-bar-menu {
-    display: none;
-}
-
-.mobile-menu-button {
-    position: fixed;
-    right: calc(20px + env(safe-area-inset-right, 0px));
-    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-    z-index: var(--yy-z-drawer);
-
-    width: 60px;
-    height: 60px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    color: var(--yy-calm-accent);
-    background: var(--yy-calm-olive);
-    border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-radius-control);
-    cursor: pointer;
-    transition: transform .15s ease;
+    transform: scale(var(--yy-ui-press));
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .mobile-menu-button:hover {
-  }
+    .bar-item:not(.active):hover {
+        background: var(--yy-calm-info-bg);
+    }
 }
 
-.mobile-menu-button:active {
-  transform: scale(0.97);
-  box-shadow: none;
+@media (prefers-reduced-motion: reduce) {
+    .bar-item {
+        transition: none;
+    }
+
+    .bar-item:active {
+        transform: none;
+    }
 }
 
-.mobile-menu-indicator {
-    position: absolute;
-    right: -7px;
-    bottom: -7px;
-    width: 22px;
-    height: 22px;
-    padding: 2px;
-
-    color: var(--yy-calm-olive);
-    background: var(--yy-calm-accent);
-    border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-radius-tag);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+@media (forced-colors: active) {
+    .bar-item.active {
+        outline: 2px solid Highlight;
+    }
 }
 
-.mobile-menu {
-    position: fixed;
-    right: calc(20px + env(safe-area-inset-right, 0px));
-    bottom: calc(92px + env(safe-area-inset-bottom, 0px));
-    z-index: var(--yy-z-nav);
-    width: 210px;
-    padding: 16px;
-
-    background: var(--yy-calm-surface);
-    border: var(--yy-border-width) solid var(--yy-calm-line);
-    border-radius: var(--yy-radius-panel);
-}
-
-.mobile-menu-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-    padding-bottom: 10px;
-    color: var(--yy-calm-text);
-    border-bottom: 3px solid var(--yy-calm-olive);
-    font-family: var(--yy-font-body);
-    font-size: 0.875rem;
-}
-
-.mobile-closeBtn {
-    padding: 3px;
-    color: var(--yy-calm-accent);
-    background: transparent;
-    border: 0;
-    cursor: pointer;
-}
-
-.mobile-menu-items {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
-.mobile-menu-item {
-    width: 100%;
-    font: inherit;
-    color: inherit;
-    text-align: left;
-    background: transparent;
-    min-height: var(--yy-control-md);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px;
-    border: var(--yy-border-width) solid transparent;
-    border-radius: var(--yy-radius-panel);
-    cursor: pointer;
-    transition: background .2s ease, border-color .2s ease;
-}
-
-.mobile-menu-item[aria-current="page"] {
-    color: var(--yy-calm-accent);
-    background: var(--yy-calm-tag);
-    border-color: var(--yy-calm-text);
-}
-
-.mobile-menu-item:active {
-    transform: scale(0.97);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .mobile-menu-item:hover {
-      color: var(--yy-calm-accent);
-      background: var(--yy-calm-info-bg);
-      border-color: var(--yy-calm-text);
-  }
-}
-
+/* 手機：頂部頁籤。群組標題不顯示（群組仍有無障礙名稱）；四個項目排成一列，窄螢幕自動換成兩列，
+   所以不需要橫向捲動，也不會有「看不到的項目」或被捲動區裁掉的焦點框 */
 @media (max-width: 900px) {
     .bar-container {
+        flex: none;
+        width: 100%;
+        min-width: 0;
+        padding: 0;
+    }
+
+    .bar-items {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .bar-group {
+        display: contents;
+    }
+
+    .bar-title {
         display: none;
     }
 
-    .mobile-bar-menu {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
+    .bar-item {
+        flex: 1 1 auto;
+        justify-content: center;
+        width: auto;
+        margin: 0;
+        padding: var(--yy-space-2) var(--yy-space-3);
+        border-radius: 0;
+        border-bottom: 3px solid transparent;
+    }
+
+    .bar-item-label {
+        flex: none;
+        font-size: var(--yy-text-sm);
+    }
+
+    /* 頁籤的選取：底下一條銅褐線，字用主文字色，不用整塊底色。字重全部一樣，切換時寬度不跳；
+       非選取項字色降成次要文字，選取項的辨識靠底線這個形狀，不只靠顏色 */
+    .bar-item:not(.active) {
+        color: var(--yy-calm-text-sub);
+    }
+
+    .bar-item.active {
+        color: var(--yy-calm-text);
+        background: transparent;
+        border-bottom-color: var(--yy-calm-accent);
+    }
+
+    .bar-item.active .bar-item-icon {
+        color: var(--yy-calm-accent);
+    }
+
+    .bar-item-current {
+        display: none;
+    }
+
+    /* 焦點框畫在項目裡面，不會被圓角容器裁掉 */
+    .bar-item:focus-visible {
+        outline-offset: -3px;
+    }
+
+    /* 手機版 .quiz-body 是區塊排版，頁籤列和下面的內容之間留一點距離 */
+    .quiz-body > .bar-container {
+        margin-bottom: var(--yy-space-4);
+    }
+}
+
+/* 窄螢幕：四個頁籤排成整齊的 2×2，不是 3＋1 */
+@media (max-width: 720px) {
+    .bar-items {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }

@@ -14,16 +14,16 @@ describe('StepBar', () => {
 
   test('current 步驟標記為 active，之前的步驟標記為 done，之後的步驟兩者皆無', () => {
     const { container } = render(<StepBar steps={steps} current={2} />);
-    const diamonds = container.querySelectorAll('.yy-step-diamond');
+    const dots = container.querySelectorAll('.yy-step-dot');
 
-    expect(diamonds[0]).toHaveClass('done');
-    expect(diamonds[0]).not.toHaveClass('active');
+    expect(dots[0]).toHaveClass('done');
+    expect(dots[0]).not.toHaveClass('active');
 
-    expect(diamonds[1]).toHaveClass('active');
-    expect(diamonds[1]).not.toHaveClass('done');
+    expect(dots[1]).toHaveClass('active');
+    expect(dots[1]).not.toHaveClass('done');
 
-    expect(diamonds[2]).not.toHaveClass('active');
-    expect(diamonds[2]).not.toHaveClass('done');
+    expect(dots[2]).not.toHaveClass('active');
+    expect(dots[2]).not.toHaveClass('done');
   });
 
   test('步驟之間有連接線，但最後一個步驟後面沒有', () => {
@@ -46,7 +46,7 @@ describe('StepBar 無障礙', () => {
 
   test('完成的步驟顯示勾號並有「已完成」文字，不只靠顏色', () => {
     const { container } = render(<StepBar steps={steps} current={3} />);
-    expect(container.querySelectorAll('.yy-step-diamond.done')[0].textContent).toBe('✓');
+    expect(container.querySelectorAll('.yy-step-dot.done')[0].textContent).toBe('✓');
     expect(screen.getAllByText('（已完成）')).toHaveLength(2);
     expect(screen.getByText('（目前步驟）')).toBeInTheDocument();
   });
@@ -78,7 +78,34 @@ describe('StepBar 的分段進度變體（Apple 化步驟 4-4）', () => {
 
   test('預設仍是菱形，不受影響', () => {
     const { container } = render(<StepBar steps={steps} current={1} />);
-    expect(container.querySelector('.yy-step-diamond')).not.toBeNull();
+    expect(container.querySelector('.yy-step-dot')).not.toBeNull();
     expect(container.querySelector('.yy-segstep')).toBeNull();
+  });
+});
+
+describe('StepBar 的圓點與連線（P4-6）', () => {
+  const steps = ['選擇族語', '開始測驗', '看結果'];
+
+  test('走過的步驟標 is-done，連線裡有填滿層；目前與之後的步驟沒有 is-done', () => {
+    const { container } = render(<StepBar steps={steps} current={2} />);
+    const items = container.querySelectorAll('.yy-step-item');
+    expect(items[0]).toHaveClass('is-done');
+    expect(items[1]).not.toHaveClass('is-done');
+    expect(items[0].querySelector('.yy-step-connector-fill')).not.toBeNull();
+  });
+
+  test('未到的步驟是空心圓點、顯示數字；目前是實心加數字；完成是勾（符號不只靠顏色）', () => {
+    const { container } = render(<StepBar steps={steps} current={2} />);
+    const dots = container.querySelectorAll('.yy-step-dot');
+    expect(dots[0].textContent).toBe('✓');
+    expect(dots[1].textContent).toBe('2');
+    expect(dots[2].textContent).toBe('3');
+    expect(dots[2]).not.toHaveClass('active');
+    expect(dots[2]).not.toHaveClass('done');
+  });
+
+  test('不再有紅色菱形的類別', () => {
+    const { container } = render(<StepBar steps={steps} current={1} />);
+    expect(container.querySelector('.yy-step-diamond')).toBeNull();
   });
 });

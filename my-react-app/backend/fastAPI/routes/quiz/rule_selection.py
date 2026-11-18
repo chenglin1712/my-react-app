@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 LOOKAHEAD = 40
 POLICY_FALLBACK = "adaptive-fallback"        # 旗標開著，但這一題沒挑到合適的規則，照原本排序出
+POLICY_FOCUS = "focus-rule"                  # 使用者在結果頁按「練這條」：指定練某一條規則
+FOCUS_LOOKAHEAD = 150                        # 指定規則時往後找的候選數（比一般適性選題多，才找得到那條規則）
 
 
 def policy_name(mode: str) -> str:
@@ -69,3 +71,20 @@ class RulePolicy:
         """題目真的建出來了才計入這條規則的題數（沒有例句建不出題的候選不算）。"""
         if rule is not None:
             self.rule_counts[rule] = self.rule_counts.get(rule, 0) + 1
+
+
+class FocusRulePolicy(RulePolicy):
+    """使用者指定「練這條規則」（結果頁的「練這條」按鈕）：往後找測得到該規則的候選字，找到就用；
+    找不到就回傳 None，呼叫端照原本排序出題（不會因為題庫少就出不了題）。
+    只改「句子填空」挑目標詞的方式，其他題型與計分不受影響。"""
+
+    def __init__(self, kit, tribe, skills, focus_rule: str, rng=None):
+        super().__init__(kit, tribe, skills, rng=rng, lookahead=FOCUS_LOOKAHEAD)
+        self.focus_rule = focus_rule
+
+    def pick(self, picker):
+        for candidate in picker.peek(self.lookahead):
+            if self.rule_of(candidate["word"].name) == self.focus_rule:
+                picker.take(candidate)
+                return candidate, self.focus_rule, POLICY_FOCUS
+        return None

@@ -1,6 +1,5 @@
 import "../../static/css/_quiz/quiz_panel_start.css"
 import { useNavigate } from "react-router-dom";
-import RecommonImg from "../../static/assets/_quiz/recommon.png"
 import StepBar from "../ui/StepBar";
 import { QUIZ_LEVELS } from "./quizLevels";
 
@@ -25,15 +24,17 @@ const Panel_Start = ({ tribe = "tayal" }) => {
                             key={level.id}
                             className={`level-card level-${level.id} ${level.disabled ? "disabled" : ""}`}
                         >
-                            {level.recommended && (
-                                <img decoding="async" loading="lazy" src={RecommonImg} alt="推薦等級" className="level-recommend-img" />
-                            )}
+                            {/* 推薦：膠囊小標籤加文字（P4-7），不是貼紙；標籤在卡片上緣，不蓋住等級徽章 */}
+                            {level.recommended && <span className="level-recommend-tag" aria-hidden="true">推薦</span>}
 
                             <div className="level-card-icon">
                                 <span className="level-icon-text">{level.short}</span>
                             </div>
 
-                            <div className="level-card-title">{level.name}</div>
+                            <div className="level-card-title">
+                                {level.name}
+                                {level.recommended && <span className="visually-hidden">（推薦）</span>}
+                            </div>
 
                             <div className="level-card-info">
                                 <span className="level-type-label">{level.typeLabel}</span>

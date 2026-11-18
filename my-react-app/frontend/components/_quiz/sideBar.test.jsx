@@ -61,36 +61,47 @@ describe('SideBar 鍵盤與報讀器操作（審查項 P1-1、P1-2）', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/quiz/recommon');
   });
 
-  test('手機選單有四個項目，包含「進階-推薦測驗」', async () => {
+  test('桌面側欄與手機頁籤是同一組 button：四個項目都在，包含「進階-推薦測驗」（共用之後手機版不會再漏項）', () => {
     mockPathname = '/quiz';
-    const user = userEvent.setup();
     render(<SideBar />);
-    await user.click(screen.getByRole('button', { name: '開啟選單', hidden: true }));
-    const menu = screen.getByRole('navigation', { name: '測驗功能選單', hidden: true });
+    const nav = screen.getByRole('navigation', { name: '測驗選單' });
     ['基礎-等級測驗', '進階-推薦測驗', '答題情形', '重點複習'].forEach((name) => {
-      expect(within(menu).getByRole('button', { name: new RegExp(name), hidden: true })).toBeInTheDocument();
+      expect(within(nav).getByRole('button', { name: new RegExp(name) })).toBeInTheDocument();
     });
+    expect(document.querySelector('.mobile-menu-button')).toBeNull();
   });
 
-  test('進入推薦測驗頁時，手機選單按鈕的圖示不是空的', () => {
-    mockPathname = '/quiz/recommon';
+  test('分成「測驗」與「紀錄」兩個群組，群組有無障礙名稱（手機頁籤列不顯示標題時仍讀得到）', () => {
+    mockPathname = '/quiz';
+    render(<SideBar />);
+    const quiz = screen.getByRole('group', { name: '測驗' });
+    const record = screen.getByRole('group', { name: '紀錄' });
+    expect(within(quiz).getAllByRole('button')).toHaveLength(2);
+    expect(within(record).getAllByRole('button')).toHaveLength(2);
+  });
+
+  test('目前頁有「目前」文字標示（aria-hidden，報讀器讀 aria-current），沒有紅色三角圖示', () => {
+    mockPathname = '/quiz/review';
     const { container } = render(<SideBar />);
-    expect(container.querySelector('.mobile-menu-button svg')).not.toBeNull();
+    const current = container.querySelector('.bar-item.active');
+    expect(current).toHaveTextContent('重點複習');
+    expect(current.querySelector('.bar-item-current')).toHaveTextContent('目前');
+    expect(container.querySelectorAll('.bar-item-current')).toHaveLength(1);
+    expect(container.querySelector('.func-hint')).toBeNull();
   });
 
-  test('手機選單按鈕有 aria-expanded / aria-controls，Esc 關閉並把焦點還給按鈕', async () => {
+  test('圖示不寫死顏色（跟著 currentColor），三個入口都達得到：點擊會導向對應路徑', async () => {
     mockPathname = '/quiz';
     const user = userEvent.setup();
-    render(<SideBar />);
-    const toggle = screen.getByRole('button', { name: '開啟選單', hidden: true });
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await user.click(toggle);
-    const opened = screen.getByRole('button', { name: '關閉選單', expanded: true, hidden: true });
-    expect(opened).toHaveAttribute('aria-controls', 'quiz-mobile-menu');
-    expect(document.getElementById('quiz-mobile-menu')).not.toBeNull();
-
-    await user.keyboard('{Escape}');
-    expect(document.getElementById('quiz-mobile-menu')).toBeNull();
-    expect(screen.getByRole('button', { name: '開啟選單', hidden: true })).toHaveFocus();
+    const { container } = render(<SideBar />);
+    expect(container.querySelector('[style*="--yy-green"], [style*="--yy-red"], [style*="--yy-gold"]')).toBeNull();
+    const nav = screen.getByRole('navigation', { name: '測驗選單' });
+    await user.click(within(nav).getByRole('button', { name: /答題情形/ }));
+    expect(mockNavigate).toHaveBeenLastCalledWith('/quiz/situation');
+    await user.click(within(nav).getByRole('button', { name: /重點複習/ }));
+    expect(mockNavigate).toHaveBeenLastCalledWith('/quiz/review');
+    await user.click(within(nav).getByRole('button', { name: /基礎-等級測驗/ }));
+    expect(mockNavigate).toHaveBeenLastCalledWith('/quiz');
   });
+
 });

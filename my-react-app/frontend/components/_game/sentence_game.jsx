@@ -6,8 +6,10 @@ import { useGameSession } from "./useGameSession";
 import { useGameAudioPlayer } from "./useGameAudioPlayer";
 import { useTimedOptionSelect } from "./useTimedOptionSelect";
 import { TRIBE_INTRO } from "./sentenceIntro";
+import GameIntro from "./GameIntro";
 import CelebrationBurst from "./CelebrationBurst";
 import { shouldCelebrate } from "./celebrate";
+import GameResultRecorder from "./GameResultRecorder";
 import { apiUrl } from "../../utils/apiUrls";
 
 const RATING_THRESHOLDS = [
@@ -80,13 +82,7 @@ function SentenceGame({ tribe = "tayal" }) {
   if (status === "intro") {
     return (
       <div className="sent-intro">
-        {config.lines.map((line, i) => (
-          <p key={i} className="sent-intro-line">{line}</p>
-        ))}
-        {error && <p className="sent-error" role="alert">{error}</p>}
-        <button type="button" className="sent-btn-primary" onClick={handleStart} disabled={loading}>
-          {loading ? "載入中..." : error ? "重試" : "開始"}
-        </button>
+        <GameIntro lines={config.lines} onStart={handleStart} loading={loading} error={error} />
       </div>
     );
   }
@@ -182,6 +178,7 @@ function SentenceGame({ tribe = "tayal" }) {
 
     return (
       <div className="sent-result">
+        <GameResultRecorder gameId="sentence" tribe={tribe} pct={pct} />
         <h2 className="sent-result-title">句型練習結果</h2>
 
         <div className={`sent-result-score ${ratingCls}${shouldCelebrate(pct) ? " is-celebrating" : ""}`}>

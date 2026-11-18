@@ -755,3 +755,105 @@ describe("P3 翻譯與影像辨識規則", () => {
     expect(src).toMatch(/keyCode === 229/);
   });
 });
+
+// P4-7：等級徽章是同一個銅褐色階（深淺代表等級），不再每級一個顏色；「推薦」是文字小標籤不是貼紙圖片
+describe("P4-7 等級卡", () => {
+  const css = stripCss(readFileSync(join(FRONTEND, "static/css/_quiz/quiz_panel_start.css"), "utf8"));
+  it("四級徽章都由 --yy-calm-accent 調出來，沒有 success／olive／copper 之類的另一組顏色", () => {
+    for (const n of [1, 2, 3, 4]) {
+      const body = css.match(new RegExp(String.raw`\.level-${n} \.level-icon-text\s*\{([^}]*)\}`))?.[1] || "";
+      expect(body, `level-${n}`).toMatch(/--yy-calm-accent/);
+      expect(body).not.toMatch(/success|olive|copper/);
+    }
+  });
+  it("「推薦」是膠囊小標籤，沒有貼紙圖片", () => {
+    expect(css).toMatch(/\.level-recommend-tag\s*\{[^}]*border-radius:\s*var\(--yy-radius-pill\)/);
+    expect(css).not.toMatch(/level-recommend-img/);
+  });
+});
+
+// P4-8：AI 助手入口是玻璃膠囊，浮層開啟時自動隱藏
+describe("P4-8 AI 助手入口", () => {
+  const css = stripCss(readFileSync(join(FRONTEND, "static/css/_quiz/bot_launcher.css"), "utf8"));
+  it("膠囊：pill 圓角、最小 44px 高、文字用主文字色（對比由 glass.test.js 把關）", () => {
+    const body = css.match(/\.bot-launcher\s*\{([^}]*)\}/)?.[1] || "";
+    expect(body).toMatch(/border-radius:\s*var\(--yy-radius-pill\)/);
+    expect(body).toMatch(/min-height:\s*var\(--yy-control-md\)/);
+    expect(body).toMatch(/color:\s*var\(--yy-calm-text\)/);
+  });
+  it("modal、offcanvas、遮罩開著時隱藏（visibility 一起收，鍵盤也到不了）", () => {
+    const m = css.match(/body:has\(([^)]*)\)\s*\.bot-launcher\s*\{([^}]*)\}/);
+    expect(m?.[1]).toMatch(/\.modal\.show/);
+    expect(m?.[1]).toMatch(/\.offcanvas\.show/);
+    expect(m?.[1]).toMatch(/\.modal-backdrop\.show/);
+    expect(m?.[2]).toMatch(/visibility 0s linear var\(--dur-fast\)/); // 先淡出再隱藏
+    expect(m?.[2]).toMatch(/visibility:\s*hidden/);
+    expect(m?.[2]).toMatch(/pointer-events:\s*none/);
+  });
+  it("減少動態：沒有過場與按下縮放", () => {
+    expect(css).toMatch(/prefers-reduced-motion:\s*reduce\)\s*\{\s*\.bot-launcher\s*\{\s*transition:\s*none/);
+  });
+});
+
+// P4-3：答對與答錯回饋
+describe("P4-3 答對答錯回饋", () => {
+  const css = stripCss(readFileSync(join(FRONTEND, "static/css/_game/gameFeedback.css"), "utf8"));
+  // 取出 @keyframes name { ... } 的整段內容（用括號計數，巢狀的 0%／100% 也算在內）
+  const keyframes = (name) => {
+    const start = css.indexOf(`@keyframes ${name}`);
+    if (start < 0) return "";
+    const open = css.indexOf("{", start);
+    let depth = 0;
+    for (let i = open; i < css.length; i += 1) {
+      if (css[i] === "{") depth += 1;
+      if (css[i] === "}") depth -= 1;
+      if (depth === 0) return css.slice(open + 1, i);
+    }
+    return "";
+  };
+  it("三組動畫（彈、勾彈、搖）都只動 transform，而且都不循環", () => {
+    for (const name of ["game-pop", "game-check-pop", "game-shake"]) {
+      const body = keyframes(name);
+      expect(body, name).not.toBe("");
+      for (const m of body.matchAll(/([a-z-]+)\s*:/g)) expect(m[1], name).toBe("transform");
+    }
+    expect(css).not.toMatch(/infinite/);
+  });
+  it("答錯輕搖左右各 6px、240ms；動畫只在 prefers-reduced-motion: no-preference 底下套用", () => {
+    const shake = keyframes("game-shake");
+    expect(shake).toMatch(/translateX\(-6px\)/);
+    expect(shake).toMatch(/translateX\(6px\)/);
+    expect(css).toMatch(/animation:\s*game-shake 240ms/);
+    const idx = css.indexOf("prefers-reduced-motion: no-preference");
+    expect(idx).toBeGreaterThan(-1);
+    expect(css.indexOf("animation: game-shake")).toBeGreaterThan(idx);
+    expect(css.indexOf("animation: game-pop")).toBeGreaterThan(idx);
+  });
+  it("對錯的 ✓／✗ 圖示與回饋文字一直在 JSX 裡（減少動態時靠它們，不靠動畫）", () => {
+    for (const f of ["components/_game/listening_game.jsx", "components/_game/sentence_game.jsx"]) {
+      const src = readFileSync(join(FRONTEND, f), "utf8");
+      expect(src, f).toMatch(/game-mark[^>]*>✓/);
+      expect(src, f).toMatch(/game-mark[^>]*>✗/);
+    }
+    expect(readFileSync(join(FRONTEND, "components/_game/listening_game.jsx"), "utf8")).toMatch(/答錯了，正確答案/);
+  });
+});
+
+describe("P4 遊戲專區與測驗（其餘項目）", () => {
+  const read = (f) => stripCss(readFileSync(join(FRONTEND, f), "utf8"));
+  it("P4-1 卡片微傾斜：只在有滑鼠、沒開減少動態時；角度上限在 hook 裡（3 度）", () => {
+    const css = read("static/css/_game/index.css");
+    expect(css).toMatch(/@media \(hover: hover\) and \(pointer: fine\) and \(prefers-reduced-motion: no-preference\)\s*\{\s*\.gamehub-card\s*\{\s*transform: perspective\(900px\) rotateX\(var\(--tilt-x, 0deg\)\) rotateY\(var\(--tilt-y, 0deg\)\)/);
+    expect(readFileSync(join(FRONTEND, "src/_game/useCardTilt.js"), "utf8")).toMatch(/maxDeg = 3/);
+  });
+  it("P4-5 測驗導覽：選取是銅褐底、沒有紅色三角（func-hint）、沒有舊的手機浮動選單", () => {
+    const css = read("static/css/_quiz/sideBar.css");
+    expect(css).toMatch(/\.bar-item\.active\s*\{[^}]*background: var\(--yy-calm-accent\)/);
+    expect(css).not.toMatch(/func-hint|mobile-menu|mobile-bar-menu/);
+  });
+  it("P4-9 診斷條形圖：長條用資料色 1、底色用細線色、數字在格子裡（樣式不靠陰影）", () => {
+    const css = read("static/css/_quiz/quiz_recommon_result.css");
+    expect(css).toMatch(/\.rule-bar-fill\s*\{[^}]*background: var\(--yy-data-1\)/);
+    expect(css).toMatch(/\.rule-bar-track\s*\{[^}]*background: var\(--yy-calm-rule\)/);
+  });
+});

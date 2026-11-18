@@ -5,8 +5,10 @@ import { apiPost } from '../../utils/apiClient';
 import { loadQuizModel, saveQuizModel } from './quizModelService';
 
 const mockNavigate = vi.fn();
+let mockLocationState = null;
 vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
+  useLocation: () => ({ state: mockLocationState }),
 }));
 let mockAuth = { userData: { uid: 'user-1' }, loading: false };
 vi.mock('../../src/userServives/authContext', () => ({
@@ -63,12 +65,29 @@ function generateResponse(questions) {
 
 describe('RecommendedQuizQuestion（FR-4b）', () => {
   beforeEach(() => {
+    mockLocationState = null;
     mockNavigate.mockReset();
     apiPost.mockReset();
     loadQuizModel.mockReset();
     saveQuizModel.mockReset();
     loadQuizModel.mockResolvedValue({});
     saveQuizModel.mockResolvedValue();
+  });
+
+  test('P4-9：一般開始測驗不帶 focus_rule；從結果頁「練這條」進來才帶指定的詞綴', async () => {
+    apiPost.mockResolvedValue(generateResponse([
+      { id: 'q1', type: 'sentence-fill', payload: {}, difficulty: 1, meta: {} },
+    ]));
+    const { unmount } = render(<RecommendedQuizQuestion tribe="amis" />);
+    await screen.findByRole('button', { name: '作答' });
+    expect(apiPost.mock.calls[0][2]).toEqual({ params: { tribe: 'amis' } });
+    unmount();
+
+    apiPost.mockClear();
+    mockLocationState = { focusRule: 'v1|amis|P|ma||0' };
+    render(<RecommendedQuizQuestion tribe="amis" />);
+    await screen.findByRole('button', { name: '作答' });
+    expect(apiPost.mock.calls[0][2]).toEqual({ params: { tribe: 'amis', focus_rule: 'v1|amis|P|ma||0' } });
   });
 
   test('題目的 canonical id/type 不會被 payload 裡同名欄位覆蓋（回歸測試：原本 spread 順序反了）', async () => {

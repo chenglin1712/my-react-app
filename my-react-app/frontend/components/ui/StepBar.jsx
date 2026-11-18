@@ -1,6 +1,6 @@
 import '../../static/css/ui/stepBar.css';
 
-// 步驟流程條：菱形數字徽章 + 虛線連接，current 態與 done 態皆變赭紅實色。
+// 步驟流程條：銅褐圓點 + 實線連接（P4-6）：目前為實心、完成為實心加勾、未到為空心；走過的連線由左往右填滿。
 // 語意是有序清單（ol）；目前這一步標 aria-current="step"，完成的步驟在菱形裡顯示勾號，
 // 並用看不見的文字讓報讀器也知道「已完成」，不再只靠顏色與陰影區分。
 //
@@ -38,11 +38,11 @@ const StepBar = ({ steps, current, ariaLabel = '步驟', variant = 'diamond' }) 
       return (
         <li
           key={label}
-          className="yy-step-item"
+          className={`yy-step-item${done ? ' is-done' : ''}`}
           aria-current={active ? 'step' : undefined}
         >
           <div className="yy-step">
-            <div className={`yy-step-diamond${active ? ' active' : ''}${done ? ' done' : ''}`}>
+            <div className={`yy-step-dot${active ? ' active' : ''}${done ? ' done' : ''}`}>
               <span aria-hidden="true">{done ? '✓' : num}</span>
             </div>
             <span className="yy-step-label">
@@ -51,7 +51,11 @@ const StepBar = ({ steps, current, ariaLabel = '步驟', variant = 'diamond' }) 
               {active && <span className="visually-hidden">（目前步驟）</span>}
             </span>
           </div>
-          {num < steps.length && <div className="yy-step-connector" aria-hidden="true" />}
+          {num < steps.length && (
+            <div className="yy-step-connector" aria-hidden="true">
+              <span className="yy-step-connector-fill" />
+            </div>
+          )}
         </li>
       );
     })}

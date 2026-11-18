@@ -9,6 +9,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from config import rule_skill_model as R
 from config.tribes import TRIBE_IDS, TRIBES
 from dictionary_db.connect import get_db
 
@@ -37,6 +38,7 @@ from .irt import (
     update_theta,
 )
 from .repository import load_all_words, warm_cache
+from . import rule_selection
 from .rule_selection import RulePolicy
 from .schemas import (
     GenerateQuizResponse,
@@ -80,16 +82,21 @@ def _token_options(tribe: str, uid: str):
     return TokenOptions(tribe, uid)
 
 
-def _rule_policy(source, tribe: str, uid: str):
+def _rule_policy(source, tribe: str, uid: str, focus_rule: str | None = None):
     """適性選題：旗標開、有干擾項來源、而且讀得到這位使用者的規則熟練度才啟用；任何一項不成立就是 None
-    （照原本的難度排序出題）。"""
+    （照原本的難度排序出題）。focus_rule 有給（結果頁的「練這條」）時，改成優先挑測得到那條規則的詞。"""
     if source is None or not uid or not flags.enabled(flags.ADAPTIVE):
         return None
     try:
         store = rule_state_store.get_store()
         if store is None:
             return None
-        return RulePolicy(source.kit, tribe, store.load(uid, tribe).skills)
+        skills = store.load(uid, tribe).skills
+        # 格式不對、或不是這個族語的規則 ID 就當作沒指定（不讓亂填的值觸發一整輪無效掃描）
+        parsed = R.parse_rule_id(focus_rule) if focus_rule else None
+        if parsed and parsed[0] == tribe:
+            return rule_selection.FocusRulePolicy(source.kit, tribe, skills, focus_rule)
+        return RulePolicy(source.kit, tribe, skills)
     except Exception:
         logger.exception("quiz rule policy setup failed")
         return None
@@ -102,6 +109,7 @@ def _rule_policy(source, tribe: str, uid: str):
 def generate_quiz_frontend(
     user_data: UserModelReq = Body(...),
     tribe: str = Query(default="tayal"),
+    focus_rule: str | None = Query(default=None, max_length=200),
     db: Session = Depends(get_db),
     user: dict = Depends(auth.verify_firebase_token),
 ):
@@ -133,7 +141,7 @@ def generate_quiz_frontend(
         picker, all_words, type_count["sentenceFill"],
         distractor_source=fill_source,
         token_options=_token_options(tribe, uid),
-        rule_policy=_rule_policy(fill_source, tribe, uid),
+        rule_policy=_rule_policy(fill_source, tribe, uid, focus_rule),
     )
     generated += _generate_sentence_order_questions(picker, all_words, type_count["sentenceOrder"])
 

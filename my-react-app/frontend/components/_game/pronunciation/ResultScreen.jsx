@@ -1,8 +1,10 @@
 import { Link } from "react-router-dom";
+import GameResultRecorder from "../GameResultRecorder";
 
-export default function ResultScreen({ avg, avgRating, answers, thresholds, getRating, backTo, onRestart }) {
+export default function ResultScreen({ tribe, avg, avgRating, answers, thresholds, getRating, backTo, onRestart }) {
   return (
     <div className="pron-result">
+      <GameResultRecorder gameId="pronunciation" tribe={tribe} pct={avg} />
       <h2 className="pron-result-title">發音練習結果</h2>
 
       <div className={`pron-result-score ${avgRating.cls}`}>

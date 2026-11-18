@@ -57,9 +57,10 @@ describe("選取狀態與過渡", () => {
 
   it("TabSwitch 與 StepBar 切換有 150ms 的顏色過渡", () => {
     const theme = read("default/theme-v2.css");
+    const stepBar = read("ui/stepBar.css");
     expect(rule(theme, ".yy-tabswitch__tab")).toMatch(/transition:[^;]*background-color var\(--dur-fast\)[^;]*color var\(--dur-fast\)/);
-    expect(rule(theme, ".yy-step-diamond::before")).toMatch(/transition:[^;]*background-color var\(--dur-fast\)/);
-    expect(rule(theme, ".yy-step-label")).toMatch(/transition:\s*color var\(--dur-fast\)/);
+    expect(rule(stepBar, ".yy-step-dot")).toMatch(/transition:[^;]*background-color var\(--dur-fast\)/);
+    expect(rule(stepBar, ".yy-step-label")).toMatch(/transition:\s*color var\(--dur-fast\)/);
   });
 });
 

@@ -5,6 +5,8 @@ import "../../static/css/_game/index.css";
 import { TRIBES, COMING_SOON_LABEL, tribeHasFeature } from "../constants/tribes";
 import { scrollBehavior } from "../hooks/useReducedMotion";
 import AbstractCover from "@components/ui/AbstractCover";
+import { clearProgress, currentStreak, hasAnyProgress, readProgress } from "./gameProgress";
+import useCardTilt from "./useCardTilt";
 
 const GAMES = [
   {
@@ -42,8 +44,19 @@ const GAMES = [
   },
 ];
 
+// 「06/18」這種短日期；日期壞掉就不顯示
+const shortDate = (ms) => {
+  const d = new Date(ms);
+  return Number.isNaN(d.getTime()) ? null : `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+};
+
 const GameZonePage = () => {
   const navigate = useNavigate();
+  const tilt = useCardTilt();
+  // 個人進度只存在這台裝置（見 gameProgress.js）；進頁面時讀一次就好
+  const [progress, setProgress] = useState(readProgress);
+  const streak = currentStreak(progress.days);
+  const anyProgress = hasAnyProgress(progress);
   const [activeGame, setActiveGame] = useState(null);
   const [activeTribe, setActiveTribe] = useState(null);
 
@@ -78,6 +91,10 @@ const GameZonePage = () => {
         <div className="yy-fade-up">
           <h1 className="gamehub-title">遊戲專區</h1>
           <p className="gamehub-desc">透過遊戲，輕鬆學習原住民族語。</p>
+          {streak > 0 && <p className="gamehub-streak">已連續 {streak} 天有玩遊戲</p>}
+          {!anyProgress && (
+            <p className="gamehub-empty">還沒有遊戲紀錄。玩完一局後，這裡會記下每款遊戲的最高分和連續天數。</p>
+          )}
         </div>
       </section>
 
@@ -87,11 +104,16 @@ const GameZonePage = () => {
         <div className="gamehub-grid">
           {GAMES.map((g) => {
             const active = activeGame === g.id;
+            const mine = progress.games[g.id];
+            const lastTribe = TRIBES.find((t) => t.slug === mine?.lastTribe);
+            const lastDate = mine?.lastAt != null ? shortDate(mine.lastAt) : null;
             return (
               <div
                 key={g.id}
                 className={`yy-card yy-fade-up gamehub-card${g.featured ? ' gamehub-card--feature' : ''}${active ? ' is-selected' : ''}`}
                 data-cover-host
+                onPointerMove={tilt.onPointerMove}
+                onPointerLeave={tilt.onPointerLeave}
               >
                 <AbstractCover layout={g.cover.layout} tone={g.cover.tone} className="gamehub-card-cover" />
                 <div className="gamehub-card-head">
@@ -116,6 +138,13 @@ const GameZonePage = () => {
                     <span className="gamehub-card-art" aria-hidden="true"><g.Icon size={160} strokeWidth={1.25} /></span>
                   )}
                   <p>{g.desc}</p>
+                  {/* 沒有紀錄的欄位就不顯示（不用 0 或假資料充數） */}
+                  {mine && (mine.best != null || lastDate) && (
+                    <p className="gamehub-card-progress">
+                      {mine.best != null && <span>最高分 {mine.best}{g.id === "pronunciation" ? " 分" : "%"}</span>}
+                      {lastDate && <span>上次玩{lastTribe ? ` ${lastTribe.name}族語` : ""} · {lastDate}</span>}
+                    </p>
+                  )}
                   <span className={`gamehub-card-badge${active ? ' active' : ''}`} aria-hidden="true">
                     {active ? '✓ 已選擇' : '選這個'}
                   </span>
@@ -124,6 +153,15 @@ const GameZonePage = () => {
             );
           })}
         </div>
+
+        <p className="gamehub-privacy">
+          個人進度只存在這台裝置的瀏覽器，不會上傳或同步到伺服器；清除瀏覽器資料、使用無痕視窗或換裝置就不會有。
+          {anyProgress && (
+            <button type="button" className="gamehub-privacy-clear" onClick={() => { clearProgress(); setProgress(readProgress()); }}>
+              清除我的遊戲進度
+            </button>
+          )}
+        </p>
 
         {activeGameData && (
           <div className="yy-card yy-fade-up gamehub-panel">

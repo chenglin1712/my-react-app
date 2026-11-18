@@ -4,8 +4,7 @@
 html[data-quiz-focus] .navbar,
 html[data-quiz-focus] .yy-tabbar,
 html[data-quiz-focus] .yy-footer,
-html[data-quiz-focus] .quiz-body .bar-container,
-html[data-quiz-focus] .quiz-body .mobile-bar-menu {
+html[data-quiz-focus] .quiz-body .bar-container {
   display: none;
 }
 

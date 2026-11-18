@@ -184,7 +184,8 @@ describe("測驗", () => {
 
   it("目前所在的題與側欄項目不靠陰影，改用框線", () => {
     expect(find("_quiz/quiz_answerBox.css")('.box-question-btn[aria-current="step"]').body).toMatch(/outline:\s*3px solid/);
-    expect(find("_quiz/sideBar.css")(".bar-item.active").body).toMatch(/border-left:\s*7px solid var\(--yy-calm-accent\)/);
+    expect(find("_quiz/sideBar.css")(".bar-item.active").body).toMatch(/background:\s*var\(--yy-calm-accent\)/);
+    expect(find("_quiz/sideBar.css")(".bar-item.active").body).not.toMatch(/box-shadow/);
   });
 
   it("答對答錯回饋（4-6b）：彈簧只動 transform／opacity、只在 .is-springy 上、減少動態關閉；推薦測驗的對錯按鈕有勾叉，不只靠顏色", () => {
@@ -213,7 +214,7 @@ describe("測驗", () => {
 
   it("作答專注模式：只在 html[data-quiz-focus] 下收起導覽、tab bar、頁尾、測驗選單；歸還 tab bar 保留的底部空間", () => {
     const f = find("_quiz/quiz_focus.css");
-    const hide = f("html[data-quiz-focus] .navbar, html[data-quiz-focus] .yy-tabbar, html[data-quiz-focus] .yy-footer, html[data-quiz-focus] .quiz-body .bar-container, html[data-quiz-focus] .quiz-body .mobile-bar-menu").body;
+    const hide = f("html[data-quiz-focus] .navbar, html[data-quiz-focus] .yy-tabbar, html[data-quiz-focus] .yy-footer, html[data-quiz-focus] .quiz-body .bar-container").body;
     expect(hide).toMatch(/display:\s*none/);
     expect(f("html[data-quiz-focus]").body).toMatch(/--yy-tabbar-h:\s*0px/);
     // 每一條規則都要在專注模式屬性之下，不能漏出去影響別的頁

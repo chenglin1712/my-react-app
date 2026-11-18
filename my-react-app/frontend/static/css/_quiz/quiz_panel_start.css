@@ -54,12 +54,20 @@
   }
 }
 
-.level-recommend-img {
+/* 「推薦」膠囊小標籤（P4-7）：文字加底色，壓在卡片上緣的正中央（用 translate 置中，不動排版） */
+.level-recommend-tag {
     position: absolute;
-    top: -15px;
-    left: -20px;
-    height: 40px;
-    z-index: 10;
+    top: 0;
+    left: 50%;
+    z-index: 1;
+    padding: 2px var(--yy-space-3);
+    border-radius: var(--yy-radius-pill);
+    background: var(--yy-calm-tag);
+    color: var(--yy-calm-tag-on);
+    font-size: var(--yy-text-sm);
+    font-weight: 700;
+    white-space: nowrap;
+    transform: translate(-50%, -50%);
 }
 
 .level-card-icon {
@@ -77,28 +85,28 @@
     font-family: var(--yy-font-body);
     font-size: 1.6rem;
     font-weight: 700;
-    color: var(--yy-calm-info-bg);
 }
 
+/* 等級徽章（P4-7）：同一個銅褐色階，越深等級越高；初、中、中+、高 的字就在徽章裡，等級不靠顏色也分得出來。
+   前兩階底色淺（字用主文字色）、後兩階底色深（字用 accent-on）；深色模式 accent 變亮、accent-on 變深，兩組字色一樣成立。 */
 .level-1 .level-icon-text {
-    background-color: var(--yy-calm-accent);
+    background-color: color-mix(in srgb, var(--yy-calm-accent) 20%, var(--yy-calm-surface));
+    color: var(--yy-calm-text);
 }
 
 .level-2 .level-icon-text {
-    background-color: var(--yy-calm-success);
+    background-color: color-mix(in srgb, var(--yy-calm-accent) 46%, var(--yy-calm-surface));
+    color: var(--yy-calm-text);
 }
 
 .level-3 .level-icon-text {
-    background-color: var(--yy-calm-olive);
-    color: var(--yy-calm-text);
+    background-color: color-mix(in srgb, var(--yy-calm-accent) 78%, var(--yy-calm-surface));
+    color: var(--yy-calm-accent-on);
 }
 
 .level-4 .level-icon-text {
     background-color: var(--yy-calm-accent);
-}
-
-.level-5 .level-icon-text {
-    background-color: var(--yy-calm-copper);
+    color: var(--yy-calm-accent-on);
 }
 
 .level-card-title {

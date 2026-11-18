@@ -1,12 +1,14 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import RecommendedQuizResult from './quiz_recommon_result';
 import { apiGet } from '../../utils/apiClient';
 
 let mockState = null;
+const mockNavigate = vi.fn();
 vi.mock('react-router-dom', () => ({
   useLocation: () => ({ state: mockState }),
-  useNavigate: () => vi.fn(),
+  useNavigate: () => mockNavigate,
 }));
 vi.mock('../../utils/apiClient', () => ({ apiGet: vi.fn(), apiPut: vi.fn() }));
 
@@ -63,5 +65,16 @@ describe('RecommendedQuizResult（詞綴診斷區塊）', () => {
     await waitFor(() => expect(apiGet).toHaveBeenCalled());
     expect(screen.getByText('建議文字')).toBeInTheDocument();
     expect(screen.queryByTestId('rule-feedback')).not.toBeInTheDocument();
+  });
+
+  test('P4-9：「練這條」真的回到題目頁，並把該列的詞綴 ID 當成 focusRule 帶過去', async () => {
+    mockNavigate.mockClear();
+    mockState = { ...baseState, tribe: 'amis', ruleFeedback: [] };
+    apiGet.mockImplementation((url) => (String(url).includes('rule_summary')
+      ? Promise.resolve({ available: true, minObservations: 5, confusions: [], weakest: [{ rule: MA, label: 'ma-', p: 0.3, n: 7, c: 2 }] })
+      : Promise.reject(new Error('no consent endpoint'))));
+    render(<RecommendedQuizResult />);
+    await userEvent.click(await screen.findByRole('button', { name: '練這條：ma-' }));
+    expect(mockNavigate).toHaveBeenCalledWith('../question', { state: { focusRule: MA } });
   });
 });

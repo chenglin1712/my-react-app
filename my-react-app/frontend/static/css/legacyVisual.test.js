@@ -182,7 +182,7 @@ describe("菱形與圖示", () => {
   it("菱形只旋轉背景層，文字不再旋轉 -45°", () => {
     const theme = css.find(({ file }) => file.endsWith("default/theme-v2.css")).text;
     expect(theme).not.toMatch(/rotate\(-45deg\)/);
-    expect(theme).toMatch(/\.yy-step-diamond::before\s*\{[^}]*rotate\(45deg\)/);
+    expect(theme).not.toMatch(/yy-step-diamond/); // 步驟條已改成圓點（P4-6），見 ui/stepBar.css
     expect(theme).toMatch(/\.yy-diamond-badge::before\s*\{[^}]*rotate\(45deg\)/);
   });
 

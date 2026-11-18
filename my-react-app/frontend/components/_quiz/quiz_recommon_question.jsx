@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { apiPost } from "../../utils/apiClient";
 import { useAuth } from "../../src/userServives/authContext";
 import { loadQuizModel, saveQuizModel } from "./quizModelService";
@@ -11,6 +11,8 @@ import { apiUrl } from "../../utils/apiUrls";
 export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
   const { userData, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  // 結果頁「練這條」帶來的指定詞綴（只在那一次導頁有；一般開始測驗沒有）
+  const focusRule = useLocation().state?.focusRule;
 
   const [questionList, setQuestionList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +72,7 @@ export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
         const data = await apiPost(
           apiUrl('GENERATE_QUIZ'),
           storedModel,
-          { params: { tribe } }
+          { params: focusRule ? { tribe, focus_rule: focusRule } : { tribe } }
         );
         if (cancelled) return;
 
@@ -95,7 +97,7 @@ export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
 
     loadQuiz();
     return () => { cancelled = true; };
-  }, [userData?.uid, authLoading, tribe]);
+  }, [userData?.uid, authLoading, tribe, focusRule]);
 
   // 題目載入完成、且真的有題目可作答才開始計時——原本只看 loading，
   // 載入失敗或題目為空時（loading 也會變 false）計時器仍會在錯誤畫面
