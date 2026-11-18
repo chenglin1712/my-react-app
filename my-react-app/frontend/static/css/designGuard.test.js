@@ -860,7 +860,7 @@ describe("P4 遊戲專區與測驗（其餘項目）", () => {
 
 describe("P4-10 補充（實測後的修正）", () => {
   const readCss = (f) => stripCss(readFileSync(join(FRONTEND, f), "utf8"));
-  it("前台 CSS 裡沒有上標數字亂碼（反斜線被吃掉的 \2713 會變成「¹3」）", () => {
+  it("前台 CSS 裡沒有上標數字亂碼（反斜線被吃掉的勾號跳脫碼會變成「¹3」）", () => {
     const bad = cssFiles.filter(({ css }) => /[\u00B9\u00B2\u00B3]/.test(css)).map(({ file }) => file);
     expect(bad).toEqual([]);
   });
