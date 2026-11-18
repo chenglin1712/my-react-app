@@ -502,7 +502,7 @@
   .admin-shell .admin-empty-stage__action:active:not(:disabled) { transform: none; }
 }
 
-/* 觸控裝置：密集後台在桌面維持緊湊，但手指操作的點擊區至少 44px（外觀尺寸不變的元件用寬高撐開） */
+/* 觸控裝置：密集後台在桌面維持緊湊，但手指操作的點選區至少 44px（外觀尺寸不變的元件用寬高撐開） */
 @media (pointer: coarse) {
   .admin-shell .admin-nav-link,
   .admin-shell .admin-row-menu-item,

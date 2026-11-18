@@ -166,7 +166,7 @@ describe('TaxonomyManager', () => {
         expect(screen.getByRole('button', { name: '刪除動物' })).toBeDisabled();
     });
 
-    test('點擊合併開啟 MergeDialog', async () => {
+    test('點選合併開啟 MergeDialog', async () => {
         renderPage();
         fireEvent.click(screen.getByRole('button', { name: '分類' }));
         await screen.findByText('動物');

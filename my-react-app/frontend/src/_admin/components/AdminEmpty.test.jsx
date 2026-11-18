@@ -17,7 +17,7 @@ describe('AdminEmpty（後台共用空狀態）', () => {
     expect(screen.getByText('說明文字')).toBeInTheDocument();
   });
 
-  test('onClick 行動渲染成按鈕並可點擊', () => {
+  test('onClick 行動渲染成按鈕並可點選', () => {
     const onClick = vi.fn();
     render(<AdminEmpty title="沒有符合條件的項目" action={{ label: '清除篩選', onClick }} />);
     fireEvent.click(screen.getByRole('button', { name: '清除篩選' }));

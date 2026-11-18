@@ -74,7 +74,7 @@ describe("AI 助手：收合的建議與提醒", () => {
     expect(notices.match(/\.bot-disclaimer\s*\{([^}]*)\}/)[1]).toMatch(/padding:\s*10px 0 0 16px/);
   });
 
-  it("展開鈕與追問建議鈕都有 44px 點擊高度", () => {
+  it("展開鈕與追問建議鈕都有 44px 點選高度", () => {
     expect(notices).toMatch(/\.bot-note-toggle\s*\{[^}]*min-height:\s*44px/);
     expect(notices).toMatch(/\.suggestions-toggle\s*\{[^}]*min-height:\s*44px/);
   });

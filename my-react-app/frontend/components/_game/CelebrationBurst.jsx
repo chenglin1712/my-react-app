@@ -1,7 +1,7 @@
 import "../../static/css/_game/celebrate.css";
 
 // 結算頁的慶祝動態（Apple 化步驟 4-5）：從分數中心往外散開的一小撮圓點，一次性、不循環。
-// 純裝飾：aria-hidden、不攔截點擊；成績文字本身由頁面照常提供。座標固定（不用亂數），畫面可重現、測試可預期。
+// 純裝飾：aria-hidden、不攔截點選；成績文字本身由頁面照常提供。座標固定（不用亂數），畫面可重現、測試可預期。
 // 減少動態時整個隱藏（見 celebrate.css）。只有成績達標才渲染，呼叫端用 celebrate.js 的 shouldCelebrate(pct) 判斷。
 
 const PARTICLES = [

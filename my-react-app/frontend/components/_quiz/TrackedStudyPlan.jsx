@@ -47,7 +47,7 @@ const TrackedStudyPlan = ({ refreshKey = 0, replanEnabled = false, tribe, onQuot
     const [confirmingStop, setConfirmingStop] = useState(false);
     const [notice, setNotice] = useState("");
     const mountedRef = useRef(true);
-    const writeChainRef = useRef(Promise.resolve());     // 勾選依點擊順序一筆一筆寫，最後的資料一定是最後一次點擊
+    const writeChainRef = useRef(Promise.resolve());     // 勾選依點選順序一筆一筆寫，最後的資料一定是最後一次點選
     const pendingWritesRef = useRef(0);
     const loadSeqRef = useRef(0);                        // 載入的世代：只有最新一次載入的結果可以套用
     const editsRef = useRef(0);                          // 本機勾選的次數：載入期間有人勾選，那份載入結果就是舊的

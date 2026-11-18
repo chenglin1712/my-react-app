@@ -60,7 +60,7 @@ describe('Forgot (forgotPassword)', () => {
 
     const message = screen.getByText(expectedMessage);
     expect(message).toHaveClass('error');
-    // 失敗後按鈕仍可點擊，能夠再次嘗試送出
+    // 失敗後按鈕仍可點選，能夠再次嘗試送出
     expect(screen.getByText('重設密碼')).not.toBeDisabled();
   });
 
@@ -76,7 +76,7 @@ describe('Forgot (forgotPassword)', () => {
     expect(screen.getByText('已寄送密碼重設信件，請至信箱確認。')).toHaveClass('success');
   });
 
-  test('點擊取消會導向上一頁', () => {
+  test('點選取消會導向上一頁', () => {
     render(<Forgot />);
     fireEvent.click(screen.getByText('取消'));
     expect(mockNavigate).toHaveBeenCalledWith(-1);

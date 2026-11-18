@@ -6,7 +6,7 @@ import CategoryBar from './CategoryBar';
 
 /** 這份元件原本在 _search／_camera／_favorite 三邊各自維護一份幾乎一樣的複本，
  * 且已經彼此走鐘（收藏版完全沒有鍵盤支援）。這裡鎖住合併後共用的行為：
- * 真正的 button（不是 div+role=button）、點擊會展開/收合、選子分類會關閉面板。 */
+ * 真正的 button（不是 div+role=button）、點選會展開/收合、選子分類會關閉面板。 */
 
 function renderBar(overrides = {}) {
   const props = {
@@ -19,7 +19,7 @@ function renderBar(overrides = {}) {
 }
 
 describe('CategoryBar', () => {
-  test('點擊分類列會呼叫 setShowCategories 展開面板', async () => {
+  test('點選分類列會呼叫 setShowCategories 展開面板', async () => {
     const user = userEvent.setup();
     const { props } = renderBar();
 

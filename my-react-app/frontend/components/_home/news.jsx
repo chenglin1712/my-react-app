@@ -37,7 +37,7 @@ const News = ({ withImage = [], withoutImage = [], loading = false, error = fals
     // 「有沒有在輪播」只由 shouldRun 決定，暫停鈕的圖示與文字也看它，不另存一份會失去同步的鏡像狀態。
     // 按「繼續」時，滑鼠或焦點仍在輪播上的那個原因會被「略過」到離開為止，否則按了繼續畫面仍不動。
     // 焦點暫停只認鍵盤焦點（:focus-visible）：用滑鼠點暫停鈕時焦點也會落在按鈕上，
-    // 若算進去，按下去的瞬間輪播就先被停掉，按鈕文字翻成「繼續」，這一下點擊就變成「繼續」而不是「暫停」。
+    // 若算進去，按下去的瞬間輪播就先被停掉，按鈕文字翻成「繼續」，這一下點選就變成「繼續」而不是「暫停」。
     const [swiper, setSwiper] = useState(null);
     const [userPaused, setUserPaused] = useState(false);
     const [hovering, setHovering] = useState(false);

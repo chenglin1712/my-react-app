@@ -142,7 +142,7 @@ def _create_user(request, decoded):
     except firebase_auth.EmailAlreadyExistsError:
         return JsonResponse({"detail": "這個 email 已經被使用"}, status=400)
     except (ValueError, firebase_auth.FirebaseError) as e:
-        # ValueError 是 Admin SDK 對 email 格式等參數做用戶端驗證失敗時丟出；
+        # ValueError 是 Admin SDK 對 email 格式等參數做客戶端驗證失敗時丟出；
         # FirebaseError 涵蓋其餘伺服器端拒絕的情況。訊息本身是英文但已經
         # 夠明確，直接透出比自己重新設計一份錯誤訊息更不容易漏掉 SDK
         # 版本更新後新增的檢查項目。

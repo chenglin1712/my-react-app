@@ -103,7 +103,7 @@ describe('AIAssistantOverlay（回歸測試：注音/拼音輸入法選字時的
     resolveApiPost({ message: '回應' });
   });
 
-  test('回應還在等待時，輸入框標示忙碌、發送鈕標示不可用，且不能連續送出（不用 disabled，焦點才不會掉走）', async () => {
+  test('回應還在等待時，輸入框標示忙碌、傳送鈕標示不可用，且不能連續送出（不用 disabled，焦點才不會掉走）', async () => {
     let resolveApiPost;
     apiPost.mockImplementation(() => new Promise((resolve) => { resolveApiPost = resolve; }));
     const user = userEvent.setup();
@@ -351,7 +351,7 @@ describe('AIAssistantOverlay 串流回覆（路線圖 #9）', () => {
     expect(announceSpy).toHaveBeenCalledWith('哈囉，同學');
   });
 
-  test('回覆進行中，發送鈕變成「停止」；按下去保留已經收到的文字並標示已停止，可以重試', async () => {
+  test('回覆進行中，傳送鈕變成「停止」；按下去保留已經收到的文字並標示已停止，可以重試', async () => {
     const control = controlledStream();
     const user = userEvent.setup();
     render(<AIAssistantOverlay onClose={vi.fn()} />);

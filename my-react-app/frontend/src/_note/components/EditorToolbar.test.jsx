@@ -30,7 +30,7 @@ describe('EditorToolbar（筆記工具列）', () => {
 });
 
 describe('EditorToolbar 粗斜體（E-7，P3-27）', () => {
-    test('粗體與斜體是圖示按鈕（不是數學字母符號），有 aria-pressed 並在點擊後切換', () => {
+    test('粗體與斜體是圖示按鈕（不是數學字母符號），有 aria-pressed 並在點選後切換', () => {
         const execStyle = vi.fn();
         render(<EditorToolbar execStyle={execStyle} onImageFileSelected={vi.fn()} isUploadingImage={false} />);
         const bold = screen.getByRole('button', { name: '粗體' });

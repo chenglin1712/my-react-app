@@ -71,7 +71,7 @@ function QualityTooltip({ active, payload }) {
             <span>作答次數：{item.attempt_count}</span>
             <span>答對率：{formatPercent(item.accuracy_rate)}</span>
             <span>鑑別度：{item.discrimination.toFixed(2)}</span>
-            <small>點擊前往題庫列表</small>
+            <small>點選前往題庫列表</small>
         </div>
     );
 }

@@ -9,7 +9,7 @@ import WordCard from './WordCard';
 describe('WordCard', () => {
   const baseResult = { name: 'balay', frequency: 100, tribe: '泰雅語' };
 
-  test('展開區塊預設收合，點擊標題會呼叫 toggleExpand(keyName)', () => {
+  test('展開區塊預設收合，點選標題會呼叫 toggleExpand(keyName)', () => {
     const toggleExpand = vi.fn();
     render(
       <WordCard

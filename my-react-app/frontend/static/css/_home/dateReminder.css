@@ -119,7 +119,7 @@
     color: var(--yy-calm-text-sub);
 }
 
-/* 多則提示垂直堆疊（原本每則都 fixed 在同一個角落，會互相蓋住）；容器不攔截點擊，只有每則本身可點 */
+/* 多則提示垂直堆疊（原本每則都 fixed 在同一個角落，會互相蓋住）；容器不攔截點選，只有每則本身可點 */
 .toast-stack {
   position: fixed;
   top: 20px;

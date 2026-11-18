@@ -18,7 +18,7 @@ const ENABLED_ITEMS = '[role="menuitem"]:not([aria-disabled="true"])';
  *   - 有 href 的項目渲染成真正的連結（可以在新分頁開啟）
  *   - danger 的項目排在最後，上方自動加分隔線、使用紅色文字
  *
- * 鍵盤：點擊或 Enter／Space 開啟並聚焦第一項；↑↓ 移動、Home／End 到頭尾；Escape 關閉並把焦點還給按鈕；
+ * 鍵盤：點選或 Enter／Space 開啟並聚焦第一項；↑↓ 移動、Home／End 到頭尾；Escape 關閉並把焦點還給按鈕；
  * Tab 關閉並回到按鈕（讓下一次 Tab 從這一列繼續往後走）。
  */
 export default function AdminRowMenu({ label, items, disabled = false }) {

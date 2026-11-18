@@ -252,7 +252,7 @@ describe("影像辨識", () => {
     expect(inner).toMatch(/border-top:\s*1px solid var\(--yy-calm-rule\)\s*!important/);
   });
 
-  it("取景框：大圓角、玻璃提示貼在下緣不攔截點擊；玻璃材質來自 .yy-glass，這支檔案不自己寫 backdrop-filter", () => {
+  it("取景框：大圓角、玻璃提示貼在下緣不攔截點選；玻璃材質來自 .yy-glass，這支檔案不自己寫 backdrop-filter", () => {
     expect(find.wizard(".camera-dropzone").body).toMatch(/border-radius:\s*var\(--yy-radius-block\)/);
     expect(find.wizard(".camera-dropzone").body).toMatch(/position:\s*relative/);
     const hint = find.wizard(".camera-dropzone-hint").body;

@@ -442,7 +442,7 @@ describe('WordEditor', () => {
         // 包在同一個 act() 裡，讓兩個按鈕的 click handler 在 React 重新
         // render、更新 disabled 屬性之前就都執行——分開呼叫 fireEvent.click
         // 時，RTL 會各自用 act() 包一次，兩次呼叫之間 React 已經重新
-        // render，第二顆按鈕在真正點擊前就已經被 disabled 擋下，測不出
+        // render，第二顆按鈕在真正點選前就已經被 disabled 擋下，測不出
         // useActionLock 本身的保護，只測到 React 正常的重新渲染時序。
         act(() => {
             fireEvent.click(submitButton);

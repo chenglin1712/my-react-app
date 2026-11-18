@@ -35,7 +35,7 @@ from .web_search import MAX_PAUSE_CONTINUATIONS, WEB_RULES, count_searches, extr
 MAX_TOOL_ROUNDS = 3
 MEMORY_EXTRA_ROUNDS = 1
 
-# Anthropic 記憶工具（用戶端工具，不需要 beta header；定義就是這兩個欄位）。實作在 memory_store.py。
+# Anthropic 記憶工具（客戶端工具，不需要 beta header；定義就是這兩個欄位）。實作在 memory_store.py。
 MEMORY_TOOL = {"type": "memory_20250818", "name": "memory"}
 
 logger = logging.getLogger(__name__)
@@ -323,7 +323,7 @@ def _history_key() -> bytes:
 def sign_reply(uid: str, text: str) -> str:
     """助手回覆的簽章（HMAC-SHA256，綁定使用者與內容）。回覆隨 response 帶給前端，
     前端下次送歷史時原樣帶回，後端靠它確認「這句助手訊息真的是我們說過的」。
-    歷史由用戶端保存，沒有簽章的話，使用者可以偽造助手說過的話來影響模型。
+    歷史由客戶端保存，沒有簽章的話，使用者可以偽造助手說過的話來影響模型。
 
     已知限制：簽章只證明「這段文字曾經對這位使用者出現過」，不綁定輪次與順序，
     所以使用者可以重放自己以前收到的真回覆、或調換順序。這只能影響他自己的對話，
@@ -343,7 +343,7 @@ def verified_history(history: list, uid: str) -> list:
     for m in history:
         if m["role"] != "assistant":
             continue
-        # 以 bytes 比較：compare_digest 遇到非 ASCII 的 str 會丟 TypeError，簽章是用戶端給的
+        # 以 bytes 比較：compare_digest 遇到非 ASCII 的 str 會丟 TypeError，簽章是客戶端給的
         sig = (m.get("sig") or "").encode("utf-8")
         if not hmac.compare_digest(sig, sign_reply(uid, m["text"]).encode("ascii")):
             logger.warning("[AIModel] 對話紀錄中有簽章不符的助手訊息，整段上文捨棄（uid=%s）", uid or "-")

@@ -128,7 +128,7 @@ describe('AIAssistantOverlay 圖片提問（路線圖 #24）', () => {
     }
   });
 
-  test('功能被關閉後再按發送：不會再帶 image', async () => {
+  test('功能被關閉後再按傳送：不會再帶 image', async () => {
     apiPost.mockRejectedValueOnce(Object.assign(new Error('x'), { status: 403, data: { code: 'ai_image_input_disabled' } }));
     apiPost.mockResolvedValue({ message: 'ok' });
     const user = userEvent.setup();

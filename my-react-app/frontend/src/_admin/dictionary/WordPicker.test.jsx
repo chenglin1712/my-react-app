@@ -32,7 +32,7 @@ describe('WordPicker', () => {
         expect(onSelect).toHaveBeenCalledWith({ word_id: 'word-1', word_name: 'lokah' });
     });
 
-    test('滑鼠點擊候選項目只選取一次，不會因為 mousedown 又觸發一次', async () => {
+    test('滑鼠點選候選項目只選取一次，不會因為 mousedown 又觸發一次', async () => {
         const user = userEvent.setup();
         listWords.mockResolvedValue({
             results: [{ id: 'word-1', name: 'lokah', dialect: '', pinyin: '' }],

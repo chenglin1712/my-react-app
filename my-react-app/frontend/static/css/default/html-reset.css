@@ -16,7 +16,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* 觸控：取消雙擊縮放的 300ms 等待，點擊高亮改用品牌墨色的淡色 */
+/* 觸控：取消雙擊縮放的 300ms 等待，點選高亮改用品牌墨色的淡色 */
 a,
 button,
 summary,

@@ -41,6 +41,12 @@ body:has(.offline-banner) {
 
 /* 詳情浮卡、彈窗、抽屜開著時整顆隱藏，不會疊在浮層上或蓋住浮層裡的操作。
    用 visibility 一起收掉，隱藏後鍵盤與報讀器也到不了；浮層一關就回來。 */
+body.modal-open .bot-launcher {
+    /* 不支援 :has() 的瀏覽器的後備（Bootstrap 彈窗開啟時 body 會有 modal-open）；抽屜只靠下面的 :has() */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
 body:has(.modal.show, .offcanvas.show, .modal-backdrop.show) .bot-launcher {
     opacity: 0;
     visibility: hidden;

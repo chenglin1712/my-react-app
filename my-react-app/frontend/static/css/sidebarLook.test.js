@@ -86,7 +86,7 @@ describe("個人資料側欄：互動", () => {
     expect(find(sidebarRules, ".profile-btn:active", /prefers-reduced-motion/).body).toMatch(/transform:\s*none/);
   });
 
-  it("選項列至少 44px 高，登出／編輯按鈕用 ::after 擴成 44px 點擊區", () => {
+  it("選項列至少 44px 高，登出／編輯按鈕用 ::after 擴成 44px 點選區", () => {
     expect(find(sidebarRules, ".nav-button").body).toMatch(/min-height:\s*(5[2-9]|[6-9]\d)px/);
     expect(find(sidebarRules, ".profile-btn::after").body).toMatch(/width:\s*max\(100%,\s*var\(--yy-control-md\)\)/);
   });

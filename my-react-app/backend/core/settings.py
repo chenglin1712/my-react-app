@@ -71,7 +71,7 @@ AUTH_DEV_BYPASS = auth_dev_bypass()
 # SECURE_PROXY_SSL_HEADER 例外，兩種環境都設定：Render/Cloud Run 對外都是 HTTPS，
 # 但反向代理到 Django process 這一段是 HTTP，Django 原生的 request.is_secure() 會誤判
 # 成不安全連線，導致 SECURE_SSL_REDIRECT 陷入重導迴圈、secure cookie 也不會被送出。
-# 這兩個平台都會在自己的邊緣層蓋掉用戶端送來的 X-Forwarded-Proto，不會讓外部請求
+# 這兩個平台都會在自己的邊緣層蓋掉客戶端送來的 X-Forwarded-Proto，不會讓外部請求
 # 偽造這個標頭，才能放心依它判斷；本機開發沒有反向代理，不會有這個標頭，不受影響。
 # 這個信任成立的前提：後端埠口只有反向代理連得到。能直接連到 gunicorn 的人可以自己帶
 # X-Forwarded-Proto: https，騙過 SECURE_SSL_REDIRECT 與 secure cookie 的判斷。所以正式環境的

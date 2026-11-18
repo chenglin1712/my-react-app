@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
  * 或重來，過期的 timeout 還是會在 1.4 秒後把畫面拉回去。
  *
  * beginSelection() 用 lockedRef（不是單靠 selected state）擋重複觸發：連續
- * 兩次點擊如果剛好在同一個 React 批次內、selected 的狀態更新還沒真的提交，
+ * 兩次點選如果剛好在同一個 React 批次內、selected 的狀態更新還沒真的提交，
  * 兩次呼叫讀到的 selected 都還是 null，光靠「if (selected !== null) return」
  * 擋不住——ref 是同步、立即更新的，不會有這個問題。
  */

@@ -104,7 +104,7 @@ def _finalize_approved_revision(pk, result_id, result_payload, request, decoded)
     """把「內容已經在 dictionary DB 生效」這件事記到 Django 端：寫
     applied_at／target_id、寫稽核紀錄、通知快取失效。
 
-    寫成幂等函式，可以安全重複呼叫：revision 已經有 applied_at 就直接視為
+    寫成冪等函式，可以安全重複呼叫：revision 已經有 applied_at 就直接視為
     完成、原樣回傳（no-op），不會重複寫入稽核紀錄或重複通知快取失效。這讓
     dictionary_revision_approve() 可以在同一個 request 內做幾次短重試，
     reconcile_stuck_dictionary_revisions 管理指令之後也能安全地再呼叫一次

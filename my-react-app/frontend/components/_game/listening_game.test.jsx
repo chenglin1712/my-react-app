@@ -56,7 +56,7 @@ describe('ListeningGame（回歸測試：原本 1.4 秒的計時器沒有清理�
     await screen.findByText('第 2 / 2 題');
   }, 10000);
 
-  test('同一題快速連點兩個不同選項，只會記錄第一次點擊的答案（回歸測試：原本只靠 state 擋，同一批次內兩次點擊都讀到未選取，會記錄兩筆答案並推進兩題）', async () => {
+  test('同一題快速連點兩個不同選項，只會記錄第一次點選的答案（回歸測試：原本只靠 state 擋，同一批次內兩次點選都讀到未選取，會記錄兩筆答案並推進兩題）', async () => {
     apiGet.mockResolvedValueOnce({ questions: QUESTIONS });
     const user = userEvent.setup();
     renderGame();
@@ -68,7 +68,7 @@ describe('ListeningGame（回歸測試：原本 1.4 秒的計時器沒有清理�
     fireEvent.click(screen.getByRole('button', { name: '真的' }));
     fireEvent.click(screen.getByRole('button', { name: '假的' }));
 
-    // 只有第一次點擊生效：真的顯示為 correct，假的沒有被標記成 wrong
+    // 只有第一次點選生效：真的顯示為 correct，假的沒有被標記成 wrong
     expect(screen.getByRole('button', { name: '真的' })).toHaveClass('correct');
     expect(screen.getByRole('button', { name: '假的' })).not.toHaveClass('wrong');
 

@@ -119,7 +119,7 @@ a.exam-link:focus-visible {
     outline-offset: -3px;
 }
 
-/* 整列都是點擊區，焦點框也畫在整列上；不支援 :has() 的瀏覽器維持連結自己的框 */
+/* 整列都是點選區，焦點框也畫在整列上；不支援 :has() 的瀏覽器維持連結自己的框 */
 .exam-card:has(a.exam-link:focus-visible) {
     outline: var(--yy-ui-focus-ring);
     outline-color: var(--yy-calm-focus-on-block);

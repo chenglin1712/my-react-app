@@ -339,7 +339,7 @@ describe("手機版（階段 6-4）", () => {
     expect(hits).toEqual([]);
   });
 
-  it("跑馬燈暫停鈕視覺 32px，但點擊區用透明 ::after 擴成 44px", () => {
+  it("跑馬燈暫停鈕視覺 32px，但點選區用透明 ::after 擴成 44px", () => {
     const css = everyCss.find(({ file }) => file.endsWith("_home/masthead.css")).css;
     expect(css).toMatch(/\.home-ticker__toggle::after\s*\{[^}]*width:\s*max\(100%, var\(--yy-control-md\)\)/);
   });
@@ -1039,5 +1039,20 @@ describe("P6-3／P6-4 手勢與學習紀錄", () => {
     expect(css).toMatch(/\.ns-pull\s*\{[^}]*transform:\s*translate\(-50%, calc\(var\(--ns-pull/);
     expect(css).toMatch(/prefers-reduced-motion: reduce\)\s*\{\s*\.ns-pull\s*\{\s*transform:\s*translate\(-50%, 0\)/);
     expect(read("src/_note/noteshare.jsx")).toMatch(/aria-hidden="true"\s*>\s*\{pullToRefresh\.state/);
+  });
+});
+
+describe("P5-5／P4-8 收尾：筆記詳情卡進場與 AI 助手鈕的舊瀏覽器後備", () => {
+  const read = (f) => readFileSync(join(FRONTEND, f), "utf8");
+  it("筆記詳情卡（.ns-modal）與單詞詳情卡同一套進場：遮罩淡入、卡片 yy-pop、用 elev token", () => {
+    const css = stripCss(read("static/css/_note/notesharestyle.css"));
+    expect(css).toMatch(/\.ns-modal-mask\s*\{[^}]*animation:\s*yy-overlay-in var\(--dur-overlay-in\)/);
+    expect(css).toMatch(/\.ns-modal\s*\{[^}]*animation:\s*yy-pop var\(--dur-overlay-in\)/);
+    expect(css).toMatch(/\.ns-modal\s*\{[^}]*box-shadow:\s*var\(--yy-elev-4\)/);
+  });
+  it("AI 助手鈕：:has() 與 body.modal-open 兩條規則分開寫（合在一起時，舊瀏覽器會整條作廢）", () => {
+    const css = stripCss(read("static/css/_quiz/bot_launcher.css"));
+    expect(css).toMatch(/body\.modal-open \.bot-launcher\s*\{[^}]*visibility:\s*hidden/);
+    expect(css).toMatch(/body:has\(\.modal\.show, \.offcanvas\.show, \.modal-backdrop\.show\) \.bot-launcher\s*\{[^}]*visibility:\s*hidden/);
   });
 });

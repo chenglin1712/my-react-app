@@ -100,7 +100,7 @@
   .ns-card:hover {transform:translateY(-1px);}
 }
 
-/* 卡片的「開啟詳情」按鈕：視覺上要跟原本可點擊的整張 div 一樣，不像 button */
+/* 卡片的「開啟詳情」按鈕：視覺上要跟原本可點選的整張 div 一樣，不像 button */
 .ns-card-open{
   display:block; flex:1 1 auto; width:100%; border:none; background:none; padding:0;
   margin:0; text-align:left; font:inherit; color:inherit; cursor:pointer;
@@ -179,10 +179,14 @@
 .ns-modal-mask{
   position:fixed; inset:0; background:color-mix(in srgb, var(--yy-calm-block) 75%, transparent);
   display:flex; align-items:center; justify-content:center; z-index:var(--yy-z-overlay);
+  animation: yy-overlay-in var(--dur-overlay-in) var(--ease-out) both;
 }
 .ns-modal{
   background:var(--yy-calm-surface); width:95%; max-width:720px; max-height:90vh; max-height: 90dvh; overflow:auto;
   border:var(--yy-border-width) solid var(--yy-calm-line); border-radius:var(--yy-radius-panel); padding:1.25rem 1.25rem 1rem;
+  box-shadow: var(--yy-elev-4);
+  /* 和單詞詳情卡同一套進場（P5-5：同一種浮卡手感）：遮罩淡入、卡片從 94% 彈出；減少動態時由全站規則取消 */
+  animation: yy-pop var(--dur-overlay-in) var(--ease-out) both;
 }
 .ns-modal-title{ font-size:1.25rem; font-weight:600; margin-bottom:.25rem; }
 .ns-modal-sub{ font-size:.9rem; color:var(--yy-calm-text-sub); margin-bottom:.75rem; }

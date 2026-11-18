@@ -12,7 +12,7 @@
   aspect-ratio: 4 / 3;
   overflow: hidden;
   isolation: isolate;
-  pointer-events: none; /* 純裝飾，點擊與游標都交給外面的卡片 */
+  pointer-events: none; /* 純裝飾，點選與游標都交給外面的卡片 */
   border-radius: var(--yy-radius-panel);
   background: var(--yy-calm-tint-copper-1);
   transition: --lx 260ms var(--ease-out), --ly 260ms var(--ease-out);

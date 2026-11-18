@@ -14,7 +14,7 @@ describe('TabSwitch', () => {
     expect(screen.getByText('註冊')).toHaveClass('active');
   });
 
-  test('點擊非 active 的頁籤會呼叫 onChange 並帶上該頁籤的 key', () => {
+  test('點選非 active 的頁籤會呼叫 onChange 並帶上該頁籤的 key', () => {
     const onChange = vi.fn();
     render(<TabSwitch tabs={tabs} active="login" onChange={onChange} />);
     screen.getByText('註冊').click();

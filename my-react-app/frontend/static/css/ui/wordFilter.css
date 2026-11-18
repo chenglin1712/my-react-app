@@ -86,7 +86,7 @@
   gap: 6px;
 }
 
-/* 手指操作（手機、平板）：可點擊區要有 44×44px */
+/* 手指操作（手機、平板）：可點選區要有 44×44px */
 @media (pointer: coarse), (max-width: 720px) {
   .wf-chip--text { min-height: 44px; }
   .wf-chip--freq { min-width: 52px; height: 44px; }

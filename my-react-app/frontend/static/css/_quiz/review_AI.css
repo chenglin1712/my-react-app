@@ -419,7 +419,7 @@ a.review-vocab-word:focus-visible,
     color: var(--yy-calm-text-sub);
 }
 
-/* 逐詞對照裡的發音鈕：點擊範圍 44px，看得到的是 28px 的圓形圖示 */
+/* 逐詞對照裡的發音鈕：點選範圍 44px，看得到的是 28px 的圓形圖示 */
 .review-word-play {
     display: inline-flex;
     align-items: center;

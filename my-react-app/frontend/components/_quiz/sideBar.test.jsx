@@ -90,7 +90,7 @@ describe('SideBar 鍵盤與報讀器操作（審查項 P1-1、P1-2）', () => {
     expect(container.querySelector('.func-hint')).toBeNull();
   });
 
-  test('圖示不寫死顏色（跟著 currentColor），三個入口都達得到：點擊會導向對應路徑', async () => {
+  test('圖示不寫死顏色（跟著 currentColor），三個入口都達得到：點選會導向對應路徑', async () => {
     mockPathname = '/quiz';
     const user = userEvent.setup();
     const { container } = render(<SideBar />);

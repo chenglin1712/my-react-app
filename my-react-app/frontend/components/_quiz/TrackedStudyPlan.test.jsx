@@ -124,7 +124,7 @@ describe('TrackedStudyPlan', () => {
     expect(screen.getByText('1／3 完成')).toBeInTheDocument();
   });
 
-  test('連續勾選依點擊順序一筆一筆寫，最後的狀態是最後一次點擊', async () => {
+  test('連續勾選依點選順序一筆一筆寫，最後的狀態是最後一次點選', async () => {
     const order = [];
     setTaskDone.mockImplementation(async (id, done) => {
       order.push([id, done]);

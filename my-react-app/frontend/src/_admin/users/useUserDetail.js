@@ -79,7 +79,7 @@ export function useUserDetail({ uid, canViewUser }) {
         loadUser();
         // loadUser 已經把 canViewUser／uid 列進自己的相依陣列，這裡只需要在
         // uid 改變時觸發重置＋重新載入，重複列 loadUser 只會讓 lint 誤以為
-        // 少了别的相依。
+        // 少了別的相依。
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [uid, canViewUser]);
 

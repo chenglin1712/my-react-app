@@ -135,7 +135,7 @@ describe('ResetPassword (resetPassword)', () => {
     getAuth.mockReset();
   });
 
-  test('點擊取消會導向上一頁', () => {
+  test('點選取消會導向上一頁', () => {
     getAuth.mockReturnValue({ currentUser: { email: 'a@b.com' } });
     render(<ResetPassword />);
     fireEvent.click(screen.getByText('取消'));

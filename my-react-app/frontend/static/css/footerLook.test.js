@@ -89,7 +89,7 @@ describe("頁尾（雜誌版，對齊 Artifact）", () => {
 });
 
 describe("頁尾浮水印與欄標題（步驟 2-5）", () => {
-  it("超大「原語」浮水印：淡（7% 混合）、置於內容之後、不攔截點擊、不可選取，用品牌字標", () => {
+  it("超大「原語」浮水印：淡（7% 混合）、置於內容之後、不攔截點選、不可選取，用品牌字標", () => {
     const body = find(".yy-footer__mark").body;
     expect(body).toMatch(/color:\s*color-mix\(in srgb, var\(--yy-calm-block-on\) 7%, transparent\)/);
     expect(body).toMatch(/z-index:\s*-1;/);

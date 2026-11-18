@@ -44,7 +44,7 @@ export default function NoteShare() {
   // 快速點開 A 又點開 B，A 比較慢的回應不該蓋掉 B 已經顯示的內容。
   const modalGenerationRef = useRef(0);
   // 同一則筆記還在等按讚的 Firestore transaction 回來時，先忽略同一則筆記的
-  // 下一次點擊，避免用同一份過期資料算兩次（同一分頁內的快速連點）。
+  // 下一次點選，避免用同一份過期資料算兩次（同一分頁內的快速連點）。
   const pendingLikesRef = useRef(new Set());
   useEffect(() => {
     return () => {
@@ -101,8 +101,8 @@ export default function NoteShare() {
       return;
     }
     if (isMine(note)) return;
-    // 上一次按讚還在等 Firestore transaction 回來，先忽略同一則筆記的下一次點擊——
-    // 不然兩次點擊會用同一份過期的 note 算出同樣的樂觀結果，等於白按一次。
+    // 上一次按讚還在等 Firestore transaction 回來，先忽略同一則筆記的下一次點選——
+    // 不然兩次點選會用同一份過期的 note 算出同樣的樂觀結果，等於白按一次。
     if (pendingLikesRef.current.has(note.id)) return;
     pendingLikesRef.current.add(note.id);
 
@@ -124,11 +124,11 @@ export default function NoteShare() {
       const { likes, likedBy } = await toggleNoteLike(note.id, userData.uid);
       applyLikeState(likes, likedBy);
       // 愛心的狀態變化螢幕報讀器看不到，用公告補上（審查項 P2-99）
-      // 依伺服器回傳的結果公告：transaction 是以伺服器最新狀態切換，點擊前的快照可能已過期
+      // 依伺服器回傳的結果公告：transaction 是以伺服器最新狀態切換，點選前的快照可能已過期
       announce(likedBy?.includes(userData.uid) ? "已按讚" : "已收回讚");
     } catch (e) {
       console.error("toggleLike error:", e);
-      applyLikeState(note.likes || 0, note.likedBy || []); // 回滾成點擊前的狀態
+      applyLikeState(note.likes || 0, note.likedBy || []); // 回滾成點選前的狀態
       showToast("操作失敗，請稍後再試");
     } finally {
       pendingLikesRef.current.delete(note.id);

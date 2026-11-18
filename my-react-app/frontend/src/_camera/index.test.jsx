@@ -96,7 +96,7 @@ describe('CameraWizard', () => {
 
     selectFile(file);
     // handleImageChange 用 FileReader 非同步讀檔才 setImage，「提交辨識」按鈕的
-    // disabled={!image} 要等 FileReader 的 onloadend 跑完才會變成可點擊。
+    // disabled={!image} 要等 FileReader 的 onloadend 跑完才會變成可點選。
     await waitFor(() => expect(screen.getByText('提交辨識 ▸')).not.toBeDisabled());
     fireEvent.click(screen.getByText('提交辨識 ▸'));
     // 第 2、3 步改成 lazy load，包在 Suspense 底下，即使模組本身已被 mock，

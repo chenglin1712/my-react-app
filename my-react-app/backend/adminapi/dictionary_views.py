@@ -568,7 +568,7 @@ def dictionary_revision_approve(request, decoded, pk):
     # 到這裡，辭典 DB 的寫入已經真的 commit 了——內容已經生效。不管接下來
     # 記帳這步發生什麼事，都不能再把 revision 退回 pending_review：那樣
     # 下次核准會對同一個 target 重新套用一次，可能重複建立或跟已生效內容
-    # 打架。finalize 函式本身是幂等的，這裡先做幾次短重試。
+    # 打架。finalize 函式本身是冪等的，這裡先做幾次短重試。
     try:
         revision = _finalize_approved_revision_with_retry(pk, result_id, result_payload, request, decoded)
     except Exception:

@@ -28,7 +28,7 @@ describe('TribeSegmented（P3-2）', () => {
     expect(container.querySelector('.yy-seg__track').style.getPropertyValue('--seg-n')).toBe('3');
   });
 
-  test('點擊換族語；文字只出現一次（getByText 可直接點）', () => {
+  test('點選換族語；文字只出現一次（getByText 可直接點）', () => {
     const onChange = vi.fn();
     render(<Controlled onChange={onChange} />);
     fireEvent.click(screen.getByText('布農族語'));

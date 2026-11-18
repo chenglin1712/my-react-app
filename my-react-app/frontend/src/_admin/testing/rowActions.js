@@ -35,7 +35,7 @@ export function hasRowAction(row, name) {
     return Boolean(element);
 }
 
-/** 點擊這一列的某個操作；找不到就丟錯，讓測試失敗並說明是哪個操作不存在。 */
+/** 點選這一列的某個操作；找不到就丟錯，讓測試失敗並說明是哪個操作不存在。 */
 export function clickRowAction(row, name) {
     const { element } = findRowAction(row, name);
     if (!element) throw new Error(`這一列找不到操作：${String(name)}`);

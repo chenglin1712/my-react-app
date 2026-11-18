@@ -101,7 +101,7 @@ describe('useAudioRecorder', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:fake-url');
   });
 
-  test('getUserMedia 還沒回來前連續呼叫兩次 start()，只會真的要求一次麥克風（回歸測試：原本沒有防止連續點擊）', async () => {
+  test('getUserMedia 還沒回來前連續呼叫兩次 start()，只會真的要求一次麥克風（回歸測試：原本沒有防止連續點選）', async () => {
     let resolveGetUserMedia;
     window.navigator.mediaDevices.getUserMedia = vi.fn(() => new Promise((resolve) => { resolveGetUserMedia = resolve; }));
     const { result } = renderHook(() => useAudioRecorder());

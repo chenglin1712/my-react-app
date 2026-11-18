@@ -272,7 +272,7 @@ describe('AnnouncementList', () => {
     await screen.findByText('草稿公告');
     const row = screen.getByText('草稿公告').closest('tr');
     // react-bootstrap 的 Button as={Link} 渲染成 <a role="button">（樣式是按鈕，
-    // 語意上仍是可點擊按鈕），不是 role="link"。
+    // 語意上仍是可點選按鈕），不是 role="link"。
     expect(getRowAction(row, /檢視/)).toBeInTheDocument();
     expect(queryRowAction(row, /編輯|送審|刪除/)).not.toBeInTheDocument();
   });
@@ -536,7 +536,7 @@ describe('AnnouncementList · 爬蟲同步', () => {
     expect(await screen.findByText(/爬蟲同步已連續失敗 4 次/)).toBeInTheDocument();
   });
 
-  test('點擊同步按鈕會呼叫 POST 端點、重新載入列表並顯示筆數訊息', async () => {
+  test('點選同步按鈕會呼叫 POST 端點、重新載入列表並顯示筆數訊息', async () => {
     apiPost.mockResolvedValue({
       available: true,
       imported: 3,

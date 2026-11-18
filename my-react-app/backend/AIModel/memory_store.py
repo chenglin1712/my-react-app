@@ -1,6 +1,6 @@
-"""AI 助手的學習記憶（路線圖 #21）：Anthropic 記憶工具（memory_20250818）的用戶端實作。
+"""AI 助手的學習記憶（路線圖 #21）：Anthropic 記憶工具（memory_20250818）的客戶端實作。
 
-記憶工具是「用戶端工具」：模型只提出 view / create / str_replace / insert / delete / rename，
+記憶工具是「客戶端工具」：模型只提出 view / create / str_replace / insert / delete / rename，
 由我們自己執行並把結果回給模型。檔案存在資料庫（adminapi.LearnerMemoryFile），每個 uid 一份，
 查詢一律帶 uid 條件，不同學習者互相看不到。
 

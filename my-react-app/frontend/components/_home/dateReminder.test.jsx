@@ -73,7 +73,7 @@ describe('DateReminder', () => {
     expect(upcoming).not.toHaveTextContent('（目前階段）');
   });
 
-  test('點擊「重設提醒」會清空 localStorage 裡已忽略的提醒紀錄', async () => {
+  test('點選「重設提醒」會清空 localStorage 裡已忽略的提醒紀錄', async () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ 測試場次: ['報名'] }));
     mockScheduleFetch({ session: '測試場次', phases: [] });
 

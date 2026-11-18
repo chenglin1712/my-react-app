@@ -9,7 +9,7 @@ const QUESTION = {
 };
 
 describe('ClozeQuestion', () => {
-  test('顯示短文（含空格）與中譯，點擊選項回報 1-based 索引', () => {
+  test('顯示短文（含空格）與中譯，點選選項回報 1-based 索引', () => {
     const onSelect = vi.fn();
     render(<ClozeQuestion question={QUESTION} selected={null} onSelect={onSelect} />);
 

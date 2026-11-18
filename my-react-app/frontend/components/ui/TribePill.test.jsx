@@ -30,7 +30,7 @@ describe('TribePill', () => {
     expect(container.querySelector('.yy-pill__dot')).toBeNull();
   });
 
-  test('沒有傳入 children 時顯示預設「族語」文字，點擊會呼叫 onClick', () => {
+  test('沒有傳入 children 時顯示預設「族語」文字，點選會呼叫 onClick', () => {
     const onClick = vi.fn();
     render(<TribePill tribe={tribe} active={false} onClick={onClick} />);
     const button = screen.getByText('泰雅族語');

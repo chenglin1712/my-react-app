@@ -608,7 +608,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
     const handleStop = () => {
         stoppedRef.current = true;
         request.abort();
-        // 「停止」鈕馬上會被「發送」鈕取代；焦點先回到輸入框，不然鍵盤使用者的焦點會掉到頁面最上面
+        // 「停止」鈕馬上會被「傳送」鈕取代；焦點先回到輸入框，不然鍵盤使用者的焦點會掉到頁面最上面
         inputRef.current?.focus({ preventScroll: true });
     };
 
@@ -904,7 +904,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                     )}
                 >
                     {isPending ? (
-                        // 回覆進行中，同一個位置變成「停止」：不必找別的按鈕，也不會誤按到發送
+                        // 回覆進行中，同一個位置變成「停止」：不必找別的按鈕，也不會誤按到傳送
                         <button type="button" className="send-button stop" onClick={handleStop}>
                             停止
                         </button>

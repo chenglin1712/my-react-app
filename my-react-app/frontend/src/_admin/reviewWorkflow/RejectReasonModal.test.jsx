@@ -34,7 +34,7 @@ describe('RejectReasonModal', () => {
         expect(reject.close).toHaveBeenCalled();
     });
 
-    test('回歸測試：送出中（actionId 等於 target.id）時，取消按鈕被 disabled、點擊不會呼叫 close', async () => {
+    test('回歸測試：送出中（actionId 等於 target.id）時，取消按鈕被 disabled、點選不會呼叫 close', async () => {
         const reject = {
             target: { id: 1 },
             reason: '內容有誤',

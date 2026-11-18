@@ -8,7 +8,7 @@ vi.mock('react-router-dom', () => ({
 }));
 
 describe('Panel_Start（FR-4a：等級資料改用共用 QUIZ_LEVELS）', () => {
-  test('四個等級都顯示，點擊會依 level.id 導向對應路徑', () => {
+  test('四個等級都顯示，點選會依 level.id 導向對應路徑', () => {
     mockNavigate.mockReset();
     render(<Panel_Start tribe="tayal" />);
 
@@ -46,7 +46,7 @@ describe('Panel_Start（FR-4a：等級資料改用共用 QUIZ_LEVELS）', () => 
     expect(badges).toEqual(['初', '中', '中+', '高']);
   });
 
-  test('點擊「開始情境練習」會導向 scenario 路徑', () => {
+  test('點選「開始情境練習」會導向 scenario 路徑', () => {
     mockNavigate.mockReset();
     render(<Panel_Start tribe="tayal" />);
 

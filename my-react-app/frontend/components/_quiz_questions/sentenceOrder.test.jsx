@@ -32,7 +32,7 @@ function clickWord(button) {
 }
 
 describe('SentenceOrder 重複單字識別（回歸測試：原本用單字文字當 id）', () => {
-  test('點擊其中一個重複的字只會移動那一個 token，不會連帶移除另一個相同文字的字', () => {
+  test('點選其中一個重複的字只會移動那一個 token，不會連帶移除另一個相同文字的字', () => {
     render(<SentenceOrder question={QUESTION} checked={false} onSelect={vi.fn()} onConfirm={vi.fn()} />);
 
     expect(getWordButtons()).toHaveLength(3);

@@ -172,14 +172,14 @@ export function useQuizPanelData(level, tribe) {
         }
     }, [data]);
 
-    //點擊星星
+    //點選星星
     const handleStar = () => {
         const updateStars = [...userStars];
         updateStars[currentQuestionIndex] = updateStars[currentQuestionIndex] === "T" ? "F" : "T";
         setUserStars(updateStars);
     };
 
-    //點擊選項
+    //點選選項
     const handleAnswer = (choice) => {
         const updateAns = [...userAnswers];
         updateAns[currentQuestionIndex] = choice;

@@ -228,7 +228,7 @@ describe('AnnouncementEditor · 新增模式', () => {
     );
     expect(apiPost).toHaveBeenCalledTimes(2);
 
-    // 再次點擊「儲存」應該走 PATCH（因為畫面現在已經有 id），不會再
+    // 再次點選「儲存」應該走 PATCH（因為畫面現在已經有 id），不會再
     // POST 建立第二筆公告。
     fireEvent.click(screen.getByRole('button', { name: /^儲存$/ }));
     await waitFor(() => {

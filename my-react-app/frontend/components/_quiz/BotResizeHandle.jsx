@@ -43,7 +43,7 @@ const BotResizeHandle = ({ overlayRef, size, onCommit }) => {
   };
 
   // 放開：存下拖曳結果。放開之後瀏覽器會緊接著再送一次 click，那不是「切換預設」，要擋掉；
-  // 旗標只活到這一輪事件結束，不會殘留到下一次真正的點擊
+  // 旗標只活到這一輪事件結束，不會殘留到下一次真正的點選
   const onPointerUp = () => {
     const d = drag.current;
     drag.current = null;

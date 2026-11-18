@@ -5,7 +5,7 @@
 approve/reject、reports 的 resolve/dismiss）。這裡把三種不同資料源
 （Django ORM 的新內容送審、PendingRevision 的已發布內容修改提案、
 Firestore 的待處理檢舉）合併成一個依時間排序的清單，每筆帶一個 link
-讓前端點擊直接跳到對應的既有管理頁面。
+讓前端點選直接跳到對應的既有管理頁面。
 """
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt

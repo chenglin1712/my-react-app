@@ -232,7 +232,7 @@ describe('QuizQualityAnalysis', () => {
     });
   });
 
-  test('點擊散佈圖題目點會導到該題型的題庫列表', async () => {
+  test('點選散佈圖題目點會導到該題型的題庫列表', async () => {
     renderPage();
 
     const point = await screen.findByRole('button', {

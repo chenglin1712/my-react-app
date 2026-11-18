@@ -15,7 +15,7 @@ const REPORT_REASONS = [
 /** 分享筆記的詳情彈窗（點卡片或從分享連結進入都會開這個）。
  *
  * 檢舉按鈕刻意不像 canLike／canDelete 那樣依登入狀態隱藏——未登入訪客
- * （例如透過 /share/:id 公開連結進來的人）也看得到，點擊後由 onReport
+ * （例如透過 /share/:id 公開連結進來的人）也看得到，點選後由 onReport
  * 自行判斷登入狀態並導去 /login（跟 noteshare.jsx 的 toggleLike 同一種
  * 「先讓看得到，點了才擋」的處理方式），而不是像按讚那樣直接不給看到入口。
  */
@@ -63,7 +63,7 @@ export default function NoteModal({ note, canLike, iLike, canDelete, onToggleLik
   const modalTitleId = "note-modal-title";
 
   const handleMaskClick = () => {
-    if (reportSubmitting) return; // 檢舉送出中先不讓背景點擊關閉，避免中斷送出結果的回饋
+    if (reportSubmitting) return; // 檢舉送出中先不讓背景點選關閉，避免中斷送出結果的回饋
     onClose();
   };
 

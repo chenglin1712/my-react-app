@@ -38,7 +38,7 @@ describe('useGameSession', () => {
     expect(result.current.status).toBe('intro');
   });
 
-  test('loading 期間再次呼叫 start() 不會觸發第二次請求（回歸測試：原本沒有防止連續點擊）', async () => {
+  test('loading 期間再次呼叫 start() 不會觸發第二次請求（回歸測試：原本沒有防止連續點選）', async () => {
     let resolveFetch;
     apiGet.mockImplementation(() => new Promise((resolve) => { resolveFetch = resolve; }));
     const { result } = renderHook(() => useGameSession({ endpoint: '/x', tribe: 'tayal', count: 2 }));
