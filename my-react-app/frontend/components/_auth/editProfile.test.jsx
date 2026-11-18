@@ -82,6 +82,15 @@ describe('EditProfile (editProfile)', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/');
   });
 
+  test('後端訊息結尾已有標點時，不會變成「。，」', async () => {
+    updateProfile.mockResolvedValueOnce({ success: false, message: '資料格式錯誤。' });
+    render(<EditProfile />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /儲存變更/ }));
+    });
+    expect(screen.getByText('資料格式錯誤，請修改後再試一次。')).toBeInTheDocument();
+  });
+
   test('updateProfile 回傳 success: false 時顯示錯誤訊息，且不會卡住無法重試', async () => {
     updateProfile.mockResolvedValueOnce({ success: false, message: '沒有更新的資料' });
     render(<EditProfile />);
