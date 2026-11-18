@@ -11,6 +11,7 @@ import { useToast } from "./hooks/useToast";
 import { announce } from "@utils/announce";
 import NoteCard from "./components/NoteCard";
 import NoteModal from "./components/NoteModal";
+import SegmentedFilter from "./components/SegmentedFilter";
 import "../../static/css/_note/./notesharestyle.css";
 import TabSwitch from "../../components/ui/TabSwitch";
 import { confirmAction } from "@components/ui/ConfirmDialog";
@@ -232,20 +233,16 @@ export default function NoteShare() {
         </div>
 
         <div className="ns-tabs">
-          {[
-            { key: "my", label: "我的" },
-            { key: "latest", label: "最新" },
-            { key: "hot", label: "熱門" },
-          ].map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setFilter(t.key)}
-              className={`ns-tab ${filter === t.key ? "active" : ""}`}
-            >
-              {t.label}
-            </button>
-          ))}
+          <SegmentedFilter
+            ariaLabel="筆記排序與範圍"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { key: "my", label: "我的" },
+              { key: "latest", label: "最新" },
+              { key: "hot", label: "熱門" },
+            ]}
+          />
 
           <button
             type="button"

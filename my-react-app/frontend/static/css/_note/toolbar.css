@@ -16,91 +16,69 @@
   z-index: var(--yy-z-sticky);
 }
 .editor-toolbar .group { display: flex; align-items: center; gap: 8px; }
+
+/* 固定列只剩粗斜體與上傳圖片（P5-1），按鈕寬度跟著內容 */
+.note-page .editor-toolbar .btn-ghost {
+  min-width: var(--yy-control-md);
+  padding-inline: var(--yy-space-3);
+}
+.note-page .editor-toolbar .btn-ghost[aria-pressed="true"] {
+  position: relative;
+  background: var(--yy-calm-info-bg);
+  color: var(--yy-calm-accent);
+}
+.note-page .editor-toolbar .btn-ghost[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  left: 25%;
+  right: 25%;
+  bottom: 4px;
+  height: 2px;
+  background: var(--yy-calm-accent);
+}
 .editor-toolbar .divider { width:1px; height:20px; background:var(--yy-calm-info-bg); }
 
-/* 選色條（示意） */
-.editor-toolbar .colorbar { display:flex; align-items:center; gap:10px; height:4px; }
-.editor-toolbar .colorbar span { display:block; width:120px; height:4px; background:var(--yy-calm-text); }
-
-/* 底部工具列（上一頁 / 下一頁 / 分享等）。材質是毛玻璃（.yy-glass，P1-7）：背景、模糊、細框與降級純色都由它提供。 */
+/* 底部操作列（新增、儲存、上一頁／下一頁、刪除）。材質是毛玻璃（.yy-glass，P1-7）：背景、模糊、細框與降級純色都由它提供。
+   P5-2：改成「浮動」的一條——離畫面底部留一段距離、圓角、第 3 級陰影，而不是貼底的整排。 */
 .bottom-toolbar {
   position: fixed;
-  bottom: 0; left: 0; right: 0;
+  /* 左右各留「12px 或瀏海內距」再用 auto 邊界置中：可用區域的中心，而不是整個畫面的中心（橫向時左右內距不對稱） */
+  left: max(12px, env(safe-area-inset-left, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+  margin-inline: auto;
+  /* 手機有底部選單（tab bar）時，--yy-tabbar-h 已含安全區，浮動列要浮在它上面；桌機沒有 tab bar，退回自己的安全區 */
+  bottom: calc(var(--yy-tabbar-h, env(safe-area-inset-bottom, 0px)) + 12px);
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 10px max(20px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
+  gap: var(--yy-space-2);
+  width: max-content;
+  max-width: calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+  padding: var(--yy-space-2) var(--yy-space-3);
+  border-radius: var(--yy-radius-panel);
+  box-shadow: var(--yy-elev-3);
   z-index: var(--yy-z-float);
 }
+/* 底部操作列的按鈕：文字鈕有個像樣的寬度，頁碼不用 */
+.note-page .bottom-toolbar button { min-width: 5rem; }
 .toolbar-page-info {
   align-self: center;
+  min-width: 3.5em;
+  text-align: center;
   font-weight: bold;
+  font-variant-numeric: tabular-nums;
 }
 
-/* RWD */
+/* 手機：維持一列（五顆鈕加頁碼會自動換行），不再疊成一直排佔掉半個畫面 */
 @media (max-width: 720px) {
-  .bottom-toolbar {
-    flex-direction: column;
-    align-items: center;
-    padding: 15px max(10px, env(safe-area-inset-right, 0px)) calc(15px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px));
+  .note-page .bottom-toolbar button {
+    min-width: var(--yy-control-md);
+    padding-inline: var(--yy-space-3);
   }
-  .toolbar-page-info { margin: 10px 0; }
+  .toolbar-page-info { min-width: 3em; }
 }
 
-/* 文字顏色色票（審查項 P1-18）：原本 40x6px 手機幾乎點不到。
-   視覺 32px 圓形，外圍透明邊框把可點範圍撐到 44px，選中時加外環與勾。 */
-.editor-toolbar .color-box {
-  position: relative;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  border-radius: var(--yy-radius-round);
-  flex: none;
-  min-width: 44px; /* 蓋掉全域 button min-width:100px（B-1 遺留的問題） */
-}
-.editor-toolbar .color-box::before {
-  content: "";
-  position: absolute;
-  inset: 6px;
-  border-radius: var(--yy-radius-round);
-  background: var(--swatch);
-  border: var(--yy-border-width) solid var(--yy-calm-line);
-  box-sizing: border-box;
-}
-.editor-toolbar .color-box[aria-pressed="true"]::before {
-  outline: 2px solid var(--yy-calm-text);
-  outline-offset: 2px;
-}
-.editor-toolbar .color-box[aria-pressed="true"]::after {
-  content: "";
-  position: absolute;
-  left: 16px;
-  top: 12px;
-  width: 7px;
-  height: 13px;
-  border: solid var(--yy-calm-surface);
-  border-width: 0 3px 3px 0;
-  transform: rotate(45deg);
-}
-.editor-toolbar .color-box:focus-visible {
-  outline: 3px solid var(--yy-calm-accent);
-  outline-offset: 1px;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .editor-toolbar .color-box::before {
-    transition: transform 120ms var(--ease-out);
-  }
-}
-.editor-toolbar .color-box:active::before {
-  transform: scale(0.94);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .editor-toolbar .color-box:active::before {
-    transform: none;
-  }
+@media (max-width: 720px) {
+  .note-page { padding-bottom: calc(11rem + var(--yy-tabbar-h, 0px)); }
 }

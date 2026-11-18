@@ -60,6 +60,9 @@ describe('NoteModal 的消毒只在內容變動時做（O24）', () => {
   });
 });
 
+// P5-5：每次 preview 變動消毒 2 次（預覽文字＝先去圖再消毒；封面＝消毒後取第一張圖），按讚等其他變動仍然 0 次
+const PER_PREVIEW = 2;
+
 describe('NoteCard 的預覽只在 preview 變動時重新消毒（O24）', () => {
   const card = (note, extra = {}) => (
     <NoteCard note={note} isMyTab={false} isMine={false} iLike={false} onOpen={vi.fn()} onToggleLike={vi.fn()} {...extra} />
@@ -68,16 +71,16 @@ describe('NoteCard 的預覽只在 preview 變動時重新消毒（O24）', () =
 
   test('按讚造成 likes／iLike 改變時，不重新消毒預覽', () => {
     const { rerender } = render(card(BASE));
-    expect(sanitizeSpy).toHaveBeenCalledTimes(1);
+    expect(sanitizeSpy).toHaveBeenCalledTimes(PER_PREVIEW);
     rerender(card({ ...BASE, likes: 1 }, { iLike: true }));
-    expect(sanitizeSpy).toHaveBeenCalledTimes(1);
+    expect(sanitizeSpy).toHaveBeenCalledTimes(PER_PREVIEW);
     expect(screen.getByText('預覽')).toBeInTheDocument();
   });
 
   test('preview 變了才重新消毒；沒有 preview 時用預設的「內容」', () => {
     const { rerender } = render(card(BASE));
     rerender(card({ ...BASE, preview: '<p>換了</p>' }));
-    expect(sanitizeSpy).toHaveBeenCalledTimes(2);
+    expect(sanitizeSpy).toHaveBeenCalledTimes(PER_PREVIEW * 2);
     expect(screen.getByText('換了')).toBeInTheDocument();
     rerender(card({ ...BASE, preview: '' }));
     expect(screen.getByText('內容')).toBeInTheDocument();

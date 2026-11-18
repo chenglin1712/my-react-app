@@ -4,6 +4,7 @@ import { StarterKit } from '@tiptap/starter-kit';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
 import { Image as ImageExtension } from '@tiptap/extension-image';
+import { Placeholder } from '@tiptap/extensions';
 import FontSize from './fontSizeExtension';
 
 // 套件升級（Dependabot）時的煙霧測試：用「真的」TipTap 編輯器（不是 mock），
@@ -18,6 +19,7 @@ function createEditor(content = '<p></p>') {
       TextStyle,
       Color,
       FontSize,
+      Placeholder.configure({ placeholder: '從這裡開始寫' }),
       ImageExtension.configure({ HTMLAttributes: { style: 'max-width: 30%; height: auto;' } }),
     ],
     content,
@@ -78,5 +80,15 @@ describe('筆記編輯器（真實 TipTap）', () => {
     expect(reloaded.getHTML()).toBe(html);
     editor.destroy();
     reloaded.destroy();
+  });
+
+  test('P5-4：空白筆記的第一個段落有 is-editor-empty 與引導文字；打了字就沒有', () => {
+    const editor = createEditor('<p></p>');
+    const first = () => editor.view.dom.querySelector('p');
+    expect(first().classList.contains('is-editor-empty')).toBe(true);
+    expect(first().getAttribute('data-placeholder')).toBe('從這裡開始寫');
+    editor.commands.insertContent('你好');
+    expect(first().classList.contains('is-editor-empty')).toBe(false);
+    editor.destroy();
   });
 });

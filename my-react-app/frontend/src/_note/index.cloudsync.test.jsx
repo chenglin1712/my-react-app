@@ -6,6 +6,8 @@ import NotePage from './index';
 import { useNotesCloudSyncFlag } from './hooks/useNotesCloudSyncFlag';
 import { useCloudNoteSync } from './hooks/useCloudNoteSync';
 import { exportNoteAsHtml } from './sync/exportNote';
+import { mockViewport } from './testDesktopMatchMedia';
+mockViewport(true);   // 電腦版寬度：頁面清單直接顯示
 
 // 站內確認視窗（原本是瀏覽器原生 window.confirm）：測試直接替換成可控制回傳值的 mock
 const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
@@ -25,6 +27,7 @@ vi.mock('@tiptap/extension-text-style', () => ({ TextStyle: {} }));
 vi.mock('@tiptap/extension-color', () => ({ Color: {} }));
 vi.mock('@tiptap/extension-image', () => ({ Image: { configure: () => ({}) } }));
 vi.mock('./fontSizeExtension', () => ({ default: {} }));
+vi.mock('./components/SelectionBubble', () => ({ default: () => null }));
 vi.mock('../userServives/noteService', () => ({ shareNote: vi.fn() }));
 vi.mock('@utils/uploadToCloudinary', () => ({ uploadToCloudinary: vi.fn() }));
 vi.mock('../../../firebase', () => ({ db: { fake: true } }));
@@ -88,8 +91,8 @@ describe('NotePage 的雲端同步接線', () => {
     }));
     renderPage();
 
-    expect(screen.getByLabelText(/第 2 頁：第二篇（未同步）/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/第 1 頁：第一篇/).closest('div').textContent).not.toContain('未同步');
+    expect(screen.getByLabelText(/分享：第 2 頁：第二篇（未同步）/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/分享：第 1 頁：第一篇/).closest('li').textContent).not.toContain('未同步');
 
     fireEvent.click(screen.getByRole('button', { name: '匯出此頁' }));
     expect(exportNoteAsHtml).toHaveBeenCalledWith(expect.objectContaining({ id: 'b', title: '第二篇' }));
@@ -108,13 +111,13 @@ describe('NotePage 的雲端同步接線', () => {
     expect(screen.queryByText(/筆記只存在這台裝置的瀏覽器/)).not.toBeInTheDocument();
   });
 
-  test('D-5：按「儲存」後狀態變成「已儲存於這台裝置」並顯示時間', () => {
+  test('D-5：按「儲存」後狀態變成「已儲存於 時:分（這台裝置）」', () => {
     useNotesCloudSyncFlag.mockReturnValue(true);
     useCloudNoteSync.mockReturnValue(syncStub({ status: 'synced' }));
     const { container } = renderPage();
 
     fireEvent.click(screen.getByRole('button', { name: '儲存' }));
-    expect(container.querySelector('.note-save__status')).toHaveTextContent('已儲存於這台裝置 · 剛剛');
+    expect(container.querySelector('.note-save__status')).toHaveTextContent(/已儲存於 \d{2}:\d{2}（這台裝置）/);
   });
 
   test('刪除一頁時通知同步（帶筆記 id）', async () => {

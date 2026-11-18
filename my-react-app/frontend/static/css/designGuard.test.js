@@ -314,10 +314,10 @@ describe("手機版（階段 6-4）", () => {
         if (m && Number(m[1]) > 64 && /button/.test(selector)) hits.push(`${file}: ${selector.replace(/\s+/g, " ").slice(0, 60)} ${m[0]}`);
       });
     });
-    // 例外：筆記頁（路由專屬 CSS，限縮在 .note-page 底下）電腦版 100px，手機寬度在同檔另有覆蓋；遊戲開始頁單獨一顆的開始鈕 120px
-    expect(hits.filter((h) => !/(_note\/buttons|_game\/game_start)\.css/.test(h)), hits.join(", ")).toEqual([]);
+    // 例外：遊戲開始頁單獨一顆的開始鈕 120px。筆記頁（P5-2）已改成 44px 觸控區，不再有例外
+    expect(hits.filter((h) => !/_game\/game_start\.css/.test(h)), hits.join(", ")).toEqual([]);
     const note = everyCss.find(({ file }) => file.endsWith("_note/buttons.css")).css;
-    expect(note).toMatch(/@media \(max-width: 600px\)\s*\{[^}]*\.note-page \.btn\s*\{\s*min-width:\s*var\(--yy-control-md\)/);
+    expect(note).toMatch(/\.note-page \.btn\s*\{\s*min-width:\s*var\(--yy-control-md\)/);
   });
 
   it("貼著畫面底部的固定元素都把 safe-area-inset-bottom 算進去（瀏海機的手勢條不會蓋住）", () => {
@@ -879,5 +879,120 @@ describe("P4-10 補充（實測後的修正）", () => {
     expect(css).toMatch(/\.load-spinner\s*\{[^}]*border-top-color: var\(--yy-calm-accent\)/);
     expect(css).toMatch(/prefers-reduced-motion: reduce\)\s*\{\s*\.load-spinner\s*\{\s*animation: none/);
     expect(readFileSync(join(FRONTEND, "components/_quiz/quiz_panel.jsx"), "utf8")).not.toMatch(/loadLoadingAnimation|useLottieAnimation/);
+  });
+});
+
+describe("P5 筆記（選取氣泡工具列）", () => {
+  const read = (f) => readFileSync(join(FRONTEND, f), "utf8");
+  it("氣泡工具列用毛玻璃材質，沒有進出場動畫（高頻動作不動）", () => {
+    expect(read("src/_note/components/SelectionBubble.jsx")).toMatch(/className="sel-bubble yy-glass"/);
+    const css = stripCss(read("static/css/_note/bubble.css"));
+    expect(css).not.toMatch(/@keyframes|animation\s*:/);
+  });
+  it("文字顏色色盤是資料色：六個 token 只在淺色區塊定義，深色模式不改（否則同一篇筆記會隨模式變色）", () => {
+    const theme = read("static/css/default/theme-v2.css");
+    const defs = theme.match(/--yy-note-ink-[a-z]+:\s*#[0-9A-Fa-f]{6}/g) || [];
+    expect(defs).toHaveLength(6);
+    const darkBlocks = theme.slice(theme.indexOf("prefers-color-scheme: dark"));
+    expect(darkBlocks).not.toMatch(/--yy-note-ink-/);
+  });
+  it("JS 裡不寫死筆記色碼，一律讀 token", () => {
+    expect(read("src/_note/components/SelectionBubble.jsx")).not.toMatch(/#[0-9A-Fa-f]{6}/);
+  });
+});
+
+describe("P5-2 筆記底部操作列", () => {
+  const read = (f) => stripCss(readFileSync(join(FRONTEND, f), "utf8"));
+  it("按鈕只有三種：主要（銅褐實底）、其餘（外框）、刪除（危險色外框）；不再有綠、酒紅、深灰實底", () => {
+    const css = read("static/css/_note/buttons.css");
+    expect(css).toMatch(/\.note-page \.btn-primary\s*\{[^}]*background-color:\s*var\(--yy-calm-accent\)/);
+    expect(css).toMatch(/\.btn-add,\s*\.note-page \.btn-page\s*\{[^}]*background-color:\s*transparent/);
+    expect(css).toMatch(/\.note-page \.btn-danger\s*\{[^}]*background-color:\s*transparent;[^}]*color:\s*var\(--yy-calm-danger\)/);
+    expect(css).not.toMatch(/--yy-calm-success|--yy-calm-block|--danger\b/);
+  });
+  it("筆記頁的按鈕不再全頁 min-width: 100px（只有底部操作列的文字鈕有 5rem）", () => {
+    expect(read("static/css/_note/buttons.css")).not.toMatch(/min-width:\s*100px/);
+    expect(read("static/css/_note/toolbar.css")).toMatch(/\.note-page \.bottom-toolbar button\s*\{\s*min-width:\s*5rem/);
+  });
+  it("停用的主要動作要淡掉；底部浮動列用 auto 邊界在安全區內置中、頁面底部預留空間", () => {
+    expect(read("static/css/_note/buttons.css")).toMatch(/\.btn-primary:disabled,\s*\.note-page \.btn-primary\.disabled\s*\{[^}]*opacity:\s*0\.5/);
+    const bar = read("static/css/_note/toolbar.css").match(/\.bottom-toolbar\s*\{([^}]*)\}/)[1];
+    expect(bar).toMatch(/left:\s*max\(12px, env\(safe-area-inset-left, 0px\)\)/);
+    expect(bar).toMatch(/right:\s*max\(12px, env\(safe-area-inset-right, 0px\)\)/);
+    expect(bar).toMatch(/margin-inline:\s*auto/);
+    expect(bar).not.toMatch(/transform/);
+    expect(read("static/css/_note/notestyle.css")).toMatch(/\.note-page\s*\{[^}]*padding-bottom:\s*7rem/);
+  });
+  it("底部操作列是浮動的毛玻璃：離底部有距離、圓角、elev 陰影", () => {
+    const css = read("static/css/_note/toolbar.css");
+    const bar = css.match(/\.bottom-toolbar\s*\{([^}]*)\}/)[1];
+    expect(bar).toMatch(/position:\s*fixed/);
+    expect(bar).toMatch(/border-radius:\s*var\(--yy-radius-panel\)/);
+    expect(bar).toMatch(/box-shadow:\s*var\(--yy-elev-3\)/);
+    expect(readFileSync(join(FRONTEND, "src/_note/index.jsx"), "utf8")).toMatch(/className="bottom-toolbar yy-glass /);
+  });
+});
+
+describe("P5-4 編輯區紙感（純樣式）", () => {
+  const css = stripCss(readFileSync(join(FRONTEND, "static/css/_note/notestyle.css"), "utf8"));
+  it("欄寬約 65 字元並置中、長字詞折行、圖片不超出欄寬", () => {
+    const pm = css.match(/\.note-text \.ProseMirror\s*\{([^}]*)\}/)[1];
+    expect(pm).toMatch(/max-width:\s*65ch/);
+    expect(pm).toMatch(/margin-inline:\s*auto/);
+    expect(pm).toMatch(/line-height:\s*1\.8/);
+    expect(pm).toMatch(/overflow-wrap:\s*break-word/);
+    expect(css).toMatch(/\.ProseMirror a,\s*\.note-text \.ProseMirror code\s*\{\s*overflow-wrap:\s*anywhere/);
+    expect(css).toMatch(/\.note-text \.ProseMirror img\s*\{[^}]*max-width:\s*100%/);
+  });
+  it("標題字級加大；編輯區與標題框邊框是細線，不再是強調色紅框", () => {
+    expect(css).toMatch(/\.note-title\s*\{[^}]*font-size:\s*var\(--yy-text-2xl\)/);
+    expect(css).toMatch(/\.note-title\s*\{[^}]*border:\s*var\(--yy-border-width\) solid var\(--yy-calm-rule\)/);
+    expect(css).toMatch(/\.note-text\s*\{[^}]*border:\s*var\(--yy-border-width\) solid var\(--yy-calm-rule\)/);
+  });
+  it("空白引導文字用 TipTap 的 Placeholder 狀態 class，不去解析編輯器內部 DOM", () => {
+    expect(css).toMatch(/\.ProseMirror p\.is-editor-empty:first-child::before\s*\{[^}]*content:\s*attr\(data-placeholder\)/);
+    expect(readFileSync(join(FRONTEND, "src/_note/hooks/useNotePages.js"), "utf8")).toMatch(/Placeholder\.configure/);
+  });
+});
+
+describe("P5-3 左側頁面縮圖列", () => {
+  const read = (f) => readFileSync(join(FRONTEND, f), "utf8");
+  const css = stripCss(read("static/css/_note/notestyle.css"));
+  it("長清單（上限 200 頁）：卡片用 content-visibility: auto 加預估高度，電腦版清單自己捲動、不撐高整欄", () => {
+    expect(css).toMatch(/\.note-page-card\s*\{[^}]*content-visibility:\s*auto/);
+    expect(css).toMatch(/\.note-page-card\s*\{[^}]*contain-intrinsic-size:\s*auto /);
+    expect(css).toMatch(/\.note-rail \.note-page-list\s*\{[^}]*max-height:[^}]*overflow-y:\s*auto/);
+  });
+  it("目前編輯的頁不只靠顏色（有粗邊加「目前編輯」標籤，元件有 aria-current）", () => {
+    expect(css).toMatch(/\.note-page-card\.is-current\s*\{[^}]*border-left:\s*4px solid/);
+    const jsx = read("src/_note/components/PageSidebar.jsx");
+    expect(jsx).toMatch(/aria-current=\{isCurrent \? "page" : undefined\}/);
+    expect(jsx).toMatch(/目前編輯/);
+  });
+  it("手機抽屜留在 .note-page 底下（筆記頁的按鈕樣式都限縮在 .note-page，抽屜被移去 body 會失去樣式）", () => {
+    expect(read("src/_note/components/PageSidebar.jsx")).toMatch(/container=\{\(\) => document\.querySelector\("\.note-page"\)\}/);
+  });
+  it("頁面清單在左、編輯區在右", () => {
+    const jsx = read("src/_note/index.jsx");
+    expect(jsx.indexOf('className="note-rail-col sticky-md-top"')).toBeLessThan(jsx.indexOf('className="note-title mb-1"'));
+  });
+});
+
+describe("P5-5 / P5-6 分享區卡片與篩選列", () => {
+  const css = stripCss(readFileSync(join(FRONTEND, "static/css/_note/notesharestyle.css"), "utf8"));
+  it("卡片等高：格線拉伸、卡片直排、讚列貼底；封面固定 16:9、預覽固定高度", () => {
+    expect(css).toMatch(/\.ns-grid\s*\{[^}]*align-items:\s*stretch/);
+    expect(css).toMatch(/\.ns-card\s*\{[^}]*display:\s*flex;\s*flex-direction:\s*column/);
+    expect(css).toMatch(/\.ns-like-row\s*\{[^}]*margin-top:\s*auto/);
+    expect(css).toMatch(/\.ns-cover\s*\{[^}]*aspect-ratio:\s*16 \/ 9/);
+    expect(css).toMatch(/\.ns-preview\s*\{[^}]*\bheight:\s*4\.2rem/);
+  });
+  it("分段控制：指示器只動 transform，減少動態時直接跳過去，選中的項目有勾（不只靠顏色），鍵盤有焦點框", () => {
+    const thumb = css.match(/\.ns-seg-thumb\s*\{([^}]*)\}/)[1];
+    expect(thumb).toMatch(/transition:\s*transform /);
+    expect(thumb).not.toMatch(/transition:[^;]*(left|width|background)/);
+    expect(css).toMatch(/prefers-reduced-motion: reduce\)\s*\{\s*\.ns-seg-thumb, \.ns-seg-label\s*\{\s*transition:\s*none/);
+    expect(css).toMatch(/\.ns-seg-item\.is-active \.ns-seg-label::before\s*\{[^}]*content:/);
+    expect(css).toMatch(/\.ns-seg-input:focus-visible \+ \.ns-seg-label\s*\{[^}]*outline:/);
   });
 });

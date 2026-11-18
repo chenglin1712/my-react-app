@@ -37,14 +37,32 @@
 
 /* 分頁籤與刷新 */
 .ns-tabs{display:flex; align-items:center; gap:.5rem;}
-.ns-tab{
-  border:1px solid var(--rose-700); color:var(--rose-700);
-  background:var(--yy-calm-surface); padding:.5rem 1rem; min-height:var(--yy-control-md); border-radius:var(--yy-radius-control);
-  transition:background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
+/* 分段控制（P5-6）：三等寬，指示器只用 transform 滑動 */
+.ns-seg{
+  position:relative; display:grid; grid-template-columns:repeat(var(--count), 1fr);
+  min-height:var(--yy-control-md); padding:3px;
+  border:var(--yy-border-width) solid var(--rose-700); border-radius:var(--yy-radius-control);
+  background:var(--yy-calm-surface);
 }
-.ns-tab.active{background:var(--rose-700); color:var(--yy-calm-accent-on);}
-/* 目前分頁：除了反白，名稱前多一個勾 */
-.ns-tab.active::before{content:"\2713"; margin-right:var(--yy-space-1);}
+.ns-seg-thumb{
+  position:absolute; top:3px; bottom:3px; left:3px;
+  width:calc((100% - 6px) / var(--count));
+  border-radius:var(--yy-radius-control);
+  background:var(--rose-700);
+  transform:translateX(calc(var(--i) * 100%));
+  transition:transform var(--dur-fast) var(--ease-out);
+}
+.ns-seg-item{ position:relative; display:flex; align-items:center; justify-content:center; min-width:4.5rem; cursor:pointer; }
+/* 原生 radio 留在原位當鍵盤與報讀器的焦點，只是看不見 */
+.ns-seg-input{ position:absolute; inset:0; margin:0; opacity:0; cursor:pointer; }
+.ns-seg-label{ position:relative; padding:.25rem 1rem; color:var(--rose-700); transition:color var(--dur-fast) var(--ease-out); pointer-events:none; }
+.ns-seg-item.is-active .ns-seg-label{ color:var(--yy-calm-accent-on); font-weight:700; }
+/* 目前項目：名稱前多一個勾（不只靠顏色） */
+.ns-seg-item.is-active .ns-seg-label::before{ content:"\2713"; margin-right:var(--yy-space-1); }
+.ns-seg-input:focus-visible + .ns-seg-label{ outline:var(--yy-ui-focus-ring); outline-offset:var(--yy-ui-focus-offset); border-radius:var(--yy-radius-control); }
+@media (prefers-reduced-motion: reduce){
+  .ns-seg-thumb, .ns-seg-label{ transition:none; }
+}
 .ns-refresh{
   border:1px solid var(--rose-700); color:var(--rose-700);
   background:var(--yy-calm-surface); padding:.5rem .75rem; min-width:var(--yy-control-md); min-height:var(--yy-control-md); border-radius:var(--yy-radius-control); cursor:pointer;
@@ -61,6 +79,7 @@
 .ns-grid{
   display:grid; gap:1.25rem;
   grid-template-columns:1fr;
+  align-items:stretch; /* 同一列的卡片等高（P5-5） */
 }
 /* minmax(0,1fr)：讓欄位可以比內容窄，超長的無空白標題才不會把整個 grid 撐破 */
 .ns-grid{ grid-template-columns:minmax(0,1fr); }
@@ -75,6 +94,7 @@
   border:1px solid var(--border);
   border-radius:var(--yy-radius-panel);
   cursor:pointer; overflow:hidden; transition:transform .2s;
+  display:flex; flex-direction:column; /* 內容區撐滿，讚列永遠貼在卡片底部 */
 }
 @media (hover: hover) and (pointer: fine) {
   .ns-card:hover {transform:translateY(-1px);}
@@ -82,8 +102,19 @@
 
 /* 卡片的「開啟詳情」按鈕：視覺上要跟原本可點擊的整張 div 一樣，不像 button */
 .ns-card-open{
-  display:block; width:100%; border:none; background:none; padding:0;
+  display:block; flex:1 1 auto; width:100%; border:none; background:none; padding:0;
   margin:0; text-align:left; font:inherit; color:inherit; cursor:pointer;
+}
+
+/* 封面：固定 16:9，圖片裁切填滿；預設封面用淡底加文件圖示 */
+.ns-cover{
+  aspect-ratio:16 / 9; width:100%; overflow:hidden; background:var(--yy-calm-info-bg);
+  border-bottom:1px solid var(--border);
+}
+.ns-cover img{ width:100%; height:100%; object-fit:cover; display:block; }
+.ns-cover-fallback{
+  width:100%; height:100%; display:flex; align-items:center; justify-content:center;
+  color:var(--yy-calm-text-sub);
 }
 
 /* 卡片頭 */
@@ -114,14 +145,14 @@
 
 /* 預覽（3行截斷的簡易作法，與實際內容高度搭配） */
 .ns-preview{
-  color:var(--yy-calm-accent); font-size:.95rem; max-height:4.2rem; overflow:hidden;
+  color:var(--yy-calm-accent); font-size:.95rem; height:4.2rem; overflow:hidden; /* 固定高度：預覽長短不同，卡片高度也一致 */
 }
 
 /* 讚列 */
 .ns-like-row{
   display:flex; justify-content:flex-end; align-items:center; gap:.5rem;
-  color:var(--rose-700); margin-top:.5rem;
-  padding:0 1rem .75rem 1rem;
+  color:var(--rose-700); margin-top:auto;
+  padding:.5rem 1rem .75rem 1rem;
 }
 .ns-like-btn{
   background:none; border:none; color:var(--rose-700); text-decoration:none; padding:0; display: contents;
@@ -234,7 +265,6 @@
   outline-offset:2px;
 }
 
-.ns-tab:active,
 .ns-refresh:active,
 .ns-page-btn:active:not(:disabled),
 .ns-btn:active {
@@ -242,8 +272,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ns-tab:active,
-  .ns-refresh:active,
+    .ns-refresh:active,
   .ns-page-btn:active:not(:disabled),
   .ns-btn:active { transform: none; }
   .ns-toast, .ns-toast.is-visible { translate: 0 0; transition-property: opacity, visibility; }

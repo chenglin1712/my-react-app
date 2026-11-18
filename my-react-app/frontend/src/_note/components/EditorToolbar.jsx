@@ -3,24 +3,6 @@ import { Row, Col, Button } from "react-bootstrap";
 import { Image as ImageIcon, Bold, Italic } from "lucide-react";
 import { useNavbarOffset } from "../../hooks/useScrolledPast";
 
-// 色票改用品牌色盤 token（審查項 P1-18）：原本直接拿 red/blue/orange 當 CSS 色，不在品牌色盤內。
-// value 是寫進筆記內容的實際色碼；筆記內容是存下來的資料，所以用色碼而不是 var()。
-const COLOR_SWATCHES = [
-  { id: "red", label: "紅色", value: "#9E1B24" },
-  { id: "blue", label: "藍色", value: "#1F3A5C" },
-  { id: "black", label: "黑色", value: "#221812" },
-  { id: "orange", label: "橘色", value: "#C4601A" },
-];
-
-// queryCommandValue 在各瀏覽器可能回 "rgb(r, g, b)" 或 "#rrggbb"，統一換成色票 id
-function swatchIdFromColor(raw) {
-  if (!raw || typeof raw !== "string") return null;
-  let hex = raw.trim().toLowerCase();
-  const m = hex.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-  if (m) hex = "#" + [m[1], m[2], m[3]].map((n) => Number(n).toString(16).padStart(2, "0")).join("");
-  return COLOR_SWATCHES.find((s) => s.value.toLowerCase() === hex)?.id ?? null;
-}
-
 // 執行命令後以瀏覽器回報的實際狀態為準；查不到時（瀏覽器不支援）才改成反轉目前狀態
 function readCommandState(command) {
   try {
@@ -30,20 +12,18 @@ function readCommandState(command) {
   return (previous) => !previous;
 }
 
-/** 筆記編輯器上方的工具列：字級、粗斜體、上傳圖片、文字顏色。 */
+/**
+ * 筆記編輯器上方的固定工具列（P5-1 精簡版）：粗斜體與上傳圖片。
+ * 字級與顏色移到「選取文字時浮出的氣泡」（SelectionBubble）；這裡留粗斜體，是因為沒有選字、
+ * 或手機上選字不方便時，仍有一個固定、永遠找得到的地方。
+ */
 export default function EditorToolbar({ execStyle, onImageFileSelected, isUploadingImage }) {
   const imageInputRef = useRef(null);
-  // 選取狀態要反映「游標所在處的實際文字顏色」，不是最後點過哪顆：
-  // 監聽 selectionchange，用 queryCommandValue 讀出顏色再對應回色票。
-  const [activeColor, setActiveColor] = useState(null);
+  // 監聽 selectionchange，讀出游標所在處是不是粗體、斜體
   const [isBold, setIsBold] = useState(false);
   const [isItalic, setIsItalic] = useState(false);
   useEffect(() => {
     const sync = () => {
-      try {
-        const rgb = document.queryCommandValue?.("foreColor");
-        setActiveColor(swatchIdFromColor(rgb));
-      } catch { setActiveColor(null); }
       try {
         setIsBold(Boolean(document.queryCommandState?.("bold")));
         setIsItalic(Boolean(document.queryCommandState?.("italic")));
@@ -60,14 +40,6 @@ export default function EditorToolbar({ execStyle, onImageFileSelected, isUpload
 
   return (
     <Row className="editor-toolbar" style={{ top: navbarOffset }}>
-      <Col xs="auto" className="group">
-        <label htmlFor="note-font-size-select" className="group-label">大小</label>
-        <select id="note-font-size-select" onChange={(e) => execStyle("fontSize", e.target.value)} defaultValue="24px">
-          <option value="16px">小</option>
-          <option value="24px">中</option>
-          <option value="32px">大</option>
-        </select>
-      </Col>
       <Col xs="auto" className="group">
         {/* 原本用數學字母符號 𝐁 𝑰 當圖示，Noto Sans TC 沒有這些字形會顯示成方框（審查項 P3-27） */}
         <Button type="button" className="btn-ghost" aria-pressed={isBold} onClick={() => { execStyle("bold"); setIsBold(readCommandState("bold")); }} aria-label="粗體"><Bold size={18} aria-hidden="true" /></Button>
@@ -94,22 +66,6 @@ export default function EditorToolbar({ execStyle, onImageFileSelected, isUpload
         >
           <ImageIcon size={20} />{isUploadingImage ? "上傳中…" : "上傳圖片"}
         </Button>
-      </Col>
-      <Col xs="auto" className="group" role="group" aria-label="文字顏色">
-        {COLOR_SWATCHES.map((swatch) => (
-          <button
-            key={swatch.id}
-            type="button"
-            className="color-box"
-            style={{ "--swatch": swatch.value }}
-            aria-pressed={activeColor === swatch.id}
-            onClick={() => {
-              setActiveColor(swatch.id);
-              execStyle("foreColor", swatch.value);
-            }}
-            aria-label={`文字顏色：${swatch.label}`}
-          />
-        ))}
       </Col>
     </Row>
   );

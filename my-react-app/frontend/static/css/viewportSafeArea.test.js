@@ -50,8 +50,9 @@ describe("其他貼邊元件也避開瀏海", () => {
   it("離線橫幅的最大寬度扣掉左右內距", () => {
     expect(css("ui/offlineBanner.css")).toMatch(/max-width:\s*calc\(100vw - 32px - env\(safe-area-inset-left, 0px\) - env\(safe-area-inset-right, 0px\)\)/);
   });
-  it("筆記底部工具列左右都用 max(原內距, 瀏海內距)", () => {
+  it("筆記底部浮動操作列：浮在手機 tab bar（含安全區）上方 12px，寬度扣掉左右瀏海內距", () => {
     const toolbar = css("_note/toolbar.css");
-    expect(toolbar).toMatch(/padding:\s*10px max\(20px, env\(safe-area-inset-right, 0px\)\)[^;]*max\(20px, env\(safe-area-inset-left, 0px\)\)/);
+    expect(toolbar).toMatch(/bottom:\s*calc\(var\(--yy-tabbar-h, env\(safe-area-inset-bottom, 0px\)\) \+ 12px\)/);
+    expect(toolbar).toMatch(/max-width:\s*calc\(100vw - 24px - env\(safe-area-inset-left, 0px\) - env\(safe-area-inset-right, 0px\)\)/);
   });
 });
