@@ -996,3 +996,29 @@ describe("P5-5 / P5-6 分享區卡片與篩選列", () => {
     expect(css).toMatch(/\.ns-seg-input:focus-visible \+ \.ns-seg-label\s*\{[^}]*outline:/);
   });
 });
+
+describe("P6-2 手機浮動元件不互相重疊、不蓋底部導覽", () => {
+  const read = (f) => readFileSync(join(FRONTEND, f), "utf8");
+  const launcher = stripCss(read("static/css/_quiz/bot_launcher.css"));
+  it("AI 助手鈕手機縮成 44px 圓形，文字只留給報讀器（按鈕仍有 aria-label）", () => {
+    const m = launcher.match(/@media \(max-width: 600px\)\s*\{([\s\S]*)\}\s*$/m) || launcher.match(/@media \(max-width: 600px\)\s*\{([\s\S]*?)\n\}/);
+    expect(m).not.toBeNull();
+    expect(m[1]).toMatch(/\.bot-launcher\s*\{[^}]*width:\s*var\(--yy-control-md\)/);
+    expect(m[1]).toMatch(/\.bot-launcher-label\s*\{[^}]*clip-path:\s*inset\(50%\)/);
+    expect(read("components/_quiz/BotLauncher.jsx")).toMatch(/aria-label="開啟 AI 助手"/);
+  });
+  it("啟動鈕的位置 = 原本的 --bot-bottom（已含 tab bar）再加 --bot-launcher-lift；只有啟動鈕讓位，聊天視窗不動", () => {
+    expect(launcher).toMatch(/\.bot-launcher\s*\{[^}]*bottom:\s*calc\(var\(--bot-bottom,[^;]*\+ var\(--bot-launcher-lift, 0px\)\)/);
+    expect(launcher).toMatch(/html\[data-floating-bar\]\s*\{\s*--bot-launcher-lift:\s*calc\(var\(--note-toolbar-h, 64px\) \+ 12px\)/);
+    expect(stripCss(read("static/css/_quiz/bot.css"))).not.toMatch(/bot-launcher-lift/);
+  });
+  it("筆記底部操作列手機壓成單列：窄到放不下才換行，高度由 useFloatingBarHeight 量出", () => {
+    const tb = stripCss(read("static/css/_note/toolbar.css"));
+    expect(tb).toMatch(/@media \(max-width: 720px\)\s*\{\s*\.bottom-toolbar\s*\{[^}]*justify-content:\s*space-between/);
+    expect(tb).toMatch(/\.bottom-toolbar\s*\{[^}]*flex-wrap:\s*wrap/);
+    const jsx = read("src/_note/index.jsx");
+    expect(jsx).toMatch(/useFloatingBarHeight\(\)/);
+    // Bootstrap 的 gap-2 是 !important，會蓋掉窄螢幕較小的 gap，不能留在操作列上
+    expect(jsx).toMatch(/className="bottom-toolbar yy-glass mt-3 d-flex align-items-center flex-wrap"/);
+  });
+});

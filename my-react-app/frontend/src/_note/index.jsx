@@ -15,6 +15,7 @@ import { confirmAction } from "@components/ui/ConfirmDialog";
 import { EditorContent } from "@tiptap/react";
 import { useNotePages } from "./hooks/useNotePages";
 import { useNotesCloudSyncFlag } from "./hooks/useNotesCloudSyncFlag";
+import { useFloatingBarHeight } from "./hooks/useFloatingBarHeight";
 import { useCloudNoteSync } from "./hooks/useCloudNoteSync";
 import SyncStatus from "./components/SyncStatus";
 import { exportNoteAsHtml } from "./sync/exportNote";
@@ -40,6 +41,7 @@ function NotePage() {
   // 的 image 欄位（給 SharedNotesModeration 審核頁顯示縮圖用，見 noteService.jsx）。
   const [uploadedImageUrl, setUploadedImageUrl] = useState("");
   const sharingLockRef = useRef(false);
+  const bottomBarRef = useFloatingBarHeight();   // AI 助手鈕要浮在底部操作列上方（P6-2）
 
   // 雲端筆記同步（D-2）：由後台功能開關 notes_cloud_sync 控制，預設關閉。關閉時筆記完全維持
   // 原本只存在瀏覽器的行為，下面的同步 hook 什麼都不做。
@@ -284,7 +286,7 @@ function NotePage() {
       </Row>
 
       {/* 底部固定工具列：按鈕改新色系 */}
-      <div className="bottom-toolbar yy-glass mt-3 d-flex align-items-center gap-2 flex-wrap">
+      <div ref={bottomBarRef} className="bottom-toolbar yy-glass mt-3 d-flex align-items-center flex-wrap">
         {/* 主要動作只有「儲存」一顆實心銅褐；其餘外框；刪除是危險色外框（handleDelete 會先確認） */}
         <Button type="button" onClick={handleAdd} className="btn-add">新增</Button>
         <Button type="button" onClick={handleSave} className="btn-primary">儲存</Button>

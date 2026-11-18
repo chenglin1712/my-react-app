@@ -240,7 +240,7 @@ const FavoritePage = () => {
       ) : loadError ? (
         <div className="text-center py-5" role="alert">
           <p className="yy-text-danger">單字資料暫時載入失敗，請稍後再試。</p>
-          <Button type="button" variant="danger" onClick={() => setLoadAttempt(n => n + 1)}>重試</Button>
+          <Button type="button" variant="primary" onClick={() => setLoadAttempt(n => n + 1)}>重試</Button>
         </div>
       ) : (
         <>
@@ -248,7 +248,7 @@ const FavoritePage = () => {
             currentTab.content.length === 0 ? (
               <EmptyState
                 title="這個分類還沒有收藏的詞"
-                actions={<Link to="/search" className="btn btn-danger">去單詞查詢</Link>}
+                actions={<Link to="/search" className="btn btn-primary">去單詞查詢</Link>}
               >
                 <p>在單詞查詢找到喜歡的詞，點字卡旁的愛心就會收進來。</p>
               </EmptyState>
@@ -256,7 +256,7 @@ const FavoritePage = () => {
               <EmptyState
                 title="目前的條件下沒有符合的收藏"
                 actions={(hasSearchQuery || activeFilterParts.length > 0) ? (
-                  <Button type="button" variant="danger" onClick={clearFilters}>清除搜尋與篩選</Button>
+                  <Button type="button" variant="primary" onClick={clearFilters}>清除搜尋與篩選</Button>
                 ) : undefined}
               >
                 {(hasSearchQuery || activeFilterParts.length > 0) && (
@@ -293,7 +293,7 @@ const FavoritePage = () => {
           </div>
           {visibleCount < filteredWords.length && (
             <div className="text-center my-3">
-              <Button type="button" variant="outline-danger" className="yy-btn-touch" onClick={() => setVisibleCount(c => c + PAGE_SIZE)}>
+              <Button type="button" variant="outline-primary" className="yy-btn-touch" onClick={() => setVisibleCount(c => c + PAGE_SIZE)}>
                 載入更多（剩 {filteredWords.length - visibleCount} 筆）
               </Button>
             </div>
