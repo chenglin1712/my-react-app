@@ -1,7 +1,7 @@
 // @vitest-environment node
 //
 // viewport-fit=cover：頁面延伸到瀏海與底部橫條下，所以貼邊的元素要自己用 env(safe-area-inset-*) 避開。
-// 另外：頁尾兩字連結的點擊寬度。
+// 另外：頁尾兩字連結的點選寬度。
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,7 +32,7 @@ describe("viewport-fit=cover", () => {
   });
 });
 
-describe("頁尾連結的點擊區", () => {
+describe("頁尾連結的點選區", () => {
   it("高與寬都至少 44px（兩個字的連結寬度只有約 29px）", () => {
     const rule = theme.match(/\.yy-footer__links a\s*\{([^}]*)\}/)[1];
     expect(rule).toMatch(/min-height:\s*var\(--yy-control-md\)/);

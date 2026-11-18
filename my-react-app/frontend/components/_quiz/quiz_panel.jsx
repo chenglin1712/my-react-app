@@ -106,7 +106,7 @@ const Panel = ({ tribe = "tayal" }) => {
         );
     };
 
-    // 點擊提交——主畫面按鈕與側邊欄 AnswerBox 共用這一個函式（見 <AnswerBox
+    // 點選提交——主畫面按鈕與側邊欄 AnswerBox 共用這一個函式（見 <AnswerBox
     // onSubmit={handleSubmit}>）。原本 AnswerBox 自己有一份平行的、簡化過頭
     // 的送出邏輯：只彈確認框、清計時器、直接 navigate，完全沒有呼叫
     // uploadSituationDB／trackEvent，也沒有寫 sessionStorage fallback、沒有帶

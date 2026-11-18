@@ -63,7 +63,7 @@ export function useReviewableContentCrud({
     const actionLockRef = useRef(false);
     // openEdit 讀「待審修改」內容是唯讀查詢，不佔用上面那個鎖：使用者點錯列
     // 之後應該能立刻改點另一列，不需要等第一次查詢做完；改用 generation 只
-    // 接受最後一次點擊的回應。
+    // 接受最後一次點選的回應。
     const editRequestGenerationRef = useRef(0);
     // 審核者看到的待審修改版本（稽核 FLW-1）：核准／退件修改時要把它送回後端，編輯者在這之後
     // 又改了內容就會被擋下（409）。優先用審核者打開編輯視窗時看到的版本，沒有再用列表那一列帶的。

@@ -189,7 +189,7 @@ const ReviewAIAssistant = ({ tribe = "tayal" }) => {
                         <button
                             type="button"
                             className="review-retry"
-                            // 訊息整塊可點開放大；重試鈕自己的點擊與按鍵不能冒泡成「放大」
+                            // 訊息整塊可點開放大；重試鈕自己的點選與按鍵不能冒泡成「放大」
                             onClick={(e) => { e.stopPropagation(); handleRetry(); }}
                             onKeyDown={(e) => e.stopPropagation()}
                         >

@@ -88,7 +88,7 @@ describe('PageSidebar', () => {
         expect(shareButton).toHaveFocus();
     });
 
-    test('有選取時分享按鈕可用、沒有原因說明，點擊會送出', async () => {
+    test('有選取時分享按鈕可用、沒有原因說明，點選會送出', async () => {
         const user = userEvent.setup();
         const { props } = renderSidebar({ selectedPageIds: ['a'] });
         const shareButton = screen.getByRole('button', { name: '分享' });

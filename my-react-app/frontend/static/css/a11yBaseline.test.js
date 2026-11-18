@@ -1,6 +1,6 @@
 // B-5 全站無障礙基線的靜態檢查：
 // 1. 每個拿掉 outline 的規則都要有登記在案的替代焦點樣式（審查項 P2-97）
-// 2. 小圖示按鈕有 44px 點擊區（審查項 P2-96）
+// 2. 小圖示按鈕有 44px 點選區（審查項 P2-96）
 // 3. B-1／B-2 留下的全站按鈕污染與窄螢幕寬度
 // 後台（_admin 資料夾、檔名以 admin 開頭）用另一套樣式，留到階段 G。
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -77,7 +77,7 @@ describe("outline: none 一律要有替代的焦點樣式", () => {
   });
 });
 
-describe("小圖示按鈕的 44px 點擊區", () => {
+describe("小圖示按鈕的 44px 點選區", () => {
   it("--yy-control-md 是 44px，關閉鈕、收藏愛心用 ::after 往外擴到這個尺寸", () => {
     expect(theme).toMatch(/--yy-control-md:\s*44px/);
     const rule = rules(theme).find(
@@ -97,13 +97,13 @@ describe("小圖示按鈕的 44px 點擊區", () => {
     expect(all.find((r) => r.selector === `${selector}::after`).body).toMatch(/width:\s*max\(100%,\s*var\(--yy-control-md\)\)/);
   });
 
-  it("翻譯頁交換鈕本身就是 44px（步驟 4-3 起移到雙欄中間，不再靠 ::after 擴大點擊區）", () => {
+  it("翻譯頁交換鈕本身就是 44px（步驟 4-3 起移到雙欄中間，不再靠 ::after 擴大點選區）", () => {
     const swap = rules(files.find((f) => f.file === "_translate/index.css").css).find((r) => r.selector === ".translate-swap-btn");
     expect(swap.body).toMatch(/width:\s*var\(--yy-control-md\)/);
     expect(swap.body).toMatch(/height:\s*var\(--yy-control-md\)/);
   });
 
-  it("首頁輪播的左右箭頭本身就是 44px（S6-3 起不再靠 ::before 擴大點擊區，見 newsLook.test.js）", () => {
+  it("首頁輪播的左右箭頭本身就是 44px（S6-3 起不再靠 ::before 擴大點選區，見 newsLook.test.js）", () => {
     const all = rules(files.find((f) => f.file === "_home/news.css").css);
     const arrows = all.find((r) => r.selector.includes(".news-carousel .swiper-button-prev") && /width:/.test(r.body));
     expect(arrows.body).toMatch(/width:\s*var\(--yy-control-md\)/);
@@ -151,7 +151,7 @@ describe("B-6 測驗區：選中與已作答不只靠顏色，也不用低對比
     expect(rules(quiz).find((r) => r.selector === ".quiz-image-box.selected::after").body).toMatch(/content:\s*"✓"/);
   });
 
-  it("標星按鈕有 44px 點擊區", () => {
+  it("標星按鈕有 44px 點選區", () => {
     const rule = rules(quiz).find((r) => r.selector === ".star-btn");
     expect(rule.body).toMatch(/min-width:\s*var\(--yy-control-md\)/);
     expect(rule.body).toMatch(/min-height:\s*var\(--yy-control-md\)/);

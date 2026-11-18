@@ -27,7 +27,7 @@ export async function createAuthorizedAudio(url) {
   };
   audioEl.addEventListener("ended", revoke, { once: true });
   audioEl.addEventListener("error", revoke, { once: true });
-  // 呼叫端手動中斷播放去切下一首（例如快速連續點擊）時只會呼叫 pause()，
+  // 呼叫端手動中斷播放去切下一首（例如快速連續點選）時只會呼叫 pause()，
   // 不會觸發 ended/error，blob URL 不會被上面兩個監聽器釋放，長期下來會
   // 累積記憶體洩漏。呼叫端要自己在 pause() 的同時呼叫這個方法才會釋放。
   audioEl.revokeObjectUrl = revoke;

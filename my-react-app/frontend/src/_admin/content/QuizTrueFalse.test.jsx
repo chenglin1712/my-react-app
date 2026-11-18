@@ -320,7 +320,7 @@ describe('QuizTrueFalse', () => {
     ).not.toBeInTheDocument();
   });
 
-  test('點擊 published 編輯會先 GET pending-revision', async () => {
+  test('點選 published 編輯會先 GET pending-revision', async () => {
     mockRole = 'editor';
     mockApiGet({
       results: [{

@@ -5,7 +5,7 @@ import TrueFalseQuestion from './quiz_true_false_question';
 const QUESTION = { image: 'q.png' };
 
 describe('TrueFalseQuestion', () => {
-  test('點擊 O/X 會回報 1/2', () => {
+  test('點選 O/X 會回報 1/2', () => {
     const onSelect = vi.fn();
     render(<TrueFalseQuestion question={QUESTION} selected={null} onSelect={onSelect} />);
 

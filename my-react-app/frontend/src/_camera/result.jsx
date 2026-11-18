@@ -94,7 +94,7 @@ const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onResta
   }, [selectedWords, tribe, retryCount]);
 
   // playAudio 改用 _search 頁面共用的 hook：原本這裡自己維護一份 playAudio，
-  // 缺少 hook 版本後來補上的「取消上一次播放的請求」（避免快速連續點擊時舊音檔
+  // 缺少 hook 版本後來補上的「取消上一次播放的請求」（避免快速連續點選時舊音檔
   // 蓋掉新音檔）與「失敗音檔追蹤」（播放失敗過的 fileId 不再顯示播放鈕）。
   const { playAudio, failedAudio } = useAudioPlayback(tribe, setError);
 

@@ -148,7 +148,7 @@ describe("後台共用規則", () => {
     expect(css["_admin/layout.css"]).toMatch(/--admin-row-height:\s*52px/);
   });
 
-  it("批次操作列浮起：sticky 貼底，用 raised 陰影；篩選 chip 的移除鈕點擊區 44px", () => {
+  it("批次操作列浮起：sticky 貼底，用 raised 陰影；篩選 chip 的移除鈕點選區 44px", () => {
     const bar = find("_admin/admin-collection.css")(".admin-shell .admin-bulk-bar").body;
     expect(bar).toMatch(/position:\s*sticky/);
     expect(bar).toMatch(/box-shadow:\s*var\(--admin-shadow-raised\),\s*var\(--admin-edge-raised\)/);
@@ -162,7 +162,7 @@ describe("後台共用規則", () => {
     expect(find("_admin/admin-base.css")(".admin-modal--danger .modal-title").body).toMatch(/color:\s*var\(--yy-calm-danger\)/);
   });
 
-  it("觸控裝置的點擊區至少 44px", () => {
+  it("觸控裝置的點選區至少 44px", () => {
     const block = find("_admin/admin-base.css")(".admin-shell .rte-tool", /pointer:\s*coarse/) ?? rules["_admin/admin-base.css"].find((r) => r.atRules.some((a) => /pointer:\s*coarse/.test(a)) && /rte-tool/.test(r.selector));
     expect(block.body).toMatch(/width:\s*var\(--yy-control-md\)/);
     expect(block.body).toMatch(/height:\s*var\(--yy-control-md\)/);

@@ -50,7 +50,7 @@ describe('SentenceGame（回歸測試：跟 listening_game 一樣少了計時器
     expect(screen.queryByRole('button', { name: /聽例句發音/ })).not.toBeInTheDocument();
   }, 10000);
 
-  test('同一題快速連點兩個不同選項，只會記錄第一次點擊的答案', async () => {
+  test('同一題快速連點兩個不同選項，只會記錄第一次點選的答案', async () => {
     apiGet.mockResolvedValueOnce({ questions: QUESTIONS });
     const user = userEvent.setup();
     renderGame();

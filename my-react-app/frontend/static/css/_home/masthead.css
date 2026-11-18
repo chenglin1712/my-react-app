@@ -84,7 +84,7 @@
   transform: scale(var(--yy-ui-press));
 }
 
-/* 按鈕本身 32px（跑馬燈列的高度）；用透明 ::after 把點擊區擴成 44px，不改變外觀（階段 6-4，共用寫法見 passwordField.css） */
+/* 按鈕本身 32px（跑馬燈列的高度）；用透明 ::after 把點選區擴成 44px，不改變外觀（階段 6-4，共用寫法見 passwordField.css） */
 .home-ticker__toggle {
   position: relative;
 }

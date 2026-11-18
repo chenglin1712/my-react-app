@@ -117,7 +117,7 @@ describe("遊戲專區", () => {
   });
 
   it("整張卡片都點得到：覆蓋層偽元素只對 .gamehub-card 撐滿，頭部與標題不能設定位", () => {
-    // 偽元素 inset:0 是對最近的定位祖先撐滿；頭部若是 relative，點擊範圍會縮到頭部，
+    // 偽元素 inset:0 是對最近的定位祖先撐滿；頭部若是 relative，點選範圍會縮到頭部，
     // 按卡片下半部（含「選這個」）沒有反應
     expect(find("_game/index.css")(".gamehub-card").body).toMatch(/position:\s*relative/);
     expect(find("_game/index.css")(".gamehub-card-btn::after").body).toMatch(/position:\s*absolute/);

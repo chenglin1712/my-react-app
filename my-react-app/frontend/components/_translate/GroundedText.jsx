@@ -3,7 +3,7 @@ import "../../static/css/_translate/index.css";
 // 佐證檢核結果的逐詞渲染：headword/attested/derived 三層都算「有語料佐證」，
 // unsupported（含模型意外夾雜的中文字/數字等非拉丁字元內容）用波浪底線 +
 // 淡紅底色雙重標示（不只靠顏色，避免色盲使用者看不出差異）。punct 原樣顯示、
-// 不可點擊。
+// 不可點選。
 const STATUS_LABEL = {
     headword: "辭典詞條",
     attested: "見辭典例句",

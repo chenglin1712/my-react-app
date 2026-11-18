@@ -6,7 +6,7 @@ import Navbar from './navbar';
 vi.mock('react-router-dom', () => ({
   useLocation: () => ({ pathname: '/' }),
   // 導頁項目改用真正的 NavLink（FR-1）：測試用一個輕量的假 <a> 取代，
-  // 只需要能斷言 href／點擊後關閉選單這兩件事，不需要真的 React Router context。
+  // 只需要能斷言 href／點選後關閉選單這兩件事，不需要真的 React Router context。
   // jsdom 沒有實作真的頁面導覽，真的觸發 <a> 的預設行為會印出
   // "Not implemented: navigation to another Document" 噪音；preventDefault
   // 讓這個假元件單純模擬「不會真的換頁、但仍會呼叫 onClick」。
@@ -43,7 +43,7 @@ describe('Navbar navigation links', () => {
   test('mobile nav link closes the mobile menu on click', () => {
     render(<Navbar />);
     const mobileSearchLink = screen.getAllByText('單詞查詢')[1].closest('a');
-    // 點擊不應該拋出例外；onClick 會呼叫 setIsOpen(false) 收合手機選單。
+    // 點選不應該拋出例外；onClick 會呼叫 setIsOpen(false) 收合手機選單。
     expect(() => mobileSearchLink.click()).not.toThrow();
   });
 

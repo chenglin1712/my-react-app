@@ -15,7 +15,7 @@ describe('BotLauncher（P4-8：玻璃膠囊）', () => {
     expect(btn.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });
 
-  test('點擊呼叫 onClick；未登入不顯示', () => {
+  test('點選呼叫 onClick；未登入不顯示', () => {
     const onClick = vi.fn();
     auth.current = { userData: { firestoreData: {} } };
     const { unmount } = render(<BotLauncher onClick={onClick} />);

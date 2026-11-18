@@ -30,7 +30,7 @@
 }
 .admin-shell .admin-filter-chip-label::after { content: "："; }
 
-/* 視覺上是小叉，點擊區用負邊距撐到 44px（不把整顆 chip 撐高） */
+/* 視覺上是小叉，點選區用負邊距撐到 44px（不把整顆 chip 撐高） */
 .admin-shell .admin-filter-chip-remove {
   display: inline-flex;
   align-items: center;

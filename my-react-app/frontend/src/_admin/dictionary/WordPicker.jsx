@@ -202,9 +202,9 @@ export default function WordPicker({
                                  * mousedown 只 preventDefault，不在這裡選取：
                                  * 目的是在輸入框 blur 前先擋掉預設的焦點轉移，
                                  * 讓候選清單不會在 click 觸發前就被關掉。真正
-                                 * 的選取交給 onClick——這樣滑鼠點擊跟鍵盤
+                                 * 的選取交給 onClick——這樣滑鼠點選跟鍵盤
                                  * Enter/Space 觸發的合成 click 都能選到詞條；
-                                 * 如果選取邏輯放在 onMouseDown 裡，滑鼠點擊會
+                                 * 如果選取邏輯放在 onMouseDown 裡，滑鼠點選會
                                  * 因為 mousedown 後接著觸發的 click 而選取兩次，
                                  * 鍵盤操作則完全選不到（鍵盤啟用按鈕不會先發出
                                  * mousedown）。

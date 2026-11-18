@@ -161,7 +161,7 @@ describe('Panel + AnswerBox 提交流程整合（FR-4a：兩顆繳交按鈕必�
     expect(questionButton.querySelector('.answered-mark')).not.toBeNull();
   });
 
-  test('標星是 button：有名稱、aria-pressed 反映狀態，點擊會呼叫 handleStar 並念出結果（審查項 P1-3）', () => {
+  test('標星是 button：有名稱、aria-pressed 反映狀態，點選會呼叫 handleStar 並念出結果（審查項 P1-3）', () => {
     const handleStar = vi.fn();
     useQuizPanelData.mockReturnValue(baseHookState({ userStars: ['F'], handleStar }));
     render(<Panel tribe="tayal" />);

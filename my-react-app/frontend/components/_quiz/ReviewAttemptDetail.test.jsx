@@ -20,7 +20,7 @@ describe('ReviewAttemptDetail（回歸測試：原本詳情標題顯示題目建
     expect(screen.queryByText(/2020/)).not.toBeInTheDocument();
   });
 
-  test('點擊返回會呼叫 onBack', async () => {
+  test('點選返回會呼叫 onBack', async () => {
     const onBack = vi.fn();
     const user = userEvent.setup();
     render(<ReviewAttemptDetail quiz={{ title: 'x', answeredAt: makeTimestamp('2026-01-01') }} reviewQuestions={[]} onBack={onBack} onViewQuestion={vi.fn()} />);

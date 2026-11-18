@@ -53,7 +53,7 @@ describe('useAudioPlayback.playAudio 世代防呆', () => {
       playAPromise = result.current.playAudio('wordA');
     });
 
-    // B 在 A 還卡在網路請求時就被點擊，且先回來、先播放
+    // B 在 A 還卡在網路請求時就被點選，且先回來、先播放
     await act(async () => {
       await result.current.playAudio('wordB');
     });

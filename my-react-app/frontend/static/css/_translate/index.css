@@ -26,7 +26,7 @@
     margin-top: var(--yy-space-2);
 }
 
-/* 「了解更多」：說明裡的文字連結，自己的盒子就有 44px 高（點擊區與排版一致，不靠負 margin 去蓋到相鄰行） */
+/* 「了解更多」：說明裡的文字連結，自己的盒子就有 44px 高（點選區與排版一致，不靠負 margin 去蓋到相鄰行） */
 .translate-more {
     display: inline-flex;
     align-items: center;

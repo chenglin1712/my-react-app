@@ -5,7 +5,7 @@ import { timeAgo } from "../timeAgo";
 import { firstImageSrc, stripImages } from "../noteCover";
 
 /**
- * 分享筆記格線裡的單張卡片。整張卡片可點擊開啟詳情，但裡面還有一顆獨立的
+ * 分享筆記格線裡的單張卡片。整張卡片可點選開啟詳情，但裡面還有一顆獨立的
  * 讚按鈕——HTML 不允許 button 巢狀 button，所以「開啟詳情」跟「按讚」是兩顆
  * 平行的 button，不是外層 div 包內層 button（也讓整張卡片能用鍵盤操作）。
  */

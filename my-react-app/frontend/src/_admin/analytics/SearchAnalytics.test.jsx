@@ -190,7 +190,7 @@ describe('SearchAnalytics', () => {
     },
   );
 
-  test('點擊建立詞條草稿會用 prefillName state 導到新建詞條頁', async () => {
+  test('點選建立詞條草稿會用 prefillName state 導到新建詞條頁', async () => {
     renderPage();
 
     const button = await screen.findByRole('button', {

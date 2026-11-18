@@ -22,7 +22,7 @@ describe('ReviewAttemptList（回歸測試：同一份測驗被作答兩次以�
     expect(screen.getAllByRole('button', { name: '查看測驗' })).toHaveLength(2);
   });
 
-  test('點擊「查看測驗」會把整筆 situation 記錄回傳給呼叫端', async () => {
+  test('點選「查看測驗」會把整筆 situation 記錄回傳給呼叫端', async () => {
     const onViewAttempt = vi.fn();
     const user = userEvent.setup();
     const situation = { id: 'situation-1', quizId: 'quiz-A', quizType: '初級', answeredAt: makeTimestamp('2026-01-01'), results: [] };

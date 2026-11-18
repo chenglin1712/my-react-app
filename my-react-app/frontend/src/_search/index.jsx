@@ -128,7 +128,7 @@ const SearchPage = () => {
   // 快速切換族語/篩選條件時，比較慢的舊主查詢可能在新條件的結果顯示之後才回來；
   // requestGenerationRef 讓過期的回應（包含過期的「載入更多」）不再更新畫面。
   // loadingMoreLockRef 是另一件事——擋同一次主查詢底下「載入更多」被同時點兩下，
-  // 用 ref 而不是 state，兩次點擊在同一個 tick 內也擋得住。
+  // 用 ref 而不是 state，兩次點選在同一個 tick 內也擋得住。
   const requestGenerationRef = useRef(0);
   const loadingMoreLockRef = useRef(false);
   // 收藏超過後端單次上限（MAX_NAMES_PER_REQUEST）時，「只顯示收藏」改成分批查完、合併排序後放在這裡，

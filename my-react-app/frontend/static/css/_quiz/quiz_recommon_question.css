@@ -230,7 +230,7 @@
     transition: transform 0.15s ease, background-color 0.2s ease, color 0.2s ease;
   }
 
-  /* 手機點擊回饋動畫 */
+  /* 手機點選回饋動畫 */
   .custom-btn:active,
   .custom0-btn:active,
   .confirm-btn:active {

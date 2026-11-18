@@ -5,7 +5,7 @@ import ChoiceQuestion from './quiz_choice_question';
 const QUESTION = { imageA: 'a.png', imageB: 'b.png', imageC: 'c.png' };
 
 describe('ChoiceQuestion', () => {
-  test('三個選項都是可鍵盤操作的 button，點擊會回報對應的 1-based 索引', () => {
+  test('三個選項都是可鍵盤操作的 button，點選會回報對應的 1-based 索引', () => {
     const onSelect = vi.fn();
     render(<ChoiceQuestion question={QUESTION} selected={null} onSelect={onSelect} />);
 

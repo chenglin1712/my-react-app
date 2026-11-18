@@ -91,7 +91,7 @@ describe('UserCalendar (calendar_date) — FR-3 補齊的行事曆持久化', ()
     await waitFor(() => expect(screen.queryByText('看醫生')).not.toBeInTheDocument());
   });
 
-  test('內容包含「測驗」字樣的事件會顯示前往測驗按鈕，點擊導向 /quiz/select', async () => {
+  test('內容包含「測驗」字樣的事件會顯示前往測驗按鈕，點選導向 /quiz/select', async () => {
     getCalendar.mockResolvedValue([
       { id: 'evt-1', summary: '準備測驗', description: '', start: `${todayKey()}T00:00:00+08:00`, end: `${todayKey()}T00:30:00+08:00` },
     ]);

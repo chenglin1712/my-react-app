@@ -129,9 +129,9 @@ describe('EditProfile (editProfile)', () => {
   });
 
   test('大頭貼區塊是關聯到隱藏檔案輸入框的 label，滑鼠與鍵盤都能觸發', () => {
-    // 原本用可點擊 div + ref.click() 觸發隱藏 input，鍵盤使用者完全無法操作。
+    // 原本用可點選 div + ref.click() 觸發隱藏 input，鍵盤使用者完全無法操作。
     // 改用 <label htmlFor> 關聯輸入框（input 用 visually-hidden 而非
-    // display:none，Tab 才到得了），瀏覽器原生就會處理點擊與鍵盤觸發，
+    // display:none，Tab 才到得了），瀏覽器原生就會處理點選與鍵盤觸發，
     // 這裡驗證兩者的關聯是否正確，而不是重現瀏覽器原生的委派行為。
     const { container } = render(<EditProfile />);
     const label = container.querySelector('label.avatar-uploader');

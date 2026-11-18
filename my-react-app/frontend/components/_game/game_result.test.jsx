@@ -25,7 +25,7 @@ describe('Game_result（回歸測試：word_details 不是陣列時原本會直�
     expect(screen.getByText('沒有錯誤的單字。')).toBeInTheDocument();
   });
 
-  test('已收藏的單字顯示實心愛心，點擊會呼叫 toggleFavorite', async () => {
+  test('已收藏的單字顯示實心愛心，點選會呼叫 toggleFavorite', async () => {
     const toggleFavorite = vi.fn();
     useFavorites.mockReturnValue({
       favorites: [{ id: 1, content: ['balay'] }],

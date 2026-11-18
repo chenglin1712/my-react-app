@@ -119,7 +119,7 @@ describe('LoginForm', () => {
     });
 
     expect(screen.getByText('帳號或密碼錯誤，請檢查電子郵件和密碼是否正確')).toBeInTheDocument();
-    // 錯誤發生後按鈕仍可點擊，不會卡在無法重試的狀態
+    // 錯誤發生後按鈕仍可點選，不會卡在無法重試的狀態
     expect(screen.getByRole('button', { name: '登入' })).not.toBeDisabled();
   });
 

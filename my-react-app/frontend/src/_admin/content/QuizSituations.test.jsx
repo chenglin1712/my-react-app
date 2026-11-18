@@ -83,7 +83,7 @@ describe('QuizSituations', () => {
     });
   });
 
-  test('點擊正解圓形按鈕會切換 answer 索引', async () => {
+  test('點選正解圓形按鈕會切換 answer 索引', async () => {
     mockRole = 'editor';
     apiGet.mockResolvedValue({ results: [{ ...situationItem, status: 'draft' }], count: 1, page: 1, page_size: 20 });
     apiPatch.mockResolvedValueOnce({});

@@ -204,7 +204,7 @@ const DateReminder = () => {
                 <div className="toast-stack">
                     {toastList.map((toast) => (
                         // 每則提示各自是一個 status 區域（容器整個當 live region 的話，增減任何一則都會把其餘的再唸一遍）；
-                        // 退場中的提示 inert：不能再被聚焦或點擊，焦點不會留在即將卸載的按鈕上
+                        // 退場中的提示 inert：不能再被聚焦或點選，焦點不會留在即將卸載的按鈕上
                         <div className={`toast-notification${toast.leaving ? " is-leaving" : ""}`} key={toast.phase} role="status" aria-live="polite" inert={toast.leaving}>
                             <div className="toast-header">
                                 📢 {toast.phase} 今日開始！

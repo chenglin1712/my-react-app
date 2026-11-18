@@ -103,7 +103,7 @@ function NotePage() {
   const handleShare = async () => {
     // 快速連點「分享」可能在第一次的 Firestore 寫入還沒回來時就送出第二次，
     // 造成同一份內容被分享兩次；用 ref（不是 state）擋，避免同一個 tick 內
-    // 兩次點擊都讀到「還沒在分享中」的舊值。
+    // 兩次點選都讀到「還沒在分享中」的舊值。
     if (sharingLockRef.current) return;
     sharingLockRef.current = true;
     setIsSharing(true);

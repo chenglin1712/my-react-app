@@ -255,7 +255,7 @@ describe('SharedNotesModeration', () => {
         expect(apiGet).not.toHaveBeenCalled();
     });
 
-    test('下一頁按鈕依分頁資料啟用，點擊後查詢第二頁', async () => {
+    test('下一頁按鈕依分頁資料啟用，點選後查詢第二頁', async () => {
         apiGet.mockResolvedValue(
             mockNotesResponse({
                 count: 25,

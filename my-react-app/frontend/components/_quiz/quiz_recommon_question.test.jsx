@@ -175,7 +175,7 @@ describe('RecommendedQuizQuestion（FR-4b）', () => {
     fireEvent.click(screen.getByRole('button', { name: '作答' }));
     const nextButton = screen.getByRole('button', { name: '下一題' });
 
-    // 送出中按鈕應該被 disable，第二次點擊不會再觸發一次提交
+    // 送出中按鈕應該被 disable，第二次點選不會再觸發一次提交
     fireEvent.click(nextButton);
     fireEvent.click(nextButton);
     expect(apiPost).toHaveBeenCalledTimes(2); // 產生題目 1 次 + 提交答案 1 次

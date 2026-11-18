@@ -249,7 +249,7 @@ describe('QuizBank', () => {
     ).not.toBeInTheDocument();
   });
 
-  test('點擊 published 詞彙的編輯會先 GET pending-revision', async () => {
+  test('點選 published 詞彙的編輯會先 GET pending-revision', async () => {
     mockRole = 'editor';
     mockApiGet({
       vocabResults: [{ ...vocabItem, status: 'published' }],
@@ -713,7 +713,7 @@ describe('QuizBank', () => {
     ).toHaveValue('keep-me');
   });
 
-  test('點擊 published 克漏字編輯會先 GET revision，儲存時 POST revision', async () => {
+  test('點選 published 克漏字編輯會先 GET revision，儲存時 POST revision', async () => {
     mockRole = 'editor';
     mockApiGet({
       clozeResults: [{ ...clozeItem, status: 'published' }],

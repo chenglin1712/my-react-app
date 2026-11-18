@@ -392,7 +392,7 @@ def call_claude(client, *, feature: str, system: str | list, messages: list, uid
     output_schema：給 JSON Schema 時走結構化輸出（output_config.format），回應文字保證是
     符合 schema 的 JSON；與 effort 並存於同一個 output_config。
 
-    tools／tool_choice：用戶端工具的定義與選擇方式。回應可能是 stop_reason == "tool_use"，
+    tools／tool_choice：客戶端工具的定義與選擇方式。回應可能是 stop_reason == "tool_use"，
     由呼叫端執行工具後把結果放回 messages 再呼叫一次（見 AIModel/services.py 的工具迴圈）。
     Sonnet 5.5 不能強制指定某個工具，tool_choice 只用 auto（不傳）或 {"type": "none"}。
 

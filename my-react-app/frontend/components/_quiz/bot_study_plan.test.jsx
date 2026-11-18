@@ -44,7 +44,7 @@ describe('StudyPlan（回歸測試：加入行事曆原本完全是假的，只�
     expect(container).toBeEmptyDOMElement();
   });
 
-  test('點擊單一事件的「加入」會真的呼叫 addCalendarEvent，成功後顯示「已加入」', async () => {
+  test('點選單一事件的「加入」會真的呼叫 addCalendarEvent，成功後顯示「已加入」', async () => {
     addCalendarEvent.mockResolvedValue({ id: 'e1' });
     const user = userEvent.setup();
     renderWithRouter(<StudyPlan plan={PLAN} onClose={vi.fn()} />);
@@ -55,7 +55,7 @@ describe('StudyPlan（回歸測試：加入行事曆原本完全是假的，只�
     expect(await screen.findByText('已加入')).toBeInTheDocument();
   });
 
-  test('點擊「全部加入」只呼叫一次 addCalendarEvents（批次寫入），不是對每筆各自呼叫（回歸測試：原本用 Promise.all 平行呼叫 addCalendarEvent 會互相覆蓋遺失更新）', async () => {
+  test('點選「全部加入」只呼叫一次 addCalendarEvents（批次寫入），不是對每筆各自呼叫（回歸測試：原本用 Promise.all 平行呼叫 addCalendarEvent 會互相覆蓋遺失更新）', async () => {
     addCalendarEvents.mockResolvedValue([{ id: 'e1' }, { id: 'e2' }]);
     const user = userEvent.setup();
     renderWithRouter(<StudyPlan plan={PLAN} onClose={vi.fn()} />);

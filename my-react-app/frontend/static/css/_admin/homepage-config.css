@@ -16,7 +16,7 @@
 .homepage-config-uploader .form-text { display: block; margin-top: 10px; }
 .homepage-config-upload-status { display: inline-flex; align-items: center; gap: 7px; margin-top: 10px; color: var(--admin-muted); font-size: 14px; }
 .homepage-config-count { max-width: 320px; }
-/* 開關列：整列至少 44px 高，標籤可點擊；說明文字放在開關下方 */
+/* 開關列：整列至少 44px 高，標籤可點選；說明文字放在開關下方 */
 .homepage-config-switch { margin-bottom: 22px; padding: 12px 14px; background: var(--admin-surface-muted); border: 1px solid var(--admin-border); border-radius: var(--yy-radius-tag); }
 .homepage-config-switch .form-check { display: flex; align-items: center; gap: 12px; min-height: 44px; margin: 0; padding-left: 0; }
 .homepage-config-switch .form-check-input { flex: none; float: none; margin: 0; }

@@ -91,7 +91,7 @@ describe('BotResizeHandle', () => {
     expect(onCommit).toHaveBeenCalledWith({ w: 568, h: 620 });
   });
 
-  test('拖曳被系統取消：回到拖曳前的大小、不存、之後第一次點擊仍然有效', () => {
+  test('拖曳被系統取消：回到拖曳前的大小、不存、之後第一次點選仍然有效', () => {
     const { handle, onCommit, overlayRef } = setup({ w: 400, h: 620 });
     overlayRef.current.style.setProperty('--bot-w', '400px');
     fireEvent.pointerDown(handle, { button: 0, clientX: 1000, clientY: 300, pointerId: 1 });

@@ -2,7 +2,7 @@
 「Django 呼叫 FastAPI 內部端點」模式，但刻意不共用那支函式：
 dictionary_cache.py 的 invalidate_dictionary_cache() 是寫入觸發、
 fire-and-forget（吞例外、不回傳結果，因為呼叫端是辭典寫入流程，快取通知
-失敗不該讓使用者的寫入操作看起來失敗）；這裡是管理者主動點擊「清除」
+失敗不該讓使用者的寫入操作看起來失敗）；這裡是管理者主動點選「清除」
 按鈕，失敗與否正是這個操作唯一要回報的結果，不能吞掉。
 """
 import logging

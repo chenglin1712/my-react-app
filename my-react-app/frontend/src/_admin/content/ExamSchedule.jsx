@@ -190,7 +190,7 @@ export default function ExamSchedule() {
     });
 
     const failures = data.status?.consecutive_failures || 0;
-    // Modal 開著時背景表格會被 backdrop 擋住點擊，所以 Modal 開著期間唯一
+    // Modal 開著時背景表格會被 backdrop 擋住點選，所以 Modal 開著期間唯一
     // 可能持有這把鎖的操作就是這個 Modal 自己的送出——不需要比對 phase
     // 字串本身是否相符（新增覆寫時 newPhase 在送出後使用者仍可能繼續打字，
     // 比對字串反而不可靠）。

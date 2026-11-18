@@ -46,7 +46,7 @@ describe('Game_Start（回歸測試：提交時原本會意外觸發填字題目
     await waitFor(() => expect(screen.getByRole('button', { name: '完成' })).not.toBeDisabled());
   });
 
-  test('點擊「完成」提交時，不會讓填字題目重新產生一份新的（回歸測試：原本 gameDataLoaded 是每次 render 都換身分的 callback，setSubmitting 觸發的重新渲染會讓子元件重新抓題目）', async () => {
+  test('點選「完成」提交時，不會讓填字題目重新產生一份新的（回歸測試：原本 gameDataLoaded 是每次 render 都換身分的 callback，setSubmitting 觸發的重新渲染會讓子元件重新抓題目）', async () => {
     apiGet.mockResolvedValueOnce(VALID_RESPONSE);
     apiPost.mockResolvedValueOnce({ total_words: 1, correct_words_count: 1, word_details: [] });
     const user = await startGame();

@@ -21,7 +21,7 @@ import { playCorrectSound } from "../../utils/correctSound";
 import { announce } from "@utils/announce";
 
 const MOVE_ANIMATION_MS = 400;
-// 滑鼠與觸控要真的拖過這個距離才算拖曳；沒拖動就是點擊（移動單詞）
+// 滑鼠與觸控要真的拖過這個距離才算拖曳；沒拖動就是點選（移動單詞）
 const DRAG_ACTIVATION_DISTANCE_PX = 5;
 
 // 單個可排序單詞元件
@@ -160,7 +160,7 @@ export default function SentenceOrder({ question, _selected, checked, onSelect, 
     }
   };
 
-  // 點擊（或 Enter／Space）：把單詞在單詞庫與答案區之間移動
+  // 點選（或 Enter／Space）：把單詞在單詞庫與答案區之間移動
   // fromPointer=false 代表是鍵盤觸發：鍵盤動作會反覆做，不加移動動畫
   const handleClickWord = (id, fromPointer = true) => {
     if (checked) return;
