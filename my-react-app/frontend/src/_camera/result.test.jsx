@@ -106,7 +106,7 @@ describe('CameraResultStep', () => {
 
     render(<CameraResultStep selectedWords={['balay']} tribe="tayal" onRestart={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByText(/查詢失敗，請檢查網路後再試一次/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/查詢失敗，可能是網路不穩或伺服器忙碌，請稍後再試一次/)).toBeInTheDocument());
   });
 });
 

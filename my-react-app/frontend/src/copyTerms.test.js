@@ -26,35 +26,41 @@ function* walk(dir) {
 
 // 只留下「程式碼」那部分：去掉行尾註解、單行與跨行的區塊註解（含 JSX 的 {/* */}）。
 // 用一個小狀態機逐行處理，狀態 inBlock 表示目前在跨行的 /* ... */ 裡面。
-function codeLines(text) {
-  let inBlock = false;
-  return text.split(/\r?\n/).map((line) => {
-    let out = '';
-    let rest = line;
-    while (rest.length) {
-      if (inBlock) {
-        const end = rest.indexOf('*/');
-        if (end === -1) break;                       // 這一行剩下的都在註解裡
-        inBlock = false;
-        rest = rest.slice(end + 2);
-        continue;
-      }
-      const block = rest.indexOf('/*');
-      const lineComment = rest.search(/(^|\s)\/\//);
-      if (lineComment !== -1 && (block === -1 || lineComment < block)) {
-        out += rest.slice(0, lineComment);           // 行尾註解：之後都不算
-        break;
-      }
-      if (block === -1) {
-        out += rest;
-        break;
-      }
-      out += rest.slice(0, block);
-      inBlock = true;
-      rest = rest.slice(block + 2);
+export function codeLines(text) {
+  // 逐字元掃描並記住目前在哪種區段：字串（' " `）裡的 // 與 /* 不是註解，註解裡的引號也不是字串。
+  // 模板字串的 \${ } 內容視為字串的一部分（畫面文字也要檢查，不分裡外）。
+  let state = 'code';            // code | line | block | ' | " | `
+  const lines = [];
+  let out = '';
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (ch === '\r') continue;
+    if (ch === '\n') {
+      lines.push(out);
+      out = '';
+      if (state === 'line' || state === "'" || state === '"') state = 'code';   // 單行字串與行註解到行尾結束
+      continue;
     }
-    return out;
-  });
+    if (state === 'line') continue;
+    if (state === 'block') {
+      if (ch === '*' && next === '/') { state = 'code'; i += 1; }
+      continue;
+    }
+    if (state === 'code') {
+      if (ch === '/' && next === '/') { state = 'line'; i += 1; continue; }
+      if (ch === '/' && next === '*') { state = 'block'; i += 1; continue; }
+      if (ch === "'" || ch === '"' || ch === '`') state = ch;
+      out += ch;
+      continue;
+    }
+    // 在字串裡
+    out += ch;
+    if (ch === '\\') { if (next && next !== '\n') { out += next; i += 1; } continue; }
+    if (ch === state) state = 'code';
+  }
+  lines.push(out);
+  return lines;
 }
 
 describe('畫面文字的台灣用語（P6-5）', () => {
@@ -69,5 +75,23 @@ describe('畫面文字的台灣用語（P6-5）', () => {
       });
     }
     expect(hits).toEqual([]);
+  });
+});
+
+describe('copyTerms 的註解剝除', () => {
+  it('字串裡的 // 與 /* 不是註解；註解裡的內容不算', () => {
+    const src = [
+      'const a = "說明 // 點擊這裡";',
+      'doThing(); // 保存 在註解裡',
+      '/* 發送',
+      '   點擊 */ const b = "儲存";',
+      "const c = '網址 /* 保存';",
+    ].join('\n');
+    const out = codeLines(src).join('\n');
+    expect(out).toContain('點擊這裡');
+    expect(out).toContain('網址 /* 保存');
+    expect(out).not.toContain('在註解裡');
+    expect(out).not.toContain('發送');
+    expect(out).toContain('儲存');
   });
 });

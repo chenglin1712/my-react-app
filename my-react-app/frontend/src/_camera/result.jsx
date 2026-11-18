@@ -83,7 +83,7 @@ const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onResta
       })
       .catch(() => {
         if (myGeneration !== requestGenerationRef.current) return;
-        setError("查詢失敗，請檢查網路後再試一次。");
+        setError("查詢失敗，可能是網路不穩或伺服器忙碌，請稍後再試一次。");
         announce("查詢失敗", { assertive: true });
       })
       .finally(() => {

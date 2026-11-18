@@ -55,7 +55,7 @@ const Edit = () => {
                 updateUserData({ ...authUser, firestoreData: result.firestoreData });
                 navigate("/");
             } else {
-                setErrorMsg(`${result.message}，請修改後再試一次。`);
+                setErrorMsg(`${String(result.message || "更新失敗").replace(/[。！!，,\s]+$/u, "")}，請修改後再試一次。`);
             }
         } catch {
             setErrorMsg("更新失敗，請檢查網路後再試一次。");
