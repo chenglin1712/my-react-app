@@ -9,7 +9,8 @@ body:has(.offline-banner) {
 .bot-launcher {
     position: fixed;
     right: calc(20px + env(safe-area-inset-right, 0px));
-    bottom: var(--bot-bottom, calc(20px + env(safe-area-inset-bottom, 0px)));
+    /* --bot-launcher-lift：頁面上還有別的浮動列（筆記底部操作列）時，只讓這顆鈕往上讓位；聊天視窗不受影響 */
+    bottom: calc(var(--bot-bottom, calc(20px + env(safe-area-inset-bottom, 0px))) + var(--bot-launcher-lift, 0px));
     z-index: var(--yy-z-float);
     display: inline-flex;
     align-items: center;
@@ -48,10 +49,33 @@ body:has(.modal.show, .offcanvas.show, .modal-backdrop.show) .bot-launcher {
     transition: opacity var(--dur-fast) var(--ease-out), visibility 0s linear var(--dur-fast);
 }
 
+/* 筆記頁有浮動的底部操作列：啟動鈕浮在它上方（列高由 useFloatingBarHeight 量出，沒量到就先抓 64px）。
+   寬螢幕時操作列置中、啟動鈕在右邊，不會碰到，所以只在窄螢幕讓位。
+   用 <html> 上的 data-floating-bar 屬性判斷（useFloatingBarHeight 設的），不用 :has()：舊瀏覽器不支援 :has() 就會退化成重疊。 */
+@media (max-width: 900px) {
+    html[data-floating-bar] {
+        --bot-launcher-lift: calc(var(--note-toolbar-h, 64px) + 12px);
+    }
+}
+
+/* 手機（P6-2）：縮成 44px 圓形圖示，壓到的內容面積少一半；文字只留給報讀器（按鈕本身有 aria-label） */
 @media (max-width: 600px) {
     .bot-launcher {
         right: calc(14px + env(safe-area-inset-right, 0px));
-        bottom: var(--bot-bottom, calc(14px + env(safe-area-inset-bottom, 0px)));
+        bottom: calc(var(--bot-bottom, calc(14px + env(safe-area-inset-bottom, 0px))) + var(--bot-launcher-lift, 0px));
+        width: var(--yy-control-md);
+        padding: 0;
+        justify-content: center;
+        gap: 0;
+    }
+
+    .bot-launcher-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
     }
 }
 

@@ -1,8 +1,9 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from 'react-bootstrap';
-import { Heart, CirclePlay } from 'lucide-react';
+import { CirclePlay } from 'lucide-react';
 import StarRating from '../../../components/ui/StarRating';
 import AbstractCover from '../../../components/ui/AbstractCover';
+import FavoriteButton from '../../../components/ui/FavoriteButton';
 
 // 沒有圖片時的抽象封面：依單詞固定挑一個色調（同一個詞每次都一樣），清單看起來有變化但不閃動
 const placeholderTone = (word = '') => ([...String(word)].reduce((n, c) => n + c.charCodeAt(0), 0) % 4) + 1;
@@ -47,18 +48,18 @@ const WordCardImage = ({ imageUrl, word, isFavorited, onToggleFavorite }) => {
         />
       )}
 
-      <Button
-        type="button"
-        variant="link"
+      {/* 共用的收藏愛心（顏色走 token、aria-pressed、加入時彈跳），不再自己寫死紅與灰。
+          卡片正面整塊是「翻面」按鈕，所以點愛心不能冒泡出去。 */}
+      <FavoriteButton
+        name={word}
+        isFavorited={isFavorited}
+        size={16}
         className="favorite-btn"
-        aria-label={isFavorited ? "取消收藏" : "加入收藏"}
-        onClick={(e) => {
+        onToggle={(e) => {
           e.stopPropagation();
           onToggleFavorite();
         }}
-      >
-        <Heart size="1em" className="yy-icon" style={{ color: isFavorited ? "#dc2626" : "#6b7280" }} fill={isFavorited ? "currentColor" : "none"} aria-hidden="true" />
-      </Button>
+      />
     </div>
   );
 };
@@ -160,6 +161,8 @@ const WordCardWithImg = memo(({ word, result, keyName, isExpanded, toggleExpand,
 
   const handleToggleExpand = () => toggleExpand(keyName);
   const handleToggleExpandKeyDown = (e) => {
+    // 卡片裡還有愛心、播放鈕：焦點在它們身上按 Enter／空白，只該觸發它們自己，不能冒泡上來把卡片翻面
+    if (e.target !== e.currentTarget) return;
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       handleToggleExpand();

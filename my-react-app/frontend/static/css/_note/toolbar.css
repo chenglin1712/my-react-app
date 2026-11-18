@@ -70,13 +70,20 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 手機：維持一列（五顆鈕加頁碼會自動換行），不再疊成一直排佔掉半個畫面 */
+/* 手機（P6-2）：壓成緊湊的一列——按鈕少一點內距、間距縮小、滿版寬、兩端對齊；
+   真的太窄（約 360px 以下）放不下才換行，高度由 useFloatingBarHeight 量出來給 AI 助手鈕讓位 */
 @media (max-width: 720px) {
+  .bottom-toolbar {
+    width: auto;
+    justify-content: space-between;
+    gap: var(--yy-space-1);
+    padding: var(--yy-space-1);
+  }
   .note-page .bottom-toolbar button {
     min-width: var(--yy-control-md);
-    padding-inline: var(--yy-space-3);
+    padding-inline: var(--yy-space-1);
   }
-  .toolbar-page-info { min-width: 3em; }
+  .toolbar-page-info { min-width: 2.5em; }
 }
 
 @media (max-width: 720px) {

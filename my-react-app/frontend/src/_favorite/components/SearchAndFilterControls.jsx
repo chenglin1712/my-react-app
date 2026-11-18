@@ -23,7 +23,7 @@ const SearchAndFilterControls = ({ state, onStateChange, alphabet, isMobile, act
       />
       <Button
         type="button"
-        variant="danger"
+        variant="primary"
         aria-label="搜尋"
         onClick={() => onStateChange('activeQuery', state.inputValue)}
       >

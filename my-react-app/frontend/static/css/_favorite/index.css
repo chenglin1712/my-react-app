@@ -69,7 +69,9 @@
     color: var(--yy-calm-text-sub);
 }
 
-.word-card-front .favorite-btn {
+.word-card-front .favorite-btn.yy-fav-btn {
+    min-height: 0;
+    padding: 0;
     position: absolute;
     top: 8px;
     right: 8px;
