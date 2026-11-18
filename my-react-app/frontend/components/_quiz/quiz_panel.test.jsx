@@ -1,8 +1,12 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+// P6-4：結算、繳交、收藏這些地方會記一次學習活動，需要知道目前登入者（見 src/_learning/studyStreak.js）。
+vi.mock('../../src/userServives/authContext', () => ({ useAuth: () => ({ userData: { uid: 'test-uid' } }) }));
+
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import Panel from './quiz_panel';
 import { useQuizPanelData } from './useQuizPanelData';
 import { uploadSituationDB } from '../../src/userServives/uploadDb';
+import { readActivity } from '../../src/_learning/studyStreak';
 import { trackEvent } from '../../utils/apiClient';
 
 // 站內確認視窗（原本是瀏覽器原生 window.confirm）：測試直接替換成可控制回傳值的 mock
@@ -49,10 +53,13 @@ function baseHookState(overrides = {}) {
   };
 }
 
+const learningTotal = () => Object.values(readActivity('test-uid')).reduce((a, b) => a + b, 0);
+
 describe('Panel + AnswerBox 提交流程整合（FR-4a：兩顆繳交按鈕必須走同一條路）', () => {
   beforeEach(() => {
     mockNavigate.mockReset();
     uploadSituationDB.mockReset();
+    localStorage.clear();
     trackEvent.mockReset();
     confirmMock.mockResolvedValue(true);
     sessionStorage.clear();
@@ -75,6 +82,8 @@ describe('Panel + AnswerBox 提交流程整合（FR-4a：兩顆繳交按鈕必�
       state: { situationID: 'situation-1', fallback: expect.objectContaining({ tribe: 'tayal' }) },
     });
     expect(JSON.parse(sessionStorage.getItem('quizFallback')).tribe).toBe('tayal');
+    // P6-4：繳交一次算一次學習活動
+    expect(learningTotal()).toBe(1);
   });
 
   test('點側邊欄 AnswerBox 的「繳交試卷」跟主畫面走完全一樣的存檔流程（回歸測試：原本側邊欄會整個繞過存檔，直接 navigate）', async () => {
@@ -112,6 +121,7 @@ describe('Panel + AnswerBox 提交流程整合（FR-4a：兩顆繳交按鈕必�
     expect(container.textContent).toContain('還有 1 題尚未作答');
     expect(uploadSituationDB).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
+    expect(learningTotal()).toBe(0);   // 取消繳交不算
   });
 
   test('uploadSituationDB 失敗時仍會用 fallback 導頁，但會顯示錯誤提示（回歸測試：原本靜默失敗，使用者以為分數存好了）', async () => {
@@ -129,6 +139,7 @@ describe('Panel + AnswerBox 提交流程整合（FR-4a：兩顆繳交按鈕必�
     expect(mockNavigate).toHaveBeenCalledWith('/quiz/1/submit', {
       state: { situationID: undefined, fallback: expect.objectContaining({ saveFailed: true }) },
     });
+    expect(learningTotal()).toBe(1);   // 儲存失敗但確實作答完了，仍算一次
   });
 
   test('AnswerBox 的題號在尚未作答時不會顯示成已作答（回歸測試：原本用 !== undefined 判斷，null 也會被當成已作答）', () => {

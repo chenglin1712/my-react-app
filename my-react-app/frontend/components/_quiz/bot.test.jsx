@@ -232,7 +232,7 @@ describe('AIAssistantOverlay 每日提問額度與拒答（路線圖 #5、#6）'
 
     expect(await screen.findByText('今天的提問次數已用完，台灣時間 00:00重置。')).toBeInTheDocument();
     expect(screen.getByLabelText('輸入訊息')).toHaveAttribute('placeholder', '今天的提問次數已用完');
-    expect(screen.getByRole('button', { name: '發送' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: '傳送' })).toHaveAttribute('aria-disabled', 'true');
 
     await user.type(screen.getByLabelText('輸入訊息'), '還想問{Enter}');
     expect(apiPost).not.toHaveBeenCalled();
@@ -253,7 +253,7 @@ describe('AIAssistantOverlay 每日提問額度與拒答（路線圖 #5、#6）'
     // 對話紀錄裡一則、輸入區上方一行，說的是同一件事
     expect((await screen.findAllByText('今天的提問次數已用完，台灣時間 00:00重置。')).length).toBe(2);
     expect(screen.queryByText('很抱歉，無法取得回應，請稍後再試。')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '發送' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: '傳送' })).toHaveAttribute('aria-disabled', 'true');
     consoleErrorSpy.mockRestore();
   });
 
@@ -357,7 +357,7 @@ describe('AIAssistantOverlay 串流回覆（路線圖 #9）', () => {
     render(<AIAssistantOverlay onClose={vi.fn()} />);
 
     await user.type(screen.getByLabelText('輸入訊息'), '你好{Enter}');
-    expect(screen.queryByRole('button', { name: '發送' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '傳送' })).not.toBeInTheDocument();
     control.onDelta('說到一半');
     await screen.findByText('說到一半');
 
@@ -367,7 +367,7 @@ describe('AIAssistantOverlay 串流回覆（路線圖 #9）', () => {
     expect(await screen.findByText('已停止回覆')).toBeInTheDocument();
     expect(screen.getByLabelText('輸入訊息')).toHaveFocus();      // 停止鈕被換掉後焦點不會掉到頁面最上面
     expect(screen.getByText('說到一半')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '發送' })).toBeInTheDocument(); // 按鈕換回來
+    expect(screen.getByRole('button', { name: '傳送' })).toBeInTheDocument(); // 按鈕換回來
     expect(screen.getByRole('button', { name: '重試' })).toBeInTheDocument();
   });
 
@@ -826,7 +826,7 @@ describe('AIAssistantOverlay 無障礙（審查項 P1-5、P1-6）', () => {
     const user = userEvent.setup();
     render(<AIAssistantOverlay onClose={vi.fn()} />);
     await user.type(screen.getByLabelText('輸入訊息'), '你好');
-    await user.click(screen.getByRole('button', { name: '發送' }));
+    await user.click(screen.getByRole('button', { name: '傳送' }));
     expect(await screen.findByText('好的')).toBeInTheDocument();
     expect(screen.getByLabelText('輸入訊息')).toHaveFocus();
   });

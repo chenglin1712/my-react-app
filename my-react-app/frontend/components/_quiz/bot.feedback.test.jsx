@@ -21,7 +21,7 @@ const ask = async (feedback) => {
   render(<AIAssistantOverlay onClose={vi.fn()} />);
   await screen.findByText(/今天還可以問/);
   await user.type(screen.getByRole('textbox'), 'lokah 是什麼意思？');
-  await user.click(screen.getByRole('button', { name: '發送' }));
+  await user.click(screen.getByRole('button', { name: '傳送' }));
   await screen.findByText('是你好的意思。');
   return user;
 };

@@ -8,6 +8,7 @@ import EmptyState from "@components/ui/EmptyState";
 import { REPORT_ALREADY_OR_DENIED, submitReport } from "../userServives/reportService";
 import { useSharedNotesPager } from "./hooks/useSharedNotesPager";
 import { useToast } from "./hooks/useToast";
+import { usePullToRefresh } from "./hooks/usePullToRefresh";
 import { announce } from "@utils/announce";
 import NoteCard from "./components/NoteCard";
 import NoteModal from "./components/NoteModal";
@@ -35,6 +36,8 @@ export default function NoteShare() {
     goToPage, refresh, updateCurrentPageCache, decrementTotalCount,
   } = useSharedNotesPager(filter, myUid);
   const { toast, showToast } = useToast();
+  // 手機下拉重新整理（P6-3）。每個手勢都有按鈕備援：工具列上的「重新整理」鈕一直都在。
+  const pullToRefresh = usePullToRefresh(refresh, { enabled: !showModal });
 
   const redirectTimerRef = useRef(null);
   // 開 Modal（點卡片、或從 /note/share/:id 這種分享連結進來）可能重疊——
@@ -204,7 +207,16 @@ export default function NoteShare() {
   }, [id]);
 
   return (
-    <div className="yy-page">
+    <div className="yy-page ns-page">
+    {/* 下拉指示（P6-3）：純視覺，所以 aria-hidden——這個手勢的無障礙路徑是工具列上一直都在的「重新整理」按鈕。
+        拉到門檻前顯示「下拉重新整理」，到了顯示「放開即可重新整理」；位置用 transform，減少動態時不位移。 */}
+    <div
+      className={`ns-pull${pullToRefresh.state === "idle" ? "" : " is-active"}${pullToRefresh.state === "ready" ? " is-ready" : ""}`}
+      style={{ "--ns-pull": `${pullToRefresh.pull}px` }}
+      aria-hidden="true"
+    >
+      {pullToRefresh.state === "ready" ? "放開即可重新整理" : pullToRefresh.state === "pulling" ? "下拉重新整理" : ""}
+    </div>
     <div className="note-hero yy-fade-up">
       <h1 className="note-hero-title">筆記分享區</h1>
       <TabSwitch

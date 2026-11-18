@@ -18,7 +18,7 @@ const PermissionProtect = () => {
                         <span /><span /><span />
                     </div>
                     <h1 className="permission-title">請先登入才可使用「{featureName}」</h1>
-                    <p className="permission-text">登入後才能保存你的學習紀錄、收藏與筆記。還沒有帳號可以免費註冊，也可以先回首頁逛逛。</p>
+                    <p className="permission-text">登入後才能儲存你的學習紀錄、收藏與筆記。還沒有帳號可以免費註冊，也可以先回首頁逛逛。</p>
                     <div className="permission-actions">
                         <Link to="/login" className="yy-btn-primary permission-link">前往登入</Link>
                         <Link to="/register" className="yy-btn-outline permission-link">註冊帳號</Link>

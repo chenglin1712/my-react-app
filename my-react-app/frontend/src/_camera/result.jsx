@@ -81,9 +81,9 @@ const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onResta
         const count = countMatchedWords(data.exact_match_results, data.fuzzy_match_results);
         announce(count > 0 ? `找到 ${count} 筆結果` : "沒有找到符合的詞");
       })
-      .catch(err => {
+      .catch(() => {
         if (myGeneration !== requestGenerationRef.current) return;
-        setError("查詢失敗: " + err.message);
+        setError("查詢失敗，請檢查網路後再試一次。");
         announce("查詢失敗", { assertive: true });
       })
       .finally(() => {

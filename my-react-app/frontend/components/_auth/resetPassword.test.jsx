@@ -52,7 +52,7 @@ describe('ResetPassword (resetPassword)', () => {
     ['auth/wrong-password', '密碼錯誤，請再試一次。'],
     ['auth/invalid-credential', '密碼錯誤，請再試一次。'],
     ['auth/weak-password', '新密碼強度不足，請使用至少 6 個字元。'],
-    ['auth/unknown', '密碼更新失敗'],
+    ['auth/unknown', '密碼更新失敗，請稍後再試，或重新申請重設連結。'],
   ])('重新驗證失敗代碼 %s 顯示對應錯誤訊息，且不會卡住', async (code, expectedMessage) => {
     const fakeUser = { email: 'a@b.com' };
     getAuth.mockReturnValue({ currentUser: fakeUser });

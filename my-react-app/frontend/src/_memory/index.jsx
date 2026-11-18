@@ -255,7 +255,7 @@ export default function LearnerMemoryPage() {
                             <>
                                 <label className="memory-check">
                                     <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-                                    <span>我已看過說明，同意讓 AI 助手保存我的學習記憶</span>
+                                    <span>我已看過說明，同意讓 AI 助手儲存我的學習記憶</span>
                                 </label>
                                 <button
                                     type="button"

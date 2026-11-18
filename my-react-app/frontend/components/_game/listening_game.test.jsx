@@ -1,4 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+// P6-4：結算、繳交、收藏這些地方會記一次學習活動，需要知道目前登入者（見 src/_learning/studyStreak.js）。
+vi.mock('../../src/userServives/authContext', () => ({ useAuth: () => ({ userData: { uid: 'test-uid' } }) }));
+
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';

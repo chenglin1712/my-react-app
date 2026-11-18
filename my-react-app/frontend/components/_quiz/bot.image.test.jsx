@@ -80,7 +80,7 @@ describe('AIAssistantOverlay 圖片提問（路線圖 #24）', () => {
     await chooseFile(user);
     await screen.findByAltText('準備送出的圖片預覽');
 
-    await user.click(screen.getByRole('button', { name: '發送' }));
+    await user.click(screen.getByRole('button', { name: '傳送' }));
 
     expect(await screen.findByText('這是 lokah，辨識不確定。')).toBeInTheDocument();
     const body = apiPost.mock.calls[0][1];
@@ -115,7 +115,7 @@ describe('AIAssistantOverlay 圖片提問（路線圖 #24）', () => {
     const user = userEvent.setup();
     await openWithImages();
     await chooseFile(user);
-    await user.click(screen.getByRole('button', { name: '發送' }));
+    await user.click(screen.getByRole('button', { name: '傳送' }));
 
     const log = await screen.findByRole('log', { name: '對話紀錄' });
     await waitFor(() => expect(within(log).getByText(expected)).toBeInTheDocument());
@@ -134,7 +134,7 @@ describe('AIAssistantOverlay 圖片提問（路線圖 #24）', () => {
     const user = userEvent.setup();
     await openWithImages();
     await chooseFile(user);
-    await user.click(screen.getByRole('button', { name: '發送' }));
+    await user.click(screen.getByRole('button', { name: '傳送' }));
     await screen.findByText(/圖片提問目前沒有開放/);
 
     await user.type(screen.getByLabelText('輸入訊息'), '改用文字問{Enter}');
@@ -148,7 +148,7 @@ describe('AIAssistantOverlay 圖片提問（路線圖 #24）', () => {
     const user = userEvent.setup();
     const { unmount } = await openWithImages();
     await chooseFile(user);
-    await user.click(screen.getByRole('button', { name: '發送' }));
+    await user.click(screen.getByRole('button', { name: '傳送' }));
     await screen.findByText(/這張圖片無法使用/);
 
     await user.click(screen.getByRole('button', { name: '移除圖片' }));
@@ -165,7 +165,7 @@ describe('AIAssistantOverlay 圖片提問（路線圖 #24）', () => {
     const user = userEvent.setup();
     await openWithImages();
     await chooseFile(user);
-    await user.click(screen.getByRole('button', { name: '發送' }));
+    await user.click(screen.getByRole('button', { name: '傳送' }));
 
     expect(screen.getByRole('button', { name: '拍照或選擇圖片' })).toHaveAttribute('aria-disabled', 'true');
     finish({ message: 'done' });

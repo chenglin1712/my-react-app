@@ -915,7 +915,7 @@ const AIAssistantOverlay = ({ onClose, open = true, returnFocusRef = null }) => 
                             onClick={handleSend}
                             aria-disabled={(input.trim() === "" && !attachment) || isPending || attachBusy || quotaUsedUp}
                         >
-                            發送
+                            傳送
                         </button>
                     )}
                 </ChatComposer>

@@ -281,3 +281,32 @@
 @media (prefers-reduced-motion: reduce) and (hover: hover) and (pointer: fine) {
   .ns-card:hover { transform: none; }
 }
+
+/* ── 手機下拉重新整理（P6-3）────────────────────
+   頁面自己處理下拉；關掉瀏覽器內建下拉的 overscroll-behavior 由 usePullToRefresh 設在 <html> 上。
+   指示器固定在導覽列下面，位置只用 transform 表示拉了多遠；減少動態時不位移，只剩文字。 */
+
+.ns-pull {
+  position: fixed;
+  top: calc(var(--yy-nav-h, 64px) + var(--yy-space-2));
+  left: 50%;
+  z-index: var(--yy-z-dropdown);   /* 要在導覽列（nav）之上，不然拉的時候上緣會被蓋住 */
+  padding: var(--yy-space-1) var(--yy-space-4);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-radius-pill);
+  background: var(--yy-calm-surface);
+  color: var(--yy-calm-text);
+  font-size: var(--yy-text-sm);
+  font-weight: 700;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, calc(var(--ns-pull, 0px) - 100%));
+}
+
+.ns-pull.is-active { opacity: 1; }
+.ns-pull.is-ready { background: var(--yy-calm-info-bg); border-color: var(--yy-calm-accent); }
+.ns-pull:empty { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ns-pull { transform: translate(-50%, 0); }
+}

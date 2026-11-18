@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Alert, Container, Button, Dropdown } from 'react-bootstrap';
 import { Link, useLocation } from 'react-router-dom';
 import { useFavorites } from "../../src/userServives/useFavorites";
+import { useAuth } from "../../src/userServives/authContext";
 import ErrorBoundary from "../errorBoundary";
 import { TRIBES as TRIBE_LIST, TRIBE_NAMES as TRIBES } from "../constants/tribes";
 import { apiPost } from "../../utils/apiClient";
@@ -12,6 +13,7 @@ import { filterFavoriteWords } from "./filterFavoriteWords";
 import { chunkNames, collectFavoriteNames } from "./favoriteNames";
 import WordCardWithImg from "./components/WordCardWithImg";
 import SearchAndFilterControls from "./components/SearchAndFilterControls";
+import StudyStreakCard from "../_learning/StudyStreakCard";
 import EmptyState from "@components/ui/EmptyState";
 import LoadingSpinner from "@components/ui/LoadingSpinner";
 import { describeActiveFilters } from "@utils/wordFilterState";
@@ -30,6 +32,8 @@ const FavoritePage = () => {
   // /favorite 已經在 route.jsx 的 <ProtectedLayout> 底下，未登入會由它統一導去
   // PermissionProtect，這裡不需要再重複判斷一次登入狀態。
   const { favorites, toggleFavorite, error: favoritesError } = useFavorites();
+  const { userData } = useAuth();
+  const uid = userData?.uid || null;
   const [activeTab, setActiveTab] = useState(1);
   const [allWords, setAllWords] = useState([]);
   const [expandedWord, setExpandedWord] = useState(null);
@@ -192,6 +196,7 @@ const FavoritePage = () => {
       </div>
     </section>
     <Container className="p-2 word-library-container">
+      <StudyStreakCard uid={uid} />
       {/* 頁首不再 sticky：原本 top:0 會被 z-index 1000 的全站導覽列蓋住（審查項 P1-14），改成隨內容捲走，跟辭典頁一致 */}
       <div className="favorite-controls">
         <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
