@@ -5,6 +5,8 @@ import { apiPost } from '../../utils/apiClient';
 import { loadQuizModel, saveQuizModel } from './quizModelService';
 
 const mockNavigate = vi.fn();
+const mockConfirm = vi.hoisted(() => vi.fn());
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: mockConfirm }));
 let mockLocationState = null;
 vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
@@ -72,6 +74,27 @@ describe('RecommendedQuizQuestion（FR-4b）', () => {
     saveQuizModel.mockReset();
     loadQuizModel.mockResolvedValue({});
     saveQuizModel.mockResolvedValue();
+  });
+
+  test('P4-10：題目載入後進入專注模式（收起導覽與側欄），離開時還原；「離開測驗」是出口，要先確認', async () => {
+    apiPost.mockResolvedValue(generateResponse([{ id: 'q1', type: 'sentence-fill', payload: {}, difficulty: 1, meta: {} }]));
+    mockConfirm.mockReset();
+    const { unmount } = render(<RecommendedQuizQuestion tribe="tayal" />);
+    expect(document.documentElement).not.toHaveAttribute('data-quiz-focus');   // 載入中：導覽要留著
+    await screen.findByRole('button', { name: '作答' });
+    expect(document.documentElement).toHaveAttribute('data-quiz-focus');
+
+    mockConfirm.mockResolvedValueOnce(false);
+    fireEvent.click(screen.getByRole('button', { name: '離開測驗' }));
+    await waitFor(() => expect(mockConfirm).toHaveBeenCalledTimes(1));
+    expect(mockNavigate).not.toHaveBeenCalled();                               // 選「繼續作答」：留在原地
+
+    mockConfirm.mockResolvedValueOnce(true);
+    fireEvent.click(screen.getByRole('button', { name: '離開測驗' }));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('..'));
+
+    unmount();
+    expect(document.documentElement).not.toHaveAttribute('data-quiz-focus');
   });
 
   test('P4-9：一般開始測驗不帶 focus_rule；從結果頁「練這條」進來才帶指定的詞綴', async () => {
@@ -320,5 +343,13 @@ describe('RecommendedQuizQuestion 的登入狀態', () => {
     expect(screen.getByText(/題目載入中/)).toBeInTheDocument();
     expect(screen.queryByText('請先登入後再開始測驗。')).not.toBeInTheDocument();
     expect(apiPost).not.toHaveBeenCalled();
+  });
+});
+
+describe('P4-10：進階測驗要自己載入專注模式的樣式', () => {
+  test('quiz_recommon_question.jsx 有 import quiz_focus.css（只靠基礎測驗載入的話，直接進進階測驗時導覽不會收起）', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync('frontend/components/_quiz/quiz_recommon_question.jsx', 'utf8');   // vitest 從專案根目錄執行
+    expect(src).toMatch(/import\s+"\.\.\/\.\.\/static\/css\/_quiz\/quiz_focus\.css"/);
   });
 });

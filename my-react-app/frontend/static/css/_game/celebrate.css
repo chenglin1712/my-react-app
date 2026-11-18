@@ -46,8 +46,7 @@
 }
 
 /* 分數數字用彈簧彈一下（只做一次） */
-.is-celebrating .listening-result-num,
-.is-celebrating .sent-result-num {
+.is-celebrating .game-result-ring-num {
   display: inline-block;
   animation: game-score-pop var(--dur-spring) var(--ease-spring) both;
 }
@@ -66,8 +65,7 @@
     display: none;
   }
 
-  .is-celebrating .listening-result-num,
-  .is-celebrating .sent-result-num {
+  .is-celebrating .game-result-ring-num {
     animation: none;
   }
 }

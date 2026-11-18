@@ -10,17 +10,8 @@ import GameIntro from "./GameIntro";
 import CelebrationBurst from "./CelebrationBurst";
 import { shouldCelebrate } from "./celebrate";
 import GameResultRecorder from "./GameResultRecorder";
+import GameResultSummary from "./GameResultSummary";
 import { apiUrl } from "../../utils/apiUrls";
-
-const RATING_THRESHOLDS = [
-  { min: 80, className: "excellent" },
-  { min: 60, className: "good" },
-  { min: 40, className: "fair" },
-];
-
-function getRatingClass(pct) {
-  return RATING_THRESHOLDS.find((r) => pct >= r.min)?.className ?? "poor";
-}
 
 function SentenceGame({ tribe = "tayal" }) {
   const config = TRIBE_INTRO[tribe] || TRIBE_INTRO.tayal;
@@ -174,18 +165,16 @@ function SentenceGame({ tribe = "tayal" }) {
     const score = answers.filter((a) => a.isCorrect).length;
     const total = answers.length;
     const pct   = total > 0 ? Math.round((score / total) * 100) : 0;
-    const ratingCls = getRatingClass(pct);
 
     return (
       <div className="sent-result">
         <GameResultRecorder gameId="sentence" tribe={tribe} pct={pct} />
         <h2 className="sent-result-title">句型練習結果</h2>
 
-        <div className={`sent-result-score ${ratingCls}${shouldCelebrate(pct) ? " is-celebrating" : ""}`}>
-          {shouldCelebrate(pct) && <CelebrationBurst />}
-          <span className="sent-result-num">{score}</span>
-          <span className="sent-result-denom"> / {total}</span>
-          <p className="sent-result-pct">{pct}%</p>
+        <div className={`game-result-burst-anchor${shouldCelebrate(pct) ? " is-celebrating" : ""}`}>
+        {shouldCelebrate(pct) && <CelebrationBurst />}
+        {/* 句子不是單字，不進單字收藏：句型只提供結果與再練一次（reviewWords 不傳） */}
+        <GameResultSummary storageKey="yy.game.sentence.lastResult" pct={pct} correct={score} total={total} />
         </div>
 
         <div className="sent-result-list">

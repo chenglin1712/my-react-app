@@ -129,6 +129,54 @@ describe('Game_crossword_board 的鍵盤操作（E-5，P1-13）', () => {
     expect(cell('第 1 列第 3 欄')).toHaveFocus();
   });
 
+  test('P4-10：點縱向題的格子，打字往下走，不會跳到右邊別題的格子', async () => {
+    apiGet.mockResolvedValue({
+      grid_solution: ['a-b', 'c-d', 'e-f'],
+      legend: [
+        { number: 1, direction: 'down', start_row: 1, start_col: 1, clue: '縱一' },
+        { number: 2, direction: 'down', start_row: 1, start_col: 3, clue: '縱二' },
+      ],
+      grid_display: ['1 2', '   ', '   '],
+    });
+    const user = userEvent.setup();
+    render(<Game_crossword_board tribe="tayal" />);
+    await screen.findByText('縱向題目');
+    await user.click(cell('第 1 列第 1 欄'));
+    await user.keyboard('a');
+    expect(cell('第 2 列第 1 欄')).toHaveFocus();
+    await user.keyboard('c');
+    expect(cell('第 3 列第 1 欄')).toHaveFocus();
+    await user.keyboard('e');
+    expect(cell('第 3 列第 1 欄')).toHaveFocus();   // 這題的最後一格：停住，不跳到別題
+  });
+
+  test('P4-10：橫向題打到黑格前就停，不跳過黑格', async () => {
+    apiGet.mockResolvedValue({
+      grid_solution: ['ab-cd'],
+      legend: [
+        { number: 1, direction: 'across', start_row: 1, start_col: 1, clue: '橫一' },
+        { number: 2, direction: 'across', start_row: 1, start_col: 4, clue: '橫二' },
+      ],
+      grid_display: ['1  2 '],
+    });
+    const user = userEvent.setup();
+    render(<Game_crossword_board tribe="tayal" />);
+    await screen.findByText('橫向題目');
+    await user.click(cell('第 1 列第 1 欄'));
+    await user.keyboard('ab');
+    expect(cell('第 1 列第 2 欄')).toHaveFocus();
+  });
+
+  test('P4-10：兩個方向都有題的格子，再點一次同一格就切換輸入方向', async () => {
+    const user = userEvent.setup();
+    render(<Game_crossword_board tribe="tayal" />);
+    await screen.findByText('橫向題目');
+    await user.click(cell('第 1 列第 1 欄'));      // 預設橫向
+    await user.click(cell('第 1 列第 1 欄'));      // 再點：改成縱向
+    await user.keyboard('a');
+    expect(cell('第 2 列第 1 欄')).toHaveFocus();
+  });
+
   test('空格按退格會回到上一格並清掉它', async () => {
     const user = userEvent.setup();
     render(<Game_crossword_board tribe="tayal" />);

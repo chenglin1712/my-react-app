@@ -66,6 +66,8 @@ const Game_crossword_board = forwardRef(({ tribe, disabled, onReadyChange }, ref
   const cellRefs = useRef({});
   // 目前輸入的方向：打完一個字往這個方向跳到下一格；按方向鍵時會跟著改
   const directionRef = useRef("across");
+  // 上一次點的格子：再點同一格（這格橫向、縱向都有題）時切換方向，跟一般填字遊戲一樣
+  const lastClickRef = useRef(null);
 
   const rows = useMemo(
     () => (crosswordData ? crosswordData.grid_solution.map((row) => row.replace(/\s/g, "")) : []),
@@ -98,6 +100,23 @@ const Game_crossword_board = forwardRef(({ tribe, disabled, onReadyChange }, ref
     return null;
   };
 
+  // 進到一格時，輸入方向要跟著這格屬於哪一題：這格只有縱向題就改成縱向（原本方向固定橫向，
+  // 在縱向題的格子打字會跳去右邊別題的格子）。兩個方向都有就維持目前方向。
+  const syncDirectionToCell = (rowIndex, colIndex) => {
+    const clues = cellClues.get(`${rowIndex}-${colIndex}`);
+    if (!clues || clues[directionRef.current]) return;
+    directionRef.current = clues.across ? "across" : "down";
+  };
+
+  const toggleDirectionIfRepeatedClick = (rowIndex, colIndex) => {
+    const key = `${rowIndex}-${colIndex}`;
+    const clues = cellClues.get(key);
+    if (lastClickRef.current === key && clues?.across && clues?.down) {
+      directionRef.current = directionRef.current === "across" ? "down" : "across";
+    }
+    lastClickRef.current = key;
+  };
+
   const focusCell = (target) => {
     if (target) cellRefs.current[`${target[0]}-${target[1]}`]?.focus();
   };
@@ -115,10 +134,12 @@ const Game_crossword_board = forwardRef(({ tribe, disabled, onReadyChange }, ref
 
     setCellValue(rowIndex, colIndex, newValue);
 
-    // 打完一個字自動跳到同方向的下一格（輸入法組字中不跳，免得打斷選字）
+    // 打完一個字自動跳到同一題的下一格（輸入法組字中不跳，免得打斷選字）。
+    // 只看緊鄰的那一格：遇到黑格就是這題的尾巴，停在原地，不跳過黑格去別題。
     if (newValue && !event.nativeEvent?.isComposing) {
       const [dr, dc] = DIRECTION_VECTOR[directionRef.current];
-      focusCell(findCell(rowIndex, colIndex, dr, dc));
+      const next = rows[rowIndex + dr]?.[colIndex + dc];
+      if (next !== undefined && next !== "-") focusCell([rowIndex + dr, colIndex + dc]);
     }
   };
 
@@ -258,8 +279,13 @@ const Game_crossword_board = forwardRef(({ tribe, disabled, onReadyChange }, ref
                       value={userAnswersGrid[rowIndex]?.[colIndex] || ""}
                       onChange={(e) => handleCellChange(rowIndex, colIndex, e)}
                       onKeyDown={(e) => handleCellKeyDown(rowIndex, colIndex, e)}
-                      onFocus={(e) => e.target.select()}
-                      onClick={(e) => e.target.select()}
+                      onFocus={(e) => {
+                        // 焦點是用鍵盤移到別格的：「上一次點的格子」作廢，之後點回舊格不算連點
+                        if (lastClickRef.current !== `${rowIndex}-${colIndex}`) lastClickRef.current = null;
+                        syncDirectionToCell(rowIndex, colIndex);
+                        e.target.select();
+                      }}
+                      onClick={(e) => { toggleDirectionIfRepeatedClick(rowIndex, colIndex); e.target.select(); }}
                       disabled={disabled}
                       aria-label={describeCell(rowIndex, colIndex, cellClues.get(`${rowIndex}-${colIndex}`))}
                       aria-describedby="crossword-help"

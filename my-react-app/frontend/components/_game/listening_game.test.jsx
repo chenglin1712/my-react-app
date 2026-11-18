@@ -8,6 +8,8 @@ import { createAuthorizedAudio } from '../../utils/authAudio';
 
 vi.mock('../../utils/apiClient', () => ({ apiGet: vi.fn() }));
 vi.mock('../../utils/authAudio', () => ({ createAuthorizedAudio: vi.fn() }));
+const mockToggle = vi.hoisted(() => vi.fn());
+vi.mock('../../src/userServives/useFavorites', () => ({ useFavorites: () => ({ favorites: [], toggleFavorite: mockToggle, error: null }) }));
 
 const QUESTIONS = [
   { word: 'balay', audio_id: 'a1', correct: '真的', options: ['真的', '假的', '好', '壞'] },
@@ -142,6 +144,7 @@ describe('ListeningGame 答題後的操作與錯誤（E-5）', () => {
 
 describe('ListeningGame 結算頁的慶祝動態（Apple 化步驟 4-5）', () => {
   beforeEach(() => {
+    localStorage.clear();
     apiGet.mockReset();
     createAuthorizedAudio.mockReset();
     createAuthorizedAudio.mockResolvedValue({
@@ -162,15 +165,36 @@ describe('ListeningGame 結算頁的慶祝動態（Apple 化步驟 4-5）', () =
     return container;
   };
 
-  test('全對（100%）：分數區標為 is-celebrating，並出現慶祝圓點', async () => {
+  test('全對（100%）：結算摘要區標為 is-celebrating，並出現慶祝圓點', async () => {
     const container = await playThrough(userEvent.setup(), ['真的', '加油']);
-    expect(container.querySelector('.listening-result-score')).toHaveClass('is-celebrating');
+    expect(container.querySelector('.game-result-burst-anchor')).toHaveClass('is-celebrating');
     expect(container.querySelector('.game-celebrate')).not.toBeNull();
   });
 
   test('答對一半（50%，低於 60% 門檻）：不慶祝', async () => {
     const container = await playThrough(userEvent.setup(), ['真的', '謝謝']);
-    expect(container.querySelector('.listening-result-score')).not.toHaveClass('is-celebrating');
+    expect(container.querySelector('.game-result-burst-anchor')).not.toHaveClass('is-celebrating');
     expect(container.querySelector('.game-celebrate')).toBeNull();
+  });
+
+  test('P4-10：結算頁有分數環；有上一局的紀錄就顯示與上次比較', async () => {
+    localStorage.setItem('yy.game.listening.lastResult', JSON.stringify({ pct: 100, at: 1 }));
+    const container = await playThrough(userEvent.setup(), ['真的', '謝謝']);
+    expect(container.querySelector('.game-result-ring')).not.toBeNull();
+    expect(screen.getByText(/比上次退步 50%/)).toBeInTheDocument();
+  });
+
+  test('P4-10：答錯的族語單字可一鍵加入單字收藏（分類 1），答對的不會加', async () => {
+    mockToggle.mockReset();
+    const user = userEvent.setup();
+    await playThrough(user, ['真的', '謝謝']);   // balay 對、lokah 錯
+    await user.click(screen.getByRole('button', { name: /把 1 個錯詞加入收藏複習/ }));
+    expect(mockToggle).toHaveBeenCalledTimes(1);
+    expect(mockToggle).toHaveBeenCalledWith('lokah', 1);
+  });
+
+  test('P4-10：全對時沒有加入收藏的按鈕', async () => {
+    await playThrough(userEvent.setup(), ['真的', '加油']);
+    expect(screen.queryByRole('button', { name: /加入收藏複習/ })).toBeNull();
   });
 });

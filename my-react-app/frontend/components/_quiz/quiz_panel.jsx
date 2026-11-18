@@ -8,13 +8,11 @@ import MatchingQuestion from "./quiz_matching_question"
 import ClozeQuestion from "./quiz_cloze_question"
 import TrueFalseQuestion from "./quiz_true_false_question"
 import ChoiceQuestion from "./quiz_choice_question"
-import { loadLoadingAnimation } from "../../src/animations/loaders";
 import { Star, CircleHelp } from "lucide-react";
 import { uploadSituationDB } from "../../src/userServives/uploadDb"
 import { useQuizPanelData } from "./useQuizPanelData"
 import { trackEvent } from "../../utils/apiClient"
 import { buildQuizAnswerEvents } from "./quizAnswerTracking"
-import { useLottieAnimation } from "@hooks/useLottieAnimation";
 import { announce } from "@utils/announce";
 import { useOnlineStatus } from "@hooks/useOnlineStatus";
 import OfflineNotice from "@components/ui/OfflineNotice";
@@ -58,9 +56,6 @@ const Panel = ({ tribe = "tayal" }) => {
         document.addEventListener("keydown", onKeyDown);
         return () => document.removeEventListener("keydown", onKeyDown);
     }, [showIntro]);
-
-    //載入loading動畫
-    const animation = useLottieAnimation({ loadAnimationData: loadLoadingAnimation, enabled: isLoading });
 
     // 使用者主動切題（上一題、下一題、側欄題號）時，畫面整塊換內容，螢幕報讀器不會知道，
     // 用公告補上目前是第幾題（審查項 P2-99）。只在這個函式裡公告，資料重新載入造成的索引歸零不會誤報。
@@ -177,7 +172,8 @@ const Panel = ({ tribe = "tayal" }) => {
         return (
             <div className="load-container" role="status">
                 <div className="load-title">題目載入中...</div>
-                <div className="load-animate" ref={animation}></div>
+                {/* 載入指示：CSS 轉圈（銅褐，減少動態時靜止），取代原本紅色的紙飛機動畫 */}
+                <div className="load-spinner" aria-hidden="true"></div>
             </div>
         );
     } else {
