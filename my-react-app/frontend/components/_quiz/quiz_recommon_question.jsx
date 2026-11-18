@@ -260,7 +260,7 @@ export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
   const leaveQuiz = async () => {
     const ok = await confirmAction({
       title: "離開測驗？",
-      message: <p className="mb-0">未完成的測驗將不會保存。</p>,
+      message: <p className="mb-0">未完成的測驗將不會儲存。</p>,
       confirmLabel: "離開測驗",
       cancelLabel: "繼續作答",
     });

@@ -164,7 +164,7 @@ const CameraWizard = () => {
                             )}
                             {/* 取景框上的玻璃提示：浮在圖片或空框之上，說明這一步要做什麼（文字對比由毛玻璃材質的守門測試把關） */}
                             <span className="camera-dropzone-hint yy-glass" aria-hidden="true">
-                                {dragging ? "放開就會使用這張圖片" : image ? "點擊可更換圖片" : "把想辨識的物件放在框內，或貼上圖片"}
+                                {dragging ? "放開就會使用這張圖片" : image ? "點選可更換圖片" : "把想辨識的物件放在框內，或貼上圖片"}
                             </span>
                         </label>
 

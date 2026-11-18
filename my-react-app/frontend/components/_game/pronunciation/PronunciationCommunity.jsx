@@ -54,7 +54,7 @@ export default function PronunciationCommunity({ tribe }) {
   const loadRecordings = useCallback(async () => {
     if (!tribe) {
       setRecordings([]);
-      setError('缺少族語參數，無法載入社群錄音。');
+      setError('缺少族語參數，無法載入社群錄音。請回到遊戲專區重新選擇族語。');
       setLoading(false);
       return;
     }

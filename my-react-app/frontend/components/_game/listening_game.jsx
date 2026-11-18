@@ -123,7 +123,7 @@ function ListeningGame({ tribe = "tayal" }) {
             {isPlaying ? "♪" : "▶"}
           </button>
           <p className="listening-play-hint">
-            {isPlaying ? "播放中..." : "點擊播放發音"}
+            {isPlaying ? "播放中..." : "點選播放發音"}
           </p>
         </div>
 

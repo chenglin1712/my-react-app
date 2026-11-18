@@ -90,7 +90,7 @@ describe('EditProfile (editProfile)', () => {
       fireEvent.click(screen.getByRole('button', { name: /儲存變更/ }));
     });
 
-    expect(screen.getByText('失敗: 沒有更新的資料')).toBeInTheDocument();
+    expect(screen.getByText('沒有更新的資料，請修改後再試一次。')).toBeInTheDocument();
     expect(updateUserData).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: /儲存變更/ })).not.toBeDisabled();
@@ -104,7 +104,7 @@ describe('EditProfile (editProfile)', () => {
       fireEvent.click(screen.getByRole('button', { name: /儲存變更/ }));
     });
 
-    expect(screen.getByText('更新失敗')).toBeInTheDocument();
+    expect(screen.getByText('更新失敗，請檢查網路後再試一次。')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /儲存變更/ })).not.toBeDisabled();
   });
 

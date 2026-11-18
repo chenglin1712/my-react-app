@@ -88,7 +88,7 @@ describe('AI chat conversation controls', () => {
     await user.click(await screen.findByRole('button', { name: '停止' }));
     expect(capturedSignal.aborted).toBe(true);
     expect(await screen.findByText('已停止回覆。')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '發送' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '傳送' })).toBeInTheDocument();
   });
 
   test('the conversation is saved on this device and restored after a reload', async () => {

@@ -24,7 +24,7 @@ const open = async (quota = {}) => {
 
 const ask = async (user) => {
   await user.type(screen.getByRole('textbox'), '問題');
-  await user.click(screen.getByRole('button', { name: '發送' }));
+  await user.click(screen.getByRole('button', { name: '傳送' }));
   await screen.findByText('是你好的意思。');
 };
 
@@ -89,7 +89,7 @@ describe('AI chat suggestions and light formatting', () => {
     apiPost.mockResolvedValue(reply({ message: '重點：**lokah**\n- 一\n- 二\n<b>x</b>' }));
     const user = await open();
     await user.type(screen.getByRole('textbox'), '**不是粗體**');
-    await user.click(screen.getByRole('button', { name: '發送' }));
+    await user.click(screen.getByRole('button', { name: '傳送' }));
     await screen.findByText('lokah');
     expect(document.querySelectorAll('.bot-md li')).toHaveLength(2);
     expect(document.querySelector('.bot-md b')).toBeNull();

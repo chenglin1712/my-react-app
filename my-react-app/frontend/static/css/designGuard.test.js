@@ -1022,3 +1022,22 @@ describe("P6-2 手機浮動元件不互相重疊、不蓋底部導覽", () => {
     expect(jsx).toMatch(/className="bottom-toolbar yy-glass mt-3 d-flex align-items-center flex-wrap"/);
   });
 });
+
+describe("P6-3／P6-4 手勢與學習紀錄", () => {
+  const read = (f) => readFileSync(join(FRONTEND, f), "utf8");
+  it("學習紀錄卡：只用 token、進度條只動 transform，減少動態時不再過渡", () => {
+    const css = stripCss(read("static/css/_learning/studyStreak.css"));
+    expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(css).toMatch(/\.study-bar-fill\s*\{[^}]*transition:\s*transform/);
+    expect(css).not.toMatch(/transition:[^;]*\b(width|height|margin|padding)\b/);
+    expect(css).toMatch(/prefers-reduced-motion: reduce\)\s*\{\s*\.study-bar-fill\s*\{\s*transition:\s*none/);
+    expect(css).toMatch(/\.study-card-clear\s*\{[^}]*min-height:\s*var\(--yy-control-md\)/);
+  });
+  it("下拉重新整理：指示器純視覺（aria-hidden），位置只用 transform，減少動態時不位移，且在導覽列之上", () => {
+    const css = stripCss(read("static/css/_note/notesharestyle.css"));
+    expect(css).toMatch(/\.ns-pull\s*\{[^}]*z-index:\s*var\(--yy-z-dropdown\)/);
+    expect(css).toMatch(/\.ns-pull\s*\{[^}]*transform:\s*translate\(-50%, calc\(var\(--ns-pull/);
+    expect(css).toMatch(/prefers-reduced-motion: reduce\)\s*\{\s*\.ns-pull\s*\{\s*transform:\s*translate\(-50%, 0\)/);
+    expect(read("src/_note/noteshare.jsx")).toMatch(/aria-hidden="true"\s*>\s*\{pullToRefresh\.state/);
+  });
+});

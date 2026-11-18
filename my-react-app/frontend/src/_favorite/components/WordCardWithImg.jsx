@@ -229,7 +229,7 @@ const WordCardWithImg = memo(({ word, result, keyName, isExpanded, toggleExpand,
 
           {/* 返回按鈕 */}
           <div className="flip-back-btn">
-            <small className="yy-text-muted">點擊返回</small>
+            <small className="yy-text-muted">點一下返回</small>
           </div>
         </div>
       </div>

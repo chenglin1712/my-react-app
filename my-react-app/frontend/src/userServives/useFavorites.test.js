@@ -3,6 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import { useFavorites } from './useFavorites';
 import { useAuth } from './authContext';
 import { toggleFavoriteWord } from './userServive';
+import { readActivity } from '../_learning/studyStreak';
 
 vi.mock('./authContext', () => ({
   useAuth: vi.fn(),
@@ -24,6 +25,7 @@ describe('useFavorites', () => {
   };
 
   beforeEach(() => {
+    localStorage.clear();
     vi.clearAllMocks();
     toggleFavoriteWord.mockResolvedValue(undefined);
   });
@@ -184,5 +186,26 @@ describe('useFavorites 連點（P2-7）', () => {
     await act(async () => { release(); await p1; await p2; });
     expect(order).toEqual(['start1', 'end1', 'start2']);
     expect(current.firestoreData.favorites[0].content).toEqual(['a']); // 加入再取消 = 原狀
+  });
+
+  test('P6-4：新增一個收藏算一次學習活動；取消收藏不算；寫入失敗也不算', async () => {
+    const updateUserData = vi.fn();
+    const baseUser = { uid: 'user-1', firestoreData: { favorites: [{ id: 1, content: ['tayal-word-a'] }] } };
+    useAuth.mockReturnValue({ userData: baseUser, updateUserData });
+    localStorage.clear();
+    toggleFavoriteWord.mockReset();
+    toggleFavoriteWord.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useFavorites());
+    const total = () => Object.values(readActivity('user-1')).reduce((a, b) => a + b, 0);
+
+    await act(async () => { await result.current.toggleFavorite('tayal-word-b', 1); });
+    expect(total()).toBe(1);
+
+    await act(async () => { await result.current.toggleFavorite('tayal-word-a', 1); });   // 取消收藏
+    expect(total()).toBe(1);
+
+    toggleFavoriteWord.mockRejectedValueOnce(new Error('network'));
+    await act(async () => { await result.current.toggleFavorite('tayal-word-c', 1); });
+    expect(total()).toBe(1);
   });
 });

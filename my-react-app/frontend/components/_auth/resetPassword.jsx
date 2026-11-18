@@ -55,7 +55,7 @@ const ResetPassword = () => {
             } else if (error.code === "auth/weak-password") {
                 setErrorMsg("新密碼強度不足，請使用至少 6 個字元。");
             } else {
-                setErrorMsg(authErrorMessage(error, "密碼更新失敗"));
+                setErrorMsg(authErrorMessage(error, "密碼更新失敗，請稍後再試，或重新申請重設連結。"));
             }
         } finally {
             setIsSubmitting(false);

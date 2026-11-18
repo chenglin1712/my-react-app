@@ -200,7 +200,7 @@ const GameZonePage = () => {
               <div className="yy-fade-up gamehub-confirm">
                 <span className="gamehub-tribe-mark gamehub-tribe-mark--lg" aria-hidden="true">{activeTribeData.name}</span>
                 <h4>{activeTribeData.name}族語 {activeGameData.title}</h4>
-                <p>準備好了嗎？點擊下方開始挑戰</p>
+                <p>準備好了嗎？點選下方開始挑戰</p>
                 <button type="button" className="yy-btn-primary" onClick={startChallenge}>開始挑戰 ▸</button>
               </div>
             )}

@@ -10,6 +10,8 @@ import TrueFalseQuestion from "./quiz_true_false_question"
 import ChoiceQuestion from "./quiz_choice_question"
 import { Star, CircleHelp } from "lucide-react";
 import { uploadSituationDB } from "../../src/userServives/uploadDb"
+import { recordLearningActivity } from "../../src/_learning/studyStreak"
+import { useAuth } from "../../src/userServives/authContext"
 import { useQuizPanelData } from "./useQuizPanelData"
 import { trackEvent } from "../../utils/apiClient"
 import { buildQuizAnswerEvents } from "./quizAnswerTracking"
@@ -26,6 +28,7 @@ const Panel = ({ tribe = "tayal" }) => {
     const basePath = tribe === "tayal" ? "/quiz" : `/quiz/${tribe}`;
 
     const navigate = useNavigate();
+    const { userData } = useAuth();
 
     const {
         data, dataLen, isLoading, quizInfo, savedQuestions, uploadFailed,
@@ -134,6 +137,8 @@ const Panel = ({ tribe = "tayal" }) => {
         } catch (err) {
             console.error("儲存作答結果失敗：", err);
         }
+        // 完成一次測驗算一次學習活動（P6-4）；儲存失敗不影響，因為使用者確實作答完了
+        recordLearningActivity(userData?.uid, "quiz");
         if (!situationID) {
             // uploadSituationDB 失敗時回傳 undefined（它自己 catch 掉例外），
             // 不擋下導頁——既有的 sessionStorage fallback 仍能讓使用者看到這次
@@ -209,7 +214,7 @@ const Panel = ({ tribe = "tayal" }) => {
                             onClick={async () => {
                                 const isConfirmed = await confirmAction({
                                     title: "離開測驗？",
-                                    message: <p className="mb-0">未完成的測驗將不會保存。</p>,
+                                    message: <p className="mb-0">未完成的測驗將不會儲存。</p>,
                                     confirmLabel: "離開測驗",
                                     cancelLabel: "繼續作答",
                                 });
