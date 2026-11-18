@@ -115,6 +115,7 @@ describe('SentenceGame 答題後的操作（E-5）', () => {
 
 describe('SentenceGame 結算頁的慶祝動態（Apple 化步驟 4-5）', () => {
   beforeEach(() => {
+    localStorage.clear();
     apiGet.mockReset();
     createAuthorizedAudio.mockReset();
     createAuthorizedAudio.mockResolvedValue({
@@ -135,15 +136,23 @@ describe('SentenceGame 結算頁的慶祝動態（Apple 化步驟 4-5）', () =>
     return container;
   };
 
-  test('全對（100%）：分數區標為 is-celebrating，並出現慶祝圓點', async () => {
+  test('全對（100%）：結算摘要區標為 is-celebrating，並出現慶祝圓點', async () => {
     const container = await playThrough(userEvent.setup(), ['真的很好', '你好']);
-    expect(container.querySelector('.sent-result-score')).toHaveClass('is-celebrating');
+    expect(container.querySelector('.game-result-burst-anchor')).toHaveClass('is-celebrating');
     expect(container.querySelector('.game-celebrate')).not.toBeNull();
   });
 
   test('全錯（0%）：不慶祝', async () => {
     const container = await playThrough(userEvent.setup(), ['假的不好', '謝謝']);
-    expect(container.querySelector('.sent-result-score')).not.toHaveClass('is-celebrating');
+    expect(container.querySelector('.game-result-burst-anchor')).not.toHaveClass('is-celebrating');
     expect(container.querySelector('.game-celebrate')).toBeNull();
+  });
+
+  test('P4-10：結算頁有分數環與上次比較；句子不是單字，沒有「加入收藏」按鈕', async () => {
+    localStorage.setItem('yy.game.sentence.lastResult', JSON.stringify({ pct: 50, at: 1 }));
+    const container = await playThrough(userEvent.setup(), ['真的很好', '你好']);
+    expect(container.querySelector('.game-result-ring')).not.toBeNull();
+    expect(screen.getByText(/比上次進步 50%/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /加入收藏/ })).toBeNull();
   });
 });

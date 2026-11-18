@@ -582,7 +582,7 @@
 }
 
 .pos-filter-btn[aria-pressed="true"]::before {
-    content: "¹3" / "";
+    content: "\2713" / "";
 }
 
 .pos-filter-btn:active {

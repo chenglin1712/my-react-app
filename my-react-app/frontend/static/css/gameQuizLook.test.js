@@ -108,8 +108,8 @@ describe("遊戲專區", () => {
     expect(f(".game-celebrate-dot:nth-child(even)").body).toMatch(/background:\s*var\(--yy-calm-copper\)/);
     expect(f(".game-celebrate").body).toMatch(/pointer-events:\s*none/);
     expect(f(".game-celebrate", /prefers-reduced-motion/).body).toMatch(/display:\s*none/);
-    expect(f(".is-celebrating .listening-result-num, .is-celebrating .sent-result-num").body).toMatch(/var\(--ease-spring\)/);
-    expect(f(".is-celebrating .listening-result-num, .is-celebrating .sent-result-num", /prefers-reduced-motion/).body).toMatch(/animation:\s*none/);
+    expect(f(".is-celebrating .game-result-ring-num").body).toMatch(/var\(--ease-spring\)/);
+    expect(f(".is-celebrating .game-result-ring-num", /prefers-reduced-motion/).body).toMatch(/animation:\s*none/);
   });
 
   it("遊戲卡片頂端流動色帶（漸層）已移除", () => {
@@ -199,8 +199,9 @@ describe("測驗", () => {
     expect(f(".scenario-quiz-feedback.is-springy, .scenario-quiz-option.is-springy .scenario-quiz-option-result", /prefers-reduced-motion/).body).toMatch(/animation:\s*none/);
     expect(css["_quiz/scenario_quiz.css"]).not.toMatch(/infinite/);
     const r = find("_quiz/quiz_recommon_question.css");
-    expect(r(".custom-btn.correct::before").body).toMatch(/content:\s*"\2713";[\s\S]*content:\s*"\2713" \/ "答對"/);
-    expect(r(".custom-btn.wrong::before").body).toMatch(/content:\s*"\2717";[\s\S]*content:\s*"\2717" \/ "答錯"/);
+    // 正規式裡的反斜線要寫成 \\，不然 \271 會被當成八進位跳脫，測試會去比對亂碼「¹3」
+    expect(r(".custom-btn.correct::before").body).toMatch(/content:\s*"\\2713";[\s\S]*content:\s*"\\2713" \/ "答對"/);
+    expect(r(".custom-btn.wrong::before").body).toMatch(/content:\s*"\\2717";[\s\S]*content:\s*"\\2717" \/ "答錯"/);
   });
 
   it("結果頁分數環（4-6c）：環只用單一強調色與細線底色、用 pathLength 當百分比、沒有動畫", () => {

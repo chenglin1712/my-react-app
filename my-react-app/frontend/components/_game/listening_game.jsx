@@ -10,6 +10,7 @@ import GameIntro from "./GameIntro";
 import CelebrationBurst from "./CelebrationBurst";
 import { shouldCelebrate } from "./celebrate";
 import GameResultRecorder from "./GameResultRecorder";
+import { GameResultSummaryWithFavorites } from "./GameResultSummary";
 import { apiUrl } from "../../utils/apiUrls";
 
 function ListeningGame({ tribe = "tayal" }) {
@@ -186,11 +187,15 @@ function ListeningGame({ tribe = "tayal" }) {
         <GameResultRecorder gameId="listening" tribe={tribe} pct={pct} />
         <h2 className="listening-result-title">遊戲結果</h2>
 
-        <div className={`listening-result-score${shouldCelebrate(pct) ? " is-celebrating" : ""}`}>
-          {shouldCelebrate(pct) && <CelebrationBurst />}
-          <span className="listening-result-num">{score}</span>
-          <span className="listening-result-denom"> / {total}</span>
-          <p className="listening-result-pct">{pct}%</p>
+        <div className={`game-result-burst-anchor${shouldCelebrate(pct) ? " is-celebrating" : ""}`}>
+        {shouldCelebrate(pct) && <CelebrationBurst />}
+        <GameResultSummaryWithFavorites
+          storageKey="yy.game.listening.lastResult"
+          pct={pct}
+          correct={score}
+          total={total}
+          reviewWords={answers.filter((a) => !a.isCorrect).map((a) => a.word)}
+        />
         </div>
 
         <div className="listening-result-list">

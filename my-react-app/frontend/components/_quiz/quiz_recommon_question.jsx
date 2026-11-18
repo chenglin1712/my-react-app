@@ -6,7 +6,10 @@ import { loadQuizModel, saveQuizModel } from "./quizModelService";
 import { getWordNameForQuestion, buildResultAnalysis } from "./quizResultAnalysis";
 import QuestionRenderer, { QUESTION_COMPONENTS } from "./quiz_recommon_question_renderer";
 import "../../static/css/_quiz/quiz_recommon_question.css";
+import "../../static/css/_quiz/quiz_focus.css";
 import { apiUrl } from "../../utils/apiUrls";
+import { confirmAction } from "@components/ui/ConfirmDialog";
+import { useQuizFocusMode } from "./useQuizFocusMode";
 
 export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
   const { userData, loading: authLoading } = useAuth();
@@ -32,6 +35,11 @@ export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
   const [userAnswers, setUserAnswers] = useState([]);
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [saveWarning, setSaveWarning] = useState("");
+
+  // 作答專注模式（與基礎測驗一致，P4-10）：題目真的載入、可以作答之後才收起全站導覽與測驗選單。
+  // 載入中與載入失敗的畫面沒有「離開測驗」，導覽要留著當出口。
+  const quizReady = !loading && !loadError && questionList.length > 0;
+  useQuizFocusMode(quizReady);
 
   // 計時
   const [totalTime, setTotalTime] = useState(0);
@@ -249,8 +257,21 @@ export default function RecommendedQuizQuestion({ tribe = "tayal" }) {
     );
   }
 
+  const leaveQuiz = async () => {
+    const ok = await confirmAction({
+      title: "離開測驗？",
+      message: <p className="mb-0">未完成的測驗將不會保存。</p>,
+      confirmLabel: "離開測驗",
+      cancelLabel: "繼續作答",
+    });
+    if (ok) navigate("..");
+  };
+
   return (
     <div className="recommon-card">
+      {/* 專注模式收起了導覽與側欄，這裡是唯一的出口 */}
+      <button type="button" className="recommon-leave" onClick={leaveQuiz}>離開測驗</button>
+
       {/* 進度條 */}
       <div
         className="recommon-progress"

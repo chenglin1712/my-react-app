@@ -268,7 +268,7 @@ describe("詞類篩選（Apple 化步驟 4-2）", () => {
     const f = find.search;
     expect(f(".pos-filter-btn").body).toMatch(/min-height:\s*var\(--yy-control-md\)/);
     expect(f('.pos-filter-btn[aria-pressed="true"]').body).toMatch(/border-color:\s*var\(--yy-calm-accent\)/);
-    expect(f('.pos-filter-btn[aria-pressed="true"]::before').body).toMatch(/content:\s*"\2713"/);
+    expect(f('.pos-filter-btn[aria-pressed="true"]::before').body).toMatch(/content:\s*"\\2713"/);
     expect(f(".pos-filter-btn:active").body).toMatch(/scale\(var\(--yy-ui-press\)\)/);
     expect(f(".pos-filter-btn:active", /prefers-reduced-motion/).body).toMatch(/transform:\s*none/);
   });

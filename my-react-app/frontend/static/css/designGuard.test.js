@@ -416,7 +416,7 @@ describe("動態規則不退回舊寫法", () => {
   // （yy-audio-wave：只在播放中那一顆存在，播完即消失，減少動態時凍結成靜態波形）。
   // home-ticker-scroll 是例外：首頁跑馬燈是契約要求的內容（HOMEPAGE_CONTRACT.md 4.3），
   // 有可見的暫停鈕、滑過與聚焦暫停、減少動態時改靜態（見 Ticker.jsx 與 mastheadLook.test.js）。
-  const INFINITE_ALLOWED = ["home-ticker-scroll", "yy-skeleton-pulse", "yy-blink", "pron-pulse", "sentPulse", "listening-pulse", "pron-community-spin", "bot-bounce", "review-ai-bounce", "yy-audio-wave"];
+  const INFINITE_ALLOWED = ["home-ticker-scroll", "yy-skeleton-pulse", "yy-blink", "pron-pulse", "sentPulse", "listening-pulse", "pron-community-spin", "quiz-load-spin", "bot-bounce", "review-ai-bounce", "yy-audio-wave"];
 
   it("前台 CSS 的無限循環動畫只限狀態指示（白名單）", () => {
     const found = new Set();
@@ -855,5 +855,29 @@ describe("P4 遊戲專區與測驗（其餘項目）", () => {
     const css = read("static/css/_quiz/quiz_recommon_result.css");
     expect(css).toMatch(/\.rule-bar-fill\s*\{[^}]*background: var\(--yy-data-1\)/);
     expect(css).toMatch(/\.rule-bar-track\s*\{[^}]*background: var\(--yy-calm-rule\)/);
+  });
+});
+
+describe("P4-10 補充（實測後的修正）", () => {
+  const readCss = (f) => stripCss(readFileSync(join(FRONTEND, f), "utf8"));
+  it("前台 CSS 裡沒有上標數字亂碼（反斜線被吃掉的 \2713 會變成「¹3」）", () => {
+    const bad = cssFiles.filter(({ css }) => /[\u00B9\u00B2\u00B3]/.test(css)).map(({ file }) => file);
+    expect(bad).toEqual([]);
+  });
+  it("進階測驗對錯：用淺底加同色字與框，不用實心綠／實心紅；進度條是強調色", () => {
+    const css = readCss("static/css/_quiz/quiz_recommon_question.css");
+    expect(css).toMatch(/\.custom-btn\.correct\s*\{[^}]*background: var\(--yy-calm-success-bg\)/);
+    expect(css).toMatch(/\.custom-btn\.wrong\s*\{[^}]*background: var\(--yy-calm-danger-bg\)/);
+    expect(css).toMatch(/\.recommon-progress-fill\s*\{[^}]*background: var\(--yy-calm-accent\)/);
+  });
+  it("句型卡與發音卡是中性底，不是粉紅（粉紅只留給答錯）", () => {
+    expect(readCss("static/css/_game/sentence.css")).toMatch(/\.sent-card\s*\{[^}]*background: var\(--yy-calm-info-bg\)/);
+    expect(readCss("static/css/_game/pronunciation.css")).toMatch(/\.pron-card\s*\{[^}]*background: var\(--yy-calm-info-bg\)/);
+  });
+  it("測驗載入指示是 CSS 轉圈（銅褐、減少動態靜止），不再用紅色 Lottie", () => {
+    const css = readCss("static/css/_quiz/quiz_panel.css");
+    expect(css).toMatch(/\.load-spinner\s*\{[^}]*border-top-color: var\(--yy-calm-accent\)/);
+    expect(css).toMatch(/prefers-reduced-motion: reduce\)\s*\{\s*\.load-spinner\s*\{\s*animation: none/);
+    expect(readFileSync(join(FRONTEND, "components/_quiz/quiz_panel.jsx"), "utf8")).not.toMatch(/loadLoadingAnimation|useLottieAnimation/);
   });
 });

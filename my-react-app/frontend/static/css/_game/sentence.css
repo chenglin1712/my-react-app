@@ -71,7 +71,7 @@
 }
 @media (hover: hover) and (pointer: fine) {
   .sent-btn-secondary:hover {
-    background: var(--yy-calm-danger-bg);
+    background: var(--yy-calm-info-bg);
     transform: translateY(-2px);
   }
 }
@@ -109,8 +109,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: var(--yy-calm-danger-bg);
-  border: 1.5px solid var(--yy-calm-danger-bg);
+  background: var(--yy-calm-info-bg);
+  border: var(--yy-border-width) solid var(--yy-calm-line);
   border-radius: var(--yy-radius-panel);
   padding: 1.5rem 2rem;
   width: 100%;
@@ -193,7 +193,7 @@
 @media (hover: hover) and (pointer: fine) {
   .sent-option:hover:not(:disabled) {
     border-color: var(--yy-calm-accent);
-    background: var(--yy-calm-danger-bg);
+    background: var(--yy-calm-info-bg);
     transform: translateX(4px);
   }
 }

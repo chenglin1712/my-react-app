@@ -44,7 +44,7 @@
 .recommon-progress-fill {
   width: 100%;
   height: 100%;
-  background: var(--yy-calm-success);
+  background: var(--yy-calm-accent);
   transform-origin: left center;
   transition: transform 300ms var(--ease-out);
 }
@@ -106,27 +106,27 @@
 }
 
 .custom-btn.correct {
-  background: var(--yy-calm-success);
-  color: var(--yy-calm-surface);
-  border-color: var(--yy-calm-text);
+  background: var(--yy-calm-success-bg);
+  color: var(--yy-calm-success);
+  border-color: var(--yy-calm-success);
 }
 
 .custom-btn.wrong {
-  background: var(--yy-calm-danger);
-  color: var(--yy-calm-surface);
-  border-color: var(--yy-calm-text);
+  background: var(--yy-calm-danger-bg);
+  color: var(--yy-calm-danger);
+  border-color: var(--yy-calm-danger);
 }
 
 /* 答對答錯不只靠顏色：前面加勾或叉（Apple 化步驟 4-6b），替代文字讓報讀器也知道結果 */
 .custom-btn.correct::before {
-  content: "¹3"; /* 不支援替代文字語法的瀏覽器仍保有勾叉 */
-  content: "¹3" / "答對";
+  content: "\2713"; /* 不支援替代文字語法的瀏覽器仍保有勾叉 */
+  content: "\2713" / "答對";
   margin-right: 0.4em;
 }
 
 .custom-btn.wrong::before {
-  content: "¹7";
-  content: "¹7" / "答錯";
+  content: "\2717";
+  content: "\2717" / "答錯";
   margin-right: 0.4em;
 }
 
@@ -235,5 +235,46 @@
   .custom0-btn:active,
   .confirm-btn:active {
     transform: scale(0.95);
+  }
+}
+
+/* 離開測驗（專注模式下唯一的出口）：靠左上、次要樣式 */
+.recommon-leave {
+  align-self: flex-start;
+  min-height: var(--yy-control-md);
+  margin-bottom: var(--yy-space-3);
+  padding: 0 var(--yy-space-4);
+  font: inherit;
+  font-weight: 700;
+  color: var(--yy-calm-text);
+  background: transparent;
+  border: var(--yy-border-width) solid var(--yy-calm-line);
+  border-radius: var(--yy-radius-pill);
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+}
+
+.recommon-leave:focus-visible {
+  outline: var(--yy-ui-focus-ring);
+  outline-offset: var(--yy-ui-focus-offset);
+}
+
+.recommon-leave:active {
+  transform: scale(var(--yy-ui-press));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .recommon-leave:hover {
+    background: var(--yy-calm-info-bg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recommon-leave {
+    transition: none;
+  }
+
+  .recommon-leave:active {
+    transform: none;
   }
 }

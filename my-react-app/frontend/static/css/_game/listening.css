@@ -154,7 +154,7 @@
 @media (hover: hover) and (pointer: fine) {
   .listening-option:hover:not(:disabled) {
     border-color: var(--yy-calm-accent);
-    background: var(--yy-calm-danger-bg);
+    background: var(--yy-calm-info-bg);
     transform: translateY(-2px);
   }
 }
