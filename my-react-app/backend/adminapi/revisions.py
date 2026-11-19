@@ -186,6 +186,24 @@ def _create_or_update_pending_revision(request, pk, model, serializer_class, tar
                 {"detail": "此內容尚未發布，請直接使用一般的編輯功能"}, status=409,
             )
 
+        # 已經有一筆待審修改時，update_or_create 會原地覆蓋它的內容與提交者。編輯者要帶上自己載入時看到的
+        # 版本（base_version，來自 GET pending-revision 回傳的 version）；沒帶或對不上，代表別人在這段
+        # 時間送出或改過了，回 409 讓他重新載入，不能無聲蓋掉。target 已在上面鎖住，所以這裡的比對不會被插隊。
+        existing = PendingRevision.objects.select_for_update().filter(
+            target_type=target_type, target_id=pk, status=PendingRevision.STATUS_PENDING_REVIEW,
+        ).first()
+        if existing:
+            base_version = data.get("base_version") if isinstance(data, dict) else None
+            current_version = revision_version(existing)
+            if not isinstance(base_version, str) or not hmac.compare_digest(
+                base_version.encode("utf-8"), current_version.encode("utf-8"),
+            ):
+                return JsonResponse(
+                    {"detail": "這筆內容已有待審修改（可能是其他人剛送出或更新的），請重新載入，確認最新內容後再送出",
+                     "code": "revision_changed"},
+                    status=409,
+                )
+
         serializer = serializer_class(instance=obj, data=data, partial=True)
         if not serializer.is_valid():
             return JsonResponse({"detail": "請求參數錯誤", "errors": serializer.errors}, status=400)

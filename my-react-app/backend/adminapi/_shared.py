@@ -15,6 +15,7 @@ import json
 import logging
 
 from django.http import JsonResponse
+from django.utils.dateparse import parse_datetime
 from django_ratelimit.core import is_ratelimited
 
 from config.client_ip import client_ip, valid_ip_or_none
@@ -190,6 +191,35 @@ def guarded_action(method, role, rate_limit=None):
                 )
         return wrapper
     return decorator
+
+
+def stale_edit_response(data, current_updated_at):
+    """樂觀鎖：編輯頁帶著載入時的 updated_at（base_updated_at），期間若有別人先存過就拒絕，
+    避免後存的人無聲蓋掉先存的（做法與 site_page_views 相同）。呼叫端必須已經鎖住那一列
+    （select_for_update）才呼叫，比對與寫入才不會被插隊。
+
+    - 沒帶 base_updated_at：不檢查，維持原本行為。只改單一欄位的小工具（例如宣傳影片的啟用開關）
+      不會整份覆蓋別人的內容，沒有帶這個值的必要。
+    - 帶了但格式不對：400。
+    - 帶了但跟目前的 updated_at 不同：409，code 是 edit_conflict。
+    通過回傳 None，否則回傳要直接回給呼叫端的 JsonResponse。"""
+    if not isinstance(data, dict) or "base_updated_at" not in data:
+        return None
+    raw = data["base_updated_at"]
+    try:
+        base = parse_datetime(raw) if isinstance(raw, str) else None
+    except ValueError:
+        base = None
+    if base is None:
+        return JsonResponse(
+            {"detail": "請求參數錯誤", "errors": {"base_updated_at": ["格式不正確"]}}, status=400,
+        )
+    if base != current_updated_at:
+        return JsonResponse(
+            {"detail": "內容已被其他人更新，請重新整理頁面，確認最新內容後再編輯", "code": "edit_conflict"},
+            status=409,
+        )
+    return None
 
 
 def invalid_transition(current_status, action):

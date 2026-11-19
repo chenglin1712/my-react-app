@@ -69,6 +69,54 @@ describe('HomepageConfig', () => {
     expect(await screen.findByText('首頁顯示設定已儲存')).toBeInTheDocument();
   });
 
+  describe('並行編輯保護（F8）', () => {
+    const save = () => fireEvent.click(screen.getByRole('button', { name: /儲存設定/ }));
+
+    test('儲存時帶載入時的 updated_at；存成功後下一次改帶回應裡的新值', async () => {
+      apiPatch.mockResolvedValueOnce({ ...baseConfig, updated_at: '2026-08-02T00:00:00Z' });
+      apiPatch.mockResolvedValueOnce({ ...baseConfig, updated_at: '2026-08-03T00:00:00Z' });
+      renderPage();
+      await screen.findByLabelText('顯示最新消息區塊');
+
+      save();
+      await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(1));
+      expect(apiPatch.mock.calls[0][1]).toHaveProperty('base_updated_at', '2026-08-01T00:00:00Z');
+
+      await screen.findByText('首頁顯示設定已儲存');
+      save();
+      await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(2));
+      expect(apiPatch.mock.calls[1][1]).toHaveProperty('base_updated_at', '2026-08-02T00:00:00Z');
+    });
+
+    test('後端回 409（別人先存過）：顯示後端說明，不顯示成功訊息，下一次仍帶原本載入的值', async () => {
+      apiPatch.mockRejectedValueOnce(Object.assign(
+        new Error('內容已被其他人更新，請重新整理頁面，確認最新內容後再編輯'), { status: 409 },
+      ));
+      apiPatch.mockResolvedValueOnce({ ...baseConfig });
+      renderPage();
+      await screen.findByLabelText('顯示最新消息區塊');
+
+      save();
+      expect(await screen.findByText(/已被其他人更新/)).toBeInTheDocument();
+      expect(screen.queryByText('首頁顯示設定已儲存')).not.toBeInTheDocument();
+
+      save();
+      await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(2));
+      expect(apiPatch.mock.calls[1][1]).toHaveProperty('base_updated_at', '2026-08-01T00:00:00Z');
+    });
+
+    test('載入的設定沒有 updated_at 時不送這個欄位（不送空字串，免得被後端當成格式錯誤）', async () => {
+      apiGet.mockResolvedValue({ ...baseConfig, updated_at: '' });
+      apiPatch.mockResolvedValueOnce({ ...baseConfig });
+      renderPage();
+      await screen.findByLabelText('顯示最新消息區塊');
+
+      save();
+      await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(1));
+      expect(apiPatch.mock.calls[0][1]).not.toHaveProperty('base_updated_at');
+    });
+  });
+
   test('editor 看得到目前設定但所有欄位唯讀，看不到儲存按鈕', async () => {
     mockRole = 'editor';
     renderPage();

@@ -85,7 +85,8 @@ export default function RateLimitSettings() {
         try {
             const saved = await apiPatch(
                 `/adminapi/rate-limit-rules/${item.id}/`,
-                { rate: drafts[item.id] },
+                // 這條規則載入（或上次儲存）時的 updated_at：兩個人同時改同一條時，後存的人會收到 409，不會無聲蓋掉
+                { rate: drafts[item.id], ...(item.updated_at ? { base_updated_at: item.updated_at } : {}) },
             );
             setItems((current) => current.map((row) => (
                 row.id === item.id ? saved : row

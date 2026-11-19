@@ -105,6 +105,9 @@ export default function AnnouncementEditor() {
     // 保證，可能讓送審成功的訊息被悄悄清掉。用這個 ref 標記「這個 id 是
     // 我自己剛建立、剛 navigate 過去的」，effect 看到吻合就整個跳過。
     const skipNextLoadRef = useRef(null);
+    // 這篇已發布公告目前的待審修改版本：載入時從 GET pending-revision 取得，每次送出後換成回應裡的新版本。
+    // 後端用它判斷「你看到的是不是最新的」，別人在這段時間送出或改過就回 409，不會無聲蓋掉。
+    const revisionVersionRef = useRef(null);
 
     // 狀態允許編輯只是後端狀態機的一半條件，角色也要對得上——reviewer／
     // analyst 沒有 CONTENT_EDITORS 權限，就算內容是 draft，儲存也一定會被
@@ -134,6 +137,7 @@ export default function AnnouncementEditor() {
             // 內容，看起來像是在對新公告操作。loading 為 true 時整頁只
             // 顯示 Spinner，不會有閃爍。
             setForm(EMPTY_FORM);
+            revisionVersionRef.current = null;
             setStatus('draft');
             setSource('admin');
             media.setPreview('cover', '');
@@ -161,6 +165,7 @@ export default function AnnouncementEditor() {
                         if (revision?.payload) {
                             formSource = { ...item, ...revision.payload };
                         }
+                        revisionVersionRef.current = revision?.version ?? null;
                     } catch (err) {
                         // 404 是正常情況，代表這篇公告尚未建立待審修改；其他錯誤
                         // 仍應交給外層顯示，避免權限或伺服器錯誤被誤當成沒有提案。
@@ -252,10 +257,13 @@ export default function AnnouncementEditor() {
                 // published 的儲存不直接改公告本身，也不需要再呼叫 submit：
                 // 建立／更新 pending revision 本身就代表已提交等待審核。
                 if (id && status === 'published') {
-                    await apiPost(
+                    const submitted = await apiPost(
                         `/adminapi/announcements/${id}/pending-revision/`,
-                        buildPayload(),
+                        revisionVersionRef.current
+                            ? { ...buildPayload(), base_version: revisionVersionRef.current }
+                            : buildPayload(),
                     );
+                    revisionVersionRef.current = submitted?.version ?? revisionVersionRef.current;
                     setSuccess('已提交修改，待審核核准後生效');
                     return;
                 }

@@ -12,6 +12,7 @@ from ._shared import (
     ip_rate_limited_response as _ip_rate_limited_response,
     parse_json_body as _parse_json_body,
     rate_limited_response as _rate_limited_response,
+    stale_edit_response as _stale_edit_response,
     write_audit_log as _write_audit_log,
 )
 from .models import HomepageConfig, PromoVideo
@@ -53,6 +54,10 @@ def _update_homepage_config(request):
     HomepageConfig.load()  # 確保單例那筆存在，鎖之前才有列可鎖
     with transaction.atomic():
         config = HomepageConfig.objects.select_for_update().get(pk=1)
+        # 整份表單的儲存要帶載入時的 updated_at：期間若有別人先存過就回 409，不讓後存的人蓋掉先存的
+        stale = _stale_edit_response(data, config.updated_at)
+        if stale:
+            return stale
         # 鎖順序固定：先鎖 HomepageConfig 單例列，再鎖要啟用的 PromoVideo 列（S3-4 的替換、
         # 刪除端點也必須照這個順序），避免「驗證時有影片檔、提交前被清掉」的競態與死結。
         video_id = data.get("active_promo_video") if isinstance(data, dict) else None

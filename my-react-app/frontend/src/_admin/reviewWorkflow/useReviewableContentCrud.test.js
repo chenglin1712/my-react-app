@@ -287,4 +287,116 @@ describe('useReviewableContentCrud', () => {
             expect(result.current.editor.form).toEqual({ name: 'B內容' });
         });
     });
+
+    /** F8：已經有待審修改時重送會原地覆蓋它。後端要求帶「打開編輯表單時看到的版本」，
+     * 別人在這段時間送出或改過就回 409，不會無聲蓋掉。 */
+    describe('重送待審修改要帶打開時看到的版本（F8）', () => {
+        const publishedItem = { id: 5, status: 'published', name: '舊' };
+        const revisionUrl = '/adminapi/things/5/pending-revision/';
+
+        const openAndSave = async (result, item = publishedItem) => {
+            await act(async () => { await result.current.editor.openEdit(item); });
+            await act(async () => { await result.current.editor.save(undefined, { name: '新內容' }); });
+        };
+
+        test('打開時已有待審修改：送出帶 base_version', async () => {
+            apiGet.mockImplementation(async (url) => (url === revisionUrl ? { payload: { name: '提案' }, version: 'v-open' } : listPage()));
+            const { result } = setup();
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            await openAndSave(result);
+
+            expect(apiPost).toHaveBeenCalledWith(revisionUrl, { name: '新內容', base_version: 'v-open' });
+        });
+
+        test('打開時沒有待審修改（404）：不帶 base_version', async () => {
+            apiGet.mockImplementation(async (url) => {
+                if (url === revisionUrl) throw Object.assign(new Error('沒有'), { status: 404 });
+                return listPage();
+            });
+            const { result } = setup();
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            await openAndSave(result);
+
+            expect(apiPost).toHaveBeenCalledWith(revisionUrl, { name: '新內容' });
+        });
+
+        test('先前開過別次、留著舊版本：這次打開是 404 就不能沿用舊版本', async () => {
+            let hasPending = true;
+            apiGet.mockImplementation(async (url) => {
+                if (url !== revisionUrl) return listPage();
+                if (hasPending) return { payload: { name: '提案' }, version: 'v-old' };
+                throw Object.assign(new Error('沒有'), { status: 404 });
+            });
+            const { result } = setup();
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            await act(async () => { await result.current.editor.openEdit(publishedItem); });
+            hasPending = false;
+            await openAndSave(result);
+
+            expect(apiPost).toHaveBeenCalledWith(revisionUrl, { name: '新內容' });
+        });
+
+        test('送出成功後記下回應裡的新版本，之後核准帶的是新版本而不是舊的', async () => {
+            apiGet.mockImplementation(async (url) => (url === revisionUrl ? { payload: { name: '提案' }, version: 'v-open' } : listPage()));
+            apiPost.mockResolvedValueOnce({ id: 9, version: 'v-after-save' });
+            const { result } = setup();
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            await openAndSave(result);
+            apiPost.mockClear();
+            await act(async () => { await result.current.handleAction('approveRevision', { ...publishedItem, pending_revision_version: 'v-list' }); });
+
+            expect(apiPost).toHaveBeenCalledWith(
+                '/adminapi/things/5/pending-revision/approve/', { review_comment: '', revision_version: 'v-after-save' },
+            );
+        });
+
+        test('後端回 409（別人先改過）：顯示後端說明、編輯視窗保持開著、不關閉也不重新載入', async () => {
+            apiGet.mockImplementation(async (url) => (url === revisionUrl ? { payload: { name: '提案' }, version: 'v-open' } : listPage()));
+            apiPost.mockRejectedValueOnce(Object.assign(new Error('這筆內容已有待審修改，請重新載入'), { status: 409 }));
+            const { result } = setup();
+            await waitFor(() => expect(result.current.loading).toBe(false));
+            const listCalls = () => apiGet.mock.calls.filter(([url]) => url !== revisionUrl).length;
+            const before = listCalls();
+
+            await openAndSave(result);
+
+            expect(result.current.error).toBe('這筆內容已有待審修改，請重新載入');
+            expect(result.current.editor.target).not.toBeNull();
+            expect(listCalls()).toBe(before);
+        });
+
+        test('存過之後別人核准又建了新提案：第一次核准被擋（revision_changed）後丟掉快取版本，第二次改用列表上的新版本', async () => {
+            apiGet.mockImplementation(async (url) => (url === revisionUrl ? { payload: { name: '提案' }, version: 'v-open' } : listPage()));
+            apiPost.mockResolvedValueOnce({ id: 9, version: 'v-after-save' });
+            const { result } = setup();
+            await waitFor(() => expect(result.current.loading).toBe(false));
+            await openAndSave(result);
+            apiPost.mockClear();
+            apiPost.mockRejectedValueOnce(Object.assign(new Error('這筆待審修改在你檢視之後被更新了'), {
+                status: 409, data: { code: 'revision_changed' },
+            }));
+            apiPost.mockResolvedValueOnce({});
+            const rowNow = { ...publishedItem, pending_revision_version: 'v-new-proposal' };
+
+            await act(async () => { await result.current.handleAction('approveRevision', rowNow); });
+            await act(async () => { await result.current.handleAction('approveRevision', rowNow); });
+
+            expect(apiPost.mock.calls[0][1]).toEqual({ review_comment: '', revision_version: 'v-after-save' });
+            expect(apiPost.mock.calls[1][1]).toEqual({ review_comment: '', revision_version: 'v-new-proposal' });
+        });
+
+        test('草稿等不走待審修改的狀態：照舊用 PATCH，不帶 base_version', async () => {
+            const { result } = setup();
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            await openAndSave(result, { id: 5, status: 'draft', name: '草稿' });
+
+            expect(apiPatch).toHaveBeenCalledWith('/adminapi/things/5/', { name: '新內容' });
+            expect(apiPost).not.toHaveBeenCalled();
+        });
+    });
 });

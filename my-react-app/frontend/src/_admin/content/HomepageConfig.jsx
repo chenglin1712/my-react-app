@@ -179,6 +179,8 @@ export default function HomepageConfig() {
         return saveLock.runLocked('save', async () => {
             try {
                 const saved = await apiPatch('/adminapi/homepage-config/', {
+                    // 載入（或上次儲存）時的 updated_at：期間若有別人先存過，後端回 409，不會無聲蓋掉
+                    ...(metadata.updated_at ? { base_updated_at: metadata.updated_at } : {}),
                     ...form,
                     hero_link_url: form.hero_link_url.trim(),
                     hero_title_override: form.hero_title_override.trim(),
