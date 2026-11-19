@@ -32,7 +32,17 @@ const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const redirectTimeoutRef = useRef(null);
-    useEffect(() => () => clearTimeout(redirectTimeoutRef.current), []);
+    // 登入要等網路回應，使用者可能在那之前就離開這個頁面。元件卸載時清掉的計時器是「當下已經有的」，
+    // 之後才完成的登入會建立新的導頁計時器，把人從別的頁面拉回來（F11）；所以登入完成後要先確認還在頁面上。
+    // 每次掛載都要重設成 true：開發模式的 StrictMode 會先卸載再掛載一次。
+    const mountedRef = useRef(false);
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+            clearTimeout(redirectTimeoutRef.current);
+        };
+    }, []);
     const redirectTargetRef = useRef("/");
     // 成功提示出現後本來會等一小段時間才跳頁；按「立即前往」或 Esc 就不用等
     const skipWait = () => {
@@ -89,6 +99,8 @@ const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }
             // 前台登入則一定清掉旗標：前台登入不算「在後台登入頁輸入過密碼」，之前殘留的旗標不能讓人直接進後台
             if (isAdminVariant) markAdminSession(credential?.user?.uid);
             else clearAdminSession();
+            // 已經離開這個頁面：登入本身成功了（上面的後台旗標照常處理），但不要再顯示成功畫面或導頁
+            if (!mountedRef.current) return;
             setIsLogin(true);
             const redirectTarget = getRedirectTarget();
             redirectTargetRef.current = redirectTarget;

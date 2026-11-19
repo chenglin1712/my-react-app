@@ -55,6 +55,13 @@ const CameraWizard = () => {
     // 快速選圖 A 再選圖 B、或選圖後立刻取消，A 的 FileReader 可能比較晚才讀完；
     // 沒有這個 generation 的話，晚到的 onloadend 會把預覽蓋回已經不對的那張圖。
     const fileReadGenerationRef = useRef(0);
+    // 目前進行中的 FileReader：換圖時中止上一個、離開頁面時中止最後一個（F18），不讓讀檔白白做完
+    const readerRef = useRef(null);
+    useEffect(() => () => {
+        fileReadGenerationRef.current += 1;
+        readerRef.current?.abort();
+        readerRef.current = null;
+    }, []);
 
     // 選圖、拖放、貼上三種來源共用同一套驗證：只收圖片、上限 5MB，不合格都用文字說明原因
     const acceptFile = (newFile) => {
@@ -67,8 +74,13 @@ const CameraWizard = () => {
             return;
         }
         setErrorMsg("");
+        // 先讓舊的世代作廢、再中止上一個讀檔：abort() 會同步觸發它的 loadend，
+        // 順序反過來的話，舊讀檔的 onloadend 會以為自己還是最新的，把預覽清成 null（F18）。
+        // 已經讀完的 abort 不會有任何作用。
         const myGeneration = ++fileReadGenerationRef.current;
+        readerRef.current?.abort();
         const reader = new FileReader();
+        readerRef.current = reader;
         reader.onloadend = () => {
             if (myGeneration !== fileReadGenerationRef.current) return;
             setImage(reader.result);

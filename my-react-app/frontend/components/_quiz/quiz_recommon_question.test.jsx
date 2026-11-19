@@ -82,7 +82,8 @@ describe('RecommendedQuizQuestion（FR-4b）', () => {
     const { unmount } = render(<RecommendedQuizQuestion tribe="tayal" />);
     expect(document.documentElement).not.toHaveAttribute('data-quiz-focus');   // 載入中：導覽要留著
     await screen.findByRole('button', { name: '作答' });
-    expect(document.documentElement).toHaveAttribute('data-quiz-focus');
+    // 屬性是在題目渲染後的 effect 裡設上的；機器忙碌（整套測試同時跑）時，按鈕出現的當下可能還沒設好，所以要等（F20）
+    await waitFor(() => expect(document.documentElement).toHaveAttribute('data-quiz-focus'));
 
     mockConfirm.mockResolvedValueOnce(false);
     fireEvent.click(screen.getByRole('button', { name: '離開測驗' }));

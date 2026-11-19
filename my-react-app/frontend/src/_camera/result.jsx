@@ -67,10 +67,12 @@ const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onResta
     setLoading(true);
     setError("");
     announce("查詢中，請稍候");
+    // 換族語或離開時，把還在路上的舊請求真的取消（F18）：只用 generation 擋住晚到的回應，請求本身還是會跑完。
+    const controller = new AbortController();
     // apiPost 內部一定會回傳 Promise（即使 auth.currentUser 是 null，token 只影響
     // 要不要帶 Authorization header），不會有「未登入時整條 .then/.catch/.finally
     // 都不執行、loading 卡住」的問題。
-    apiPost(apiUrl('SEARCH_KEYS'), { words: selectedWords, tribe })
+    apiPost(apiUrl('SEARCH_KEYS'), { words: selectedWords, tribe }, { signal: controller.signal })
       .then(data => {
         if (myGeneration !== requestGenerationRef.current) return;
         setDetail(null); // 查詢期間舊清單還能點，新結果一寫入就把那時開的舊詳情收掉
@@ -90,7 +92,10 @@ const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onResta
         if (myGeneration === requestGenerationRef.current) setLoading(false);
       });
     // 步驟卸載（例如按「重新辨識」）時讓還在跑的查詢作廢，不再更新畫面或公告
-    return () => { requestGenerationRef.current += 1; };
+    return () => {
+      requestGenerationRef.current += 1;
+      controller.abort();
+    };
   }, [selectedWords, tribe, retryCount]);
 
   // playAudio 改用 _search 頁面共用的 hook：原本這裡自己維護一份 playAudio，

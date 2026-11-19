@@ -37,6 +37,17 @@ describe('CameraWizard（回歸測試：FileReader race）', () => {
     }
     triggerLoad(result) {
       this.result = result;
+      this.done = true;
+      this.onloadend?.();
+    }
+    // 跟真的 FileReader 一樣：讀完之後 abort 沒有作用；還沒讀完才會中止，
+    // 而且會「同步」觸發 abort 與 loadend 事件，result 變成 null
+    abort() {
+      if (this.done) return;
+      this.aborted = true;
+      this.done = true;
+      this.result = null;
+      this.onabort?.();
       this.onloadend?.();
     }
   }
@@ -70,6 +81,49 @@ describe('CameraWizard（回歸測試：FileReader race）', () => {
 
     act(() => { readerA.triggerLoad('data:image/png;base64,A'); }); // 過期的 A 這時候才讀完
     expect(document.querySelector('img[alt="預覽圖片"]').src).toContain('base64,B');
+  });
+
+  // F18：換圖時中止上一個讀檔、離開頁面時中止最後一個，不讓它白白做完
+  test('換選另一張圖時，還沒讀完的上一張會被中止；已經讀完的不受影響', () => {
+    render(<CameraWizard />);
+    selectFile(new File(['a'], 'a.png', { type: 'image/png' }));
+    selectFile(new File(['b'], 'b.png', { type: 'image/png' }));
+    const [readerA, readerB] = FakeFileReader.instances;
+    expect(readerA.aborted).toBe(true);
+    expect(readerB.aborted).toBeUndefined();
+
+    act(() => { readerB.triggerLoad('data:image/png;base64,B'); });
+    selectFile(new File(['c'], 'c.png', { type: 'image/png' }));
+    expect(readerB.aborted).toBeUndefined();     // B 已讀完，abort 沒有作用
+  });
+
+  test('換圖中止上一張時，預覽不會被清掉（abort 會同步觸發舊讀檔的 loadend）', () => {
+    render(<CameraWizard />);
+    selectFile(new File(['p'], 'p.png', { type: 'image/png' }));
+    act(() => { FakeFileReader.instances[0].triggerLoad('data:image/png;base64,P'); });
+    expect(document.querySelector('img[alt="預覽圖片"]').src).toContain('base64,P');
+
+    selectFile(new File(['a'], 'a.png', { type: 'image/png' }));      // A 還在讀
+    selectFile(new File(['b'], 'b.png', { type: 'image/png' }));      // 選 B：中止 A
+    expect(FakeFileReader.instances[1].aborted).toBe(true);
+    expect(document.querySelector('img[alt="預覽圖片"]').src).toContain('base64,P');   // 沒有被 A 的 loadend 清成空白
+
+    act(() => { FakeFileReader.instances[2].triggerLoad('data:image/png;base64,B'); });
+    expect(document.querySelector('img[alt="預覽圖片"]').src).toContain('base64,B');
+  });
+
+  test('離開頁面（元件卸載）時，還在讀的檔案會被中止，之後讀完也不再更新畫面', () => {
+    const { unmount } = render(<CameraWizard />);
+    selectFile(new File(['a'], 'a.png', { type: 'image/png' }));
+    const [reader] = FakeFileReader.instances;
+    unmount();
+    expect(reader.aborted).toBe(true);
+    expect(() => reader.triggerLoad('data:image/png;base64,A')).not.toThrow();
+  });
+
+  test('沒有選過圖就離開頁面：不會出錯', () => {
+    const { unmount } = render(<CameraWizard />);
+    expect(() => unmount()).not.toThrow();
   });
 });
 

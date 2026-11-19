@@ -209,3 +209,95 @@ describe('useFavorites 連點（P2-7）', () => {
     expect(total()).toBe(1);
   });
 });
+
+describe('useFavorites 換人與登出（F10）', () => {
+  const makeUser = (uid, content) => ({ uid, firestoreData: { favorites: [{ id: 1, content }] } });
+  let reject;
+  let slowWrite;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { resetToasts } = await import('../../utils/toast');
+    resetToasts();
+    // 寫入卡住，由測試決定何時失敗
+    slowWrite = new Promise((_, rej) => { reject = rej; });
+    toggleFavoriteWord.mockReturnValue(slowWrite);
+  });
+
+  test('寫入很慢，期間換成另一位使用者：失敗後不動新使用者的收藏，也不顯示錯誤', async () => {
+    const updateUserData = vi.fn();
+    const userA = makeUser('A', ['a']);
+    const userB = makeUser('B', ['x', 'y']);
+    useAuth.mockReturnValue({ userData: userA, updateUserData });
+    const { result, rerender } = renderHook(() => useFavorites());
+
+    let pending;
+    await act(async () => { pending = result.current.toggleFavorite('w', 1); await Promise.resolve(); });
+    expect(updateUserData).toHaveBeenCalledTimes(1);              // A 的樂觀更新
+    expect(updateUserData.mock.calls[0][0].uid).toBe('A');
+
+    useAuth.mockReturnValue({ userData: userB, updateUserData });  // 登出、B 登入
+    rerender();
+    await act(async () => { reject(new Error('late failure')); await pending; });
+
+    expect(updateUserData).toHaveBeenCalledTimes(1);              // 沒有再對 B 的資料做任何還原
+    expect(result.current.error).toBe('');
+    expect(result.current.favorites[0].content).toEqual(['x', 'y']);
+  });
+
+  test('寫入很慢，期間登出：失敗後不會把舊使用者的資料又塞回畫面', async () => {
+    const updateUserData = vi.fn();
+    useAuth.mockReturnValue({ userData: makeUser('A', ['a']), updateUserData });
+    const { result, rerender } = renderHook(() => useFavorites());
+
+    let pending;
+    await act(async () => { pending = result.current.toggleFavorite('w', 1); await Promise.resolve(); });
+
+    useAuth.mockReturnValue({ userData: null, updateUserData });   // 登出
+    rerender();
+    await act(async () => { reject(new Error('late failure')); await pending; });
+
+    expect(updateUserData).toHaveBeenCalledTimes(1);              // 只有最初那次樂觀更新
+    expect(result.current.error).toBe('');
+  });
+
+  test('還是同一位使用者時，失敗照舊還原並顯示錯誤', async () => {
+    const updateUserData = vi.fn();
+    const userA = makeUser('A', ['a']);
+    useAuth.mockReturnValue({ userData: userA, updateUserData });
+    const { result } = renderHook(() => useFavorites());
+
+    let pending;
+    await act(async () => { pending = result.current.toggleFavorite('w', 1); await Promise.resolve(); });
+    await act(async () => { reject(new Error('down')); await pending; });
+
+    expect(updateUserData).toHaveBeenCalledTimes(2);              // 樂觀更新 + 還原
+    expect(updateUserData.mock.calls[1][0].firestoreData.favorites[0].content).toEqual(['a']);
+    expect(result.current.error).toBe('收藏失敗，「w」已還原，請稍後再試。');
+  });
+
+  test('換人後，上一位留下的復原提示不會去改新使用者的收藏', async () => {
+    const { subscribeToasts } = await import('../../utils/toast');
+    let list = [];
+    subscribeToasts((t) => { list = t; });
+    toggleFavoriteWord.mockReset();
+    toggleFavoriteWord.mockResolvedValue(undefined);
+
+    let current = makeUser('A', ['a']);
+    const update = vi.fn((u) => { current = u; });
+    useAuth.mockImplementation(() => ({ userData: current, updateUserData: update }));
+    const { result, rerender } = renderHook(() => useFavorites());
+    await act(async () => { await result.current.toggleFavorite('w', 1, { undo: true }); });
+    expect(list).toHaveLength(1);
+
+    current = makeUser('B', ['w']);                                // 換成 B，B 剛好也收藏了 w
+    rerender();
+    toggleFavoriteWord.mockClear();
+    update.mockClear();
+    await act(async () => { await list[0].onAction(); });
+
+    expect(toggleFavoriteWord).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect(current.firestoreData.favorites[0].content).toEqual(['w']);
+  });
+});

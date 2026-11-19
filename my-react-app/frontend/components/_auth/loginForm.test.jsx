@@ -281,3 +281,76 @@ describe('LoginForm 重複送出', () => {
     await act(async () => { resolveSignIn({}); });
   });
 });
+
+describe('LoginForm：登入完成前就離開頁面（F11）', () => {
+  beforeEach(() => {
+    mockNavigate.mockReset();
+    signInWithEmailAndPassword.mockReset();
+    mockSearchParams = new URLSearchParams();
+  });
+
+  const startLogin = async () => {
+    let resolveSignIn;
+    signInWithEmailAndPassword.mockReturnValueOnce(new Promise((resolve) => { resolveSignIn = resolve; }));
+    const view = render(<LoginForm />);
+    fillLoginForm('a@b.com', 'secret1');
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '登入' })); });
+    return { ...view, resolveSignIn };
+  };
+
+  test('離開頁面之後才登入成功：不會再被導頁', async () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount, resolveSignIn } = await startLogin();
+      unmount();                                           // 使用者按了別的連結
+      await act(async () => { resolveSignIn({}); await Promise.resolve(); await Promise.resolve(); });
+      act(() => { vi.advanceTimersByTime(5000); });
+      expect(mockNavigate).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('還在頁面上時登入成功，照舊顯示成功畫面並導頁', async () => {
+    vi.useFakeTimers();
+    try {
+      const { resolveSignIn } = await startLogin();
+      await act(async () => { resolveSignIn({}); await Promise.resolve(); await Promise.resolve(); });
+      expect(screen.getByText(/登入成功！您將移至首頁/)).toBeInTheDocument();
+      act(() => { vi.advanceTimersByTime(800); });
+      expect(mockNavigate).toHaveBeenCalledWith('/');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('StrictMode（先卸載再掛載一次）下，登入成功仍然會導頁', async () => {
+    const { StrictMode } = await import('react');
+    vi.useFakeTimers();
+    try {
+      let resolveSignIn;
+      signInWithEmailAndPassword.mockReturnValueOnce(new Promise((resolve) => { resolveSignIn = resolve; }));
+      render(<StrictMode><LoginForm /></StrictMode>);
+      fillLoginForm('a@b.com', 'secret1');
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: '登入' })); });
+      await act(async () => { resolveSignIn({}); await Promise.resolve(); await Promise.resolve(); });
+      act(() => { vi.advanceTimersByTime(800); });
+      expect(mockNavigate).toHaveBeenCalledWith('/');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('按「立即前往」仍可跳過等待', async () => {
+    vi.useFakeTimers();
+    try {
+      const { resolveSignIn } = await startLogin();
+      await act(async () => { resolveSignIn({}); await Promise.resolve(); await Promise.resolve(); });
+      expect(mockNavigate).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: /立即前往/ }));
+      expect(mockNavigate).toHaveBeenCalledWith('/');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

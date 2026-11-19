@@ -56,7 +56,7 @@ describe('CameraResultStep', () => {
     expect(axios.post).toHaveBeenCalledWith(
       expect.any(String),
       { words: ['balay'], tribe: 'tayal' },
-      { headers: {}, timeout: expect.any(Number) },
+      { headers: {}, timeout: expect.any(Number), signal: expect.any(AbortSignal) },
     );
   });
 
@@ -71,8 +71,49 @@ describe('CameraResultStep', () => {
     expect(axios.post).toHaveBeenCalledWith(
       expect.any(String),
       { words: ['balay'], tribe: 'tayal' },
-      { headers: { Authorization: 'Bearer fake-token' }, timeout: expect.any(Number) },
+      { headers: { Authorization: 'Bearer fake-token' }, timeout: expect.any(Number), signal: expect.any(AbortSignal) },
     );
+  });
+
+  // F18：換族語或離開時，舊的搜尋請求要真的取消，不只是忽略晚到的回應
+  test('換族語時，上一個族語的請求會被取消，新的請求不會', async () => {
+    const signals = [];
+    axios.post.mockImplementation((url, body, config) => {
+      signals.push(config.signal);
+      return new Promise(() => {});                 // 一直不回來
+    });
+    const { rerender } = render(<CameraResultStep selectedWords={['好']} tribe="tayal" onRestart={vi.fn()} />);
+    await waitFor(() => expect(signals).toHaveLength(1));
+    expect(signals[0].aborted).toBe(false);
+
+    rerender(<CameraResultStep selectedWords={['好']} tribe="bunun" onRestart={vi.fn()} />);
+    await waitFor(() => expect(signals).toHaveLength(2));
+    expect(signals[0].aborted).toBe(true);
+    expect(signals[1].aborted).toBe(false);
+  });
+
+  test('離開這一步（卸載）時，還在路上的請求會被取消', async () => {
+    let signal;
+    axios.post.mockImplementation((url, body, config) => { signal = config.signal; return new Promise(() => {}); });
+    const { unmount } = render(<CameraResultStep selectedWords={['好']} tribe="tayal" onRestart={vi.fn()} />);
+    await waitFor(() => expect(signal).toBeDefined());
+    expect(signal.aborted).toBe(false);
+    unmount();
+    expect(signal.aborted).toBe(true);
+  });
+
+  test('請求被取消後不會顯示「查詢失敗」', async () => {
+    // apiPost 內部先非同步取 token 才呼叫 axios，所以依族語分流，不能靠「下一次呼叫回傳什麼」的順序
+    axios.post.mockImplementation((url, body, config) => {
+      if (body.tribe === 'bunun') return Promise.resolve(FAKE_RESPONSE);
+      return new Promise((resolve, reject) => {
+        config.signal.addEventListener('abort', () => reject(Object.assign(new Error('canceled'), { code: 'ERR_CANCELED' })));
+      });
+    });
+    const { rerender } = render(<CameraResultStep selectedWords={['好']} tribe="tayal" onRestart={vi.fn()} />);
+    rerender(<CameraResultStep selectedWords={['好']} tribe="bunun" onRestart={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText(/完全符合結果/)).toBeInTheDocument());
+    expect(screen.queryByText(/查詢失敗/)).not.toBeInTheDocument();
   });
 
   test('回歸測試：快速切換族語時，比較慢的舊族語回應不會蓋掉新族語已經顯示的結果', async () => {

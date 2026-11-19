@@ -87,3 +87,31 @@ describe('LoginForm（後台專用登入頁版本）', () => {
     window.sessionStorage.clear();
   });
 });
+
+describe('LoginForm 後台版：登入完成前就離開頁面（F11）', () => {
+  beforeEach(() => {
+    mockNavigate.mockReset();
+    signInWithEmailAndPassword.mockReset();
+    mockSearchParams = new URLSearchParams();
+    sessionStorage.clear();
+  });
+
+  test('離開頁面之後才登入成功：後台登入旗標照常記下（登入是成功的），但不導頁', async () => {
+    vi.useFakeTimers();
+    try {
+      let resolveSignIn;
+      signInWithEmailAndPassword.mockReturnValueOnce(new Promise((resolve) => { resolveSignIn = resolve; }));
+      const { unmount } = render(<LoginForm variant="admin" />);
+      fireEvent.change(screen.getByLabelText('電子郵件'), { target: { value: 'a@b.com' } });
+      fireEvent.change(screen.getByLabelText('密碼'), { target: { value: 'secret1' } });
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: '登入後台' })); });
+      unmount();
+      await act(async () => { resolveSignIn({ user: { uid: 'admin-1' } }); await Promise.resolve(); await Promise.resolve(); });
+      act(() => { vi.advanceTimersByTime(5000); });
+      expect(hasAdminSession('admin-1')).toBe(true);
+      expect(mockNavigate).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

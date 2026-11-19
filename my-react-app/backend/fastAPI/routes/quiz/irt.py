@@ -239,9 +239,16 @@ def compute_delta_w(recent_results: List[int], e_w: int, n_w: int) -> float:
     D_total = (e_w / n_w) if n_w and n_w > 0 else 0.0
     return 1.0 if D_total == 0 else D_recent / D_total
 
+# 全體平均作答時間小於這個值（十億分之一秒）就當作「沒有平均時間」，跟原本對 0 的處理一樣。
+_MIN_AVG_TIME = 1e-9
+
 def compute_Tw(recent_times: List[float], t_avg_all: float) -> float:
-    t_w = sum(recent_times) / len(recent_times) if recent_times else (t_avg_all or 1.0)
-    return t_w / (t_avg_all or 1.0)
+    # 平均時間趨近 0（例如 5e-324 或 1e-299）時，除下去的比值會變成無限大或大到下一步乘係數就溢位；
+    # 它會一路進到 Bq，而 Bq 會放進題目的 meta 回傳，回應就不是合法 JSON（稽核 F16）。
+    # 真實的作答時間不會小於十億分之一秒，這種值只可能來自被竄改的資料。
+    base = t_avg_all if abs(t_avg_all or 0.0) >= _MIN_AVG_TIME else 1.0
+    t_w = sum(recent_times) / len(recent_times) if recent_times else base
+    return t_w / base
 
 def compute_Bq(F_w: float, R_w: float, Delta_w: float, T_w: float, fprime: float) -> float:
     return (BETA1*F_w + BETA2*R_w + BETA3*Delta_w + BETA4*T_w + BETA5*fprime)
@@ -252,12 +259,25 @@ def compute_score(Ptheta: float, Bq: float) -> float:
 
 def _compute_type_counts(theta: float) -> Dict[str, int]:
     ratios = {'translate':0.3,'match':0.2,'fill':0.25,'order':0.25} if theta<0.7 else {'translate':0.2,'match':0.1,'fill':0.3,'order':0.4}
-    type_count = {
-        "wordTranslate": round(TOTAL_QUESTIONS*ratios['translate']),
-        "wordMatch": round(TOTAL_QUESTIONS*ratios['match']),
-        "sentenceFill": round(TOTAL_QUESTIONS*ratios['fill']),
-        "sentenceOrder": round(TOTAL_QUESTIONS*ratios['order']),
+    # 每個題型「理想上」該有幾題（小數）；下面四捨五入後再校正到剛好等於總題數。
+    quotas = {
+        "wordTranslate": TOTAL_QUESTIONS*ratios['translate'],
+        "wordMatch": TOTAL_QUESTIONS*ratios['match'],
+        "sentenceFill": TOTAL_QUESTIONS*ratios['fill'],
+        "sentenceOrder": TOTAL_QUESTIONS*ratios['order'],
     }
+    type_count = {name: round(quota) for name, quota in quotas.items()}
+    # 四捨五入後的總和可能比總題數多（例如總題數 3：四種題型各進位成 1 題，共 4 題）。
+    # 以前是照多的題數全部出完，再把洗牌後的最後幾題截掉，結果哪個題型被砍是隨機的。
+    # 現在改成在這裡就扣掉：從「被進位進最多」的題型（四捨五入多算的量最大＝最大餘數法裡餘數最小的）
+    # 先扣，同分時扣後面的題型。總和沒超過時結果跟以前完全一樣（預設 10 題的分配不變）。
+    names = list(type_count)
+    while sum(type_count.values()) > TOTAL_QUESTIONS:
+        donor = max(
+            (name for name in names if type_count[name] > 0),
+            key=lambda name: (type_count[name] - quotas[name], names.index(name)),
+        )
+        type_count[donor] -= 1
     tot_assigned = sum(type_count.values())
     if tot_assigned < TOTAL_QUESTIONS:
         type_count["wordTranslate"] += TOTAL_QUESTIONS - tot_assigned
