@@ -11,6 +11,9 @@ from .keyed_cache import KeyedCache
 
 router = APIRouter()
 
+# 一題至少要有幾個「不同」的選項（正解＋干擾項）才出題
+MIN_DISTINCT_OPTIONS = 4
+
 # 每個族語去重後的例句清單只在第一次請求時查詢+解析一次，
 # 之後直接從記憶體回傳，不用每個 request 都重新撈全表、重新 parse JSON。
 _unique_sentences_cache: KeyedCache[str, list] = KeyedCache()
@@ -85,12 +88,16 @@ def get_sentence_questions(
     with_audio = [s for s in unique_sentences if s['audio_id']]
     pool = with_audio if len(with_audio) >= 4 else unique_sentences
 
-    if len(pool) < 4:
+    # 干擾選項是從「不同的中文句子」抽的，所以除了可出題的句子數，也要看不同中文的數量：
+    # 很多個例句共用少數幾種中文時，只看句數會放行，結果出一題選項不足的殘缺題目。
+    all_chinese = list({s['chinese'] for s in unique_sentences})
+    # 後台可以把每題選項數調大，不同中文也要至少那麼多，不然 min(...) 會悄悄少給選項
+    needed = max(MIN_DISTINCT_OPTIONS, game_config.SENTENCE_OPTIONS_PER_QUESTION)
+    if len(pool) < MIN_DISTINCT_OPTIONS or len(all_chinese) < needed:
         raise HTTPException(status_code=500, detail='例句資料不足，無法生成句型題目')
 
     # 隨機抽題
     selected = random.sample(pool, min(count, len(pool)))
-    all_chinese = list({s['chinese'] for s in unique_sentences})
 
     distractor_count = max(0, game_config.SENTENCE_OPTIONS_PER_QUESTION - 1)
     questions = []

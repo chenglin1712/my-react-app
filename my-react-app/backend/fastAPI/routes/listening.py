@@ -11,6 +11,9 @@ from .keyed_cache import KeyedCache
 
 router = APIRouter()
 
+# 一題至少要有幾個「不同」的選項（正解＋干擾項）才出題
+MIN_DISTINCT_OPTIONS = 4
+
 # 每個族語的有效詞彙（有音檔+有中文解釋）只在第一次請求時查詢+解析一次，
 # 之後直接從記憶體回傳，不用每個 request 都重新撈全表、重新 parse JSON。
 _valid_words_cache: KeyedCache[str, list] = KeyedCache()
@@ -71,12 +74,15 @@ def get_listening_questions(
 
     valid_words = _load_valid_words(db, tribe_id)
 
-    if len(valid_words) < 4:
+    # 干擾選項是從「不同的中文意思」抽的，所以門檻要看不同意思的數量，不是詞的數量：
+    # 很多個詞共用少數幾種意思時，只看詞數會放行，結果出一題選項不足的殘缺題目。
+    all_meanings = list({w['meaning'] for w in valid_words})
+    # 後台可以把每題選項數調大，不同意思也要至少那麼多，不然 min(...) 會悄悄少給選項
+    if len(all_meanings) < max(MIN_DISTINCT_OPTIONS, game_config.LISTENING_OPTIONS_PER_QUESTION):
         raise HTTPException(status_code=500, detail='音頻詞彙不足，無法生成聽力題目')
 
     # 隨機抽取題目
     selected = random.sample(valid_words, min(count, len(valid_words)))
-    all_meanings = list({w['meaning'] for w in valid_words})
 
     distractor_count = max(0, game_config.LISTENING_OPTIONS_PER_QUESTION - 1)
     questions = []
