@@ -54,7 +54,7 @@ describe('本期專題文章頁', () => {
     expect(container.querySelector('.tpage-body blockquote').textContent).toBe('一句引用');
     expect(screen.getByAltText('內文圖')).toHaveAttribute('src', 'https://res.cloudinary.com/demo/body.jpg');
     expect(screen.getByText('內文圖說').tagName).toBe('FIGCAPTION');
-    await waitFor(() => expect(document.title).toBe('織紋裡的語言｜源·語'));
+    await waitFor(() => expect(document.title).toBe('織紋裡的語言｜原語'));
   });
 
   test('內文裡的 HTML 當成純文字顯示；不安全的圖片與連結整個略過', async () => {

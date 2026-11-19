@@ -24,9 +24,9 @@ afterEach(() => { vi.restoreAllMocks(); document.title = ''; });
 describe('換頁時的標題、捲動與焦點', () => {
     test('進站就設定分頁標題，換頁後更新', () => {
         render(<MemoryRouter initialEntries={['/login']}><Harness /></MemoryRouter>);
-        expect(document.title).toBe('登入｜源·語');
+        expect(document.title).toBe('登入｜原語');
         fireEvent.click(screen.getByText('前往翻譯'));
-        expect(document.title).toBe('翻譯｜源·語');
+        expect(document.title).toBe('翻譯｜原語');
     });
 
     test('一般換頁捲回頂端並把焦點移到新頁的 h1', async () => {

@@ -39,6 +39,12 @@ describe('AdminLoginPage', () => {
 
     test('分頁標題是「後台登入」', () => {
         renderPage();
-        expect(document.title).toBe('後台登入｜源·語');
+        expect(document.title).toBe('後台登入｜原語');
+    });
+
+    test('品牌字標與名稱一致：字標是「原」、名稱是「原語管理後台」（F7）', () => {
+        const { container } = renderPage();
+        expect(container.querySelector('.admin-login-brand-mark')).toHaveTextContent(/^原$/);
+        expect(container.querySelector('.admin-login-brand-name')).toHaveTextContent('原語管理後台');
     });
 });

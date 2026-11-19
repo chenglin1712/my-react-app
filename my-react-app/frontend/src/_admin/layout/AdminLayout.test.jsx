@@ -40,7 +40,7 @@ describe('AdminLayout', () => {
 
   test('渲染品牌名稱與 Outlet 帶入的頁面內容', () => {
     renderLayout();
-    expect(screen.getByText('源·語')).toBeInTheDocument();
+    expect(screen.getByText('原語')).toBeInTheDocument();
     expect(screen.getByText('ADMIN CONSOLE')).toBeInTheDocument();
     expect(screen.getByText('DASHBOARD_CONTENT')).toBeInTheDocument();
   });
