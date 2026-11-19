@@ -75,6 +75,28 @@ function extractMessage(value) {
   return null;
 }
 
+/** 後端沒有回 detail／error 時（nginx 的 502／504 是 HTML、部署重啟中、會場網路斷線、
+ * 上傳超過 nginx 上限），axios 的 err.message 是英文（"Request failed with status code 502"、
+ * "Network Error"），而不少畫面會把 err.message 直接顯示給使用者。這裡集中換成中文說明。
+ *
+ * 只處理「確定是連線或 HTTP 狀態造成的」錯誤：沒有 response 的一般 Error（例如程式自己丟的）
+ * 訊息要原樣保留，不能一律當成斷線。 */
+const AXIOS_STATUS_BOILERPLATE = /^Request failed with status code \d{3}$/;
+
+function fallbackMessage(err, status, isTimeout) {
+  if (isTimeout) return '伺服器回應逾時，請稍後再試';
+  if (status === undefined) {
+    const isNetworkFailure = err.code === 'ERR_NETWORK' || err.message === 'Network Error';
+    return isNetworkFailure ? '連線失敗，請檢查網路後再試' : err.message;
+  }
+  // 有 HTTP 狀態時，只把 axios 自己產生的英文樣板換成中文；3xx，或訊息來自別處（不是樣板）的錯誤，原樣保留
+  if (status < 400 || (err.message && !AXIOS_STATUS_BOILERPLATE.test(err.message))) return err.message;
+  if (status >= 500) return '伺服器暫時無法回應，請稍後再試';
+  if (status === 413) return '上傳的內容太大，請縮小後再試';
+  if (status === 429) return '操作太頻繁，請稍後再試';
+  return '這個要求沒有成功，請稍後再試';
+}
+
 function throwNormalizedError(rawErr) {
   // 被丟出來的不一定是物件（null、字串）：先轉成 Error，避免讀屬性時再丟 TypeError 蓋掉原始錯誤
   const err = rawErr && typeof rawErr === 'object' ? rawErr : new Error(String(rawErr ?? '請求失敗'));
@@ -90,7 +112,7 @@ function throwNormalizedError(rawErr) {
   }
   const isTimeout = err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT';
   const message = extractMessage(respData?.detail) || extractMessage(respData?.error)
-    || (isTimeout ? '伺服器回應逾時，請稍後再試' : err.message) || '請求失敗';
+    || fallbackMessage(err, status, isTimeout) || '請求失敗';
   throw new ApiError(message, { status, data: respData, timedOut: isTimeout });
 }
 
