@@ -12,8 +12,12 @@ from fastAPI.routes.quiz.schemas import WordDTO
 
 
 def test_word_translate_question_payload_uses_answer_not_cn(monkeypatch):
+    # 干擾選項也要有真實釋義：沒有釋義的詞不會被拿來當選項（見 test_quiz_option_integrity.py）
     monkeypatch.setattr(quiz_module, "_word_explanations_cache", {
         "w1": [{"chineseExplanation": "石頭"}],
+        "w2": [{"chineseExplanation": "水"}],
+        "w3": [{"chineseExplanation": "火"}],
+        "w4": [{"chineseExplanation": "樹"}],
     })
     monkeypatch.setattr(quiz_module, "_word_audios_cache", {})
 
