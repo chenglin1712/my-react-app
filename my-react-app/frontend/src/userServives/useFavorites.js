@@ -45,9 +45,12 @@ export function useFavorites() {
     // 內部的 run 永遠讀「當下最新」的使用者資料（userRef），並以明確的目標狀態（要收藏或不要）運作：
     // 復原提示放了幾秒、期間收藏又變過，按復原仍然是「回到原來的狀態」，不會因為舊快照而切到錯的方向。
     const toggleFavorite = useCallback(async (word, categoryId = DEFAULT_CATEGORY_ID, options = {}) => {
-        const run = async (target, opts) => {
+        // owner：復原提示是某位使用者按出來的，按下時如果已經換人了就什麼都不做（F10）。
+        // 用物件包起來，是為了「有沒有指定」不要依賴 uid 本身是不是真值。
+        const run = async (target, opts, owner) => {
             const current = userRef.current ?? user;
             if (!current) return;
+            if (owner && current.uid !== owner.uid) return;
             setError("");
 
             const currentFavorites = current.firestoreData?.favorites || EMPTY_FAVORITES;
@@ -74,7 +77,7 @@ export function useFavorites() {
                 ? showToast({
                     message: added ? `已加入收藏：${word}` : `已取消收藏：${word}`,
                     actionLabel: "復原",
-                    onAction: () => run(!added, {}),
+                    onAction: () => run(!added, {}, { uid: current.uid }),
                 })
                 : null;
 
@@ -89,7 +92,15 @@ export function useFavorites() {
             } catch (err) {
                 // 實際寫入失敗，只把「這個詞」還原（對當下最新的收藏），並讓消費這個 hook 的頁面知道要顯示錯誤，
                 // 不然使用者會以為收藏成功了，但 Firestore 其實沒有真的存進去。
-                const latest = userRef.current ?? current;
+                const latest = userRef.current;
+                if (!latest || latest.uid !== current.uid) {
+                    // F10：寫入很慢，期間已經登出或換了另一位使用者。還原只能套在送出這次切換的那位使用者身上：
+                    // 套在新使用者的資料上會把別人的收藏改掉，登出後還會把舊使用者的資料又塞回畫面。
+                    // 舊使用者的樂觀更新已隨著他的工作階段結束，不需要還原；錯誤訊息也不該顯示給新使用者。
+                    if (toastId) dismissToast(toastId);
+                    console.error("同步收藏失敗（使用者已變更，略過還原）", err);
+                    return;
+                }
                 const reverted = {
                     ...latest,
                     firestoreData: {
