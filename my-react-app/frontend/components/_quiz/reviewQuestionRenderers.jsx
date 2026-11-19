@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Check, Play } from "lucide-react";
 
 // 複習頁「單一題目」卡片的題型渲染器。跟 quiz_panel_submit.jsx 的
@@ -14,13 +15,38 @@ function formatOX(num) {
   return "未作答";
 }
 
+// 一次只播一段（F18）：連點播放鈕，以前每按一次就新建一個 Audio 疊著播；離開題目後也不會停。
+// 現在記住「正在播的那一個」，要播新的之前先停掉舊的；按鈕卸載（換題、離開頁面）時，
+// 如果正在播的是自己放的，也一併停掉。
+let activeAudio = null;
+function stopActiveAudio() {
+  if (!activeAudio) return;
+  activeAudio.pause();
+  activeAudio = null;
+}
+
 function PlayAudioButton({ audio }) {
+  const ownRef = useRef(null);
+  useEffect(() => () => {
+    if (ownRef.current && activeAudio === ownRef.current) stopActiveAudio();
+    ownRef.current = null;
+  }, []);
+
   if (!audio) return null;
+
+  const play = () => {
+    stopActiveAudio();
+    const player = new Audio(audio);
+    ownRef.current = player;
+    activeAudio = player;
+    player.play().catch(() => {});
+  };
+
   return (
     <button
       type="button"
       className="play-btn"
-      onClick={() => { new Audio(audio).play().catch(() => {}); }}
+      onClick={play}
       aria-label="播放音訊"
     >
       <Play size={20} />
