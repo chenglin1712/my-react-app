@@ -16,7 +16,7 @@ from .irt import (
     compute_Tw,
     compute_smoothed_error_rate,
 )
-from .repository import _get_audio, _get_cn
+from .repository import _get_audio, _get_real_cn
 from .schemas import WordDTO
 
 logger = logging.getLogger(__name__)
@@ -54,16 +54,48 @@ def _sample_others(all_words_list, exclude_names, k):
     return picked
 
 
-def _build_translate_options(w, all_words_list):
-    others = _sample_others(all_words_list, {w.name}, 3)
-    distractors = [_get_cn(o) for o in others]
-    correct_cn = _get_cn(w)
+TRANSLATE_DISTRACTOR_COUNT = 3
+
+
+def _distinct_real_cns(all_words_list):
+    """詞庫裡所有「真實釋義」的中文，去重複（保留第一次出現的順序）。
+
+    單詞翻譯題的干擾選項從這份清單抽：抽的單位是「中文文字」而不是「詞」，所以選項不會有
+    「未知」、不會彼此重複，也不會和正解相同。以前是抽詞再取中文：沒有釋義的詞變成「未知」，
+    不同詞共用同一個中文意思（例如 qsya 與 qsya' 都是「水」）時選項會重複，而重複的選項都等於
+    正解，點哪個都算對。整份出題只建一次（O(詞庫大小)），每題再從裡面抽。"""
+    seen, out = set(), []
+    for word in all_words_list:
+        cn = _get_real_cn(word)
+        if cn is not None and cn not in seen:
+            seen.add(cn)
+            out.append(cn)
+    return out
+
+
+def _build_translate_options(w, all_words_list, cn_pool=None):
+    """回傳 (正解中文, 打亂後的四個選項)；這個詞沒有釋義、或湊不滿三個不同的干擾選項時回傳 None。
+
+    cn_pool：_distinct_real_cns() 的結果。連續出很多題時由呼叫端建一次傳進來，不要每題重掃詞庫。"""
+    correct_cn = _get_real_cn(w)
+    if correct_cn is None:
+        return None
+    pool = cn_pool if cn_pool is not None else _distinct_real_cns(all_words_list)
+    # 多抽一個：萬一抽到的剛好是正解，丟掉它仍然有三個。池子裡的中文互不相同，所以不會有重複。
+    sampled = random.sample(pool, min(TRANSLATE_DISTRACTOR_COUNT + 1, len(pool)))
+    distractors = [cn for cn in sampled if cn != correct_cn][:TRANSLATE_DISTRACTOR_COUNT]
+    if len(distractors) < TRANSLATE_DISTRACTOR_COUNT:
+        return None
     opts = [correct_cn] + distractors
     random.shuffle(opts)
     return correct_cn, opts
 
-def _build_word_translate_question(w, all_words_list, question_id, difficulty=None, meta=None):
-    correct_cn, opts = _build_translate_options(w, all_words_list)
+def _build_word_translate_question(w, all_words_list, question_id, difficulty=None, meta=None, cn_pool=None):
+    """做不出這題（沒有釋義、干擾選項不夠）時回傳 None，呼叫端要換下一個詞。"""
+    built = _build_translate_options(w, all_words_list, cn_pool)
+    if built is None:
+        return None
+    correct_cn, opts = built
     return {
         "id": question_id,
         "type": "word-translate",
@@ -167,6 +199,21 @@ class _CandidatePicker:
         """把指定的候選字標記為已用（不一定是排序最前面的那一個）。"""
         self._used.add(candidate["word"].name)
 
+    def next_where(self, predicate):
+        """依序找第一個「尚未用過、而且符合條件」的候選字，標記為已用並回傳；沒有就回 None。
+
+        不符合條件的候選字原封不動：它們不會被標成已用，後面的題型（句子填空、句子排序）
+        還是可以挑到。單詞翻譯／配對題需要真實釋義，如果直接用 next() 再自己略過，
+        釋義缺很多的詞庫會在這兩種題型就把候選字耗光，後面的題型沒詞可用。"""
+        i = self._idx
+        while i < len(self._candidates):
+            c = self._candidates[i]
+            if c["word"].name not in self._used and predicate(c):
+                self._used.add(c["word"].name)
+                return c
+            i += 1
+        return None
+
     def next(self):
         while self._idx < len(self._candidates) and self._candidates[self._idx]["word"].name in self._used:
             self._idx += 1
@@ -231,33 +278,50 @@ def _score_candidates(all_words: List[WordDTO], user_model: dict, theta: float, 
 
 def _generate_word_translate_questions(picker: _CandidatePicker, all_words: List[WordDTO], theta: float, count: int) -> list:
     generated = []
-    for i in range(count):
-        c = picker.next()
+    cn_pool = _distinct_real_cns(all_words)   # 整份出題只建一次
+    while len(generated) < count:
+        # 只挑有真實釋義的候選字；沒有釋義的留給別的題型，不在這裡耗掉
+        c = picker.next_where(lambda cand: _get_real_cn(cand["word"]) is not None)
         if not c: break
         w = c["word"]
         Dt = c["Dt_map"].get("word-translate", 0.5)
         Dq, bw = compute_Dq_and_bw(c["Dw"], Dt, c["fprime"])
         a_q = irt.TYPE_AQ.get("word-translate", 1.0)
         Ptheta = compute_P_theta(theta, bw, a_q, irt.DEFAULT_GUESS)
-        generated.append(_build_word_translate_question(
-            w, all_words, f"wt-{w.id}-{i}",
-            difficulty=bw, meta={"Ptheta": Ptheta, "Bq": c["Bq"], "Dq": Dq}
-        ))
+        question = _build_word_translate_question(
+            w, all_words, f"wt-{w.id}-{len(generated)}",
+            difficulty=bw, meta={"Ptheta": Ptheta, "Bq": c["Bq"], "Dq": Dq},
+            cn_pool=cn_pool,
+        )
+        if question is None:
+            break   # 候選字都有釋義了，還做不出題就只剩「不同的中文意思不到四種」，每個詞都一樣做不出來
+        generated.append(question)
     return generated
 
 def _generate_word_match_questions(picker: _CandidatePicker, count: int) -> list:
-    """每題取 5 個單詞組成配對題"""
+    """每題取 5 個單詞組成配對題。
+
+    每個中文標籤在同一題裡只能出現一次、而且必須是真實釋義：畫面上兩顆一模一樣的按鈕，
+    只有一顆算對，使用者會以為自己答對卻被判錯。沒有釋義或中文重複的詞直接略過，換下一個。"""
     generated = []
     for i in range(count):
-        group = []
-        for _ in range(5):
-            c = picker.next()
+        group, seen_cn = [], set()
+
+        def usable(cand):
+            # 有真實釋義、而且中文和這一組已經挑的都不同；不符合的候選字原封不動留給別的題型
+            cn = _get_real_cn(cand["word"])
+            return cn is not None and cn not in seen_cn
+
+        while len(group) < 5:
+            c = picker.next_where(usable)
             if not c: break
-            group.append(c)
+            cn = _get_real_cn(c["word"])
+            seen_cn.add(cn)
+            group.append((c, cn))
         if not group: break
-        pairs = [{"cn": _get_cn(gc["word"]),
+        pairs = [{"cn": cn,
                   "tayal": {"word": gc["word"].name, "audio": _get_audio(gc["word"])}}
-                 for gc in group]
+                 for gc, cn in group]
         generated.append({
             "id": f"wm-{i}",
             "type": "word-match",
@@ -319,7 +383,9 @@ def _generate_sentence_fill_questions(picker: _CandidatePicker, all_words: List[
     # 若句子資料不足，以 word-translate 補足
     for c in fallback[:count - fill_done]:
         w = c["word"]
-        generated.append(_build_word_translate_question(w, all_words, f"sf-fb-{w.id}"))
+        question = _build_word_translate_question(w, all_words, f"sf-fb-{w.id}")
+        if question is not None:
+            generated.append(question)
     return generated
 
 def _generate_sentence_order_questions(picker: _CandidatePicker, all_words: List[WordDTO], count: int) -> list:
@@ -345,5 +411,7 @@ def _generate_sentence_order_questions(picker: _CandidatePicker, all_words: List
     # 若句子資料不足，以 word-translate 補足
     for c in fallback[:count - order_done]:
         w = c["word"]
-        generated.append(_build_word_translate_question(w, all_words, f"so-fb-{w.id}"))
+        question = _build_word_translate_question(w, all_words, f"so-fb-{w.id}")
+        if question is not None:
+            generated.append(question)
     return generated

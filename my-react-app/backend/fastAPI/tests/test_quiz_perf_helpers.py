@@ -3,6 +3,7 @@ import random
 
 from fastAPI.routes.quiz import generator as G
 from fastAPI.routes.quiz import irt
+from fastAPI.routes.quiz import repository
 from fastAPI.routes.quiz.schemas import WordDTO
 
 
@@ -64,12 +65,16 @@ def test_sample_others_still_finds_candidates_when_almost_everything_is_excluded
         assert {o.name for o in G._sample_others(words, exclude, 3)} == {"name998", "name999"}
 
 
-def test_translate_options_contain_the_answer_plus_three_distractors():
+def test_translate_options_contain_the_answer_plus_three_distractors(monkeypatch):
     words = _words(100)
+    # 每個詞都要有真實釋義才出得了題（沒有釋義的詞見 test_quiz_option_integrity.py）
+    monkeypatch.setattr(repository, "_word_explanations_cache",
+                        {w.id: [{"chineseExplanation": f"意思{w.name}"}] for w in words})
     for w in words[:20]:
         correct, opts = G._build_translate_options(w, words)
         assert correct in opts
         assert len(opts) == 4
+        assert len(set(opts)) == 4
 
 
 # ---------------- O3 ----------------

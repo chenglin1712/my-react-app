@@ -295,6 +295,57 @@ def test_words_and_affix_scopes_also_invalidate_the_quiz_distractor_kit_of_that_
     distractors.invalidate()
 
 
+def test_words_scope_only_drops_explanations_and_audios_of_the_notified_tribe(client, monkeypatch):
+    """釋義／音檔快取是用 word_id 當 key、不分族語的全域字典。原本失效時整個清空，
+    但只有被通知的族語的詞庫快取會失效並重新預熱：其他族語的詞庫快取還在、釋義卻沒了，
+    它們的測驗查不到任何釋義（改成只出有釋義的詞之後，會變成完全出不了題）。
+    現在只清被通知族語自己的詞。"""
+    from config.tribes import TRIBES
+    from fastAPI.routes.quiz import repository as quiz
+    from fastAPI.routes.quiz.schemas import WordDTO
+
+    monkeypatch.setenv("INTERNAL_API_SECRET", "correct-secret-0123456789-0123456789-abcdef")
+    tayal = next(t for t in TRIBES if t.slug == "tayal")
+    amis = next(t for t in TRIBES if t.slug == "amis")
+
+    class _NoopThread:   # 不要真的啟動背景重新預熱（它會打真實的辭典資料庫）
+        def __init__(self, target, args=(), daemon=None):
+            pass
+
+        def start(self):
+            pass
+
+    def _fill():
+        quiz._words_cache.invalidate(tayal.id)
+        quiz._words_cache.invalidate(amis.id)
+        quiz._words_cache.get_or_compute(tayal.id, lambda: [WordDTO(id="t1", name="a", frequency=1), WordDTO(id="t2", name="b", frequency=1)])
+        quiz._words_cache.get_or_compute(amis.id, lambda: [WordDTO(id="m1", name="c", frequency=1)])
+        monkeypatch.setattr(quiz, "_word_explanations_cache", {i: [{"chineseExplanation": "x"}] for i in ("t1", "t2", "m1")})
+        monkeypatch.setattr(quiz, "_word_audios_cache", {i: [{"fileId": "f"}] for i in ("t1", "t2", "m1")})
+
+    def _invalidate(tribes):
+        with patch("fastAPI.routes.internal.threading.Thread", _NoopThread):
+            return client.post(
+                "/internal/cache/invalidate",
+                json={"scopes": ["words"], "tribes": tribes},
+                headers={"X-Internal-Secret": "correct-secret-0123456789-0123456789-abcdef"},
+            )
+
+    try:
+        _fill()
+        assert _invalidate(["tayal"]).status_code == 200
+        assert set(quiz._word_explanations_cache) == {"m1"}      # 泰雅語的清掉，阿美語的還在
+        assert set(quiz._word_audios_cache) == {"m1"}
+        assert quiz._words_cache.get(amis.id) is not None         # 阿美語的詞庫快取也沒動
+
+        _fill()
+        assert _invalidate(None).status_code == 200               # 沒指定族語＝全部：全清
+        assert quiz._word_explanations_cache == {} and quiz._word_audios_cache == {}
+    finally:
+        quiz._words_cache.invalidate(tayal.id)
+        quiz._words_cache.invalidate(amis.id)
+
+
 def test_secret_shorter_than_32_characters_is_refused_even_when_it_matches(client, monkeypatch):
     # 稽核 DEP-7：太短的密鑰等於沒有保護，連「正確」的請求也 fail-closed，且不洩漏原因細節
     monkeypatch.setenv("INTERNAL_API_SECRET", "short-secret")

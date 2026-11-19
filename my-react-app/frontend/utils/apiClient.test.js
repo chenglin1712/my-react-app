@@ -96,15 +96,60 @@ describe('normalizeError（透過 apiPost 間接測試，函式本身沒有 expo
     }
   });
 
-  test('沒有 response（網路錯誤）時退回 err.message', async () => {
+  test('沒有 response 的網路錯誤顯示中文，不把英文 Network Error 丟給使用者（F3）', async () => {
     axios.post.mockRejectedValueOnce(new Error('Network Error'));
+    await expect(apiPost('/x', {})).rejects.toMatchObject({ message: '連線失敗，請檢查網路後再試' });
 
-    try {
-      await apiPost('/x', {});
-      throw new Error('should have thrown');
-    } catch (err) {
-      expect(err.message).toBe('Network Error');
+    axios.post.mockRejectedValueOnce(Object.assign(new Error('whatever'), { code: 'ERR_NETWORK' }));
+    await expect(apiPost('/x', {})).rejects.toMatchObject({ message: '連線失敗，請檢查網路後再試' });
+  });
+
+  test('沒有 response、也不是網路錯誤的一般 Error，訊息原樣保留', async () => {
+    axios.post.mockRejectedValueOnce(new Error('boom'));
+    await expect(apiPost('/x', {})).rejects.toMatchObject({ message: 'boom' });
+  });
+
+  test('5xx 且沒有 detail（nginx 的 HTML 錯誤頁）顯示中文，不是 Request failed with status code', async () => {
+    for (const status of [500, 502, 503, 504]) {
+      axios.post.mockRejectedValueOnce({
+        message: `Request failed with status code ${status}`,
+        response: { status, data: '<html><body>Bad Gateway</body></html>' },
+      });
+      await expect(apiPost('/x', {})).rejects.toMatchObject({
+        message: '伺服器暫時無法回應，請稍後再試', status,
+      });
     }
+  });
+
+  test('4xx 沒有 detail 時：413、429 用對應說明，其餘用通用說明；都不顯示英文', async () => {
+    const cases = [
+      [413, '上傳的內容太大，請縮小後再試'],
+      [429, '操作太頻繁，請稍後再試'],
+      [404, '這個要求沒有成功，請稍後再試'],
+    ];
+    for (const [status, expected] of cases) {
+      axios.post.mockRejectedValueOnce({
+        message: `Request failed with status code ${status}`,
+        response: { status, data: '<html></html>' },
+      });
+      await expect(apiPost('/x', {})).rejects.toMatchObject({ message: expected, status });
+    }
+  });
+
+  test('訊息不是 axios 的英文樣板時原樣保留（不論狀態碼），3xx 也不換', async () => {
+    axios.post.mockRejectedValueOnce(Object.assign(new Error('自訂的錯誤說明'), { response: { status: 400, data: '' } }));
+    await expect(apiPost('/x', {})).rejects.toMatchObject({ message: '自訂的錯誤說明', status: 400 });
+
+    axios.post.mockRejectedValueOnce({ message: 'Request failed with status code 304', response: { status: 304, data: '' } });
+    await expect(apiPost('/x', {})).rejects.toMatchObject({ message: 'Request failed with status code 304', status: 304 });
+  });
+
+  test('後端有給 detail 時一律以 detail 為準，不被狀態碼說明取代', async () => {
+    axios.post.mockRejectedValueOnce({
+      message: 'Request failed with status code 502',
+      response: { status: 502, data: { detail: '翻譯服務暫時無法回應，請稍後再試' } },
+    });
+    await expect(apiPost('/x', {})).rejects.toMatchObject({ message: '翻譯服務暫時無法回應，請稍後再試' });
   });
 });
 

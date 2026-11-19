@@ -139,6 +139,7 @@ def invalidate_cache(
     invalidated = {"words": 0, "grammar": 0, "grammar_affixes": 0, "grammar_quiz": 0}
 
     if "words" in scopes:
+        stale_word_ids: set[str] = set()
         for name in tribe_names:
             if search._tribe_words_cache.invalidate(name):
                 invalidated["words"] += 1
@@ -152,14 +153,18 @@ def invalidate_cache(
                 morphology.service.invalidate(tribe_id)
                 listening._valid_words_cache.invalidate(tribe_id)
                 sentence._unique_sentences_cache.invalidate(tribe_id)
+                # 失效之前先記下這個族語有哪些詞，下面才知道要清哪些釋義／音檔
+                stale_word_ids.update(w.id for w in (quiz._words_cache.get(tribe_id) or []))
                 quiz._words_cache.invalidate(tribe_id)
 
-        # _word_explanations_cache／_word_audios_cache 是用 word_id 當 key 的
-        # 全域字典，不是照族語分開存，沒辦法只清特定族語的部分——乾脆整個清掉，
-        # 下次 quiz.load_all_words() 被呼叫（含上面的背景重新預熱）時會自然
-        # 重新填值，成本遠低於讓內容改完之後繼續回傳舊音檔連結。
-        quiz._word_explanations_cache.clear()
-        quiz._word_audios_cache.clear()
+        # _word_explanations_cache／_word_audios_cache 是用 word_id 當 key 的全域字典，
+        # 釋義與音檔是跟著該族語的詞庫一起載入的（quiz.load_all_words）。只清「被失效的族語」
+        # 自己的詞：只有這些族語的詞庫快取會失效並被重新預熱、重新填值。
+        # 原本整個清空，其他族語的詞庫快取還在、釋義與音檔卻沒了，它們的測驗就查不到釋義
+        # （後台改了泰雅語的詞條，阿美語的測驗選項就出現「未知」），要等到服務重啟才恢復。
+        for word_id in stale_word_ids:
+            quiz._word_explanations_cache.pop(word_id, None)
+            quiz._word_audios_cache.pop(word_id, None)
 
     if "grammar" in scopes:
         for name in tribe_names:

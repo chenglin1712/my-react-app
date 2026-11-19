@@ -55,9 +55,14 @@ def warm_cache(db: Session) -> None:
 # 出題用小工具（原本是 generate_quiz_frontend 內的巢狀函式，
 # 因為只讀模組級快取＋參數都已明確傳入，不需要 closure，抽成模組層級函式）
 # ----------------------------
-def _get_cn(word_obj):
+def _get_real_cn(word_obj):
+    """該詞第一筆釋義的中文（去頭尾空白）；沒有釋義、或釋義是空字串就回 None。
+
+    出題一定要用這個，不能把「查不到」補成「未知」之類的字串：那會讓「未知」變成選項，
+    兩個以上沒有釋義的詞被抽成干擾項時還會出現重複選項。呼叫端遇到 None 要換一個詞。"""
     items = _word_explanations_cache.get(word_obj.id, [])
-    return (items[0].get('chineseExplanation') or '未知') if items else '未知'
+    cn = ((items[0].get('chineseExplanation') or '').strip()) if items else ''
+    return cn or None
 
 def _get_audio(word_obj):
     items = _word_audios_cache.get(word_obj.id, [])

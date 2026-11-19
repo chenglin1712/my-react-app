@@ -482,7 +482,10 @@ class TestQuizEndpointWiring:
 
     def _post(self, client, tribe="amis"):
         words = [WordDTO(id=f"w{i}", name=f"word{i}", frequency=i + 1) for i in range(40)]
-        with patch("fastAPI.routes.quiz.api.load_all_words", return_value=words):
+        # 出題只用有真實釋義的詞（沒有釋義的詞不會變成「未知」選項，見 test_quiz_option_integrity.py）
+        explanations = {w.id: [{"chineseExplanation": f"意思{w.id}"}] for w in words}
+        with patch("fastAPI.routes.quiz.api.load_all_words", return_value=words), \
+             patch.object(repository, "_word_explanations_cache", explanations):
             return client.post(f"/api/v1/quiz/generate_quiz_frontend?tribe={tribe}", json={})
 
     def test_the_source_for_the_requested_tribe_is_passed_to_sentence_fill(self, client):
