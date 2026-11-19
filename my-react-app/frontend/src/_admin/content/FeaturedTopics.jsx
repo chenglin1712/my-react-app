@@ -89,6 +89,8 @@ function Editor({ topic, role, publishedCount, onChanged, onCreated, onDeleted, 
     const media = useMediaUpload({ resetKey: topic?.id ?? 'new' });
     const uploading = Boolean(media.uploadingKey);
     const lock = useActionLock();
+    // 這則已發布專題目前的待審修改版本（載入時取得、每次送出後換成回應裡的新版本），送出修改時帶給後端比對
+    const revisionVersionRef = useRef(null);
     const errors = validate(form);
     const fieldError = (name) => (showErrors ? errors[name] : undefined);
     const update = (name, value) => setForm((current) => ({ ...current, [name]: value }));
@@ -108,6 +110,7 @@ function Editor({ topic, role, publishedCount, onChanged, onCreated, onDeleted, 
             try {
                 const revision = await apiGet(`/adminapi/featured-topics/${topic.id}/pending-revision/`);
                 if (!active || !revision?.payload) return;
+                revisionVersionRef.current = revision.version ?? null;
                 setForm(formOf({ ...topic, ...revision.payload }));
                 setBaseline(formOf({ ...topic, ...revision.payload }));
                 media.setPreview('image', revision.payload.image_url ?? topic.image_url ?? '');
@@ -137,7 +140,12 @@ function Editor({ topic, role, publishedCount, onChanged, onCreated, onDeleted, 
         return lock.runLocked(key, async () => {
             try { await task(); } catch (err) {
                 // 409 = 狀態衝突（別人剛改過這則專題，或已發布數量到上限）：保留後端說的原因，並重新載入讓畫面和伺服器一致
-                if (err?.status === 409) onStale(`${formatApiError(err)}`, topic?.id, topic?.status);
+                // revision_changed（別人在你載入之後送出或改過待審修改）：狀態沒變也要重建編輯區，重新取得最新的
+                // 待審內容與版本；只重新載入列表的話，畫面上的版本還是舊的，之後每次送出都會再被擋
+                if (err?.status === 409) {
+                    const revisionChanged = err?.data?.code === 'revision_changed';
+                    onStale(`${formatApiError(err)}`, topic?.id, revisionChanged ? null : topic?.status);
+                }
                 else setError(formatApiError(err));
             }
         });
@@ -153,7 +161,11 @@ function Editor({ topic, role, publishedCount, onChanged, onCreated, onDeleted, 
         if (!guardForm()) return undefined;
         return run(submit ? 'submit' : 'save', async () => {
             if (status === 'published') {
-                await apiPost(`/adminapi/featured-topics/${topic.id}/pending-revision/`, payload());
+                const submitted = await apiPost(
+                    `/adminapi/featured-topics/${topic.id}/pending-revision/`,
+                    revisionVersionRef.current ? { ...payload(), base_version: revisionVersionRef.current } : payload(),
+                );
+                revisionVersionRef.current = submitted?.version ?? revisionVersionRef.current;
                 onNotice('已提交修改，待審核核准後生效');
                 onChanged({ ...topic, has_pending_revision: true }, { keepForm: true });
                 setRevisionNote(true);

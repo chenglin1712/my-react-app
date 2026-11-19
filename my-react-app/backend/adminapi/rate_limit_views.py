@@ -18,6 +18,7 @@ from ._shared import (
     ip_rate_limited_response as _ip_rate_limited_response,
     parse_json_body as _parse_json_body,
     rate_limited_response as _rate_limited_response,
+    stale_edit_response as _stale_edit_response,
     write_audit_log as _write_audit_log,
 )
 from .models import RateLimitRule
@@ -63,6 +64,10 @@ def rate_limit_rule_detail(request, pk):
 
         with transaction.atomic():
             obj = get_object_or_404(RateLimitRule.objects.select_for_update(), pk=pk)
+            # 兩個人同時改同一條規則時，後存的人要先看到先存的結果，不能無聲蓋掉
+            stale = _stale_edit_response(data, obj.updated_at)
+            if stale:
+                return stale
             before = RateLimitRuleSerializer(obj).data
             # 只有 rate 這個欄位是真的可寫（見 RateLimitRuleSerializer 的
             # read_only_fields）——即使呼叫端多帶了 key/backend 之類的欄位，

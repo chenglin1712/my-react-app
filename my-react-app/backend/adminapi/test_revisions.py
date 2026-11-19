@@ -33,10 +33,20 @@ def _as_role(role):
 
 
 _REVISION_ACTION_URL = re.compile(r"/(\d+)/pending-revision/(?:approve|reject)/$")
+_REVISION_EDIT_URL = re.compile(r"/(\d+)/pending-revision/$")
 
 
-def _post_json(client, url, headers, payload=None, *, with_version=True):
+def _post_json(client, url, headers, payload=None, *, with_version=True, with_base_version=True):
     body = dict(payload or {})
+    # 編輯者重送待審修改要帶自己載入時看到的版本（base_version）；既有測試不關心這件事，
+    # 已經有待審修改時預設帶目前的版本。要測缺版本或舊版本時傳 with_base_version=False 或自己放 base_version。
+    edit = _REVISION_EDIT_URL.search(url)
+    if with_base_version and edit and "base_version" not in body:
+        pending = PendingRevision.objects.filter(
+            target_id=int(edit.group(1)), status=PendingRevision.STATUS_PENDING_REVIEW,
+        ).first()
+        if pending:
+            body["base_version"] = revision_version(pending)
     # 核准／退件要帶審核者看到的版本（稽核 FLW-1）；既有測試不關心版本，預設帶目前的版本，
     # 要測缺版本或舊版本時傳 with_version=False 或自己放 revision_version。
     match = _REVISION_ACTION_URL.search(url)
@@ -566,3 +576,88 @@ class AiDraftRevisionApprovalTest(TestCase):
         with _as_role(OWNER) as headers:
             response = _post_json(self.client, self.base + "approve/", headers, {"review_comment": ""})
         self.assertEqual(response.status_code, 200)
+
+
+class RevisionResubmitConflictTest(TestCase):
+    """F8：已經有待審修改時，再送一次會原地覆蓋它。編輯者要帶自己載入時看到的版本（base_version），
+    沒帶或對不上（別人在這段時間送出或改過）就回 409，先送的人的內容不能被無聲蓋掉。"""
+
+    def setUp(self):
+        self.client = Client()
+        self.announcement = Announcement.objects.create(
+            title="原標題", body="原內文", category="announcement",
+            status=Announcement.STATUS_PUBLISHED, created_by="editor-uid",
+        )
+        self.url = f"/adminapi/announcements/{self.announcement.pk}/pending-revision/"
+
+    def _submit(self, title, **extra):
+        """原樣送出：只帶 title 與 extra（要帶 base_version 就自己放），不自動補版本。"""
+        with _as_role(EDITOR) as headers:
+            return _post_json(self.client, self.url, headers, {"title": title, **extra}, with_base_version=False)
+
+    def _pending(self):
+        return PendingRevision.objects.get(target_id=self.announcement.pk, status=PendingRevision.STATUS_PENDING_REVIEW)
+
+    def test_first_submission_needs_no_base_version(self):
+        self.assertEqual(self._submit("第一版").status_code, 201)
+
+    def test_base_version_is_ignored_when_there_is_nothing_pending_yet(self):
+        for garbage in (123, ["x"], "", "not-a-version"):
+            PendingRevision.objects.all().delete()
+            self.assertEqual(self._submit("第一版", base_version=garbage).status_code, 201, garbage)
+
+    def test_second_editor_who_saw_nothing_pending_gets_409_and_first_content_survives(self):
+        self._submit("先送的標題")
+        response = self._submit("後送的標題")            # 後送的人載入時還沒有待審修改，所以沒帶 base_version
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["code"], "revision_changed")
+        self.assertEqual(self._pending().payload["title"], "先送的標題")
+
+    def test_stale_base_version_gets_409_and_content_is_unchanged(self):
+        stale = self._submit("第一版").json()["version"]
+        current = self._submit("第二版", base_version=stale).json()["version"]   # 別人（或另一個分頁）又改過
+        self.assertNotEqual(stale, current)
+        response = self._submit("用舊版本想蓋掉", base_version=stale)
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["code"], "revision_changed")
+        self.assertEqual(self._pending().payload["title"], "第二版")
+
+    def test_missing_or_malformed_base_version_gets_409_when_something_is_pending(self):
+        self._submit("先送的標題")
+        for extra in ({}, {"base_version": ""}, {"base_version": None}, {"base_version": 123},
+                      {"base_version": ["x"]}, {"base_version": {"v": 1}}, {"base_version": "not-a-version"}):
+            response = self._submit("不該成功", **extra)
+            self.assertEqual(response.status_code, 409, extra)
+        self.assertEqual(self._pending().payload["title"], "先送的標題")
+
+    def test_conflict_writes_no_audit_log_and_keeps_the_revision_row_as_is(self):
+        self._submit("先送的標題")
+        before_logs = AuditLog.objects.count()
+        before = self._pending()
+        response = self._submit("後送的標題")
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(AuditLog.objects.count(), before_logs)
+        after = self._pending()
+        self.assertEqual((after.pk, after.submitted_by, after.payload), (before.pk, before.submitted_by, before.payload))
+        self.assertEqual(PendingRevision.objects.filter(target_id=self.announcement.pk).count(), 1)
+
+    def test_resubmitting_with_the_current_version_still_works_and_changes_the_version(self):
+        first = self._submit("第一版").json()
+        second = self._submit("第二版", base_version=first["version"])
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(second.json()["id"], first["id"])
+        self.assertEqual(second.json()["payload"]["title"], "第二版")
+        self.assertNotEqual(second.json()["version"], first["version"])
+
+    def test_the_version_returned_by_get_is_the_one_to_send_back(self):
+        self._submit("第一版")
+        with _as_role(EDITOR) as headers:
+            loaded = self.client.get(self.url, **headers).json()
+        response = self._submit("依載入版本修改", base_version=loaded["version"])
+        self.assertEqual(response.status_code, 200)
+
+    def test_a_validation_error_is_still_400_when_the_version_is_right(self):
+        first = self._submit("第一版").json()
+        response = self._submit("", base_version=first["version"])
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self._pending().payload["title"], "第一版")

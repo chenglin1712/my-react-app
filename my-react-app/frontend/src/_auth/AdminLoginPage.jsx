@@ -46,7 +46,7 @@ function AdminLoginPage() {
     const currentEmail = auth.currentUser?.email ?? ""
 
     // /admin 開頭的路徑不經過前台的 RouteEffects，分頁標題在這裡自己設定
-    useEffect(() => { document.title = "後台登入｜源·語" }, [])
+    useEffect(() => { document.title = "後台登入｜原語" }, [])
 
     return (
         <div className="admin-login">
@@ -86,10 +86,10 @@ function AdminLoginPage() {
             <main className="admin-login-main">
                 <section className="admin-login-card" aria-labelledby="admin-login-title">
                     <div className="admin-login-brand">
-                        <span className="admin-login-brand-mark" aria-hidden="true">源</span>
+                        <span className="admin-login-brand-mark" aria-hidden="true">原</span>
                         <div>
                             <span className="admin-login-brand-eyebrow">SECURE CONSOLE</span>
-                            <span className="admin-login-brand-name">源・語管理後台</span>
+                            <span className="admin-login-brand-name">原語管理後台</span>
                         </div>
                     </div>
 

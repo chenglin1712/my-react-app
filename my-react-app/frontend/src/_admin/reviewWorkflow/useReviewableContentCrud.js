@@ -202,7 +202,13 @@ export function useReviewableContentCrud({
         try {
             if (editTarget.id) {
                 if (supportsRevision && editTarget.status === 'published') {
-                    await apiPost(`${endpoint}${editTarget.id}/pending-revision/`, payload);
+                    // 已經有待審修改時，後端要我們帶「打開編輯表單時看到的版本」：別人在這段時間送出或改過就回 409，
+                    // 不會無聲蓋掉。沒有待審修改（打開時是 404）就沒有版本可帶。
+                    const baseVersion = viewedRevisionRef.current.get(editTarget.id);
+                    const body = baseVersion ? { ...payload, base_version: baseVersion } : payload;
+                    const saved = await apiPost(`${endpoint}${editTarget.id}/pending-revision/`, body);
+                    // 送出後版本就變了：記下新版本，之後審核（核准／退件）帶的才是最新的，不會因為舊版本被擋
+                    if (saved?.version) viewedRevisionRef.current.set(editTarget.id, saved.version);
                 } else {
                     await apiPatch(`${endpoint}${editTarget.id}/`, payload);
                 }

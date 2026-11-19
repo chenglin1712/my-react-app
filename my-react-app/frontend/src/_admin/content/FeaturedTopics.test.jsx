@@ -246,6 +246,88 @@ describe('FeaturedTopics', () => {
     expect(apiPatch).not.toHaveBeenCalled();
   });
 
+  describe('重送待審修改要帶版本（F8）', () => {
+    const submitButton = () => screen.getByRole('button', { name: /提交修改（待審核）/ });
+
+    /** 模擬後端：pending 是目前的待審修改（null＝沒有，GET 回 404）；每次 POST 成功後版本就換成新的。 */
+    const emulateServer = (pending) => {
+      const base = apiGet.getMockImplementation();
+      const server = { pending, versions: ['v-1', 'v-2', 'v-3'], posted: [] };
+      apiGet.mockImplementation(async (url) => {
+        if (!url.endsWith('/pending-revision/')) return base(url);
+        if (!server.pending) throw Object.assign(new Error('沒有'), { status: 404 });
+        return server.pending;
+      });
+      apiPost.mockImplementation(async (url, body) => {
+        server.posted.push(body);
+        const version = server.versions.shift();
+        server.pending = { payload: { title: body.title }, version };
+        return { id: 1, version };
+      });
+      return server;
+    };
+
+    test('載入時已有待審修改：第一次送出帶載入的版本，第二次帶第一次回應的新版本', async () => {
+      setTopics([topic({ status: 'published', title: '公開中' })]);
+      const server = emulateServer({ payload: { title: '待審標題' }, version: 'v-loaded' });
+      render(<FeaturedTopics />);
+      await open('公開中');
+      await waitFor(() => expect(screen.getByLabelText('標題')).toHaveValue('待審標題'));
+
+      fireEvent.click(submitButton());
+      await waitFor(() => expect(server.posted).toHaveLength(1));
+      expect(server.posted[0]).toHaveProperty('base_version', 'v-loaded');
+
+      await waitFor(() => expect(submitButton()).not.toBeDisabled());
+      fireEvent.click(submitButton());
+      await waitFor(() => expect(server.posted).toHaveLength(2));
+      expect(server.posted[1]).toHaveProperty('base_version', 'v-1');
+    });
+
+    test('載入時沒有待審修改（404）：第一次不帶 base_version，第二次帶第一次回應的版本', async () => {
+      setTopics([topic({ status: 'published', title: '公開中' })]);
+      const server = emulateServer(null);
+      render(<FeaturedTopics />);
+      await open('公開中');
+      await screen.findByLabelText('標題');
+
+      fireEvent.click(submitButton());
+      await waitFor(() => expect(server.posted).toHaveLength(1));
+      expect(server.posted[0]).not.toHaveProperty('base_version');
+
+      await waitFor(() => expect(submitButton()).not.toBeDisabled());
+      fireEvent.click(submitButton());
+      await waitFor(() => expect(server.posted).toHaveLength(2));
+      expect(server.posted[1]).toHaveProperty('base_version', 'v-1');
+    });
+
+    test('後端回 409 revision_changed（別人先送出或改過）：重建編輯區取得最新待審內容，之後送出改帶新版本，不會一直被擋', async () => {
+      setTopics([topic({ status: 'published', title: '公開中' })]);
+      const server = emulateServer({ payload: { title: '我載入時的待審' }, version: 'v-loaded' });
+      apiPost.mockReset()
+        .mockImplementationOnce(async () => {
+          // 就在我按下送出之前，別人先送出了新的待審修改
+          server.pending = { payload: { title: '別人的提案' }, version: 'v-other' };
+          throw Object.assign(new Error('這筆內容已有待審修改（可能是其他人剛送出或更新的），請重新載入，確認最新內容後再送出'), {
+            status: 409, data: { code: 'revision_changed' },
+          });
+        })
+        .mockImplementation(async (url, body) => { server.posted.push(body); return { id: 1, version: 'v-mine' }; });
+      render(<FeaturedTopics />);
+      await open('公開中');
+      await waitFor(() => expect(screen.getByLabelText('標題')).toHaveValue('我載入時的待審'));
+
+      fireEvent.click(submitButton());
+
+      expect(await screen.findByText(/已有待審修改/)).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByLabelText('標題')).toHaveValue('別人的提案'));   // 編輯區已重建、帶入最新內容
+
+      fireEvent.click(submitButton());
+      await waitFor(() => expect(server.posted).toHaveLength(1));
+      expect(server.posted[0]).toHaveProperty('base_version', 'v-other');
+    });
+  });
+
   test('已發布的專題可以下架', async () => {
     setTopics([topic({ status: 'published' })]);
     apiPost.mockResolvedValueOnce(topic({ status: 'unpublished' }));

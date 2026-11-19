@@ -129,10 +129,10 @@ export default function AdminLayout({ pendingCounts = {} }) {
     const contentRef = useRef(null);
     const { firstEntry, revealed, skipped, markReady } = useAdminEntry();
 
-    // 分頁標題跟著麵包屑走（原本整個後台都是「源·語」）
+    // 分頁標題跟著麵包屑走（原本整個後台的分頁標題都一樣，分不出在哪一頁）
     const pageTitle = breadcrumb[breadcrumb.length - 1];
     useEffect(() => {
-        document.title = `${pageTitle}｜後台管理｜源·語`;
+        document.title = `${pageTitle}｜後台管理｜原語`;
     }, [pageTitle]);
 
     // 後台殼層掛載完成 = 入口閘門可以開始倒數最短可見時間，然後收合
@@ -223,7 +223,7 @@ export default function AdminLayout({ pendingCounts = {} }) {
                 <button type="button" className="admin-nav-close" ref={closeRef} onClick={() => closeNav(true)} aria-label="關閉主選單">
                     <X size={20} aria-hidden="true" />
                 </button>
-                <Link className="admin-brand" to="/admin" onClick={() => closeNav()}><span>源·語</span><small>ADMIN CONSOLE</small></Link>
+                <Link className="admin-brand" to="/admin" onClick={() => closeNav()}><span>原語</span><small>ADMIN CONSOLE</small></Link>
                 <nav className="admin-navigation" aria-label="後台主選單">
                     {groups.map(({ label, icon: Icon, items }) => (
                         <section className="admin-nav-group" key={label}>

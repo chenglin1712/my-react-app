@@ -1,8 +1,8 @@
-// 前台各頁的瀏覽器分頁標題。原本整站只有 index.html 的一個固定標題「源·語」，
+// 前台各頁的瀏覽器分頁標題。原本整站只有 index.html 的一個固定標題，
 // 分頁、瀏覽紀錄與螢幕報讀器都分不出現在是哪一頁。
 // 比對順序由上到下，精確路徑要排在較短的前綴之前。後台（/admin）的標題由
 // AdminLayout 依麵包屑自己設定，這裡不處理。
-export const SITE_NAME = '源·語';
+export const SITE_NAME = '原語';
 
 const TITLE_RULES = [
   { test: (p) => p === '/', title: `${SITE_NAME}｜五族語言學習平台` },

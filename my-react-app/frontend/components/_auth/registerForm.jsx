@@ -131,7 +131,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
         <div className="register-container">
             <div className="register-box">
                 <h1 className="formTitle">註冊</h1>
-                <p className="register-subtitle">立即體驗源·語</p>
+                <p className="register-subtitle">立即體驗原語</p>
                 {(errorMsg || uploadError) && <Alert variant="danger" className="py-2">{errorMsg || uploadError}</Alert>}
                 <form className="registerForm" onSubmit={handleRegister} noValidate ref={formRef}>
                     <div className="auth-field">

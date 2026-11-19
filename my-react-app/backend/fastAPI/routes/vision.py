@@ -32,6 +32,11 @@ MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
 ALLOWED_IMAGE_FORMATS = ("JPEG", "PNG", "WEBP")
 # 邊長上限：與 AIModel/image_input.py 一致。這裡只讀檔頭宣告的尺寸，先擋掉「檔案很小、宣告的像素卻極大」
 MAX_IMAGE_SIDE = 8000
+# 呼叫 Google Vision 失敗時回給前端的固定訊息（Google 的原文只寫 log，不回給前端）
+VISION_TIMEOUT_MESSAGE = "辨識服務回應逾時，請稍後再試"
+VISION_UNREACHABLE_MESSAGE = "暫時連不上辨識服務，請稍後再試"
+VISION_BUSY_MESSAGE = "辨識服務目前較忙碌，請稍後再試"
+VISION_UNAVAILABLE_MESSAGE = "辨識服務暫時無法使用，請稍後再試"
 if not CLOUD_API_KEY:
     _logger.warning("CLOUD_API_KEY 環境變數未設定，影像辨識功能將無法使用")
 if not CLOUD_API_URL:
@@ -104,6 +109,38 @@ def translate_labels(descriptions: list[str]) -> dict[str, str | None]:
         _logger.error("[vision] 翻譯失敗，保留英文原字 text=%r", d)
         out[d] = d
     return out
+
+
+def _is_valid_label(label) -> bool:
+    return (
+        isinstance(label, dict)
+        and isinstance(label.get("description"), str)
+        and isinstance(label.get("score"), (int, float))
+        and not isinstance(label.get("score"), bool)
+        # Google 的 score 是 0～1。順便擋掉 NaN／Infinity（json 模組會收下，但它們無法序列化回 JSON）
+        # 與超大整數；比大小不會像 math.isfinite 那樣在超大整數時丟出 OverflowError
+        and 0 <= label["score"] <= 1
+    )
+
+
+def _google_error_summary(payload, response) -> str:
+    """從 Google 的回應挑出可以寫進 log 的一小段文字：優先用 error.message，沒有就用回應本文的開頭。
+    不論哪一種都先把金鑰換成 ***，並截短，避免把內部細節或金鑰寫進 log。"""
+    text = None
+    if isinstance(payload, dict):
+        error = payload.get("error")
+        if isinstance(error, dict):
+            text = error.get("message")
+    if not isinstance(text, str) or not text:
+        try:
+            text = response.text
+        except Exception:
+            text = ""
+        if not isinstance(text, str):
+            text = ""
+    if CLOUD_API_KEY:
+        text = text.replace(CLOUD_API_KEY, "***")
+    return text[:200]
 
 
 @router.post("/analyze_image/", openapi_extra=multipart_openapi_extra(file_field="file"))
@@ -192,21 +229,57 @@ async def _analyze_uploaded_image(file):
         ]
     }
 
-    async with httpx.AsyncClient(timeout=15) as client:
-        response = await client.post(url, headers=headers, json=data)
+    # 呼叫 Google 的各種失敗都要分得清楚，前端才知道該不該叫使用者重試：
+    #   逾時 → 504、連線失敗 → 503、Google 說配額用完（429）→ 429、其餘 Google 端的問題 → 502。
+    # Google 的原文（可能是英文、也可能含內部細節）只寫 log，回給前端的一律是固定的中文。
+    # 注意：url 裡面帶著金鑰，所以 log 只記例外的「類型」，不記例外訊息，也不記完整的回應內容。
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.post(url, headers=headers, json=data)
+    except httpx.TimeoutException:
+        _logger.warning("[vision] 呼叫 Google Vision 逾時 bytes=%d", len(contents))
+        raise HTTPException(status_code=504, detail=VISION_TIMEOUT_MESSAGE) from None
+    except httpx.RequestError as exc:
+        _logger.warning("[vision] 連不上 Google Vision：%s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail=VISION_UNREACHABLE_MESSAGE) from None
 
-    result = response.json()
-    if "responses" not in result or len(result["responses"]) == 0:
-        raise HTTPException(status_code=500, detail="Google API 回傳格式錯誤（缺少 responses）")
+    try:
+        result = response.json()
+    except ValueError:
+        result = None
 
-    if "error" in result["responses"][0]:
+    if response.status_code != 200:
+        # Google 的 HTTP 錯誤（金鑰被限制 403、配額 429、伺服器 5xx…）
+        _logger.warning(
+            "[vision] Google Vision 回傳 HTTP %s：%s", response.status_code, _google_error_summary(result, response),
+        )
+        if response.status_code == 429:
+            raise HTTPException(status_code=429, detail=VISION_BUSY_MESSAGE)
+        raise HTTPException(status_code=502, detail=VISION_UNAVAILABLE_MESSAGE)
+
+    responses = result.get("responses") if isinstance(result, dict) else None
+    if not isinstance(responses, list) or not responses or not isinstance(responses[0], dict):
+        _logger.warning("[vision] Google Vision 回傳格式不符預期（缺少 responses）：%s", _google_error_summary(result, response))
+        raise HTTPException(status_code=502, detail=VISION_UNAVAILABLE_MESSAGE)
+
+    first = responses[0]
+    if "error" in first:
         _logger.warning(
             "[vision] Google 回傳 error，收到的圖片 bytes=%d filename=%r：%s",
-            len(contents), getattr(file, "filename", None), result["responses"][0]["error"]["message"],
+            len(contents), getattr(file, "filename", None), _google_error_summary(first, response),
         )
-        raise HTTPException(status_code=500, detail=result["responses"][0]["error"]["message"])
+        # google.rpc.Code 8 ＝ RESOURCE_EXHAUSTED（配額用完）
+        error = first["error"] if isinstance(first["error"], dict) else {}
+        if error.get("code") == 8:
+            raise HTTPException(status_code=429, detail=VISION_BUSY_MESSAGE)
+        raise HTTPException(status_code=502, detail=VISION_UNAVAILABLE_MESSAGE)
 
-    labels = result["responses"][0].get("labelAnnotations", [])
+    # Google 沒有辨識到任何東西時會省略 labelAnnotations（當作空清單）；有的話每一項都要是
+    # 「文字描述＋數字分數」。格式不符就當成 Google 回壞掉的資料（502），不要讓 KeyError／TypeError 變成 500。
+    labels = first.get("labelAnnotations", [])
+    if not isinstance(labels, list) or not all(_is_valid_label(label) for label in labels):
+        _logger.warning("[vision] Google Vision 的 labelAnnotations 格式不符預期 bytes=%d", len(contents))
+        raise HTTPException(status_code=502, detail=VISION_UNAVAILABLE_MESSAGE)
 
     # 翻譯是同步的 HTTP 呼叫，整批丟到執行緒池，避免卡住 event loop。
     translations = await asyncio.to_thread(translate_labels, [l["description"] for l in labels])

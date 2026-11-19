@@ -85,6 +85,70 @@ describe('RateLimitSettings', () => {
             .toBeInTheDocument();
     });
 
+    describe('並行編輯保護（F8）', () => {
+        const withStamp = (stamp) => baseResults.map((item) => ({ ...item, updated_at: stamp }));
+
+        test('儲存時帶這條規則載入時的 updated_at；存成功後下一次改帶回應裡的新值', async () => {
+            apiGet.mockResolvedValue({ results: withStamp('2026-08-01T00:00:00Z') });
+            apiPatch.mockResolvedValueOnce({ ...baseResults[0], rate: '5/m', updated_at: '2026-08-02T00:00:00Z' });
+            apiPatch.mockResolvedValueOnce({ ...baseResults[0], rate: '6/m', updated_at: '2026-08-03T00:00:00Z' });
+            render(<RateLimitSettings />);
+            const input = await screen.findByLabelText('user_create 限流值');
+            const row = input.closest('tr');
+
+            fireEvent.change(input, { target: { value: '5/m' } });
+            fireEvent.click(within(row).getByRole('button', { name: /儲存/ }));
+            await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(1));
+            expect(apiPatch).toHaveBeenLastCalledWith(
+                '/adminapi/rate-limit-rules/1/', { rate: '5/m', base_updated_at: '2026-08-01T00:00:00Z' },
+            );
+
+            await screen.findByText('已更新「user_create」的限流值');
+            fireEvent.change(input, { target: { value: '6/m' } });
+            fireEvent.click(within(row).getByRole('button', { name: /儲存/ }));
+            await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(2));
+            expect(apiPatch).toHaveBeenLastCalledWith(
+                '/adminapi/rate-limit-rules/1/', { rate: '6/m', base_updated_at: '2026-08-02T00:00:00Z' },
+            );
+        });
+
+        test('每條規則各帶各的 updated_at，改一條不會影響另一條', async () => {
+            apiGet.mockResolvedValue({
+                results: [
+                    { ...baseResults[0], updated_at: '2026-08-01T00:00:00Z' },
+                    { ...baseResults[1], updated_at: '2026-08-05T00:00:00Z' },
+                ],
+            });
+            apiPatch.mockResolvedValueOnce({ ...baseResults[1], rate: '9/minute', updated_at: '2026-08-06T00:00:00Z' });
+            render(<RateLimitSettings />);
+            const input = await screen.findByLabelText('dictionary_search 限流值');
+
+            fireEvent.change(input, { target: { value: '9/minute' } });
+            fireEvent.click(within(input.closest('tr')).getByRole('button', { name: /儲存/ }));
+
+            await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(1));
+            expect(apiPatch).toHaveBeenLastCalledWith(
+                `/adminapi/rate-limit-rules/${baseResults[1].id}/`, { rate: '9/minute', base_updated_at: '2026-08-05T00:00:00Z' },
+            );
+        });
+
+        test('後端回 409（別人先改過這條）：顯示後端說明，使用者輸入的值保留，不顯示成功訊息', async () => {
+            apiGet.mockResolvedValue({ results: withStamp('2026-08-01T00:00:00Z') });
+            apiPatch.mockRejectedValueOnce(Object.assign(
+                new Error('內容已被其他人更新，請重新整理頁面，確認最新內容後再編輯'), { status: 409 },
+            ));
+            render(<RateLimitSettings />);
+            const input = await screen.findByLabelText('user_create 限流值');
+
+            fireEvent.change(input, { target: { value: '5/m' } });
+            fireEvent.click(within(input.closest('tr')).getByRole('button', { name: /儲存/ }));
+
+            expect(await screen.findByText(/已被其他人更新/)).toBeInTheDocument();
+            expect(screen.queryByText('已更新「user_create」的限流值')).not.toBeInTheDocument();
+            expect(input).toHaveValue('5/m');
+        });
+    });
+
     test('後端篩選會用 query parameter 重新取得資料', async () => {
         render(<RateLimitSettings />);
         await screen.findByText('user_create');

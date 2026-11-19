@@ -498,6 +498,98 @@ describe('AnnouncementEditor · 編輯模式', () => {
     expect(screen.getByText(/目前狀態：已發布/)).toBeInTheDocument();
   });
 
+  describe('重送待審修改要帶版本（F8）', () => {
+    const publishedAnnouncement = (id) => ({
+      id, title: '已發布標題', body: '內文', category: 'announcement', tribes: [], cover_image_url: '', link_url: '',
+      is_pinned: false, pin_until: null, publish_at: null, unpublish_at: null, status: 'published',
+      display_date_text: '', source: 'admin',
+    });
+    const mockLoad = (id, revision) => {
+      apiGet.mockImplementation((url) => {
+        if (url === `/adminapi/announcements/${id}/`) return Promise.resolve(publishedAnnouncement(id));
+        if (url === `/adminapi/announcements/${id}/pending-revision/`) {
+          if (revision) return Promise.resolve(revision);
+          return Promise.reject(Object.assign(new Error('目前沒有待審核的修改'), { status: 404 }));
+        }
+        return Promise.reject(new Error(`unexpected url: ${url}`));
+      });
+    };
+    const changeTitleAndSubmit = async (title) => {
+      fireEvent.change(screen.getByLabelText(/標題/), { target: { value: title } });
+      fireEvent.click(screen.getByRole('button', { name: /提交修改/ }));
+    };
+    const url = (id) => `/adminapi/announcements/${id}/pending-revision/`;
+
+    test('載入時已有待審修改：第一次送出帶 base_version，之後每次都帶上一次回應的新版本', async () => {
+      mockLoad(40, { id: 3, payload: { title: '提案標題' }, version: 'v-loaded' });
+      apiPost.mockResolvedValueOnce({ id: 3, payload: {}, version: 'v-second' });
+      apiPost.mockResolvedValueOnce({ id: 3, payload: {}, version: 'v-third' });
+      renderEdit(40);
+      await screen.findByDisplayValue('提案標題');
+
+      await changeTitleAndSubmit('第二版');
+      await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(1));
+      expect(apiPost).toHaveBeenLastCalledWith(url(40), expect.objectContaining({ title: '第二版', base_version: 'v-loaded' }));
+
+      await screen.findByText('已提交修改，待審核核准後生效');
+      await changeTitleAndSubmit('第三版');
+      await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(2));
+      expect(apiPost).toHaveBeenLastCalledWith(url(40), expect.objectContaining({ title: '第三版', base_version: 'v-second' }));
+    });
+
+    test('載入時沒有待審修改（404）：第一次不帶 base_version，送出後第二次改帶回應的版本', async () => {
+      mockLoad(41, null);
+      apiPost.mockResolvedValueOnce({ id: 4, payload: {}, version: 'v-created' });
+      apiPost.mockResolvedValueOnce({ id: 4, payload: {}, version: 'v-next' });
+      renderEdit(41);
+      await screen.findByDisplayValue('已發布標題');
+
+      await changeTitleAndSubmit('第一次提案');
+      await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(1));
+      expect(apiPost.mock.calls[0][1]).not.toHaveProperty('base_version');
+
+      await screen.findByText('已提交修改，待審核核准後生效');
+      await changeTitleAndSubmit('再改一次');
+      await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(2));
+      expect(apiPost).toHaveBeenLastCalledWith(url(41), expect.objectContaining({ title: '再改一次', base_version: 'v-created' }));
+    });
+
+    test('後端回 409（別人先送出或改過）：顯示後端說明、不顯示成功訊息，也不換版本', async () => {
+      mockLoad(42, { id: 5, payload: { title: '提案標題' }, version: 'v-loaded' });
+      apiPost.mockRejectedValueOnce(Object.assign(
+        new Error('這筆內容已有待審修改（可能是其他人剛送出或更新的），請重新載入，確認最新內容後再送出'),
+        { status: 409 },
+      ));
+      apiPost.mockResolvedValueOnce({ id: 5, payload: {}, version: 'v-after' });
+      renderEdit(42);
+      await screen.findByDisplayValue('提案標題');
+
+      await changeTitleAndSubmit('我的修改');
+      expect(await screen.findByText(/已有待審修改/)).toBeInTheDocument();
+      expect(screen.queryByText('已提交修改，待審核核准後生效')).not.toBeInTheDocument();
+
+      await changeTitleAndSubmit('再試一次');          // 失敗後版本沒變，仍帶原本載入的版本
+      await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(2));
+      expect(apiPost).toHaveBeenLastCalledWith(url(42), expect.objectContaining({ base_version: 'v-loaded' }));
+    });
+
+    test('切換到另一篇公告時，不沿用上一篇的版本', async () => {
+      mockLoad(43, { id: 6, payload: { title: '甲的提案' }, version: 'v-of-43' });
+      const { unmount } = renderEdit(43);
+      await screen.findByDisplayValue('甲的提案');
+      unmount();
+
+      mockLoad(44, null);
+      apiPost.mockResolvedValueOnce({ id: 7, payload: {}, version: 'v-of-44' });
+      renderEdit(44);
+      await screen.findByDisplayValue('已發布標題');
+      await changeTitleAndSubmit('乙的提案');
+
+      await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(1));
+      expect(apiPost.mock.calls[0][1]).not.toHaveProperty('base_version');
+    });
+  });
+
   test('published 的 pending revision 查詢若不是 404，會顯示錯誤而非靜默忽略', async () => {
     apiGet.mockImplementation((url) => {
       if (url === '/adminapi/announcements/23/') {

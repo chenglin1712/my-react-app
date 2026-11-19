@@ -48,6 +48,7 @@ def _post(client, content: bytes, name="photo.jpg", content_type="image/jpeg"):
 
 def _google_ok():
     response = MagicMock()
+    response.status_code = 200   # 真的 httpx 回應一定有整數狀態碼；vision.py 現在會檢查它
     response.json.return_value = {"responses": [{"labelAnnotations": [{"description": "dog", "score": 0.9}]}]}
     mock_post = AsyncMock(return_value=response)
     return patch("httpx.AsyncClient.post", mock_post), mock_post
