@@ -7,6 +7,8 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from .routes import crawler, vision, dictionary, quiz, listening, sentence, auth, internal, translation, morphology, features
 from .routes.pronunciation import model as pronunciation_model
@@ -176,6 +178,18 @@ app.add_middleware(SlowAPIMiddleware)
 async def _guest_token_error_handler(request: Request, exc: auth.GuestTokenError):
     """訪客憑證不合格：401 加上機器可讀的 code，前端據此換領新憑證。其餘 HTTPException 維持 FastAPI 內建格式。"""
     return JSONResponse({"detail": exc.detail, "code": auth.GUEST_TOKEN_INVALID_CODE}, status_code=401)
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_error_handler(request: Request, exc: RequestValidationError):
+    """請求驗證失敗一律回 422，格式維持 FastAPI 內建的 [{type, loc, msg}]。
+
+    跟內建 handler 的差別：不把使用者送來的原始值（input）和內部的 ctx 一起回傳。
+    內建 handler 會原樣回傳 input；請求裡有 NaN／Infinity 時，那個值轉不成合法的 JSON，
+    本來該是 422 的回應自己炸成 500（稽核 F16）。前端只讀每一項的 msg（見 apiClient 的 extractMessage），
+    不依賴 input；不回傳 input 也順便避免把使用者送來的內容原樣吐回去。"""
+    errors = [{key: err[key] for key in ("type", "loc", "msg") if key in err} for err in exc.errors()]
+    return JSONResponse({"detail": jsonable_encoder(errors)}, status_code=422)
 
 
 @app.exception_handler(Exception)
