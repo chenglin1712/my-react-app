@@ -17,6 +17,9 @@ import "../../static/css/_note/./notesharestyle.css";
 import TabSwitch from "../../components/ui/TabSwitch";
 import { confirmAction } from "@components/ui/ConfirmDialog";
 
+const LINK_GONE_TITLE = "這則筆記已不存在或已被下架";
+const LINK_ERROR_TITLE = "暫時無法開啟這則筆記";
+
 export default function NoteShare() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -187,24 +190,66 @@ export default function NoteShare() {
   };
 
   // 從分享連結直接開啟特定筆記：不依賴目前這一頁有沒有載入這筆資料，
-  // 直接用 id 去讀，涵蓋筆記在其他頁的情況
+  // 直接用 id 去讀，涵蓋筆記在其他頁的情況。
+  // 開不起來時要告訴使用者原因，不能只寫 console、讓人停在列表不知道連結怎麼了：
+  //   gone  ＝ 這個連結已經失效（筆記不存在，或已被刪除、下架：下架的文件會被 Firestore 規則擋下）
+  //   error ＝ 暫時讀不到（斷線、逾時），重試可能就好
+  // 連 id 一起記，換到別的連結時舊的提示就不會留著。
+  const [linkProblem, setLinkProblem] = useState(null); // { id, kind: "gone" | "error" }
+  const [linkRetry, setLinkRetry] = useState(0);
+  // 正在重試的連結 id。跟 linkProblem 分開存：重試期間使用者可能點開別張卡片，那會讓重試的結果被
+  // 忽略（見下面的世代檢查），如果「重試中」放在 linkProblem 裡，就沒有人把它清掉。
+  const [retryingFor, setRetryingFor] = useState(null);
+  const linkRunRef = useRef(0);
+  const heroTitleRef = useRef(null);
+  // 提示關掉後，原本按著的按鈕就不存在了，焦點會掉到頁面最上層；比照換頁（RouteEffects）的作法，
+  // 把焦點移到頁面標題，鍵盤與報讀器使用者才知道自己在哪裡。
+  const dismissLinkProblem = () => {
+    setLinkProblem(null);
+    heroTitleRef.current?.focus({ preventScroll: true });
+  };
+  // 重試期間按鈕維持在原地、改成「重試中…」，並忽略再次點擊。用 aria-disabled 而不是 disabled：
+  // disabled 的按鈕會失去焦點，鍵盤使用者按下去之後焦點就消失了。
+  const retrying = Boolean(id) && retryingFor === id;
+  const retryLink = () => {
+    if (retrying) return;
+    setRetryingFor(id);
+    setLinkRetry((n) => n + 1);
+  };
   useEffect(() => {
-    if (!id) return;
+    if (!id) return undefined;
     const myGeneration = ++modalGenerationRef.current;
+    const myRun = ++linkRunRef.current;
+    // 世代計數只在「下一次 effect 執行」時才會前進；離開頁面或換連結的瞬間，
+    // 舊請求若剛好這時回來，還是會認為自己是最新的，所以另外用 active 旗標在清理時關掉
+    let active = true;
+    const isCurrent = () => active && myGeneration === modalGenerationRef.current;
     (async () => {
       try {
         const full = await fetchSharedNoteById(id);
-        if (myGeneration !== modalGenerationRef.current) return;
+        if (!isCurrent()) return;
         if (full) {
+          setLinkProblem(null);
           setModalNote(full);
           setShowModal(true);
+        } else {
+          setLinkProblem({ id, kind: "gone" });
+          announce(LINK_GONE_TITLE);
         }
       } catch (e) {
-        if (myGeneration !== modalGenerationRef.current) return;
+        if (!isCurrent()) return;
         console.error("Open modal from URL error:", e);
+        const gone = e?.code === "permission-denied";
+        setLinkProblem({ id, kind: gone ? "gone" : "error" });
+        announce(gone ? LINK_GONE_TITLE : LINK_ERROR_TITLE);
+      } finally {
+        // 最後一次請求結束就清掉「重試中」，不論結果有沒有被採用（可能已被別張卡片的點擊取代）
+        if (myRun === linkRunRef.current) setRetryingFor(null);
       }
     })();
-  }, [id]);
+    return () => { active = false; };
+  }, [id, linkRetry]);
+  const showLinkProblem = Boolean(id) && linkProblem?.id === id;
 
   return (
     <div className="yy-page ns-page">
@@ -218,7 +263,7 @@ export default function NoteShare() {
       {pullToRefresh.state === "ready" ? "放開即可重新整理" : pullToRefresh.state === "pulling" ? "下拉重新整理" : ""}
     </div>
     <div className="note-hero yy-fade-up">
-      <h1 className="note-hero-title">筆記分享區</h1>
+      <h1 className="note-hero-title" ref={heroTitleRef} tabIndex={-1}>筆記分享區</h1>
       <TabSwitch
         tabs={[{ key: "write", label: "✎ 寫筆記" }, { key: "share", label: "☺ 筆記分享區" }]}
         active="share"
@@ -228,6 +273,28 @@ export default function NoteShare() {
       />
     </div>
     <div className="ns-wrap">
+      {/* 從分享連結進來卻開不起來：說明原因與下一步。列表就在下面，所以「失效」只需要一個關掉提示的按鈕 */}
+      {showLinkProblem && linkProblem.kind === "gone" && (
+        <EmptyState
+          title={LINK_GONE_TITLE}
+          actions={<button type="button" className="yy-btn-outline" onClick={dismissLinkProblem}>看看其他筆記</button>}
+        >
+          <p>這個分享連結可能已失效，或作者已經刪除這則筆記。下方還有其他人分享的筆記，可以直接瀏覽。</p>
+        </EmptyState>
+      )}
+      {showLinkProblem && linkProblem.kind === "error" && (
+        <EmptyState
+          title={LINK_ERROR_TITLE}
+          actions={(
+            <button type="button" className="yy-btn-outline" aria-disabled={retrying || undefined} onClick={retryLink}>
+              {retrying ? "重試中…" : "再試一次"}
+            </button>
+          )}
+        >
+          <p>請檢查網路連線，然後再試一次。</p>
+        </EmptyState>
+      )}
+
       {/* Toolbar */}
       <div className="ns-toolbar">
         <div className="ns-search-group">
