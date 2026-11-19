@@ -14,9 +14,20 @@ const CameraLabelStep = lazy(() => import("./label"));
 const CameraResultStep = lazy(() => import("./result"));
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-// 部分 Android／HEIC 的檔案 MIME type 是空字串，這時用副檔名做初步判斷，不能因為沒有 type 就當成不是圖片
-const IMAGE_EXT_RE = /\.(avif|heic|heif|jpe?g|png|webp|gif|bmp)$/i;
-const isImageFile = (f) => (f.type ? f.type.startsWith("image/") : IMAGE_EXT_RE.test(f.name || ""));
+// 後端（routes/vision.py 的 ALLOWED_IMAGE_FORMATS）只收 JPEG、PNG、WebP。第 1 步就用同一份白名單擋，
+// HEIC／AVIF／GIF／BMP 不用等到第 2 步送出辨識才被退回。兩個 <input> 的 accept 也用同一份，
+// 讓選檔對話框一開始就只列出這三種（iPhone Safari 在 accept 沒有 HEIC 時會自動轉成 JPEG）。
+const ACCEPTED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const ACCEPT_ATTRIBUTE = ACCEPTED_MIME_TYPES.join(",");
+// 少數舊版瀏覽器、Android WebView 會把 JPEG 回報成這兩個非標準的名稱；內容還是 JPEG，後端收得下
+const JPEG_MIME_ALIASES = ["image/jpg", "image/pjpeg"];
+// 部分 Android 的檔案 MIME type 是空字串，這時用副檔名判斷，不能因為沒有 type 就當成不是圖片
+const ACCEPTED_EXT_RE = /\.(jpe?g|png|webp)$/i;
+const isSupportedImage = (f) => (f.type
+    ? [...ACCEPTED_MIME_TYPES, ...JPEG_MIME_ALIASES].includes(f.type.toLowerCase())
+    : ACCEPTED_EXT_RE.test(f.name || ""));
+// 「看起來是圖片但格式不收」：貼上時用來決定要不要出聲說明（貼上 PDF 之類的檔案則不攔截）
+const looksLikeImage = (f) => Boolean(f.type) && f.type.toLowerCase().startsWith("image/");
 
 const StepLoading = () => (
     <div className="camera-step-loading d-flex justify-content-center py-5">
@@ -47,7 +58,7 @@ const CameraWizard = () => {
 
     // 選圖、拖放、貼上三種來源共用同一套驗證：只收圖片、上限 5MB，不合格都用文字說明原因
     const acceptFile = (newFile) => {
-        if (!isImageFile(newFile)) {
+        if (!isSupportedImage(newFile)) {
             setErrorMsg("不支援這個檔案格式，請選擇圖片檔（例如 JPG、PNG、WebP）。");
             return;
         }
@@ -103,7 +114,9 @@ const CameraWizard = () => {
             // 焦點在輸入框或可編輯區時，貼上屬於那個欄位，不攔截
             const target = event.target;
             if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable) return;
-            const pasted = Array.from(event.clipboardData?.files || []).find(isImageFile);
+            const files = Array.from(event.clipboardData?.files || []);
+            // 優先用收得下的圖片；貼的是圖片但格式不收（例如 GIF），也要攔下來讓使用者看到說明，不能毫無反應
+            const pasted = files.find(isSupportedImage) || files.find(looksLikeImage);
             if (!pasted) return;
             event.preventDefault();
             acceptFileRef.current(pasted);
@@ -181,7 +194,7 @@ const CameraWizard = () => {
                                     id="camera-file-input"
                                     key={`album-${inputKey}`}
                                     type="file"
-                                    accept="image/*"
+                                    accept={ACCEPT_ATTRIBUTE}
                                     onChange={handleImageChange}
                                     ref={albumInputRef}
                                     style={{ display: "none" }}
@@ -190,7 +203,7 @@ const CameraWizard = () => {
                                 <input
                                     key={`camera-${inputKey}`}
                                     type="file"
-                                    accept="image/*"
+                                    accept={ACCEPT_ATTRIBUTE}
                                     capture="environment"
                                     onChange={handleImageChange}
                                     ref={cameraInputRef}
@@ -199,7 +212,7 @@ const CameraWizard = () => {
                                     tabIndex={-1}
                                 />
                                 {errorMsg && <Alert variant="danger" className="py-2 mt-2 mb-0">{errorMsg}</Alert>}
-                                <p className="camera-hint">支援常見圖片格式，檔案大小上限 5MB。</p>
+                                <p className="camera-hint">支援 JPG、PNG、WebP 格式，檔案大小上限 5MB。</p>
                                 <CameraPrivacyNote />
                             </div>
                             <div className="camera-step1-actions">
