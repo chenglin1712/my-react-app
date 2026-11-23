@@ -10,14 +10,14 @@ django-redis==7.0.0
 redis==8.1.0
 
 # FastAPI / ASGI
-fastapi==0.162.7
+fastapi==0.165.0
 uvicorn==0.54.0
-python-multipart==0.0.33
+python-multipart==0.0.34
 starlette==1.10.0
 slowapi==0.1.10
 
 # Database
-sqlalchemy==2.1.8
+sqlalchemy==2.1.9
 alembic==1.20.1
 dj-database-url==3.1.2
 psycopg2-binary==2.9.13
@@ -28,7 +28,7 @@ firebase-admin==7.8.0
 cryptography==50.0.2
 
 # AI / ML
-anthropic==2.8.0
+anthropic==2.12.0
 # torch/torchaudio must be installed together from pytorch.org with matching CUDA version.
 # Example (CPU): pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 # 這兩個不在 requirements.lock 裡（要從 PyTorch 自己的 index 裝）。
@@ -47,7 +47,7 @@ torchaudio==2.11.0
 Pillow==13.0.0
 
 # Data Processing
-numpy==2.5.4
+numpy==2.5.5
 
 # Audio
 # pydub 依賴 audioop，Python 3.13 已移除；專案固定用 Python 3.12，升 3.13 前要先處理這個套件
@@ -59,6 +59,6 @@ httpx==0.28.1
 beautifulsoup4==4.15.0
 
 # Utilities
-pydantic==2.14.3
+pydantic==2.14.4
 python-dotenv==1.2.4
 sentry-sdk==2.75.0
