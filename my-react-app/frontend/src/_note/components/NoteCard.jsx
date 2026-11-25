@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { FileText, Heart, User } from "lucide-react";
 import { sanitizeNoteHtml } from "@utils/sanitizeNoteHtml";
 import { timeAgo } from "../timeAgo";
-import { firstImageSrc, stripImages } from "../noteCover";
+import { firstImageSrc, isCloudinaryUrl, stripImages } from "../noteCover";
 
 /**
  * 分享筆記格線裡的單張卡片。整張卡片可點選開啟詳情，但裡面還有一顆獨立的
@@ -17,9 +17,11 @@ export default function NoteCard({ note, isMyTab, isMine, iLike, onOpen, onToggl
     // 不在消毒之後再改寫 HTML（改寫過的結果不保證還是安全的）
     return {
       previewHtml: sanitizeNoteHtml(stripImages(raw), { strictImages: true }),
-      coverSrc: firstImageSrc(sanitizeNoteHtml(raw, { strictImages: true })),
+      // 優先用分享時存的 image 欄位（preview 會先去掉圖片，所以新分享的筆記封面只能靠它）；舊資料才從 preview 找（FE6-08）
+      coverSrc: (isCloudinaryUrl(note.image) ? note.image : null)
+        ?? firstImageSrc(sanitizeNoteHtml(raw, { strictImages: true })),
     };
-  }, [note.preview]);
+  }, [note.preview, note.image]);
   // 記下「哪一個網址載入失敗」而不是單一布林值：同一張卡片換成另一則筆記或新封面時，不會被舊的失敗狀態卡住
   const [failedSrc, setFailedSrc] = useState(null);
   const coverFailed = coverSrc !== null && failedSrc === coverSrc;

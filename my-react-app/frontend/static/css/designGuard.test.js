@@ -951,7 +951,7 @@ describe("P5-4 編輯區紙感（純樣式）", () => {
   });
   it("空白引導文字用 TipTap 的 Placeholder 狀態 class，不去解析編輯器內部 DOM", () => {
     expect(css).toMatch(/\.ProseMirror p\.is-editor-empty:first-child::before\s*\{[^}]*content:\s*attr\(data-placeholder\)/);
-    expect(readFileSync(join(FRONTEND, "src/_note/hooks/useNotePages.js"), "utf8")).toMatch(/Placeholder\.configure/);
+    expect(readFileSync(join(FRONTEND, "src/_note/noteEditorExtensions.js"), "utf8")).toMatch(/Placeholder\.configure/);
   });
 });
 

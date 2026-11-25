@@ -1,27 +1,15 @@
 import { describe, expect, test } from 'vitest';
 import { Editor } from '@tiptap/core';
-import { StarterKit } from '@tiptap/starter-kit';
-import { TextStyle } from '@tiptap/extension-text-style';
-import { Color } from '@tiptap/extension-color';
-import { Image as ImageExtension } from '@tiptap/extension-image';
-import { Placeholder } from '@tiptap/extensions';
-import FontSize from './fontSizeExtension';
+import { createNoteExtensions, upgradeLegacyNoteHtml } from './noteEditorExtensions';
 
 // 套件升級（Dependabot）時的煙霧測試：用「真的」TipTap 編輯器（不是 mock），
 // 跑筆記編輯器實際用到的延伸套件組合與指令。useNotePages.test.js 把編輯器整個換成假物件，
 // 所以升級 @tiptap/* 時只有這支能發現編輯器行為被改壞。
-// 延伸套件組合與 useNotePages.js 的 useEditor 設定相同。
+// 延伸套件組合與 useNotePages.js 共用（noteEditorExtensions.js），不會兩邊各寫一份而不一致。
 function createEditor(content = '<p></p>') {
   return new Editor({
     element: document.createElement('div'),
-    extensions: [
-      StarterKit,
-      TextStyle,
-      Color,
-      FontSize,
-      Placeholder.configure({ placeholder: '從這裡開始寫' }),
-      ImageExtension.configure({ HTMLAttributes: { style: 'max-width: 30%; height: auto;' } }),
-    ],
+    extensions: createNoteExtensions({ placeholder: '從這裡開始寫' }),
     content,
   });
 }
@@ -90,5 +78,43 @@ describe('筆記編輯器（真實 TipTap）', () => {
     editor.commands.insertContent('你好');
     expect(first().classList.contains('is-editor-empty')).toBe(false);
     editor.destroy();
+  });
+
+  // FE6-01：舊筆記把圖片以 Base64 內嵌。TipTap 3 的 Image 預設 allowBase64:false，載入時圖片會被丟掉，
+  // 之後存檔就永久消失。
+  test('舊筆記內嵌的 Base64 圖片載入後仍保留，重新載入輸出也不變', () => {
+    const dataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    const editor = createEditor(`<p>舊筆記</p><img src="${dataUrl}" alt="舊圖">`);
+    const html = editor.getHTML();
+    expect(html).toContain(dataUrl);
+    const reloaded = createEditor(html);
+    expect(reloaded.getHTML()).toBe(html);
+    editor.destroy();
+    reloaded.destroy();
+  });
+
+  // FE6-01b：舊版 contenteditable 會留下 <mark>、<sub>、<sup>，載入後不能被整理掉。
+  test('舊筆記的螢光標記與上下標載入後仍保留', () => {
+    const editor = createEditor('<p><mark>重點</mark>H<sub>2</sub>O，x<sup>2</sup></p>');
+    const html = editor.getHTML();
+    expect(html).toContain('<mark>重點</mark>');
+    expect(html).toContain('<sub>2</sub>');
+    expect(html).toContain('<sup>2</sup>');
+    editor.destroy();
+  });
+
+  test('舊版 <font color size> 先轉成 span 樣式，顏色與字級保留；沒有 font 的內容原樣不動', () => {
+    const upgraded = upgradeLegacyNoteHtml('<p><font color="#ff0000" size="5">紅字</font></p>');
+    expect(upgraded).not.toContain('<font');
+    const editor = createEditor(upgraded);
+    const html = editor.getHTML();
+    expect(html).toContain('紅字');
+    expect(html).toMatch(/color:\s*(#ff0000|rgb\(255,\s*0,\s*0\))/i);
+    expect(html).toMatch(/font-size:\s*24px/);
+    editor.destroy();
+
+    const plain = '<p>沒有舊標籤</p>';
+    expect(upgradeLegacyNoteHtml(plain)).toBe(plain);
+    expect(upgradeLegacyNoteHtml(undefined)).toBeUndefined();
   });
 });
