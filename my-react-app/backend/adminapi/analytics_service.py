@@ -428,11 +428,18 @@ def build_quiz_quality_analytics(start_date, end_date, tribe):
     # 總分排名」跟「逐題分組計數」兩種不同維度的聚合，資料量現階段（使用
     # 事件表，不是辭典那種數十萬列的表）不大，Python 端處理比在 SQL 端疊
     # window function 直接得多。
+    # 稽核 BE2b-10：先在 SQL 端依 (uid, 題目, 對錯) 分組計數，再進 Python，不把每一筆事件都讀回來。
     records = []
-    for uid, payload in qs.values_list("uid", "payload"):
-        item_kind = payload.get("item_kind")
-        item_id = payload.get("item_id")
-        correct = payload.get("correct")
+    grouped = (
+        qs.values("uid", "payload__item_kind", "payload__item_id", "payload__correct")
+        .annotate(n=Count("id"))
+    )
+    for row in grouped:
+        uid = row["uid"]
+        item_kind = row["payload__item_kind"]
+        item_id = row["payload__item_id"]
+        correct = row["payload__correct"]
+        occurrences = row["n"]
         # 讀取端也做一次防禦性檢查，不只依賴寫入端的驗證——歷史資料可能是
         # 這次修正之前寫入的：型別不對的 item_kind/item_id（例如 list/dict）
         # 會讓底下當 (item_kind, item_id) 雜湊 key 直接 500（unhashable
@@ -442,13 +449,13 @@ def build_quiz_quality_analytics(start_date, end_date, tribe):
             continue
         if type(correct) is not bool:
             continue
-        records.append((uid, item_kind, item_id, correct))
+        records.append((uid, item_kind, item_id, correct, occurrences))
 
     user_totals = defaultdict(lambda: [0, 0])  # uid -> [correct_count, total_count]
-    for uid, _kind, _id, correct in records:
-        user_totals[uid][1] += 1
+    for uid, _kind, _id, correct, occurrences in records:
+        user_totals[uid][1] += occurrences
         if correct:
-            user_totals[uid][0] += 1
+            user_totals[uid][0] += occurrences
 
     ranked_uids = sorted(user_totals, key=lambda u: user_totals[u][0] / user_totals[u][1], reverse=True)
     n_users = len(ranked_uids)
@@ -459,19 +466,19 @@ def build_quiz_quality_analytics(start_date, end_date, tribe):
     item_stats = defaultdict(lambda: {
         "total": 0, "correct": 0, "high_total": 0, "high_correct": 0, "low_total": 0, "low_correct": 0,
     })
-    for uid, item_kind, item_id, correct in records:
+    for uid, item_kind, item_id, correct, occurrences in records:
         stat = item_stats[(item_kind, item_id)]
-        stat["total"] += 1
+        stat["total"] += occurrences
         if correct:
-            stat["correct"] += 1
+            stat["correct"] += occurrences
         if uid in high_group:
-            stat["high_total"] += 1
+            stat["high_total"] += occurrences
             if correct:
-                stat["high_correct"] += 1
+                stat["high_correct"] += occurrences
         elif uid in low_group:
-            stat["low_total"] += 1
+            stat["low_total"] += occurrences
             if correct:
-                stat["low_correct"] += 1
+                stat["low_correct"] += occurrences
 
     labels = _resolve_item_labels(item_stats.keys())
 

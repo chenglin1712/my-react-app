@@ -538,8 +538,10 @@ class RevisionTest(Base):
         pk = self.publish()
         self._propose(pk, {"image_url": IMG})
         with patch.dict(os.environ, {"CLOUDINARY_CLOUD_NAME": "othercloud"}):
-            with self.assertRaises(ValidationError):
-                self.call("post", f"{ADMIN_URL}{pk}/pending-revision/approve/", {})
+            # 稽核 BE2b-12：驗證失敗回可讀的 400，不是 500／未處理例外
+            response = self.call("post", f"{ADMIN_URL}{pk}/pending-revision/approve/", {})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("errors", response.json())
         self.assertEqual(FeaturedTopic.objects.get(pk=pk).image_url, "")
 
     def test_revision_reject_leaves_content_alone(self):

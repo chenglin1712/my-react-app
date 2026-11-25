@@ -81,6 +81,19 @@ def _require_list(value, field, errors):
     return True
 
 
+def _require_name_list(value, field, errors):
+    """批次匯入的主檔名稱陣列（稽核 BE2b-01）：每個元素都必須是非空白字串、有長度上限。
+    只檢查是陣列會讓 [["x"]]、整數、空字串一路撐到解析／建立主檔時才出事。不改寫原值。"""
+    if not _require_list(value, field, errors):
+        return False
+    for index, element in enumerate(value or []):
+        if not isinstance(element, str) or not element.strip():
+            errors[f'{field}[{index}]'] = '必須是非空白字串'
+        elif len(element) > 255:
+            errors[f'{field}[{index}]'] = '不可超過 255 個字元'
+    return True
+
+
 def _require_int_id_list(value, field, errors):
     """給 category_ids／pos_ids／focus_ids／source_ids／affix_ids 這種
     「主檔 id 陣列」共用——只檢查是陣列還不夠，元素型別不對（例如字串）會
@@ -105,6 +118,8 @@ def _validate_word_name_ref(item, errors_prefix, errors):
     """批次匯入的標註項目參照：word_name，字串、允許空白、選填（人工編輯
     檔案時用詞形比對，見本檔案批次匯入區塊開頭的說明）。"""
     _require_str(item.get('word_name'), f'{errors_prefix}.word_name', errors, allow_blank=True, required=False)
+    # 稽核 BE2b-02：匯出會一併帶 word_id（比詞形可靠），匯入時優先採用
+    _validate_word_id_ref(item, errors_prefix, errors)
 
 
 def _validate_anaphora_item(item, index, errors_prefix, errors, *, validate_ref):
@@ -182,9 +197,9 @@ _TAXONOMY_ID_FIELDS = [
     ('focus_ids', _require_int_id_list),
 ]
 _TAXONOMY_NAME_FIELDS = [
-    ('category_names', _require_list),
-    ('pos_names', _require_list),
-    ('focus_names', _require_list),
+    ('category_names', _require_name_list),
+    ('pos_names', _require_name_list),
+    ('focus_names', _require_name_list),
 ]
 
 
@@ -235,7 +250,7 @@ def _validate_word_payload(payload, *, mode):
     if mode == 'tree':
         _require_int_id_list(payload.get('source_ids', []), 'source_ids', errors)
     else:
-        _require_list(payload.get('source_names', []), 'source_names', errors)
+        _require_name_list(payload.get('source_names', []), 'source_names', errors)
 
     audios = payload.get('audios', [])
     if _bounded_list(audios, 'audios', errors):

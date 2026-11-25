@@ -257,19 +257,21 @@ class ValidateWordBundleEntryTest(SimpleTestCase):
         for field in ("is_derivative_root", "is_image", "is_zuzucidian", "is_other_dialect"):
             self.assertEqual(errors[field], "必須是布林值")
 
-    def test_source_names_must_be_list_but_element_type_is_not_checked(self):
-        # 目前的既有行為（刻意保留，不是這次重構的目標）：只檢查
-        # source_names 本身是不是陣列，不檢查陣列裡每個元素的型別——跟
-        # validate_word_tree_payload 的 source_ids 用 _require_int_id_list
-        # 逐元素檢查是整數不同。
+    def test_source_names_must_be_a_list_of_non_blank_strings(self):
+        # 稽核 BE2b-01：原本只檢查是陣列、不檢查元素，畸形元素會一路撐到解析／建立主檔才出事。
         _, errors = validate_word_bundle_entry({"name": "n", "source_names": "oops"})
         self.assertEqual(errors["source_names"], "必須是陣列")
 
-        _, errors = validate_word_bundle_entry({"name": "n", "source_names": [1, None, {"x": 1}]})
-        self.assertNotIn("source_names", errors)
+        _, errors = validate_word_bundle_entry({"name": "n", "source_names": [1, None, {"x": 1}, "", "ok"]})
+        self.assertEqual(
+            sorted(key for key in errors if key.startswith("source_names")),
+            ["source_names[0]", "source_names[1]", "source_names[2]", "source_names[3]"],
+        )
+
+        _, errors = validate_word_bundle_entry({"name": "n", "source_names": ["甲", "乙"]})
         self.assertEqual(errors, {})
 
-    def test_explanation_category_names_pos_names_focus_names_element_type_not_checked(self):
+    def test_explanation_category_names_pos_names_focus_names_elements_are_checked(self):
         payload = {
             "name": "n",
             "explanations": [{
@@ -278,8 +280,9 @@ class ValidateWordBundleEntryTest(SimpleTestCase):
         }
         _, errors = validate_word_bundle_entry(payload)
         self.assertEqual(errors["explanations[0].pos_names"], "必須是陣列")
-        self.assertNotIn("explanations[0].category_names", errors)
-        self.assertNotIn("explanations[0].focus_names", errors)
+        self.assertIn("explanations[0].category_names[0]", errors)
+        self.assertIn("explanations[0].category_names[1]", errors)
+        self.assertIn("explanations[0].focus_names[0]", errors)
 
     def test_explanation_images_and_sentences_same_as_tree(self):
         payload = {

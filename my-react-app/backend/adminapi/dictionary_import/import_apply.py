@@ -21,6 +21,17 @@ _IMPORT_ROW_ID_NAMESPACE = uuid.UUID("f2e6b9d0-9b1a-4b7a-9f3a-6c2f6f9a7d31")
 _REPORT_CHECKPOINT_EVERY = 25
 
 
+class ImportClaimLost(Exception):
+    """這個匯入工作已經被續跑指令接手（稽核 BE2b-05），原本的核准迴圈必須立刻停手，不能再寫入。"""
+
+
+def _still_owner(job):
+    # 續跑指令接手時會把 applied_by 設成「resume:…」；核准迴圈持有工作期間 applied_by 一直是空字串
+    from ..models import DictionaryImportJob
+
+    return DictionaryImportJob.objects.filter(pk=job.pk, applied_by="").exists()
+
+
 def _deterministic_import_row_id(job_pk, row):
     return str(uuid.uuid5(_IMPORT_ROW_ID_NAMESPACE, f"dictionary-import-job:{job_pk}:row:{row}"))
 
@@ -46,6 +57,8 @@ def apply_import_job_rows(job, fresh_report):
     outcomes = []
     for item in fresh_report["items"]:
         row = item["row"]
+        if not _still_owner(job):
+            raise ImportClaimLost()
         if item["action"] == "error":
             outcome = {"row": row, "name": item["name"], "outcome": "skipped", "detail": item["errors"]}
         else:

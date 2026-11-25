@@ -33,6 +33,8 @@ class UsageEvent(models.Model):
         indexes = [
             models.Index(fields=['event_type', 'created_at']),
             models.Index(fields=['uid', 'created_at']),
+            # 稽核 BE2b-10：儀表板只依日期區間查詢（沒帶 event_type）時用得到
+            models.Index(fields=['created_at'], name='usageevent_created_at_idx'),
         ]
 
     def __str__(self):

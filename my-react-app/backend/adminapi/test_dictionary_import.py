@@ -420,7 +420,7 @@ class ImportApproveTest(DictionaryDbTestCase):
         self.assertEqual(blocked_resp.status_code, 409)
 
         from django.core.management import call_command
-        call_command("resume_stuck_dictionary_import", str(job_id), "--apply")
+        call_command("resume_stuck_dictionary_import", str(job_id), "--apply", "--min-age-minutes", "0")
 
         job.refresh_from_db()
         self.assertEqual(job.status, DictionaryImportJob.STATUS_APPLIED)
