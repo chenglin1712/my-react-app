@@ -8,7 +8,8 @@ import { apiGet } from '../../utils/apiClient';
 vi.mock('../../utils/apiClient', () => ({ apiGet: vi.fn() }));
 
 const VALID_RESPONSE = {
-  grid_solution: ['ab', 'c-'],
+  puzzle_token: 'token-abc',
+  grid_solution: ['__', '_-'],
   legend: [{ number: 1, direction: 'across', start_row: 1, start_col: 1, clue: '線索一' }],
   grid_display: ['1 ', '  '],
 };
@@ -42,10 +43,21 @@ describe('Game_crossword_board（回歸測試：原本題目還沒載入完成�
     const payload = ref.current.getSubmissionPayload();
     expect(payload).toEqual({
       user_answers: [['', ''], ['', '-']],
-      crossword_solution: VALID_RESPONSE.grid_solution,
-      crossword_legend: VALID_RESPONSE.legend,
-      crossword_grid_display: VALID_RESPONSE.grid_display,
+      puzzle_token: 'token-abc',
     });
+    // 稽核 BE5-09：解答與圖例不再由前端送出，判分用的是後端憑證裡的內容
+    expect(payload).not.toHaveProperty('crossword_solution');
+    expect(payload).not.toHaveProperty('crossword_legend');
+  });
+
+  test('沒有題目憑證時不給提交內容（舊版後端回應、或憑證遺失）', async () => {
+    const { puzzle_token: _omit, ...withoutToken } = VALID_RESPONSE;
+    apiGet.mockResolvedValueOnce(withoutToken);
+    const ref = createRef();
+    render(<Game_crossword_board ref={ref} tribe="tayal" onReadyChange={vi.fn()} />);
+
+    await screen.findByText('橫向題目');
+    expect(ref.current.getSubmissionPayload()).toBeNull();
   });
 
   test('後端回傳格式不符時顯示錯誤，不會直接把不完整的資料當成正常題目（回歸測試：原本沒有驗證回應形狀，格式錯誤會直接拋例外）', async () => {

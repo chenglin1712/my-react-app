@@ -200,31 +200,31 @@ class ParseJsonBodyTests(SimpleTestCase):
 
 
 class CrosswordSerializerLimitsTests(SimpleTestCase):
-    def _payload(self, legend):
-        return {"user_answers": [["a"]], "crossword_solution": ["a"], "crossword_legend": legend}
+    """稽核 BE5-09：提交只收作答與題目憑證；解答與圖例不再由前端送入。"""
 
     @staticmethod
-    def _item(**overrides):
-        item = {"number": 1, "word": "ab", "clue": "c", "direction": "across", "start_col": 1, "start_row": 1, "length": 2}
-        item.update(overrides)
-        return item
+    def _payload(rows=1, cols=1, token="t"):
+        return {"user_answers": [["a"] * cols for _ in range(rows)], "puzzle_token": token}
 
     def test_normal_payload_is_valid(self):
         from CrosswordPuzzle.serializers import SubmitAnsSerializer
 
-        self.assertTrue(SubmitAnsSerializer(data=self._payload([self._item()])).is_valid())
-        self.assertTrue(SubmitAnsSerializer(data=self._payload([self._item()] * 50)).is_valid())
+        self.assertTrue(SubmitAnsSerializer(data=self._payload()).is_valid())
+        self.assertTrue(SubmitAnsSerializer(data=self._payload(rows=30, cols=30)).is_valid())
 
-    def test_legend_over_fifty_items_is_refused(self):
+    def test_grid_has_an_upper_bound(self):
         from CrosswordPuzzle.serializers import SubmitAnsSerializer
 
-        serializer = SubmitAnsSerializer(data=self._payload([self._item()] * 51))
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("crossword_legend", serializer.errors)
+        self.assertFalse(SubmitAnsSerializer(data=self._payload(rows=51)).is_valid())
+        self.assertFalse(SubmitAnsSerializer(data=self._payload(cols=51)).is_valid())
 
-    def test_length_has_an_upper_bound(self):
+    def test_token_is_required_and_bounded(self):
         from CrosswordPuzzle.serializers import SubmitAnsSerializer
 
-        self.assertTrue(SubmitAnsSerializer(data=self._payload([self._item(length=50)])).is_valid())
-        serializer = SubmitAnsSerializer(data=self._payload([self._item(length=10**9)]))
-        self.assertFalse(serializer.is_valid())
+        self.assertFalse(SubmitAnsSerializer(data={"user_answers": [["a"]]}).is_valid())
+        self.assertFalse(SubmitAnsSerializer(data=self._payload(token="x" * 100001)).is_valid())
+
+    def test_single_cell_must_be_one_character(self):
+        from CrosswordPuzzle.serializers import SubmitAnsSerializer
+
+        self.assertFalse(SubmitAnsSerializer(data={"user_answers": [["ab"]], "puzzle_token": "t"}).is_valid())

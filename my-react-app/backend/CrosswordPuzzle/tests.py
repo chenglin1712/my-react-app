@@ -5,7 +5,8 @@ from django.core.cache import cache
 from django.test import TestCase, Client
 from django.test.utils import override_settings
 
-from CrosswordPuzzle.views import _get_words_from_db
+from CrosswordPuzzle import puzzle_token
+from CrosswordPuzzle.views import _get_words_from_db, _grade_submission
 
 # 5 個族語統一即時查辭典資料庫選字（原本只有泰雅語走另一套 CrosswordTayalWord
 # 後台詞庫，使用者要求拿掉這個特例，見規劃文件「並行項目」章節）——這裡
@@ -50,8 +51,16 @@ class GenerateCrosswordTest(TestCase):
         data = response.json()
         self.assertIn('grid_solution', data)
         self.assertIn('legend', data)
-        self.assertIn('word_bank', data)
-        self.assertGreater(len(data['word_bank']), 0)
+        self.assertGreater(len(data['legend']), 0)
+        # 稽核 BE5-09：答案只在加密憑證裡，前端拿到的網格與提示都不含答案
+        self.assertTrue(data['puzzle_token'])
+        self.assertNotIn('word_bank', data)
+        self.assertTrue(all('word' not in item for item in data['legend']))
+        self.assertFalse(any(ch.isalpha() for row in data['grid_solution'] for ch in row))
+        for item in data['legend']:
+            for answer in (w[0] for w in _MOCK_DB_ROWS):
+                self.assertNotIn(answer, json.dumps(item, ensure_ascii=False))
+        self.assertNotIn('debug_loops', data['info'])
         # debug_loops 是內部運算迴圈次數，純除錯用，正式環境 API 不該外露。
         self.assertNotIn('debug_loops', data['info'])
 
@@ -59,7 +68,7 @@ class GenerateCrosswordTest(TestCase):
         with self._mock_db(_MOCK_DB_ROWS):
             response = self.client.get('/CrosswordPuzzle/generate/?tribe=amis')
         self.assertEqual(response.status_code, 200)
-        self.assertGreater(len(response.json()['word_bank']), 0)
+        self.assertGreater(len(response.json()['legend']), 0)
 
     def test_insufficient_word_pool_returns_500(self):
         # 只留 2 筆（低於 generate_crossword 要求的最少 5 筆）——泰雅語跟其他
@@ -176,196 +185,163 @@ class GetWordsFromDbTest(TestCase):
 
 
 class SubmitAnsTest(TestCase):
-    """submit_ans 的橫向/縱向逐字比對邏輯。"""
+    """submit_ans：解答與圖例來自伺服器簽發的題目憑證（稽核 BE5-09），前端只送憑證與作答。"""
+
+    UID = "u1"
 
     def setUp(self):
         self.client = Client()
         cache.clear()
+        patcher = patch("CrosswordPuzzle.views.verify_firebase_token", return_value=({"uid": self.UID}, None))
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
-    def _payload(self, user_row):
-        return {
-            "user_answers": [list(user_row)],
-            "crossword_solution": ["cyux"],
-            "crossword_legend": [
-                {
-                    "number": 1, "clue": "高興", "direction": "across",
-                    "length": 4, "start_col": 1, "start_row": 1, "word": "cyux",
-                },
-            ],
+    @staticmethod
+    def _legend(direction="across", **overrides):
+        item = {
+            "number": 1, "clue": "高興", "direction": direction,
+            "length": 4, "start_col": 1, "start_row": 1, "word": "cyux",
         }
+        item.update(overrides)
+        return [item]
+
+    def _token(self, solution=("cyux",), legend=None, uid=None):
+        return puzzle_token.issue(uid or self.UID, list(solution), legend or self._legend())
+
+    def _post(self, user_rows, token=None, extra=None):
+        payload = {"user_answers": user_rows, "puzzle_token": token or self._token()}
+        payload.update(extra or {})
+        return self.client.post('/CrosswordPuzzle/submit/', data=json.dumps(payload), content_type='application/json')
 
     def test_scores_correct_answer(self):
-        response = self.client.post(
-            '/CrosswordPuzzle/submit/',
-            data=json.dumps(self._payload("cyux")),
-            content_type='application/json',
-        )
+        response = self._post([list("cyux")])
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data['correct_words_count'], 1)
+        self.assertEqual(data['score'], 100)
         self.assertTrue(data['word_details'][0]['is_correct'])
 
     def test_scores_incorrect_answer(self):
-        response = self.client.post(
-            '/CrosswordPuzzle/submit/',
-            data=json.dumps(self._payload("xxxx")),
-            content_type='application/json',
-        )
-        data = response.json()
+        data = self._post([list("xxxx")]).json()
         self.assertEqual(data['correct_words_count'], 0)
+        self.assertEqual(data['score'], 0)
         self.assertFalse(data['word_details'][0]['is_correct'])
 
     def test_user_word_keeps_full_answer_after_first_wrong_letter(self):
         """稽核 FE5-07：原本遇到第一個錯字就 break，結果頁的「你的答案」只到出錯那格為止。"""
-        for direction_payload in (self._payload("cyaa"),):
-            response = self.client.post(
-                '/CrosswordPuzzle/submit/',
-                data=json.dumps(direction_payload),
-                content_type='application/json',
-            )
-            detail = response.json()['word_details'][0]
-            self.assertFalse(detail['is_correct'])
-            self.assertEqual(detail['user_word'], 'cyaa')
+        detail = self._post([list("cyaa")]).json()['word_details'][0]
+        self.assertFalse(detail['is_correct'])
+        self.assertEqual(detail['user_word'], 'cyaa')
 
     def test_user_word_keeps_full_answer_for_down_words(self):
-        payload = {
-            "user_answers": [["c"], ["x"], ["u"], ["x"]],
-            "crossword_solution": ["c", "y", "u", "x"],
-            "crossword_legend": [{
-                "number": 1, "clue": "高興", "direction": "down",
-                "length": 4, "start_col": 1, "start_row": 1, "word": "cyux",
-            }],
-        }
-        response = self.client.post(
-            '/CrosswordPuzzle/submit/', data=json.dumps(payload), content_type='application/json',
-        )
-        detail = response.json()['word_details'][0]
+        token = self._token(solution=("c", "y", "u", "x"), legend=self._legend("down"))
+        detail = self._post([["c"], ["x"], ["u"], ["x"]], token=token).json()['word_details'][0]
         self.assertFalse(detail['is_correct'])
         self.assertEqual(detail['user_word'], 'cxux')
+
+    def test_client_supplied_solution_and_legend_are_ignored(self):
+        """稽核 BE5-09 的核心：送出自己編的「解答」與「圖例」不能讓錯誤的作答得分。"""
+        forged = {
+            "crossword_solution": ["xxxx"],
+            "crossword_legend": self._legend(word="xxxx"),
+        }
+        data = self._post([list("xxxx")], extra=forged).json()
+        self.assertEqual(data['correct_words_count'], 0)
+        self.assertEqual(data['word_details'][0]['correct_word'], 'cyux')
+
+    def test_token_issued_to_someone_else_is_refused(self):
+        response = self._post([list("cyux")], token=self._token(uid="someone-else"))
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['code'], 'puzzle_expired')
+
+    def test_tampered_token_is_refused(self):
+        token = self._token()
+        tampered = token[:-4] + ("AAAA" if not token.endswith("AAAA") else "BBBB")
+        self.assertEqual(self._post([list("cyux")], token=tampered).status_code, 400)
+
+    def test_expired_token_is_refused(self):
+        token = self._token()
+        with patch.object(puzzle_token, "TOKEN_TTL_SECONDS", -1):
+            response = self._post([list("cyux")], token=token)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['code'], 'puzzle_expired')
 
     def test_get_method_not_allowed(self):
         response = self.client.get('/CrosswordPuzzle/submit/')
         self.assertEqual(response.status_code, 405)
 
     def test_malformed_json_returns_400_not_html_500(self):
-        # 原本沒驗證請求結構，畸形請求會讓例外一路往外拋、被 Django 預設的 500
-        # 處理接住（正式環境回一頁 HTML），跟這個 API 統一回 JSON 的約定不一致。
-        response = self.client.post(
-            '/CrosswordPuzzle/submit/',
-            data="not valid json",
-            content_type='application/json',
-        )
+        response = self.client.post('/CrosswordPuzzle/submit/', data="not valid json", content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
-    def test_missing_required_field_returns_400(self):
-        payload = self._payload("cyux")
-        del payload["crossword_legend"]
+    def test_missing_token_returns_400(self):
         response = self.client.post(
-            '/CrosswordPuzzle/submit/',
-            data=json.dumps(payload),
-            content_type='application/json',
+            '/CrosswordPuzzle/submit/', data=json.dumps({"user_answers": [list("cyux")]}), content_type='application/json',
         )
         self.assertEqual(response.status_code, 400)
 
     def test_wrong_field_type_returns_400(self):
-        payload = self._payload("cyux")
-        payload["crossword_solution"] = "not-a-list"
         response = self.client.post(
             '/CrosswordPuzzle/submit/',
-            data=json.dumps(payload),
+            data=json.dumps({"user_answers": "not-a-list", "puzzle_token": self._token()}),
             content_type='application/json',
         )
         self.assertEqual(response.status_code, 400)
 
     @patch('CrosswordPuzzle.views.is_ratelimited', return_value=True)
     def test_rate_limited_returns_429(self, _mock_limited):
-        response = self.client.post(
-            '/CrosswordPuzzle/submit/',
-            data=json.dumps(self._payload("cyux")),
-            content_type='application/json',
-        )
-        self.assertEqual(response.status_code, 429)
-
-    # 稽核修正：length/start_col/start_row 原本只是普通 IntegerField，沒有下限，
-    # 0 或負數會讓判分整個失準（length<=0 時 for i in range(word_length) 迴圈
-    # 不執行，預設 True 的 is_correct 永遠不會被推翻；start_row/start_col 為 0
-    # 則會讓 start_row - 1 算出 -1，繞成負索引比對到陣列最後一列/欄），
-    # 現在應該在序列化驗證階段就被擋成 400。
-    def test_rejects_non_positive_length(self):
-        payload = self._payload("")
-        payload["crossword_legend"][0]["length"] = 0
-        response = self.client.post(
-            '/CrosswordPuzzle/submit/',
-            data=json.dumps(payload),
-            content_type='application/json',
-        )
-        self.assertEqual(response.status_code, 400)
-
-    def test_rejects_non_positive_start_row(self):
-        payload = self._payload("cyux")
-        payload["crossword_legend"][0]["start_row"] = 0
-        response = self.client.post(
-            '/CrosswordPuzzle/submit/',
-            data=json.dumps(payload),
-            content_type='application/json',
-        )
-        self.assertEqual(response.status_code, 400)
-
-    def test_rejects_non_positive_start_col(self):
-        payload = self._payload("cyux")
-        payload["crossword_legend"][0]["start_col"] = 0
-        response = self.client.post(
-            '/CrosswordPuzzle/submit/',
-            data=json.dumps(payload),
-            content_type='application/json',
-        )
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self._post([list("cyux")]).status_code, 429)
 
 
-class SubmitAnsDefenseInDepthTest(TestCase):
-    """E5：序列化器已擋 start_* < 1；views.py 的 0 <= row／col 檢查是第二道防線。
-    這裡繞過序列化器直接餵 0 或負數起點，確認不會因為 Python 的負索引而比對到對面（尾端）的格子。"""
+class GenerateThenSubmitTest(TestCase):
+    """產生 → 提交整條路：前端只憑遮蔽過的網格與不含答案的提示，填入正確答案後能拿到滿分。"""
 
-    def setUp(self):
-        self.client = Client()
-        cache.clear()
+    def test_round_trip_scores_full_marks_with_the_real_answers(self):
+        mock_db = MagicMock()
+        mock_db.execute.return_value.fetchall.return_value = _MOCK_DB_ROWS
+        with patch("CrosswordPuzzle.views.verify_firebase_token", return_value=({"uid": "u1"}, None)),                 patch("CrosswordPuzzle.views.SessionLocal", return_value=mock_db):
+            generated = self.client.get('/CrosswordPuzzle/generate/?tribe=tayal').json()
+            # 玩家看不到答案；測試從伺服器端憑證取出答案來模擬「全部填對」
+            puzzle = puzzle_token.read(generated['puzzle_token'], "u1")
+            self.assertIsNotNone(puzzle)
+            answers = [list(row.replace(' ', '')) for row in puzzle['solution']]
+            response = self.client.post(
+                '/CrosswordPuzzle/submit/',
+                data=json.dumps({"user_answers": answers, "puzzle_token": generated['puzzle_token']}),
+                content_type='application/json',
+            )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['correct_words_count'], data['total_words'])
+        self.assertEqual(data['score'], 100)
 
-    def _post_bypassing_serializer(self, direction, start_row, start_col):
+
+class GradeSubmissionDefenseInDepthTest(TestCase):
+    """E5：判分函式本身的 0 <= row／col 檢查是第二道防線（憑證內容理論上可信，但仍不讓負索引繞到尾端）。
+    直接餵 0 或負數起點，確認不會因為 Python 的負索引而比對到對面（尾端）的格子。"""
+
+    def _grade(self, direction, start_row, start_col):
         # 盤面只有最後一列/欄有 "cyux"，使用者也填了 "cyux"：若負索引繞到尾端，就會被誤判成答對。
         if direction == "across":
             solution, answers = ["----", "----", "cyux"], [list("----"), list("----"), list("cyux")]
         else:
             solution, answers = ["---c", "---y", "---u", "---x"], [list("---c"), list("---y"), list("---u"), list("---x")]
-        validated = {
-            "user_answers": answers,
-            "crossword_solution": solution,
-            "crossword_legend": [{
-                "number": 1, "clue": "高興", "direction": direction,
-                "length": 4, "start_col": start_col, "start_row": start_row, "word": "cyux",
-            }],
-        }
-        fake = MagicMock()
-        fake.is_valid.return_value = True
-        fake.validated_data = validated
-        with patch("CrosswordPuzzle.views.SubmitAnsSerializer", return_value=fake):
-            return self.client.post("/CrosswordPuzzle/submit/", data=json.dumps({"x": 1}), content_type="application/json")
+        legend = [{
+            "number": 1, "clue": "高興", "direction": direction,
+            "length": 4, "start_col": start_col, "start_row": start_row, "word": "cyux",
+        }]
+        return _grade_submission(answers, solution, legend)
 
     def test_across_with_zero_row_is_not_matched_against_the_last_row(self):
-        response = self._post_bypassing_serializer("across", start_row=0, start_col=1)
-        self.assertEqual(response.status_code, 200)
-        detail = response.json()["word_details"][0]
-        self.assertFalse(detail["is_correct"])
-        self.assertEqual(response.json()["correct_words_count"], 0)
+        results = self._grade("across", start_row=0, start_col=1)
+        self.assertFalse(results["word_details"][0]["is_correct"])
+        self.assertEqual(results["correct_words_count"], 0)
 
     def test_across_with_zero_col_is_not_matched_against_the_last_col(self):
-        # start_col=0 → 第一個字母落在 col -1（尾端），其餘字母落在 0..2；整個字要被判錯
-        response = self._post_bypassing_serializer("across", start_row=3, start_col=0)
-        self.assertFalse(response.json()["word_details"][0]["is_correct"])
+        self.assertFalse(self._grade("across", start_row=3, start_col=0)["word_details"][0]["is_correct"])
 
     def test_down_with_zero_col_is_not_matched_against_the_last_col(self):
-        response = self._post_bypassing_serializer("down", start_row=1, start_col=0)
-        self.assertFalse(response.json()["word_details"][0]["is_correct"])
+        self.assertFalse(self._grade("down", start_row=1, start_col=0)["word_details"][0]["is_correct"])
 
     def test_down_with_negative_row_is_not_matched(self):
-        response = self._post_bypassing_serializer("down", start_row=-1, start_col=4)
-        self.assertFalse(response.json()["word_details"][0]["is_correct"])
+        self.assertFalse(self._grade("down", start_row=-1, start_col=4)["word_details"][0]["is_correct"])

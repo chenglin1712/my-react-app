@@ -11,6 +11,7 @@ import threading
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone as dt_timezone
+from zoneinfo import ZoneInfo
 
 from django.db.models import Count
 from django.db.models.fields.json import KeyTextTransform
@@ -102,11 +103,26 @@ class DateRangeError(Exception):
 
 _MAX_CUSTOM_DATE_RANGE_DAYS = 90
 
+# 稽核 BE2b-09：全站 TIME_ZONE 是 UTC，原本分析以 UTC 切日，台灣 00:00–07:59 的活動會算到前一天。
+# 分析一律明確用台灣時區切日（不動全站設定，避免影響其他功能）。
+ANALYTICS_TZ = ZoneInfo("Asia/Taipei")
+
+
+def _created_between(start_date, end_date):
+    """台灣日期 [start_date, end_date]（含頭尾）對應的 created_at 區間（半開）。"""
+    start = datetime.combine(start_date, datetime.min.time(), tzinfo=ANALYTICS_TZ)
+    try:
+        end_day = end_date + timedelta(days=1)
+    except OverflowError:
+        end_day = end_date
+    end = datetime.combine(end_day, datetime.min.time(), tzinfo=ANALYTICS_TZ)
+    return {"created_at__gte": start, "created_at__lt": end}
+
 
 def parse_date_range(date_range, date_from, date_to):
     """回傳 (start_date, end_date)，含頭尾兩端。date_range：today／7d／30d／
     custom（custom 需要另外帶 date_from/date_to，格式 YYYY-MM-DD）。"""
-    today = timezone.localdate()
+    today = timezone.localdate(timezone=ANALYTICS_TZ)
     if date_range == "today":
         return today, today
     if date_range == "7d":
@@ -169,7 +185,7 @@ def _join_date_to_local_date(raw):
         # 值本來就是 UTC（呼應前端寫入時一律用 UTC ISO 字串的慣例），
         # 補上時區後才轉換，不能讓這批既有的髒資料讓整個報表端點 500。
         dt = timezone.make_aware(dt, dt_timezone.utc)
-    return timezone.localtime(dt).date()
+    return timezone.localtime(dt, ANALYTICS_TZ).date()
 
 
 # 全量掃描 Firebase Auth + Firestore 取得每位使用者的 joinDate 很貴（使用者數 × 往返），
@@ -238,7 +254,7 @@ def build_dashboard_analytics(start_date, end_date, tribe):
     全部由 UsageEvent 聚合（新註冊例外——那是 Firebase Auth 才有的資料，
     UsageEvent 不知道使用者何時註冊）。回傳完整的回應 dict（含 date_range
     外層），呼叫端（views.py）直接包進 JsonResponse。"""
-    qs = UsageEvent.objects.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+    qs = UsageEvent.objects.filter(**_created_between(start_date, end_date))
     if tribe:
         qs = qs.filter(tribe=tribe)
 
@@ -246,7 +262,7 @@ def build_dashboard_analytics(start_date, end_date, tribe):
         row["day"]: row["count"]
         for row in (
             qs.exclude(uid="")
-            .annotate(day=TruncDate("created_at"))
+            .annotate(day=TruncDate("created_at", tzinfo=ANALYTICS_TZ))
             .values("day")
             .annotate(count=Count("uid", distinct=True))
         )
@@ -293,7 +309,7 @@ def build_search_analytics(start_date, end_date, tribe):
     避免在還沒看過真實查詢分布之前過度設計。"""
     qs = UsageEvent.objects.filter(
         event_type="dictionary_search",
-        created_at__date__gte=start_date, created_at__date__lte=end_date,
+        **_created_between(start_date, end_date),
     )
     if tribe:
         qs = qs.filter(tribe=tribe)
@@ -403,7 +419,7 @@ def build_quiz_quality_analytics(start_date, end_date, tribe):
     決策」第 1 點）。"""
     qs = UsageEvent.objects.filter(
         event_type="quiz_answer",
-        created_at__date__gte=start_date, created_at__date__lte=end_date,
+        **_created_between(start_date, end_date),
     ).exclude(uid="")
     if tribe:
         qs = qs.filter(tribe=tribe)
@@ -540,13 +556,13 @@ def build_retention_analytics():
     active_uids_by_week = defaultdict(set)
     # 資料庫端先依（使用者, 當地日期）去重，只傳回這些組合，不把每一筆事件都載進記憶體；
     # 也不再把全部世代的 uid 塞進一個 IN 清單（人數多時超過資料庫的參數上限），改在這裡過濾。
-    # TruncDate 用目前時區取日期，與 timezone.localtime(created_at).date() 同一套規則。
+    # TruncDate 明確用台灣時區取日期，與 _join_date_to_local_date 同一套規則。
     # 日期下界：比最早世代的加入週還早的事件不可能被算進任何世代，不必掃整張表。
     earliest_week = min(cohort_start_by_uid.values())
     events = (
         UsageEvent.objects.exclude(uid="")
-        .filter(created_at__gte=timezone.make_aware(datetime.combine(earliest_week, datetime.min.time())))
-        .annotate(day=TruncDate("created_at"))
+        .filter(created_at__gte=timezone.make_aware(datetime.combine(earliest_week, datetime.min.time()), ANALYTICS_TZ))
+        .annotate(day=TruncDate("created_at", tzinfo=ANALYTICS_TZ))
         .values_list("uid", "day")
         .distinct()
     )
@@ -555,7 +571,7 @@ def build_retention_analytics():
             active_uids_by_week[_week_start(day)].add(uid)
     no_activity = frozenset()
 
-    today_week_start = _week_start(timezone.localdate())
+    today_week_start = _week_start(timezone.localdate(timezone=ANALYTICS_TZ))
 
     cohorts = []
     for cohort_start in sorted(cohort_uids):

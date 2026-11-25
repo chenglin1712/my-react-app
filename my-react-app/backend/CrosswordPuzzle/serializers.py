@@ -1,4 +1,4 @@
-"""submit_ans 的請求驗證。
+"""submit_ans 的請求驗證（稽核 BE5-09：只收題目憑證與使用者作答，解答與圖例一律由伺服器從憑證取得）。
 
 原本完全沒驗證請求結構，直接對 request.body 做 json.loads 後就用 dict.get()／
 list index 存取，型別不對或欄位缺漏時會讓例外一路往外拋、被 Django 預設的 500
@@ -7,25 +7,8 @@ list index 存取，型別不對或欄位缺漏時會讓例外一路往外拋、
 from rest_framework import serializers
 
 
-class CrosswordLegendItemSerializer(serializers.Serializer):
-    number = serializers.IntegerField()
-    word = serializers.CharField(max_length=100)
-    clue = serializers.CharField(max_length=500, allow_blank=True)
-    direction = serializers.ChoiceField(choices=["across", "down"])
-    # min_value=1：start_col/start_row 是 1-based 座標（views.py 用
-    # start_row - 1 換算成 0-based index），0 或負數會讓換算後的 index 變成
-    # -1，繞成 Python 負索引比對到陣列最後一列/欄；length<=1 則會讓判分迴圈
-    # for i in range(word_length) 整段不執行，預設 True 的 is_correct 永遠
-    # 不會被推翻。
-    start_col = serializers.IntegerField(min_value=1)
-    start_row = serializers.IntegerField(min_value=1)
-    # 稽核 MSC-4：length 沒有上限時，判分迴圈 for i in range(word_length) 可以被拉到很長；網格最大 13x13
-    length = serializers.IntegerField(min_value=1, max_value=50)
-
-
 class SubmitAnsSerializer(serializers.Serializer):
-    # 13x13 網格（見 generate_crossword），上限留一些餘裕，主要目的是擋掉
-    # 明顯不合理的超大陣列，不是精確重現遊戲規則。
+    # 網格最大 30x30（後台 crossword_grid_size 上限），上限留一些餘裕，主要目的是擋掉明顯不合理的超大陣列。
     user_answers = serializers.ListField(
         child=serializers.ListField(
             child=serializers.CharField(max_length=1, allow_blank=True),
@@ -34,10 +17,5 @@ class SubmitAnsSerializer(serializers.Serializer):
         max_length=50,
         allow_empty=False,
     )
-    crossword_solution = serializers.ListField(
-        child=serializers.CharField(max_length=200, allow_blank=True),
-        max_length=50,
-        allow_empty=False,
-    )
-    # 稽核 MSC-4：legend 原本沒有筆數上限（max_length 是 ListSerializer 的選項）
-    crossword_legend = CrosswordLegendItemSerializer(many=True, max_length=50)
+    # 產生題目時發給前端的加密憑證（見 puzzle_token.py）；200 個單字壓縮加密後遠小於這個上限。
+    puzzle_token = serializers.CharField(max_length=100000)

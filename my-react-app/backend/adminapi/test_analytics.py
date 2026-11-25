@@ -906,12 +906,12 @@ class JoinDateToLocalDateTest(TestCase):
             local_date = _join_date_to_local_date("2026-08-09T16:30:00Z")
         self.assertEqual(local_date, date(2026, 8, 10))
 
-    def test_under_utc_setting_conversion_is_a_no_op(self):
-        # 這個專案目前的 TIME_ZONE 就是 UTC，驗證這個情況下轉換前後日期
-        # 相同，不會意外改變既有行為。
+    def test_global_utc_setting_does_not_change_the_taipei_day(self):
+        # 稽核 BE2b-09：全站 TIME_ZONE 仍是 UTC，但分析一律明確用台灣時區切日，
+        # 與全站設定無關（台灣 00:00–07:59 的活動不再算到前一天）。
         with override_settings(TIME_ZONE="UTC"):
             local_date = _join_date_to_local_date("2026-08-09T16:30:00Z")
-        self.assertEqual(local_date, date(2026, 8, 9))
+        self.assertEqual(local_date, date(2026, 8, 10))
 
     def test_invalid_string_returns_none(self):
         self.assertIsNone(_join_date_to_local_date("not-a-date"))
@@ -925,5 +925,5 @@ class JoinDateToLocalDateTest(TestCase):
         datetime，這種值原本會直接讓整個報表端點 500（透過真實 Firebase
         資料跑 test_custom_range_exactly_90_days_accepted 時意外發現的
         真實 bug，不是憑空想像的邊角案例）。"""
-        local_date = _join_date_to_local_date("2026-08-09T16:30:00")
-        self.assertEqual(local_date, date(2026, 8, 9))
+        local_date = _join_date_to_local_date("2026-08-09T16:30:00")   # 沒有時區資訊：視為 UTC，再換成台灣日期
+        self.assertEqual(local_date, date(2026, 8, 10))

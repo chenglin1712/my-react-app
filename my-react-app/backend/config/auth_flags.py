@@ -47,6 +47,8 @@ def _bind_hosts_from_argv(argv):
             value = args[index + 1]
         elif arg.startswith("--bind="):
             value = arg.split("=", 1)[1]
+        elif arg.startswith("-b") and not arg.startswith("--") and len(arg) > 2:
+            value = arg[2:]                           # -b0.0.0.0:8000（黏寫）
         elif arg == "runserver":
             following = [a for a in args[index + 1:] if not a.startswith("-")]
             value = following[0] if following else None
@@ -56,6 +58,16 @@ def _bind_hosts_from_argv(argv):
         if value.isdigit() or not host:
             continue                                  # 只有埠號：預設綁 127.0.0.1
         hosts.append(host)
+    # 稽核 BE1-07：gunicorn 沒有明確 --bind 時，有 PORT 環境變數就綁 0.0.0.0，用設定檔（-c）時也看不出綁在哪。
+    # 這兩種情況無法證明只綁本機，視為對外。
+    # `python -m gunicorn` 時 argv[0] 是 gunicorn 套件裡的 __main__.py，所以看整個路徑字串而不只是檔名；
+    # gunicorn 也會自動載入工作目錄下的 gunicorn.conf.py，不需要 -c。
+    if not hosts and any("gunicorn" in str(a).lower() for a in args[:2]):
+        if os.getenv("PORT"):
+            hosts.append("0.0.0.0")
+        elif (any(a in ("-c", "--config") or a.startswith("--config=") for a in args)
+              or os.path.exists("gunicorn.conf.py")):
+            hosts.append("（設定檔指定，無法確認）")
     return hosts
 
 

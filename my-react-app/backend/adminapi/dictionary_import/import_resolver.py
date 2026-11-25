@@ -292,19 +292,30 @@ def _attach_current_hashes(db: Session, items: list) -> None:
     的另一列）改過」的關鍵，不能只比對這份 bundle 自己的內容有沒有變
     （見 import_report_hash 的說明——bundle 內容本來就沒變，是資料庫端的
     現況變了）。"""
+    from dictionary_db import model as m
+
     from .. import dictionary_write as dw
+    from ..dictionary_write.tree_reader import _build_word_trees
+
+    # 稽核 BE2b-04：原本每個更新列各讀一整棵詞條樹（每棵十幾個查詢）；改成整批查、依 id 取。
+    # 組樹與雜湊用的是同一份 _build_word_trees，雜湊與 get_word_tree 單筆結果一致。
+    update_ids = sorted({item["word_id"] for item in items if item["action"] == "update" and item["word_id"]})
+    trees = {}
+    for start in range(0, len(update_ids), 500):
+        chunk = update_ids[start:start + 500]
+        words = db.query(m.Word).filter(m.Word.id.in_(chunk)).all()
+        trees.update(_build_word_trees(db, words))
 
     for item in items:
+        item["current_hash"] = None
         if item["action"] == "update" and item["word_id"]:
-            try:
-                item["current_hash"] = dw.word_content_hash(dw.get_word_tree(db, item["word_id"]))
-            except dw.WordNotFoundError:
+            tree = trees.get(item["word_id"])
+            if tree is None:
                 item["action"] = "error"
                 item["errors"].append(f"目標詞條在解析過程中已經不存在：{item['word_id']}")
                 item["payload"] = None
-                item["current_hash"] = None
-        else:
-            item["current_hash"] = None
+            else:
+                item["current_hash"] = dw.word_content_hash(tree)
 
 
 def import_report_hash(report: dict) -> str:

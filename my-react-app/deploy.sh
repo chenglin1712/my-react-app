@@ -18,6 +18,7 @@
 #      PROXY_BASE=...    反向代理對外位址，預設 https://127.0.0.1
 #      ALLOW_NO_REDIS=1  .env 沒有 REDIS_URL 也照常部署（限流計數會退回各 worker 的記憶體）
 #      ALLOW_NO_AI_BUDGET=1  .env 沒有設定 AI_MONTHLY_BUDGET_USD 也照常部署（AI 月預算保護不會運作）
+#      ALLOW_NO_FIRESTORE_BACKUP=1  沒有設定 FIRESTORE_BACKUP_BUCKET 也照常部署（Firestore 資料不會被這支備份腳本備份）
 #      ALLOW_NO_GUEST_GLOBAL_LIMIT=1  已啟用訪客翻譯試用卻沒有設定全站每日上限，也照常部署（訪客翻譯總花費沒有上限）
 #
 # 請用一般使用者（不是 root）執行：容器會用這個使用者的 uid 跑，掛載的 logs／media 才不會有權限問題。
@@ -85,6 +86,11 @@ preflight() {
   # 確定要這樣部署時用 ALLOW_NO_REDIS=1 明確放行。
   if [ -z "$(env_value REDIS_URL)" ] && ! is_true "${ALLOW_NO_REDIS:-}"; then
     echo "!! .env 沒有 REDIS_URL，限流計數會退回各 worker 的記憶體。請設定，或用 ALLOW_NO_REDIS=1 明確放行。部署中止。"; return 1
+  fi
+  # 稽核 BE5-12：備份預設不含 Firestore（使用者筆記、作答、錄音紀錄都在那裡）。沒設定 FIRESTORE_BACKUP_BUCKET 時
+  # 這些資料完全沒有備份；確定要這樣（例如另外用 Firestore 排程備份）時用 ALLOW_NO_FIRESTORE_BACKUP=1 明確放行。
+  if [ -z "$(env_value FIRESTORE_BACKUP_BUCKET)" ] && [ -z "${FIRESTORE_BACKUP_BUCKET:-}" ] && ! is_true "${ALLOW_NO_FIRESTORE_BACKUP:-}"; then
+    echo "!! 沒有設定 FIRESTORE_BACKUP_BUCKET（.env 或環境變數），Firestore 資料不會被備份。請設定，或用 ALLOW_NO_FIRESTORE_BACKUP=1 明確放行。部署中止。"; return 1
   fi
   # 稽核 DEP-7：內部 API 密鑰有設定的話至少要 32 字元（沒設定代表不啟用內部快取通知，不在這裡擋）。
   internal_secret="$(env_value INTERNAL_API_SECRET)"
@@ -315,6 +321,17 @@ check_route() {
   esac
 }
 
+# 稽核 BE5-15：內部端點只該給後端自己呼叫，nginx 要擋掉（deny all → 403）。要打真實存在的路由、只接受 403：
+# Django 那支 view 自己只會回 401／405／503，沒有路由的路徑則是 404，兩者都不能證明 nginx 有擋。
+check_blocked() {
+  local method="$1" path="$2" code
+  code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 15 -X "$method" "$PROXY_BASE$path" || true)
+  case "$code" in
+    403) echo "   OK   $method $path -> $code（已被 nginx 擋下）" ;;
+    *) echo "   FAIL $method $path -> $code（預期 403，內部端點可能對外開放）"; PROXY_OK=0 ;;
+  esac
+}
+
 # 後端只准 nginx 連：Django 信任 X-Forwarded-Proto（settings.py 的 SECURE_PROXY_SSL_HEADER），
 # 能直接連到後端埠口的人可以自己宣稱「這是 HTTPS」、偽造來源 IP，繞過 nginx 的限流與標頭。
 # docker-compose.prod.yml 綁 127.0.0.1；這裡確認實際監聽的位址真的只有本機。
@@ -344,6 +361,7 @@ if curl -fsk --max-time 15 -o /dev/null "$PROXY_BASE/"; then echo "   OK   GET /
 if curl -fsk --max-time 15 -o /dev/null "$PROXY_BASE/health/"; then echo "   OK   GET /health/"; else echo "   FAIL GET /health/（沒有轉到 Django？）"; PROXY_OK=0; fi
 check_route POST /AIModel/tayal_chat/
 check_route POST /api/v1/translation/translate
+check_blocked POST /adminapi/internal/ai-budget/enforce/
 check_loopback_only 8000
 check_loopback_only 8001
 check_server_header

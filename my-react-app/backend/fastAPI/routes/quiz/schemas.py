@@ -4,7 +4,10 @@
 from dataclasses import dataclass
 from typing import Annotated, Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+MAX_USER_MODEL_ENTRIES = 20000    # 單一族語詞庫的規模上限
+MAX_USER_MODEL_KEY_LENGTH = 200
 
 
 @dataclass(frozen=True)
@@ -52,7 +55,7 @@ MAX_RECENT = 100
 class SubmitAnswerReq(BaseModel):
     question_id: str
     question_type: str
-    word_name: Optional[str] = None
+    word_name: Optional[str] = Field(default=None, max_length=MAX_USER_MODEL_KEY_LENGTH)  # 會成為 user_errors 的鍵，不能比鍵上限長
     correct: bool
     # 這個值會被累進使用者模型的 recent_times，所以現在就擋掉 NaN／無限大，
     # 免得它被存進模型後，之後每個請求都因為 recent_times 不合法而被拒絕。
@@ -110,6 +113,19 @@ class UserModelReq(BaseModel):
     favorites: Dict[str, bool] = Field(default_factory=dict)
     explorations: Dict[str, BoundedFloat] = Field(default_factory=dict)
     type_stats: Dict[str, TypeStat] = Field(default_factory=dict)
+
+    @field_validator("user_errors", "favorites", "explorations", "type_stats", mode="before")
+    @classmethod
+    def _bounded_mapping(cls, value):
+        if not isinstance(value, dict):
+            return value          # 型別錯誤交給後面的欄位驗證回報
+        # before 模式：在逐筆驗證之前先看原始大小，不讓超大字典先耗掉 CPU
+        # 稽核 BE4-05：這些字典整份進入出題評分，不設上限的話一個請求可以塞幾十萬筆
+        if len(value) > MAX_USER_MODEL_ENTRIES:
+            raise ValueError(f"最多 {MAX_USER_MODEL_ENTRIES} 筆")
+        if any(len(key) > MAX_USER_MODEL_KEY_LENGTH for key in value):
+            raise ValueError(f"鍵長度不可超過 {MAX_USER_MODEL_KEY_LENGTH}")
+        return value
 
 
 class SubmitAnswerFrontendReq(BaseModel):

@@ -223,16 +223,15 @@ const Game_crossword_board = forwardRef(({ tribe, disabled, onReadyChange }, ref
   }, [tribe, onReadyChange, attempt]);
 
   useImperativeHandle(ref, () => ({
-    // 提交需要的四樣東西（使用者填的答案、正解、圖例、顯示用網格）永遠一起
-    // 出現、一起消失，包成一個方法，呼叫端不用個別檢查每一樣是否就緒，也不會
-    // 因為題目還沒載入完成／載入失敗而送出缺欄位的提交內容。
+    // 提交需要的兩樣東西（使用者填的答案、後端簽發的題目憑證）永遠一起出現、一起消失，
+    // 呼叫端不用個別檢查每一樣是否就緒，也不會因為題目還沒載入完成／載入失敗而送出缺欄位的內容。
+    // 解答與答案單字只存在憑證裡（後端加密），判分由後端做（稽核 BE5-09）。
     getSubmissionPayload: () => {
       if (!crosswordData || userAnswersGrid.length === 0) return null;
+      if (typeof crosswordData.puzzle_token !== "string" || !crosswordData.puzzle_token) return null;
       return {
         user_answers: userAnswersGrid,
-        crossword_solution: crosswordData.grid_solution,
-        crossword_legend: crosswordData.legend,
-        crossword_grid_display: crosswordData.grid_display,
+        puzzle_token: crosswordData.puzzle_token,
       };
     },
   }));

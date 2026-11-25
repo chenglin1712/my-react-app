@@ -72,9 +72,12 @@ class Command(BaseCommand):
             return
 
         prior_outcomes = {o["row"]: o for o in (job.report or {}).get("outcomes", [])}
+        # 計數一律由 outcomes 重算，不信任 job 上的欄位（兩者只在檢查點同步，這裡避免任何不一致造成重複計算）
+        prior_applied = sum(1 for o in prior_outcomes.values() if o.get("outcome") == "applied")
+        prior_failed = sum(1 for o in prior_outcomes.values() if o.get("outcome") == "failed")
         self.stdout.write(
             f"工作 #{job_id}（{job.tribe}，{job.filename or '未命名'}）目前卡在套用中，"
-            f"已知已處理 {len(prior_outcomes)} 列（成功 {job.applied_count}，失敗 {job.failed_count}）。"
+            f"已知已處理 {len(prior_outcomes)} 列（成功 {prior_applied}，失敗 {prior_failed}）。"
         )
 
         tribe_id = _TRIBE_SLUG_TO_ID[job.tribe]
@@ -93,8 +96,8 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("這是診斷模式，沒有實際改動任何資料。加上 --apply 才會真的續跑。"))
             return
 
-        applied_count = job.applied_count
-        failed_count = job.failed_count
+        applied_count = prior_applied
+        failed_count = prior_failed
         outcomes = list(prior_outcomes.values())
 
         for item in remaining:

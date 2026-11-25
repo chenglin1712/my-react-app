@@ -701,6 +701,15 @@ class ExamScheduleOverrideTest(TestCase):
         mock_get.side_effect = requests.exceptions.ConnectTimeout("upstream timed out")
 
         self.client.get('/crawler/exam_schedule/')
+        # 稽核 BE5-02：剛失敗後的短時間內不會再真的打上游，也不算新的一次失敗
+        self.client.get('/crawler/exam_schedule/')
+        self.assertEqual(ExamScheduleCrawlStatus.load().consecutive_failures, 1)
+        self.assertEqual(mock_get.call_count, 1)
+
+        # 失敗記憶過期（或手動重爬）後再失敗才累計
+        from django.core.cache import cache
+        from crawler.exam_site import EXAM_SITE_FAILURE_CACHE_KEY
+        cache.delete(EXAM_SITE_FAILURE_CACHE_KEY)
         self.client.get('/crawler/exam_schedule/')
 
         status = ExamScheduleCrawlStatus.load()

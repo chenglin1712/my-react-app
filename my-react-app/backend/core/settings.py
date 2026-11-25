@@ -258,6 +258,13 @@ USE_I18N = True
 
 USE_TZ = True
 
+# 稽核 BE2b-11：整份族語辭典匯出的 JSON 常超過 Django 預設的 2.5MB，匯出後無法重新匯入。
+# 與 nginx 的 client_max_body_size（12m）對齊，略小一點讓超限時由 Django 回有意義的錯誤。
+try:
+    DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("DJANGO_DATA_UPLOAD_MAX_MB", "10")) * 1024 * 1024
+except ValueError:
+    DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 

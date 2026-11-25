@@ -1,7 +1,7 @@
 from django.urls import path
 
 from . import (
-    ai_assistant_views, ai_feedback_views, ai_usage_views, analytics_views, dictionary_grammar_views, dictionary_import_views, dictionary_taxonomy_views,
+    ai_assistant_views, ai_feedback_views, csp_report_views, ai_usage_views, analytics_views, dictionary_grammar_views, dictionary_import_views, dictionary_taxonomy_views,
     dictionary_views, exam_schedule_admin_views, featured_topic_views, feature_flag_views, game_config_views,
     homepage_config_views, internal_views, moderation_views, promo_video_views, quizbank_views, site_page_views, ai_quiz_draft_views,
     morphology_capability_views, rate_limit_views, review_queue_views, system_cache_views, user_views, verification_views, views,
@@ -42,6 +42,7 @@ urlpatterns = [
     path('announcements/sync-crawler/', views.announcement_sync_crawler),
     path('audit-log/', views.audit_log_list),
     path('public/announcements/', views.public_announcement_list),
+    path('public/csp-report/', csp_report_views.csp_report),
     path('exam-schedule/', exam_schedule_admin_views.exam_schedule_admin),
     path('exam-schedule/overrides/<str:phase>/', exam_schedule_admin_views.exam_schedule_override_detail),
     path('featured-topics/', featured_topic_views.featured_topic_list),
