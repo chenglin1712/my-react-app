@@ -12,6 +12,9 @@ import { shouldCelebrate } from "./celebrate";
 import GameResultRecorder from "./GameResultRecorder";
 import { GameResultSummaryWithFavorites } from "./GameResultSummary";
 import { apiUrl } from "../../utils/apiUrls";
+import { tribeLangCode } from "../../src/constants/tribes";
+
+const isValidQuestion = (q) => Boolean(q) && Array.isArray(q.options) && q.options.length > 0;
 
 function ListeningGame({ tribe = "tayal" }) {
   const config = TRIBE_INTRO[tribe] || TRIBE_INTRO.tayal;
@@ -24,7 +27,7 @@ function ListeningGame({ tribe = "tayal" }) {
     // 當預設值（後台可調），跟 pronunciation_game.jsx 刻意固定傳 count=5 不同：
     // 那邊是借用同一個出題端點的詞彙池，但發音練習每輪題數是獨立的遊戲設計，
     // 不該被「聽力遊戲每輪題數」這個設定連動改變。
-  } = useGameSession({ endpoint: apiUrl('LISTENING_QUESTIONS'), tribe });
+  } = useGameSession({ endpoint: apiUrl('LISTENING_QUESTIONS'), tribe, isValidQuestion });
   const { isPlaying, play: playAudio, stop: stopAudio } = useGameAudioPlayer(audioBaseUrl);
 
   const q = questions[current];
@@ -159,7 +162,7 @@ function ListeningGame({ tribe = "tayal" }) {
               <p className={`game-feedback ${selected === q.correct ? "correct" : "wrong"}`}>
                 {selected === q.correct ? "✓ 答對了" : `✗ 答錯了，正確答案：${q.correct}`}
               </p>
-              <p>族語：<strong>{q.word}</strong></p>
+              <p>族語：<strong lang={tribeLangCode(tribe)}>{q.word}</strong></p>
             </>
           )}
         </div>

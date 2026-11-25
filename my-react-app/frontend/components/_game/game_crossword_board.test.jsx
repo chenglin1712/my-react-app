@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import Game_crossword_board from './game_crossword_board';
@@ -111,6 +111,39 @@ describe('Game_crossword_board 的鍵盤操作（E-5，P1-13）', () => {
     expect(cell('第 1 列第 2 欄')).toHaveFocus();
     await user.keyboard('b');
     expect(cell('第 1 列第 3 欄')).toHaveFocus();
+  });
+
+  // 稽核 FE5-16：Android 鍵盤輸入拉丁字母常走組字流程，原本永遠不跳格
+  test('組字結束（compositionend）時取最後一個字元寫入並跳到下一格', async () => {
+    render(<Game_crossword_board tribe="tayal" />);
+    await screen.findByText('橫向題目');
+    const first = cell('第 1 列第 1 欄');
+    first.focus();
+    fireEvent.compositionStart(first);
+    // 組字中的 input 事件：值必須寫進 state（否則受控 input 會被 React 改回舊值、吃掉輸入），但不跳格
+    fireEvent.input(first, { target: { value: 'a' }, isComposing: true });
+    expect(first).toHaveValue('a');
+    expect(first).toHaveFocus();
+    fireEvent.input(first, { target: { value: 'ab' }, isComposing: true });
+    expect(first).toHaveValue('ab');
+    // compositionend 時不再塞 target.value：用組字中保留下來的 DOM 值收尾
+    fireEvent.compositionEnd(first);
+    expect(first).toHaveValue('b');
+    expect(cell('第 1 列第 2 欄')).toHaveFocus();
+  });
+
+  test('Firefox 的順序（compositionend 之後才再送 input）不會重複寫入或多跳一格', async () => {
+    render(<Game_crossword_board tribe="tayal" />);
+    await screen.findByText('橫向題目');
+    const first = cell('第 1 列第 1 欄');
+    first.focus();
+    fireEvent.input(first, { target: { value: 'a' }, isComposing: true });
+    fireEvent.compositionEnd(first);
+    expect(cell('第 1 列第 2 欄')).toHaveFocus();
+    // 緊接著那一次非組字的 input，內容已經處理過，要被忽略
+    fireEvent.input(first, { target: { value: 'a' } });
+    expect(first).toHaveValue('a');
+    expect(cell('第 1 列第 2 欄')).toHaveFocus();
   });
 
   test('方向鍵移動、跳過黑格；按下鍵後輸入會往下填', async () => {

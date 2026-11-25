@@ -55,7 +55,9 @@ describe('useAudioRecorder', () => {
   });
 
   test('取得麥克風權限失敗時呼叫 onError，不會噴例外', async () => {
-    window.navigator.mediaDevices.getUserMedia = vi.fn().mockRejectedValue(new Error('denied'));
+    window.navigator.mediaDevices.getUserMedia = vi.fn().mockRejectedValue(
+      Object.assign(new Error('denied'), { name: 'NotAllowedError' }),
+    );
     const onError = vi.fn();
     const { result } = renderHook(() => useAudioRecorder(onError));
 
@@ -65,6 +67,70 @@ describe('useAudioRecorder', () => {
 
     expect(onError).toHaveBeenCalledWith('無法存取麥克風，請確認瀏覽器權限。');
     expect(result.current.recState).toBe('idle');
+  });
+
+  // 稽核 FE5-03
+  test('找不到麥克風時給明確訊息，不是一律說權限問題', async () => {
+    window.navigator.mediaDevices.getUserMedia = vi.fn().mockRejectedValue(
+      Object.assign(new Error('none'), { name: 'NotFoundError' }),
+    );
+    const onError = vi.fn();
+    const { result } = renderHook(() => useAudioRecorder(onError));
+    await act(async () => { await result.current.start(); });
+    expect(onError).toHaveBeenCalledWith('找不到麥克風，請確認裝置已連接麥克風。');
+  });
+
+  test('瀏覽器沒有 MediaRecorder（或非 https 沒有 mediaDevices）時不呼叫 getUserMedia，並說明原因', async () => {
+    delete window.MediaRecorder;
+    const onError = vi.fn();
+    const { result } = renderHook(() => useAudioRecorder(onError));
+    await act(async () => { await result.current.start(); });
+    expect(window.navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith(expect.stringContaining('不支援錄音'));
+    expect(result.current.recState).toBe('idle');
+  });
+
+  test('getUserMedia 成功但 new MediaRecorder 丟錯時，要釋放已經開啟的麥克風', async () => {
+    window.MediaRecorder = class { constructor() { throw new Error('bad type'); } };
+    const onError = vi.fn();
+    const { result } = renderHook(() => useAudioRecorder(onError));
+    await act(async () => { await result.current.start(); });
+    expect(fakeTracks[0].stop).toHaveBeenCalledTimes(1);
+    expect(fakeTracks[1].stop).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalled();
+    expect(result.current.recState).toBe('idle');
+  });
+
+  // 稽核 FE5-11
+  test('錄音成功開始時用 onError(null) 清掉先前的錯誤', async () => {
+    const onError = vi.fn();
+    const { result } = renderHook(() => useAudioRecorder(onError));
+    await act(async () => { await result.current.start(); });
+    expect(onError).toHaveBeenLastCalledWith(null);
+  });
+
+  // 稽核 FE5-04
+  test('Blob 的型別用錄音器實際的格式，不是一律標 audio/webm', async () => {
+    window.MediaRecorder = class extends FakeMediaRecorder {
+      constructor(stream) { super(stream); this.mimeType = 'audio/mp4'; }
+    };
+    const { result } = renderHook(() => useAudioRecorder());
+    await act(async () => { await result.current.start(); });
+    act(() => { result.current.stop(); });
+    expect(result.current.audioBlob.type).toBe('audio/mp4');
+  });
+
+  test('支援 webm 時明確要求 audio/webm', async () => {
+    const ctor = vi.fn();
+    window.MediaRecorder = class extends FakeMediaRecorder {
+      static isTypeSupported = (t) => t === 'audio/webm';
+      constructor(stream, options) { super(stream); ctor(options); this.mimeType = 'audio/webm;codecs=opus'; }
+    };
+    const { result } = renderHook(() => useAudioRecorder());
+    await act(async () => { await result.current.start(); });
+    expect(ctor).toHaveBeenCalledWith({ mimeType: 'audio/webm' });
+    act(() => { result.current.stop(); });
+    expect(result.current.audioBlob.type).toBe('audio/webm');
   });
 
   test('重新錄音時會 revoke 上一段錄音的 blob URL（回歸測試：原本 reset() 只是丟掉 state，從未 revoke）', async () => {

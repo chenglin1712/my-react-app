@@ -215,6 +215,34 @@ class SubmitAnsTest(TestCase):
         self.assertEqual(data['correct_words_count'], 0)
         self.assertFalse(data['word_details'][0]['is_correct'])
 
+    def test_user_word_keeps_full_answer_after_first_wrong_letter(self):
+        """稽核 FE5-07：原本遇到第一個錯字就 break，結果頁的「你的答案」只到出錯那格為止。"""
+        for direction_payload in (self._payload("cyaa"),):
+            response = self.client.post(
+                '/CrosswordPuzzle/submit/',
+                data=json.dumps(direction_payload),
+                content_type='application/json',
+            )
+            detail = response.json()['word_details'][0]
+            self.assertFalse(detail['is_correct'])
+            self.assertEqual(detail['user_word'], 'cyaa')
+
+    def test_user_word_keeps_full_answer_for_down_words(self):
+        payload = {
+            "user_answers": [["c"], ["x"], ["u"], ["x"]],
+            "crossword_solution": ["c", "y", "u", "x"],
+            "crossword_legend": [{
+                "number": 1, "clue": "高興", "direction": "down",
+                "length": 4, "start_col": 1, "start_row": 1, "word": "cyux",
+            }],
+        }
+        response = self.client.post(
+            '/CrosswordPuzzle/submit/', data=json.dumps(payload), content_type='application/json',
+        )
+        detail = response.json()['word_details'][0]
+        self.assertFalse(detail['is_correct'])
+        self.assertEqual(detail['user_word'], 'cxux')
+
     def test_get_method_not_allowed(self):
         response = self.client.get('/CrosswordPuzzle/submit/')
         self.assertEqual(response.status_code, 405)

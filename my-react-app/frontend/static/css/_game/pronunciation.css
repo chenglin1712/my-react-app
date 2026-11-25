@@ -276,6 +276,8 @@
 /* ── 分數回饋 ──────────────────────────────────── */
 .pron-score-box {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: baseline;
   gap: 0.5rem;
   padding: 0.75rem 2rem;

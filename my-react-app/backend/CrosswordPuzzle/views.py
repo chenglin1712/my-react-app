@@ -266,8 +266,8 @@ def submit_ans(request):
                         correct_char_from_grid = cleaned_solution[row][col].lower()
                         if correct_char_from_grid not in ('-', ''):
                             if correct_char_from_grid != user_char:
+                                # 不能 break：user_word 要收集整個單字，結果頁才會顯示使用者實際填的完整答案
                                 is_correct = False
-                                break
                     else:
                         logger.warning("Index out of bounds for word %s (across).", word_number)
                         is_correct = False
@@ -287,8 +287,8 @@ def submit_ans(request):
                         correct_char_from_grid = cleaned_solution[row][col].lower()
                         if correct_char_from_grid not in ('-', ''):
                             if correct_char_from_grid != user_char:
+                                # 不能 break：user_word 要收集整個單字，結果頁才會顯示使用者實際填的完整答案
                                 is_correct = False
-                                break
                     else:
                         logger.warning("Index out of bounds for word %s (down).", word_number)
                         is_correct = False

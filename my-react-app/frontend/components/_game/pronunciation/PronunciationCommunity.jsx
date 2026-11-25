@@ -10,6 +10,7 @@ import {
 import { db } from '../../../../firebase';
 import { REPORT_ALREADY_OR_DENIED, submitReport } from '../../../src/userServives/reportService';
 import { useAuth } from '../../../src/userServives/authContext';
+import { tribeLangCode } from '../../../src/constants/tribes';
 import { confirmAction } from '@components/ui/ConfirmDialog';
 import { deleteOwnRecording } from './pronunciationRecordingService';
 import { useDialog } from '@hooks/useDialog';
@@ -45,8 +46,8 @@ export default function PronunciationCommunity({ tribe }) {
   const [successMessage, setSuccessMessage] = useState('');
 
   // 讀取錄音清單跟送出檢舉是兩件不相關的事，共用同一個 error state 的話，
-  // 開啟檢舉視窗會把「載入清單失敗」的錯誤一起清掉，檢舉本身的錯誤又會顯示
-  // 在整頁層級（視窗外面），分開放才不會互相干擾。
+  // 開啟檢舉視窗會把「載入清單失敗」的錯誤一起清掉，分開放才不會互相干擾。
+  // 檢舉失敗時錯誤顯示在視窗內（視窗外的頁面被背景蓋住）；視窗關掉後才改顯示在頁面層級。
   const [reportError, setReportError] = useState('');
 
   const [reportTarget, setReportTarget] = useState(null);
@@ -237,7 +238,7 @@ export default function PronunciationCommunity({ tribe }) {
         </div>
       )}
 
-      {reportError && (
+      {reportError && !reportTarget && (
         <div className="pron-community-message error" role="alert">
           {reportError}
         </div>
@@ -258,7 +259,7 @@ export default function PronunciationCommunity({ tribe }) {
           {groupedRecordings.map(({ word, items }) => (
             <section className="pron-community-group" key={word}>
               <div className="pron-community-group-heading">
-                <h2>{word}</h2>
+                <h2 lang={tribeLangCode(tribe)}>{word}</h2>
                 <span>{items.length} 筆錄音</span>
               </div>
 
@@ -381,6 +382,10 @@ export default function PronunciationCommunity({ tribe }) {
                   </label>
                 )}
               </fieldset>
+
+              {reportError && (
+                <p className="pron-community-modal-error" role="alert">{reportError}</p>
+              )}
 
               <div className="pron-community-modal-actions">
                 <button

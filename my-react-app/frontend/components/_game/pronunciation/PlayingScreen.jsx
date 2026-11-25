@@ -1,12 +1,13 @@
 import { Mic, Square } from "lucide-react";
 import { useOnlineStatus } from "@hooks/useOnlineStatus";
 import OfflineNotice from "@components/ui/OfflineNotice";
+import { tribeLangCode } from "../../../src/constants/tribes";
 
 export default function PlayingScreen({
   progressPct, current, totalQuestions, q, rating,
   onPlayRef, recState, onStartRecording, onStopRecording, onPlayUserAudio, onResetRecState,
   submitting, onSubmit, score, officialScore, error, onNext,
-  shareState, onShare,
+  shareState, onShare, tribe, canShare = true,
 }) {
   const online = useOnlineStatus();
   return (
@@ -27,7 +28,7 @@ export default function PlayingScreen({
       <p className="pron-counter">第 {current + 1} / {totalQuestions} 題</p>
 
       <div className="pron-card">
-        <p className="pron-word">{q.word}</p>
+        <p className="pron-word" lang={tribeLangCode(tribe)}>{q.word}</p>
         <p className="pron-meaning">{q.correct}</p>
         <button
           type="button"
@@ -78,7 +79,10 @@ export default function PlayingScreen({
 
       {/* 分享是使用者自己決定的動作，不是比對成功就自動發生——上傳後任何
           登入使用者都能在社群示範發音頁面聽到這段錄音。 */}
-      {recState === "submitted" && (
+      {recState === "submitted" && !canShare && (
+        <p className="pron-share-hint">這個瀏覽器的錄音格式目前不能分享到社群，但比對與分數不受影響。</p>
+      )}
+      {recState === "submitted" && canShare && (
         <div className="pron-share-area">
           <button
             type="button"

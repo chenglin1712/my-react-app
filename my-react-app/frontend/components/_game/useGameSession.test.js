@@ -24,6 +24,23 @@ describe('useGameSession', () => {
     expect(result.current.questions).toHaveLength(2);
   });
 
+  // 稽核 FE5-17
+  test('isValidQuestion 會濾掉缺欄位的題目；全被濾掉時回報錯誤而不是進入空白畫面', async () => {
+    const isValidQuestion = (q) => Array.isArray(q.options);
+    apiGet.mockResolvedValueOnce({ questions: [{ id: 1 }, { id: 2, options: ['a'] }] });
+    const { result } = renderHook(() => useGameSession({ endpoint: '/x', tribe: 'tayal', count: 2, isValidQuestion }));
+    await act(async () => { await result.current.start(); });
+    expect(result.current.questions).toEqual([{ id: 2, options: ['a'] }]);
+
+    apiGet.mockResolvedValueOnce({ questions: [{ id: 1 }] });
+    const second = renderHook(() => useGameSession({ endpoint: '/y', tribe: 'tayal', count: 2, isValidQuestion }));
+    let started;
+    await act(async () => { started = await second.result.current.start(); });
+    expect(started).toBe(false);
+    expect(second.result.current.status).toBe('intro');
+    expect(second.result.current.error).toMatch(/沒有題目/);
+  });
+
   test('後端回傳的 questions 不是陣列時顯示錯誤，不會直接把非陣列塞進 state（回歸測試：原本沒有驗證回應形狀）', async () => {
     apiGet.mockResolvedValueOnce({ questions: null });
     const { result } = renderHook(() => useGameSession({ endpoint: '/x', tribe: 'tayal', count: 2 }));

@@ -49,6 +49,11 @@ export function useAudioRecorder(onError) {
     };
   }, []);
 
+  // 停止播放自己的錄音（開始播範本前呼叫，兩種播放互斥；稽核 FE5-10）
+  const stopUserAudio = () => {
+    userAudioRef.current?.pause();
+  };
+
   const reset = () => {
     userAudioRef.current?.pause();
     userAudioRef.current = null;
@@ -63,6 +68,12 @@ export function useAudioRecorder(onError) {
     // 又點了一次」這種同一批次內的重複呼叫；純靠 recState（state）擋不住，
     // 因為兩次呼叫可能都讀到還沒更新的舊值。
     if (startingRef.current || recState === "recording") return;
+    // 稽核 FE5-03：非 HTTPS 時 navigator.mediaDevices 是 undefined、舊瀏覽器沒有 MediaRecorder，
+    // 兩種都會被當成「權限問題」，使用者無從排除。先檢查並給明確的訊息。
+    if (!navigator.mediaDevices?.getUserMedia || typeof window.MediaRecorder === "undefined") {
+      onError?.("這個瀏覽器或連線不支援錄音，請改用較新的瀏覽器，並確認網址是 https。");
+      return;
+    }
     startingRef.current = true;
     try {
       const s = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -71,12 +82,19 @@ export function useAudioRecorder(onError) {
         return;
       }
       streamRef.current = s;
-      mediaRecorderRef.current = new MediaRecorder(s);
+      // 稽核 FE5-04：能錄 webm 就明確指定（Storage 規則與社群頁都只收 webm）；不支援的瀏覽器
+      // （例如舊版 Safari 只錄 MP4）讓它用預設格式，下面 Blob 的型別以實際格式為準，不再一律謊稱 webm。
+      const wantsWebm = MediaRecorder.isTypeSupported?.("audio/webm") === true;
+      mediaRecorderRef.current = wantsWebm
+        ? new MediaRecorder(s, { mimeType: "audio/webm" })
+        : new MediaRecorder(s);
       chunksRef.current = [];
       mediaRecorderRef.current.ondataavailable = (e) => chunksRef.current.push(e.data);
       mediaRecorderRef.current.onstop = () => {
         if (!mountedRef.current) return;
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        // 瀏覽器沒回報格式時保持空字串：不能假定是 webm，否則 Storage 規則會擋、社群頁也可能播不了
+        const actualType = (mediaRecorderRef.current?.mimeType || "").split(";")[0];
+        const blob = new Blob(chunksRef.current, { type: actualType });
         releaseRecordingUrl();
         const url = URL.createObjectURL(blob);
         audioUrlRef.current = url;
@@ -87,9 +105,20 @@ export function useAudioRecorder(onError) {
       };
       mediaRecorderRef.current.start();
       setRecState("recording");
+      onError?.(null); // 稽核 FE5-11：重試成功後，先前的麥克風錯誤不能繼續掛著
       announce("開始錄音");
-    } catch {
-      onError?.("無法存取麥克風，請確認瀏覽器權限。");
+    } catch (err) {
+      // 稽核 FE5-03：getUserMedia 成功後 new MediaRecorder 才丟錯時，麥克風已經開著，必須釋放
+      releaseStream();
+      mediaRecorderRef.current = null;
+      const name = err?.name;
+      if (name === "NotFoundError" || name === "OverconstrainedError") {
+        onError?.("找不到麥克風，請確認裝置已連接麥克風。");
+      } else if (name === "NotAllowedError" || name === "SecurityError") {
+        onError?.("無法存取麥克風，請確認瀏覽器權限。");
+      } else {
+        onError?.("無法開始錄音，請重新整理頁面或改用其他瀏覽器。");
+      }
     } finally {
       startingRef.current = false;
     }
@@ -115,5 +144,5 @@ export function useAudioRecorder(onError) {
   // setRecState——避免呼叫端把狀態機轉去不合法的狀態。
   const markSubmitted = () => setRecState("submitted");
 
-  return { recState, audioBlob, audioUrl, reset, start, stop, playUserAudio, markSubmitted };
+  return { recState, audioBlob, audioUrl, reset, start, stop, playUserAudio, stopUserAudio, markSubmitted };
 }

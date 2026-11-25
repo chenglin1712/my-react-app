@@ -128,19 +128,41 @@ const Game_crossword_board = forwardRef(({ tribe, disabled, onReadyChange }, ref
     }));
   };
 
-  const handleCellChange = (rowIndex, colIndex, event) => {
-    const newValue = event.target.value.toLowerCase();
-    if (newValue.length > 1) return;
-
+  // 寫入一格並（有值時）跳到同一題的下一格。
+  // 只看緊鄰的那一格：遇到黑格就是這題的尾巴，停在原地，不跳過黑格去別題。
+  const commitCell = (rowIndex, colIndex, newValue) => {
     setCellValue(rowIndex, colIndex, newValue);
-
-    // 打完一個字自動跳到同一題的下一格（輸入法組字中不跳，免得打斷選字）。
-    // 只看緊鄰的那一格：遇到黑格就是這題的尾巴，停在原地，不跳過黑格去別題。
-    if (newValue && !event.nativeEvent?.isComposing) {
+    if (newValue) {
       const [dr, dc] = DIRECTION_VECTOR[directionRef.current];
       const next = rows[rowIndex + dr]?.[colIndex + dc];
       if (next !== undefined && next !== "-") focusCell([rowIndex + dr, colIndex + dc]);
     }
+  };
+
+  // compositionend 剛處理完的那一個 tick：Firefox 的順序是 compositionend 之後才再送一次 input，
+  // 那一次的內容已經由 compositionend 處理過，不能再算一次（會重複跳格）。
+  const justComposedRef = useRef(null); // 剛結束組字的格子 key；只忽略那一格，別格的輸入照常處理
+
+  const handleCellChange = (rowIndex, colIndex, event) => {
+    const rawValue = event.target.value.toLowerCase();
+    if (justComposedRef.current === `${rowIndex}-${colIndex}`) return;
+    // 組字中（中文輸入法選字、Android 鍵盤的拉丁字母組字）：受控 input 的 onChange 裡一定要寫入 state，
+    // 否則 React 會把 DOM 的值改回舊值、吃掉使用者打的字（也會中斷組字）。所以組字中照原樣寫入，
+    // 但不檢查長度、不跳格，等 compositionend 再取最後一個字元收尾（稽核 FE5-16）。
+    if (event.nativeEvent?.isComposing) {
+      setCellValue(rowIndex, colIndex, rawValue);
+      return;
+    }
+    if (rawValue.length > 1) return;
+    commitCell(rowIndex, colIndex, rawValue);
+  };
+
+  const handleCellCompositionEnd = (rowIndex, colIndex, event) => {
+    const chars = Array.from(event.currentTarget.value);
+    const last = (chars[chars.length - 1] ?? "").toLowerCase();
+    justComposedRef.current = `${rowIndex}-${colIndex}`;
+    setTimeout(() => { justComposedRef.current = null; }, 0);
+    commitCell(rowIndex, colIndex, last);
   };
 
   const handleCellKeyDown = (rowIndex, colIndex, event) => {
@@ -278,6 +300,7 @@ const Game_crossword_board = forwardRef(({ tribe, disabled, onReadyChange }, ref
                       spellCheck={false}
                       value={userAnswersGrid[rowIndex]?.[colIndex] || ""}
                       onChange={(e) => handleCellChange(rowIndex, colIndex, e)}
+                      onCompositionEnd={(e) => handleCellCompositionEnd(rowIndex, colIndex, e)}
                       onKeyDown={(e) => handleCellKeyDown(rowIndex, colIndex, e)}
                       onFocus={(e) => {
                         // 焦點是用鍵盤移到別格的：「上一次點的格子」作廢，之後點回舊格不算連點

@@ -99,6 +99,16 @@
   border: 1px solid var(--yy-calm-danger-bg);
 }
 
+/* 檢舉視窗內的錯誤訊息：視窗外的頁面被背景蓋住，錯誤必須顯示在視窗裡（稽核 FE5-06） */
+.pron-community-modal-error {
+  margin: 0.75rem 0 0;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--yy-radius-tag);
+  color: var(--yy-calm-accent);
+  background: var(--yy-calm-danger-bg);
+  line-height: 1.5;
+}
+
 .pron-community-loading,
 .pron-community-empty {
   width: min(100%, 980px);
