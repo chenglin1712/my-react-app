@@ -64,6 +64,12 @@ class LLMUnavailableError(RuntimeError):
     """斷路器開啟中：供應商連續失敗，這段冷卻期間直接拒絕，不再占用 worker 等逾時。"""
 
 
+class LLMNotConfiguredError(EnvironmentError):
+    """沒有設定 ANTHROPIC_API_KEY。跟一般的 EnvironmentError（等於 OSError，範圍很廣）分開，
+    端點只攔這一種並回固定訊息，訊息原文（含設定說明）只寫 log（稽核 BE4-14）。
+    仍然繼承 EnvironmentError，既有「except EnvironmentError」的呼叫端行為不變。"""
+
+
 class _CircuitBreaker:
     """三態斷路器：CLOSED（正常）→ OPEN（連續失敗後暫停）→ HALF_OPEN（冷卻結束，
     只放行「一個」試探請求）→ 試探成功回 CLOSED，失敗回 OPEN 並從失敗當下重新計時。
@@ -570,7 +576,7 @@ def get_llm_client():
         return _client
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
-        raise EnvironmentError(
+        raise LLMNotConfiguredError(
             "[config.llm] 環境變數 ANTHROPIC_API_KEY 未設定，AI 對話／翻譯功能無法使用。"
             "請在 .env 填入 Anthropic API key。"
         )

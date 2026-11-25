@@ -77,7 +77,8 @@ _engine_url = _database_url or f"sqlite:///{DB_PATH}"
 # SQLite 專屬設定（check_same_thread connect_args、WAL/foreign_keys PRAGMA）只在
 # 走 SQLite 分支時套用——PRAGMA 是 SQLite 獨有語法，直接對 Postgres 連線下會報錯，
 # 不能只是「反正沒差就照樣執行」。
-_connect_args = {"check_same_thread": False} if _is_sqlite else {}
+# 稽核 BE4-06：Postgres 連不上時最多等 3 秒，不要卡到作業系統預設的逾時（整個行程的請求都在等連線池）
+_connect_args = {"check_same_thread": False} if _is_sqlite else {"connect_timeout": 3}
 
 # 連線引擎
 # 明確指定 QueuePool 大小並開啟 pool_pre_ping，取代預設值，

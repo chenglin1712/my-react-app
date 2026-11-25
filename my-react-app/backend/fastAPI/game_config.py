@@ -16,6 +16,7 @@ import threading
 import time
 
 import requests
+from . import background_refresh
 from .internal_headers import DJANGO_INTERNAL_HEADERS
 
 logger = logging.getLogger(__name__)
@@ -82,6 +83,19 @@ def _parse_game_config(data) -> dict:
     return parsed
 
 
+def _fetch_game_config() -> None:
+    global _game_config_last_fetch
+    try:
+        resp = requests.get(_GAME_CONFIG_URL, timeout=5, headers=DJANGO_INTERNAL_HEADERS)
+        resp.raise_for_status()
+        parsed = _parse_game_config(resp.json())  # 整份驗證完才動全域變數
+        globals().update(parsed)
+    except Exception:
+        logger.warning("[game_config] 無法從後台讀取遊戲參數，沿用目前值", exc_info=True)
+    finally:
+        _game_config_last_fetch = time.monotonic()
+
+
 def refresh_game_config_if_stale() -> None:
     global _game_config_last_fetch
 
@@ -91,12 +105,10 @@ def refresh_game_config_if_stale() -> None:
     with _game_config_lock:
         if time.monotonic() - _game_config_last_fetch < _GAME_CONFIG_TTL_SECONDS:
             return
-        try:
-            resp = requests.get(_GAME_CONFIG_URL, timeout=5, headers=DJANGO_INTERNAL_HEADERS)
-            resp.raise_for_status()
-            parsed = _parse_game_config(resp.json())  # 整份驗證完才動全域變數
-            globals().update(parsed)
-        except Exception:
-            logger.warning("[game_config] 無法從後台讀取遊戲參數，沿用目前值", exc_info=True)
-        finally:
+        if background_refresh.is_enabled():
+            # 稽核 BE4-06：不在事件迴圈上等 Django；認領這一輪後丟到背景
             _game_config_last_fetch = time.monotonic()
+            background_refresh.spawn("game_config", _fetch_game_config)
+            return
+        _fetch_game_config()
+

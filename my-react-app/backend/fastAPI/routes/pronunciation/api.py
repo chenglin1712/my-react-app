@@ -7,12 +7,13 @@ from fastapi import APIRouter, HTTPException, Request
 
 from config.audio_source import is_valid_audio_id
 from fastAPI import game_config, rate_limit_config
+from fastAPI.executors import inference_executor, run_in
 from fastAPI.form_limits import multipart_openapi_extra, parse_bounded_form, require_text, require_upload
 from fastAPI.rate_limit import limiter
 
 from . import model
 from .audio_fetch import _is_allowed_reference_url, download_reference_audio, fetch_audio_from_id
-from .model import bytes_to_tensor, convert_to_wav, get_wav2vec2, _get_embedding, _score_from_bytes
+from .model import AudioTooLongError, bytes_to_tensor, convert_to_wav, get_wav2vec2, _get_embedding, _score_from_bytes
 
 import httpx
 
@@ -92,15 +93,17 @@ async def _compare_uploaded_audio(user_audio, audio_id: str, reference_urls: str
         # 以下都是同步、CPU 密集或（下載官方音檔時）阻塞式 I/O，用 asyncio.to_thread
         # 丟到執行緒池執行，避免卡住 event loop、拖慢同一 worker 上的其他請求。
         try:
-            user_wav = await asyncio.to_thread(convert_to_wav, user_bytes)
-            user_wave, _ = await asyncio.to_thread(bytes_to_tensor, user_wav)
+            user_wav = await run_in(inference_executor, convert_to_wav, user_bytes)
+            user_wave, _ = await run_in(inference_executor, bytes_to_tensor, user_wav)
+        except AudioTooLongError:
+            return make_error("audio_too_long", f"錄音太長，請縮短到 {model.MAX_AUDIO_SECONDS} 秒以內再試一次")
         except Exception:
             _logger.exception("[pronunciation] 使用者錄音轉換 WAV 失敗 audio_id=%r", audio_id)
             return make_error("convert_user_to_wav", "錄音格式轉換失敗，請重新錄音再試一次")
 
         try:
-            wav2vec2_model = await asyncio.to_thread(get_wav2vec2)
-            user_emb = await asyncio.to_thread(_get_embedding, wav2vec2_model, user_wave)
+            wav2vec2_model = await run_in(inference_executor, get_wav2vec2)
+            user_emb = await run_in(inference_executor, _get_embedding, wav2vec2_model, user_wave)
         except Exception:
             _logger.exception("[pronunciation] 使用者錄音特徵擷取失敗 audio_id=%r", audio_id)
             return make_error("user_embedding", "語音特徵擷取失敗，請稍後再試")
@@ -113,7 +116,7 @@ async def _compare_uploaded_audio(user_audio, audio_id: str, reference_urls: str
             return make_error("download_target", "官方音檔下載失敗，請稍後再試")
 
         try:
-            official_score = await asyncio.to_thread(_score_from_bytes, wav2vec2_model, user_emb, target_bytes)
+            official_score = await run_in(inference_executor, _score_from_bytes, wav2vec2_model, user_emb, target_bytes)
         except Exception:
             _logger.exception("[pronunciation] 官方音檔相似度計算失敗 audio_id=%r", audio_id)
             return make_error("official_similarity", "語音比對計算失敗，請稍後再試")
@@ -134,7 +137,7 @@ async def _compare_uploaded_audio(user_audio, audio_id: str, reference_urls: str
                         ref_bytes = await download_reference_audio(client, url, max_audio_bytes)
                         if ref_bytes is None:
                             continue
-                        ref_score = await asyncio.to_thread(_score_from_bytes, wav2vec2_model, user_emb, ref_bytes)
+                        ref_score = await run_in(inference_executor, _score_from_bytes, wav2vec2_model, user_emb, ref_bytes)
                         if best_ref_score is None or ref_score > best_ref_score:
                             best_ref_score = ref_score
                     except Exception:

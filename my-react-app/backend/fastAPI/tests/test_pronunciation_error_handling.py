@@ -87,3 +87,16 @@ def test_unexpected_failure_outside_named_steps_masks_internal_exception_and_log
     assert body["error"] == "評分過程發生未預期的錯誤，請稍後再試"
     assert "not_a_number" not in response.text
     mock_log.assert_called_once()
+
+
+def test_audio_that_is_too_long_returns_an_actionable_error(client, monkeypatch):
+    """稽核 BE4-01：高壓縮的長錄音檔案很小、解碼後卻很長，要在推論前就擋下，並告訴使用者怎麼處理。"""
+    monkeypatch.setattr(pronunciation_model, "_ffmpeg_path", "/fake/ffmpeg")
+
+    with patch.object(pronunciation_api, "convert_to_wav", side_effect=pronunciation_model.AudioTooLongError("too long")):
+        response = _post_compare_audio(client)
+
+    body = response.json()
+    assert body["success"] is False
+    assert body["error_step"] == "audio_too_long"
+    assert "錄音太長" in body["error"]

@@ -20,7 +20,7 @@ const isValidQuestion = (q) => Boolean(q) && typeof q.word === "string" && q.wor
 // 後端這幾個步驟的訊息已在地化、不含內部細節，而且是使用者可以照著做的（重錄、檔案過大）；
 // 一律顯示「請稍後再試」會讓人重送同一個檔案一直失敗（稽核 FE5-08）。
 const ACTIONABLE_ERROR_STEPS = new Set([
-  "file_too_large", "read_user_audio", "convert_user_to_wav", "user_embedding",
+  "file_too_large", "audio_too_long", "read_user_audio", "convert_user_to_wav", "user_embedding",
 ]);
 
 function compareFailureMessage(data) {

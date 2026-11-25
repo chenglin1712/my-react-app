@@ -69,6 +69,8 @@ if _database_url:
         _database_url,
         pool_size=2, max_overflow=3, pool_timeout=5,
         pool_pre_ping=True, pool_recycle=1800,
+        # 稽核 BE4-06：資料庫連不上時最多等 3 秒
+        connect_args={"connect_timeout": 3} if not _database_url.startswith("sqlite") else {},
     )
 
 _metadata = MetaData()
@@ -141,6 +143,39 @@ def _secret() -> str:
     return os.getenv("GUEST_TRIAL_SECRET", "")
 
 
+def _daily_secret() -> str:
+    """已登入使用者「每日翻譯次數」計次用的雜湊密鑰（稽核 BE4-08）。
+
+    原本直接用 GUEST_TRIAL_SECRET，而且還要求整個訪客試用都就緒（is_ready）：沒開訪客試用的部署，這個上限整個失效，
+    每次翻譯還記一筆 ERROR 灌爆 Sentry。現在順序是：
+      1. TRANSLATION_DAILY_SECRET（專用，夠長才採用）
+      2. GUEST_TRIAL_SECRET（既有部署沿用，雜湊值不變，今天的計次不會被重置）
+      3. 由 INTERNAL_API_SECRET 以固定標籤衍生（沒開訪客試用也能運作）
+    都沒有就回空字串＝計次系統未就緒。"""
+    dedicated = os.getenv("TRANSLATION_DAILY_SECRET", "")
+    if len(dedicated) >= _MIN_SECRET_LENGTH:
+        return dedicated
+    if dedicated and "TRANSLATION_DAILY_SECRET" not in _warned_short_secrets:
+        # 設了但太短：跟 GUEST_TRIAL_TOKEN_SECRET 一樣要大聲說，不能悄悄退回下一層讓營運人員以為已換成專用密鑰
+        _warned_short_secrets.add("TRANSLATION_DAILY_SECRET")
+        logger.error("TRANSLATION_DAILY_SECRET 已設定但少於 %d 個字元，已忽略並改用下一層密鑰", _MIN_SECRET_LENGTH)
+    legacy = _secret()
+    if len(legacy) >= _MIN_SECRET_LENGTH and len(set(legacy)) >= 8:
+        return legacy
+    internal = os.getenv("INTERNAL_API_SECRET", "")
+    if len(internal) >= _MIN_SECRET_LENGTH:
+        return hmac.new(internal.encode("utf-8"), b"translation-daily-cap", hashlib.sha256).hexdigest()
+    return ""
+
+
+def daily_ready() -> bool:
+    """每日翻譯上限的計次系統是否可用：只需要資料庫與上面其中一種密鑰，不依賴訪客試用設定。"""
+    return _engine is not None and bool(_daily_secret())
+
+
+_warned_daily_unready = False
+
+
 _warned_short_secrets: set[str] = set()
 
 
@@ -179,6 +214,10 @@ def next_reset_at(today: date) -> str:
 
 def _hash(scope: str, value: str) -> str:
     return hmac.new(_secret().encode("utf-8"), f"{scope}:{value}".encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def _user_hash(uid: str) -> str:
+    return hmac.new(_daily_secret().encode("utf-8"), f"{SCOPE_USER}:{uid}".encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def _ip_key(client_ip: str | None) -> str:
@@ -413,16 +452,25 @@ def consume_user_daily(uid: str, now: datetime | None = None) -> UserDaily:
 
     和訪客不同，這裡計次系統故障時【放行】（fail-open）：已登入使用者另有每分鐘的限流與月預算自動關閉當後盾，
     不能因為計次表暫時連不上，讓所有登入使用者都無法翻譯。放行時會記 log，讓維運看得到。"""
+    global _warned_daily_unready
     now = now or datetime.now(timezone.utc)
     day = taipei_today(now)
     limit = user_daily_limit()
     resets_at = next_reset_at(day)
     if limit <= 0 or not uid:
         return UserDaily(True, limit, limit, resets_at, day)
-    if not is_ready():
-        logger.error("翻譯每日上限無法計次（資料庫或 GUEST_TRIAL_SECRET 未就緒），本次放行")
+    if not daily_ready():
+        # 只在第一次記 ERROR：原本每次翻譯都記一筆，Sentry 會被灌爆（稽核 BE4-08）；之後降為 debug
+        if not _warned_daily_unready:
+            _warned_daily_unready = True
+            logger.error(
+                "翻譯每日上限無法計次（資料庫未連線，或 TRANSLATION_DAILY_SECRET／GUEST_TRIAL_SECRET／"
+                "INTERNAL_API_SECRET 都沒有設定足夠長的值），已登入使用者的每日上限不會生效"
+            )
+        else:
+            logger.debug("翻譯每日上限無法計次，本次放行")
         return UserDaily(True, limit, limit, resets_at, day)
-    key_hash = _hash(SCOPE_USER, uid)
+    key_hash = _user_hash(uid)
     try:
         with _engine.begin() as conn:
             used = _bump(conn, day, SCOPE_USER, key_hash, limit, now)
