@@ -140,8 +140,8 @@ class Command(BaseCommand):
 
     def _migrate_tribe(self, source_config, max_calls, cloud_name, upload_preset):
         tribe = source_config.tribe
-        known_tf_keys = set(QuizTrueFalseItem.objects.filter(tribe=tribe).values_list("origin_key", flat=True))
-        known_choice_keys = set(QuizChoiceItem.objects.filter(tribe=tribe).values_list("origin_key", flat=True))
+        known_tf_keys = set(QuizTrueFalseItem.all_objects.filter(tribe=tribe).values_list("origin_key", flat=True))
+        known_choice_keys = set(QuizChoiceItem.all_objects.filter(tribe=tribe).values_list("origin_key", flat=True))
 
         tf_created = choice_created = 0
         consecutive_misses = 0

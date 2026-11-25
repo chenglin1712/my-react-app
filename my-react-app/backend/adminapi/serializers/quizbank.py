@@ -2,6 +2,7 @@ import re
 
 from rest_framework import serializers
 
+from ..models.quizbank import situation_options_error
 from ..models import (
     QuizChoiceItem,
     QuizClozePassage,
@@ -112,7 +113,11 @@ class QuizSituationItemSerializer(serializers.ModelSerializer):
 
         if obj.pk is None:
             return None
-        draft = AiQuizDraft.objects.filter(content_type='quiz_situation_item', content_id=obj.pk).first()
+        prefetched = self.context.get('ai_drafts')
+        if prefetched is not None:  # 列表端點整頁一次查好（稽核 BE2a-06）
+            draft = prefetched.get(obj.pk)
+        else:
+            draft = AiQuizDraft.objects.filter(content_type='quiz_situation_item', content_id=obj.pk).first()
         if draft is None:
             return None
         return {
@@ -124,8 +129,9 @@ class QuizSituationItemSerializer(serializers.ModelSerializer):
     def validate(self, data):
         options = data.get('options', getattr(self.instance, 'options', None))
         answer = data.get('answer', getattr(self.instance, 'answer', None))
-        if not isinstance(options, list) or len(options) != 4:
-            raise serializers.ValidationError({'options': '選項必須恰好 4 個'})
+        options_error = situation_options_error(options)
+        if options_error:
+            raise serializers.ValidationError({'options': options_error})
         if answer is None or not (1 <= answer <= 4):
             raise serializers.ValidationError({'answer': '正解索引必須介於 1 到 4'})
         return data

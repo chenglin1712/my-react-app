@@ -353,7 +353,7 @@ function Editor({ topic, role, publishedCount, onChanged, onCreated, onDeleted, 
                                 <Form.Text id="topic-review-comment-hint">核准時選填；退件時必填。</Form.Text>
                             </Form.Group>
                             <div className="featured-topics-actions">
-                                <Button disabled={busy || atLimit} onClick={() => act('approve', 'approve', '已核准並發布', { review_comment: comment.trim() })}>核准並發布</Button>
+                                <Button disabled={busy || atLimit} onClick={() => act('approve', 'approve', '已核准並發布', { review_comment: comment.trim(), ...(topic.updated_at ? { base_updated_at: topic.updated_at } : {}) })}>核准並發布</Button>
                                 <Button variant="outline-danger" disabled={busy} onClick={reject}>退件</Button>
                             </div>
                         </div>

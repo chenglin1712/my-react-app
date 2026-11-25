@@ -86,7 +86,12 @@ def _build_client_router(users_doc=None, notes=None, recordings=None):
             return users_col
         if name == "sharedNotes":
             return notes_query
-        raise AssertionError(f"unexpected collection: {name}")
+        # 其他個人資料集合（行事曆、答題紀錄、檢舉…）：這個使用者沒有資料
+        empty = MagicMock()
+        empty.where.return_value = empty
+        empty.stream.return_value = []
+        empty.document.return_value.get.return_value.exists = False
+        return empty
     mock_client.collection.side_effect = collection_side_effect
 
     recordings_query = MagicMock()
@@ -827,10 +832,13 @@ class UserExportPrivilegeAndAuditTest(TestCase):
 class UserDeleteTest(TestCase):
     def setUp(self):
         self.client = Client()
-        # 刪除帳號會先撤銷登入；這個類別的測試都不連真的 Firebase
+        # 刪除帳號會先停權並撤銷登入；這個類別的測試都不連真的 Firebase
         patcher = patch("adminapi.firebase_ops.revoke_sessions")
         self.mock_revoke = patcher.start()
         self.addCleanup(patcher.stop)
+        disable_patcher = patch("adminapi.firebase_ops.set_user_disabled")
+        self.mock_disable = disable_patcher.start()
+        self.addCleanup(disable_patcher.stop)
 
     @patch("adminapi.firebase_ops.delete_firebase_user")
     @patch("adminapi.firebase_ops.get_firebase_user")

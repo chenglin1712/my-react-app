@@ -19,7 +19,14 @@ from django.views.decorators.csrf import csrf_exempt
 
 from config.roles import ACCOUNT_MANAGERS, OWNER, ROLE_ASSIGNERS, STAFF_ROLES
 
+from firebase_admin.exceptions import FirebaseError
+
 from . import firebase_ops, quiz_research_service
+from .user_data_locations import DELETED_USER_PLACEHOLDER, LOCATIONS, export_docs, find_docs
+from .user_input import (
+    AVATAR_URL_MAX, EMAIL_MAX, IDENTITY_MAX, NAME_MAX, PASSWORD_MAX,
+    firebase_error_message, mask_email, text_field,
+)
 from ._shared import (
     guarded_action,
     mark_action_failed as _mark_action_failed,
@@ -39,6 +46,21 @@ from .user_service import (
 logger = logging.getLogger(__name__)
 
 
+def _audit_value(key, value):
+    return mask_email(value) if key == "email" else value
+
+
+def _count_query(query):
+    """稽核 BE2a-18：用 Firestore 的 count() 聚合查詢取筆數，不把整批文件讀回來；聚合不可用時退回逐筆計數。"""
+    try:
+        value = query.count().get()[0][0].value
+        if isinstance(value, int):
+            return value
+    except Exception:
+        logger.debug("count() 聚合查詢不可用，改用逐筆計數", exc_info=True)
+    return len(list(query.stream()))
+
+
 @csrf_exempt
 def user_list(request):
     if request.method == "GET":
@@ -50,7 +72,7 @@ def user_list(request):
 
 @guarded_action(method="GET", role=STAFF_ROLES)
 def _list_users(request, decoded):
-    users = firebase_ops.list_all_firebase_users()
+    users = firebase_ops.list_all_firebase_users(use_cache=True)     # 稽核 BE2a-18：列表頁容許 45 秒前的資料
 
     client = firebase_ops.get_firestore_client()
     refs = [client.collection("users").document(u.uid) for u in users]
@@ -120,11 +142,24 @@ def _create_user(request, decoded):
     if err_resp:
         return err_resp
 
-    email = (data.get("email") or "").strip()
+    # 稽核 BE2a-12：每個欄位先驗證型別與長度（非字串原本會讓 .strip() 丟 500）
+    email, err_resp = text_field(data, "email", "email", max_len=EMAIL_MAX)
+    if err_resp:
+        return err_resp
+    name, err_resp = text_field(data, "name", "姓名", max_len=NAME_MAX)
+    if err_resp:
+        return err_resp
+    identity, err_resp = text_field(data, "identity", "身分", max_len=IDENTITY_MAX, default="學生")
+    if not err_resp and not identity:
+        identity = "學生"  # 清空欄位送來空字串時，與沒帶一樣用預設
+    if err_resp:
+        return err_resp
+    avatar_url, err_resp = text_field(data, "avatar_url", "大頭貼網址", max_len=AVATAR_URL_MAX)
+    if err_resp:
+        return err_resp
     password = data.get("password") or ""
-    name = (data.get("name") or "").strip()
-    identity = (data.get("identity") or "學生").strip()
-    avatar_url = (data.get("avatar_url") or "").strip()
+    if not isinstance(password, str) or len(password) > PASSWORD_MAX:
+        return JsonResponse({"detail": "密碼格式錯誤"}, status=400)
     role = data.get("role")
 
     if not email or not name:
@@ -136,17 +171,24 @@ def _create_user(request, decoded):
     if role is not None and decoded.get("role") != OWNER:
         return JsonResponse({"detail": "只有 owner 可以在建立帳號時指派角色"}, status=403)
 
+    # 稽核 BE2a-04：先寫稽核紀錄再建立帳號（含要指派的角色）。這時還沒有 uid，target 先用遮罩後的 email；
+    # 建立成功後另外記一筆帶 uid 的 create_user，失敗則補一筆 create_user_failed。
+    pending_target = mask_email(email)
+    _write_audit_log_first(
+        request, decoded, "create_user_requested", pending_target, target_type="user",
+        after={"email": mask_email(email), "name": name, "identity": identity, "role": role},
+    )
+
     from firebase_admin import auth as firebase_auth
     try:
         user_record = firebase_ops.create_firebase_user(email, password, display_name=name)
     except firebase_auth.EmailAlreadyExistsError:
+        _mark_action_failed(request, decoded, "create_user", pending_target, reason="email_exists")
         return JsonResponse({"detail": "這個 email 已經被使用"}, status=400)
-    except (ValueError, firebase_auth.FirebaseError) as e:
-        # ValueError 是 Admin SDK 對 email 格式等參數做客戶端驗證失敗時丟出；
-        # FirebaseError 涵蓋其餘伺服器端拒絕的情況。訊息本身是英文但已經
-        # 夠明確，直接透出比自己重新設計一份錯誤訊息更不容易漏掉 SDK
-        # 版本更新後新增的檢查項目。
-        return JsonResponse({"detail": str(e)}, status=400)
+    except (ValueError, FirebaseError) as e:
+        # 稽核 BE2a-13：例外原文只寫伺服器日誌，回給前端的是固定的中文訊息
+        _mark_action_failed(request, decoded, "create_user", pending_target, reason="firebase_rejected")
+        return JsonResponse({"detail": firebase_error_message(e)}, status=400)
 
     client = firebase_ops.get_firestore_client()
     try:
@@ -157,7 +199,8 @@ def _create_user(request, decoded):
         # Firestore 文件沒建成功的帳號能登入、但前台幾乎每個功能都會因為
         # users/{uid} 不存在而出錯——這種「半殘帳號」比完全沒建立更糟，
         # 寧可把剛剛建立的 Auth 帳號刪掉、讓整個操作乾淨失敗，也不要留著。
-        logger.exception("建立使用者 %s 的 Firestore 文件失敗，嘗試 rollback Auth 帳號", email)
+        logger.exception("建立使用者 %s 的 Firestore 文件失敗，嘗試 rollback Auth 帳號", mask_email(email))
+        _mark_action_failed(request, decoded, "create_user", pending_target, reason="firestore_failed")
         try:
             firebase_ops.delete_firebase_user(user_record.uid)
         except Exception:
@@ -184,6 +227,7 @@ def _create_user(request, decoded):
             firebase_ops.set_user_role(user_record.uid, role)
         except Exception:
             role_assigned = False
+            _mark_action_failed(request, decoded, "create_user", user_record.uid, reason="role_assignment_failed")
             logger.exception(
                 "建立使用者 %s 後指派角色 %s 失敗，帳號已建立但角色未設定，需至使用者詳情頁重新指派",
                 user_record.uid, role,
@@ -191,7 +235,7 @@ def _create_user(request, decoded):
 
     _safe_write_audit_log(
         request, decoded, "create_user", user_record.uid, target_type="user",
-        after={"email": email, "name": name, "identity": identity, "role": role if role_assigned else None},
+        after={"email": mask_email(email), "name": name, "identity": identity, "role": role if role_assigned else None},
     )
 
     payload = _merge_user(user_record, {"name": name, "identity": identity, "avatarUrl": avatar_url})
@@ -212,12 +256,8 @@ def user_detail(request, decoded, uid):
     doc = client.collection("users").document(uid).get()
     firestore_data = doc.to_dict() if doc.exists else {}
 
-    notes_count = len(list(
-        client.collection("sharedNotes").where("uid", "==", uid).stream()
-    ))
-    recordings_count = len(list(
-        client.collection_group("recordings").where("uid", "==", uid).stream()
-    ))
+    notes_count = _count_query(client.collection("sharedNotes").where("uid", "==", uid))
+    recordings_count = _count_query(client.collection_group("recordings").where("uid", "==", uid))
 
     can_see_email = decoded.get("role") in ACCOUNT_MANAGERS
     payload = _merge_user(user_record, firestore_data, include_email=can_see_email)
@@ -300,21 +340,32 @@ def user_profile(request, decoded, uid):
     before_snapshot = doc_ref.get()
     before_data = before_snapshot.to_dict() if before_snapshot.exists else {}
 
+    # 稽核 BE2a-12：型別與長度先驗證，非字串原本會讓 .strip() 丟 500
     firestore_updates = {}
     if "name" in data:
-        name = (data.get("name") or "").strip()
+        name, err_resp = text_field(data, "name", "姓名", max_len=NAME_MAX)
+        if err_resp:
+            return err_resp
         if not name:
             return JsonResponse({"detail": "姓名不可為空"}, status=400)
         firestore_updates["name"] = name
     if "identity" in data:
-        firestore_updates["identity"] = (data.get("identity") or "").strip()
+        identity, err_resp = text_field(data, "identity", "身分", max_len=IDENTITY_MAX)
+        if err_resp:
+            return err_resp
+        firestore_updates["identity"] = identity
     if "avatar_url" in data:
-        firestore_updates["avatarUrl"] = (data.get("avatar_url") or "").strip()
+        avatar_url, err_resp = text_field(data, "avatar_url", "大頭貼網址", max_len=AVATAR_URL_MAX)
+        if err_resp:
+            return err_resp
+        firestore_updates["avatarUrl"] = avatar_url
 
     original_email = user_record.email
     new_email = data.get("email")
     if new_email is not None:
-        new_email = new_email.strip()
+        new_email, err_resp = text_field(data, "email", "email", max_len=EMAIL_MAX)
+        if err_resp:
+            return err_resp
         if not new_email:
             return JsonResponse({"detail": "email 不可為空"}, status=400)
     email_will_change = new_email is not None and new_email != user_record.email
@@ -323,9 +374,11 @@ def user_profile(request, decoded, uid):
     # 先寫稽核紀錄再動手（稽核 FLW-4）：改 email 等於能接管帳號，寫不進去就中止。
     # 動作本身失敗時，apply_changes 回傳錯誤回應，下面補一筆 update_profile_failed。
     if planned_updates:
+        # 稽核 BE2a-03：只記錄這次實際要改的欄位（差異），不存整份使用者文件；email 遮罩
         _write_audit_log_first(
             request, decoded, "update_profile", uid, target_type="user",
-            before=before_data, after={**before_data, **planned_updates},
+            before={key: _audit_value(key, before_data.get(key)) for key in planned_updates},
+            after={key: _audit_value(key, value) for key, value in planned_updates.items()},
         )
 
     def apply_changes():
@@ -335,8 +388,8 @@ def user_profile(request, decoded, uid):
                 firebase_ops.set_user_email(uid, new_email)
             except firebase_auth.EmailAlreadyExistsError:
                 return JsonResponse({"detail": "這個 email 已經被使用"}, status=400)
-            except (ValueError, firebase_auth.FirebaseError) as e:
-                return JsonResponse({"detail": str(e)}, status=400)
+            except (ValueError, FirebaseError) as e:
+                return JsonResponse({"detail": firebase_error_message(e)}, status=400)
             email_changed = True
             firestore_updates["email"] = new_email
 
@@ -499,9 +552,33 @@ def user_force_logout(request, decoded, uid):
     if forbidden_resp:
         return forbidden_resp
 
+    # 強制登出是防禦動作：稽核資料庫壞掉時不該連它一起擋，所以維持事後 best-effort 寫入（有測試保護這個決定）
     firebase_ops.revoke_sessions(uid)
     _safe_write_audit_log(request, decoded, "force_logout", uid, target_type="user")
     return JsonResponse({"uid": uid, "revoked": True})
+
+
+def _django_side_summary(uid):
+    """存在 Django 資料庫、無法直接以 uid 查得的資料：只能給出筆數（研究事件是假名、AI 回饋是單向雜湊）。"""
+    summary = {}
+    try:
+        from config import quiz_research as QR
+        from .models import QuizSkillEvent
+        pseud = QR.pseudonym(uid)
+        summary["quiz_research_events"] = (
+            QuizSkillEvent.objects.filter(pseudonym=pseud).count() if pseud is not None else "未設定假名鹽，無法對應"
+        )
+    except Exception:
+        logger.exception("統計使用者 %s 的研究事件筆數失敗", uid)
+        summary["quiz_research_events"] = "統計失敗"
+    try:
+        from AIModel.feedback import hash_uid
+        from .models import AiFeedback
+        summary["ai_feedback"] = AiFeedback.objects.filter(uid_hash=hash_uid(uid)).count()
+    except Exception:
+        logger.exception("統計使用者 %s 的 AI 回饋筆數失敗", uid)
+        summary["ai_feedback"] = "統計失敗"
+    return summary
 
 
 @csrf_exempt
@@ -527,26 +604,24 @@ def user_export(request, decoded, uid):
     doc = client.collection("users").document(uid).get()
     firestore_data = doc.to_dict() if doc.exists else None
 
-    notes = [
-        {"id": d.id, **d.to_dict()}
-        for d in client.collection("sharedNotes").where("uid", "==", uid).stream()
-    ]
-    recordings = [
-        {"id": d.id, "path": d.reference.path, **d.to_dict()}
-        for d in client.collection_group("recordings").where("uid", "==", uid).stream()
-    ]
+    # 稽核 BE2a-02：與刪除帳號共用同一份位置清單（user_data_locations.LOCATIONS），匯出與刪除範圍一致
+    exported = export_docs(client, uid)
 
     from AIModel import memory_store
 
     export_payload = {
         "auth": _merge_user(user_record, firestore_data or {}),
         "firestore_user_document": firestore_data,
-        "shared_notes": notes,
-        "pronunciations": recordings,
+        # 既有鍵名維持不變（前端與使用者習慣的格式）
+        "shared_notes": exported.pop("shared_notes", []),
+        "pronunciations": exported.pop("pronunciations", []),
+        # 其餘位置（雲端筆記、行事曆、作答紀錄、學習統計、規則熟練度、檢舉…）
+        "other_firestore_data": exported,
         "ai_learner_memory": {
             "consented": memory_store.has_consent(uid),
             "files": memory_store.list_files(uid),
         },
+        "django_side": _django_side_summary(uid),
     }
 
     import json
@@ -555,6 +630,32 @@ def user_export(request, decoded, uid):
     response = HttpResponse(body, content_type="application/json; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="user_export_{uid}.json"'
     return response
+
+
+def _delete_recordings(uid, recordings):
+    """刪除錄音文件與對應的 Storage 音檔，回傳 {"deleted", "storage_cleanup_failed"}。"""
+    deleted_count = 0
+    storage_failed = 0
+    for rec in recordings:
+        rec_data = rec.to_dict() or {}
+        storage_url = rec_data.get("storageUrl")
+        # 用文件真正的路徑區段（pronunciations/{tribe}/recordings/{id}）
+        # 組出預期前綴，不是信任文件內部欄位——避免偽造的 storageUrl
+        # 誘使刪除同 bucket 裡不相關的物件。
+        rec_tribe = rec.reference.parent.parent.id
+        # Storage 音檔刪除失敗時（例如物件已不存在、網址格式不符預期）不能
+        # 悄悄略過——這裡仍然刪掉 Firestore 文件（審核者的意圖是整筆錄音都
+        # 不該再留），但把失敗筆數回報出來，讓管理者知道有孤兒音檔需要
+        # 人工到 Storage 主控台複查，而不是被 "deleted" 數字誤導成全部乾淨。
+        if storage_url and not firebase_ops.delete_storage_file_by_download_url(
+            storage_url, expected_path_prefix=f"pronunciations/{rec_tribe}/",
+            expected_uid=uid,
+        ):
+            storage_failed += 1
+            logger.warning("刪除帳號 %s 的錄音 %s 時，Storage 音檔清除失敗：%s", uid, rec.id, storage_url)
+        rec.reference.delete()
+        deleted_count += 1
+    return {"deleted": deleted_count, "storage_cleanup_failed": storage_failed}
 
 
 @csrf_exempt
@@ -593,13 +694,12 @@ def user_delete(request, decoded, uid):
     client = firebase_ops.get_firestore_client()
     doc_ref = client.collection("users").document(uid)
     firestore_snapshot = doc_ref.get()
+    # 稽核 BE2a-03：稽核紀錄是永久保存的，被刪帳號的個資不能留在裡面——只記 uid、角色與停權狀態，
+    # 不存 email 與使用者文件內容；各集合刪了幾筆由結尾的 delete_account_result 記錄。
     before_snapshot = {
-        "auth": {
-            "uid": user_record.uid, "email": user_record.email,
-            "disabled": user_record.disabled,
-            "custom_claims": user_record.custom_claims,
-        },
-        "firestore_user_document": firestore_snapshot.to_dict() if firestore_snapshot.exists else None,
+        "uid": user_record.uid,
+        "role": (user_record.custom_claims or {}).get("role"),
+        "disabled": user_record.disabled,
     }
 
     # 先寫稽核紀錄再動手（稽核 FLW-4）：刪除是不可逆的，寫不進去就中止。動作的結果（每一段刪了多少、
@@ -611,84 +711,36 @@ def user_delete(request, decoded, uid):
 
     results = {}
 
-    # 先撤銷這個帳號的所有登入（FastAPI 驗證 token 時有 check_revoked，之後的請求立刻失效），再清資料：
-    # 否則清除研究資料的同時，這個帳號仍可能重新同意、或補寫事件（尚無同意紀錄時資料庫沒有列可以鎖）。
+    # 稽核 BE2a-09：先停權並撤銷所有登入，確定這個帳號無法再登入、寫入新資料，才開始清資料；
+    # 否則清到一半使用者還能重新登入，留下刪不掉的孤兒資料。停權失敗就整個中止（尚未刪任何東西）。
+    # 之後 Auth 刪除失敗時，帳號也維持停權狀態，不會是「資料沒了但人還能登入」。
     try:
+        firebase_ops.set_user_disabled(uid, True)
         firebase_ops.revoke_sessions(uid)
+        results["suspended"] = {"disabled": True}
         results["sessions_revoked"] = {"revoked": True}
     except Exception:
-        logger.exception("刪除帳號 %s 前撤銷登入失敗", uid)
-        results["sessions_revoked"] = {"revoked": False, "error": "撤銷登入失敗，需人工複查"}
+        logger.exception("刪除帳號 %s 前停權／撤銷登入失敗，已中止刪除", uid)
+        _mark_action_failed(request, decoded, "delete_account", uid, reason="suspend_failed")
+        return JsonResponse({"detail": "無法先停用這個帳號，已中止刪除，沒有刪除任何資料（帳號可能已被停用），請稍後再試"}, status=502)
 
-    try:
-        notes = list(client.collection("sharedNotes").where("uid", "==", uid).stream())
-        for note in notes:
-            note.reference.delete()
-        results["shared_notes"] = {"deleted": len(notes)}
-    except Exception:
-        logger.exception("刪除帳號 %s 的 sharedNotes 失敗", uid)
-        results["shared_notes"] = {"deleted": 0, "error": "刪除失敗，需人工複查"}
-
-    try:
-        recordings = list(client.collection_group("recordings").where("uid", "==", uid).stream())
-        deleted_count = 0
-        storage_failed = 0
-        for rec in recordings:
-            rec_data = rec.to_dict()
-            storage_url = rec_data.get("storageUrl")
-            # 用文件真正的路徑區段（pronunciations/{tribe}/recordings/{id}）
-            # 組出預期前綴，不是信任文件內部欄位——避免偽造的 storageUrl
-            # 誘使刪除同 bucket 裡不相關的物件。
-            rec_tribe = rec.reference.parent.parent.id
-            # Storage 音檔刪除失敗時（例如物件已不存在、網址格式不符預期）不能
-            # 悄悄略過——這裡仍然刪掉 Firestore 文件（審核者的意圖是整筆錄音都
-            # 不該再留），但把失敗筆數回報出來，讓管理者知道有孤兒音檔需要
-            # 人工到 Storage 主控台複查，而不是被 "deleted" 數字誤導成全部乾淨。
-            if storage_url and not firebase_ops.delete_storage_file_by_download_url(
-                storage_url, expected_path_prefix=f"pronunciations/{rec_tribe}/",
-                expected_uid=uid,
-            ):
-                storage_failed += 1
-                logger.warning("刪除帳號 %s 的錄音 %s 時，Storage 音檔清除失敗：%s", uid, rec.id, storage_url)
-            rec.reference.delete()
-            deleted_count += 1
-        results["pronunciations"] = {"deleted": deleted_count, "storage_cleanup_failed": storage_failed}
-    except Exception:
-        logger.exception("刪除帳號 %s 的 pronunciations 失敗", uid)
-        results["pronunciations"] = {"deleted": 0, "error": "刪除失敗，需人工複查"}
-
-    try:
-        # 詞素學習的規則熟練度狀態存在 users/{uid}/quizRuleState 子集合；刪除 users 文件不會連帶刪除子集合。
-        states = list(doc_ref.collection("quizRuleState").stream())
-        for state in states:
-            state.reference.delete()
-        results["quiz_rule_state"] = {"deleted": len(states)}
-    except Exception:
-        logger.exception("刪除帳號 %s 的詞素學習狀態失敗", uid)
-        results["quiz_rule_state"] = {"deleted": 0, "error": "刪除失敗，需人工複查"}
-
-    try:
-        # AI 助手記下的「問過哪一題」（users/{uid}/aiAskedQuestions，路線圖 #22）同樣在子集合，要明確刪除。
-        asked = list(doc_ref.collection("aiAskedQuestions").stream())
-        for item in asked:
-            item.reference.delete()
-        results["ai_asked_questions"] = {"deleted": len(asked)}
-    except Exception:
-        logger.exception("刪除帳號 %s 的 AI 助手題目紀錄失敗", uid)
-        results["ai_asked_questions"] = {"deleted": 0, "error": "刪除失敗，需人工複查"}
-
-    for sub_name, result_key, label in (
-        ("studyPlans", "study_plans", "追蹤中的讀書計畫"),        # 路線圖 #26：users/{uid}/studyPlans/current
-        ("weeklyDigest", "weekly_digest", "每週學習摘要"),       # 路線圖 #25：users/{uid}/weeklyDigest/current
-    ):
+    # 稽核 BE2a-01：個人資料位置由 user_data_locations.LOCATIONS 統一列出（匯出與刪除共用）
+    for location in LOCATIONS:
         try:
-            items = list(doc_ref.collection(sub_name).stream())
-            for item in items:
-                item.reference.delete()
-            results[result_key] = {"deleted": len(items)}
+            docs = find_docs(client, uid, location)
+            if location.kind == "group_query":
+                results[location.key] = _delete_recordings(uid, docs)
+            elif location.kind == "anonymize":
+                for doc in docs:
+                    doc.reference.update({location.field: DELETED_USER_PLACEHOLDER})
+                results[location.key] = {"anonymized": len(docs)}
+            else:
+                for doc in docs:
+                    doc.reference.delete()
+                results[location.key] = {"deleted": len(docs)}
         except Exception:
-            logger.exception("刪除帳號 %s 的%s失敗", uid, label)
-            results[result_key] = {"deleted": 0, "error": "刪除失敗，需人工複查"}
+            logger.exception("刪除帳號 %s 的「%s」失敗", uid, location.label)
+            results[location.key] = {"deleted": 0, "error": "刪除失敗，需人工複查"}
 
     try:
         # AI 助手的學習記憶（路線圖 #21）存在 Django 資料庫，不在 Firestore：刪除記憶檔與同意紀錄。
@@ -713,9 +765,15 @@ def user_delete(request, decoded, uid):
         logger.exception("刪除帳號 %s 的 users 文件失敗", uid)
         results["firestore_user_document"] = {"deleted": False, "error": "刪除失敗，需人工複查"}
 
+    # 任何一個資料位置刪除失敗時不刪 Auth 帳號（維持停權）：Auth 一刪，同一個端點就找不到人，
+    # 殘留資料沒辦法再用它補刪；留著讓管理者重試
+    partial_failure = any(isinstance(value, dict) and value.get("error") for value in results.values())
     try:
-        firebase_ops.delete_firebase_user(uid)
-        results["firebase_auth"] = {"deleted": True}
+        if partial_failure:
+            results["firebase_auth"] = {"deleted": False, "error": "部分資料刪除失敗，帳號維持停用，請重新執行刪除"}
+        else:
+            firebase_ops.delete_firebase_user(uid)
+            results["firebase_auth"] = {"deleted": True}
     except Exception:
         logger.exception("刪除帳號 %s 的 Firebase Auth 記錄失敗", uid)
         results["firebase_auth"] = {"deleted": False, "error": "刪除失敗，需人工複查"}

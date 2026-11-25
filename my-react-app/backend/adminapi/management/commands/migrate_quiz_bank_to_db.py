@@ -65,7 +65,7 @@ class Command(BaseCommand):
         （獨立審查找到的問題，QuizClozePassage.clean() 尤其重要，因為裡面
         有標記一致性檢查）。回傳 (was_created, was_invalid)；驗證失敗時不
         中斷整批遷移，只跳過這一筆並印出原因，讓管理者能單獨處理。"""
-        if model.objects.filter(**lookup).exists():
+        if model.all_objects.filter(**lookup).exists():  # 含已軟刪除的，避免把刪掉的題目重新匯入復活
             return False, False
 
         obj = model(**lookup, **defaults)

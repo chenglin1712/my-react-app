@@ -46,6 +46,14 @@ class AnnouncementSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('標題不能空白')
         return value
 
+    def validate_cover_image_url(self, value):
+        # 稽核 BE2a-11：後台建立／編輯的封面圖只收 Cloudinary（與專題圖片同一規則）。
+        # 爬蟲匯入的公告不經過這個 serializer；編輯時沒動這個欄位（原值是爬蟲來的外部網址）就放行。
+        if self.instance is not None and value == self.instance.cover_image_url:
+            return value
+        validate_cloudinary_image_url(value)
+        return value
+
     def validate_tribes(self, value):
         if not isinstance(value, list):
             raise serializers.ValidationError('tribes 必須是陣列')

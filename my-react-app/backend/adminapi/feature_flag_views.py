@@ -16,6 +16,7 @@ from config.roles import PUBLISHERS, STAFF_ROLES
 from ._shared import (
     parse_json_body as _parse_json_body,
     rate_limited_response as _rate_limited_response,
+    stale_edit_response as _stale_edit_response,
     write_audit_log as _write_audit_log,
 )
 from .models import FeatureFlag
@@ -56,6 +57,9 @@ def feature_flag_detail(request, pk):
 
         with transaction.atomic():
             obj = get_object_or_404(FeatureFlag.objects.select_for_update(), pk=pk)
+            stale = _stale_edit_response(data, obj.updated_at)  # 稽核 BE2a-07
+            if stale:
+                return stale
             before = FeatureFlagSerializer(obj).data
             serializer = FeatureFlagSerializer(obj, data=data, partial=True)
             if not serializer.is_valid():

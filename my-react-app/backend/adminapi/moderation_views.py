@@ -18,15 +18,23 @@ from core.firebase_auth import require_role
 from config.roles import MODERATORS, STAFF_ROLES
 
 from . import firebase_ops
+from .user_input import text_field
 from ._shared import (
+    guarded_action,
+    mark_action_failed as _mark_action_failed,
     parse_json_body as _parse_json_body,
     rate_limited_response as _rate_limited_response,
     safe_write_audit_log as _safe_write_audit_log,
+    write_audit_log_first as _write_audit_log_first,
 )
 
 logger = logging.getLogger(__name__)
 
 REPORT_STATUS_CHOICES = ("pending", "resolved", "dismissed")
+
+# 列表只會用到這些欄位（稽核 BE2a-05：用欄位投影減少讀回的資料量）
+_NOTE_LIST_FIELDS = ["preview", "image", "uid", "username", "likes", "deleted", "createdAt"]
+_RECORDING_LIST_FIELDS = ["word", "uid", "score", "storageUrl", "createdAt", "approved", "tribe"]
 
 
 def _paginate(items, request):
@@ -73,6 +81,8 @@ def note_list(request):
     if deleted_param in ("true", "false"):
         qs_ref = qs_ref.where("deleted", "==", deleted_param == "true")
 
+    # 稽核 BE2a-05：只取列表會用到的欄位，不把整篇筆記內容整批讀回來
+    qs_ref = qs_ref.select(_NOTE_LIST_FIELDS)
     docs = list(qs_ref.order_by("createdAt", direction=firestore.Query.DESCENDING).stream())
     report_counts = _pending_report_counts(client)
 
@@ -107,16 +117,8 @@ def note_list(request):
 
 
 @csrf_exempt
-def note_toggle_deleted(request, note_id):
-    if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, MODERATORS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="note_toggle_deleted", rate="30/m")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="POST", role=MODERATORS, rate_limit=("note_toggle_deleted", "30/m"))
+def note_toggle_deleted(request, decoded, note_id):
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
@@ -145,11 +147,16 @@ def note_toggle_deleted(request, note_id):
         }, status=409)
 
     new_value = not current
-    doc_ref.update({"deleted": new_value})
-    _safe_write_audit_log(
+    # 稽核 BE2a-10：先寫稽核紀錄再動手（下架會讓內容立刻對所有人消失），寫不進去就中止
+    _write_audit_log_first(
         request, decoded, "toggle_note_deleted", note_id, target_type="shared_note",
         before={"deleted": current}, after={"deleted": new_value},
     )
+    try:
+        doc_ref.update({"deleted": new_value})
+    except Exception:
+        _mark_action_failed(request, decoded, "toggle_note_deleted", note_id, target_type="shared_note", reason="firestore_error")
+        raise
     return JsonResponse({"id": note_id, "deleted": new_value})
 
 
@@ -166,7 +173,7 @@ def recording_list(request):
         return err_resp
 
     client = firebase_ops.get_firestore_client()
-    docs = list(client.collection_group("recordings").stream())
+    docs = list(client.collection_group("recordings").select(_RECORDING_LIST_FIELDS).stream())
     report_counts = _pending_report_counts(client)
 
     items = []
@@ -251,16 +258,8 @@ def recording_approve(request, tribe, recording_id):
 
 
 @csrf_exempt
-def recording_delete(request, tribe, recording_id):
-    if request.method != "DELETE":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    decoded, err_resp = require_role(request, MODERATORS)
-    if err_resp:
-        return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="recording_delete", rate="30/m", method="DELETE")
-    if limited_resp:
-        return limited_resp
-
+@guarded_action(method="DELETE", role=MODERATORS, rate_limit=("recording_delete", "30/m", "DELETE"))
+def recording_delete(request, decoded, tribe, recording_id):
     client = firebase_ops.get_firestore_client()
     doc_ref = (
         client.collection("pronunciations").document(tribe)
@@ -272,6 +271,11 @@ def recording_delete(request, tribe, recording_id):
 
     data = snapshot.to_dict()
     storage_url = data.get("storageUrl")
+    # 稽核 BE2a-10：永久刪除不可逆，先寫稽核紀錄（內容存 before）再動手，寫不進去就中止、什麼都不刪
+    _write_audit_log_first(
+        request, decoded, "delete_recording", f"{tribe}/{recording_id}",
+        target_type="pronunciation_recording", before=data,
+    )
     if storage_url:
         # 用 URL 路徑上真正的 tribe 區段組出預期前綴（不是信任文件內部
         # 欄位），避免偽造的 storageUrl 誘使刪除同 bucket 裡不相關的物件。
@@ -286,6 +290,10 @@ def recording_delete(request, tribe, recording_id):
             # 得回來。保留 Firestore 文件讓管理者能安全重試（獨立審查
             # 找到的問題：原本這裡不管刪 Storage 成不成功都會接著刪
             # Firestore 文件，"deleted": true 會讓管理者誤以為已經清乾淨）。
+            _mark_action_failed(
+                request, decoded, "delete_recording", f"{tribe}/{recording_id}",
+                target_type="pronunciation_recording", reason="storage_delete_failed",
+            )
             return JsonResponse({
                 "detail": "刪除 Storage 音檔失敗，為避免留下孤兒檔案，Firestore 紀錄予以保留，請稍後再試",
             }, status=502)
@@ -293,13 +301,14 @@ def recording_delete(request, tribe, recording_id):
         # 沒有 storageUrl 代表本來就沒有東西要清，不是「清理失敗」。
         storage_deleted = True
 
-    doc_ref.delete()
-
-    _safe_write_audit_log(
-        request, decoded, "delete_recording", f"{tribe}/{recording_id}",
-        target_type="pronunciation_recording",
-        before={**data, "storage_deleted": storage_deleted},
-    )
+    try:
+        doc_ref.delete()
+    except Exception:
+        _mark_action_failed(
+            request, decoded, "delete_recording", f"{tribe}/{recording_id}",
+            target_type="pronunciation_recording", reason="firestore_delete_failed",
+        )
+        raise
     return JsonResponse({"tribe": tribe, "id": recording_id, "deleted": True, "storage_deleted": storage_deleted})
 
 
@@ -337,6 +346,44 @@ def _fetch_report_target_summary(client, data):
     return None
 
 
+def _summarize_target(target_type, tribe, snapshot):
+    if snapshot is None or not snapshot.exists:
+        return None
+    data = snapshot.to_dict() or {}
+    if target_type == "note":
+        return {"preview": data.get("preview"), "username": data.get("username")}
+    return {"word": data.get("word"), "tribe": tribe, "score": data.get("score")}
+
+
+def _fetch_report_target_summaries(client, report_datas):
+    """一次批次讀取一頁檢舉的目標文件（client.get_all），回傳與 report_datas 同順序的摘要 list（讀不到是 None）。
+    批次讀取本身失敗時退回逐筆讀，不讓整個列表失敗。"""
+    refs = {}
+    for index, data in enumerate(report_datas):
+        target_type, target_id = data.get("targetType"), data.get("targetId")
+        if not isinstance(target_id, str) or not target_id or "/" in target_id:
+            continue
+        if target_type == "note":
+            refs[index] = client.collection("sharedNotes").document(target_id)
+        elif target_type == "recording" and isinstance(data.get("targetTribe"), str) and data.get("targetTribe"):
+            refs[index] = (
+                client.collection("pronunciations").document(data["targetTribe"])
+                .collection("recordings").document(target_id)
+            )
+    summaries = [None] * len(report_datas)
+    if not refs:
+        return summaries
+    try:
+        by_path = {snap.reference.path: snap for snap in client.get_all(list(refs.values())) if snap.exists}
+    except Exception:
+        logger.exception("批次讀取檢舉目標失敗，改為逐筆讀取")
+        return [_fetch_report_target_summary(client, data) for data in report_datas]
+    for index, ref in refs.items():
+        data = report_datas[index]
+        summaries[index] = _summarize_target(data.get("targetType"), data.get("targetTribe"), by_path.get(ref.path))
+    return summaries
+
+
 @csrf_exempt
 def report_list(request):
     if request.method != "GET":
@@ -365,8 +412,10 @@ def report_list(request):
     docs = list(qs_ref.stream())
 
     items = []
+    raw_by_id = {}
     for doc in docs:
         data = doc.to_dict()
+        raw_by_id[doc.id] = data
         items.append({
             "id": doc.id,
             "target_type": data.get("targetType"),
@@ -380,7 +429,6 @@ def report_list(request):
             "resolved_by": data.get("resolvedBy"),
             "resolved_at": data.get("resolvedAt"),
             "resolution_note": data.get("resolutionNote"),
-            "target_summary": _fetch_report_target_summary(client, data),
         })
 
     target_type_param = request.GET.get("target_type")
@@ -388,6 +436,11 @@ def report_list(request):
         items = [item for item in items if item["target_type"] == target_type_param]
 
     page_items, total, page, page_size = _paginate(items, request)
+    # 稽核 BE2a-05：原本對每一筆檢舉（含不在這一頁的）都逐筆讀目標文件（N+1）；現在只補「這一頁」的摘要，
+    # 而且用 get_all 一次批次讀取。
+    summaries = _fetch_report_target_summaries(client, [raw_by_id[item["id"]] for item in page_items])
+    for item, summary in zip(page_items, summaries):
+        item["target_summary"] = summary
     return JsonResponse({"results": page_items, "count": total, "page": page, "page_size": page_size})
 
 
@@ -400,6 +453,10 @@ def _resolve_report(request, report_id, new_status):
         return limited_resp
 
     data, err_resp = _parse_json_body(request)
+    if err_resp:
+        return err_resp
+    # 稽核 BE2a-12：處理說明必須是字串、長度有上限（非字串原本會讓 .strip() 丟 500）
+    resolution_note_value, err_resp = text_field(data, "resolution_note", "處理說明", max_len=1000)
     if err_resp:
         return err_resp
 
@@ -418,7 +475,7 @@ def _resolve_report(request, report_id, new_status):
         # （獨立審查找到的問題）。
         return JsonResponse({"detail": f"這筆檢舉目前狀態是「{before_status}」，無法核結"}, status=409)
 
-    resolution_note = (data.get("resolution_note") or "").strip()
+    resolution_note = resolution_note_value
     try:
         # 用 update_time 當樂觀併發控制的 precondition，不是單純的
         # get() 後再 update()——原本兩者是獨立呼叫，兩位管理員幾乎同時

@@ -165,6 +165,9 @@ class AccountDeletionTests(TestCase):
         self.addCleanup(cache.clear)
         self.calls = []                                   # 記錄呼叫順序：撤銷登入必須在清資料之前
         self.revoke_error = None
+        disable = mock.patch("adminapi.firebase_ops.set_user_disabled")
+        disable.start()
+        self.addCleanup(disable.stop)
         revoke = mock.patch("adminapi.firebase_ops.revoke_sessions", side_effect=self._revoke)
         revoke.start()
         self.addCleanup(revoke.stop)
@@ -224,14 +227,12 @@ class AccountDeletionTests(TestCase):
         assert_equal(self.calls, ["revoke", "purge"])
         assert_equal(resp.json()["results"]["sessions_revoked"], {"revoked": True})
 
-    def test_a_failure_revoking_logins_is_reported_but_the_deletion_continues(self):
+    def test_a_failure_revoking_logins_aborts_the_deletion(self):
+        # 稽核 BE2a-01：先停權並撤銷登入，這一步失敗就整個中止，不刪任何資料（避免帳號還能登入又被刪資料）
         self.revoke_error = RuntimeError("firebase down")
         resp, users_doc_ref = self._delete([])
-        results = resp.json()["results"]
-        self.assertFalse(results["sessions_revoked"]["revoked"])
-        self.assertIn("error", results["sessions_revoked"])
-        self.assertIn("quiz_research", results)
-        users_doc_ref.delete.assert_called_once()
+        self.assertEqual(resp.status_code, 502)
+        users_doc_ref.delete.assert_not_called()
 
     def test_a_failure_cleaning_rule_state_is_reported_and_does_not_stop_the_rest(self):
         def boom(ref):

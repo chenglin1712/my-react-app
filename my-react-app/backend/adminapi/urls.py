@@ -83,6 +83,7 @@ urlpatterns = [
     path('public/irt-config/', quizbank_views.public_irt_config),
     # 服務對服務：FastAPI 通知 Django 評估 AI 月預算（nginx 對 /adminapi/internal/ 一律拒絕，只有同機直連打得到）
     path('internal/ai-budget/enforce/', internal_views.ai_budget_enforce),
+    path('internal/fastapi-rate-limit-rules/', internal_views.fastapi_rate_limit_rules),
 
     # P3 使用者與審核
     path('users/', user_views.user_list),
@@ -161,7 +162,6 @@ urlpatterns = [
     # 並行項目：限流設定
     path('rate-limit-rules/', rate_limit_views.rate_limit_rule_list),
     path('rate-limit-rules/<int:pk>/', rate_limit_views.rate_limit_rule_detail),
-    path('public/fastapi-rate-limit-rules/', rate_limit_views.public_fastapi_rate_limit_rules),
 
     # 並行項目：功能開關
     path('feature-flags/', feature_flag_views.feature_flag_list),

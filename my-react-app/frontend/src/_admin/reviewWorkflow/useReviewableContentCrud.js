@@ -237,7 +237,10 @@ export function useReviewableContentCrud({
 
         const { endpointAction } = REVIEW_ACTION_META[actionKey];
         // 核准類動作後端要求帶 review_comment（可為空字串）。
-        let body = endpointAction?.endsWith('approve') ? { review_comment: '' } : undefined;
+        // 核准時帶上審核者看到的 updated_at，送審後被改過就會被後端擋下（稽核 BE1-03）
+        let body = endpointAction?.endsWith('approve')
+            ? { review_comment: '', ...(item.updated_at && actionKey !== 'approveRevision' ? { base_updated_at: item.updated_at } : {}) }
+            : undefined;
         if (actionKey === 'approveRevision') {
             const version = revisionVersionOf(item);
             if (!version) {

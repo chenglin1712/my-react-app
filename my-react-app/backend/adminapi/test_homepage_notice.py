@@ -24,7 +24,8 @@ ADMIN_URL = "/adminapi/homepage-config/"
 
 @contextmanager
 def _as_role(role):
-    with override_settings(AUTH_DEV_BYPASS=False):
+    # PATCH 現在也會計入限流（稽核 BE1-02）；這些測試會連續送很多次，關掉限流專心測內容
+    with override_settings(AUTH_DEV_BYPASS=False, RATELIMIT_ENABLE=False):
         with patch("core.firebase_auth.ensure_firebase_initialized"):
             decoded = {"uid": "test-uid", "role": role}
             with patch("firebase_admin.auth.verify_id_token", return_value=fresh_auth(decoded)):

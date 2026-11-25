@@ -1,6 +1,6 @@
 """FastAPI 端 12 個 @limiter.limit(...) 呼叫點的動態限流值——輪詢 Django
 adminapi 的 RateLimitRule（backend=fastapi 那批，見
-backend/adminapi/rate_limit_views.py 的 public_fastapi_rate_limit_rules）。
+backend/adminapi/internal_views.py 的 fastapi_rate_limit_rules，要 X-Internal-Secret）。
 
 完全比照 game_config.py／routes/quiz.py 既有的 TTL 輪詢模式，差別只在於
 這裡快取的是「key -> rate 字串」的整包字典（一次 HTTP 請求換全部 12 筆），
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 _RATE_LIMIT_CONFIG_URL = (
     os.getenv("DJANGO_INTERNAL_BASE_URL", "http://127.0.0.1:8000")
-    + "/adminapi/public/fastapi-rate-limit-rules/"
+    + "/adminapi/internal/fastapi-rate-limit-rules/"
 )
 # 限流值改了之後最慢幾分鐘內生效即可，不是秒等的即時性需求，跟 IRT／
 # 遊戲參數輪詢同一種取捨。
@@ -40,7 +40,10 @@ _rate_limit_rules: dict = {}
 def _fetch_rules() -> None:
     global _rate_limit_last_fetch, _rate_limit_rules
     try:
-        resp = requests.get(_RATE_LIMIT_CONFIG_URL, timeout=5, headers=DJANGO_INTERNAL_HEADERS)
+        resp = requests.get(
+            _RATE_LIMIT_CONFIG_URL, timeout=5,
+            headers={**DJANGO_INTERNAL_HEADERS, "X-Internal-Secret": os.getenv("INTERNAL_API_SECRET", "")},
+        )
         resp.raise_for_status()
         _rate_limit_rules = resp.json().get("rules", {})
     except Exception:

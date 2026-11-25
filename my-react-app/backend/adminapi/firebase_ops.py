@@ -8,19 +8,42 @@ set_custom_user_claims）。延用 ensure_firebase_initialized() + 延遲 import
 Firebase 的測試）單純 import 這個模組不會出錯，只有真的呼叫到才會要求金鑰
 存在，呼叫端測試時可以直接 patch 這裡的個別函式，不需要真的連 Firebase。
 """
+import threading
+import time
+
 from config.firebase_init import ensure_firebase_initialized
 
 _firestore_client = None
 _storage_bucket = None
 
 
-def list_all_firebase_users():
+# 稽核 BE2a-18：使用者列表每次都全量拉 Firebase Auth，開一次列表等於好幾次 API 呼叫。列表頁用短期快取
+# （USERS_CACHE_TTL_SECONDS 秒），任何會改變使用者資料的操作都會立刻清掉快取。需要即時正確的檢查
+# （例如「還剩幾位 owner」）一律不用快取。
+USERS_CACHE_TTL_SECONDS = 45
+_users_cache = {"at": 0.0, "users": None}
+_users_cache_lock = threading.Lock()
+
+
+def invalidate_users_cache():
+    with _users_cache_lock:
+        _users_cache["users"] = None
+
+
+def list_all_firebase_users(use_cache=False):
     """回傳 Firebase Auth 全部使用者的 UserRecord list（分頁疊代到底）。
+
+    use_cache=True 給使用者列表頁用（容許最多 USERS_CACHE_TTL_SECONDS 秒前的資料）；預設不用快取。
 
     使用者列表頁（§P3.2）刻意不建 Firestore 影子索引表，每次開列表都即時
     全量拉取——這支函式就是那個「全量拉取」的實作，篩選/分頁交給呼叫端在
     記憶體裡做（比照 Announcement.tribes 篩選的既有做法）。
     """
+    if use_cache:
+        with _users_cache_lock:
+            cached = _users_cache["users"]
+            if cached is not None and time.monotonic() - _users_cache["at"] < USERS_CACHE_TTL_SECONDS:
+                return cached
     ensure_firebase_initialized()
     from firebase_admin import auth as firebase_auth
 
@@ -29,6 +52,9 @@ def list_all_firebase_users():
     while page:
         users.extend(page.users)
         page = page.get_next_page()
+    with _users_cache_lock:
+        _users_cache["users"] = users
+        _users_cache["at"] = time.monotonic()
     return users
 
 
@@ -171,6 +197,7 @@ def set_user_role(uid, role):
     else:
         claims["role"] = role
     firebase_auth.set_custom_user_claims(uid, claims)
+    invalidate_users_cache()
 
 
 def revoke_sessions(uid):
@@ -188,12 +215,14 @@ def set_user_disabled(uid, disabled):
     ensure_firebase_initialized()
     from firebase_admin import auth as firebase_auth
     firebase_auth.update_user(uid, disabled=disabled)
+    invalidate_users_cache()
 
 
 def delete_firebase_user(uid):
     ensure_firebase_initialized()
     from firebase_admin import auth as firebase_auth
     firebase_auth.delete_user(uid)
+    invalidate_users_cache()
 
 
 def create_firebase_user(email, password, display_name=None):
@@ -204,7 +233,9 @@ def create_firebase_user(email, password, display_name=None):
     原樣往外拋，呼叫端自行 catch 轉成 400。"""
     ensure_firebase_initialized()
     from firebase_admin import auth as firebase_auth
-    return firebase_auth.create_user(email=email, password=password, display_name=display_name)
+    record = firebase_auth.create_user(email=email, password=password, display_name=display_name)
+    invalidate_users_cache()
+    return record
 
 
 def set_user_password(uid, new_password):
@@ -224,3 +255,4 @@ def set_user_email(uid, new_email):
     ensure_firebase_initialized()
     from firebase_admin import auth as firebase_auth
     firebase_auth.update_user(uid, email=new_email)
+    invalidate_users_cache()

@@ -266,7 +266,10 @@ export default function AnnouncementList() {
         if (actionKey === 'reject') return openRejectModal(item, 'reject');
         if (actionKey === 'rejectRevision') return openRejectModal(item, 'pending-revision');
         const { endpointAction } = REVIEW_ACTION_META[actionKey];
-        let body = endpointAction?.endsWith('approve') ? { review_comment: '' } : undefined;
+        // 核准時帶上審核者看到的 updated_at，送審後被改過就會被後端擋下（稽核 BE1-03）
+        let body = endpointAction?.endsWith('approve')
+            ? { review_comment: '', ...(item.updated_at && actionKey !== 'approveRevision' ? { base_updated_at: item.updated_at } : {}) }
+            : undefined;
         if (actionKey === 'approveRevision') {
             // 帶上審核者在列表上看到的版本，編輯者之後改過內容就會被後端擋下（稽核 FLW-1）
             if (!item.pending_revision_version) {

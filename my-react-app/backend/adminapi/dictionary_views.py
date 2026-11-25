@@ -40,6 +40,7 @@ from ._shared import (
     guarded_action,
     invalid_transition as _invalid_transition,
     parse_json_body as _parse_json_body,
+    stale_edit_response as _stale_edit_response,
     write_audit_log as _write_audit_log,
 )
 from .dictionary_revision_service import (
@@ -420,6 +421,7 @@ def _revision_get(request, decoded, pk):
         "id": revision.pk, "target_kind": revision.target_kind, "target_id": revision.target_id,
         "operation": revision.operation, "status": revision.status, "payload": revision.payload,
         "base_hash": revision.base_hash, "tribe": revision.tribe,
+        "updated_at": revision.updated_at.isoformat(),
         "submitted_by": revision.submitted_by,
         "submitted_at": revision.submitted_at.isoformat() if revision.submitted_at else None,
     })
@@ -507,6 +509,10 @@ def dictionary_revision_approve(request, decoded, pk):
         revision = get_object_or_404(DictionaryRevision.objects.select_for_update(), pk=pk)
         if revision.status != DictionaryRevision.STATUS_PENDING_REVIEW:
             return _invalid_transition(revision.status, "approve")
+        # 稽核 BE1-03：審核者核准的是他看到的那一版提案內容，送審後被改過就擋（帶 base_updated_at 時比對）
+        stale = _stale_edit_response(data, revision.updated_at)
+        if stale:
+            return stale
 
         applier = _APPLIERS.get(revision.target_kind)
         if applier is None:

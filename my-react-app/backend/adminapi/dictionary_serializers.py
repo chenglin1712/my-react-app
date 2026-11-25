@@ -385,7 +385,6 @@ class GrammarSectionReorderSerializer(serializers.Serializer):
 
 class ApproveDictionaryRevisionSerializer(serializers.Serializer):
     review_comment = serializers.CharField(max_length=1000, allow_blank=True, required=False, default='')
-    base_hash = serializers.CharField(max_length=71, allow_blank=True, required=False, default='')
 
 
 # ---------------------------------------------------------------------------

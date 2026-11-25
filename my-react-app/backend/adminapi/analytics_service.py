@@ -369,22 +369,22 @@ def _resolve_item_labels(keys):
 
     tf_ids = [item_id for kind, item_id in keys if kind == "true_false"]
     if tf_ids:
-        for row in QuizTrueFalseItem.objects.filter(id__in=tf_ids).values("id", "question_ch"):
+        for row in QuizTrueFalseItem.all_objects.filter(id__in=tf_ids).values("id", "question_ch"):
             labels[("true_false", row["id"])] = row["question_ch"]
 
     choice_ids = [item_id for kind, item_id in keys if kind == "choice"]
     if choice_ids:
-        for row in QuizChoiceItem.objects.filter(id__in=choice_ids).values("id", "question_ch"):
+        for row in QuizChoiceItem.all_objects.filter(id__in=choice_ids).values("id", "question_ch"):
             labels[("choice", row["id"])] = row["question_ch"]
 
     matching_ids = [item_id for kind, item_id in keys if kind == "matching"]
     if matching_ids:
-        for row in QuizVocabItem.objects.filter(id__in=matching_ids).values("id", "foreign_word", "chinese_gloss"):
+        for row in QuizVocabItem.all_objects.filter(id__in=matching_ids).values("id", "foreign_word", "chinese_gloss"):
             labels[("matching", row["id"])] = f"{row['foreign_word']}／{row['chinese_gloss']}"
 
     situation_ids = [item_id for kind, item_id in keys if kind == "situation"]
     if situation_ids:
-        for row in QuizSituationItem.objects.filter(id__in=situation_ids).values("id", "scenario_chinese"):
+        for row in QuizSituationItem.all_objects.filter(id__in=situation_ids).values("id", "scenario_chinese"):
             labels[("situation", row["id"])] = row["scenario_chinese"][:40]
 
     # 克漏字的 item_id 是 "passageId:blankKey"，先拆出唯一的 passage id
@@ -397,7 +397,7 @@ def _resolve_item_labels(keys):
             if passage_id_str.isdigit():
                 passage_ids.add(int(passage_id_str))
         passages_by_id = dict(
-            QuizClozePassage.objects.filter(id__in=passage_ids).values_list("id", "passage_chinese")
+            QuizClozePassage.all_objects.filter(id__in=passage_ids).values_list("id", "passage_chinese")
         )
         for item_id in cloze_keys:
             passage_id_str, _, blank_key = item_id.partition(":")

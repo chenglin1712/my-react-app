@@ -46,6 +46,7 @@ class FakeDocRef:
         self.update = MagicMock()
         self.delete = MagicMock()
         self._subcollections = {}
+        self.path = self.snapshot.reference.path
 
     def get(self):
         return self.snapshot
@@ -69,6 +70,9 @@ class FakeCollection:
     def order_by(self, *args, **kwargs):
         return self
 
+    def select(self, *args, **kwargs):
+        return self
+
     def stream(self):
         return self._docs
 
@@ -89,6 +93,7 @@ def _build_client(collections=None, groups=None):
     mock_client = MagicMock()
     mock_client.collection.side_effect = lambda name: collections.get(name, FakeCollection())
     mock_client.collection_group.side_effect = lambda name: groups.get(name, FakeCollection())
+    mock_client.get_all.side_effect = lambda refs, **kwargs: [ref.get() for ref in refs]
     return mock_client
 
 
@@ -408,7 +413,9 @@ class RecordingDeleteTest(TestCase):
             resp = self.client.delete('/adminapi/moderation/recordings/tayal/rec1/', **headers)
         self.assertEqual(resp.status_code, 502)
         rec_ref.delete.assert_not_called()
-        self.assertEqual(AuditLog.objects.filter(action="delete_recording").count(), 0)
+        # 稽核 BE2a-10：先寫「要刪除」的紀錄，Storage 失敗後再補一筆失敗紀錄
+        self.assertEqual(AuditLog.objects.filter(action="delete_recording").count(), 1)
+        self.assertEqual(AuditLog.objects.filter(action="delete_recording_failed").count(), 1)
 
     @patch("adminapi.firebase_ops.get_firestore_client")
     def test_missing_storage_url_still_deletes_firestore_doc(self, mock_client_fn):
@@ -545,3 +552,70 @@ class ReportResolveDismissTest(TestCase):
         self.assertEqual(resp.status_code, 409)
         self.assertIn("其他管理員", resp.json()["detail"])
         self.assertEqual(AuditLog.objects.filter(action="report_resolved").count(), 0)
+
+
+class ModerationAuditFirstTest(TestCase):
+    """稽核 BE2a-10：永久刪除錄音與下架筆記先寫稽核，寫不進去就不動手。"""
+
+    def setUp(self):
+        self.client = Client()
+        self.audit_down = patch("adminapi._shared.write_audit_log", side_effect=Exception("audit db down"))
+
+    @patch("adminapi.firebase_ops.delete_storage_file_by_download_url")
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_recording_delete_does_nothing_when_the_audit_log_is_down(self, mock_client_fn, mock_delete_storage):
+        recordings_col = FakeCollection()
+        rec_ref = recordings_col.set_document("rec1", {"word": "abas", "uid": "u1", "storageUrl": "https://x/o/p?alt=media"})
+        tribe_ref = FakeDocRef()
+        tribe_ref._subcollections["recordings"] = recordings_col
+        pronunciations = FakeCollection()
+        pronunciations._doc_refs["tayal"] = tribe_ref
+        mock_client_fn.return_value = _build_client(collections={"pronunciations": pronunciations})
+        with self.audit_down, _as_role(OWNER) as headers:
+            resp = self.client.delete('/adminapi/moderation/recordings/tayal/rec1/', **headers)
+        self.assertEqual(resp.status_code, 503)
+        mock_delete_storage.assert_not_called()
+        rec_ref.delete.assert_not_called()
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_note_takedown_does_nothing_when_the_audit_log_is_down(self, mock_client_fn):
+        notes = FakeCollection()
+        note_ref = notes.set_document("note1", {"deleted": False})
+        mock_client_fn.return_value = _build_client(collections={"sharedNotes": notes})
+        with self.audit_down, _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/moderation/notes/note1/toggle-deleted/', headers)
+        self.assertEqual(resp.status_code, 503)
+        note_ref.update.assert_not_called()
+
+
+class ReportListBatchTest(TestCase):
+    """稽核 BE2a-05：只補當頁的目標摘要，而且一次批次讀取。"""
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_summaries_are_fetched_once_and_only_for_the_requested_page(self, mock_client_fn):
+        notes = FakeCollection()
+        for index in range(5):
+            notes.set_document(f"note{index}", {"preview": f"p{index}", "username": "A"})
+        reports = FakeCollection(docs=[
+            _fake_snapshot(f"rep{index}", {
+                "targetType": "note", "targetId": f"note{index}", "targetTribe": "",
+                "reporterUid": "u", "reason": "spam", "status": "pending",
+            }) for index in range(5)
+        ])
+        client = _build_client(collections={"sharedNotes": notes, "reports": reports})
+        mock_client_fn.return_value = client
+        with _as_role(OWNER) as headers:
+            resp = self.client.get('/adminapi/reports/?page=2&page_size=2', **headers)
+        data = resp.json()
+        self.assertEqual(data["count"], 5)
+        self.assertEqual([item["id"] for item in data["results"]], ["rep2", "rep3"])
+        self.assertEqual([item["target_summary"]["preview"] for item in data["results"]], ["p2", "p3"])
+        client.get_all.assert_called_once()
+        self.assertEqual(len(client.get_all.call_args[0][0]), 2)
+
+
+class ReportResolveValidationTest(TestCase):
+    def test_non_string_resolution_note_is_400_not_500(self):
+        with _as_role(OWNER) as headers:
+            resp = _post_json(Client(), '/adminapi/reports/rep1/resolve/', headers, {"resolution_note": 123})
+        self.assertEqual(resp.status_code, 400)

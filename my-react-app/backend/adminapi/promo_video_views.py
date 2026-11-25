@@ -19,6 +19,7 @@ from . import promo_upload as upload
 from ._shared import (
     guarded_action,
     parse_json_body as _parse_json_body,
+    stale_edit_response as _stale_edit_response,
     write_audit_log as _write_audit_log,
 )
 from .models import HomepageConfig, PromoVideo
@@ -106,6 +107,9 @@ def _update(request, decoded, pk):
         return err_resp
     with transaction.atomic():
         config, video = _lock_config_then(pk)
+        stale = _stale_edit_response(data, video.updated_at)  # 稽核 BE2a-07
+        if stale:
+            return stale
         before = _data(video, config.active_promo_video_id)
         serializer = PromoVideoSerializer(video, data=data, partial=True)
         if not serializer.is_valid():
