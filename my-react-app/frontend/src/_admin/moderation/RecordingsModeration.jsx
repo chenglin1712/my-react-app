@@ -11,10 +11,11 @@ import {
     RefreshCw,
     Search,
     Trash2,
+    BadgeCheck,
 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBE_NAME_BY_SLUG } from '../../constants/tribes';
-import { apiDelete } from '../../../utils/apiClient';
+import { apiDelete, apiPost } from '../../../utils/apiClient';
 import { useAdminListQuery } from '../hooks/useAdminListQuery';
 import { useActionLock } from '../hooks/useActionLock';
 import { AdminEmptyBody } from '../components/AdminEmpty';
@@ -53,6 +54,27 @@ export default function RecordingsModeration() {
 
     const [success, setSuccess] = useState('');
     const deleteLock = useActionLock();
+    const approveLock = useActionLock();
+
+    // 核准（或取消核准）當成其他學習者的「參考音」（稽核 BE5-01）：錄音的 score 是使用者自己帶的，
+    // 只有在這裡聽過、確認沒問題的錄音才會被遊戲拿去當參考音。
+    const setApproved = (item, approved) => {
+        approveLock.runLocked(recordingKey(item), async () => {
+            setError('');
+            setSuccess('');
+
+            try {
+                await apiPost(
+                    `/adminapi/moderation/recordings/${item.tribe}/${item.id}/approve/`,
+                    { approved },
+                );
+                setSuccess(approved ? '已核准為參考音' : '已取消核准');
+                await loadRecordings();
+            } catch (err) {
+                setError(err.message);
+            }
+        });
+    };
 
     const deleteRecording = async (item) => {
         const confirmed = await confirmAction({
@@ -172,6 +194,7 @@ export default function RecordingsModeration() {
                                         <th>詞彙</th>
                                         <th>族語</th>
                                         <th>分數</th>
+                                        <th>參考音</th>
                                         <th>檢舉數</th>
                                         <th>上傳者</th>
                                         <th>操作</th>
@@ -181,7 +204,9 @@ export default function RecordingsModeration() {
                                     {items.map((item) => {
                                         const key = recordingKey(item);
                                         const busy = deleteLock.pendingKey === key;
-                                        const disabled = deleteLock.isLocked && !busy;
+                                        const approving = approveLock.pendingKey === key;
+                                        const disabled = (deleteLock.isLocked && !busy)
+                                            || (approveLock.isLocked && !approving);
 
                                         return (
                                             <tr key={key}>
@@ -208,6 +233,13 @@ export default function RecordingsModeration() {
                                                 </td>
                                                 <td>{item.score ?? '—'}</td>
                                                 <td>
+                                                    {item.approved === true ? (
+                                                        <Badge bg="success">已核准</Badge>
+                                                    ) : (
+                                                        <Badge bg="secondary">未核准</Badge>
+                                                    )}
+                                                </td>
+                                                <td>
                                                     {(item.report_count ?? 0) > 0 ? (
                                                         <Badge bg="danger">
                                                             {item.report_count}
@@ -222,10 +254,24 @@ export default function RecordingsModeration() {
                                                 <td>
                                                     <div className="moderation-row-actions">
                                                         {canManage ? (
+                                                            <>
+                                                            <Button
+                                                                size="sm"
+                                                                variant={item.approved === true ? 'outline-secondary' : 'outline-success'}
+                                                                disabled={busy || approving || disabled}
+                                                                onClick={() => setApproved(item, item.approved !== true)}
+                                                            >
+                                                                {approving ? (
+                                                                    <Spinner animation="border" size="sm" />
+                                                                ) : (
+                                                                    <BadgeCheck size={14} />
+                                                                )}
+                                                                {item.approved === true ? '取消核准' : '核准為參考音'}
+                                                            </Button>
                                                             <Button
                                                                 size="sm"
                                                                 variant="outline-danger"
-                                                                disabled={busy || disabled}
+                                                                disabled={busy || approving || disabled}
                                                                 onClick={() => (
                                                                     deleteRecording(item)
                                                                 )}
@@ -237,6 +283,7 @@ export default function RecordingsModeration() {
                                                                 )}
                                                                 刪除
                                                             </Button>
+                                                            </>
                                                         ) : (
                                                             <span className="moderation-readonly">
                                                                 僅供檢視
@@ -250,7 +297,7 @@ export default function RecordingsModeration() {
 
                                     {!items.length && (
                                         <tr>
-                                            <td className="admin-empty-cell" colSpan={7}>
+                                            <td className="admin-empty-cell" colSpan={8}>
                                                 <AdminEmptyBody title="沒有符合條件的發音錄音" />
                                             </td>
                                         </tr>

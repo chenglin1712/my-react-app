@@ -1,6 +1,8 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { addDoc, getDoc, setDoc, updateDoc, runTransaction } from 'firebase/firestore';
-import { uploadSituationDB, addCalendarEvent, addCalendarEvents, deleteCalendarEvent } from './uploadDb';
+import {
+  uploadSituationDB, addCalendarEvent, addCalendarEvents, deleteCalendarEvent, CalendarFullError, CALENDAR_EVENT_LIMIT,
+} from './uploadDb';
 
 /** firestore.rules 的 quizs read 規則允許任何登入使用者讀取，原本每題的
  * answer（正確答案）欄位會被原封不動寫進這份可被任何人讀到的文件，等於
@@ -112,6 +114,24 @@ describe('addCalendarEvent／deleteCalendarEvent（calendar/{uid} 單一文件�
     expect(updatedEvents[0]).toEqual({ id: 'old-1', summary: '舊行程' });
     expect(updatedEvents[1]).toMatchObject({ summary: '新行程' });
     expect(setDoc).not.toHaveBeenCalled();
+  });
+
+  // 稽核 FE6-12：firestore.rules 限制最多 500 筆；超過會讓整筆 transaction 被拒絕且重試永遠不會成功
+  test('已達 500 筆時再新增會丟出 CalendarFullError，不寫入', async () => {
+    const full = Array.from({ length: CALENDAR_EVENT_LIMIT }, (_, i) => ({ id: `e${i}`, summary: `行程${i}` }));
+    getDoc.mockResolvedValueOnce({ exists: () => true, data: () => ({ events: full }) });
+
+    await expect(addCalendarEvent({ summary: '第 501 筆' })).rejects.toBeInstanceOf(CalendarFullError);
+    expect(updateDoc).not.toHaveBeenCalled();
+    expect(setDoc).not.toHaveBeenCalled();
+  });
+
+  test('剛好補到 500 筆仍可寫入', async () => {
+    const almost = Array.from({ length: CALENDAR_EVENT_LIMIT - 1 }, (_, i) => ({ id: `e${i}`, summary: `行程${i}` }));
+    getDoc.mockResolvedValueOnce({ exists: () => true, data: () => ({ events: almost }) });
+
+    await addCalendarEvent({ summary: '第 500 筆' });
+    expect(updateDoc.mock.calls[0][1].events).toHaveLength(CALENDAR_EVENT_LIMIT);
   });
 
   test('文件尚未存在時（使用者第一次新增行程）用 setDoc 建立', async () => {

@@ -326,6 +326,19 @@ export const getCalendar = async () => {
 //
 // event 補上 client-generated 的 id（陣列本身沒有 Firestore 文件 id 可用），
 // 讓刪除／React key 都能用穩定的 id，不必依賴陣列 index。
+// firestore.rules 限制 calendar/{uid}.events 最多 500 筆（稽核 RUL-5）。超過時整筆 transaction 會被拒絕，
+// 畫面只能顯示泛用的「請稍後再試」而且重試永遠不會成功（稽核 FE6-12），所以寫入前先在 transaction 內檢查，
+// 丟出可辨識的錯誤讓畫面說明原因。
+export const CALENDAR_EVENT_LIMIT = 500;
+
+export class CalendarFullError extends Error {
+    constructor() {
+        super("行事曆已滿，請先刪除舊行程");
+        this.name = "CalendarFullError";
+        this.code = "calendar/full";
+    }
+}
+
 export const addCalendarEvents = async (events) => {
     const user = auth.currentUser;
     if (!user) throw new Error("請先登入才能新增行程");
@@ -339,6 +352,7 @@ export const addCalendarEvents = async (events) => {
         const docSnap = await tx.get(docRef);
         const existingEvents = docSnap.exists() ? (docSnap.data().events || []) : [];
         const updatedEvents = [...existingEvents, ...newEvents];
+        if (updatedEvents.length > CALENDAR_EVENT_LIMIT) throw new CalendarFullError();
 
         if (docSnap.exists()) {
             tx.update(docRef, { events: updatedEvents });

@@ -261,6 +261,94 @@ class RecordingListTest(TestCase):
         self.assertEqual(data["results"][0]["id"], "rec1")
 
 
+class RecordingApproveTest(TestCase):
+    """稽核 BE5-01：只有後端核准過的錄音才會被前端當成其他學習者的參考音。"""
+
+    def setUp(self):
+        self.client = Client()
+
+    def _setup_recording(self, mock_client_fn, data=None):
+        recordings_col = FakeCollection()
+        rec_ref = recordings_col.set_document(
+            "rec1", data if data is not None else {"word": "abas", "uid": "u1", "score": 99},
+        )
+        tribe_ref = FakeDocRef()
+        tribe_ref._subcollections["recordings"] = recordings_col
+        pronunciations = FakeCollection()
+        pronunciations._doc_refs["tayal"] = tribe_ref
+        mock_client_fn.return_value = _build_client(collections={"pronunciations": pronunciations})
+        return rec_ref
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_approve_sets_flag_and_writes_audit_log(self, mock_client_fn):
+        rec_ref = self._setup_recording(mock_client_fn)
+        with _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/moderation/recordings/tayal/rec1/approve/', headers)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["approved"])
+        rec_ref.update.assert_called_once_with({"approved": True})
+        self.assertEqual(AuditLog.objects.filter(action="approve_recording").count(), 1)
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_can_unapprove(self, mock_client_fn):
+        rec_ref = self._setup_recording(mock_client_fn, {"word": "abas", "uid": "u1", "score": 99, "approved": True})
+        with _as_role(OWNER) as headers:
+            resp = _post_json(
+                self.client, '/adminapi/moderation/recordings/tayal/rec1/approve/', headers, {"approved": False},
+            )
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.json()["approved"])
+        rec_ref.update.assert_called_once_with({"approved": False})
+        self.assertEqual(AuditLog.objects.filter(action="unapprove_recording").count(), 1)
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_non_boolean_approved_is_rejected(self, mock_client_fn):
+        rec_ref = self._setup_recording(mock_client_fn)
+        with _as_role(OWNER) as headers:
+            resp = _post_json(
+                self.client, '/adminapi/moderation/recordings/tayal/rec1/approve/', headers, {"approved": "yes"},
+            )
+        self.assertEqual(resp.status_code, 400)
+        rec_ref.update.assert_not_called()
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_404_for_missing_recording(self, mock_client_fn):
+        mock_client_fn.return_value = _build_client(collections={"pronunciations": FakeCollection()})
+        with _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/moderation/recordings/tayal/missing/approve/', headers)
+        self.assertEqual(resp.status_code, 404)
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_only_moderators_can_approve(self, mock_client_fn):
+        rec_ref = self._setup_recording(mock_client_fn)
+        with _as_role(ANALYST) as headers:
+            resp = _post_json(self.client, '/adminapi/moderation/recordings/tayal/rec1/approve/', headers)
+        self.assertEqual(resp.status_code, 403)
+        rec_ref.update.assert_not_called()
+
+    def test_get_is_not_allowed(self):
+        with _as_role(OWNER) as headers:
+            resp = self.client.get('/adminapi/moderation/recordings/tayal/rec1/approve/', **headers)
+        self.assertEqual(resp.status_code, 405)
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_list_reports_approved_flag(self, mock_client_fn):
+        recordings = FakeCollection(docs=[
+            _fake_snapshot("rec1", {"word": "abas", "approved": True}, path="pronunciations/tayal/recordings/rec1"),
+            _fake_snapshot("rec2", {"word": "kolong", "approved": "true"}, path="pronunciations/tayal/recordings/rec2"),
+            _fake_snapshot("rec3", {"word": "lokah"}, path="pronunciations/tayal/recordings/rec3"),
+        ])
+        mock_client_fn.return_value = _build_client(
+            collections={"reports": FakeCollection(docs=[])}, groups={"recordings": recordings},
+        )
+        with _as_role(OWNER) as headers:
+            resp = self.client.get('/adminapi/moderation/recordings/', **headers)
+        by_id = {item["id"]: item for item in resp.json()["results"]}
+        self.assertTrue(by_id["rec1"]["approved"])
+        self.assertFalse(by_id["rec2"]["approved"])  # 只有布林 true 才算核准
+        self.assertFalse(by_id["rec3"]["approved"])
+
+
 class RecordingDeleteTest(TestCase):
     def setUp(self):
         self.client = Client()

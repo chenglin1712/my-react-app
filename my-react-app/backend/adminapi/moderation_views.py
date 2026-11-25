@@ -185,6 +185,8 @@ def recording_list(request):
             "score": data.get("score"),
             "storage_url": data.get("storageUrl"),
             "created_at": data.get("createdAt"),
+            # 是否已核准當成其他學習者的「參考音」（稽核 BE5-01）；舊資料沒有這個欄位，視為未核准
+            "approved": data.get("approved") is True,
             "report_count": report_counts.get(("recording", doc.id), 0),
         })
 
@@ -199,6 +201,53 @@ def recording_list(request):
 
     page_items, total, page, page_size = _paginate(items, request)
     return JsonResponse({"results": page_items, "count": total, "page": page, "page_size": page_size})
+
+
+@csrf_exempt
+def recording_approve(request, tribe, recording_id):
+    """核准（或取消核准）一筆錄音當成其他學習者的「參考音」（稽核 BE5-01）。
+
+    錄音的 score 是使用者自己帶的，規則只能檢查它是 0–100 的整數，不能證明是真的比對結果，所以
+    偽造高分的錄音不能直接被當成參考音。approved 欄位只有這裡（Admin SDK）能寫——firestore.rules
+    的欄位白名單讓使用者建立錄音時不能帶 approved，也沒有任何更新規則。前端 fetchReferenceUrls
+    只取 approved == true 的錄音。
+
+    POST，body: {"approved": true | false}，沒帶就是 true。
+    """
+    if request.method != "POST":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+    decoded, err_resp = require_role(request, MODERATORS)
+    if err_resp:
+        return err_resp
+    limited_resp = _rate_limited_response(request, decoded, group="recording_approve", rate="60/m", method="POST")
+    if limited_resp:
+        return limited_resp
+
+    body, body_err = _parse_json_body(request)
+    if body_err:
+        return body_err
+    approved = body.get("approved", True)
+    if not isinstance(approved, bool):
+        return JsonResponse({"detail": "approved 必須是布林值"}, status=400)
+
+    client = firebase_ops.get_firestore_client()
+    doc_ref = (
+        client.collection("pronunciations").document(tribe)
+        .collection("recordings").document(recording_id)
+    )
+    snapshot = doc_ref.get()
+    if not snapshot.exists:
+        return JsonResponse({"detail": "找不到這筆錄音"}, status=404)
+
+    before = snapshot.to_dict() or {}
+    doc_ref.update({"approved": approved})
+
+    _safe_write_audit_log(
+        request, decoded, "approve_recording" if approved else "unapprove_recording",
+        f"{tribe}/{recording_id}", target_type="pronunciation_recording",
+        before={"approved": before.get("approved") is True}, after={"approved": approved},
+    )
+    return JsonResponse({"tribe": tribe, "id": recording_id, "approved": approved})
 
 
 @csrf_exempt

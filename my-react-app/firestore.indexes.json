@@ -48,6 +48,15 @@
         { "fieldPath": "word", "order": "ASCENDING" },
         { "fieldPath": "score", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "recordings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "word", "order": "ASCENDING" },
+        { "fieldPath": "approved", "order": "ASCENDING" },
+        { "fieldPath": "score", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

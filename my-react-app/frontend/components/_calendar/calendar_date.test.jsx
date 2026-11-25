@@ -1,7 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import UserCalendar from './calendar_date';
-import { getCalendar, addCalendarEvent, deleteCalendarEvent } from '../../src/userServives/uploadDb';
+import { getCalendar, addCalendarEvent, deleteCalendarEvent, CalendarFullError } from '../../src/userServives/uploadDb';
 
 const mockNavigate = vi.fn();
 const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
@@ -15,6 +15,8 @@ vi.mock('../../src/userServives/uploadDb', () => ({
   getCalendar: vi.fn(),
   addCalendarEvent: vi.fn(),
   deleteCalendarEvent: vi.fn(),
+  CALENDAR_EVENT_LIMIT: 500,
+  CalendarFullError: class CalendarFullError extends Error {},
 }));
 
 // react-calendar 本身的月曆邏輯不是這裡要測的重點，這幾個測試也都只用預設
@@ -65,6 +67,24 @@ describe('UserCalendar (calendar_date) — FR-3 補齊的行事曆持久化', ()
     fireEvent.click(screen.getByRole('button', { name: '新增' }));
 
     await waitFor(() => expect(screen.getByText('新增行程失敗，請稍後再試。')).toBeInTheDocument());
+  });
+
+  // 稽核 FE6-12：規則限制最多 500 筆，滿了之後重試永遠不會成功，要明確告訴使用者原因
+  test('行事曆已滿時顯示具體原因，不是泛用的「請稍後再試」', async () => {
+    addCalendarEvent.mockRejectedValueOnce(new CalendarFullError('full'));
+    render(<UserCalendar />);
+    await waitFor(() => expect(getCalendar).toHaveBeenCalledTimes(1));
+
+    fireEvent.change(screen.getByLabelText('新增事件'), { target: { value: '看醫生' } });
+    fireEvent.click(screen.getByRole('button', { name: '新增' }));
+
+    await waitFor(() => expect(screen.getByText('行事曆已滿 500 筆，請先刪除舊行程後再新增。')).toBeInTheDocument());
+  });
+
+  test('事件名稱輸入框有長度上限（100 字）', async () => {
+    render(<UserCalendar />);
+    await waitFor(() => expect(getCalendar).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText('新增事件')).toHaveAttribute('maxlength', '100');
   });
 
   test('空白事件不會呼叫 addCalendarEvent', async () => {

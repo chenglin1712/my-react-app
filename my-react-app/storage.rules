@@ -11,10 +11,16 @@ rules_version = '2';
 // 已知限制（啟用前請知悉）：
 // 1. 規則用 file.matches() 把 request.auth.uid 串進正規表示式，沒有跳脫特殊字元。Firebase
 //    自動產生的 UID 只含英數字，不受影響；但若系統用 Admin SDK 建立「自訂 UID」，且其中含有
-//    . + * [ ] 這類正規表示式字元，該帳號就能上傳不以自己完整 UID 結尾的檔名。啟用前請確認
-//    沒有自訂 UID，或把路徑改成 .../{uid}/{uuid}.webm，直接比較路徑萬用字元與 request.auth.uid。
+//    . + * [ ] 這類正規表示式字元，該帳號就能上傳不以自己完整 UID 結尾的檔名。create／delete 規則
+//    現在都先要求 UID 只含英數字、底線與連字號（與 firestore.rules 的錄音規則一致），含其他字元的
+//    自訂 UID 一律拒絕；要支援自訂 UID，請把路徑改成 .../{uid}/{uuid}.webm 直接比較路徑萬用字元。
 // 2. contentType 只是上傳者宣告的 metadata，不能證明內容真的是 WebM。後端取用錄音時
 //    （fastAPI/routes/pronunciation）會經 ffmpeg 轉檔、解碼，這才是內容驗證的那一層。
+// 3. 規則無法限制「每人上傳幾個檔案」，也無法讓上傳與 Firestore 紀錄綁在一起（稽核 BE5-06）：登入者
+//    可以在合法路徑下反覆上傳最大 10 MB 的檔案，上傳後不寫 Firestore 紀錄就成了沒有任何文件指向的
+//    孤兒檔，後台審核與帳號刪除都找不到。部署前請先在 Console 確認現行規則不是全開，並規劃：
+//    (a) 定期清掃沒有 Firestore 紀錄的 pronunciations/ 物件；(b) 長期改由後端簽發上傳網址或代傳。
+//    本人撤回分享時，前端會依序刪除 Storage 物件與 Firestore 文件（稽核 FE5-05）。
 //
 // 專案裡唯一由「前端直接」寫入 Storage 的地方是發音遊戲的使用者錄音
 // （frontend/components/_game/pronunciation/pronunciationRecordingService.js 的
@@ -32,19 +38,27 @@ service firebase.storage {
     match /pronunciations/{tribe}/{word}/{file} {
       allow read: if request.auth != null;
 
-      // 只能建立、不能覆寫或刪除（resource == null 明確要求物件尚不存在，不依賴
+      // 只能建立、不能覆寫（本人只能刪除自己的檔案，見下方 delete；resource == null 明確要求物件尚不存在，不依賴
       // create／update 的判定細節）：檔名結尾必須是本人 uid（uploadRecording 的命名
       // 慣例），擋掉用別人的 uid 上傳；型別與大小上限比照後端 PRONUNCIATION_MAX_AUDIO_MB
       // 的 10 MB。
       allow create: if request.auth != null
         && resource == null
         && tribe in ['tayal', 'amis', 'bunun', 'kavalan', 'paiwan']
+        && request.auth.uid.matches('[A-Za-z0-9_-]+')
         && file.matches('.+_' + request.auth.uid + '[.]webm')
         && request.resource.contentType == 'audio/webm'
         && request.resource.size > 0
         && request.resource.size <= 10 * 1024 * 1024;
 
-      allow update, delete: if false;
+      allow update: if false;
+
+      // 本人可以刪除自己的錄音檔（稽核 FE5-05：撤回已分享的錄音）。條件與 create 對稱：檔名結尾必須是
+      // 本人 uid，所以只能刪自己上傳的檔案；審核下架與帳號刪除由後端 Admin SDK 處理，不受規則限制。
+      allow delete: if request.auth != null
+        && tribe in ['tayal', 'amis', 'bunun', 'kavalan', 'paiwan']
+        && request.auth.uid.matches('[A-Za-z0-9_-]+')
+        && file.matches('.+_' + request.auth.uid + '[.]webm');
     }
 
     // 其餘路徑一律拒絕（預設拒絕）。

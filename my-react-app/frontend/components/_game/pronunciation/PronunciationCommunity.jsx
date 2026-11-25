@@ -9,6 +9,9 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../../../firebase';
 import { REPORT_ALREADY_OR_DENIED, submitReport } from '../../../src/userServives/reportService';
+import { useAuth } from '../../../src/userServives/authContext';
+import { confirmAction } from '@components/ui/ConfirmDialog';
+import { deleteOwnRecording } from './pronunciationRecordingService';
 import { useDialog } from '@hooks/useDialog';
 import '../../../static/css/_game/pronunciation-community.css';
 
@@ -33,7 +36,10 @@ const formatCreatedAt = (timestamp) => {
 };
 
 export default function PronunciationCommunity({ tribe }) {
+  const { userData } = useAuth();
+  const myUid = userData?.uid ?? null;
   const [recordings, setRecordings] = useState([]);
+  const [deletingId, setDeletingId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -128,6 +134,32 @@ export default function PronunciationCommunity({ tribe }) {
     setReportTarget(null);
     setReason('inappropriate');
     setReasonText('');
+  };
+
+  // 撤回自己分享的錄音（稽核 FE5-05）：分享是使用者自己同意的動作，同意之後要有撤回途徑。
+  const removeMyRecording = async (recording) => {
+    if (deletingId) return;
+    const confirmed = await confirmAction({
+      title: '刪除我分享的錄音',
+      message: `確定要刪除你分享的「${recording.word}」錄音嗎？刪除後其他人就聽不到了，無法復原。`,
+      confirmLabel: '刪除',
+      cancelLabel: '先不要',
+    });
+    if (!confirmed) return;
+
+    setDeletingId(recording.id);
+    setError('');
+    setSuccessMessage('');
+    try {
+      await deleteOwnRecording(tribe, recording.id, recording.storageUrl);
+      setRecordings((prev) => prev.filter((item) => item.id !== recording.id));
+      setSuccessMessage('已刪除你分享的錄音');
+    } catch (err) {
+      console.error('刪除自己的錄音失敗:', err?.message);
+      setError('刪除錄音失敗，請稍後再試。');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const submitRecordingReport = async (event) => {
@@ -254,13 +286,24 @@ export default function PronunciationCommunity({ tribe }) {
                       </time>
                     </div>
 
-                    <button
-                      type="button"
-                      className="pron-community-report-button"
-                      onClick={() => openReportModal(recording)}
-                    >
-                      檢舉
-                    </button>
+                    {myUid && recording.uid === myUid ? (
+                      <button
+                        type="button"
+                        className="pron-community-report-button"
+                        disabled={deletingId === recording.id}
+                        onClick={() => removeMyRecording(recording)}
+                      >
+                        {deletingId === recording.id ? '刪除中…' : '刪除我的錄音'}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="pron-community-report-button"
+                        onClick={() => openReportModal(recording)}
+                      >
+                        檢舉
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>

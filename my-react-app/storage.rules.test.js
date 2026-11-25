@@ -69,14 +69,43 @@ describe('pronunciations 錄音上傳規則', () => {
     await assertFails(uploadBytes(ref(alice, 'anything/else.webm'), audio(), webm));
   });
 
-  test('已存在的錄音不能被覆寫或刪除（刪除只由後端 Admin SDK 執行）', async () => {
+  test('已存在的錄音不能被覆寫，連本人也一樣', async () => {
     const p = path('tayal', 'alice');
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await uploadBytes(ref(ctx.storage(), p), audio(), webm);
     });
     const alice = testEnv.authenticatedContext('alice').storage();
     await assertFails(uploadBytes(ref(alice, p), audio(), webm));
-    await assertFails(deleteObject(ref(alice, p)));
+  });
+
+  // 稽核 FE5-05：分享是使用者自己同意的動作，同意之後要有撤回途徑。
+  test('本人可以刪除自己的錄音檔（撤回分享）', async () => {
+    const p = path('tayal', 'alice');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await uploadBytes(ref(ctx.storage(), p), audio(), webm);
+    });
+    const alice = testEnv.authenticatedContext('alice').storage();
+    await assertSucceeds(deleteObject(ref(alice, p)));
+  });
+
+  test('不能刪除別人的錄音檔，未登入也不能刪', async () => {
+    const p = path('tayal', 'alice');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await uploadBytes(ref(ctx.storage(), p), audio(), webm);
+    });
+    await assertFails(deleteObject(ref(testEnv.authenticatedContext('mallory').storage(), p)));
+    await assertFails(deleteObject(ref(testEnv.unauthenticatedContext().storage(), p)));
+  });
+
+  // uid 會被串進規則的正規式；含 . 之類字元的自訂 uid 一律拒絕（storage.rules 已知限制 1）。
+  test('uid 含正規式特殊字元（例如 a.b）時，上傳與刪除都被拒絕', async () => {
+    const dotted = testEnv.authenticatedContext('a.b').storage();
+    await assertFails(uploadBytes(ref(dotted, path('tayal', 'a.b')), audio(), webm));
+    const p = path('tayal', 'a.b');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await uploadBytes(ref(ctx.storage(), p), audio(), webm);
+    });
+    await assertFails(deleteObject(ref(dotted, p)));
   });
 
   test('登入者可讀、未登入不能讀', async () => {

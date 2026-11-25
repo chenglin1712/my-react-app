@@ -98,6 +98,7 @@ urlpatterns = [
     path('moderation/notes/', moderation_views.note_list),
     path('moderation/notes/<str:note_id>/toggle-deleted/', moderation_views.note_toggle_deleted),
     path('moderation/recordings/', moderation_views.recording_list),
+    path('moderation/recordings/<str:tribe>/<str:recording_id>/approve/', moderation_views.recording_approve),
     path('moderation/recordings/<str:tribe>/<str:recording_id>/', moderation_views.recording_delete),
 
     path('reports/', moderation_views.report_list),
