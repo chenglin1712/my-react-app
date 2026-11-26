@@ -37,20 +37,20 @@ describe('WordCardWithImg 翻牌卡（E-7，P2-67）', () => {
 
   test('P6-1：愛心用共用的收藏鈕（aria-pressed 表示狀態），顏色走 token，沒有寫死的色碼', () => {
     const { container, rerender } = renderCard(false, { isFavorited: true });
-    const heart = screen.getByRole('button', { name: '取消收藏' });
+    const heart = screen.getByRole('button', { name: /^收藏「/ });
     expect(heart).toHaveAttribute('aria-pressed', 'true');
     expect(heart).toHaveClass('yy-fav-btn', 'favorite-btn', 'is-favorited');
     expect(container.innerHTML).not.toMatch(/#[0-9a-fA-F]{3,6}\b/);
     rerender(<div />);
     renderCard(false, { isFavorited: false });
-    expect(screen.getByRole('button', { name: '加入收藏' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: /^收藏「/ })).toHaveAttribute('aria-pressed', 'false');
   });
 
   test('P6-1：點愛心只切換收藏，不會順便把卡片翻面', () => {
     const toggleExpand = vi.fn();
     const toggleFavorite = vi.fn();
     renderCard(false, { toggleExpand, toggleFavorite });
-    fireEvent.click(screen.getByRole('button', { name: '加入收藏' }));
+    fireEvent.click(screen.getByRole('button', { name: /^收藏「/ }));
     expect(toggleFavorite).toHaveBeenCalledTimes(1);
     expect(toggleExpand).not.toHaveBeenCalled();
   });
@@ -83,7 +83,7 @@ describe('WordCardWithImg 翻牌卡（E-7，P2-67）', () => {
   test('P6-1：焦點在愛心上按 Enter／空白，不會冒泡成「翻面」（只有卡片本身有焦點時才翻）', () => {
     const toggleExpand = vi.fn();
     const { container } = renderCard(false, { toggleExpand });
-    const heart = screen.getByRole('button', { name: '加入收藏' });
+    const heart = screen.getByRole('button', { name: /^收藏「/ });
     fireEvent.keyDown(heart, { key: 'Enter' });
     fireEvent.keyDown(heart, { key: ' ' });
     expect(toggleExpand).not.toHaveBeenCalled();

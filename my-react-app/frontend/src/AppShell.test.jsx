@@ -35,6 +35,27 @@ describe('AppShell AI 助手 overlay', () => {
   });
 });
 
+describe('後台外殼判斷（稽核 FE1-24）', () => {
+  afterEach(() => {
+    routerState.pathname = '/';
+  });
+
+  test.each(['/admin', '/admin/', '/admin/users/3', '/admin-login', '/admin-login/'])('%s 是後台：不顯示前台導覽列與主要內容區', (path) => {
+    routerState.pathname = path;
+    render(<AppShell />);
+    expect(screen.getByText('routes')).toBeInTheDocument();
+    expect(screen.queryByText('open-bot')).not.toBeInTheDocument();
+    expect(document.querySelector('#main-content')).toBeNull();
+  });
+
+  test.each(['/administrator', '/adminxyz', '/admin-old', '/admin-login-old'])('%s 不是後台：照常有前台導覽列（落到 404 時才有路可回）', (path) => {
+    routerState.pathname = path;
+    render(<AppShell />);
+    expect(screen.getByText('open-bot')).toBeInTheDocument();
+    expect(document.querySelector('#main-content')).toContainElement(screen.getByText('routes'));
+  });
+});
+
 describe('AppShell 啟動鈕', () => {
   afterEach(() => {
     authState.userData = null;

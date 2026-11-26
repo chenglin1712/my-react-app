@@ -28,6 +28,13 @@ describe('NoteModal', () => {
     expect(screen.getByRole('button', { name: '關閉' })).toBeInTheDocument();
   });
 
+  test('FE6-17：彈窗讚鈕不用 aria-label 蓋掉可見文字，名稱與可見文字一致並有 aria-pressed', () => {
+    renderModal({ iLike: true });
+    const btn = screen.getByRole('button', { name: '收回讚' });
+    expect(btn).not.toHaveAttribute('aria-label');
+    expect(btn).toHaveAttribute('aria-pressed', 'true');
+  });
+
   test('FE6-19：一般（未下架）筆記沒有下架說明，按讚與檢舉照常顯示', () => {
     renderModal();
     expect(screen.queryByText(/已下架/)).not.toBeInTheDocument();

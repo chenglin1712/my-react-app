@@ -17,9 +17,11 @@ vi.mock('lottie-web', () => ({
   default: { loadAnimation: vi.fn(() => ({ destroy: vi.fn() })) },
 }));
 
-const fillPasswords = (current, next) => {
+// 稽核 FE1-17：多了「確認新密碼」欄；未指定時填與新密碼相同的值
+const fillPasswords = (current, next, confirm = next) => {
   fireEvent.change(screen.getByLabelText('目前密碼'), { target: { value: current } });
   fireEvent.change(screen.getByLabelText('新密碼'), { target: { value: next } });
+  fireEvent.change(screen.getByLabelText('確認新密碼'), { target: { value: confirm } });
 };
 
 describe('ResetPassword (resetPassword)', () => {
@@ -86,7 +88,8 @@ describe('ResetPassword (resetPassword)', () => {
     expect(screen.getByRole('button', { name: '變更密碼' })).not.toBeDisabled();
   });
 
-  test('變更成功後顯示成功動畫，並在延遲後返回上一頁', async () => {
+  // 稽核 FE1-17、FE1-21：原本 navigate(-1)，直接開 /reset 時會離開網站，與「將移至編輯資料頁面」也不符；改為明確回 /edit
+  test('變更成功後顯示成功提示，並在延遲後回到編輯資料頁', async () => {
     vi.useFakeTimers();
     try {
       const fakeUser = { email: 'a@b.com' };
@@ -110,7 +113,7 @@ describe('ResetPassword (resetPassword)', () => {
         vi.advanceTimersByTime(1500);
       });
 
-      expect(mockNavigate).toHaveBeenCalledWith(-1);
+      expect(mockNavigate).toHaveBeenCalledWith('/edit');
     } finally {
       vi.useRealTimers();
     }
@@ -133,6 +136,47 @@ describe('ResetPassword (resetPassword)', () => {
     expect(EmailAuthProvider.credential).toHaveBeenCalledWith('late@b.com', 'oldpass');
     expect(updatePassword).toHaveBeenCalledWith({ email: 'late@b.com' }, 'newpass123');
     getAuth.mockReset();
+  });
+
+  test('稽核 FE1-17：新密碼太短或兩次不一致時不呼叫 Firebase，錯誤綁在欄位上並移動焦點', async () => {
+    getAuth.mockReturnValue({ currentUser: { email: 'a@b.com' } });
+    render(<ResetPassword />);
+
+    fillPasswords('oldpass', '123', '123');
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '變更密碼' })); });
+    expect(screen.getByLabelText('新密碼')).toHaveAccessibleDescription('新密碼至少需要 6 個字元');
+    expect(screen.getByLabelText('新密碼')).toHaveFocus();
+
+    fillPasswords('oldpass', 'newpass123', 'newpass124');
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '變更密碼' })); });
+    expect(screen.getByLabelText('確認新密碼')).toHaveAccessibleDescription('兩次輸入的新密碼不一致');
+    expect(screen.getByLabelText('確認新密碼')).toHaveFocus();
+    expect(reauthenticateWithCredential).not.toHaveBeenCalled();
+    expect(updatePassword).not.toHaveBeenCalled();
+  });
+
+  test('稽核 FE1-17：欄位有 autocomplete，密碼管理工具分得出目前密碼與新密碼', () => {
+    render(<ResetPassword />);
+    expect(screen.getByLabelText('目前密碼')).toHaveAttribute('autocomplete', 'current-password');
+    expect(screen.getByLabelText('新密碼')).toHaveAttribute('autocomplete', 'new-password');
+    expect(screen.getByLabelText('確認新密碼')).toHaveAttribute('autocomplete', 'new-password');
+  });
+
+  test('稽核 FE1-17：成功提示是有名稱的對話框（報讀器讀得到），「立即前往」直接回編輯資料頁', async () => {
+    const fakeUser = { email: 'a@b.com' };
+    getAuth.mockReturnValue({ currentUser: fakeUser });
+    reauthenticateWithCredential.mockResolvedValueOnce();
+    updatePassword.mockResolvedValueOnce();
+    render(<ResetPassword />);
+    fillPasswords('oldpass', 'newpass123');
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '變更密碼' }));
+      for (let i = 0; i < 10; i += 1) await Promise.resolve();
+    });
+    const dialog = screen.getByRole('dialog', { name: '密碼更新成功！將移至編輯資料頁面' });
+    expect(dialog).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '立即前往' }));
+    expect(mockNavigate).toHaveBeenCalledWith('/edit');
   });
 
   test('點選取消會導向上一頁', () => {

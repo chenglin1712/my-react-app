@@ -1,4 +1,5 @@
-import { useRef, useState, lazy, Suspense } from 'react';
+import { useRef, useState, Suspense } from 'react';
+import { lazyWithRetry } from './lazyWithRetry';
 import { useLocation } from 'react-router-dom';
 import AppRoutes from './route';
 import { RouteTransitionProvider } from './routeTransition';
@@ -14,7 +15,8 @@ import ToastHost from '../components/ui/ToastHost';
 import ErrorBoundary from './errorBoundary';
 import { HomeNavSlotProvider } from './homeNavSlot';
 
-const OverlayAdvice = lazy(() => import('../components/_quiz/bot'));
+// 稽核 FE1-05：部署後舊 chunk 不存在時自動重新載入一次，與 route.jsx 的頁面相同
+const OverlayAdvice = lazyWithRetry(() => import('../components/_quiz/bot'));
 
 const BOT_ERROR_STYLE = {
   position: 'fixed', left: '50%', bottom: 'var(--bot-bottom, 24px)', transform: 'translateX(-50%)',
@@ -25,9 +27,16 @@ const BOT_ERROR_STYLE = {
 // /admin/* 是獨立的全螢幕後台介面，AdminLayout 自己就有一整套側邊欄／頂欄
 // （見 frontend/src/_admin/layout/AdminLayout.jsx），疊在前台的 Navbar／
 // Footer 底下只會變成兩層 header 疊在一起、後台可用高度被前台導覽列吃掉。
+// 稽核 FE1-24：原本用 startsWith('/admin')，/administrator、/adminxyz 這類打錯的網址也被當成後台，
+// 落到 404 時沒有導覽列可回、分頁標題也停在上一頁。改成只認 /admin、/admin/… 與後台登入頁。
+function isAdminShellPath(pathname) {
+  // /admin-login/（結尾斜線）路由一樣會對應到後台登入頁，也要算進來，否則會疊上前台導覽列
+  return pathname === '/admin' || pathname.startsWith('/admin/') || pathname === '/admin-login' || pathname === '/admin-login/';
+}
+
 export default function AppShell() {
   const { pathname } = useLocation();
-  const isAdmin = pathname.startsWith('/admin');
+  const isAdmin = isAdminShellPath(pathname);
   const [isBotOpen, setIsBotOpen] = useState(false);
   // 聊天視窗第一次開啟後就保持掛載（收合只是隱藏），對話內容與進行中的請求不會因為收合而遺失
   const [botMounted, setBotMounted] = useState(false);

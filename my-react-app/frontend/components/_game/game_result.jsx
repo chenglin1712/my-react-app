@@ -22,7 +22,7 @@ const GameResultCard = ({ word, isCorrect, toggleFavorite, isFavorited }) => {
                         <p className="user-answer">你的答案：{word.user_word || '無答案'}</p>
                         <p className="correct-answer">正確答案：{word.correct_word}</p>
                         <div className='result-likebtn'>
-                            <LikeButton isFavorited={isFavorited} onToggle={() => toggleFavorite(word.correct_word, WORD_FAVORITES_CATEGORY_ID)} />
+                            <LikeButton word={word.correct_word} isFavorited={isFavorited} onToggle={() => toggleFavorite(word.correct_word, WORD_FAVORITES_CATEGORY_ID)} />
                         </div>
                     </div>
                 </div>
@@ -31,13 +31,14 @@ const GameResultCard = ({ word, isCorrect, toggleFavorite, isFavorited }) => {
     );
 };
 
-const LikeButton = ({ isFavorited, onToggle }) => {
+// FE1-10：名稱帶詞彙且不隨狀態改變，狀態交給 aria-pressed（與共用的 FavoriteButton 一致）
+const LikeButton = ({ word, isFavorited, onToggle }) => {
     return (
         <button
             type="button"
             onClick={onToggle}
             className='result-likebtn'
-            aria-label={isFavorited ? "取消收藏" : "加入收藏"}
+            aria-label={`收藏「${word}」`}
             aria-pressed={isFavorited}
         >
             {isFavorited ? '♥' : '♡'}

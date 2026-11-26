@@ -9,11 +9,23 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         const unsubscribe = authChanges((user) => {
+            // FE1-03／FE1-15：登入後的角色更新、個人資料重讀與補建，authChanges 傳的是 (prev) => next，
+            // 要套在目前狀態上（保留期間的樂觀更新），不是整包換掉。這些都發生在登入事件之後，
+            // 不代表「第一次的登入狀態已經確定」，所以不動 loading。
+            if (typeof user === "function") {
+                setUserData(user);
+                return;
+            }
             // 註冊時帳號建立的登入事件早於使用者資料寫入 Firestore，這次事件讀到的是「沒有資料」；
             // 註冊表單寫入後會用 updateUserData 補上完整資料，這裡不能讓較晚才回來的舊讀取把它蓋回空的。
-            setUserData((prev) => (
-                user && !user.firestoreData && prev?.uid === user.uid && prev.firestoreData ? prev : user
-            ));
+            // FE1-03：讀取失敗時給的降級資料（profileUnavailable）同理，不能蓋掉同一位使用者已有的完整資料。
+            setUserData((prev) => {
+                const sameUserWithData = user && prev?.uid === user.uid && prev.firestoreData
+                    && !prev.firestoreData.profileUnavailable;
+                if (sameUserWithData && !user.firestoreData) return prev;
+                if (sameUserWithData && user.firestoreData?.profileUnavailable) return { ...prev, role: user.role };
+                return user;
+            });
             setLoading(false);
         });
 

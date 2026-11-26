@@ -10,7 +10,7 @@ const formatClock = (ms) => new Date(ms).toLocaleTimeString("zh-TW", { hour: "2-
  * 兩者分開講，離線或同步失敗時才不會出現「已儲存」跟「同步失敗」互相打架。
  * 時間是固定的時間點，不會自己跳動，所以不需要計時器，報讀器也不會被一直打斷。
  */
-export default function SaveStatus({ isDirty, storageError, lastSavedAt, cloudSyncOn }) {
+export default function SaveStatus({ isDirty, storageError, lastSavedAt, cloudSyncOn, cloudSyncUnknown = false }) {
   let state = "idle";
   let label;
   if (storageError) {
@@ -31,7 +31,12 @@ export default function SaveStatus({ isDirty, storageError, lastSavedAt, cloudSy
       <p className="note-save__status" data-state={state}>
         <span role="status">{label}</span>
       </p>
-      {!cloudSyncOn && (
+      {/* 稽核 FE6-18：還沒查到同步功能是否開啟（離線或查詢失敗）時，不能說「只存在這台裝置」，
+          那是把「沒查到」誤報成「確定沒開」；改成如實說明並告知會自動重試 */}
+      {!cloudSyncOn && cloudSyncUnknown && (
+        <p className="note-save__hint">目前無法確認雲端同步是否可用，筆記先存在這台裝置；連上網路後會自動再確認。</p>
+      )}
+      {!cloudSyncOn && !cloudSyncUnknown && (
         <p className="note-save__hint">筆記只存在這台裝置的瀏覽器，換裝置或清除瀏覽器資料後就看不到了。</p>
       )}
     </div>

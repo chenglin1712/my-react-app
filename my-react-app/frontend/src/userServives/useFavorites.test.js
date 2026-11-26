@@ -2,15 +2,16 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useFavorites } from './useFavorites';
 import { useAuth } from './authContext';
-import { toggleFavoriteWord } from './userServive';
+import { setFavoriteWord } from './userServive';
 import { readActivity } from '../_learning/studyStreak';
 
 vi.mock('./authContext', () => ({
   useAuth: vi.fn(),
 }));
 vi.mock('./userServive', () => ({
-  toggleFavoriteWord: vi.fn(),
+  setFavoriteWord: vi.fn(),
 }));
+vi.mock('@utils/announce', () => ({ announce: vi.fn() }));
 
 describe('useFavorites', () => {
   const updateUserData = vi.fn();
@@ -27,7 +28,7 @@ describe('useFavorites', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
-    toggleFavoriteWord.mockResolvedValue(undefined);
+    setFavoriteWord.mockResolvedValue(undefined);
   });
 
   test('isFavorited reflects current favorites content', () => {
@@ -45,7 +46,7 @@ describe('useFavorites', () => {
       await result.current.toggleFavorite('tayal-word-b', 1);
     });
 
-    expect(toggleFavoriteWord).toHaveBeenCalledWith('user-1', 'tayal-word-b', 1);
+    expect(setFavoriteWord).toHaveBeenCalledWith('user-1', 'tayal-word-b', 1, true);
     expect(updateUserData).toHaveBeenCalledTimes(1);
     const updated = updateUserData.mock.calls[0][0];
     const category1 = updated.firestoreData.favorites.find((f) => f.id === 1);
@@ -73,13 +74,13 @@ describe('useFavorites', () => {
       await result.current.toggleFavorite('tayal-word-a', 1);
     });
 
-    expect(toggleFavoriteWord).not.toHaveBeenCalled();
+    expect(setFavoriteWord).not.toHaveBeenCalled();
     expect(updateUserData).not.toHaveBeenCalled();
   });
 
   test('toggleFavorite reverts the optimistic update and surfaces an error when the write fails', async () => {
     useAuth.mockReturnValue({ userData: baseUser, updateUserData });
-    toggleFavoriteWord.mockRejectedValue(new Error('network down'));
+    setFavoriteWord.mockRejectedValue(new Error('network down'));
     const { result } = renderHook(() => useFavorites());
 
     await act(async () => {
@@ -101,7 +102,7 @@ describe('useFavorites 的復原提示與還原（P2-7）', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    toggleFavoriteWord.mockResolvedValue(undefined);
+    setFavoriteWord.mockResolvedValue(undefined);
     const { resetToasts } = await import('../../utils/toast');
     resetToasts();
   });
@@ -121,9 +122,9 @@ describe('useFavorites 的復原提示與還原（P2-7）', () => {
     expect(list[0].message).toBe('已加入收藏：b');
     expect(list[0].actionLabel).toBe('復原');
     rerender(); // 真實的 AuthContext 更新後會重新 render，這裡的假 context 要手動模擬
-    toggleFavoriteWord.mockClear();
+    setFavoriteWord.mockClear();
     await act(async () => { await list[0].onAction(); });
-    expect(toggleFavoriteWord).toHaveBeenCalledWith('u', 'b', 1);
+    expect(setFavoriteWord).toHaveBeenCalledWith('u', 'b', 1, false);
     expect(current.firestoreData.favorites[0].content).toEqual(['a']); // 回到原來的狀態
     expect(list).toHaveLength(1); // 復原本身沒有再附提示
   });
@@ -144,7 +145,7 @@ describe('useFavorites 的復原提示與還原（P2-7）', () => {
     subscribeToasts((t) => { list = t; });
     const latest = { uid: 'u', firestoreData: { favorites: [{ id: 1, content: ['a', 'b', 'c'] }, { id: 2, content: ['z'] }] } };
     useAuth.mockReturnValue({ userData: latest, updateUserData });
-    toggleFavoriteWord.mockRejectedValue(new Error('down'));
+    setFavoriteWord.mockRejectedValue(new Error('down'));
     const { result } = renderHook(() => useFavorites());
     // 目前最新的收藏已含 b、c（c 是別處剛加的）；使用者切換 b（取消），寫入失敗 → 只把 b 加回，c 保留
     await act(async () => { await result.current.toggleFavorite('b', 1, { undo: true }); });
@@ -158,7 +159,7 @@ describe('useFavorites 的復原提示與還原（P2-7）', () => {
   test('離線時的失敗訊息說明是沒有網路', async () => {
     const spy = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     useAuth.mockReturnValue({ userData: user(), updateUserData });
-    toggleFavoriteWord.mockRejectedValue(new Error('offline'));
+    setFavoriteWord.mockRejectedValue(new Error('offline'));
     const { result } = renderHook(() => useFavorites());
     await act(async () => { await result.current.toggleFavorite('b', 1); });
     expect(result.current.error).toBe('目前沒有網路，「b」的收藏沒有存下來，已還原。');
@@ -173,8 +174,8 @@ describe('useFavorites 連點（P2-7）', () => {
     useAuth.mockImplementation(() => ({ userData: current, updateUserData: update }));
     const order = [];
     let release;
-    toggleFavoriteWord.mockImplementationOnce(() => new Promise((res) => { order.push('start1'); release = () => { order.push('end1'); res(); }; }));
-    toggleFavoriteWord.mockImplementationOnce(async () => { order.push('start2'); });
+    setFavoriteWord.mockImplementationOnce(() => new Promise((res) => { order.push('start1'); release = () => { order.push('end1'); res(); }; }));
+    setFavoriteWord.mockImplementationOnce(async () => { order.push('start2'); });
     const { result } = renderHook(() => useFavorites());
     let p1; let p2;
     await act(async () => {
@@ -193,8 +194,8 @@ describe('useFavorites 連點（P2-7）', () => {
     const baseUser = { uid: 'user-1', firestoreData: { favorites: [{ id: 1, content: ['tayal-word-a'] }] } };
     useAuth.mockReturnValue({ userData: baseUser, updateUserData });
     localStorage.clear();
-    toggleFavoriteWord.mockReset();
-    toggleFavoriteWord.mockResolvedValue(undefined);
+    setFavoriteWord.mockReset();
+    setFavoriteWord.mockResolvedValue(undefined);
     const { result } = renderHook(() => useFavorites());
     const total = () => Object.values(readActivity('user-1')).reduce((a, b) => a + b, 0);
 
@@ -204,7 +205,7 @@ describe('useFavorites 連點（P2-7）', () => {
     await act(async () => { await result.current.toggleFavorite('tayal-word-a', 1); });   // 取消收藏
     expect(total()).toBe(1);
 
-    toggleFavoriteWord.mockRejectedValueOnce(new Error('network'));
+    setFavoriteWord.mockRejectedValueOnce(new Error('network'));
     await act(async () => { await result.current.toggleFavorite('tayal-word-c', 1); });
     expect(total()).toBe(1);
   });
@@ -221,7 +222,7 @@ describe('useFavorites 換人與登出（F10）', () => {
     resetToasts();
     // 寫入卡住，由測試決定何時失敗
     slowWrite = new Promise((_, rej) => { reject = rej; });
-    toggleFavoriteWord.mockReturnValue(slowWrite);
+    setFavoriteWord.mockReturnValue(slowWrite);
   });
 
   test('寫入很慢，期間換成另一位使用者：失敗後不動新使用者的收藏，也不顯示錯誤', async () => {
@@ -280,8 +281,8 @@ describe('useFavorites 換人與登出（F10）', () => {
     const { subscribeToasts } = await import('../../utils/toast');
     let list = [];
     subscribeToasts((t) => { list = t; });
-    toggleFavoriteWord.mockReset();
-    toggleFavoriteWord.mockResolvedValue(undefined);
+    setFavoriteWord.mockReset();
+    setFavoriteWord.mockResolvedValue(undefined);
 
     let current = makeUser('A', ['a']);
     const update = vi.fn((u) => { current = u; });
@@ -292,12 +293,131 @@ describe('useFavorites 換人與登出（F10）', () => {
 
     current = makeUser('B', ['w']);                                // 換成 B，B 剛好也收藏了 w
     rerender();
-    toggleFavoriteWord.mockClear();
+    setFavoriteWord.mockClear();
     update.mockClear();
     await act(async () => { await list[0].onAction(); });
 
-    expect(toggleFavoriteWord).not.toHaveBeenCalled();
+    expect(setFavoriteWord).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
     expect(current.firestoreData.favorites[0].content).toEqual(['w']);
+  });
+});
+
+describe('useFavorites 跨分頁的明確目標狀態（FE1-01）', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    setFavoriteWord.mockReset();
+    const { resetToasts } = await import('../../utils/toast');
+    resetToasts();
+  });
+
+  // 模擬伺服器端的 users/{uid}：setFavoriteWord 依目標狀態設定（與 userServive 的實作同語意）
+  const makeServer = (content) => {
+    const server = { content: [...content] };
+    setFavoriteWord.mockImplementation(async (_uid, word, _cat, shouldContain) => {
+      const has = server.content.includes(word);
+      if (has === shouldContain) return;
+      server.content = shouldContain ? [...server.content, word] : server.content.filter((w) => w !== word);
+    });
+    return server;
+  };
+
+  test('B 分頁資料過期（A 分頁已加入 w）：在 B 按加入，伺服器仍是已收藏，畫面也是已收藏', async () => {
+    const server = makeServer(['w']);                       // A 分頁已經加入
+    let current = { uid: 'u', firestoreData: { favorites: [{ id: 1, content: [] }] } }; // B 分頁的舊資料
+    useAuth.mockImplementation(() => ({ userData: current, updateUserData: (u) => { current = u; } }));
+    const { result } = renderHook(() => useFavorites());
+
+    await act(async () => { await result.current.toggleFavorite('w', 1); });
+
+    expect(setFavoriteWord).toHaveBeenCalledWith('u', 'w', 1, true);
+    expect(server.content).toEqual(['w']);                  // 原本的「切換」會在這裡把它刪掉
+    expect(current.firestoreData.favorites[0].content).toEqual(['w']);
+  });
+
+  test('兩個分頁交錯：A 取消、B（還以為已收藏）也取消，結果是不收藏而不是又加回來', async () => {
+    const server = makeServer(['w']);
+    const tab = (content) => {
+      let state = { uid: 'u', firestoreData: { favorites: [{ id: 1, content }] } };
+      return { get: () => state, set: (u) => { state = u; } };
+    };
+    const a = tab(['w']);
+    const b = tab(['w']);
+    useAuth.mockImplementation(() => ({ userData: a.get(), updateUserData: a.set }));
+    const hookA = renderHook(() => useFavorites());
+    await act(async () => { await hookA.result.current.toggleFavorite('w', 1); });
+    expect(server.content).toEqual([]);
+
+    useAuth.mockImplementation(() => ({ userData: b.get(), updateUserData: b.set }));
+    const hookB = renderHook(() => useFavorites());
+    await act(async () => { await hookB.result.current.toggleFavorite('w', 1); });
+    expect(setFavoriteWord).toHaveBeenLastCalledWith('u', 'w', 1, false);
+    expect(server.content).toEqual([]);
+    expect(b.get().firestoreData.favorites[0].content).toEqual([]);
+  });
+
+  test('寫入失敗：畫面還原成送出前的狀態，伺服器沒有被改動', async () => {
+    const server = makeServer([]);
+    setFavoriteWord.mockRejectedValueOnce(new Error('down'));
+    let current = { uid: 'u', firestoreData: { favorites: [{ id: 1, content: [] }] } };
+    useAuth.mockImplementation(() => ({ userData: current, updateUserData: (u) => { current = u; } }));
+    const { result } = renderHook(() => useFavorites());
+    await act(async () => { await result.current.toggleFavorite('w', 1); });
+    expect(current.firestoreData.favorites[0].content).toEqual([]);
+    expect(server.content).toEqual([]);
+    expect(result.current.error).toBe('收藏失敗，「w」已還原，請稍後再試。');
+  });
+
+  test('復原提示：按復原送出的是明確的「取消」，伺服器與畫面都回到原狀', async () => {
+    const { subscribeToasts } = await import('../../utils/toast');
+    let list = [];
+    subscribeToasts((t) => { list = t; });
+    const server = makeServer([]);
+    let current = { uid: 'u', firestoreData: { favorites: [{ id: 1, content: [] }] } };
+    useAuth.mockImplementation(() => ({ userData: current, updateUserData: (u) => { current = u; } }));
+    const { result, rerender } = renderHook(() => useFavorites());
+    await act(async () => { await result.current.toggleFavorite('w', 1, { undo: true }); });
+    expect(server.content).toEqual(['w']);
+    rerender();
+    await act(async () => { await list[0].onAction(); });
+    expect(setFavoriteWord).toHaveBeenLastCalledWith('u', 'w', 1, false);
+    expect(server.content).toEqual([]);
+    expect(current.firestoreData.favorites[0].content).toEqual([]);
+  });
+});
+
+describe('useFavorites 公告不重複（FE1-19）', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    setFavoriteWord.mockReset();
+    setFavoriteWord.mockResolvedValue(undefined);
+    const { resetToasts } = await import('../../utils/toast');
+    resetToasts();
+  });
+
+  test('有復原提示時只由提示框播報，不另外公告；沒有提示時照常公告', async () => {
+    const { announce } = await import('@utils/announce');
+    const { subscribeToasts } = await import('../../utils/toast');
+    let list = [];
+    subscribeToasts((t) => { list = t; });
+    useAuth.mockReturnValue({ userData: { uid: 'u', firestoreData: { favorites: [{ id: 1, content: [] }] } }, updateUserData: vi.fn() });
+    const { result } = renderHook(() => useFavorites());
+
+    await act(async () => { await result.current.toggleFavorite('w', 1, { undo: true }); });
+    expect(list[0].message).toBe('已加入收藏：w');
+    expect(announce).not.toHaveBeenCalled();
+
+    await act(async () => { await result.current.toggleFavorite('v', 1); });
+    expect(announce).toHaveBeenCalledWith('已加入收藏：v');
+  });
+
+  test('寫入失敗的錯誤訊息仍用 assertive 公告（失敗時提示框已收回）', async () => {
+    const { announce } = await import('@utils/announce');
+    setFavoriteWord.mockRejectedValueOnce(new Error('down'));
+    useAuth.mockReturnValue({ userData: { uid: 'u', firestoreData: { favorites: [{ id: 1, content: [] }] } }, updateUserData: vi.fn() });
+    const { result } = renderHook(() => useFavorites());
+    await act(async () => { await result.current.toggleFavorite('w', 1, { undo: true }); });
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(announce).toHaveBeenCalledWith('收藏失敗，「w」已還原，請稍後再試。', { assertive: true });
   });
 });

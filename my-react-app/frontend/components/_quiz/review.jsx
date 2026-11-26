@@ -32,37 +32,91 @@ const Review = () => {
         return () => { cancelled = true; };
     }, []);
 
-    useEffect(() => {
-        const fetchSituations = async () => {
-            try {
-                const data = await getCurrentSituation();
-                setSituations(data);
-            } catch (err) {
-                console.error("載入失敗：", err);
-            } finally {
-                setLoading(false);
-            }
-        };
+    // 稽核 FE1-11／FE4-10：答題紀錄改成伺服器端分頁，一次讀一頁（getCurrentSituation 預設 20 筆），
+    // 需要更早的紀錄再按「載入更早的紀錄」接著讀，不再一進頁面就讀出全部並逐筆查題目。
+    const [cursor, setCursor] = useState(null);
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [listError, setListError] = useState("");
+    // 稽核 FE4-20：按「查看測驗」到題目讀回來之前顯示讀取中；讀不到時給提示，不再沒反應
+    const [viewingId, setViewingId] = useState(null);
+    const [viewError, setViewError] = useState("");
 
-        fetchSituations();
+    const loadPage = async (fromCursor) => {
+        setListError("");
+        try {
+            const page = await getCurrentSituation({ cursor: fromCursor });
+            setSituations((prev) => (fromCursor ? [...prev, ...page.situations] : page.situations));
+            setCursor(page.cursor);
+            setHasMore(page.hasMore);
+        } catch (err) {
+            console.error("載入失敗：", err);
+            setListError("答題紀錄載入失敗，請稍後再試。");
+        }
+    };
+
+    useEffect(() => {
+        let cancelled = false;
+        getCurrentSituation()
+            .then((page) => {
+                if (cancelled) return;
+                setSituations(page.situations);
+                setCursor(page.cursor);
+                setHasMore(page.hasMore);
+            })
+            .catch((err) => {
+                if (cancelled) return;
+                console.error("載入失敗：", err);
+                setListError("答題紀錄載入失敗，請稍後再試。");
+            })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
     }, []);
 
-    const viewAttempt = async (situation) => {
-        const quizData = await getQuizById(situation.quizId);
-        if (quizData) {
-            setSelectedQuiz({
-                ...quizData,
-                // 測驗題目本身的建立時間（createdAt）跟使用者這一次作答的時間
-                // （answeredAt）是兩件事，複習頁要顯示的是後者。
-                attemptId: situation.id,      // 單題講解用：伺服器靠它讀這次作答（路線圖 #22）
-                answeredAt: situation.answeredAt,
-                results: situation.results,
-                answers: situation.answers,
-                correctAnswers: situation.correctAnswers,
-            });
-            setSelectedQuestionIdx(null);
-            setNavIndex(0);
+    const loadMore = async () => {
+        if (loadingMore) return;
+        setLoadingMore(true);
+        await loadPage(cursor);
+        setLoadingMore(false);
+    };
+
+    // 第一頁就失敗：重讀第一頁；「載入更早的紀錄」失敗：從同一個 cursor 再讀一次
+    const retryList = async () => {
+        if (situations.length > 0) {
+            await loadMore();
+            return;
         }
+        setLoading(true);
+        await loadPage(null);
+        setLoading(false);
+    };
+
+    const viewAttempt = async (situation) => {
+        if (viewingId) return;
+        setViewError("");
+        setViewingId(situation.id);
+        let quizData;
+        try {
+            quizData = await getQuizById(situation.quizId);
+        } finally {
+            setViewingId(null);
+        }
+        if (!quizData) {
+            setViewError("這次測驗的題目已無法讀取（可能已被移除或網路不穩），請稍後再試。");
+            return;
+        }
+        setSelectedQuiz({
+            ...quizData,
+            // 測驗題目本身的建立時間（createdAt）跟使用者這一次作答的時間
+            // （answeredAt）是兩件事，複習頁要顯示的是後者。
+            attemptId: situation.id,      // 單題講解用：伺服器靠它讀這次作答（路線圖 #22）
+            answeredAt: situation.answeredAt,
+            results: situation.results,
+            answers: situation.answers,
+            correctAnswers: situation.correctAnswers,
+        });
+        setSelectedQuestionIdx(null);
+        setNavIndex(0);
     };
 
     // 返回測驗紀錄列表時，右側題目詳情也要一併清掉，不然會殘留上一份測驗
@@ -115,11 +169,25 @@ const Review = () => {
 
                     <div className="review-table-container">
                         {!selectedQuiz ? (
-                            <ReviewAttemptList
-                                situations={situations}
-                                loading={loading}
-                                onViewAttempt={viewAttempt}
-                            />
+                            <>
+                                {viewError && <p className="review-error-text" role="alert">{viewError}</p>}
+                                {listError && !loading && (
+                                    <div className="review-error-text" role="alert">
+                                        <p className="mb-1">{listError}</p>
+                                        <button type="button" className="view-btn" onClick={retryList}>重試</button>
+                                    </div>
+                                )}
+                                <ReviewAttemptList
+                                    situations={situations}
+                                    loading={loading}
+                                    error={!!listError && situations.length === 0}
+                                    onViewAttempt={viewAttempt}
+                                    viewingId={viewingId}
+                                    hasMore={hasMore && !listError}
+                                    loadingMore={loadingMore}
+                                    onLoadMore={loadMore}
+                                />
+                            </>
                         ) : (
                             <div className="review-quiz-detail">
                                 {navIndex === 0 && (

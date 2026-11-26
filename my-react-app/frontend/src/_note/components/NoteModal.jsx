@@ -104,13 +104,15 @@ export default function NoteModal({ note, canLike, iLike, canDelete, onToggleLik
           </p>
         )}
 
+        {/* 稽核 FE6-17：不再用 aria-label 蓋掉可見文字（語音控制唸可見的「收回讚」要對得到），
+            狀態改由 aria-pressed 表達 */}
         {canLike && note.deleted !== true && (
           <div style={{ marginBottom: "0.75rem" }}>
             <button
               type="button"
               className={`ns-like-btn ${iLike ? "is-liked" : ""}`}
               onClick={(e) => onToggleLike(e, note, "modal")}
-              aria-label={iLike ? "取消按讚" : "按讚"}
+              aria-pressed={iLike}
             >
               {iLike ? "收回讚" : "按讚"}
             </button>

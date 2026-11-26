@@ -24,6 +24,8 @@ export default function NoteCard({ note, isMyTab, isMine, iLike, onOpen, onToggl
   }, [note.preview, note.image]);
   // 記下「哪一個網址載入失敗」而不是單一布林值：同一張卡片換成另一則筆記或新封面時，不會被舊的失敗狀態卡住
   const [failedSrc, setFailedSrc] = useState(null);
+  const title = note.pages?.[0]?.title?.trim() || "（未命名）";
+  const likes = note.likes ?? 0;
   const coverFailed = coverSrc !== null && failedSrc === coverSrc;
   return (
     <article className="ns-card">
@@ -48,7 +50,9 @@ export default function NoteCard({ note, isMyTab, isMine, iLike, onOpen, onToggl
             <div className="ns-time">{timeAgo(note.createdAt)}</div>
           </div>
 
-          {isMyTab && isMine && <span className="ns-edit">編輯</span>}
+          {/* 稽核 FE6-15：分享後的筆記沒有編輯功能（詳情只有刪除、檢舉、關閉），標「編輯」會誤導；
+              改成中性的狀態標籤。沿用 ns-edit 樣式 */}
+          {isMyTab && isMine && <span className="ns-edit">我的分享</span>}
         </div>
 
         <div className="ns-card-body">
@@ -63,14 +67,24 @@ export default function NoteCard({ note, isMyTab, isMine, iLike, onOpen, onToggl
       </button>
 
       <div className="ns-like-row">
-        <button
-          type="button"
-          className={`ns-like-btn ${iLike ? "is-liked" : ""}`}
-          onClick={(e) => onToggleLike(e, note, "card")}
-          aria-label={iLike ? "取消按讚" : "按讚"}
-        >
-          <Heart size={20} fill={iLike ? "red" : "none"} /><span>{note.likes ?? 0}</span>
-        </button>
+        {isMine ? (
+          // 稽核 FE6-17：自己的筆記不能按讚（toggleLike 直接 return、沒有回饋），所以只顯示讚數、不渲染按鈕
+          <span className="ns-like-btn is-own" role="img" aria-label={`${title}，目前 ${likes} 個讚`}>
+            <Heart size={20} aria-hidden="true" /><span aria-hidden="true">{likes}</span>
+          </span>
+        ) : (
+          // 稽核 FE6-17：aria-label 原本只有「按讚」，會蓋掉內部的讚數、也不知道是哪一則；
+          // 現在帶筆記標題與讚數（含可見的數字，語音控制唸得到），狀態用 aria-pressed
+          <button
+            type="button"
+            className={`ns-like-btn ${iLike ? "is-liked" : ""}`}
+            onClick={(e) => onToggleLike(e, note, "card")}
+            aria-pressed={iLike}
+            aria-label={`${iLike ? "收回讚" : "按讚"}：${title}，目前 ${likes} 個讚`}
+          >
+            <Heart size={20} fill={iLike ? "red" : "none"} aria-hidden="true" /><span aria-hidden="true">{likes}</span>
+          </button>
+        )}
       </div>
     </article>
   );

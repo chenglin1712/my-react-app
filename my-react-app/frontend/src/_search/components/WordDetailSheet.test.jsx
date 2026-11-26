@@ -57,7 +57,7 @@ describe('WordDetailSheet', () => {
     render(<WordDetailSheet {...base} detail={detail} onClose={onClose} toggleFavorite={toggleFavorite} playAudio={playAudio} isFavorited />);
     fireEvent.click(screen.getByRole('button', { name: '關閉詳情' }));
     expect(onClose).toHaveBeenCalled();
-    const fav = screen.getByRole('button', { name: '取消收藏' });
+    const fav = screen.getByRole('button', { name: /^收藏「/ });
     expect(fav).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(fav);
     expect(toggleFavorite).toHaveBeenCalledWith('babaw');
@@ -250,7 +250,7 @@ describe('詳情內的空白鍵播放（P2-9）', () => {
     const playAudio = vi.fn();
     const { rerender } = render(<WordDetailSheet {...props} playAudio={playAudio} detail={withAudio} />);
     const dialog = screen.getByRole('dialog');
-    fireEvent.keyDown(screen.getByRole('button', { name: '加入收藏' }), { key: ' ', code: 'Space' });
+    fireEvent.keyDown(screen.getByRole('button', { name: /^收藏「/ }), { key: ' ', code: 'Space' });
     const input = document.createElement('input');
     dialog.appendChild(input);
     fireEvent.keyDown(input, { key: ' ', code: 'Space' });

@@ -19,6 +19,8 @@ vi.mock('../../../firebase', () => ({
 vi.mock('lottie-web', () => ({
   default: { loadAnimation: vi.fn(() => ({ destroy: vi.fn() })) },
 }));
+// 稽核 FE1-09：LoginForm 現在讀 AuthContext（等它換成剛登入的帳號才導頁）；這裡的 signIn 多半沒有 uid，不用等
+vi.mock('../../src/userServives/authContext', () => ({ useAuth: () => ({ userData: null }) }));
 
 describe('LoginForm（後台專用登入頁版本）', () => {
   beforeEach(() => {

@@ -39,4 +39,35 @@ describe('ReviewAttemptList（回歸測試：同一份測驗被作答兩次以�
     rerender(<ReviewAttemptList situations={[]} loading={false} onViewAttempt={vi.fn()} />);
     expect(screen.getByText('尚無答題紀錄')).toBeInTheDocument();
   });
+
+  test('讀取失敗（error）時不顯示「尚無答題紀錄」', () => {
+    render(<ReviewAttemptList situations={[]} loading={false} error onViewAttempt={vi.fn()} />);
+    expect(screen.queryByText('尚無答題紀錄')).not.toBeInTheDocument();
+    expect(screen.getByText('無法載入答題紀錄')).toBeInTheDocument();
+  });
+
+  // 稽核 FE1-11／FE4-10
+  test('hasMore 時顯示「載入更早的紀錄」，按下呼叫 onLoadMore；載入中停用', async () => {
+    const onLoadMore = vi.fn();
+    const user = userEvent.setup();
+    const situation = { id: 's1', quizType: '初級', answeredAt: makeTimestamp('2026-01-01'), results: [] };
+    const { rerender } = render(<ReviewAttemptList situations={[situation]} loading={false} onViewAttempt={vi.fn()} hasMore onLoadMore={onLoadMore} />);
+
+    await user.click(screen.getByRole('button', { name: '載入更早的紀錄' }));
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+
+    rerender(<ReviewAttemptList situations={[situation]} loading={false} onViewAttempt={vi.fn()} hasMore loadingMore onLoadMore={onLoadMore} />);
+    expect(screen.getByRole('button', { name: '載入中…' })).toBeDisabled();
+  });
+
+  // 稽核 FE4-20
+  test('viewingId 那一筆顯示「讀取中…」，所有「查看測驗」暫時停用', () => {
+    const situations = [
+      { id: 's1', quizType: '初級', answeredAt: makeTimestamp('2026-01-01'), results: [] },
+      { id: 's2', quizType: '中級', answeredAt: makeTimestamp('2026-01-02'), results: [] },
+    ];
+    render(<ReviewAttemptList situations={situations} loading={false} onViewAttempt={vi.fn()} viewingId="s1" />);
+    expect(screen.getByRole('button', { name: '讀取中…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '查看測驗' })).toBeDisabled();
+  });
 });

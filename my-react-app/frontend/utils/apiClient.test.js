@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import axios from 'axios';
-import { apiGet, apiPost, apiPatch, apiPut, apiDelete, trackEvent, ApiError, DEFAULT_TIMEOUT_MS } from './apiClient';
+import { apiGet, apiPost, apiPatch, apiPut, apiDelete, trackEvent, ApiError, DEFAULT_TIMEOUT_MS, resetForcedTokenRefreshForTest } from './apiClient';
 import { forgetGuestToken, resetGuestTokenForTests } from './guestToken';
 
 vi.mock('axios');
@@ -500,5 +500,77 @@ describe('訪客憑證標頭（S-01：只有標示 guest 的未登入請求才�
     expect(headers.Authorization).toBe('Bearer tok');
     expect(headers['X-Guest-Token']).toBeUndefined();
     expect(issued).toHaveLength(0);
+  });
+});
+
+describe('FE1-16：取 token 失敗時轉成中文 ApiError', () => {
+  beforeEach(() => {
+    axios.get.mockReset();
+    axios.post.mockReset();
+    axios.isCancel.mockReturnValue(false);
+  });
+  afterEach(() => { vi.useRealTimers(); });
+
+  const firebaseError = (code) => Object.assign(new Error(`Firebase: Error (${code}).`), { code, name: 'FirebaseError' });
+
+  test('網路中斷：訊息是「連線失敗」，不送出請求', async () => {
+    mockCurrentUser = { getIdToken: vi.fn().mockRejectedValue(firebaseError('auth/network-request-failed')) };
+    const err = await apiPost('/x', {}).catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.message).toBe('連線失敗，請檢查網路後再試');
+    expect(err.message).not.toContain('Firebase');
+    expect(axios.post).not.toHaveBeenCalled();
+  });
+
+  test('token 被撤銷等其他錯誤：訊息是「登入已過期」；apiGet 不會白白重試', async () => {
+    const getIdToken = vi.fn().mockRejectedValue(firebaseError('auth/user-token-expired'));
+    mockCurrentUser = { getIdToken };
+    const err = await apiGet('/x').catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.message).toBe('登入已過期，請重新登入');
+    expect(getIdToken).toHaveBeenCalledTimes(1);
+    expect(axios.get).not.toHaveBeenCalled();
+  });
+
+  test('apiGet 遇到連線問題的 token 失敗仍照常重試一次', async () => {
+    vi.useFakeTimers();
+    const getIdToken = vi.fn()
+      .mockRejectedValueOnce(firebaseError('auth/network-request-failed'))
+      .mockResolvedValue('tok');
+    mockCurrentUser = { getIdToken };
+    axios.get.mockResolvedValue({ data: { ok: 1 } });
+    const call = apiGet('/x');
+    await vi.runAllTimersAsync();
+    await expect(call).resolves.toEqual({ ok: 1 });
+    expect(getIdToken).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('FE1-15：後端回 403 時強制刷新 token（有節流）', () => {
+  beforeEach(() => {
+    axios.post.mockReset();
+    axios.isCancel.mockReturnValue(false);
+    resetForcedTokenRefreshForTest();
+  });
+
+  test('403 觸發一次 getIdToken(true)；一分鐘內再遇到 403 不再刷新；其他狀態不刷新', async () => {
+    const getIdToken = vi.fn().mockResolvedValue('tok');
+    mockCurrentUser = { getIdToken };
+    axios.post.mockRejectedValue({ response: { status: 403, data: { detail: '沒有權限' } } });
+    await expect(apiPost('/x', {})).rejects.toThrow('沒有權限');
+    await Promise.resolve();
+    expect(getIdToken).toHaveBeenCalledWith(true);
+    const forcedCalls = () => getIdToken.mock.calls.filter(([force]) => force === true).length;
+    expect(forcedCalls()).toBe(1);
+
+    await expect(apiPost('/x', {})).rejects.toThrow('沒有權限');
+    await Promise.resolve();
+    expect(forcedCalls()).toBe(1);
+
+    resetForcedTokenRefreshForTest();
+    axios.post.mockRejectedValue({ response: { status: 401, data: { detail: '未登入' } } });
+    await expect(apiPost('/x', {})).rejects.toThrow('未登入');
+    await Promise.resolve();
+    expect(forcedCalls()).toBe(1);
   });
 });

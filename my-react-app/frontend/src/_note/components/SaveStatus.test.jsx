@@ -45,6 +45,12 @@ describe('SaveStatus（D-5）', () => {
     expect(screen.queryByText(/^已儲存/)).not.toBeInTheDocument();
   });
 
+  test('FE6-18：還沒確認同步旗標（離線或查詢失敗）時，不說「只存在這台裝置的瀏覽器」', () => {
+    render(<SaveStatus {...base} cloudSyncUnknown />);
+    expect(screen.queryByText(/只存在這台裝置/)).not.toBeInTheDocument();
+    expect(screen.getByText(/目前無法確認雲端同步是否可用/)).toBeInTheDocument();
+  });
+
   test('寫入這台裝置失敗：如實說明沒有儲存，不顯示「已儲存」，即使之前儲存過', () => {
     render(<SaveStatus {...base} lastSavedAt={NOW} storageError="空間不足" />);
     expect(screen.getByRole('status')).toHaveTextContent('沒有儲存到這台裝置');

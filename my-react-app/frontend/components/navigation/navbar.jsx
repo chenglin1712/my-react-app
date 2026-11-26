@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { Menu, X } from "lucide-react";
 import { House, TextSearch, Camera, Gamepad2, BookOpenCheck, NotebookPen, User, ChevronDown, Languages, Heart, Ellipsis } from "lucide-react";
 import "../../static/css/navigation/Navbar.css"
-import { NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../src/userServives/authContext"
 import AvatarImg from "../../static/assets/_auth/avatar.webp"
 import UserSidebar from "./userSidebar"
@@ -74,6 +74,10 @@ const TAB_ITEMS = TAB_IDS.map((id) => MENU_ITEMS.find((item) => item.id === id))
 // activePrefix 的項目就用 route 本身當 prefix。比對子路由用 `${prefix}/`
 // 而不是單純 startsWith(prefix)，避免 /game 誤判到未來可能出現的
 // /game-old 這類同前綴但不同功能的路由。桌面版／手機版共用同一份規則。
+//
+// 稽核 FE1-20：主選單項目（桌面、手機選單、tab bar）改用 Link，active class 與 aria-current 一律依這個函式決定。
+// NavLink 只有在「它自己」判斷為 active（路徑相同或子路徑）時才輸出 aria-current，傳進去的值在其他情況會被丟掉：
+// 測驗連到 /quiz/select，在 /quiz/tayal 等頁只有視覺上的 active，報讀器卻不知道目前在測驗。
 function isRouteActive(item, pathname) {
   const prefix = item.activePrefix || item.route;
   return (
@@ -100,6 +104,9 @@ const Navbar = ({ onOpenBot }) => {
   const moreTabRef = useRef(null);
 
   const isLoggedIn = userData != null && userData.firestoreData != null;
+  // 稽核 FE1-02：登出（含 token 失效、其他分頁登出這類被動登出）後把側欄狀態歸零，
+  // 否則下次登入時側欄會以開啟狀態出現、焦點陷阱與捲動鎖跟著啟用。在 render 中依前一個狀態調整，不另開 effect。
+  if (!isLoggedIn && isUserOpen) setIsUserOpen(false);
   const userName = userData?.firestoreData?.name;
   // 可見文字是使用者名稱，aria-label 必須以它開頭，語音控制說出名稱才能啟動（WCAG 2.5.3，審查項 P2-2）
   const userButtonLabel = userName ? `${userName}，開啟個人資料選單` : "開啟個人資料選單";
@@ -143,14 +150,15 @@ const Navbar = ({ onOpenBot }) => {
         {/* 導覽列 */}
         <div className="menu">
           {MENU_ITEMS.map((item) => (
-            <NavLink
+            <Link
               key={item.id}
               to={item.route}
               className={`menu-item ${isRouteActive(item, location.pathname) ? "active" : ""}`}
+              aria-current={isRouteActive(item, location.pathname) ? "page" : undefined}
             >
               {item.icon}
               <span>{item.label}</span>
-            </NavLink>
+            </Link>
           ))}
 
           {/* 筆記下拉選單：觸發鈕與選單項目是兄弟節點（<button> 裡面不能再放連結，
@@ -183,7 +191,8 @@ const Navbar = ({ onOpenBot }) => {
               </span>
             </button>
             <div id="note-dropdown-menu" className={`dropdown-content ${isDropdownOpen ? "active" : ""}`}>
-              <NavLink className="dropdown-item" to="/note" onClick={() => setIsDropdownOpen(false)}>
+              {/* 稽核 FE1-20：加 end，在 /note/share 時「寫筆記」才不會跟「筆記分享區」一起被標成目前頁 */}
+              <NavLink className="dropdown-item" to="/note" end onClick={() => setIsDropdownOpen(false)}>
                 寫筆記
               </NavLink>
               <NavLink className="dropdown-item" to="/note/share" onClick={() => setIsDropdownOpen(false)}>
@@ -257,17 +266,18 @@ const Navbar = ({ onOpenBot }) => {
         )}
 
         {MENU_ITEMS.map((item) => (
-          <NavLink
+          <Link
             key={item.id}
             to={item.route}
-            className={`menu-mobile-item${TAB_IDS.includes(item.id) ? " menu-mobile-item--in-tabbar" : ""}`}
+            className={`menu-mobile-item${TAB_IDS.includes(item.id) ? " menu-mobile-item--in-tabbar" : ""}${isRouteActive(item, location.pathname) ? " active" : ""}`}
+            aria-current={isRouteActive(item, location.pathname) ? "page" : undefined}
             onClick={() => setIsOpen(false)}
           >
             {item.icon}
             <span>{item.label}</span>
-          </NavLink>
+          </Link>
         ))}
-        <NavLink className="menu-mobile-item" to="/note" onClick={() => setIsOpen(false)}>
+        <NavLink className="menu-mobile-item" to="/note" end onClick={() => setIsOpen(false)}>
           <NotebookPen size={20} />
           <span>寫筆記</span>
         </NavLink>
@@ -297,7 +307,7 @@ const Navbar = ({ onOpenBot }) => {
         面板在手機寬度改成貼在 tab bar 上方的底部面板。tab bar 在 <nav> 之外，不受首頁 portal 影響。 */}
     <nav className="yy-tabbar" aria-label="主要分頁">
       {TAB_ITEMS.map((item) => (
-        <NavLink
+        <Link
           key={item.id}
           to={item.route}
           className={`yy-tabbar__item${isRouteActive(item, location.pathname) ? " active" : ""}`}
@@ -306,7 +316,7 @@ const Navbar = ({ onOpenBot }) => {
         >
           {item.icon}
           <span>{item.label}</span>
-        </NavLink>
+        </Link>
       ))}
       <button
         type="button"

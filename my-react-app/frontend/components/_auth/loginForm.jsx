@@ -12,7 +12,9 @@ import { clearAdminSession, markAdminSession } from "../../src/_admin/session/ad
 import { authErrorMessage } from "@utils/firebaseAuthErrors";
 import AuthField from "./AuthField";
 import PasswordField from "./PasswordField";
-import { AUTH_SUCCESS_REDIRECT_MS } from "./authTiming";
+import { AUTH_SUCCESS_REDIRECT_MS, AUTH_SYNC_MAX_WAIT_MS } from "./authTiming";
+import { safeRedirectPath } from "./redirectTarget";
+import { useAuth } from "../../src/userServives/authContext";
 
 // variant 只影響呈現：'admin' 是後台專用登入頁（src/_auth/AdminLoginPage.jsx）用的版本，
 // 標題由頁面自己提供、不顯示註冊入口、成功文案改成進後台。登入函式、next 驗證與導頁邏輯兩種版本完全相同。
@@ -36,18 +38,39 @@ const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }
     // 之後才完成的登入會建立新的導頁計時器，把人從別的頁面拉回來（F11）；所以登入完成後要先確認還在頁面上。
     // 每次掛載都要重設成 true：開發模式的 StrictMode 會先卸載再掛載一次。
     const mountedRef = useRef(false);
+    const authWaitTimeoutRef = useRef(null);
     useEffect(() => {
         mountedRef.current = true;
         return () => {
             mountedRef.current = false;
             clearTimeout(redirectTimeoutRef.current);
+            clearTimeout(authWaitTimeoutRef.current);
         };
     }, []);
-    const redirectTargetRef = useRef("/");
-    // 成功提示出現後本來會等一小段時間才跳頁；按「立即前往」或 Esc 就不用等
+
+    // 稽核 FE1-09：signIn 完成時，全站的 AuthContext 還沒更新（要等 authChanges 讀完 Firestore 個人資料與角色）。
+    // 原本 800ms 後（或按「立即前往」立刻）就導頁：慢網路下 AdminRoute 看到 userData 還是 null 會導回登入頁；
+    // 前台原本是別的帳號時，看到的是舊帳號的角色，被默默導回首頁。
+    // 改成「提示時間到（或按了立即前往）」且「AuthContext 已換成剛登入的帳號」兩個條件都成立才導頁；
+    // AuthContext 一直沒跟上時，最多等 AUTH_SYNC_MAX_WAIT_MS 就照常導頁，不讓人卡在成功提示上。
+    const { userData: authUser } = useAuth();
+    const [redirect, setRedirect] = useState(null); // { target, uid }：登入成功後才有
+    const [waitDone, setWaitDone] = useState(false);
+    const [authWaitExpired, setAuthWaitExpired] = useState(false);
+    const navigatedRef = useRef(false);
+    // credential 沒有 uid（不應發生）時無從比對，不等
+    const authCaughtUp = redirect !== null && (!redirect.uid || authUser?.uid === redirect.uid);
+    useEffect(() => {
+        if (!redirect || !waitDone || navigatedRef.current) return;
+        if (!authCaughtUp && !authWaitExpired) return;
+        navigatedRef.current = true;
+        navigate(redirect.target);
+    }, [redirect, waitDone, authCaughtUp, authWaitExpired, navigate]);
+
+    // 成功提示出現後本來會等一小段時間才跳頁；按「立即前往」或 Esc 就不用等（仍會等登入狀態同步完成）
     const skipWait = () => {
         clearTimeout(redirectTimeoutRef.current);
-        navigate(redirectTargetRef.current);
+        setWaitDone(true);
     };
 
     // 送出後有欄位錯誤時，把焦點移到第一個有問題的欄位（鍵盤與報讀器使用者才知道錯在哪）
@@ -57,25 +80,9 @@ const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }
     }, [attempt]);
 
     // 登入後預設回首頁；只有從「先被要求登入才能進去」的頁面過來（例如
-    // AdminRoute 導去 /login?next=/admin）才會帶 next 參數，登入成功後導回
-    // 原本要去的地方。用瀏覽器原生的 URL 解析器判斷是否為同源站內路徑，
-    // 而不是自己手刻字串規則——單純檢查開頭是不是 "/"、"//" 會漏掉瀏覽器
-    // 自己會正規化的變形，例如 "/\evil.com" 在網址解析時會被當成跟
-    // "//evil.com" 等價的協定相對網址，直接跳到別的網站；用同一套 URL
-    // 解析器（new URL）判斷才不會跟實際的導頁行為有認知落差。
-    const getRedirectTarget = () => {
-        const next = searchParams.get("next");
-        if (!next) return "/";
-        try {
-            const resolved = new URL(next, window.location.origin);
-            if (resolved.origin === window.location.origin) {
-                return resolved.pathname + resolved.search + resolved.hash;
-            }
-        } catch {
-            // next 不是合法的 URL 片段，忽略、走預設值
-        }
-        return "/";
-    };
+    // AdminRoute 導去 /admin-login?next=/admin、登入牆的「前往登入」）才會帶 next 參數，
+    // 登入成功後導回原本要去的地方。next 只接受同源站內路徑（驗證方式見 redirectTarget.js）。
+    const getRedirectTarget = () => safeRedirectPath(searchParams.get("next"));
 
     //使用者登入
     const handleLogin = async (e) => {
@@ -102,11 +109,9 @@ const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }
             // 已經離開這個頁面：登入本身成功了（上面的後台旗標照常處理），但不要再顯示成功畫面或導頁
             if (!mountedRef.current) return;
             setIsLogin(true);
-            const redirectTarget = getRedirectTarget();
-            redirectTargetRef.current = redirectTarget;
-            redirectTimeoutRef.current = setTimeout(() => {
-                navigate(redirectTarget);
-            }, AUTH_SUCCESS_REDIRECT_MS);
+            setRedirect({ target: getRedirectTarget(), uid: credential?.user?.uid });
+            redirectTimeoutRef.current = setTimeout(() => setWaitDone(true), AUTH_SUCCESS_REDIRECT_MS);
+            authWaitTimeoutRef.current = setTimeout(() => setAuthWaitExpired(true), AUTH_SYNC_MAX_WAIT_MS);
         } catch (error) {
             // error.code 只有 Firebase 的錯誤才會有，非 Firebase 的例外（例如網路層
             // 的 TypeError）沒有這個欄位，直接呼叫 .includes() 會在這個 catch 區塊
@@ -129,6 +134,10 @@ const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }
     //載入動畫
     const [isLogin, setIsLogin] = useState(false);
     const animation = useLottieAnimation({ loadAnimationData: loadSuccessAnimation, enabled: isLogin });
+    // 稽核 FE1-21：有 next 時不是去首頁，成功提示要依實際目的地寫
+    const successText = isAdminVariant
+        ? "登入成功！正在確認後台權限"
+        : (redirect && redirect.target !== "/" ? "登入成功！正在回到原本要去的頁面" : "登入成功！您將移至首頁");
 
     return (
         <div className="login-box">
@@ -172,7 +181,7 @@ const LoginForm = ({ onSwitchToRegister, variant = "member", defaultEmail = "" }
                 </p>
             )}
 
-            <SuccessModal show={isLogin} text={isAdminVariant ? "登入成功！正在確認後台權限" : "登入成功！您將移至首頁"} icon={<div ref={animation} />} onClose={skipWait} closeLabel="立即前往" />
+            <SuccessModal show={isLogin} text={successText} icon={<div ref={animation} />} onClose={skipWait} closeLabel="立即前往" />
         </div>
     );
 };

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "./authContext";
-import { toggleFavoriteWord } from "./userServive";
+import { setFavoriteWord } from "./userServive";
 import { announce } from "@utils/announce";
 import { showToast, dismissToast } from "@utils/toast";
 import { recordLearningActivity } from "../_learning/studyStreak";
@@ -22,6 +22,7 @@ const withMembership = (favorites, categoryId, word, shouldContain) => favorites
  * Firestore（toggleFavoriteWord）並立刻更新 context（updateUserData），確保所有
  * 讀取收藏清單的頁面（/search、/favorite、/camera/result、遊戲結果頁）看到同一份、
  * 不會過期的資料，不用各自重新訂閱 Firebase 或各自實作一套切換邏輯。
+ * 寫入用 setFavoriteWord 傳明確的目標狀態（FE1-01），不是讓伺服器端「切換」。
  *
  * isFavorited/toggleFavorite 包 useCallback：消費頁面把它們傳給 React.memo
  * 包裝的卡片元件時，識別度要能跨無關的 re-render 保持穩定，卡片才不會因為
@@ -59,12 +60,15 @@ export function useFavorites() {
             const added = target ?? !has;
             if (added === has) return; // 已經是目標狀態（例如別處剛改過），不重複寫入
 
-            // 愛心圖示的狀態變化螢幕報讀器看不到，用公告補上（審查項 P2-99）
-            announce(added ? `已加入收藏：${word}` : `已取消收藏：${word}`);
+            // 愛心圖示的狀態變化螢幕報讀器看不到，用公告補上（審查項 P2-99）。
+            // FE1-19：有復原提示時不公告——提示框本身是 role=status 的 live region，會念同一句，
+            // 兩邊都播報就會聽到兩次；而且提示框念的那次還帶著「復原」按鈕。
+            const statusMessage = added ? `已加入收藏：${word}` : `已取消收藏：${word}`;
+            if (!opts.undo) announce(statusMessage);
 
             // 樂觀更新：立刻同步 AuthContext，其他頁面不用等 Firestore 寫入完成或
             // 重新訂閱就能看到最新收藏狀態。userRef 也同步更新：連點時第二次要讀到第一次的結果，
-            // 不能等 AuthContext 下一次 render（否則兩次都當成「加入」，後端切換兩次反而變回未收藏）。
+            // 不能等 AuthContext 下一次 render（否則兩次都當成「加入」，第二次按的「取消」就不見了）。
             const optimistic = {
                 ...current,
                 firestoreData: { ...current.firestoreData, favorites: withMembership(currentFavorites, categoryId, word, added) },
@@ -75,16 +79,18 @@ export function useFavorites() {
             // 復原提示：按「復原」就是回到切換前的狀態（不再附提示，避免提示疊提示）
             const toastId = opts.undo
                 ? showToast({
-                    message: added ? `已加入收藏：${word}` : `已取消收藏：${word}`,
+                    message: statusMessage,
                     actionLabel: "復原",
                     onAction: () => run(!added, {}, { uid: current.uid }),
                 })
                 : null;
 
-            // 後端的 toggleFavoriteWord 是「切換」不是「設成」：同一個詞的寫入必須一個接一個送，不能並行
+            // FE1-01：寫入帶明確的目標狀態（added），伺服器端已經是那個狀態就不動，跨分頁／跨裝置資料過期時
+            // 也不會把使用者想加入的詞反而刪掉。同一個詞的寫入仍一個接一個送：並行的話，先按的那次可能
+            // 較晚到伺服器，最後狀態就不是使用者最後按的那個。
             const queueKey = `${categoryId}\u0000${word}`;
             const previous = writeQueueRef.current.get(queueKey) || Promise.resolve();
-            const write = previous.catch(() => {}).then(() => toggleFavoriteWord(current.uid, word, categoryId));
+            const write = previous.catch(() => {}).then(() => setFavoriteWord(current.uid, word, categoryId, added));
             writeQueueRef.current.set(queueKey, write);
             try {
                 await write;

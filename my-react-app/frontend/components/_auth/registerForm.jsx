@@ -1,7 +1,7 @@
 import "../../static/css/_auth/registerForm.css"
 import { User, Mail, CheckCircle, Circle } from "lucide-react"
 import { useEffect, useId, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Alert } from "react-bootstrap";
 import avatarImage from '../../static/assets/_auth/avatar.webp';
 import { registerWithImg } from "../../src/userServives/userServive"
@@ -14,8 +14,13 @@ import { authErrorMessage } from "@utils/firebaseAuthErrors";
 import AuthField from "./AuthField";
 import PasswordField from "./PasswordField";
 import { AUTH_SUCCESS_REDIRECT_MS } from "./authTiming";
+import { safeRedirectPath } from "./redirectTarget";
 
 const MIN_PASSWORD_LENGTH = 6;
+// userServive.jsx 的 ProfileWriteError.code（稽核 FE1-04）。只比對字串，不 import 類別：測試會整個替換 userServive 模組
+const PROFILE_WRITE_FAILED = "app/profile-write-failed";
+// 個人資料是補建出來時，成功提示多一句說明，自動導頁前多等一下讓人讀完（仍可按「立即前往」）
+const BACKFILL_NOTICE_REDIRECT_MS = 4000;
 // 註冊表單原本有一個只有「學生」一個選項的「身分」下拉（審查項 P3-12），移除後
 // 仍沿用同一個預設值寫進使用者資料，後台與個人資料頁的「身分」欄位不受影響。
 const DEFAULT_IDENTITY = "學生";
@@ -47,6 +52,8 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     const [avatarUrl, setAvatarUrl] = useState(null);
 
     const [isRegistered, setIsRegistered] = useState(false);
+    // 稽核 FE1-04：個人資料由預設值補建時要額外說明的文字（一般註冊成功時為空）
+    const [successNotice, setSuccessNotice] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
     const { updateUserData } = useAuth();
@@ -54,9 +61,13 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     useEffect(() => () => clearTimeout(redirectTimeoutRef.current), []);
     // 註冊成功後本來會等一小段時間才跳頁；按「立即前往」或 Esc 就不用等。
     // Firebase 建好帳號時就已經登入了，所以直接去首頁，不用再手動登入一次（審查項 P2-71）。
+    // 稽核 FE1-08：從登入牆的「註冊帳號」過來會帶 next，註冊完成後回到原本要去的功能（只接受站內路徑）。
+    // 註冊成功時下面已用 updateUserData 補上使用者資料，不需要像登入那樣等 AuthContext。
+    const [searchParams] = useSearchParams();
+    const redirectTarget = safeRedirectPath(searchParams.get("next"));
     const skipWait = () => {
         clearTimeout(redirectTimeoutRef.current);
-        navigate("/");
+        navigate(redirectTarget);
     };
 
     // 送出後有欄位錯誤時，把焦點移到第一個有問題的欄位
@@ -97,9 +108,29 @@ const RegisterForm = ({ onSwitchToLogin }) => {
             }
             setIsRegistered(true);
             redirectTimeoutRef.current = setTimeout(() => {
-                navigate("/");
+                navigate(redirectTarget);
             }, AUTH_SUCCESS_REDIRECT_MS);
         } catch (error) {
+            // 稽核 FE1-04：帳號建好但個人資料寫不進去（userServive 的 ProfileWriteError）。
+            // 帳號已刪掉：等同註冊失敗，可以用同一個 Email 再註冊一次；
+            // 帳號沒刪成：帳號其實還在，再按註冊只會得到「電子郵件已註冊」，要告訴使用者直接登入、資料會自動補上。
+            if (error?.code === PROFILE_WRITE_FAILED && !error.accountRemoved && error.backfilledData) {
+                // 帳號沒刪成但已用預設值補建個人資料（userServive 也已通知畫面）：使用者其實已登入、資料也在，
+                // 不該停在註冊表單。改走成功提示流程並說明哪裡要補，提示停久一點讓人讀完，之後照常導向目標頁。
+                setSuccessNotice(error.message || "帳號已建立，但部分個人資料沒有存好，已先用預設值建立，可以到個人資料頁修改名稱與頭像");
+                setIsRegistered(true);
+                redirectTimeoutRef.current = setTimeout(() => {
+                    navigate(redirectTarget);
+                }, BACKFILL_NOTICE_REDIRECT_MS);
+                return;
+            }
+            if (error?.code === PROFILE_WRITE_FAILED) {
+                setErrorMsg(error.accountRemoved
+                    ? "註冊失敗，請稍後再試。帳號沒有建立，可以用同一個電子郵件重新註冊。"
+                    : (error.message || "帳號已建立，但個人資料沒有存好；請直接用這組電子郵件與密碼登入，系統會自動補上資料"));
+                setIsRegistered(false);
+                return;
+            }
             const message = authErrorMessage(error, "註冊失敗，請稍後再試");
             const field = FIELD_BY_ERROR_CODE[error?.code];
             if (field) {
@@ -207,7 +238,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                         )}
                     </p>
                 </form>
-                <SuccessModal show={isRegistered} text="註冊成功！您將移至首頁" icon={<div ref={animation} />} onClose={skipWait} closeLabel="立即前往" />
+                <SuccessModal show={isRegistered} text={`${redirectTarget === "/" ? "註冊成功！您將移至首頁" : "註冊成功！正在回到原本要去的頁面"}${successNotice ? `。${successNotice}` : ""}`} icon={<div ref={animation} />} onClose={skipWait} closeLabel="立即前往" />
             </div>
         </div>
     );

@@ -27,9 +27,52 @@ export class ApiError extends Error {
   }
 }
 
+/** FE1-16：getIdToken 刷新失敗（網路中斷、token 被撤銷、帳號被停用）丟出的是 FirebaseError，
+ * 原本不經 throwNormalizedError，呼叫端拿到的不是 ApiError，畫面會顯示
+ * 「Firebase: Error (auth/network-request-failed)」這種英文。這裡轉成中文 ApiError；
+ * data.authTokenError 讓 apiGet 分辨「連線問題可重試」與「登入失效重試也沒用」。 */
+function tokenErrorToApiError(err) {
+  const code = err?.code;
+  const isNetwork = code === 'auth/network-request-failed';
+  const message = isNetwork ? '連線失敗，請檢查網路後再試' : '登入已過期，請重新登入';
+  const apiError = new ApiError(message, { data: { authTokenError: true, code, retryable: isNetwork } });
+  apiError.cause = err;
+  return apiError;
+}
+
+async function getIdTokenOrThrow() {
+  try {
+    return await auth.currentUser?.getIdToken();
+  } catch (err) {
+    throw tokenErrorToApiError(err);
+  }
+}
+
+/** FE1-15：後端回 403 時，可能是角色剛被撤銷、前端手上還是舊 token。強制換一次 token，
+ * userServive 的 onIdTokenChanged 會據此更新角色（例如把已沒有權限的人導出後台）。
+ * 403 也可能只是一般的「沒有權限」，所以至少間隔一分鐘才強制刷新一次，避免每次 403 都多打一個請求。 */
+const FORCED_TOKEN_REFRESH_MIN_INTERVAL_MS = 60000;
+let lastForcedTokenRefresh = -Infinity;
+
+function refreshTokenAfterForbidden() {
+  const user = auth.currentUser;
+  if (!user || typeof user.getIdToken !== 'function') return;
+  const now = Date.now();
+  if (now - lastForcedTokenRefresh < FORCED_TOKEN_REFRESH_MIN_INTERVAL_MS) return;
+  lastForcedTokenRefresh = now;
+  Promise.resolve()
+    .then(() => user.getIdToken(true))
+    .catch(() => {}); // 刷新失敗不影響這次錯誤的處理，下一次自動刷新或請求會再處理
+}
+
+/** 測試用：重設 403 強制刷新的節流時間 */
+export function resetForcedTokenRefreshForTest() {
+  lastForcedTokenRefresh = -Infinity;
+}
+
 async function authHeaders(guest) {
   await waitForAuthReady();
-  const token = await auth.currentUser?.getIdToken();
+  const token = await getIdTokenOrThrow();
   if (token) return { Authorization: `Bearer ${token}` };
   if (!guest) return {};
   // 沒登入、且呼叫端明確標示 guest（訪客翻譯試用）才帶後端核發的訪客憑證；其他請求不帶，避免到處送出憑證。
@@ -110,6 +153,7 @@ function throwNormalizedError(rawErr) {
   if (status === 401 && respData?.code === 'reauth_required' && typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('admin:reauth-required'));
   }
+  if (status === 403) refreshTokenAfterForbidden();
   const isTimeout = err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT';
   const message = extractMessage(respData?.detail) || extractMessage(respData?.error)
     || fallbackMessage(err, status, isTimeout) || '請求失敗';
@@ -212,6 +256,7 @@ export async function apiStream(url, data, { signal, onDelta, idleTimeoutMs = ST
     const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(data), signal: controller.signal });
     if (!response.ok) {
       const body = await response.json().catch(() => undefined);
+      if (response.status === 403) refreshTokenAfterForbidden(); // FE1-15，與 throwNormalizedError 相同
       throw new ApiError(extractMessage(body?.detail) || extractMessage(body?.error) || '請求失敗', { status: response.status, data: body });
     }
     if (!response.body) throw new ApiError('瀏覽器不支援串流回應', { status: response.status });
@@ -296,9 +341,11 @@ export async function apiGet(url, options = {}) {
       return await executeApi(requestOptions, (config) => axios.get(url, config));
     } catch (err) {
       const original = err?.cause ?? err;
-      const transient = err instanceof ApiError
+      // FE1-16：取 token 失敗時只有連線問題值得重試；登入失效（token 被撤銷等）重試也一樣失敗
+      const tokenFailureNotRetryable = err instanceof ApiError && err.data?.authTokenError && !err.data.retryable;
+      const transient = !tokenFailureNotRetryable && (err instanceof ApiError
         ? (err.status === undefined || [502, 503, 504].includes(err.status)) && !err.timedOut
-        : isTransientFailure(original);
+        : isTransientFailure(original));
       if (attempt >= retries || !transient || requestOptions.signal?.aborted) throw err;
       await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * (attempt + 1)));
     }

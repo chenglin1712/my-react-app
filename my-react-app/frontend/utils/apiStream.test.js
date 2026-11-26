@@ -194,4 +194,13 @@ describe('apiStream', () => {
     expect(err).toBeInstanceOf(ApiError);
     expect(err).toMatchObject({ timedOut: true, partial: true });
   });
+
+  test('FE1-16：取 token 失敗時丟出中文 ApiError，不送出請求', async () => {
+    const { auth } = await import('../../firebase');
+    auth.currentUser.getIdToken.mockRejectedValueOnce(Object.assign(new Error('Firebase: Error (auth/network-request-failed).'), { code: 'auth/network-request-failed' }));
+    const err = await apiStream('/s/', {}, { onDelta() {} }).catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.message).toBe('連線失敗，請檢查網路後再試');
+    expect(fetch).not.toHaveBeenCalled();
+  });
 });

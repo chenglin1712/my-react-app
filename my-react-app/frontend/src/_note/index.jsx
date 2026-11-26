@@ -14,7 +14,7 @@ import TabSwitch from "../../components/ui/TabSwitch";
 import { confirmAction } from "@components/ui/ConfirmDialog";
 import { EditorContent } from "@tiptap/react";
 import { useNotePages } from "./hooks/useNotePages";
-import { useNotesCloudSyncFlag } from "./hooks/useNotesCloudSyncFlag";
+import { useNotesCloudSyncFlagStatus } from "./hooks/useNotesCloudSyncFlag";
 import { useFloatingBarHeight } from "./hooks/useFloatingBarHeight";
 import { useCloudNoteSync } from "./hooks/useCloudNoteSync";
 import SyncStatus from "./components/SyncStatus";
@@ -43,7 +43,7 @@ function NotePage() {
 
   // 雲端筆記同步（D-2）：由後台功能開關 notes_cloud_sync 控制，預設關閉。關閉時筆記完全維持
   // 原本只存在瀏覽器的行為，下面的同步 hook 什麼都不做。
-  const cloudSyncOn = useNotesCloudSyncFlag(uid !== "guest");
+  const { on: cloudSyncOn, unknown: cloudSyncUnknown } = useNotesCloudSyncFlagStatus(uid !== "guest");
   const syncApiRef = useRef(null);
 
   const {
@@ -132,6 +132,13 @@ function NotePage() {
       }
       if (hasEmptyTitle) {
         setError("所選頁面中包含空白標題，請填寫後再分享。");
+        return;
+      }
+
+      // 個人資料讀不到時 userServive 會給降級資料（name 可能是 Email @ 前段、頭像是 Auth 的），
+      // 分享會把它公開寫進 sharedNotes，所以直接擋下，不寫入不確定的作者資訊
+      if (userData?.firestoreData?.profileUnavailable === true) {
+        setError("個人資料暫時讀取不到，請稍後再分享。");
         return;
       }
 
@@ -228,7 +235,7 @@ function NotePage() {
       />
     </div>
     <Container fluid className="main-container">
-      <EditorToolbar execStyle={execStyle} onImageFileSelected={handleImageFileSelected} isUploadingImage={isUploadingImage} />
+      <EditorToolbar editor={editor} execStyle={execStyle} onImageFileSelected={handleImageFileSelected} isUploadingImage={isUploadingImage} />
 
       <Row>
         {/* 左：頁面縮圖列（P5-3）。電腦版固定在左邊；手機收成抽屜，按鈕在編輯區上方 */}
@@ -266,6 +273,7 @@ function NotePage() {
             storageError={storageError}
             lastSavedAt={lastSavedAt}
             cloudSyncOn={cloudSyncOn}
+            cloudSyncUnknown={cloudSyncUnknown}
           />
 
           {/* 編輯區：只保留 .note-text，不再包一層卡片。

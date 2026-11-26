@@ -16,9 +16,11 @@ const fakeUserData = {
   },
 };
 
+// 稽核 FE1-07：location.state 改成可變，才能測直接開 /edit（state 為 null）的情況
+const locationState = vi.hoisted(() => ({ current: null }));
 vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
-  useLocation: () => ({ state: fakeUserData }),
+  useLocation: () => ({ state: locationState.current }),
   Link: ({ to, children }) => <a href={to}>{children}</a>,
 }));
 vi.mock('../../src/userServives/userServive', () => ({
@@ -40,6 +42,7 @@ describe('EditProfile (editProfile)', () => {
     updateProfile.mockReset();
     updateUserData.mockReset();
     useAuth.mockReturnValue({ userData: authUserData, updateUserData });
+    locationState.current = fakeUserData;
     vi.stubGlobal('fetch', vi.fn());
   });
 
@@ -138,5 +141,142 @@ describe('EditProfile (editProfile)', () => {
     const input = screen.getByLabelText('變更圖片');
 
     expect(label).toHaveAttribute('for', input.id);
+  });
+});
+
+describe('EditProfile：直接開 /edit（稽核 FE1-07）', () => {
+  const updateUserData = vi.fn();
+  beforeEach(() => {
+    locationState.current = null; // 書籤、重新輸入網址、新分頁：沒有 location.state
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  test('沒有 location.state 時改用 AuthContext 的資料，不會崩潰', () => {
+    useAuth.mockReturnValue({ userData: authUserData, updateUserData, loading: false });
+    render(<EditProfile />);
+    expect(screen.getByLabelText('姓名')).toHaveValue('小明');
+  });
+
+  test('AuthContext 的資料比 location.state 新時以 AuthContext 為準', () => {
+    locationState.current = { uid: 'user-1', firestoreData: { ...fakeUserData.firestoreData, name: '舊名字' } };
+    useAuth.mockReturnValue({ userData: authUserData, updateUserData, loading: false });
+    render(<EditProfile />);
+    expect(screen.getByLabelText('姓名')).toHaveValue('小明');
+  });
+
+  test('登入狀態還在確認中：顯示載入狀態而不是表單', () => {
+    useAuth.mockReturnValue({ userData: null, updateUserData, loading: true });
+    render(<EditProfile />);
+    expect(screen.getByRole('status')).toHaveTextContent('正在載入個人資料…');
+    expect(screen.queryByLabelText('姓名')).not.toBeInTheDocument();
+  });
+
+  test('已登入但讀不到個人資料（firestoreData 缺漏）：顯示說明', () => {
+    useAuth.mockReturnValue({ userData: { uid: 'user-1', firestoreData: null }, updateUserData, loading: false });
+    render(<EditProfile />);
+    expect(screen.getByText(/目前讀不到你的個人資料/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('姓名')).not.toBeInTheDocument();
+  });
+});
+
+describe('EditProfile：降級資料不能拿來編輯（稽核 FE1-03）', () => {
+  const updateUserData = vi.fn();
+  const degraded = {
+    uid: 'user-1',
+    role: 'admin',
+    firestoreData: { name: 'a', email: 'a@b.com', identity: '', avatarUrl: null, favorites: [], profileUnavailable: true },
+  };
+  beforeEach(() => {
+    updateProfile.mockReset();
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  test('AuthContext 是降級資料時不顯示表單（就算 location.state 有舊資料），背景重讀成功後才顯示', () => {
+    locationState.current = { ...degraded };
+    useAuth.mockReturnValue({ userData: degraded, updateUserData, loading: false });
+    const view = render(<EditProfile />);
+    expect(screen.getByText(/目前讀不到你的個人資料，系統會自動重試/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('姓名')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /儲存變更/ })).not.toBeInTheDocument();
+
+    useAuth.mockReturnValue({ userData: authUserData, updateUserData, loading: false });
+    view.rerender(<EditProfile />);
+    expect(screen.getByLabelText('姓名')).toHaveValue('小明');
+    expect(screen.getByLabelText('身分')).toHaveValue('學生');
+  });
+
+  test('側欄帶來的 location.state 是降級資料、AuthContext 還沒有資料：也不顯示表單', () => {
+    locationState.current = degraded;
+    useAuth.mockReturnValue({ userData: null, updateUserData, loading: false });
+    render(<EditProfile />);
+    expect(screen.queryByLabelText('姓名')).not.toBeInTheDocument();
+  });
+});
+
+describe('EditProfile：儲存防呆（稽核 FE1-18）', () => {
+  const updateUserData = vi.fn();
+  beforeEach(() => {
+    mockNavigate.mockReset();
+    updateProfile.mockReset();
+    useAuth.mockReturnValue({ userData: authUserData, updateUserData });
+    locationState.current = fakeUserData;
+    vi.stubGlobal('fetch', vi.fn());
+    if (!URL.createObjectURL) URL.createObjectURL = () => 'blob:preview';
+    if (!URL.revokeObjectURL) URL.revokeObjectURL = () => {};
+  });
+
+  test('姓名只有空白時不送出，欄位顯示錯誤並取得焦點', async () => {
+    render(<EditProfile />);
+    const nameInput = screen.getByLabelText('姓名');
+    fireEvent.change(nameInput, { target: { value: '   ' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /儲存變更/ }));
+    });
+    expect(updateProfile).not.toHaveBeenCalled();
+    expect(nameInput).toHaveAttribute('aria-invalid', 'true');
+    expect(nameInput).toHaveAccessibleDescription('請輸入姓名');
+    expect(nameInput).toHaveFocus();
+
+    fireEvent.change(nameInput, { target: { value: '小華' } });
+    expect(nameInput).not.toHaveAttribute('aria-invalid');
+  });
+
+  test('姓名前後空白會去掉再儲存', async () => {
+    updateProfile.mockResolvedValueOnce({ success: true, firestoreData: fakeUserData.firestoreData, uid: 'user-1' });
+    render(<EditProfile />);
+    fireEvent.change(screen.getByLabelText('姓名'), { target: { value: '  小華  ' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /儲存變更/ }));
+    });
+    expect(updateProfile).toHaveBeenCalledWith('user-1', expect.objectContaining({ name: '小華' }));
+  });
+
+  test('儲存中連按只送出一次，按鈕停用並顯示「儲存中…」', async () => {
+    let resolveSave;
+    updateProfile.mockImplementation(() => new Promise((resolve) => { resolveSave = resolve; }));
+    render(<EditProfile />);
+    const button = screen.getByRole('button', { name: /儲存變更/ });
+    await act(async () => {
+      fireEvent.click(button);
+      fireEvent.click(button);
+    });
+    expect(updateProfile).toHaveBeenCalledTimes(1);
+    expect(button).toBeDisabled();
+    expect(button).toHaveTextContent('儲存中…');
+    await act(async () => { resolveSave({ success: false, message: '沒有更新的資料' }); });
+    expect(button).not.toBeDisabled();
+  });
+
+  test('頭像上傳中不能儲存（避免存到舊頭像網址、上傳結果被丟掉）', async () => {
+    fetch.mockImplementation(() => new Promise(() => {})); // 上傳一直沒回來
+    render(<EditProfile />);
+    const file = new File(['x'], 'ok.png', { type: 'image/png' });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('變更圖片'), { target: { files: [file] } });
+    });
+    const button = screen.getByRole('button', { name: /頭像上傳中/ });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(updateProfile).not.toHaveBeenCalled();
   });
 });

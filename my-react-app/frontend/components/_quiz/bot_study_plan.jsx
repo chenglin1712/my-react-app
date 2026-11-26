@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { Alert } from "react-bootstrap";
 import { loadSuccessAnimation } from "../../src/animations/loaders";
 import { useLottieAnimation } from "../../hooks/useLottieAnimation";
-import { addCalendarEvent, addCalendarEvents } from "../../src/userServives/uploadDb";
+import { addCalendarEventsSkippingDuplicates } from "../../src/userServives/uploadDb";
 import { ExistingPlanError, startTracking } from "../../src/userServives/studyPlanService";
 
 function CalendarPlusIcon() {
@@ -47,6 +47,10 @@ const StudyPlan = ({ plan, onClose, onTracked = null }) => {
     const [addedIndexes, setAddedIndexes] = useState(new Set());
     const [showSuccess, setShowSuccess] = useState(false);
     const [errorMsg, setErrorMsg] = useState("");
+    // 稽核 FE4-09：addedIndexes 只在記憶體，還原對話（botStorage 從 localStorage 還原訊息）或重新產生計畫後
+    // 按鈕會回到「全部加入」。寫入改走 addCalendarEventsSkippingDuplicates：行事曆裡已有相同
+    // 「名稱＋開始＋結束」的行程就略過，不會因為再按一次而出現重複行程；略過幾筆在這裡告訴使用者。
+    const [skippedMsg, setSkippedMsg] = useState("");
     // 序號 → 行事曆事件 id：開始追蹤時帶進去，之後重排才找得到要換掉的行事曆事件
     const [calendarIds, setCalendarIds] = useState({});
     const [tracking, setTracking] = useState("idle");        // idle | confirm | saving | done
@@ -61,11 +65,13 @@ const StudyPlan = ({ plan, onClose, onTracked = null }) => {
     const handleAddToCalendar = async (event, index) => {
         if (isSaving) return;
         setErrorMsg("");
+        setSkippedMsg("");
         setIsSaving(true);
         try {
-            const saved = await addCalendarEvent(toCalendarEvent(event));
+            const { saved: [saved], skipped } = await addCalendarEventsSkippingDuplicates([toCalendarEvent(event)]);
             setAddedIndexes((prev) => new Set([...prev, index]));
             if (saved?.id) setCalendarIds((prev) => ({ ...prev, [index]: saved.id }));
+            if (skipped > 0) setSkippedMsg("這個行程已經在行事曆中，沒有重複加入。");
         } catch (error) {
             console.error("加入行事曆失敗:", error);
             setErrorMsg("加入行事曆失敗，請稍後再試。");
@@ -77,6 +83,7 @@ const StudyPlan = ({ plan, onClose, onTracked = null }) => {
     const handleAddAllToCalendar = async () => {
         if (isSaving) return;
         setErrorMsg("");
+        setSkippedMsg("");
 
         const pendingIndexes = plan.events
             .map((_, index) => index)
@@ -85,14 +92,20 @@ const StudyPlan = ({ plan, onClose, onTracked = null }) => {
 
         setIsSaving(true);
         try {
-            const saved = await addCalendarEvents(pendingIndexes.map((index) => toCalendarEvent(plan.events[index])));
+            const { saved, skipped } = await addCalendarEventsSkippingDuplicates(
+                pendingIndexes.map((index) => toCalendarEvent(plan.events[index])),
+            );
             setAddedIndexes((prev) => new Set([...prev, ...pendingIndexes]));
             setCalendarIds((prev) => {
                 const next = { ...prev };
                 pendingIndexes.forEach((index, i) => { if (saved?.[i]?.id) next[index] = saved[i].id; });
                 return next;
             });
-            setShowSuccess(true);
+            if (skipped > 0) {
+                setSkippedMsg(`其中 ${skipped} 個行程已經在行事曆中，沒有重複加入。`);
+            }
+            // 全部都已存在時沒有真的新增任何行程，不放「成功加入」動畫
+            if (skipped < pendingIndexes.length) setShowSuccess(true);
         } catch (error) {
             console.error("加入行事曆失敗:", error);
             setErrorMsg("加入行事曆失敗，請稍後再試。");
@@ -196,6 +209,7 @@ const StudyPlan = ({ plan, onClose, onTracked = null }) => {
                 </div>
 
                 {errorMsg && <Alert variant="danger" className="py-2" role="alert">{errorMsg}</Alert>}
+                {skippedMsg && <p className="study-plan-track-note" role="status">{skippedMsg}</p>}
 
                 <div className="study-plan-track">
                     {tracking === "confirm" ? (

@@ -21,7 +21,7 @@ const fakeEditor = {
   commands: { setContent: vi.fn() },
   chain: () => ({ focus: () => ({}) }),
 };
-vi.mock('@tiptap/react', () => ({ useEditor: () => fakeEditor, EditorContent: () => null }));
+vi.mock('@tiptap/react', () => ({ useEditor: () => fakeEditor, useEditorState: () => ({ isBold: false, isItalic: false }), EditorContent: () => null }));
 vi.mock('@tiptap/starter-kit', () => ({ StarterKit: {} }));
 vi.mock('@tiptap/extension-text-style', () => ({ TextStyle: {} }));
 vi.mock('@tiptap/extension-color', () => ({ Color: {} }));
@@ -34,7 +34,11 @@ vi.mock('../../../firebase', () => ({ db: { fake: true } }));
 vi.mock('../../src/userServives/authContext', () => ({
   useAuth: () => ({ userData: { uid: 'user-1', firestoreData: { name: '測試使用者' } } }),
 }));
-vi.mock('./hooks/useNotesCloudSyncFlag', () => ({ useNotesCloudSyncFlag: vi.fn() }));
+vi.mock('./hooks/useNotesCloudSyncFlag', () => {
+  const flag = vi.fn();
+  // index.jsx 改用 Status 版（FE6-18）；測試仍以 useNotesCloudSyncFlag 的回傳值控制旗標
+  return { useNotesCloudSyncFlag: flag, useNotesCloudSyncFlagStatus: (e) => ({ on: flag(e), unknown: false }) };
+});
 vi.mock('./hooks/useCloudNoteSync', () => ({ useCloudNoteSync: vi.fn() }));
 vi.mock('./sync/exportNote', () => ({ exportNoteAsHtml: vi.fn() }));
 

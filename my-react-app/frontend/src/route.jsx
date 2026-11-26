@@ -1,5 +1,7 @@
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+// 稽核 FE1-05：部署後舊 chunk 已不存在時自動重新載入一次（說明見 lazyWithRetry.js）
+import { lazyWithRetry } from './lazyWithRetry';
 import { useDisplayedLocation } from './routeTransition';
 import { DelayedSkeleton } from '@components/ui/StateViews';
 import { useAuth } from './userServives/authContext';
@@ -9,65 +11,65 @@ import { TRIBES, tribeHasFeature } from './constants/tribes';
 import AdminEntryFallback from './_admin/entry/AdminEntryFallback';
 import AdminEntryGate from './_admin/entry/AdminEntryGate';
 //找不到頁面
-const NotFoundPage = lazy(() => import('./_error/NotFoundPage'));
+const NotFoundPage = lazyWithRetry(() => import('./_error/NotFoundPage'));
 //首頁
-const HomePage = lazy(() => import('./_home/index'));
+const HomePage = lazyWithRetry(() => import('./_home/index'));
 //登入、註冊、編輯資料
-const LoginPage = lazy(() => import('./_auth/login'));
-const AdminLoginPage = lazy(() => import('./_auth/AdminLoginPage'));
-const RegisterPage = lazy(() => import('./_auth/register'));
-const EditPage = lazy(() => import('../components/_auth/editProfile'));
-const LearnerMemoryPage = lazy(() => import('./_memory/index'));
+const LoginPage = lazyWithRetry(() => import('./_auth/login'));
+const AdminLoginPage = lazyWithRetry(() => import('./_auth/AdminLoginPage'));
+const RegisterPage = lazyWithRetry(() => import('./_auth/register'));
+const EditPage = lazyWithRetry(() => import('../components/_auth/editProfile'));
+const LearnerMemoryPage = lazyWithRetry(() => import('./_memory/index'));
 //忘記密碼、重設密碼
-const ForgotPage = lazy(() => import('../components/_auth/forgotPassword'));
-const ResetPage = lazy(() => import('../components/_auth/resetPassword'));
+const ForgotPage = lazyWithRetry(() => import('../components/_auth/forgotPassword'));
+const ResetPage = lazyWithRetry(() => import('../components/_auth/resetPassword'));
 //影像辨識（單頁 3 步驟精靈，見 _camera/index.jsx；label.jsx/result.jsx 是內部步驟元件，不再是獨立路由頁面）
-const CameraPage = lazy(() => import('./_camera/index'));
+const CameraPage = lazyWithRetry(() => import('./_camera/index'));
 //辭典
-const SearchPage = lazy(() => import('./_search/index'));
+const SearchPage = lazyWithRetry(() => import('./_search/index'));
 //翻譯
-const TranslatePage = lazy(() => import('./_translate/index'));
-const HelpPage = lazy(() => import('./_info/index').then((m) => ({ default: m.HelpPage })));
-const AnnouncementsPage = lazy(() => import('./_announcements/index'));
-const TopicPage = lazy(() => import('./_topic/index'));
-const PrivacyPage = lazy(() => import('./_info/index').then((m) => ({ default: m.PrivacyPage })));
-const ContactPage = lazy(() => import('./_info/index').then((m) => ({ default: m.ContactPage })));
+const TranslatePage = lazyWithRetry(() => import('./_translate/index'));
+const HelpPage = lazyWithRetry(() => import('./_info/index').then((m) => ({ default: m.HelpPage })));
+const AnnouncementsPage = lazyWithRetry(() => import('./_announcements/index'));
+const TopicPage = lazyWithRetry(() => import('./_topic/index'));
+const PrivacyPage = lazyWithRetry(() => import('./_info/index').then((m) => ({ default: m.PrivacyPage })));
+const ContactPage = lazyWithRetry(() => import('./_info/index').then((m) => ({ default: m.ContactPage })));
 //遊戲
-const GamePage = lazy(() => import('./_game/index'));
-const VocabularyPage = lazy(() => import('./_game/vocabulary'));
-const TribeVocabularyGame = lazy(() => import('./_game/tribeVocabularyGame'));
-const ListeningPage = lazy(() => import('./_game/listening'));
-const TribeListeningGame = lazy(() => import('./_game/tribeListeningGame'));
-const PronunciationPage = lazy(() => import('./_game/pronunciation'));
-const TribePronunciationGame = lazy(() => import('./_game/tribePronunciationGame'));
-const TribePronunciationCommunity = lazy(() => import('./_game/pronunciationCommunity'));
-const SentencePage = lazy(() => import('./_game/sentence'));
-const TribeSentenceGame = lazy(() => import('./_game/tribeSentenceGame'));
+const GamePage = lazyWithRetry(() => import('./_game/index'));
+const VocabularyPage = lazyWithRetry(() => import('./_game/vocabulary'));
+const TribeVocabularyGame = lazyWithRetry(() => import('./_game/tribeVocabularyGame'));
+const ListeningPage = lazyWithRetry(() => import('./_game/listening'));
+const TribeListeningGame = lazyWithRetry(() => import('./_game/tribeListeningGame'));
+const PronunciationPage = lazyWithRetry(() => import('./_game/pronunciation'));
+const TribePronunciationGame = lazyWithRetry(() => import('./_game/tribePronunciationGame'));
+const TribePronunciationCommunity = lazyWithRetry(() => import('./_game/pronunciationCommunity'));
+const SentencePage = lazyWithRetry(() => import('./_game/sentence'));
+const TribeSentenceGame = lazyWithRetry(() => import('./_game/tribeSentenceGame'));
 //測驗
-const QuizTribeSelect = lazy(() => import('./_quiz/tribeSelect'));
-const QuizPage = lazy(() => import('./_quiz/index'));
-const Comp_quiz = lazy(() => import('../components/_quiz/quiz'));
-const Comp_quiz_start = lazy(() => import('../components/_quiz/quiz_panel_start'));
-const Comp_quiz_panel = lazy(() => import('../components/_quiz/quiz_panel'));
-const Comp_quiz_submit = lazy(() => import('../components/_quiz/quiz_panel_submit'));
-const Comp_quiz_recommon_result = lazy(() => import('../components/_quiz/quiz_recommon_result'));
-const Comp_quiz_recommon_start = lazy(() => import('../components/_quiz/quiz_recommon_start'));
-const Comp_quiz_recommon_question = lazy(() => import('../components/_quiz/quiz_recommon_question'));
-const Comp_quiz_recommon = lazy(() => import('../components/_quiz/quiz_recommon'));
-const ScenarioQuiz = lazy(() => import('../components/_quiz/ScenarioQuiz'));
-const Comp_situation = lazy(() => import('../components/_quiz/situation'));
-const Comp_review = lazy(() => import('../components/_quiz/review'));
-const Comp_bot = lazy(() => import('../components/_quiz/bot'));
+const QuizTribeSelect = lazyWithRetry(() => import('./_quiz/tribeSelect'));
+const QuizPage = lazyWithRetry(() => import('./_quiz/index'));
+const Comp_quiz = lazyWithRetry(() => import('../components/_quiz/quiz'));
+const Comp_quiz_start = lazyWithRetry(() => import('../components/_quiz/quiz_panel_start'));
+const Comp_quiz_panel = lazyWithRetry(() => import('../components/_quiz/quiz_panel'));
+const Comp_quiz_submit = lazyWithRetry(() => import('../components/_quiz/quiz_panel_submit'));
+const Comp_quiz_recommon_result = lazyWithRetry(() => import('../components/_quiz/quiz_recommon_result'));
+const Comp_quiz_recommon_start = lazyWithRetry(() => import('../components/_quiz/quiz_recommon_start'));
+const Comp_quiz_recommon_question = lazyWithRetry(() => import('../components/_quiz/quiz_recommon_question'));
+const Comp_quiz_recommon = lazyWithRetry(() => import('../components/_quiz/quiz_recommon'));
+const ScenarioQuiz = lazyWithRetry(() => import('../components/_quiz/ScenarioQuiz'));
+const Comp_situation = lazyWithRetry(() => import('../components/_quiz/situation'));
+const Comp_review = lazyWithRetry(() => import('../components/_quiz/review'));
+const Comp_bot = lazyWithRetry(() => import('../components/_quiz/bot'));
 //筆記
-const NotePage = lazy(() => import('./_note/index'));
-const NoteShare = lazy(() => import('./_note/noteshare'));
+const NotePage = lazyWithRetry(() => import('./_note/index'));
+const NoteShare = lazyWithRetry(() => import('./_note/noteshare'));
 //收藏
-const FavoritePage = lazy(() => import('./_favorite/index'));
+const FavoritePage = lazyWithRetry(() => import('./_favorite/index'));
 //行事曆
-const CalendarPage = lazy(() => import('../components/_calendar/calendar_date'));
+const CalendarPage = lazyWithRetry(() => import('../components/_calendar/calendar_date'));
 //後台管理系統（P0 最小骨架，見規劃文件 §1.4）
-const AdminApp = lazy(() => import('./_admin/AdminApp'));
-const AdminRoute = lazy(() => import('./_admin/AdminRoute'));
+const AdminApp = lazyWithRetry(() => import('./_admin/AdminApp'));
+const AdminRoute = lazyWithRetry(() => import('./_admin/AdminRoute'));
 
 
 // FE-4：登入後的功能頁（測驗、遊戲、筆記、收藏、影像辨識、翻譯）原本
@@ -115,7 +117,10 @@ const AppRoutes = () => {
   // 有換頁轉場時，路由先停在舊頁，等瀏覽器拍好舊畫面才換成新頁（見 routeTransition.jsx）
   const displayedLocation = useDisplayedLocation();
   return (
-    <ErrorBoundary>
+    // 稽核 FE1-06：首頁、單詞查詢、登入、公告、專題、分享筆記等公開頁只被這一層包住；
+    // 原本沒有 resetKeys，一出錯就黏在錯誤畫面，點導覽列換頁也不會復原。改成跟內層一樣依路徑重設。
+    // 用 displayedLocation（實際畫在畫面上的那一頁）而不是網址列的 location：換頁轉場期間兩者會短暫不同。
+    <ErrorBoundary resetKeys={[displayedLocation.pathname]}>
       <Suspense fallback={<RouteLoadingFallback />}>
         <Routes location={displayedLocation}>
           <Route path="/" element={<HomePage />} />
@@ -135,7 +140,6 @@ const AppRoutes = () => {
           />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot" element={<ForgotPage />} />
-          <Route path="/reset" element={<ResetPage />} />
           <Route path="/announcements" element={<AnnouncementsPage />} />
           <Route path="/topics/:id" element={<TopicPage />} />
           <Route path="/help" element={<HelpPage />} />
@@ -192,6 +196,9 @@ const AppRoutes = () => {
             <Route path='/note' element={<NotePage />} />
             <Route path='/note/share' element={<NoteShare />} />
             <Route path="/edit" element={<EditPage />} />
+            {/* 稽核 FE1-17：/reset 是「變更密碼」（要先輸入目前密碼），原本掛在公開路由，
+                未登入也能把表單填完才被告知無法確認登入狀態；改放進受保護區，未登入直接看到登入牆。 */}
+            <Route path="/reset" element={<ResetPage />} />
             <Route path="/memory" element={<LearnerMemoryPage />} />
             <Route path="/calendar" element={<CalendarPage />} />
           </Route>

@@ -45,7 +45,7 @@ describe('WordCard', () => {
         isFavorited={false}
       />
     );
-    const toggle = screen.getByRole('button', { name: /balay/ });
+    const toggle = screen.getByRole('button', { name: /^balay/ });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('heading', { level: 3 })).toContainElement(toggle);
     toggle.focus();
@@ -70,7 +70,7 @@ describe('WordCard', () => {
         isFavorited={false}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: '加入收藏' }));
+    fireEvent.click(screen.getByRole('button', { name: /^收藏「/ }));
     expect(toggleFavorite).toHaveBeenCalledWith('balay');
   });
 
@@ -178,7 +178,7 @@ describe('WordCard 的詳情 sheet 模式（Apple 化步驟 4-2）', () => {
     const onOpenDetail = vi.fn();
     const toggleExpand = vi.fn();
     render(<WordCard {...props} result={result} toggleExpand={toggleExpand} onOpenDetail={onOpenDetail} />);
-    const title = screen.getByRole('button', { name: /babaw/ });
+    const title = screen.getByRole('button', { name: /^babaw/ });
     expect(title).toHaveAttribute('aria-haspopup', 'dialog');
     expect(title).not.toHaveAttribute('aria-expanded');
     fireEvent.click(title);
