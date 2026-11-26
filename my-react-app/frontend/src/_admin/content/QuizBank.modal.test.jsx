@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { describe, test, expect, vi, beforeEach, afterAll } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import QuizBank from './QuizBank';
@@ -47,6 +47,10 @@ async function openEdit() {
 }
 
 describe('QuizBank 編輯對話框', () => {
+  // 最後一個測試關掉對話框後，react-bootstrap 的轉場計時器還沒跑完就拆掉 jsdom，會在 Linux CI 丟出
+  // 「document is not defined」的未處理錯誤（vitest 因此回傳失敗）。等轉場結束再收尾。
+  afterAll(() => new Promise((resolve) => setTimeout(resolve, 600)));
+
   beforeEach(() => {
     apiGet.mockReset();
     apiPost.mockReset();

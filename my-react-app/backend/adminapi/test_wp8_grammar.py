@@ -1,4 +1,6 @@
 """稽核 WP-8（FE7a-01／FE7a-02）：文法章節的草稿載入與提案防護，以及送審佇列連結。"""
+from unittest.mock import patch
+
 from django.core.cache import cache
 from django.test import Client
 
@@ -69,7 +71,10 @@ class GrammarDraftGuardsTest(DictionaryDbTestCase):
         self.assertEqual(self._propose().status_code, 200)
         self.assertEqual(self._open().count(), 1)
 
-    def test_review_queue_links_to_the_revision_itself(self):
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_review_queue_links_to_the_revision_itself(self, mock_client_fn):
+        # 檢舉那一路會讀 Firestore，CI 沒有服務帳戶金鑰，這裡只關心辭典提案的連結
+        mock_client_fn.return_value.collection.return_value.where.return_value.stream.return_value = []
         proposed = self._propose().json()["revision_id"]
         with _as_role(EDITOR) as headers:
             _post_json_raw(self.client, f"/adminapi/dictionary/revisions/{proposed}/submit/", headers)
