@@ -36,12 +36,13 @@ import sys
 from types import SimpleNamespace
 
 from django.core.management.base import BaseCommand
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from adminapi import dictionary_write as dw
 from adminapi._shared import safe_write_audit_log
 from adminapi.dictionary_cache import invalidate_dictionary_cache
+from adminapi.dictionary_revision_service import revision_create_id
 from adminapi.dictionary_views import _CACHE_SCOPES, _TREE_GETTERS, _revision_target_type
 from adminapi.models import DictionaryRevision
 from dictionary_db.connect import SessionLocal
@@ -97,7 +98,14 @@ class Command(BaseCommand):
                     f"reviewed_by={revision.reviewed_by} 卡住 {stuck_for} 了"
                 )
 
-                if revision.operation == DictionaryRevision.OPERATION_CREATE:
+                if (
+                    revision.operation == DictionaryRevision.OPERATION_CREATE
+                    and revision.target_kind == DictionaryRevision.TARGET_WORD
+                    and not revision.target_id
+                ):
+                    # 稽核 BE2b-06：新建詞條提案用固定 id 套用，可以直接查它有沒有建立成功
+                    revision.target_id_candidate = revision_create_id(revision.pk)
+                elif revision.operation == DictionaryRevision.OPERATION_CREATE:
                     self.stdout.write(self.style.WARNING(
                         "      → create 操作，無法自動辨識對應的新建記錄，需人工複查（見本檔案 docstring）"
                     ))
@@ -116,12 +124,44 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(f"      → 未知的 target_kind，跳過"))
             return
 
+        is_create = revision.operation == DictionaryRevision.OPERATION_CREATE
+        lookup_id = getattr(revision, "target_id_candidate", None) if is_create else revision.target_id
         try:
-            current = tree_getter(read_db, revision.target_id)
+            current = tree_getter(read_db, lookup_id)
             exists = True
         except dw.DictionaryWriteError:
             current = None
             exists = False
+
+        # 稽核 BE2b-06：update 的目標本來就存在，「讀得到」不代表這次提案有寫入。
+        # 內容雜湊仍然等於提案當時的 base_hash，表示根本沒套用，必須退回待審而不是補記帳。
+        if (
+            revision.operation == DictionaryRevision.OPERATION_UPDATE
+            and exists and revision.base_hash and current.get("content_hash") == revision.base_hash
+        ):
+            self.stdout.write(self.style.WARNING(
+                "      → 目標內容仍等於提案當時的版本，代表這次修改根本沒有套用；退回待審核狀態"
+            ))
+            try:
+                with transaction.atomic():
+                    locked = DictionaryRevision.objects.select_for_update().get(pk=revision.pk)
+                    if locked.status == DictionaryRevision.STATUS_APPROVED and locked.applied_at is None:
+                        locked.status = DictionaryRevision.STATUS_PENDING_REVIEW
+                        locked.apply_error = "補記帳檢查發現內容並未套用，已退回待審核"
+                        locked.save(update_fields=["status", "apply_error", "updated_at"])
+            except IntegrityError:
+                self.stdout.write(self.style.ERROR(
+                    "      → 同一個目標已經有另一筆待審提案，無法退回待審核；需人工複查"
+                ))
+            return
+        if is_create and not exists:
+            # 不自動退回：這個提案可能是改成固定 id 之前核准的（當時用隨機 id，詞條其實已經存在），
+            # 退回後再核准一次會重複建立。只列出來，由人工到辭典依內容確認。
+            self.stdout.write(self.style.WARNING(
+                "      → 固定 id 的新建詞條不存在（可能沒建立成功，也可能是舊式隨機 id 建立的），"
+                "不自動處理，需人工複查"
+            ))
+            return
 
         expect_exists = revision.operation != DictionaryRevision.OPERATION_DELETE
         if exists != expect_exists:
@@ -138,7 +178,9 @@ class Command(BaseCommand):
                 self.stdout.write("      → 已經在其他地方補完成了，略過")
                 return
             revision.applied_at = timezone.now()
-            revision.save(update_fields=["applied_at", "updated_at"])
+            if is_create:
+                revision.target_id = lookup_id
+            revision.save(update_fields=["applied_at", "target_id", "updated_at"])
             # write_audit_log() 預期一個真正的 Django HttpRequest（讀
             # request.META 記 IP／User-Agent）；管理指令沒有這個東西，用一個
             # 只帶空 META 的替身物件湊出相同介面，稽核紀錄的 actor_uid 標成

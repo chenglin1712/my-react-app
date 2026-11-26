@@ -176,6 +176,83 @@ describe('Dashboard', () => {
     );
   });
 
+  test('稽核 FE7b-18：預設 7 天區間只打一次 7 天分析 API，換區間後本週新註冊才另外查詢', async () => {
+    renderDashboard();
+
+    const registrationCard = screen.getByText('本週新註冊')
+      .closest('.admin-stat-card');
+    expect(await within(registrationCard).findByText('4')).toBeInTheDocument();
+
+    const sevenDayUrl = '/adminapi/analytics/dashboard/?date_range=7d';
+    expect(apiGet.mock.calls.filter(([url]) => url === sevenDayUrl)).toHaveLength(1);
+
+    fireEvent.change(screen.getByLabelText('日期區間'), { target: { value: '30d' } });
+
+    await waitFor(() => {
+      expect(apiGet.mock.calls.filter(([url]) => url === sevenDayUrl)).toHaveLength(2);
+    });
+    expect(await within(registrationCard).findByText('4')).toBeInTheDocument();
+  });
+
+  test('稽核 FE7b-17／19：最近操作的 target_type 顯示中文，無效日期不會讓整頁崩潰', async () => {
+    apiGet.mockImplementation((url) => {
+      if (url.includes('/announcements/')) return Promise.resolve({ results: [], count: 1 });
+      if (url.includes('/audit-log/')) {
+        return Promise.resolve({
+          results: [{
+            id: 7,
+            actor_uid: 'owner-uid',
+            action: 'approve',
+            target_type: 'shared_note',
+            target_id: 'n1',
+            created_at: 'not-a-date',
+          }],
+        });
+      }
+      return Promise.resolve(analyticsData);
+    });
+
+    renderDashboard();
+
+    expect(await screen.findByText(/分享筆記 #n1/)).toBeInTheDocument();
+    expect(screen.getByText('儀表板')).toBeInTheDocument();
+  });
+
+  test('WP-8 追加：最近操作顯示操作者姓名，沒有姓名時退回縮短的 uid，辭典類型用「辭典」', async () => {
+    apiGet.mockImplementation((url) => {
+      if (url.includes('/announcements/')) return Promise.resolve({ results: [], count: 1 });
+      if (url.includes('/audit-log/')) {
+        return Promise.resolve({
+          results: [
+            {
+              id: 1, actor_uid: 'uid-alice-123456', actor_name: '王小美', action: 'approve',
+              target_type: 'dictionary_import_job', target_id: '3', created_at: '2026-08-02T03:00:00Z',
+            },
+            {
+              id: 2, actor_uid: 'abcdefghijklmnop', actor_name: '', action: 'approve',
+              target_type: 'dictionary_taxonomy', target_id: '4', created_at: '2026-08-02T03:00:00Z',
+            },
+            {
+              id: 3, actor_uid: 'system', action: 'approve',
+              target_type: 'announcement', target_id: '5', created_at: '2026-08-02T03:00:00Z',
+            },
+          ],
+        });
+      }
+      return Promise.resolve(analyticsData);
+    });
+
+    renderDashboard();
+
+    expect(await screen.findByText('王小美')).toBeInTheDocument();
+    const shortened = screen.getByText('abcdefgh…');
+    expect(shortened).toHaveAttribute('title', 'abcdefghijklmnop');
+    expect(screen.getByText('system')).toBeInTheDocument();
+    expect(screen.getByText(/辭典匯入工作 #3/)).toBeInTheDocument();
+    expect(screen.getByText(/辭典分類 #4/)).toBeInTheDocument();
+    expect(screen.queryByText(/詞典/)).not.toBeInTheDocument();
+  });
+
   test('有資料時渲染每日趨勢、族語分布與功能使用熱度三個圖表', async () => {
     renderDashboard();
 
@@ -215,14 +292,8 @@ describe('Dashboard', () => {
         return Promise.resolve(todayAnalyticsData);
       }
       if (url === '/adminapi/analytics/dashboard/?date_range=7d') {
-        const sevenDayCalls = apiGet.mock.calls
-          .filter(([calledUrl]) => (
-            calledUrl === '/adminapi/analytics/dashboard/?date_range=7d'
-          )).length;
-
-        return Promise.resolve(
-          sevenDayCalls >= 2 ? emptyChartData : analyticsData,
-        );
+        // 稽核 FE7b-18：本週新註冊直接用主查詢（7d）的結果，不再另外打一次
+        return Promise.resolve(emptyChartData);
       }
       return Promise.resolve(emptyChartData);
     });
@@ -342,24 +413,14 @@ describe('Dashboard', () => {
       if (url === '/adminapi/analytics/dashboard/?date_range=today') {
         return Promise.resolve(todayAnalyticsData);
       }
-      if (url === '/adminapi/analytics/dashboard/?date_range=7d') {
-        const sevenDayCalls = apiGet.mock.calls
-          .filter(([calledUrl]) => (
-            calledUrl === '/adminapi/analytics/dashboard/?date_range=7d'
-          )).length;
-
-        if (sevenDayCalls >= 2) {
-          return Promise.reject(new Error('分析資料載入失敗'));
-        }
-        return Promise.resolve(analyticsData);
-      }
       return Promise.reject(new Error('分析資料載入失敗'));
     });
 
     renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getAllByText('分析資料載入失敗')).toHaveLength(3);
+      // 三個圖表區塊各一個，加上「本週新註冊」統計卡共用主查詢的錯誤（稽核 FE7b-18）
+      expect(screen.getAllByText('分析資料載入失敗')).toHaveLength(4);
     });
 
     expect(screen.getByText('儀表板')).toBeInTheDocument();

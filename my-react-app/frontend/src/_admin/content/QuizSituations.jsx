@@ -5,6 +5,7 @@ import { Plus, Sparkles } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
 import AiDraftModal from './AiDraftModal';
+import EditorModalError from '../reviewWorkflow/EditorModalError';
 import RejectReasonModal from '../reviewWorkflow/RejectReasonModal';
 import ReviewActions from '../reviewWorkflow/ReviewActions';
 import ReviewPagination from '../reviewWorkflow/ReviewPagination';
@@ -221,10 +222,10 @@ export default function QuizSituations() {
 
             <Modal
                 show={Boolean(editTarget)}
-                onHide={formSubmitting ? undefined : editor.close}
+                onHide={formSubmitting ? undefined : editor.requestClose}
                 centered
                 size="lg"
-                backdrop={formSubmitting ? 'static' : true}
+                backdrop={formSubmitting || editor.dirty ? 'static' : true}
                 keyboard={!formSubmitting}
             >
                 <Form onSubmit={saveForm}>
@@ -234,6 +235,7 @@ export default function QuizSituations() {
                         </Modal.Title>
                     </Modal.Header>
                     <Modal.Body>
+                        <EditorModalError error={editor.error} conflict={editor.conflict} onReload={editor.reloadLatest} />
                         <Form.Group
                             className="quiz-bank-field"
                             controlId="quiz-situation-tribe"
@@ -318,7 +320,7 @@ export default function QuizSituations() {
                             type="button"
                             variant="secondary"
                             disabled={formSubmitting}
-                            onClick={editor.close}
+                            onClick={editor.requestClose}
                         >
                             取消
                         </Button>

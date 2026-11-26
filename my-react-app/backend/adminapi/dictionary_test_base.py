@@ -87,6 +87,12 @@ class DictionaryDbTestCase(TestCase):
         self.addCleanup(patcher.stop)
         patcher.start()
 
+        # WP-8 追加：詞條／章節詳情與提案 GET 會附帶建立者姓名（user_names.py 查 Firestore）。
+        # 測試不連真的 Firebase，預設回「查無此人」；要驗證姓名的測試自己覆寫 self.fetch_names。
+        names_patcher = patch("adminapi.user_names._fetch_names", side_effect=lambda uids: {uid: "" for uid in uids})
+        self.addCleanup(names_patcher.stop)
+        self.fetch_names = names_patcher.start()
+
     def seed_tribe(self, tribe_id="tribe-tayal", name="泰雅語", slug="tayal"):
         db = connect_module.SessionLocal()
         try:

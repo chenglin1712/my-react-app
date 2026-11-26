@@ -16,6 +16,21 @@ logger = logging.getLogger(__name__)
 # 建一筆新的」這個保證的根本，沒有這個就無法安全續跑 create 列。
 _IMPORT_ROW_ID_NAMESPACE = uuid.UUID("f2e6b9d0-9b1a-4b7a-9f3a-6c2f6f9a7d31")
 
+# 稽核 BE2b-04：每列都重寫整份報告（含每一列的 payload），大批匯入的寫入量是列數的平方。
+# 計數與報告一起每隔這麼多列寫一次，最後一定再寫一次；中斷時最多重做這一段，由 deterministic id 保證不重複建立。
+_REPORT_CHECKPOINT_EVERY = 25
+
+
+class ImportClaimLost(Exception):
+    """這個匯入工作已經被續跑指令接手（稽核 BE2b-05），原本的核准迴圈必須立刻停手，不能再寫入。"""
+
+
+def _still_owner(job):
+    # 續跑指令接手時會把 applied_by 設成「resume:…」；核准迴圈持有工作期間 applied_by 一直是空字串
+    from ..models import DictionaryImportJob
+
+    return DictionaryImportJob.objects.filter(pk=job.pk, applied_by="").exists()
+
 
 def _deterministic_import_row_id(job_pk, row):
     return str(uuid.uuid5(_IMPORT_ROW_ID_NAMESPACE, f"dictionary-import-job:{job_pk}:row:{row}"))
@@ -42,6 +57,8 @@ def apply_import_job_rows(job, fresh_report):
     outcomes = []
     for item in fresh_report["items"]:
         row = item["row"]
+        if not _still_owner(job):
+            raise ImportClaimLost()
         if item["action"] == "error":
             outcome = {"row": row, "name": item["name"], "outcome": "skipped", "detail": item["errors"]}
         else:
@@ -71,9 +88,15 @@ def apply_import_job_rows(job, fresh_report):
         outcomes.append(outcome)
         # 逐列 checkpoint：每處理完一筆就立刻寫回 Django，而不是等整個
         # 迴圈跑完才一次寫入——見本函式 docstring 的說明。
-        job.report = {**fresh_report, "outcomes": outcomes}
-        job.applied_count = applied_count
-        job.failed_count = failed_count
-        job.save(update_fields=["report", "applied_count", "failed_count"])
+        # 計數與 outcomes 必須一起寫：續跑指令用 outcomes 判斷哪些列處理過，兩者不同步會重複計算
+        if len(outcomes) % _REPORT_CHECKPOINT_EVERY == 0:
+            job.applied_count = applied_count
+            job.failed_count = failed_count
+            job.report = {**fresh_report, "outcomes": outcomes}
+            job.save(update_fields=["report", "applied_count", "failed_count"])
 
+    job.applied_count = applied_count
+    job.failed_count = failed_count
+    job.report = {**fresh_report, "outcomes": outcomes}
+    job.save(update_fields=["report", "applied_count", "failed_count"])
     return applied_count, failed_count, outcomes

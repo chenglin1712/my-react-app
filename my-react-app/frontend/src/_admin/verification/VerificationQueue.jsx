@@ -10,6 +10,7 @@ import {
   Spinner,
 } from 'react-bootstrap';
 import AdminTable from '../components/AdminTable';
+import { useActionLock } from '../hooks/useActionLock';
 import { Download, Upload } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { apiGet, apiPost } from '../../../utils/apiClient';
@@ -67,7 +68,9 @@ function ReviewModal({ item, canSeeOpinions, onClose, onSaved }) {
     const [correction, setCorrection] = useState(mine?.correction ?? '');
     const [dialect, setDialect] = useState(mine?.dialect ?? '');
     const [notes, setNotes] = useState(mine?.notes ?? '');
-    const [saving, setSaving] = useState(false);
+    // 稽核 FE7b-12：用 useActionLock 做同步鎖（避免連點重複送出），送出中不可關閉對話框。
+    const saveLock = useActionLock();
+    const saving = saveLock.isLocked;
     const [error, setError] = useState('');
     const [reviews, setReviews] = useState(null);
     const [reviewsError, setReviewsError] = useState('');
@@ -82,8 +85,12 @@ function ReviewModal({ item, canSeeOpinions, onClose, onSaved }) {
         return () => { active = false; };
     }, [canSeeOpinions, item.id]);
 
-    const submit = async () => {
-        setSaving(true);
+    const close = () => {
+        if (saving) return;
+        onClose();
+    };
+
+    const submit = () => saveLock.runLocked('submit', async () => {
         setError('');
         try {
             const response = await apiPost(`${BASE}/items/${item.id}/review/`, {
@@ -92,14 +99,18 @@ function ReviewModal({ item, canSeeOpinions, onClose, onSaved }) {
             onSaved(response.item);
         } catch (err) {
             setError(err.message);
-        } finally {
-            setSaving(false);
         }
-    };
+    });
 
     return (
-        <Modal show onHide={onClose} centered>
-            <Modal.Header closeButton>
+        <Modal
+            show
+            onHide={close}
+            centered
+            backdrop={saving ? 'static' : true}
+            keyboard={!saving}
+        >
+            <Modal.Header closeButton={!saving}>
                 <Modal.Title>提供意見：{item.form}</Modal.Title>
             </Modal.Header>
             <Modal.Body>
@@ -108,9 +119,10 @@ function ReviewModal({ item, canSeeOpinions, onClose, onSaved }) {
                 <Alert variant="secondary" className="mt-3">
                     你的意見只會被記錄，不會改動辭典或測驗題庫；這個項目仍然待專家驗證。
                 </Alert>
-                {error && <Alert variant="danger">{error}</Alert>}
-                <Form.Group className="mb-3">
-                    <Form.Label>你的意見</Form.Label>
+                {error && <Alert variant="danger" role="alert">{error}</Alert>}
+                {/* 稽核 FE7b-12：單選群組用 fieldset／legend，讀屏軟體才會念出群組名稱 */}
+                <fieldset className="mb-3">
+                    <legend className="form-label fs-6">你的意見</legend>
                     <div>
                         {Object.entries(VERDICTS).map(([value, label]) => (
                             <Form.Check
@@ -121,11 +133,12 @@ function ReviewModal({ item, canSeeOpinions, onClose, onSaved }) {
                                 name="verdict"
                                 label={label}
                                 checked={verdict === value}
+                                disabled={saving}
                                 onChange={() => setVerdict(value)}
                             />
                         ))}
                     </div>
-                </Form.Group>
+                </fieldset>
                 <Form.Group className="mb-3" controlId="verification-correction">
                     <Form.Label>建議的正確寫法或詞根（選填）</Form.Label>
                     <Form.Control value={correction} maxLength={200} onChange={(e) => setCorrection(e.target.value)} />
@@ -161,7 +174,7 @@ function ReviewModal({ item, canSeeOpinions, onClose, onSaved }) {
                 )}
             </Modal.Body>
             <Modal.Footer>
-                <Button variant="outline-secondary" onClick={onClose}>取消</Button>
+                <Button variant="outline-secondary" disabled={saving} onClick={close}>取消</Button>
                 <Button variant="primary" disabled={!verdict || saving} onClick={submit}>
                     {saving ? <Spinner animation="border" size="sm" /> : null}
                     送出意見
@@ -290,6 +303,9 @@ export default function VerificationQueue() {
     const [loading, setLoading] = useState(canView);
     const [error, setError] = useState('');
     const [active, setActive] = useState(null);
+    // 稽核 FE7b-11：搜尋框輸入先留在 qInput，停手 300ms 才套用到 filters.q 發查詢，
+    // 避免每打一個字就送一次請求。
+    const [qInput, setQInput] = useState('');
     const [exportError, setExportError] = useState('');
 
     useEffect(() => {
@@ -329,6 +345,15 @@ export default function VerificationQueue() {
         return () => { live = false; };
     }, [canView, enabled, load]);
 
+    useEffect(() => {
+        if (qInput === filters.q) return undefined;
+        const timer = setTimeout(() => {
+            setFilters((prev) => ({ ...prev, q: qInput }));
+            setPage(1);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [qInput, filters.q]);
+
     const setFilter = (key, value) => {
         setFilters((prev) => ({ ...prev, [key]: value }));
         setPage(1);
@@ -345,8 +370,14 @@ export default function VerificationQueue() {
             const link = document.createElement('a');
             link.href = url;
             link.download = 'verification-queue-template.csv';
+            // 稽核 FE7b-16：<a> 要先掛進 DOM 才能在所有瀏覽器觸發下載；click() 後立刻
+            // revoke 會讓下載取不到內容，所以延後再回收。
+            document.body.appendChild(link);
             link.click();
-            URL.revokeObjectURL(url);
+            setTimeout(() => {
+                link.remove();
+                URL.revokeObjectURL(url);
+            }, 1000);
         } catch (err) {
             setExportError(err.message);
         }
@@ -405,17 +436,22 @@ export default function VerificationQueue() {
                         <Form.Control
                             aria-label="搜尋詞形"
                             placeholder="搜尋詞形"
-                            value={filters.q}
+                            value={qInput}
                             maxLength={50}
-                            onChange={(e) => setFilter('q', e.target.value)}
+                            onChange={(e) => setQInput(e.target.value)}
                         />
                     </div>
 
                     {loading && !data && (
                         <div className="admin-loading"><Spinner animation="border" /><span>載入中…</span></div>
                     )}
+                    {loading && data && (
+                        <div className="admin-loading" role="status">
+                            <Spinner animation="border" size="sm" /><span>更新中…</span>
+                        </div>
+                    )}
                     {data && (
-                        <div className="admin-table-card">
+                        <div className="admin-table-card" aria-busy={loading}>
                             <AdminTable label="待專家驗證項目" hover className="admin-table">
                                 <thead>
                                     <tr>
@@ -429,7 +465,7 @@ export default function VerificationQueue() {
                                             colSpan={6}
                                             title={Object.values(filters).some(Boolean) ? '沒有符合條件的項目' : '目前沒有待驗證的項目'}
                                             action={Object.values(filters).some(Boolean)
-                                                ? { label: '清除篩選', onClick: () => { setFilters(EMPTY_FILTERS); setPage(1); } }
+                                                ? { label: '清除篩選', onClick: () => { setFilters(EMPTY_FILTERS); setQInput(''); setPage(1); } }
                                                 : undefined}
                                         />
                                     )}

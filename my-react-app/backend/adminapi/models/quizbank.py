@@ -8,6 +8,35 @@ from config.tribes import TRIBES
 _TRIBE_CHOICES = [(t.slug, t.full_name) for t in TRIBES]
 
 
+class LiveContentManager(models.Manager):
+    """排除已軟刪除的題目。"""
+
+    def get_queryset(self):
+        return super().get_queryset().filter(deleted_at__isnull=True)
+
+
+def situation_options_error(options):
+    """情境題選項檢查（稽核 BE2a-14）：恰好 4 個，每個是 {foreign, chinese} 非空字串（有長度上限），
+    四個外語選項不能重複。回傳錯誤訊息，沒問題回 None。"""
+    if not isinstance(options, list) or len(options) != 4:
+        return '選項必須恰好 4 個'
+    seen = set()
+    for index, option in enumerate(options, start=1):
+        if not isinstance(option, dict):
+            return f'第 {index} 個選項格式不正確'
+        for key, label in (('foreign', '族語'), ('chinese', '中文')):
+            value = option.get(key)
+            if not isinstance(value, str) or not value.strip():
+                return f'第 {index} 個選項的{label}不能空白'
+            if len(value) > 200:
+                return f'第 {index} 個選項的{label}不能超過 200 字'
+        normalized = option['foreign'].strip().lower()
+        if normalized in seen:
+            return '四個族語選項不能重複'
+        seen.add(normalized)
+    return None
+
+
 class ReviewableContent(models.Model):
     """題庫類內容（配合題詞彙／克漏字短文／情境題）共用的送審狀態機欄位。
 
@@ -30,6 +59,10 @@ class ReviewableContent(models.Model):
     ]
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT)
+    # 軟刪除（稽核 BE2a-16）：曾送審過或遷移匯入的題目刪除時只標記，保留審核紀錄；
+    # 預設 manager 自動排除，所有既有查詢不用改。要看含已刪除的用 all_objects。
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.CharField(max_length=128, blank=True)
     created_by = models.CharField(max_length=128)
     submitted_by = models.CharField(max_length=128, blank=True)
     submitted_at = models.DateTimeField(null=True, blank=True)
@@ -38,6 +71,9 @@ class ReviewableContent(models.Model):
     review_comment = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = LiveContentManager()
+    all_objects = models.Manager()
 
     class Meta:
         abstract = True
@@ -165,8 +201,9 @@ class QuizSituationItem(ReviewableContent):
         indexes = [models.Index(fields=['tribe', 'status'])]
 
     def clean(self):
-        if not isinstance(self.options, list) or len(self.options) != 4:
-            raise ValidationError({'options': '選項必須恰好 4 個'})
+        options_error = situation_options_error(self.options)
+        if options_error:
+            raise ValidationError({'options': options_error})
         if not (1 <= self.answer <= 4):
             raise ValidationError({'answer': '正解索引必須介於 1 到 4'})
 

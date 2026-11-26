@@ -12,6 +12,10 @@ vi.mock('../../../utils/apiClient', () => ({
     apiPatch: vi.fn(),
 }));
 
+// 關閉功能開關前會先確認（稽核 FE7a-10）
+const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: confirmMock }));
+
 let mockRole = 'owner';
 vi.mock('../../userServives/authContext', () => ({
     useAuth: () => ({ userData: { role: mockRole }, loading: false }),
@@ -43,7 +47,39 @@ describe('FeatureFlags', () => {
         mockRole = 'owner';
         apiGet.mockReset();
         apiPatch.mockReset();
+        confirmMock.mockReset().mockResolvedValue(true);
         apiGet.mockResolvedValue({ results: baseResults });
+    });
+
+    test('關閉開關前先確認；取消則不送出請求、開關維持原狀（稽核 FE7a-10）', async () => {
+        confirmMock.mockResolvedValue(false);
+        render(<FeatureFlags />);
+        const toggle = await screen.findByLabelText('泰雅語測驗 功能開關');
+        fireEvent.click(toggle);
+
+        await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+        expect(confirmMock.mock.calls[0][0].message).toMatch(/立即生效/);
+        expect(apiPatch).not.toHaveBeenCalled();
+        expect(toggle).toBeChecked();
+    });
+
+    test('開啟開關不需要確認', async () => {
+        apiPatch.mockResolvedValueOnce({ ...baseResults[1], enabled: true });
+        render(<FeatureFlags />);
+        fireEvent.click(await screen.findByLabelText('阿美語測驗 功能開關'));
+
+        await waitFor(() => expect(apiPatch).toHaveBeenCalledWith('/adminapi/feature-flags/2/', { enabled: true }));
+        expect(confirmMock).not.toHaveBeenCalled();
+    });
+
+    test('驗證錯誤顯示具體原因，不只是「請求參數錯誤」（稽核 FE7a-05）', async () => {
+        apiPatch.mockRejectedValueOnce(Object.assign(new Error('請求參數錯誤'), {
+            data: { errors: { enabled: ['這個開關目前不能關閉'] } },
+        }));
+        render(<FeatureFlags />);
+        fireEvent.click(await screen.findByLabelText('泰雅語測驗 功能開關'));
+
+        expect(await screen.findByText('這個開關目前不能關閉')).toBeInTheDocument();
     });
 
     test('載入並顯示功能開關', async () => {
@@ -65,7 +101,6 @@ describe('FeatureFlags', () => {
         const toggle = await screen.findByLabelText('泰雅語測驗 功能開關');
         fireEvent.click(toggle);
 
-        expect(toggle).toBeDisabled();
         await waitFor(() => {
             expect(apiPatch).toHaveBeenCalledWith(
                 '/adminapi/feature-flags/1/',
@@ -73,6 +108,21 @@ describe('FeatureFlags', () => {
             );
         });
         expect(await screen.findByText('已關閉「泰雅語測驗」')).toBeInTheDocument();
+    });
+
+    // WP-8 追加：確認流程是非同步的，要用 waitFor 等 disabled 出現；回應回來後才能再操作
+    test('送出中該開關會停用，PATCH 完成後恢復', async () => {
+        let resolvePatch;
+        apiPatch.mockReturnValueOnce(new Promise((resolve) => { resolvePatch = resolve; }));
+
+        render(<FeatureFlags />);
+        const toggle = await screen.findByLabelText('泰雅語測驗 功能開關');
+        fireEvent.click(toggle);
+
+        await waitFor(() => expect(toggle).toBeDisabled());
+
+        resolvePatch({ ...baseResults[0], enabled: false, updated_by: 'owner-uid' });
+        await waitFor(() => expect(toggle).not.toBeDisabled());
     });
 
     test('PATCH 失敗時顯示錯誤並還原開關', async () => {

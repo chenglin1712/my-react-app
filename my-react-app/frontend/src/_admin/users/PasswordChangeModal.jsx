@@ -19,6 +19,8 @@ const EMPTY_PASSWORD_FORM = {
  */
 export default function PasswordChangeModal({ show, user, uid, onClose, onSaved, onError }) {
     const [form, setForm] = useState(EMPTY_PASSWORD_FORM);
+    // 稽核 FE7b-01：錯誤顯示在對話框內，不然會出現在對話框背後的頁面上，操作者看不到。
+    const [localError, setLocalError] = useState('');
     const saveLock = useActionLock();
     const saving = saveLock.isLocked;
 
@@ -29,13 +31,16 @@ export default function PasswordChangeModal({ show, user, uid, onClose, onSaved,
     const close = () => {
         if (saving) return;
         setForm(EMPTY_PASSWORD_FORM);
+        setLocalError('');
         onClose();
     };
 
     const canSubmit = (
         form.newPassword.length >= 6
         && form.confirmPassword === form.newPassword
-        && form.confirmEmail === user?.email
+        // 稽核 FE7b-15：去頭尾空白並忽略大小寫；送出時仍用帳號真實 email。
+        && Boolean(user?.email)
+        && form.confirmEmail.trim().toLowerCase() === user.email.trim().toLowerCase()
     );
 
     const changePassword = (event) => {
@@ -44,11 +49,12 @@ export default function PasswordChangeModal({ show, user, uid, onClose, onSaved,
 
         saveLock.runLocked('change-password', async () => {
             onError('');
+            setLocalError('');
 
             try {
                 const result = await apiPost(`/adminapi/users/${uid}/password/`, {
                     new_password: form.newPassword,
-                    confirm_email: form.confirmEmail,
+                    confirm_email: user.email,
                 });
 
                 setForm(EMPTY_PASSWORD_FORM);
@@ -61,7 +67,7 @@ export default function PasswordChangeModal({ show, user, uid, onClose, onSaved,
                         : '密碼已變更，但撤銷登入狀態失敗，此帳號的舊登入可能仍然有效，請稍後重新嘗試或聯繫系統管理員。',
                 );
             } catch (err) {
-                onError(err.message);
+                setLocalError(err.message);
             }
         });
     };
@@ -80,6 +86,8 @@ export default function PasswordChangeModal({ show, user, uid, onClose, onSaved,
                 </Modal.Header>
 
                 <Modal.Body>
+                    {localError && <Alert variant="danger" role="alert">{localError}</Alert>}
+
                     <Alert variant="danger">
                         此操作無法復原，請輸入該帳號的 email（{user.email}）以確認變更密碼。
                     </Alert>

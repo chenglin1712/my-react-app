@@ -96,7 +96,15 @@ export default function NoteModal({ note, canLike, iLike, canDelete, onToggleLik
           分享者：{note.username || "匿名者"} ❤️ {note.likes || 0}
         </p>
 
-        {canLike && (
+        {/* 已下架的筆記只有管理人員讀得到（firestore.rules 的 read 規則）；沒有標示的話，管理人員會以為
+            它仍然公開，也可能對它按讚（規則會擋，只得到泛用錯誤）（稽核 FE6-19）。 */}
+        {note.deleted === true && (
+          <p className="ns-modal-sub" role="status">
+            此筆記已下架，只有管理人員看得到。
+          </p>
+        )}
+
+        {canLike && note.deleted !== true && (
           <div style={{ marginBottom: "0.75rem" }}>
             <button
               type="button"
@@ -131,9 +139,11 @@ export default function NoteModal({ note, canLike, iLike, canDelete, onToggleLik
               刪除筆記
             </button>
           )}
-          <button type="button" className="ns-btn" onClick={() => setShowReportForm((v) => !v)}>
-            檢舉
-          </button>
+          {note.deleted !== true && (
+            <button type="button" className="ns-btn" onClick={() => setShowReportForm((v) => !v)}>
+              檢舉
+            </button>
+          )}
           <button type="button" className="ns-btn" onClick={onClose}>
             關閉
           </button>

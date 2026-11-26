@@ -1,8 +1,9 @@
+import { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../userServives/authContext';
 import { STAFF_ROLES } from './constants/roles';
 import AdminEntryFallback from './entry/AdminEntryFallback';
-import { hasAdminSession } from './session/adminSession';
+import { endAdminLogout, hasAdminSession, isAdminLogoutInProgress } from './session/adminSession';
 
 // STAFF_ROLES 跟後端 backend/config/roles.py 的同名常數保持一致——這裡只是
 // 前端的 UX 層守衛（早一步擋掉明顯沒有權限的畫面），不是信任邊界，真正的
@@ -16,8 +17,17 @@ const AdminRoute = ({ children }) => {
     const { userData, loading } = useAuth();
     const location = useLocation();
 
+    // WP-8 追加：登出流程結束（離開後台、這個元件卸載）時清掉「正在登出」旗標，之後再進後台照常導去登入頁
+    useEffect(() => endAdminLogout, []);
+
     // 登入狀態還沒確認前不能渲染後台，也不能留一片空白：沿用入口載入畫面，文案改成正在確認工作階段
     if (loading) return <AdminEntryFallback message="正在確認工作階段" />;
+
+    // WP-8 追加：使用者按了後台的「登出」：auth 狀態變成 null 時直接回前台首頁，
+    // 不要導去 /admin-login?next=…（那是給「工作階段失效、要重新登入」的情況用的）
+    if ((!userData || !hasAdminSession(userData.uid)) && isAdminLogoutInProgress()) {
+        return <Navigate to="/" replace />;
+    }
 
     if (!userData) {
         const next = encodeURIComponent(location.pathname + location.search);

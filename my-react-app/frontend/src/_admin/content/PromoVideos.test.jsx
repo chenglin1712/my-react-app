@@ -299,4 +299,111 @@ describe('PromoVideos', () => {
     unmount();
     expect(aborted).toBe(true);
   });
+
+  /** 稽核 FE7b-05：上傳中切換影片或離開頁面，上傳會被靜默中止；現在和未儲存的文字變更走同一套確認。 */
+  test('上傳進行中切換到另一支影片：先確認，留在這裡則上傳不被中止', async () => {
+    let aborted = false;
+    apiPost.mockImplementationOnce((url, body, options) => new Promise(() => {
+      options.signal.addEventListener('abort', () => { aborted = true; });
+    }));
+    render(<PromoVideos />);
+    await openVideo('介紹影片');
+    fireEvent.change(await screen.findByLabelText('影片檔', { selector: 'input' }), { target: { files: [new File(['x'], 'v.mp4')] } });
+    await screen.findByRole('button', { name: '取消上傳' });
+
+    fireEvent.click(screen.getByRole('button', { name: /完整影片/ }));
+    expect(await screen.findByText(/正在上傳檔案/)).toBeInTheDocument();
+    expect(aborted).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: '留在這裡' }));
+    expect(screen.getByRole('button', { name: '取消上傳' })).toBeInTheDocument();
+    expect(aborted).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: /完整影片/ }));
+    fireEvent.click(await screen.findByRole('button', { name: '放棄變更並切換' }));
+    await waitFor(() => expect(screen.getByLabelText('標題')).toHaveValue('完整影片'));
+    expect(aborted).toBe(true);
+  });
+
+  test('上傳進行中關閉分頁會觸發瀏覽器的離開確認；上傳結束後解除', async () => {
+    let finish;
+    apiPost.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    render(<PromoVideos />);
+    await openVideo('介紹影片');
+    fireEvent.change(await screen.findByLabelText('影片檔', { selector: 'input' }), { target: { files: [new File(['x'], 'v.mp4')] } });
+    await screen.findByRole('button', { name: '取消上傳' });
+
+    const during = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(during);
+    expect(during.defaultPrevented).toBe(true);
+
+    finish(full);
+    await waitFor(() => expect(screen.queryByRole('button', { name: '取消上傳' })).not.toBeInTheDocument());
+    await waitFor(() => {
+      const after = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(after);
+      expect(after.defaultPrevented).toBe(false);
+    });
+  });
+
+  test('封面、字幕上傳中也有「取消上傳」', async () => {
+    apiPost.mockImplementationOnce((url, body, options) => new Promise(() => {
+      options.signal.addEventListener('abort', () => {});
+    }));
+    render(<PromoVideos />);
+    await openVideo('完整影片');
+    fireEvent.change(await screen.findByLabelText('封面圖', { selector: 'input' }), {
+      target: { files: [new File(['x'], 'c.jpg', { type: 'image/jpeg' })] },
+    });
+    expect(await screen.findByRole('button', { name: '取消上傳' })).toBeInTheDocument();
+  });
+
+  /** 稽核 FE7b-08：宣傳影片文字儲存帶 updated_at；啟用開關這種單一欄位動作不帶。 */
+  describe('並行編輯保護', () => {
+    const stamped = { ...empty, updated_at: '2026-08-01T00:00:00Z' };
+
+    test('儲存文字內容帶載入時的 updated_at；成功後換成回應裡的新值', async () => {
+      apiGet.mockResolvedValue(listOf([stamped]));
+      apiPatch.mockResolvedValueOnce({ ...stamped, title: '改過', updated_at: '2026-08-02T00:00:00Z' });
+      apiPatch.mockResolvedValueOnce({ ...stamped, title: '再改', updated_at: '2026-08-03T00:00:00Z' });
+      render(<PromoVideos />);
+      await openVideo('介紹影片');
+      fireEvent.change(await screen.findByLabelText('標題'), { target: { value: '改過' } });
+      fireEvent.click(screen.getByRole('button', { name: /儲存文字內容/ }));
+      await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(1));
+      expect(apiPatch.mock.calls[0][1]).toHaveProperty('base_updated_at', '2026-08-01T00:00:00Z');
+
+      await screen.findByText('已儲存');
+      fireEvent.change(screen.getByLabelText('標題'), { target: { value: '再改' } });
+      fireEvent.click(screen.getByRole('button', { name: /儲存文字內容/ }));
+      await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(2));
+      expect(apiPatch.mock.calls[1][1]).toHaveProperty('base_updated_at', '2026-08-02T00:00:00Z');
+    });
+
+    test('409 edit_conflict：顯示「有人剛更新過」；載入最新版本後表單換成伺服器內容', async () => {
+      apiGet.mockResolvedValue(listOf([stamped]));
+      apiPatch.mockRejectedValueOnce(Object.assign(new Error('內容已被其他人更新'), { status: 409, data: { code: 'edit_conflict' } }));
+      render(<PromoVideos />);
+      await openVideo('介紹影片');
+      fireEvent.change(await screen.findByLabelText('標題'), { target: { value: '我改的' } });
+      fireEvent.click(screen.getByRole('button', { name: /儲存文字內容/ }));
+
+      expect(await screen.findByText(/有人剛更新過/)).toBeInTheDocument();
+      expect(screen.getByLabelText('標題')).toHaveValue('我改的');
+
+      apiGet.mockResolvedValueOnce({ ...stamped, title: '別人改的', updated_at: '2026-08-09T00:00:00Z' });
+      fireEvent.click(screen.getByRole('button', { name: '載入最新版本' }));
+      await waitFor(() => expect(screen.getByLabelText('標題')).toHaveValue('別人改的'));
+      expect(screen.queryByText(/有人剛更新過/)).not.toBeInTheDocument();
+    });
+
+    test('設為首頁宣傳影片（單一欄位動作）不帶 base_updated_at', async () => {
+      apiGet.mockResolvedValue(listOf([{ ...full, updated_at: '2026-08-01T00:00:00Z' }]));
+      apiPatch.mockResolvedValueOnce({});
+      render(<PromoVideos />);
+      await openVideo('完整影片');
+      fireEvent.click(await screen.findByRole('button', { name: '設為首頁宣傳影片' }));
+      fireEvent.click(await screen.findByRole('button', { name: '確定設為首頁使用' }));
+      await waitFor(() => expect(apiPatch).toHaveBeenCalledWith('/adminapi/homepage-config/', { active_promo_video: 2 }));
+    });
+  });
 });

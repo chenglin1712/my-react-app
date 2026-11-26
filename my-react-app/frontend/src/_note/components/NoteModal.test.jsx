@@ -19,6 +19,22 @@ function renderModal(overrides = {}) {
 }
 
 describe('NoteModal', () => {
+  // 稽核 FE6-19：只有管理人員讀得到已下架的筆記，沒有標示會讓人以為它仍然公開
+  test('FE6-19：已下架（deleted: true）的筆記顯示下架說明，並隱藏按讚與檢舉', () => {
+    renderModal({ note: { ...NOTE, deleted: true } });
+    expect(screen.getByText('此筆記已下架，只有管理人員看得到。')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '按讚' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '檢舉' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '關閉' })).toBeInTheDocument();
+  });
+
+  test('FE6-19：一般（未下架）筆記沒有下架說明，按讚與檢舉照常顯示', () => {
+    renderModal();
+    expect(screen.queryByText(/已下架/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '按讚' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '檢舉' })).toBeInTheDocument();
+  });
+
   test('回歸測試：note.pages 是空陣列時不會丟例外，標題退回預設文字', () => {
     renderModal({ note: { ...NOTE, pages: [] } });
     expect(screen.getByRole('heading', { name: '筆記內容' })).toBeInTheDocument();

@@ -139,7 +139,7 @@ export default function UserDetail() {
     setShowProfileModal(false);
     if (uidRef.current !== uid) return;
     setSuccessMessage(message);
-    await loadUser();
+    await loadUser({ background: true });
   };
 
   const handlePasswordSaved = (message) => {

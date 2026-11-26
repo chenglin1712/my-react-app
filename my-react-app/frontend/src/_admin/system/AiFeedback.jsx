@@ -3,6 +3,7 @@ import { Alert, Button, Form, Spinner } from 'react-bootstrap';
 import AdminTable from '../components/AdminTable';
 import { useAuth } from '../../userServives/authContext';
 import { apiGet, apiPost } from '../../../utils/apiClient';
+import { formatApiError } from '../apiErrors';
 import '../../../static/css/_admin/system.css';
 import '../../../static/css/_admin/ai-usage.css';
 import '../../../static/css/_admin/ai-feedback.css';
@@ -104,7 +105,7 @@ export default function AiFeedback() {
             } catch (err) {
                 if (active) {
                     setData(null); // 不能繼續顯示上一組篩選的結果
-                    setError(err.message);
+                    setError(formatApiError(err));
                 }
             } finally {
                 if (active) setLoading(false);
@@ -129,7 +130,7 @@ export default function AiFeedback() {
                 summary: { ...prev.summary, candidates: prev.summary.candidates + (candidate ? 1 : -1) },
             }));
         } catch (err) {
-            setError(err.message);
+            setError(formatApiError(err));
         } finally {
             setBusyId(null);
         }

@@ -117,12 +117,14 @@ if [ -n "$DICT_URL" ] && [ "$DICT_URL" != "$DB_URL" ]; then
   dump_one dictionary "$DICT_URL"
 fi
 
+# 稽核 BE5-12：bucket 也可以寫在 .env（deploy.sh 的部署前檢查會讀那裡）
+FIRESTORE_BACKUP_BUCKET="${FIRESTORE_BACKUP_BUCKET:-$(env_value FIRESTORE_BACKUP_BUCKET)}"
 if [ -n "${FIRESTORE_BACKUP_BUCKET:-}" ]; then
   echo "==> Firestore 匯出 -> $FIRESTORE_BACKUP_BUCKET/firestore/$STAMP"
   command -v gcloud >/dev/null 2>&1 || { echo "!! 找不到 gcloud" >&2; exit 1; }
   gcloud firestore export "$FIRESTORE_BACKUP_BUCKET/firestore/$STAMP"
 else
-  echo "==> 略過 Firestore（未設定 FIRESTORE_BACKUP_BUCKET；Firestore 與 Firebase Auth 目前沒有被備份）"
+  echo "!! 略過 Firestore（未設定 FIRESTORE_BACKUP_BUCKET；Firestore 與 Firebase Auth 目前沒有被備份）" >&2
 fi
 
 if [ -n "${STORAGE_BACKUP_BUCKET:-}" ] && [ -n "${STORAGE_SOURCE_BUCKET:-}" ]; then

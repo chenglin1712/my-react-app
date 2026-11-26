@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Form, Modal } from 'react-bootstrap';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../../../../firebase';
@@ -17,13 +17,20 @@ export default function AdminReauthModal() {
     const [error, setError] = useState('');
     const [busy, setBusy] = useState(false);
     const [done, setDone] = useState(false);
+    // 同一批請求同時回 401 會連發多次事件；視窗已經開著（而且還沒驗證完）時，後來的事件不能把使用者
+    // 正在輸入的密碼清掉。用 ref 同步記錄，不能靠 state（同一個 tick 內讀到的還是舊值）（稽核 FE7a-18）。
+    const openRef = useRef(false);
+    const doneRef = useRef(false);
+    const markDone = (value) => { doneRef.current = value; setDone(value); };
+    const markShow = (value) => { openRef.current = value; setShow(value); };
 
     useEffect(() => {
         const open = () => {
+            if (openRef.current && !doneRef.current) return;
             setPassword('');
             setError('');
-            setDone(false);
-            setShow(true);
+            markDone(false);
+            markShow(true);
         };
         window.addEventListener(REAUTH_REQUIRED_EVENT, open);
         return () => window.removeEventListener(REAUTH_REQUIRED_EVENT, open);
@@ -48,7 +55,7 @@ export default function AdminReauthModal() {
             // 強制換發新的 ID token：舊 token 裡的 auth_time 還是過期的那一個
             await auth.currentUser.getIdToken(true);
             markAdminSession(auth.currentUser.uid);
-            setDone(true);
+            markDone(true);
             setPassword('');
         } catch (err) {
             if (err?.code?.includes('auth/invalid-credential') || err?.code?.includes('auth/wrong-password')) {
@@ -64,7 +71,7 @@ export default function AdminReauthModal() {
     };
 
     return (
-        <Modal show={show} onHide={() => !busy && setShow(false)} centered backdrop="static" dialogClassName="admin-reauth-dialog">
+        <Modal show={show} onHide={() => !busy && markShow(false)} centered backdrop="static" dialogClassName="admin-reauth-dialog">
             <Form onSubmit={submit}>
                 <Modal.Header closeButton={!busy}>
                     <Modal.Title>請重新驗證身分</Modal.Title>
@@ -97,10 +104,10 @@ export default function AdminReauthModal() {
                 </Modal.Body>
                 <Modal.Footer>
                     {done ? (
-                        <Button variant="primary" onClick={() => setShow(false)}>關閉</Button>
+                        <Button variant="primary" onClick={() => markShow(false)}>關閉</Button>
                     ) : (
                         <>
-                            <Button variant="outline-secondary" onClick={() => setShow(false)} disabled={busy}>稍後再說</Button>
+                            <Button variant="outline-secondary" onClick={() => markShow(false)} disabled={busy}>稍後再說</Button>
                             <Button type="submit" variant="primary" disabled={busy}>驗證</Button>
                         </>
                     )}

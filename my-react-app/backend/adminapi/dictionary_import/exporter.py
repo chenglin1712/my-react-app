@@ -47,6 +47,8 @@ def _tree_to_bundle_entry(tree: dict, name_by_id: dict) -> dict:
                                 "items": [
                                     {
                                         "id": item["id"], "word_name": item["word_name"] or "",
+                                        # 稽核 BE2b-02：同族語同名詞條很多，只靠詞形重新匯入會解析成空值而清掉連結
+                                        "word_id": item.get("word_id"),
                                         "name": item["name"] or "",
                                     }
                                     for item in ana["items"]

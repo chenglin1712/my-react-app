@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse
 from bs4 import BeautifulSoup
 
 from fastAPI import rate_limit_config
+from fastAPI.executors import crawler_executor, run_in
 from fastAPI.rate_limit import limiter
 
 router = APIRouter()
@@ -219,8 +220,8 @@ async def search_tayal_dictionary(request: Request):
                 status_code=400,
             )
 
-        loop = asyncio.get_event_loop()
-        tasks = [loop.run_in_executor(None, query, word) for word in words]
+        # 稽核 BE4-03：爬蟲是對外連線、可能很慢，用專用且有上限的池子，不佔用 Firebase 驗證等共用的預設池
+        tasks = [run_in(crawler_executor, query, word) for word in words]
         results_list = await asyncio.gather(*tasks)
         results = dict(zip(words, results_list))
 

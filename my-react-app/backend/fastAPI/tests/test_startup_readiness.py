@@ -174,3 +174,37 @@ def test_preload_gives_up_after_limited_attempts_and_stays_unready():
     """重試有上限：持續失敗（例如權重檔損毀）最後仍維持 503，讓部署被擋下，且不會無限重試。"""
     status, calls = _ready_status_with_model_side_effects(RuntimeError("corrupted weights"))
     assert (status, calls) == (503, main_module._PRELOAD_ATTEMPTS)
+
+
+def test_ready_is_503_when_neither_dictionary_nor_quiz_cache_could_be_warmed():
+    """稽核 BE4-15：所有快取預熱都失敗（幾乎一定是資料庫連不上）時 /ready 不能回 200，
+    部署的健康檢查才擋得住有問題的版本。"""
+    app = main_module.app
+    app.state.caches_warm = False
+    with patch.object(main_module, "_WARM_CACHE_JITTER_MAX_SECONDS", 0), \
+         patch.object(main_module.listening, "warm_cache", side_effect=RuntimeError("db down")), \
+         patch.object(main_module.sentence, "warm_cache", side_effect=RuntimeError("db down")), \
+         patch.object(main_module.quiz, "warm_cache", side_effect=RuntimeError("db down")), \
+         patch.object(main_module.dictionary, "warm_cache", side_effect=RuntimeError("db down")), \
+         patch.object(main_module, "SessionLocal") as mock_session_local:
+        mock_session_local.return_value.close = lambda: None
+        main_module._warm_caches(app)
+    assert app.state.caches_warm is True
+    assert app.state.caches_usable is False
+    with TestClient(app, raise_server_exceptions=False) as client:
+        app.state.caches_warm = True
+        app.state.caches_usable = False
+        assert client.get("/ready").status_code == 503
+
+
+def test_ready_needs_only_one_of_dictionary_or_quiz():
+    app = main_module.app
+    with patch.object(main_module, "_WARM_CACHE_JITTER_MAX_SECONDS", 0), \
+         patch.object(main_module.listening, "warm_cache", side_effect=RuntimeError("boom")), \
+         patch.object(main_module.sentence, "warm_cache"), \
+         patch.object(main_module.quiz, "warm_cache"), \
+         patch.object(main_module.dictionary, "warm_cache", side_effect=RuntimeError("boom")), \
+         patch.object(main_module, "SessionLocal") as mock_session_local:
+        mock_session_local.return_value.close = lambda: None
+        main_module._warm_caches(app)
+    assert app.state.caches_usable is True

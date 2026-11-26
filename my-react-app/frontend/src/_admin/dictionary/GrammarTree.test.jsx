@@ -5,7 +5,10 @@ import {
     screen,
     waitFor,
 } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import {
+    MemoryRouter, Route, Routes, useLocation, useNavigate,
+} from 'react-router-dom';
+import { confirmAction } from '@components/ui/ConfirmDialog';
 import {
     beforeEach,
     describe,
@@ -15,6 +18,8 @@ import {
 } from 'vitest';
 import GrammarTree from './GrammarTree';
 import {
+    getGrammarSection,
+    listNewWordRevisions,
     listGrammarSections,
     listTaxonomies,
     reorderGrammarSections,
@@ -28,16 +33,22 @@ vi.mock('../../userServives/authContext', () => ({
     }),
 }));
 
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: vi.fn(() => Promise.resolve(true)) }));
+
 vi.mock('./dictionaryApi', () => ({
+    getGrammarSection: vi.fn(),
+    listNewWordRevisions: vi.fn(() => Promise.resolve({ results: [] })),
     listTaxonomies: vi.fn(),
     listGrammarSections: vi.fn(),
     reorderGrammarSections: vi.fn(),
 }));
 
 vi.mock('./GrammarNodePanel', () => ({
-    default: ({ sectionId }) => (
-        <div data-testid="grammar-node-panel">
+    default: ({ sectionId, onDirtyChange, focusOnLoad, onCreated }) => (
+        <div data-testid="grammar-node-panel" data-focus-on-load={String(Boolean(focusOnLoad))}>
             {sectionId === null ? '新增面板' : `章節 ${sectionId}`}
+            <button type="button" onClick={() => onDirtyChange?.(true)}>模擬編輯</button>
+            <button type="button" onClick={() => onCreated?.(77)}>模擬第一次存檔</button>
         </div>
     ),
 }));
@@ -73,9 +84,9 @@ const tribeOneSections = {
     ],
 };
 
-function renderPage() {
+function renderPage(path = '/admin/dictionary/grammar') {
     return render(
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[path]}>
             <GrammarTree />
         </MemoryRouter>,
     );
@@ -85,6 +96,7 @@ describe('GrammarTree', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockRole = 'editor';
+        confirmAction.mockResolvedValue(true);
 
         listTaxonomies.mockResolvedValue(taxonomies);
         listGrammarSections.mockImplementation((tribeId) => (
@@ -100,6 +112,36 @@ describe('GrammarTree', () => {
             )
         ));
         reorderGrammarSections.mockResolvedValue({ detail: 'ok' });
+    });
+
+    it('WP-8 追加：新建章節第一次存檔用 replace 換到提案網址，上一頁不會回到未存檔的新增畫面', async () => {
+        function RevisionPage() {
+            const navigate = useNavigate();
+            const location = useLocation();
+            return (
+                <div>
+                    <span>提案頁 {location.pathname} {location.state?.flash}</span>
+                    <button type="button" onClick={() => navigate(-1)}>上一頁</button>
+                </div>
+            );
+        }
+        render(
+            <MemoryRouter initialEntries={['/start', '/admin/dictionary/grammar']} initialIndex={1}>
+                <Routes>
+                    <Route path="/start" element={<div>起始頁</div>} />
+                    <Route path="/admin/dictionary/grammar" element={<GrammarTree />} />
+                    <Route path="/admin/dictionary/revisions/:id" element={<RevisionPage />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+
+        await screen.findByText('基礎句型');
+        fireEvent.click(screen.getByRole('button', { name: /新增章節/ }));
+        fireEvent.click(await screen.findByRole('button', { name: '模擬第一次存檔' }));
+
+        expect(await screen.findByText('提案頁 /admin/dictionary/revisions/77 草稿已儲存')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: '上一頁' }));
+        expect(await screen.findByText('起始頁')).toBeInTheDocument();
     });
 
     it('loads sections and renders revision badges', async () => {
@@ -163,7 +205,8 @@ describe('GrammarTree', () => {
         await screen.findByText('基礎句型');
         fireEvent.click(screen.getByRole('button', { name: /新增章節/ }));
 
-        expect(screen.getByText('新增面板')).toBeInTheDocument();
+        // 切換前會先檢查未儲存變更（非同步），所以要等面板出現
+        expect(await screen.findByText('新增面板')).toBeInTheDocument();
     });
 
     it('reorders with the complete ordered section id array', async () => {
@@ -204,6 +247,86 @@ describe('GrammarTree', () => {
         expect(screen.queryByRole('button', { name: /下移章節/ })).not.toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', { name: /基礎句型/ }));
+        expect(await screen.findByText('章節 10')).toBeInTheDocument();
+    });
+
+    it('稽核 FE7a-16：選取的章節標示 aria-current，並要求面板載入後取得焦點', async () => {
+        renderPage();
+        await screen.findByText('基礎句型');
+
+        fireEvent.click(screen.getByRole('button', { name: /^基礎句型/ }));
+        const panel = await screen.findByTestId('grammar-node-panel');
+
+        expect(screen.getByRole('button', { name: /^基礎句型/ })).toHaveAttribute('aria-current', 'true');
+        expect(screen.getByRole('button', { name: /^動詞/ })).not.toHaveAttribute('aria-current');
+        expect(screen.getByRole('button', { name: /^基礎句型/ }).closest('.dictionary-nested-card')).toHaveClass('is-selected');
+        expect(panel).toHaveAttribute('data-focus-on-load', 'true');
+    });
+
+    it('稽核 FE7a-04：面板有未儲存變更時，切換章節先確認；取消則留在原章節', async () => {
+        renderPage();
+        await screen.findByText('基礎句型');
+
+        fireEvent.click(screen.getByRole('button', { name: /^基礎句型/ }));
+        await screen.findByText('章節 10');
+        fireEvent.click(screen.getByRole('button', { name: '模擬編輯' }));
+
+        confirmAction.mockResolvedValueOnce(false);
+        fireEvent.click(screen.getByRole('button', { name: /^動詞/ }));
+
+        await waitFor(() => expect(confirmAction).toHaveBeenCalledTimes(1));
         expect(screen.getByText('章節 10')).toBeInTheDocument();
+
+        confirmAction.mockResolvedValueOnce(true);
+        fireEvent.click(screen.getByRole('button', { name: /^動詞/ }));
+        expect(await screen.findByText('章節 20')).toBeInTheDocument();
+    });
+
+    it('稽核 FE7a-04：面板有未儲存變更時，切換族語先確認；取消則不切換', async () => {
+        renderPage();
+        await screen.findByText('基礎句型');
+
+        fireEvent.click(screen.getByRole('button', { name: /^基礎句型/ }));
+        await screen.findByText('章節 10');
+        fireEvent.click(screen.getByRole('button', { name: '模擬編輯' }));
+
+        confirmAction.mockResolvedValueOnce(false);
+        fireEvent.change(screen.getByLabelText(/^族語$/), { target: { value: '2' } });
+
+        await waitFor(() => expect(confirmAction).toHaveBeenCalledTimes(1));
+        expect(listGrammarSections).not.toHaveBeenCalledWith('2');
+        expect(screen.getByText('章節 10')).toBeInTheDocument();
+    });
+
+    it('沒有未儲存變更時切換章節不跳確認', async () => {
+        renderPage();
+        await screen.findByText('基礎句型');
+
+        fireEvent.click(screen.getByRole('button', { name: /^基礎句型/ }));
+        await screen.findByText('章節 10');
+        fireEvent.click(screen.getByRole('button', { name: /^動詞/ }));
+
+        expect(await screen.findByText('章節 20')).toBeInTheDocument();
+        expect(confirmAction).not.toHaveBeenCalled();
+    });
+
+    it('稽核 FE7a-02：列出我的新建章節草稿與待審的新建章節', async () => {
+        listNewWordRevisions.mockResolvedValue({
+            results: [{ id: 55, status: 'draft', title: '新章節草稿', tribe: 'tribe-one' }],
+        });
+        renderPage();
+
+        const link = await screen.findByRole('link', { name: '新章節草稿' });
+        expect(link).toHaveAttribute('href', '/admin/dictionary/revisions/55');
+        expect(listNewWordRevisions).toHaveBeenCalledWith('grammar_section');
+    });
+
+    it('稽核 FE7a-02：以 ?section= 開啟時切到該章節的族語並選取它', async () => {
+        getGrammarSection.mockResolvedValue({ id: 30, tribe_id: 2, title: '族語二章節' });
+        renderPage('/admin/dictionary/grammar?section=30');
+
+        expect(await screen.findByText('章節 30')).toBeInTheDocument();
+        expect(getGrammarSection).toHaveBeenCalledWith('30');
+        expect(listGrammarSections).toHaveBeenCalledWith('2');
     });
 });

@@ -6,11 +6,22 @@
 只有在 key 完全沒出現在環境變數裡才生效，.env.example 留空字串當範本一樣算
 「有出現」，會變成空白名單擋掉所有跨來源請求。
 """
+import logging
 import os
+
+from config.debug_flag import is_debug
 
 _DEFAULT_DEV_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
 
 
 def get_allowed_origins() -> list:
     raw = os.getenv("ALLOWED_ORIGINS") or _DEFAULT_DEV_ORIGINS
-    return [o.strip() for o in raw.split(",") if o.strip()]
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
+    # 稽核 BE4-17：萬用字元 "*" 會讓任何網站都能從瀏覽器呼叫 API。非除錯環境一律拒絕，
+    # 其餘來源照常生效，並大聲記錄，讓人看得到設定錯了。
+    if "*" in origins and not is_debug():
+        logging.getLogger(__name__).error(
+            "ALLOWED_ORIGINS 含有萬用字元 '*'，正式環境已忽略；請改列出實際的網站來源"
+        )
+        origins = [o for o in origins if o != "*"]
+    return origins

@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import Game_crossword_board from './game_crossword_board';
@@ -8,7 +8,8 @@ import { apiGet } from '../../utils/apiClient';
 vi.mock('../../utils/apiClient', () => ({ apiGet: vi.fn() }));
 
 const VALID_RESPONSE = {
-  grid_solution: ['ab', 'c-'],
+  puzzle_token: 'token-abc',
+  grid_solution: ['__', '_-'],
   legend: [{ number: 1, direction: 'across', start_row: 1, start_col: 1, clue: '線索一' }],
   grid_display: ['1 ', '  '],
 };
@@ -42,10 +43,21 @@ describe('Game_crossword_board（回歸測試：原本題目還沒載入完成�
     const payload = ref.current.getSubmissionPayload();
     expect(payload).toEqual({
       user_answers: [['', ''], ['', '-']],
-      crossword_solution: VALID_RESPONSE.grid_solution,
-      crossword_legend: VALID_RESPONSE.legend,
-      crossword_grid_display: VALID_RESPONSE.grid_display,
+      puzzle_token: 'token-abc',
     });
+    // 稽核 BE5-09：解答與圖例不再由前端送出，判分用的是後端憑證裡的內容
+    expect(payload).not.toHaveProperty('crossword_solution');
+    expect(payload).not.toHaveProperty('crossword_legend');
+  });
+
+  test('沒有題目憑證時不給提交內容（舊版後端回應、或憑證遺失）', async () => {
+    const { puzzle_token: _omit, ...withoutToken } = VALID_RESPONSE;
+    apiGet.mockResolvedValueOnce(withoutToken);
+    const ref = createRef();
+    render(<Game_crossword_board ref={ref} tribe="tayal" onReadyChange={vi.fn()} />);
+
+    await screen.findByText('橫向題目');
+    expect(ref.current.getSubmissionPayload()).toBeNull();
   });
 
   test('後端回傳格式不符時顯示錯誤，不會直接把不完整的資料當成正常題目（回歸測試：原本沒有驗證回應形狀，格式錯誤會直接拋例外）', async () => {
@@ -111,6 +123,39 @@ describe('Game_crossword_board 的鍵盤操作（E-5，P1-13）', () => {
     expect(cell('第 1 列第 2 欄')).toHaveFocus();
     await user.keyboard('b');
     expect(cell('第 1 列第 3 欄')).toHaveFocus();
+  });
+
+  // 稽核 FE5-16：Android 鍵盤輸入拉丁字母常走組字流程，原本永遠不跳格
+  test('組字結束（compositionend）時取最後一個字元寫入並跳到下一格', async () => {
+    render(<Game_crossword_board tribe="tayal" />);
+    await screen.findByText('橫向題目');
+    const first = cell('第 1 列第 1 欄');
+    first.focus();
+    fireEvent.compositionStart(first);
+    // 組字中的 input 事件：值必須寫進 state（否則受控 input 會被 React 改回舊值、吃掉輸入），但不跳格
+    fireEvent.input(first, { target: { value: 'a' }, isComposing: true });
+    expect(first).toHaveValue('a');
+    expect(first).toHaveFocus();
+    fireEvent.input(first, { target: { value: 'ab' }, isComposing: true });
+    expect(first).toHaveValue('ab');
+    // compositionend 時不再塞 target.value：用組字中保留下來的 DOM 值收尾
+    fireEvent.compositionEnd(first);
+    expect(first).toHaveValue('b');
+    expect(cell('第 1 列第 2 欄')).toHaveFocus();
+  });
+
+  test('Firefox 的順序（compositionend 之後才再送 input）不會重複寫入或多跳一格', async () => {
+    render(<Game_crossword_board tribe="tayal" />);
+    await screen.findByText('橫向題目');
+    const first = cell('第 1 列第 1 欄');
+    first.focus();
+    fireEvent.input(first, { target: { value: 'a' }, isComposing: true });
+    fireEvent.compositionEnd(first);
+    expect(cell('第 1 列第 2 欄')).toHaveFocus();
+    // 緊接著那一次非組字的 input，內容已經處理過，要被忽略
+    fireEvent.input(first, { target: { value: 'a' } });
+    expect(first).toHaveValue('a');
+    expect(cell('第 1 列第 2 欄')).toHaveFocus();
   });
 
   test('方向鍵移動、跳過黑格；按下鍵後輸入會往下填', async () => {

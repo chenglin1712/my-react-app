@@ -9,12 +9,34 @@ import {
 import AdminTable from '../components/AdminTable';
 import { RotateCcw, Save, Search } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
+import { confirmAction } from '@components/ui/ConfirmDialog';
 import { apiGet, apiPatch } from '../../../utils/apiClient';
+import { formatApiError } from '../apiErrors';
+import EditConflictAlert from '../components/EditConflictAlert';
+import { isEditConflict } from '../hooks/editConflict';
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import '../../../static/css/_admin/system.css';
 import { SuccessNotice } from '../components/AdminToast';
 
 const PUBLISHERS = ['owner', 'admin'];
 const STAFF_ROLES = ['owner', 'admin', 'editor', 'reviewer', 'analyst'];
+
+// 與後端 RateLimitRuleSerializer.validate_rate 同一套規則：格式、依後端分的單位、次數至少 1。
+// 前端先預檢，讓格式錯誤在輸入時就看得到，不用等按下儲存才被 400 擋回（稽核 FE7a-20）。
+const DJANGO_UNITS = ['s', 'm', 'h', 'd'];
+const FASTAPI_UNITS = ['second', 'minute', 'hour', 'day'];
+
+function validateRate(value, backend) {
+    const match = /^(\d+)\/(s|m|h|d|second|minute|hour|day)$/.exec((value ?? '').trim());
+    if (!match) return '格式不正確，範例："30/m"（Django）或 "20/minute"（FastAPI）';
+    const [, count, unit] = match;
+    const units = backend === 'django' ? DJANGO_UNITS : FASTAPI_UNITS;
+    if (!units.includes(unit)) {
+        return `這筆規則屬於 ${backend === 'django' ? 'Django' : 'FastAPI'}，範例：${backend === 'django' ? '"30/m"' : '"20/minute"'}`;
+    }
+    if (Number(count) < 1) return '請求次數必須至少為 1';
+    return '';
+}
 
 export default function RateLimitSettings() {
     const { userData } = useAuth();
@@ -30,6 +52,9 @@ export default function RateLimitSettings() {
     const [savingId, setSavingId] = useState(null);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    // 收到 409 的那一列：提示「有人剛更新過」，並提供只重新載入這一列的出路（稽核 FE7b-08）
+    const [conflictItem, setConflictItem] = useState(null);
+    const [reloadingConflict, setReloadingConflict] = useState(false);
 
     useEffect(() => {
         let active = true;
@@ -52,7 +77,7 @@ export default function RateLimitSettings() {
                     rows.map((item) => [item.id, item.rate]),
                 ));
             } catch (err) {
-                if (active) setError(err.message);
+                if (active) setError(formatApiError(err));
             } finally {
                 if (active) setLoading(false);
             }
@@ -77,9 +102,43 @@ export default function RateLimitSettings() {
         setDrafts((current) => ({ ...current, [id]: value }));
     };
 
+    const dirtyCount = items.filter((item) => (drafts[item.id] ?? item.rate) !== item.rate).length;
+    useUnsavedChangesGuard(dirtyCount > 0);
+
+    // 切換「後端」會重新載入並覆蓋所有草稿；有沒存的修改時先確認，不要無聲丟掉（稽核 FE7a-20）
+    const changeBackend = async (next) => {
+        if (next === backend) return;
+        if (dirtyCount > 0) {
+            const confirmed = await confirmAction({
+                title: '切換後端篩選',
+                message: `目前有 ${dirtyCount} 筆限流值尚未儲存，切換後會被捨棄。確定要切換嗎？`,
+                confirmLabel: '捨棄並切換',
+            });
+            if (!confirmed) return;
+        }
+        setBackend(next);
+    };
+
+    const reloadConflict = async () => {
+        if (!conflictItem) return;
+        setReloadingConflict(true);
+        try {
+            const latest = await apiGet(`/adminapi/rate-limit-rules/${conflictItem.id}/`);
+            setItems((current) => current.map((row) => (row.id === latest.id ? latest : row)));
+            setDrafts((current) => ({ ...current, [latest.id]: latest.rate }));
+            setConflictItem(null);
+            setError('');
+        } catch (err) {
+            setError(formatApiError(err));
+        } finally {
+            setReloadingConflict(false);
+        }
+    };
+
     const save = async (item) => {
         setError('');
         setSuccess('');
+        setConflictItem(null);
         setSavingId(item.id);
 
         try {
@@ -97,7 +156,8 @@ export default function RateLimitSettings() {
             }));
             setSuccess(`已更新「${item.key}」的限流值`);
         } catch (err) {
-            setError(err.message);
+            if (isEditConflict(err)) setConflictItem(item);
+            else setError(formatApiError(err));
         } finally {
             setSavingId(null);
         }
@@ -130,6 +190,11 @@ export default function RateLimitSettings() {
                 </Alert>
             )}
             {error && <Alert variant="danger">{error}</Alert>}
+            {conflictItem && (
+                <EditConflictAlert onReload={reloadConflict} busy={reloadingConflict}>
+                    「{conflictItem.key}」的限流值已被其他人更新，你的修改尚未儲存。載入最新值後，請重新確認再儲存。
+                </EditConflictAlert>
+            )}
             <SuccessNotice message={success} />
 
             <div className="system-filter-panel">
@@ -149,7 +214,7 @@ export default function RateLimitSettings() {
                     <Form.Label>後端</Form.Label>
                     <Form.Select
                         value={backend}
-                        onChange={(event) => setBackend(event.target.value)}
+                        onChange={(event) => changeBackend(event.target.value)}
                     >
                         <option value="all">全部</option>
                         <option value="django">Django</option>
@@ -175,6 +240,8 @@ export default function RateLimitSettings() {
                         {visibleItems.length > 0 ? visibleItems.map((item) => {
                             const draft = drafts[item.id] ?? '';
                             const changed = draft !== item.rate;
+                            // 沒改過的列不標錯（既有資料不該一進來就紅一片）
+                            const rateError = changed ? validateRate(draft, item.backend) : '';
 
                             return (
                                 <tr key={item.id}>
@@ -186,11 +253,18 @@ export default function RateLimitSettings() {
                                             placeholder="30/m 或 20/minute"
                                             disabled={!editable}
                                             value={draft}
+                                            isInvalid={Boolean(rateError)}
+                                            aria-describedby={rateError ? `rate-error-${item.id}` : undefined}
                                             onChange={(event) => updateDraft(
                                                 item.id,
                                                 event.target.value,
                                             )}
                                         />
+                                        {rateError && (
+                                            <Form.Control.Feedback type="invalid" id={`rate-error-${item.id}`}>
+                                                {rateError}
+                                            </Form.Control.Feedback>
+                                        )}
                                     </td>
                                     <td>{item.default_rate}</td>
                                     <td>
@@ -204,7 +278,7 @@ export default function RateLimitSettings() {
                                             <div className="admin-row-actions">
                                                 <Button
                                                     size="sm"
-                                                    disabled={!changed || savingId === item.id}
+                                                    disabled={!changed || Boolean(rateError) || savingId === item.id}
                                                     onClick={() => save(item)}
                                                 >
                                                     {savingId === item.id

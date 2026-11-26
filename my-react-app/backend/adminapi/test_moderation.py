@@ -46,6 +46,7 @@ class FakeDocRef:
         self.update = MagicMock()
         self.delete = MagicMock()
         self._subcollections = {}
+        self.path = self.snapshot.reference.path
 
     def get(self):
         return self.snapshot
@@ -69,6 +70,9 @@ class FakeCollection:
     def order_by(self, *args, **kwargs):
         return self
 
+    def select(self, *args, **kwargs):
+        return self
+
     def stream(self):
         return self._docs
 
@@ -89,6 +93,7 @@ def _build_client(collections=None, groups=None):
     mock_client = MagicMock()
     mock_client.collection.side_effect = lambda name: collections.get(name, FakeCollection())
     mock_client.collection_group.side_effect = lambda name: groups.get(name, FakeCollection())
+    mock_client.get_all.side_effect = lambda refs, **kwargs: [ref.get() for ref in refs]
     return mock_client
 
 
@@ -261,6 +266,94 @@ class RecordingListTest(TestCase):
         self.assertEqual(data["results"][0]["id"], "rec1")
 
 
+class RecordingApproveTest(TestCase):
+    """稽核 BE5-01：只有後端核准過的錄音才會被前端當成其他學習者的參考音。"""
+
+    def setUp(self):
+        self.client = Client()
+
+    def _setup_recording(self, mock_client_fn, data=None):
+        recordings_col = FakeCollection()
+        rec_ref = recordings_col.set_document(
+            "rec1", data if data is not None else {"word": "abas", "uid": "u1", "score": 99},
+        )
+        tribe_ref = FakeDocRef()
+        tribe_ref._subcollections["recordings"] = recordings_col
+        pronunciations = FakeCollection()
+        pronunciations._doc_refs["tayal"] = tribe_ref
+        mock_client_fn.return_value = _build_client(collections={"pronunciations": pronunciations})
+        return rec_ref
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_approve_sets_flag_and_writes_audit_log(self, mock_client_fn):
+        rec_ref = self._setup_recording(mock_client_fn)
+        with _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/moderation/recordings/tayal/rec1/approve/', headers)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["approved"])
+        rec_ref.update.assert_called_once_with({"approved": True})
+        self.assertEqual(AuditLog.objects.filter(action="approve_recording").count(), 1)
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_can_unapprove(self, mock_client_fn):
+        rec_ref = self._setup_recording(mock_client_fn, {"word": "abas", "uid": "u1", "score": 99, "approved": True})
+        with _as_role(OWNER) as headers:
+            resp = _post_json(
+                self.client, '/adminapi/moderation/recordings/tayal/rec1/approve/', headers, {"approved": False},
+            )
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.json()["approved"])
+        rec_ref.update.assert_called_once_with({"approved": False})
+        self.assertEqual(AuditLog.objects.filter(action="unapprove_recording").count(), 1)
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_non_boolean_approved_is_rejected(self, mock_client_fn):
+        rec_ref = self._setup_recording(mock_client_fn)
+        with _as_role(OWNER) as headers:
+            resp = _post_json(
+                self.client, '/adminapi/moderation/recordings/tayal/rec1/approve/', headers, {"approved": "yes"},
+            )
+        self.assertEqual(resp.status_code, 400)
+        rec_ref.update.assert_not_called()
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_404_for_missing_recording(self, mock_client_fn):
+        mock_client_fn.return_value = _build_client(collections={"pronunciations": FakeCollection()})
+        with _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/moderation/recordings/tayal/missing/approve/', headers)
+        self.assertEqual(resp.status_code, 404)
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_only_moderators_can_approve(self, mock_client_fn):
+        rec_ref = self._setup_recording(mock_client_fn)
+        with _as_role(ANALYST) as headers:
+            resp = _post_json(self.client, '/adminapi/moderation/recordings/tayal/rec1/approve/', headers)
+        self.assertEqual(resp.status_code, 403)
+        rec_ref.update.assert_not_called()
+
+    def test_get_is_not_allowed(self):
+        with _as_role(OWNER) as headers:
+            resp = self.client.get('/adminapi/moderation/recordings/tayal/rec1/approve/', **headers)
+        self.assertEqual(resp.status_code, 405)
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_list_reports_approved_flag(self, mock_client_fn):
+        recordings = FakeCollection(docs=[
+            _fake_snapshot("rec1", {"word": "abas", "approved": True}, path="pronunciations/tayal/recordings/rec1"),
+            _fake_snapshot("rec2", {"word": "kolong", "approved": "true"}, path="pronunciations/tayal/recordings/rec2"),
+            _fake_snapshot("rec3", {"word": "lokah"}, path="pronunciations/tayal/recordings/rec3"),
+        ])
+        mock_client_fn.return_value = _build_client(
+            collections={"reports": FakeCollection(docs=[])}, groups={"recordings": recordings},
+        )
+        with _as_role(OWNER) as headers:
+            resp = self.client.get('/adminapi/moderation/recordings/', **headers)
+        by_id = {item["id"]: item for item in resp.json()["results"]}
+        self.assertTrue(by_id["rec1"]["approved"])
+        self.assertFalse(by_id["rec2"]["approved"])  # 只有布林 true 才算核准
+        self.assertFalse(by_id["rec3"]["approved"])
+
+
 class RecordingDeleteTest(TestCase):
     def setUp(self):
         self.client = Client()
@@ -320,7 +413,9 @@ class RecordingDeleteTest(TestCase):
             resp = self.client.delete('/adminapi/moderation/recordings/tayal/rec1/', **headers)
         self.assertEqual(resp.status_code, 502)
         rec_ref.delete.assert_not_called()
-        self.assertEqual(AuditLog.objects.filter(action="delete_recording").count(), 0)
+        # 稽核 BE2a-10：先寫「要刪除」的紀錄，Storage 失敗後再補一筆失敗紀錄
+        self.assertEqual(AuditLog.objects.filter(action="delete_recording").count(), 1)
+        self.assertEqual(AuditLog.objects.filter(action="delete_recording_failed").count(), 1)
 
     @patch("adminapi.firebase_ops.get_firestore_client")
     def test_missing_storage_url_still_deletes_firestore_doc(self, mock_client_fn):
@@ -457,3 +552,70 @@ class ReportResolveDismissTest(TestCase):
         self.assertEqual(resp.status_code, 409)
         self.assertIn("其他管理員", resp.json()["detail"])
         self.assertEqual(AuditLog.objects.filter(action="report_resolved").count(), 0)
+
+
+class ModerationAuditFirstTest(TestCase):
+    """稽核 BE2a-10：永久刪除錄音與下架筆記先寫稽核，寫不進去就不動手。"""
+
+    def setUp(self):
+        self.client = Client()
+        self.audit_down = patch("adminapi._shared.write_audit_log", side_effect=Exception("audit db down"))
+
+    @patch("adminapi.firebase_ops.delete_storage_file_by_download_url")
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_recording_delete_does_nothing_when_the_audit_log_is_down(self, mock_client_fn, mock_delete_storage):
+        recordings_col = FakeCollection()
+        rec_ref = recordings_col.set_document("rec1", {"word": "abas", "uid": "u1", "storageUrl": "https://x/o/p?alt=media"})
+        tribe_ref = FakeDocRef()
+        tribe_ref._subcollections["recordings"] = recordings_col
+        pronunciations = FakeCollection()
+        pronunciations._doc_refs["tayal"] = tribe_ref
+        mock_client_fn.return_value = _build_client(collections={"pronunciations": pronunciations})
+        with self.audit_down, _as_role(OWNER) as headers:
+            resp = self.client.delete('/adminapi/moderation/recordings/tayal/rec1/', **headers)
+        self.assertEqual(resp.status_code, 503)
+        mock_delete_storage.assert_not_called()
+        rec_ref.delete.assert_not_called()
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_note_takedown_does_nothing_when_the_audit_log_is_down(self, mock_client_fn):
+        notes = FakeCollection()
+        note_ref = notes.set_document("note1", {"deleted": False})
+        mock_client_fn.return_value = _build_client(collections={"sharedNotes": notes})
+        with self.audit_down, _as_role(OWNER) as headers:
+            resp = _post_json(self.client, '/adminapi/moderation/notes/note1/toggle-deleted/', headers)
+        self.assertEqual(resp.status_code, 503)
+        note_ref.update.assert_not_called()
+
+
+class ReportListBatchTest(TestCase):
+    """稽核 BE2a-05：只補當頁的目標摘要，而且一次批次讀取。"""
+
+    @patch("adminapi.firebase_ops.get_firestore_client")
+    def test_summaries_are_fetched_once_and_only_for_the_requested_page(self, mock_client_fn):
+        notes = FakeCollection()
+        for index in range(5):
+            notes.set_document(f"note{index}", {"preview": f"p{index}", "username": "A"})
+        reports = FakeCollection(docs=[
+            _fake_snapshot(f"rep{index}", {
+                "targetType": "note", "targetId": f"note{index}", "targetTribe": "",
+                "reporterUid": "u", "reason": "spam", "status": "pending",
+            }) for index in range(5)
+        ])
+        client = _build_client(collections={"sharedNotes": notes, "reports": reports})
+        mock_client_fn.return_value = client
+        with _as_role(OWNER) as headers:
+            resp = self.client.get('/adminapi/reports/?page=2&page_size=2', **headers)
+        data = resp.json()
+        self.assertEqual(data["count"], 5)
+        self.assertEqual([item["id"] for item in data["results"]], ["rep2", "rep3"])
+        self.assertEqual([item["target_summary"]["preview"] for item in data["results"]], ["p2", "p3"])
+        client.get_all.assert_called_once()
+        self.assertEqual(len(client.get_all.call_args[0][0]), 2)
+
+
+class ReportResolveValidationTest(TestCase):
+    def test_non_string_resolution_note_is_400_not_500(self):
+        with _as_role(OWNER) as headers:
+            resp = _post_json(Client(), '/adminapi/reports/rep1/resolve/', headers, {"resolution_note": 123})
+        self.assertEqual(resp.status_code, 400)

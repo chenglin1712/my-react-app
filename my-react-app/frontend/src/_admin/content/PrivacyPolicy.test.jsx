@@ -85,6 +85,101 @@ describe('後台 隱私與資料', () => {
     expect(screen.getByRole('button', { name: '儲存' })).toBeEnabled();
   });
 
+  /** 稽核 FE7b-08：409 要有出路，不能只顯示錯誤。WP-8 追加：後端 409 已帶 code=edit_conflict，前端用 isEditConflict 判斷。 */
+  test('409：顯示「有人剛更新過」，按「載入最新版本」換成伺服器內容並帶新的 updated_at', async () => {
+    apiPatch.mockRejectedValueOnce(Object.assign(new Error('內容已被其他人更新'), { status: 409, data: { code: 'edit_conflict' } }));
+    render(<PrivacyPolicy />);
+    fireEvent.click(await screen.findByRole('button', { name: '改內容' }));
+    fireEvent.click(screen.getByRole('button', { name: '儲存' }));
+    expect(await screen.findByText(/有人剛更新過/)).toBeInTheDocument();
+
+    const latestDoc = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '別人改的內容' }] }] };
+    apiGet.mockResolvedValueOnce({ content: latestDoc, updated_by: 'boss3', updated_at: '2026-10-20T08:00:00Z' });
+    fireEvent.click(screen.getByRole('button', { name: '載入最新版本' }));
+    await waitFor(() => expect(screen.getByTestId('editor-value')).toHaveTextContent('別人改的內容'));
+    expect(screen.queryByText(/有人剛更新過/)).not.toBeInTheDocument();
+
+    apiPatch.mockResolvedValueOnce({ ...policy, content: NEW_DOC });
+    fireEvent.click(screen.getByRole('button', { name: '改內容' }));
+    fireEvent.click(screen.getByRole('button', { name: '儲存' }));
+    await waitFor(() => expect(apiPatch).toHaveBeenLastCalledWith('/adminapi/privacy-policy/', {
+      content: NEW_DOC, base_updated_at: '2026-10-20T08:00:00Z',
+    }));
+  });
+
+  /** WP-8 追加：尚未更新的後端回的 409 沒有 code，仍退回只看狀態碼；帶了其他 code 的 409 則照一般錯誤顯示 */
+  test('409 沒有 code 時仍視為編輯衝突；409 帶其他 code 時顯示錯誤訊息、不出現衝突提示', async () => {
+    apiPatch.mockRejectedValueOnce(Object.assign(new Error('內容已被其他人更新'), { status: 409 }));
+    const { unmount } = render(<PrivacyPolicy />);
+    fireEvent.click(await screen.findByRole('button', { name: '改內容' }));
+    fireEvent.click(screen.getByRole('button', { name: '儲存' }));
+    expect(await screen.findByText(/有人剛更新過/)).toBeInTheDocument();
+    unmount();
+
+    apiPatch.mockRejectedValueOnce(Object.assign(new Error('別的衝突'), { status: 409, data: { code: 'something_else', detail: '別的衝突' } }));
+    render(<PrivacyPolicy />);
+    fireEvent.click(await screen.findByRole('button', { name: '改內容' }));
+    fireEvent.click(screen.getByRole('button', { name: '儲存' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('別的衝突');
+    expect(screen.queryByText(/有人剛更新過/)).not.toBeInTheDocument();
+  });
+
+  /** WP-8 追加：載入最新版本前暫存自己的正文，載入後仍可複製 */
+  test('409 後可「複製我的版本」；載入最新版本後仍保留暫存可複製，儲存成功後清掉', async () => {
+    const writeText = vi.fn().mockResolvedValue();
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    apiPatch.mockRejectedValueOnce(Object.assign(new Error('內容已被其他人更新'), { status: 409, data: { code: 'edit_conflict' } }));
+    render(<PrivacyPolicy />);
+    fireEvent.click(await screen.findByRole('button', { name: '改內容' }));
+    fireEvent.click(screen.getByRole('button', { name: '儲存' }));
+    await screen.findByText(/有人剛更新過/);
+
+    fireEvent.click(screen.getByRole('button', { name: '複製我的版本' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('改過的內容'));
+
+    const latestDoc = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '別人改的內容' }] }] };
+    apiGet.mockResolvedValueOnce({ content: latestDoc, updated_by: 'boss3', updated_at: '2026-10-20T08:00:00Z' });
+    fireEvent.click(screen.getByRole('button', { name: '載入最新版本' }));
+    await waitFor(() => expect(screen.getByTestId('editor-value')).toHaveTextContent('別人改的內容'));
+    expect(screen.queryByText(/有人剛更新過/)).not.toBeInTheDocument();
+
+    // 載入後原本的內容仍暫存在記憶體，可再複製
+    writeText.mockClear();
+    fireEvent.click(await screen.findByRole('button', { name: '複製我的版本' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('改過的內容'));
+
+    // 重新編輯並儲存成功後，暫存提示消失
+    apiPatch.mockResolvedValueOnce({ ...policy, content: NEW_DOC });
+    fireEvent.click(screen.getByRole('button', { name: '改內容' }));
+    fireEvent.click(screen.getByRole('button', { name: '儲存' }));
+    await screen.findByText(/立即生效/);
+    expect(screen.queryByRole('button', { name: '複製我的版本' })).not.toBeInTheDocument();
+    delete navigator.clipboard;
+  });
+
+  /** 稽核 FE7b-03 */
+  test('有未儲存的修改時掛上離開頁面的瀏覽器確認，儲存後解除', async () => {
+    apiPatch.mockResolvedValue({ ...policy, content: NEW_DOC });
+    render(<PrivacyPolicy />);
+    await screen.findByRole('button', { name: '儲存' });
+    const clean = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(clean);
+    expect(clean.defaultPrevented).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: '改內容' }));
+    const dirty = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(dirty);
+    expect(dirty.defaultPrevented).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: '儲存' }));
+    await screen.findByRole('status');
+    await waitFor(() => {
+      const saved = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(saved);
+      expect(saved.defaultPrevented).toBe(false);
+    });
+  });
+
   test('編輯者只能檢視：沒有儲存按鈕，編輯器唯讀', async () => {
     mockRole = 'editor';
     render(<PrivacyPolicy />);

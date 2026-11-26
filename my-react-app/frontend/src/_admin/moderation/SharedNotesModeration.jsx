@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Alert,
   Badge,
@@ -32,12 +33,16 @@ export default function SharedNotesModeration() {
     const canRead = STAFF_ROLES.includes(role);
     const canManage = MODERATORS.includes(role);
 
+    // 稽核 FE7b-07：檢舉佇列的「查看內容」連結帶 ?id=<筆記 id>，當成初始篩選。
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [initialId] = useState(() => searchParams.get('id') ?? '');
+
     const {
         items, data, loading, error, setError, page, setPage, hasNext,
-        filters, setFilters, search, reload: loadNotes,
+        filters, setFilters, search, applyFilters, reload: loadNotes,
     } = useAdminListQuery({
         endpoint: '/adminapi/moderation/notes/',
-        initialFilters: { keyword: '', deleted: '', has_reports: false },
+        initialFilters: { keyword: '', deleted: '', has_reports: false, id: initialId },
         pageSize: PAGE_SIZE,
         enabled: canRead,
         // 這一頁的參數不是「非空就原名帶上」：keyword 要 trim、deleted 允許
@@ -47,6 +52,7 @@ export default function SharedNotesModeration() {
             if (query.keyword.trim()) params.set('keyword', query.keyword.trim());
             if (query.deleted !== '') params.set('deleted', query.deleted);
             if (query.has_reports) params.set('has_reports', 'true');
+            if (query.id) params.set('id', query.id);
         },
     });
 
@@ -123,6 +129,24 @@ export default function SharedNotesModeration() {
                 </Alert>
             )}
             {error && <Alert variant="danger">{error}</Alert>}
+
+            {filters.id && (
+                <Alert variant="info" className="moderation-info-alert">
+                    目前只顯示筆記 ID：{filters.id}
+                    {' '}
+                    <Button
+                        variant="link"
+                        size="sm"
+                        className="p-0 align-baseline"
+                        onClick={() => {
+                            setSearchParams({}, { replace: true });
+                            applyFilters({ ...filters, id: '' });
+                        }}
+                    >
+                        顯示全部
+                    </Button>
+                </Alert>
+            )}
 
             <Form className="moderation-filter-panel" onSubmit={search}>
                 <Form.Control

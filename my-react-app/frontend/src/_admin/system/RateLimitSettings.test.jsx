@@ -7,6 +7,10 @@ import {
 import RateLimitSettings from './RateLimitSettings';
 import { apiGet, apiPatch } from '../../../utils/apiClient';
 
+// 切換「後端」篩選且有未存草稿時會先確認（稽核 FE7a-20）
+const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: confirmMock }));
+
 vi.mock('../../../utils/apiClient', () => ({
     apiGet: vi.fn(),
     apiPatch: vi.fn(),
@@ -32,8 +36,8 @@ const baseResults = [
         id: 2,
         key: 'dictionary_search',
         backend: 'fastapi',
-        rate: '30/m',
-        default_rate: '60/m',
+        rate: '30/minute',
+        default_rate: '60/minute',
         description: '辭典搜尋',
         updated_by: 'admin-uid',
         updated_at: null,
@@ -45,6 +49,7 @@ describe('RateLimitSettings', () => {
         mockRole = 'owner';
         apiGet.mockReset();
         apiPatch.mockReset();
+        confirmMock.mockReset().mockResolvedValue(true);
         apiGet.mockResolvedValue({ results: baseResults });
     });
 
@@ -135,7 +140,8 @@ describe('RateLimitSettings', () => {
         test('後端回 409（別人先改過這條）：顯示後端說明，使用者輸入的值保留，不顯示成功訊息', async () => {
             apiGet.mockResolvedValue({ results: withStamp('2026-08-01T00:00:00Z') });
             apiPatch.mockRejectedValueOnce(Object.assign(
-                new Error('內容已被其他人更新，請重新整理頁面，確認最新內容後再編輯'), { status: 409 },
+                new Error('內容已被其他人更新，請重新整理頁面，確認最新內容後再編輯'),
+                { status: 409, data: { code: 'edit_conflict' } },
             ));
             render(<RateLimitSettings />);
             const input = await screen.findByLabelText('user_create 限流值');
@@ -143,10 +149,74 @@ describe('RateLimitSettings', () => {
             fireEvent.change(input, { target: { value: '5/m' } });
             fireEvent.click(within(input.closest('tr')).getByRole('button', { name: /儲存/ }));
 
-            expect(await screen.findByText(/已被其他人更新/)).toBeInTheDocument();
+            expect(await screen.findByText(/有人剛更新過/)).toBeInTheDocument();
             expect(screen.queryByText('已更新「user_create」的限流值')).not.toBeInTheDocument();
             expect(input).toHaveValue('5/m');
         });
+
+        test('409 之後按「載入最新版本」：只重新載入那一條，取代草稿並換成新的 updated_at（稽核 FE7b-08）', async () => {
+            apiGet.mockResolvedValue({ results: withStamp('2026-08-01T00:00:00Z') });
+            apiPatch.mockRejectedValueOnce(Object.assign(new Error('衝突'), { status: 409, data: { code: 'edit_conflict' } }));
+            render(<RateLimitSettings />);
+            const input = await screen.findByLabelText('user_create 限流值');
+            fireEvent.change(input, { target: { value: '5/m' } });
+            fireEvent.click(within(input.closest('tr')).getByRole('button', { name: /儲存/ }));
+            await screen.findByText(/有人剛更新過/);
+
+            apiGet.mockResolvedValueOnce({ ...baseResults[0], rate: '20/m', updated_at: '2026-08-09T00:00:00Z' });
+            fireEvent.click(screen.getByRole('button', { name: '載入最新版本' }));
+
+            await waitFor(() => expect(input).toHaveValue('20/m'));
+            expect(apiGet).toHaveBeenLastCalledWith('/adminapi/rate-limit-rules/1/');
+            expect(screen.queryByText(/有人剛更新過/)).not.toBeInTheDocument();
+        });
+    });
+
+    test('有未存草稿時切換「後端」先確認：取消則不切換、草稿保留；確認才切換並重新載入（稽核 FE7a-20）', async () => {
+        render(<RateLimitSettings />);
+        const input = await screen.findByLabelText('user_create 限流值');
+        fireEvent.change(input, { target: { value: '5/m' } });
+
+        confirmMock.mockResolvedValueOnce(false);
+        fireEvent.change(screen.getByLabelText('後端'), { target: { value: 'fastapi' } });
+        await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+        expect(confirmMock.mock.calls[0][0].message).toContain('1 筆');
+        expect(screen.getByLabelText('後端')).toHaveValue('all');
+        expect(input).toHaveValue('5/m');
+        expect(apiGet).toHaveBeenCalledTimes(1);
+
+        fireEvent.change(screen.getByLabelText('後端'), { target: { value: 'fastapi' } });
+        await waitFor(() => expect(apiGet).toHaveBeenLastCalledWith('/adminapi/rate-limit-rules/?backend=fastapi'));
+    });
+
+    test('沒有未存草稿時切換「後端」不跳確認', async () => {
+        render(<RateLimitSettings />);
+        await screen.findByText('user_create');
+        fireEvent.change(screen.getByLabelText('後端'), { target: { value: 'django' } });
+        await waitFor(() => expect(apiGet).toHaveBeenLastCalledWith('/adminapi/rate-limit-rules/?backend=django'));
+        expect(confirmMock).not.toHaveBeenCalled();
+    });
+
+    test('格式不正確時即時標示並停用儲存；單位要符合該規則的後端（稽核 FE7a-20）', async () => {
+        render(<RateLimitSettings />);
+        const djangoInput = await screen.findByLabelText('user_create 限流值');
+        const fastapiInput = screen.getByLabelText('dictionary_search 限流值');
+
+        fireEvent.change(djangoInput, { target: { value: 'garbage' } });
+        expect(djangoInput).toHaveClass('is-invalid');
+        expect(within(djangoInput.closest('tr')).getByRole('button', { name: /儲存/ })).toBeDisabled();
+
+        fireEvent.change(djangoInput, { target: { value: '0/m' } });
+        expect(djangoInput).toHaveClass('is-invalid');
+        fireEvent.change(djangoInput, { target: { value: '20/minute' } });
+        expect(djangoInput).toHaveClass('is-invalid'); // Django 規則不能用 FastAPI 的單位
+        fireEvent.change(djangoInput, { target: { value: '5/m' } });
+        expect(djangoInput).not.toHaveClass('is-invalid');
+
+        fireEvent.change(fastapiInput, { target: { value: '5/m' } });
+        expect(fastapiInput).toHaveClass('is-invalid');
+        // 沒改過的列不標錯
+        expect(screen.getByLabelText('user_create 限流值')).not.toHaveClass('is-invalid');
     });
 
     test('後端篩選會用 query parameter 重新取得資料', async () => {
@@ -185,7 +255,7 @@ describe('RateLimitSettings', () => {
             name: /重設為預設值/,
         }));
 
-        expect(input).toHaveValue('60/m');
+        expect(input).toHaveValue('60/minute');
         expect(within(row).getByRole('button', { name: /儲存/ })).toBeEnabled();
     });
 
@@ -199,15 +269,18 @@ describe('RateLimitSettings', () => {
     });
 
     test('儲存失敗時顯示錯誤訊息', async () => {
-        apiPatch.mockRejectedValueOnce(new Error('限流格式不正確'));
+        // 後端驗證失敗：顯示具體原因（稽核 FE7a-05），不是只有「請求參數錯誤」
+        apiPatch.mockRejectedValueOnce(Object.assign(new Error('請求參數錯誤'), {
+            data: { errors: { rate: ['換算後每秒 60.0 次請求，超過上限'] } },
+        }));
 
         render(<RateLimitSettings />);
         const input = await screen.findByLabelText('user_create 限流值');
         const row = input.closest('tr');
 
-        fireEvent.change(input, { target: { value: 'garbage' } });
+        fireEvent.change(input, { target: { value: '9999/m' } });
         fireEvent.click(within(row).getByRole('button', { name: /儲存/ }));
 
-        expect(await screen.findByText('限流格式不正確')).toBeInTheDocument();
+        expect(await screen.findByText('換算後每秒 60.0 次請求，超過上限')).toBeInTheDocument();
     });
 });

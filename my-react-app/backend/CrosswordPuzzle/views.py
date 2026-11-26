@@ -1,20 +1,29 @@
 import json
 import logging
+import os
 import random
 import re
+import threading
 from django.http import HttpResponse, JsonResponse
 from django_ratelimit.core import is_ratelimited
 from sqlalchemy import text
 from .crossword import Crossword, Word as CrosswordWord
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET
 from config.tribes import TRIBE_IDS as _ALL_TRIBE_IDS
 from core.firebase_auth import verify_firebase_token
 from dictionary_db.connect import SessionLocal
 from adminapi.game_config_service import get_crossword_config
 from adminapi.rate_limits import get_configured_rate
+from . import puzzle_token
 from .serializers import SubmitAnsSerializer
 
 logger = logging.getLogger(__name__)
+
+# 稽核 BE5-03：排字是同步的 CPU 忙等（最長 compute_time_limit_seconds 秒），同時跑太多會吃滿這個行程的 worker。
+# 每個行程同時最多幾份；超過就請使用者稍後再試（每個 gunicorn worker 各自計算）。
+_MAX_CONCURRENT_GENERATIONS = max(1, int(os.getenv("CROSSWORD_MAX_CONCURRENT_GENERATIONS", "2")))
+_generation_slots = threading.BoundedSemaphore(_MAX_CONCURRENT_GENERATIONS)
 
 
 def _rate_limited_response(request, decoded, group, rate, method):
@@ -106,13 +115,14 @@ def _get_words_from_db(tribe_id: str, min_length: int, max_length: int, limit: i
     return results, None
 
 
+@require_GET
 def generate_crossword(request):
     # 每次呼叫最長要花 2 秒 CPU 運算（見下方 compute_crossword(time_permitted=2)），
     # 且原本匿名可打、無限流，可被重複呼叫拿來耗盡伺服器資源，故加上登入 + 限流。
     decoded, err_resp = verify_firebase_token(request)
     if err_resp:
         return err_resp
-    limited_resp = _rate_limited_response(request, decoded, group="generate_crossword", rate="30/m", method="GET")
+    limited_resp = _rate_limited_response(request, decoded, group="generate_crossword", rate="6/m", method="GET")
     if limited_resp:
         return limited_resp
 
@@ -152,10 +162,15 @@ def generate_crossword(request):
     grid_rows = game_config.grid_size
 
     #計算填字遊戲
-    crossword_generator = Crossword(
-        grid_cols, grid_rows, empty='-', maxloops=5000, available_words=available_words_for_generator,
-    )
-    crossword_generator.compute_crossword(time_permitted=game_config.compute_time_limit_seconds)
+    if not _generation_slots.acquire(blocking=False):
+        return JsonResponse({'detail': '系統忙碌，請稍後再試'}, status=503)
+    try:
+        crossword_generator = Crossword(
+            grid_cols, grid_rows, empty='-', maxloops=5000, available_words=available_words_for_generator,
+        )
+        crossword_generator.compute_crossword(time_permitted=game_config.compute_time_limit_seconds)
+    finally:
+        _generation_slots.release()
 
     # 獲取生成的填字遊戲資料進行編號排序
     crossword_generator.order_number_words()
@@ -179,15 +194,18 @@ def generate_crossword(request):
             'length': word_obj.length,
         })
     
-    #單字庫列表
-    word_bank_list = [word.word for word in crossword_generator.current_word_list]
+    # 稽核 BE5-09：完整解答與答案單字只放在加密的題目憑證裡（綁這位使用者、兩小時有效），
+    # 前端拿到的網格只剩「哪些格子可以填」，提示不含答案單字，也不再送出單字庫列表。
+    token = puzzle_token.issue(decoded.get('uid', 'anon'), grid_solution, legend_data)
+    public_solution = [re.sub(r'[^\s-]', '_', row) for row in grid_solution]
+    public_legend = [{key: value for key, value in item.items() if key != 'word'} for item in legend_data]
 
     #將結果組合成JSON
     response_data = {
-        'grid_solution': grid_solution,         #遊戲網格 (解答)
+        'puzzle_token': token,                  #提交作答時原樣送回，伺服器用它判分
+        'grid_solution': public_solution,       #遮蔽後的網格（只看得出哪些格子可填）
         'grid_display': grid_display,           #數字和空格的填字格子
-        'legend': legend_data,                  #數字和方向的提示
-        'word_bank': word_bank_list,            #填字遊戲中使用的單字列表
+        'legend': public_legend,                #數字、提示、方向與位置（不含答案單字）
         'info': {
             'placed_words_count': len(crossword_generator.current_word_list),
             'total_words_available': len(available_words_for_generator),
@@ -197,117 +215,121 @@ def generate_crossword(request):
 
     return JsonResponse(response_data)
 
+def _grade_submission(user_answers, crossword_solution, crossword_legend):
+    """逐字比對作答與解答，回傳結果 dict。解答與圖例必須來自伺服器簽發的題目憑證，不能是前端送來的值。"""
+    # 移除空格，使其與 user_answers 的格式一致
+    cleaned_solution = [row.replace(' ', '') for row in crossword_solution]
+
+    results = {
+        'total_words': len(crossword_legend),
+        'correct_words_count': 0,
+        'word_details': []
+    }
+
+    for clue in crossword_legend:
+        word_number = clue['number']
+        word_clue = clue['clue']
+        word_direction = clue['direction']
+        word_length = clue['length']
+        start_col = clue['start_col']
+        start_row = clue['start_row']
+
+        correct_word = clue['word'].lower()
+        user_word_chars = []
+        is_correct = True 
+
+        # 橫向單字比對
+        if word_direction == 'across':
+            for i in range(word_length):
+                row, col = start_row - 1, start_col - 1 + i
+                # 0 <= row/col：序列化器已擋 start_* < 1，這裡再守一次，避免負索引繞到尾端。
+                if (0 <= row < len(user_answers) and 0 <= col < len(user_answers[row]) and
+                        0 <= row < len(cleaned_solution) and 0 <= col < len(cleaned_solution[row])):
+
+                    user_char = user_answers[row][col].lower()
+                    user_word_chars.append(user_char)
+
+                    correct_char_from_grid = cleaned_solution[row][col].lower()
+                    if correct_char_from_grid not in ('-', ''):
+                        if correct_char_from_grid != user_char:
+                            # 不能 break：user_word 要收集整個單字，結果頁才會顯示使用者實際填的完整答案
+                            is_correct = False
+                else:
+                    logger.warning("Index out of bounds for word %s (across).", word_number)
+                    is_correct = False
+                    break
+
+        # 縱向單字比對
+        elif word_direction == 'down':
+            for i in range(word_length):
+                row, col = start_row - 1 + i, start_col - 1
+                # 0 <= row/col：序列化器已擋 start_* < 1，這裡再守一次，避免負索引繞到尾端。
+                if (0 <= row < len(user_answers) and 0 <= col < len(user_answers[row]) and
+                        0 <= row < len(cleaned_solution) and 0 <= col < len(cleaned_solution[row])):
+
+                    user_char = user_answers[row][col].lower()
+                    user_word_chars.append(user_char)
+
+                    correct_char_from_grid = cleaned_solution[row][col].lower()
+                    if correct_char_from_grid not in ('-', ''):
+                        if correct_char_from_grid != user_char:
+                            # 不能 break：user_word 要收集整個單字，結果頁才會顯示使用者實際填的完整答案
+                            is_correct = False
+                else:
+                    logger.warning("Index out of bounds for word %s (down).", word_number)
+                    is_correct = False
+                    break
+
+        # 如果單字被判斷為正確，增加答對數
+        if is_correct:
+            results['correct_words_count'] += 1
+
+        results['word_details'].append({
+            'number': word_number,
+            'clue': word_clue,
+            'direction': word_direction,
+            'is_correct': is_correct,
+            # 將正確答案欄位legend 中取出的完整單字
+            'correct_word': correct_word,
+            'user_word': "".join(user_word_chars)
+        })
+
+    # 四捨五入（與前端 Math.round 一致；Python 的 round 是銀行家捨入）
+    results['score'] = int(100 * results['correct_words_count'] / results['total_words'] + 0.5) if results['total_words'] else 0
+    return results
+
+
+# 稽核 BE5-09：判分在伺服器端——解答與圖例從題目憑證（puzzle_token.py）取得，前端只送憑證與自己的作答。
 # csrf_exempt 在這裡不是「豁免掉一項保護」，而是「這項保護原本就不適用」，永久生效，
 # 不隨 DEBUG 變動：這是無狀態的 Bearer-token JSON API（見下方 verify_firebase_token），
 # 前端從不帶 CSRF cookie/token，CSRF 保護針對的是瀏覽器自動夾帶 session cookie
 # 的情境，跟這裡的認證機制無關（比照 AIModel/views.py 同樣的 Bearer-token 端點）。
 @csrf_exempt
 def submit_ans(request):
-    if request.method == 'POST':
-        decoded, err_resp = verify_firebase_token(request)
-        if err_resp:
-            return err_resp
-        # 原本只有認證、完全沒限流；答案比對本身不貴，但沒有上限的話一樣能被
-        # 重複呼叫拿來當簡單的濫用管道，跟 generate_crossword 用同一套標準。
-        limited_resp = _rate_limited_response(request, decoded, group="submit_ans", rate="30/m", method="POST")
-        if limited_resp:
-            return limited_resp
+    if request.method != 'POST':
+        return JsonResponse({'detail': 'Invalid request method'}, status=405)
 
-        # 原本直接 json.loads(request.body) 後就用 dict.get()／list index 存取，
-        # 完全沒驗證請求結構——欄位缺漏或型別不對時例外會一路往外拋，被 Django
-        # 預設的 500 處理接住，正式環境回一頁 HTML，跟這個 API 統一回 JSON 的
-        # 約定不一致。改成先安全解析 JSON，再用 SubmitAnsSerializer 驗證結構。
-        try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({'detail': '請求格式錯誤'}, status=400)
+    decoded, err_resp = verify_firebase_token(request)
+    if err_resp:
+        return err_resp
+    # 原本只有認證、完全沒限流；答案比對本身不貴，但沒有上限的話一樣能被
+    # 重複呼叫拿來當簡單的濫用管道，跟 generate_crossword 用同一套標準。
+    limited_resp = _rate_limited_response(request, decoded, group="submit_ans", rate="30/m", method="POST")
+    if limited_resp:
+        return limited_resp
 
-        serializer = SubmitAnsSerializer(data=data)
-        if not serializer.is_valid():
-            return JsonResponse({'detail': '請求參數錯誤', 'errors': serializer.errors}, status=400)
-        validated = serializer.validated_data
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({'detail': '請求格式錯誤'}, status=400)
 
-        user_answers = validated['user_answers']
-        crossword_solution = validated['crossword_solution']
-        crossword_legend = validated['crossword_legend']
+    serializer = SubmitAnsSerializer(data=data)
+    if not serializer.is_valid():
+        return JsonResponse({'detail': '請求參數錯誤', 'errors': serializer.errors}, status=400)
+    validated = serializer.validated_data
 
-        # 移除空格，使其與 user_answers 的格式一致
-        cleaned_solution = [row.replace(' ', '') for row in crossword_solution]
+    puzzle = puzzle_token.read(validated['puzzle_token'], decoded.get('uid', 'anon'))
+    if puzzle is None:
+        return JsonResponse({'detail': '題目已過期或無效，請重新開始一局', 'code': 'puzzle_expired'}, status=400)
 
-        results = {
-            'total_words': len(crossword_legend),
-            'correct_words_count': 0,
-            'word_details': []
-        }
-
-        for clue in crossword_legend:
-            word_number = clue['number']
-            word_clue = clue['clue']
-            word_direction = clue['direction']
-            word_length = clue['length']
-            start_col = clue['start_col']
-            start_row = clue['start_row']
-            
-            correct_word = clue['word'].lower()
-            user_word_chars = []
-            is_correct = True 
-
-            # 橫向單字比對
-            if word_direction == 'across':
-                for i in range(word_length):
-                    row, col = start_row - 1, start_col - 1 + i
-                    # 0 <= row/col：序列化器已擋 start_* < 1，這裡再守一次，避免負索引繞到尾端。
-                    if (0 <= row < len(user_answers) and 0 <= col < len(user_answers[row]) and
-                            0 <= row < len(cleaned_solution) and 0 <= col < len(cleaned_solution[row])):
-
-                        user_char = user_answers[row][col].lower()
-                        user_word_chars.append(user_char)
-
-                        correct_char_from_grid = cleaned_solution[row][col].lower()
-                        if correct_char_from_grid not in ('-', ''):
-                            if correct_char_from_grid != user_char:
-                                is_correct = False
-                                break
-                    else:
-                        logger.warning("Index out of bounds for word %s (across).", word_number)
-                        is_correct = False
-                        break
-
-            # 縱向單字比對
-            elif word_direction == 'down':
-                for i in range(word_length):
-                    row, col = start_row - 1 + i, start_col - 1
-                    # 0 <= row/col：序列化器已擋 start_* < 1，這裡再守一次，避免負索引繞到尾端。
-                    if (0 <= row < len(user_answers) and 0 <= col < len(user_answers[row]) and
-                            0 <= row < len(cleaned_solution) and 0 <= col < len(cleaned_solution[row])):
-
-                        user_char = user_answers[row][col].lower()
-                        user_word_chars.append(user_char)
-
-                        correct_char_from_grid = cleaned_solution[row][col].lower()
-                        if correct_char_from_grid not in ('-', ''):
-                            if correct_char_from_grid != user_char:
-                                is_correct = False
-                                break
-                    else:
-                        logger.warning("Index out of bounds for word %s (down).", word_number)
-                        is_correct = False
-                        break
-            
-            # 如果單字被判斷為正確，增加答對數
-            if is_correct:
-                results['correct_words_count'] += 1
-
-            results['word_details'].append({
-                'number': word_number,
-                'clue': word_clue,
-                'direction': word_direction,
-                'is_correct': is_correct,
-                # 將正確答案欄位legend 中取出的完整單字
-                'correct_word': correct_word,
-                'user_word': "".join(user_word_chars)
-            })
-        
-        return JsonResponse(results)
-    
-    return JsonResponse({'detail': 'Invalid request method'}, status=405)
+    return JsonResponse(_grade_submission(validated['user_answers'], puzzle['solution'], puzzle['legend']))

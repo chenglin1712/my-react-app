@@ -6,7 +6,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import NoteShare from './noteshare';
 import {
   fetchSharedNotesPage, fetchSharedNotesCount, fetchSharedNoteById,
-  softDeleteNote, toggleNoteLike,
+  deleteSharedNote, toggleNoteLike,
 } from '../userServives/noteService';
 import { submitReport } from '../userServives/reportService';
 
@@ -18,7 +18,7 @@ vi.mock('../userServives/noteService', () => ({
   fetchSharedNotesPage: vi.fn(),
   fetchSharedNotesCount: vi.fn(),
   fetchSharedNoteById: vi.fn(),
-  softDeleteNote: vi.fn(),
+  deleteSharedNote: vi.fn(),
   toggleNoteLike: vi.fn(),
 }));
 vi.mock('../userServives/reportService', () => ({
@@ -54,7 +54,7 @@ describe('NoteShare', () => {
     fetchSharedNotesPage.mockReset();
     fetchSharedNotesCount.mockReset();
     fetchSharedNoteById.mockReset();
-    softDeleteNote.mockReset();
+    deleteSharedNote.mockReset();
     toggleNoteLike.mockReset();
     submitReport.mockReset();
   });
@@ -116,7 +116,7 @@ describe('NoteShare', () => {
     fetchSharedNoteById.mockImplementation((id) => Promise.resolve({
       id, uid: 'user-1', pages: [{ title: id === 'mine-1' ? '筆記1' : '筆記2', content: '<p></p>' }],
     }));
-    softDeleteNote.mockResolvedValue(undefined);
+    deleteSharedNote.mockResolvedValue(undefined);
     confirmMock.mockResolvedValue(true);
 
     const user = userEvent.setup();
@@ -132,7 +132,7 @@ describe('NoteShare', () => {
     await screen.findByRole('dialog');
     await user.click(screen.getByRole('button', { name: '刪除筆記' }));
 
-    await waitFor(() => expect(softDeleteNote).toHaveBeenCalledWith('mine-2'));
+    await waitFor(() => expect(deleteSharedNote).toHaveBeenCalledWith('mine-2'));
     await screen.findByText('筆記1');
   });
 

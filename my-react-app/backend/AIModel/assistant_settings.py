@@ -122,6 +122,15 @@ def _load_from_db() -> tuple:
         return dict(DEFAULTS), 0
 
 
+def active_from_db() -> tuple:
+    """後台頁面專用：直接讀資料庫、不經 process 內快取（稽核 WP-8）。
+    多個 worker 各有 30 秒快取，後台用快取版本號做樂觀鎖會誤報或漏報衝突。"""
+    draft = _override.get()
+    if draft is not None:
+        return draft, -1
+    return _load_from_db()
+
+
 def active() -> dict:
     """目前生效的設定（乾淨的 dict，呼叫端可以直接用，不要修改它）。"""
     return active_with_version()[0]

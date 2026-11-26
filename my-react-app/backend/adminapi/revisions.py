@@ -17,6 +17,7 @@ import hashlib
 import hmac
 import json
 
+from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.http import JsonResponse
@@ -281,7 +282,15 @@ def _approve_pending_revision(request, pk, model, serializer_class, target_type,
         before = serializer_class(obj).data
         for field, value in revision.payload.items():
             setattr(obj, field, value)
-        obj.full_clean(exclude=["status", "created_by", "submitted_by", "submitted_at", "reviewed_by", "reviewed_at", "review_comment"])
+        try:
+            obj.full_clean(exclude=["status", "created_by", "submitted_by", "submitted_at", "reviewed_by", "reviewed_at", "review_comment"])
+        except ValidationError as exc:
+            # 稽核 BE2b-12：提案送審之後規則可能改嚴，驗證失敗要回可讀的 400，不是 500；
+            # 這時還沒寫入任何東西，審核者應該退件請編輯者重新送出
+            return JsonResponse({
+                "detail": "待審修改的內容現在不符合驗證規則，無法核准，請退件並請編輯者修正後重新送出",
+                "errors": exc.message_dict if hasattr(exc, "message_dict") else {"__all__": exc.messages},
+            }, status=400)
         obj.save()
 
         revision.status = PendingRevision.STATUS_APPROVED

@@ -12,10 +12,13 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from config.llm import REFUSAL_MESSAGE, LLMRefusalError, classify_llm_error, current_uid as llm_current_uid
+from config.llm import (
+    REFUSAL_MESSAGE, LLMNotConfiguredError, LLMRefusalError, classify_llm_error, current_uid as llm_current_uid,
+)
 from config.tribes import TRIBES
 from dictionary_db.connect import get_db
 from fastAPI import budget_guard, feature_flags, guest_trial, rate_limit_config, usage_events
+from fastAPI.executors import llm_executor, run_in
 from fastAPI.rate_limit import limiter
 
 from . import retrieve as R
@@ -111,7 +114,8 @@ async def guest_quota_endpoint(request: Request):
 @router.post("/translate", response_model=TranslateResponse)
 @limiter.limit(lambda: rate_limit_config.get_configured_rate("translation_translate", "10/minute"))
 async def translate_endpoint(request: Request, body: TranslateRequest, db: Session = Depends(get_db)):
-    if not feature_flags.is_enabled(_FEATURE_FLAG_KEY, default=True):
+    # 稽核 BE4-16：會花錢的開關。旗標資料太久沒能更新時改回「關閉」，AI 月預算自動關閉才不會因為讀不到旗標而靜默失效
+    if not feature_flags.is_enabled_paid(_FEATURE_FLAG_KEY, default=True):
         return JSONResponse({"detail": "翻譯功能目前已關閉，請稍後再試"}, status_code=403)
 
     user = getattr(request.state, "user", None)
@@ -147,7 +151,8 @@ async def translate_endpoint(request: Request, body: TranslateRequest, db: Sessi
         # 檢索＋LLM 呼叫都是阻塞式操作（DB 查詢＋同步的 Anthropic client），
         # 丟到執行緒池執行，避免卡住 event loop——跟 dictionary/search.py
         # 對 _search_multi_words 的既有作法一致。
-        result = await asyncio.to_thread(service.translate, db, body.tribe, body.direction, body.text)
+        # 稽核 BE4-03：LLM 呼叫最長 25 秒，用專用的池子，不佔用 Firebase 驗證等共用的預設池
+        result = await run_in(llm_executor, service.translate, db, body.tribe, body.direction, body.text)
     except (service.UnsupportedTribeError, service.UnsupportedDirectionError) as e:
         await _refund_guest(quota, daily)
         return JSONResponse({"detail": str(e)}, status_code=400)
@@ -155,11 +160,13 @@ async def translate_endpoint(request: Request, body: TranslateRequest, db: Sessi
         await _refund_guest(quota, daily)
         logger.error("[translation] %s", e)
         return JSONResponse({"detail": "翻譯功能暫時無法使用，請稍後再試"}, status_code=503)
-    except EnvironmentError as e:
-        # 缺 ANTHROPIC_API_KEY，比照 AIModel/views.py 的既有處理：只讓這個功能
-        # 回 503，不影響其他不相關的端點。
+    except LLMNotConfiguredError as e:
+        # 缺 ANTHROPIC_API_KEY，比照 AIModel/views.py 的既有處理：只讓這個功能回 503，不影響其他不相關的端點。
+        # 例外原文含環境變數名稱與設定說明，只寫 log，不回給前端（稽核 BE4-14）；其他 EnvironmentError（等於 OSError）
+        # 不再被誤當成「沒設定金鑰」，落到下面的通用處理。
         await _refund_guest(quota, daily)
-        return JSONResponse({"detail": str(e)}, status_code=503)
+        logger.error("[translation] %s", e)
+        return JSONResponse({"detail": "翻譯功能暫時無法使用，請稍後再試"}, status_code=503)
     except LLMRefusalError:
         # 模型拒答：服務本身正常，回 422 與固定說明；不是服務故障，所以不退還訪客額度（模型已實際處理）
         return JSONResponse({"detail": REFUSAL_MESSAGE, "refused": True}, status_code=422)

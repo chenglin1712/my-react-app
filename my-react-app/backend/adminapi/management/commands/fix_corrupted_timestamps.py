@@ -89,8 +89,12 @@ class Command(BaseCommand):
             help="要修正的欄位名稱，例如 createdAt",
         )
         parser.add_argument(
+            "--apply", action="store_true",
+            help="實際寫入 Firestore；不加這個旗標只預覽（與其他指令的慣例一致）",
+        )
+        parser.add_argument(
             "--dry-run", action="store_true",
-            help="只列出會被修正的文件與轉換後的時間，不實際寫入 Firestore",
+            help="（相容用，預設就是預覽）只列出會被修正的文件，不寫入",
         )
 
     def handle(self, *args, **options):
@@ -105,7 +109,8 @@ class Command(BaseCommand):
         if not collection_name or not field:
             raise CommandError("--collection 與 --field 都必須是非空字串")
 
-        dry_run = options["dry_run"]
+        # 稽核 BE2b-16：預設預覽，加 --apply 才寫入正式 Firestore
+        dry_run = options["dry_run"] or not options["apply"]
         mode_label = "dry-run（不會寫入）" if dry_run else "實際執行"
         self.stdout.write(f"掃描 {collection_name}.{field}，模式：{mode_label}\n")
 
@@ -159,4 +164,4 @@ class Command(BaseCommand):
             summary += f"，{errored} 筆數值異常無法轉換（需人工複查）"
         self.stdout.write(self.style.SUCCESS(summary + "。"))
         if dry_run and fixed:
-            self.stdout.write("不加 --dry-run 重新執行以實際寫入。")
+            self.stdout.write("加上 --apply 重新執行以實際寫入。")

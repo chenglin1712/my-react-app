@@ -14,7 +14,7 @@ import {
 } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import RecordingsModeration from './RecordingsModeration';
-import { apiDelete, apiGet } from '../../../utils/apiClient';
+import { apiDelete, apiGet, apiPost } from '../../../utils/apiClient';
 
 // 站內確認視窗（原本是瀏覽器原生 window.confirm）：測試直接替換成可控制回傳值的 mock
 const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
@@ -23,6 +23,7 @@ vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: confirmMock }));
 vi.mock('../../../utils/apiClient', () => ({
     apiGet: vi.fn(),
     apiDelete: vi.fn(),
+    apiPost: vi.fn(),
 }));
 
 let mockRole = 'owner';
@@ -79,6 +80,8 @@ describe('RecordingsModeration', () => {
         mockRole = 'owner';
         apiGet.mockReset();
         apiDelete.mockReset();
+        apiPost.mockReset();
+        apiPost.mockResolvedValue({ tribe: 'tayal', id: 'rec123', approved: true });
         apiGet.mockResolvedValue(mockRecordingsResponse());
         apiDelete.mockResolvedValue({
             tribe: 'tayal',
@@ -164,6 +167,55 @@ describe('RecordingsModeration', () => {
 
         expect(await screen.findByText('發音錄音已刪除')).toBeInTheDocument();
         expect(apiGet.mock.calls.length).toBeGreaterThan(1);
+    });
+
+    // 稽核 BE5-01：只有核准過的錄音才會被遊戲當成參考音
+    test('顯示是否已核准；未核准的可以核准，已核准的可以取消', async () => {
+        apiGet.mockResolvedValue(mockRecordingsResponse({
+            results: [recording, { ...cleanRecording, approved: true }],
+        }));
+        renderPage();
+
+        const row = await screen.findByText('abas').then((element) => element.closest('tr'));
+        expect(within(row).getByText('未核准')).toBeInTheDocument();
+        const approvedRow = screen.getByText('loma').closest('tr');
+        expect(within(approvedRow).getByText('已核准')).toBeInTheDocument();
+
+        fireEvent.click(within(row).getByRole('button', { name: /核准為參考音/ }));
+        await waitFor(() => {
+            expect(apiPost).toHaveBeenCalledWith(
+                '/adminapi/moderation/recordings/tayal/rec123/approve/',
+                { approved: true },
+            );
+        });
+        expect(await screen.findByText('已核准為參考音')).toBeInTheDocument();
+
+        fireEvent.click(within(approvedRow).getByRole('button', { name: /取消核准/ }));
+        await waitFor(() => {
+            expect(apiPost).toHaveBeenCalledWith(
+                '/adminapi/moderation/recordings/amis/rec456/approve/',
+                { approved: false },
+            );
+        });
+    });
+
+    test('唯讀角色（analyst）看得到核准狀態，但沒有核准按鈕', async () => {
+        mockRole = 'analyst';
+        renderPage();
+
+        const row = await screen.findByText('abas').then((element) => element.closest('tr'));
+        expect(within(row).getByText('未核准')).toBeInTheDocument();
+        expect(within(row).queryByRole('button', { name: /核准/ })).not.toBeInTheDocument();
+    });
+
+    test('核准失敗時顯示錯誤', async () => {
+        apiPost.mockRejectedValueOnce(new Error('核准失敗了'));
+        renderPage();
+
+        const row = await screen.findByText('abas').then((element) => element.closest('tr'));
+        fireEvent.click(within(row).getByRole('button', { name: /核准為參考音/ }));
+
+        expect(await screen.findByText('核准失敗了')).toBeInTheDocument();
     });
 
     test('storage_deleted=false 時提示需要人工複查', async () => {

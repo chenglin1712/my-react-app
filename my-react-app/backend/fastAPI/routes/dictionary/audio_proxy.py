@@ -59,11 +59,10 @@ async def proxy_audio(
 
     # P5 辭典媒體自主化：有自己 Storage 的已驗證副本就直接 302 過去，讓
     # Google 的 CDN 送檔，這個端點自己不用再扛流量，也不再依賴 ILRDF 存活。
-    # 這是單一、有索引的查詢（media_asset 的 unique index 就是
-    # (source_provider, source_kind, source_locator)），跟 search.py 既有
-    # 「直接同步呼叫 db.query()，不特地丟 to_thread」的作法一致，不像
-    # /sentence-audio/ 那種迴圈查詢才需要丟執行緒池。
-    asset = _lookup_verified_audio_asset(db, file_id)
+    # 這是單一、有索引的查詢（media_asset 的 unique index 就是 (source_provider, source_kind, source_locator)），
+    # 但仍是同步的資料庫呼叫：直接在 async 端點裡執行，資料庫慢或連線池滿時會卡住事件迴圈、整個 FastAPI 一起停
+    # （稽核 BE4-06），所以丟到執行緒池。
+    asset = await asyncio.to_thread(_lookup_verified_audio_asset, db, file_id)
     if asset is not None and asset.public_url:
         return RedirectResponse(url=asset.public_url, status_code=302)
 

@@ -52,7 +52,11 @@ def make_site_page_views(model, serializer_class, public_serializer_class, key):
             if base is None:
                 return JsonResponse({"detail": "請求參數錯誤", "errors": {"base_updated_at": ["缺少或格式不正確"]}}, status=400)
             if base != page.updated_at:
-                return JsonResponse({"detail": "內容已被其他人更新，請重新整理頁面，確認最新內容後再編輯"}, status=409)
+                # WP-8 追加：補上 code，與 _shared.stale_edit_response 一致，前端統一用 isEditConflict 判斷
+                return JsonResponse(
+                    {"detail": "內容已被其他人更新，請重新整理頁面，確認最新內容後再編輯", "code": "edit_conflict"},
+                    status=409,
+                )
             before = serializer_class(page).data
             serializer = serializer_class(page, data={"content": data["content"]}, partial=True)
             if not serializer.is_valid():

@@ -7,7 +7,10 @@ import {
 import AdminTable from '../components/AdminTable';
 import { Database, RefreshCw, Trash2 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
+import { confirmAction } from '@components/ui/ConfirmDialog';
 import { apiGet, apiPost } from '../../../utils/apiClient';
+import { formatApiError } from '../apiErrors';
+import { useActionLock } from '../hooks/useActionLock';
 import '../../../static/css/_admin/system.css';
 
 const PUBLISHERS = ['owner', 'admin'];
@@ -28,7 +31,13 @@ export default function CacheManagement() {
 
     const [djangoCaches, setDjangoCaches] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [clearing, setClearing] = useState('');
+    // 兩顆清除按鈕互斥：同一個 tick 內連點或兩顆同時按，只有第一個會執行（稽核 FE7a-10）
+    const clearLock = useActionLock();
+    const clearing = clearLock.pendingKey ?? '';
+    // WP-8 追加：確認步驟也在鎖裡（為了讓兩顆按鈕互斥），但確認視窗開著時還沒真的在清除，
+    // 按鈕不該顯示轉圈圈；另記「正在確認」的是哪一顆，只有確認後才算清除中。
+    const [confirmingKey, setConfirmingKey] = useState('');
+    const isClearing = (key) => clearing === key && confirmingKey !== key;
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [details, setDetails] = useState([]);
@@ -41,7 +50,7 @@ export default function CacheManagement() {
                 const response = await apiGet('/adminapi/system/cache/');
                 if (active) setDjangoCaches(response.django_caches ?? []);
             } catch (err) {
-                if (active) setError(err.message);
+                if (active) setError(formatApiError(err));
             } finally {
                 if (active) setLoading(false);
             }
@@ -52,11 +61,20 @@ export default function CacheManagement() {
         };
     }, []);
 
-    const clearDjango = async () => {
+    const clearDjango = () => clearLock.runLocked('django', async () => {
+        // 清掉之後前台下一次請求會全部回源，說明影響範圍再讓使用者確認（稽核 FE7a-10）
+        setConfirmingKey('django');
+        const confirmed = await confirmAction({
+            title: '清除全部 Django 快取',
+            message: '清除後，辭典搜尋、文法等具名快取會立即失效，前台下一次請求會重新向資料庫查詢，短時間內回應可能變慢。確定要清除嗎？',
+            confirmLabel: '清除快取',
+        });
+        setConfirmingKey('');
+        if (!confirmed) return;
+
         setError('');
         setSuccess('');
         setDetails([]);
-        setClearing('django');
 
         try {
             const response = await apiPost(
@@ -66,17 +84,23 @@ export default function CacheManagement() {
             setSuccess('已清除全部 Django 快取');
             setDetails(response.cleared_keys ?? []);
         } catch (err) {
-            setError(err.message);
-        } finally {
-            setClearing('');
+            setError(formatApiError(err));
         }
-    };
+    });
 
-    const clearFastApi = async () => {
+    const clearFastApi = () => clearLock.runLocked('fastapi', async () => {
+        setConfirmingKey('fastapi');
+        const confirmed = await confirmAction({
+            title: '清除全部 FastAPI 快取',
+            message: '清除後，辭典搜尋、文法與各遊戲的詞彙快取會立即失效並在背景重新預熱，預熱完成前相關功能的回應可能變慢。確定要清除嗎？',
+            confirmLabel: '清除快取',
+        });
+        setConfirmingKey('');
+        if (!confirmed) return;
+
         setError('');
         setSuccess('');
         setDetails([]);
-        setClearing('fastapi');
 
         try {
             const response = await apiPost(
@@ -89,11 +113,9 @@ export default function CacheManagement() {
                 `${INVALIDATED_LABELS[scope] ?? scope}：${count}`
             )));
         } catch (err) {
-            setError(err.message);
-        } finally {
-            setClearing('');
+            setError(formatApiError(err));
         }
-    };
+    });
 
     if (loading) {
         return (
@@ -173,7 +195,7 @@ export default function CacheManagement() {
                                 disabled={Boolean(clearing)}
                                 onClick={clearDjango}
                             >
-                                {clearing === 'django'
+                                {isClearing('django')
                                     ? <Spinner animation="border" size="sm" />
                                     : <Trash2 size={16} />}
                                 清除全部 Django 快取
@@ -204,7 +226,7 @@ export default function CacheManagement() {
                                 disabled={Boolean(clearing)}
                                 onClick={clearFastApi}
                             >
-                                {clearing === 'fastapi'
+                                {isClearing('fastapi')
                                     ? <Spinner animation="border" size="sm" />
                                     : <Trash2 size={16} />}
                                 清除全部 FastAPI 快取

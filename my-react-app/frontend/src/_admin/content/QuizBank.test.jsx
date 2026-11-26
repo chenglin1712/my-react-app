@@ -5,6 +5,12 @@ import QuizBank from './QuizBank';
 import { apiGet, apiPost, apiPatch, apiDelete } from '../../../utils/apiClient';
 
 import { getRowAction, queryRowAction } from '../testing/rowActions';
+
+// 核准、下架、重新發布會先跳確認（稽核 FE7b-02）：這個檔案的既有測試自動按「確認」，其餘（例如刪除）仍走真正的對話框
+vi.mock('@components/ui/ConfirmDialog', async (importOriginal) => {
+  const { withAutoConfirmedTransitions } = await import('../testing/autoConfirmForTests');
+  return withAutoConfirmedTransitions(await importOriginal());
+});
 vi.mock('../../../utils/apiClient', () => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),

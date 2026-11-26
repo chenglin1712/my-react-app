@@ -29,7 +29,9 @@ export default function TribeGamePage({ titles, fallbackPath, GameComponent, fea
 
   return (
     <div className="background">
-      <h1 className="game-title">{titles[tribe]}</h1>
+      {/* 各遊戲的 titles 只寫了目前的五族；新啟用的族群沒有條目時 <h1> 會是空的（稽核 FE5-15），
+          改用族名組出保底標題。 */}
+      <h1 className="game-title">{titles[tribe] || `${TRIBES.find((t) => t.slug === tribe)?.name ?? ""}族語練習`}</h1>
       <div className="game-background">
         <GameComponent tribe={tribe} />
       </div>

@@ -12,6 +12,28 @@ import { useActionLock } from '../hooks/useActionLock';
 
 const EMPTY_JOBS = { results: [], count: 0, page: 1, page_size: 20 };
 
+const REVOKE_DELAY_MS = 1000;
+
+// 稽核 BE2b-11：後端 Django 的 DATA_UPLOAD_MAX_MEMORY_SIZE 預設 10 MB（core/settings.py，
+// 可用 DJANGO_DATA_UPLOAD_MAX_MB 調整），nginx 的 client_max_body_size 是 12m。
+// 超過時伺服器直接拒絕，畫面只會看到籠統的錯誤，所以在瀏覽器端先用「實際要送出的
+// JSON 大小」檢查（上傳的是重新序列化後的 bundle，不是原始檔，縮排會被去掉）。
+export const MAX_IMPORT_UPLOAD_BYTES = 10 * 1024 * 1024;
+// 原始檔大到這個程度就不讀進記憶體解析了（避免整個分頁卡住），直接請使用者分批。
+const MAX_IMPORT_FILE_BYTES = 50 * 1024 * 1024;
+
+const formatMegabytes = (bytes) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+
+const tooLargeMessage = (bytes) => (
+    `檔案過大（約 ${formatMegabytes(bytes)}），單次匯入上限為 ${formatMegabytes(MAX_IMPORT_UPLOAD_BYTES)}，`
+    + '請把詞條拆成多個檔案分批匯入。'
+);
+
+/** 與 apiClient 送出的請求本體相同的序列化方式，算出實際會送出的位元組數。 */
+export const importPayloadBytes = (filename, bundle) => (
+    new Blob([JSON.stringify({ filename, bundle })]).size
+);
+
 /**
  * 批次匯入／匯出精靈的資料與流程（FE-9）。
  *
@@ -131,16 +153,31 @@ export function useImportWizard({ id }) {
 
         if (!file) return;
 
+        if (file.size > MAX_IMPORT_FILE_BYTES) {
+            setError(tooLargeMessage(file.size));
+            return;
+        }
+
         const reader = new FileReader();
 
         reader.onload = () => {
             if (generation !== fileReadGenerationRef.current || !mountedRef.current) return;
 
+            let bundle;
             try {
-                setParsedBundle(JSON.parse(reader.result));
+                bundle = JSON.parse(reader.result);
             } catch {
                 setError('檔案不是有效的 JSON');
+                return;
             }
+
+            // 稽核 BE2b-11：超過伺服器上限就不讓「上傳」可按，避免送出後才失敗
+            const bytes = importPayloadBytes(file.name, bundle);
+            if (bytes > MAX_IMPORT_UPLOAD_BYTES) {
+                setError(tooLargeMessage(bytes));
+                return;
+            }
+            setParsedBundle(bundle);
         };
 
         reader.onerror = () => {
@@ -166,7 +203,11 @@ export function useImportWizard({ id }) {
                     state: { rowErrors: result.row_errors ?? {} },
                 });
             } catch (err) {
-                if (mountedRef.current) setError(err.message);
+                if (!mountedRef.current) return;
+                // 伺服器上限若被調得比前端常數更小，仍以 413／400 拒絕；給出一樣明確的分批建議
+                setError(err.status === 413
+                    ? '檔案超過伺服器允許的大小，請把詞條拆成多個檔案分批匯入。'
+                    : err.message);
             }
         });
     };
@@ -186,9 +227,13 @@ export function useImportWizard({ id }) {
 
                 anchor.href = url;
                 anchor.download = `dictionary_${selectedTribe}.json`;
+                // 稽核 FE7a-21：部分瀏覽器（Firefox）要求 anchor 在文件裡才會觸發下載；
+                // 點擊後立刻 revoke 也可能讓下載還沒開始就被取消，所以延後到下一輪再釋放。
+                anchor.style.display = 'none';
+                document.body.appendChild(anchor);
                 anchor.click();
-
-                URL.revokeObjectURL(url);
+                anchor.remove();
+                setTimeout(() => URL.revokeObjectURL(url), REVOKE_DELAY_MS);
                 if (mountedRef.current) setSuccessMessage('辭典匯出檔已開始下載。');
             } catch (err) {
                 if (mountedRef.current) setError(err.message);

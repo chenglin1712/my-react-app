@@ -6,6 +6,7 @@ uid 只存單向雜湊，這裡只顯示雜湊的前 8 碼讓管理者看出「�
 """
 import math
 
+from django.db import transaction
 from django.db.models import Count
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -116,9 +117,11 @@ def ai_feedback_eval_candidate(request, pk):
     row.eval_candidate, row.eval_note = candidate, note.strip() if candidate else ""
     row.eval_question = question.strip() if candidate else ""
     row.eval_marked_by = decoded.get("uid", "") if candidate else ""
-    row.save(update_fields=["eval_candidate", "eval_note", "eval_question", "eval_marked_by", "updated_at"])
-    write_audit_log(
-        request, decoded, "ai_feedback_eval_mark", row, before=before,
-        after={"evalCandidate": row.eval_candidate, "evalNote": row.eval_note}, target_type=TARGET_TYPE,
-    )
+    # 稽核 BE2a-08：標記與稽核紀錄同一個交易
+    with transaction.atomic():
+        row.save(update_fields=["eval_candidate", "eval_note", "eval_question", "eval_marked_by", "updated_at"])
+        write_audit_log(
+            request, decoded, "ai_feedback_eval_mark", row, before=before,
+            after={"evalCandidate": row.eval_candidate, "evalNote": row.eval_note}, target_type=TARGET_TYPE,
+        )
     return JsonResponse(_serialize(row))

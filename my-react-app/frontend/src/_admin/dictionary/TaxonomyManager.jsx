@@ -217,6 +217,8 @@ export default function TaxonomyManager() {
                                             {isEditing ? (
                                                 <Form.Control
                                                     size="sm"
+                                                    // 稽核 FE7a-15：行內欄位沒有可見標籤，螢幕報讀器需要 aria-label
+                                                    aria-label={`編輯 ${label} ${isAffix ? '詞綴' : '名稱'}`}
                                                     value={isAffix ? editDraft.affix : editDraft.name}
                                                     onChange={(event) => setEditDraft((draft) => ({
                                                         ...draft,
@@ -231,6 +233,7 @@ export default function TaxonomyManager() {
                                                 {isEditing ? (
                                                     <Form.Select
                                                         size="sm"
+                                                        aria-label={`編輯 ${label} 類型`}
                                                         value={editDraft.affix_type}
                                                         onChange={(event) => setEditDraft((draft) => ({
                                                             ...draft, affix_type: event.target.value,
@@ -254,6 +257,7 @@ export default function TaxonomyManager() {
                                                 {isEditing ? (
                                                     <Form.Control
                                                         size="sm"
+                                                        aria-label={`編輯 ${label} 功能說明`}
                                                         value={editDraft.function}
                                                         onChange={(event) => setEditDraft((draft) => ({
                                                             ...draft, function: event.target.value,
@@ -291,6 +295,7 @@ export default function TaxonomyManager() {
                                                             type="button"
                                                             size="sm"
                                                             variant="outline-secondary"
+                                                            aria-label={`取消編輯 ${label}`}
                                                             disabled={savingEdit}
                                                             onClick={cancelEdit}
                                                         >
@@ -327,16 +332,25 @@ export default function TaxonomyManager() {
                                                         size="sm"
                                                         variant="outline-danger"
                                                         aria-label={`刪除${label}`}
-                                                        disabled={row.reference_count > 0 || deletingId === row.id}
-                                                        title={row.reference_count > 0
-                                                            ? '仍被引用，無法刪除，請改用合併'
+                                                        // 稽核 FE7a-15：停用原因原本只在 title（觸控與報讀器都看不到），改成可見文字並以 aria-describedby 連結
+                                                        aria-describedby={row.reference_count > 0
+                                                            ? `taxonomy-delete-hint-${activeKind}-${row.id}`
                                                             : undefined}
+                                                        disabled={row.reference_count > 0 || deletingId === row.id}
                                                         onClick={() => removeRow(row)}
                                                     >
                                                         {deletingId === row.id
                                                             ? <Spinner animation="border" size="sm" />
                                                             : <Trash2 size={14} />}
                                                     </Button>
+                                                )}
+                                                {canEdit && row.reference_count > 0 && (
+                                                    <small
+                                                        id={`taxonomy-delete-hint-${activeKind}-${row.id}`}
+                                                        className="dictionary-muted"
+                                                    >
+                                                        仍被引用，無法刪除，請改用合併
+                                                    </small>
                                                 )}
                                             </div>
                                         </td>

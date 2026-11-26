@@ -7,6 +7,8 @@ import { useActionLock } from '../hooks/useActionLock';
 import { useGuardedSelection } from '../hooks/useGuardedSelection';
 import { countChars, formatApiError, isAborted, isOutcomeUnknown } from '../apiErrors';
 import { AdminEmptyStage } from '../components/AdminEmpty';
+import EditConflictAlert from '../components/EditConflictAlert';
+import { isEditConflict } from '../hooks/editConflict';
 import '../../../static/css/_admin/promo-videos.css';
 import { SuccessNotice } from '../components/AdminToast';
 
@@ -136,6 +138,8 @@ function Editor({ video, editable, activeId, onSaved, onCreated, onDeleted, onAc
     const [progress, setProgress] = useState({ loaded: 0, total: 0 });
     const [confirm, setConfirm] = useState(null); // null | 'delete' | 'activate' | 'deactivate'
     const abortRef = useRef(null);
+    // 儲存文字時發現別人剛更新過這支影片（edit_conflict）（稽核 FE7b-08）
+    const [conflict, setConflict] = useState(false);
     const lock = useActionLock();
     const errors = validate(form);
     const fieldError = (name) => (showErrors ? errors[name] : undefined);
@@ -143,15 +147,28 @@ function Editor({ video, editable, activeId, onSaved, onCreated, onDeleted, onAc
     const isActive = Boolean(video && video.id === activeId);
     const dirty = normalized(form) !== normalized(formOf(video));
 
-    useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
+    // 上傳中也回報成「有未完成的工作」：切換影片或離開頁面會中止上傳，必須和未儲存的文字走同一套確認（稽核 FE7b-05）
+    const working = dirty || Boolean(busyKind);
+    useEffect(() => { onDirtyChange(working); }, [working, onDirtyChange]);
     useEffect(() => () => {
         onDirtyChange(false);
         abortRef.current?.abort(); // 離開時中止還在送的上傳，避免離頁後仍占著連線
     }, [onDirtyChange]);
 
     const run = (key, task) => lock.runLocked(key, async () => {
-        setError(''); setSuccess('');
-        try { await task(); } catch (err) { setError(formatApiError(err)); }
+        setError(''); setSuccess(''); setConflict(false);
+        try { await task(); } catch (err) {
+            if (isEditConflict(err)) setConflict(true);
+            else setError(formatApiError(err));
+        }
+    });
+
+    // 載入最新版本：用伺服器上的內容取代表單與列表（自己的文字修改會被捨棄）
+    const reloadLatest = () => run('reload', async () => {
+        const latest = await apiGet(`/adminapi/promo-videos/${video.id}/`);
+        onSaved(latest);
+        setForm(formOf(latest));
+        setShowErrors(false);
     });
 
     const save = () => {
@@ -164,7 +181,11 @@ function Editor({ video, editable, activeId, onSaved, onCreated, onDeleted, onAc
                 onCreated(await apiPost('/adminapi/promo-videos/', payload));
                 return;
             }
-            onSaved(await apiPatch(`/adminapi/promo-videos/${video.id}/`, payload));
+            // 帶載入時的 updated_at：期間別人改過就回 409，不會無聲蓋掉
+            onSaved(await apiPatch(`/adminapi/promo-videos/${video.id}/`, {
+                ...payload,
+                ...(video.updated_at ? { base_updated_at: video.updated_at } : {}),
+            }));
             setShowErrors(false);
             setSuccess('已儲存');
         });
@@ -238,6 +259,7 @@ function Editor({ video, editable, activeId, onSaved, onCreated, onDeleted, onAc
         <section className={`promo-videos-editor${isNew ? '' : ' has-files'}`} id="promo-editor" aria-labelledby="promo-editor-title">
             <h2 id="promo-editor-title">{isNew ? '新增宣傳影片' : video.title}</h2>
             {error && <Alert variant="danger" role="alert">{error}</Alert>}
+            {conflict && <EditConflictAlert onReload={reloadLatest} busy={lock.isLocked} />}
             <SuccessNotice message={success} role="status" />
 
             <Form noValidate className="promo-videos-text" onSubmit={(event) => { event.preventDefault(); save(); }}>
@@ -310,11 +332,11 @@ function Editor({ video, editable, activeId, onSaved, onCreated, onDeleted, onAc
                             ) : <p className="promo-videos-placeholder">尚未上傳影片</p>}
                         </FileSlot>
                         <FileSlot kind="cover" video={video} editable={editable} busyKind={busyKind} progress={progress}
-                            error={slotErrors.cover} onUpload={upload} onClear={clear}>
+                            error={slotErrors.cover} onUpload={upload} onCancel={() => abortRef.current?.abort()} onClear={clear}>
                             {video.cover_url ? <img className="promo-videos-cover" src={video.cover_url} alt="封面圖預覽" /> : <p className="promo-videos-placeholder">尚未上傳封面</p>}
                         </FileSlot>
                         <FileSlot kind="caption" video={video} editable={editable} busyKind={busyKind} progress={progress}
-                            error={slotErrors.caption} onUpload={upload} onClear={clear}>
+                            error={slotErrors.caption} onUpload={upload} onCancel={() => abortRef.current?.abort()} onClear={clear}>
                             <p className="promo-videos-placeholder">{video.caption_url ? '已上傳字幕檔，可在上方播放器的字幕按鈕開啟檢查' : '尚未上傳字幕'}</p>
                         </FileSlot>
                     </div>
@@ -432,7 +454,7 @@ export default function PromoVideos() {
             {error && <Alert variant="danger" role="alert">{error}</Alert>}
             {hasPending && (
                 <Alert variant="warning" role="alert">
-                    <p>目前這支影片有尚未儲存的文字變更，切換後會遺失。</p>
+                    <p>目前這支影片有尚未儲存的文字變更，或正在上傳檔案；切換後變更會遺失，上傳也會被中止。</p>
                     <Button size="sm" variant="outline-danger" onClick={confirmSwitch}>放棄變更並切換</Button>{' '}
                     <Button size="sm" variant="outline-secondary" onClick={cancelSwitch}>留在這裡</Button>
                 </Alert>

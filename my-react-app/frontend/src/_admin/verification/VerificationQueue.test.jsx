@@ -219,7 +219,9 @@ describe('VerificationQueue', () => {
         const bytes = new Uint8Array(await new Promise((resolve) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsArrayBuffer(blob); }));
         expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);          // 開頭恰好一個 UTF-8 BOM
         expect(new TextDecoder().decode(bytes.slice(3))).toBe('item_key,tribe\r\nabc,kavalan\r\n');
-        expect(revoke).toHaveBeenCalledWith('blob:x');
+        // 稽核 FE7b-16：click() 後不立刻 revoke，延後再回收
+        expect(revoke).not.toHaveBeenCalled();
+        await waitFor(() => expect(revoke).toHaveBeenCalledWith('blob:x'), { timeout: 3000 });
     });
 
     test('匯出：後端內容已含 BOM 時不重複添加；回傳不是文字時顯示錯誤', async () => {

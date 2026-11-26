@@ -15,6 +15,7 @@ from .routes.pronunciation import model as pronunciation_model
 from .routes.quiz import deadline as quiz_deadline
 from dictionary_db.connect import SessionLocal
 from .rate_limit import limiter
+from . import background_refresh, feature_flags
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
@@ -106,6 +107,14 @@ def _warm_caches(app: FastAPI):
     if _WARM_CACHE_JITTER_MAX_SECONDS > 0:
         time.sleep(random.uniform(0, _WARM_CACHE_JITTER_MAX_SECONDS))
 
+    # 稽核 BE4-06／16：會花錢的旗標在第一次成功載入前一律視為關閉，這裡在背景預熱執行緒先同步讀一次，
+    # 縮短重啟後翻譯回 403 的空窗（沒有設定資料庫時什麼都不做）。
+    try:
+        feature_flags.preload()
+    except Exception:
+        logger.exception("FeatureFlag 預載失敗，之後由背景更新補上")
+
+    ok_caches = {}
     db = SessionLocal()
     try:
         for name, warm in (
@@ -116,10 +125,21 @@ def _warm_caches(app: FastAPI):
         ):
             try:
                 warm(db)
+                ok_caches[name] = True
             except Exception:
+                ok_caches[name] = False
                 logger.exception("%s 快取預熱失敗", name)
+                # 四個預熱共用同一個 Session：Postgres 的交易一旦出錯就進入 aborted 狀態，不 rollback 的話
+                # 後面的快取會連帶失敗，/ready 因此永遠 503
+                try:
+                    db.rollback()
+                except Exception:
+                    logger.exception("預熱失敗後 rollback 也失敗")
     finally:
         db.close()
+    # 稽核 BE4-15：「嘗試過預熱」不等於「資料庫連得上」。辭典與測驗是最核心的資料，至少要有一個成功才算就緒；
+    # 兩個都失敗幾乎一定是資料庫連不上，這時 /ready 要回 503，部署的健康檢查才擋得住有問題的版本。
+    app.state.caches_usable = ok_caches.get("dictionary", False) or ok_caches.get("quiz", False)
 
     if _PRELOAD_PRONUNCIATION_MODEL:
         app.state.pronunciation_model_ready = _preload_pronunciation_model()
@@ -139,7 +159,11 @@ async def lifespan(app: FastAPI):
     if secret_issue and not is_debug():
         logger.error("%s；/internal/* 端點會拒絕所有請求", secret_issue)
     app.state.caches_warm = False
+    app.state.caches_usable = False
     app.state.pronunciation_model_ready = not _PRELOAD_PRONUNCIATION_MODEL
+    # 稽核 BE4-06：設定快取（旗標、限流規則、遊戲參數）到期後的更新改在背景執行緒，請求路徑不再等資料庫或 Django。
+    # 第一次請求時快取還是空的，會先用預設值回應並觸發背景載入。
+    background_refresh.enable()
     warm_thread = threading.Thread(target=_warm_caches, args=(app,), daemon=True)
     warm_thread.start()
     try:
@@ -159,6 +183,7 @@ async def lifespan(app: FastAPI):
         # 詞素學習的背景工作（Firestore／Postgres 寫入）：不等卡住的外部呼叫，免得拖住關閉
         quiz_deadline.shutdown()
         set_usage_recorder(previous_usage_recorder)
+        background_refresh.disable()
 
 
 # 互動式文件（/docs、/redoc）與 /openapi.json 會把所有端點、參數與內部欄位列給任何人看，
@@ -211,7 +236,8 @@ async def _unhandled_exception_handler(request: Request, exc: Exception):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_allowed_origins(),
-    allow_credentials=True,
+    # 稽核 BE4-17：全站用 Authorization: Bearer 標頭驗證，不靠 cookie，不需要允許帶憑證的跨來源請求
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -264,7 +290,11 @@ def readiness_check():
     balancer 可以選擇在「process 活著但還沒真正準備好」的這段期間暫緩導
     流量進來，不需要讓冷啟動當下最早幾個使用者請求承擔全表掃描的延遲
     （P4 review BE-24）。不需要登入，跟 /health 同一種公開探測端點性質。"""
-    ready = getattr(app.state, "caches_warm", False) and getattr(app.state, "pronunciation_model_ready", True)
+    ready = (
+        getattr(app.state, "caches_warm", False)
+        and getattr(app.state, "caches_usable", False)
+        and getattr(app.state, "pronunciation_model_ready", True)
+    )
     return JSONResponse({"ready": ready}, status_code=200 if ready else 503)
 
 

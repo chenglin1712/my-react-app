@@ -18,6 +18,7 @@ from ._shared import (
     invalid_transition as _invalid_transition,
     ip_rate_limited_response as _ip_rate_limited_response,
     parse_json_body as _parse_json_body,
+    stale_edit_response as _stale_edit_response,
     write_audit_log as _write_audit_log,
 )
 from .models import FeaturedTopic
@@ -125,6 +126,9 @@ def _update_topic(request, decoded, pk):
         return err_resp
     with transaction.atomic():
         topic = service.lock_topic(pk)
+        stale = _stale_edit_response(data, topic.updated_at)  # 稽核 BE2a-07
+        if stale:
+            return stale
         # 送審中與已發布的內容不能直接改；已發布的走 pending-revision，已下架視同重新起草
         if topic.status not in _EDITABLE:
             return _invalid_transition(topic.status, "edit")
@@ -208,6 +212,10 @@ def featured_topic_approve(request, decoded, pk):
     if not serializer.is_valid():
         return JsonResponse({"detail": "請求參數錯誤", "errors": serializer.errors}, status=400)
     with transaction.atomic():
+        locked = service.lock_topic(pk)
+        stale = _stale_edit_response(data, locked.updated_at)  # 稽核 BE1-03
+        if stale:
+            return stale
         try:
             topic, before = service.publish_topic(
                 pk, expected_status=FeaturedTopic.STATUS_PENDING_REVIEW,

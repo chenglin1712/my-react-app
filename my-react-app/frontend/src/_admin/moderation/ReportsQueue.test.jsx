@@ -212,7 +212,7 @@ describe('ReportsQueue', () => {
         });
     });
 
-    test('pending 筆記提供前往分享筆記頁面的快速連結', async () => {
+    test('pending 筆記提供前往分享筆記頁面的快速連結（帶 id，稽核 FE7b-07）', async () => {
         renderPage();
 
         const row = await screen
@@ -224,11 +224,11 @@ describe('ReportsQueue', () => {
 
         expect(link).toHaveAttribute(
             'href',
-            '/admin/moderation/notes',
+            '/admin/moderation/notes?id=note123',
         );
     });
 
-    test('錄音檢舉連結前往錄音列表且不附加 target ID', async () => {
+    test('錄音檢舉連結帶 id 與 tribe（稽核 FE7b-07）', async () => {
         renderPage();
 
         const row = await screen
@@ -240,9 +240,8 @@ describe('ReportsQueue', () => {
 
         expect(link).toHaveAttribute(
             'href',
-            '/admin/moderation/recordings',
+            '/admin/moderation/recordings?id=rec456&tribe=tayal',
         );
-        expect(link.getAttribute('href')).not.toContain('rec456');
     });
 
     test('owner 點核結後可填選填備註並送到 resolve 端點', async () => {

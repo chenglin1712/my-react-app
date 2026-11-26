@@ -99,6 +99,9 @@ def exam_schedule_override_detail(request, phase):
 
 
 def _upsert_exam_schedule_override(request, phase):
+    # 稽核 BE1-04：編輯者可直接新增／修改覆寫，公開首頁行事曆會立即改變，不經核准。
+    # 這是刻意的：考試日期以官網為準，編輯者的用途是在爬蟲解析失敗或官網延遲時即時更正，
+    # 每次異動都有稽核紀錄（_write_audit_log）。若日後要改成需核准，把角色換成 PUBLISHERS 即可。
     decoded, err_resp = require_role(request, CONTENT_EDITORS)
     if err_resp:
         return err_resp

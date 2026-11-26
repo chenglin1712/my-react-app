@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { Button, Form, Modal } from 'react-bootstrap';
+import EditorModalError from './EditorModalError';
 
 /**
  * 退件理由對話框（FE-2）——「退件」與「退件修改」共用同一個對話框，差別只在
@@ -10,6 +12,11 @@ import { Button, Form, Modal } from 'react-bootstrap';
 export default function RejectReasonModal({ reject, actionId, controlId }) {
     const { target, reason, setReason, isRevision, close, submit } = reject;
     const submitting = actionId === target?.id;
+
+    // 一打開就顯示紅色「必填」會像是剛開就做錯事；使用者碰過欄位（輸入或離開欄位）之後才標錯（稽核 FE7b-13）。
+    // 換一筆或重新開啟時重置。
+    const [touched, setTouched] = useState(false);
+    useEffect(() => { setTouched(false); }, [target]);
 
     // 送出中不能被關掉——不然使用者按了確認、退件理由送出中途手滑點到背景／
     // 按 Escape，會直接關掉對話框；失敗時 hook 那層特意保留的理由文字也就
@@ -27,10 +34,11 @@ export default function RejectReasonModal({ reject, actionId, controlId }) {
             keyboard={!submitting}
             centered
         >
-            <Modal.Header closeButton>
+            <Modal.Header closeButton={!submitting}>
                 <Modal.Title>{isRevision ? '退件修改原因' : '退件原因'}</Modal.Title>
             </Modal.Header>
             <Modal.Body>
+                <EditorModalError error={reject.error} />
                 <Form.Group controlId={controlId}>
                     <Form.Label>請說明需要修改的內容</Form.Label>
                     <Form.Control
@@ -38,8 +46,9 @@ export default function RejectReasonModal({ reject, actionId, controlId }) {
                         rows={4}
                         required
                         value={reason}
-                        onChange={(event) => setReason(event.target.value)}
-                        isInvalid={Boolean(target) && !reason.trim()}
+                        onChange={(event) => { setTouched(true); setReason(event.target.value); }}
+                        onBlur={() => setTouched(true)}
+                        isInvalid={touched && !reason.trim()}
                     />
                     <Form.Control.Feedback type="invalid">
                         退件理由為必填

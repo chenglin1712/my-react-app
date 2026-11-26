@@ -38,6 +38,7 @@ from django.db.models import Case, Q, When
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
 
 from core.firebase_auth import require_role
@@ -49,9 +50,12 @@ from ._shared import (
     ip_rate_limited_response as _ip_rate_limited_response,
     parse_json_body as _parse_json_body,
     rate_limited_response as _rate_limited_response,
+    safe_write_audit_log as _safe_write_audit_log,
+    stale_edit_response as _stale_edit_response,
     write_audit_log as _write_audit_log,
 )
 from .crawler_sync import sync_crawler_announcements
+from .user_names import lookup_user_names
 from .models import Announcement, AnnouncementSyncStatus, AuditLog
 from .revisions import (
     cancel_stale_pending_revision, make_revision_views, pending_revision_target_ids,
@@ -283,6 +287,10 @@ def _update_announcement(request, decoded, pk):
 
     with transaction.atomic():
         announcement = _locked(pk)
+        # 稽核 BE2a-07：兩個人同時編輯同一篇，後存的人要先看到先存的結果，不能無聲蓋掉
+        stale = _stale_edit_response(data, announcement.updated_at)
+        if stale:
+            return stale
         # 送審中的內容不能直接改——避免審核者正在看的內容跟送出核准當下已經
         # 不是同一份。已下架的內容允許編輯，但視同「重新起草」，儲存後會退回
         # draft，強制走一次完整的送審／核准流程，不會有「編輯已下架內容後
@@ -411,6 +419,10 @@ def announcement_approve(request, decoded, pk):
         announcement = _locked(pk)
         if announcement.status != Announcement.STATUS_PENDING_REVIEW:
             return _invalid_transition(announcement.status, "approve")
+        # 稽核 BE1-03：審核者核准的是「他看到的那一版」，送審後被改過就要擋
+        stale = _stale_edit_response(data, announcement.updated_at)
+        if stale:
+            return stale
 
         before = AnnouncementSerializer(announcement).data
         now = timezone.now()
@@ -561,7 +573,8 @@ def announcement_sync_crawler(request):
 
     result = sync_crawler_announcements(force_refresh=True)
     status = AnnouncementSyncStatus.load()
-    _write_audit_log(
+    # 稽核 BE2a-08：同步已經寫進資料庫，稽核紀錄寫不進去不該讓整個請求變 500
+    _safe_write_audit_log(
         request, decoded, "sync", status,
         target_type="announcement_crawler_sync", after=result,
     )
@@ -581,9 +594,36 @@ def audit_log_list(request, decoded):
     任何寫入方法。
     """
     try:
-        limit = min(50, max(1, int(request.GET.get("limit", 10))))
+        limit = min(100, max(1, int(request.GET.get("limit", request.GET.get("page_size", 10)))))
     except ValueError:
         limit = 10
+    try:
+        page = max(1, int(request.GET.get("page", 1)))
+    except ValueError:
+        page = 1
 
-    logs = AuditLog.objects.all()[:limit]
-    return JsonResponse({"results": AuditLogSerializer(logs, many=True).data})
+    # 稽核 BE2a-17：可以依操作者、對象、動作、日期範圍篩選並分頁（原本只能看最新的幾筆）
+    logs = AuditLog.objects.all()
+    for param, field in (
+        ("actor_uid", "actor_uid"), ("target_type", "target_type"), ("target_id", "target_id"), ("action", "action"),
+    ):
+        value = request.GET.get(param, "").strip()
+        if value:
+            logs = logs.filter(**{field: value})
+    for param, lookup in (("date_from", "created_at__date__gte"), ("date_to", "created_at__date__lte")):
+        value = request.GET.get(param, "").strip()
+        if value:
+            parsed = parse_date(value)
+            if parsed is None:
+                return JsonResponse({"detail": "請求參數錯誤", "errors": {param: ["日期格式必須是 YYYY-MM-DD"]}}, status=400)
+            logs = logs.filter(**{lookup: parsed})
+
+    total = logs.count()
+    start = (page - 1) * limit
+    page_logs = list(logs[start:start + limit])
+    # WP-8 追加：一次批次查完這一頁所有操作者的姓名（有快取、失敗回空字串），不逐筆查
+    actor_names = lookup_user_names(log.actor_uid for log in page_logs)
+    return JsonResponse({
+        "results": AuditLogSerializer(page_logs, many=True, context={"actor_names": actor_names}).data,
+        "count": total, "page": page, "page_size": limit,
+    })

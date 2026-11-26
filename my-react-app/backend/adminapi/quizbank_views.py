@@ -38,6 +38,7 @@ from ._shared import (
     ip_rate_limited_response as _ip_rate_limited_response,
     parse_json_body as _parse_json_body,
     rate_limited_response as _rate_limited_response,
+    stale_edit_response as _stale_edit_response,
     write_audit_log as _write_audit_log,
 )
 from .models import (
@@ -97,7 +98,14 @@ def _list_content(request, model, serializer_class, target_type, extra_filter_fi
     # has_pending_revision：這一列是否有一筆待審核的「編輯已發布內容」提案
     # （見 revisions.py）。一次查詢這一頁全部 id，不要每列各自查一次。
     pending_versions = pending_revision_versions(target_type, [item.pk for item in items])
-    results = serializer_class(items, many=True).data
+    # 稽核 BE2a-06：情境題每一列都會查一次 AI 草稿來源（N+1）；整頁一次查好，用 context 傳進去
+    context = {}
+    if target_type == "quiz_situation_item":
+        context["ai_drafts"] = {
+            draft.content_id: draft
+            for draft in AiQuizDraft.objects.filter(content_type=target_type, content_id__in=[item.pk for item in items])
+        }
+    results = serializer_class(items, many=True, context=context).data
     for result, item in zip(results, items):
         result["has_pending_revision"] = item.pk in pending_versions
         result["pending_revision_version"] = pending_versions.get(item.pk)
@@ -157,6 +165,9 @@ def _update_content(request, pk, model, serializer_class, target_type):
 
     with transaction.atomic():
         obj = _locked_content(model, pk)
+        stale = _stale_edit_response(data, obj.updated_at)  # 稽核 BE2a-07
+        if stale:
+            return stale
         # 送審中／已啟用的內容不能直接改——已啟用的內容如果要修改，先用
         # unpublish 退回草稿，避免正在被學生抽到的題目跟審核者核准當下
         # 看到的內容不一致（跟 Announcement 的 _update_announcement 同一個
@@ -187,9 +198,22 @@ def _delete_content(request, pk, model, serializer_class, target_type):
 
     with transaction.atomic():
         obj = _locked_content(model, pk)
-        if obj.status != model.STATUS_DRAFT:
+        # 稽核 BE2a-16：草稿與「已退件」都能刪（退件的題目原本永遠刪不掉）
+        if obj.status not in (model.STATUS_DRAFT, model.STATUS_REJECTED):
             return _invalid_transition(obj.status, "delete")
         before = serializer_class(obj).data
+        # 曾經送審過、或是遷移匯入（有 origin_key）的題目改為軟刪除：保留資料列當墓碑，
+        # 不抹掉審核紀錄，也避免之後重新匯入又把同一題復活
+        if obj.submitted_at is not None or getattr(obj, "origin_key", None):
+            obj.deleted_at = timezone.now()
+            obj.deleted_by = decoded.get("uid", "")
+            obj.save(update_fields=["deleted_at", "deleted_by", "updated_at"])
+            _write_audit_log(
+                request, decoded, "soft_delete", obj, before=before,
+                after={"deleted_at": obj.deleted_at.isoformat(), "previous_status": before.get("status")},
+                target_type=target_type,
+            )
+            return JsonResponse({"detail": "已刪除"}, status=200)
         _write_audit_log(request, decoded, "delete", obj, before=before, target_type=target_type)
         # AI 草稿的來源紀錄跟題目一起刪，避免殘留孤兒資料、也避免主鍵被重用時新題被誤標成 AI 草稿
         AiQuizDraft.objects.filter(content_type=target_type, content_id=obj.pk).delete()
@@ -273,6 +297,9 @@ def _content_approve(request, pk, model, serializer_class, target_type):
         obj = _locked_content(model, pk)
         if obj.status != model.STATUS_PENDING_REVIEW:
             return _invalid_transition(obj.status, "approve")
+        stale = _stale_edit_response(data, obj.updated_at)  # 稽核 BE1-03
+        if stale:
+            return stale
 
         # AI 產生的草稿不能由產生者自己核可（路線圖 #23）：owner／admin 同時是編輯者與核准者，也一樣擋
         own_draft_err = own_ai_draft_approval_response(target_type, obj.pk, decoded.get("uid", "anon"))
@@ -499,6 +526,9 @@ def _update_irt_config(request, decoded):
     config = IrtConfig.load()
     with transaction.atomic():
         obj = IrtConfig.objects.select_for_update().get(pk=config.pk)
+        stale = _stale_edit_response(data, obj.updated_at)  # 稽核 BE2a-07
+        if stale:
+            return stale
         before = IrtConfigSerializer(obj).data
         serializer = IrtConfigSerializer(obj, data=data, partial=True)
         if not serializer.is_valid():

@@ -44,7 +44,10 @@ export function useUserDetail({ uid, canViewUser }) {
     // 編號還是不是自己出發時的那一個，不是才動手更新狀態。
     const uidGenerationRef = useRef(0);
 
-    const loadUser = useCallback(async () => {
+    // 稽核 FE7b-14：background=true 是帳號操作成功後的「背景重新整理」，不切換整頁
+    // 載入轉圈（否則整頁換成 spinner，焦點與捲動位置全部遺失），舊資料先留著、
+    // 回應回來再換；按鈕上的忙碌狀態由 useActionLock 的 pendingKey 負責。
+    const loadUser = useCallback(async ({ background = false } = {}) => {
         const generation = uidGenerationRef.current;
         const isStale = () => uidGenerationRef.current !== generation;
 
@@ -53,7 +56,7 @@ export function useUserDetail({ uid, canViewUser }) {
             return;
         }
 
-        setLoading(true);
+        if (!background) setLoading(true);
         setError('');
 
         try {
@@ -65,7 +68,7 @@ export function useUserDetail({ uid, canViewUser }) {
             if (isStale()) return;
             setError(err.message);
         } finally {
-            if (!isStale()) setLoading(false);
+            if (!isStale() && !background) setLoading(false);
         }
     }, [canViewUser, uid]);
 
@@ -92,7 +95,7 @@ export function useUserDetail({ uid, canViewUser }) {
             await apiPost(`/adminapi/users/${uid}/${endpoint}/`);
             if (uidGenerationRef.current !== generation) return;
             if (message) setSuccessMessage(message);
-            await loadUser();
+            await loadUser({ background: true });
         } catch (err) {
             if (uidGenerationRef.current !== generation) return;
             setError(err.message);
@@ -119,7 +122,7 @@ export function useUserDetail({ uid, canViewUser }) {
                 await apiPost(`/adminapi/users/${uid}/role/`, { role: selectedRole || null });
                 if (uidGenerationRef.current !== generation) return;
                 setSuccessMessage('角色已更新。');
-                await loadUser();
+                await loadUser({ background: true });
             } catch (err) {
                 if (uidGenerationRef.current !== generation) return;
                 setError(err.message);
@@ -171,9 +174,14 @@ export function useUserDetail({ uid, canViewUser }) {
 
             anchor.href = url;
             anchor.download = `user_export_${uid}.json`;
+            // 稽核 FE7b-16：部分瀏覽器要求 <a> 在 DOM 內才會觸發下載，且 click() 後立刻
+            // revoke 會讓下載取不到內容，所以先掛進 body、延後再回收。
+            document.body.appendChild(anchor);
             anchor.click();
-
-            URL.revokeObjectURL(url);
+            setTimeout(() => {
+                anchor.remove();
+                URL.revokeObjectURL(url);
+            }, 1000);
             setSuccessMessage('個資匯出檔已開始下載。');
         } catch (err) {
             if (uidGenerationRef.current !== generation) return;

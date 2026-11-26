@@ -37,6 +37,7 @@ from .dictionary_import import (
     import_report_hash,
     resolve_import_bundle,
 )
+from .dictionary_import.import_apply import ImportClaimLost
 from .dictionary_serializers import validate_import_bundle_structure
 from .models import DictionaryImportJob
 from .serializers import RejectSerializer
@@ -56,10 +57,17 @@ def _job_summary(job):
         "reviewed_by": job.reviewed_by, "reviewed_at": job.reviewed_at.isoformat() if job.reviewed_at else None,
         "review_comment": job.review_comment,
         "applied_by": job.applied_by, "applied_at": job.applied_at.isoformat() if job.applied_at else None,
+        "word_count": _word_count(job),
     }
 
 
+def _word_count(job):
+    words = (job.payload or {}).get("words") if isinstance(job.payload, dict) else None
+    return len(words) if isinstance(words, list) else 0
+
+
 def _job_detail(job):
+    # 稽核 BE2b-14：精靈步驟二顯示的詞條數（原本欄位不存在，永遠是 0）
     return {**_job_summary(job), "payload": job.payload, "report": job.report}
 
 
@@ -109,6 +117,8 @@ def _import_job_upload(request, decoded):
         return JsonResponse({"detail": "請求格式錯誤"}, status=400)
 
     filename = data.get("filename", "")
+    if not isinstance(filename, str):
+        return JsonResponse({"detail": "請求參數錯誤", "errors": {"filename": "必須是字串"}}, status=400)
     bundle = data.get("bundle")
     tribe_slug, words, row_errors = validate_import_bundle_structure(bundle)
     if tribe_slug is None:
@@ -187,8 +197,9 @@ def import_job_auto_create_taxonomies(request, decoded, pk):
     """owner-only：把這份 bundle 用到、但資料庫裡還沒有的分類/詞類/焦點/
     來源名稱建起來，然後立刻重新預檢一次（避免使用者忘記重新預檢、看到
     一份還是「找不到」的舊報告）。"""
+    editable_states = (DictionaryImportJob.STATUS_UPLOADED, DictionaryImportJob.STATUS_VALIDATED)
     job = get_object_or_404(DictionaryImportJob, pk=pk)
-    if job.status not in (DictionaryImportJob.STATUS_UPLOADED, DictionaryImportJob.STATUS_VALIDATED):
+    if job.status not in editable_states:
         return JsonResponse({"detail": f"目前狀態「{job.status}」無法自動建立主檔"}, status=409)
 
     tribe_id = _TRIBE_SLUG_TO_ID[job.tribe]
@@ -201,13 +212,19 @@ def import_job_auto_create_taxonomies(request, decoded, pk):
     finally:
         db.close()
 
-    job.report = report
-    job.preflight_hash = import_report_hash(report)
-    job.status = DictionaryImportJob.STATUS_VALIDATED
-    job.new_count = report["new_count"]
-    job.update_count = report["update_count"]
-    job.error_count = report["error_count"]
-    job.save(update_fields=["report", "preflight_hash", "status", "new_count", "update_count", "error_count"])
+    # 稽核 BE2b-07：寫回時鎖列並重新確認狀態（比照預檢）。主檔已經建立並 commit，無論如何都要留稽核；
+    # 但工作若這段期間被送審或核准，不能被改回「已預檢」。
+    with transaction.atomic():
+        job = get_object_or_404(DictionaryImportJob.objects.select_for_update(), pk=pk)
+        state_changed = job.status not in editable_states
+        if not state_changed:
+            job.report = report
+            job.preflight_hash = import_report_hash(report)
+            job.status = DictionaryImportJob.STATUS_VALIDATED
+            job.new_count = report["new_count"]
+            job.update_count = report["update_count"]
+            job.error_count = report["error_count"]
+            job.save(update_fields=["report", "preflight_hash", "status", "new_count", "update_count", "error_count"])
 
     # 分類/詞類/焦點/來源已經真的寫進 dictionary_db 並 commit 了——稽核紀錄
     # 寫入失敗不該讓呼叫端收到 500、誤以為這批主檔沒有建立成功（跟
@@ -215,8 +232,13 @@ def import_job_auto_create_taxonomies(request, decoded, pk):
     # 這裡是 codex 獨立審查抓到的一個沒套用到位的疏漏）。
     _safe_write_audit_log(
         request, decoded, "auto_create_import_taxonomies", str(job.pk),
-        after={"created": created}, target_type="dictionary_import_job",
+        after={"created": created, "state_changed": state_changed}, target_type="dictionary_import_job",
     )
+    if state_changed:
+        return JsonResponse({
+            "detail": f"主檔已建立，但這個匯入工作的狀態在這段期間變成「{job.status}」，沒有更新預檢報告",
+            "created_taxonomies": created,
+        }, status=409)
     return JsonResponse({**_job_detail(job), "created_taxonomies": created})
 
 
@@ -319,7 +341,8 @@ def import_job_approve(request, decoded, pk):
         job.reviewed_by = decoded.get("uid", "anon")
         job.reviewed_at = timezone.now()
         job.review_comment = review_comment
-        job.save(update_fields=["status", "reviewed_by", "reviewed_at", "review_comment"])
+        job.applied_by = ""  # 續跑指令的認領標記由這個欄位表示，核准迴圈開始時一定是空的
+        job.save(update_fields=["status", "reviewed_by", "reviewed_at", "review_comment", "applied_by"])
 
     # 工作在上面那個交易裡已經認領成 applying——這裡重新解析 bundle 如果
     # 拋出非預期例外（不只是雜湊不符），沒有 except Exception 兜底的話，
@@ -345,16 +368,31 @@ def import_job_approve(request, decoded, pk):
                       "或目標詞條的內容被其他人異動），請重新預檢後再核准",
         }, status=409)
 
-    applied_count, failed_count, _outcomes = apply_import_job_rows(job, fresh_report)
+    try:
+        applied_count, failed_count, _outcomes = apply_import_job_rows(job, fresh_report)
+    except ImportClaimLost:
+        logger.warning("匯入工作 #%s 已被續跑指令接手，核准請求停止寫入", pk)
+        return JsonResponse({
+            "detail": "這個匯入工作已被續跑指令接手處理，這次請求已停止，請重新整理查看結果",
+        }, status=409)
 
     job.status = (
         DictionaryImportJob.STATUS_APPLIED
         if failed_count == 0 and fresh_report["error_count"] == 0
         else DictionaryImportJob.STATUS_APPLIED_WITH_ERRORS
     )
+    # 條件式寫入：最後一列檢查完到這裡之間若被續跑指令認領，不能覆寫它的認領與狀態
+    final_applied_at = timezone.now()
+    updated = DictionaryImportJob.objects.filter(
+        pk=job.pk, status=DictionaryImportJob.STATUS_APPLYING, applied_by="",
+    ).update(status=job.status, applied_by=decoded.get("uid", "anon"), applied_at=final_applied_at)
+    if not updated:
+        logger.warning("匯入工作 #%s 在收尾時已被續跑指令接手，核准請求不覆寫狀態", pk)
+        return JsonResponse({
+            "detail": "這個匯入工作已被續跑指令接手處理，這次請求已停止，請重新整理查看結果",
+        }, status=409)
     job.applied_by = decoded.get("uid", "anon")
-    job.applied_at = timezone.now()
-    job.save(update_fields=["status", "applied_by", "applied_at"])
+    job.applied_at = final_applied_at
 
     _safe_write_audit_log(
         request, decoded, "approve_import_job", str(job.pk),

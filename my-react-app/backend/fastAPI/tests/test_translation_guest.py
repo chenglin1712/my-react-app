@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 from sqlalchemy.pool import StaticPool
 
+from config.llm import LLMNotConfiguredError
 from dictionary_db.connect import get_db
 from fastAPI import guest_trial as G
 from fastAPI.main import app
@@ -249,7 +250,7 @@ def test_failures_before_the_paid_llm_call_refund_the_guest_quota(client):
     for error, status in (
         (S.UnsupportedTribeError("不支援"), 400),
         (S.UnsupportedDirectionError("不支援"), 400),
-        (EnvironmentError("ANTHROPIC_API_KEY 未設定"), 503),
+        (LLMNotConfiguredError("ANTHROPIC_API_KEY 未設定"), 503),
     ):
         with patch.object(S, "translate", side_effect=error):
             assert client.post("/api/v1/translation/translate", json=BODY, headers=_guest_headers()).status_code == status
@@ -345,7 +346,7 @@ def test_a_failure_before_the_llm_gives_the_daily_count_back(client, monkeypatch
     _as_user(monkeypatch)
     monkeypatch.setenv("TRANSLATION_USER_DAILY_LIMIT", "2")
     headers = {"Authorization": "Bearer valid-token"}
-    with patch.object(S, "translate", side_effect=EnvironmentError("no key")):
+    with patch.object(S, "translate", side_effect=LLMNotConfiguredError("no key")):
         for _ in range(4):               # 缺金鑰 503 不佔額度
             assert client.post("/api/v1/translation/translate", json=BODY, headers=headers).status_code == 503
     with _ok():
@@ -356,11 +357,28 @@ def test_the_daily_cap_fails_open_when_the_counter_is_unavailable(client, monkey
     _as_user(monkeypatch)
     monkeypatch.setenv("TRANSLATION_USER_DAILY_LIMIT", "1")
     headers = {"Authorization": "Bearer valid-token"}
-    with _ok(), patch.object(G, "is_ready", return_value=False), \
+    monkeypatch.setattr(G, "_warned_daily_unready", False)
+    with _ok(), patch.object(G, "daily_ready", return_value=False), \
             patch.object(G.logger, "error") as log_error:
         for _ in range(3):
             assert client.post("/api/v1/translation/translate", json=BODY, headers=headers).status_code == 200
-    assert log_error.called
+    # 只在第一次記 ERROR，之後不再灌（稽核 BE4-08）
+    assert log_error.call_count == 1
+
+
+def test_the_daily_cap_works_without_guest_trial_being_configured(client, monkeypatch):
+    """稽核 BE4-08：每日上限原本綁在 GUEST_TRIAL_SECRET 上，沒開訪客試用就整個失效。"""
+    _as_user(monkeypatch)
+    monkeypatch.setenv("TRANSLATION_USER_DAILY_LIMIT", "1")
+    monkeypatch.delenv("GUEST_TRIAL_SECRET", raising=False)
+    monkeypatch.delenv("TRANSLATION_DAILY_SECRET", raising=False)
+    monkeypatch.setenv("INTERNAL_API_SECRET", "internal-secret-0123456789-abcdefghijklmnop")
+    headers = {"Authorization": "Bearer valid-token"}
+    assert not G.is_ready()      # 訪客試用沒開
+    assert G.daily_ready()       # 但每日上限可以計次
+    with _ok():
+        assert client.post("/api/v1/translation/translate", json=BODY, headers=headers).status_code == 200
+        assert client.post("/api/v1/translation/translate", json=BODY, headers=headers).status_code == 429
 
 
 def test_invalid_token_is_401_and_never_falls_back_to_guest(client, monkeypatch):

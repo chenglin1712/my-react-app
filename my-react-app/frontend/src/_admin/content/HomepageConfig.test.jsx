@@ -105,6 +105,29 @@ describe('HomepageConfig', () => {
       expect(apiPatch.mock.calls[1][1]).toHaveProperty('base_updated_at', '2026-08-01T00:00:00Z');
     });
 
+    test('後端回 409 edit_conflict：顯示「有人剛更新過」；按「載入最新版本」換成伺服器內容並改帶新的 updated_at（稽核 FE7b-08）', async () => {
+      apiPatch.mockRejectedValueOnce(Object.assign(new Error('內容已被其他人更新'), { status: 409, data: { code: 'edit_conflict' } }));
+      renderPage();
+      await screen.findByLabelText('顯示最新消息區塊');
+      fireEvent.click(screen.getByLabelText('顯示最新消息區塊'));
+
+      save();
+      expect(await screen.findByText(/有人剛更新過/)).toBeInTheDocument();
+      expect(screen.queryByText('首頁顯示設定已儲存')).not.toBeInTheDocument();
+      expect(screen.getByLabelText('顯示最新消息區塊')).not.toBeChecked();
+
+      apiGet.mockResolvedValueOnce({ ...baseConfig, tagline: '別人改的標語', updated_at: '2026-08-09T00:00:00Z' });
+      fireEvent.click(screen.getByRole('button', { name: '載入最新版本' }));
+      await waitFor(() => expect(screen.getByLabelText('標語')).toHaveValue('別人改的標語'));
+      expect(screen.getByLabelText('顯示最新消息區塊')).toBeChecked();
+      expect(screen.queryByText(/有人剛更新過/)).not.toBeInTheDocument();
+
+      apiPatch.mockResolvedValueOnce({ ...baseConfig });
+      save();
+      await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(2));
+      expect(apiPatch.mock.calls[1][1]).toHaveProperty('base_updated_at', '2026-08-09T00:00:00Z');
+    });
+
     test('載入的設定沒有 updated_at 時不送這個欄位（不送空字串，免得被後端當成格式錯誤）', async () => {
       apiGet.mockResolvedValue({ ...baseConfig, updated_at: '' });
       apiPatch.mockResolvedValueOnce({ ...baseConfig });
@@ -115,6 +138,86 @@ describe('HomepageConfig', () => {
       await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(1));
       expect(apiPatch.mock.calls[0][1]).not.toHaveProperty('base_updated_at');
     });
+  });
+
+  /** 稽核 FE7b-23：主視覺連結與最新消息筆數原本沒有前端驗證，清空筆數會送出 0。 */
+  describe('主視覺連結與最新消息筆數的前端驗證', () => {
+    const save = () => fireEvent.click(screen.getByRole('button', { name: /儲存設定/ }));
+
+    test('主視覺連結必須是站內路徑或 https；不合規則時標示欄位且不送出', async () => {
+      renderPage();
+      fireEvent.change(await screen.findByLabelText('主視覺連結'), { target: { value: 'http://evil.example.com' } });
+      save();
+
+      expect(await screen.findByText('連結必須是站內路徑（以 / 開頭）或 https 網址')).toBeInTheDocument();
+      expect(screen.getByLabelText('主視覺連結')).toHaveAttribute('aria-invalid', 'true');
+      expect(apiPatch).not.toHaveBeenCalled();
+    });
+
+    test.each(['//evil.example.com', '/\\evil.example.com', 'javascript:alert(1)'])('主視覺連結 %s 被擋下', async (value) => {
+      renderPage();
+      fireEvent.change(await screen.findByLabelText('主視覺連結'), { target: { value } });
+      save();
+      await screen.findByText('連結必須是站內路徑（以 / 開頭）或 https 網址');
+      expect(apiPatch).not.toHaveBeenCalled();
+    });
+
+    test('主視覺連結可填站內路徑或 https 網址（空白也可以）', async () => {
+      apiPatch.mockResolvedValue({ ...baseConfig });
+      renderPage();
+      const link = await screen.findByLabelText('主視覺連結');
+      fireEvent.change(link, { target: { value: '/quiz/select' } });
+      save();
+      await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(1));
+      expect(apiPatch.mock.calls[0][1]).toHaveProperty('hero_link_url', '/quiz/select');
+
+      fireEvent.change(link, { target: { value: 'https://example.com/x' } });
+      save();
+      await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(2));
+    });
+
+    test.each(['', '0', '21', '3.5', 'abc'])('最新消息筆數「%s」不是 1 到 20 的整數：標示欄位、不送出', async (value) => {
+      renderPage();
+      const count = await screen.findByLabelText('最新消息顯示筆數');
+      fireEvent.change(count, { target: { value } });
+      save();
+
+      expect(await screen.findByText('請填 1 到 20 的整數')).toBeInTheDocument();
+      expect(count).toHaveAttribute('aria-invalid', 'true');
+      expect(apiPatch).not.toHaveBeenCalled();
+    });
+
+    test('最新消息筆數 1 與 20 可以送出', async () => {
+      apiPatch.mockResolvedValue({ ...baseConfig });
+      renderPage();
+      const count = await screen.findByLabelText('最新消息顯示筆數');
+      fireEvent.change(count, { target: { value: '20' } });
+      save();
+      await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(1));
+      expect(apiPatch.mock.calls[0][1]).toHaveProperty('news_display_count', 20);
+    });
+  });
+
+  /** 稽核 FE7b-03：首頁設定離開頁面前，有未儲存的修改要提醒。 */
+  test('有未儲存的修改時掛上離開頁面的瀏覽器確認，儲存後解除', async () => {
+    apiPatch.mockResolvedValueOnce({ ...baseConfig, tagline: '新標語' });
+    renderPage();
+    const tagline = await screen.findByLabelText('標語');
+
+    const clean = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(clean);
+    expect(clean.defaultPrevented).toBe(false);
+
+    fireEvent.change(tagline, { target: { value: '新標語' } });
+    const dirty = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(dirty);
+    expect(dirty.defaultPrevented).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: /儲存設定/ }));
+    await screen.findByText('首頁顯示設定已儲存');
+    const saved = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(saved);
+    expect(saved.defaultPrevented).toBe(false);
   });
 
   test('editor 看得到目前設定但所有欄位唯讀，看不到儲存按鈕', async () => {

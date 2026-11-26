@@ -3,6 +3,7 @@ import { Alert, Form, Spinner } from 'react-bootstrap';
 import AdminTable from '../components/AdminTable';
 import { useAuth } from '../../userServives/authContext';
 import { apiGet } from '../../../utils/apiClient';
+import { formatApiError } from '../apiErrors';
 import '../../../static/css/_admin/system.css';
 import '../../../static/css/_admin/ai-usage.css';
 
@@ -327,7 +328,7 @@ export default function AiUsage() {
                 if (active) {
                     // 新區間查詢失敗時不能繼續顯示上一個區間的數字，會被誤認成目前區間的結果。
                     setData(null);
-                    setError(err.message);
+                    setError(formatApiError(err));
                 }
             } finally {
                 if (active) setLoading(false);

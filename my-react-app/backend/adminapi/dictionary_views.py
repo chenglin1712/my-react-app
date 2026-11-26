@@ -25,13 +25,13 @@ decorator（P4 review BE-27），dictionary_revision_approve() 這支風險最
 import json
 import logging
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
-from config.roles import CONTENT_APPROVERS, CONTENT_EDITORS, STAFF_ROLES
+from config.roles import CONTENT_APPROVERS, CONTENT_EDITORS, PUBLISHERS, STAFF_ROLES
 from config.tribes import TRIBES
 from dictionary_db.connect import SessionLocal, dictionary_write_session
 
@@ -40,6 +40,7 @@ from ._shared import (
     guarded_action,
     invalid_transition as _invalid_transition,
     parse_json_body as _parse_json_body,
+    stale_edit_response as _stale_edit_response,
     write_audit_log as _write_audit_log,
 )
 from .dictionary_revision_service import (
@@ -61,6 +62,7 @@ from .dictionary_serializers import (
 )
 from .models import DictionaryRevision
 from .serializers import RejectSerializer
+from .user_names import lookup_user_names
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +79,15 @@ def _pending_revision_for(target_kind, target_id):
     ).first()
 
 
+def _open_revision_for(target_kind, target_id):
+    """草稿或送審中的提案（同一個目標同時最多一筆，見 word_propose／word_delete_proposal 的 409）。
+    稽核 FE7a-01：詳情頁只回 pending_review 的話，重新載入後看不見自己的草稿，再存檔就會無聲覆蓋。"""
+    return DictionaryRevision.objects.filter(
+        target_kind=target_kind, target_id=target_id,
+        status__in=[DictionaryRevision.STATUS_DRAFT, DictionaryRevision.STATUS_PENDING_REVIEW],
+    ).order_by("-updated_at").first()
+
+
 def _pending_revision_summary(revision):
     if revision is None:
         return None
@@ -85,6 +96,89 @@ def _pending_revision_summary(revision):
         "submitted_by": revision.submitted_by,
         "submitted_at": revision.submitted_at.isoformat() if revision.submitted_at else None,
     }
+
+
+def _open_revision_summary(revision):
+    if revision is None:
+        return None
+    return {
+        **_pending_revision_summary(revision),
+        "created_by": revision.created_by,
+        "updated_at": revision.updated_at.isoformat(),
+    }
+
+
+def _with_actor_names(body):
+    """WP-8 追加：他人草稿／送審中提示原本只有 uid，看不出是誰。單筆詳情才附姓名
+    （列表不附，避免每列都要查），一次批次查建立者與送審者；查不到或查詢失敗時為空字串，
+    前端退回顯示 uid。"""
+    if body is None:
+        return None
+    names = lookup_user_names([body.get("created_by") or "", body.get("submitted_by") or ""])
+    body["created_by_name"] = names.get(body.get("created_by") or "", "")
+    body["submitted_by_name"] = names.get(body.get("submitted_by") or "", "")
+    return body
+
+
+# 稽核 FE7a-07：「核准刪除時一併解除所有引用」會改動其他詞條的標註，只有 owner／admin 能提出
+# （WP-8 追加：核准端點不再限制，reviewer 可核准，見 dictionary_revision_approve）
+_UNLINK_ROLES = PUBLISHERS
+
+
+def _unlink_forbidden_response(decoded, unlink_references):
+    if unlink_references is True and decoded.get("role") not in _UNLINK_ROLES:
+        return JsonResponse({
+            "detail": "只有擁有者或管理員可以在刪除提案中一併解除引用",
+            "errors": {"unlink_references": ["權限不足"]},
+        }, status=403)
+    return None
+
+
+def _not_draft_owner_response(decoded, revision, *, allow_submitter=False):
+    """稽核 WP-8 驗證：草稿是建立者自己的工作副本，別人不能改寫、捨棄或代為送審
+    （owner／admin 例外，用來處理離職或卡住的草稿）。allow_submitter：撤回時，
+    送審的人也可以撤回自己送出的提案。通過回傳 None。"""
+    uid = decoded.get("uid", "anon")
+    if decoded.get("role") in PUBLISHERS or revision.created_by == uid:
+        return None
+    if allow_submitter and revision.submitted_by and revision.submitted_by == uid:
+        return None
+    return JsonResponse({
+        "detail": "這是其他人建立的草稿，只有建立者本人或擁有者／管理員可以操作",
+        "code": "not_draft_owner",
+    }, status=403)
+
+
+def _pop_lock_data(data):
+    """WP-8 追加：把 base_updated_at 從請求內容取出來（它不是提案內容，不能進內容驗證或存進 payload）。"""
+    if isinstance(data, dict) and "base_updated_at" in data:
+        return {"base_updated_at": data.pop("base_updated_at")}
+    return {}
+
+
+def _propose_overwrite_lock_response(decoded, existing, lock_data):
+    """WP-8 追加：propose 寫入「既有草稿」時的樂觀鎖。
+
+    owner／admin 可以透過 propose 覆寫別人的草稿（_not_draft_owner_response 放行），但 propose
+    原本沒有任何版本比對：停在舊頁面（載入時還沒有這份草稿）的管理員一按儲存，就會無聲蓋掉
+    建立者剛寫的內容。所以覆寫別人的草稿時必須帶 base_updated_at，且要與目前的 updated_at 相同；
+    沒帶就回 409 edit_conflict，前端既有的衝突提示會請他重新載入、看到這份草稿後改走 PUT
+    （PUT 對他人草稿一直有帶 base_updated_at）。
+
+    覆寫自己的草稿維持原本行為、不要求帶；有帶的話一樣比對（同一人在兩個分頁各存一次的情況）。
+    409 會附上 revision_id：走 propose 的頁面原本不知道有這份草稿，前端「載入最新內容」靠它找到要載入哪一筆。
+    呼叫端必須已經 select_for_update 鎖住 existing。通過回傳 None。"""
+    if existing.created_by != decoded.get("uid", "anon") and "base_updated_at" not in lock_data:
+        return JsonResponse({
+            "detail": "這個項目已經有一份其他人建立的草稿，請重新載入草稿、確認對方的內容後再編輯",
+            "code": "edit_conflict",
+            "errors": {"base_updated_at": ["覆寫其他人的草稿時必須帶上載入時的草稿版本"]},
+            "revision_id": existing.pk,
+        }, status=409)
+    stale = _stale_edit_response(lock_data, existing.updated_at)
+    if stale is not None and stale.status_code == 409:
+        return JsonResponse({**json.loads(stale.content), "revision_id": existing.pk}, status=409)
+    return stale
 
 
 # ---------------------------------------------------------------------------
@@ -105,6 +199,8 @@ def _word_list(request, decoded):
     """扁平、伺服器端分頁的列表——本機約 3 萬筆詞條不可能一次全部載入
     （跟題庫類內容的小表不同），比照 word_data.py 的既有紀律：批次查詢，
     不要每列各自查一次。"""
+    if request.GET.get("revisions") == "new":
+        return _new_word_revision_list(request, decoded)
     tribe_id = request.GET.get("tribe_id", "")
     keyword = request.GET.get("keyword", "").strip()
     has_pending = request.GET.get("has_pending", "").lower() in ("1", "true")
@@ -202,6 +298,37 @@ def _word_list(request, decoded):
     return JsonResponse({"results": results, "count": total, "page": page, "page_size": page_size})
 
 
+_NEW_REVISION_LIST_LIMIT = 100
+
+
+def _new_word_revision_list(request, decoded):
+    """稽核 FE7a-02：新建詞條的提案沒有 word_id，詞條列表找不到它，離開頁面就回不去。
+    這裡列出「自己的新建草稿」與「所有送審中的新建提案」（審核者要能開啟核准），
+    別人的草稿仍不列出——草稿是提案者自己的工作副本（見 listWords 的說明）。"""
+    from django.db.models import Q
+
+    # kind=grammar_section：文法章節的新建提案一樣沒有章節 id，共用同一套查詢
+    kind = request.GET.get("kind", DictionaryRevision.TARGET_WORD)
+    if kind not in (DictionaryRevision.TARGET_WORD, DictionaryRevision.TARGET_GRAMMAR_SECTION):
+        return JsonResponse({"detail": "請求參數錯誤", "errors": {"kind": ["不支援的類型"]}}, status=400)
+    uid = decoded.get("uid", "anon")
+    revisions = DictionaryRevision.objects.filter(
+        Q(status=DictionaryRevision.STATUS_DRAFT, created_by=uid)
+        | Q(status=DictionaryRevision.STATUS_PENDING_REVIEW),
+        target_kind=kind,
+        operation=DictionaryRevision.OPERATION_CREATE,
+    ).order_by("-updated_at")[:_NEW_REVISION_LIST_LIMIT]
+    results = [
+        {
+            **_open_revision_summary(rev),
+            "title": rev.title_cache, "tribe": rev.tribe,
+            "mine": rev.created_by == uid,
+        }
+        for rev in revisions
+    ]
+    return JsonResponse({"results": results})
+
+
 @guarded_action(method="POST", role=CONTENT_EDITORS, rate_limit=("dictionary_word_create", "30/m"))
 def _word_create_proposal(request, decoded):
     """新建詞條：不直接寫 dictionary_db，先建立一筆 operation=create 的
@@ -226,7 +353,10 @@ def _word_create_proposal(request, decoded):
             request, decoded, "propose_create", str(revision.pk),
             after=cleaned, target_type="dictionary_word_revision",
         )
-    return JsonResponse({"revision_id": revision.pk, "payload": revision.payload}, status=201)
+    return JsonResponse({
+        "revision_id": revision.pk, "payload": revision.payload,
+        "updated_at": revision.updated_at.isoformat(),
+    }, status=201)
 
 
 @csrf_exempt
@@ -244,6 +374,10 @@ def word_detail(request, decoded, word_id):
     tree["meta"]["pending_revision"] = _pending_revision_summary(
         _pending_revision_for(DictionaryRevision.TARGET_WORD, word_id)
     )
+    # 稽核 FE7a-01：pending_revision 維持原意（只有送審中），另外回傳含草稿的 open_revision 給編輯器載入
+    tree["meta"]["open_revision"] = _with_actor_names(_open_revision_summary(
+        _open_revision_for(DictionaryRevision.TARGET_WORD, word_id)
+    ))
     return JsonResponse(tree)
 
 
@@ -256,6 +390,8 @@ def word_propose(request, decoded, word_id):
     if err_resp:
         return err_resp
     base_hash = data.pop("base_hash", "") if isinstance(data, dict) else ""
+    # WP-8 追加：base_updated_at 是覆寫既有草稿時的樂觀鎖，不是詞條內容（見 _propose_overwrite_lock_response）
+    lock_data = _pop_lock_data(data)
     # 更新既有內容必須帶 base_hash（稽核 FLW-5）：它是核准時比對「有沒有人在你之後改過」的依據，
     # 省略等於關掉樂觀鎖。前端的編輯器一直都有帶（取自載入時的 content_hash）。
     if not isinstance(base_hash, str) or not base_hash.strip() or len(base_hash) > 71:
@@ -270,21 +406,38 @@ def word_propose(request, decoded, word_id):
     db = SessionLocal()
     try:
         try:
-            dw.get_word_tree(db, word_id)
+            current_tree = dw.get_word_tree(db, word_id)
         except dw.WordNotFoundError:
             return JsonResponse({"detail": "詞條不存在"}, status=404)
     finally:
         db.close()
-
-    existing = DictionaryRevision.objects.filter(
-        target_kind=DictionaryRevision.TARGET_WORD, target_id=word_id,
-        status__in=[DictionaryRevision.STATUS_DRAFT, DictionaryRevision.STATUS_PENDING_REVIEW],
-    ).first()
-    if existing and existing.status == DictionaryRevision.STATUS_PENDING_REVIEW:
-        return JsonResponse({"detail": "這個詞條已經有一筆待審核的提案，請先撤回或等待審核完成"}, status=409)
+    # 稽核 BE2b-08：修改提案不能把詞條搬到別的族語
+    if cleaned.get("tribe_id") != current_tree.get("tribe_id"):
+        return JsonResponse({
+            "detail": "請求參數錯誤", "errors": {"tribe_id": "不能變更詞條所屬的族語"},
+        }, status=400)
 
     with transaction.atomic():
+        # 稽核 BE2b-03：查詢與建立在同一個交易裡，並鎖住既有草稿，兩個請求不會各自建一筆
+        existing = DictionaryRevision.objects.select_for_update().filter(
+            target_kind=DictionaryRevision.TARGET_WORD, target_id=word_id,
+            status__in=[DictionaryRevision.STATUS_DRAFT, DictionaryRevision.STATUS_PENDING_REVIEW],
+        ).first()
+        if existing and existing.status == DictionaryRevision.STATUS_PENDING_REVIEW:
+            return JsonResponse({"detail": "這個詞條已經有一筆待審核的提案，請先撤回或等待審核完成"}, status=409)
+        if existing and existing.operation != DictionaryRevision.OPERATION_UPDATE:
+            return JsonResponse({
+                "detail": "這個詞條已經有一筆「刪除」草稿，請先丟棄或處理它再提出修改",
+            }, status=409)
         if existing:
+            # WP-8 追加：與 PUT 同規則——建立者本人或 owner／admin 可寫入既有草稿，其他人 403。
+            # 「刪除」草稿在上面就已 409，不會被改寫成內容提案。
+            not_owner = _not_draft_owner_response(decoded, existing)
+            if not_owner:
+                return not_owner
+            stale = _propose_overwrite_lock_response(decoded, existing, lock_data)
+            if stale:
+                return stale
             existing.payload = cleaned
             existing.base_hash = base_hash
             existing.tribe = _tribe_slug_for(cleaned.get("tribe_id", ""))
@@ -307,7 +460,10 @@ def word_propose(request, decoded, word_id):
             request, decoded, "propose_update" if created else "update_proposal", word_id,
             after=cleaned, target_type="dictionary_word_revision",
         )
-    return JsonResponse({"revision_id": revision.pk, "payload": revision.payload}, status=201 if created else 200)
+    return JsonResponse({
+        "revision_id": revision.pk, "payload": revision.payload,
+        "updated_at": revision.updated_at.isoformat(),
+    }, status=201 if created else 200)
 
 
 @csrf_exempt
@@ -319,6 +475,9 @@ def word_delete_proposal(request, decoded, word_id):
     serializer = DeleteProposalSerializer(data=data)
     if not serializer.is_valid():
         return JsonResponse({"detail": "請求參數錯誤", "errors": serializer.errors}, status=400)
+    forbidden = _unlink_forbidden_response(decoded, serializer.validated_data["unlink_references"])
+    if forbidden:
+        return forbidden
 
     db = SessionLocal()
     try:
@@ -350,7 +509,10 @@ def word_delete_proposal(request, decoded, word_id):
             request, decoded, "propose_delete", word_id,
             before=tree, target_type="dictionary_word_revision",
         )
-    return JsonResponse({"revision_id": revision.pk}, status=201)
+    return JsonResponse({
+        "revision_id": revision.pk, "payload": revision.payload,
+        "updated_at": revision.updated_at.isoformat(),
+    }, status=201)
 
 
 # ---------------------------------------------------------------------------
@@ -380,18 +542,49 @@ def _revision_update_payload(request, decoded, pk):
     data, err_resp = _parse_json_body(request)
     if err_resp:
         return err_resp
+    # 稽核 FE7a-06：草稿 PUT 的樂觀鎖。base_updated_at 不是提案內容的一部分，先取出來，
+    # 不然內容驗證會把它當成未知欄位（或存進 payload）。
+    lock_data = {}
+    if isinstance(data, dict) and "base_updated_at" in data:
+        lock_data["base_updated_at"] = data.pop("base_updated_at")
 
     with transaction.atomic():
         revision = get_object_or_404(DictionaryRevision.objects.select_for_update(), pk=pk)
         if revision.status != DictionaryRevision.STATUS_DRAFT:
             return _invalid_transition(revision.status, "update")
+        not_owner = _not_draft_owner_response(decoded, revision)
+        if not_owner:
+            return not_owner
+        stale = _stale_edit_response(lock_data, revision.updated_at)
+        if stale:
+            return stale
 
         if revision.operation == DictionaryRevision.OPERATION_DELETE:
-            cleaned = data
+            # 稽核 BE2b-13：刪除提案的內容只有 unlink_references，一樣要驗型別，不能存入任意 payload
+            delete_serializer = DeleteProposalSerializer(data=data)
+            if not delete_serializer.is_valid():
+                return JsonResponse({"detail": "請求參數錯誤", "errors": delete_serializer.errors}, status=400)
+            forbidden = _unlink_forbidden_response(decoded, delete_serializer.validated_data["unlink_references"])
+            if forbidden:
+                return forbidden
+            cleaned = {"unlink_references": delete_serializer.validated_data["unlink_references"]}
         elif revision.target_kind == DictionaryRevision.TARGET_WORD:
             cleaned, errors = validate_word_tree_payload(data)
             if errors:
                 return JsonResponse({"detail": "請求參數錯誤", "errors": errors}, status=400)
+            if revision.target_id:
+                tribe_db = SessionLocal()
+                try:
+                    try:
+                        current_tribe = dw.get_word_tree(tribe_db, revision.target_id).get("tribe_id")
+                    except dw.WordNotFoundError:
+                        current_tribe = None
+                finally:
+                    tribe_db.close()
+                if current_tribe is not None and cleaned.get("tribe_id") != current_tribe:
+                    return JsonResponse({
+                        "detail": "請求參數錯誤", "errors": {"tribe_id": "不能變更詞條所屬的族語"},
+                    }, status=400)
             revision.tribe = _tribe_slug_for(cleaned.get("tribe_id", ""))
             revision.title_cache = cleaned.get("name", "")
         elif revision.target_kind == DictionaryRevision.TARGET_GRAMMAR_SECTION:
@@ -410,19 +603,40 @@ def _revision_update_payload(request, decoded, pk):
             after=cleaned, target_type=_revision_target_type(revision),
         )
 
-    return JsonResponse({"id": revision.pk, "payload": revision.payload})
+    return JsonResponse({
+        "id": revision.pk, "payload": revision.payload, "updated_at": revision.updated_at.isoformat(),
+    })
 
 
 @guarded_action(method="GET", role=STAFF_ROLES)
 def _revision_get(request, decoded, pk):
     revision = get_object_or_404(DictionaryRevision, pk=pk)
-    return JsonResponse({
+    body = {
         "id": revision.pk, "target_kind": revision.target_kind, "target_id": revision.target_id,
         "operation": revision.operation, "status": revision.status, "payload": revision.payload,
         "base_hash": revision.base_hash, "tribe": revision.tribe,
+        "title": revision.title_cache,
+        "updated_at": revision.updated_at.isoformat(),
+        "created_by": revision.created_by,
         "submitted_by": revision.submitted_by,
         "submitted_at": revision.submitted_at.isoformat() if revision.submitted_at else None,
-    })
+        "review_comment": revision.review_comment,
+        "apply_error": revision.apply_error,
+    }
+    _with_actor_names(body)
+    # 稽核 FE7a-07：審核刪除提案時要看得到「核准後會解除幾筆引用」；以目前的引用數為準
+    # （送出提案後引用數可能變動，核准時才是真正的解除範圍）。
+    if (
+        revision.target_kind == DictionaryRevision.TARGET_WORD
+        and revision.operation == DictionaryRevision.OPERATION_DELETE
+        and revision.target_id
+    ):
+        db = SessionLocal()
+        try:
+            body["reference_counts"] = dw.count_word_references(db, revision.target_id)
+        finally:
+            db.close()
+    return JsonResponse(body)
 
 
 @guarded_action(method="DELETE", role=CONTENT_EDITORS)
@@ -432,6 +646,9 @@ def _revision_discard(request, decoded, pk):
         revision = get_object_or_404(DictionaryRevision.objects.select_for_update(), pk=pk)
         if revision.status != DictionaryRevision.STATUS_DRAFT:
             return _invalid_transition(revision.status, "discard")
+        not_owner = _not_draft_owner_response(decoded, revision)
+        if not_owner:
+            return not_owner
         _write_audit_log(
             request, decoded, "discard_proposal", revision.target_id or f"revision:{pk}",
             before=revision.payload, target_type=_revision_target_type(revision),
@@ -443,19 +660,26 @@ def _revision_discard(request, decoded, pk):
 @csrf_exempt
 @guarded_action(method="POST", role=CONTENT_EDITORS, rate_limit=("dictionary_revision_submit", "60/m"))
 def dictionary_revision_submit(request, decoded, pk):
-    with transaction.atomic():
-        revision = get_object_or_404(DictionaryRevision.objects.select_for_update(), pk=pk)
-        if revision.status != DictionaryRevision.STATUS_DRAFT:
-            return _invalid_transition(revision.status, "submit")
-        revision.status = DictionaryRevision.STATUS_PENDING_REVIEW
-        revision.submitted_by = decoded.get("uid", "anon")
-        revision.submitted_at = timezone.now()
-        revision.save(update_fields=["status", "submitted_by", "submitted_at", "updated_at"])
-        _write_audit_log(
-            request, decoded, "submit_proposal", revision.target_id or f"revision:{pk}",
-            target_type=_revision_target_type(revision),
-        )
-    return JsonResponse({"id": revision.pk, "status": revision.status})
+    try:
+        with transaction.atomic():
+            revision = get_object_or_404(DictionaryRevision.objects.select_for_update(), pk=pk)
+            if revision.status != DictionaryRevision.STATUS_DRAFT:
+                return _invalid_transition(revision.status, "submit")
+            not_owner = _not_draft_owner_response(decoded, revision)
+            if not_owner:
+                return not_owner
+            revision.status = DictionaryRevision.STATUS_PENDING_REVIEW
+            revision.submitted_by = decoded.get("uid", "anon")
+            revision.submitted_at = timezone.now()
+            revision.save(update_fields=["status", "submitted_by", "submitted_at", "updated_at"])
+            _write_audit_log(
+                request, decoded, "submit_proposal", revision.target_id or f"revision:{pk}",
+                target_type=_revision_target_type(revision),
+            )
+    except IntegrityError:
+        # 稽核 BE2b-03：同一個目標已經有另一筆待審提案（部分唯一約束），回 409 而不是 500
+        return JsonResponse({"detail": "這個項目已經有另一筆待審核的提案，請先處理它"}, status=409)
+    return JsonResponse({"id": revision.pk, "status": revision.status, "updated_at": revision.updated_at.isoformat()})
 
 
 @csrf_exempt
@@ -465,13 +689,18 @@ def dictionary_revision_withdraw(request, decoded, pk):
         revision = get_object_or_404(DictionaryRevision.objects.select_for_update(), pk=pk)
         if revision.status != DictionaryRevision.STATUS_PENDING_REVIEW:
             return _invalid_transition(revision.status, "withdraw")
+        # 撤回會把提案退回草稿、讓它離開審核佇列；別的編輯者不該能把它撤掉
+        # （否則可以藉撤回＋改寫繞過所有權）。建立者、送審者本人或 owner／admin 可以撤回。
+        not_owner = _not_draft_owner_response(decoded, revision, allow_submitter=True)
+        if not_owner:
+            return not_owner
         revision.status = DictionaryRevision.STATUS_DRAFT
         revision.save(update_fields=["status", "updated_at"])
         _write_audit_log(
             request, decoded, "withdraw_proposal", revision.target_id or f"revision:{pk}",
             target_type=_revision_target_type(revision),
         )
-    return JsonResponse({"id": revision.pk, "status": revision.status})
+    return JsonResponse({"id": revision.pk, "status": revision.status, "updated_at": revision.updated_at.isoformat()})
 
 
 @csrf_exempt
@@ -507,6 +736,13 @@ def dictionary_revision_approve(request, decoded, pk):
         revision = get_object_or_404(DictionaryRevision.objects.select_for_update(), pk=pk)
         if revision.status != DictionaryRevision.STATUS_PENDING_REVIEW:
             return _invalid_transition(revision.status, "approve")
+        # 稽核 BE1-03：審核者核准的是他看到的那一版提案內容，送審後被改過就擋（帶 base_updated_at 時比對）
+        stale = _stale_edit_response(data, revision.updated_at)
+        if stale:
+            return stale
+        # WP-8 追加（放寬 FE7a-07）：「一併解除引用」只限制提出者——建立刪除提案與 PUT 更新時
+        # unlink_references=true 仍只有 owner／admin 能設定；核准是審核者的正常職責，reviewer
+        # 也可以核准（審核畫面會明確顯示核准後會解除幾筆引用，見 _revision_get 的 reference_counts）。
 
         applier = _APPLIERS.get(revision.target_kind)
         if applier is None:
@@ -615,7 +851,7 @@ def dictionary_revision_reject(request, decoded, pk):
             request, decoded, "reject_proposal", revision.target_id or f"revision:{pk}",
             after={"rejected_payload": revision.payload}, target_type=_revision_target_type(revision),
         )
-    return JsonResponse({"id": revision.pk, "status": revision.status})
+    return JsonResponse({"id": revision.pk, "status": revision.status, "updated_at": revision.updated_at.isoformat()})
 
 
 # ---------------------------------------------------------------------------

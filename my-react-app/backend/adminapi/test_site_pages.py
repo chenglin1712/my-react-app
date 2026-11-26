@@ -19,7 +19,8 @@ from .models import AuditLog, ContactPage, PrivacyPolicy
 
 @contextmanager
 def _as_role(role, uid="test-uid"):
-    with override_settings(AUTH_DEV_BYPASS=False):
+    # PATCH 現在也會計入限流（稽核 BE1-02）；這些測試會連續送很多次，關掉限流專心測內容
+    with override_settings(AUTH_DEV_BYPASS=False, RATELIMIT_ENABLE=False):
         with patch("core.firebase_auth.ensure_firebase_initialized"):
             decoded = {"uid": uid}
             if role is not None:
@@ -81,6 +82,8 @@ class SitePageMixin:
         response = self.call("patch", self.ADMIN_URL, {"content": _doc("後存的"), "base_updated_at": stale})
         self.assertEqual(response.status_code, 409)
         self.assertIn("其他人", response.json()["detail"])
+        # WP-8 追加：與 stale_edit_response 一致帶 code，前端用 isEditConflict 判斷
+        self.assertEqual(response.json()["code"], "edit_conflict")
         self.assertEqual(self.client.get(self.PUBLIC_URL).json()["content"], _doc("先存的"))
         fresh = self._base()
         self.assertEqual(self.call("patch", self.ADMIN_URL, {"content": _doc("再改"), "base_updated_at": fresh}).status_code, 200)

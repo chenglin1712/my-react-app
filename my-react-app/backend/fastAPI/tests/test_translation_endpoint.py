@@ -2,6 +2,7 @@
 既有慣例：mock 掉 get_db／auth 依賴注入，以及 service.translate／
 retrieve.get_all_capability_stats（避免依賴本機是否真的有 PostgreSQL）。
 """
+from config.llm import LLMNotConfiguredError
 from unittest.mock import patch
 
 import pytest
@@ -76,10 +77,20 @@ class TestTranslateEndpoint:
 
     def test_missing_llm_token_returns_503(self, client):
         with patch("fastAPI.routes.translation.api.service.translate",
-                    side_effect=EnvironmentError("ANTHROPIC_API_KEY 未設定")):
+                    side_effect=LLMNotConfiguredError("ANTHROPIC_API_KEY 未設定")):
             resp = client.post("/api/v1/translation/translate",
                                 json={"text": "hello", "tribe": "tayal", "direction": "zh2tribe"})
         assert resp.status_code == 503
+        # 稽核 BE4-14：例外原文（含環境變數名稱）不能回給前端
+        assert "ANTHROPIC" not in resp.text
+
+    def test_unrelated_environment_error_is_not_reported_as_missing_key(self, client):
+        """EnvironmentError 就是 OSError，範圍很廣；只有 LLMNotConfiguredError 才算「沒設定金鑰」。"""
+        with patch("fastAPI.routes.translation.api.service.translate", side_effect=OSError("disk full")):
+            resp = client.post("/api/v1/translation/translate",
+                                json={"text": "hello", "tribe": "tayal", "direction": "zh2tribe"})
+        assert resp.status_code == 502
+        assert "disk full" not in resp.text
 
     def test_non_postgres_dialect_returns_503(self, client):
         with patch("fastAPI.routes.translation.api.service.translate",

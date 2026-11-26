@@ -6,12 +6,16 @@ import { useGameSession } from "./useGameSession";
 import { useGameAudioPlayer } from "./useGameAudioPlayer";
 import { useTimedOptionSelect } from "./useTimedOptionSelect";
 import { TRIBE_INTRO } from "./sentenceIntro";
+import { tribeLangCode } from "../../src/constants/tribes";
 import GameIntro from "./GameIntro";
 import CelebrationBurst from "./CelebrationBurst";
 import { shouldCelebrate } from "./celebrate";
 import GameResultRecorder from "./GameResultRecorder";
 import GameResultSummary from "./GameResultSummary";
 import { apiUrl } from "../../utils/apiUrls";
+
+// 沒有選項的題目進到畫面只會是空白頁（稽核 FE5-17）
+const isValidQuestion = (q) => Boolean(q) && Array.isArray(q.options) && q.options.length > 0;
 
 function SentenceGame({ tribe = "tayal" }) {
   const config = TRIBE_INTRO[tribe] || TRIBE_INTRO.tayal;
@@ -22,7 +26,7 @@ function SentenceGame({ tribe = "tayal" }) {
     start, restart, goToNext, progressPct,
     // count 不在這裡寫死——省略時後端用 GameConfig.sentence_questions_per_round
     // 當預設值（後台可調）。
-  } = useGameSession({ endpoint: apiUrl('SENTENCE_QUESTIONS'), tribe });
+  } = useGameSession({ endpoint: apiUrl('SENTENCE_QUESTIONS'), tribe, isValidQuestion });
   const { isPlaying, play: playAudio, stop: stopAudio } = useGameAudioPlayer(audioBaseUrl);
 
   const q = questions[current];
@@ -100,7 +104,7 @@ function SentenceGame({ tribe = "tayal" }) {
         <p className="sent-counter">第 {current + 1} / {questions.length} 題</p>
 
         <div className="sent-card">
-          <p className="sent-sentence">{q.tayal}</p>
+          <p className="sent-sentence" lang={tribeLangCode(tribe)}>{q.tayal}</p>
           {q.audio_id && (
             <button
               type="button"

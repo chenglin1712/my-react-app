@@ -14,7 +14,8 @@ vi.mock('../../src/userServives/useFavorites', () => ({
 }));
 
 const VALID_RESPONSE = {
-  grid_solution: ['ab'],
+  puzzle_token: 'token-abc',
+  grid_solution: ['__'],
   legend: [],
   grid_display: ['  '],
 };
@@ -79,6 +80,16 @@ describe('Game_Start（回歸測試：提交時原本會意外觸發填字題目
 
     expect(await screen.findByRole('alert')).toHaveTextContent('提交失敗');
     expect(screen.getByRole('button', { name: '完成' })).toBeInTheDocument();
+  });
+
+  test('題目憑證過期時，提示重新開始一局而不是叫人重試', async () => {
+    apiGet.mockResolvedValueOnce(VALID_RESPONSE);
+    apiPost.mockRejectedValueOnce(Object.assign(new Error('bad request'), { data: { code: 'puzzle_expired' } }));
+    const user = await startGame();
+
+    await user.click(screen.getByRole('button', { name: '完成' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('重新開始');
   });
 });
 

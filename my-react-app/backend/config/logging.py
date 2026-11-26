@@ -65,4 +65,11 @@ def get_logging_config(log_filename: str) -> dict:
             "handlers": ["console", "file"],
             "level": log_level,
         },
+        # 稽核 BE4-02：httpx 在 INFO 等級會把「完整請求網址」寫進日誌；Google Vision／Translation 的 API 金鑰
+        # 放在網址的查詢字串裡，會連金鑰一起寫進 log 檔與標準輸出（進而被 Sentry／日誌蒐集看到）。
+        # 把這兩個函式庫的日誌壓到 WARNING；就算 LOG_LEVEL=DEBUG 也一樣，金鑰不該因為除錯而外流。
+        "loggers": {
+            "httpx": {"level": "WARNING", "propagate": True},
+            "httpcore": {"level": "WARNING", "propagate": True},
+        },
     }

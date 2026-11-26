@@ -1,5 +1,6 @@
 from adminapi.auth_fixtures import fresh_auth
 import json
+import os
 from contextlib import contextmanager
 from unittest.mock import patch
 
@@ -170,16 +171,26 @@ class RateLimitRuleAdminTest(TestCase):
         log = AuditLog.objects.filter(target_type="rate_limit_rule", action="update").first()
         self.assertIsNotNone(log)
 
-    def test_public_endpoint_only_returns_fastapi_backend_rules(self):
-        response = self.client.get('/adminapi/public/fastapi-rate-limit-rules/')
+    _SECRET = "s" * 40
+
+    def test_internal_endpoint_only_returns_fastapi_backend_rules(self):
+        with patch.dict(os.environ, {"INTERNAL_API_SECRET": self._SECRET}):
+            response = self.client.get('/adminapi/internal/fastapi-rate-limit-rules/', HTTP_X_INTERNAL_SECRET=self._SECRET)
         self.assertEqual(response.status_code, 200)
         rules = response.json()["rules"]
         self.assertEqual(rules, {"quiz_compare_audio": "20/minute"})
         self.assertNotIn("quiz_vocab_item_create", rules)
 
-    def test_public_endpoint_does_not_require_login(self):
-        response = self.client.get('/adminapi/public/fastapi-rate-limit-rules/')
-        self.assertEqual(response.status_code, 200)
+    def test_internal_endpoint_rejects_missing_or_wrong_secret(self):
+        with patch.dict(os.environ, {"INTERNAL_API_SECRET": self._SECRET}):
+            self.assertEqual(self.client.get('/adminapi/internal/fastapi-rate-limit-rules/').status_code, 401)
+            self.assertEqual(
+                self.client.get('/adminapi/internal/fastapi-rate-limit-rules/', HTTP_X_INTERNAL_SECRET="x" * 40).status_code,
+                401,
+            )
+
+    def test_old_public_path_is_gone(self):
+        self.assertEqual(self.client.get('/adminapi/public/fastapi-rate-limit-rules/').status_code, 404)
 
 
 class GetConfiguredRateTest(TestCase):

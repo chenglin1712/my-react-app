@@ -498,6 +498,35 @@
   outline-offset: var(--admin-focus-offset);
 }
 
+/* 稽核 FE7a-16：目前選取的章節要看得出來（尤其手機寬度面板在清單下方時） */
+.dictionary-nested-card.is-selected {
+  border-color: var(--admin-accent);
+  border-left-width: 3px;
+}
+.dictionary-grammar-section-link[aria-current="true"] { color: var(--admin-accent); }
+
+/* 選取章節後焦點移到面板標題（tabIndex=-1）；鍵盤操作時顯示一致的焦點框 */
+.dictionary-panel-heading:focus-visible {
+  outline: var(--admin-focus-ring);
+  outline-offset: var(--admin-focus-offset);
+}
+
+/* 稽核 FE7a-14：匯入報告的篩選與分頁列 */
+.dictionary-report-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+}
+
+/* 稽核 FE7a-03／07／13：審核區塊的刪除提案資訊與變更摘要 */
+.dictionary-change-summary ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+.dictionary-change-summary li { overflow-wrap: anywhere; }
+
 @media (max-width: 900px) {
 
   .dictionary-filter-panel {

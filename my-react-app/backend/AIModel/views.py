@@ -156,7 +156,7 @@ def _prepare_chat(request):
 
     try:
         body = json.loads(request.body)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return None, JsonResponse({"detail": "請求格式錯誤"}, status=400)
 
     serializer = TayalChatSerializer(data=body)
@@ -315,7 +315,7 @@ def review_tayal_chat(request):
 
         try:
             body = json.loads(request.body)
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, UnicodeDecodeError):
             return JsonResponse({"detail": "請求格式錯誤"}, status=400)
 
         serializer = ReviewTayalChatSerializer(data=body)
@@ -392,7 +392,7 @@ def review_question(request):
 
     try:
         body = json.loads(request.body)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({"detail": "請求格式錯誤"}, status=400)
     serializer = ReviewQuestionSerializer(data=body)
     if not serializer.is_valid():
@@ -475,7 +475,7 @@ def replan_study_plan(request):
 
     try:
         body = json.loads(request.body)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({"detail": "請求格式錯誤"}, status=400)
     serializer = ReplanStudyPlanSerializer(data=body)
     if not serializer.is_valid():
@@ -546,7 +546,7 @@ def ai_feedback(request):
 
     try:
         body = json.loads(request.body)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({"detail": "請求格式錯誤"}, status=400)
     uid = decoded.get("uid", "")
     serializer = FeedbackSerializer(data=body, context={"uid": uid})

@@ -4,6 +4,9 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
 import GameZonePage from './index';
+
+const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: confirmMock }));
 import { recordGameResult } from './gameProgress';
 
 const navigate = vi.hoisted(() => vi.fn());
@@ -140,9 +143,21 @@ describe('遊戲專區的個人進度與微傾斜（P4-1）', () => {
     unmount();
     recordGameResult('listening', { tribe: 'amis', pct: 85, now: new Date() });
     renderPage();
+    confirmMock.mockResolvedValue(true);
     await user.click(screen.getByRole('button', { name: '清除我的遊戲進度' }));
-    expect(screen.getByText(/還沒有遊戲紀錄/)).toBeInTheDocument();
+    expect(await screen.findByText(/還沒有遊戲紀錄/)).toBeInTheDocument();
     expect(localStorage.getItem('yy.game.progress.v1')).toBeNull();
+  });
+
+  // 稽核 FE5-18：進度只存在這台裝置，刪了沒有備份，要先確認
+  test('「清除我的遊戲進度」按「先不要」不會刪除', async () => {
+    const user = userEvent.setup();
+    recordGameResult('listening', { tribe: 'amis', pct: 85, now: new Date() });
+    renderPage();
+    confirmMock.mockResolvedValue(false);
+    await user.click(screen.getByRole('button', { name: '清除我的遊戲進度' }));
+    expect(confirmMock).toHaveBeenCalled();
+    expect(localStorage.getItem('yy.game.progress.v1')).not.toBeNull();
   });
 
   test('發音練習的最高分單位是「分」，不是百分比', () => {

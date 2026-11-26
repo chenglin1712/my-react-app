@@ -28,6 +28,7 @@ import {
   buildPreview, estimateSharePayload, formatKb, SHARE_MAX_PAGES, SHARE_MAX_PAYLOAD_BYTES,
 } from "../../utils/notePreview";
 import { uploadToCloudinary } from "@utils/uploadToCloudinary";
+import { pickShareCover } from "./noteCover";
 
 function NotePage() {
   const navigate = useNavigate();
@@ -37,9 +38,6 @@ function NotePage() {
   const [error, setError] = useState("");
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
-  // 目前編輯器裡最後一次成功上傳的圖片網址，分享時當作封面圖存進 sharedNotes
-  // 的 image 欄位（給 SharedNotesModeration 審核頁顯示縮圖用，見 noteService.jsx）。
-  const [uploadedImageUrl, setUploadedImageUrl] = useState("");
   const sharingLockRef = useRef(false);
   const bottomBarRef = useFloatingBarHeight();   // AI 助手鈕要浮在底部操作列上方（P6-2）
 
@@ -90,7 +88,6 @@ function NotePage() {
     try {
       // transform: false 維持原本純 image/upload、不加 f_auto,q_auto 的行為
       const url = await uploadToCloudinary(file, { folder: "tayal_note", transform: false });
-      setUploadedImageUrl(url);
       execStyle("insertImage", url);
     } catch (err) {
       console.error("圖片上傳失敗：", err);
@@ -150,7 +147,8 @@ function NotePage() {
 
       // 所有選取的頁面會整包寫進同一份 Firestore 文件（上限 1 MiB），超過就在送出前擋下，
       // 並指出最大的一頁，否則使用者只會看到泛用的「分享失敗」。
-      const effectiveImage = uploadedImageUrl || "";
+      // 封面取自「實際分享的頁面」裡第一張 Cloudinary 圖片（FE6-08），不再用最後一次上傳的圖
+      const effectiveImage = pickShareCover(sanitizedPages);
       const { total, perPage } = estimateSharePayload(sanitizedPages, preview, {
         image: effectiveImage, uid, username: effectiveName, avatarUrl: effectiveImg,
       });
@@ -174,7 +172,7 @@ function NotePage() {
       await shareNote({
         pages: sanitizedPages,
         preview,
-        image: uploadedImageUrl,
+        image: effectiveImage,
         uid,
         username: effectiveName,
         avatarUrl: effectiveImg,

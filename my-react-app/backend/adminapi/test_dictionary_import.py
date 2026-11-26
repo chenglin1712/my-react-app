@@ -393,7 +393,9 @@ class ImportApproveTest(DictionaryDbTestCase):
                 raise RuntimeError("模擬 process 在這裡被中斷")
             return real_save(self_job, *args, **kwargs)
 
-        with patch.object(DictionaryImportJob, "save", flaky_save):
+        # 稽核 BE2b-04：正式環境每 25 列才寫一次完整報告；這個測試要看的是「每列都寫」時的續跑保證，所以調成 1
+        with patch("adminapi.dictionary_import.import_apply._REPORT_CHECKPOINT_EVERY", 1), \
+                patch.object(DictionaryImportJob, "save", flaky_save):
             with _as_role(REVIEWER) as headers:
                 with self.assertRaises(RuntimeError):
                     _post_json(self.client, f'/adminapi/dictionary/import/{job_id}/approve/', headers)
@@ -418,7 +420,7 @@ class ImportApproveTest(DictionaryDbTestCase):
         self.assertEqual(blocked_resp.status_code, 409)
 
         from django.core.management import call_command
-        call_command("resume_stuck_dictionary_import", str(job_id), "--apply")
+        call_command("resume_stuck_dictionary_import", str(job_id), "--apply", "--min-age-minutes", "0")
 
         job.refresh_from_db()
         self.assertEqual(job.status, DictionaryImportJob.STATUS_APPLIED)

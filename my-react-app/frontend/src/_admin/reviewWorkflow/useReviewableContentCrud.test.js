@@ -33,6 +33,8 @@ describe('useReviewableContentCrud', () => {
         apiPost.mockReset().mockResolvedValue({});
         apiPatch.mockReset().mockResolvedValue({});
         apiDelete.mockReset().mockResolvedValue({});
+        // 核准、下架等動作會先確認（稽核 FE7b-02）；預設使用者按「確認」
+        confirmAction.mockReset().mockResolvedValue(true);
     });
     afterEach(() => { vi.restoreAllMocks(); });
 
@@ -52,7 +54,9 @@ describe('useReviewableContentCrud', () => {
 
             expect(result.current.reject.target).not.toBeNull();
             expect(result.current.reject.reason).toBe('內容有誤，請修正');
-            expect(result.current.error).toBe('網路掛了');
+            // 錯誤要交給退件對話框自己顯示（頁面上方的錯誤會被對話框蓋住，稽核 FE7b-01）
+            expect(result.current.reject.error).toBe('網路掛了');
+            expect(result.current.error).toBe('');
         });
 
         test('退件成功才關閉對話框並清空理由', async () => {
@@ -165,7 +169,7 @@ describe('useReviewableContentCrud', () => {
             act(() => { result.current.reject.setReason('不同意'); });
             await act(async () => { await result.current.reject.submit(); });
             expect(apiPost).not.toHaveBeenCalled();
-            expect(result.current.error).toContain('重新載入');
+            expect(result.current.reject.error).toContain('重新載入');
         });
 
         test('一般退件（非修改）不帶版本', async () => {
@@ -364,7 +368,9 @@ describe('useReviewableContentCrud', () => {
 
             await openAndSave(result);
 
-            expect(result.current.error).toBe('這筆內容已有待審修改，請重新載入');
+            // 編輯對話框還開著，錯誤顯示在對話框裡（稽核 FE7b-01）
+            expect(result.current.editor.error).toBe('這筆內容已有待審修改，請重新載入');
+            expect(result.current.error).toBe('');
             expect(result.current.editor.target).not.toBeNull();
             expect(listCalls()).toBe(before);
         });
@@ -397,6 +403,102 @@ describe('useReviewableContentCrud', () => {
 
             expect(apiPatch).toHaveBeenCalledWith('/adminapi/things/5/', { name: '新內容' });
             expect(apiPost).not.toHaveBeenCalled();
+        });
+
+        test('PATCH 帶打開時這一筆的 updated_at 做樂觀鎖（稽核 FE7b-08）', async () => {
+            const { result } = setup();
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            await openAndSave(result, { id: 5, status: 'draft', name: '草稿', updated_at: '2026-11-25T01:00:00Z' });
+
+            expect(apiPatch).toHaveBeenCalledWith('/adminapi/things/5/', {
+                name: '新內容', base_updated_at: '2026-11-25T01:00:00Z',
+            });
+        });
+
+        test('PATCH 回 409 edit_conflict：標成衝突、編輯視窗保持開著；載入最新版本後換成伺服器內容並用新的 updated_at', async () => {
+            apiPatch.mockRejectedValueOnce(Object.assign(new Error('內容已被其他人更新'), {
+                status: 409, data: { code: 'edit_conflict' },
+            }));
+            const { result } = setup();
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            await openAndSave(result, { id: 5, status: 'draft', name: '草稿', updated_at: 'old' });
+            expect(result.current.editor.conflict).toBe(true);
+            expect(result.current.editor.error).toBe('');
+            expect(result.current.editor.target).not.toBeNull();
+
+            apiGet.mockImplementation(async (url) => (
+                url === '/adminapi/things/5/' ? { id: 5, status: 'draft', name: '別人改的', updated_at: 'new' } : listPage()
+            ));
+            await act(async () => { await result.current.editor.reloadLatest(); });
+            expect(result.current.editor.conflict).toBe(false);
+            expect(result.current.editor.form).toEqual({ name: '別人改的' });
+            expect(result.current.editor.dirty).toBe(false);
+
+            await act(async () => { await result.current.editor.save(undefined, { name: '我的' }); });
+            expect(apiPatch).toHaveBeenLastCalledWith('/adminapi/things/5/', { name: '我的', base_updated_at: 'new' });
+        });
+    });
+
+    /** 稽核 FE7b-03：關閉對話框前，有未儲存的修改要先確認。 */
+    describe('編輯對話框的未儲存變更保護', () => {
+        test('沒有修改時直接關閉，不跳確認', async () => {
+            const { result } = setup();
+            await waitFor(() => expect(result.current.loading).toBe(false));
+            act(() => { result.current.editor.openNew(); });
+            expect(result.current.editor.dirty).toBe(false);
+
+            await act(async () => { await result.current.editor.requestClose(); });
+
+            expect(confirmAction).not.toHaveBeenCalled();
+            expect(result.current.editor.target).toBeNull();
+        });
+
+        test('有修改時要先確認：取消則留在對話框，確認才關閉', async () => {
+            const { result } = setup();
+            await waitFor(() => expect(result.current.loading).toBe(false));
+            act(() => { result.current.editor.openNew(); });
+            act(() => { result.current.editor.setForm({ name: '打到一半' }); });
+            expect(result.current.editor.dirty).toBe(true);
+
+            confirmAction.mockResolvedValueOnce(false);
+            await act(async () => { await result.current.editor.requestClose(); });
+            expect(result.current.editor.target).not.toBeNull();
+            expect(result.current.editor.form).toEqual({ name: '打到一半' });
+
+            await act(async () => { await result.current.editor.requestClose(); });
+            expect(confirmAction).toHaveBeenCalledTimes(2);
+            expect(result.current.editor.target).toBeNull();
+        });
+    });
+
+    /** 稽核 FE7b-02：核准、下架、重新發布會立刻影響前台，執行前先確認。 */
+    describe('會立刻影響前台的動作要先確認', () => {
+        test.each(['approve', 'approveRevision', 'unpublish'])('%s：使用者取消就不送出請求', async (actionKey) => {
+            confirmAction.mockResolvedValueOnce(false);
+            const { result } = setup();
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            let ok;
+            await act(async () => {
+                ok = await result.current.handleAction(actionKey, { id: 3, title: '某內容', pending_revision_version: 'v1' });
+            });
+
+            expect(ok).toBe(false);
+            expect(apiPost).not.toHaveBeenCalled();
+            expect(confirmAction).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('某內容') }));
+        });
+
+        test('送審、撤回不需要確認', async () => {
+            const { result } = setup();
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            await act(async () => { await result.current.handleAction('submit', { id: 3 }); });
+            await act(async () => { await result.current.handleAction('withdraw', { id: 3 }); });
+
+            expect(confirmAction).not.toHaveBeenCalled();
+            expect(apiPost).toHaveBeenCalledTimes(2);
         });
     });
 });

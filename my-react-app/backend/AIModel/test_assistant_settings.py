@@ -302,6 +302,46 @@ class AdminEndpointTest(TestCase):
         self.assertTrue(body["versions"][0]["active"])
         self.assertEqual(AuditLog.objects.filter(action="ai_assistant_settings_save").count(), 1)
 
+    def _stale_worker_cache(self):
+        """模擬「這個 worker 的 30 秒快取還是 v1，另一個 worker 已經存了 v2」：
+        直接用 ORM 新增 v2、不呼叫 invalidate()，本 process 的快取仍停在 v1。"""
+        v1 = assistant_settings.save_version(_content(chat_extra="v1"), created_by="a")
+        self.assertEqual(assistant_settings.active_with_version()[1], v1.pk)       # 快取填入 v1
+        v2 = AiAssistantSettingsVersion.objects.create(
+            content=assistant_settings.validate(_content(chat_extra="v2")), created_by="other-worker",
+        )
+        self.assertEqual(assistant_settings.active_with_version()[1], v1.pk)       # 快取確實是舊的
+        return v1, v2
+
+    def test_overview_reads_the_database_not_the_stale_worker_cache(self):
+        """稽核 WP-8 追加：active_from_db() 讓後台概況反映資料庫最新版本。"""
+        v1, v2 = self._stale_worker_cache()
+        self.assertEqual(assistant_settings.active_from_db()[1], v2.pk)
+        with self._as() as headers:
+            body = self.http.get("/adminapi/ai-assistant/settings/", **headers).json()
+        self.assertEqual(body["activeVersion"], v2.pk)
+        self.assertEqual(body["active"]["chat_extra"], "v2")
+        self.assertEqual([v["id"] for v in body["versions"] if v["active"]], [v2.pk])
+
+    def test_save_with_the_latest_db_version_is_not_a_false_409_under_a_stale_cache(self):
+        v1, v2 = self._stale_worker_cache()
+        with self._as() as headers:
+            response = self._post("/adminapi/ai-assistant/settings/",
+                                  {"content": _content(chat_extra="v3"), "base_version": v2.pk}, headers)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["active"]["chat_extra"], "v3")
+        self.assertEqual(AuditLog.objects.get(action="ai_assistant_settings_save").before, {"version": v2.pk})
+
+    def test_save_based_on_the_cached_old_version_is_still_a_409(self):
+        """反過來：拿快取裡的舊版本號（v1）存檔，資料庫已經是 v2，必須回 409，不可漏報。"""
+        v1, v2 = self._stale_worker_cache()
+        with self._as() as headers:
+            response = self._post("/adminapi/ai-assistant/settings/",
+                                  {"content": _content(chat_extra="v3"), "base_version": v1.pk}, headers)
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["code"], "edit_conflict")
+        self.assertEqual(AiAssistantSettingsVersion.objects.count(), 2)
+
     def test_invalid_content_is_a_400_and_stores_nothing(self):
         with self._as() as headers:
             response = self._post("/adminapi/ai-assistant/settings/", {"content": _content(suggestions=["a"])}, headers)

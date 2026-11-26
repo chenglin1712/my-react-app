@@ -1,12 +1,7 @@
 import { useCallback, useRef, useState, useEffect } from "react";
 import { sanitizeNoteHtml } from "@utils/sanitizeNoteHtml";
 import { useEditor } from "@tiptap/react";
-import { StarterKit } from "@tiptap/starter-kit";
-import { TextStyle } from "@tiptap/extension-text-style";
-import { Color } from "@tiptap/extension-color";
-import { Image as ImageExtension } from "@tiptap/extension-image";
-import { Placeholder } from "@tiptap/extensions";
-import FontSize from "../fontSizeExtension";
+import { createNoteExtensions, upgradeLegacyNoteHtml } from "../noteEditorExtensions";
 import { confirmAction } from "@components/ui/ConfirmDialog";
 
 // 標題輸入停止多久後才把整份筆記寫進 localStorage（毫秒）
@@ -79,6 +74,12 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
   // 使用者真的在編輯器裡打過字（不含程式載入內容）。雲端同步只在這種情況才蓋新的 editedAt，
   // 否則舊筆記一打開就會因為編輯器把 HTML 重新整理過，被誤判成「剛剛修改過」。
   const touchedRef = useRef(false);
+  // 編輯器內容跟已存的筆記不一樣（尚未寫回）。雲端同步關閉時 touchedRef 不會動，離開頁面時要靠這個
+  // 判斷有沒有東西要存（FE6-03）。
+  const dirtyRef = useRef(false);
+  // 這個分頁刪掉的筆記 id。別的分頁寫入 localStorage 時，如果它的記憶體裡還留著已刪除的筆記，
+  // 合併時不能把它當成「新筆記」併回來而復活（FE6-06 的合併只收本分頁沒有、也沒刪過的 id）。
+  const deletedIdsRef = useRef(new Set());
   const editListenersRef = useRef(new Set());
   useEffect(() => { cloudSyncRef.current = cloudSync; }, [cloudSync]);
   useEffect(() => { onNoteDeletedRef.current = onNoteDeleted; }, [onNoteDeleted]);
@@ -149,22 +150,15 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
   useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
 
   const editor = useEditor({
-    extensions: [
-      StarterKit,
-      TextStyle,
-      Color,
-      FontSize,
-      // 空白筆記的引導文字（P5-4）：TipTap 官方做法，只在整篇是空的時候給第一個段落加 is-editor-empty
-      Placeholder.configure({ placeholder: "從這裡開始寫，選取文字可以調整粗體、字級和顏色…" }),
-      ImageExtension.configure({
-        HTMLAttributes: { style: "max-width: 30%; height: auto;" },
-      }),
-    ],
+    // 空白筆記的引導文字（P5-4）：TipTap 官方做法，只在整篇是空的時候給第一個段落加 is-editor-empty。
+    // 延伸套件組合與真實 TipTap 煙霧測試共用（noteEditorExtensions.js）。
+    extensions: createNoteExtensions({ placeholder: "從這裡開始寫，選取文字可以調整粗體、字級和顏色…" }),
     content: "<p></p>",
     onUpdate: ({ editor }) => {
       const currentHTML = editor.getHTML();
       const originalHTML = notesRef.current[currentPageRef.current]?.content || "<p></p>";
-      setIsDirty(currentHTML !== originalHTML);
+      dirtyRef.current = currentHTML !== originalHTML;
+      setIsDirty(dirtyRef.current);
       if (cloudSyncRef.current) {
         touchedRef.current = true;
         editListenersRef.current.forEach((listener) => listener());
@@ -209,10 +203,43 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
   const currentNoteId = notes[currentPage]?.id;
   useEffect(() => {
     if (!editor || currentNoteId == null) return;
-    editor.commands.setContent(notesRef.current[currentPageRef.current]?.content || "<p></p>", false);
+    editor.commands.setContent(upgradeLegacyNoteHtml(notesRef.current[currentPageRef.current]?.content) || "<p></p>", false);
     touchedRef.current = false;
+    dirtyRef.current = false;
     setIsDirty(false);
   }, [currentNoteId, editor]);
+
+  /**
+   * 離開頁面（關分頁、切到分享區、頁面隱藏）時，把編輯器還沒存的內容寫回這台裝置（FE6-03）。
+   * 原本只有「儲存」「換頁」「新增」才會寫回編輯器內容，pagehide 只會寫延後中的標題，
+   * 雲端同步關閉時（旗標關、沒有種子資料、features API 失敗）直接離開就會靜默遺失。
+   */
+  const flushEditorToLocal = useCallback(() => {
+    if (!editor || editor.isDestroyed || !dirtyRef.current) return;
+    const prev = notesRef.current;
+    const index = currentPageRef.current;
+    if (!prev[index]) return;
+    let html;
+    try { html = editor.getHTML(); } catch { return; }
+    const stamp = cloudSyncRef.current && touchedRef.current;
+    const updated = prev.map((note, i) => (
+      i === index ? { ...note, content: sanitizeNoteHtml(html), ...(stamp ? { editedAt: Date.now() } : {}) } : note
+    ));
+    if (stamp) touchedRef.current = false;
+    persistNotes(updated);
+    dirtyRef.current = !persistOkRef.current;
+  }, [editor, persistNotes]);
+
+  useEffect(() => {
+    const onHidden = () => { if (document.visibilityState === "hidden") flushEditorToLocal(); };
+    window.addEventListener("pagehide", flushEditorToLocal);
+    document.addEventListener("visibilitychange", onHidden);
+    return () => {
+      window.removeEventListener("pagehide", flushEditorToLocal);
+      document.removeEventListener("visibilitychange", onHidden);
+      flushEditorToLocal(); // 元件卸載（例如切到分享區、點導覽）時也要存
+    };
+  }, [flushEditorToLocal]);
 
   /**
    * 把編輯器目前的內容寫回筆記，並「回傳」寫回之後的完整陣列。
@@ -242,7 +269,9 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
     ));
     if (stamp) touchedRef.current = false;
 
-    return persistNotes(updatedNotes);
+    const result = persistNotes(updatedNotes);
+    dirtyRef.current = !persistOkRef.current;
+    return result;
   };
 
   /**
@@ -260,6 +289,7 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
       i === index ? { ...note, content: sanitized, editedAt: Date.now() } : note
     ));
     persistNotes(updated);
+    dirtyRef.current = !persistOkRef.current;
     setIsDirty(!persistOkRef.current);
     return updated;
   }, [editor, persistNotes]);
@@ -287,13 +317,35 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
     const after = finalNext[index];
     const before = prev.find((note) => note.id === after?.id);
     if (refreshEditor && editor && after && before && after.id === currentId && after.content !== before.content) {
-      editor.commands.setContent(after.content || "<p></p>", false);
+      editor.commands.setContent(upgradeLegacyNoteHtml(after.content) || "<p></p>", false);
       touchedRef.current = false;
+      dirtyRef.current = false;
       setIsDirty(false);
     }
     setSelectedPageIds((ids) => ids.filter((id) => finalNext.some((note) => note.id === id)));
     return finalNext;
   }, [editor, persistNotes]);
+
+  // 同一個帳號開兩個筆記分頁時，另一個分頁新增的頁面不能被這個分頁的整包寫入蓋掉（FE6-06）。
+  // 收到別的分頁寫入時，只把「這個分頁還沒有的筆記（以 id 判斷）」併進來；已有的筆記維持這裡的版本，
+  // 不覆蓋使用者正在編輯的內容。限制：另一個分頁修改了既有頁面的內容，仍以後存的分頁為準。
+  useEffect(() => {
+    const onStorage = (event) => {
+      if (event.key !== LOCAL_KEY || event.storageArea !== localStorage || !event.newValue) return;
+      let parsed;
+      try { parsed = JSON.parse(event.newValue); } catch { return; }
+      if (!Array.isArray(parsed)) return;
+      applyExternalChange((prev) => {
+        const have = new Set(prev.map((note) => note.id));
+        const extra = parsed.filter((note) => (
+          note && typeof note === "object" && note.id != null && !have.has(note.id) && !deletedIdsRef.current.has(note.id)
+        ));
+        return extra.length ? [...prev, ...extra] : prev;
+      }, { refreshEditor: false });
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [LOCAL_KEY, applyExternalChange]);
 
   /** 使用者在編輯器裡打字時通知（雲端同步用來重設「停止輸入 2 秒後存」的計時）。回傳取消訂閱的函式。 */
   const subscribeEdit = useCallback((listener) => {
@@ -345,9 +397,14 @@ export function useNotePages(uid, { cloudSync = false, onNoteDeleted } = {}) {
       confirmLabel: "刪除筆記",
       cancelLabel: "先不要",
     })) return;
-    const deletedId = notes[currentPage]?.id;
-    const newNotes = notes.filter((_, i) => i !== currentPage);
-    const newPage = Math.max(currentPage - 1, 0);
+    // 確認對話框開著的時候，雲端同步可能已經套用了其他裝置的修改；刪除要以「確認之後」的最新狀態為準，
+    // 不能用這次 render 的舊陣列，否則會把對話框期間合併進來的內容蓋回舊版（FE6-05）。
+    const latestNotes = notesRef.current;
+    const latestPage = Math.min(currentPageRef.current, latestNotes.length - 1);
+    const deletedId = latestNotes[latestPage]?.id;
+    if (deletedId != null) deletedIdsRef.current.add(deletedId);
+    const newNotes = latestNotes.filter((_, i) => i !== latestPage);
+    const newPage = Math.max(latestPage - 1, 0);
 
     const finalNotes = newNotes.length ? newNotes : [createEmptyNote("未命名筆記")];
 

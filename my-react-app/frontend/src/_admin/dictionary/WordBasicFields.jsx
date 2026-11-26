@@ -10,13 +10,21 @@ import MediaUploadField from './MediaUploadField';
  * 而是這一整塊只關心「詞條本身的欄位長什麼樣」，跟外層的載入/儲存/送審流程
  * 是兩件不同的事，混在同一個函式裡會讓兩邊都難讀。
  */
+/** 稽核 FE7a-05 殘留（WP-8 追加）：欄位層級的錯誤訊息（前端必填檢查或後端驗證錯誤）。 */
+function FieldError({ message }) {
+    if (!message) return null;
+    return <Form.Control.Feedback type="invalid">{message}</Form.Control.Feedback>;
+}
+
 export default function WordBasicFields({
     tree,
     updateRoot,
     editable,
     taxonomies,
     toggleSource,
+    fieldErrors = {},
 }) {
+    const invalid = (field) => Boolean(fieldErrors[field]);
     return (
         <>
                 <div className="dictionary-form-grid">
@@ -31,6 +39,7 @@ export default function WordBasicFields({
                             required
                             disabled={!editable}
                             value={tree.tribe_id}
+                            isInvalid={invalid('tribe_id')}
                             onChange={(event) => updateRoot(
                                 'tribe_id',
                                 event.target.value,
@@ -43,6 +52,7 @@ export default function WordBasicFields({
                                 </option>
                             ))}
                         </Form.Select>
+                        <FieldError message={fieldErrors.tribe_id} />
                     </Form.Group>
 
                     <Form.Group
@@ -56,11 +66,13 @@ export default function WordBasicFields({
                             required
                             disabled={!editable}
                             value={tree.name}
+                            isInvalid={invalid('name')}
                             onChange={(event) => updateRoot(
                                 'name',
                                 event.target.value,
                             )}
                         />
+                        <FieldError message={fieldErrors.name} />
                     </Form.Group>
 
                     <Form.Group
@@ -71,11 +83,13 @@ export default function WordBasicFields({
                         <Form.Control
                             disabled={!editable}
                             value={tree.dialect}
+                            isInvalid={invalid('dialect')}
                             onChange={(event) => updateRoot(
                                 'dialect',
                                 event.target.value,
                             )}
                         />
+                        <FieldError message={fieldErrors.dialect} />
                     </Form.Group>
 
                     <Form.Group
@@ -86,11 +100,13 @@ export default function WordBasicFields({
                         <Form.Control
                             disabled={!editable}
                             value={tree.pinyin}
+                            isInvalid={invalid('pinyin')}
                             onChange={(event) => updateRoot(
                                 'pinyin',
                                 event.target.value,
                             )}
                         />
+                        <FieldError message={fieldErrors.pinyin} />
                     </Form.Group>
 
                     <Form.Group
@@ -101,11 +117,13 @@ export default function WordBasicFields({
                         <Form.Control
                             disabled={!editable}
                             value={tree.variant}
+                            isInvalid={invalid('variant')}
                             onChange={(event) => updateRoot(
                                 'variant',
                                 event.target.value,
                             )}
                         />
+                        <FieldError message={fieldErrors.variant} />
                     </Form.Group>
 
                     <Form.Group
@@ -116,11 +134,13 @@ export default function WordBasicFields({
                         <Form.Control
                             disabled={!editable}
                             value={tree.formation_word}
+                            isInvalid={invalid('formation_word')}
                             onChange={(event) => updateRoot(
                                 'formation_word',
                                 event.target.value,
                             )}
                         />
+                        <FieldError message={fieldErrors.formation_word} />
                     </Form.Group>
 
                     <Form.Group
@@ -131,11 +151,13 @@ export default function WordBasicFields({
                         <Form.Control
                             disabled={!editable}
                             value={tree.derivative_root}
+                            isInvalid={invalid('derivative_root')}
                             onChange={(event) => updateRoot(
                                 'derivative_root',
                                 event.target.value,
                             )}
                         />
+                        <FieldError message={fieldErrors.derivative_root} />
                     </Form.Group>
 
                     <Form.Group
@@ -148,11 +170,13 @@ export default function WordBasicFields({
                             min="0"
                             disabled={!editable}
                             value={tree.frequency}
+                            isInvalid={invalid('frequency')}
                             onChange={(event) => updateRoot(
                                 'frequency',
                                 event.target.value,
                             )}
                         />
+                        <FieldError message={fieldErrors.frequency} />
                     </Form.Group>
                 </div>
 
@@ -166,11 +190,13 @@ export default function WordBasicFields({
                         rows={4}
                         disabled={!editable}
                         value={tree.dictionary_note}
+                        isInvalid={invalid('dictionary_note')}
                         onChange={(event) => updateRoot(
                             'dictionary_note',
                             event.target.value,
                         )}
                     />
+                    <FieldError message={fieldErrors.dictionary_note} />
                 </Form.Group>
 
                 <MediaUploadField

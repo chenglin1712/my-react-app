@@ -5,6 +5,7 @@ import "../../static/css/_game/index.css";
 import { TRIBES, COMING_SOON_LABEL, tribeHasFeature } from "../constants/tribes";
 import { scrollBehavior } from "../hooks/useReducedMotion";
 import AbstractCover from "@components/ui/AbstractCover";
+import { confirmAction } from "@components/ui/ConfirmDialog";
 import { clearProgress, currentStreak, hasAnyProgress, readProgress } from "./gameProgress";
 import useCardTilt from "./useCardTilt";
 
@@ -157,7 +158,18 @@ const GameZonePage = () => {
         <p className="gamehub-privacy">
           個人進度只存在這台裝置的瀏覽器，不會上傳或同步到伺服器；清除瀏覽器資料、使用無痕視窗或換裝置就不會有。
           {anyProgress && (
-            <button type="button" className="gamehub-privacy-clear" onClick={() => { clearProgress(); setProgress(readProgress()); }}>
+            <button type="button" className="gamehub-privacy-clear" onClick={async () => {
+              // 稽核 FE5-18：最高分與連續天數只存在這台裝置，刪了就沒有備份，要先確認
+              const ok = await confirmAction({
+                title: "清除遊戲進度？",
+                message: <p className="mb-0">最高分與連續天數都會被刪除，無法復原。</p>,
+                confirmLabel: "清除",
+                cancelLabel: "先不要",
+              });
+              if (!ok) return;
+              clearProgress();
+              setProgress(readProgress());
+            }}>
               清除我的遊戲進度
             </button>
           )}

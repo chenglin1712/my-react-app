@@ -42,4 +42,8 @@ limiter = Limiter(
     key_func=rate_limit_key,
     config_filename="__slowapi_no_dotenv__",
     storage_uri=os.getenv("REDIS_URL"),  # 未設定時是 None，slowapi 退回預設的記憶體儲存
+    # 稽核 BE4-07：Redis 一斷線，所有有 @limiter.limit 的端點原本一律回 500。改成退回行程內計數
+    # （降級但仍有限流），並讓連線與讀寫都有短逾時，Redis 卡住時不會把請求一起拖住。
+    in_memory_fallback_enabled=True,
+    storage_options={"socket_connect_timeout": 1, "socket_timeout": 1} if os.getenv("REDIS_URL") else {},
 )

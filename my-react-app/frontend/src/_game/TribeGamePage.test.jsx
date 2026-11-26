@@ -24,6 +24,15 @@ describe('TribeGamePage（共用：驗證 :tribe 網址參數，取代原本每�
     expect(screen.getByText('遊戲畫面：amis')).toBeInTheDocument();
   });
 
+  // 稽核 FE5-15：titles 只寫了目前的幾個族群，新啟用的族群沒有條目時標題不能是空的
+  test('titles 沒有這個族群的條目時，標題用族名組出保底文字，不是空白', () => {
+    renderAt('/game/x/bunun');
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading).toHaveTextContent('族語練習');
+    expect(heading.textContent.trim().length).toBeGreaterThan('族語練習'.length);
+    expect(screen.getByText('遊戲畫面：bunun')).toBeInTheDocument();
+  });
+
   test('無效的族語 slug 導回 fallbackPath，不會渲染遊戲畫面', () => {
     renderAt('/game/x/not-a-tribe');
     expect(screen.getByText('選擇族語頁面')).toBeInTheDocument();

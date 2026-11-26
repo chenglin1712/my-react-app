@@ -11,6 +11,7 @@ get_news_data／apply_exam_schedule_overrides／get_exam_schedule_data 在
 繼續匯出同一個名稱，兩邊呼叫路徑不必更動。
 """
 from django.http import JsonResponse
+from django.views.decorators.http import require_GET
 from django_ratelimit.core import is_ratelimited
 
 from core.firebase_auth import verify_firebase_token
@@ -24,7 +25,9 @@ from .exam_site import apply_exam_schedule_overrides, get_exam_schedule_data, ge
 
 
 def _rate_limited_response(request, key, group, rate, method):
-    """依 key（已登入使用者 uid 或 IP）限速，邏輯與 AIModel/views.py 一致。"""
+    """依 key（已登入使用者 uid 或 IP）限速，邏輯與 AIModel/views.py 一致。
+    稽核 BE1-01：django-ratelimit 的 method 參數只計入指定的 HTTP 方法，HEAD／OPTIONS 不算，
+    所以呼叫這個函式的 view 都必須用 @require_GET 擋掉其他方法，否則可繞過限流（含每日 300 份上限）。"""
     effective_rate = get_configured_rate(group, rate)
     limited = is_ratelimited(
         request, group=group, key=lambda g, r: key,
@@ -35,6 +38,7 @@ def _rate_limited_response(request, key, group, rate, method):
     return None
 
 
+@require_GET
 def get_situation_quiz_data(request):
     """情境題的獨立出題端點——跟 get_quiz_data 同一套認證/限流標準，
     但刻意不共用同一個 URL/函式：情境題沒有 level 概念，混進
@@ -64,6 +68,7 @@ def get_situation_quiz_data(request):
 
 #爬取線上測驗題目——四個等級皆已改用本地題庫（見 quiz_bank.py 的 build_*_from_db 函式），
 #不再即時代理外部 API
+@require_GET
 def get_quiz_data(request):
     # 會對外打第三方 API（無逾時風險）且完全沒有認證/限流保護，可被匿名重複呼叫，
     # 故加上登入 + 限流，與 CrosswordPuzzle.generate_crossword 同標準。
@@ -122,6 +127,7 @@ def get_quiz_data(request):
     return JsonResponse(format_data, safe=False)
 
 
+@require_GET
 def get_tayal_imformation(request):
     """首頁新聞（族語認證最新公告 + tacp 活動消息）公開端點。
 
@@ -146,6 +152,7 @@ def get_tayal_imformation(request):
     return JsonResponse(data, safe=False, json_dumps_params={'ensure_ascii': False, 'indent': 2})
 
 
+@require_GET
 def get_exam_schedule(request):
     # 首頁行事曆維持公開（不要求登入），比照 get_tayal_imformation 加 IP 限流 + 快取。
     client_ip = get_client_ip(request)   # 不能直接用 REMOTE_ADDR：前面是 nginx 時會是全站共用的 127.0.0.1

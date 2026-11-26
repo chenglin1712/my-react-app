@@ -230,6 +230,12 @@ def _call_llm(prompt: str, user_message: str) -> str:
     return extract_text(response)
 
 
+def _release_connection(db) -> None:
+    """結束目前的交易、把連線還給連線池（稽核 BE4-09）。檢索結果都是一般資料物件，不會因此失效。"""
+    if db is not None:
+        db.commit()
+
+
 def _translate_zh2tribe(db: Session, tribe_id: str, tribe_slug: str, tribe_full_name: str,
                          source_text: str, *, morph=None) -> TranslationResult:
     retrieval = R.retrieve_for_zh(db, tribe_id, source_text)
@@ -251,6 +257,9 @@ def _translate_zh2tribe(db: Session, tribe_id: str, tribe_slug: str, tribe_full_
             )
 
     prompt = prompts.build_zh2tribe_prompt(tribe_full_name, source_text, retrieval.sentences, retrieval.words)
+    # 稽核 BE4-09：檢索結果已是一般的資料物件，先結束交易、把連線還給連線池，LLM 呼叫（最長 25 秒）期間
+    # 不再占著一條辭典資料庫連線；回來後的佐證查詢會自動重新取得連線。
+    _release_connection(db)
     raw = _call_llm(prompt, source_text)
     parsed = _parse_llm_json(raw)
 
@@ -297,6 +306,7 @@ def _translate_tribe2zh(db: Session, tribe_id: str, tribe_slug: str, tribe_full_
             )
 
     prompt = prompts.build_tribe2zh_prompt(tribe_full_name, source_text, retrieval.tokens, retrieval.sentences)
+    _release_connection(db)  # 同上：LLM 呼叫期間不占著資料庫連線（稽核 BE4-09）
     raw = _call_llm(prompt, source_text)
     parsed = _parse_llm_json(raw)
 

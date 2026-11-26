@@ -51,9 +51,7 @@ function Game_Start({ tribe = "tayal" }) {
     try {
       const data = await apiPost("/CrosswordPuzzle/submit/", {
         user_answers: payload.user_answers,
-        crossword_solution: payload.crossword_solution,
-        crossword_legend: payload.crossword_legend,
-        crossword_grid_display: payload.crossword_grid_display,
+        puzzle_token: payload.puzzle_token,
       });
       if (!mountedRef.current) return;
       setGameResults(data);
@@ -61,7 +59,12 @@ function Game_Start({ tribe = "tayal" }) {
     } catch (error) {
       if (!mountedRef.current) return;
       console.error("填字遊戲提交失敗:", error.data ?? error.message);
-      setSubmitError("提交失敗，請檢查網路連線後再試一次。");
+      // 題目憑證只有兩小時有效，放太久才交會被後端退回；這時重新開始一局才有用，重試沒用
+      setSubmitError(
+        error.data?.code === "puzzle_expired"
+          ? "這一局放太久已經失效了，請按「再玩一次」重新開始。"
+          : "提交失敗，請檢查網路連線後再試一次。",
+      );
     } finally {
       if (mountedRef.current) setSubmitting(false);
     }

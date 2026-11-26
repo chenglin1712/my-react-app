@@ -15,6 +15,7 @@ from ._shared import (
     ip_rate_limited_response as _ip_rate_limited_response,
     parse_json_body as _parse_json_body,
     rate_limited_response as _rate_limited_response,
+    stale_edit_response as _stale_edit_response,
     write_audit_log as _write_audit_log,
 )
 from .models import GameConfig
@@ -52,6 +53,9 @@ def _update_game_config(request):
     config = GameConfig.load()
     with transaction.atomic():
         obj = GameConfig.objects.select_for_update().get(pk=config.pk)
+        stale = _stale_edit_response(data, obj.updated_at)  # 稽核 BE2a-07
+        if stale:
+            return stale
         before = GameConfigSerializer(obj).data
         serializer = GameConfigSerializer(obj, data=data, partial=True)
         if not serializer.is_valid():

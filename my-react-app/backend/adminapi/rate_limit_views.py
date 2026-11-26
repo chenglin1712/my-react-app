@@ -15,7 +15,6 @@ from core.firebase_auth import require_role
 from config.roles import PUBLISHERS, STAFF_ROLES
 
 from ._shared import (
-    ip_rate_limited_response as _ip_rate_limited_response,
     parse_json_body as _parse_json_body,
     rate_limited_response as _rate_limited_response,
     stale_edit_response as _stale_edit_response,
@@ -84,20 +83,3 @@ def rate_limit_rule_detail(request, pk):
         return JsonResponse(RateLimitRuleSerializer(obj).data)
 
     return JsonResponse({"detail": "Method not allowed"}, status=405)
-
-
-def public_fastapi_rate_limit_rules(request):
-    """給 FastAPI rate_limit_config.py 輪詢用，無需登入——比照
-    public_game_config／public_irt_config 的公開唯讀模式。只回傳
-    backend=fastapi 的規則（Django 自己的限流值不需要跨服務查詢），
-    格式是扁平的 {key: rate} 字典，不是逐筆物件陣列——FastAPI 端只需要
-    「這個 key 現在的 rate 是多少」，不需要 id／description 這些後台
-    維運資訊。"""
-    if request.method != "GET":
-        return JsonResponse({"detail": "Method not allowed"}, status=405)
-    limited_resp = _ip_rate_limited_response(request, group="public_fastapi_rate_limit_rules", rate="120/m")
-    if limited_resp:
-        return limited_resp
-
-    rules = RateLimitRule.objects.filter(backend=RateLimitRule.BACKEND_FASTAPI).values_list("key", "rate")
-    return JsonResponse({"rules": dict(rules)})

@@ -5,11 +5,13 @@
 import logging
 import random
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from config import rule_skill_model as R
+from fastAPI import rate_limit_config
+from fastAPI.rate_limit import limiter
 from config.tribes import TRIBE_IDS, TRIBES
 from dictionary_db.connect import get_db
 
@@ -106,7 +108,9 @@ def _rule_policy(source, tribe: str, uid: str, focus_rule: str | None = None):
 # API: 產生 quiz
 # ----------------------------
 @router.post("/generate_quiz_frontend", response_model=GenerateQuizResponse)
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("quiz_generate", "30/minute"))  # 稽核 BE4-05：每次出題都對全詞庫評分
 def generate_quiz_frontend(
+    request: Request,
     user_data: UserModelReq = Body(...),
     tribe: str = Query(default="tayal"),
     focus_rule: str | None = Query(default=None, max_length=200),
@@ -155,7 +159,9 @@ def generate_quiz_frontend(
 # API: submit answer
 # ----------------------------
 @router.post("/submit_answer_frontend", response_model=SubmitAnswerResp)
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("quiz_submit_answer", "120/minute"))
 def submit_answer_frontend(
+    request: Request,
     body: SubmitAnswerFrontendReq = Body(...),
     tribe: str = Query(default="tayal"),
     db: Session = Depends(get_db),
@@ -235,7 +241,8 @@ class ResearchConsentReq(BaseModel):
 
 
 @router.get("/research_consent")
-def get_research_consent(user: dict = Depends(auth.verify_firebase_token)):
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("quiz_research_consent_get", "60/minute"))
+def get_research_consent(request: Request, user: dict = Depends(auth.verify_firebase_token)):
     """這位使用者目前有沒有同意（目前版本的）研究資料說明；enabled 是這個功能對外有沒有開放。"""
     state = research_events.consent_state((user or {}).get("uid", ""))
     state["enabled"] = flags.enabled(flags.EVENTS)
@@ -243,7 +250,8 @@ def get_research_consent(user: dict = Depends(auth.verify_firebase_token)):
 
 
 @router.put("/research_consent")
-def put_research_consent(body: ResearchConsentReq, user: dict = Depends(auth.verify_firebase_token)):
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("quiz_research_consent_put", "10/minute"))
+def put_research_consent(request: Request, body: ResearchConsentReq, user: dict = Depends(auth.verify_firebase_token)):
     """同意或撤回；撤回會一併刪除這位使用者已記錄的全部事件。功能不可用時回 503，不假裝成功。"""
     try:
         state = research_events.set_consent((user or {}).get("uid", ""), body.granted)
@@ -254,7 +262,8 @@ def put_research_consent(body: ResearchConsentReq, user: dict = Depends(auth.ver
 
 
 @router.get("/rule_summary")
-def get_rule_summary(tribe: str = Query(default="tayal"), user: dict = Depends(auth.verify_firebase_token)):
+@limiter.limit(lambda: rate_limit_config.get_configured_rate("quiz_rule_summary", "60/minute"))
+def get_rule_summary(request: Request, tribe: str = Query(default="tayal"), user: dict = Depends(auth.verify_firebase_token)):
     """測驗結束頁用：待加強的規則（資料足夠才列）與常見混淆。旗標關閉或狀態儲存不可用時 available=False。"""
     if tribe not in TRIBE_IDS:
         raise HTTPException(status_code=400, detail=f"不支援的族語：{tribe}")

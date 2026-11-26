@@ -27,7 +27,7 @@ from .rate_limits import get_configured_rate
 logger = logging.getLogger(__name__)
 
 
-def rate_limited_response(request, decoded, group, rate="60/m", method="POST"):
+def rate_limited_response(request, decoded, group, rate="60/m", method=None):
     """依已登入使用者的 uid 限速，邏輯與 AIModel/views.py、CrosswordPuzzle/views.py 一致。
 
     rate 參數現在只是「資料庫裡沒有這個 group 對應的 RateLimitRule 時」的
@@ -35,23 +35,25 @@ def rate_limited_response(request, decoded, group, rate="60/m", method="POST"):
     因為這次改動修改任何一個既有呼叫點。"""
     uid = decoded.get("uid", "anon")
     effective_rate = get_configured_rate(group, rate)
+    # 稽核 BE1-02：method 沒指定就用這個請求自己的 method。以前預設 "POST"，
+    # PATCH／DELETE／PUT 端點忘了帶 method 時，限流計數器根本不會累加，等於沒有限流
     limited = is_ratelimited(
         request, group=group, key=lambda g, r: uid,
-        rate=effective_rate, method=method, increment=True,
+        rate=effective_rate, method=method or getattr(request, "method", "POST"), increment=True,
     )
     if limited:
         return JsonResponse({"detail": "請求過於頻繁，請稍後再試"}, status=429)
     return None
 
 
-def ip_rate_limited_response(request, group, rate="60/m", method="GET"):
+def ip_rate_limited_response(request, group, rate="60/m", method=None):
     """給匿名公開端點用（沒有登入者 uid 可綁），依 IP 限速。"""
     # 不能直接用 REMOTE_ADDR：正式環境前面是 nginx，那會變成所有人共用 127.0.0.1 一份額度（見 config/client_ip.py）
     ip = client_ip(request)
     effective_rate = get_configured_rate(group, rate)
     limited = is_ratelimited(
         request, group=group, key=lambda g, r: ip,
-        rate=effective_rate, method=method, increment=True,
+        rate=effective_rate, method=method or getattr(request, "method", "POST"), increment=True,
     )
     if limited:
         return JsonResponse({"detail": "請求過於頻繁，請稍後再試"}, status=429)
@@ -160,8 +162,7 @@ def guarded_action(method, role, rate_limit=None):
     role：傳給 require_role() 的角色集合。
     rate_limit：None 表示這個 view 不需要限流；否則傳
     (group, rate) 或 (group, rate, method) tuple，對應
-    rate_limited_response() 的參數（method 預設 "POST"，GET 端點需要的話
-    要自己傳 "GET"）。
+    rate_limited_response() 的參數（method 沒傳就用這個 view 的 method）。
 
     包好之後的 view 收到的第二個參數固定是 require_role() 解出來的
     decoded token（不是原本各自在函式內部才呼叫 require_role() 拿到的那個
@@ -178,7 +179,7 @@ def guarded_action(method, role, rate_limit=None):
                 return err_resp
             if rate_limit is not None:
                 group, rate, *rest = rate_limit
-                limit_method = rest[0] if rest else "POST"
+                limit_method = rest[0] if rest else method
                 limited_resp = rate_limited_response(request, decoded, group=group, rate=rate, method=limit_method)
                 if limited_resp:
                     return limited_resp

@@ -9,6 +9,8 @@ import AdminRouteSkeleton from './AdminRouteSkeleton';
 import AdminReauthModal from '../session/AdminReauthModal';
 import { AdminToastProvider } from '../components/AdminToast';
 import { useAdminEntry } from '../entry/adminEntryContext';
+import { confirmDiscardChanges, hasUnsavedChanges, releaseUnsavedChangesGuards } from '../hooks/useUnsavedChangesGuard';
+import { beginAdminLogout } from '../session/adminSession';
 import '../../../static/css/_admin/layout.css';
 import '../../../static/css/_admin/admin-base.css';
 
@@ -204,14 +206,29 @@ export default function AdminLayout({ pendingCounts = {} }) {
 
     // 登出後 AdminRoute 看到沒有登入狀態會自己導走；這裡直接回前台首頁，不停在後台登入頁。
     // 失敗時留在原頁並顯示原因，不要讓人以為已經登出。
+    //
+    // WP-8 追加：編輯頁有未儲存內容時，原本是先登出、再 navigate('/')，那次導頁會被編輯頁的 useBlocker
+    // 攔下；同時 AdminRoute 因為沒有登入狀態把人導去 /admin-login?next=…，結果不是停在後台登入頁，
+    // 就是留下一個按了也沒作用的確認視窗。改成「登出之前」先問：
+    //   1. 有未儲存內容就先用同一個確認視窗詢問，取消就什麼都不做（還沒登出）。
+    //   2. 確認後放行目前掛著的 guard（不另外註冊 blocker，維持一個 router 只有一個 blocker），
+    //      並標記「正在登出」，讓 AdminRoute 在 auth 狀態變成 null 時直接回首頁。
+    //   3. 登出失敗就把兩者都恢復，留在原頁、編輯內容仍受保護。
     const handleLogout = async () => {
         setLogoutError('');
+        if (hasUnsavedChanges() && !(await confirmDiscardChanges())) return;
+        const restoreGuards = releaseUnsavedChangesGuards();
+        const endLogout = beginAdminLogout();
         try {
             await signOut();
-            navigate('/', { replace: true });
         } catch {
+            restoreGuards();
+            endLogout();
             setLogoutError('登出失敗，請再試一次。');
+            return;
         }
+        // 「正在登出」旗標不在這裡清：auth 狀態的通知可能比這裡晚到，由 AdminRoute 卸載時清
+        navigate('/', { replace: true });
     };
 
     return (

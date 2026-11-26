@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import { Trash2 } from "lucide-react";
-import { getCalendar, addCalendarEvent, deleteCalendarEvent } from "../../src/userServives/uploadDb"
+import { getCalendar, addCalendarEvent, deleteCalendarEvent, CalendarFullError, CALENDAR_EVENT_LIMIT } from "../../src/userServives/uploadDb"
 import { useNavigate } from "react-router-dom";
 import { confirmAction } from "@components/ui/ConfirmDialog";
 import {
@@ -13,6 +13,10 @@ import {
     formatEventTime,
     getEventType,
 } from "@utils/calendarEvents";
+
+// 事件名稱長度上限（稽核 FE6-12）：原本沒有任何限制，一筆超長文字就能讓整份行事曆文件逼近 1 MiB。
+// 比照讀書計畫 summary 的上限。
+const EVENT_SUMMARY_MAX_LENGTH = 100;
 
 // 本地日期 key（YYYY-MM-DD）。原本同時用 toLocaleDateString().split("/").join("-")
 // 和 toISOString().split("T")[0] 兩種方式產生日期 key：後者是 UTC，跟使用者
@@ -94,7 +98,11 @@ const UserCalendar = () => {
             setNewEventType(EVENT_TYPE_GENERAL);
         } catch (err) {
             console.error("新增行程失敗：", err);
-            setError("新增行程失敗，請稍後再試。");
+            setError(
+                err instanceof CalendarFullError
+                    ? `行事曆已滿 ${CALENDAR_EVENT_LIMIT} 筆，請先刪除舊行程後再新增。`
+                    : "新增行程失敗，請稍後再試。",
+            );
         } finally {
             setIsSaving(false);
         }
@@ -191,6 +199,7 @@ const UserCalendar = () => {
                         placeholder="新增事件..."
                         value={newEvent}
                         onChange={(e) => setNewEvent(e.target.value)}
+                        maxLength={EVENT_SUMMARY_MAX_LENGTH}
                         aria-label="新增事件"
                     />
                     <input

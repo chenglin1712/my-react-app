@@ -16,6 +16,7 @@ _revision_target_type`——dictionary_views.py 會把這幾個名稱重新匯�
 """
 import json
 import time
+import uuid
 
 from django.db import transaction
 from django.utils import timezone
@@ -33,6 +34,14 @@ def _revision_target_type(revision):
     return f"dictionary_{revision.target_kind}_revision"
 
 
+_REVISION_CREATE_NAMESPACE = uuid.UUID("0b8f3c52-6d1e-4a0b-8f55-2f6e5c7a9d14")
+
+
+def revision_create_id(revision_pk):
+    """新建詞條提案核准時使用的固定 id（同一個提案不管重試幾次都得到同一個 id）。"""
+    return str(uuid.uuid5(_REVISION_CREATE_NAMESPACE, f"dictionary-revision:{revision_pk}"))
+
+
 def _apply_word_revision(db, revision):
     """回傳 (result_word_id, result_payload_for_audit)。expected_hash 一律
     傳 revision.base_hash——新建提案這個欄位本來就是空字串，
@@ -41,12 +50,19 @@ def _apply_word_revision(db, revision):
     if revision.operation == DictionaryRevision.OPERATION_DELETE:
         counts = dw.delete_word_tree(
             db, revision.target_id,
-            unlink_references=revision.payload.get("unlink_references", False),
+            unlink_references=revision.payload.get("unlink_references") is True,  # 稽核 BE2b-13：只認真正的布林
             expected_hash=revision.base_hash,
         )
         return revision.target_id, {"deleted": True, **counts}
+    if revision.target_id:
+        # 稽核 BE2b-08：更新既有詞條時不能改掉所屬族語（其他詞條對它的標註會變成跨族語，舊族語快取也不會清）
+        current = dw.get_word_tree(db, revision.target_id)
+        if revision.payload.get("tribe_id") != current.get("tribe_id"):
+            raise dw.DictionaryWriteError("不能變更詞條所屬的族語")
     new_id = dw.apply_word_tree(
         db, revision.payload, word_id=revision.target_id or None, expected_hash=revision.base_hash,
+        # 稽核 BE2b-06：新建提案用以提案編號推導的固定 id，補記帳指令才能辨識「這筆到底有沒有建立成功」
+        create_id=None if revision.target_id else revision_create_id(revision.pk),
     )
     return new_id, dw.get_word_tree(db, new_id)
 

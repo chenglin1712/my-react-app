@@ -16,7 +16,7 @@ import { apiGet } from "../../utils/apiClient";
  * 掛載，endpoint/tribe/count 改變時要把上一個設定殘留的題目/進度整個歸零，不然
  * 使用者會在新族語的遊戲畫面上看到舊族語的題目或結果。
  */
-export function useGameSession({ endpoint, tribe, count }) {
+export function useGameSession({ endpoint, tribe, count, isValidQuestion }) {
   const [status, setStatus] = useState("intro"); // intro | playing | result
   const [questions, setQuestions] = useState([]);
   const [current, setCurrent] = useState(0);
@@ -54,13 +54,16 @@ export function useGameSession({ endpoint, tribe, count }) {
         setError("題目暫時載入失敗，請稍後再試。");
         return null;
       }
+      // 缺欄位的題目（例如沒有選項）進到畫面只會得到空白頁，連「結束遊戲」都沒有（稽核 FE5-17）。
+      // 呼叫端可以給 isValidQuestion 把壞題目濾掉；全被濾掉就和「沒有題目」走同一條錯誤路徑。
+      const usable = isValidQuestion ? data.questions.filter(isValidQuestion) : data.questions;
       // 後端正常回應但沒有題目：開始鈕不能沒反應，要明講原因
-      if (data.questions.length === 0) {
+      if (usable.length === 0) {
         setError("這個族語暫時沒有題目，請換一個族語或稍後再試。");
         return null;
       }
-      setQuestions(data.questions);
-      return data.questions;
+      setQuestions(usable);
+      return usable;
     } catch {
       if (myGeneration !== generationRef.current) return null;
       setError("題目暫時載入失敗，請稍後再試。");
@@ -68,7 +71,7 @@ export function useGameSession({ endpoint, tribe, count }) {
     } finally {
       if (myGeneration === generationRef.current) setLoading(false);
     }
-  }, [endpoint, tribe, count]);
+  }, [endpoint, tribe, count, isValidQuestion]);
 
   // 回傳是否成功開始，讓呼叫端知道要不要接著做自己遊戲特有的重置
   const start = useCallback(async () => {

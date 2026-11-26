@@ -28,6 +28,7 @@ import { useAsyncValue } from '../hooks/useAsyncValue';
 import ChartFigure from '../../../components/ui/ChartFigure';
 import AdminEmpty from '../components/AdminEmpty';
 import { PENDING_QUEUES } from '../hooks/usePendingCounts';
+import { formatDateTime } from '../adminFormat';
 import { TRIBES } from '../../constants/tribes';
 import '../../../static/css/_admin/dashboard.css';
 
@@ -52,12 +53,46 @@ const DATE_RANGE_OPTIONS = [
 // 圖表資料色取自 --yy-data-*（theme-v2.css），深淺色主題各有一組，色盲友善
 const FEATURE_COLORS = ['var(--yy-data-1)', 'var(--yy-data-2)', 'var(--yy-data-3)', 'var(--yy-data-4)'];
 
-const formatDateTime = (value) => value
-    ? new Intl.DateTimeFormat('zh-TW', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-    }).format(new Date(value))
-    : '—';
+// 稽核 FE7b-17：日期格式化改用共用的 adminFormat.formatDateTime（無效日期回傳「—」，
+// 不會丟 RangeError 讓整頁崩潰）。
+
+// 稽核 FE7b-19：最近操作的 target_type 是後端的英文代碼，轉成中文給管理者看；
+// 沒列到的類型維持原代碼，不吞掉資訊。
+const TARGET_TYPE_LABELS = {
+    announcement: '公告',
+    user: '使用者',
+    shared_note: '分享筆記',
+    pronunciation_recording: '發音錄音',
+    report: '檢舉',
+    feature_flag: '功能開關',
+    featured_topic: '精選主題',
+    promo_video: '宣傳影片',
+    homepage_config: '首頁設定',
+    game_config: '遊戲設定',
+    exam_schedule: '考試日程',
+    exam_schedule_override: '考試日程覆寫',
+    rate_limit_rule: '頻率限制規則',
+    dictionary_word_revision: '詞條修訂',
+    dictionary_grammar_section: '文法章節',
+    dictionary_grammar_section_revision: '文法章節修訂',
+    dictionary_import_job: '辭典匯入工作',
+    dictionary_taxonomy: '辭典分類',
+    verification_item: '驗證項目',
+    verification_import: '驗證匯入',
+    quiz_vocab_item: '測驗詞彙題',
+    quiz_source_config: '題源設定',
+    irt_config: 'IRT 設定',
+    system_cache: '系統快取',
+};
+
+// WP-8 追加：最近操作顯示操作者姓名（後端批次查好的 actor_name）；查不到時退回縮短的 uid
+// （完整 uid 放在 title，滑過可看）。系統動作沒有姓名，直接顯示 uid（例如 system）。
+const actorLabel = (item) => {
+    if (item.actor_name) return item.actor_name;
+    const uid = item.actor_uid || '';
+    if (!uid) return '—';
+    return uid.length > 10 ? `${uid.slice(0, 8)}…` : uid;
+};
 
 const formatChartDate = (value) => {
     if (!value) return '';
@@ -191,14 +226,6 @@ export default function Dashboard() {
         },
     );
 
-    const weeklyRegistration = useAsyncValue(
-        async () => {
-            const data = await apiGet('/adminapi/analytics/dashboard/?date_range=7d');
-            return (data.daily_new_registrations ?? [])
-                .reduce((sum, item) => sum + item.count, 0);
-        },
-    );
-
     const audit = useAsyncValue(
         async () => (await apiGet('/adminapi/audit-log/?limit=8')).results ?? [],
         { enabled: canViewAudit, initialValue: [] },
@@ -217,6 +244,29 @@ export default function Dashboard() {
         dateRange, setDateRange, dateFrom, setDateFrom,
         dateTo, setDateTo, tribe, setTribe,
     } = filters;
+
+    // 稽核 FE7b-18：「本週新註冊」原本固定另外打一次 7 天分析 API，跟主查詢（預設
+    // 也是 7 天）重複。主查詢剛好是 7 天且沒有族語篩選時，直接用它的
+    // daily_new_registrations 加總；使用者換了區間或族語才額外查一次。
+    const weeklyFromMain = dateRange === '7d' && !tribe;
+    const weeklyFallback = useAsyncValue(
+        async () => {
+            const data = await apiGet('/adminapi/analytics/dashboard/?date_range=7d');
+            return (data.daily_new_registrations ?? [])
+                .reduce((sum, item) => sum + item.count, 0);
+        },
+        { enabled: !weeklyFromMain },
+    );
+    const weeklyRegistration = weeklyFromMain
+        ? {
+            value: analytics
+                ? (analytics.daily_new_registrations ?? [])
+                    .reduce((sum, item) => sum + item.count, 0)
+                : null,
+            loading: analyticsLoading,
+            error: analyticsError,
+        }
+        : weeklyFallback;
 
     const pendingCount = pending.value;
     const pendingLoading = pending.loading;
@@ -477,7 +527,7 @@ export default function Dashboard() {
                                         <YAxis
                                             type="category"
                                             dataKey="label"
-                                            width={70}
+                                            width={90}
                                             stroke="var(--yy-calm-text-sub)"
                                             fontSize={12}
                                             tickLine={false}
@@ -571,11 +621,13 @@ export default function Dashboard() {
                                             {auditItems.map((item) => (
                                                 <li key={item.id}>
                                                     <div>
-                                                        <strong>{item.actor_uid || '—'}</strong>
+                                                        <strong title={item.actor_uid || undefined}>
+                                                            {actorLabel(item)}
+                                                        </strong>
                                                         <span>
                                                             {ACTION_LABELS[item.action] ?? item.action}
                                                             {' '}
-                                                            {item.target_type} #{item.target_id}
+                                                            {TARGET_TYPE_LABELS[item.target_type] ?? item.target_type} #{item.target_id}
                                                         </span>
                                                     </div>
                                                     <time>{formatDateTime(item.created_at)}</time>

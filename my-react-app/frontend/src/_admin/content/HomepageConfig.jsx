@@ -5,6 +5,10 @@ import { apiGet, apiPatch } from '../../../utils/apiClient';
 import { useAuth } from '../../userServives/authContext';
 import { useMediaUpload } from '../hooks/useMediaUpload';
 import { useActionLock } from '../hooks/useActionLock';
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
+import { formatApiError } from '../apiErrors';
+import EditConflictAlert from '../components/EditConflictAlert';
+import { isEditConflict } from '../hooks/editConflict';
 import { formatDateTime } from '../adminFormat';
 import '../../../static/css/_admin/homepage-config.css';
 import { SuccessNotice } from '../components/AdminToast';
@@ -65,6 +69,13 @@ const formFrom = (item, fallback = EMPTY_FORM) => Object.fromEntries(
     }),
 );
 
+// 連結規則（通知條與主視覺共用）：站內路徑（以 / 開頭）或 https 網址。
+// 反斜線先換成斜線再判斷，與後端同一規則（瀏覽器會把「斜線加反斜線」開頭的網址當成協定相對網址）
+const isValidLink = (link) => {
+    const normalizedLink = link.replace(/\\/g, '/');
+    return link.startsWith('https://') || (normalizedLink.startsWith('/') && !normalizedLink.startsWith('//'));
+};
+
 function validate(form) {
     const errors = {};
     const items = parseMarquee(form.marquee_items);
@@ -80,10 +91,17 @@ function validate(form) {
     if (countChars(noticeText) > LIMITS.notice) errors.notice_text = `通知文字最多 ${LIMITS.notice} 字`;
     else if (form.notice_enabled && !noticeText) errors.notice_text = '啟用通知條時必須填寫文字';
     const link = form.notice_link_url.trim();
-    // 反斜線先換成斜線再判斷，與後端同一規則（瀏覽器會把「斜線加反斜線」開頭的網址當成協定相對網址）
-    const normalizedLink = link.replace(/\\/g, '/');
-    if (link && !(link.startsWith('https://') || (normalizedLink.startsWith('/') && !normalizedLink.startsWith('//')))) {
+    if (link && !isValidLink(link)) {
         errors.notice_link_url = '連結必須是站內路徑（以 / 開頭）或 https 網址';
+    }
+    // 稽核 FE7b-23：主視覺連結與通知條同一規則；最新消息筆數 1 到 20 的整數（清空不能被當成 0 送出）
+    const heroLink = form.hero_link_url.trim();
+    if (heroLink && !isValidLink(heroLink)) {
+        errors.hero_link_url = '連結必須是站內路徑（以 / 開頭）或 https 網址';
+    }
+    const newsCount = String(form.news_display_count).trim();
+    if (!/^\d+$/.test(newsCount) || Number(newsCount) < 1 || Number(newsCount) > 20) {
+        errors.news_display_count = '請填 1 到 20 的整數';
     }
     const start = localInputToIso(form.notice_starts_at);
     const end = localInputToIso(form.notice_ends_at);
@@ -120,6 +138,11 @@ export default function HomepageConfig() {
     const [success, setSuccess] = useState('');
     const [showErrors, setShowErrors] = useState(false);
     const formRef = useRef(null);
+    // 載入（或上次儲存）時的表單內容，用來判斷有沒有未儲存的修改（稽核 FE7b-03）
+    const [baseline, setBaseline] = useState(EMPTY_FORM);
+    // 儲存時發現別人剛更新過（409 edit_conflict）：提供「載入最新版本」（稽核 FE7b-08）
+    const [conflict, setConflict] = useState(false);
+    const [reloading, setReloading] = useState(false);
 
     // 只有一份設定，沒有「切換編輯目標」的概念，resetKey 固定就好——這裡
     // 主要是要拿 generation/mounted 安全與物件網址清理，不是要在多個目標
@@ -140,10 +163,12 @@ export default function HomepageConfig() {
             try {
                 const item = await apiGet('/adminapi/homepage-config/');
                 if (!active) return;
-                setForm(formFrom(item));
+                const loaded = formFrom(item);
+                setForm(loaded);
+                setBaseline(loaded);
                 setMetadata({ updated_by: item.updated_by ?? '', updated_at: item.updated_at ?? '' });
                 media.setPreview('hero', item.hero_image_url ?? '');
-            } catch (err) { setError(err.message); }
+            } catch (err) { if (active) setError(formatApiError(err)); }
             finally { if (active) setLoading(false); }
         })();
         return () => { active = false; };
@@ -151,6 +176,25 @@ export default function HomepageConfig() {
     }, []);
 
     const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+    const dirty = !loading && JSON.stringify(form) !== JSON.stringify(baseline);
+    useUnsavedChangesGuard(dirty);
+
+    // 載入最新版本：用伺服器上的內容取代目前表單（自己的修改會被捨棄）
+    const reloadLatest = async () => {
+        setReloading(true);
+        try {
+            const item = await apiGet('/adminapi/homepage-config/');
+            const loaded = formFrom(item);
+            setForm(loaded);
+            setBaseline(loaded);
+            setMetadata({ updated_by: item.updated_by ?? '', updated_at: item.updated_at ?? '' });
+            media.setPreview('hero', item.hero_image_url ?? '');
+            setConflict(false);
+            setShowErrors(false);
+            setError('');
+        } catch (err) { setError(formatApiError(err)); }
+        finally { setReloading(false); }
+    };
     const errors = validate(form);
     // 欄位驗證摘要由目前的欄位狀態推導，修正完就自動消失；API 錯誤另放在 error
     const validationSummary = showErrors && Object.keys(errors).length > 0 ? '有欄位需要修正，請看標示的欄位' : '';
@@ -166,7 +210,7 @@ export default function HomepageConfig() {
     };
 
     const save = () => {
-        setError(''); setSuccess('');
+        setError(''); setSuccess(''); setConflict(false);
         if (uploading) { setError('請等待主視覺圖片上傳完成'); return undefined; }
         if (Object.keys(errors).length > 0) {
             setShowErrors(true);
@@ -195,12 +239,17 @@ export default function HomepageConfig() {
                     ...storyPayloadFrom(form),
                 });
                 // 儲存期間使用者若又改了欄位，不拿回應蓋掉他的新輸入
-                setForm((current) => (current === submitted ? formFrom(saved, current) : current));
+                const next = formFrom(saved, submitted);
+                setBaseline(next);
+                setForm((current) => (current === submitted ? next : current));
                 setMetadata({ updated_by: saved.updated_by ?? '', updated_at: saved.updated_at ?? '' });
                 media.setPreview('hero', saved.hero_image_url ?? '');
                 setShowErrors(false);
                 setSuccess('首頁顯示設定已儲存');
-            } catch (err) { setError(err.message); }
+            } catch (err) {
+                if (isEditConflict(err)) setConflict(true);
+                else setError(formatApiError(err));
+            }
         });
     };
 
@@ -224,6 +273,7 @@ export default function HomepageConfig() {
             {(error || media.error || validationSummary) && (
                 <Alert variant="danger" role="alert">{error || media.error || validationSummary}</Alert>
             )}
+            {conflict && <EditConflictAlert onReload={reloadLatest} busy={reloading} />}
             <SuccessNotice message={success} role="status" />
 
             <Form
@@ -286,8 +336,12 @@ export default function HomepageConfig() {
                                 value={form.hero_link_url}
                                 onChange={(e) => update('hero_link_url', e.target.value)}
                                 placeholder="/quiz/select 或 https://example.com"
+                                isInvalid={Boolean(fieldError('hero_link_url'))}
+                                aria-invalid={Boolean(fieldError('hero_link_url'))}
+                                aria-describedby={describedBy('homepage-hero-link', 'hero_link_url')}
                             />
-                            <Form.Text>選填；可填站內路徑（以 / 開頭）或 https:// 開頭的外部網址。</Form.Text>
+                            <Form.Control.Feedback type="invalid" id="homepage-hero-link-error">{fieldError('hero_link_url')}</Form.Control.Feedback>
+                            <Form.Text id="homepage-hero-link-hint">選填；可填站內路徑（以 / 開頭）或 https:// 開頭的外部網址。</Form.Text>
                         </Form.Group>
                     </div>
                 </section>
@@ -500,8 +554,12 @@ export default function HomepageConfig() {
                             disabled={!editable}
                             value={form.news_display_count}
                             onChange={(e) => update('news_display_count', e.target.value)}
+                            isInvalid={Boolean(fieldError('news_display_count'))}
+                            aria-invalid={Boolean(fieldError('news_display_count'))}
+                            aria-describedby={describedBy('homepage-news-count', 'news_display_count')}
                         />
-                        <Form.Text>首頁最新消息區塊一次顯示的項目數量（1 到 20）。</Form.Text>
+                        <Form.Control.Feedback type="invalid" id="homepage-news-count-error">{fieldError('news_display_count')}</Form.Control.Feedback>
+                        <Form.Text id="homepage-news-count-hint">首頁最新消息區塊一次顯示的項目數量（1 到 20）。</Form.Text>
                     </Form.Group>
                 </section>
 

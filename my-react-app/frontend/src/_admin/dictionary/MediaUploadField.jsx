@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 import { uploadToCloudinary } from '@utils/uploadToCloudinary';
+import { useReportUploading } from './mediaUploadTracker';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -42,10 +43,13 @@ export default function MediaUploadField({
     onChange,
     label,
     disabled = false,
+    onUploadingChange,
 }) {
     const inputId = useId();
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState('');
+    // 稽核 FE7a-08：上傳中回報給編輯器，讓它停用儲存與送審
+    useReportUploading(uploading, onUploadingChange);
 
     // 上傳中把這個媒體列刪掉（removeChild）或整份表單卸載時，Cloudinary
     // 的回應還是會回來——這裡擋住 unmount 之後的 setState／onChange。

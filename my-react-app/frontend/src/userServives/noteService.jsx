@@ -1,7 +1,7 @@
 import { db } from "../../../firebase";
 import {
-  addDoc, collection, doc, getCountFromServer, getDoc, getDocs,
-  limit, orderBy, query, runTransaction, serverTimestamp, startAfter, updateDoc, where,
+  addDoc, collection, deleteDoc, doc, getCountFromServer, getDoc, getDocs,
+  limit, orderBy, query, runTransaction, serverTimestamp, startAfter, where,
 } from "firebase/firestore";
 
 /**
@@ -98,7 +98,12 @@ export async function toggleNoteLike(noteId, uid) {
   });
 }
 
-/** 軟刪除（deleted: true），不是真的從 Firestore 移除文件。 */
-export async function softDeleteNote(noteId) {
-  return updateDoc(doc(db, SHARED_NOTES_COLLECTION, noteId), { deleted: true });
+/**
+ * 作者刪除自己分享的筆記：真的刪除文件（稽核 FE6-02）。
+ * 原本寫的是 updateDoc({ deleted: true })，但規則的作者分支只允許改 pages／preview／image，
+ * 只有審核角色能改 deleted，所以一般作者的刪除一定被 permission-denied。
+ * 規則（作者可刪除「未下架」的筆記）與規則測試本來就支援 deleteDoc；deleted=true 只代表 staff 下架。
+ */
+export async function deleteSharedNote(noteId) {
+  return deleteDoc(doc(db, SHARED_NOTES_COLLECTION, noteId));
 }

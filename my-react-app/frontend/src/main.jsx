@@ -4,10 +4,9 @@ import '../static/css/default/html-reset.css'
 import '../static/css/default/tailwind.css'
 import '../static/css/default/theme-v2.css'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom';
-import AppShell from './AppShell'
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import StartupError from './StartupError'
-import { AuthProvider } from "./userServives/authContext";
+import { appRoutes } from './appRoutes'
 import { firebaseInitError } from '../../firebase'
 import { initTheme } from './theme/themeStore'
 import { registerServiceWorker } from './registerServiceWorker'
@@ -16,16 +15,15 @@ import { registerServiceWorker } from './registerServiceWorker'
 initTheme()
 registerServiceWorker()
 
+// data router 一建立就開始監聽瀏覽器歷史；Firebase 初始化失敗時整個 App 不會掛上去，也就不必建立
+const router = firebaseInitError ? null : createBrowserRouter(appRoutes)
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     {firebaseInitError ? (
       <StartupError />
     ) : (
-      <BrowserRouter>
-        <AuthProvider>
-          <AppShell />
-        </AuthProvider>
-      </BrowserRouter>
+      <RouterProvider router={router} />
     )}
   </StrictMode>
 )

@@ -37,6 +37,7 @@ const ReviewQueue = lazy(() => import('./review/ReviewQueue'));
 const VerificationQueue = lazy(() => import('./verification/VerificationQueue'));
 const WordList = lazy(() => import('./dictionary/WordList'));
 const WordEditor = lazy(() => import('./dictionary/WordEditor'));
+const DictionaryRevisionRoute = lazy(() => import('./dictionary/DictionaryRevisionRoute'));
 const TaxonomyManager = lazy(() => import('./dictionary/TaxonomyManager'));
 const GrammarTree = lazy(() => import('./dictionary/GrammarTree'));
 const ImportWizard = lazy(() => import('./dictionary/ImportWizard'));
@@ -88,6 +89,8 @@ const AdminApp = () => {
                 <Route path="dictionary/words" element={<WordList />} />
                 <Route path="dictionary/words/new" element={<WordEditor />} />
                 <Route path="dictionary/words/:id" element={<WordEditor />} />
+                {/* 稽核 FE7a-02：新建詞條／章節提案沒有目標 id，用提案編號開啟 */}
+                <Route path="dictionary/revisions/:id" element={<DictionaryRevisionRoute />} />
                 <Route path="dictionary/taxonomies" element={<TaxonomyManager />} />
                 <Route path="dictionary/grammar" element={<GrammarTree />} />
                 <Route path="dictionary/import" element={<ImportWizard />} />

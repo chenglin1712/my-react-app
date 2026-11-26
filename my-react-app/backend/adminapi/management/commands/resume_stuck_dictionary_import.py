@@ -32,6 +32,7 @@ import sys
 from types import SimpleNamespace
 
 from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
 from django.utils import timezone
 
 from adminapi import dictionary_write as dw
@@ -49,6 +50,14 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("job_id", type=int)
         parser.add_argument("--apply", action="store_true", help="實際續跑剩下的列；不加只診斷、不改動任何資料")
+        parser.add_argument(
+            "--min-age-minutes", type=int, default=10,
+            help="核准時間必須超過這麼多分鐘才允許續跑，避免與仍在執行的核准請求並行（預設 10 分鐘）",
+        )
+        parser.add_argument(
+            "--reclaim", action="store_true",
+            help="這個工作已被先前的續跑指令認領過（可能中途中斷）時，確認沒有其他續跑仍在執行後強制重新認領",
+        )
 
     def handle(self, *args, **options):
         # Windows 終端機預設不是 UTF-8（cp1252），這支指令的輸出全是中文，
@@ -72,9 +81,12 @@ class Command(BaseCommand):
             return
 
         prior_outcomes = {o["row"]: o for o in (job.report or {}).get("outcomes", [])}
+        # 計數一律由 outcomes 重算，不信任 job 上的欄位（兩者只在檢查點同步，這裡避免任何不一致造成重複計算）
+        prior_applied = sum(1 for o in prior_outcomes.values() if o.get("outcome") == "applied")
+        prior_failed = sum(1 for o in prior_outcomes.values() if o.get("outcome") == "failed")
         self.stdout.write(
             f"工作 #{job_id}（{job.tribe}，{job.filename or '未命名'}）目前卡在套用中，"
-            f"已知已處理 {len(prior_outcomes)} 列（成功 {job.applied_count}，失敗 {job.failed_count}）。"
+            f"已知已處理 {len(prior_outcomes)} 列（成功 {prior_applied}，失敗 {prior_failed}）。"
         )
 
         tribe_id = _TRIBE_SLUG_TO_ID[job.tribe]
@@ -93,8 +105,31 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("這是診斷模式，沒有實際改動任何資料。加上 --apply 才會真的續跑。"))
             return
 
-        applied_count = job.applied_count
-        failed_count = job.failed_count
+        # 稽核 BE2b-05：認領。鎖住這一列確認狀態仍是套用中、核准時間夠久、沒有別的續跑認領過，
+        # 然後把 applied_by 設成 resume 標記——核准迴圈每列寫入前都會檢查這個欄位，發現被接手就停手。
+        with transaction.atomic():
+            locked = DictionaryImportJob.objects.select_for_update().get(pk=job_id)
+            if locked.status != DictionaryImportJob.STATUS_APPLYING:
+                raise CommandError("這個工作的狀態在診斷之後已經改變，沒有續跑")
+            age = timezone.now() - (locked.reviewed_at or locked.uploaded_at)
+            if age < timezone.timedelta(minutes=options["min_age_minutes"]):
+                raise CommandError(
+                    f"這個工作 {int(age.total_seconds() // 60)} 分鐘前才核准，核准請求可能還在執行；"
+                    f"請稍後再試（--min-age-minutes {options['min_age_minutes']}）"
+                )
+            if locked.applied_by.startswith("resume:") and not options["reclaim"]:
+                raise CommandError("這個工作已被先前的續跑指令認領過；確認沒有其他續跑在執行後可加 --reclaim 重新認領")
+            locked.applied_by = f"resume:{timezone.now().isoformat()}"
+            locked.save(update_fields=["applied_by"])
+            job = locked
+
+        # 認領之後才重讀 outcomes：核准迴圈被打斷前最後一次 checkpoint 可能晚於診斷時讀到的內容
+        prior_outcomes = {o["row"]: o for o in (job.report or {}).get("outcomes", [])}
+        prior_applied = sum(1 for o in prior_outcomes.values() if o.get("outcome") == "applied")
+        prior_failed = sum(1 for o in prior_outcomes.values() if o.get("outcome") == "failed")
+        remaining = [item for item in fresh_report["items"] if item["row"] not in prior_outcomes]
+        applied_count = prior_applied
+        failed_count = prior_failed
         outcomes = list(prior_outcomes.values())
 
         for item in remaining:

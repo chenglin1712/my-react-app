@@ -68,6 +68,16 @@ const validReport = (reporterUid, overrides = {}) => ({
   ...overrides,
 });
 
+// 檢舉的目標必須真的存在（稽核 BE5-07），建立檢舉前先在規則外放好被檢舉的文件。
+const seedReportTargets = async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const fs = ctx.firestore();
+    await setDoc(doc(fs, 'sharedNotes/note123'), { uid: 'carol', deleted: false });
+    await setDoc(doc(fs, 'sharedNotes/note456'), { uid: 'carol', deleted: false });
+    await setDoc(doc(fs, 'pronunciations/tayal/recordings/rec1'), { uid: 'carol', word: 'huzil', score: 88 });
+  });
+};
+
 describe('quizs 規則（只有伺服器能寫，S-06）', () => {
   test('登入者不能自己建立測驗（即使內容完整合法）', async () => {
     const alice = testEnv.authenticatedContext('alice');
@@ -776,11 +786,27 @@ describe('pronunciations 規則（staff 審核）', () => {
     await assertFails(deleteDoc(doc(analyst.firestore(), 'pronunciations/tayal/recordings/r1')));
   });
 
-  test('本人也不能刪除自己的錄音（原本就沒有開放 delete，這裡不能因為加了 staff 例外而意外放寬）', async () => {
+  // 稽核 FE5-05：分享是使用者自己同意的動作，同意之後要有撤回途徑。
+  test('本人可以刪除自己分享的錄音（撤回）', async () => {
     await seedRecording('r1');
     const alice = testEnv.authenticatedContext('alice');
     const { deleteDoc } = await import('firebase/firestore');
-    await assertFails(deleteDoc(doc(alice.firestore(), 'pronunciations/tayal/recordings/r1')));
+    await assertSucceeds(deleteDoc(doc(alice.firestore(), 'pronunciations/tayal/recordings/r1')));
+  });
+
+  test('不能刪除別人的錄音，未登入也不能刪', async () => {
+    await seedRecording('r1');
+    const mallory = testEnv.authenticatedContext('mallory');
+    const { deleteDoc } = await import('firebase/firestore');
+    await assertFails(deleteDoc(doc(mallory.firestore(), 'pronunciations/tayal/recordings/r1')));
+    await assertFails(deleteDoc(doc(testEnv.unauthenticatedContext().firestore(), 'pronunciations/tayal/recordings/r1')));
+  });
+
+  test('本人不能改自己錄音的 score 或 approved（沒有任何 update 規則）', async () => {
+    await seedRecording('r1');
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(updateDoc(doc(alice.firestore(), 'pronunciations/tayal/recordings/r1'), { score: 100 }));
+    await assertFails(updateDoc(doc(alice.firestore(), 'pronunciations/tayal/recordings/r1'), { approved: true }));
   });
 });
 
@@ -896,6 +922,18 @@ describe('pronunciations recordings create 規則', () => {
     );
   });
 
+  // 稽核 BE5-05 / BE5-01：欄位白名單。approved 只有後端審核頁能寫，使用者建立時帶了就被拒絕，
+  // 偽造高分的錄音因此不會被當成其他學習者的參考音。
+  test('夾帶白名單以外的欄位（含 approved）時被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'pronunciations/tayal/recordings/r1'), validRecording('tayal', { approved: true }))
+    );
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'pronunciations/tayal/recordings/r2'), validRecording('tayal', { junk: 'x'.repeat(5000) }))
+    );
+  });
+
   test('score 型別或範圍不合法時被拒絕', async () => {
     const alice = testEnv.authenticatedContext('alice');
     await assertFails(
@@ -911,6 +949,8 @@ describe('pronunciations recordings create 規則', () => {
 // frontend/src/userServives/reportService.jsx），沒有後端端點把關，這條規則
 // 本身就是唯一的信任邊界，這裡要驗證跟 sharedNotes/quizs 同一種嚴謹程度。
 describe('reports create 規則', () => {
+  beforeEach(seedReportTargets);
+
   test('已登入、reporterUid 是本人、內容完整合法時可以建立', async () => {
     const alice = testEnv.authenticatedContext('alice');
     await assertSucceeds(setDoc(doc(alice.firestore(), 'reports/alice_note123'), validReport('alice')));
@@ -1000,6 +1040,8 @@ describe('reports create 規則', () => {
 });
 
 describe('reports create 規則（去重與 targetId，稽核 RUL-5）', () => {
+  beforeEach(seedReportTargets);
+
   test('文件 ID 不是 {reporterUid}_{targetId} 會被拒絕', async () => {
     const alice = testEnv.authenticatedContext('alice');
     await assertFails(setDoc(doc(alice.firestore(), 'reports/random-id'), validReport('alice')));
@@ -1020,6 +1062,38 @@ describe('reports create 規則（去重與 targetId，稽核 RUL-5）', () => {
       setDoc(doc(alice.firestore(), 'reports/alice_note456'), validReport('alice', { targetId: 'note456' }))
     );
     await assertSucceeds(setDoc(doc(bob.firestore(), 'reports/bob_note123'), validReport('bob')));
+  });
+
+  // 稽核 BE5-07：原本 targetId 只檢查長度，用隨機字串就能無限建立檢舉灌爆審核佇列。
+  test('檢舉不存在的筆記會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'reports/alice_ghost'), validReport('alice', { targetId: 'ghost' }))
+    );
+  });
+
+  test('檢舉不存在的錄音，或錄音存在但族語路徑不符，都會被拒絕', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(
+        doc(alice.firestore(), 'reports/alice_ghost'),
+        validReport('alice', { targetType: 'recording', targetId: 'ghost', targetTribe: 'tayal' }),
+      )
+    );
+    // rec1 存在於 tayal，不在 amis
+    await assertFails(
+      setDoc(
+        doc(alice.firestore(), 'reports/alice_rec1'),
+        validReport('alice', { targetType: 'recording', targetId: 'rec1', targetTribe: 'amis' }),
+      )
+    );
+  });
+
+  test('targetType 是 note 時，只有 pronunciations 底下有同 id 的文件不算數', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'reports/alice_rec1'), validReport('alice', { targetId: 'rec1' }))
+    );
   });
 
   test('targetId 超過 128 字元會被拒絕', async () => {
@@ -1750,5 +1824,95 @@ describe('calendar 規則：欄位白名單與大小（稽核 RUL-5）', () => {
   test('別人不能讀寫', async () => {
     const bob = testEnv.authenticatedContext('bob');
     await assertFails(setDoc(doc(bob.firestore(), 'calendar/alice'), { events: [] }));
+  });
+});
+
+// 稽核 BE5-14：以下是原本完全沒有涵蓋的規則行為（讀取權限與預設拒絕），先把「現在的行為」鎖住，
+// 之後有人改規則時不會悄悄放寬。
+describe('situations 讀取：只有本人', () => {
+  test('本人可讀自己的答題紀錄，別人與未登入都不能讀', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'situations/s1'), { userId: 'alice', quizId: 'q1' });
+    });
+    await assertSucceeds(getDoc(doc(testEnv.authenticatedContext('alice').firestore(), 'situations/s1')));
+    await assertFails(getDoc(doc(testEnv.authenticatedContext('bob').firestore(), 'situations/s1')));
+    await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'situations/s1')));
+  });
+});
+
+describe('userSituation 規則：只由後端寫入，globalAverages 所有登入者可讀', () => {
+  test('登入者可讀 globalAverages；只能讀自己的統計，不能讀別人的', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'userSituation/globalAverages'), { avg: 0.5 });
+      await setDoc(doc(ctx.firestore(), 'userSituation/u1'), { userId: 'alice', total: 3 });
+    });
+    const bob = testEnv.authenticatedContext('bob').firestore();
+    await assertSucceeds(getDoc(doc(bob, 'userSituation/globalAverages')));
+    await assertFails(getDoc(doc(bob, 'userSituation/u1')));
+    await assertSucceeds(getDoc(doc(testEnv.authenticatedContext('alice').firestore(), 'userSituation/u1')));
+    await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'userSituation/globalAverages')));
+  });
+
+  test('任何前端身分都不能寫入', async () => {
+    const alice = testEnv.authenticatedContext('alice').firestore();
+    await assertFails(setDoc(doc(alice, 'userSituation/u1'), { userId: 'alice', total: 999 }));
+    await assertFails(setDoc(doc(alice, 'userSituation/globalAverages'), { avg: 1 }));
+  });
+});
+
+describe('sharedNotes／pronunciations 讀取與預設拒絕', () => {
+  test('未登入可讀未下架的分享筆記（單筆與帶 deleted==false 的列表）——這是公開分享連結的設計；匿名能讀到整份文件含 likedBy 是已知待處理項（F12）', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sharedNotes/n1'), { ...validSharedNote('alice'), createdAt: new Date() });
+    });
+    const anon = testEnv.unauthenticatedContext().firestore();
+    await assertSucceeds(getDoc(doc(anon, 'sharedNotes/n1')));
+    const { collection, getDocs, query, where } = await import('firebase/firestore');
+    await assertSucceeds(getDocs(query(collection(anon, 'sharedNotes'), where('deleted', '==', false))));
+  });
+
+  test('未登入不能讀發音錄音，登入者可以', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'pronunciations/tayal/recordings/r1'), { uid: 'alice', word: 'huzil', score: 80 });
+    });
+    await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'pronunciations/tayal/recordings/r1')));
+    await assertSucceeds(getDoc(doc(testEnv.authenticatedContext('bob').firestore(), 'pronunciations/tayal/recordings/r1')));
+  });
+
+  test('未知集合一律拒絕讀寫（預設拒絕）', async () => {
+    const alice = testEnv.authenticatedContext('alice').firestore();
+    await assertFails(setDoc(doc(alice, 'somethingNew/x1'), { a: 1 }));
+    await assertFails(getDoc(doc(alice, 'somethingNew/x1')));
+  });
+});
+
+// 稽核 BE5-13：validShareUsername 只比對本人 users 文件的 name，users 規則又允許本人把 name 改成任意字串，
+// 所以「先改名再分享」可以冒用別人的名稱。規則層沒有名稱唯一性可以檢查，這裡把這個已知限制鎖成測試，
+// 以免有人誤以為規則已經擋住。
+describe('分享筆記名稱：已知限制（可先把自己的 users.name 改成別人的名字再分享）', () => {
+  test('本人把 users.name 改成別人的名字後，可以用那個名字分享（刻意接受，見 firestore.rules 註解）', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users/mallory'), { name: '真正的管理員', role: 'user' });
+    });
+    const mallory = testEnv.authenticatedContext('mallory');
+    await assertSucceeds(
+      setDoc(doc(mallory.firestore(), 'sharedNotes/n1'), { ...validSharedNote('mallory'), username: '真正的管理員' })
+    );
+  });
+});
+
+// 稽核 FE5-15：規則裡寫死的族群清單要和 backend/config/tribes.json 啟用的族群一致，
+// 新增族群時漏改規則，分享與檢舉錄音會被拒絕。
+describe('規則內的族群清單與 tribes.json 一致', () => {
+  const enabled = JSON.parse(readFileSync('backend/config/tribes.json', 'utf8'))
+    .tribes.filter((t) => t.enabled).map((t) => t.slug).sort();
+  const listsIn = (file) => [...readFileSync(file, 'utf8').matchAll(/in \[((?:'[a-z]+',?\s*)+)\]/g)]
+    .map((m) => [...m[1].matchAll(/'([a-z]+)'/g)].map((x) => x[1]))
+    .filter((list) => list.includes('tayal'));
+
+  test.each(['firestore.rules', 'storage.rules'])('%s 的族群清單 = 啟用中的族群', (file) => {
+    const lists = listsIn(file);
+    expect(lists.length).toBeGreaterThan(0);
+    lists.forEach((list) => expect([...list].sort()).toEqual(enabled));
   });
 });

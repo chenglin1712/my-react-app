@@ -45,6 +45,17 @@ _ffprobe_path = _find_ffprobe()
 # compare_audio 上傳的使用者錄音大小上限，避免超大音檔送進 wav2vec2 拖垮記憶體
 MAX_AUDIO_BYTES = 10 * 1024 * 1024  # 10 MB
 
+# 稽核 BE4-01：檔案大小限制擋不住「很小的檔案解碼後很長」（高壓縮的 opus 10 MB 可以是數小時），
+# 解碼成 PCM 再送進 wav2vec2 會讓唯一的 FastAPI 行程記憶體爆掉。所以另外限制音訊「長度」，
+# 並在 ffmpeg 解碼時就用 -t 截斷，不先解出整段。遊戲的單字／例句錄音遠短於這個長度。
+MAX_AUDIO_SECONDS = 30
+# wav2vec2 的訓練取樣率；一律重採樣成這個值（稽核 BE4-04）
+MODEL_SAMPLE_RATE = 16000
+
+
+class AudioTooLongError(Exception):
+    """音訊長度超過 MAX_AUDIO_SECONDS。"""
+
 if _ffmpeg_path:
     # 把 ffmpeg bin 目錄加進 PATH，讓 pydub subprocess 找得到 ffprobe
     _bin_dir = os.path.dirname(_ffmpeg_path)
@@ -63,10 +74,22 @@ else:
 # 2. WebM → WAV
 def convert_to_wav(audio_bytes):
     try:
-        audio = AudioSegment.from_file(io.BytesIO(audio_bytes), format=None)
+        # duration 多留 1 秒：解碼最多只吐出 MAX_AUDIO_SECONDS + 1 秒，超過就能判定太長，又不會把整段長音檔解出來。
+        # 注意要用 duration 參數，不能用 parameters=["-t", ...]：pydub 會把 parameters 接在輸出 "-" 之後，
+        # ffmpeg 會把它當成多餘的選項忽略（實測 600 秒的檔案仍整段解碼）。
+        audio = AudioSegment.from_file(
+            io.BytesIO(audio_bytes), format=None, duration=MAX_AUDIO_SECONDS + 1,
+        )
     except Exception as e:
         _logging.warning("[pronunciation] 無法解碼音檔，前 10 bytes: %s", list(audio_bytes[:10]))
         raise Exception(f"無法解碼音檔：{str(e)}")
+
+    if len(audio) > MAX_AUDIO_SECONDS * 1000:
+        raise AudioTooLongError(f"音訊長度超過 {MAX_AUDIO_SECONDS} 秒")
+
+    # 稽核 BE4-04：使用者錄音（瀏覽器通常 48 kHz）與官方音檔（各種取樣率）原本各用自己的取樣率餵給
+    # wav2vec2（它只認 16 kHz），分數失真。統一重採樣成 16 kHz 單聲道。
+    audio = audio.set_frame_rate(MODEL_SAMPLE_RATE).set_channels(1)
 
     wav_io = io.BytesIO()
     audio.export(wav_io, format="wav")
@@ -88,6 +111,10 @@ def bytes_to_tensor(wav_io):
     # 多聲道轉單聲道
     if waveform.size(0) > 1:
         waveform = waveform.mean(dim=0, keepdim=True)
+    # 保險：convert_to_wav 已重採樣成 16 kHz；直接餵進來的其他來源也一律對齊模型要的取樣率
+    if sr != MODEL_SAMPLE_RATE:
+        waveform = torchaudio.functional.resample(waveform, sr, MODEL_SAMPLE_RATE)
+        sr = MODEL_SAMPLE_RATE
     return waveform, sr
 
 # 4. wav2vec2（懶載入，第一次呼叫時才下載模型，Lock 保護執行緒安全）
@@ -106,8 +133,10 @@ def get_wav2vec2():
 
 def _get_embedding(model, wave):
     """wav tensor → 最後一層 transformer 特徵向量"""
-    features, _ = model.extract_features(wave)
-    return features[-1].mean(dim=1)
+    # 稽核 BE4-01：推論不需要梯度，包在 inference_mode 內省下反向傳播要保留的中間張量
+    with torch.inference_mode():
+        features, _ = model.extract_features(wave)
+        return features[-1].mean(dim=1)
 
 
 def _score_from_bytes(model, user_emb, audio_bytes):
@@ -115,5 +144,6 @@ def _score_from_bytes(model, user_emb, audio_bytes):
     wav = convert_to_wav(audio_bytes)
     wave, _ = bytes_to_tensor(wav)
     emb = _get_embedding(model, wave)
-    sim = F.cosine_similarity(user_emb, emb).item()
+    with torch.inference_mode():
+        sim = F.cosine_similarity(user_emb, emb).item()
     return round(sim * 100, 2)

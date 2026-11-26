@@ -6,7 +6,9 @@ import {
 } from 'react-bootstrap';
 import AdminTable from '../components/AdminTable';
 import { useAuth } from '../../userServives/authContext';
+import { confirmAction } from '@components/ui/ConfirmDialog';
 import { apiGet, apiPatch } from '../../../utils/apiClient';
+import { formatApiError } from '../apiErrors';
 import '../../../static/css/_admin/system.css';
 import { SuccessNotice } from '../components/AdminToast';
 
@@ -33,7 +35,7 @@ export default function FeatureFlags() {
                 const { results } = await apiGet('/adminapi/feature-flags/');
                 if (active) setItems(results ?? []);
             } catch (err) {
-                if (active) setError(err.message);
+                if (active) setError(formatApiError(err));
             } finally {
                 if (active) setLoading(false);
             }
@@ -45,6 +47,15 @@ export default function FeatureFlags() {
     }, []);
 
     const toggle = async (item, enabled) => {
+        // 關閉功能會立刻影響前台使用者（測驗、翻譯回傳 403），先說明再執行；開啟不需要確認（稽核 FE7a-10）
+        if (!enabled) {
+            const confirmed = await confirmAction({
+                title: `關閉「${item.label}」`,
+                message: '關閉後會立即生效，前台使用這項功能的人會馬上被擋下。確定要關閉嗎？',
+                confirmLabel: '關閉',
+            });
+            if (!confirmed) return;
+        }
         const previousEnabled = item.enabled;
 
         setError('');
@@ -69,7 +80,7 @@ export default function FeatureFlags() {
                     ? { ...row, enabled: previousEnabled }
                     : row
             )));
-            setError(err.message);
+            setError(formatApiError(err));
         } finally {
             setSavingIds((current) => current.filter((id) => id !== item.id));
         }

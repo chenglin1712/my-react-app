@@ -105,12 +105,15 @@ export default function ReportsQueue() {
     const [success, setSuccess] = useState('');
     const [actionTarget, setActionTarget] = useState(null);
     const [resolutionNote, setResolutionNote] = useState('');
+    // 稽核 FE7b-01：核結／駁回失敗的訊息顯示在對話框內，頁面上的 Alert 被對話框遮住看不到。
+    const [modalError, setModalError] = useState('');
     const submitLock = useActionLock();
     const submitting = submitLock.isLocked;
 
     const openActionModal = (report, action) => {
         setActionTarget({ report, action });
         setResolutionNote('');
+        setModalError('');
         setError('');
     };
 
@@ -118,6 +121,7 @@ export default function ReportsQueue() {
         if (submitting) return;
         setActionTarget(null);
         setResolutionNote('');
+        setModalError('');
     };
 
     const submitAction = () => {
@@ -128,6 +132,7 @@ export default function ReportsQueue() {
         submitLock.runLocked('submit', async () => {
             setError('');
             setSuccess('');
+            setModalError('');
 
             try {
                 await apiPost(
@@ -144,9 +149,23 @@ export default function ReportsQueue() {
                 setResolutionNote('');
                 await loadReports();
             } catch (err) {
-                setError(err.message);
+                setModalError(err.message);
             }
         });
+    };
+
+    // 稽核 FE7b-07：連到審核頁時帶上被檢舉項目的 id（錄音再帶 tribe），審核頁據此預先篩選。
+    const targetLink = (report) => {
+        const basePath = TARGET_TYPES[report.target_type]?.path;
+        if (!basePath) return null;
+        const params = new URLSearchParams();
+        if (report.target_id) params.set('id', report.target_id);
+        if (report.target_type === 'recording') {
+            const tribe = report.target_summary?.tribe ?? report.target_tribe;
+            if (tribe) params.set('tribe', tribe);
+        }
+        const qs = params.toString();
+        return qs ? `${basePath}?${qs}` : basePath;
     };
 
     const modalIsResolve = actionTarget?.action === 'resolve';
@@ -262,7 +281,7 @@ export default function ReportsQueue() {
                                             label: report.status,
                                             bg: 'secondary',
                                         };
-                                        const targetPath = TARGET_TYPES[report.target_type]?.path;
+                                        const targetPath = targetLink(report);
 
                                         return (
                                             <tr key={report.id}>
@@ -393,6 +412,7 @@ export default function ReportsQueue() {
                     </Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
+                    {modalError && <Alert variant="danger" role="alert">{modalError}</Alert>}
                     <p className="moderation-modal-description">
                         {modalIsResolve
                             ? '確認此檢舉已完成處理。這項操作不會自動下架被檢舉的內容。'

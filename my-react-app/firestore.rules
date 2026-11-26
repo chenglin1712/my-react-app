@@ -356,12 +356,20 @@ service cloud.firestore {
     // （跟後端 delete_storage_file_by_download_url() 的 expected_path_prefix
     // 檢查是同一道防線的兩端）；其餘欄位型別也一併驗證，比照 quizs 集合的
     // 既有慣例。
+    //
+    // 關於 score（稽核 BE5-01）：score 是前端自己帶的，規則只能檢查是 0–100 的整數，不能證明它真的是
+    // 比對出來的分數。所以「能不能當成其他學習者的參考音」不看 score，而是看 approved 欄位：approved
+    // 只有後端（審核頁 POST /adminapi/moderation/recordings/{tribe}/{id}/approve/）用 Admin SDK 寫入，
+    // 使用者建立時不能帶（欄位白名單）、也沒有任何更新規則，所以偽造高分的錄音不會被當成參考音。
     match /pronunciations/{tribe}/recordings/{recordingId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null
         && request.resource.data.uid == request.auth.uid
         && tribe in ['tayal', 'amis', 'bunun', 'kavalan', 'paiwan']
         && request.resource.data.tribe == tribe
+        // 欄位白名單（稽核 BE5-05）：只收這六個欄位，不能夾帶任意欄位塞大小。這也同時擋住
+        // 使用者自己帶上 approved——approved 只有後端（審核頁核准）能寫（稽核 BE5-01）。
+        && request.resource.data.keys().hasOnly(['word', 'tribe', 'uid', 'score', 'storageUrl', 'createdAt'])
         && request.resource.data.word is string
         && request.resource.data.word.size() > 0 && request.resource.data.word.size() <= 100
         && request.resource.data.score is int
@@ -374,19 +382,21 @@ service cloud.firestore {
         && request.resource.data.storageUrl
           .matches('https://firebasestorage\\.googleapis\\.com/v0/b/[^/]+/o/pronunciations%2F' + tribe + '%2F[^?]*_' + request.auth.uid + '\\.webm([?].*)?')
         && request.resource.data.createdAt == request.time;
-      allow delete: if isModerator();
+      // 本人可以撤回自己分享的錄音（稽核 FE5-05：分享是使用者自己同意的動作，同意之後要有撤回途徑）；
+      // 審核角色也可以刪。Storage 物件由前端接著刪（storage.rules 允許刪除檔名結尾是本人 uid 的檔案）。
+      allow delete: if request.auth != null
+        && (isModerator() || resource.data.uid == request.auth.uid);
     }
 
     // 共享筆記：任何人（含未登入）可讀，配合 /share/:id 這條公開分享連結路由
     // （見 route.jsx，該路由沒有包 ProtectedRoute）；登入者可建立；作者只能更新
     // pages/preview/image 這幾個內容欄位（見下方 update 規則），非作者的登入者
     // 只能更新 likes/likedBy（按讚，見 noteshare.jsx toggleLike）；作者可刪除。
-    // 刪除是軟刪除（noteshare.jsx 的 handleModalDelete 只是 updateDoc 把 deleted
-    // 設成 true，文件並未真的移除），列表查詢都有帶 where("deleted","==",false)
-    // 過濾，但原本這裡的 read 規則沒有擋，直接用文件 ID 讀取（/share/:id 分享連結）
-    // 仍能打開已刪除的筆記。用 .get('deleted', false) 而非直接比對欄位，讓這個
-    // 軟刪除功能上線之前建立、沒有 deleted 欄位的舊文件預設視為未刪除，不會被
-    // 這條新規則擋掉。
+    // 作者刪除自己的筆記是「真的刪除文件」（deleteDoc，見下方 delete 規則；稽核 FE6-02：原本前端寫的是
+    // updateDoc({deleted:true})，但作者分支不允許改 deleted，一定被拒）。deleted=true 只代表 staff 下架
+    // （只有審核角色能寫）：列表查詢都有帶 where("deleted","==",false) 過濾，直接用文件 ID 讀取
+    // （/share/:id 分享連結）也由 read 規則擋下。用 .get('deleted', false) 而非直接比對欄位，讓
+    // 沒有 deleted 欄位的舊文件預設視為未刪除。
     function validSharePage(page) {
       return page is map
         && page.keys().hasAll(['title', 'content'])
@@ -399,6 +409,9 @@ service cloud.firestore {
         && validSharePage(pages[0])
         && validSharePage(pages[pages.size() - 1]);
     }
+    // 已知限制（稽核 BE5-13，P3，刻意接受）：這裡只比對「本人 users 文件的 name」。users 規則允許本人把
+    // name 改成任意 1–100 字字串，所以有人可以先把自己的 name 改成別人的名字再分享，就能冒用名稱。
+    // 規則層沒有名稱唯一性可以檢查；顯示端靠頭像與作者 uid 區分。要根治需由後端維護名稱唯一性。
     function validShareUsername(name, uid) {
       return name is string && name.size() > 0 && name.size() <= 100
         && (name == '匿名'
@@ -543,6 +556,18 @@ service cloud.firestore {
           || (
             request.resource.data.targetType == 'recording'
             && request.resource.data.targetTribe in ['tayal', 'amis', 'bunun', 'kavalan', 'paiwan']
+          )
+        )
+        // 目標必須真的存在（稽核 BE5-07）：原本 targetId 只檢查長度，用隨機字串就能無限建立檢舉灌爆審核佇列。
+        // 同一人對同一目標的去重仍由文件 ID 負責。
+        && (
+          (
+            request.resource.data.targetType == 'note'
+            && exists(/databases/$(database)/documents/sharedNotes/$(request.resource.data.targetId))
+          )
+          || (
+            request.resource.data.targetType == 'recording'
+            && exists(/databases/$(database)/documents/pronunciations/$(request.resource.data.targetTribe)/recordings/$(request.resource.data.targetId))
           )
         )
         && request.resource.data.reason in ['inappropriate', 'wrong_content', 'spam', 'other']

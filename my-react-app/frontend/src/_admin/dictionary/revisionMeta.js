@@ -51,4 +51,47 @@ export function revisionFromSave(result, fallback) {
     };
 }
 
+const REVISION_MANAGER_ROLES = ['owner', 'admin'];
+
+/**
+ * 稽核 WP-8 驗證：草稿是建立者自己的工作副本。後端只允許建立者本人（撤回時也包含送審者）
+ * 或 owner／admin 改寫、捨棄、送審、撤回（dictionary_views._not_draft_owner_response），
+ * 前端照同一套規則決定表單是否唯讀、按鈕是否顯示。
+ * revision 沒有 created_by（舊資料或尚未建立）時視為可操作，最終仍由後端把關。
+ */
+export function canManageRevision(revision, { uid, role } = {}) {
+    if (!revision?.created_by) return true;
+    if (REVISION_MANAGER_ROLES.includes(role)) return true;
+    if (uid && revision.created_by === uid) return true;
+    return Boolean(
+        uid && revision.status === 'pending_review' && revision.submitted_by === uid,
+    );
+}
+
+/**
+ * WP-8 追加：提示文字裡顯示建立者／送審者。後端在 revision GET 與詳情的 open_revision
+ * 附上 created_by_name／submitted_by_name；查不到姓名（或舊後端）時退回顯示 uid。
+ */
+export function revisionActorLabel(revision, kind = 'created') {
+    if (!revision) return '';
+    const uid = kind === 'submitted' ? revision.submitted_by : revision.created_by;
+    const name = kind === 'submitted' ? revision.submitted_by_name : revision.created_by_name;
+    return name || uid || '';
+}
+
+/**
+ * WP-8 追加（已知小問題 b）：送審中提案的唯讀說明要依身分給。撤回只有建立者、送審者本人
+ * 或 owner／admin 能做（canManageRevision）；其他編輯者看不到撤回鈕，不能叫他們「先撤回」。
+ */
+export function pendingReviewNotice(revision, { canWithdraw, entityLabel = '' } = {}) {
+    const subject = `此${entityLabel}提案正在送審，欄位為唯讀；`;
+    if (canWithdraw) return `${subject}可以先撤回提案再修改。`;
+    const creator = revisionActorLabel(revision, 'created');
+    const submitter = revisionActorLabel(revision, 'submitted');
+    const people = [creator && `建立者 ${creator}`, submitter && submitter !== creator && `送審者 ${submitter}`]
+        .filter(Boolean)
+        .join('、');
+    return `${subject}只有${people ? `${people}或` : ''}擁有者／管理員可以撤回後修改，請等待審核結果或聯繫他們。`;
+}
+
 export default REVISION_STATUS_META;

@@ -35,6 +35,16 @@ vi.mock('../../../../firebase', () => ({
   db: { name: 'mock-db' },
 }));
 
+const { confirmMock, authState, deleteOwnRecordingMock } = vi.hoisted(() => ({
+  confirmMock: vi.fn(),
+  authState: { userData: { uid: 'someone-else' } },
+  deleteOwnRecordingMock: vi.fn(),
+}));
+
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: confirmMock }));
+vi.mock('../../../src/userServives/authContext', () => ({ useAuth: () => authState }));
+vi.mock('./pronunciationRecordingService', () => ({ deleteOwnRecording: deleteOwnRecordingMock }));
+
 vi.mock('../../../src/userServives/reportService', () => ({
   submitReport: vi.fn(),
   REPORT_ALREADY_OR_DENIED: 'report/already-or-denied',
@@ -103,6 +113,10 @@ describe('PronunciationCommunity', () => {
     query.mockReturnValue('recordings-query');
     getDocs.mockResolvedValue({ docs: recordingDocs });
     submitReport.mockResolvedValue(undefined);
+    authState.userData = { uid: 'someone-else' };
+    confirmMock.mockReset();
+    deleteOwnRecordingMock.mockReset();
+    deleteOwnRecordingMock.mockResolvedValue(undefined);
   });
 
   test('依 tribe 查詢最近 200 筆錄音', async () => {
@@ -339,5 +353,58 @@ describe('PronunciationCommunity 檢舉視窗的鍵盤操作（審查項 P1-5）
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(reportButton).toHaveFocus();
+  });
+
+  // 稽核 FE5-05：使用者要能撤回自己分享的錄音
+  describe('撤回自己分享的錄音', () => {
+    test('只有自己的錄音顯示「刪除我的錄音」，別人的錄音仍是「檢舉」', async () => {
+      authState.userData = { uid: 'private-user-a' };
+      renderCommunity();
+      await screen.findByText('mhuway');
+
+      expect(screen.getAllByRole('button', { name: '刪除我的錄音' })).toHaveLength(1);
+      expect(screen.getAllByRole('button', { name: '檢舉' })).toHaveLength(2);
+    });
+
+    test('確認後呼叫 deleteOwnRecording，成功就把該筆從清單移除', async () => {
+      authState.userData = { uid: 'private-user-c' };
+      confirmMock.mockResolvedValue(true);
+      renderCommunity();
+      await screen.findByText('mhuway');
+
+      fireEvent.click(screen.getByRole('button', { name: '刪除我的錄音' }));
+
+      await waitFor(() => expect(deleteOwnRecordingMock).toHaveBeenCalledWith(
+        'tayal', 'recording-c', 'https://example.com/mhuway.webm',
+      ));
+      await waitFor(() => expect(screen.queryByText('mhuway')).not.toBeInTheDocument());
+      expect(screen.getByText('已刪除你分享的錄音')).toBeInTheDocument();
+    });
+
+    test('在確認視窗按「先不要」不會刪除', async () => {
+      authState.userData = { uid: 'private-user-c' };
+      confirmMock.mockResolvedValue(false);
+      renderCommunity();
+      await screen.findByText('mhuway');
+
+      fireEvent.click(screen.getByRole('button', { name: '刪除我的錄音' }));
+
+      await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+      expect(deleteOwnRecordingMock).not.toHaveBeenCalled();
+      expect(screen.getByText('mhuway')).toBeInTheDocument();
+    });
+
+    test('刪除失敗時錄音保留在清單並顯示錯誤', async () => {
+      authState.userData = { uid: 'private-user-c' };
+      confirmMock.mockResolvedValue(true);
+      deleteOwnRecordingMock.mockRejectedValue(new Error('denied'));
+      renderCommunity();
+      await screen.findByText('mhuway');
+
+      fireEvent.click(screen.getByRole('button', { name: '刪除我的錄音' }));
+
+      expect(await screen.findByText('刪除錄音失敗，請稍後再試。')).toBeInTheDocument();
+      expect(screen.getByText('mhuway')).toBeInTheDocument();
+    });
   });
 });

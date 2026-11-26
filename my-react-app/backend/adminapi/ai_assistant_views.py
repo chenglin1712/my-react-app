@@ -8,6 +8,7 @@
 import logging
 import math
 
+from django.db import transaction
 from django.db.models import Count
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -48,7 +49,7 @@ def _limits() -> dict:
 
 
 def _overview() -> dict:
-    content, version = assistant_settings.active_with_version()
+    content, version = assistant_settings.active_from_db()
     rows = list(AiAssistantSettingsVersion.objects.order_by("-id")[:VERSION_LIST_SIZE])
     return {
         "activeVersion": version, "active": content, "defaults": assistant_settings.DEFAULTS,
@@ -74,17 +75,27 @@ def ai_assistant_settings(request):
     note = body.get("note", "")
     if not isinstance(note, str):
         return JsonResponse({"detail": "備註必須是文字"}, status=400)
-    before_content, before_version = assistant_settings.active_with_version()
-    try:
-        row = assistant_settings.save_version(
-            body.get("content"), created_by=decoded.get("uid", ""), note=note,
+    before_content, before_version = assistant_settings.active_from_db()
+    # 稽核 BE2a-07：編輯頁帶載入時的版本號，期間被別人存過新版就拒絕，不無聲蓋掉
+    base_version = body.get("base_version")
+    if base_version is not None and (not isinstance(base_version, int) or base_version != before_version):
+        return JsonResponse(
+            {"detail": "設定已被其他人更新，請重新整理頁面，確認最新內容後再儲存", "code": "edit_conflict"},
+            status=409,
         )
+    try:
+        # 稽核 BE2a-08：新版本與稽核紀錄同一個交易，稽核寫不進去就不留下新版本
+        with transaction.atomic():
+            row = assistant_settings.save_version(
+                body.get("content"), created_by=decoded.get("uid", ""), note=note,
+            )
+            write_audit_log(
+                request, decoded, "ai_assistant_settings_save", row, before={"version": before_version},
+                after={"version": row.pk}, target_type=TARGET_TYPE,
+            )
     except assistant_settings.SettingsError as exc:
         return JsonResponse({"detail": str(exc)}, status=400)
-    write_audit_log(
-        request, decoded, "ai_assistant_settings_save", row, before={"version": before_version},
-        after={"version": row.pk}, target_type=TARGET_TYPE,
-    )
+    assistant_settings.invalidate()  # 交易提交後再清一次快取，其他 worker 才不會讀到未提交前的舊值
     return JsonResponse(_overview(), status=201)
 
 
@@ -100,18 +111,20 @@ def ai_assistant_settings_rollback(request, pk):
         old = AiAssistantSettingsVersion.objects.get(pk=pk)
     except AiAssistantSettingsVersion.DoesNotExist:
         return JsonResponse({"detail": "找不到這個版本"}, status=404)
-    _, before_version = assistant_settings.active_with_version()
+    _, before_version = assistant_settings.active_from_db()
     try:
-        row = assistant_settings.save_version(
-            old.content, created_by=decoded.get("uid", ""), note=f"回滾到 v{old.pk}", source=f"rollback:{old.pk}",
-        )
+        with transaction.atomic():
+            row = assistant_settings.save_version(
+                old.content, created_by=decoded.get("uid", ""), note=f"回滾到 v{old.pk}", source=f"rollback:{old.pk}",
+            )
+            write_audit_log(
+                request, decoded, "ai_assistant_settings_rollback", row, before={"version": before_version},
+                after={"version": row.pk, "from": old.pk}, target_type=TARGET_TYPE,
+            )
     except assistant_settings.SettingsError as exc:
         # 舊版本在驗證規則改嚴之後可能不再合法：明講原因，不硬存
         return JsonResponse({"detail": f"這個版本現在不符合規則，無法回滾：{exc}"}, status=400)
-    write_audit_log(
-        request, decoded, "ai_assistant_settings_rollback", row, before={"version": before_version},
-        after={"version": row.pk, "from": old.pk}, target_type=TARGET_TYPE,
-    )
+    assistant_settings.invalidate()
     return JsonResponse(_overview(), status=201)
 
 

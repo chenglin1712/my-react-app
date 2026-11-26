@@ -78,4 +78,4 @@ def clear_fastapi_caches():
         return True, resp.json()
     except Exception as exc:
         logger.exception("清除 FastAPI 快取失敗")
-        return False, f"呼叫 FastAPI 失敗：{exc}"
+        return False, "呼叫 FastAPI 失敗"

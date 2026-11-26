@@ -2,7 +2,7 @@ import { Search } from "lucide-react";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../src/userServives/authContext";
-import { fetchSharedNoteById, softDeleteNote, toggleNoteLike } from "../userServives/noteService";
+import { fetchSharedNoteById, deleteSharedNote, toggleNoteLike } from "../userServives/noteService";
 import { NoteCardSkeleton } from "@components/ui/SkeletonShapes";
 import EmptyState from "@components/ui/EmptyState";
 import { REPORT_ALREADY_OR_DENIED, submitReport } from "../userServives/reportService";
@@ -171,7 +171,7 @@ export default function NoteShare() {
       cancelLabel: "先不要",
     })) return;
     try {
-      await softDeleteNote(modalNote.id);
+      await deleteSharedNote(modalNote.id);
       // 刪掉的正好是這一頁唯一一筆、而且不是第一頁時，留在原地只會看到空白頁，
       // 應該退回上一頁（見這批審查發現的分頁邊界情況）。
       const wasOnlyNoteOnPage = pageNotes.length === 1 && pageNotes[0]?.id === modalNote.id;

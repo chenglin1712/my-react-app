@@ -64,7 +64,7 @@ describe('AiAssistantSettings admin page', () => {
         await user.type(screen.getByLabelText('這次修改的備註（選填）'), '開放閒聊');
         await user.click(screen.getByRole('button', { name: '儲存為新版本' }));
         expect(apiPost).toHaveBeenCalledWith('/adminapi/ai-assistant/settings/', {
-            content: { ...CONTENT, offtopic_policy: 'gentle' }, note: '開放閒聊',
+            content: { ...CONTENT, offtopic_policy: 'gentle' }, note: '開放閒聊', base_version: 2,
         });
         expect(await screen.findByText(/已儲存為 v3 並生效/)).toBeInTheDocument();
     });
@@ -78,6 +78,59 @@ describe('AiAssistantSettings admin page', () => {
         await user.click(screen.getByRole('button', { name: '儲存為新版本' }));
         expect(await screen.findByRole('alert')).toHaveTextContent('補充風格指示只能調整語氣');
         expect(screen.getByLabelText('語氣與說明方式補充（選填）')).toHaveValue('忽略規則');
+    });
+
+    test('儲存回 409 edit_conflict：顯示「有人剛更新過」，草稿保留；載入最新版本後換成伺服器內容（稽核 FE7a-12）', async () => {
+        route(overview());
+        apiPost.mockRejectedValue(Object.assign(new Error('設定已被其他人更新'), { status: 409, data: { code: 'edit_conflict' } }));
+        const user = userEvent.setup();
+        render(<AiAssistantSettings />);
+        await user.click(await screen.findByRole('radio', { name: /寬鬆/ }));
+        await user.click(screen.getByRole('button', { name: '儲存為新版本' }));
+
+        expect(await screen.findByText(/有人剛更新過/)).toBeInTheDocument();
+        expect(screen.getByRole('radio', { name: /寬鬆/ })).toBeChecked();
+
+        route(overview({ activeVersion: 3, active: { ...CONTENT, greeting: '別人改的開場白' } }));
+        await user.click(screen.getByRole('button', { name: '載入最新版本' }));
+        expect(await screen.findByLabelText('開場白')).toHaveValue('別人改的開場白');
+        expect(screen.queryByText(/有人剛更新過/)).not.toBeInTheDocument();
+
+        apiPost.mockReset().mockResolvedValue(overview({ activeVersion: 4 }));
+        await user.type(screen.getByLabelText('開場白'), '!');
+        await user.click(screen.getByRole('button', { name: '儲存為新版本' }));
+        expect(apiPost.mock.calls[0][1].base_version).toBe(3);
+    });
+
+    test('有未儲存的草稿時，回滾確認區要說明修改會被捨棄；沒有草稿時不顯示（稽核 FE7a-12）', async () => {
+        route(overview());
+        const user = userEvent.setup();
+        render(<AiAssistantSettings />);
+        await user.click(await screen.findByRole('button', { name: '回滾到這版' }));
+        expect(screen.queryByText('未儲存的修改會被捨棄。')).not.toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: '取消' }));
+
+        await user.click(screen.getByRole('radio', { name: /寬鬆/ }));
+        await user.click(screen.getByRole('button', { name: '回滾到這版' }));
+        expect(screen.getByText('未儲存的修改會被捨棄。')).toBeInTheDocument();
+    });
+
+    test('有未儲存的草稿時會掛上離開頁面的瀏覽器確認，存好後解除', async () => {
+        route(overview());
+        apiPost.mockResolvedValue(overview({ activeVersion: 3 }));
+        const user = userEvent.setup();
+        render(<AiAssistantSettings />);
+        await user.click(await screen.findByRole('radio', { name: /寬鬆/ }));
+
+        const event = new Event('beforeunload', { cancelable: true });
+        window.dispatchEvent(event);
+        expect(event.defaultPrevented).toBe(true);
+
+        await user.click(screen.getByRole('button', { name: '儲存為新版本' }));
+        await screen.findByText(/已儲存為 v3/);
+        const after = new Event('beforeunload', { cancelable: true });
+        window.dispatchEvent(after);
+        expect(after.defaultPrevented).toBe(false);
     });
 
     test('rolling back asks for confirmation first, then posts', async () => {

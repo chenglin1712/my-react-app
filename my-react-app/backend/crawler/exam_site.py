@@ -5,8 +5,10 @@ exam.sce.ntnu.edu.tw/abst/ 頁面的原始 HTML 快取（見 _fetch_exam_site_ht
 函式全部吃純值、回傳純值（或 (data, error) tuple），不碰 Django
 HttpRequest/JsonResponse——那是 views.py 的事。
 """
+import json
 import logging
 import re
+import time
 from datetime import datetime
 from urllib.parse import urljoin
 
@@ -33,6 +35,19 @@ _EXTERNAL_TIMEOUT = 10
 EXAM_SITE_HTML_CACHE_KEY = "crawler_exam_site_html"
 EXAM_SITE_HTML_CACHE_TTL = 900  # 15 分鐘，跟兩支端點自己的資料快取一致
 
+# 稽核 BE5-02：公開端點上游失敗時，原本每個匿名請求都會同步卡住一條執行緒最多 10 秒、再寫一筆資料庫紀錄。
+# 失敗後短時間內不再重打（負向快取），同一時間只讓一個請求去打上游（單飛鎖）。
+EXAM_SITE_FAILURE_CACHE_KEY = "crawler_exam_site_failure"
+EXAM_SITE_FAILURE_TTL = 90
+EXAM_SITE_LOCK_KEY = "crawler_exam_site_fetch_lock"
+EXAM_SITE_LOCK_TTL = _EXTERNAL_TIMEOUT + 5
+_MAX_HTML_CHARS = 2_000_000       # 稽核 BE5-11：官網頁面異常變大時不整份塞進快取
+_SKIPPED_FETCH = "暫時略過（最近一次請求失敗，或另一個請求正在更新）"
+
+
+class ExamSiteTemporarilyUnavailable(requests.RequestException):
+    """沒有真的對外請求：最近剛失敗過，或別的請求正在抓。不是新的上游失敗，不要記進失敗統計。"""
+
 
 def _fetch_exam_site_html(force_refresh=False):
     """回傳 exam.sce.ntnu.edu.tw/abst/ 的原始 HTML（有共用快取）。連線/逾時等例外
@@ -52,15 +67,41 @@ def _fetch_exam_site_html(force_refresh=False):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Accept": "text/html",
     }
-    res = requests.get("https://exam.sce.ntnu.edu.tw/abst/", headers=headers, timeout=_EXTERNAL_TIMEOUT)
-    res.raise_for_status()
-    cache.set(EXAM_SITE_HTML_CACHE_KEY, res.text, EXAM_SITE_HTML_CACHE_TTL)
-    return res.text
+    if not force_refresh and cache.get(EXAM_SITE_FAILURE_CACHE_KEY) is not None:
+        raise ExamSiteTemporarilyUnavailable("官網最近一次請求失敗，暫時不重試")
+    locked = cache.add(EXAM_SITE_LOCK_KEY, 1, EXAM_SITE_LOCK_TTL)
+    if not locked and not force_refresh:
+        # 另一個請求正在抓：等它抓完直接用快取（原本這些請求只是慢一點，不該變成失敗）
+        deadline = time.monotonic() + _EXTERNAL_TIMEOUT + 2
+        while time.monotonic() < deadline:
+            time.sleep(0.2)
+            cached = cache.get(EXAM_SITE_HTML_CACHE_KEY)
+            if cached is not None:
+                return cached
+            if cache.get(EXAM_SITE_FAILURE_CACHE_KEY) is not None:
+                break
+        raise ExamSiteTemporarilyUnavailable("官網正由另一個請求更新中")
+    try:
+        res = requests.get("https://exam.sce.ntnu.edu.tw/abst/", headers=headers, timeout=_EXTERNAL_TIMEOUT)
+        res.raise_for_status()
+        text = res.text
+        if len(text) > _MAX_HTML_CHARS:
+            raise requests.RequestException("官網回應過大")
+    except requests.RequestException:
+        cache.set(EXAM_SITE_FAILURE_CACHE_KEY, 1, EXAM_SITE_FAILURE_TTL)
+        raise
+    finally:
+        if locked:
+            cache.delete(EXAM_SITE_LOCK_KEY)
+    cache.delete(EXAM_SITE_FAILURE_CACHE_KEY)
+    cache.set(EXAM_SITE_HTML_CACHE_KEY, text, EXAM_SITE_HTML_CACHE_TTL)
+    return text
 
 
 # 爬取活動及族語認證資料（使用 tacp.gov.tw 官方 API）
 NEWS_CACHE_KEY = "crawler_news_data"
 NEWS_CACHE_TTL = 900  # 15 分鐘，避免每次開首頁都重新爬 tacp 公告 + 師大考試網站
+NEWS_FAILURE_CACHE_KEY = "crawler_news_failure"
 
 
 def _safe_external_url(value):
@@ -120,21 +161,24 @@ def _scrape_news(force_refresh=False):
         res.raise_for_status()
         result = res.json()
         for item in result.get("data", []):
-            import json as _json
-            raw_images = item.get("images", [])
-            images = _json.loads(raw_images) if isinstance(raw_images, str) else raw_images
-            img_url = images[0].get("url") if isinstance(images, list) and images and isinstance(images[0], dict) else None
-            item_id = item.get("id")
-            data.append({
-                "title": item.get("title"),
-                "detail": _safe_external_url(f"https://www.tacp.gov.tw/news/{item.get('category_id')}/{item_id}"),
-                "image": _safe_external_url(img_url),
-                "start_date": item.get("start_date") or item.get("published_at"),
-                "end_date": item.get("end_date"),
-                "tag": item.get("category", {}).get("title") if isinstance(item.get("category"), dict) else None,
-                "isExam": "F",
-                "source_key": f"tacp:{item_id}" if item_id is not None else None,
-            })
+            # 稽核 BE5-11：單筆資料壞掉只略過那一筆，不丟掉整批
+            try:
+                raw_images = item.get("images", [])
+                images = json.loads(raw_images) if isinstance(raw_images, str) else raw_images
+                img_url = images[0].get("url") if isinstance(images, list) and images and isinstance(images[0], dict) else None
+                item_id = item.get("id")
+                data.append({
+                    "title": item.get("title"),
+                    "detail": _safe_external_url(f"https://www.tacp.gov.tw/news/{item.get('category_id')}/{item_id}"),
+                    "image": _safe_external_url(img_url),
+                    "start_date": item.get("start_date") or item.get("published_at"),
+                    "end_date": item.get("end_date"),
+                    "tag": item.get("category", {}).get("title") if isinstance(item.get("category"), dict) else None,
+                    "isExam": "F",
+                    "source_key": f"tacp:{item_id}" if item_id is not None else None,
+                })
+            except (AttributeError, TypeError, ValueError, IndexError):
+                logger.warning("tacp 公告有一筆格式異常，已略過")
         tacp_ok = True
     except Exception as e:
         logger.error("tacp API error: %s", e)
@@ -189,11 +233,15 @@ def get_news_data(force_refresh=False):
         cached = cache.get(NEWS_CACHE_KEY)
         if cached is not None:
             return cached
+        if cache.get(NEWS_FAILURE_CACHE_KEY) is not None:
+            return None          # 稽核 BE5-02：剛失敗過，短時間內不再同步卡住請求去重打上游
 
     data, error = _scrape_news(force_refresh=force_refresh)
     if data is None:
         logger.error("get_news_data 爬取失敗: %s", error)
+        cache.set(NEWS_FAILURE_CACHE_KEY, 1, EXAM_SITE_FAILURE_TTL)
         return None
+    cache.delete(NEWS_FAILURE_CACHE_KEY)
 
     cache.set(NEWS_CACHE_KEY, data, NEWS_CACHE_TTL)
     return data
@@ -229,6 +277,8 @@ def _scrape_exam_schedule(force_refresh=False):
     """
     try:
         html = _fetch_exam_site_html(force_refresh=force_refresh)
+    except ExamSiteTemporarilyUnavailable:
+        return None, _SKIPPED_FETCH
     except requests.RequestException as e:
         return None, f"上游請求失敗：{e}"
 
@@ -252,8 +302,13 @@ def _scrape_exam_schedule(force_refresh=False):
             if not m:
                 continue
             label = label_el.get_text(strip=True)
-            start_dt = datetime.strptime(m.group(1), "%Y%m%dT%H%M%S")
-            end_dt = datetime.strptime(m.group(2), "%Y%m%dT%H%M%S")
+            try:
+                start_dt = datetime.strptime(m.group(1), "%Y%m%dT%H%M%S")
+                end_dt = datetime.strptime(m.group(2), "%Y%m%dT%H%M%S")
+            except ValueError:
+                # 稽核 BE5-11：官網出現不合法日期（例如月份 13）時只略過這一列，不讓公開端點 500
+                logger.warning("考試時程有一列日期不合法，已略過：%s", label)
+                continue
             phases.append({
                 "phase": EXAM_SCHEDULE_PHASE_MAP.get(label, label),
                 "label": label,
@@ -283,6 +338,8 @@ def get_exam_schedule_data(force_refresh=False):
 
     data, error = _scrape_exam_schedule(force_refresh=force_refresh)
     if data is None:
+        if error == _SKIPPED_FETCH:
+            return None          # 沒有真的對外請求，不是新的失敗，不記錄
         logger.error("get_exam_schedule 爬取失敗: %s", error)
         record_crawl_failure(error)
         return None

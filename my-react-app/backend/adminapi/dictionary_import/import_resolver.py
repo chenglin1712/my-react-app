@@ -19,11 +19,34 @@ from dictionary_db import model as m
 from .bundle_schema import _TAXONOMY_MODEL_BY_KIND
 
 
+def row_structure_errors(words):
+    """逐列做結構檢查（稽核 BE2b-01）：上傳時只回報不擋，預檢與核准也必須沿用，否則結構不合法的列
+    （例如 explanations 不是陣列）會一路被寫進辭典。回傳 {row_index: [錯誤訊息]}。"""
+    from ..dictionary_serializers import validate_word_bundle_entry
+
+    result = {}
+    for index, word in enumerate(words):
+        if not isinstance(word, dict):
+            result[index] = ["這一列不是詞條物件"]
+            continue
+        _cleaned, errors = validate_word_bundle_entry(word)
+        if errors:
+            result[index] = [f"{field}：{message}" for field, message in errors.items()]
+    return result
+
+
+def structurally_valid_words(words):
+    """只留結構合法的列，給建立缺漏主檔等不需要逐列報告的函式用。"""
+    bad = row_structure_errors(words)
+    return [word for index, word in enumerate(words) if index not in bad]
+
+
 def _collect_bundle_names(words):
     """掃過整份 bundle，收集會用到的分類主檔名稱／標註連結詞彙名稱，
     給後面的批次查詢用——一次查完，不要每筆詞條各自查一次。"""
     names = {"source": set(), "category": set(), "part_of_speech": set(), "focus": set()}
     anaphora_word_names = set()
+    anaphora_word_ids = set()
     for word in words:
         names["source"].update(word.get("source_names") or [])
         for exp in word.get("explanations") or []:
@@ -36,7 +59,9 @@ def _collect_bundle_names(words):
                         word_name = item.get("word_name")
                         if word_name:
                             anaphora_word_names.add(word_name)
-    return names, anaphora_word_names
+                        if isinstance(item.get("word_id"), str) and item["word_id"]:
+                            anaphora_word_ids.add(item["word_id"])
+    return names, anaphora_word_names, anaphora_word_ids
 
 
 def _lookup_taxonomy_maps(db: Session, names: dict) -> dict:
@@ -67,6 +92,14 @@ def _lookup_anaphora_word_map(db: Session, tribe_id: str, names: set) -> dict:
     return {name: (id_by_name[name] if counts.get(name) == 1 else None) for name in names}
 
 
+def _lookup_valid_anaphora_ids(db: Session, tribe_id: str, ids: set) -> set:
+    """匯出檔帶的 word_id 中，真的存在且屬於這個族語的那些。"""
+    if not ids:
+        return set()
+    rows = db.query(m.Word.id).filter(m.Word.tribe_id == tribe_id, m.Word.id.in_(ids)).all()
+    return {row[0] for row in rows}
+
+
 def _lookup_existing_words_by_name(db: Session, tribe_id: str, names: set):
     """回傳 (counts, id_by_name)。詞形在同族語內本來就可能重複（既有資料
     就是這樣，見規劃文件 P4 §2），比對到多筆時無法安全判定要更新哪一筆，
@@ -90,7 +123,7 @@ def create_missing_taxonomies(db: Session, words: list) -> dict:
     給稽核紀錄用；呼叫端負責交易邊界，建立完之後必須重新呼叫
     resolve_import_bundle()——沿用建立之前算出來的結果，這些名稱在那份
     結果裡仍然是「找不到」。"""
-    names, _anaphora_names = _collect_bundle_names(words)
+    names, _anaphora_names, _anaphora_ids = _collect_bundle_names(structurally_valid_words(words))
     created = {"source": [], "category": [], "part_of_speech": [], "focus": []}
     for kind, name_set in names.items():
         if not name_set:
@@ -117,17 +150,21 @@ def resolve_import_bundle(db: Session, tribe_id: str, words: list) -> dict:
     純唯讀查詢，不寫入任何東西——預檢（步驟 3）跟核准套用前的重新驗證
     都呼叫這支函式，形狀完全一致才能拿雜湊互相比對（見 import_report_hash）。
     """
-    names, anaphora_word_names = _collect_bundle_names(words)
+    structure_errors = row_structure_errors(words)
+    # 結構不合法的列不參與名稱收集與解析（避免畸形資料讓解析本身丟例外），直接在迴圈裡標成錯誤
+    safe_words = [({} if index in structure_errors else word) for index, word in enumerate(words)]
+    names, anaphora_word_names, anaphora_word_ids = _collect_bundle_names(safe_words)
     taxonomy_maps = _lookup_taxonomy_maps(db, names)
     anaphora_word_map = _lookup_anaphora_word_map(db, tribe_id, anaphora_word_names)
+    valid_anaphora_ids = _lookup_valid_anaphora_ids(db, tribe_id, anaphora_word_ids)
 
-    bundle_names = [w.get("name") for w in words if isinstance(w.get("name"), str) and w.get("name").strip()]
+    bundle_names = [w.get("name") for w in safe_words if isinstance(w.get("name"), str) and w.get("name").strip()]
     name_counts_in_bundle = {}
     for bundle_name in bundle_names:
         name_counts_in_bundle[bundle_name] = name_counts_in_bundle.get(bundle_name, 0) + 1
     existing_counts, existing_id_by_name = _lookup_existing_words_by_name(db, tribe_id, set(bundle_names))
 
-    explicit_ids = {w.get("id") for w in words if w.get("id")}
+    explicit_ids = {w.get("id") for w in safe_words if w.get("id")}
     existing_tribe_by_id = {}
     if explicit_ids:
         rows = db.query(m.Word.id, m.Word.tribe_id).filter(m.Word.id.in_(explicit_ids)).all()
@@ -135,7 +172,15 @@ def resolve_import_bundle(db: Session, tribe_id: str, words: list) -> dict:
 
     items = []
     for index, word in enumerate(words):
+        if index in structure_errors:
+            raw_name = word.get("name") if isinstance(word, dict) else ""
+            items.append({
+                "row": index, "name": raw_name if isinstance(raw_name, str) else "", "action": "error",
+                "word_id": None, "errors": structure_errors[index], "payload": None, "warnings": [],
+            })
+            continue
         row_errors = []
+        row_warnings = []
         name = word.get("name")
 
         if name and name_counts_in_bundle.get(name, 0) > 1 and not word.get("id"):
@@ -201,7 +246,18 @@ def resolve_import_bundle(db: Session, tribe_id: str, words: list) -> dict:
                     resolved_items = []
                     for item in (ana.get("items") or []):
                         word_name = item.get("word_name")
-                        resolved_word_id = anaphora_word_map.get(word_name) if word_name else None
+                        explicit_word_id = item.get("word_id")
+                        resolved_word_id = None
+                        # 稽核 BE2b-02：優先用匯出檔帶的 word_id（驗證存在且同族語），詞形只當備援
+                        if isinstance(explicit_word_id, str) and explicit_word_id:
+                            if explicit_word_id in valid_anaphora_ids:
+                                resolved_word_id = explicit_word_id
+                            else:
+                                row_warnings.append(f"標註連結的 word_id 不存在或不屬於這個族語：{explicit_word_id}")
+                        if resolved_word_id is None and word_name:
+                            resolved_word_id = anaphora_word_map.get(word_name)
+                            if resolved_word_id is None:
+                                row_warnings.append(f"標註連結「{word_name}」找不到唯一對應的詞條，連結會留空")
                         resolved_items.append({
                             "id": item.get("id"), "word_id": resolved_word_id, "name": item.get("name", ""),
                         })
@@ -230,7 +286,7 @@ def resolve_import_bundle(db: Session, tribe_id: str, words: list) -> dict:
         if row_errors:
             items.append({
                 "row": index, "name": name or "", "action": "error",
-                "word_id": word_id, "errors": row_errors, "payload": None,
+                "word_id": word_id, "errors": row_errors, "payload": None, "warnings": row_warnings,
             })
             continue
 
@@ -251,7 +307,7 @@ def resolve_import_bundle(db: Session, tribe_id: str, words: list) -> dict:
         }
         items.append({
             "row": index, "name": name or "", "action": ("update" if word_id else "create"),
-            "word_id": word_id, "errors": [], "payload": resolved_payload,
+            "word_id": word_id, "errors": [], "payload": resolved_payload, "warnings": row_warnings,
         })
 
     _reject_duplicate_targets(items)
@@ -262,6 +318,7 @@ def resolve_import_bundle(db: Session, tribe_id: str, words: list) -> dict:
         "new_count": sum(1 for it in items if it["action"] == "create"),
         "update_count": sum(1 for it in items if it["action"] == "update"),
         "error_count": sum(1 for it in items if it["action"] == "error"),
+        "warning_count": sum(len(it.get("warnings") or []) for it in items),
     }
 
 
@@ -292,19 +349,30 @@ def _attach_current_hashes(db: Session, items: list) -> None:
     的另一列）改過」的關鍵，不能只比對這份 bundle 自己的內容有沒有變
     （見 import_report_hash 的說明——bundle 內容本來就沒變，是資料庫端的
     現況變了）。"""
+    from dictionary_db import model as m
+
     from .. import dictionary_write as dw
+    from ..dictionary_write.tree_reader import _build_word_trees
+
+    # 稽核 BE2b-04：原本每個更新列各讀一整棵詞條樹（每棵十幾個查詢）；改成整批查、依 id 取。
+    # 組樹與雜湊用的是同一份 _build_word_trees，雜湊與 get_word_tree 單筆結果一致。
+    update_ids = sorted({item["word_id"] for item in items if item["action"] == "update" and item["word_id"]})
+    trees = {}
+    for start in range(0, len(update_ids), 500):
+        chunk = update_ids[start:start + 500]
+        words = db.query(m.Word).filter(m.Word.id.in_(chunk)).all()
+        trees.update(_build_word_trees(db, words))
 
     for item in items:
+        item["current_hash"] = None
         if item["action"] == "update" and item["word_id"]:
-            try:
-                item["current_hash"] = dw.word_content_hash(dw.get_word_tree(db, item["word_id"]))
-            except dw.WordNotFoundError:
+            tree = trees.get(item["word_id"])
+            if tree is None:
                 item["action"] = "error"
                 item["errors"].append(f"目標詞條在解析過程中已經不存在：{item['word_id']}")
                 item["payload"] = None
-                item["current_hash"] = None
-        else:
-            item["current_hash"] = None
+            else:
+                item["current_hash"] = dw.word_content_hash(tree)
 
 
 def import_report_hash(report: dict) -> str:

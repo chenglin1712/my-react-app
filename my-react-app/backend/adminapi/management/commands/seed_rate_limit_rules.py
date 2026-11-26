@@ -113,7 +113,8 @@ DJANGO_RULES = [
     ("learner_memory", "30/m", "AI 學習記憶管理（檢視、編輯、同意、清除）"),
     ("quiz_draft_generate", "10/m", "後台 AI 產生情境題草稿"),
     ("ai_daily_quota", "100/d", "AI 助手每人每日提問上限（單位必須是 /d，台灣時間午夜重置，兩種對話共用）"),
-    ("generate_crossword", "30/m", "產生填字遊戲"),
+    ("generate_crossword", "6/m", "產生填字遊戲"),
+    ("csp_report", "30/m", "CSP 違規回報（依 IP）"),
     ("submit_ans", "30/m", "填字遊戲繳交答案"),
     ("get_situation_quiz_data", "30/m", "情境題出題"),
     ("get_quiz_data", "30/m", "官方等級測驗出題"),
@@ -164,6 +165,11 @@ FASTAPI_RULES = [
     ("translation_capabilities", "60/minute", "翻譯能力資訊查詢"),
     ("listening_questions", "30/minute", "聽力題目產生"),
     ("sentence_questions", "30/minute", "句型題目產生"),
+    ("quiz_generate", "30/minute", "測驗出題（全詞庫評分）"),
+    ("quiz_submit_answer", "120/minute", "測驗作答"),
+    ("quiz_research_consent_get", "60/minute", "研究資料同意狀態查詢"),
+    ("quiz_research_consent_put", "10/minute", "研究資料同意或撤回"),
+    ("quiz_rule_summary", "60/minute", "測驗結束頁規則摘要"),
 ]
 
 

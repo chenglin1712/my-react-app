@@ -3,6 +3,7 @@ import AdminTable from '../components/AdminTable';
 import { Minus, Plus } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
+import EditorModalError from '../reviewWorkflow/EditorModalError';
 import RejectReasonModal from '../reviewWorkflow/RejectReasonModal';
 import ReviewActions from '../reviewWorkflow/ReviewActions';
 import ReviewPagination from '../reviewWorkflow/ReviewPagination';
@@ -207,9 +208,9 @@ function VocabPanel({ role }) {
 
             <Modal
                 show={Boolean(editTarget)}
-                onHide={formSubmitting ? undefined : editor.close}
+                onHide={formSubmitting ? undefined : editor.requestClose}
                 centered
-                backdrop={formSubmitting ? 'static' : true}
+                backdrop={formSubmitting || editor.dirty ? 'static' : true}
                 keyboard={!formSubmitting}
             >
                 <Form onSubmit={editor.save}>
@@ -219,6 +220,7 @@ function VocabPanel({ role }) {
                         </Modal.Title>
                     </Modal.Header>
                     <Modal.Body>
+                        <EditorModalError error={editor.error} conflict={editor.conflict} onReload={editor.reloadLatest} />
                         <div className="quiz-bank-form-grid">
                             <Form.Group controlId="quiz-vocab-tribe">
                                 <Form.Label>族語</Form.Label>
@@ -300,7 +302,7 @@ function VocabPanel({ role }) {
                         </Form.Group>
                     </Modal.Body>
                     <Modal.Footer>
-                        <Button type="button" variant="secondary" disabled={formSubmitting} onClick={editor.close}>
+                        <Button type="button" variant="secondary" disabled={formSubmitting} onClick={editor.requestClose}>
                             取消
                         </Button>
                         <Button
@@ -541,10 +543,10 @@ function ClozePanel({ role }) {
 
             <Modal
                 show={Boolean(editTarget)}
-                onHide={formSubmitting ? undefined : editor.close}
+                onHide={formSubmitting ? undefined : editor.requestClose}
                 centered
                 size="lg"
-                backdrop={formSubmitting ? 'static' : true}
+                backdrop={formSubmitting || editor.dirty ? 'static' : true}
                 keyboard={!formSubmitting}
             >
                 <Form onSubmit={editor.save}>
@@ -554,6 +556,7 @@ function ClozePanel({ role }) {
                         </Modal.Title>
                     </Modal.Header>
                     <Modal.Body>
+                        <EditorModalError error={editor.error} conflict={editor.conflict} onReload={editor.reloadLatest} />
                         <Form.Group
                             className="quiz-bank-field"
                             controlId="quiz-cloze-tribe"
@@ -675,7 +678,7 @@ function ClozePanel({ role }) {
                         </Button>
                     </Modal.Body>
                     <Modal.Footer>
-                        <Button type="button" variant="secondary" disabled={formSubmitting} onClick={editor.close}>
+                        <Button type="button" variant="secondary" disabled={formSubmitting} onClick={editor.requestClose}>
                             取消
                         </Button>
                         <Button

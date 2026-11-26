@@ -85,7 +85,7 @@ export default function ReviewQueue() {
   const canView = STAFF_ROLES.includes(role);
 
   const {
-    data, loading, error, page, setPage, hasNext,
+    data, loading, error, setPage, hasNext,
     filters, applyFilters, reload: loadQueue,
   } = useAdminListQuery({
     endpoint: '/adminapi/review-queue/',
@@ -106,6 +106,9 @@ export default function ReviewQueue() {
     ? 0
     : (data.page - 1) * data.page_size + 1;
   const lastItem = Math.min(data.page * data.page_size, data.count);
+  // 稽核 FE7b-09：最後一頁的項目全被處理掉時，頁碼可能暫時超出範圍（firstItem > lastItem），
+  // 不顯示「第 21–20 筆」這種不合理的範圍。
+  const rangeValid = firstItem <= lastItem;
 
   if (authLoading) {
     return (
@@ -252,7 +255,9 @@ export default function ReviewQueue() {
         {!loading && data.count > 0 && (
           <div className="review-queue-pagination">
             <span>
-              顯示第 {firstItem}–{lastItem} 筆，共 {data.count} 筆
+              {rangeValid
+                ? `顯示第 ${firstItem}–${lastItem} 筆，共 ${data.count} 筆`
+                : `共 ${data.count} 筆`}
             </span>
 
             <div>

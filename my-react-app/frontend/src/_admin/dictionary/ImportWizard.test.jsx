@@ -32,6 +32,10 @@ import {
     uploadImportJob,
     withdrawImportJob,
 } from './dictionaryApi';
+import { confirmAction } from '@components/ui/ConfirmDialog';
+
+// 稽核 FE7a-09：核准與自動建立主檔改經 confirmAction，測試裡預設按「確認」
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: vi.fn(() => Promise.resolve(true)) }));
 
 vi.mock('./dictionaryApi', () => ({
     approveImportJob: vi.fn(),
@@ -125,6 +129,8 @@ describe('ImportWizard', () => {
             submitImportJob, uploadImportJob, withdrawImportJob,
         ].forEach((mock) => mock.mockReset());
 
+        confirmAction.mockReset();
+        confirmAction.mockResolvedValue(true);
         listTaxonomies.mockResolvedValue(taxonomies);
         listImportJobs.mockResolvedValue({
             results: [], count: 0, page: 1, page_size: 20,
@@ -151,6 +157,49 @@ describe('ImportWizard', () => {
         expect(await screen.findByText('檔案不是有效的 JSON')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '上傳' })).toBeDisabled();
         expect(uploadImportJob).not.toHaveBeenCalled();
+    });
+
+    test('稽核 BE2b-11：原始檔過大時不讀取，直接提示分批匯入', async () => {
+        renderWizard();
+        await screen.findByText('步驟一：上傳檔案');
+
+        const file = new File(['{}'], 'huge.json', { type: 'application/json' });
+        Object.defineProperty(file, 'size', { value: 60 * 1024 * 1024 });
+
+        fireEvent.change(screen.getByLabelText('JSON 匯入檔案'), { target: { files: [file] } });
+
+        expect(await screen.findByText(/檔案過大.*分批匯入/)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '上傳' })).toBeDisabled();
+    });
+
+    test('稽核 BE2b-11：送出內容超過 10 MB 上限時顯示錯誤，上傳鈕維持停用', async () => {
+        class FakeFileReader {
+            readAsText() {
+                FakeFileReader.instance = this;
+            }
+        }
+        const OriginalFileReader = window.FileReader;
+        window.FileReader = FakeFileReader;
+
+        try {
+            renderWizard();
+            await screen.findByText('步驟一：上傳檔案');
+
+            const file = new File(['{}'], 'big.json', { type: 'application/json' });
+            fireEvent.change(screen.getByLabelText('JSON 匯入檔案'), { target: { files: [file] } });
+
+            const big = JSON.stringify({ tribe: 'tayal', words: ['x'.repeat(11 * 1024 * 1024)] });
+            await act(async () => {
+                FakeFileReader.instance.result = big;
+                FakeFileReader.instance.onload();
+            });
+
+            expect(screen.getByText(/單次匯入上限為 10.0 MB/)).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: '上傳' })).toBeDisabled();
+            expect(uploadImportJob).not.toHaveBeenCalled();
+        } finally {
+            window.FileReader = OriginalFileReader;
+        }
     });
 
     test('回歸測試：快速換選兩個檔案時，較晚完成的 FileReader 不會蓋掉後選檔案的內容', async () => {
@@ -280,6 +329,19 @@ describe('ImportWizard', () => {
         });
 
         expect(await screen.findByText('已建立分類：植物、動物；詞性：名詞')).toBeInTheDocument();
+        expect(confirmAction).toHaveBeenCalledWith(expect.objectContaining({ title: '自動建立缺漏主檔' }));
+    });
+
+    test('稽核 FE7a-09：自動建立缺漏主檔取消確認時不呼叫 API', async () => {
+        confirmAction.mockResolvedValue(false);
+        getImportJob.mockResolvedValue(jobForStatus('validated'));
+
+        renderWizard('/admin/dictionary/import/42');
+
+        fireEvent.click(await screen.findByRole('button', { name: '自動建立缺漏主檔' }));
+
+        await waitFor(() => expect(confirmAction).toHaveBeenCalled());
+        expect(autoCreateImportTaxonomies).not.toHaveBeenCalled();
     });
 
     test('非 owner 不顯示自動建立缺漏主檔按鈕', async () => {
@@ -357,6 +419,27 @@ describe('ImportWizard', () => {
         });
     });
 
+    test('稽核 FE7a-09：核准匯入前確認，確認文字帶出新增／更新／錯誤筆數；取消則不呼叫 API', async () => {
+        mockRole = 'reviewer';
+        confirmAction.mockResolvedValue(false);
+        getImportJob.mockResolvedValue(jobForStatus('pending_review', {
+            new_count: 12, update_count: 3, error_count: 2,
+        }));
+
+        renderWizard('/admin/dictionary/import/42');
+        await screen.findByText('審核匯入工作');
+
+        fireEvent.click(screen.getByRole('button', { name: '核准' }));
+
+        await waitFor(() => expect(confirmAction).toHaveBeenCalled());
+        const { message } = confirmAction.mock.calls[0][0];
+        const { container } = render(message);
+        expect(container).toHaveTextContent('新增 12 筆');
+        expect(container).toHaveTextContent('更新 3 筆');
+        expect(container).toHaveTextContent('2 筆錯誤資料會被略過');
+        expect(approveImportJob).not.toHaveBeenCalled();
+    });
+
     test('核准發生 409 時原樣顯示後端訊息', async () => {
         mockRole = 'reviewer';
         getImportJob.mockResolvedValue(jobForStatus('pending_review'));
@@ -415,6 +498,10 @@ describe('ImportWizard', () => {
 
         expect(await screen.findByText('已退件')).toBeInTheDocument();
         expect(screen.getByText(/請修正分類名稱/)).toBeInTheDocument();
+        // 稽核 FE7a-14：預檢報告預設只顯示錯誤列，切換「全部」才看到其他列
+        expect(screen.getByText('bad-row')).toBeInTheDocument();
+        expect(screen.queryByText('lokah')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /全部（3）/ }));
         expect(screen.getByText('lokah')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: '送出審核' })).not.toBeInTheDocument();
     });
@@ -432,7 +519,10 @@ describe('ImportWizard', () => {
 
     test('選擇族語並匯出 JSON 檔案', async () => {
         const exported = { tribe: 'amis', words: [{ name: 'maku' }] };
-        const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+        let clickedWhileInDocument = false;
+        const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function recordClick() {
+            clickedWhileInDocument = document.body.contains(this);
+        });
 
         vi.stubGlobal('URL', {
             ...URL,
@@ -452,8 +542,13 @@ describe('ImportWizard', () => {
         });
 
         expect(URL.createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
-        expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:dictionary');
         expect(click).toHaveBeenCalled();
+        // 稽核 FE7a-21：點擊當下 anchor 必須在文件裡，revoke 延後到下載開始之後
+        expect(clickedWhileInDocument).toBe(true);
+        expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+        await waitFor(() => {
+            expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:dictionary');
+        }, { timeout: 2000 });
         expect(await screen.findByText('辭典匯出檔已開始下載。')).toBeInTheDocument();
 
         click.mockRestore();

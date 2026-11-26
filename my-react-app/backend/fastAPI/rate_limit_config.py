@@ -1,6 +1,6 @@
 """FastAPI 端 12 個 @limiter.limit(...) 呼叫點的動態限流值——輪詢 Django
 adminapi 的 RateLimitRule（backend=fastapi 那批，見
-backend/adminapi/rate_limit_views.py 的 public_fastapi_rate_limit_rules）。
+backend/adminapi/internal_views.py 的 fastapi_rate_limit_rules，要 X-Internal-Secret）。
 
 完全比照 game_config.py／routes/quiz.py 既有的 TTL 輪詢模式，差別只在於
 這裡快取的是「key -> rate 字串」的整包字典（一次 HTTP 請求換全部 12 筆），
@@ -20,13 +20,14 @@ import threading
 import time
 
 import requests
+from . import background_refresh
 from .internal_headers import DJANGO_INTERNAL_HEADERS
 
 logger = logging.getLogger(__name__)
 
 _RATE_LIMIT_CONFIG_URL = (
     os.getenv("DJANGO_INTERNAL_BASE_URL", "http://127.0.0.1:8000")
-    + "/adminapi/public/fastapi-rate-limit-rules/"
+    + "/adminapi/internal/fastapi-rate-limit-rules/"
 )
 # 限流值改了之後最慢幾分鐘內生效即可，不是秒等的即時性需求，跟 IRT／
 # 遊戲參數輪詢同一種取捨。
@@ -36,8 +37,26 @@ _rate_limit_lock = threading.Lock()
 _rate_limit_rules: dict = {}
 
 
-def _refresh_if_stale() -> None:
+def _fetch_rules() -> None:
     global _rate_limit_last_fetch, _rate_limit_rules
+    try:
+        resp = requests.get(
+            _RATE_LIMIT_CONFIG_URL, timeout=5,
+            headers={**DJANGO_INTERNAL_HEADERS, "X-Internal-Secret": os.getenv("INTERNAL_API_SECRET", "")},
+        )
+        resp.raise_for_status()
+        _rate_limit_rules = resp.json().get("rules", {})
+    except Exception:
+        # Django 暫時連不上時保留目前值（可能是上次成功抓到的，也可能是
+        # 空字典）——空字典會讓 get_configured_rate() 一律退回呼叫端的
+        # 預設值，等於這次輪詢失敗前的行為完全不變，不會讓限流突然失效。
+        logger.warning("[rate_limit_config] 無法從後台讀取限流規則，沿用目前值", exc_info=True)
+    finally:
+        _rate_limit_last_fetch = time.monotonic()
+
+
+def _refresh_if_stale() -> None:
+    global _rate_limit_last_fetch
 
     if time.monotonic() - _rate_limit_last_fetch < _RATE_LIMIT_CONFIG_TTL_SECONDS:
         return
@@ -45,17 +64,13 @@ def _refresh_if_stale() -> None:
     with _rate_limit_lock:
         if time.monotonic() - _rate_limit_last_fetch < _RATE_LIMIT_CONFIG_TTL_SECONDS:
             return
-        try:
-            resp = requests.get(_RATE_LIMIT_CONFIG_URL, timeout=5, headers=DJANGO_INTERNAL_HEADERS)
-            resp.raise_for_status()
-            _rate_limit_rules = resp.json().get("rules", {})
-        except Exception:
-            # Django 暫時連不上時保留目前值（可能是上次成功抓到的，也可能是
-            # 空字典）——空字典會讓 get_configured_rate() 一律退回呼叫端的
-            # 預設值，等於這次輪詢失敗前的行為完全不變，不會讓限流突然失效。
-            logger.warning("[rate_limit_config] 無法從後台讀取限流規則，沿用目前值", exc_info=True)
-        finally:
+        if background_refresh.is_enabled():
+            # 稽核 BE4-06：這個函式在 slowapi 的限流判斷裡被呼叫，不能在事件迴圈上等 Django。認領後丟到背景
             _rate_limit_last_fetch = time.monotonic()
+            background_refresh.spawn("rate_limit_config", _fetch_rules)
+            return
+        _fetch_rules()
+
 
 
 def get_configured_rate(key: str, default: str) -> str:

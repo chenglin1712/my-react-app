@@ -19,6 +19,7 @@ from config.internal_api import secret_problem
 
 from . import ai_budget
 from ._shared import ip_rate_limited_response
+from .models import RateLimitRule
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,15 @@ def ai_budget_enforce(request):
     if limited:
         return limited
 
+    auth_error = _internal_auth_error(request)
+    if auth_error:
+        return auth_error
+
+    return JsonResponse({"level": ai_budget.enforce()["level"]})
+
+
+def _internal_auth_error(request):
+    """驗證 X-Internal-Secret；通過回傳 None，否則回傳要直接回給呼叫端的 JsonResponse（fail-closed）。"""
     secret = os.getenv("INTERNAL_API_SECRET", "")
     problem = secret_problem(secret)
     if not secret or problem:
@@ -41,5 +51,21 @@ def ai_budget_enforce(request):
     provided = request.headers.get("X-Internal-Secret", "")
     if not provided or not hmac.compare_digest(provided.encode("utf-8"), secret.encode("utf-8")):
         return JsonResponse({"detail": "unauthorized"}, status=401)
+    return None
 
-    return JsonResponse({"level": ai_budget.enforce()["level"]})
+
+@csrf_exempt
+def fastapi_rate_limit_rules(request):
+    """給 FastAPI rate_limit_config.py 輪詢用（稽核 BE2a-15：原本掛在 public/ 底下，任何人都讀得到
+    限流設定；現在移到 internal/，要密鑰、nginx 對外一律拒絕）。只回 backend=fastapi 的規則，
+    格式是扁平的 {key: rate}。"""
+    if request.method != "GET":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+    limited = ip_rate_limited_response(request, group="public_fastapi_rate_limit_rules", rate="120/m", method="GET")
+    if limited:
+        return limited
+    auth_error = _internal_auth_error(request)
+    if auth_error:
+        return auth_error
+    rules = RateLimitRule.objects.filter(backend=RateLimitRule.BACKEND_FASTAPI).values_list("key", "rate")
+    return JsonResponse({"rules": dict(rules)})

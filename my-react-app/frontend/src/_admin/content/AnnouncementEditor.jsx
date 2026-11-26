@@ -13,6 +13,10 @@ import { useAuth } from '../../userServives/authContext';
 import { TRIBES } from '../../constants/tribes';
 import { useMediaUpload } from '../hooks/useMediaUpload';
 import { useActionLock } from '../hooks/useActionLock';
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
+import { formatApiError } from '../apiErrors';
+import EditConflictAlert, { MyVersionBackupNotice } from '../components/EditConflictAlert';
+import { isEditConflict } from '../hooks/editConflict';
 import '../../../static/css/_admin/announcements.css';
 import { SuccessNotice } from '../components/AdminToast';
 
@@ -83,6 +87,16 @@ export default function AnnouncementEditor() {
     const [loading, setLoading] = useState(Boolean(id));
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    // 載入（或上次儲存）時的表單內容與 updated_at：判斷未儲存的修改（稽核 FE7b-03），
+    // 並在 PATCH 時帶 base_updated_at 做樂觀鎖，收到 409 edit_conflict 時提供「載入最新版本」（稽核 FE7b-08）
+    const [baseline, setBaseline] = useState(EMPTY_FORM);
+    const [updatedAt, setUpdatedAt] = useState('');
+    const [conflict, setConflict] = useState(false);
+    const [reloadKey, setReloadKey] = useState(0);
+    // WP-8 追加：按「載入最新版本」前把自己的標題與內文暫存在記憶體（不寫 localStorage），
+    // 載入後仍可「複製我的版本」；儲存成功或換一篇公告就清掉。
+    const [myVersionBackup, setMyVersionBackup] = useState('');
+    useEffect(() => { setMyVersionBackup(''); }, [id]);
 
     // 「儲存」（type=submit）跟「儲存並送審」（onClick）兩顆不同按鈕都呼叫
     // save()，共用同一把鎖——而不是像原本那樣只靠 saving state，那樣擋不住
@@ -122,6 +136,9 @@ export default function AnnouncementEditor() {
     useEffect(() => {
         if (id && skipNextLoadRef.current === id) {
             skipNextLoadRef.current = null;
+            // 換網址會讓 useMediaUpload 以 resetKey 重置而清掉預覽；這筆資料是自己剛建立的，
+            // 表單上的封面網址就是正式網址，補回預覽，否則第一次儲存後封面圖預覽會消失（稽核 FE7b-04）
+            media.setPreview('cover', form.cover_image_url);
             return undefined;
         }
 
@@ -137,6 +154,9 @@ export default function AnnouncementEditor() {
             // 內容，看起來像是在對新公告操作。loading 為 true 時整頁只
             // 顯示 Spinner，不會有閃爍。
             setForm(EMPTY_FORM);
+            setBaseline(EMPTY_FORM);
+            setUpdatedAt('');
+            setConflict(false);
             revisionVersionRef.current = null;
             setStatus('draft');
             setSource('admin');
@@ -177,9 +197,11 @@ export default function AnnouncementEditor() {
                 setStatus(item.status);
                 setSource(item.source ?? 'admin');
                 setForm(itemToForm(formSource));
+                setBaseline(itemToForm(formSource));
+                setUpdatedAt(item.updated_at ?? '');
                 media.setPreview('cover', formSource.cover_image_url ?? '');
             } catch (err) {
-                if (active) setError(err.message);
+                if (active) setError(formatApiError(err));
             } finally {
                 if (active) setLoading(false);
             }
@@ -191,7 +213,10 @@ export default function AnnouncementEditor() {
         // media 是每次 render 都會拿到新物件的 hook 回傳值，把它列進相依
         // 陣列會造成無限重載；這個 effect 只依賴 id 本身。
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [id]);
+    }, [id, reloadKey]);
+
+    const dirty = !loading && JSON.stringify(form) !== JSON.stringify(baseline);
+    const { allowNextNavigation } = useUnsavedChangesGuard(dirty);
 
     const update = (field, value) => {
         setForm((current) => ({ ...current, [field]: value }));
@@ -238,6 +263,7 @@ export default function AnnouncementEditor() {
     const save = (submitAfterSave) => {
         setError('');
         setSuccess('');
+        setConflict(false);
 
         if (!form.title.trim()) {
             setError('標題為必填');
@@ -252,6 +278,7 @@ export default function AnnouncementEditor() {
             return undefined;
         }
 
+        const submittedForm = form;
         return saveLock.runLocked('save', async () => {
             try {
                 // published 的儲存不直接改公告本身，也不需要再呼叫 submit：
@@ -264,14 +291,20 @@ export default function AnnouncementEditor() {
                             : buildPayload(),
                     );
                     revisionVersionRef.current = submitted?.version ?? revisionVersionRef.current;
+                    setBaseline(submittedForm);
                     setSuccess('已提交修改，待審核核准後生效');
                     return;
                 }
 
                 const saved = id
-                    ? await apiPatch(`/adminapi/announcements/${id}/`, buildPayload())
+                    ? await apiPatch(`/adminapi/announcements/${id}/`, {
+                        ...buildPayload(),
+                        ...(updatedAt ? { base_updated_at: updatedAt } : {}),
+                    })
                     : await apiPost('/adminapi/announcements/', buildPayload());
                 const savedId = id || saved.id;
+                setBaseline(submittedForm);
+                setUpdatedAt(saved.updated_at ?? updatedAt);
 
                 // 新公告建立成功後立刻換成這篇公告自己的網址，不等
                 // submitAfterSave 的第二支 API 也成功才換：如果先前那樣寫、
@@ -280,9 +313,12 @@ export default function AnnouncementEditor() {
                 // POST 建立，變成建立兩筆重複公告。
                 if (!id) {
                     skipNextLoadRef.current = String(savedId);
+                    // 剛存好，但 dirty 要等下一次 render 才會變回 false：先放行，免得被自己的未儲存保護攔下
+                    allowNextNavigation();
                     navigate(`/admin/content/announcements/${savedId}`, { replace: true });
                 }
 
+                setMyVersionBackup('');
                 if (submitAfterSave) {
                     await apiPost(`/adminapi/announcements/${savedId}/submit/`);
                     setStatus('pending_review');
@@ -292,7 +328,8 @@ export default function AnnouncementEditor() {
                     setSuccess('公告已儲存');
                 }
             } catch (err) {
-                setError(err.message);
+                if (isEditConflict(err)) setConflict(true);
+                else setError(formatApiError(err));
             }
         });
     };
@@ -336,6 +373,14 @@ export default function AnnouncementEditor() {
             )}
 
             {(error || media.error) && <Alert variant="danger">{error || media.error}</Alert>}
+            {conflict && (
+                <EditConflictAlert
+                    onReload={() => setReloadKey((k) => k + 1)}
+                    myVersionText={[form.title, form.body].filter(Boolean).join('\n\n')}
+                    onStash={setMyVersionBackup}
+                />
+            )}
+            {!conflict && <MyVersionBackupNotice text={myVersionBackup} onDismiss={() => setMyVersionBackup('')} />}
             <SuccessNotice message={success} />
 
             <Form

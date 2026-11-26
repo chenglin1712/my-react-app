@@ -2,7 +2,9 @@
 之後怎麼轉成向量）是完全不同的關注點，這裡只管「音檔從哪裡來、安全地
 下載回來」。
 """
-from urllib.parse import urlparse
+import logging
+import os
+from urllib.parse import unquote, urlparse
 
 import httpx
 
@@ -22,7 +24,41 @@ from dictionary_db.model import MediaAsset
 _ALLOWED_REF_HOSTS = ("firebasestorage.googleapis.com", "storage.googleapis.com")
 
 
+_REFERENCE_PATH_PREFIX = "pronunciations/"
+_logger = logging.getLogger(__name__)
+_warned_no_bucket = False
+
+
+def _project_bucket() -> str:
+    return (os.getenv("VITE_FIREBASE_STORAGE_BUCKET") or "").strip().lower()
+
+
+def _object_location(parsed) -> tuple[str, str] | None:
+    """從 Firebase Storage／GCS 的網址取出 (bucket, 物件路徑)；格式不認得就回 None。"""
+    host = (parsed.hostname or "").lower()
+    # 先用「原始」路徑切段，只對最後的物件路徑解碼：整條路徑先解碼會讓 %2F 偽裝成分隔符號
+    # （例如 /v0%2Fb%2F<bucket>%2Fo%2F...），解析結果和 Google 伺服器實際的解讀不一致。
+    raw = parsed.path
+    if host == "firebasestorage.googleapis.com":
+        # /v0/b/<bucket>/o/<object>
+        parts = raw.split("/", 5)
+        if len(parts) == 6 and parts[1] == "v0" and parts[2] == "b" and parts[4] == "o":
+            return unquote(parts[3]).lower(), unquote(parts[5])
+        return None
+    if host == "storage.googleapis.com":
+        # /<bucket>/<object>
+        parts = raw.split("/", 2)
+        if len(parts) == 3 and parts[1]:
+            return unquote(parts[1]).lower(), unquote(parts[2])
+        return None
+    if host.endswith(".storage.googleapis.com"):
+        # <bucket>.storage.googleapis.com/<object>
+        return host[: -len(".storage.googleapis.com")], unquote(raw.lstrip("/"))
+    return None
+
+
 def _is_allowed_reference_url(url: str) -> bool:
+    global _warned_no_bucket
     try:
         parsed = urlparse(url)
     except ValueError:
@@ -30,7 +66,27 @@ def _is_allowed_reference_url(url: str) -> bool:
     if parsed.scheme != "https" or not parsed.hostname:
         return False
     host = parsed.hostname.lower()
-    return any(host == allowed or host.endswith(f".{allowed}") for allowed in _ALLOWED_REF_HOSTS)
+    if not any(host == allowed or host.endswith(f".{allowed}") for allowed in _ALLOWED_REF_HOSTS):
+        return False
+
+    # 稽核 BE4-13：光是 Google 的網域不夠——任何人都能開自己的 GCS bucket 放一份音檔當「參考音」，拿滿分。
+    # 限定本專案的 bucket，而且只收錄音區（pronunciations/）。沒設定 bucket 名稱時（本機開發）維持原本只看網域，
+    # 並記一次警告，正式環境要設定 VITE_FIREBASE_STORAGE_BUCKET。
+    bucket = _project_bucket()
+    if not bucket:
+        if not _warned_no_bucket:
+            _warned_no_bucket = True
+            _logger.warning("VITE_FIREBASE_STORAGE_BUCKET 未設定：發音參考音檔只檢查網域，沒有限定專案 bucket")
+        return True
+    location = _object_location(parsed)
+    if location is None:
+        return False
+    object_bucket, object_path = location
+    # "." 與 ".." 路徑段：httpx 實際送出請求前會把它們正規化掉（.../pronunciations/../../evil/... 變成別的 bucket），
+    # 檢查的路徑和真正送出的路徑就不一致了。原始路徑或解碼後的物件路徑出現這種段一律拒絕。
+    if any(segment in (".", "..") for segment in (*parsed.path.split("/"), *object_path.split("/"))):
+        return False
+    return object_bucket == bucket and object_path.startswith(_REFERENCE_PATH_PREFIX)
 
 
 # 1. 下載語音

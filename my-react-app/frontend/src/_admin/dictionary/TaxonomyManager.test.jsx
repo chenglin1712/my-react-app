@@ -64,6 +64,51 @@ const baseTaxonomies = () => ({
 
 const renderPage = () => render(<TaxonomyManager />);
 
+describe('TaxonomyManager 稽核 FE7a-05／15', () => {
+    beforeEach(() => {
+        mockRole = 'owner';
+        listTaxonomies.mockReset();
+        updateTaxonomyTerm.mockReset();
+        listTaxonomies.mockResolvedValue(baseTaxonomies());
+    });
+
+    test('行內編輯欄位與取消鈕有可存取名稱', async () => {
+        render(<TaxonomyManager />);
+        await screen.findByText('線上辭典');
+
+        fireEvent.click(screen.getByRole('button', { name: /編輯/ }));
+
+        expect(screen.getByRole('textbox', { name: '編輯 線上辭典 名稱' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '取消編輯 線上辭典' })).toBeInTheDocument();
+    });
+
+    test('仍被引用的刪除鈕以可見文字說明停用原因並以 aria-describedby 連結', async () => {
+        render(<TaxonomyManager />);
+        await screen.findByText('線上辭典');
+        fireEvent.click(screen.getByRole('button', { name: '分類' }));
+        await screen.findByText('動物');
+
+        const deleteButton = screen.getByRole('button', { name: '刪除動物' });
+        expect(deleteButton).toBeDisabled();
+        expect(deleteButton).toHaveAccessibleDescription('仍被引用，無法刪除，請改用合併');
+        expect(screen.getByText('仍被引用，無法刪除，請改用合併')).toBeVisible();
+    });
+
+    test('驗證錯誤顯示後端回傳的欄位原因，而不是只有「請求參數錯誤」', async () => {
+        const err = new Error('請求參數錯誤');
+        err.status = 400;
+        err.data = { errors: { name: ['名稱已存在'] } };
+        updateTaxonomyTerm.mockRejectedValue(err);
+
+        render(<TaxonomyManager />);
+        await screen.findByText('線上辭典');
+        fireEvent.click(screen.getByRole('button', { name: /編輯/ }));
+        fireEvent.click(screen.getByRole('button', { name: '儲存' }));
+
+        expect(await screen.findByText('名稱已存在')).toBeInTheDocument();
+    });
+});
+
 describe('TaxonomyManager', () => {
     beforeEach(() => {
         mockRole = 'owner';

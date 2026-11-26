@@ -21,7 +21,9 @@ import {
     withdrawImportJob,
 } from './dictionaryApi';
 import { useImportWizard } from './useImportWizard';
-import ImportPreflightReport from './ImportPreflightReport';
+import ImportPreflightReport, { ReportPagingControls } from './ImportPreflightReport';
+import { useReportPaging } from './useReportPaging';
+import { confirmAction } from '@components/ui/ConfirmDialog';
 import AdminEmpty from '../components/AdminEmpty';
 import '../../../static/css/_admin/dictionary.css';
 
@@ -63,6 +65,50 @@ function formatDetail(detail) {
     if (Array.isArray(detail)) return detail.join('；');
     if (detail === null || detail === undefined || detail === '') return '—';
     return String(detail);
+}
+
+const isFailedOutcome = (outcome) => outcome.outcome !== 'applied';
+
+/** 套用結果表（稽核 FE7a-14：預設只看失敗／略過的列，每頁 100 列）。
+ * 抽成元件是因為分頁狀態要用 hook，不能放在依狀態分支呼叫的 render 函式裡。 */
+function ImportOutcomeTable({ outcomes }) {
+    const paging = useReportPaging(outcomes, isFailedOutcome);
+
+    return (
+        <div className="dictionary-table-card">
+            <ReportPagingControls paging={paging} problemLabel="失敗或略過" idPrefix="outcome" />
+            <AdminTable label="套用結果" hover className="dictionary-table">
+                <thead>
+                    <tr>
+                        <th>列號</th>
+                        <th>詞形</th>
+                        <th>結果</th>
+                        <th>詳細資料</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {paging.rows.map(({ item: outcome, index }) => {
+                        const meta = OUTCOME_STATUSES[outcome.outcome] ?? {
+                            label: outcome.outcome || '未知', bg: 'secondary',
+                        };
+
+                        return (
+                            <tr key={`${outcome.row ?? index}-${outcome.name ?? ''}-${index}`}>
+                                <td>{outcome.row ?? index + 1}</td>
+                                <td>{outcome.name || '—'}</td>
+                                <td><Badge bg={meta.bg}>{meta.label}</Badge></td>
+                                <td>
+                                    <small className={outcome.outcome === 'applied' ? 'text-muted' : undefined}>
+                                        {formatDetail(outcome.detail)}
+                                    </small>
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </AdminTable>
+        </div>
+    );
 }
 
 function formatCreatedTaxonomies(created = {}) {
@@ -120,11 +166,25 @@ export default function ImportWizard() {
                         type="button"
                         variant="outline-primary"
                         disabled={Boolean(pendingAction)}
-                        onClick={() => runJobAction('auto-create', async () => {
-                            const result = await autoCreateImportTaxonomies(id);
-                            setSuccessMessage(formatCreatedTaxonomies(result.created_taxonomies));
-                            return result;
-                        })}
+                        onClick={async () => {
+                            // 稽核 FE7a-09：自動建立的主檔會直接寫進正式主檔表（不經送審），先確認
+                            const confirmed = await confirmAction({
+                                title: '自動建立缺漏主檔',
+                                message: (
+                                    <p className="mb-0">
+                                        將依匯入檔直接在正式主檔中建立缺漏的來源、分類、詞性與焦點，
+                                        不經送審；建立後若要移除需逐筆刪除或合併。確定要建立嗎？
+                                    </p>
+                                ),
+                                confirmLabel: '建立缺漏主檔',
+                            });
+                            if (!confirmed) return;
+                            await runJobAction('auto-create', async () => {
+                                const result = await autoCreateImportTaxonomies(id);
+                                setSuccessMessage(formatCreatedTaxonomies(result.created_taxonomies));
+                                return result;
+                            });
+                        }}
                     >
                         {pendingAction === 'auto-create' && <Spinner animation="border" size="sm" />}
                         自動建立缺漏主檔
@@ -200,11 +260,27 @@ export default function ImportWizard() {
                             type="button"
                             variant="success"
                             disabled={Boolean(pendingAction)}
-                            onClick={() => runJobAction(
-                                'approve',
-                                () => approveImportJob(id, reviewComment),
-                                '匯入工作已核准並套用。',
-                            )}
+                            onClick={async () => {
+                                // 稽核 FE7a-09：核准會立即把整批資料寫入正式辭典且無法整批還原，確認文字帶出筆數
+                                const confirmed = await confirmAction({
+                                    title: '核准並套用匯入',
+                                    message: (
+                                        <p className="mb-0">
+                                            核准後將立即寫入正式辭典：新增 {job.new_count ?? 0} 筆、
+                                            更新 {job.update_count ?? 0} 筆，
+                                            {job.error_count ?? 0} 筆錯誤資料會被略過。
+                                            套用後無法整批還原，確定要核准嗎？
+                                        </p>
+                                    ),
+                                    confirmLabel: '核准並套用',
+                                });
+                                if (!confirmed) return;
+                                await runJobAction(
+                                    'approve',
+                                    () => approveImportJob(id, reviewComment),
+                                    '匯入工作已核准並套用。',
+                                );
+                            }}
                         >
                             {pendingAction === 'approve' && <Spinner animation="border" size="sm" />}
                             核准
@@ -241,38 +317,7 @@ export default function ImportWizard() {
                 </Alert>
 
                 {outcomes.length > 0 ? (
-                    <div className="dictionary-table-card">
-                        <AdminTable label="套用結果" hover className="dictionary-table">
-                            <thead>
-                                <tr>
-                                    <th>列號</th>
-                                    <th>詞形</th>
-                                    <th>結果</th>
-                                    <th>詳細資料</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {outcomes.map((outcome, index) => {
-                                    const meta = OUTCOME_STATUSES[outcome.outcome] ?? {
-                                        label: outcome.outcome || '未知', bg: 'secondary',
-                                    };
-
-                                    return (
-                                        <tr key={`${outcome.row ?? index}-${outcome.name ?? ''}`}>
-                                            <td>{outcome.row ?? index + 1}</td>
-                                            <td>{outcome.name || '—'}</td>
-                                            <td><Badge bg={meta.bg}>{meta.label}</Badge></td>
-                                            <td>
-                                                <small className={outcome.outcome === 'applied' ? 'text-muted' : undefined}>
-                                                    {formatDetail(outcome.detail)}
-                                                </small>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </AdminTable>
-                    </div>
+                    <ImportOutcomeTable outcomes={outcomes} />
                 ) : (
                     <div className="dictionary-empty">尚未有套用結果</div>
                 )}
