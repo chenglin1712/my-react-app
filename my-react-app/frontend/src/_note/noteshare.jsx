@@ -61,7 +61,10 @@ export default function NoteShare() {
     const kw = keyword.trim().toLowerCase();
     if (!kw) return pageNotes;
     return pageNotes.filter((n) => {
-      const title = (n.title || "").toLowerCase();
+      // 稽核 FE6-07：分享文件沒有頂層 title，標題在 pages[].title（卡片顯示的是第一頁）；
+      // 原本讀 n.title 永遠是空字串，用標題搜尋找不到。改比對所有頁的標題。
+      const title = (Array.isArray(n.pages) ? n.pages : [])
+        .map((p) => p?.title || "").join(" ").toLowerCase();
       const user = (n.username || "").toLowerCase();
       const preview = (n.preview || "").replace(/<[^>]+>/g, " ").toLowerCase();
       return title.includes(kw) || user.includes(kw) || preview.includes(kw);

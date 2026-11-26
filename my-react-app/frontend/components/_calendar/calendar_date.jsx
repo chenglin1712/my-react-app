@@ -13,6 +13,7 @@ import {
     formatEventTime,
     getEventType,
 } from "@utils/calendarEvents";
+import { groupEventsByDate } from "./eventDateKey";
 
 // 事件名稱長度上限（稽核 FE6-12）：原本沒有任何限制，一筆超長文字就能讓整份行事曆文件逼近 1 MiB。
 // 比照讀書計畫 summary 的上限。
@@ -45,26 +46,28 @@ const UserCalendar = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState("");
+    // 稽核 FE6-11／FE1-23：讀取失敗跟新增／刪除失敗分開記，讀取失敗時不顯示「尚無紀錄」並提供重試
+    const [loadError, setLoadError] = useState("");
+    const [reloadToken, setReloadToken] = useState(0);
 
     const dateKey = toLocalDateKey(date);
 
     useEffect(() => {
         let cancelled = false;
         const fetchEvents = async () => {
+            setIsLoading(true);
+            setLoadError("");
             try {
                 const data = await getCalendar();
                 if (cancelled) return;
-                const grouped = {};
-                (data || []).forEach(event => {
-                    const key = event.start.split("T")[0];
-                    if (!grouped[key]) grouped[key] = [];
-                    grouped[key].push(event);
-                });
+                // 稽核 FE6-14：用台灣時間解析日期；單筆格式錯誤只略過那一筆，不讓整份載入失敗
+                const { grouped, skipped } = groupEventsByDate(data);
+                if (skipped.length > 0) console.warn("行事曆有無法判斷日期的行程，已略過：", skipped);
                 setEventsByDate(grouped);
             } catch (err) {
                 if (!cancelled) {
                     console.error("載入行事曆失敗：", err);
-                    setError("載入行事曆失敗，請稍後再試。");
+                    setLoadError("載入行事曆失敗，請稍後再試。");
                 }
             } finally {
                 if (!cancelled) setIsLoading(false);
@@ -72,7 +75,7 @@ const UserCalendar = () => {
         };
         fetchEvents();
         return () => { cancelled = true; };
-    }, []);
+    }, [reloadToken]);
 
     const handleAddEvent = async (e) => {
         e.preventDefault();
@@ -109,7 +112,6 @@ const UserCalendar = () => {
     };
 
     const handleDelete = async (event) => {
-        const eventId = event.id;
         // 刪除沒有復原，先確認，並說明刪的是哪一筆
         const confirmed = await confirmAction({
             title: "刪除這個行程？",
@@ -120,10 +122,12 @@ const UserCalendar = () => {
         if (!confirmed) return;
         setError("");
         try {
-            await deleteCalendarEvent(eventId);
+            // 稽核 FE6-04：有 id 傳 id；沒有 id 的舊行程傳整個物件讓服務層依內容只刪那一筆。
+            // 畫面也只移除這一筆（用物件參照比對），不能用 e.id !== undefined 把當天所有舊行程一起濾掉。
+            await deleteCalendarEvent(event.id ? event.id : event);
             setEventsByDate(prev => ({
                 ...prev,
-                [dateKey]: (prev[dateKey] || []).filter(e => e.id !== eventId),
+                [dateKey]: (prev[dateKey] || []).filter(e => (event.id ? e.id !== event.id : e !== event)),
             }));
         } catch (err) {
             console.error("刪除行程失敗：", err);
@@ -152,12 +156,19 @@ const UserCalendar = () => {
                     tileContent={({ date, view }) => {
                         const key = toLocalDateKey(date);
                         const isSelected = key === dateKey;
-                        if (view === "month" && eventsByDate[key]?.length > 0) {
+                        const count = eventsByDate[key]?.length ?? 0;
+                        if (view === "month" && count > 0) {
+                            // 稽核 FE6-13：原本只有顏色圓點，報讀器讀不到。圓點本身標 aria-hidden，
+                            // 另放視覺隱藏文字，讓日期按鈕的可存取名稱變成「11月5日，有 2 個行程」。
                             return (
-                                <div
-                                    className="dot-indicator"
-                                    style={{ backgroundColor: isSelected ? "white" : "var(--yy-red)" }}
-                                />
+                                <>
+                                    <div
+                                        className="dot-indicator"
+                                        aria-hidden="true"
+                                        style={{ backgroundColor: isSelected ? "white" : "var(--yy-red)" }}
+                                    />
+                                    <span className="visually-hidden">，有 {count} 個行程</span>
+                                </>
                             );
                         }
                         return null;
@@ -167,6 +178,14 @@ const UserCalendar = () => {
             <div className="calendar-right">
                 <h2>{formatChineseDate(date)} 的行程</h2>
                 {error && <p className="calendar-error-text" role="alert">{error}</p>}
+                {!isLoading && loadError && (
+                    <div className="calendar-error-text" role="alert">
+                        <p className="mb-1">{loadError}</p>
+                        <button type="button" className="calendar-retry-btn" onClick={() => setReloadToken((n) => n + 1)}>
+                            重試
+                        </button>
+                    </div>
+                )}
                 <div className="event-list-scroll">
                     {isLoading && <div className="no-event" role="status">載入行程中…</div>}
                     {!isLoading && eventsForDate.map((event, index) => (
@@ -190,7 +209,7 @@ const UserCalendar = () => {
                             )}
                         </div>
                     ))}
-                    {!isLoading && eventsForDate.length === 0 && <div className="no-event">尚無紀錄</div>}
+                    {!isLoading && !loadError && eventsForDate.length === 0 && <div className="no-event">尚無紀錄</div>}
                 </div>
 
                 <form className="event-input-bar" onSubmit={handleAddEvent}>

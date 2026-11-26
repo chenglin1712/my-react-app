@@ -65,6 +65,38 @@ describe('個人資料側欄（UserSidebar）', () => {
     spy.mockRestore();
   });
 
+  test('稽核 FE1-02：登出成功先關閉側欄再回首頁；登出失敗不關，才看得到錯誤', async () => {
+    signOut.mockResolvedValueOnce();
+    const first = renderSidebar();
+    fireEvent.click(screen.getByRole('button', { name: '登出' }));
+    await vi.waitFor(() => expect(navigate).toHaveBeenLastCalledWith('/'));
+    expect(closeSidebar).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    closeSidebar.mockReset();
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    signOut.mockRejectedValueOnce(new Error('network'));
+    renderSidebar();
+    fireEvent.click(screen.getByRole('button', { name: '登出' }));
+    await screen.findByRole('alert');
+    expect(closeSidebar).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  test('稽核 FE1-03：個人資料讀不到（降級資料）時顯示提示（role=status），登出鈕照常可用', async () => {
+    signOut.mockResolvedValueOnce();
+    const degraded = { firestoreData: { name: 'a', email: 'a@b.tw', favorites: [], profileUnavailable: true } };
+    render(<UserSidebar userData={degraded} closeSidebar={closeSidebar} onOpenBot={onOpenBot} />);
+    expect(screen.getByRole('status')).toHaveTextContent('個人資料暫時讀取不到，部分內容可能不完整，系統會自動重試');
+    fireEvent.click(screen.getByRole('button', { name: '登出' }));
+    await vi.waitFor(() => expect(navigate).toHaveBeenLastCalledWith('/'));
+  });
+
+  test('稽核 FE1-03：正常資料不顯示提示', () => {
+    renderSidebar();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
   test('導覽區有名稱，圖示不會被報讀器讀出', () => {
     renderSidebar();
     expect(screen.getByRole('navigation', { name: '個人選單' })).toBeInTheDocument();

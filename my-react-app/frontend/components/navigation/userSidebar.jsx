@@ -23,6 +23,10 @@ const UserSidebar = ({ userData, closeSidebar, onOpenBot }) => {
     const handleSignOut = async () => {
         try {
             await signOut();
+            // 稽核 FE1-02：Navbar 不會卸載，沒關掉的話 isUserOpen 一直是 true；
+            // 同一分頁換人登入時側欄會自己彈開、鎖住焦點與捲動，和登入成功提示疊在一起。
+            // 登出失敗時不關，側欄裡才看得到錯誤訊息。
+            closeSidebar();
             navigate("/");
         } catch (err) {
             console.error("登出失敗", err);
@@ -57,6 +61,13 @@ const UserSidebar = ({ userData, closeSidebar, onOpenBot }) => {
                             <LogOut size={14} className="icon" aria-hidden="true" /> 登出
                         </button>
                     </div>
+                    {/* 稽核 FE1-03：讀不到 Firestore 個人資料時，userServive 給的是降級資料（名稱、信箱取自登入帳號，收藏為空），
+                        並在背景重讀。說一聲，免得使用者以為收藏不見了；放在登出鈕之後，不擋住登出入口。 */}
+                    {userData.firestoreData.profileUnavailable && (
+                        <p className="sidebar-profile-notice" role="status" style={{ margin: "8px 0 0", fontSize: "var(--yy-text-sm)", color: "var(--yy-calm-text-sub)" }}>
+                            個人資料暫時讀取不到，部分內容可能不完整，系統會自動重試
+                        </p>
+                    )}
                     {signOutError && (
                         <p className="sidebar-signout-error" role="alert">
                             <CircleAlert size={16} aria-hidden="true" />

@@ -4,8 +4,11 @@ import { registerWithImg } from '../../src/userServives/userServive';
 import RegisterForm from './registerForm';
 
 const mockNavigate = vi.fn();
+// 稽核 FE1-08：註冊完成後也依 ?next= 導回；預設沒有 next
+let mockSearchParams = new URLSearchParams();
 vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
+  useSearchParams: () => [mockSearchParams],
 }));
 vi.mock('../../src/userServives/userServive', () => ({
   registerWithImg: vi.fn(),
@@ -165,6 +168,134 @@ describe('RegisterForm', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  test.each([
+    ['/quiz/select', '/quiz/select', /註冊成功！正在回到原本要去的頁面/],
+    ['//evil.example.com', '/', /註冊成功！您將移至首頁/],
+    ['/.//evil.example.com', '/', /註冊成功！您將移至首頁/],
+    ['/..//evil.example.com', '/', /註冊成功！您將移至首頁/],
+  ])('稽核 FE1-08：帶 next=%s 註冊成功後導向 %s（只接受站內路徑）', async (next, expected, text) => {
+    mockSearchParams = new URLSearchParams({ next });
+    vi.useFakeTimers();
+    try {
+      registerWithImg.mockResolvedValueOnce({ uid: 'u1', firestoreData: { name: '小明' } });
+      render(<RegisterForm />);
+      fillRequiredFields();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: '註冊' }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getByText(text)).toBeInTheDocument();
+      act(() => { vi.advanceTimersByTime(800); });
+      expect(mockNavigate).toHaveBeenCalledWith(expected);
+    } finally {
+      vi.useRealTimers();
+      mockSearchParams = new URLSearchParams();
+    }
+  });
+
+  test.each([
+    [true, '註冊失敗，請稍後再試。帳號沒有建立，可以用同一個電子郵件重新註冊。'],
+    [false, '帳號已建立，但個人資料沒有存好；請直接用這組 Email 與密碼登入，系統會自動補上資料'],
+  ])('稽核 FE1-04：個人資料寫入失敗（accountRemoved=%s）顯示對應說明，不顯示成功、不導頁', async (accountRemoved, expected) => {
+    const error = Object.assign(new Error('帳號已建立，但個人資料沒有存好；請直接用這組 Email 與密碼登入，系統會自動補上資料'), {
+      code: 'app/profile-write-failed',
+      accountRemoved,
+    });
+    registerWithImg.mockRejectedValueOnce(error);
+    render(<RegisterForm />);
+    fillRequiredFields();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '註冊' }));
+    });
+    expect(screen.getByText(expected)).toBeInTheDocument();
+    expect(screen.queryByText(/註冊成功/)).not.toBeInTheDocument();
+    expect(mockUpdateUserData).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '註冊' })).not.toBeDisabled();
+  });
+
+  test('稽核 FE1-04：帳號沒刪成但個人資料已補建：顯示說明並照常導向目標頁（沿用 next）', async () => {
+    mockSearchParams = new URLSearchParams({ next: '/quiz/select' });
+    vi.useFakeTimers();
+    try {
+      const error = Object.assign(new Error('帳號已建立，但部分個人資料沒有存好，已先用預設值建立，可以到個人資料頁修改名稱與頭像'), {
+        code: 'app/profile-write-failed',
+        accountRemoved: false,
+        backfilledData: { name: '小明', favorites: [] },
+      });
+      registerWithImg.mockRejectedValueOnce(error);
+      render(<RegisterForm />);
+      fillRequiredFields();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: '註冊' }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toHaveTextContent('註冊成功！正在回到原本要去的頁面');
+      expect(dialog).toHaveTextContent('已先用預設值建立，可以到個人資料頁修改名稱與頭像');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+      act(() => { vi.advanceTimersByTime(800); });
+      expect(mockNavigate).not.toHaveBeenCalled(); // 說明較長，多停一下
+      act(() => { vi.advanceTimersByTime(4000); });
+      expect(mockNavigate).toHaveBeenCalledWith('/quiz/select');
+    } finally {
+      vi.useRealTimers();
+      mockSearchParams = new URLSearchParams();
+    }
+  });
+
+  describe('稽核 FE1-04：補建成功後的 4 秒等待', () => {
+    const backfillError = () => Object.assign(new Error('帳號已建立，但部分個人資料沒有存好，已先用預設值建立，可以到個人資料頁修改名稱與頭像'), {
+      code: 'app/profile-write-failed',
+      accountRemoved: false,
+      backfilledData: { name: '小明', favorites: [] },
+    });
+    const submitWithBackfill = async () => {
+      registerWithImg.mockRejectedValueOnce(backfillError());
+      const view = render(<RegisterForm />);
+      fillRequiredFields();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: '註冊' }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      return view;
+    };
+
+    test('4 秒內按「立即前往」立刻導頁，且之後計時器到期也不會再導一次', async () => {
+      vi.useFakeTimers();
+      try {
+        await submitWithBackfill();
+        act(() => { vi.advanceTimersByTime(1000); });
+        expect(mockNavigate).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: '立即前往' }));
+        expect(mockNavigate).toHaveBeenCalledTimes(1);
+        expect(mockNavigate).toHaveBeenCalledWith('/');
+        act(() => { vi.advanceTimersByTime(10000); });
+        expect(mockNavigate).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    test('4 秒內離開頁面（元件卸載）：計時器已清除，不會再把人拉走', async () => {
+      vi.useFakeTimers();
+      try {
+        const { unmount } = await submitWithBackfill();
+        act(() => { vi.advanceTimersByTime(1000); });
+        unmount();
+        expect(vi.getTimerCount()).toBe(0);
+        act(() => { vi.advanceTimersByTime(10000); });
+        expect(mockNavigate).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   test('必填欄位留空時不呼叫 registerWithImg', async () => {

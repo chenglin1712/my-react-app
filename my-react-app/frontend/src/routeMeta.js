@@ -9,7 +9,8 @@ const TITLE_RULES = [
   { test: (p) => p === '/search', title: '單詞查詢' },
   { test: (p) => p === '/translate', title: '翻譯' },
   { test: (p) => p.startsWith('/camera'), title: '影像辨識' },
-  { test: (p) => p === '/favorite', title: '收藏' },
+  // 稽核 FE1-21：分頁標題要和頁面 h1、導覽上的名稱一致（登入牆也用這裡的名稱說明被擋下的是哪個功能）
+  { test: (p) => p === '/favorite', title: '個人詞語庫' },
   { test: (p) => p.startsWith('/game'), title: '遊戲專區' },
   { test: (p) => p === '/quiz/select', title: '選擇測驗族語' },
   { test: (p) => p.startsWith('/quiz'), title: '測驗' },
@@ -20,7 +21,8 @@ const TITLE_RULES = [
   { test: (p) => p === '/login', title: '登入' },
   { test: (p) => p === '/register', title: '註冊' },
   { test: (p) => p === '/forgot', title: '忘記密碼' },
-  { test: (p) => p === '/reset', title: '重設密碼' },
+  // 稽核 FE1-21：/reset 是登入後輸入目前密碼來「變更密碼」（頁面 h1 也是），不是忘記密碼的「重設密碼」
+  { test: (p) => p === '/reset', title: '變更密碼' },
   { test: (p) => p === '/announcements', title: '最新公告' },
   { test: (p) => p.startsWith('/topics/'), title: '本期專題' },
   { test: (p) => p === '/help', title: '使用說明' },

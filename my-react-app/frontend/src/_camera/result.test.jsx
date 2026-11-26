@@ -203,7 +203,7 @@ describe('CameraResultStep 的詞條詳情（Apple 化步驟 4-4）', () => {
   test('點詞條開詳情 sheet，永遠從底部滑出；關閉後收起', async () => {
     axios.post.mockResolvedValueOnce(FAKE_RESPONSE);
     render(<CameraResultStep selectedWords={['balay']} tribe="tayal" onRestart={vi.fn()} />);
-    fireEvent.click(await screen.findByRole('button', { name: /balay/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /^balay/ }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveAccessibleName('balay');
     expect(dialog).toHaveClass('word-sheet--bottom');
@@ -213,7 +213,7 @@ describe('CameraResultStep 的詞條詳情（Apple 化步驟 4-4）', () => {
   test('換族語重新查詢：詳情立刻收起；查詢期間點開舊詞條，新結果回來時也會收掉，不留舊資料', async () => {
     axios.post.mockResolvedValueOnce(FAKE_RESPONSE);
     const { rerender } = render(<CameraResultStep selectedWords={['好']} tribe="tayal" onRestart={vi.fn()} />);
-    fireEvent.click(await screen.findByRole('button', { name: /balay/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /^balay/ }));
     await screen.findByRole('dialog');
 
     let resolveNext;
@@ -222,11 +222,11 @@ describe('CameraResultStep 的詞條詳情（Apple 化步驟 4-4）', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
     // 查詢還沒回來，舊清單還在：先點開舊詞條
-    fireEvent.click(screen.getByRole('button', { name: /balay/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^balay/ }));
     await screen.findByRole('dialog');
     resolveNext({ data: { exact_match_results: { cyux: [{ name: 'cyux', explanationItems: [{ chineseExplanation: '看' }] }] }, fuzzy_match_results: {} } });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(await screen.findByRole('button', { name: /cyux/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^cyux/ })).toBeInTheDocument();
   });
 
   test('舞台上的詞標籤（P3-8）：點了開那個詞的詞卡；辭典裡沒有就用文字說明', async () => {

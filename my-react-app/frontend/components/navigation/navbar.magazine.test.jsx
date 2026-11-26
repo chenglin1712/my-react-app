@@ -7,6 +7,10 @@ const slotState = vi.hoisted(() => ({ slot: null }));
 
 vi.mock('react-router-dom', () => ({
   useLocation: () => ({ pathname: '/' }),
+  // 稽核 FE1-20：主選單項目改用 Link
+  Link: ({ to, className, children, onClick, ...rest }) => (
+    <a href={to} className={className} onClick={(e) => { e.preventDefault(); onClick?.(); }} {...rest}>{children}</a>
+  ),
   NavLink: ({ to, className, children, onClick, ...rest }) => (
     <a href={to} className={className} onClick={(e) => { e.preventDefault(); onClick?.(); }} {...rest}>{children}</a>
   ),

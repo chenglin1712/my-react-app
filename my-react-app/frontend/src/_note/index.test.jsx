@@ -34,7 +34,7 @@ fakeEditor.chain = () => ({
   }),
 });
 
-vi.mock('@tiptap/react', () => ({ useEditor: () => fakeEditor, EditorContent: () => null }));
+vi.mock('@tiptap/react', () => ({ useEditor: () => fakeEditor, useEditorState: () => ({ isBold: false, isItalic: false }), EditorContent: () => null }));
 vi.mock('@tiptap/starter-kit', () => ({ StarterKit: {} }));
 vi.mock('@tiptap/extension-text-style', () => ({ TextStyle: {} }));
 vi.mock('@tiptap/extension-color', () => ({ Color: {} }));
@@ -42,10 +42,12 @@ vi.mock('@tiptap/extension-image', () => ({ Image: { configure: () => ({}) } }))
 vi.mock('./fontSizeExtension', () => ({ default: {} }));
 vi.mock('./components/SelectionBubble', () => ({ default: () => null }));
 
+// 可由個別測試覆寫的個人資料欄位（例如 profileUnavailable）
+let mockProfileExtra = {};
 vi.mock('../userServives/noteService', () => ({ shareNote: vi.fn() }));
 vi.mock('@utils/uploadToCloudinary', () => ({ uploadToCloudinary: vi.fn() }));
 vi.mock('../../src/userServives/authContext', () => ({
-  useAuth: () => ({ userData: { uid: 'user-1', firestoreData: { name: '測試使用者' } } }),
+  useAuth: () => ({ userData: { uid: 'user-1', firestoreData: { name: '測試使用者', ...mockProfileExtra } } }),
 }));
 
 const LOCAL_KEY = 'userNotes_user-1';
@@ -153,5 +155,17 @@ describe('NotePage（_note/index.jsx）', () => {
     fireEvent.click(await screen.findByRole('button', { name: '分享' }));
 
     await waitFor(() => expect(shareNote).toHaveBeenCalledTimes(1));
+  });
+
+  test('個人資料暫時讀不到（profileUnavailable）：擋下分享並提示，不把降級的名稱寫進 sharedNotes', async () => {
+    mockProfileExtra = { profileUnavailable: true };
+    try {
+      localStorage.setItem(LOCAL_KEY, JSON.stringify([{ id: 'a', title: '第一頁', content: '<p>內容</p>' }]));
+      renderPage();
+      fireEvent.click(await screen.findByRole('checkbox'));
+      fireEvent.click(await screen.findByRole('button', { name: '分享' }));
+      expect(await screen.findByText('個人資料暫時讀取不到，請稍後再分享。')).toBeInTheDocument();
+      expect(shareNote).not.toHaveBeenCalled();
+    } finally { mockProfileExtra = {}; }
   });
 });

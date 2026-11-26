@@ -2,3 +2,8 @@
 // 原本固定等 1.5～1.8 秒；提示視窗有「立即前往」與 Esc 可以不用等（審查項 P2-61、P2-71），
 // 這裡縮短到讓人讀完一句話就走。
 export const AUTH_SUCCESS_REDIRECT_MS = 800;
+
+// 稽核 FE1-09：登入成功後要等全站的登入狀態（AuthContext，要讀完 Firestore 個人資料與角色）
+// 換成剛登入的帳號才導頁。最多等這麼久；逾時仍照常導頁，不讓使用者卡在成功提示上
+// （之後的頁面自己會依當時的登入狀態處理）。
+export const AUTH_SYNC_MAX_WAIT_MS = 8000;

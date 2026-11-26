@@ -21,8 +21,11 @@ vi.mock('../../src/userServives/uploadDb', () => ({
 
 // react-calendar 本身的月曆邏輯不是這裡要測的重點，這幾個測試也都只用預設
 // 選取日期（today），不需要真的操作月曆格子，這裡用一個最小的替身取代。
+// 替身會把「今天」那一格的 tileContent 畫出來，讓 FE6-13 的報讀文字可以被測到。
 vi.mock('react-calendar', () => ({
-  default: () => <div data-testid="calendar-stub" />,
+  default: ({ tileContent }) => (
+    <div data-testid="calendar-stub">{tileContent?.({ date: new Date(), view: 'month' })}</div>
+  ),
 }));
 
 function todayKey() {
@@ -256,5 +259,75 @@ describe('UserCalendar 時間、刪除確認與載入狀態（E-7，P2-65、P2-6
     resolveEvents([]);
     expect(await screen.findByText('尚無紀錄')).toBeInTheDocument();
     expect(screen.queryByText('載入行程中…')).not.toBeInTheDocument();
+  });
+});
+
+describe('UserCalendar 稽核 WP-9（FE6-04、FE6-11、FE6-13、FE6-14）', () => {
+  beforeEach(() => {
+    getCalendar.mockReset();
+    addCalendarEvent.mockReset();
+    deleteCalendarEvent.mockReset();
+    confirmMock.mockReset();
+    confirmMock.mockResolvedValue(true);
+  });
+
+  test('FE6-04：刪除沒有 id 的舊行程，傳整個事件給服務層，畫面只移除那一筆', async () => {
+    const legacyA = { summary: '舊行程甲', description: '', start: `${todayKey()}T09:00:00+08:00`, end: `${todayKey()}T09:30:00+08:00` };
+    const legacyB = { summary: '舊行程乙', description: '', start: `${todayKey()}T10:00:00+08:00`, end: `${todayKey()}T10:30:00+08:00` };
+    getCalendar.mockResolvedValue([legacyA, legacyB]);
+    deleteCalendarEvent.mockResolvedValueOnce();
+    render(<UserCalendar />);
+    await screen.findByText('舊行程甲');
+
+    fireEvent.click(screen.getByRole('button', { name: '刪除「舊行程甲」' }));
+
+    await waitFor(() => expect(deleteCalendarEvent).toHaveBeenCalledWith(legacyA));
+    await waitFor(() => expect(screen.queryByText('舊行程甲')).not.toBeInTheDocument());
+    expect(screen.getByText('舊行程乙')).toBeInTheDocument();
+  });
+
+  test('FE6-11：讀取失敗時顯示錯誤與重試，不顯示「尚無紀錄」；重試成功後顯示行程', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    getCalendar
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce([{ id: 'r1', summary: '重試後的行程', description: '', start: `${todayKey()}T09:00:00+08:00`, end: `${todayKey()}T09:30:00+08:00` }]);
+    render(<UserCalendar />);
+
+    expect(await screen.findByText('載入行事曆失敗，請稍後再試。')).toBeInTheDocument();
+    expect(screen.queryByText('尚無紀錄')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '重試' }));
+
+    expect(await screen.findByText('重試後的行程')).toBeInTheDocument();
+    expect(getCalendar).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText('載入行事曆失敗，請稍後再試。')).not.toBeInTheDocument();
+    errorSpy.mockRestore();
+  });
+
+  test('FE6-13：有行程的日期格除了圓點，還有報讀器讀得到的行程數', async () => {
+    getCalendar.mockResolvedValue([
+      { id: 'a', summary: '一', description: '', start: `${todayKey()}T09:00:00+08:00`, end: `${todayKey()}T09:30:00+08:00` },
+      { id: 'b', summary: '二', description: '', start: `${todayKey()}T10:00:00+08:00`, end: `${todayKey()}T10:30:00+08:00` },
+    ]);
+    render(<UserCalendar />);
+    expect(await screen.findByText('，有 2 個行程')).toHaveClass('visually-hidden');
+    expect(document.querySelector('.dot-indicator')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  test('FE6-14：單筆 start 格式錯誤（缺少、非字串、無法解析）只略過那一筆，其他行程照常顯示', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    getCalendar.mockResolvedValue([
+      { id: 'bad1', summary: '沒有開始時間' },
+      { id: 'bad2', summary: '開始是數字', start: 12345 },
+      { id: 'bad3', summary: '亂碼', start: 'not-a-date' },
+      { id: 'ok', summary: '正常行程', description: '', start: `${todayKey()}T09:00:00+08:00`, end: `${todayKey()}T09:30:00+08:00` },
+    ]);
+    render(<UserCalendar />);
+
+    expect(await screen.findByText('正常行程')).toBeInTheDocument();
+    expect(screen.queryByText('載入行事曆失敗，請稍後再試。')).not.toBeInTheDocument();
+    expect(screen.queryByText('沒有開始時間')).not.toBeInTheDocument();
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });

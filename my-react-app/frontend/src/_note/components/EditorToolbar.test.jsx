@@ -1,6 +1,14 @@
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import EditorToolbar from './EditorToolbar';
+
+// 以可控的假 editor 驅動 useEditorState（FE6-16）
+let activeMarks = {};
+vi.mock('@tiptap/react', () => ({
+    useEditorState: ({ editor, selector }) => selector({ editor }),
+}));
+const fakeEditor = { isActive: (name) => Boolean(activeMarks[name]) };
+beforeEach(() => { activeMarks = {}; });
 
 afterEach(() => { document.body.innerHTML = ''; });
 
@@ -8,19 +16,19 @@ describe('EditorToolbar（筆記工具列）', () => {
     test('釘在全站導覽列下方：top 取導覽列實際高度，不是 0（0 會被導覽列蓋住）', () => {
         document.body.innerHTML = '<nav class="navbar"></nav>';
         Object.defineProperty(document.querySelector('.navbar'), 'offsetHeight', { value: 72 });
-        const { container } = render(<EditorToolbar execStyle={vi.fn()} onImageFileSelected={vi.fn()} isUploadingImage={false} />);
+        const { container } = render(<EditorToolbar editor={fakeEditor} execStyle={vi.fn()} onImageFileSelected={vi.fn()} isUploadingImage={false} />);
         expect(container.querySelector('.editor-toolbar').style.top).toBe('72px');
     });
 
     test('找不到導覽列時退回預設高度，工具列仍可操作', () => {
         const execStyle = vi.fn();
-        render(<EditorToolbar execStyle={execStyle} onImageFileSelected={vi.fn()} isUploadingImage={false} />);
+        render(<EditorToolbar editor={fakeEditor} execStyle={execStyle} onImageFileSelected={vi.fn()} isUploadingImage={false} />);
         fireEvent.click(screen.getByRole('button', { name: '粗體' }));
         expect(execStyle).toHaveBeenCalledWith('bold');
     });
 
     test('P5-1：固定列只留粗斜體與上傳圖片，字級與顏色移到選取氣泡', () => {
-        render(<EditorToolbar execStyle={vi.fn()} onImageFileSelected={vi.fn()} isUploadingImage={false} />);
+        render(<EditorToolbar editor={fakeEditor} execStyle={vi.fn()} onImageFileSelected={vi.fn()} isUploadingImage={false} />);
         expect(screen.getByRole('button', { name: '粗體' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '斜體' })).toBeInTheDocument();
         expect(screen.getByText('上傳圖片')).toBeInTheDocument();
@@ -29,20 +37,27 @@ describe('EditorToolbar（筆記工具列）', () => {
     });
 });
 
-describe('EditorToolbar 粗斜體（E-7，P3-27）', () => {
-    test('粗體與斜體是圖示按鈕（不是數學字母符號），有 aria-pressed 並在點選後切換', () => {
-        const execStyle = vi.fn();
-        render(<EditorToolbar execStyle={execStyle} onImageFileSelected={vi.fn()} isUploadingImage={false} />);
+describe('EditorToolbar 粗斜體（E-7，P3-27；FE6-16）', () => {
+    test('粗體與斜體是圖示按鈕（不是數學字母符號），有 aria-pressed', () => {
+        render(<EditorToolbar editor={fakeEditor} execStyle={vi.fn()} onImageFileSelected={vi.fn()} isUploadingImage={false} />);
         const bold = screen.getByRole('button', { name: '粗體' });
-        const italic = screen.getByRole('button', { name: '斜體' });
-
         expect(bold.textContent).toBe('');
         expect(bold.querySelector('svg')).not.toBeNull();
         expect(bold).toHaveAttribute('aria-pressed', 'false');
+        expect(screen.getByRole('button', { name: '斜體' })).toHaveAttribute('aria-pressed', 'false');
+    });
 
-        fireEvent.click(bold);
-        expect(execStyle).toHaveBeenCalledWith('bold');
-        expect(bold).toHaveAttribute('aria-pressed', 'true');
-        expect(italic).toHaveAttribute('aria-pressed', 'false');
+    test('FE6-16：aria-pressed 反映 editor.isActive（沒選字時的 stored marks 也算），不讀 DOM 的 queryCommandState', () => {
+        const spy = vi.fn();
+        document.queryCommandState = spy;
+        activeMarks = { bold: true };
+        const { rerender } = render(<EditorToolbar editor={fakeEditor} execStyle={vi.fn()} onImageFileSelected={vi.fn()} isUploadingImage={false} />);
+        expect(screen.getByRole('button', { name: '粗體' })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('button', { name: '斜體' })).toHaveAttribute('aria-pressed', 'false');
+        activeMarks = { italic: true };
+        rerender(<EditorToolbar editor={{ ...fakeEditor }} execStyle={vi.fn()} onImageFileSelected={vi.fn()} isUploadingImage={false} />);
+        expect(screen.getByRole('button', { name: '斜體' })).toHaveAttribute('aria-pressed', 'true');
+        expect(spy).not.toHaveBeenCalled();
+        delete document.queryCommandState;
     });
 });

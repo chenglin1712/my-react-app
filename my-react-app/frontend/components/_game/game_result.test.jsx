@@ -39,8 +39,8 @@ describe('Game_result（回歸測試：word_details 不是陣列時原本會直�
       word_details: [{ clue: '線索', user_word: 'balay', correct_word: 'balay', is_correct: true }],
     }} />);
 
-    expect(screen.getByRole('button', { name: '取消收藏' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: '取消收藏' }));
+    expect(screen.getByRole('button', { name: '收藏「balay」' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '收藏「balay」' }));
     expect(toggleFavorite).toHaveBeenCalledWith('balay', 1);
   });
 

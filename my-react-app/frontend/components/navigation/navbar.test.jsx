@@ -5,6 +5,12 @@ import Navbar from './navbar';
 
 vi.mock('react-router-dom', () => ({
   useLocation: () => ({ pathname: '/' }),
+  // 稽核 FE1-20：主選單項目改用 Link（active 與 aria-current 自己決定），假元件同下面的 NavLink
+  Link: ({ to, className, children, onClick }) => (
+    <a href={to} className={className} onClick={(e) => { e.preventDefault(); onClick?.(); }}>
+      {children}
+    </a>
+  ),
   // 導頁項目改用真正的 NavLink（FR-1）：測試用一個輕量的假 <a> 取代，
   // 只需要能斷言 href／點選後關閉選單這兩件事，不需要真的 React Router context。
   // jsdom 沒有實作真的頁面導覽，真的觸發 <a> 的預設行為會印出

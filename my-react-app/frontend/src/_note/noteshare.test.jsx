@@ -59,6 +59,21 @@ describe('NoteShare', () => {
     submitReport.mockReset();
   });
 
+  test('FE6-07：用筆記標題（pages 裡的標題，含非第一頁）搜尋找得到，找不到的字顯示無符合', async () => {
+    const NOTE_C = { ...NOTE_B, id: 'note-c', preview: '<p>無關</p>', pages: [{ title: '第一頁', content: '' }, { title: '獨特第二頁標題', content: '' }] };
+    fetchSharedNotesPage.mockResolvedValue({ notes: [NOTE_A, NOTE_C], hasMore: false, lastDoc: null });
+    fetchSharedNotesCount.mockResolvedValue(2);
+    renderPage();
+    await screen.findByText('標題A');
+    fireEvent.change(screen.getByLabelText('搜尋筆記'), { target: { value: '獨特第二頁' } });
+    expect(screen.getByText('第一頁')).toBeInTheDocument();
+    expect(screen.queryByText('標題A')).toBeNull();
+    fireEvent.change(screen.getByLabelText('搜尋筆記'), { target: { value: '標題a' } });
+    expect(screen.getByText('標題A')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('搜尋筆記'), { target: { value: '不存在的字' } });
+    expect(screen.getByText('沒有符合的筆記')).toBeInTheDocument();
+  });
+
   test('回歸測試：快速連點兩下讚，只會真的呼叫一次 toggleNoteLike，最終畫面用它回傳的結果', async () => {
     fetchSharedNotesPage.mockResolvedValue({ notes: [NOTE_A], hasMore: false, lastDoc: null });
     fetchSharedNotesCount.mockResolvedValue(1);
@@ -68,7 +83,7 @@ describe('NoteShare', () => {
     renderPage();
     await screen.findByText('標題A');
 
-    const likeButton = screen.getByRole('button', { name: '按讚' });
+    const likeButton = screen.getByRole('button', { name: /^按讚：標題A/ });
     fireEvent.click(likeButton);
     fireEvent.click(likeButton);
 

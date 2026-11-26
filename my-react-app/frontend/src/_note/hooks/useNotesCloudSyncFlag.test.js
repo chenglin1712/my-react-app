@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { useNotesCloudSyncFlag } from './useNotesCloudSyncFlag';
+import { useNotesCloudSyncFlag, useNotesCloudSyncFlagStatus } from './useNotesCloudSyncFlag';
 import { apiGet } from '../../../utils/apiClient';
 
 vi.mock('../../../utils/apiClient', () => ({ apiGet: vi.fn() }));
@@ -38,5 +38,33 @@ describe('useNotesCloudSyncFlag', () => {
     await act(async () => { view = renderHook(() => useNotesCloudSyncFlag(true)); });
     expect(apiGet).toHaveBeenCalled();
     expect(view.result.current).toBe(false);
+  });
+
+  test('FE6-18：查詢失敗保留「未知」，online 事件後重查，查到開啟就切換', async () => {
+    apiGet.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ notesCloudSync: true });
+    const { result } = renderHook(() => useNotesCloudSyncFlagStatus(true));
+    await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(1));
+    expect(result.current).toEqual({ on: false, unknown: true });
+    await act(async () => { window.dispatchEvent(new Event('online')); });
+    await waitFor(() => expect(result.current).toEqual({ on: true, unknown: false }));
+    expect(apiGet).toHaveBeenCalledTimes(2);
+  });
+
+  test('FE6-18：失敗後依退避時間自動重試', async () => {
+    vi.useFakeTimers();
+    try {
+      apiGet.mockRejectedValueOnce(new Error('500')).mockResolvedValueOnce({ notesCloudSync: false });
+      const { result } = renderHook(() => useNotesCloudSyncFlagStatus(true));
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(result.current.unknown).toBe(true);
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      expect(apiGet).toHaveBeenCalledTimes(2);
+      expect(result.current).toEqual({ on: false, unknown: false });
+    } finally { vi.useRealTimers(); }
+  });
+
+  test('FE6-18：沒登入時不是「未知」（不需要查）', () => {
+    const { result } = renderHook(() => useNotesCloudSyncFlagStatus(false));
+    expect(result.current).toEqual({ on: false, unknown: false });
   });
 });

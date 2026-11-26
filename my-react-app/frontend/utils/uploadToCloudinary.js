@@ -30,14 +30,43 @@
 const CLOUDINARY_TRANSFORM = 'f_auto,q_auto';
 const CLOUDINARY_RESOURCE_TYPES = ['image', 'video'];
 
+/**
+ * 稽核 FE1-12：上傳用的是打包進前端的「未簽章 preset」，真正的防線只能在 Cloudinary 後台的 preset
+ * 設定（允許格式、檔案大小、固定資料夾、停用覆寫）或改由後端簽章。這裡是前端能做的緩解：
+ * 送出前先擋下類型不符或過大的檔案，避免站內任何呼叫點（含註冊頁）誤傳非媒體檔或超大檔案。
+ * 擋不住直接拿 preset 打 API 的人，這點要在回報中說明。
+ *
+ * 上限取 Cloudinary 免費方案單檔上限（圖片 10 MB、影音 100 MB）；各呼叫點自己已有更嚴的限制（多為 5 MB），
+ * 這裡只是最後一道總上限，不改變既有呼叫點的行為。
+ * Cloudinary 的 video 資源類型同時涵蓋音檔（QuizTrueFalse 的 mp3 就走 video），所以 video 也接受 audio/*。
+ */
+const MB = 1024 * 1024;
+export const CLOUDINARY_MAX_BYTES = { image: 10 * MB, video: 100 * MB };
+const ALLOWED_MIME_PREFIXES = { image: ['image/'], video: ['video/', 'audio/'] };
+// 部分系統（例如 Windows 少見副檔名）會給空的 file.type，這時才退回用副檔名判斷
+const ALLOWED_EXTENSIONS = {
+  image: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'heic', 'heif', 'bmp'],
+  video: ['mp4', 'webm', 'mov', 'm4v', 'mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'flac'],
+};
+
+function isAllowedType(file, resourceType) {
+  const type = typeof file?.type === 'string' ? file.type.toLowerCase() : '';
+  if (type) return ALLOWED_MIME_PREFIXES[resourceType].some((prefix) => type.startsWith(prefix));
+  const name = typeof file?.name === 'string' ? file.name.toLowerCase() : '';
+  const ext = name.includes('.') ? name.split('.').pop() : '';
+  return ALLOWED_EXTENSIONS[resourceType].includes(ext);
+}
+
 /** 上傳失敗時丟出的例外；`cause` 保留原始錯誤（網路層例外或 HTTP 狀態）供
  * 呼叫端記 log，但呼叫端顯示給使用者的訊息一律自己決定，不直接用這裡的
  * message（跟後端「不把內部錯誤原文透出給使用者」的既有原則一致）。 */
 export class CloudinaryUploadError extends Error {
-  constructor(message, { status, cause } = {}) {
+  constructor(message, { status, cause, code } = {}) {
     super(message);
     this.name = 'CloudinaryUploadError';
     this.status = status;
+    // 稽核 FE1-12：送出前就被擋下時的原因（invalid_type／too_large），呼叫端可據此顯示訊息
+    this.code = code;
     this.cause = cause;
   }
 }
@@ -75,6 +104,14 @@ export async function uploadToCloudinary(file, options = {}) {
     // 呼叫端傳錯字串時應該立刻報錯，而不是打出一個看起來像合法路徑、
     // 實際上 Cloudinary 會回 4xx 的網址。
     throw new CloudinaryUploadError(`不支援的 resourceType："${resourceType}"（僅支援 ${CLOUDINARY_RESOURCE_TYPES.join('／')}）`);
+  }
+
+  // 稽核 FE1-12：類型與大小在送出前檢查（說明見檔案上方 ALLOWED_MIME_PREFIXES）
+  if (!isAllowedType(file, resourceType)) {
+    throw new CloudinaryUploadError(`檔案類型不符（${resourceType} 只接受${resourceType === 'image' ? '圖片' : '影片或音檔'}）`, { code: 'invalid_type' });
+  }
+  if (typeof file?.size === 'number' && file.size > CLOUDINARY_MAX_BYTES[resourceType]) {
+    throw new CloudinaryUploadError(`檔案超過 ${CLOUDINARY_MAX_BYTES[resourceType] / MB} MB 上限`, { code: 'too_large' });
   }
 
   const formData = new FormData();

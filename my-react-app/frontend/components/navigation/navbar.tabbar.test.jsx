@@ -7,6 +7,10 @@ import Navbar from './navbar';
 const loc = vi.hoisted(() => ({ pathname: '/search' }));
 vi.mock('react-router-dom', () => ({
   useLocation: () => ({ pathname: loc.pathname }),
+  // 稽核 FE1-20：主選單與 tab bar 項目改用 Link
+  Link: ({ to, className, children, onClick, ...rest }) => (
+    <a href={to} className={className} onClick={(e) => { e.preventDefault(); onClick?.(); }} {...rest}>{children}</a>
+  ),
   NavLink: ({ to, className, children, onClick, ...rest }) => (
     <a href={to} className={className} onClick={(e) => { e.preventDefault(); onClick?.(); }} {...rest}>{children}</a>
   ),

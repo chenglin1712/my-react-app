@@ -23,6 +23,25 @@ function renderCard(overrides = {}) {
 }
 
 describe('NoteCard', () => {
+  test('FE6-17：讚鈕名稱含標題與讚數、用 aria-pressed 表示狀態；已按讚時動作改為收回讚', () => {
+    const { rerender, props } = renderCard();
+    expect(screen.getByRole('button', { name: '按讚：我的筆記標題，目前 3 個讚' })).toHaveAttribute('aria-pressed', 'false');
+    rerender(<NoteCard {...props} iLike />);
+    expect(screen.getByRole('button', { name: '收回讚：我的筆記標題，目前 3 個讚' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('FE6-17：自己的筆記不渲染讚按鈕，只讀得到讚數', () => {
+    renderCard({ isMine: true });
+    expect(screen.queryByRole('button', { name: /讚/ })).toBeNull();
+    expect(screen.getByRole('img', { name: '我的筆記標題，目前 3 個讚' })).toBeInTheDocument();
+  });
+
+  test('FE6-15：「我的」分頁的自己筆記標示「我的分享」，不再寫沒有功能的「編輯」', () => {
+    renderCard({ isMyTab: true, isMine: true });
+    expect(screen.getByText('我的分享')).toBeInTheDocument();
+    expect(screen.queryByText('編輯')).toBeNull();
+  });
+
   test('點卡片本體會呼叫 onOpen', async () => {
     const user = userEvent.setup();
     const { props } = renderCard();
@@ -35,7 +54,7 @@ describe('NoteCard', () => {
     const user = userEvent.setup();
     const { props } = renderCard();
 
-    await user.click(screen.getByRole('button', { name: '按讚' }));
+    await user.click(screen.getByRole('button', { name: '按讚：我的筆記標題，目前 3 個讚' }));
     expect(props.onToggleLike).toHaveBeenCalled();
     expect(props.onOpen).not.toHaveBeenCalled();
   });

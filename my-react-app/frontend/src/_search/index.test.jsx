@@ -273,7 +273,7 @@ describe('SearchPage 的空狀態與字母篩選（E-2）', () => {
     expect(screen.getByText(/只是拼寫開頭相近，意思不一定相同/)).toBeInTheDocument();
     // 換族語與（有篩選時的）清除篩選仍在：三種出路並存
     expect(screen.getByRole('group', { name: /改用其他族語查/ })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /zzzab/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^zzzab/ }));
     await waitFor(() => expect(apiPost).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ keyword: 'zzzab' })));
     expect(await screen.findByText('zzzab', { selector: '.word-card-toggle *, .list-group-item *' })).toBeInTheDocument();
   });
@@ -306,7 +306,7 @@ describe('SearchPage 的詳情 sheet 與查無結果建議（Apple 化步驟 4-2
   test('點詞條開詳情 sheet，顯示該詞；按關閉鈕收起', async () => {
     apiPost.mockResolvedValue({ all_results: { 0: [word('balay', '真的')] }, total: 1 });
     render(<SearchPage />);
-    fireEvent.click(await screen.findByRole('button', { name: /balay/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /^balay/ }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveAccessibleName('balay');
     fireEvent.click(screen.getByRole('button', { name: '關閉詳情' }));

@@ -1,5 +1,5 @@
 import { db, auth } from "../../../firebase";
-import { collection, addDoc, serverTimestamp, query, where, doc, getDoc, getDocs, orderBy, runTransaction } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, where, doc, getDoc, getDocs, orderBy, runTransaction, limit, startAfter, documentId } from "firebase/firestore";
 import { TRIBE_FULL_NAME_BY_SLUG as TRIBE_NAME } from "../constants/tribes";
 import { normalizeCalendarEvent } from "../../utils/calendarEvents";
 
@@ -123,58 +123,74 @@ export const getQuizSubmitById = async (id) => {
         return null;
     }
 };
-//取得最近的答題情形
-export const getCurrentSituation = async () => {
+// 稽核 FE1-11／FE4-10：原本一次讀出全部作答紀錄（沒有 limit），再對每一筆各做一次 getDoc(quizs)，
+// 作答一百次就是一百多次讀取，同一份題目被作答多次也會重複讀。改成：
+// 1. 伺服器端分頁：每次只讀 pageSize 筆（多讀 1 筆只用來判斷還有沒有下一頁，不回傳），用 startAfter 接續；
+// 2. 只對這一頁「去重後」的 quizId 查 quizs，並用 documentId() in [...] 批次讀（每批 10 筆，
+//    是各版 Firestore 都接受的 in 上限，不必依賴新版放寬的 30 筆）。
+// 排序維持 answeredAt 由新到舊（orderBy 本來就會排除沒有 answeredAt 的文件，行為不變）。
+export const SITUATION_PAGE_SIZE = 20;
+const QUIZ_IN_BATCH_SIZE = 10;
+
+function toQuizType(quizData) {
+    if (!quizData) return "未知類型";
+    // 舊資料沒有 tribe 欄位，一律視為泰雅語（該功能上線時唯一支援的語言）
+    const tribe = quizData.tribe || "tayal";
+    const title = quizData.title || "未知";
+    return tribe === "tayal" ? title : `${TRIBE_NAME[tribe] || tribe}-${title}`;
+}
+
+// 批次讀題目文件，回傳 quizId → 題目資料。某一批讀取失敗只讓那一批顯示「未知類型」，不拖垮整頁。
+async function fetchQuizzesByIds(quizIds) {
+    const quizById = new Map();
+    const batches = [];
+    for (let i = 0; i < quizIds.length; i += QUIZ_IN_BATCH_SIZE) {
+        batches.push(quizIds.slice(i, i + QUIZ_IN_BATCH_SIZE));
+    }
+    await Promise.all(batches.map(async (ids) => {
+        try {
+            const snapshot = await getDocs(query(collection(db, "quizs"), where(documentId(), "in", ids)));
+            snapshot.forEach((quizDoc) => { quizById.set(quizDoc.id, quizDoc.data()); });
+        } catch (err) {
+            console.error(`取得 quiz（${ids.join(", ")}）失敗:`, err);
+        }
+    }));
+    return quizById;
+}
+
+//取得最近的答題情形（分頁）
+// 回傳 { situations, cursor, hasMore }：cursor 傳回下一次呼叫即可接著讀更早的紀錄。
+// 讀取失敗會往外拋（不再回傳空陣列），讓畫面能分辨「沒有紀錄」與「讀取失敗」。
+export const getCurrentSituation = async ({ pageSize = SITUATION_PAGE_SIZE, cursor = null } = {}) => {
     const user = auth.currentUser;
 
     if (!user) {
-        return [];
+        return { situations: [], cursor: null, hasMore: false };
     }
 
-    const q = query(
-        collection(db, "situations"),
+    const constraints = [
         where("userId", "==", user.uid),
-        orderBy("answeredAt", "desc")
-    );
+        orderBy("answeredAt", "desc"),
+    ];
+    if (cursor) constraints.push(startAfter(cursor));
+    constraints.push(limit(pageSize + 1));
 
-    try {
-        const querySnapshot = await getDocs(q);
-        const situations = [];
-        querySnapshot.forEach((doc) => {
-            situations.push({
-                id: doc.id,
-                ...doc.data()
-            });
-        });
+    const querySnapshot = await getDocs(query(collection(db, "situations"), ...constraints));
+    const pageDocs = querySnapshot.docs.slice(0, pageSize);
+    const hasMore = querySnapshot.docs.length > pageSize;
+    const situations = pageDocs.map((situationDoc) => ({ id: situationDoc.id, ...situationDoc.data() }));
 
-        const enrichedSituations = await Promise.all(
-            situations.map(async (s) => {
-                if (s.quizId) {
-                    try {
-                        const quizRef = doc(db, "quizs", s.quizId);
-                        const quizSnap = await getDoc(quizRef);
-                        if (quizSnap.exists()) {
-                            const quizData = quizSnap.data();
-                            // 舊資料沒有 tribe 欄位，一律視為泰雅語（該功能上線時唯一支援的語言）
-                            const tribe = quizData.tribe || "tayal";
-                            const title = quizData.title || "未知";
-                            return {
-                                ...s,
-                                quizType: tribe === "tayal" ? title : `${TRIBE_NAME[tribe] || tribe}-${title}`,
-                            };
-                        }
-                    } catch (err) {
-                        console.error(`取得 quiz ${s.quizId} 失敗:`, err);
-                    }
-                }
-                return { ...s, quizType: "未知類型" };
-            })
-        );
-        return enrichedSituations;
-    } catch (error) {
-        console.error("取得答題情形失敗:", error);
-        return [];
-    }
+    const quizIds = [...new Set(situations.filter((s) => s.quizId).map((s) => String(s.quizId)))];
+    const quizById = quizIds.length > 0 ? await fetchQuizzesByIds(quizIds) : new Map();
+
+    return {
+        situations: situations.map((s) => ({
+            ...s,
+            quizType: s.quizId ? toQuizType(quizById.get(String(s.quizId))) : "未知類型",
+        })),
+        cursor: pageDocs.length > 0 ? pageDocs[pageDocs.length - 1] : cursor,
+        hasMore,
+    };
 };
 
 export const getQuizById = async (id) => {
@@ -295,20 +311,13 @@ export const getCalendar = async () => {
         return null;
     }
 
-    try {
-        const docRef = doc(db, "calendar", user.uid);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            return data.events || [];
-        } else {
-            return [];
-        }
-    } catch (error) {
-        console.error("取得行事曆失敗:", error);
-        return [];
-    }
+    // 稽核 FE6-11／FE1-23：原本讀取失敗只記 log 後回傳 []，畫面每天都顯示「尚無紀錄」，
+    // 使用者會誤以為行程被刪掉而重新輸入。現在失敗直接往外拋，由畫面顯示錯誤與重試。
+    const docRef = doc(db, "calendar", user.uid);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) return [];
+    const events = docSnap.data().events;
+    return Array.isArray(events) ? events : [];
 };
 
 // 新增一筆或多筆行事曆事件。calendar/{uid} 是單一文件、events 是它裡面的
@@ -339,19 +348,50 @@ export class CalendarFullError extends Error {
     }
 }
 
-export const addCalendarEvents = async (events) => {
+// 稽核 FE4-09：判斷「同一個行程」用的鍵（名稱＋開始＋結束）。時間先解析成毫秒再比，
+// 同一時刻寫成 +08:00 或 Z 也視為相同；解析不了就用原字串。
+function eventTime(value) {
+    const ms = typeof value === "string" ? Date.parse(value) : NaN;
+    return Number.isNaN(ms) ? String(value ?? "") : String(ms);
+}
+export function calendarEventDedupeKey(event) {
+    return `${String(event?.summary ?? "").trim()}|${eventTime(event?.start)}|${eventTime(event?.end)}`;
+}
+
+// 共用的寫入核心：skipDuplicates 為 true 時，行事曆裡已有「名稱＋開始＋結束」相同的行程就不再寫入，
+// 回傳既有那一筆（保留它的 id，讀書計畫的追蹤功能仍找得到對應的行事曆事件）。
+async function writeCalendarEvents(events, { skipDuplicates }) {
     const user = auth.currentUser;
     if (!user) throw new Error("請先登入才能新增行程");
 
     const docRef = doc(db, "calendar", user.uid);
     // 每一筆都補齊 allDay（是否全天）與 type（"quiz" | "general"）：呼叫端（行事曆頁、學習計畫）
     // 沒明確給的，用 utils/calendarEvents.js 的判讀補上，之後讀取不必再靠猜。
-    const newEvents = events.map((event) => ({ ...normalizeCalendarEvent(event), id: crypto.randomUUID() }));
+    const candidates = events.map((event) => ({ ...normalizeCalendarEvent(event), id: crypto.randomUUID() }));
 
+    let result = null;
     await runTransaction(db, async (tx) => {
+        // 回呼可能被重跑，結果每次都重算，不沿用上一輪的狀態
         const docSnap = await tx.get(docRef);
         const existingEvents = docSnap.exists() ? (docSnap.data().events || []) : [];
-        const updatedEvents = [...existingEvents, ...newEvents];
+        const byKey = new Map();
+        if (skipDuplicates) {
+            existingEvents.forEach((e) => { if (!byKey.has(calendarEventDedupeKey(e))) byKey.set(calendarEventDedupeKey(e), e); });
+        }
+        const added = [];
+        const saved = candidates.map((event) => {
+            if (skipDuplicates) {
+                const key = calendarEventDedupeKey(event);
+                if (byKey.has(key)) return byKey.get(key);
+                byKey.set(key, event);
+            }
+            added.push(event);
+            return event;
+        });
+        result = { saved, skipped: candidates.length - added.length };
+        if (added.length === 0) return;
+
+        const updatedEvents = [...existingEvents, ...added];
         if (updatedEvents.length > CALENDAR_EVENT_LIMIT) throw new CalendarFullError();
 
         if (docSnap.exists()) {
@@ -360,7 +400,12 @@ export const addCalendarEvents = async (events) => {
             tx.set(docRef, { events: updatedEvents });
         }
     });
-    return newEvents;
+    return result;
+}
+
+export const addCalendarEvents = async (events) => {
+    const { saved } = await writeCalendarEvents(events, { skipDuplicates: false });
+    return saved;
 };
 
 export const addCalendarEvent = async (event) => {
@@ -368,10 +413,35 @@ export const addCalendarEvent = async (event) => {
     return savedEvent;
 };
 
-// 依 id 刪除一筆行事曆事件，同樣在 transaction 內讀出、過濾、寫回。
-export const deleteCalendarEvent = async (eventId) => {
+// 稽核 FE4-09：讀書計畫卡片的「已加入」狀態只在記憶體，還原對話或重新產生後可再按「全部加入」。
+// 讀書計畫改走這個函式：已存在的相同行程略過不寫，回傳 { saved（與輸入同順序）, skipped（略過筆數）}。
+// 行事曆頁手動新增不去重（使用者可能刻意在同一時段記兩筆同名行程）。
+export const addCalendarEventsSkippingDuplicates = (events) => writeCalendarEvents(events, { skipDuplicates: true });
+
+// 比對沒有 id 的舊行程用的欄位（91905e4 以前寫入的行程只有這幾個欄位）
+const LEGACY_EVENT_FIELDS = ["summary", "description", "start", "end"];
+function isSameLegacyEvent(a, b) {
+    return LEGACY_EVENT_FIELDS.every((field) => (a?.[field] ?? null) === (b?.[field] ?? null));
+}
+
+// 刪除一筆行事曆事件，同樣在 transaction 內讀出、過濾、寫回。
+// 參數可以是 id 字串，或整個事件物件（有 id 依 id 刪；沒有 id 的舊行程依內容比對）。
+//
+// 稽核 FE6-04：原本一律 filter(e => e.id !== eventId)；舊行程沒有 id 時 eventId 是 undefined，
+// 會把整份行事曆（跨所有日期）所有沒有 id 的行程一次刪光。現在：
+// - 有 id：只刪 id 相符的那筆；
+// - 沒有 id：只刪「第一筆」沒有 id 且 summary／description／start／end 都相同的行程
+//   （內容完全相同的兩筆本來就分不出差別，刪掉其中一筆即可）；
+// - 兩者都沒有（undefined、空字串）：直接丟錯，絕不寫回。
+export const deleteCalendarEvent = async (eventOrId) => {
     const user = auth.currentUser;
     if (!user) throw new Error("請先登入才能刪除行程");
+
+    const target = typeof eventOrId === "string" ? { id: eventOrId } : eventOrId;
+    const targetId = typeof target?.id === "string" && target.id ? target.id : null;
+    if (!targetId && !(target && typeof target === "object" && target.start !== undefined)) {
+        throw new Error("缺少要刪除的行程識別資料");
+    }
 
     const docRef = doc(db, "calendar", user.uid);
     await runTransaction(db, async (tx) => {
@@ -379,6 +449,11 @@ export const deleteCalendarEvent = async (eventId) => {
         if (!docSnap.exists()) return;
 
         const existingEvents = docSnap.data().events || [];
-        tx.update(docRef, { events: existingEvents.filter((e) => e.id !== eventId) });
+        const index = targetId
+            ? existingEvents.findIndex((e) => e?.id === targetId)
+            : existingEvents.findIndex((e) => !e?.id && isSameLegacyEvent(e, target));
+        // 找不到（例如另一個分頁已經刪掉）就不寫回，維持原本的安全 no-op
+        if (index === -1) return;
+        tx.update(docRef, { events: existingEvents.filter((_, i) => i !== index) });
     });
 };

@@ -50,7 +50,12 @@ async function openBotFromSidebar(user) {
   await user.click(within(sidebar).getByText('AI 助手'));
 }
 
-describe('從側邊欄開啟 AI 助手（真實元件整合）', () => {
+// 第一次開啟要 lazy 載入 bot 的 chunk；多個測試程序同時跑（CI、多代理）時可能要好幾秒。
+// 等待元素出現放寬到 15 秒，整個 describe 的單一測試逾時放寬到 20 秒（比等待時間長，失敗時看得到是哪個元素沒出現）。
+const LAZY_WAIT = { timeout: 15000 };
+const LAZY_TEST_TIMEOUT_MS = 20000;
+
+describe('從側邊欄開啟 AI 助手（真實元件整合）', { timeout: LAZY_TEST_TIMEOUT_MS }, () => {
   beforeEach(() => {
     apiPost.mockReset();
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -62,8 +67,7 @@ describe('從側邊欄開啟 AI 助手（真實元件整合）', () => {
 
     await openBotFromSidebar(user);
 
-    // 第一次開啟要 lazy 載入 bot 的 chunk，給比預設 1 秒更寬鬆的等待時間
-    expect(await screen.findByRole('dialog', { name: '族語 AI 助手' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: '族語 AI 助手' }, LAZY_WAIT)).toBeInTheDocument();
     expect(screen.getByText('頁面內容')).toBeInTheDocument();
     // 個人選單點完會自己關閉，不該留下擋住畫面的遮罩
     expect(document.querySelector('.navbar-overlay')).not.toBeInTheDocument();
@@ -73,7 +77,7 @@ describe('從側邊欄開啟 AI 助手（真實元件整合）', () => {
     const user = userEvent.setup();
     renderApp();
     await openBotFromSidebar(user);
-    await screen.findByRole('dialog', { name: '族語 AI 助手' });
+    await screen.findByRole('dialog', { name: '族語 AI 助手' }, LAZY_WAIT);
 
     expect(document.querySelector('.bot-overlay')).toBeInTheDocument();
     expect(document.querySelector('.overlay')).not.toBeInTheDocument();
@@ -85,7 +89,7 @@ describe('從側邊欄開啟 AI 助手（真實元件整合）', () => {
     renderApp();
     await openBotFromSidebar(user);
 
-    await user.type(await screen.findByLabelText('輸入訊息'), '你好{Enter}');
+    await user.type(await screen.findByLabelText('輸入訊息', {}, LAZY_WAIT), '你好{Enter}');
     expect(await screen.findByText('你好，我是助手回應')).toBeInTheDocument();
 
     // 開著的時候不顯示啟動鈕
@@ -108,7 +112,7 @@ describe('從側邊欄開啟 AI 助手（真實元件整合）', () => {
     const user = userEvent.setup();
     renderApp();
     await user.click(screen.getByRole('button', { name: '開啟 AI 助手' }));
-    expect(await screen.findByRole('dialog', { name: '族語 AI 助手' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: '族語 AI 助手' }, LAZY_WAIT)).toBeInTheDocument();
     expect(screen.getByText('頁面內容')).toBeVisible();
     expect(document.body.style.overflow).toBe('');
   });
@@ -120,7 +124,7 @@ describe('從側邊欄開啟 AI 助手（真實元件整合）', () => {
     renderApp();
     await openBotFromSidebar(user);
 
-    await user.type(await screen.findByLabelText('輸入訊息'), '你好{Enter}');
+    await user.type(await screen.findByLabelText('輸入訊息', {}, LAZY_WAIT), '你好{Enter}');
 
     expect(await screen.findByText(/連不上伺服器/)).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: '族語 AI 助手' })).toBeInTheDocument();

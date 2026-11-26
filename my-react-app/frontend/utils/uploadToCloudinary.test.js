@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CloudinaryUploadError, uploadToCloudinary } from './uploadToCloudinary';
+import { CLOUDINARY_MAX_BYTES, CloudinaryUploadError, uploadToCloudinary } from './uploadToCloudinary';
 
 const CLOUD_NAME = 'test-cloud';
 const UPLOAD_PRESET = 'test-preset';
@@ -62,8 +62,10 @@ describe('uploadToCloudinary', () => {
 
   it('resourceType:video 預設不加轉換（QuizTrueFalse 音檔分支的既有行為）', async () => {
     const spy = mockFetchOnce(async () => jsonResponse({ secure_url: 'https://cdn/c.mp3' }));
+    // 稽核 FE1-12 起 video 只收影音檔，這裡改用真的音檔（原本借用 a.png）
+    const audio = new File(['x'], 'c.mp3', { type: 'audio/mpeg' });
 
-    await uploadToCloudinary(file, { resourceType: 'video' });
+    await uploadToCloudinary(audio, { resourceType: 'video' });
 
     expect(lastEndpoint(spy)).toBe(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/upload`);
   });
@@ -136,6 +138,53 @@ describe('uploadToCloudinary', () => {
     mockFetchOnce(async () => { throw abortError; });
 
     await expect(uploadToCloudinary(file)).rejects.toBe(abortError);
+  });
+
+  // ---- 稽核 FE1-12：未簽章 preset 的前端緩解（送出前檢查類型與大小） ----
+  it('image 只收圖片：非圖片檔在送出前就被擋下', async () => {
+    const spy = mockFetchOnce(async () => jsonResponse({ secure_url: 'x' }));
+    const pdf = new File(['x'], 'a.pdf', { type: 'application/pdf' });
+
+    await expect(uploadToCloudinary(pdf)).rejects.toMatchObject({ name: 'CloudinaryUploadError', code: 'invalid_type' });
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('video 接受影片與音檔，不接受圖片', async () => {
+    const spy = mockFetchOnce(async () => jsonResponse({ secure_url: 'https://cdn/v.mp4' }));
+
+    await uploadToCloudinary(new File(['x'], 'v.mp4', { type: 'video/mp4' }), { resourceType: 'video' });
+    await uploadToCloudinary(new File(['x'], 'a.mp3', { type: 'audio/mpeg' }), { resourceType: 'video' });
+    expect(spy).toHaveBeenCalledTimes(2);
+
+    await expect(uploadToCloudinary(file, { resourceType: 'video' })).rejects.toMatchObject({ code: 'invalid_type' });
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('file.type 是空字串時改看副檔名', async () => {
+    const spy = mockFetchOnce(async () => jsonResponse({ secure_url: 'https://cdn/a.mp3' }));
+
+    await uploadToCloudinary(new File(['x'], 'a.mp3'), { resourceType: 'video' });
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    await expect(uploadToCloudinary(new File(['x'], 'a.exe'))).rejects.toMatchObject({ code: 'invalid_type' });
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('超過總上限（圖片 10 MB）時送出前擋下', async () => {
+    const spy = mockFetchOnce(async () => jsonResponse({ secure_url: 'x' }));
+    const big = new File(['x'], 'big.png', { type: 'image/png' });
+    Object.defineProperty(big, 'size', { value: CLOUDINARY_MAX_BYTES.image + 1 });
+
+    await expect(uploadToCloudinary(big)).rejects.toMatchObject({ code: 'too_large' });
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('筆記同步用的 Blob（有 image/* 類型、沒有檔名）照常上傳', async () => {
+    const spy = mockFetchOnce(async () => jsonResponse({ secure_url: 'https://cdn/n.png' }));
+    const blob = new Blob(['x'], { type: 'image/png' });
+
+    await expect(uploadToCloudinary(blob, { folder: 'tayal_note', transform: false })).resolves.toBe('https://cdn/n.png');
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 
   it('環境變數未設定時提前擋下，不會打出 undefined 的網址', async () => {

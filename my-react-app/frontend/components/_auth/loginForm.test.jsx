@@ -2,6 +2,7 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import LoginForm from './loginForm';
+import { AUTH_SYNC_MAX_WAIT_MS } from './authTiming';
 
 const mockNavigate = vi.fn();
 // mockSearchParams 預設是空的（等同沒有 next 參數），個別測試可以在 render 前
@@ -19,6 +20,12 @@ vi.mock('../../../firebase', () => ({
 }));
 vi.mock('lottie-web', () => ({
   default: { loadAnimation: vi.fn(() => ({ destroy: vi.fn() })) },
+}));
+// 稽核 FE1-09：LoginForm 要等 AuthContext 換成剛登入的帳號才導頁。多數測試的 signIn 回傳 {}（沒有 uid），
+// 不需要等；FE1-09 的測試會改 authState.userData 模擬 AuthContext 晚一步才更新。
+const authState = vi.hoisted(() => ({ userData: null }));
+vi.mock('../../src/userServives/authContext', () => ({
+  useAuth: () => ({ userData: authState.userData }),
 }));
 
 const fillLoginForm = (email, password) => {
@@ -258,6 +265,123 @@ describe('LoginForm', () => {
       expect(mockNavigate).toHaveBeenCalledWith('/');
     } finally {
       vi.useRealTimers();
+    }
+  });
+});
+
+describe('LoginForm：等 AuthContext 換成剛登入的帳號才導頁（稽核 FE1-09）', () => {
+  beforeEach(() => {
+    mockNavigate.mockReset();
+    signInWithEmailAndPassword.mockReset();
+    mockSearchParams = new URLSearchParams('next=/admin');
+    authState.userData = { uid: 'member-1' }; // 前台原本登入的是別的帳號
+  });
+
+  const signInAs = async (uid) => {
+    signInWithEmailAndPassword.mockResolvedValueOnce({ user: { uid } });
+    const view = render(<LoginForm variant="admin" />);
+    fillLoginForm('a@b.com', 'secret1');
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '登入後台' }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    return view;
+  };
+
+  test('提示時間到但 AuthContext 還是舊帳號：先不導頁；換成新帳號後才導向 next', async () => {
+    vi.useFakeTimers();
+    try {
+      const view = await signInAs('admin-1');
+      act(() => { vi.advanceTimersByTime(800); });
+      expect(mockNavigate).not.toHaveBeenCalled();
+
+      authState.userData = { uid: 'admin-1', role: 'admin' };
+      view.rerender(<LoginForm variant="admin" />);
+      expect(mockNavigate).toHaveBeenCalledTimes(1);
+      expect(mockNavigate).toHaveBeenCalledWith('/admin');
+    } finally {
+      vi.useRealTimers();
+      authState.userData = null;
+    }
+  });
+
+  test('按「立即前往」也要等 AuthContext 跟上', async () => {
+    vi.useFakeTimers();
+    try {
+      const view = await signInAs('admin-1');
+      fireEvent.click(screen.getByRole('button', { name: /立即前往/ }));
+      expect(mockNavigate).not.toHaveBeenCalled();
+      authState.userData = { uid: 'admin-1', role: 'admin' };
+      view.rerender(<LoginForm variant="admin" />);
+      expect(mockNavigate).toHaveBeenCalledWith('/admin');
+    } finally {
+      vi.useRealTimers();
+      authState.userData = null;
+    }
+  });
+
+  test('AuthContext 一直沒跟上：最多等 AUTH_SYNC_MAX_WAIT_MS 就照常導頁，不卡在成功提示', async () => {
+    vi.useFakeTimers();
+    try {
+      await signInAs('admin-1');
+      act(() => { vi.advanceTimersByTime(AUTH_SYNC_MAX_WAIT_MS - 1); });
+      expect(mockNavigate).not.toHaveBeenCalled();
+      act(() => { vi.advanceTimersByTime(1); });
+      expect(mockNavigate).toHaveBeenCalledWith('/admin');
+    } finally {
+      vi.useRealTimers();
+      authState.userData = null;
+    }
+  });
+
+  test('AuthContext 已經是同一個帳號（前台、後台同帳號再驗證）：照原本的提示時間導頁', async () => {
+    authState.userData = { uid: 'admin-1', role: 'admin' };
+    vi.useFakeTimers();
+    try {
+      await signInAs('admin-1');
+      act(() => { vi.advanceTimersByTime(800); });
+      expect(mockNavigate).toHaveBeenCalledWith('/admin');
+    } finally {
+      vi.useRealTimers();
+      authState.userData = null;
+    }
+  });
+});
+
+describe('LoginForm：成功提示依目的地（稽核 FE1-21）與 next 驗證（稽核 FE1-08）', () => {
+  beforeEach(() => {
+    mockNavigate.mockReset();
+    signInWithEmailAndPassword.mockReset();
+    authState.userData = null;
+  });
+
+  test.each([
+    ['/quiz/select', '/quiz/select', /登入成功！正在回到原本要去的頁面/],
+    ['/favorite?x=1#top', '/favorite?x=1#top', /登入成功！正在回到原本要去的頁面/],
+    ['/login', '/', /登入成功！您將移至首頁/],
+    ['javascript:alert(1)', '/', /登入成功！您將移至首頁/],
+    ['https://evil.example.com/quiz', '/', /登入成功！您將移至首頁/],
+    ['/.//evil.example.com', '/', /登入成功！您將移至首頁/],
+    ['/..//evil.example.com', '/', /登入成功！您將移至首頁/],
+  ])('next=%s 導向 %s', async (next, expected, text) => {
+    mockSearchParams = new URLSearchParams({ next });
+    vi.useFakeTimers();
+    try {
+      signInWithEmailAndPassword.mockResolvedValueOnce({});
+      render(<LoginForm />);
+      fillLoginForm('a@b.com', 'secret1');
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: '登入' }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getByText(text)).toBeInTheDocument();
+      act(() => { vi.advanceTimersByTime(800); });
+      expect(mockNavigate).toHaveBeenCalledWith(expected);
+    } finally {
+      vi.useRealTimers();
+      mockSearchParams = new URLSearchParams();
     }
   });
 });

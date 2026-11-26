@@ -3,22 +3,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#221812" />
+  <meta name="theme-color" content="#FFF9ED" />
   <title>目前離線｜原語</title>
+  <!-- 稽核 FE1-22：改用定案的象牙底、深色字與銅褐主色（與 index.html 載入殼、站內主要按鈕同一組色），
+       全頁無襯線，只有品牌字標「原語」用宋體。離線時抓不到網路字型，一律用系統字型。
+       這個檔案在 service worker 安裝時存進快取；改了內容要讓 public/sw.js 的 CACHE_VERSION 加一，已安裝的裝置才會更新。 -->
   <style>
-    html, body { margin: 0; background: #F3E7CF; color: #221812; }
-    main { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; font-family: 'Songti TC', 'PMingLiU', serif; }
-    h1 { margin: 0; font-size: 22px; letter-spacing: .08em; }
+    /* 只有淺色：全站深色主題由 VITE_ENABLE_DARK_THEME 旗標控制、預設關閉，離線頁讀不到旗標，不自己跟著系統變暗 */
+    :root { --off-bg: #FFF9ED; --off-ink: #221812; --off-line: #98694C; --off-btn: #7E5239; --off-btn-ink: #FFF9ED; }
+    html, body { margin: 0; background: var(--off-bg); color: var(--off-ink); }
+    main { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; box-sizing: border-box; text-align: center; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
+    .off-brand { font-family: 'Songti TC', 'PMingLiU', serif; font-weight: 900; font-size: 28px; letter-spacing: .32em; padding-left: .32em; padding-bottom: 10px; border-bottom: 2px solid var(--off-line); }
+    h1 { margin: 0; font-size: 22px; font-weight: 700; }
     p { margin: 0; max-width: 28em; line-height: 1.7; }
-    button { margin-top: 8px; min-height: 44px; padding: 0 24px; border: 2px solid #221812; background: #9E1B24; color: #fff; font: inherit; cursor: pointer; }
-    button:focus-visible { outline: 3px solid #D9A227; outline-offset: 2px; }
+    button { margin-top: 8px; min-height: 44px; padding: 0 24px; border: 0; border-radius: 12px; background: var(--off-btn); color: var(--off-btn-ink); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+    button:focus-visible { outline: 2px solid var(--off-btn); outline-offset: 3px; }
   </style>
 </head>
 <body>
   <main>
+    <div class="off-brand" aria-hidden="true">原語</div>
     <h1>目前沒有網路連線</h1>
     <p>原語需要連線才能查詢、翻譯與練習。請確認網路後再試一次。</p>
-    <button type="button" onclick="location.reload()">重新載入</button>
+    <!-- 稽核 FE1-14：不用內嵌 onclick（CSP 的 script-src 不開 'unsafe-inline'，改為強制後會被擋），由同源的 /offline.js 綁定 -->
+    <button type="button" data-offline-reload>重新載入</button>
   </main>
+  <script src="/offline.js" defer></script>
 </body>
 </html>

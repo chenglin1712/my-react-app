@@ -24,6 +24,12 @@ describe('前台分頁標題', () => {
         expect(getPageTitle('/no-such-page')).toBe('找不到頁面｜原語');
     });
 
+  test('稽核 FE1-21：標題與頁面 h1、導覽名稱一致', () => {
+    expect(getPageTitle('/reset')).toBe('變更密碼｜原語');
+    expect(getPageTitle('/favorite')).toBe('個人詞語庫｜原語');
+    expect(getPageTitle('/edit')).toBe('編輯個人資料｜原語');
+  });
+
   test('頁尾三個入口頁有自己的標題', () => {
     expect(getPageTitle('/help')).toBe('使用說明｜原語');
     expect(getPageTitle('/privacy')).toBe('隱私與資料｜原語');
