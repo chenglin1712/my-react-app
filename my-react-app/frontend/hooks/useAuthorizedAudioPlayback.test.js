@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import useAuthorizedAudioPlayback from './useAuthorizedAudioPlayback';
+import useAuthorizedAudioPlayback, { isAuthFailedAudio } from './useAuthorizedAudioPlayback';
 import { createAuthorizedAudio } from '../utils/authAudio';
 
 /** 世代防呆/失敗記錄的完整行為已經在 useAudioPlayback.test.js 透過公開的
@@ -32,6 +32,24 @@ describe('useAuthorizedAudioPlayback', () => {
 
     expect(audio.pause).toHaveBeenCalledTimes(1);
     expect(audio.revokeObjectUrl).toHaveBeenCalledTimes(1);
+  });
+
+  test('WP-10：401／403 失敗另記為需要登入，一般失敗不會；重試會一併清掉', async () => {
+    createAuthorizedAudio
+      .mockRejectedValueOnce(Object.assign(new Error('x'), { status: 401 }))
+      .mockRejectedValueOnce(new Error('network'));
+    const { result } = renderHook(() => useAuthorizedAudioPlayback());
+
+    await act(async () => { await result.current.playAudio('a'); });
+    await act(async () => { await result.current.playAudio('b'); });
+    expect(result.current.failedAudio.has('a')).toBe(true);
+    expect(isAuthFailedAudio(result.current.failedAudio, 'a')).toBe(true);
+    expect(result.current.failedAudio.has('b')).toBe(true);
+    expect(isAuthFailedAudio(result.current.failedAudio, 'b')).toBe(false);
+
+    createAuthorizedAudio.mockResolvedValueOnce(fakeAudio());
+    await act(async () => { await result.current.retryAudio('a'); });
+    expect(isAuthFailedAudio(result.current.failedAudio, 'a')).toBe(false);
   });
 
   test('unmount 時會釋放正在播放的音檔，不留下沒 revoke 的 blob URL', async () => {

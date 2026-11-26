@@ -282,6 +282,112 @@ class RunChatTest(TestCase):
         _, client = self._run([_mock_response("哈囉")])
         self.assertNotIn("tools", client.messages.create.call_args.kwargs)
 
+    def test_the_search_turn_never_gets_the_memory_tool_even_when_memory_is_on(self, _flow):
+        # 稽核 BE3-04：搜尋結果是第三方網頁全文（不可信的輸入），這一輪從權限上拿掉記憶：工具清單、規則都沒有
+        _, client = self._run([_response([_cited("答案", "https://cip.gov.tw/a")])], memory=True)
+        kwargs = client.messages.create.call_args.kwargs
+        self.assertEqual([t.get("name") for t in kwargs["tools"]], ["web_search"])
+        self.assertNotIn("memory", [t.get("name") for t in kwargs["tools"]])
+        self.assertNotIn("學習記憶目錄", system_text(kwargs["system"]))
+
+    def test_a_memory_call_induced_by_a_web_page_is_refused_without_touching_storage(self, _flow):
+        # 稽核 BE3-04：就算模型被網頁內容誘導而要求記憶工具（create／delete），也一律拒絕，不碰資料庫
+        lookup = MagicMock()
+        lookup.search.return_value = []
+        delete = MagicMock(type="tool_use", id="tu1", input={"command": "delete", "path": "/memories/goals.txt"})
+        delete.name = "memory"
+        with patch("AIModel.services.memory_store.execute") as execute:
+            result, client = self._run(
+                [_response([_search_block(), delete], stop_reason="tool_use"), _response([_cited("答案", "https://cip.gov.tw/a")])],
+                memory=True, lookup=lookup,
+            )
+        execute.assert_not_called()
+        tool_result = client.messages.create.call_args_list[1].kwargs["messages"][-1]["content"][0]
+        self.assertTrue(tool_result["is_error"])
+        self.assertEqual([t.get("name") for t in client.messages.create.call_args.kwargs["tools"]],
+                         ["search_words", "get_word", "web_search"])
+        self.assertEqual(result["sources"][0]["url"], "https://cip.gov.tw/a")
+
+    def test_ordinary_chat_still_gets_the_memory_tool(self, flow):
+        # 對照組：沒有搜尋的一般對話，記憶照常（只有查證回合拿掉）
+        flow.return_value = "chat"
+        _, client = self._run([_mock_response("哈囉")], memory=True)
+        self.assertIn("memory", [t.get("name") for t in client.messages.create.call_args.kwargs["tools"]])
+
+
+@patch("AIModel.services.choose_flow", return_value="culture")
+class WebSearchUsageTest(TestCase):
+    """稽核 BE3-06：每次網路搜尋寫一筆 feature=web_search 的用量紀錄，月預算才算得到。"""
+
+    def setUp(self):
+        cache.clear()
+        _set_flag(True)
+        from config import llm
+
+        self.entries = []
+        self.addCleanup(llm.set_usage_recorder, llm._usage_recorder)
+        llm.set_usage_recorder(self.entries.append)
+
+    def _searches(self):
+        return [e for e in self.entries if e["feature"] == web_search.USAGE_FEATURE]
+
+    def test_each_search_in_each_round_is_recorded_once(self, _flow):
+        paused = _response([_search_block(), _search_block(), _cited("前半。", "https://cip.gov.tw/a")], stop_reason="pause_turn")
+        done = _response([_search_block(), _cited("後半。", "https://cip.gov.tw/b")])
+        client = MagicMock()
+        client.messages.create.side_effect = [paused, done]
+        run_tayal_chat(client, "阿美語", "豐年祭是什麼", None, uid="u1")
+        searches = self._searches()
+        self.assertEqual(len(searches), 3)
+        self.assertEqual({(e["uid"], e["model"], e["status"]) for e in searches}, {("u1", web_search.TOOL_TYPE, "ok")})
+        self.assertTrue(all(e["input_tokens"] is None and e["output_tokens"] is None for e in searches))
+
+    def test_the_billed_count_reported_by_the_api_wins_over_counting_blocks(self, _flow):
+        response = _response([_search_block(), _cited("答案", "https://cip.gov.tw/a")])
+        response.usage.server_tool_use.web_search_requests = 2
+        client = MagicMock()
+        client.messages.create.return_value = response
+        run_tayal_chat(client, "阿美語", "豐年祭是什麼", None, uid="u1")
+        self.assertEqual(len(self._searches()), 2)
+
+    def test_the_streaming_path_records_searches_too(self, _flow):
+        final = _response([_search_block(), _cited("豐年祭是祭典。", "https://cip.gov.tw/a")])
+
+        def fake(*args, **kwargs):
+            def gen():
+                yield "豐年祭是祭典。"
+                return final
+            return gen()
+
+        with patch("AIModel.services.stream_claude", side_effect=fake):
+            list(stream_tayal_chat(MagicMock(), "阿美語", "豐年祭是什麼", None, uid="u1"))
+        self.assertEqual(len(self._searches()), 1)
+
+    def test_other_flows_record_no_search_and_a_broken_recorder_never_breaks_the_reply(self, flow):
+        flow.return_value = "chat"
+        client = MagicMock()
+        client.messages.create.return_value = _response([_search_block(), _cited("哈囉")])
+        run_tayal_chat(client, "阿美語", "你好", None, uid="u1")
+        self.assertEqual(self._searches(), [])
+
+        flow.return_value = "culture"
+        from config import llm
+
+        def broken(entry):
+            if entry["feature"] == web_search.USAGE_FEATURE:
+                raise RuntimeError("db down")
+
+        llm.set_usage_recorder(broken)
+        client.messages.create.return_value = _response([_search_block(), _cited("答案", "https://cip.gov.tw/a")])
+        with self.assertLogs("AIModel.services", level="WARNING"):
+            result = run_tayal_chat(client, "阿美語", "豐年祭是什麼", None, uid="u1")
+        self.assertEqual(result["message"], "答案")
+
+    def test_the_feature_name_matches_the_budget_side(self, _flow):
+        from adminapi.ai_usage import WEB_SEARCH_FEATURE
+
+        self.assertEqual(web_search.USAGE_FEATURE, WEB_SEARCH_FEATURE)
+
 
 @patch("AIModel.services.choose_flow", return_value="culture")
 class StreamChatTest(TestCase):

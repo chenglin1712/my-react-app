@@ -5,7 +5,7 @@
 
 Django 端 61+ 個呼叫點（adminapi/_shared.py、crawler/views.py、
 AIModel/views.py、CrosswordPuzzle/views.py 四個共用限流函式各自的呼叫端）
-與 FastAPI 端 12 個 @limiter.limit(...) 呼叫點，值全部設成目前程式碼裡
+與 FastAPI 端的 @limiter.limit(...) 呼叫點（含辭典訪客／查詢建議的額度 key），值全部設成目前程式碼裡
 寫死的原始值——這樣後台列表一開始就完整可見/可編輯，不必等呼叫端逐一
 登錄。用 get_or_create()，已存在的 key 完全不動（只在新建時設定初始值），
 可重複執行、冪等；之後程式碼新增呼叫點時重跑這支指令即可補上新的，不會
@@ -160,6 +160,12 @@ FASTAPI_RULES = [
     ("dictionary_search_multiword", "60/minute", "辭典多關鍵字搜尋"),
     ("dictionary_search_all_words", "60/minute", "辭典全詞條查詢"),
     ("dictionary_search_allsearch", "60/minute", "辭典單字搜尋"),
+    # FE3-01／FE3-04：訪客（依 IP）與查詢建議的額度；預設值必須與 fastAPI/routes/dictionary/search.py
+    # 的 GUEST_RATE_*／MEMBER_RATE_SUGGEST 一致（adminapi/test_rate_limits.py 會比對）
+    ("dictionary_search_allsearch_guest", "30/minute", "辭典單字搜尋（訪客，依 IP）"),
+    ("dictionary_search_all_words_guest", "30/minute", "辭典全詞條查詢（訪客，依 IP）"),
+    ("dictionary_search_suggest_guest", "60/minute", "辭典查詢建議（訪客，依 IP）"),
+    ("dictionary_search_suggest", "120/minute", "辭典查詢建議（登入者）"),
     ("dictionary_favorites_summary", "30/minute", "各族語收藏數統計"),
     ("translation_translate", "10/minute", "族語翻譯（含 LLM 呼叫）"),
     ("translation_capabilities", "60/minute", "翻譯能力資訊查詢"),

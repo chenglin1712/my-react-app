@@ -126,6 +126,18 @@ class SummarizeTest(TestCase):
         self.assertEqual(by_feature["review"]["calls"], 1)
         self.assertEqual({row["status"]: row["calls"] for row in data["byStatus"]}, {"ok": 3, "timeout": 1})
 
+    def test_web_searches_are_reported_separately_and_not_counted_as_calls(self):
+        # 稽核 BE3-06：搜尋紀錄沒有 token、延遲是 0，混進呼叫數與延遲百分位數會失真；另外以 webSearch 顯示次數與費用
+        _log(feature="chat", input=1000, latency=300)
+        for _ in range(3):
+            _log(feature=ai_usage.WEB_SEARCH_FEATURE, model="web_search_20250305", latency=0)
+        _log(feature=ai_usage.WEB_SEARCH_FEATURE, model="web_search_20250305", days_ago=10)
+        data = ai_usage.summarize(7)
+        self.assertEqual(data["totals"]["calls"], 1)
+        self.assertEqual(data["totals"]["latencyP50Ms"], 300)
+        self.assertNotIn(ai_usage.WEB_SEARCH_FEATURE, [row["feature"] for row in data["byFeature"]])
+        self.assertEqual(data["webSearch"], {"searches": 3, "costUsd": 0.03})
+
     def test_cost_is_flagged_incomplete_when_a_model_has_no_price(self):
         _log(model="some-future-model", input=1000, output=100)
         self.assertTrue(ai_usage.summarize(7)["totals"]["costIncomplete"])

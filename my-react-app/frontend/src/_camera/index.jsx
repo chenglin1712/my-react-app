@@ -6,6 +6,7 @@ import "../../static/css/_camera/wizard.css";
 import CameraPrivacyNote from "./components/CameraPrivacyNote";
 import { useOnlineStatus } from "@hooks/useOnlineStatus";
 import OfflineNotice from "@components/ui/OfflineNotice";
+import { prepareImageForUpload, ImageUploadError } from "./imageUpload";
 
 // 第 2、3 步各自 lazy load：第 1 步（選圖）原本會把三步全部一起打包進去，
 // 含第 3 步查詢結果頁引用的 36 張分類圖（見 constants/categoryGroups.js），
@@ -13,7 +14,6 @@ import OfflineNotice from "@components/ui/OfflineNotice";
 const CameraLabelStep = lazy(() => import("./label"));
 const CameraResultStep = lazy(() => import("./result"));
 
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 // 後端（routes/vision.py 的 ALLOWED_IMAGE_FORMATS）只收 JPEG、PNG、WebP。第 1 步就用同一份白名單擋，
 // HEIC／AVIF／GIF／BMP 不用等到第 2 步送出辨識才被退回。兩個 <input> 的 accept 也用同一份，
 // 讓選檔對話框一開始就只列出這三種（iPhone Safari 在 accept 沒有 HEIC 時會自動轉成 JPEG）。
@@ -41,6 +41,7 @@ const CameraWizard = () => {
     const [image, setImage] = useState(null);
     const online = useOnlineStatus();
     const [file, setFile] = useState(null);
+    const [processing, setProcessing] = useState(false);
     const [inputKey, setInputKey] = useState(Date.now());
     const [fileName, setFileName] = useState("請選擇圖片");
     const [errorMsg, setErrorMsg] = useState("");
@@ -69,10 +70,6 @@ const CameraWizard = () => {
             setErrorMsg("不支援這個檔案格式，請選擇圖片檔（例如 JPG、PNG、WebP）。");
             return;
         }
-        if (newFile.size > MAX_IMAGE_BYTES) {
-            setErrorMsg("圖片不得超過 5 MB，請重新選擇。");
-            return;
-        }
         setErrorMsg("");
         // 先讓舊的世代作廢、再中止上一個讀檔：abort() 會同步觸發它的 loadend，
         // 順序反過來的話，舊讀檔的 onloadend 會以為自己還是最新的，把預覽清成 null（F18）。
@@ -86,9 +83,27 @@ const CameraWizard = () => {
             setImage(reader.result);
         };
         reader.readAsDataURL(newFile);
-        setFile(newFile);
+        // FE3-11／FE3-12：所有來源（相簿、拍照、拖放、貼上）都經過這裡，上傳用的檔案一律是
+        // 本機縮小並重新編碼後的 JPEG（同時去掉 EXIF／GPS）；處理完成前 file 為 null，不能提交。
+        setFile(null);
+        setProcessing(true);
         setFileName(newFile.name);
         setLabelState(null);
+        prepareImageForUpload(newFile).then((prepared) => {
+            if (myGeneration !== fileReadGenerationRef.current) return;
+            setFile(prepared);
+            setProcessing(false);
+        }).catch((err) => {
+            if (myGeneration !== fileReadGenerationRef.current) return;
+            // 處理失敗（太大或解不開）：不留下預覽，免得看起來能送出
+            fileReadGenerationRef.current += 1;
+            readerRef.current?.abort();
+            setProcessing(false);
+            setImage(null);
+            setFileName("請選擇圖片");
+            setInputKey(Date.now());
+            setErrorMsg(err instanceof ImageUploadError ? err.message : "無法處理這張圖片，請換一張再試。");
+        });
     };
 
     const handleImageChange = (event) => {
@@ -141,6 +156,7 @@ const CameraWizard = () => {
         fileReadGenerationRef.current += 1; // 還沒讀完的舊 FileReader 不再更新預覽
         setImage(null);
         setFile(null);
+        setProcessing(false);
         setInputKey(Date.now());
         setFileName("請選擇圖片");
         setLabelState(null);
@@ -224,11 +240,12 @@ const CameraWizard = () => {
                                     tabIndex={-1}
                                 />
                                 {errorMsg && <Alert variant="danger" className="py-2 mt-2 mb-0">{errorMsg}</Alert>}
-                                <p className="camera-hint">支援 JPG、PNG、WebP 格式，檔案大小上限 5MB。</p>
+                                {processing && <p className="camera-hint" role="status">正在縮小圖片…</p>}
+                                <p className="camera-hint">支援 JPG、PNG、WebP 格式；上傳前會自動縮小，縮小後的檔案上限 5MB。</p>
                                 <CameraPrivacyNote />
                             </div>
                             <div className="camera-step1-actions">
-                                <button type="button" className="yy-btn-primary" disabled={!image || !online} aria-describedby={online ? undefined : "camera-offline"} onClick={() => setStep(2)}>提交辨識 ▸</button>
+                                <button type="button" className="yy-btn-primary" disabled={!image || !file || processing || !online} aria-describedby={online ? undefined : "camera-offline"} onClick={() => setStep(2)}>提交辨識 ▸</button>
                                 <button type="button" className="yy-btn-outline" disabled={!image} onClick={handleCancel}>移除圖片</button>
                             </div>
                             {/* 提交鈕旁永遠留一行簡短揭露：說明卡看過後會收起，但送出前資料的去向仍要看得到 */}

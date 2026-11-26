@@ -4,7 +4,7 @@ import SearchSpotlight from './SearchSpotlight';
 import { RECENT_SEARCHES_KEY, loadRecentSearches } from '../../../utils/recentSearches';
 import { ANNOUNCE_EVENT } from '../../../utils/announce';
 
-vi.mock('../../../utils/apiClient', () => ({ apiPost: vi.fn().mockResolvedValue({ exact_match_results: [], fuzzy_match_results: {} }) }));
+vi.mock('../../../utils/apiClient', () => ({ apiPost: vi.fn().mockResolvedValue({ suggestions: [] }) }));
 
 const setup = (props = {}) => {
   const handleSearch = vi.fn();

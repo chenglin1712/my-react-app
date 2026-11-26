@@ -2,6 +2,12 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import CameraWizard from './index';
 
+// jsdom 沒有 canvas：縮圖處理用替身，真實邏輯見 imageUpload.test.js（FE3-11）
+vi.mock('./imageUpload', async (importOriginal) => ({
+  ...(await importOriginal()),
+  prepareImageForUpload: vi.fn(async (file) => file),
+}));
+
 vi.mock('./label', () => ({ default: () => <div>label-step</div> }));
 vi.mock('./result', () => ({ default: () => <div>result-step</div> }));
 
@@ -222,5 +228,15 @@ describe('檔案類型判斷（P3-6、F6）', () => {
     await waitFor(() => expect(submitButton()).not.toBeDisabled());
     expect(screen.getByText('ok.png')).toBeInTheDocument();
     expect(unsupported()).not.toBeInTheDocument();
+  });
+});
+
+describe('隱私說明的中繼資料說明（FE3-12）', () => {
+  beforeEach(() => { try { localStorage.clear(); } catch { /* 沒有 storage 也沒關係 */ } });
+
+  test('說明寫明會先在本機縮小並移除照片中的位置等中繼資料，且仍註明送到 Google Cloud Vision', () => {
+    render(<CameraWizard />);
+    expect(screen.getByText(/先在本機縮小並移除照片中的位置等中繼資料/)).toBeVisible();
+    expect(screen.getByText(/Google Cloud Vision/)).toBeVisible();
   });
 });

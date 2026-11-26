@@ -1,10 +1,17 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import CameraWizard from './index';
+import { prepareImageForUpload, ImageUploadError } from './imageUpload';
 
 // 精靈容器本身只負責 step 切換與圖片驗證，實際辨識/查詢邏輯在 label.jsx／result.jsx
 // 各自的測試（label.test.jsx／result.test.jsx）裡驗證，這裡把兩步都換成簡單的樁元件，
 // 只驗證 index.jsx 自己的職責：step 切換、image/file 傳遞、5MB 大小驗證。
+// jsdom 沒有 canvas／createImageBitmap：縮圖與重新編碼的真實邏輯在 imageUpload.test.js 驗證，
+// 這裡用替身（FE3-11）：預設原樣放行，個別測試用 prepareImageForUpload.mockRejectedValueOnce 模擬失敗。
+vi.mock('./imageUpload', async (importOriginal) => ({
+  ...(await importOriginal()),
+  prepareImageForUpload: vi.fn(async (file) => file),
+}));
 vi.mock('./label', () => ({
   default: ({ onConfirm, onBack }) => (
     <div>
@@ -133,15 +140,52 @@ describe('CameraWizard', () => {
     expect(screen.getByText('提交辨識 ▸')).toBeDisabled();
   });
 
-  test('超過 5MB 的圖片會顯示錯誤，不會進到下一步', () => {
+  test('縮小後仍超過 5MB 的圖片會顯示錯誤、清掉預覽，不會進到下一步（FE3-11：5MB 改在縮圖後才判斷）', async () => {
+    prepareImageForUpload.mockRejectedValueOnce(new ImageUploadError('TOO_LARGE', '圖片不得超過 5 MB，請重新選擇。'));
     render(<CameraWizard />);
-    const bigFile = new File(['x'.repeat(10)], 'big.png', { type: 'image/png' });
-    Object.defineProperty(bigFile, 'size', { value: 6 * 1024 * 1024 });
 
-    selectFile(bigFile);
+    selectFile(new File(['x'], 'big.png', { type: 'image/png' }));
 
-    expect(screen.getByText('圖片不得超過 5 MB，請重新選擇。')).toBeInTheDocument();
+    expect(await screen.findByText('圖片不得超過 5 MB，請重新選擇。')).toBeInTheDocument();
     expect(screen.getByText('提交辨識 ▸')).toBeDisabled();
+    expect(screen.getByText('請選擇圖片')).toBeInTheDocument();
+  });
+
+  test('原檔超過 5MB 但縮小後合格：照常可以提交，上傳的是縮小後的檔案（FE3-11、FE3-12）', async () => {
+    const small = new File(['s'], 'big.jpg', { type: 'image/jpeg' });
+    prepareImageForUpload.mockResolvedValueOnce(small);
+    render(<CameraWizard />);
+    const big = new File(['x'], 'big.png', { type: 'image/png' });
+    Object.defineProperty(big, 'size', { value: 9 * 1024 * 1024 });
+
+    selectFile(big);
+
+    await waitFor(() => expect(screen.getByText('提交辨識 ▸')).not.toBeDisabled());
+    expect(prepareImageForUpload).toHaveBeenCalledWith(big);
+    expect(screen.queryByText(/不得超過 5 MB/)).not.toBeInTheDocument();
+  });
+
+  test('處理中（縮圖還沒完成）時提交鈕維持停用，並有狀態說明（FE3-11）', async () => {
+    let finish;
+    prepareImageForUpload.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    render(<CameraWizard />);
+    selectFile(new File(['x'], 'slow.png', { type: 'image/png' }));
+    await screen.findByText('正在縮小圖片…');
+    expect(screen.getByText('提交辨識 ▸')).toBeDisabled();
+    finish(new File(['x'], 'slow.jpg', { type: 'image/jpeg' }));
+    await waitFor(() => expect(screen.getByText('提交辨識 ▸')).not.toBeDisabled());
+    expect(screen.queryByText('正在縮小圖片…')).not.toBeInTheDocument();
+  });
+
+  test('拖放、貼上、拍照入口都經過同一個縮圖處理（FE3-12）', async () => {
+    prepareImageForUpload.mockClear();
+    const { container } = render(<CameraWizard />);
+    fireEvent.drop(container.querySelector('.camera-dropzone'), { dataTransfer: { types: ['Files'], files: [new File(['x'], 'd.png', { type: 'image/png' })] } });
+    const paste = new Event('paste', { bubbles: true, cancelable: true });
+    paste.clipboardData = { files: [new File(['x'], 'p.png', { type: 'image/png' })] };
+    document.dispatchEvent(paste);
+    fireEvent.change(screen.getByLabelText('拍照', { selector: 'input' }), { target: { files: [new File(['x'], 'c.jpg', { type: 'image/jpeg' })] } });
+    await waitFor(() => expect(prepareImageForUpload).toHaveBeenCalledTimes(3));
   });
 
   test('選好圖片後可以進入第 2 步，選字後可以進入第 3 步並帶上選字結果', async () => {

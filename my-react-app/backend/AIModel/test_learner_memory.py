@@ -158,6 +158,40 @@ class MemoryEndpointTest(TestCase):
         self.assertEqual(LearnerMemoryFile.objects.count(), 0)
         self.assertEqual(LearnerMemoryConsent.objects.count(), 0)
 
+    # FE3-22：同意時帶的說明版本要與 CONSENT_VERSION 相符
+    def test_consent_with_matching_version_is_granted(self):
+        _enable()
+        resp = self._json("post", "/AIModel/memory/consent/", {"granted": True, "version": ms.CONSENT_VERSION})
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["consented"])
+        self.assertEqual(resp.json()["consentVersion"], ms.CONSENT_VERSION)
+        self.assertTrue(ms.has_consent("u1"))
+
+    def test_consent_with_stale_version_is_409_and_not_written(self):
+        _enable()
+        for stale in ("2000-01-v0", 1):           # 舊字串版本，或型別不同的整數，都視為不一致
+            with self.subTest(version=stale):
+                resp = self._json("post", "/AIModel/memory/consent/", {"granted": True, "version": stale})
+                self.assertEqual(resp.status_code, 409)
+                self.assertEqual(resp.json()["code"], "consent_version_mismatch")
+                self.assertEqual(resp.json()["detail"], "說明已更新，請重新整理頁面後再同意")
+                self.assertFalse(ms.has_consent("u1"))
+                self.assertEqual(LearnerMemoryConsent.objects.count(), 0)
+
+    def test_consent_without_version_stays_compatible(self):
+        _enable()
+        resp = self._json("post", "/AIModel/memory/consent/", {"granted": True})
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(ms.has_consent("u1"))
+
+    def test_revoking_ignores_version(self):
+        _enable()
+        ms.grant_consent("u1")
+        resp = self._json("post", "/AIModel/memory/consent/", {"granted": False, "version": "2000-01-v0"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.json()["consented"])
+        self.assertEqual(LearnerMemoryConsent.objects.count(), 0)
+
     def test_view_edit_delete_and_clear_own_notes(self):
         _enable()
         ms.grant_consent("u1")

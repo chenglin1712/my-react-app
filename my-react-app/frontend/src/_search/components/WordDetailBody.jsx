@@ -5,7 +5,25 @@ import StarRating from '../../../components/ui/StarRating';
 // 詞條詳情內容：詞頻、來源、異體、構詞、備註、各義項與例句（含音檔）。
 // 兩個地方共用：字卡原地展開（_camera 結果頁仍是這種）、單詞查詢的詳情 sheet。
 // summary 為 true 時只畫例句（不畫詞頻、來源與義項標題）。
-const WordDetailBody = ({ result, playAudio, playSentence, hasSentenceAudio, failedAudio, summary = false }) => (
+//
+// 稽核 FE3-05：整句發音（TTS 備用）失敗時，就在那一句旁邊說明並給「重播」，不寫進查詢頁的主錯誤框。
+// sentenceFailure 是 useAudioPlayback 回傳的 { sentence, reason }。
+const SENTENCE_FAILURE_TEXT = {
+  auth: '登入後才能播放例句發音。',
+  empty: '這一句目前沒有可以播放的發音。',
+  failed: '例句發音播放失敗。',
+};
+
+const SentenceFailureNote = ({ failure, onReplay }) => (
+  <span className="d-block small yy-text-danger" role="status">
+    {SENTENCE_FAILURE_TEXT[failure.reason] || SENTENCE_FAILURE_TEXT.failed}
+    {failure.reason === 'failed' && (
+      <Button type="button" variant="link" size="sm" className="p-0 ms-1 align-baseline" onClick={onReplay}>重播</Button>
+    )}
+  </span>
+);
+
+const WordDetailBody = ({ result, playAudio, playSentence, hasSentenceAudio, failedAudio, sentenceFailure = null, summary = false }) => (
   <ListGroup variant="flush">
     {!summary && Number(result.frequency) > 0 && <ListGroup.Item><strong>詞頻：</strong><StarRating frequency={result.frequency} /></ListGroup.Item>}
     {!summary && result.sources?.length > 0 && <ListGroup.Item><strong>收錄來源：</strong>{Array.isArray(result.sources) ? result.sources.join('、') : result.sources}</ListGroup.Item>}
@@ -44,6 +62,9 @@ const WordDetailBody = ({ result, playAudio, playSentence, hasSentenceAudio, fai
                     <CirclePlay size={20} className="yy-icon word-card-icon" aria-hidden="true" />
                   </Button>
                 ) : null}
+                {showTtsFallback && sentenceFailure && sentenceFailure.sentence === ex.originalSentence && (
+                  <SentenceFailureNote failure={sentenceFailure} onReplay={() => playSentence(ex.originalSentence)} />
+                )}
               </p>
               <p className="fw-bolder mb-1">{ex.chineseSentence}</p>
               <p className="fw-bolder mb-0">{ex.englishSentence || ''}</p>

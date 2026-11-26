@@ -6,7 +6,8 @@ import { apiPost } from '../../../utils/apiClient';
 
 vi.mock('../../../utils/apiClient', () => ({ apiPost: vi.fn() }));
 
-const w = (name, gloss) => ({ name, explanationItems: [{ chineseExplanation: gloss }] });
+// 稽核 FE3-04：建議改打專用端點，回應是 { suggestions: [{ name, gloss }] }
+const w = (name, gloss) => ({ name, gloss });
 
 const setup = (props = {}) => {
   const handleSearch = vi.fn();
@@ -26,7 +27,7 @@ describe('SearchSpotlight', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     apiPost.mockReset();
-    apiPost.mockResolvedValue({ exact_match_results: [w('balay', '真的'), w('baqa', '牛')], fuzzy_match_results: {} });
+    apiPost.mockResolvedValue({ suggestions: [w('balay', '真的'), w('baqa', '牛')] });
   });
   afterEach(() => vi.useRealTimers());
 
@@ -100,6 +101,14 @@ describe('SearchSpotlight', () => {
     await openSuggestions();
     fireEvent.click(screen.getByRole('option', { name: /balay/ }));
     expect(handleSearch).toHaveBeenCalledWith(null, 'balay');
+  });
+
+  test('稽核 FE3-02：搜尋框關掉自動大寫、自動修正與拼字檢查（iOS 會把族語詞首字大寫、改寫撇號）', () => {
+    setup();
+    const input = screen.getByRole('combobox', { name: '查詢關鍵字' });
+    expect(input).toHaveAttribute('autocapitalize', 'off');
+    expect(input).toHaveAttribute('autocorrect', 'off');
+    expect(input).toHaveAttribute('spellcheck', 'false');
   });
 
   test('loading 時搜尋鈕停用', () => {

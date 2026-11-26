@@ -15,6 +15,7 @@ from .routes.pronunciation import model as pronunciation_model
 from .routes.quiz import deadline as quiz_deadline
 from dictionary_db.connect import SessionLocal
 from .rate_limit import limiter
+from .routes.dictionary import access as dictionary_access
 from . import background_refresh, feature_flags
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -244,11 +245,19 @@ app.add_middleware(
 
 # /vision、/dictionary、/quiz、/listening、/sentence 會被呼叫付費 API（Google Vision）
 # 或消耗運算資源（wav2vec2 語音比對、辭典全表查詢、題目生成全表掃描），一律要求登入才能呼叫。
+# 例外：辭典的唯讀詞條查詢另外掛 public_router 開放訪客（稽核 FE3-01，見下方）。
 _require_login = [Depends(auth.verify_firebase_token)]
 
 app.include_router(crawler.router, prefix="/api/v1/crawler", dependencies=_require_login)
 app.include_router(vision.router, prefix="/api/v1/vision", dependencies=_require_login)
 app.include_router(dictionary.router, prefix="/api/v1/dictionary", dependencies=_require_login)
+# 稽核 FE3-01：單詞查詢頁對訪客公開，唯讀的詞條查詢（/key/、/suggest/、/all/）允許未登入的訪客呼叫。
+# 回應只有辭典公開資料；訪客依 IP 限流、額度比登入者保守（見 routes/dictionary/search.py）。
+# 帶了登入憑證的請求仍照常驗證，驗證失敗回 401、不會降級成訪客（見 routes/dictionary/access.py）。
+app.include_router(
+    dictionary.public_router, prefix="/api/v1/dictionary",
+    dependencies=[Depends(dictionary_access.verify_firebase_token_or_anonymous)],
+)
 app.include_router(quiz.router, prefix="/api/v1/quiz", dependencies=_require_login)
 app.include_router(listening.router, prefix="/api/v1/listening", dependencies=_require_login)
 app.include_router(sentence.router, prefix="/api/v1/sentence", dependencies=_require_login)

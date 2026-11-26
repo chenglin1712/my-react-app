@@ -101,7 +101,9 @@ const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onResta
   // playAudio 改用 _search 頁面共用的 hook：原本這裡自己維護一份 playAudio，
   // 缺少 hook 版本後來補上的「取消上一次播放的請求」（避免快速連續點選時舊音檔
   // 蓋掉新音檔）與「失敗音檔追蹤」（播放失敗過的 fileId 不再顯示播放鈕）。
-  const { playAudio, failedAudio } = useAudioPlayback(tribe, setError);
+  const { playAudio, failedAudio, stopAudio, retryAudio, playingId, playingDuration } = useAudioPlayback(tribe, setError);
+  // FE3-06：失敗後的「重試」與播放中狀態要靠這幾個才有作用，比照 _search 一併傳給清單與詳情
+  const audioState = { stopAudio, retryAudio, playingId, playingDuration };
 
   // 展平＋篩選＋排序只在資料或篩選條件變動時算一次（原本每次 render 都重做，連打開選單也算）
   const exactMatchWords = useMemo(() => sortWords(Object.values(definitions.exact_match_results).flat(), {
@@ -235,6 +237,7 @@ const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onResta
           playAudio={playAudio}
           favoriteWords={favoriteWords}
           failedAudio={failedAudio}
+          {...audioState}
           onOpenDetail={openDetail}
         />
       )}
@@ -248,6 +251,7 @@ const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onResta
           playAudio={playAudio}
           favoriteWords={favoriteWords}
           failedAudio={failedAudio}
+          {...audioState}
           onOpenDetail={openDetail}
         />
       )}
@@ -261,6 +265,7 @@ const CameraResultStep = ({ selectedWords, tribe, onTribeChange, onBack, onResta
         toggleFavorite={toggleFavorite}
         playAudio={playAudio}
         failedAudio={failedAudio}
+        {...audioState}
       />
     </div>
   );

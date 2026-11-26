@@ -1,7 +1,8 @@
-import { describe, test, expect, vi } from 'vitest';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 
 import MorphologyResult from './MorphologyResult';
+import { ANNOUNCE_EVENT } from '../../utils/announce';
 
 const base = (over = {}) => ({
   tribe: '阿美語', tribeSlug: 'amis', input: 'cimaopohayay', normalized: 'cimaopohayay',
@@ -151,9 +152,33 @@ describe('MorphologyResult', () => {
     expect(within(items[1]).getByText('second')).toBeInTheDocument();
   });
 
-  test('緊湊模式加上對應的樣式類別；結果區是 aria-live（螢幕閱讀器會朗讀更新）', () => {
+  test('緊湊模式加上對應的樣式類別；結果區本身不再掛 aria-live（FE3-17 改由常駐公告區唸）', () => {
     const { container } = render(<MorphologyResult result={base()} compact />);
     expect(container.firstChild).toHaveClass('yy-morph-compact');
-    expect(container.firstChild).toHaveAttribute('aria-live', 'polite');
+    expect(container.firstChild).not.toHaveAttribute('aria-live');
+  });
+
+  // FE3-17：live region 先存在、再更新內容才會被唸；這裡改走全站的 announce()
+  describe('結果公告（FE3-17）', () => {
+    const heard = [];
+    const listener = (e) => heard.push(e.detail.message);
+    beforeEach(() => { heard.length = 0; window.addEventListener(ANNOUNCE_EVENT, listener); });
+    afterEach(() => window.removeEventListener(ANNOUNCE_EVENT, listener));
+
+    test('結果出現時公告可能詞根的數量，同一筆結果重新渲染不重複公告', () => {
+      const result = base({ candidates: [ruleCandidate()] });
+      const { rerender } = render(<MorphologyResult result={result} />);
+      expect(heard).toHaveLength(1);
+      expect(heard[0]).toBe('詞形分析完成，找到 1 個可能的詞根');
+      rerender(<MorphologyResult result={result} compact />);
+      expect(heard).toHaveLength(1);
+    });
+
+    test('沒有候選詞根時公告「沒有找到可能的詞根」；result 為 null 不公告', () => {
+      const { rerender } = render(<MorphologyResult result={null} />);
+      expect(heard).toHaveLength(0);
+      rerender(<MorphologyResult result={base({ candidates: [] })} />);
+      expect(heard).toEqual(['詞形分析完成，沒有找到可能的詞根']);
+    });
   });
 });

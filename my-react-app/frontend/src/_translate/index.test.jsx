@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 import TranslatePage from './index';
 import { apiGet, apiPost, trackEvent } from '../../utils/apiClient';
+import { ANNOUNCE_EVENT } from '../../utils/announce';
 
 const authState = vi.hoisted(() => ({ current: { userData: { uid: 'u1' }, loading: false } }));
 vi.mock('../userServives/authContext', () => ({ useAuth: () => authState.current }));
@@ -349,5 +350,50 @@ describe('TranslatePage 的訪客試用（C-3）', () => {
 
     await waitFor(() => expect(screen.queryByText('blaq')).not.toBeInTheDocument());
     expect(screen.getByPlaceholderText(/輸入要翻譯的中文句子/)).toHaveValue('');
+  });
+});
+
+describe('TranslatePage 的完成公告（FE3-07）', () => {
+  const heard = [];
+  const listener = (e) => heard.push(e.detail);
+  beforeEach(() => {
+    apiGet.mockReset();
+    apiPost.mockReset();
+    apiGet.mockResolvedValue({ tribes: [] });
+    heard.length = 0;
+    window.addEventListener(ANNOUNCE_EVENT, listener);
+    return () => window.removeEventListener(ANNOUNCE_EVENT, listener);
+  });
+
+  test('翻譯成功時公告一次「翻譯完成」與佐證概況，且是非干擾（polite）', async () => {
+    apiPost.mockResolvedValueOnce({
+      translation: 'a b c', tokens: [{ surface: 'a', status: 'headword' }],
+      coverage: { total: 3, unsupported: 1 }, evidence: { sentences: [] },
+    });
+    renderPage();
+    typeAndSubmit('好');
+    await screen.findByText('2/3 個詞有辭典語料佐證');
+    const done = heard.filter((h) => h.message.startsWith('翻譯完成'));
+    expect(done).toHaveLength(1);
+    expect(done[0]).toEqual({ message: '翻譯完成，2/3 個詞有辭典語料佐證', assertive: false });
+  });
+
+  test('沒有 coverage 資訊時只唸「翻譯完成」', async () => {
+    apiPost.mockResolvedValueOnce({
+      translation: 'blaq', tokens: [{ surface: 'blaq', status: 'headword' }],
+      coverage: { total: 0 }, evidence: { sentences: [] },
+    });
+    renderPage();
+    typeAndSubmit('好');
+    await screen.findByText('blaq');
+    expect(heard.map((h) => h.message)).toContain('翻譯完成');
+  });
+
+  test('翻譯失敗不公告「翻譯完成」', async () => {
+    apiPost.mockRejectedValueOnce(new Error('boom'));
+    renderPage();
+    typeAndSubmit('好');
+    await screen.findByText('boom');
+    expect(heard.some((h) => h.message.startsWith('翻譯完成'))).toBe(false);
   });
 });

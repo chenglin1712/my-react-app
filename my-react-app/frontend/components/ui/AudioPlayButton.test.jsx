@@ -59,6 +59,18 @@ describe('AudioPlayButton（P2-5、P2-6）', () => {
     expect(onRetry).toHaveBeenCalled();
   });
 
+  test('WP-10：失敗原因是需要登入（401）：不給重試鈕，顯示「登入後才能播放」連結並帶 next；一般失敗仍可重試', () => {
+    const onRetry = vi.fn();
+    const { rerender } = render(<AudioPlayButton name="babaw" failed authRequired onRetry={onRetry} />);
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.queryByText('重試')).not.toBeInTheDocument();
+    const link = screen.getByText('登入後才能播放');
+    expect(link.getAttribute('href')).toMatch(/^\/login(\?next=.+)?$/);
+    rerender(<AudioPlayButton name="babaw" failed onRetry={onRetry} />);
+    fireEvent.click(screen.getByRole('button', { name: '發音載入失敗，重試播放「babaw」的發音' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
   test('失敗（詞卡上不放整行說明）：重試鈕仍有可見的「重試」字，不只靠圖示或顏色', () => {
     render(<AudioPlayButton name="babaw" failed />);
     const retry = screen.getByRole('button', { name: '發音載入失敗，重試播放「babaw」的發音' });

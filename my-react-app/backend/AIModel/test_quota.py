@@ -16,6 +16,22 @@ BEFORE_MIDNIGHT = datetime(2026, 10, 21, 15, 59, tzinfo=timezone.utc)
 AFTER_MIDNIGHT = datetime(2026, 10, 21, 16, 0, tzinfo=timezone.utc)
 
 
+def _connection_error():
+    """請求沒送達（確定沒計費）的失敗。"""
+    import anthropic
+    import httpx
+
+    return anthropic.APIConnectionError(request=httpx.Request("POST", "https://api.anthropic.com/v1/messages"))
+
+
+def _timeout_error():
+    """逾時：供應商可能已經在處理並計費。"""
+    import anthropic
+    import httpx
+
+    return anthropic.APITimeoutError(request=httpx.Request("POST", "https://api.anthropic.com/v1/messages"))
+
+
 class DailyLimitTests(TestCase):
     def setUp(self):
         cache.clear()
@@ -191,6 +207,11 @@ class QuotaInViewsTests(TestCase):
         limit = patch.object(quota, "daily_limit", return_value=2)
         limit.start()
         self.addCleanup(limit.stop)
+        # 這裡的測試會故意製造供應商失敗：用獨立的斷路器，不讓全域斷路器跳開而影響其他測試
+        from config import llm
+        breaker = patch.object(llm, "_breaker", llm._CircuitBreaker(threshold=100, cooldown=60))
+        breaker.start()
+        self.addCleanup(breaker.stop)
 
     def _chat(self, payload=None):
         return Client().post(
@@ -223,11 +244,62 @@ class QuotaInViewsTests(TestCase):
 
     @patch("AIModel.views._get_client")
     def test_a_failed_model_call_gives_the_question_back(self, get_client):
+        # 稽核 BE3-01：只有確定沒計費的失敗（連不上、5xx、429、斷路器）才退；原本用 RuntimeError，現在它屬於「可能已計費」
         client = MagicMock()
-        client.messages.create.side_effect = RuntimeError("boom")
+        client.messages.create.side_effect = _connection_error()
+        client.with_options.return_value = client
         get_client.return_value = client
         self.assertEqual(self._chat().status_code, 502)
         self.assertEqual(AiDailyUsage.objects.get(uid="u1").count, 0)
+
+    @patch("AIModel.views._get_client")
+    def test_failures_that_may_have_been_charged_keep_the_question_counted(self, get_client):
+        # 稽核 BE3-01：逾時（供應商可能已在處理）與不明錯誤都可能已計費，不退還
+        for exc in (_timeout_error(), RuntimeError("boom")):
+            with self.subTest(exc=type(exc).__name__):
+                AiDailyUsage.objects.all().delete()
+                client = MagicMock()
+                client.messages.create.side_effect = exc
+                client.with_options.return_value = client
+                get_client.return_value = client
+                with self.assertLogs("AIModel.views", level="ERROR"):
+                    self.assertGreaterEqual(self._chat().status_code, 500)
+                self.assertEqual(AiDailyUsage.objects.get(uid="u1").count, 1)
+
+    @patch("AIModel.views._get_client")
+    def test_a_failure_after_an_earlier_paid_round_of_the_tool_loop_does_not_refund(self, get_client):
+        # 稽核 BE3-01：第一輪（查辭典）已成功計費，第二輪連不上——就算最後一個例外本身「沒計費」，這次請求已經花了錢
+        from AIModel.test_dictionary_tools import _FakeLookup, _tool_use_response
+
+        client = MagicMock()
+        client.messages.create.side_effect = [
+            _tool_use_response(("search_words", {"keywords": ["lokah"]})), _connection_error(),
+        ]
+        client.with_options.return_value = client
+        get_client.return_value = client
+        with patch("AIModel.views.SqlDictionaryLookup", return_value=_FakeLookup({"lokah": ["你好"]})), \
+                self.assertLogs("AIModel.views", level="ERROR"):
+            self.assertEqual(self._chat().status_code, 502)
+        self.assertEqual(client.messages.create.call_count, 2)
+        self.assertEqual(AiDailyUsage.objects.get(uid="u1").count, 1)
+
+    @patch("AIModel.views.search_tayal_words_bulk", return_value={})
+    @patch("AIModel.views._get_client")
+    def test_the_review_endpoint_refunds_only_failures_that_were_not_charged(self, get_client, _words):
+        # 稽核 BE3-01：句子補充說明同一套規則
+        post = lambda: Client().post(
+            "/AIModel/review_tayal_chat/", data=json.dumps({"message": "lokah su"}), content_type="application/json",
+        )
+        for exc, expected in ((_connection_error(), 0), (_timeout_error(), 1)):
+            with self.subTest(exc=type(exc).__name__):
+                AiDailyUsage.objects.all().delete()
+                client = MagicMock()
+                client.messages.create.side_effect = exc
+                client.with_options.return_value = client
+                get_client.return_value = client
+                with self.assertLogs("AIModel.views", level="ERROR"):
+                    self.assertGreaterEqual(post().status_code, 500)
+                self.assertEqual(AiDailyUsage.objects.get(uid="u1").count, expected)
 
     @patch("AIModel.views._get_client")
     def test_a_broken_quota_database_gives_503_and_never_reaches_the_model_or_refunds(self, get_client):

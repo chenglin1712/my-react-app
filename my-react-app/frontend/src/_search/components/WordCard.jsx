@@ -3,6 +3,7 @@ import { ListGroup } from 'react-bootstrap';
 import StarRating from '../../../components/ui/StarRating';
 import AudioPlayButton from '../../../components/ui/AudioPlayButton';
 import FavoriteButton from '../../../components/ui/FavoriteButton';
+import { isAuthFailedAudio } from '../../../hooks/useAuthorizedAudioPlayback';
 import WordDetailBody from './WordDetailBody';
 import { pickFirstSentence } from './wordDetailSummary';
 import '../../../static/css/_search/wordCard.css';
@@ -35,7 +36,8 @@ const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggle
           type="button"
           className="word-card-toggle"
           {...(onOpenDetail
-            ? { 'aria-haspopup': 'dialog' }
+            // data-word-key：詳情面板換詞後關閉，用它找回「最後看的那個詞」的字卡（稽核 FE3-15）
+            ? { 'aria-haspopup': 'dialog', 'data-word-key': keyName }
             : { 'aria-expanded': isExpanded, 'aria-controls': panelId })}
           onClick={(e) => (onOpenDetail ? onOpenDetail({ keyName, word, result }, e) : toggleExpand(keyName))}
         >
@@ -50,6 +52,7 @@ const WordCard = memo(({ word, result, keyName, isExpanded, toggleExpand, toggle
             playing={isPlayingWord}
             duration={playingDuration}
             failed={wordAudioFailed}
+            authRequired={isAuthFailedAudio(failedAudio, wordFileId)}
             onPlay={() => playAudio(wordFileId)}
             onStop={stopAudio}
             onRetry={() => retryAudio?.(wordFileId)}

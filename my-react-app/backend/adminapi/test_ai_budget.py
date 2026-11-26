@@ -92,6 +92,36 @@ class EvaluateTests(TestCase):
         self.assertAlmostEqual(result["spentUsd"], 51.0, places=2)
         self.assertEqual(result["level"], "exceeded")
 
+    def _search(self, n=1, when=None):
+        for _ in range(n):
+            row = AiUsageLog.objects.create(feature="web_search", model="web_search_20250305", status="ok")
+            if when is not None:
+                AiUsageLog.objects.filter(pk=row.pk).update(created_at=when)
+
+    def test_web_searches_are_charged_per_search_on_top_of_tokens(self):
+        # 稽核 BE3-06：網路搜尋另外按次計費（預設每次 $0.01），沒有 token；不能因為「模型」不在價目表就被標成不完整
+        spend(7)
+        self._search(150)
+        self._search(500, when=ai_budget.month_start() - timedelta(days=1))   # 上個月的不算
+        result = ai_budget.evaluate(use_cache=False)
+        self.assertAlmostEqual(result["spentUsd"], 8.5, places=4)              # $7 + 150 × $0.01
+        self.assertEqual(result["level"], "warning")                          # 只算 token 的話是 70%，會漏掉提醒
+        self.assertFalse(result["incomplete"])
+
+    def test_web_search_price_comes_from_the_environment_with_a_safe_default(self):
+        from adminapi import ai_usage
+
+        self._search(10)
+        for raw, expected in (("0.05", 0.5), ("", 0.1), ("abc", 0.1), ("-1", 0.1), ("inf", 0.1), ("0", 0.0)):
+            with self.subTest(raw=raw), patch.dict("os.environ", {"AI_WEB_SEARCH_COST_USD": raw}):
+                ai_usage._invalid_search_cost_reported.clear()
+                if raw in ("abc", "-1", "inf"):
+                    with self.assertLogs("adminapi.ai_usage", level="ERROR"):
+                        spent = ai_budget.evaluate(use_cache=False)["spentUsd"]
+                else:
+                    spent = ai_budget.evaluate(use_cache=False)["spentUsd"]
+                self.assertAlmostEqual(spent, expected, places=4)
+
     def test_the_result_is_cached_but_a_changed_budget_is_not_served_from_the_old_cache(self):
         spend(1)
         self.assertEqual(ai_budget.evaluate()["level"], "ok")

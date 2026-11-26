@@ -90,6 +90,10 @@ const SearchSpotlight = ({ query, setQuery, handleSearch, loading, selectedTribe
           aria-controls={listId}
           aria-activedescendant={open && activeIndex >= 0 ? optionId(activeIndex) : undefined}
           autoComplete="off"
+          // 稽核 FE3-02：手機預設會把詞首大寫、把 ' 換成 ’、自動改字，族語拼寫會被改掉；一律關掉
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
           value={query}
           maxLength={SEARCH_INPUT_MAX_LENGTH}
           onChange={(e) => {

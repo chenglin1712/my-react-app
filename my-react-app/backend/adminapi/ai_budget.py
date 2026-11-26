@@ -3,7 +3,8 @@
 預算金額來自環境變數 AI_MONTHLY_BUDGET_USD（美金）；沒設定或不是正數就是「不設預算」，什麼都不做。
 後台直接編輯預算留待路線圖 #35（模型與設定的後台頁）。
 
-已花費是用量表裡本月（台灣時間）的 token 乘上價目表的【估算】（見 ai_usage.MODEL_PRICES_PER_MTOK），不是帳單：
+已花費是用量表裡本月（台灣時間）的 token 乘上價目表的【估算】（見 ai_usage.MODEL_PRICES_PER_MTOK），
+加上網路搜尋次數乘單價（ai_usage.web_search_cost_usd，稽核 BE3-06），不是帳單：
 價目表沒有的模型改用表中最貴的單價保守估算並標示 incomplete（寧可早關，不可漏算），實際金額以 Anthropic Console 為準。所以預算要留緩衝，
 並且在 Anthropic Console 另外設定自己的支出上限，這裡只是第二道防線。
 
@@ -27,7 +28,7 @@ from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 
-from .ai_usage import BREAKER_FEATURE, MODEL_PRICES_PER_MTOK, estimate_cost_usd
+from .ai_usage import BREAKER_FEATURE, MODEL_PRICES_PER_MTOK, WEB_SEARCH_FEATURE, estimate_cost_usd, web_search_cost_usd
 from .models import AiUsageLog, AuditLog, FeatureFlag
 
 logger = logging.getLogger(__name__)
@@ -74,13 +75,16 @@ def month_start(now=None):
 
 
 def month_to_date_cost(now=None) -> tuple[float, bool]:
-    """(本月估算花費美金, 是否不完整)。不完整＝有用量但價目表沒有那個模型，實際花費比這個數字高。"""
+    """(本月估算花費美金, 是否不完整)。不完整＝有用量但價目表沒有那個模型，實際花費比這個數字高。
+    網路搜尋（稽核 BE3-06）按次計費、沒有 token：每筆 feature=web_search 的紀錄以 web_search_cost_usd() 計入，
+    不走 token 價目表（否則會因為「模型」不在價目表裡被標成不完整）。"""
+    month = AiUsageLog.objects.filter(created_at__gte=month_start(now))
     rows = (
-        AiUsageLog.objects.filter(created_at__gte=month_start(now)).exclude(feature=BREAKER_FEATURE)
+        month.exclude(feature__in=(BREAKER_FEATURE, WEB_SEARCH_FEATURE))
         .values("model")
         .annotate(i=Sum("input_tokens"), o=Sum("output_tokens"), r=Sum("cache_read_tokens"), w=Sum("cache_write_tokens"))
     )
-    total, incomplete = 0.0, False
+    total, incomplete = month.filter(feature=WEB_SEARCH_FEATURE).count() * web_search_cost_usd(), False
     for row in rows:
         i, o, r, w = (row[k] or 0 for k in ("i", "o", "r", "w"))
         cost = estimate_cost_usd(row["model"], i, o, r, w)

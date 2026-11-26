@@ -1,5 +1,8 @@
 """O4～O6：辭典查詢改用族語級索引（名稱／中文釋義字典、預先排好的清單、預先算好的簡化名稱與開頭字母）。
-結果必須與原本「逐筆掃描、每次重排」的寫法完全相同——這裡用隨機資料，把新做法與舊做法的原樣寫法逐筆對照。"""
+結果必須與原本「逐筆掃描、每次重排」的寫法完全相同——這裡用隨機資料，把新做法與舊做法的原樣寫法逐筆對照。
+
+稽核 FE3-02 之後比對改用正規化鍵（S.search_key：大小寫、撇號寫法、NFC、全形），下面的對照基準也跟著
+改成比對 search_key；空字串關鍵字不再「模糊符合所有詞」（端點本來就擋掉空字串）。"""
 import random
 from unittest.mock import patch
 
@@ -33,7 +36,7 @@ def _random_words(seed, n=300):
 def _old_search(words, keyword):
     results, matched = [], []
     for word in words:
-        if word.name == keyword:
+        if S.search_key(word.name) == S.search_key(keyword):
             matched.append(S.simplify_tayal(word.name))
             results.append(word)
     return results, matched
@@ -44,7 +47,7 @@ def _old_search_by_chinese(words, keyword):
     results, matched = [], []
     for word in words:
         for defin in (word.explanationItems or []):
-            if defin.chineseExplanation == keyword:
+            if S.search_key(defin.chineseExplanation) == S.search_key(keyword):
                 matched.append(S.simplify_tayal(word.name))
                 results.append(word)
                 break
@@ -56,7 +59,7 @@ def _old_fuzzy(words, keyword, exclude):
     for word in words:
         if S.simplify_tayal(word.name) in exclude:
             continue
-        if keyword in (word.name or ""):
+        if S.search_key(keyword) and S.search_key(keyword) in S.search_key(word.name):
             out.setdefault(word.name, []).append(word)
     return out
 
@@ -67,7 +70,7 @@ def _old_fuzzy_chinese(words, keyword, exclude):
         if S.simplify_tayal(word.name) in exclude:
             continue
         for defin in (word.explanationItems or []):
-            if keyword in (defin.chineseExplanation or ""):
+            if S.search_key(keyword) and S.search_key(keyword) in S.search_key(defin.chineseExplanation):
                 out.setdefault(defin.chineseExplanation, []).append(word)
     return out
 

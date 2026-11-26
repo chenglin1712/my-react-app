@@ -1,7 +1,8 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import useAudioPlayback from './useAudioPlayback';
+import useAudioPlayback, { SENTENCE_FAILURE_REASON } from './useAudioPlayback';
 import { createAuthorizedAudio } from '../utils/authAudio';
+import { apiPost } from '../utils/apiClient';
 
 /** playAudio() 原本沒有 playSentence() 已經有的世代（generation）防呆：
  * 快速連點兩個單字，較早那次呼叫在 await createAuthorizedAudio()（真正的
@@ -110,5 +111,66 @@ describe('useAudioPlayback.playAudio 世代防呆', () => {
     });
 
     expect(result.current.failedAudio.has('word-1')).toBe(true);
+  });
+});
+
+// 稽核 FE3-05：整句播放失敗要能就地顯示（哪一句、什麼原因），不再只能寫進呼叫端的錯誤狀態
+describe('useAudioPlayback.playSentence 失敗狀態', () => {
+  beforeEach(() => {
+    createAuthorizedAudio.mockReset();
+    apiPost.mockReset();
+  });
+
+  test('查不到發音片段失敗：記下是哪一句，不呼叫 onError 以外的東西；再播成功就清掉', async () => {
+    const onError = vi.fn();
+    apiPost.mockRejectedValueOnce(Object.assign(new Error('down'), { status: 503 }));
+    const { result } = renderHook(() => useAudioPlayback('tayal', onError));
+    await act(async () => { await result.current.playSentence('lokah su'); });
+    expect(result.current.sentenceFailure).toEqual({ sentence: 'lokah su', reason: SENTENCE_FAILURE_REASON.FAILED });
+    expect(onError).toHaveBeenCalledTimes(1); // 既有呼叫端（_translate）的行為不變
+
+    const audio = fakeAudio();
+    audio.play = vi.fn(() => { setTimeout(() => audio.onended?.(), 0); return Promise.resolve(); });
+    apiPost.mockResolvedValueOnce({ audioTokens: [{ fileId: 'f1' }] });
+    createAuthorizedAudio.mockResolvedValueOnce(audio);
+    await act(async () => { await result.current.playSentence('lokah su'); });
+    expect(result.current.sentenceFailure).toBeNull();
+  });
+
+  test('沒傳 onError 也不會出錯（單詞查詢頁不再把錯誤寫進查詢狀態）', async () => {
+    apiPost.mockRejectedValueOnce(new Error('down'));
+    const { result } = renderHook(() => useAudioPlayback('tayal'));
+    await act(async () => { await result.current.playSentence('x'); });
+    expect(result.current.sentenceFailure?.sentence).toBe('x');
+  });
+
+  test('訪客被音檔代理擋下（401）時原因是 auth', async () => {
+    apiPost.mockRejectedValueOnce(Object.assign(new Error('需要登入'), { status: 401 }));
+    const { result } = renderHook(() => useAudioPlayback('tayal'));
+    await act(async () => { await result.current.playSentence('x'); });
+    expect(result.current.sentenceFailure.reason).toBe(SENTENCE_FAILURE_REASON.AUTH);
+  });
+
+  test('每一段音檔都載不到、或根本沒有片段，也算失敗', async () => {
+    apiPost.mockResolvedValueOnce({ audioTokens: [{ fileId: 'a' }, { fileId: 'b' }] });
+    createAuthorizedAudio.mockRejectedValue(new Error('音檔載入失敗：HTTP 502'));
+    const { result } = renderHook(() => useAudioPlayback('tayal'));
+    await act(async () => { await result.current.playSentence('x'); });
+    expect(result.current.sentenceFailure.reason).toBe(SENTENCE_FAILURE_REASON.FAILED);
+
+    apiPost.mockResolvedValueOnce({ audioTokens: [] });
+    await act(async () => { await result.current.playSentence('y'); });
+    expect(result.current.sentenceFailure).toEqual({ sentence: 'y', reason: SENTENCE_FAILURE_REASON.EMPTY });
+  });
+
+  test('失敗的請求晚回來、已經開始播別的了：不會標記成失敗', async () => {
+    let rejectOld;
+    apiPost.mockImplementationOnce(() => new Promise((_r, reject) => { rejectOld = reject; }));
+    const { result } = renderHook(() => useAudioPlayback('tayal'));
+    let pending;
+    act(() => { pending = result.current.playSentence('old'); });
+    act(() => { result.current.stopAudio(); });
+    await act(async () => { rejectOld(new Error('late')); await pending; });
+    expect(result.current.sentenceFailure).toBeNull();
   });
 });

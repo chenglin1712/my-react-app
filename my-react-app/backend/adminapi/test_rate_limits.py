@@ -1,11 +1,13 @@
 from adminapi.auth_fixtures import fresh_auth
 import json
 import os
+import re
 from contextlib import contextmanager
+from pathlib import Path
 from unittest.mock import patch
 
 from django.core.cache import cache
-from django.test import Client, TestCase
+from django.test import Client, SimpleTestCase, TestCase
 from django.test.utils import override_settings
 
 from config.roles import ADMIN, ANALYST, EDITOR, OWNER
@@ -242,6 +244,45 @@ class GetConfiguredRateTest(TestCase):
             mock_manager.filter.side_effect = Exception("db error")
             rate = get_configured_rate("user_create", "10/m")
         self.assertEqual(rate, "10/m")
+
+
+class SeedFastapiDictionaryRulesMatchCodeDefaultsTest(SimpleTestCase):
+    """FE3-01／FE3-04（WP-10 驗證後修正）：辭典搜尋路由裡寫死的每個限流 key 與預設值，
+    都要在 seed_rate_limit_rules 的 FASTAPI_RULES 裡以相同的值登錄，後台才看得到、改得到。
+    直接讀 search.py 原始碼比對，不 import FastAPI 模組（避免在 Django 測試裡拉起整個 FastAPI app）。"""
+
+    SEARCH_PY = Path(__file__).resolve().parent.parent / "fastAPI" / "routes" / "dictionary" / "search.py"
+
+    def _code_defaults(self):
+        source = self.SEARCH_PY.read_text(encoding="utf-8")
+        pairs = re.findall(r'"(dictionary_search_[a-z_]+)",\s*"(\d+/[a-z]+)"', source)
+        return dict(pairs)
+
+    def test_every_dictionary_search_key_is_seeded_with_the_code_default(self):
+        from adminapi.management.commands.seed_rate_limit_rules import FASTAPI_RULES
+        seeded = {key: rate for key, rate, _ in FASTAPI_RULES}
+        defaults = self._code_defaults()
+        # 確認正則真的抓到這次要求的四個 key，避免原始碼格式改了之後測試默默變成空比對
+        self.assertLessEqual({
+            "dictionary_search_allsearch_guest", "dictionary_search_all_words_guest",
+            "dictionary_search_suggest_guest", "dictionary_search_suggest",
+        }, set(defaults))
+        for key, rate in defaults.items():
+            with self.subTest(key=key):
+                self.assertEqual(seeded.get(key), rate)
+
+    def test_guest_and_suggest_defaults(self):
+        from adminapi.management.commands.seed_rate_limit_rules import FASTAPI_RULES
+        seeded = {key: rate for key, rate, _ in FASTAPI_RULES}
+        self.assertEqual(seeded["dictionary_search_allsearch_guest"], "30/minute")
+        self.assertEqual(seeded["dictionary_search_all_words_guest"], "30/minute")
+        self.assertEqual(seeded["dictionary_search_suggest_guest"], "60/minute")
+        self.assertEqual(seeded["dictionary_search_suggest"], "120/minute")
+
+    def test_fastapi_rule_keys_are_unique(self):
+        from adminapi.management.commands.seed_rate_limit_rules import FASTAPI_RULES
+        keys = [key for key, _, _ in FASTAPI_RULES]
+        self.assertEqual(len(keys), len(set(keys)))
 
 
 class SharedRateLimitHelpersUseConfiguredRateTest(TestCase):

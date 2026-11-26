@@ -13,22 +13,78 @@ prompt 樣板、外部 API 呼叫、回應解析全部塞在同一個函式裡�
 import datetime
 import hashlib
 import hmac
+import contextvars
 import json
 import logging
 import re
+import time
 
-from config.llm import REFUSAL_MESSAGE, LLMRefusalError, call_claude, extract_text, stream_claude
+from config.llm import (
+    REFUSAL_MESSAGE, LLMDeadlineError, LLMRefusalError, call_claude, extract_text, get_usage_recorder, llm_deadline,
+    stream_claude,
+)
 from .router import route_message, routing_enabled
 from .entries import RecordingLookup, mentions
 from .image_input import with_image
-from .output_guard import StreamGuard, guard_field, guard_reply
+from .output_guard import CONTACT_REMOVED, LINK_REMOVED, StreamGuard, guard_field, guard_reply, strip_links
 from .validators import find_unverified_words
 from .schemas import PLAN_SCHEMA, REVIEW_SCHEMA
 from . import assistant_settings, memory_store, moderation
 from .followups import followups_for_entries, followups_for_plan
 from .study_plan_store import load_progress_line
 from .tools import TOOLS, ToolInputError, run_tool
-from .web_search import MAX_PAUSE_CONTINUATIONS, WEB_RULES, count_searches, extract_sources, web_search_tool
+from .web_search import (
+    MAX_PAUSE_CONTINUATIONS, TOOL_TYPE as WEB_SEARCH_TOOL_TYPE, USAGE_FEATURE as WEB_SEARCH_FEATURE, WEB_RULES,
+    count_searches, extract_sources, web_search_tool,
+)
+
+# 稽核 BE3-01：串流時供應商已經開始送文字（就算被 StreamGuard 扣住、還沒轉給前端）就代表這次呼叫已計費。
+# last_call 要等整段串流結束才會設定，中途斷線時只看它會誤判成「沒計費」而退還額度，所以另外記這個旗標。
+# contextvar：一般 generator 在呼叫端的 context 執行，views 讀得到；每個請求各自一份。
+stream_output_seen: contextvars.ContextVar = contextvars.ContextVar("ai_stream_output_seen", default=False)
+
+# 稽核 BE3-02：剩下不到這麼多秒就不再執行工具（辭典查詢、記憶寫入）：之後的模型呼叫一定來不及，
+# 工具的副作用（寫入記憶）也就沒有意義。與 config.llm._MIN_BUDGET_SECONDS 同值。
+_MIN_TOOL_BUDGET_SECONDS = 2.0
+
+
+def _check_deadline() -> None:
+    """有設定整體截止時間（views 的 _request_deadline／串流端點）且剩餘時間不足時丟 LLMDeadlineError（稽核 BE3-02）。
+    模型呼叫本身由 config.llm._with_deadline 檢查；這裡補上「執行工具之前」的檢查。"""
+    deadline = llm_deadline.get()
+    if deadline is not None and deadline - time.monotonic() < _MIN_TOOL_BUDGET_SECONDS:
+        raise LLMDeadlineError("[AIModel] 已接近整體截止時間，不再執行工具")
+
+
+def _searches_in(response) -> int:
+    """這一次回應實際執行了幾次網路搜尋。優先用 API 回報的計費數字（usage.server_tool_use.web_search_requests），
+    取不到時才數內容區塊（count_searches）。"""
+    usage = getattr(getattr(response, "usage", None), "server_tool_use", None)
+    reported = getattr(usage, "web_search_requests", None)
+    if isinstance(reported, int) and not isinstance(reported, bool) and reported >= 0:
+        return reported
+    return count_searches(getattr(response, "content", None))
+
+
+def _record_web_searches(response, uid: str, web_tool) -> None:
+    """稽核 BE3-06：網路搜尋每次另外計費（不在 token 裡），每一次搜尋寫一筆 feature=web_search 的用量紀錄，
+    月預算（adminapi/ai_budget.month_to_date_cost）才算得到。每一輪回應各自記錄（不等整則回覆完成），
+    之後的輪次失敗也不會漏記已經發生的搜尋。紀錄失敗不影響回覆。"""
+    if web_tool is None:
+        return
+    try:
+        searches = _searches_in(response)
+        recorder = get_usage_recorder()
+        if not searches or recorder is None:
+            return
+        for _ in range(searches):
+            recorder({
+                "feature": WEB_SEARCH_FEATURE, "uid": uid or "", "model": WEB_SEARCH_TOOL_TYPE, "status": "ok",
+                "request_id": "", "input_tokens": None, "output_tokens": None, "cache_read_tokens": None,
+                "cache_write_tokens": None, "latency_ms": 0, "prompt_version": "",
+            })
+    except Exception:
+        logger.warning("[AIModel] 網路搜尋用量紀錄失敗（不影響回覆）", exc_info=True)
 
 # 辭典工具來回的輪數上限（路線圖 #16）；每多一輪就多一次 API 呼叫與延遲。
 # 學習記憶（#21）開著時，API 會要求模型先 view 記憶目錄，所以多給一輪。
@@ -392,14 +448,37 @@ def _parse_event_time(value, field: str) -> datetime.datetime:
     return parsed.replace(tzinfo=TAIPEI) if parsed.tzinfo is None else parsed.astimezone(TAIPEI)
 
 
+# 稽核 BE3-05：計畫文字的長度上限，與 study_plan_store 讀回 Firestore 時的上限一致（_MAX_TITLE／_MAX_SUMMARY／
+# _MAX_DESCRIPTION），否則存進去的文字下次讀回來會被截成不同的樣子。
+_PLAN_TITLE_LIMIT = 100
+_PLAN_SUMMARY_LIMIT = 100
+_PLAN_DESCRIPTION_LIMIT = 300
+# 控制字元（C0、DEL、C1）：行事曆文字用不到，可能干擾匯出（.ics）或終端機顯示。換行與 tab 已先被壓成空白。
+_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+
+
+def _plan_text(value, limit: int) -> str:
+    """計畫的標題與任務文字（稽核 BE3-05）：這些文字會被加進學生的行事曆，標題還會組進已簽章的回覆，
+    要和一般回覆一樣經過輸出驗證——去掉控制字元，由 strip_links 移除網址、電子郵件、HTML 標籤，
+    再壓成單行並套長度上限（guard_field 截斷時不拆開字母與組合符號，族語拼寫不會被切壞）。
+    行事曆文字不留「（已移除連結）」這類標記：清完只剩標記的欄位會變成空字串，由呼叫端視為不合格。
+    不是字串回傳空字串。"""
+    if not isinstance(value, str):
+        return ""
+    cleaned, _ = strip_links(_CONTROL_CHARS.sub(" ", value))
+    cleaned = cleaned.replace(LINK_REMOVED, " ").replace(CONTACT_REMOVED, " ")
+    return guard_field(" ".join(cleaned.split()), limit).strip()
+
+
 def validate_study_plan(parsed, today: datetime.date) -> dict:
     """驗證結構化輸出回來的計畫語意，通過時回傳前端需要的 dict（含 type）。
-    不通過丟 ValueError，訊息只寫進 log，不回給使用者。"""
+    不通過丟 ValueError，訊息只寫進 log，不回給使用者。
+    文字欄位一律經過 _plan_text 的輸出驗證（稽核 BE3-05）；清完變成空字串的標題或任務視為不合格。"""
     if not isinstance(parsed, dict):
         raise ValueError("計畫不是物件")
-    title = parsed.get("title")
+    title = _plan_text(parsed.get("title"), _PLAN_TITLE_LIMIT)
     events = parsed.get("events")
-    if not isinstance(title, str) or not title.strip():
+    if not title:
         raise ValueError("缺少 title")
     if not isinstance(events, list) or not 1 <= len(events) <= _MAX_PLAN_EVENTS:
         raise ValueError(f"events 必須是 1~{_MAX_PLAN_EVENTS} 筆")
@@ -409,8 +488,8 @@ def validate_study_plan(parsed, today: datetime.date) -> dict:
     for i, ev in enumerate(events):
         if not isinstance(ev, dict):
             raise ValueError(f"events[{i}] 不是物件")
-        summary = ev.get("summary")
-        if not isinstance(summary, str) or not summary.strip():
+        summary = _plan_text(ev.get("summary"), _PLAN_SUMMARY_LIMIT)
+        if not summary:
             raise ValueError(f"events[{i}] 缺少 summary")
         start = _parse_event_time(ev.get("start"), f"events[{i}].start")
         end = _parse_event_time(ev.get("end"), f"events[{i}].end")
@@ -418,14 +497,13 @@ def validate_study_plan(parsed, today: datetime.date) -> dict:
             raise ValueError(f"events[{i}] 的 end 沒有晚於 start")
         if not (today <= start.date() <= last_day and today <= end.date() <= last_day):
             raise ValueError(f"events[{i}] 的日期 {start.date()}~{end.date()} 不在 {today}~{last_day} 內")
-        description = ev.get("description")
         clean.append({
-            "summary": summary.strip(),
-            "description": description.strip() if isinstance(description, str) else "",
+            "summary": summary,
+            "description": _plan_text(ev.get("description"), _PLAN_DESCRIPTION_LIMIT),
             "start": start.isoformat(),
             "end": end.isoformat(),
         })
-    return {"type": "study_plan", "title": title.strip(), "events": clean}
+    return {"type": "study_plan", "title": title, "events": clean}
 
 
 def _run_study_plan(client, prompt, messages: list, today: datetime.date, uid: str):
@@ -475,6 +553,13 @@ def run_study_plan_replan(client, tribe_name: str, plan: dict, availability: str
         return None
     # 標題沿用原計畫（不採用模型改過的）
     return {**result, "title": plan["title"], "replaced_ids": [t["id"] for t in unfinished]}
+
+
+def _memory_allowed(memory: bool, web_tool) -> bool:
+    """稽核 BE3-04：官方網站查證的回合不接學習記憶。搜尋結果是第三方網頁全文，和圖片裡的文字一樣是不可信的輸入
+    （views._chat_kwargs 對附圖片的回合也是同一原則），只靠 WEB_RULES 提示詞要求不照做不夠，要從權限上拿掉：
+    不給記憶工具、不放記憶規則，模型就算要求記憶工具也會被 _tool_result_blocks 拒絕，不會讀寫或刪除學生的記憶。"""
+    return bool(memory) and web_tool is None
 
 
 def _chat_tools(with_dictionary: bool, with_memory: bool, web_tool: dict | None = None) -> list:
@@ -543,6 +628,7 @@ def _run_chat_with_tools(client, prompt, messages: list, uid: str, lookup, memor
             client, feature="chat", uid=uid, system=prompt, messages=request_messages,
             tools=tools, tool_choice={"type": "none"} if last_round else None,
         )
+        _record_web_searches(response, uid, web_tool)
         if sink is not None:
             sink.extend(getattr(response, "content", None) or [])
         stop_reason = getattr(response, "stop_reason", None)
@@ -554,6 +640,7 @@ def _run_chat_with_tools(client, prompt, messages: list, uid: str, lookup, memor
             continue
         if stop_reason not in ("tool_use", "pause_turn") or last_round or not tool_uses:
             return response
+        _check_deadline()       # 稽核 BE3-02：時間快到就不再執行工具（下一次模型呼叫也來不及）
         round_number += 1
         request_messages += [
             {"role": "assistant", "content": response.content},
@@ -622,6 +709,7 @@ def run_tayal_chat(client, tribe_name: str, user_message: str, profile: dict | N
         return _plan_reply(client, tribe_name, profile, today, messages, uid)
 
     web_tool = web_search_tool() if flow == FLOW_CULTURE else None
+    memory = _memory_allowed(memory, web_tool)
     prompt = build_chat_system(tribe_name, profile, today, with_dictionary=lookup is not None, with_memory=memory,
                                with_image=bool(image), with_web=web_tool is not None)
     recorder = RecordingLookup(lookup) if lookup is not None else None
@@ -705,6 +793,7 @@ def _deltas(source, sink: list):
             except StopIteration as stop:
                 result = stop.value
                 break
+            stream_output_seen.set(True)    # 稽核 BE3-01：供應商已開始輸出＝已計費（views 據此決定是否退還額度）
             sink.append(text)
             safe = guard.feed(text)
             if safe:
@@ -732,6 +821,7 @@ def _stream_chat_with_tools(client, prompt, messages: list, uid: str, lookup, me
             client, feature="chat", uid=uid, system=prompt, messages=request_messages,
             tools=tools, tool_choice={"type": "none"} if last_round else None,
         ), parts)
+        _record_web_searches(response, uid, web_tool)
         if sink is not None:
             sink.extend(getattr(response, "content", None) or [])
         stop_reason = getattr(response, "stop_reason", None)
@@ -742,6 +832,7 @@ def _stream_chat_with_tools(client, prompt, messages: list, uid: str, lookup, me
             continue
         if stop_reason not in ("tool_use", "pause_turn") or last_round or not tool_uses:
             break
+        _check_deadline()       # 稽核 BE3-02：同非串流版
         round_number += 1
         request_messages += [
             {"role": "assistant", "content": response.content},
@@ -791,6 +882,7 @@ def stream_tayal_chat(client, tribe_name: str, user_message: str, profile: dict 
             text = "".join(parts)
         else:
             web_tool = web_search_tool() if flow == FLOW_CULTURE else None
+            memory = _memory_allowed(memory, web_tool)
             prompt = build_chat_system(tribe_name, profile, today, with_dictionary=lookup is not None, with_memory=memory,
                                        with_image=bool(image), with_web=web_tool is not None)
             recorder = RecordingLookup(lookup) if lookup is not None else None

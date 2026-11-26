@@ -2,6 +2,7 @@
 //
 // 規格（使用者在 X7 選「本輪就做」，細節由實作者定，列在這裡與檢查清單備註）：
 // - 什麼算一次「學習活動」：完成一次測驗、完成一局遊戲、新增一個收藏。其他操作不算，避免靠亂點衝數字。
+//   收藏（FE3-20）：同一個詞同一天只計一次；取消收藏不扣、「加入→取消→再加入」也不重複計。
 // - 資料與隱私：只存在這台裝置的瀏覽器（localStorage），不上傳、不跟帳號綁定、不改 Firestore 規則；
 //   清除瀏覽器資料或換裝置就歸零，畫面上會明講。每個帳號各自一份（鍵帶 uid），同一台電腦換帳號不會混在一起。
 // - 一天的界線：台灣時間（Asia/Taipei）午夜，不論使用者的裝置設在哪個時區。
@@ -55,22 +56,44 @@ export function readActivity(uid) {
   }
 }
 
-/** 完成一次學習活動時呼叫。沒有 uid（未登入）或寫不進去（無痕模式等）就靜默略過。 */
-export function recordLearningActivity(uid, kind, now = new Date()) {
-  if (!uid || !ACTIVITY_KINDS.includes(kind)) return;
+// FE3-20：「今天已經計過哪些項目」。只留當天那一份（跨日就丟掉，不讓資料越長越大）。
+// 收藏用它避免「加入→取消→再加入」同一個詞反覆累積次數。
+function readSeenToday(uid, today) {
+  try {
+    const raw = JSON.parse(localStorage.getItem(storageKey(uid)));
+    const seen = raw?.seen;
+    if (!seen || seen.day !== today || !Array.isArray(seen.keys)) return [];
+    return seen.keys.filter((k) => typeof k === "string");
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 完成一次學習活動時呼叫。沒有 uid（未登入）或寫不進去（無痕模式等）就靜默略過。
+ * itemKey：這次活動對應的項目（例如收藏的詞）。同一個項目同一天只計一次，之後再呼叫就略過，
+ * 回傳 false；沒帶 itemKey（測驗、遊戲）每次都計。回傳 true 表示有計入。
+ */
+export function recordLearningActivity(uid, kind, now = new Date(), itemKey = null) {
+  if (!uid || !ACTIVITY_KINDS.includes(kind)) return false;
   const days = readActivity(uid);
   const today = taipeiDayKey(now);
+  const dedupeKey = itemKey == null ? null : `${kind}:${String(itemKey)}`;
+  let seenKeys = readSeenToday(uid, today);
+  if (dedupeKey && seenKeys.includes(dedupeKey)) return false;
+  if (dedupeKey) seenKeys = [...seenKeys, dedupeKey];
   days[today] = (days[today] || 0) + 1;
   const keep = Object.keys(days).sort().slice(-MAX_DAYS);
   const trimmed = Object.fromEntries(keep.map((k) => [k, days[k]]));
   try {
-    localStorage.setItem(storageKey(uid), JSON.stringify({ days: trimmed }));
+    localStorage.setItem(storageKey(uid), JSON.stringify({ days: trimmed, seen: { day: today, keys: seenKeys } }));
   } catch {
-    return;
+    return false;
   }
   try {
     window.dispatchEvent(new CustomEvent(ACTIVITY_EVENT, { detail: { uid } }));
   } catch { /* 沒有 window 事件就算了，畫面下次載入會讀到 */ }
+  return true;
 }
 
 export function clearActivity(uid) {

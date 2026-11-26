@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeAll } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import WordDetailSheet from './WordDetailSheet';
 
 beforeAll(() => {
@@ -287,4 +287,40 @@ describe('詳情內的空白鍵播放（P2-9）', () => {
     expect(screen.getByRole('button', { name: '播放「babaw」的發音' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '關閉詳情' })).toBeInTheDocument();
   });
+});
+
+// 稽核 FE3-05：例句發音失敗在那一句旁邊顯示，「重播」是重新播放而不是重跑查詢
+describe('WordDetailSheet 例句發音失敗', () => {
+  const withSentence = {
+    keyName: 'k2',
+    word: '走',
+    result: { name: 'musa', explanationItems: [{ chineseExplanation: '走', sentenceItems: [{ originalSentence: 'musa ku', chineseSentence: '我走' }] }] },
+  };
+
+  test('失敗的那一句旁邊顯示說明與「重播」，按了重播呼叫 playSentence', () => {
+    const playSentence = vi.fn();
+    render(<WordDetailSheet {...base} hasSentenceAudio={false} playSentence={playSentence} detail={withSentence} sentenceFailure={{ sentence: 'musa ku', reason: 'failed' }} />);
+    expect(screen.getByText(/例句發音播放失敗/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '重播' }));
+    expect(playSentence).toHaveBeenCalledWith('musa ku');
+  });
+
+  test('訪客播不了（auth）時說明要登入，不給重播', () => {
+    render(<WordDetailSheet {...base} hasSentenceAudio={false} detail={withSentence} sentenceFailure={{ sentence: 'musa ku', reason: 'auth' }} />);
+    expect(screen.getByText('登入後才能播放例句發音。')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '重播' })).not.toBeInTheDocument();
+  });
+
+  test('別句的失敗不會顯示在這一句', () => {
+    render(<WordDetailSheet {...base} hasSentenceAudio={false} detail={withSentence} sentenceFailure={{ sentence: 'other', reason: 'failed' }} />);
+    expect(screen.queryByText(/例句發音播放失敗/)).not.toBeInTheDocument();
+  });
+});
+
+// 稽核 FE3-15：有 onExited 時關掉 react-bootstrap 的 restoreFocus，關閉後交給呼叫端放焦點
+test('關閉後呼叫 onExited，焦點不會被 react-bootstrap 拉回最初的按鈕', async () => {
+  const onExited = vi.fn();
+  const { rerender } = render(<><button type="button">origin</button><WordDetailSheet {...base} animated={false} detail={detail} onExited={onExited} /></>);
+  rerender(<><button type="button">origin</button><WordDetailSheet {...base} animated={false} detail={null} onExited={onExited} /></>);
+  await waitFor(() => expect(onExited).toHaveBeenCalled());
 });
