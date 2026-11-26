@@ -2,8 +2,10 @@ import {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from 'react';
+import { Link } from 'react-router-dom';
 import {
     Alert,
     Badge,
@@ -27,6 +29,7 @@ import {
     createGrammarSectionProposal,
     getGrammarSection,
     getRevision,
+    isEditConflict,
     proposeGrammarSectionDelete,
     proposeGrammarSectionUpdate,
     updateRevisionPayload,
@@ -38,10 +41,17 @@ import {
     canProposeDictionaryChanges,
     useRevisionActions,
 } from './useRevisionActions';
-import { REVISION_STATUS_META as STATUS_META, revisionFromSave } from './revisionMeta';
+import {
+    REVISION_STATUS_META as STATUS_META, canManageRevision, pendingReviewNotice, revisionActorLabel, revisionFromSave,
+} from './revisionMeta';
+import { SECTION_FIELD_KEYS, clearFieldError, extractFieldErrors } from './fieldErrors';
 import { useActionLock } from '../hooks/useActionLock';
 import { confirmAction } from '@components/ui/ConfirmDialog';
 import { SuccessNotice } from '../components/AdminToast';
+import { formatApiError } from '../apiErrors';
+import RevisionDetails from './RevisionDetails';
+import { diffTrees, SECTION_DIFF_SPEC } from './revisionDiff';
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 
 const emptySection = (tribeId = '') => ({
     tribe_id: tribeId,
@@ -440,11 +450,24 @@ function RuleEditor({
     );
 }
 
+/**
+ * revisionId：從 /admin/dictionary/revisions/:id 進來的「新建章節提案」（稽核 FE7a-02），
+ * sectionId 此時為 null。onDirtyChange：把有沒有未儲存變更回報給 GrammarTree，
+ * 切換章節／族語前先確認（稽核 FE7a-04）。focusOnLoad：載入完成後把焦點移到面板標題（稽核 FE7a-16）。
+ */
 export default function GrammarNodePanel({
     tribeId,
     sectionId,
     taxonomies,
     onSaved = () => {},
+    revisionId = null,
+    onDirtyChange,
+    focusOnLoad = false,
+    onCreateApproved,
+    onNewDiscarded,
+    onCreated,
+    initialRevision = null,
+    flashMessage = '',
 }) {
     const { userData } = useAuth();
     const role = userData?.role;
@@ -452,7 +475,7 @@ export default function GrammarNodePanel({
 
     const {
         tree,
-        reset,
+        reset: resetTree,
         update,
         addChild,
         removeChild,
@@ -460,12 +483,30 @@ export default function GrammarNodePanel({
         toPayload,
     } = useNestedForm(emptySection(tribeId));
 
+    // 稽核 FE7a-04：最後一次載入／儲存時的內容，用來判斷有沒有未儲存變更
+    const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(emptySection(tribeId)));
+    const reset = useCallback((nextTree) => {
+        setSavedSnapshot(JSON.stringify(nextTree));
+        resetTree(nextTree);
+    }, [resetTree]);
+
     const [revision, setRevision] = useState(null);
     const [baseHash, setBaseHash] = useState('');
+    // 目前生效的章節內容：刪除提案用它填表單（FE7a-03）、更新提案用它算變更摘要（FE7a-13）
+    const [currentSection, setCurrentSection] = useState(null);
+    // 稽核 FE7a-06：草稿 PUT 衝突時保留自己的版本
+    const [conflict, setConflict] = useState(null);
+    const headingRef = useRef(null);
     const [loading, setLoading] = useState(true);
     const [pageError, setPageError] = useState('');
+    // 稽核 FE7a-05 殘留（WP-8 追加）：能對應到章節頂層欄位的驗證錯誤，給欄位顯示 isInvalid
+    const [fieldErrors, setFieldErrors] = useState({});
     const [success, setSuccess] = useState('');
     const [reviewComment, setReviewComment] = useState('');
+    const updateSectionField = (field, value) => {
+        update([], { [field]: value });
+        setFieldErrors((current) => clearFieldError(current, field));
+    };
 
     // 儲存草稿、送審類動作（submit/withdraw/approve/reject/discard）、建立
     // 刪除提案彼此都應該互斥，共用同一把鎖——而不是像原本那樣各自用一個
@@ -480,10 +521,28 @@ export default function GrammarNodePanel({
     // 刪除提案（operation === 'delete'）也是 draft 狀態，但它的內容是
     // null——語意上是「要刪除這個章節」，不是可以繼續編輯的一般草稿。
     const isDeleteProposal = revision?.operation === 'delete';
-    const editable = canEditRole && !isDeleteProposal && (
+    // 別人建立的草稿：唯讀，也不能送審、捨棄、撤回（後端同樣會擋）
+    const canManage = canManageRevision(revision, { uid: userData?.uid, role });
+    const foreignRevision = Boolean(revision) && !canManage;
+    const editable = canEditRole && canManage && !isDeleteProposal && (
         (!revision && (isNew || Boolean(sectionId)))
         || revisionStatus === 'draft'
     );
+
+    const dirty = editable && !loading && JSON.stringify(toPayload()) !== savedSnapshot;
+    // 存檔／核准／捨棄成功後的 onCreated、onCreateApproved、onNewDiscarded 會由上層導頁，
+    // 先 allowNextNavigation()，不然 dirty 還沒更新，會被這裡的未儲存保護自己攔下
+    const { allowNextNavigation } = useUnsavedChangesGuard(dirty);
+    useEffect(() => {
+        onDirtyChange?.(dirty);
+    }, [dirty, onDirtyChange]);
+    // 面板卸載時（換章節、離開頁面）清掉回報，避免父層以為還有未儲存內容
+    useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
+
+    const changes = useMemo(() => {
+        if (!currentSection || revision?.operation !== 'update') return null;
+        return diffTrees(currentSection, normalizeSection(toPayload(), tribeId), SECTION_DIFF_SPEC);
+    }, [currentSection, revision?.operation, toPayload, tribeId]);
 
     const handleRevisionChanged = useCallback(async (result, actionKey) => {
         setPageError('');
@@ -495,16 +554,24 @@ export default function GrammarNodePanel({
             // 後端已經不存在的提案。
             setSuccess('提案已捨棄');
             setRevision(null);
+            setConflict(null);
 
             if (isNew) {
+                if (revisionId) {
+                    allowNextNavigation();
+                    onNewDiscarded?.();
+                    return;
+                }
                 reset(emptySection(tribeId));
             } else {
                 try {
                     const section = await getGrammarSection(sectionId);
                     setBaseHash(section.content_hash ?? '');
-                    reset(normalizeSection(section, tribeId));
+                    const current = normalizeSection(section, tribeId);
+                    setCurrentSection(current);
+                    reset(current);
                 } catch (err) {
-                    setPageError(err.message);
+                    setPageError(formatApiError(err));
                 }
             }
 
@@ -512,10 +579,15 @@ export default function GrammarNodePanel({
             return;
         }
 
+        if (actionKey === 'approve' && isNew && result?.target_id) {
+            allowNextNavigation();
+            onCreateApproved?.(result.target_id);
+        }
+
         setSuccess('提案狀態已更新');
         setRevision((current) => revisionFromSave(result, current));
         onSaved();
-    }, [isNew, onSaved, reset, sectionId, tribeId]);
+    }, [allowNextNavigation, isNew, onCreateApproved, onNewDiscarded, onSaved, reset, revisionId, sectionId, tribeId]);
 
     const revisionActions = useRevisionActions(
         revision?.id ?? null,
@@ -528,11 +600,29 @@ export default function GrammarNodePanel({
         (async () => {
             setLoading(true);
             setPageError('');
+            setFieldErrors({});
             setSuccess('');
             setRevision(null);
             setBaseHash('');
+            setCurrentSection(null);
+            setConflict(null);
 
             try {
+                if (revisionId) {
+                    // 提案頁（DictionaryRevisionRoute）已經讀過這筆提案，直接沿用
+                    const loadedRevision = (
+                        initialRevision && String(initialRevision.id) === String(revisionId)
+                    ) ? initialRevision : await getRevision(revisionId);
+                    if (!active) return;
+                    if (loadedRevision.target_kind && loadedRevision.target_kind !== 'grammar_section') {
+                        setPageError('這筆提案不是文法章節提案');
+                        return;
+                    }
+                    setRevision(loadedRevision);
+                    reset(normalizeSection(loadedRevision.payload ?? {}, tribeId));
+                    return;
+                }
+
                 if (isNew) {
                     reset(emptySection(tribeId));
                     return;
@@ -542,25 +632,31 @@ export default function GrammarNodePanel({
                 if (!active) return;
 
                 setBaseHash(section.content_hash ?? '');
+                const current = normalizeSection(section, tribeId);
+                setCurrentSection(current);
 
-                const pending = section.meta?.pending_revision;
+                // 稽核 FE7a-01：open_revision 含草稿與送審中的提案；舊版後端只有 pending_revision 時退回用它
+                const open = section.meta?.open_revision ?? section.meta?.pending_revision;
 
-                if (pending) {
-                    const loadedRevision = await getRevision(pending.id);
+                if (open) {
+                    const loadedRevision = await getRevision(open.id);
                     if (!active) return;
 
                     setRevision({
-                        ...pending,
+                        ...open,
                         ...loadedRevision,
-                        id: loadedRevision.id ?? pending.id,
+                        id: loadedRevision.id ?? open.id,
                     });
-                    reset(normalizeSection(loadedRevision.payload ?? section, tribeId));
+                    // 稽核 FE7a-03：刪除提案表單顯示目前生效內容
+                    reset(loadedRevision.operation === 'delete'
+                        ? current
+                        : normalizeSection(loadedRevision.payload ?? section, tribeId));
                 } else {
                     setRevision(null);
-                    reset(normalizeSection(section, tribeId));
+                    reset(current);
                 }
             } catch (err) {
-                if (active) setPageError(err.message);
+                if (active) setPageError(formatApiError(err));
             } finally {
                 if (active) setLoading(false);
             }
@@ -569,7 +665,19 @@ export default function GrammarNodePanel({
         return () => {
             active = false;
         };
-    }, [isNew, reset, sectionId, tribeId]);
+    }, [initialRevision, isNew, reset, revisionId, sectionId, tribeId]);
+
+    // 新建章節第一次存檔換到提案頁時，由呼叫端帶入成功訊息（載入流程會先清空 success，所以放在它後面）
+    useEffect(() => {
+        if (flashMessage) setSuccess(flashMessage);
+    }, [flashMessage]);
+
+    // 稽核 FE7a-16：手機寬度時面板在長清單下方，點章節後畫面看起來沒反應；載入完成後把焦點與視窗移到面板標題
+    useEffect(() => {
+        if (loading || !focusOnLoad || !headingRef.current) return;
+        headingRef.current.focus({ preventScroll: true });
+        headingRef.current.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+    }, [focusOnLoad, loading]);
 
     const affixes = useMemo(
         () => (taxonomies.grammar_affix ?? []).filter(
@@ -596,6 +704,7 @@ export default function GrammarNodePanel({
 
     const saveDraft = () => {
         setPageError('');
+        setFieldErrors({});
         setSuccess('');
 
         if (!tree.tribe_id) {
@@ -605,19 +714,24 @@ export default function GrammarNodePanel({
 
         if (!tree.title.trim()) {
             setPageError('章節名稱為必填');
+            setFieldErrors({ title: '章節名稱為必填' });
             return Promise.resolve(null);
         }
 
+        const snapshot = JSON.stringify(toPayload());
+
         return lock.runLocked('save', async () => {
+            const payload = buildPayload();
             try {
-                const payload = buildPayload();
                 let result;
 
                 if (revision?.id) {
                     if (revision.status !== 'draft') {
                         throw new Error('只有草稿提案可以修改內容');
                     }
-                    result = await updateRevisionPayload(revision.id, payload);
+                    result = await updateRevisionPayload(revision.id, payload, {
+                        baseUpdatedAt: revision.updated_at,
+                    });
                 } else if (isNew) {
                     result = await createGrammarSectionProposal(payload);
                 } else {
@@ -627,30 +741,88 @@ export default function GrammarNodePanel({
                     });
                 }
 
-                const nextRevision = revisionFromSave(result, {
+                let nextRevision = revisionFromSave(result, {
                     ...revision,
                     operation: isNew ? 'create' : 'update',
                     status: 'draft',
                     payload,
                 });
+                if (!result?.updated_at && nextRevision.id) {
+                    // 文法章節的建立／propose 端點不回 updated_at，補查一次，下次 PUT 才能帶樂觀鎖
+                    try {
+                        const loaded = await getRevision(nextRevision.id);
+                        nextRevision = { ...nextRevision, updated_at: loaded.updated_at };
+                    } catch {
+                        // 補查失敗只是少了這次的版本檢查，不影響已存好的草稿
+                    }
+                }
 
                 setRevision(nextRevision);
+                setConflict(null);
+                setSavedSnapshot(snapshot);
                 setSuccess('草稿已儲存');
                 await onSaved();
 
+                if (isNew && !revision?.id && !revisionId && nextRevision.id) {
+                    // 稽核 FE7a-02：新建章節第一次存檔後換到提案專屬網址，離開後才找得回來
+                    allowNextNavigation();
+                    onCreated?.(nextRevision.id);
+                }
+
                 return nextRevision;
             } catch (err) {
-                if (err.status === 409) {
+                if (isEditConflict(err)) {
+                    // WP-8 追加：propose 撞到別人的草稿時，頁面原本沒有 revision，靠 409 附的 revision_id 載入
+                    setConflict({ payload, latestLoaded: false, revisionId: err?.data?.revision_id });
                     setPageError(
-                        `${err.message} 文法章節在編輯期間已被其他人修改，`
-                        + '請重新載入最新內容後再建立提案。',
+                        '這份草稿在你編輯期間已被修改（可能是其他人，或你在另一個分頁存過）。'
+                        + '可以先載入最新內容比對，再決定是否改回你的版本後重新儲存。',
                     );
+                } else if (err.status === 409) {
+                    setPageError(`${formatApiError(err)} 請重新載入最新內容後再建立提案。`);
                 } else {
-                    setPageError(err.message);
+                    setPageError(formatApiError(err));
+                    setFieldErrors(extractFieldErrors(err, SECTION_FIELD_KEYS));
                 }
                 return null;
             }
         });
+    };
+
+    const reloadLatestRevision = async () => {
+        const targetId = revision?.id ?? conflict?.revisionId;
+        if (!targetId) return;
+        setPageError('');
+        try {
+            const loadedRevision = await getRevision(targetId);
+            setRevision((current) => ({ ...current, ...loadedRevision }));
+            reset(normalizeSection(loadedRevision.payload ?? {}, tribeId));
+            setConflict((current) => (current ? { ...current, latestLoaded: true } : current));
+            setSuccess('已載入最新內容；你的版本仍保留，可選擇「改回我的版本」');
+        } catch (err) {
+            setPageError(formatApiError(err));
+        }
+    };
+
+    const restoreMyVersion = () => {
+        if (!conflict) return;
+        // 只換表單、不更新快照：快照仍是伺服器最新版，未儲存保護才會繼續生效
+        resetTree(normalizeSection(conflict.payload, tribeId));
+        setConflict(null);
+        setSuccess('');
+    };
+
+    // 稽核 FE7a-09：捨棄草稿不可復原，先確認
+    const discardDraft = async () => {
+        const confirmed = await confirmAction({
+            title: '捨棄草稿',
+            message: isDeleteProposal
+                ? '確定要捨棄這個刪除提案嗎？章節本身不受影響。'
+                : '確定要捨棄這份草稿嗎？草稿中的所有修改都會消失，無法復原。',
+            confirmLabel: '捨棄草稿',
+        });
+        if (!confirmed) return;
+        await runRevisionAction(revisionActions.discard);
     };
 
     const runRevisionAction = async (action) => {
@@ -665,10 +837,15 @@ export default function GrammarNodePanel({
     };
 
     const createDeleteProposal = async () => {
+        // 稽核 FE7a-17：這一步只是建立提案（核准前可捨棄），原本寫「無法復原」會誤導
         const confirmed = await confirmAction({
-            title: '刪除文法章節',
-            message: <p className="mb-0">確定要刪除這個文法章節嗎？此操作無法復原。</p>,
-            confirmLabel: '刪除章節',
+            title: '建立刪除提案',
+            message: (
+                <p className="mb-0">
+                    將建立刪除提案，送審核准後才會移除這個文法章節；核准前可捨棄。
+                </p>
+            ),
+            confirmLabel: '建立刪除提案',
         });
         if (!confirmed) return undefined;
 
@@ -683,12 +860,13 @@ export default function GrammarNodePanel({
                     operation: 'delete',
                     payload: null,
                 }));
+                if (currentSection) reset(currentSection);
                 setSuccess('刪除提案草稿已建立');
                 // 刪除提案建立後章節仍存在（要核准後才真的移除），這裡只刷新
                 // 父層清單讓 pending_revision 徽章更新，不清除目前的選取。
                 await onSaved();
             } catch (err) {
-                setPageError(err.message);
+                setPageError(formatApiError(err));
             }
         });
     };
@@ -706,7 +884,9 @@ export default function GrammarNodePanel({
         <div className="dictionary-editor-page">
             <div className="dictionary-page-heading">
                 <div>
-                    <h2>{isNew ? '新增文法章節' : '文法章節詳情'}</h2>
+                    <h2 ref={headingRef} tabIndex={-1} className="dictionary-panel-heading">
+                        {isNew ? '新增文法章節' : '文法章節詳情'}
+                    </h2>
                     <p>
                         狀態：
                         <Badge
@@ -723,16 +903,43 @@ export default function GrammarNodePanel({
             {!editable && (
                 <Alert variant="warning">
                     {isDeleteProposal && '此章節已建立刪除提案，內容為唯讀；可以送審或捨棄這個提案。'}
-                    {!isDeleteProposal && revisionStatus === 'pending_review' && '此章節提案正在送審，欄位為唯讀；編輯者可先撤回提案再修改。'}
+                    {!isDeleteProposal && revisionStatus === 'pending_review'
+                        && pendingReviewNotice(revision, { canWithdraw: canEditRole && canManage, entityLabel: '章節' })}
                     {!isDeleteProposal && revisionStatus === 'approved' && '此章節提案已核准，內容為唯讀。'}
                     {!isDeleteProposal && revisionStatus === 'rejected' && '此章節提案已退件，內容為唯讀。'}
                     {!canEditRole && '目前角色沒有文法章節編輯權限。'}
+                    {canEditRole && foreignRevision && revisionStatus === 'draft'
+                        && `這是 ${revisionActorLabel(revision, 'created')} 建立的草稿，你無法修改。`}
                 </Alert>
             )}
 
             {pageError && <Alert variant="danger">{pageError}</Alert>}
+            {conflict && (
+                <div className="dictionary-editor-actions">
+                    <Button type="button" variant="outline-primary" onClick={reloadLatestRevision}>
+                        載入最新內容
+                    </Button>
+                    {conflict.latestLoaded && (
+                        <Button type="button" variant="outline-secondary" onClick={restoreMyVersion}>
+                            改回我的版本
+                        </Button>
+                    )}
+                </div>
+            )}
             {revisionActions.error && <Alert variant="danger">{revisionActions.error}</Alert>}
             <SuccessNotice message={success} />
+
+            <RevisionDetails revision={revision} entityLabel="文法章節" changes={changes} />
+            {isNew && !revisionId && !onCreated && revision?.id && (
+                // 稽核 FE7a-02：新建章節的提案沒有章節 id，左側清單不會出現；給一個回得來的網址
+                <Alert variant="info">
+                    這個新章節的提案可以從
+                    {' '}
+                    <Link to={`/admin/dictionary/revisions/${revision.id}`}>提案專屬頁面</Link>
+                    {' '}
+                    再次開啟（離開本頁後請由此返回或從送審佇列開啟）。
+                </Alert>
+            )}
 
             <Form
                 className="dictionary-editor-card"
@@ -747,8 +954,10 @@ export default function GrammarNodePanel({
                         <Form.Control
                             disabled={!editable}
                             value={tree.section_key}
-                            onChange={(event) => update([], { section_key: event.target.value })}
+                            isInvalid={Boolean(fieldErrors.section_key)}
+                            onChange={(event) => updateSectionField('section_key', event.target.value)}
                         />
+                        <Form.Control.Feedback type="invalid">{fieldErrors.section_key}</Form.Control.Feedback>
                     </Form.Group>
 
                     <Form.Group className="dictionary-field" controlId="grammar-section-title">
@@ -759,8 +968,10 @@ export default function GrammarNodePanel({
                             required
                             disabled={!editable}
                             value={tree.title}
-                            onChange={(event) => update([], { title: event.target.value })}
+                            isInvalid={Boolean(fieldErrors.title)}
+                            onChange={(event) => updateSectionField('title', event.target.value)}
                         />
+                        <Form.Control.Feedback type="invalid">{fieldErrors.title}</Form.Control.Feedback>
                     </Form.Group>
 
                     <Form.Group className="dictionary-field" controlId="grammar-section-description">
@@ -770,8 +981,10 @@ export default function GrammarNodePanel({
                             rows={3}
                             disabled={!editable}
                             value={tree.description}
-                            onChange={(event) => update([], { description: event.target.value })}
+                            isInvalid={Boolean(fieldErrors.description)}
+                            onChange={(event) => updateSectionField('description', event.target.value)}
                         />
+                        <Form.Control.Feedback type="invalid">{fieldErrors.description}</Form.Control.Feedback>
                     </Form.Group>
                 </div>
 
@@ -821,7 +1034,7 @@ export default function GrammarNodePanel({
                         </Button>
                     )}
 
-                    {revisionStatus === 'draft' && canEditRole && (
+                    {revisionStatus === 'draft' && canEditRole && canManage && (
                         <>
                             <Button
                                 type="button"
@@ -837,7 +1050,7 @@ export default function GrammarNodePanel({
                                 type="button"
                                 variant="outline-danger"
                                 disabled={revisionActions.pending}
-                                onClick={() => runRevisionAction(revisionActions.discard)}
+                                onClick={discardDraft}
                             >
                                 <Trash2 size={17} />
                                 捨棄草稿
@@ -845,7 +1058,7 @@ export default function GrammarNodePanel({
                         </>
                     )}
 
-                    {revisionStatus === 'pending_review' && canEditRole && (
+                    {revisionStatus === 'pending_review' && canEditRole && canManage && (
                         <Button
                             type="button"
                             variant="outline-secondary"
@@ -879,7 +1092,11 @@ export default function GrammarNodePanel({
                             variant="success"
                             disabled={revisionActions.pending}
                             onClick={() => runRevisionAction(
-                                () => revisionActions.approve({ reviewComment: reviewComment.trim() }),
+                                // 稽核 BE1-03：核准的是審核者載入時看到的那一版
+                                () => revisionActions.approve({
+                                    reviewComment: reviewComment.trim(),
+                                    baseUpdatedAt: revision?.updated_at,
+                                }),
                             )}
                         >
                             <Check size={17} />

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Form, Modal, Spinner } from 'react-bootstrap';
+import { Alert, Button, Form, Modal, Spinner } from 'react-bootstrap';
 import { Edit3, ImagePlus } from 'lucide-react';
 
 import { apiPatch } from '../../../utils/apiClient';
@@ -22,6 +22,8 @@ export default function ProfileEditModal({ show, user, uid, onClose, onSaved, on
         email: user?.email ?? '',
     });
 
+    // 稽核 FE7b-01：錯誤顯示在對話框內，不然會出現在對話框背後的頁面上，操作者看不到。
+    const [localError, setLocalError] = useState('');
     const media = useMediaUpload();
     const saveLock = useActionLock();
     const saving = saveLock.isLocked;
@@ -29,12 +31,16 @@ export default function ProfileEditModal({ show, user, uid, onClose, onSaved, on
     const avatarPreview = media.previews.avatar ?? user?.avatar_url ?? '';
     const busy = saving || avatarUploading;
 
-    // 這個對話框的其他錯誤（存檔失敗等）都是透過 onError 顯示在父層共用的
-    // Alert，上傳錯誤也走同一個管道，畫面上才不會出現兩種不同的錯誤呈現
-    // 方式。
+    // 上傳錯誤與存檔錯誤都顯示在對話框內同一個區塊（稽核 FE7b-01）。
     useEffect(() => {
-        if (media.error) onError(media.error);
-    }, [media.error, onError]);
+        if (media.error) setLocalError(media.error);
+    }, [media.error]);
+
+    // WP-8 追加（FE7b-15 殘留）：後端不支援移除 email（送空字串會被拒、不送則維持原值）。
+    // 原本有 email 的帳號清空欄位時，前端不送 email 卻顯示「已更新」，操作者會以為 email 已被移除；
+    // 改成直接阻止送出並說明。沒有 email 的帳號留空是正常狀態，照舊不送。
+    const hadEmail = Boolean(user?.email);
+    const emailCleared = hadEmail && !form.email.trim();
 
     const updateForm = (field, value) => {
         setForm((current) => ({ ...current, [field]: value }));
@@ -59,24 +65,30 @@ export default function ProfileEditModal({ show, user, uid, onClose, onSaved, on
         event.preventDefault();
 
         if (avatarUploading) {
-            onError('請等待頭像上傳完成');
+            setLocalError('請等待頭像上傳完成');
+            return;
+        }
+        if (emailCleared) {
+            setLocalError('Email 無法移除，請保留原本的 Email 或改成新的 Email 後再儲存。');
             return;
         }
 
         saveLock.runLocked('save', async () => {
             onError('');
+            setLocalError('');
 
             try {
                 await apiPatch(`/adminapi/users/${uid}/profile/`, {
                     name: form.name,
                     identity: form.identity,
                     avatar_url: form.avatar_url,
-                    email: form.email,
+                    // 稽核 FE7b-15：沒有 email 的帳號 email 欄位留空時不送，後端「有帶才更新」。
+                    ...(form.email.trim() ? { email: form.email.trim() } : {}),
                 });
 
                 onSaved('使用者資料已更新。');
             } catch (err) {
-                onError(err.message);
+                setLocalError(err.message);
             }
         });
     };
@@ -95,6 +107,8 @@ export default function ProfileEditModal({ show, user, uid, onClose, onSaved, on
                 </Modal.Header>
 
                 <Modal.Body>
+                    {localError && <Alert variant="danger" role="alert">{localError}</Alert>}
+
                     <Form.Group className="mb-3" controlId="profile-name">
                         <Form.Label>姓名</Form.Label>
                         <Form.Control
@@ -151,11 +165,14 @@ export default function ProfileEditModal({ show, user, uid, onClose, onSaved, on
                         <Form.Label>Email</Form.Label>
                         <Form.Control
                             type="email"
-                            required
                             disabled={saving}
                             value={form.email}
+                            isInvalid={emailCleared}
                             onChange={(event) => updateForm('email', event.target.value)}
                         />
+                        <Form.Control.Feedback type="invalid">
+                            Email 無法移除，只能改成新的 Email。
+                        </Form.Control.Feedback>
                     </Form.Group>
                 </Modal.Body>
 
@@ -169,7 +186,7 @@ export default function ProfileEditModal({ show, user, uid, onClose, onSaved, on
                         取消
                     </Button>
 
-                    <Button type="submit" disabled={busy}>
+                    <Button type="submit" disabled={busy || emailCleared}>
                         {saving ? <Spinner animation="border" size="sm" /> : <Edit3 size={16} />}
                         儲存
                     </Button>

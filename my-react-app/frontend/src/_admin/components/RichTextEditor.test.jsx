@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import RichTextEditor from './RichTextEditor';
+import { countImagesMissingAlt } from './imageAlt';
 
 // jsdom 沒有版面計算：ProseMirror 插入內容後會捲動到游標，需要這些方法存在，否則測試結束後才丟出未處理的錯誤
 beforeAll(() => {
@@ -131,6 +132,40 @@ describe('RichTextEditor', () => {
     const file = new File(['x'], 'a.png', { type: 'image/png' });
     fireEvent.change(container.querySelector('input[type="file"]'), { target: { files: [file] } });
     expect(m.upload).toHaveBeenCalledWith(file, 'article-image', expect.objectContaining({ onUploaded: expect.any(Function) }));
+  });
+
+  /** 稽核 FE7a-19：圖片插入後替代文字預設是空的，也沒有提醒；現在插入後自動選取圖片並把焦點帶到替代文字欄，缺 alt 的圖片會被提醒。 */
+  test('上傳完成插入圖片後：選取該圖片，焦點移到替代文字欄', async () => {
+    const m = media({ upload: vi.fn((file, key, { onUploaded }) => onUploaded('https://example.com/a.png')) });
+    const onChange = vi.fn();
+    const { container } = render(<RichTextEditor value={DOC} onChange={onChange} media={m} />);
+    await screen.findByText('既有內文');
+    fireEvent.change(container.querySelector('input[type="file"]'), { target: { files: [new File(['x'], 'a.png', { type: 'image/png' })] } });
+
+    const alt = await screen.findByLabelText('替代文字（給看不到圖片的人）');
+    await waitFor(() => expect(alt).toHaveFocus());
+    expect(JSON.stringify(onChange.mock.calls.at(-1)[0])).toContain('https://example.com/a.png');
+  });
+
+  test('文件裡有缺替代文字的圖片時顯示提醒，填了就消失', async () => {
+    const doc = { type: 'doc', content: [
+      { type: 'paragraph', content: [{ type: 'text', text: '文' }] },
+      { type: 'image', attrs: { src: 'https://example.com/a.png', alt: '' } },
+      { type: 'image', attrs: { src: 'https://example.com/b.png', alt: '有說明' } },
+    ] };
+    render(<RichTextEditor value={doc} onChange={() => {}} media={media()} />);
+    expect(await screen.findByText(/有 1 張圖片還沒有替代文字/)).toBeInTheDocument();
+  });
+
+  test('countImagesMissingAlt：只算沒有（或只有空白）替代文字的圖片，會遞迴進巢狀內容', () => {
+    expect(countImagesMissingAlt({ type: 'doc', content: [] })).toBe(0);
+    expect(countImagesMissingAlt({ type: 'doc', content: [
+      { type: 'image', attrs: { alt: '' } },
+      { type: 'image', attrs: { alt: '   ' } },
+      { type: 'image', attrs: {} },
+      { type: 'image', attrs: { alt: '好' } },
+      { type: 'blockquote', content: [{ type: 'image', attrs: { alt: '' } }] },
+    ] })).toBe(4);
   });
 
   test('上傳中顯示狀態、上傳失敗顯示錯誤', async () => {

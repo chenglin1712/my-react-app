@@ -55,6 +55,7 @@ from ._shared import (
     write_audit_log as _write_audit_log,
 )
 from .crawler_sync import sync_crawler_announcements
+from .user_names import lookup_user_names
 from .models import Announcement, AnnouncementSyncStatus, AuditLog
 from .revisions import (
     cancel_stale_pending_revision, make_revision_views, pending_revision_target_ids,
@@ -619,7 +620,10 @@ def audit_log_list(request, decoded):
 
     total = logs.count()
     start = (page - 1) * limit
+    page_logs = list(logs[start:start + limit])
+    # WP-8 追加：一次批次查完這一頁所有操作者的姓名（有快取、失敗回空字串），不逐筆查
+    actor_names = lookup_user_names(log.actor_uid for log in page_logs)
     return JsonResponse({
-        "results": AuditLogSerializer(logs[start:start + limit], many=True).data,
+        "results": AuditLogSerializer(page_logs, many=True, context={"actor_names": actor_names}).data,
         "count": total, "page": page, "page_size": limit,
     })

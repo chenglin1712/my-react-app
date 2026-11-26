@@ -48,6 +48,55 @@ describe('AdminReauthModal', () => {
         expect(mockGetIdToken).toHaveBeenCalledWith(true);
     });
 
+    /** 稽核 FE7a-18：同一批請求同時回 401 會連發多次事件，後來的事件不能清掉使用者已輸入的密碼。 */
+    test('視窗已開啟時再收到事件：不清空已輸入的密碼', () => {
+        render(<AdminReauthModal />);
+        open();
+        fireEvent.change(screen.getByLabelText('密碼'), { target: { value: 'typing' } });
+
+        open();
+        open();
+
+        expect(screen.getByLabelText('密碼')).toHaveValue('typing');
+    });
+
+    test('視窗已開啟、顯示錯誤訊息時再收到事件：錯誤不會被清掉', async () => {
+        mockReauth.mockRejectedValueOnce({ code: 'auth/invalid-credential' });
+        render(<AdminReauthModal />);
+        open();
+        fireEvent.change(screen.getByLabelText('密碼'), { target: { value: 'wrong' } });
+        fireEvent.click(screen.getByRole('button', { name: '驗證' }));
+        await screen.findByText('密碼錯誤，請再試一次。');
+
+        open();
+
+        expect(screen.getByText('密碼錯誤，請再試一次。')).toBeInTheDocument();
+    });
+
+    test('驗證成功（done）後再收到事件：重新開啟並回到輸入密碼的狀態', async () => {
+        mockReauth.mockResolvedValueOnce({});
+        render(<AdminReauthModal />);
+        open();
+        fireEvent.change(screen.getByLabelText('密碼'), { target: { value: 'secret1' } });
+        fireEvent.click(screen.getByRole('button', { name: '驗證' }));
+        await screen.findByText(/已重新驗證/);
+
+        open();
+
+        expect(screen.queryByText(/已重新驗證/)).not.toBeInTheDocument();
+        expect(screen.getByLabelText('密碼')).toHaveValue('');
+    });
+
+    test('關閉後再收到事件：會重新開啟', async () => {
+        render(<AdminReauthModal />);
+        open();
+        fireEvent.click(screen.getByRole('button', { name: '稍後再說' }));
+        await waitFor(() => expect(screen.queryByText('請重新驗證身分')).not.toBeInTheDocument());
+
+        open();
+        expect(screen.getByText('請重新驗證身分')).toBeInTheDocument();
+    });
+
     test('密碼錯誤：顯示錯誤、不換發 token', async () => {
         mockReauth.mockRejectedValueOnce({ code: 'auth/invalid-credential' });
         render(<AdminReauthModal />);

@@ -3,6 +3,9 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import AnnouncementEditor from './AnnouncementEditor';
 import { apiGet, apiPost, apiPatch } from '../../../utils/apiClient';
+import { uploadToCloudinary } from '@utils/uploadToCloudinary';
+
+vi.mock('@utils/uploadToCloudinary', () => ({ uploadToCloudinary: vi.fn() }));
 
 vi.mock('../../../utils/apiClient', () => ({
   apiGet: vi.fn(),
@@ -852,5 +855,139 @@ describe('AnnouncementEditor · 編輯模式', () => {
     expect(await screen.findByText('伺服器暫時無法處理，請稍後再試')).toBeInTheDocument();
     expect(screen.queryByDisplayValue('A 公告的標題')).not.toBeInTheDocument();
     expect(screen.queryByDisplayValue('A 公告的內文')).not.toBeInTheDocument();
+  });
+});
+
+describe('AnnouncementEditor · 稽核 FE7b 修正', () => {
+  const draftItem = {
+    id: 9, title: '可編輯的草稿', body: '', category: 'announcement', tribes: [], cover_image_url: '',
+    link_url: '', is_pinned: false, pin_until: null, publish_at: null, unpublish_at: null,
+    status: 'draft', updated_at: '2026-08-01T00:00:00Z',
+  };
+
+  beforeEach(() => {
+    mockRole = 'owner';
+    apiGet.mockReset();
+    apiPost.mockReset();
+    apiPatch.mockReset();
+    uploadToCloudinary.mockReset();
+  });
+
+  /** 稽核 FE7b-04：新公告第一次儲存後會換網址（id 改變），useMediaUpload 以 resetKey 重置而清掉預覽。 */
+  test('新公告上傳封面後第一次儲存：換成這篇公告自己的網址後，封面圖預覽仍在', async () => {
+    uploadToCloudinary.mockResolvedValue('https://res.cloudinary.com/demo/image/upload/cover.jpg');
+    apiPost.mockResolvedValueOnce({ id: 42, status: 'draft', updated_at: '2026-08-01T00:00:00Z' });
+    const { container } = renderNew();
+    fireEvent.change(screen.getByLabelText(/標題/), { target: { value: '有封面的公告' } });
+    fireEvent.change(container.querySelector('#announcement-cover'), {
+      target: { files: [new File(['x'], 'cover.jpg', { type: 'image/jpeg' })] },
+    });
+    await waitFor(() => expect(screen.getByAltText('封面圖預覽')).toHaveAttribute(
+      'src', 'https://res.cloudinary.com/demo/image/upload/cover.jpg',
+    ));
+
+    fireEvent.click(screen.getByRole('button', { name: /^儲存$/ }));
+    expect(await screen.findByText('編輯公告')).toBeInTheDocument();
+
+    expect(screen.getByAltText('封面圖預覽')).toHaveAttribute(
+      'src', 'https://res.cloudinary.com/demo/image/upload/cover.jpg',
+    );
+    expect(apiGet).not.toHaveBeenCalled();
+  });
+
+  /** 稽核 FE7b-08 */
+  test('編輯時 PATCH 帶載入時的 updated_at；存成功後下一次改帶回應裡的新值', async () => {
+    apiGet.mockResolvedValueOnce(draftItem);
+    apiPatch.mockResolvedValueOnce({ ...draftItem, updated_at: '2026-08-02T00:00:00Z' });
+    apiPatch.mockResolvedValueOnce({ ...draftItem, updated_at: '2026-08-03T00:00:00Z' });
+    renderEdit(9);
+    const title = await screen.findByDisplayValue('可編輯的草稿');
+
+    fireEvent.click(screen.getByRole('button', { name: /^儲存$/ }));
+    await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(1));
+    expect(apiPatch.mock.calls[0][1]).toHaveProperty('base_updated_at', '2026-08-01T00:00:00Z');
+
+    await screen.findByText('公告已儲存');
+    fireEvent.change(title, { target: { value: '改過的標題' } });
+    fireEvent.click(screen.getByRole('button', { name: /^儲存$/ }));
+    await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(2));
+    expect(apiPatch.mock.calls[1][1]).toHaveProperty('base_updated_at', '2026-08-02T00:00:00Z');
+  });
+
+  test('PATCH 回 409 edit_conflict：顯示「有人剛更新過」；按「載入最新版本」重新載入伺服器內容', async () => {
+    apiGet.mockResolvedValueOnce(draftItem);
+    apiPatch.mockRejectedValueOnce(Object.assign(new Error('內容已被其他人更新'), { status: 409, data: { code: 'edit_conflict' } }));
+    renderEdit(9);
+    const title = await screen.findByDisplayValue('可編輯的草稿');
+    fireEvent.change(title, { target: { value: '我改的標題' } });
+    fireEvent.click(screen.getByRole('button', { name: /^儲存$/ }));
+
+    expect(await screen.findByText(/有人剛更新過/)).toBeInTheDocument();
+    expect(screen.queryByText('公告已儲存')).not.toBeInTheDocument();
+    expect(screen.getByDisplayValue('我改的標題')).toBeInTheDocument();
+
+    apiGet.mockResolvedValueOnce({ ...draftItem, title: '別人改的標題', updated_at: '2026-08-09T00:00:00Z' });
+    fireEvent.click(screen.getByRole('button', { name: '載入最新版本' }));
+    expect(await screen.findByDisplayValue('別人改的標題')).toBeInTheDocument();
+    expect(screen.queryByText(/有人剛更新過/)).not.toBeInTheDocument();
+
+    apiPatch.mockResolvedValueOnce({ ...draftItem, title: '別人改的標題' });
+    fireEvent.click(screen.getByRole('button', { name: /^儲存$/ }));
+    await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(2));
+    expect(apiPatch.mock.calls[1][1]).toHaveProperty('base_updated_at', '2026-08-09T00:00:00Z');
+  });
+
+  /** WP-8 追加 */
+  test('409 edit_conflict：複製我的版本含標題與內文；載入最新版本後仍可複製，關閉後消失', async () => {
+    const writeText = vi.fn().mockResolvedValue();
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    apiGet.mockResolvedValueOnce(draftItem);
+    apiPatch.mockRejectedValueOnce(Object.assign(new Error('內容已被其他人更新'), { status: 409, data: { code: 'edit_conflict' } }));
+    renderEdit(9);
+    const title = await screen.findByDisplayValue('可編輯的草稿');
+    fireEvent.change(title, { target: { value: '我改的標題' } });
+    fireEvent.click(screen.getByRole('button', { name: /^儲存$/ }));
+    await screen.findByText(/有人剛更新過/);
+
+    fireEvent.click(screen.getByRole('button', { name: '複製我的版本' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText.mock.calls[0][0]).toContain('我改的標題');
+
+    apiGet.mockResolvedValueOnce({ ...draftItem, title: '別人改的標題', updated_at: '2026-08-09T00:00:00Z' });
+    fireEvent.click(screen.getByRole('button', { name: '載入最新版本' }));
+    await screen.findByDisplayValue('別人改的標題');
+    expect(screen.queryByText(/有人剛更新過/)).not.toBeInTheDocument();
+
+    writeText.mockClear();
+    fireEvent.click(await screen.findByRole('button', { name: '複製我的版本' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText.mock.calls[0][0]).toContain('我改的標題');
+
+    fireEvent.click(screen.getByRole('button', { name: '關閉' }));
+    expect(screen.queryByRole('button', { name: '複製我的版本' })).not.toBeInTheDocument();
+    delete navigator.clipboard;
+  });
+
+  /** 稽核 FE7b-03 */
+  test('有未儲存的修改時掛上離開頁面的瀏覽器確認，儲存後解除', async () => {
+    apiGet.mockResolvedValueOnce(draftItem);
+    apiPatch.mockResolvedValueOnce({ ...draftItem, title: '改過' });
+    renderEdit(9);
+    const title = await screen.findByDisplayValue('可編輯的草稿');
+
+    const clean = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(clean);
+    expect(clean.defaultPrevented).toBe(false);
+
+    fireEvent.change(title, { target: { value: '改過' } });
+    const dirty = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(dirty);
+    expect(dirty.defaultPrevented).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: /^儲存$/ }));
+    await screen.findByText('公告已儲存');
+    const saved = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(saved);
+    expect(saved.defaultPrevented).toBe(false);
   });
 });

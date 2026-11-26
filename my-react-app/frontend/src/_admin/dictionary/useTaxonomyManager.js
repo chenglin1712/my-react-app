@@ -8,6 +8,8 @@ import {
 } from './dictionaryApi';
 import { useActionLock } from '../hooks/useActionLock';
 import { confirmAction } from '@components/ui/ConfirmDialog';
+// 稽核 FE7a-05：後端驗證錯誤的具體原因放在 err.data.errors，只顯示 err.message 會只看到「請求參數錯誤」
+import { formatApiError } from '../apiErrors';
 
 const emptyAffixDraft = () => ({
     tribe_id: '',
@@ -72,7 +74,7 @@ export function useTaxonomyManager() {
             setTaxonomies(result);
         } catch (err) {
             if (isStale()) return;
-            setError(err.message);
+            setError(formatApiError(err));
         } finally {
             if (!isStale()) setLoading(false);
         }
@@ -114,7 +116,7 @@ export function useTaxonomyManager() {
                 }
                 await load();
             } catch (err) {
-                setError(err.message);
+                setError(formatApiError(err));
             }
         });
     };
@@ -141,7 +143,7 @@ export function useTaxonomyManager() {
             cancelEdit();
             await load();
         } catch (err) {
-            setError(err.message);
+            setError(formatApiError(err));
         }
     });
 
@@ -161,7 +163,7 @@ export function useTaxonomyManager() {
                 await deleteTaxonomyTerm(activeKind, row.id);
                 await load();
             } catch (err) {
-                setError(err.message);
+                setError(formatApiError(err));
             } finally {
                 setDeletingId(null);
             }

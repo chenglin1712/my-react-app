@@ -19,10 +19,6 @@ from .models import (
     QuizSituationItem, QuizTrueFalseItem, QuizVocabItem,
 )
 
-_DICTIONARY_LINKS = {
-    DictionaryRevision.TARGET_WORD: "/admin/dictionary/words",
-    DictionaryRevision.TARGET_GRAMMAR_SECTION: "/admin/dictionary/grammar",
-}
 
 REVIEW_TYPE_CHOICES = ("submission", "revision", "report")
 
@@ -133,7 +129,8 @@ def _collect_dictionary_revisions():
             "title": f"[{rev.get_operation_display()}] {title}",
             "submitted_by": rev.submitted_by,
             "submitted_at": _iso(rev.submitted_at),
-            "link": _DICTIONARY_LINKS.get(rev.target_kind, "/admin/dictionary/words"),
+            # 稽核 FE7a-02：連到這筆提案本身（新建提案沒有目標頁，離開編輯器就找不回來）
+            "link": f"/admin/dictionary/revisions/{rev.pk}",
         })
     return items
 

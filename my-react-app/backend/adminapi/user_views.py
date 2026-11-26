@@ -23,6 +23,7 @@ from firebase_admin.exceptions import FirebaseError
 
 from . import firebase_ops, quiz_research_service
 from .user_data_locations import DELETED_USER_PLACEHOLDER, LOCATIONS, export_docs, find_docs
+from .user_names import forget_user_name
 from .user_input import (
     AVATAR_URL_MAX, EMAIL_MAX, IDENTITY_MAX, NAME_MAX, PASSWORD_MAX,
     firebase_error_message, mask_email, text_field,
@@ -432,6 +433,9 @@ def user_profile(request, decoded, uid):
             )
         return failed_response
 
+    if "name" in firestore_updates:
+        # WP-8 追加：儀表板與辭典提案顯示的姓名有快取（user_names.py），改名後立刻失效
+        forget_user_name(uid)
     updated_record = firebase_ops.get_firebase_user(uid)
     updated_doc = doc_ref.get()
     payload = _merge_user(updated_record, updated_doc.to_dict() if updated_doc.exists else {})
@@ -658,11 +662,35 @@ def _delete_recordings(uid, recordings):
     return {"deleted": deleted_count, "storage_cleanup_failed": storage_failed}
 
 
+def _delete_confirmation(data, user_record, uid):
+    """WP-8 追加：刪除帳號的確認方式。有 email 的帳號維持「逐字輸入 email」；
+    沒有 email 的帳號（例如只用第三方或電話登入）原本永遠無法從後台刪除，
+    改成逐字輸入目標帳號 uid。兩者都和伺服器端查到的真實值比對，不信任前端；
+    有 email 的帳號不接受改用 uid，確認強度不因此降低。回傳 (確認方式, 錯誤回應)。"""
+    target_email = user_record.email or ""
+    if target_email:
+        confirm_email = data.get("confirm_email")
+        # 非字串原本會讓 .strip() 丟 500
+        confirm_email = confirm_email.strip() if isinstance(confirm_email, str) else ""
+        if not confirm_email or confirm_email != target_email:
+            return None, JsonResponse({"detail": "輸入的 email 與目標帳號不符"}, status=400)
+        return "email", None
+    confirm_uid = data.get("confirm_uid")
+    confirm_uid = confirm_uid.strip() if isinstance(confirm_uid, str) else ""
+    if not confirm_uid or confirm_uid != (user_record.uid or uid):
+        return None, JsonResponse({
+            "detail": "這個帳號沒有 email，請輸入帳號的 UID 以確認刪除",
+            "errors": {"confirm_uid": ["輸入的 UID 與目標帳號不符"]},
+        }, status=400)
+    return "uid", None
+
+
 @csrf_exempt
 @guarded_action(method="POST", role=ACCOUNT_MANAGERS, rate_limit=("user_delete", "10/m"))
 def user_delete(request, decoded, uid):
-    """刪除帳號——body 必填 confirm_email，逐字比對目標帳號真實 email 才會
-    真的執行（P3 規劃的既有決策：後台必須輸入該帳號 email 才能刪）。
+    """刪除帳號——有 email 的帳號 body 必填 confirm_email，逐字比對目標帳號真實
+    email 才會真的執行（P3 規劃的既有決策：後台必須輸入該帳號 email 才能刪）；
+    沒有 email 的帳號改填 confirm_uid（WP-8 追加，見 _delete_confirmation）。
 
     Firestore／Storage／Firebase Auth 之間沒有跨系統交易，每一步各自
     try/except，回傳每一步的成功/失敗，讓管理者知道哪個環節沒刪乾淨需要
@@ -687,9 +715,9 @@ def user_delete(request, decoded, uid):
     if forbidden_resp:
         return forbidden_resp
 
-    confirm_email = (data.get("confirm_email") or "").strip()
-    if not confirm_email or confirm_email != user_record.email:
-        return JsonResponse({"detail": "輸入的 email 與目標帳號不符"}, status=400)
+    confirmed_by, err_resp = _delete_confirmation(data, user_record, uid)
+    if err_resp:
+        return err_resp
 
     client = firebase_ops.get_firestore_client()
     doc_ref = client.collection("users").document(uid)
@@ -706,7 +734,8 @@ def user_delete(request, decoded, uid):
     # 哪一段失敗）要到最後才知道，另外在結尾補一筆 delete_account_result。
     _write_audit_log_first(
         request, decoded, "delete_account", uid, target_type="user",
-        before=before_snapshot, after={"status": "started"},
+        # WP-8 追加：記下用哪種方式確認（"email" 或 "uid"），只記方式、不記輸入值
+        before=before_snapshot, after={"status": "started", "confirmed_by": confirmed_by},
     )
 
     results = {}

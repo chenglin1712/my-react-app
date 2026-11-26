@@ -229,15 +229,27 @@ describe('getReviewActionLayout（外露一顆主要動作 ＋ ⋯ 選單）', (
         expect(announcement('pending_review', 'editor')).toEqual({ primary: 'withdraw', menu: ['view'] });
     });
 
-    it('已發布（owner）：主要動作是下架，編輯與檢視在選單，沒有刪除', () => {
+    it('已發布（owner）：主要動作是編輯（稽核 FE7b-02），下架與檢視在選單，沒有刪除', () => {
         const layout = announcement('published', 'owner');
-        expect(layout.primary).toBe('unpublish');
-        expect(layout.menu).toEqual(['edit', 'view']);
+        expect(layout.primary).toBe('edit');
+        expect(layout.menu).toEqual(['unpublish', 'view']);
         expect(layout.menu).not.toContain('delete');
     });
 
     it('已發布（editor）：沒有下架權限，主要動作是編輯', () => {
         expect(announcement('published', 'editor')).toEqual({ primary: 'edit', menu: ['view'] });
+    });
+
+    it('已發布（reviewer，可核准但不可編輯）：主要動作是檢視，下架收進選單（WP-8 追加）', () => {
+        const layout = getReviewActionLayout({
+            status: 'published', role: 'reviewer', roles: ROLES, supportsUnpublishedState: true, viewFallback: true,
+        });
+        expect(layout).toEqual({ primary: 'view', menu: ['unpublish'] });
+    });
+
+    it('題庫類已發布（reviewer）：沒有 view 動作，主要動作自然退回下架（WP-8 追加）', () => {
+        expect(getReviewActionLayout({ status: 'published', role: 'reviewer', roles: ROLES }))
+            .toEqual({ primary: 'unpublish', menu: [] });
     });
 
     it('已下架（owner）：主要動作是重新發布，編輯在選單，刪除在最底', () => {
@@ -255,8 +267,8 @@ describe('getReviewActionLayout（外露一顆主要動作 ＋ ⋯ 選單）', (
 
     it('已發布且有待審修改（owner）：核准修改與退件修改收進選單', () => {
         const layout = announcement('published', 'owner', { hasPendingRevision: true });
-        expect(layout.primary).toBe('unpublish');
-        expect(layout.menu).toEqual(expect.arrayContaining(['approveRevision', 'rejectRevision']));
+        expect(layout.primary).toBe('edit');
+        expect(layout.menu).toEqual(expect.arrayContaining(['approveRevision', 'rejectRevision', 'unpublish']));
     });
 
     it('題庫（沒有 view 後備）：待審核 reviewer 主要動作是核准，退件在選單，不會多出檢視', () => {

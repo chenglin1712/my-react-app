@@ -280,4 +280,28 @@ describe('QuizQualityAnalysis', () => {
     expect(screen.getByLabelText('日期區間')).toBeInTheDocument();
     expect(screen.getByLabelText('族語')).toBeInTheDocument();
   });
+
+  test('稽核 FE7b-06：樣本充足但鑑別度為空的題目出現在無法繪點清單並標明原因', async () => {
+    apiGet.mockResolvedValue({
+      ...qualityData,
+      items: [
+        {
+          item_kind: 'true_false',
+          item_id: 77,
+          label: '全員答對的題目',
+          list_path: '/admin/quiz-bank/true-false',
+          attempt_count: 50,
+          accuracy_rate: 1,
+          discrimination: null,
+          sufficient_sample: true,
+        },
+      ],
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('全員答對的題目')).toBeInTheDocument();
+    expect(screen.getByText('無法計算鑑別度（答題無變異）')).toBeInTheDocument();
+    expect(screen.queryByTestId('mock-scatter')).not.toBeInTheDocument();
+  });
 });

@@ -1,7 +1,10 @@
-import { useMemo, useState } from 'react';
+import {
+    useCallback, useEffect, useMemo, useState,
+} from 'react';
 import {
     Link,
     useLocation,
+    useNavigate,
     useParams,
 } from 'react-router-dom';
 import {
@@ -29,7 +32,10 @@ import {
     canApproveDictionaryChanges,
     canProposeDictionaryChanges,
 } from './useRevisionActions';
-import { REVISION_STATUS_META as STATUS_META, revisionFromSave } from './revisionMeta';
+import {
+    REVISION_STATUS_META as STATUS_META, canManageRevision, pendingReviewNotice, revisionActorLabel, revisionFromSave,
+} from './revisionMeta';
+import { clearFieldError } from './fieldErrors';
 import MediaUploadField from './MediaUploadField';
 import WordBasicFields from './WordBasicFields';
 import WordEditorExplanation, {
@@ -37,6 +43,15 @@ import WordEditorExplanation, {
 } from './WordEditorExplanation';
 import '../../../static/css/_admin/dictionary.css';
 import { SuccessNotice } from '../components/AdminToast';
+import { confirmAction } from '@components/ui/ConfirmDialog';
+import RevisionDetails from './RevisionDetails';
+import { diffTrees, WORD_DIFF_SPEC } from './revisionDiff';
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
+import { MediaUploadTrackerContext, useMediaUploadCounter } from './mediaUploadTracker';
+
+// 稽核 FE7a-07：「核准刪除時一併解除所有引用」只有 owner／admin 能提出（後端同樣限制）。
+// WP-8 追加：核准不再限制，reviewer 也能核准這種提案（審核畫面會明示核准後會解除引用）。
+const UNLINK_ROLES = ['owner', 'admin'];
 
 const EMPTY_TAXONOMIES = {
     tribes: [],
@@ -173,9 +188,16 @@ function normalizeWord(source = {}) {
     };
 }
 
-export default function WordEditor() {
-    const { id } = useParams();
+/**
+ * revisionId：從 /admin/dictionary/revisions/:id 進來的「新建詞條提案」（見 DictionaryRevisionRoute），
+ * 稽核 FE7a-02。這種提案還沒有 word_id，所以 isNew 仍為 true，但內容從提案載入。
+ */
+export default function WordEditor({ revisionId = null, initialRevision = null }) {
+    const params = useParams();
+    // 提案路由的 :id 是提案編號，不是詞條 id
+    const id = revisionId ? undefined : params.id;
     const location = useLocation();
+    const navigate = useNavigate();
     const { userData } = useAuth();
     const role = userData?.role;
     const isNew = !id;
@@ -186,7 +208,7 @@ export default function WordEditor() {
 
     const {
         tree,
-        reset,
+        reset: resetTree,
         update,
         addChild,
         removeChild,
@@ -194,21 +216,66 @@ export default function WordEditor() {
         toPayload,
     } = useNestedForm(EMPTY_WORD);
 
+    // 稽核 FE7a-04：記下最後一次載入／儲存時的表單內容，跟目前內容比對算出有沒有未儲存的變更
+    const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(EMPTY_WORD));
+    const reset = useCallback((nextTree) => {
+        setSavedSnapshot(JSON.stringify(nextTree));
+        resetTree(nextTree);
+    }, [resetTree]);
+
     const {
-        taxonomies, revision, baseHash, loading, saving,
-        pageError, setPageError, success, setSuccess,
+        taxonomies, revision, currentWord, loading, saving,
+        pageError, setPageError, fieldErrors, setFieldErrors, success, setSuccess,
         revisionActions, saveDraft: saveDraftWithPayload, runRevisionAction,
-        deletion,
+        conflict, deletion,
     } = useWordEditorData({
         id,
+        revisionId,
+        // DictionaryRevisionRoute 已經讀過這筆提案，直接沿用，省一次重複請求
+        initialRevision,
         isNew,
         prefillName,
         reset,
+        // 衝突時「改回我的版本」只換表單內容，不更新快照，讓未儲存保護仍然生效
+        replaceForm: resetTree,
         emptyWord: EMPTY_WORD,
         emptyTaxonomies: EMPTY_TAXONOMIES,
         normalizeWord,
         revisionFromSave,
+        // 第一次存檔後換到提案專屬網址，重新整理或離開後才找得回來（稽核 FE7a-02）
+        // 這三個導頁都發生在存檔／核准／捨棄成功之後，dirty 要等下一次 render 才會更新，
+        // 先 allowNextNavigation() 免得被下面自己的未儲存保護攔下（它在下方才宣告，
+        // 但這些 callback 只會在之後的非同步動作裡被呼叫，那時早已宣告完成）。
+        onCreated: (newRevisionId) => {
+            allowNextNavigation();
+            navigate(`/admin/dictionary/revisions/${newRevisionId}`, {
+                replace: true,
+                // 換網址會重新掛載編輯器，把成功訊息帶過去
+                state: { flash: '草稿已儲存' },
+            });
+        },
+        onCreateApproved: (wordId) => {
+            allowNextNavigation();
+            navigate(`/admin/dictionary/words/${wordId}`, { replace: true });
+        },
+        onNewDiscarded: () => {
+            allowNextNavigation();
+            navigate('/admin/dictionary/words', { replace: true });
+        },
     });
+
+    // 稽核 FE7a-08：任何一個媒體欄位上傳中，都不能儲存或送審
+    const { uploadingCount, tracker: uploadTracker } = useMediaUploadCounter();
+    const uploading = uploadingCount > 0;
+
+    // 新建詞條第一次存檔後會換到提案專屬網址（重新掛載），由 route state 帶回成功訊息
+    const flash = location.state?.flash;
+    useEffect(() => {
+        if (!flash) return;
+        setSuccess(flash);
+        // 顯示後就清掉 route state，避免重新整理時再出現一次
+        navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+    }, [flash, location.pathname, location.search, navigate, setSuccess]);
 
     // 退件意見只在這一頁的核准區塊用到，是純粹的表單欄位，留在元件裡。
     const [reviewComment, setReviewComment] = useState('');
@@ -221,10 +288,26 @@ export default function WordEditor() {
     // 草稿。沒有排除的話，建立刪除提案後整份表單仍然可以編輯，「儲存草稿」
     // 還會把一般內容 payload 寫進這筆刪除提案裡。
     const isDeleteProposal = revision?.operation === 'delete';
-    const editable = canEditRole && !isDeleteProposal && (
+    // 別人建立的草稿：唯讀，也不能送審、捨棄、撤回（後端同樣會擋）
+    const canManage = canManageRevision(revision, { uid: userData?.uid, role });
+    const foreignRevision = Boolean(revision) && !canManage;
+    const editable = canEditRole && canManage && !isDeleteProposal && (
         (!revision && (isNew || Boolean(id)))
         || revisionStatus === 'draft'
     );
+
+    const dirty = editable && !loading && JSON.stringify(toPayload()) !== savedSnapshot;
+    const { allowNextNavigation } = useUnsavedChangesGuard(dirty);
+
+    // 稽核 FE7a-13：更新提案與目前生效版本的差異（審核者不用逐欄自己比）
+    const changes = useMemo(() => {
+        if (!currentWord || revision?.operation !== 'update') return null;
+        return diffTrees(currentWord, normalizeWord(toPayload()), WORD_DIFF_SPEC);
+    }, [currentWord, revision?.operation, toPayload]);
+
+    // WP-8 追加：取代原本的 unlinkBlocksApproval——不再擋核准，只提醒審核者核准會一併解除引用
+    const approvalUnlinksReferences = isDeleteProposal
+        && revision?.payload?.unlink_references === true;
 
     const statusLabel = useMemo(() => {
         if (revisionStatus) {
@@ -235,6 +318,8 @@ export default function WordEditor() {
 
     const updateRoot = (field, value) => {
         update([], { [field]: value });
+        // 稽核 FE7a-05 殘留：改了欄位就拿掉它的錯誤標示
+        setFieldErrors((current) => clearFieldError(current, field));
     };
 
     const toggleSource = (sourceId) => {
@@ -267,19 +352,38 @@ export default function WordEditor() {
     // 不是遠端流程的事（useWordEditorData 只負責送出與錯誤處理）。
     const saveDraft = async () => {
         setPageError('');
+        setFieldErrors({});
         setSuccess('');
 
         if (!tree.tribe_id) {
             setPageError('族語為必填');
+            setFieldErrors({ tribe_id: '族語為必填' });
             return null;
         }
 
         if (!tree.name.trim()) {
             setPageError('詞形為必填');
+            setFieldErrors({ name: '詞形為必填' });
             return null;
         }
 
-        return saveDraftWithPayload(buildPayload);
+        const snapshot = JSON.stringify(toPayload());
+        const saved = await saveDraftWithPayload(buildPayload);
+        if (saved) setSavedSnapshot(snapshot);
+        return saved;
+    };
+
+    // 稽核 FE7a-09：捨棄草稿不可復原，先確認
+    const discardDraft = async () => {
+        const confirmed = await confirmAction({
+            title: '捨棄草稿',
+            message: isDeleteProposal
+                ? '確定要捨棄這個刪除提案嗎？詞條本身不受影響。'
+                : '確定要捨棄這份草稿嗎？草稿中的所有修改都會消失，無法復原。',
+            confirmLabel: '捨棄草稿',
+        });
+        if (!confirmed) return;
+        await runRevisionAction(revisionActions.discard);
     };
 
     const {
@@ -334,17 +438,31 @@ export default function WordEditor() {
                     {isDeleteProposal
                         && '此詞條已建立刪除提案，內容為唯讀；可以送審或捨棄這個提案。'}
                     {!isDeleteProposal && revisionStatus === 'pending_review'
-                        && '此提案正在送審，欄位為唯讀；編輯者可先撤回提案再修改。'}
+                        && pendingReviewNotice(revision, { canWithdraw: canEditRole && canManage })}
                     {!isDeleteProposal && revisionStatus === 'approved'
                         && '此提案已核准，內容為唯讀。'}
                     {!isDeleteProposal && revisionStatus === 'rejected'
                         && '此提案已退件，內容為唯讀。'}
                     {!canEditRole
                         && '目前角色沒有詞條編輯權限。'}
+                    {canEditRole && foreignRevision && revisionStatus === 'draft'
+                        && `這是 ${revisionActorLabel(revision, 'created')} 建立的草稿，你無法修改。`}
                 </Alert>
             )}
 
             {pageError && <Alert variant="danger">{pageError}</Alert>}
+            {conflict.active && (
+                <div className="dictionary-editor-actions">
+                    <Button type="button" variant="outline-primary" onClick={conflict.reloadLatest}>
+                        載入最新內容
+                    </Button>
+                    {conflict.latestLoaded && (
+                        <Button type="button" variant="outline-secondary" onClick={conflict.restoreMine}>
+                            改回我的版本
+                        </Button>
+                    )}
+                </div>
+            )}
             {revisionActions.error && (
                 <Alert variant="danger">
                     {revisionActions.error}
@@ -352,10 +470,19 @@ export default function WordEditor() {
             )}
             <SuccessNotice message={success} />
 
+            <RevisionDetails revision={revision} entityLabel="詞條" changes={changes} />
+            {uploading && (
+                <Alert variant="info" role="status">
+                    檔案上傳中，完成後才能儲存草稿或送審。
+                </Alert>
+            )}
+
+            <MediaUploadTrackerContext.Provider value={uploadTracker}>
             <Form
                 className="dictionary-editor-card"
                 onSubmit={(event) => {
                     event.preventDefault();
+                    if (uploading) return;
                     saveDraft();
                 }}
             >
@@ -365,6 +492,7 @@ export default function WordEditor() {
                     editable={editable}
                     taxonomies={taxonomies}
                     toggleSource={toggleSource}
+                    fieldErrors={fieldErrors}
                 />
 
                 <div className="dictionary-child-section">
@@ -508,7 +636,7 @@ export default function WordEditor() {
                         <Button
                             type="submit"
                             variant="outline-primary"
-                            disabled={saving || revisionActions.pending}
+                            disabled={saving || revisionActions.pending || uploading}
                         >
                             {saving ? (
                                 <Spinner animation="border" size="sm" />
@@ -520,13 +648,13 @@ export default function WordEditor() {
                     )}
 
                     {revisionStatus === 'draft'
-                        && canEditRole && (
+                        && canEditRole && canManage && (
                         <>
                             <Button
                                 type="button"
                                 variant="success"
                                 disabled={
-                                    saving || revisionActions.pending
+                                    saving || revisionActions.pending || uploading
                                 }
                                 onClick={() => runRevisionAction(
                                     revisionActions.submit,
@@ -540,9 +668,7 @@ export default function WordEditor() {
                                 type="button"
                                 variant="outline-danger"
                                 disabled={revisionActions.pending}
-                                onClick={() => runRevisionAction(
-                                    revisionActions.discard,
-                                )}
+                                onClick={discardDraft}
                             >
                                 <Trash2 size={17} />
                                 捨棄草稿
@@ -551,7 +677,7 @@ export default function WordEditor() {
                     )}
 
                     {revisionStatus === 'pending_review'
-                        && canEditRole && (
+                        && canEditRole && canManage && (
                         <Button
                             type="button"
                             variant="outline-secondary"
@@ -566,6 +692,7 @@ export default function WordEditor() {
                     )}
                 </div>
             </Form>
+            </MediaUploadTrackerContext.Provider>
 
             {revisionStatus === 'pending_review' && canApprove && (
                 <section className="dictionary-review-card">
@@ -583,6 +710,12 @@ export default function WordEditor() {
                         />
                     </Form.Group>
 
+                    {approvalUnlinksReferences && (
+                        <Alert variant="warning">
+                            此刪除提案設定了「一併解除引用」：核准後除了刪除詞條，其他詞條與文法例句中對它的引用也會被清除連結，請確認後再核准。
+                        </Alert>
+                    )}
+
                     <div className="dictionary-editor-actions">
                         <Button
                             type="button"
@@ -591,6 +724,8 @@ export default function WordEditor() {
                             onClick={() => runRevisionAction(
                                 () => revisionActions.approve({
                                     reviewComment: reviewComment.trim(),
+                                    // 稽核 BE1-03：核准的是審核者載入時看到的那一版
+                                    baseUpdatedAt: revision?.updated_at,
                                 }),
                             )}
                         >
@@ -683,7 +818,7 @@ export default function WordEditor() {
                                     )}
 
                                     {hasReferences
-                                        && ['owner', 'admin'].includes(role)
+                                        && UNLINK_ROLES.includes(role)
                                         && (
                                         <Form.Check
                                             id="dictionary-unlink-references"

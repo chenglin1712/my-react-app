@@ -73,6 +73,8 @@ export function useAdminListQuery({
 
         setLoading(true);
         setError('');
+        // 為 true 表示這次回應不採用、已改成重查別頁，loading 要維持到那次查詢結束
+        let redirected = false;
 
         try {
             const params = new URLSearchParams({
@@ -90,13 +92,21 @@ export function useAdminListQuery({
 
             const result = await apiGet(`${endpoint}?${params.toString()}`);
             if (isStale()) return;
+            // 最後一筆在這一頁被處理掉（核准、刪除…）後，這一頁已經沒有資料：往前退到最後一個有資料的頁面重查，
+            // 不要停在空白頁，也不要顯示「第 21–20 筆」這種不存在的範圍（稽核 FE7b-09）。
+            if (page > 1 && (result?.results?.length ?? 0) === 0) {
+                const lastPage = Math.max(1, Math.ceil((result?.count ?? 0) / pageSize));
+                setPage(Math.min(page - 1, lastPage));
+                redirected = true;
+                return;
+            }
             setData(result);
         } catch (err) {
             if (isStale()) return;
             setError(err.message);
         } finally {
             // 舊請求結束時不能碰 loading——那是新請求的狀態。
-            if (!isStale()) setLoading(false);
+            if (!isStale() && !redirected) setLoading(false);
         }
         // buildParams 是呼叫端每次 render 都會重建的 inline 函式，列進相依
         // 陣列會造成無限重載；它的行為只依賴 query，而 query 已經在陣列裡。

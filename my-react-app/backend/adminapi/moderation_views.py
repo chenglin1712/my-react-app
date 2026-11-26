@@ -101,6 +101,11 @@ def note_list(request):
             "report_count": report_counts.get(("note", doc.id), 0),
         })
 
+    # 稽核 FE7b-07：檢舉佇列的「查看內容」帶 ?id=<被檢舉的筆記 id>，只回該筆
+    id_param = request.GET.get("id", "").strip()
+    if id_param:
+        items = [item for item in items if item["id"] == id_param]
+
     keyword = request.GET.get("keyword", "").strip().lower()
     if keyword:
         items = [
@@ -202,6 +207,11 @@ def recording_list(request):
     tribe_param = request.GET.get("tribe")
     if tribe_param:
         items = [item for item in items if item["tribe"] == tribe_param]
+
+    # 稽核 FE7b-07：不同族語的錄音可能同 id，id 通常要搭配 tribe 一起帶
+    id_param = request.GET.get("id", "").strip()
+    if id_param:
+        items = [item for item in items if item["id"] == id_param]
 
     if request.GET.get("has_reports") == "true":
         items = [item for item in items if item["report_count"] > 0]

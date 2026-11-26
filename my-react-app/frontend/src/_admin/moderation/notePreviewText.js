@@ -11,6 +11,17 @@
  * 只做「拿掉標籤」這一件事，不是通用的 HTML sanitizer——這裡只需要給
  * 管理頁看的摘要純文字。
  */
-export const stripHtml = (value) => (value || '').replace(/<[^>]+>/g, ' ').trim();
+export const stripHtml = (value) => {
+  const withoutTags = (value || '').replace(/<[^>]+>/g, ' ');
+
+  // 稽核 FE7b-22：只拿掉標籤的話，審核者會看到 &amp;、&nbsp; 這類實體。用 DOMParser
+  // 解析（不插入 DOM、不執行腳本，仍然安全）取 textContent 解碼，再壓縮連續空白。
+  let decoded = withoutTags;
+  if (typeof DOMParser !== 'undefined') {
+    decoded = new DOMParser().parseFromString(withoutTags, 'text/html').documentElement.textContent ?? '';
+  }
+
+  return decoded.replace(/\s+/g, ' ').trim();
+};
 
 export default stripHtml;

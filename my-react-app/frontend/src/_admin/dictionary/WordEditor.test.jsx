@@ -16,9 +16,13 @@ import {
 import {
     MemoryRouter,
     Route,
+    RouterProvider,
     Routes,
+    createMemoryRouter,
 } from 'react-router-dom';
 import WordEditor from './WordEditor';
+import DictionaryRevisionRoute from './DictionaryRevisionRoute';
+import { confirmAction } from '@components/ui/ConfirmDialog';
 import {
     approveRevision,
     createWordProposal,
@@ -51,16 +55,24 @@ vi.mock('./dictionaryApi', () => ({
     submitRevision: vi.fn(),
     updateRevisionPayload: vi.fn(),
     withdrawRevision: vi.fn(),
+    isEditConflict: (err) => err?.status === 409 && err?.data?.code === 'edit_conflict',
 }));
 
-vi.mock('./MediaUploadField', () => ({
-    default: ({
+// 稽核 FE7a-09：捨棄草稿改經 confirmAction；測試裡換成可控制的 mock（預設按確認）
+vi.mock('@components/ui/ConfirmDialog', () => ({ confirmAction: vi.fn(() => Promise.resolve(true)) }));
+
+vi.mock('./MediaUploadField', async () => {
+    // 用真的 useReportUploading：值填 '__uploading__' 時模擬「上傳中」（稽核 FE7a-08）
+    const { useReportUploading } = await import('./mediaUploadTracker');
+    function MockMediaUploadField({
         kind,
         label,
         value,
         onChange,
         disabled,
-    }) => (
+    }) {
+        useReportUploading(value === '__uploading__');
+        return (
         <label>
             {label}
             <input
@@ -71,14 +83,16 @@ vi.mock('./MediaUploadField', () => ({
                 onChange={(event) => onChange(event.target.value)}
             />
         </label>
-    ),
-}));
+        );
+    }
+    return { default: MockMediaUploadField };
+});
 
 let mockRole = 'owner';
 
 vi.mock('../../userServives/authContext', () => ({
     useAuth: () => ({
-        userData: { role: mockRole },
+        userData: { role: mockRole, uid: 'me' },
         loading: false,
     }),
 }));
@@ -150,9 +164,42 @@ const renderEditor = (path = '/admin/dictionary/words/new', state = undefined) =
                 path="/admin/dictionary/words"
                 element={<div>詞條列表</div>}
             />
+            <Route
+                path="/admin/dictionary/revisions/:id"
+                element={<DictionaryRevisionRoute />}
+            />
         </Routes>
     </MemoryRouter>,
 );
+
+// 站內換頁的未儲存攔截（useBlocker）只在 data router 底下運作；正式入口也是 data router，
+// 結構同 appRoutes.jsx：只有一條 path: '*'，真正的路由在巢狀 <Routes>。
+const renderEditorInDataRouter = (path) => {
+    const router = createMemoryRouter([{
+        path: '*',
+        element: (
+            <Routes>
+                <Route path="/admin/dictionary/words/new" element={<WordEditor />} />
+                <Route path="/admin/dictionary/words/:id" element={<WordEditor />} />
+                <Route path="/admin/dictionary/words" element={<div>詞條列表</div>} />
+                <Route path="/admin/dictionary/revisions/:id" element={<DictionaryRevisionRoute />} />
+            </Routes>
+        ),
+    }], { initialEntries: [path] });
+    render(<RouterProvider router={router} />);
+    return router;
+};
+
+/** 新建草稿第一次存檔後會換到 /admin/dictionary/revisions/:id 並重新掛載編輯器（稽核 FE7a-02），
+ * 等新頁面載入完成。提案路由讀到的提案直接交給編輯器，所以只讀一次。 */
+async function waitForRevisionPage(revisionId) {
+    await waitFor(() => {
+        expect(getRevision.mock.calls.filter(([id]) => String(id) === String(revisionId)).length)
+            .toBeGreaterThanOrEqual(1);
+    });
+    await screen.findByLabelText(/拼音/);
+    expect(getRevision.mock.calls.filter(([id]) => String(id) === String(revisionId))).toHaveLength(1);
+}
 
 describe('WordEditor', () => {
     beforeEach(() => {
@@ -175,8 +222,20 @@ describe('WordEditor', () => {
             withdrawRevision,
         ].forEach((mock) => mock.mockReset());
 
+        confirmAction.mockReset();
+        confirmAction.mockResolvedValue(true);
         listTaxonomies.mockResolvedValue(taxonomies);
         getWord.mockResolvedValue(effectiveWord);
+        // 新建草稿第一次存檔後會導到 /admin/dictionary/revisions/:id，由 getRevision 載入
+        getRevision.mockImplementation(async (revisionId) => ({
+            id: Number(revisionId),
+            target_kind: 'word',
+            target_id: '',
+            status: 'draft',
+            operation: 'create',
+            updated_at: 'rev-updated-1',
+            payload: createWordProposal.mock.calls.at(-1)?.[0] ?? {},
+        }));
         getWordReferences.mockResolvedValue({
             counts: {
                 anaphora_items: 0,
@@ -222,13 +281,27 @@ describe('WordEditor', () => {
             );
         });
 
-        expect(
-            await screen.findByText('草稿已儲存'),
-        ).toBeInTheDocument();
+        await waitForRevisionPage(42);
+        expect(screen.getByText('草稿已儲存')).toBeInTheDocument();
         expect(screen.getByText('草稿')).toBeInTheDocument();
+        expect(screen.getByDisplayValue('lokah')).toBeInTheDocument();
         expect(screen.getByRole('button', {
             name: '送審',
         })).toBeInTheDocument();
+    });
+
+    test('WP-8 追加：新建詞條第一次存檔用 replace 換到提案網址（與新建章節一致）', async () => {
+        createWordProposal.mockResolvedValue({ revision_id: 43, status: 'draft' });
+        const router = renderEditorInDataRouter('/admin/dictionary/words/new');
+
+        await screen.findByText('尚未儲存');
+        fireEvent.change(screen.getByLabelText(/^族語\s/), { target: { value: 'tribe-tayal' } });
+        fireEvent.change(screen.getByLabelText(/詞形/), { target: { value: 'lokah' } });
+        fireEvent.click(screen.getByRole('button', { name: /儲存草稿/ }));
+
+        await waitForRevisionPage(43);
+        expect(router.state.location.pathname).toBe('/admin/dictionary/revisions/43');
+        expect(router.state.historyAction).toBe('REPLACE');
     });
 
     test('從搜尋分析「建立詞條草稿」導過來時，詞形欄位用 location.state.prefillName 預填', async () => {
@@ -265,7 +338,7 @@ describe('WordEditor', () => {
             name: /儲存草稿/,
         }));
 
-        await screen.findByText('草稿已儲存');
+        await waitForRevisionPage(42);
 
         fireEvent.change(screen.getByLabelText(/拼音/), {
             target: { value: 'lo-kah' },
@@ -281,6 +354,7 @@ describe('WordEditor', () => {
                     name: 'lokah',
                     pinyin: 'lo-kah',
                 }),
+                { baseUpdatedAt: 'rev-updated-1' },
             );
         });
 
@@ -362,7 +436,7 @@ describe('WordEditor', () => {
         }));
 
         expect(
-            await screen.findByText(/請重新整理頁面取得最新內容/),
+            await screen.findByText(/請重新整理頁面取得最新狀態/),
         ).toBeInTheDocument();
     });
 
@@ -504,7 +578,7 @@ describe('WordEditor', () => {
         fireEvent.change(screen.getByLabelText(/^族語\s/), { target: { value: 'tribe-tayal' } });
         fireEvent.change(screen.getByLabelText(/詞形/), { target: { value: 'lokah' } });
         fireEvent.click(screen.getByRole('button', { name: /儲存草稿/ }));
-        await screen.findByText('草稿');
+        await waitForRevisionPage(42);
 
         fireEvent.click(screen.getByRole('button', { name: /捨棄草稿/ }));
 
@@ -512,8 +586,8 @@ describe('WordEditor', () => {
             expect(discardRevision).toHaveBeenCalled();
         });
 
-        expect(await screen.findByText('尚未儲存')).toBeInTheDocument();
-        expect(screen.getByLabelText(/詞形/)).toHaveValue('');
+        // 稽核 FE7a-02：新建草稿已有專屬網址，捨棄後那個網址不存在了，回到詞條列表
+        expect(await screen.findByText('詞條列表')).toBeInTheDocument();
     });
 
     /** 回歸測試：editable 原本沒有排除 operation === 'delete'，建立刪除
@@ -583,6 +657,7 @@ describe('WordEditor', () => {
         await waitFor(() => {
             expect(approveRevision).toHaveBeenCalledWith(31, {
                 reviewComment: '內容正確',
+                baseUpdatedAt: undefined,
             });
         });
     });
@@ -734,6 +809,541 @@ describe('WordEditor', () => {
                 'word-1',
                 true,
             );
+        });
+    });
+
+    test('稽核 FE7a-01：詳情的 open_revision（草稿）會被載入，而不是只看送審中的', async () => {
+        getWord.mockResolvedValue({
+            ...effectiveWord,
+            meta: { ...effectiveWord.meta, open_revision: { id: 33, status: 'draft', operation: 'update' } },
+        });
+        getRevision.mockResolvedValue({
+            id: 33, status: 'draft', operation: 'update', updated_at: 'u33',
+            payload: { ...effectiveWord, name: '我的草稿' },
+        });
+        updateRevisionPayload.mockResolvedValue({ id: 33, updated_at: 'u34' });
+
+        renderEditor('/admin/dictionary/words/word-1');
+        expect(await screen.findByDisplayValue('我的草稿')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: /儲存草稿/ }));
+        await waitFor(() => {
+            expect(updateRevisionPayload).toHaveBeenCalledWith(33, expect.anything(), { baseUpdatedAt: 'u33' });
+        });
+        expect(proposeWordUpdate).not.toHaveBeenCalled();
+    });
+
+    test('稽核 FE7a-03／07：刪除提案表單顯示目前內容，並標示是否解除引用與引用數', async () => {
+        mockRole = 'reviewer';
+        getWord.mockResolvedValue({
+            ...effectiveWord,
+            meta: { ...effectiveWord.meta, open_revision: { id: 35, status: 'pending_review', operation: 'delete' } },
+        });
+        getRevision.mockResolvedValue({
+            id: 35, status: 'pending_review', operation: 'delete', updated_at: 'u35',
+            payload: { unlink_references: true },
+            reference_counts: { anaphora_items: 4, grammar_example_words: 1 },
+        });
+
+        renderEditor('/admin/dictionary/words/word-1');
+
+        expect(await screen.findByDisplayValue('abas')).toBeInTheDocument();
+        const info = screen.getByTestId('revision-delete-info');
+        expect(info).toHaveTextContent('這是刪除提案');
+        expect(info).toHaveTextContent('核准時一併解除引用：是');
+        expect(info).toHaveTextContent('標註 4 筆、文法例句 1 筆');
+        // WP-8 追加：限制只在提出端，reviewer 可以核准會解除引用的刪除提案（原本這裡測的是按鈕停用）；
+        // 畫面提醒核准會一併解除引用，並說明這個選項由誰設定
+        expect(screen.queryByText(/只有擁有者或管理員可以核准/)).not.toBeInTheDocument();
+        expect(screen.getByText(/核准後除了刪除詞條/)).toBeInTheDocument();
+        expect(info).toHaveTextContent('審核者核准即代表同意解除這些引用');
+        expect(screen.getByRole('button', { name: /核准/ })).toBeEnabled();
+    });
+
+    test('WP-8 追加：reviewer 核准會解除引用的刪除提案時照常送出', async () => {
+        mockRole = 'reviewer';
+        getWord.mockResolvedValue({
+            ...effectiveWord,
+            meta: { ...effectiveWord.meta, open_revision: { id: 35, status: 'pending_review', operation: 'delete' } },
+        });
+        getRevision.mockResolvedValue({
+            id: 35, status: 'pending_review', operation: 'delete', updated_at: 'u35',
+            payload: { unlink_references: true }, reference_counts: { anaphora_items: 2, grammar_example_words: 0 },
+        });
+        approveRevision.mockResolvedValue({ id: 35, status: 'approved' });
+
+        renderEditor('/admin/dictionary/words/word-1');
+        await screen.findByDisplayValue('abas');
+
+        fireEvent.click(screen.getByRole('button', { name: /核准/ }));
+        await waitFor(() => {
+            expect(approveRevision).toHaveBeenCalledWith(35, { reviewComment: '', baseUpdatedAt: 'u35' });
+        });
+    });
+
+    test('稽核 FE7a-07：owner 可核准會解除引用的刪除提案，並帶載入時的 updated_at', async () => {
+        getWord.mockResolvedValue({
+            ...effectiveWord,
+            meta: { ...effectiveWord.meta, open_revision: { id: 35, status: 'pending_review', operation: 'delete' } },
+        });
+        getRevision.mockResolvedValue({
+            id: 35, status: 'pending_review', operation: 'delete', updated_at: 'u35',
+            payload: { unlink_references: true }, reference_counts: { anaphora_items: 0, grammar_example_words: 0 },
+        });
+        approveRevision.mockResolvedValue({ id: 35, status: 'approved' });
+
+        renderEditor('/admin/dictionary/words/word-1');
+        await screen.findByDisplayValue('abas');
+
+        fireEvent.click(screen.getByRole('button', { name: /核准/ }));
+        await waitFor(() => {
+            expect(approveRevision).toHaveBeenCalledWith(35, { reviewComment: '', baseUpdatedAt: 'u35' });
+        });
+    });
+
+    test('稽核 FE7a-13：審核更新提案時列出與現行版本的差異', async () => {
+        mockRole = 'reviewer';
+        getWord.mockResolvedValue({
+            ...effectiveWord,
+            explanations: [{ id: 5, chinese_explanation: '舊解釋', sentences: [], images: [] }],
+            meta: { ...effectiveWord.meta, pending_revision: { id: 36, status: 'pending_review', operation: 'update' } },
+        });
+        getRevision.mockResolvedValue({
+            id: 36, status: 'pending_review', operation: 'update', updated_at: 'u36',
+            payload: {
+                ...effectiveWord,
+                pinyin: 'a-bas',
+                explanations: [{ id: 5, chinese_explanation: '新解釋', sentences: [], images: [] }],
+                audios: [{ id: null, file_id: 'x.mp3', audio_class: '' }],
+            },
+        });
+
+        renderEditor('/admin/dictionary/words/word-1');
+        await screen.findByText('審核提案');
+
+        const summary = screen.getByRole('region', { name: '變更摘要' });
+        expect(summary).toHaveTextContent('修改「拼音」');
+        expect(summary).toHaveTextContent('解釋 1 › 修改「中文解釋」');
+        expect(summary).toHaveTextContent('新增詞條音檔 1');
+        expect(summary).not.toHaveTextContent('詞形');
+    });
+
+    test('稽核 FE7a-06：草稿 PUT 遇到 edit_conflict 時提供載入最新內容，不會無聲覆蓋', async () => {
+        getWord.mockResolvedValue({
+            ...effectiveWord,
+            meta: { ...effectiveWord.meta, open_revision: { id: 33, status: 'draft', operation: 'update' } },
+        });
+        getRevision.mockResolvedValueOnce({
+            id: 33, status: 'draft', operation: 'update', updated_at: 'u1', payload: effectiveWord,
+        });
+        const conflict = new Error('內容已被其他人更新');
+        conflict.status = 409;
+        conflict.data = { code: 'edit_conflict' };
+        updateRevisionPayload.mockRejectedValueOnce(conflict);
+
+        renderEditor('/admin/dictionary/words/word-1');
+        await screen.findByDisplayValue('abas');
+        fireEvent.change(screen.getByLabelText(/詞形/), { target: { value: '我的版本' } });
+        fireEvent.click(screen.getByRole('button', { name: /儲存草稿/ }));
+
+        expect(await screen.findByText(/這份草稿在你編輯期間已被修改/)).toBeInTheDocument();
+
+        getRevision.mockResolvedValueOnce({
+            id: 33, status: 'draft', operation: 'update', updated_at: 'u2',
+            payload: { ...effectiveWord, name: '別人的版本' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: '載入最新內容' }));
+        expect(await screen.findByDisplayValue('別人的版本')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: '改回我的版本' }));
+        expect(await screen.findByDisplayValue('我的版本')).toBeInTheDocument();
+    });
+
+    test('WP-8 追加：propose 撞到載入後才出現的他人草稿（409 附 revision_id）時，可載入那份草稿，之後改走 PUT 並帶樂觀鎖', async () => {
+        getWord.mockResolvedValue(effectiveWord);
+        const conflict = new Error('這個項目已經有一份其他人建立的草稿');
+        conflict.status = 409;
+        conflict.data = { code: 'edit_conflict', revision_id: 44 };
+        proposeWordUpdate.mockRejectedValueOnce(conflict);
+
+        renderEditor('/admin/dictionary/words/word-1');
+        await screen.findByDisplayValue('abas');
+        fireEvent.change(screen.getByLabelText(/詞形/), { target: { value: '我的版本' } });
+        fireEvent.click(screen.getByRole('button', { name: /儲存草稿/ }));
+        expect(await screen.findByText(/這份草稿在你編輯期間已被修改/)).toBeInTheDocument();
+
+        getRevision.mockResolvedValueOnce({
+            id: 44, status: 'draft', operation: 'update', updated_at: 'u44', created_by: 'alice',
+            payload: { ...effectiveWord, name: '別人的版本' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: '載入最新內容' }));
+        expect(await screen.findByDisplayValue('別人的版本')).toBeInTheDocument();
+        expect(getRevision).toHaveBeenLastCalledWith(44);
+
+        fireEvent.click(screen.getByRole('button', { name: '改回我的版本' }));
+        await screen.findByDisplayValue('我的版本');
+        updateRevisionPayload.mockResolvedValueOnce({ revision_id: 44, payload: {}, updated_at: 'u45' });
+        fireEvent.click(screen.getByRole('button', { name: /儲存草稿/ }));
+        await waitFor(() => expect(updateRevisionPayload).toHaveBeenCalledWith(
+            44, expect.anything(), { baseUpdatedAt: 'u44' },
+        ));
+        expect(proposeWordUpdate).toHaveBeenCalledTimes(1);
+    });
+
+    test('稽核 FE7a-09：捨棄草稿取消確認時不呼叫 API', async () => {
+        confirmAction.mockResolvedValue(false);
+        getWord.mockResolvedValue({
+            ...effectiveWord,
+            meta: { ...effectiveWord.meta, open_revision: { id: 33, status: 'draft', operation: 'update' } },
+        });
+        getRevision.mockResolvedValue({ id: 33, status: 'draft', operation: 'update', payload: effectiveWord });
+
+        renderEditor('/admin/dictionary/words/word-1');
+        await screen.findByDisplayValue('abas');
+        fireEvent.click(screen.getByRole('button', { name: /捨棄草稿/ }));
+
+        await waitFor(() => expect(confirmAction).toHaveBeenCalled());
+        expect(discardRevision).not.toHaveBeenCalled();
+    });
+
+    test('稽核 FE7a-02：以提案網址開啟新建詞條提案並可核准，核准後導到正式詞條', async () => {
+        mockRole = 'reviewer';
+        getRevision.mockResolvedValue({
+            id: 77, target_kind: 'word', target_id: '', status: 'pending_review', operation: 'create',
+            updated_at: 'u77', payload: { ...effectiveWord, name: '新詞提案' },
+        });
+        approveRevision.mockResolvedValue({ id: 77, status: 'approved', target_id: 'word-1' });
+
+        renderEditor('/admin/dictionary/revisions/77');
+
+        expect(await screen.findByDisplayValue('新詞提案')).toBeInTheDocument();
+        expect(screen.getByText(/這是新建詞條的提案/)).toBeInTheDocument();
+        expect(getWord).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('button', { name: /核准/ }));
+        await waitFor(() => {
+            expect(approveRevision).toHaveBeenCalledWith(77, { reviewComment: '', baseUpdatedAt: 'u77' });
+        });
+        await waitFor(() => expect(getWord).toHaveBeenCalledWith('word-1'));
+    });
+
+    test('稽核 FE7a-02：提案網址指向既有詞條時導到詞條頁', async () => {
+        getRevision.mockResolvedValue({
+            id: 31, target_kind: 'word', target_id: 'word-1', status: 'draft', operation: 'update', payload: effectiveWord,
+        });
+
+        renderEditor('/admin/dictionary/revisions/31');
+
+        expect(await screen.findByText('詞條詳情')).toBeInTheDocument();
+        expect(getWord).toHaveBeenCalledWith('word-1');
+    });
+
+    test('稽核 FE7a-04：有未儲存變更時點返回連結會先確認，取消則留在頁面', async () => {
+        confirmAction.mockResolvedValue(false);
+        const router = renderEditorInDataRouter('/admin/dictionary/words/word-1');
+        await screen.findByDisplayValue('abas');
+
+        fireEvent.change(screen.getByLabelText(/詞形/), { target: { value: 'changed' } });
+        fireEvent.click(screen.getByRole('button', { name: /返回詞條列表/ }));
+
+        await waitFor(() => expect(confirmAction).toHaveBeenCalled());
+        expect(screen.queryByText('詞條列表')).not.toBeInTheDocument();
+        expect(screen.getByDisplayValue('changed')).toBeInTheDocument();
+        expect(router.state.location.pathname).toBe('/admin/dictionary/words/word-1');
+
+        confirmAction.mockResolvedValue(true);
+        fireEvent.click(screen.getByRole('button', { name: /返回詞條列表/ }));
+        expect(await screen.findByText('詞條列表')).toBeInTheDocument();
+    });
+
+    test('稽核 FE7a-04：瀏覽器上一頁一樣會先確認', async () => {
+        confirmAction.mockResolvedValue(false);
+        const router = createMemoryRouter([{
+            path: '*',
+            element: (
+                <Routes>
+                    <Route path="/admin/dictionary/words/:id" element={<WordEditor />} />
+                    <Route path="/admin/dictionary/words" element={<div>詞條列表</div>} />
+                </Routes>
+            ),
+        }], { initialEntries: ['/admin/dictionary/words', '/admin/dictionary/words/word-1'], initialIndex: 1 });
+        render(<RouterProvider router={router} />);
+        await screen.findByDisplayValue('abas');
+        fireEvent.change(screen.getByLabelText(/詞形/), { target: { value: 'changed' } });
+
+        act(() => { router.navigate(-1); });
+        await waitFor(() => expect(confirmAction).toHaveBeenCalled());
+        // 取消後 blocker 回到待命（reset），沒有卡在 blocked
+        await waitFor(() => expect([...router.state.blockers.values()].every((b) => b.state === 'unblocked')).toBe(true));
+        expect(router.state.location.pathname).toBe('/admin/dictionary/words/word-1');
+        expect(screen.getByDisplayValue('changed')).toBeInTheDocument();
+    });
+
+    test('稽核 FE7a-02／FE7a-04：新建草稿存檔後換到提案網址，不會被自己的未儲存保護攔下', async () => {
+        createWordProposal.mockResolvedValue({ revision_id: 42, status: 'draft' });
+        const router = renderEditorInDataRouter('/admin/dictionary/words/new');
+        await screen.findByText('尚未儲存');
+
+        fireEvent.change(screen.getByLabelText(/^族語\s/), { target: { value: 'tribe-tayal' } });
+        fireEvent.change(screen.getByLabelText(/詞形/), { target: { value: 'lokah' } });
+        fireEvent.click(screen.getByRole('button', { name: /儲存草稿/ }));
+
+        await waitForRevisionPage(42);
+        expect(router.state.location.pathname).toBe('/admin/dictionary/revisions/42');
+        expect(confirmAction).not.toHaveBeenCalled();
+    });
+
+    test('稽核 FE7a-04：沒有未儲存變更時直接離開，不跳確認', async () => {
+        renderEditor('/admin/dictionary/words/word-1');
+        await screen.findByDisplayValue('abas');
+
+        fireEvent.click(screen.getByRole('button', { name: /返回詞條列表/ }));
+        expect(await screen.findByText('詞條列表')).toBeInTheDocument();
+        expect(confirmAction).not.toHaveBeenCalled();
+    });
+
+    test('稽核 FE7a-04：有未儲存變更時註冊 beforeunload 離開確認', async () => {
+        renderEditor('/admin/dictionary/words/word-1');
+        await screen.findByDisplayValue('abas');
+
+        const before = new Event('beforeunload', { cancelable: true });
+        window.dispatchEvent(before);
+        expect(before.defaultPrevented).toBe(false);
+
+        fireEvent.change(screen.getByLabelText(/詞形/), { target: { value: 'changed' } });
+        const after = new Event('beforeunload', { cancelable: true });
+        window.dispatchEvent(after);
+        expect(after.defaultPrevented).toBe(true);
+    });
+
+    test('稽核 FE7a-08：媒體上傳中停用儲存草稿與送審，並說明原因', async () => {
+        getWord.mockResolvedValue({
+            ...effectiveWord,
+            meta: { ...effectiveWord.meta, open_revision: { id: 33, status: 'draft', operation: 'update' } },
+        });
+        getRevision.mockResolvedValue({ id: 33, status: 'draft', operation: 'update', payload: effectiveWord });
+
+        renderEditor('/admin/dictionary/words/word-1');
+        await screen.findByDisplayValue('abas');
+
+        fireEvent.click(screen.getByRole('button', { name: /新增詞條音檔/ }));
+        fireEvent.change(screen.getByLabelText('詞條音檔 1'), { target: { value: '__uploading__' } });
+
+        expect(await screen.findByText(/檔案上傳中，完成後才能儲存草稿或送審/)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /儲存草稿/ })).toBeDisabled();
+        expect(screen.getByRole('button', { name: /^送審/ })).toBeDisabled();
+
+        fireEvent.change(screen.getByLabelText('詞條音檔 1'), { target: { value: 'done.mp3' } });
+        await waitFor(() => expect(screen.getByRole('button', { name: /儲存草稿/ })).toBeEnabled());
+        expect(screen.queryByText(/檔案上傳中/)).not.toBeInTheDocument();
+    });
+
+    test('稽核 FE7a-08：上傳中的欄位被移除時不會讓儲存一直停用', async () => {
+        renderEditor('/admin/dictionary/words/word-1');
+        await screen.findByDisplayValue('abas');
+
+        fireEvent.click(screen.getByRole('button', { name: /新增詞條音檔/ }));
+        fireEvent.change(screen.getByLabelText('詞條音檔 1'), { target: { value: '__uploading__' } });
+        await waitFor(() => expect(screen.getByRole('button', { name: /儲存草稿/ })).toBeDisabled());
+
+        fireEvent.click(screen.getByRole('button', { name: /刪除音檔/ }));
+        await waitFor(() => expect(screen.getByRole('button', { name: /儲存草稿/ })).toBeEnabled());
+    });
+
+    test('稽核 WP-8 驗證：別人建立的草稿為唯讀，顯示提示且不能送審或捨棄', async () => {
+        mockRole = 'editor';
+        getWord.mockResolvedValue({
+            ...effectiveWord,
+            meta: { ...effectiveWord.meta, open_revision: { id: 33, status: 'draft', operation: 'update' } },
+        });
+        getRevision.mockResolvedValue({
+            id: 33, status: 'draft', operation: 'update', created_by: 'alice', payload: effectiveWord,
+        });
+
+        renderEditor('/admin/dictionary/words/word-1');
+        await screen.findByDisplayValue('abas');
+
+        expect(screen.getByText('這是 alice 建立的草稿，你無法修改。')).toBeInTheDocument();
+        expect(screen.getByLabelText(/詞形/)).toBeDisabled();
+        expect(screen.queryByRole('button', { name: /儲存草稿/ })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /^送審/ })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /捨棄草稿/ })).not.toBeInTheDocument();
+    });
+
+    test('稽核 WP-8 驗證：別人送審中的提案，一般編輯者看不到撤回', async () => {
+        mockRole = 'editor';
+        getWord.mockResolvedValue({
+            ...effectiveWord,
+            meta: { ...effectiveWord.meta, open_revision: { id: 33, status: 'pending_review', operation: 'update' } },
+        });
+        getRevision.mockResolvedValue({
+            id: 33, status: 'pending_review', operation: 'update', created_by: 'alice', submitted_by: 'alice',
+            payload: effectiveWord,
+        });
+
+        renderEditor('/admin/dictionary/words/word-1');
+        await screen.findByDisplayValue('abas');
+        expect(screen.queryByRole('button', { name: /撤回/ })).not.toBeInTheDocument();
+        // WP-8 追加（已知小問題 b）：看不到撤回鈕的人，提示不能叫他「先撤回」
+        expect(screen.queryByText(/可以先撤回提案再修改/)).not.toBeInTheDocument();
+        expect(screen.getByText(/只有建立者 alice或擁有者／管理員可以撤回後修改/)).toBeInTheDocument();
+    });
+
+    test('WP-8 追加：送審者本人看到「可以先撤回」，提示與撤回鈕一致', async () => {
+        mockRole = 'editor';
+        getWord.mockResolvedValue({
+            ...effectiveWord,
+            meta: { ...effectiveWord.meta, open_revision: { id: 33, status: 'pending_review', operation: 'update' } },
+        });
+        getRevision.mockResolvedValue({
+            id: 33, status: 'pending_review', operation: 'update', created_by: 'alice', submitted_by: 'me',
+            payload: effectiveWord,
+        });
+
+        renderEditor('/admin/dictionary/words/word-1');
+        await screen.findByDisplayValue('abas');
+        expect(screen.getByRole('button', { name: /撤回/ })).toBeInTheDocument();
+        expect(screen.getByText('此提案正在送審，欄位為唯讀；可以先撤回提案再修改。')).toBeInTheDocument();
+    });
+
+    test('WP-8 追加：他人草稿與送審中提示顯示姓名，沒有姓名時退回 uid', async () => {
+        mockRole = 'editor';
+        getWord.mockResolvedValue({
+            ...effectiveWord,
+            meta: { ...effectiveWord.meta, open_revision: { id: 33, status: 'pending_review', operation: 'update' } },
+        });
+        getRevision.mockResolvedValue({
+            id: 33, status: 'pending_review', operation: 'update',
+            created_by: 'alice', created_by_name: '王小美', submitted_by: 'carol', submitted_by_name: '',
+            payload: effectiveWord,
+        });
+
+        renderEditor('/admin/dictionary/words/word-1');
+        await screen.findByDisplayValue('abas');
+        expect(screen.getByText(/只有建立者 王小美、送審者 carol或擁有者／管理員可以撤回後修改/)).toBeInTheDocument();
+    });
+
+    test('WP-8 追加：別人的草稿提示顯示建立者姓名', async () => {
+        mockRole = 'editor';
+        getWord.mockResolvedValue({
+            ...effectiveWord,
+            meta: { ...effectiveWord.meta, open_revision: { id: 33, status: 'draft', operation: 'update' } },
+        });
+        getRevision.mockResolvedValue({
+            id: 33, status: 'draft', operation: 'update', created_by: 'alice', created_by_name: '王小美',
+            payload: effectiveWord,
+        });
+
+        renderEditor('/admin/dictionary/words/word-1');
+        await screen.findByDisplayValue('abas');
+        expect(screen.getByText('這是 王小美 建立的草稿，你無法修改。')).toBeInTheDocument();
+    });
+
+    test('稽核 FE7a-05 殘留：後端驗證錯誤對應回欄位顯示 isInvalid，改了欄位就清掉', async () => {
+        const error = new Error('請求參數錯誤');
+        error.status = 400;
+        error.data = { errors: { name: '不可超過 100 字', 'explanations[0].chinese_explanation': '為必填' } };
+        proposeWordUpdate.mockRejectedValueOnce(error);
+
+        renderEditor('/admin/dictionary/words/word-1');
+        await screen.findByDisplayValue('abas');
+        fireEvent.click(screen.getByRole('button', { name: /儲存草稿/ }));
+
+        const nameInput = screen.getByLabelText(/詞形/);
+        await waitFor(() => expect(nameInput).toHaveClass('is-invalid'));
+        expect(screen.getByText('不可超過 100 字', { selector: '.invalid-feedback' })).toBeInTheDocument();
+        // 對不到單一欄位的巢狀錯誤仍攤平在頁首
+        expect(screen.getByText(/為必填/, { selector: '.alert' })).toBeInTheDocument();
+        expect(screen.getByLabelText(/方言別/)).not.toHaveClass('is-invalid');
+
+        fireEvent.change(nameInput, { target: { value: 'abas2' } });
+        expect(nameInput).not.toHaveClass('is-invalid');
+    });
+
+    test('稽核 FE7a-05 殘留：前端必填檢查也標在欄位上', async () => {
+        renderEditor('/admin/dictionary/words/new');
+        await screen.findByLabelText(/詞形/);
+        const tribeSelect = document.getElementById('dictionary-word-tribe');
+        fireEvent.change(screen.getByLabelText(/詞形/), { target: { value: 'abas' } });
+        fireEvent.submit(tribeSelect.closest('form'));
+        await waitFor(() => expect(tribeSelect).toHaveClass('is-invalid'));
+        expect(createWordProposal).not.toHaveBeenCalled();
+    });
+
+    test('稽核 WP-8 驗證：自己的草稿與 owner 開別人的草稿都可以編輯', async () => {
+        getWord.mockResolvedValue({
+            ...effectiveWord,
+            meta: { ...effectiveWord.meta, open_revision: { id: 33, status: 'draft', operation: 'update' } },
+        });
+        getRevision.mockResolvedValue({
+            id: 33, status: 'draft', operation: 'update', created_by: 'alice', payload: effectiveWord,
+        });
+
+        renderEditor('/admin/dictionary/words/word-1');  // mockRole 預設 owner
+        await screen.findByDisplayValue('abas');
+        expect(screen.getByLabelText(/詞形/)).toBeEnabled();
+        expect(screen.queryByText(/建立的草稿，你無法修改/)).not.toBeInTheDocument();
+    });
+
+    test('稽核 WP-8 驗證：以提案網址開別人的新建草稿也是唯讀', async () => {
+        mockRole = 'editor';
+        getRevision.mockResolvedValue({
+            id: 78, target_kind: 'word', target_id: '', status: 'draft', operation: 'create',
+            created_by: 'alice', payload: { ...effectiveWord, name: '別人的新詞' },
+        });
+
+        renderEditor('/admin/dictionary/revisions/78');
+        expect(await screen.findByDisplayValue('別人的新詞')).toBeDisabled();
+        expect(screen.getByText('這是 alice 建立的草稿，你無法修改。')).toBeInTheDocument();
+    });
+
+    test('稽核 WP-8 驗證：「改回我的版本」後仍視為未儲存，離開會提醒', async () => {
+        getWord.mockResolvedValue({
+            ...effectiveWord,
+            meta: { ...effectiveWord.meta, open_revision: { id: 33, status: 'draft', operation: 'update' } },
+        });
+        getRevision.mockResolvedValueOnce({
+            id: 33, status: 'draft', operation: 'update', updated_at: 'u1', payload: effectiveWord,
+        });
+        const conflict = new Error('內容已被其他人更新');
+        conflict.status = 409;
+        conflict.data = { code: 'edit_conflict' };
+        updateRevisionPayload.mockRejectedValueOnce(conflict);
+
+        renderEditor('/admin/dictionary/words/word-1');
+        await screen.findByDisplayValue('abas');
+        fireEvent.change(screen.getByLabelText(/詞形/), { target: { value: '我的版本' } });
+        fireEvent.click(screen.getByRole('button', { name: /儲存草稿/ }));
+        await screen.findByText(/這份草稿在你編輯期間已被修改/);
+
+        getRevision.mockResolvedValueOnce({
+            id: 33, status: 'draft', operation: 'update', updated_at: 'u2',
+            payload: { ...effectiveWord, name: '別人的版本' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: '載入最新內容' }));
+        await screen.findByDisplayValue('別人的版本');
+        fireEvent.click(screen.getByRole('button', { name: '改回我的版本' }));
+        await screen.findByDisplayValue('我的版本');
+
+        const event = new Event('beforeunload', { cancelable: true });
+        window.dispatchEvent(event);
+        expect(event.defaultPrevented).toBe(true);
+    });
+
+    test('新建草稿換網址後的成功訊息只顯示一次，route state 會被清掉', async () => {
+        createWordProposal.mockResolvedValue({ revision_id: 42, status: 'draft' });
+
+        renderEditor();
+        await screen.findByText('尚未儲存');
+        fireEvent.change(screen.getByLabelText(/^族語\s/), { target: { value: 'tribe-tayal' } });
+        fireEvent.change(screen.getByLabelText(/詞形/), { target: { value: 'lokah' } });
+        fireEvent.click(screen.getByRole('button', { name: /儲存草稿/ }));
+
+        await waitForRevisionPage(42);
+        expect(screen.getByText('草稿已儲存')).toBeInTheDocument();
+        // flash 清掉後不會觸發重新載入（提案只讀一次）
+        await waitFor(() => {
+            expect(getRevision.mock.calls.filter(([id]) => String(id) === '42')).toHaveLength(1);
         });
     });
 

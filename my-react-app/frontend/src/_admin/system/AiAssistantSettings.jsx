@@ -3,6 +3,10 @@ import { Alert, Button, Form, Spinner } from 'react-bootstrap';
 import AdminTable from '../components/AdminTable';
 import { useAuth } from '../../userServives/authContext';
 import { apiGet, apiPost } from '../../../utils/apiClient';
+import { formatApiError } from '../apiErrors';
+import EditConflictAlert from '../components/EditConflictAlert';
+import { isEditConflict } from '../hooks/editConflict';
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import '../../../static/css/_admin/system.css';
 import '../../../static/css/_admin/ai-usage.css';
 import '../../../static/css/_admin/ai-assistant-settings.css';
@@ -40,7 +44,7 @@ function Field({ id, label, hint, count, limit, children }) {
     );
 }
 
-function VersionList({ versions, busy, onRollback }) {
+function VersionList({ versions, busy, dirty, onRollback }) {
     const [confirmId, setConfirmId] = useState(null);
     const confirmRef = useRef(null);
     const triggerRefs = useRef({});
@@ -77,6 +81,8 @@ function VersionList({ versions, busy, onRollback }) {
                                 <td>
                                     {v.active ? <span className="ai-assistant-muted">目前版本</span> : confirmId === v.id ? (
                                         <span className="ai-assistant-confirm" role="group" aria-label={`確認回滾到 v${v.id}`}>
+                                            {/* 回滾會換掉整份草稿；有沒存的修改時要明說會被捨棄（稽核 FE7a-12） */}
+                                            {dirty && <span className="ai-assistant-muted" role="alert">未儲存的修改會被捨棄。</span>}
                                             <Button ref={confirmRef} size="sm" variant="primary" disabled={busy} onClick={() => { returnFocusTo.current = v.id; setConfirmId(null); onRollback(v); }}>
                                                 確定回滾到 v{v.id}
                                             </Button>
@@ -115,7 +121,7 @@ function ModerationSection() {
                 const result = await apiGet(`/adminapi/ai-assistant/moderation/?${params}`);
                 if (active) setData(result);
             } catch (err) {
-                if (active) { setData(null); setError(err.message); }
+                if (active) { setData(null); setError(formatApiError(err)); }
             } finally {
                 if (active) setLoading(false);
             }
@@ -191,6 +197,8 @@ export default function AiAssistantSettings() {
     const [trialText, setTrialText] = useState('');
     const [trial, setTrial] = useState(null);
     const [reloadKey, setReloadKey] = useState(0);
+    // 樂觀鎖衝突：儲存時別人已經存過新版本（稽核 FE7a-12）
+    const [conflict, setConflict] = useState(false);
     const trialGeneration = useRef(0);
 
     const adopt = useCallback((next) => {
@@ -213,7 +221,7 @@ export default function AiAssistantSettings() {
                 const result = await apiGet('/adminapi/ai-assistant/settings/');
                 if (active) adopt(result);
             } catch (err) {
-                if (active) setError(err.message);
+                if (active) setError(formatApiError(err));
             } finally {
                 if (active) setLoading(false);
             }
@@ -222,6 +230,7 @@ export default function AiAssistantSettings() {
     }, [canView, adopt, reloadKey]);
 
     const dirty = useMemo(() => overview && draft && !sameContent(overview.active, draft), [overview, draft]);
+    useUnsavedChangesGuard(Boolean(dirty));
     const patch = (change) => {
         setDraft((prev) => ({ ...prev, ...change }));
         setNotice('');
@@ -234,13 +243,35 @@ export default function AiAssistantSettings() {
         setBusy(true);
         setError('');
         setNotice('');
+        setConflict(false);
         try {
-            const next = await apiPost('/adminapi/ai-assistant/settings/', { content: draft, note });
+            // 帶載入時的使用中版本號：期間別人存過新版本就回 409，不會無聲蓋掉
+            const next = await apiPost('/adminapi/ai-assistant/settings/', {
+                content: draft,
+                note,
+                base_version: overview.activeVersion,
+            });
             adopt(next);
             setTrial(null);
             setNotice(`已儲存為 v${next.activeVersion} 並生效。多台伺服器最久 30 秒後都會套用。`);
         } catch (err) {
-            setError(err.message);
+            if (isEditConflict(err)) setConflict(true);
+            else setError(formatApiError(err));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    // 載入最新版本：整份換成伺服器上的內容（草稿被取代），與重新整理頁面相同但不必離開
+    const reloadLatest = async () => {
+        setBusy(true);
+        setError('');
+        try {
+            adopt(await apiGet('/adminapi/ai-assistant/settings/'));
+            setTrial(null);
+            setConflict(false);
+        } catch (err) {
+            setError(formatApiError(err));
         } finally {
             setBusy(false);
         }
@@ -250,13 +281,14 @@ export default function AiAssistantSettings() {
         setBusy(true);
         setError('');
         setNotice('');
+        setConflict(false);
         try {
             const next = await apiPost(`/adminapi/ai-assistant/settings/${version.id}/rollback/`, {});
             adopt(next);
             setTrial(null);
             setNotice(`已回滾到 v${version.id} 的內容，新版本為 v${next.activeVersion}，已生效。`);
         } catch (err) {
-            setError(err.message);
+            setError(formatApiError(err));
         } finally {
             setBusy(false);
         }
@@ -272,7 +304,7 @@ export default function AiAssistantSettings() {
             const result = await apiPost('/adminapi/ai-assistant/settings/trial/', { content: draft, messages });
             if (generation === trialGeneration.current) setTrial(result);
         } catch (err) {
-            if (generation === trialGeneration.current) setError(err.message);
+            if (generation === trialGeneration.current) setError(formatApiError(err));
         } finally {
             setBusy(false);
         }
@@ -292,6 +324,7 @@ export default function AiAssistantSettings() {
 
             {!canView && !authLoading && <Alert variant="danger">只有擁有者與管理員可以調整 AI 助手設定。</Alert>}
             {canView && error && <Alert variant="danger" role="alert">{error}</Alert>}
+            {canView && conflict && <EditConflictAlert onReload={reloadLatest} busy={busy} />}
             {canView && <SuccessNotice message={notice} role="status" />}
 
             {canView && error && !overview && !loading && (
@@ -408,7 +441,7 @@ export default function AiAssistantSettings() {
                         )}
                     </section>
 
-                    <VersionList versions={overview.versions} busy={busy} onRollback={rollback} />
+                    <VersionList versions={overview.versions} busy={busy} dirty={Boolean(dirty)} onRollback={rollback} />
                     <ModerationSection />
                 </div>
             )}

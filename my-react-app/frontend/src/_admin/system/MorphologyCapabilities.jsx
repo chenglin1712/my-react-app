@@ -9,6 +9,7 @@ import AdminTable from '../components/AdminTable';
 import { RefreshCw } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { apiGet } from '../../../utils/apiClient';
+import { formatApiError } from '../apiErrors';
 import { STAFF_ROLES } from '../constants/roles';
 import formatRatio from './formatRatio';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
@@ -130,7 +131,7 @@ export default function MorphologyCapabilities() {
             // 失敗（含被撤權的 401／403）就清掉舊報表，不讓使用者以為舊數字還是現況
             if (isActive()) {
                 setData(null);
-                setError(err.message);
+                setError(formatApiError(err));
             }
         } finally {
             if (isActive()) setLoading(false);

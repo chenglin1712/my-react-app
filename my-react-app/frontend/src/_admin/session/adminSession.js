@@ -57,5 +57,25 @@ export const clearAdminSession = () => {
     }
 };
 
+// WP-8 追加：「後台的登出按鈕正在登出」旗標（模組層級，只活在記憶體裡）。
+// signOut() 會讓 auth 狀態變成 null，AdminRoute 因此重新渲染；平常沒有登入狀態時它會導去
+// /admin-login?next=…（讓人登入後回到原頁），但主動登出的人要回前台首頁，不該被帶去後台登入頁。
+// auth 狀態的通知可能比 signOut() 的 promise 先到，AdminLayout 來不及先導頁，所以由 AdminRoute 自己看這個旗標。
+// 清除時機：登出失敗時由 AdminLayout 清；登出成功後 AdminRoute 卸載時清（見 AdminRoute.jsx），
+// 不會殘留到之後重新登入、再登出的流程。
+let adminLogoutInProgress = false;
+
+/** 開始登出，回傳結束用的函式（登出失敗、留在後台時呼叫）。 */
+export const beginAdminLogout = () => {
+    adminLogoutInProgress = true;
+    return endAdminLogout;
+};
+
+export const endAdminLogout = () => {
+    adminLogoutInProgress = false;
+};
+
+export const isAdminLogoutInProgress = () => adminLogoutInProgress;
+
 /** 後端回 reauth_required 時，api 層送出這個事件，AdminLayout 的重新驗證彈窗會接手。 */
 export const REAUTH_REQUIRED_EVENT = 'admin:reauth-required';

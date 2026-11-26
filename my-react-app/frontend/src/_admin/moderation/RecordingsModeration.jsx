@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Alert,
   Badge,
@@ -37,18 +38,26 @@ export default function RecordingsModeration() {
     const canRead = STAFF_ROLES.includes(role);
     const canManage = MODERATORS.includes(role);
 
+    // 稽核 FE7b-07：檢舉佇列的「查看內容」連結帶 ?id=…&tribe=…，當成初始篩選。
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [initialParams] = useState(() => ({
+        id: searchParams.get('id') ?? '',
+        tribe: searchParams.get('tribe') ?? '',
+    }));
+
     const {
         items, data, loading, error, setError, page, setPage, hasNext,
-        filters, setFilters, search, reload: loadRecordings,
+        filters, setFilters, search, applyFilters, reload: loadRecordings,
     } = useAdminListQuery({
         endpoint: '/adminapi/moderation/recordings/',
-        initialFilters: { tribe: '', has_reports: false },
+        initialFilters: { tribe: initialParams.tribe, has_reports: false, id: initialParams.id },
         pageSize: PAGE_SIZE,
         enabled: canRead,
         // has_reports 是布林，要轉成字串 'true' 才送出。
         buildParams: (params, query) => {
             if (query.tribe) params.set('tribe', query.tribe);
             if (query.has_reports) params.set('has_reports', 'true');
+            if (query.id) params.set('id', query.id);
         },
     });
 
@@ -141,6 +150,24 @@ export default function RecordingsModeration() {
             )}
             {error && <Alert variant="danger">{error}</Alert>}
 
+            {filters.id && (
+                <Alert variant="info" className="moderation-info-alert">
+                    目前只顯示錄音 ID：{filters.id}
+                    {' '}
+                    <Button
+                        variant="link"
+                        size="sm"
+                        className="p-0 align-baseline"
+                        onClick={() => {
+                            setSearchParams({}, { replace: true });
+                            applyFilters({ ...filters, id: '' });
+                        }}
+                    >
+                        顯示全部
+                    </Button>
+                </Alert>
+            )}
+
             <Form className="moderation-filter-panel" onSubmit={search}>
                 <Form.Select
                     aria-label="族語"
@@ -215,6 +242,7 @@ export default function RecordingsModeration() {
                                                         className="moderation-audio"
                                                         controls
                                                         preload="none"
+                                                        aria-label={`${item.word || item.id} 的發音錄音`}
                                                         src={item.storage_url}
                                                     >
                                                         你的瀏覽器不支援音訊播放。

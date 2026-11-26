@@ -596,7 +596,8 @@ class WordDeleteTest(DictionaryDbTestCase):
 
     def test_delete_with_unlink_references_succeeds(self):
         self._seed_referencing_anaphora()
-        with _as_role(EDITOR) as headers:
+        # 稽核 FE7a-07：解除引用只有 owner／admin 能提出（編輯者送出會 403，見 test_wp8_dictionary）
+        with _as_role(ADMIN) as headers:
             propose_resp = _post_json(
                 self.client, f'/adminapi/dictionary/words/{self.word_id}/delete-proposal/', headers,
                 {"unlink_references": True},

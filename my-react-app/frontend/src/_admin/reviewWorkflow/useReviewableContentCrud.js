@@ -3,7 +3,10 @@ import { useRef, useState } from 'react';
 
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../../utils/apiClient';
 import { useAdminListQuery } from '../hooks/useAdminListQuery';
+import { formatApiError } from '../apiErrors';
+import { isEditConflict } from '../hooks/editConflict';
 import { REVIEW_ACTION_META } from './reviewActionPolicy';
+import { getTransitionConfirm } from './reviewConfirm';
 
 /**
  * 送審工作流的資料抓取與狀態轉換（FE-2）。
@@ -36,6 +39,8 @@ export function useReviewableContentCrud({
     deleteConfirmMessage,
     supportsRevision = true,
     pageSize = 20,
+    // 確認對話框裡顯示的內容名稱，預設依序找常見欄位
+    itemLabelOf = (item) => item.title ?? item.foreign_word ?? item.sentence ?? item.name ?? '',
 }) {
     // 清單／篩選／分頁共用 useAdminListQuery（FE-9）——那一層跟送審流程無關，
     // 檢舉佇列、錄音審核等沒有狀態機的頁面也用同一份。
@@ -50,9 +55,17 @@ export function useReviewableContentCrud({
     const [rejectTarget, setRejectTarget] = useState(null);
     const [rejectReason, setRejectReason] = useState('');
     const [rejectingRevision, setRejectingRevision] = useState(false);
+    // 對話框自己持有的錯誤：失敗時對話框還開著，錯誤只顯示在頁面上方的話會被對話框蓋住（稽核 FE7b-01）
+    const [rejectError, setRejectError] = useState('');
 
     const [editTarget, setEditTarget] = useState(null);
     const [form, setForm] = useState(emptyForm);
+    const [editError, setEditError] = useState('');
+    // 儲存時發現別人剛更新過這筆（409 edit_conflict）：對話框提供「載入最新版本」（稽核 FE7b-08）
+    const [editConflict, setEditConflict] = useState(false);
+    // 打開對話框當下的表單內容，用來判斷有沒有未儲存的修改（稽核 FE7b-03）
+    const [baseline, setBaseline] = useState(() => JSON.stringify(emptyForm));
+    const editDirty = Boolean(editTarget) && JSON.stringify(form) !== baseline;
 
     // actionId（state）只負責畫面上顯示「哪一列現在忙碌」，擋不住同一個 tick
     // 連點兩下，也擋不住不同列的操作互相踩到彼此（A 列的操作先結束，會把 B
@@ -81,13 +94,17 @@ export function useReviewableContentCrud({
      * 使用者在確認對話框按取消也回傳 false——什麼都沒發生，同樣不該讓呼叫端
      * 把 UI 當成「已完成」收掉。
      */
-    const runAction = async (item, action, body) => {
+    // options.confirm：{ title, message, confirmLabel }，會立刻影響前台的動作先確認（稽核 FE7b-02）。
+    // options.onError：有的話錯誤交給它（例如退件對話框自己顯示），不再寫到頁面上方。
+    const runAction = async (item, action, body, options = {}) => {
         if (actionLockRef.current) return false;
         actionLockRef.current = true;
         setActionId(item.id);
         setError('');
+        options.onError?.('');
 
         try {
+            if (options.confirm && !(await confirmAction(options.confirm))) return false;
             if (action === 'delete') {
                 const confirmed = await confirmAction({
                     title: '刪除',
@@ -107,7 +124,8 @@ export function useReviewableContentCrud({
                 viewedRevisionRef.current.delete(item.id);
                 try { await load(); } catch { /* 重新載入失敗時仍顯示原本的錯誤訊息 */ }
             }
-            setError(err.message);
+            if (options.onError) options.onError(formatApiError(err));
+            else setError(err.message);
             return false;
         } finally {
             actionLockRef.current = false;
@@ -119,12 +137,14 @@ export function useReviewableContentCrud({
         setRejectTarget(item);
         setRejectingRevision(revision);
         setRejectReason('');
+        setRejectError('');
     };
 
     const closeReject = () => {
         setRejectTarget(null);
         setRejectingRevision(false);
         setRejectReason('');
+        setRejectError('');
     };
 
     const submitReject = async () => {
@@ -134,7 +154,7 @@ export function useReviewableContentCrud({
         if (rejectingRevision) {
             const version = revisionVersionOf(rejectTarget);
             if (!version) {
-                setError('找不到這筆待審修改的版本，請重新載入後再試');
+                setRejectError('找不到這筆待審修改的版本，請重新載入後再試');
                 return;
             }
             body.revision_version = version;
@@ -143,6 +163,7 @@ export function useReviewableContentCrud({
             rejectTarget,
             rejectingRevision ? 'pending-revision/reject' : 'reject',
             body,
+            { onError: setRejectError },
         );
         if (succeeded && rejectingRevision) viewedRevisionRef.current.delete(rejectTarget.id);
         // 只有真的送出成功才收掉對話框；失敗時保留使用者打好的退件理由，
@@ -152,6 +173,9 @@ export function useReviewableContentCrud({
 
     const openNew = () => {
         setForm(emptyForm);
+        setBaseline(JSON.stringify(emptyForm));
+        setEditError('');
+        setEditConflict(false);
         setEditTarget({});
     };
 
@@ -180,7 +204,11 @@ export function useReviewableContentCrud({
             // 快速點開 A 列再點開 B 列時，A 比較慢回來的查詢結果不該蓋掉
             // 使用者現在正在看的 B 列編輯表單。
             if (myGeneration !== editRequestGenerationRef.current) return;
-            setForm(formFrom(values));
+            const nextForm = formFrom(values);
+            setForm(nextForm);
+            setBaseline(JSON.stringify(nextForm));
+            setEditError('');
+            setEditConflict(false);
             setEditTarget(item);
         } catch (err) {
             if (myGeneration !== editRequestGenerationRef.current) return;
@@ -190,7 +218,37 @@ export function useReviewableContentCrud({
         }
     };
 
-    const closeEdit = () => setEditTarget(null);
+    const closeEdit = () => { setEditTarget(null); setEditError(''); setEditConflict(false); };
+
+    // 載入最新版本：用伺服器上這一筆目前的內容取代表單（自己的修改會被捨棄），並更新樂觀鎖用的 updated_at
+    const reloadLatest = async () => {
+        if (!editTarget?.id) return;
+        try {
+            const latest = await apiGet(`${endpoint}${editTarget.id}/`);
+            const nextForm = formFrom(latest);
+            setForm(nextForm);
+            setBaseline(JSON.stringify(nextForm));
+            setEditTarget(latest);
+            setEditError('');
+            setEditConflict(false);
+            await load();
+        } catch (err) {
+            setEditError(formatApiError(err));
+        }
+    };
+
+    // 使用者主動關閉對話框（背景、Esc、X、取消）：有未儲存的修改先確認，不要無聲丟掉整份輸入（稽核 FE7b-03）
+    const requestCloseEdit = async () => {
+        if (editDirty) {
+            const confirmed = await confirmAction({
+                title: '放棄未儲存的修改',
+                message: '表單裡有尚未儲存的內容，關閉後會全部消失。確定要關閉嗎？',
+                confirmLabel: '放棄並關閉',
+            });
+            if (!confirmed) return;
+        }
+        closeEdit();
+    };
 
     const save = async (event, payload = form) => {
         event?.preventDefault();
@@ -198,6 +256,8 @@ export function useReviewableContentCrud({
         actionLockRef.current = true;
         setActionId('form');
         setError('');
+        setEditError('');
+        setEditConflict(false);
 
         try {
             if (editTarget.id) {
@@ -210,7 +270,11 @@ export function useReviewableContentCrud({
                     // 送出後版本就變了：記下新版本，之後審核（核准／退件）帶的才是最新的，不會因為舊版本被擋
                     if (saved?.version) viewedRevisionRef.current.set(editTarget.id, saved.version);
                 } else {
-                    await apiPatch(`${endpoint}${editTarget.id}/`, payload);
+                    // 帶打開表單時這一筆的 updated_at：期間別人改過就回 409（edit_conflict），不會無聲蓋掉
+                    await apiPatch(`${endpoint}${editTarget.id}/`, {
+                        ...payload,
+                        ...(editTarget.updated_at ? { base_updated_at: editTarget.updated_at } : {}),
+                    });
                 }
             } else {
                 await apiPost(endpoint, payload);
@@ -219,7 +283,9 @@ export function useReviewableContentCrud({
             setEditTarget(null);
             await load();
         } catch (err) {
-            setError(err.message);
+            // 對話框還開著，錯誤要顯示在對話框裡
+            if (isEditConflict(err)) setEditConflict(true);
+            else setEditError(formatApiError(err));
         } finally {
             actionLockRef.current = false;
             setActionId(null);
@@ -236,6 +302,7 @@ export function useReviewableContentCrud({
         if (actionKey === 'rejectRevision') return openReject(item, true);
 
         const { endpointAction } = REVIEW_ACTION_META[actionKey];
+        const transitionConfirm = getTransitionConfirm(actionKey, itemLabelOf(item));
         // 核准類動作後端要求帶 review_comment（可為空字串）。
         // 核准時帶上審核者看到的 updated_at，送審後被改過就會被後端擋下（稽核 BE1-03）
         let body = endpointAction?.endsWith('approve')
@@ -249,7 +316,7 @@ export function useReviewableContentCrud({
             }
             body = { ...body, revision_version: version };
         }
-        return runAction(item, endpointAction, body).then((ok) => {
+        return runAction(item, endpointAction, body, { confirm: transitionConfirm }).then((ok) => {
             if (ok && actionKey === 'approveRevision') viewedRevisionRef.current.delete(item.id);
             return ok;
         });
@@ -279,6 +346,7 @@ export function useReviewableContentCrud({
 
         // 退件理由對話框
         reject: {
+            error: rejectError,
             target: rejectTarget,
             reason: rejectReason,
             setReason: setRejectReason,
@@ -293,9 +361,15 @@ export function useReviewableContentCrud({
             target: editTarget,
             form,
             setForm,
+            error: editError,
+            setError: setEditError,
+            conflict: editConflict,
+            reloadLatest,
+            dirty: editDirty,
             openNew,
             openEdit,
             close: closeEdit,
+            requestClose: requestCloseEdit,
             save,
         },
     };

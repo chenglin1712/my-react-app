@@ -52,7 +52,7 @@ function QueryTable({
             ) : items.length === 0 ? (
                 <EmptyTable />
             ) : (
-                <AdminTable label="搜尋分析列表" hover className="search-analytics-table">
+                <AdminTable label={title} hover className="search-analytics-table">
                     <thead>
                         <tr>
                             <th>查詢字詞</th>

@@ -119,7 +119,7 @@ export function getReviewActions({
  *
  * 主要動作依狀態決定——「這一列現在最可能要做的事」：
  *   草稿／已退件 → 編輯；待審核 → 核准（沒有核准權限則是撤回）；
- *   已發布 → 下架（沒有下架權限則是編輯）；已下架 → 重新發布（沒有權限則是編輯）。
+ *   已發布 → 編輯（沒有編輯權限則是檢視，連檢視都沒有才是下架）；已下架 → 重新發布（沒有權限則是編輯）。
  * 找不到對應的就退回第一個可用操作。
  *
  * @returns {{ primary: string|null, menu: string[] }} 都是 REVIEW_ACTION_META 的 key
@@ -128,7 +128,11 @@ const PRIMARY_BY_STATUS = {
     draft: ['edit'],
     rejected: ['edit'],
     pending_review: ['approve', 'withdraw'],
-    published: ['unpublish', 'edit'],
+    // 已發布的列主要動作是「編輯」，下架收進選單：下架會立刻把內容從前台拿掉，不該是最顯眼、最容易誤點的按鈕（稽核 FE7b-02）
+    // WP-8 追加：只能核准、不能編輯的角色（reviewer）若直接落到「下架」，最顯眼的按鈕又變成危險操作；
+    // 因此在 edit 與 unpublish 之間插入 view。有 viewFallback 的內容（公告）會以「檢視」當主要動作，
+    // 沒有 view 動作的內容類型（題庫類）find 找不到 view，自然退回 unpublish。
+    published: ['edit', 'view', 'unpublish'],
     unpublished: ['republish', 'edit'],
 };
 

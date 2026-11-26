@@ -10,7 +10,7 @@ from django.core.management import call_command
 from django.test import Client, TestCase
 from django.utils import timezone
 
-from config.roles import EDITOR, OWNER, REVIEWER
+from config.roles import ADMIN, EDITOR, OWNER, REVIEWER
 from config.tribes import TRIBES
 from dictionary_db import connect as connect_module
 from dictionary_db import model as m
@@ -252,7 +252,9 @@ class ProposeGuardsTest(DictionaryDbTestCase):
             status=DictionaryRevision.STATUS_DRAFT, created_by="someone-else",
         )
         response = self._propose()
-        self.assertEqual(response.status_code, 409)
+        # WP-8 追加：與 PUT 同規則，非建立者的編輯者改回 403 not_draft_owner（原本是 409）
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["code"], "not_draft_owner")
         self.assertEqual(DictionaryRevision.objects.get().payload, {"name": "別人的"})
 
     def test_own_update_draft_is_still_reused(self):
@@ -283,7 +285,8 @@ class ProposeGuardsTest(DictionaryDbTestCase):
             operation=DictionaryRevision.OPERATION_DELETE, payload={"unlink_references": False},
             status=DictionaryRevision.STATUS_DRAFT, created_by="test-uid",
         )
-        with _as_role(EDITOR) as headers:
+        # 稽核 FE7a-07：unlink_references=true 只有 owner／admin 能設定，這裡改用 ADMIN
+        with _as_role(ADMIN) as headers:
             bad = _put_json(self.client, f"/adminapi/dictionary/revisions/{draft.pk}/", headers, {"unlink_references": "maybe"})
             good = _put_json(self.client, f"/adminapi/dictionary/revisions/{draft.pk}/", headers,
                              {"unlink_references": True, "evil": "x"})

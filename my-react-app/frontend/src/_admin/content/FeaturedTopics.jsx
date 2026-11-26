@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Badge, Button, Form, Spinner } from 'react-bootstrap';
 import { ImagePlus, Newspaper, Plus, Save, Send, Trash2 } from 'lucide-react';
+import { confirmAction } from '@components/ui/ConfirmDialog';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../../utils/apiClient';
 import { useAuth } from '../../userServives/authContext';
 import { useMediaUpload } from '../hooks/useMediaUpload';
@@ -8,6 +9,9 @@ import { useActionLock } from '../hooks/useActionLock';
 import { useGuardedSelection } from '../hooks/useGuardedSelection';
 import { countChars, formatApiError } from '../apiErrors';
 import { AdminEmptyStage } from '../components/AdminEmpty';
+import EditConflictAlert from '../components/EditConflictAlert';
+import { isEditConflict } from '../hooks/editConflict';
+import { getTransitionConfirm } from '../reviewWorkflow/reviewConfirm';
 import RichTextEditor from '../components/RichTextEditor';
 import { countDocText, hasDocContent } from '../../../components/_topic/richText';
 import '../../../static/css/_admin/featured-topics.css';
@@ -84,6 +88,8 @@ function Editor({ topic, role, publishedCount, onChanged, onCreated, onDeleted, 
     const [commentError, setCommentError] = useState('');
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [revisionNote, setRevisionNote] = useState(false);
+    // 儲存時發現別人剛更新過這則專題（edit_conflict）：提示並提供「載入最新版本」（稽核 FE7b-08）
+    const [conflict, setConflict] = useState(false);
     // 編輯器只在掛載時載入內容；載入待審修改後換 key 重新掛載，編輯器才會顯示修改後的內容
     const [editorKey, setEditorKey] = useState(0);
     const media = useMediaUpload({ resetKey: topic?.id ?? 'new' });
@@ -137,8 +143,10 @@ function Editor({ topic, role, publishedCount, onChanged, onCreated, onDeleted, 
 
     const run = (key, task) => {
         setError('');
+        setConflict(false);
         return lock.runLocked(key, async () => {
             try { await task(); } catch (err) {
+                if (isEditConflict(err) && onChanged) { setConflict(true); return; }
                 // 409 = 狀態衝突（別人剛改過這則專題，或已發布數量到上限）：保留後端說的原因，並重新載入讓畫面和伺服器一致
                 // revision_changed（別人在你載入之後送出或改過待審修改）：狀態沒變也要重建編輯區，重新取得最新的
                 // 待審內容與版本；只重新載入列表的話，畫面上的版本還是舊的，之後每次送出都會再被擋
@@ -173,7 +181,11 @@ function Editor({ topic, role, publishedCount, onChanged, onCreated, onDeleted, 
             }
             let saved = isNew
                 ? await apiPost('/adminapi/featured-topics/', payload())
-                : await apiPatch(`/adminapi/featured-topics/${topic.id}/`, payload());
+                // 帶載入時的 updated_at：期間別人改過就回 409（edit_conflict），不會無聲蓋掉
+                : await apiPatch(`/adminapi/featured-topics/${topic.id}/`, {
+                    ...payload(),
+                    ...(topic.updated_at ? { base_updated_at: topic.updated_at } : {}),
+                });
             if (submit) {
                 try {
                     saved = await apiPost(`/adminapi/featured-topics/${saved.id}/submit/`);
@@ -189,7 +201,9 @@ function Editor({ topic, role, publishedCount, onChanged, onCreated, onDeleted, 
         });
     };
 
-    const act = (key, path, message, body) => run(key, async () => {
+    // confirmOpts：會立刻影響首頁的動作（核准、下架、重新發布）先說明影響再執行（稽核 FE7b-02）
+    const act = (key, path, message, body, confirmOpts) => run(key, async () => {
+        if (confirmOpts && !(await confirmAction(confirmOpts))) return;
         const saved = await apiPost(`/adminapi/featured-topics/${topic.id}/${path}/`, body);
         onChanged(saved);
         onNotice(message);
@@ -216,6 +230,7 @@ function Editor({ topic, role, publishedCount, onChanged, onCreated, onDeleted, 
                 {!isNew && <Badge bg={STATUSES[status]?.bg ?? 'secondary'}>{STATUSES[status]?.label ?? status}</Badge>}
             </div>
             {(error || media.error) && <Alert variant="danger" role="alert">{error || media.error}</Alert>}
+            {conflict && <EditConflictAlert onReload={() => onChanged(topic)} />}
             {status === 'rejected' && topic.review_comment && (
                 <Alert variant="warning">退件理由：{topic.review_comment}</Alert>
             )}
@@ -353,18 +368,18 @@ function Editor({ topic, role, publishedCount, onChanged, onCreated, onDeleted, 
                                 <Form.Text id="topic-review-comment-hint">核准時選填；退件時必填。</Form.Text>
                             </Form.Group>
                             <div className="featured-topics-actions">
-                                <Button disabled={busy || atLimit} onClick={() => act('approve', 'approve', '已核准並發布', { review_comment: comment.trim(), ...(topic.updated_at ? { base_updated_at: topic.updated_at } : {}) })}>核准並發布</Button>
+                                <Button disabled={busy || atLimit} onClick={() => act('approve', 'approve', '已核准並發布', { review_comment: comment.trim(), ...(topic.updated_at ? { base_updated_at: topic.updated_at } : {}) }, getTransitionConfirm('approve', topic.title))}>核准並發布</Button>
                                 <Button variant="outline-danger" disabled={busy} onClick={reject}>退件</Button>
                             </div>
                         </div>
                     )}
                     {status === 'published' && canPublish && (
-                        <Button variant="outline-secondary" disabled={busy} onClick={() => act('unpublish', 'unpublish', '已下架')}>下架</Button>
+                        <Button variant="outline-secondary" disabled={busy} onClick={() => act('unpublish', 'unpublish', '已下架', undefined, getTransitionConfirm('unpublish', topic.title))}>下架</Button>
                     )}
                     {status === 'unpublished' && canPublish && (
                         <>
                             {atLimit && <Alert variant="warning">已發布的專題已滿 {MAX_PUBLISHED} 則，重新發布前要先下架其中一則。</Alert>}
-                            <Button disabled={busy || atLimit} onClick={() => act('republish', 'republish', '已重新發布')}>重新發布</Button>
+                            <Button disabled={busy || atLimit} onClick={() => act('republish', 'republish', '已重新發布', undefined, getTransitionConfirm('republish', topic.title))}>重新發布</Button>
                         </>
                     )}
                     {['draft', 'rejected'].includes(status) && <p className="featured-topics-hint">儲存並送審後，由擁有者或管理員核准才會出現在首頁。</p>}

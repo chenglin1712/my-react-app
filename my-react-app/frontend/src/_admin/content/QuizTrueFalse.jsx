@@ -3,6 +3,7 @@ import AdminTable from '../components/AdminTable';
 import { Plus } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
+import EditorModalError from '../reviewWorkflow/EditorModalError';
 import RejectReasonModal from '../reviewWorkflow/RejectReasonModal';
 import ReviewActions from '../reviewWorkflow/ReviewActions';
 import ReviewPagination from '../reviewWorkflow/ReviewPagination';
@@ -41,7 +42,7 @@ export default function QuizTrueFalse() {
   const role = userData?.role;
 
   const {
-    items, data, loading, error, setError, hasNext, page, setPage,
+    items, data, loading, error, hasNext, page, setPage,
     filters, setFilters, search,
     actionId, handleAction, reject, editor,
   } = useReviewableContentCrud({
@@ -73,6 +74,7 @@ export default function QuizTrueFalse() {
 
   const saveForm = async (event) => {
     event.preventDefault();
+    editor.setError('');
 
     const payload = {
       ...form,
@@ -89,12 +91,12 @@ export default function QuizTrueFalse() {
       || !payload.audio_url
       || !payload.image_url
     ) {
-      setError('族語句子、中文句意、音檔與圖片皆為必填');
+      editor.setError('族語句子、中文句意、音檔與圖片皆為必填');
       return;
     }
 
     if (uploadingAudio || uploadingImage) {
-      setError('請等待檔案上傳完成');
+      editor.setError('請等待檔案上傳完成');
       return;
     }
 
@@ -242,10 +244,10 @@ export default function QuizTrueFalse() {
 
       <Modal
         show={Boolean(editTarget)}
-        onHide={formSubmitting ? undefined : editor.close}
+        onHide={formSubmitting ? undefined : editor.requestClose}
         centered
         size="lg"
-        backdrop={formSubmitting ? 'static' : true}
+        backdrop={formSubmitting || editor.dirty ? 'static' : true}
         keyboard={!formSubmitting}
       >
         <Form onSubmit={saveForm}>
@@ -258,6 +260,7 @@ export default function QuizTrueFalse() {
           </Modal.Header>
 
           <Modal.Body>
+              <EditorModalError error={editor.error} conflict={editor.conflict} onReload={editor.reloadLatest} />
             <Form.Group
               className="quiz-bank-field"
               controlId="quiz-true-false-tribe"
@@ -411,7 +414,7 @@ export default function QuizTrueFalse() {
               type="button"
               variant="secondary"
               disabled={formSubmitting}
-              onClick={editor.close}
+              onClick={editor.requestClose}
             >
               取消
             </Button>

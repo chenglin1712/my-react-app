@@ -209,6 +209,10 @@ class SituationOptionsTest(TestCase):
 class AuditLogListTest(TestCase):
     def setUp(self):
         cache.clear()
+        # WP-8 追加：清單會批次查操作者姓名（Firestore），測試不連真的 Firebase
+        names_patcher = patch("adminapi.user_names._fetch_names", side_effect=lambda uids: {uid: "" for uid in uids})
+        self.addCleanup(names_patcher.stop)
+        names_patcher.start()
         for index in range(25):
             AuditLog.objects.create(
                 actor_uid="alice" if index % 2 else "bob", actor_role="owner",

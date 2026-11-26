@@ -3,6 +3,12 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import FeaturedTopics from './FeaturedTopics';
 import { apiGet, apiPost, apiPatch, apiDelete } from '../../../utils/apiClient';
 
+// 核准、下架、重新發布會先跳確認（稽核 FE7b-02）：這個檔案的既有測試自動按「確認」，其餘（例如刪除）仍走真正的對話框
+vi.mock('@components/ui/ConfirmDialog', async (importOriginal) => {
+  const { withAutoConfirmedTransitions } = await import('../testing/autoConfirmForTests');
+  return withAutoConfirmedTransitions(await importOriginal());
+});
+
 vi.mock('../../../utils/apiClient', () => ({
   apiGet: vi.fn(), apiPost: vi.fn(), apiPatch: vi.fn(), apiDelete: vi.fn(),
 }));
@@ -178,6 +184,39 @@ describe('FeaturedTopics', () => {
     await waitFor(() => expect(apiPatch).toHaveBeenCalledWith(
       '/adminapi/featured-topics/1/', expect.objectContaining({ title: '新名稱', sort_order: 0 }),
     ));
+  });
+
+  /** 稽核 FE7b-08：樂觀鎖 */
+  test('草稿 PATCH 帶載入時的 updated_at', async () => {
+    apiPatch.mockResolvedValueOnce(topic({ title: '新名稱' }));
+    render(<FeaturedTopics />);
+    await open('族語學習路徑');
+    fireEvent.change(await screen.findByLabelText('標題'), { target: { value: '新名稱' } });
+    fireEvent.click(screen.getByRole('button', { name: /儲存草稿/ }));
+    await waitFor(() => expect(apiPatch).toHaveBeenCalledWith(
+      '/adminapi/featured-topics/1/', expect.objectContaining({ base_updated_at: '2026-10-01T00:00:00Z' }),
+    ));
+  });
+
+  test('PATCH 回 409 edit_conflict：顯示「有人剛更新過」、輸入保留；按「載入最新版本」換成伺服器內容並改帶新的 updated_at', async () => {
+    apiPatch.mockRejectedValueOnce(Object.assign(new Error('內容已被其他人更新'), { status: 409, data: { code: 'edit_conflict' } }));
+    render(<FeaturedTopics />);
+    await open('族語學習路徑');
+    fireEvent.change(await screen.findByLabelText('標題'), { target: { value: '我改的標題' } });
+    fireEvent.click(screen.getByRole('button', { name: /儲存草稿/ }));
+
+    expect(await screen.findByText(/有人剛更新過/)).toBeInTheDocument();
+    expect(screen.getByLabelText('標題')).toHaveValue('我改的標題');
+
+    setTopics([topic({ title: '別人改的標題', updated_at: '2026-10-09T00:00:00Z' })]);
+    fireEvent.click(screen.getByRole('button', { name: '載入最新版本' }));
+    await waitFor(() => expect(screen.getByLabelText('標題')).toHaveValue('別人改的標題'));
+    expect(screen.queryByText(/有人剛更新過/)).not.toBeInTheDocument();
+
+    apiPatch.mockResolvedValueOnce(topic({ title: '別人改的標題' }));
+    fireEvent.click(screen.getByRole('button', { name: /儲存草稿/ }));
+    await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(2));
+    expect(apiPatch.mock.calls[1][1]).toHaveProperty('base_updated_at', '2026-10-09T00:00:00Z');
   });
 
   test('送審中：欄位唯讀，可撤回；owner 可核准或退件，退件必須填理由', async () => {

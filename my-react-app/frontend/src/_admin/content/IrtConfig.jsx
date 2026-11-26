@@ -4,6 +4,10 @@ import { Save } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { apiGet, apiPatch } from '../../../utils/apiClient';
 import { useActionLock } from '../hooks/useActionLock';
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
+import { formatApiError } from '../apiErrors';
+import EditConflictAlert from '../components/EditConflictAlert';
+import { isEditConflict } from '../hooks/editConflict';
 import { formatDateTime } from '../adminFormat';
 import '../../../static/css/_admin/quiz-bank.css';
 import { SuccessNotice } from '../components/AdminToast';
@@ -80,6 +84,11 @@ export default function IrtConfig() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    // 載入（或上次儲存）時的表單內容：判斷未儲存的修改（稽核 FE7b-03）
+    const [baseline, setBaseline] = useState(EMPTY_FORM);
+    // 儲存時發現別人剛更新過（409 edit_conflict）（稽核 FE7b-08）
+    const [conflict, setConflict] = useState(false);
+    const [reloading, setReloading] = useState(false);
 
     const saveLock = useActionLock();
     const saving = saveLock.isLocked;
@@ -91,18 +100,36 @@ export default function IrtConfig() {
                 const item = await apiGet('/adminapi/irt-config/');
                 if (!active) return;
                 setForm(formFrom(item));
+                setBaseline(formFrom(item));
                 setMetadata({ updated_by: item.updated_by ?? '', updated_at: item.updated_at ?? '' });
-            } catch (err) { setError(err.message); }
+            } catch (err) { if (active) setError(formatApiError(err)); }
             finally { if (active) setLoading(false); }
         })();
         return () => { active = false; };
     }, []);
 
+    const dirty = !loading && FORM_FIELDS.some((key) => String(form[key]) !== String(baseline[key]));
+    useUnsavedChangesGuard(dirty);
+
+    // 載入最新版本：用伺服器上的內容取代目前表單（自己的修改會被捨棄）
+    const reloadLatest = async () => {
+        setReloading(true);
+        try {
+            const item = await apiGet('/adminapi/irt-config/');
+            setForm(formFrom(item));
+            setBaseline(formFrom(item));
+            setMetadata({ updated_by: item.updated_by ?? '', updated_at: item.updated_at ?? '' });
+            setConflict(false);
+            setError('');
+        } catch (err) { setError(formatApiError(err)); }
+        finally { setReloading(false); }
+    };
+
     const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
 
     const save = (event) => {
         event.preventDefault();
-        setError(''); setSuccess('');
+        setError(''); setSuccess(''); setConflict(false);
 
         const payload = Object.fromEntries(
             Object.entries(form).map(([key, value]) => [
@@ -122,11 +149,19 @@ export default function IrtConfig() {
 
         return saveLock.runLocked('save', async () => {
             try {
-                const saved = await apiPatch('/adminapi/irt-config/', payload);
+                // 帶載入時的 updated_at：期間別人改過就回 409，不會無聲蓋掉（稽核 FE7b-08）
+                const saved = await apiPatch('/adminapi/irt-config/', {
+                    ...payload,
+                    ...(metadata.updated_at ? { base_updated_at: metadata.updated_at } : {}),
+                });
                 setForm(formFrom(saved));
+                setBaseline(formFrom(saved));
                 setMetadata({ updated_by: saved.updated_by ?? '', updated_at: saved.updated_at ?? '' });
                 setSuccess('IRT 參數已儲存');
-            } catch (err) { setError(err.message); }
+            } catch (err) {
+                if (isEditConflict(err)) setConflict(true);
+                else setError(formatApiError(err));
+            }
         });
     };
 
@@ -148,7 +183,8 @@ export default function IrtConfig() {
             {!editable && (
                 <Alert variant="warning">你可以檢視目前的 IRT 參數；只有擁有者或管理員可以變更並儲存。</Alert>
             )}
-            {error && <Alert variant="danger">{error}</Alert>}
+            {error && <Alert variant="danger" role="alert">{error}</Alert>}
+            {conflict && <EditConflictAlert onReload={reloadLatest} busy={reloading} />}
             <SuccessNotice message={success} />
 
             <Form className="quiz-bank-config-card" onSubmit={save}>

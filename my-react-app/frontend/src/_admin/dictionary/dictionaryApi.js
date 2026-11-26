@@ -40,9 +40,22 @@ export const getRevision = (revisionId) => apiGet(`/adminapi/dictionary/revision
 /** 更新一筆草稿提案的內容——給「新建詞條」這種還沒有 word_id 可以掛
  * proposeWordUpdate 的情境用（建立提案之後，送審前可能要繼續編輯好幾次，
  * 每次呼叫這個而不是重新建立一筆新提案）。只有 status=draft 的提案能改。 */
-export const updateRevisionPayload = (revisionId, payload) => (
-  apiPut(`/adminapi/dictionary/revisions/${revisionId}/`, payload)
+export const updateRevisionPayload = (revisionId, payload, { baseUpdatedAt } = {}) => (
+  // 稽核 FE7a-06：帶上載入（或上次存檔）時的 updated_at，期間被別人改過就回 409 edit_conflict，不會無聲覆蓋
+  apiPut(
+    `/adminapi/dictionary/revisions/${revisionId}/`,
+    baseUpdatedAt ? { ...payload, base_updated_at: baseUpdatedAt } : payload,
+  )
 );
+
+/** 稽核 FE7a-02：自己的新建草稿＋所有送審中的新建提案（沒有目標 id，列表本身找不到）。
+ * kind：'word'（預設）或 'grammar_section'。 */
+export const listNewWordRevisions = (kind = 'word') => apiGet(
+  `/adminapi/dictionary/words/?revisions=new${kind === 'word' ? '' : `&kind=${encodeURIComponent(kind)}`}`,
+);
+
+/** 後端 409 的 code 是 edit_conflict 時，代表提案本身在載入後被改過（不是辭典內容的 base_hash 衝突）。 */
+export const isEditConflict = (err) => err?.status === 409 && err?.data?.code === 'edit_conflict';
 
 export const discardRevision = (revisionId) => apiDelete(`/adminapi/dictionary/revisions/${revisionId}/`);
 
@@ -54,8 +67,13 @@ export const withdrawRevision = (revisionId) => (
   apiPost(`/adminapi/dictionary/revisions/${revisionId}/withdraw/`)
 );
 
-export const approveRevision = (revisionId, { reviewComment = '' } = {}) => (
-  apiPost(`/adminapi/dictionary/revisions/${revisionId}/approve/`, { review_comment: reviewComment })
+/** 稽核 BE1-03：baseUpdatedAt 是審核者載入提案時看到的 updated_at；送審後被改過，後端回 409，
+ * 核准的就一定是審核者看過的那一版。 */
+export const approveRevision = (revisionId, { reviewComment = '', baseUpdatedAt } = {}) => (
+  apiPost(`/adminapi/dictionary/revisions/${revisionId}/approve/`, {
+    review_comment: reviewComment,
+    ...(baseUpdatedAt ? { base_updated_at: baseUpdatedAt } : {}),
+  })
 );
 
 export const rejectRevision = (revisionId, reviewComment) => (

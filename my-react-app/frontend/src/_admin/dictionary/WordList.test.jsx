@@ -15,11 +15,12 @@ import {
 } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import WordList from './WordList';
-import { listTaxonomies, listWords } from './dictionaryApi';
+import { listNewWordRevisions, listTaxonomies, listWords } from './dictionaryApi';
 
 vi.mock('./dictionaryApi', () => ({
     listTaxonomies: vi.fn(),
     listWords: vi.fn(),
+    listNewWordRevisions: vi.fn(),
 }));
 
 let mockRole = 'owner';
@@ -76,10 +77,42 @@ const renderPage = () => render(
 );
 
 describe('WordList', () => {
+    test('稽核 FE7a-02：列出我的新建草稿與待審新建詞條，連到提案專屬網址', async () => {
+        listTaxonomies.mockResolvedValue(taxonomies);
+        listWords.mockResolvedValue({ results: [], count: 0, page: 1, page_size: 20 });
+        listNewWordRevisions.mockResolvedValue({
+            results: [
+                { id: 41, status: 'draft', title: 'lokah', tribe: 'tayal', mine: true },
+                { id: 42, status: 'pending_review', title: 'balay', tribe: 'amis', mine: false },
+            ],
+        });
+
+        renderPage();
+
+        const section = await screen.findByRole('region', { name: '我的草稿與待審的新建詞條' });
+        expect(listNewWordRevisions).toHaveBeenCalledWith('word');
+        expect(within(section).getByRole('link', { name: 'lokah' })).toHaveAttribute('href', '/admin/dictionary/revisions/41');
+        expect(within(section).getByRole('link', { name: 'balay' })).toHaveAttribute('href', '/admin/dictionary/revisions/42');
+        expect(within(section).getByText('送審中')).toBeInTheDocument();
+        expect(await within(section).findByText('阿美語')).toBeInTheDocument();
+    });
+
+    test('稽核 FE7a-02：沒有新建提案或讀取失敗時不顯示該區塊', async () => {
+        listTaxonomies.mockResolvedValue(taxonomies);
+        listWords.mockResolvedValue({ results: [], count: 0, page: 1, page_size: 20 });
+        listNewWordRevisions.mockRejectedValue(new Error('boom'));
+
+        renderPage();
+        await waitFor(() => expect(listNewWordRevisions).toHaveBeenCalled());
+        expect(screen.queryByRole('region', { name: '我的草稿與待審的新建詞條' })).not.toBeInTheDocument();
+    });
+
     beforeEach(() => {
         mockRole = 'owner';
         listTaxonomies.mockReset();
         listWords.mockReset();
+        listNewWordRevisions.mockReset();
+        listNewWordRevisions.mockResolvedValue({ results: [] });
 
         listTaxonomies.mockResolvedValue(taxonomies);
         listWords.mockResolvedValue({

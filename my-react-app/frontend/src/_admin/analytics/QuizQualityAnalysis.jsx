@@ -129,9 +129,12 @@ export default function QuizQualityAnalysis() {
         [data],
     );
 
+    // 稽核 FE7b-06：樣本充足但鑑別度算不出來（答題無變異）的題目，原本圖表與清單
+    // 都不收而憑空消失；第二張表改收所有「無法繪點」的題目，並標明原因。
     const insufficientItems = useMemo(
         () => (data?.items ?? []).filter(
-            (item) => !item.sufficient_sample,
+            (item) => !item.sufficient_sample
+                || typeof item.discrimination !== 'number',
         ),
         [data],
     );
@@ -417,7 +420,7 @@ export default function QuizQualityAnalysis() {
                         <div className="quiz-quality-panel-heading">
                             <div>
                                 <h2>樣本不足清單</h2>
-                                <p>尚無法可靠判定鑑別度的題目</p>
+                                <p>樣本不足，或答題無變異而無法計算鑑別度的題目</p>
                             </div>
                             {!loading && insufficientItems.length > 0 && (
                                 <span>共 {insufficientItems.length} 題</span>
@@ -460,7 +463,9 @@ export default function QuizQualityAnalysis() {
                                             <td>{formatPercent(item.accuracy_rate)}</td>
                                             <td>
                                                 <span className="quiz-quality-insufficient">
-                                                    樣本不足，尚無法判定鑑別度
+                                                    {item.sufficient_sample
+                                                        ? '無法計算鑑別度（答題無變異）'
+                                                        : '樣本不足，尚無法判定鑑別度'}
                                                 </span>
                                             </td>
                                             <td>

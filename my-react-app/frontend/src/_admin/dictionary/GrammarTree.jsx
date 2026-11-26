@@ -5,6 +5,7 @@ import {
     useRef,
     useState,
 } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
     Alert,
     Badge,
@@ -19,14 +20,17 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import {
+    getGrammarSection,
     listGrammarSections,
     listTaxonomies,
     reorderGrammarSections,
 } from './dictionaryApi';
+import { confirmDiscardChanges } from '../hooks/useUnsavedChangesGuard';
 import { canProposeDictionaryChanges } from './useRevisionActions';
 import { REVISION_STATUS_META as REVISION_STATUSES } from './revisionMeta';
 import { useActionLock } from '../hooks/useActionLock';
 import GrammarNodePanel from './GrammarNodePanel';
+import NewWordRevisions from './NewWordRevisions';
 import '../../../static/css/_admin/dictionary.css';
 
 function RevisionBadge({ revision }) {
@@ -60,6 +64,24 @@ export default function GrammarTree() {
     const [loadingTaxonomies, setLoadingTaxonomies] = useState(true);
     const [loadingSections, setLoadingSections] = useState(false);
     const [error, setError] = useState('');
+    // 稽核 FE7a-04：編輯面板回報有沒有未儲存變更；切換章節／族語／新增章節前先確認
+    const panelDirtyRef = useRef(false);
+    const handleDirtyChange = useCallback((value) => {
+        panelDirtyRef.current = value;
+    }, []);
+    // 稽核 FE7a-16：只有使用者主動選章節時才把焦點移到面板（初次載入不搶焦點）
+    const [focusPanel, setFocusPanel] = useState(false);
+    // 從送審佇列或提案頁以 ?section= 開啟時，先換到該章節的族語再選取
+    const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
+    // 稽核 FE7a-02：新建章節第一次存檔後換到提案專屬網址（比照詞條），離開後才找得回來
+    const handleCreated = useCallback((revisionId) => {
+        panelDirtyRef.current = false;
+        // WP-8 追加：與新建詞條一致用 replace——上一頁回到「尚未存檔的新增章節」畫面沒有意義，
+        // 且那個畫面再存一次會建立第二筆提案
+        navigate(`/admin/dictionary/revisions/${revisionId}`, { replace: true, state: { flash: '草稿已儲存' } });
+    }, [navigate]);
+    const initialSectionRef = useRef(searchParams.get('section'));
     // 換章節排序是不是正在進行中，跟「切換族語」共用同一種同步鎖概念——
     // 用 ref 而不是單純的 state，才能擋住同一個 tick 內的重複觸發（例如
     // 雙擊上移/下移按鈕）。
@@ -89,8 +111,20 @@ export default function GrammarTree() {
 
                 setTaxonomies(nextTaxonomies);
 
-                if (nextTaxonomies.tribes.length > 0) {
-                    setSelectedTribeId(String(nextTaxonomies.tribes[0].id));
+                let initialTribe = nextTaxonomies.tribes[0]?.id;
+                const initialSection = initialSectionRef.current;
+                if (initialSection) {
+                    try {
+                        const section = await getGrammarSection(initialSection);
+                        if (!active) return;
+                        initialTribe = section.tribe_id ?? initialTribe;
+                    } catch {
+                        initialSectionRef.current = null;
+                    }
+                }
+
+                if (initialTribe !== undefined && initialTribe !== null) {
+                    setSelectedTribeId(String(initialTribe));
                 }
             } catch (err) {
                 if (active) setError(err.message);
@@ -144,9 +178,26 @@ export default function GrammarTree() {
     }, [selectedTribeId]);
 
     useEffect(() => {
-        setSelectedSectionId(undefined);
+        // ?section= 要等族語確定（主檔載入完成）之後才套用，只用一次
+        const initialSection = selectedTribeId ? initialSectionRef.current : null;
+        if (selectedTribeId) initialSectionRef.current = null;
+        setSelectedSectionId(initialSection ? Number(initialSection) : undefined);
         loadSections();
-    }, [loadSections]);
+    }, [loadSections, selectedTribeId]);
+
+    const confirmLeavePanel = async () => {
+        if (!panelDirtyRef.current) return true;
+        const confirmed = await confirmDiscardChanges();
+        if (confirmed) panelDirtyRef.current = false;
+        return confirmed;
+    };
+
+    const selectSection = async (next) => {
+        if (next === selectedSectionId) return;
+        if (!(await confirmLeavePanel())) return;
+        setFocusPanel(true);
+        setSelectedSectionId(next);
+    };
 
     const hasPendingRevision = useMemo(
         () => sections.some((section) => section.pending_revision),
@@ -175,9 +226,11 @@ export default function GrammarTree() {
         });
     };
 
-    const changeTribe = (event) => {
+    const changeTribe = async (event) => {
+        const nextTribe = event.target.value;
+        if (!(await confirmLeavePanel())) return;
         setSelectedSectionId(undefined);
-        setSelectedTribeId(event.target.value);
+        setSelectedTribeId(nextTribe);
     };
 
     return (
@@ -193,6 +246,8 @@ export default function GrammarTree() {
             </div>
 
             {error && <Alert variant="danger">{error}</Alert>}
+
+            <NewWordRevisions kind="grammar_section" title="我的新建章節草稿與待審的新建章節" tribes={taxonomies.tribes} />
 
             <Form.Group className="dictionary-field" controlId="dictionary-grammar-tribe">
                 <Form.Label>族語</Form.Label>
@@ -221,7 +276,7 @@ export default function GrammarTree() {
                             <Button
                                 type="button"
                                 size="sm"
-                                onClick={() => setSelectedSectionId(null)}
+                                onClick={() => selectSection(null)}
                             >
                                 <Plus size={15} />
                                 新增章節
@@ -244,14 +299,21 @@ export default function GrammarTree() {
                         <div className="dictionary-empty">此族語尚未建立文法章節</div>
                     ) : (
                         <div className="dictionary-grammar-section-list">
-                            {sections.map((section, index) => (
-                                <div key={section.id} className="dictionary-nested-card">
+                            {sections.map((section, index) => {
+                                const isSelected = String(selectedSectionId) === String(section.id);
+                                return (
+                                <div
+                                    key={section.id}
+                                    className={`dictionary-nested-card${isSelected ? ' is-selected' : ''}`}
+                                >
                                     <div className="dictionary-nested-heading">
                                         <Button
                                             type="button"
                                             variant="link"
                                             className="dictionary-grammar-section-link"
-                                            onClick={() => setSelectedSectionId(section.id)}
+                                            // 稽核 FE7a-16：標示目前選取的章節
+                                            aria-current={isSelected ? 'true' : undefined}
+                                            onClick={() => selectSection(section.id)}
                                         >
                                             <strong>{section.title}</strong>
                                             <span className="d-block">
@@ -292,7 +354,8 @@ export default function GrammarTree() {
                                         </div>
                                     )}
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </section>
@@ -309,6 +372,9 @@ export default function GrammarTree() {
                             sectionId={selectedSectionId}
                             taxonomies={taxonomies}
                             onSaved={loadSections}
+                            onDirtyChange={handleDirtyChange}
+                            onCreated={handleCreated}
+                            focusOnLoad={focusPanel}
                         />
                     )}
                 </section>

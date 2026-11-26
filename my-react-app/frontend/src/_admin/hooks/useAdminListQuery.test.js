@@ -170,6 +170,54 @@ describe('useAdminListQuery 的最新請求優先', () => {
         await waitFor(() => expect(apiGet.mock.calls.at(-1)[0]).toContain('status=draft'));
     });
 
+    /** 稽核 FE7b-09：最後一筆在這一頁被處理掉後，這一頁已經沒有資料，不能停在空白頁（也不要顯示「第 21–20 筆」）。 */
+    test('停在第 2 頁時整頁被清空：自動退回上一頁重新查詢，不把空結果寫進畫面', async () => {
+        apiGet.mockResolvedValueOnce({ results: [{ id: 1 }], count: 21, page: 1, page_size: 20 }); // 第 1 頁
+        const { result } = renderHook(() => useAdminListQuery({ endpoint: '/adminapi/things/' }));
+        await waitFor(() => expect(result.current.items).toEqual([{ id: 1 }]));
+
+        apiGet.mockResolvedValueOnce({ results: [{ id: 21 }], count: 21, page: 2, page_size: 20 });
+        act(() => { result.current.setPage(2); });
+        await waitFor(() => expect(result.current.items).toEqual([{ id: 21 }]));
+
+        // 第 21 筆被處理掉：重新載入第 2 頁回來是空的，總數只剩 20
+        apiGet.mockResolvedValueOnce({ results: [], count: 20, page: 2, page_size: 20 });
+        apiGet.mockResolvedValueOnce({ results: [{ id: 1 }], count: 20, page: 1, page_size: 20 });
+        await act(async () => { await result.current.reload(); });
+
+        await waitFor(() => expect(result.current.page).toBe(1));
+        await waitFor(() => expect(result.current.items).toEqual([{ id: 1 }]));
+        expect(apiGet.mock.calls.at(-1)[0]).toContain('page=1');
+        expect(result.current.loading).toBe(false);
+    });
+
+    test('退回的頁數不超過實際最後一頁（一次被清掉好幾頁時）', async () => {
+        apiGet.mockResolvedValueOnce({ results: [{ id: 1 }], count: 100, page: 1, page_size: 20 });
+        const { result } = renderHook(() => useAdminListQuery({ endpoint: '/adminapi/things/' }));
+        await waitFor(() => expect(result.current.items).toEqual([{ id: 1 }]));
+
+        apiGet.mockResolvedValueOnce({ results: [{ id: 81 }], count: 100, page: 5, page_size: 20 });
+        act(() => { result.current.setPage(5); });
+        await waitFor(() => expect(result.current.page).toBe(5));
+        await waitFor(() => expect(result.current.items).toEqual([{ id: 81 }]));
+
+        // 其他人同時處理掉很多筆，只剩 30 筆（共 2 頁）：從第 5 頁退到第 2 頁，不是第 4 頁
+        apiGet.mockResolvedValueOnce({ results: [], count: 30, page: 5, page_size: 20 });
+        apiGet.mockResolvedValueOnce({ results: [{ id: 21 }], count: 30, page: 2, page_size: 20 });
+        await act(async () => { await result.current.reload(); });
+
+        await waitFor(() => expect(result.current.page).toBe(2));
+        await waitFor(() => expect(result.current.items).toEqual([{ id: 21 }]));
+    });
+
+    test('第 1 頁本來就沒有資料時不會一直重查', async () => {
+        apiGet.mockResolvedValue(page([]));
+        const { result } = renderHook(() => useAdminListQuery({ endpoint: '/adminapi/things/' }));
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        expect(apiGet).toHaveBeenCalledTimes(1);
+        expect(result.current.page).toBe(1);
+    });
+
     test('buildParams 可自訂參數對應（布林、需要 trim 的值）', async () => {
         apiGet.mockResolvedValue(page([]));
         renderHook(() => useAdminListQuery({

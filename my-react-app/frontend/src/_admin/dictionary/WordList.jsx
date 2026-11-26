@@ -18,6 +18,7 @@ import { Eye, Plus, Search } from 'lucide-react';
 import { useAuth } from '../../userServives/authContext';
 import { listTaxonomies, listWords } from './dictionaryApi';
 import { canProposeDictionaryChanges } from './useRevisionActions';
+import NewWordRevisions from './NewWordRevisions';
 import '../../../static/css/_admin/dictionary.css';
 
 const PAGE_SIZE = 20;
@@ -191,6 +192,8 @@ export default function WordList() {
             </div>
 
             {error && <Alert variant="danger">{error}</Alert>}
+
+            <NewWordRevisions tribes={taxonomies.tribes} />
 
             <Form
                 className="dictionary-filter-panel"

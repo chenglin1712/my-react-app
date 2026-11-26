@@ -59,4 +59,38 @@ describe('RejectReasonModal', () => {
         const submitButton = screen.getByRole('button', { name: '送出中…' });
         expect(submitButton).toBeDisabled();
     });
+
+    /** 稽核 FE7b-13：一打開就顯示紅色「必填」像是剛開就做錯事；送出中仍有關閉鈕。 */
+    test('剛打開時理由是空的也不標錯；碰過欄位（離開欄位）之後才顯示「退件理由為必填」', () => {
+        renderModal({ reason: '' });
+        const textbox = screen.getByRole('textbox');
+        expect(textbox).not.toHaveClass('is-invalid');
+
+        fireEvent.blur(textbox);
+        expect(textbox).toHaveClass('is-invalid');
+    });
+
+    test('重新打開（換一個退件目標）時錯誤標示重置', () => {
+        const reject = { target: { id: 1 }, reason: '', setReason: vi.fn(), isRevision: false, close: vi.fn(), submit: vi.fn() };
+        const { rerender } = render(<RejectReasonModal reject={reject} actionId={null} controlId="r" />);
+        fireEvent.blur(screen.getByRole('textbox'));
+        expect(screen.getByRole('textbox')).toHaveClass('is-invalid');
+
+        rerender(<RejectReasonModal reject={{ ...reject, target: { id: 2 } }} actionId={null} controlId="r" />);
+        expect(screen.getByRole('textbox')).not.toHaveClass('is-invalid');
+    });
+
+    test('送出中不顯示右上角關閉鈕；沒有送出時有', () => {
+        const base = { target: { id: 1 }, reason: '內容有誤', setReason: vi.fn(), isRevision: false, close: vi.fn(), submit: vi.fn() };
+        const { rerender } = render(<RejectReasonModal reject={base} actionId={null} controlId="r" />);
+        expect(screen.getByRole('button', { name: /close/i })).toBeInTheDocument();
+
+        rerender(<RejectReasonModal reject={base} actionId={1} controlId="r" />);
+        expect(screen.queryByRole('button', { name: /close/i })).toBeNull();
+    });
+
+    test('送出失敗的錯誤顯示在對話框裡（稽核 FE7b-01）', () => {
+        renderModal({ error: '網路掛了' });
+        expect(screen.getByRole('alert')).toHaveTextContent('網路掛了');
+    });
 });

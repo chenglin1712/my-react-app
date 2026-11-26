@@ -49,7 +49,7 @@ def _limits() -> dict:
 
 
 def _overview() -> dict:
-    content, version = assistant_settings.active_with_version()
+    content, version = assistant_settings.active_from_db()
     rows = list(AiAssistantSettingsVersion.objects.order_by("-id")[:VERSION_LIST_SIZE])
     return {
         "activeVersion": version, "active": content, "defaults": assistant_settings.DEFAULTS,
@@ -75,7 +75,7 @@ def ai_assistant_settings(request):
     note = body.get("note", "")
     if not isinstance(note, str):
         return JsonResponse({"detail": "備註必須是文字"}, status=400)
-    before_content, before_version = assistant_settings.active_with_version()
+    before_content, before_version = assistant_settings.active_from_db()
     # 稽核 BE2a-07：編輯頁帶載入時的版本號，期間被別人存過新版就拒絕，不無聲蓋掉
     base_version = body.get("base_version")
     if base_version is not None and (not isinstance(base_version, int) or base_version != before_version):
@@ -111,7 +111,7 @@ def ai_assistant_settings_rollback(request, pk):
         old = AiAssistantSettingsVersion.objects.get(pk=pk)
     except AiAssistantSettingsVersion.DoesNotExist:
         return JsonResponse({"detail": "找不到這個版本"}, status=404)
-    _, before_version = assistant_settings.active_with_version()
+    _, before_version = assistant_settings.active_from_db()
     try:
         with transaction.atomic():
             row = assistant_settings.save_version(

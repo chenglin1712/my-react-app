@@ -48,6 +48,65 @@ describe('IrtConfig', () => {
     expect(await screen.findByText('IRT 參數已儲存')).toBeInTheDocument();
   });
 
+  /** 稽核 FE7b-08：IRT 參數儲存原本完全沒帶版本，會無聲覆蓋別人剛存的設定。 */
+  test('儲存時帶載入時的 updated_at；存成功後下一次改帶回應裡的新值', async () => {
+    apiPatch.mockResolvedValueOnce({ ...baseConfig, total_questions: 15, updated_at: '2026-08-04T00:00:00Z' });
+    apiPatch.mockResolvedValueOnce({ ...baseConfig, total_questions: 16, updated_at: '2026-08-05T00:00:00Z' });
+    render(<IrtConfig />);
+    const input = await screen.findByLabelText('每次測驗題數');
+
+    fireEvent.change(input, { target: { value: '15' } });
+    fireEvent.click(screen.getByRole('button', { name: /儲存設定/ }));
+    await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(1));
+    expect(apiPatch.mock.calls[0][1]).toHaveProperty('base_updated_at', '2026-08-03T00:00:00Z');
+
+    await screen.findByText('IRT 參數已儲存');
+    fireEvent.change(input, { target: { value: '16' } });
+    fireEvent.click(screen.getByRole('button', { name: /儲存設定/ }));
+    await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(2));
+    expect(apiPatch.mock.calls[1][1]).toHaveProperty('base_updated_at', '2026-08-04T00:00:00Z');
+  });
+
+  test('載入的設定沒有 updated_at 時不送 base_updated_at', async () => {
+    apiGet.mockResolvedValue({ ...baseConfig, updated_at: '' });
+    apiPatch.mockResolvedValueOnce({ ...baseConfig });
+    render(<IrtConfig />);
+    await screen.findByLabelText('每次測驗題數');
+    fireEvent.click(screen.getByRole('button', { name: /儲存設定/ }));
+    await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(1));
+    expect(apiPatch.mock.calls[0][1]).not.toHaveProperty('base_updated_at');
+  });
+
+  test('409 edit_conflict：顯示「有人剛更新過」，輸入保留；按「載入最新版本」換成伺服器內容', async () => {
+    apiPatch.mockRejectedValueOnce(Object.assign(new Error('內容已被其他人更新'), { status: 409, data: { code: 'edit_conflict' } }));
+    render(<IrtConfig />);
+    const input = await screen.findByLabelText('每次測驗題數');
+    fireEvent.change(input, { target: { value: '15' } });
+    fireEvent.click(screen.getByRole('button', { name: /儲存設定/ }));
+
+    expect(await screen.findByText(/有人剛更新過/)).toBeInTheDocument();
+    expect(input).toHaveValue(15);
+
+    apiGet.mockResolvedValueOnce({ ...baseConfig, total_questions: 30, updated_at: '2026-08-09T00:00:00Z' });
+    fireEvent.click(screen.getByRole('button', { name: '載入最新版本' }));
+    await waitFor(() => expect(input).toHaveValue(30));
+    expect(screen.queryByText(/有人剛更新過/)).not.toBeInTheDocument();
+  });
+
+  /** 稽核 FE7b-03 */
+  test('有未儲存的修改時掛上離開頁面的瀏覽器確認', async () => {
+    render(<IrtConfig />);
+    const input = await screen.findByLabelText('每次測驗題數');
+    const clean = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(clean);
+    expect(clean.defaultPrevented).toBe(false);
+
+    fireEvent.change(input, { target: { value: '15' } });
+    const dirty = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(dirty);
+    expect(dirty.defaultPrevented).toBe(true);
+  });
+
   test('editor 看得到目前設定但所有欄位唯讀，看不到儲存按鈕', async () => {
     mockRole = 'editor';
     render(<IrtConfig />);

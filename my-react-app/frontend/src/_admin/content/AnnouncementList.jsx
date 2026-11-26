@@ -7,10 +7,13 @@ import { useAuth } from '../../userServives/authContext';
 import { TRIBE_FULL_NAME_BY_SLUG } from '../../constants/tribes';
 import AdminFilterChips from '../components/AdminFilterChips';
 import { apiDelete, apiGet, apiPost } from '../../../utils/apiClient';
+import { formatApiError } from '../apiErrors';
+import EditorModalError from '../reviewWorkflow/EditorModalError';
 import ReviewActions from '../reviewWorkflow/ReviewActions';
 import { confirmAction } from '@components/ui/ConfirmDialog';
 import ReviewPagination from '../reviewWorkflow/ReviewPagination';
 import { REVIEW_ACTION_META } from '../reviewWorkflow/reviewActionPolicy';
+import { getTransitionConfirm } from '../reviewWorkflow/reviewConfirm';
 import { formatDateTime } from '../adminFormat';
 import '../../../static/css/_admin/announcements.css';
 
@@ -21,6 +24,9 @@ const CATEGORIES = {
     announcement: '公告', activity: '活動', exam: '考試', maintenance: '系統維護',
 };
 // 後端 _delete_announcement 允許刪除的狀態；已發布與待審核必須先下架／撤回
+// WP-8 追加：每頁筆數只定義一次——請求參數、空白頁退回的總頁數、初始 state 都要用同一個值，
+// 否則改一處忘了另一處，退頁會退到不存在的頁數。
+const PAGE_SIZE = 10;
 const DELETABLE_STATUSES = ['draft', 'rejected', 'unpublished'];
 const SOURCES = { admin: '後台建立', crawler: '爬蟲匯入' };
 const STATUSES = {
@@ -51,7 +57,7 @@ export default function AnnouncementList() {
     const [searchParams] = useSearchParams();
     const [filters, setFilters] = useState({ keyword: '', status: searchParams.get('status') ?? '', category: '', tribe: '', source: '' });
     const [query, setQuery] = useState(filters);
-    const [data, setData] = useState({ results: [], count: 0, page: 1, page_size: 10 });
+    const [data, setData] = useState({ results: [], count: 0, page: 1, page_size: PAGE_SIZE });
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [actionId, setActionId] = useState(null);
@@ -68,6 +74,9 @@ export default function AnnouncementList() {
     // 兩者共用同一個理由 Modal，但送出端點不同。
     const [rejectTarget, setRejectTarget] = useState(null);
     const [rejectReason, setRejectReason] = useState('');
+    // 退件對話框自己的錯誤（對話框開著時，頁面上方的錯誤會被遮罩蓋住，稽核 FE7b-01）與「碰過欄位」狀態（稽核 FE7b-13）
+    const [rejectError, setRejectError] = useState('');
+    const [rejectTouched, setRejectTouched] = useState(false);
     const [syncStatus, setSyncStatus] = useState(null);
     const [syncing, setSyncing] = useState(false);
     const [syncMessage, setSyncMessage] = useState('');
@@ -79,17 +88,26 @@ export default function AnnouncementList() {
 
         setLoading(true);
         setError('');
+        // 為 true 表示這次回應不採用、已改成重查別頁：loading 要維持到那次查詢結束（與 useAdminListQuery 一致），
+        // 否則 finally 會先把 loading 關掉，畫面短暫露出空白頁或舊資料（WP-8 追加）。
+        let redirected = false;
         try {
-            const params = new URLSearchParams({ page: String(page), page_size: '10' });
+            const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
             Object.entries(query).forEach(([key, value]) => value && params.set(key, value));
             const result = await apiGet(`/adminapi/announcements/?${params.toString()}`);
             if (isStale()) return;
+            // 這一頁的最後一筆被處理掉後會是空白頁：退回最後一個有資料的頁面（稽核 FE7b-09）
+            if (page > 1 && (result?.results?.length ?? 0) === 0) {
+                setPage(Math.min(page - 1, Math.max(1, Math.ceil((result?.count ?? 0) / PAGE_SIZE))));
+                redirected = true;
+                return;
+            }
             setData(result);
         } catch (err) {
             if (isStale()) return;
             setError(err.message);
         } finally {
-            if (!isStale()) setLoading(false);
+            if (!isStale() && !redirected) setLoading(false);
         }
     }, [page, query]);
 
@@ -185,12 +203,15 @@ export default function AnnouncementList() {
         });
     };
 
-    const runAction = async (item, action, body) => {
+    // options.confirm：會立刻影響前台的動作先確認（稽核 FE7b-02）；options.onError：錯誤交給對話框自己顯示
+    const runAction = async (item, action, body, options = {}) => {
         if (actionLockRef.current) return false;
         actionLockRef.current = true;
         setActionId(item.id);
         setError('');
+        options.onError?.('');
         try {
+            if (options.confirm && !(await confirmAction(options.confirm))) return false;
             if (action === 'delete') {
                 if (!(await confirmDelete(item))) return false;
                 await apiDelete(`/adminapi/announcements/${item.id}/`);
@@ -204,7 +225,8 @@ export default function AnnouncementList() {
             if (err?.data?.code === 'revision_changed') {
                 try { await loadAnnouncements(); } catch { /* 重新載入失敗時仍顯示原本的錯誤訊息 */ }
             }
-            setError(err.message);
+            if (options.onError) options.onError(formatApiError(err));
+            else setError(err.message);
             return false;
         } finally {
             actionLockRef.current = false;
@@ -215,11 +237,15 @@ export default function AnnouncementList() {
     const openRejectModal = (item, type) => {
         setRejectTarget({ item, type });
         setRejectReason('');
+        setRejectError('');
+        setRejectTouched(false);
     };
 
     const closeRejectModal = () => {
         setRejectTarget(null);
         setRejectReason('');
+        setRejectError('');
+        setRejectTouched(false);
     };
 
     const submitReject = async () => {
@@ -234,12 +260,12 @@ export default function AnnouncementList() {
             // 帶上審核者在列表上看到的版本，編輯者之後改過內容就會被後端擋下（稽核 FLW-1）
             const version = rejectTarget.item.pending_revision_version;
             if (!version) {
-                setError('找不到這筆待審修改的版本，請重新載入後再試');
+                setRejectError('找不到這筆待審修改的版本，請重新載入後再試');
                 return;
             }
             body.revision_version = version;
         }
-        const succeeded = await runAction(rejectTarget.item, action, body);
+        const succeeded = await runAction(rejectTarget.item, action, body, { onError: setRejectError });
         // 只有真的送出成功才收掉對話框；失敗時保留使用者打好的退件理由，
         // 讓他可以直接重試，不用整段重打。
         if (succeeded) closeRejectModal();
@@ -266,6 +292,7 @@ export default function AnnouncementList() {
         if (actionKey === 'reject') return openRejectModal(item, 'reject');
         if (actionKey === 'rejectRevision') return openRejectModal(item, 'pending-revision');
         const { endpointAction } = REVIEW_ACTION_META[actionKey];
+        const transitionConfirm = getTransitionConfirm(actionKey, item.title);
         // 核准時帶上審核者看到的 updated_at，送審後被改過就會被後端擋下（稽核 BE1-03）
         let body = endpointAction?.endsWith('approve')
             ? { review_comment: '', ...(item.updated_at && actionKey !== 'approveRevision' ? { base_updated_at: item.updated_at } : {}) }
@@ -278,7 +305,7 @@ export default function AnnouncementList() {
             }
             body = { ...body, revision_version: item.pending_revision_version };
         }
-        return runAction(item, endpointAction, body);
+        return runAction(item, endpointAction, body, { confirm: transitionConfirm });
     };
 
 
@@ -484,6 +511,7 @@ export default function AnnouncementList() {
                     </Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
+                    <EditorModalError error={rejectError} />
                     <Form.Group controlId="announcement-reject-reason">
                         <Form.Label>請說明需要修改的內容</Form.Label>
                         <Form.Control
@@ -492,8 +520,9 @@ export default function AnnouncementList() {
                             required
                             disabled={rejectSubmitting}
                             value={rejectReason}
-                            onChange={(e) => setRejectReason(e.target.value)}
-                            isInvalid={Boolean(rejectTarget) && !rejectReason.trim()}
+                            onChange={(e) => { setRejectTouched(true); setRejectReason(e.target.value); }}
+                            onBlur={() => setRejectTouched(true)}
+                            isInvalid={rejectTouched && !rejectReason.trim()}
                         />
                         <Form.Control.Feedback type="invalid">
                             退件理由為必填

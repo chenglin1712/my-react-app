@@ -5,6 +5,10 @@ import { apiGet, apiPatch } from '../../../utils/apiClient';
 import { useAuth } from '../../userServives/authContext';
 import { useMediaUpload } from '../hooks/useMediaUpload';
 import { useActionLock } from '../hooks/useActionLock';
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
+import { isEditConflict } from '../hooks/editConflict';
+import EditConflictAlert, { MyVersionBackupNotice } from '../components/EditConflictAlert';
+import { docToPlainText } from '../components/docPlainText';
 import { formatApiError } from '../apiErrors';
 import { formatDateTime } from '../adminFormat';
 import RichTextEditor from '../components/RichTextEditor';
@@ -36,6 +40,12 @@ export default function SitePageEditor({ endpoint, title, publicPath, tip }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    // 儲存時發現別人剛更新過（409 edit_conflict）：提供「載入最新版本」（稽核 FE7b-08）。
+    // WP-8 追加：後端已補上 code，改用 isEditConflict；只有「409 且沒有 code」才退回只看狀態碼（相容尚未更新的後端）。
+    const [conflict, setConflict] = useState(false);
+    const [reloadKey, setReloadKey] = useState(0);
+    // WP-8 追加：按「載入最新版本」前把自己的正文純文字暫存在記憶體（不寫 localStorage），載入後仍可「複製我的版本」
+    const [myVersionBackup, setMyVersionBackup] = useState('');
 
     const media = useMediaUpload();
     const uploading = Boolean(media.uploadingKey);
@@ -45,6 +55,8 @@ export default function SitePageEditor({ endpoint, title, publicPath, tip }) {
     useEffect(() => {
         let active = true;
         (async () => {
+            setLoading(true);
+            setConflict(false);
             try {
                 const item = await apiGet(endpoint);
                 if (!active) return;
@@ -56,15 +68,17 @@ export default function SitePageEditor({ endpoint, title, publicPath, tip }) {
             finally { if (active) setLoading(false); }
         })();
         return () => { active = false; };
-    }, [endpoint]);
+    }, [endpoint, reloadKey]);
 
     const chars = countDocText(doc);
     const tooLong = chars > MAX_CHARS;
     const dirty = saved !== null && JSON.stringify(docOf(doc)) !== JSON.stringify(saved);
     const empty = !hasDocContent(doc);
+    // 稽核 FE7b-03：有沒存的修改時，關閉或重新整理分頁要提醒
+    useUnsavedChangesGuard(dirty);
 
     const save = () => {
-        setError(''); setSuccess('');
+        setError(''); setSuccess(''); setConflict(false);
         if (uploading) { setError('請等待圖片上傳完成'); return undefined; }
         if (tooLong) { setError(`內文最多 ${MAX_CHARS} 字，目前 ${chars} 字`); return undefined; }
         const submitted = docOf(doc);
@@ -73,8 +87,12 @@ export default function SitePageEditor({ endpoint, title, publicPath, tip }) {
                 const result = await apiPatch(endpoint, { content: submitted, base_updated_at: metadata.updated_at });
                 setSaved(docOf(result.content));
                 setMetadata({ updated_by: result.updated_by ?? '', updated_at: result.updated_at ?? '' });
+                setMyVersionBackup('');
                 setSuccess(`${title}已儲存，公開頁面立即生效`);
-            } catch (err) { setError(formatApiError(err)); }
+            } catch (err) {
+                if (isEditConflict(err) || (err?.status === 409 && !err?.data?.code)) setConflict(true);
+                else setError(formatApiError(err));
+            }
         });
     };
 
@@ -90,6 +108,14 @@ export default function SitePageEditor({ endpoint, title, publicPath, tip }) {
                 <Alert variant="info">你可以檢視目前公開中的內容；只有擁有者或管理員可以修改並儲存。</Alert>
             )}
             {(error || media.error) && <Alert variant="danger" role="alert">{error || media.error}</Alert>}
+            {conflict && (
+                <EditConflictAlert
+                    onReload={() => setReloadKey((k) => k + 1)}
+                    myVersionText={docToPlainText(doc)}
+                    onStash={setMyVersionBackup}
+                />
+            )}
+            {!conflict && <MyVersionBackupNotice text={myVersionBackup} onDismiss={() => setMyVersionBackup('')} />}
             <SuccessNotice message={success} role="status" />
 
             <Form

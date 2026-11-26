@@ -29,6 +29,10 @@ from ._shared import (
 )
 from .dictionary_cache import invalidate_dictionary_cache
 from .dictionary_serializers import GrammarSectionReorderSerializer, validate_grammar_section_payload
+from .dictionary_views import (
+    _not_draft_owner_response, _open_revision_for, _open_revision_summary, _pop_lock_data,
+    _propose_overwrite_lock_response, _with_actor_names,
+)
 from .models import DictionaryRevision
 
 _TRIBE_ID_TO_SLUG = {t.id: t.slug for t in TRIBES}
@@ -178,6 +182,11 @@ def grammar_section_detail(request, section_id):
     tree["meta"]["pending_revision"] = _pending_revision_summary(
         _pending_revision_for(str(section_id))
     )
+    # 稽核 FE7a-01：含草稿的提案，編輯器重新載入後才看得到自己的草稿（pending_revision 維持只代表送審中）
+    # WP-8 追加：附上建立者／送審者姓名，給他人草稿提示用
+    tree["meta"]["open_revision"] = _with_actor_names(_open_revision_summary(
+        _open_revision_for(DictionaryRevision.TARGET_GRAMMAR_SECTION, str(section_id))
+    ))
     return JsonResponse(tree)
 
 
@@ -198,6 +207,8 @@ def grammar_section_propose(request, section_id):
     if err_resp:
         return err_resp
     base_hash = data.pop("base_hash", "") if isinstance(data, dict) else ""
+    # WP-8 追加：base_updated_at 是覆寫既有草稿時的樂觀鎖，不是章節內容（見 _propose_overwrite_lock_response）
+    lock_data = _pop_lock_data(data)
     # 更新既有內容必須帶 base_hash（稽核 FLW-5）：它是核准時比對「有沒有人在你之後改過」的依據，
     # 省略等於關掉樂觀鎖。前端的編輯器一直都有帶（取自載入時的 content_hash）。
     if not isinstance(base_hash, str) or not base_hash.strip() or len(base_hash) > 71:
@@ -219,15 +230,29 @@ def grammar_section_propose(request, section_id):
         db.close()
 
     target_id = str(section_id)
-    existing = DictionaryRevision.objects.filter(
-        target_kind=DictionaryRevision.TARGET_GRAMMAR_SECTION, target_id=target_id,
-        status__in=[DictionaryRevision.STATUS_DRAFT, DictionaryRevision.STATUS_PENDING_REVIEW],
-    ).first()
-    if existing and existing.status == DictionaryRevision.STATUS_PENDING_REVIEW:
-        return JsonResponse({"detail": "這個章節已經有一筆待審核的提案，請先撤回或等待審核完成"}, status=409)
-
     with transaction.atomic():
+        # 稽核 FE7a-01：查詢與建立同一個交易並鎖列；既有草稿不是更新提案就不能覆寫，
+        # 不是本人的只有 owner／admin 能覆寫（WP-8 追加，與 PUT 一致）
+        existing = DictionaryRevision.objects.select_for_update().filter(
+            target_kind=DictionaryRevision.TARGET_GRAMMAR_SECTION, target_id=target_id,
+            status__in=[DictionaryRevision.STATUS_DRAFT, DictionaryRevision.STATUS_PENDING_REVIEW],
+        ).first()
+        if existing and existing.status == DictionaryRevision.STATUS_PENDING_REVIEW:
+            return JsonResponse({"detail": "這個章節已經有一筆待審核的提案，請先撤回或等待審核完成"}, status=409)
+        if existing and existing.operation != DictionaryRevision.OPERATION_UPDATE:
+            return JsonResponse({
+                "detail": "這個章節已經有一筆「刪除」草稿，請先丟棄或處理它再提出修改",
+            }, status=409)
         if existing:
+            # WP-8 追加：與 PUT 同規則——建立者本人或 owner／admin 可寫入既有草稿，其他人 403。
+            # 「刪除」草稿在上面就已 409，不會被改寫成內容提案。
+            not_owner = _not_draft_owner_response(decoded, existing)
+            if not_owner:
+                return not_owner
+            # WP-8 追加：覆寫別人的草稿必須帶 base_updated_at，避免停在舊頁面的管理員無聲蓋掉
+            stale = _propose_overwrite_lock_response(decoded, existing, lock_data)
+            if stale:
+                return stale
             existing.payload = cleaned
             existing.base_hash = base_hash
             existing.tribe = _tribe_slug_for(cleaned.get("tribe_id", ""))

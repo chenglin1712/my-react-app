@@ -15,9 +15,10 @@
  */
 import { useCallback, useState } from 'react';
 import {
-  approveRevision, discardRevision, rejectRevision, submitRevision, withdrawRevision,
+  approveRevision, discardRevision, isEditConflict, rejectRevision, submitRevision, withdrawRevision,
 } from './dictionaryApi';
 import { useActionLock } from '../hooks/useActionLock';
+import { formatApiError } from '../apiErrors';
 
 export const CONTENT_EDITORS = ['owner', 'admin', 'editor'];
 export const CONTENT_APPROVERS = ['owner', 'admin', 'reviewer'];
@@ -55,7 +56,12 @@ export function useRevisionActions(revisionId, { onChanged, lock } = {}) {
       onChanged?.(result, actionKey);
       return result;
     } catch (err) {
-      setError(err.message);
+      // 稽核 BE1-03：核准時提案已在審核期間被改過（edit_conflict），要講清楚該做什麼，而不是只顯示通用訊息
+      if (actionKey === 'approve' && isEditConflict(err)) {
+        setError('內容在你審核期間被修改，請重新載入');
+      } else {
+        setError(formatApiError(err));
+      }
       throw err;
     }
   }), [runLocked, onChanged]);

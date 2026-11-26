@@ -12,6 +12,7 @@ import {
     countDocText, parseYoutubeId, safeHref,
 } from '../../../components/_topic/richText';
 import { articleExtensions } from './articleExtensions';
+import { countImagesMissingAlt } from './imageAlt';
 import '../../../static/css/_topic/rich-palette.css';
 import '../../../static/css/_admin/rich-text-editor.css';
 
@@ -118,6 +119,9 @@ export default function RichTextEditor({ value, onChange, disabled = false, medi
     const [fullscreen, setFullscreen] = useState(false);
     const [, forceRender] = useState(0);
     const uploading = media?.uploadingKey === 'article-image';
+    const altInputRef = useRef(null);
+    // 剛插入圖片：選取它並把焦點帶到替代文字欄（稽核 FE7a-19）
+    const focusAltPendingRef = useRef(false);
 
     const editor = useEditor({
         extensions: articleExtensions,
@@ -149,6 +153,15 @@ export default function RichTextEditor({ value, onChange, disabled = false, medi
     useEffect(() => {
         editor?.setEditable(!disabled && !previewing);
     }, [editor, disabled, previewing]);
+
+    const imageSelected = Boolean(editor?.isActive('image'));
+    useEffect(() => {
+        if (!imageSelected || !focusAltPendingRef.current) return undefined;
+        focusAltPendingRef.current = false;
+        // tiptap 的 focus() 會在下一個畫面幀才把焦點還給編輯區，要比它晚一步，焦點才會留在替代文字欄
+        const frame = requestAnimationFrame(() => altInputRef.current?.focus());
+        return () => cancelAnimationFrame(frame);
+    }, [imageSelected]);
 
     // Ctrl／⌘ + K 開連結面板（編輯區的按鍵處理在 useEditor 建立時就固定了，所以經由 ref 呼叫最新的函式）
     useEffect(() => {
@@ -215,7 +228,18 @@ export default function RichTextEditor({ value, onChange, disabled = false, medi
         event.target.value = '';
         if (!file) return;
         media?.upload(file, 'article-image', {
-            onUploaded: (url) => chain().setImage({ src: url, alt: '', title: '' }).run(),
+            onUploaded: (url) => {
+                chain().setImage({ src: url, alt: '', title: '' }).run();
+                // 用網址找出剛插入的那張圖並選取它，圖片設定列才會出現，焦點再交給替代文字欄
+                let imagePos = -1;
+                editor.state.doc.descendants((node, pos) => {
+                    if (node.type.name === 'image' && node.attrs.src === url) imagePos = pos;
+                });
+                if (imagePos < 0) return;
+                focusAltPendingRef.current = true;
+                chain().setNodeSelection(imagePos).run();
+                if (!editor.isActive('image')) focusAltPendingRef.current = false;
+            },
         });
     };
     // role="toolbar" 的慣例：左右鍵在按鈕間移動、Home／End 到頭尾（Tab 仍然是逐一經過，不會漏掉任何按鈕）
@@ -257,6 +281,7 @@ export default function RichTextEditor({ value, onChange, disabled = false, medi
 
     const canEdit = !disabled && !previewing;
     const chars = countDocText(editor.getJSON());
+    const missingAlt = countImagesMissingAlt(editor.getJSON());
 
     return (
         <div
@@ -411,7 +436,7 @@ export default function RichTextEditor({ value, onChange, disabled = false, medi
                 <div className="rte-bar" role="group" aria-label="圖片設定">
                     <Form.Control size="sm" value={image.title ?? ''} maxLength={120} aria-label="圖說（顯示在圖片下方）" placeholder="圖說（顯示在圖片下方）"
                         onChange={(event) => setImageAttr('title', event.target.value)} />
-                    <Form.Control size="sm" value={image.alt ?? ''} maxLength={200} aria-label="替代文字（給看不到圖片的人）" placeholder="替代文字（給看不到圖片的人）"
+                    <Form.Control size="sm" ref={altInputRef} value={image.alt ?? ''} maxLength={200} aria-label="替代文字（給看不到圖片的人）" placeholder="替代文字（給看不到圖片的人）"
                         onChange={(event) => setImageAttr('alt', event.target.value)} />
                     <Segmented label="圖片對齊" options={IMAGE_ALIGNS} value={image.align ?? 'left'} onPick={(key) => setImageAttr('align', key === 'left' ? null : key)} />
                     <Segmented label="圖片大小" options={IMAGE_SIZES} value={image.size ?? 'full'} onPick={(key) => setImageAttr('size', key === 'full' ? null : key)} />
@@ -454,6 +479,11 @@ export default function RichTextEditor({ value, onChange, disabled = false, medi
                 <EditorContent editor={editor} />
             </div>
 
+            {missingAlt > 0 && (
+                <p className="rte-hint" role="status">
+                    有 {missingAlt} 張圖片還沒有替代文字。替代文字是給看不到圖片的人（例如使用螢幕報讀軟體）聽的說明，請點選圖片後填寫。
+                </p>
+            )}
             <div className="rte-status">字數 {chars}</div>
         </div>
     );
