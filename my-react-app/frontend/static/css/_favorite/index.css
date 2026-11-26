@@ -111,9 +111,6 @@
     font-weight: bold;
     margin-bottom: 0.5rem;
     color: var(--yy-calm-text-sub);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
 }
 
 /* 族語詞本體最多兩行，播放鈕固定在旁邊不被擠出；完整詞在背面與 title 都看得到 */
@@ -127,8 +124,70 @@
     overflow: hidden;
 }
 
-.word-card-front .favorite-word-info h3 > button {
+/* FE3-09：標題列＝標題（內含翻面按鈕）＋獨立的播放鈕，兩者並列而不巢狀 */
+.word-card-front .favorite-word-title-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.word-card-front .favorite-word-title-row h3 {
+    flex: 1;
+    min-width: 0;
+    margin-bottom: 0;
+}
+
+/* 翻面按鈕：外觀同標題文字；::after 撐滿整張正面，點卡片任何地方仍可翻面（滑鼠使用者的習慣），
+   但可聚焦、可報讀的只有這一顆真正的按鈕。愛心與播放鈕用 z-index 疊在它上面。 */
+.word-card-flip-btn {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.word-card-flip-btn::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+}
+
+.word-card-flip-btn:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
+}
+
+.word-card-front .favorite-btn.yy-fav-btn,
+.word-card-front .yy-audio-control {
+    z-index: 1;
+}
+
+.word-card-front .yy-audio-control {
+    position: relative;
     flex-shrink: 0;
+}
+
+.word-card-flip-back {
+    min-height: var(--yy-control-md);
+    padding: 0 1rem;
+    border: 0;
+    background: transparent;
+    color: var(--yy-calm-text-sub);
+    font: inherit;
+    font-size: var(--yy-text-sm);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.word-card-flip-back:focus-visible {
+    outline: var(--yy-ui-focus-ring);
+    outline-offset: var(--yy-ui-focus-offset);
 }
 
 .word-card-front .favorite-word-info h5 {

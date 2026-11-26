@@ -42,7 +42,7 @@ export function useFavorites() {
         return !!category?.content?.includes(word);
     }, [favorites]);
 
-    // options.undo：切換後顯示「已加入收藏，復原」的提示（P2-7，目前只有單詞查詢頁用）。
+    // options.undo：切換後顯示「已加入收藏，復原」的提示（P2-7；收藏頁、查詞頁、遊戲結果頁都有使用）。
     // 內部的 run 永遠讀「當下最新」的使用者資料（userRef），並以明確的目標狀態（要收藏或不要）運作：
     // 復原提示放了幾秒、期間收藏又變過，按復原仍然是「回到原來的狀態」，不會因為舊快照而切到錯的方向。
     const toggleFavorite = useCallback(async (word, categoryId = DEFAULT_CATEGORY_ID, options = {}) => {
@@ -94,7 +94,8 @@ export function useFavorites() {
             writeQueueRef.current.set(queueKey, write);
             try {
                 await write;
-                if (added) recordLearningActivity(current.uid, "favorite");   // 新增一個收藏算一次學習活動（P6-4）
+                // 新增一個收藏算一次學習活動（P6-4）；FE3-20：同一個詞同一天只計一次（含取消後再加入、按復原），避免連點衝數字
+                if (added) recordLearningActivity(current.uid, "favorite", new Date(), word);
             } catch (err) {
                 // 實際寫入失敗，只把「這個詞」還原（對當下最新的收藏），並讓消費這個 hook 的頁面知道要顯示錯誤，
                 // 不然使用者會以為收藏成功了，但 Firestore 其實沒有真的存進去。

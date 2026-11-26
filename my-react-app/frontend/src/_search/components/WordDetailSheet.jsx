@@ -3,6 +3,7 @@ import { Offcanvas, Modal, Button } from 'react-bootstrap';
 import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import FavoriteButton from '../../../components/ui/FavoriteButton';
 import AudioPlayButton from '../../../components/ui/AudioPlayButton';
+import { isAuthFailedAudio } from '../../../hooks/useAuthorizedAudioPlayback';
 import WordDetailBody from './WordDetailBody';
 import { pickSummary, hasMoreDetail } from './wordDetailSummary';
 import { announce } from '@utils/announce';
@@ -11,7 +12,10 @@ import '../../../static/css/_search/wordSheet.css';
 
 // 詞條詳情（Apple 化步驟 4-2、P2-1）：手機是底部 sheet（Offcanvas），桌面是畫面中央的卡片（Modal），
 // 進場像通知一樣從小一點淡入彈出（F9 浮層彈出、Z2 強度 7，見 wordSheet.css）。
-// 焦點圈住、Esc 關閉、點背景關閉、關閉後焦點回到原本的詞條鈕都由 react-bootstrap 處理。
+// 焦點圈住、Esc 關閉、點背景關閉由 react-bootstrap 處理。
+// 稽核 FE3-15：關閉後的焦點不交給 react-bootstrap 的 restoreFocus（它只會回到「當初點開」的那張字卡，
+// 換詞看了好幾個之後，鍵盤使用者會被送回清單裡很遠的地方）。改成關閉動畫結束（onExited）時由呼叫端
+// 把焦點放到「最後看的那個詞」的字卡上，見 _search/detailFocus.js。
 // 手機另外支援標題列往下滑關閉（階段 6-3，hooks/useSheetSwipeDismiss.js）。
 // 內容區：預設只顯示摘要，「看完整內容」展開其餘。用 key 綁詞條，換詞時自動收回摘要。
 const SheetContent = ({ result, ...audioProps }) => {
@@ -55,8 +59,9 @@ const isSpace = (e) => e.key === ' ' || e.code === 'Space';
 const WordDetailSheet = ({
   detail, onClose, onStep, stepInfo, isMobile, animated = true,
   isFavorited, toggleFavorite,
-  playAudio, playSentence, hasSentenceAudio, failedAudio,
+  playAudio, playSentence, hasSentenceAudio, failedAudio, sentenceFailure = null,
   stopAudio, retryAudio, playingId = null, playingDuration = 0,
+  onExited,
 }) => {
   const result = detail?.result;
   // 手機底部 sheet：標題列往下滑（或快速輕彈）關閉；桌面側邊 sheet 不啟用
@@ -81,6 +86,7 @@ const WordDetailSheet = ({
         // 空白鍵：只在焦點不在按鈕、輸入框等會自己處理空白鍵的元件上才播放；擋掉預設，免得內容跟著捲動
         if (e.repeat || !hasWordAudio || e.target.closest(SPACE_KEY_OWNERS)) return;
         e.preventDefault();
+        if (wordAudioFailed && isAuthFailedAudio(failedAudio, wordFileId)) return; // 需要登入：重試沒用
         if (wordAudioFailed) retryAudio?.(wordFileId);
         else if (wordAudioPlaying) stopAudio?.();
         else playAudio?.(wordFileId);
@@ -95,7 +101,7 @@ const WordDetailSheet = ({
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [detail, onStep, canPrev, canNext, hasWordAudio, wordFileId, wordAudioFailed, wordAudioPlaying, playAudio, stopAudio, retryAudio]);
+  }, [detail, onStep, canPrev, canNext, hasWordAudio, wordFileId, wordAudioFailed, wordAudioPlaying, failedAudio, playAudio, stopAudio, retryAudio]);
 
   // 換詞後告訴螢幕閱讀器現在在第幾個（只有換詞時才報，剛開啟時由 dialog 標題負責）
   const stepped = detail?.stepFade !== undefined;
@@ -128,6 +134,7 @@ const WordDetailSheet = ({
                   playing={wordAudioPlaying}
                   duration={wordAudioPlaying ? playingDuration : 0}
                   failed={wordAudioFailed}
+                  authRequired={isAuthFailedAudio(failedAudio, wordFileId)}
                   onPlay={() => playAudio(wordFileId)}
                   onStop={stopAudio}
                   onRetry={() => retryAudio?.(wordFileId)}
@@ -144,6 +151,7 @@ const WordDetailSheet = ({
                 playSentence={playSentence}
                 hasSentenceAudio={hasSentenceAudio}
                 failedAudio={failedAudio}
+                sentenceFailure={sentenceFailure}
               />
             </div>
           </Body>
@@ -167,6 +175,8 @@ const WordDetailSheet = ({
         show={Boolean(detail)}
         onHide={onClose}
         animation={animated}
+        restoreFocus={!onExited}
+        onExited={onExited}
         backdropClassName="word-sheet-backdrop"
         placement="bottom"
         className="word-sheet yy-glass word-sheet--bottom"
@@ -183,6 +193,8 @@ const WordDetailSheet = ({
       onHide={onClose}
       animation={animated}
       centered
+      restoreFocus={!onExited}
+      onExited={onExited}
       backdropClassName="word-sheet-backdrop"
       className="word-sheet word-sheet--center"
       contentClassName="yy-glass word-sheet-card"

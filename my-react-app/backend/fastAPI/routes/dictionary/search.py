@@ -20,17 +20,49 @@ from fastAPI.rate_limit import limiter
 from fastAPI.usage_events import record_event
 
 from ..keyed_cache import KeyedCache
+from .normalize import search_key
 from .schemas import (
     AllWordsRequest,
     FavoriteCountsRequest,
     KeywordRequest,
     MultiWordSearchRequest,
+    SuggestRequest,
     WordResult,
     parse_audios,
     parse_explanations,
 )
 
+# 稽核 FE3-01：辭典分成兩個 router。
+# - public_router：唯讀的詞條查詢（單字查詢、即時建議、瀏覽全部詞條），main.py 掛「登入或訪客」依賴，
+#   訪客依 IP 限流、額度比登入者保守。回應只有辭典本身的公開資料（WordResult），不含任何使用者資料。
+# - router：其餘要登入的端點（多關鍵字查詢給拍照辨識用、收藏統計）。
+public_router = APIRouter()
 router = APIRouter()
+
+
+def _is_guest_key(key: str) -> bool:
+    """rate_limit_key 的結果：登入者是 "uid:<uid>"，訪客（沒有 uid）退回 IP。"""
+    return not str(key).startswith("uid:")
+
+
+def _member_or_guest_rate(member_key: str, member_default: str, guest_key: str, guest_default: str):
+    """給 @limiter.limit 用的限流值：slowapi 看到參數名叫 key 時，會把 rate_limit_key 的結果傳進來，
+    依此分辨登入者與訪客，各自讀後台 RateLimitRule（rate_limit_config）裡的設定，沒設定時用這裡的預設值。"""
+    def provider(key: str) -> str:
+        if _is_guest_key(key):
+            return rate_limit_config.get_configured_rate(guest_key, guest_default)
+        return rate_limit_config.get_configured_rate(member_key, member_default)
+    return provider
+
+
+# 訪客額度（依 IP）。比登入者保守：同一個 IP 後面可能是整間教室，所以不能壓到一般人查不了，
+# 但也不能讓匿名流量把全表查詢打滿。值可在後台 RateLimitRule 調整（key 見下）。
+GUEST_RATE_ALLSEARCH = ("dictionary_search_allsearch_guest", "30/minute")
+GUEST_RATE_ALL_WORDS = ("dictionary_search_all_words_guest", "30/minute")
+GUEST_RATE_SUGGEST = ("dictionary_search_suggest_guest", "60/minute")
+MEMBER_RATE_SUGGEST = ("dictionary_search_suggest", "120/minute")
+# 訪客瀏覽全部詞條的上限：沒帶 limit 時套用，帶了也取 min(limit, 上限)，避免匿名請求一次拉完整份辭典（FE3-01）。
+GUEST_ALL_WORDS_MAX_LIMIT = 100
 
 # UsageEvent.tribe 存 slug（跟 Django 端 dictionary_views.py 的
 # _tribe_slug_for() 同一個慣例），這裡的 tribe_name 是 resolve_tribe_name()
@@ -120,22 +152,32 @@ class _TribeIndex:
     - simple_names：與 words 一一對應的「去掉數字結尾」名稱（原本每次查詢對每個詞都重跑 regex）
     - sorted_asc：依 _sort_key_name 升冪排好的清單（原本每個請求都重排；篩選不會改變相對順序）
     - letters：開頭字母集合（原本每個請求都掃一遍）
-    所有結構的順序都與原本逐筆走訪 words 的順序一致，查詢結果不變。"""
+    所有結構的順序都與原本逐筆走訪 words 的順序一致，查詢結果不變。
+
+    稽核 FE3-02：by_name／by_chinese 的鍵改用 search_key() 正規化（大小寫、撇號寫法、NFC、全形），
+    name_keys／gloss_keys 是模糊比對用的正規化字串。鍵只用來比對，詞條本身與顯示的名稱不動。"""
 
     def __init__(self, words: List[WordResult]):
         self.words = words
         self.simple_names = [simplify_tayal(w.name) for w in words]
-        self.by_name: Dict[Optional[str], List[WordResult]] = {}
+        self.name_keys = [search_key(w.name) for w in words]
+        # 每個詞的 [(原始中文釋義, 正規化釋義)]，模糊比對中文時不必每次請求重算
+        self.gloss_keys: List[List[Tuple[Optional[str], str]]] = []
+        self.by_name: Dict[str, List[WordResult]] = {}
         self.by_chinese: Dict[str, List[WordResult]] = {}
         letters = set()
-        for w in words:
-            self.by_name.setdefault(w.name, []).append(w)
+        for w, name_key in zip(words, self.name_keys):
+            self.by_name.setdefault(name_key, []).append(w)
             seen = set()
+            glosses = []
             for defin in (w.explanationItems or []):
                 gloss = defin.chineseExplanation
-                if gloss not in seen:
-                    seen.add(gloss)
-                    self.by_chinese.setdefault(gloss, []).append(w)
+                gloss_key = search_key(gloss)
+                glosses.append((gloss, gloss_key))
+                if gloss_key not in seen:
+                    seen.add(gloss_key)
+                    self.by_chinese.setdefault(gloss_key, []).append(w)
+            self.gloss_keys.append(glosses)
             if w.explanationItems:  # 沒有釋義的詞不列入開頭字母（與 available_initial_letters 的規則一致）
                 first = (w.name or '')[:1].lower()
                 if first and (first.isalpha() or first in ("'", "’", "ʼ")):
@@ -170,48 +212,104 @@ def search_by_chinese(db: Session, keyword: str, tribe: str = '泰雅語') -> Tu
     """完全比對中文解釋"""
     # 先用索引取出命中的幾筆，再只排這幾筆（以前是先排完整個族語、再逐詞逐釋義比較）。
     # sorted 是穩定排序，命中的子集合排序結果與「先全排再篩選」相同。
-    results = sorted(_index_for(db, tribe).by_chinese.get(keyword, []), key=lambda w: (w.name or "").lower())
+    # 稽核 FE3-02：查詢字詞與釋義都用 search_key() 比對（全形、空白寫法不同也能對上）
+    results = sorted(_index_for(db, tribe).by_chinese.get(search_key(keyword), []), key=lambda w: (w.name or "").lower())
     matched_names = [simplify_tayal(word.name) for word in results]
     return results, matched_names
 
 
 def fuzzy_search_by_chinese(db: Session, keyword: str, exclude_names: List[str], tribe: str = '泰雅語') -> Dict[str, List[WordResult]]:
-    """模糊搜尋中文解釋"""
+    """模糊搜尋中文解釋（分組的鍵維持原始釋義，顯示不變）"""
     index = _index_for(db, tribe)
     excluded = set(exclude_names)  # list 成員測試是 O(m)，轉成 set
+    needle = search_key(keyword)
     fuzzy_content = {}
+    if not needle:
+        return fuzzy_content
 
-    for word, name_simple in zip(index.words, index.simple_names):
+    for word, name_simple, glosses in zip(index.words, index.simple_names, index.gloss_keys):
         if name_simple in excluded:
             continue
 
-        for defin in (word.explanationItems or []):
-            if keyword in (defin.chineseExplanation or ""):
-                fuzzy_content.setdefault(defin.chineseExplanation, []).append(word)
+        for gloss, gloss_key in glosses:
+            if needle in gloss_key:
+                fuzzy_content.setdefault(gloss, []).append(word)
 
     return fuzzy_content
 
 def search(db: Session, keyword: str, tribe: str = '泰雅語') -> Tuple[List[WordResult], List[str]]:
-    """完全比對族語"""
-    results = list(_index_for(db, tribe).by_name.get(keyword, []))
+    """完全比對族語。稽核 FE3-02：比對正規化鍵，Balay／balay、ʼ／’／' 視為同一個寫法。"""
+    results = list(_index_for(db, tribe).by_name.get(search_key(keyword), []))
     matched_names = [simplify_tayal(word.name) for word in results]
     return results, matched_names
 
 
 def fuzzy_search(db: Session, keyword: str, exclude_names: List[str], tribe: str = '泰雅語') -> Dict[str, List[WordResult]]:
-    """模糊搜尋族語"""
+    """模糊搜尋族語（分組的鍵維持原始詞名，顯示不變）"""
     index = _index_for(db, tribe)
     excluded = set(exclude_names)
+    needle = search_key(keyword)
     fuzzy_content = {}
+    if not needle:
+        return fuzzy_content
 
-    for word, name_simple in zip(index.words, index.simple_names):
+    for word, name_simple, name_key in zip(index.words, index.simple_names, index.name_keys):
         if name_simple in excluded:
             continue
 
-        if keyword in (word.name or ""):
+        if needle in name_key:
             fuzzy_content.setdefault(word.name, []).append(word)
 
     return fuzzy_content
+
+
+def suggest_words(
+    db: Session, keyword: str, tribe: str = '泰雅語', limit: int = 5, prefix_only: bool = False,
+) -> List[Dict[str, str]]:
+    """即時建議／「開頭相近的詞」用的輕量查詢（稽核 FE3-04）。
+
+    順序與前端原本的 extractSuggestions 相同：先完全符合、再相關符合，依名稱去重；
+    但只回傳 {name, gloss}，最多 limit 筆，不回整份詞條（短前綴的相關符合可能是整個族語）。
+    prefix_only：只留正規化後以關鍵字開頭的族語詞（「開頭相近的詞」用）；中文關鍵字不適用這個選項。"""
+    needle = search_key(keyword)
+    if not needle:
+        return []
+    index = _index_for(db, tribe)
+    chinese = is_chinese(keyword)
+
+    def gloss_of(w: WordResult) -> str:
+        items = w.explanationItems or []
+        return (items[0].chineseExplanation or "") if items else ""
+
+    out: List[Dict[str, str]] = []
+    seen = set()
+
+    def add(w: WordResult) -> bool:
+        name = (w.name or "").strip()
+        if not name or name in seen:
+            return False
+        seen.add(name)
+        out.append({"name": name, "gloss": gloss_of(w)})
+        return len(out) >= limit
+
+    if chinese:
+        exact = sorted(index.by_chinese.get(needle, []), key=lambda w: (w.name or "").lower())
+        for w in exact:
+            if add(w):
+                return out
+        for w, glosses in zip(index.words, index.gloss_keys):
+            if any(needle in gloss_key for _, gloss_key in glosses) and add(w):
+                return out
+        return out
+
+    for w in index.by_name.get(needle, []):
+        if add(w):
+            return out
+    for w, name_key in zip(index.words, index.name_keys):
+        matched = name_key.startswith(needle) if prefix_only else needle in name_key
+        if matched and add(w):
+            return out
+    return out
 
 def _frequency_bucket(freq: Optional[int]) -> int:
     """把 frequency 數值換成前端顯示的星等（1~5），跟
@@ -407,12 +505,21 @@ async def search_tayal_dictionary(request: Request, body: MultiWordSearchRequest
     )
 
 
-@router.post("/all/")
-@limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_search_all_words", "60/minute"))  # 全表掃描（走快取），每位使用者每分鐘最多 60 次避免 fetchAllWords 大量請求造成壓力
+def _is_guest_request(request: Request) -> bool:
+    user = getattr(request.state, "user", None) or {}
+    return bool(user.get("guest"))
+
+
+@public_router.post("/all/")
+# 全表掃描（走快取），每位使用者每分鐘最多 60 次避免 fetchAllWords 大量請求造成壓力；訪客另計（稽核 FE3-01）
+@limiter.limit(_member_or_guest_rate("dictionary_search_all_words", "60/minute", *GUEST_RATE_ALL_WORDS))
 async def all_tayal_dictionary(request: Request, body: AllWordsRequest):
     """查詢所有詞條。可選傳入 letter/frequency/category/favorites_only(+favorite_names)/
     sort_order 做篩選與排序，並用 limit/offset 做分頁；都不傳則維持原本回傳全部
     （未篩選、未分頁）的行為，供 frontend/src/_favorite/index.jsx 沿用舊行為。
+
+    訪客（稽核 FE3-01）：不是「只看收藏」時，不論有沒有帶 limit，最多回 GUEST_ALL_WORDS_MAX_LIMIT 筆，
+    不讓匿名請求一次拉走整個族語。favorite_names 是前端自己送來的詞名，不是伺服器上的使用者資料。
 
     沒被下面明確攔截的例外交給 main.py 的全域 Exception handler 處理
     （P4 review BE-28，說明見 vision.py analyze_image()）。"""
@@ -420,11 +527,15 @@ async def all_tayal_dictionary(request: Request, body: AllWordsRequest):
         tribe_name = resolve_tribe_name(body.tribe)
     except ValueError as e:
         return JSONResponse({"detail": str(e)}, status_code=400)
+    limit = body.limit
+    # FE3-01（WP-10 驗證後修正）：訪客不論有沒有帶 limit 都封頂，否則帶 limit=500 就能繞過上限
+    if _is_guest_request(request) and not body.favorites_only:
+        limit = GUEST_ALL_WORDS_MAX_LIMIT if limit is None else min(limit, GUEST_ALL_WORDS_MAX_LIMIT)
     # 冷快取時 search_all -> _load_tribe_words 是同步的全表掃描＋JSON parse，
     # 丟到執行緒池執行，避免卡住 event loop（見 /keys/ 同樣的說明）。Session
     # 在 worker thread 內自己建立/關閉（見 _call_with_own_session 的說明）。
     results, total = await asyncio.to_thread(
-        _call_with_own_session, search_all, tribe=tribe_name, limit=body.limit, offset=body.offset,
+        _call_with_own_session, search_all, tribe=tribe_name, limit=limit, offset=body.offset,
         letter=body.letter, frequency=body.frequency, category=body.category,
         favorites_only=body.favorites_only, favorite_names=body.favorite_names,
         sort_order=body.sort_order,
@@ -463,14 +574,36 @@ def _search_single_keyword(db: Session, keyword: str, tribe_name: str):
     return exact, fuzzy
 
 
-@router.post("/key/")
-@limiter.limit(lambda: rate_limit_config.get_configured_rate("dictionary_search_allsearch", "60/minute"))  # 原本沒有限流，見同檔案其他端點的說明
+@public_router.post("/suggest/")
+# 稽核 FE3-04：即時建議與「開頭相近的詞」專用，跟正式查詢分開計數，打字中的請求不會吃掉查詢額度
+@limiter.limit(_member_or_guest_rate(*MEMBER_RATE_SUGGEST, *GUEST_RATE_SUGGEST))
+async def suggest_dictionary(request: Request, body: SuggestRequest):
+    """查詢建議：只回 {name, gloss} 清單。刻意「不」記 dictionary_search 事件——打字途中的半截字、
+    截短的前綴不是使用者真正送出的查詢，記進去會灌高零結果率（稽核 FE3-04）。"""
+    keyword = (body.keyword or "").strip()
+    if not search_key(keyword):
+        return JSONResponse({"detail": "查詢字詞不可為空"}, status_code=400)
+    try:
+        tribe_name = resolve_tribe_name(body.tribe or '泰雅')
+    except ValueError as e:
+        return JSONResponse({"detail": str(e)}, status_code=400)
+    items = await asyncio.to_thread(
+        _call_with_own_session, suggest_words, keyword, tribe_name, body.limit, body.prefix_only,
+    )
+    return JSONResponse({"suggestions": items}, status_code=200)
+
+
+@public_router.post("/key/")
+# 原本沒有限流，見同檔案其他端點的說明；訪客另計、額度較保守（稽核 FE3-01）
+@limiter.limit(_member_or_guest_rate("dictionary_search_allsearch", "60/minute", *GUEST_RATE_ALLSEARCH))
 async def allsearch_tayal_dictionary(request: Request, body: KeywordRequest):
     """單一字搜尋
 
+    比對用正規化鍵（稽核 FE3-02，見 normalize.py），回應的鍵與詞條名稱維持使用者輸入與辭典原字。
+
     沒被下面明確攔截的例外交給 main.py 的全域 Exception handler 處理
     （P4 review BE-28，說明見 vision.py analyze_image()）。"""
-    keyword = body.keyword.strip().replace("　", "")
+    keyword = (body.keyword or "").strip().replace("　", "")
     if not keyword:
         return JSONResponse({"detail": "查詢字詞不可為空"}, status_code=400)
     try:

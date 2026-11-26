@@ -17,6 +17,13 @@ import { apiUrl } from "../utils/apiUrls";
 //   useAudioPlayback.js／_quiz_questions 的行為，兩者都用預設值呼叫，不用改。
 // - 遊戲類的播放（單字發音、聽力題目）換一顆音檔通常代表換了一題，沒理由永久
 //   record 失敗的音檔 id，所以 useGameAudioPlayer 傳 rememberFailures:false。
+// 稽核 WP-10 驗證後：音檔代理要登入，訪客播單字會 401，「重試」永遠不會成功。
+// 為了不改動一路傳下去的 failedAudio（Set<fileId>）介面，401／403 的失敗除了記 fileId，
+// 另外記一筆 `auth:<fileId>`；畫面用 isAuthFailedAudio() 判斷要顯示「登入後才能播放」而不是「重試」。
+const AUTH_MARK = 'auth:';
+export const isAuthFailedAudio = (failedAudio, fileId) => Boolean(fileId && failedAudio?.has(AUTH_MARK + fileId));
+const isAuthError = (err) => err?.status === 401 || err?.status === 403;
+
 function stopAndRelease(audio) {
   if (!audio) return;
   audio.pause();
@@ -79,9 +86,10 @@ export default function useAuthorizedAudioPlayback({
     let newAudio;
     try {
       newAudio = await createAuthorizedAudio(proxyUrl);
-    } catch {
+    } catch (e) {
       if (isCurrent(myGen) && rememberFailures) {
-        setFailedAudio(prev => new Set([...prev, fileId]));
+        const marks = isAuthError(e) ? [fileId, AUTH_MARK + fileId] : [fileId];
+        setFailedAudio(prev => new Set([...prev, ...marks]));
       }
       return;
     }
@@ -137,6 +145,7 @@ export default function useAuthorizedAudioPlayback({
       if (!prev.has(fileId)) return prev;
       const next = new Set(prev);
       next.delete(fileId);
+      next.delete(AUTH_MARK + fileId);
       return next;
     });
     return playAudio(fileId, { force: true });

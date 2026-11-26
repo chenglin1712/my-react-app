@@ -3,9 +3,9 @@ import logging
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse, StreamingHttpResponse
 from django_ratelimit.core import is_ratelimited
-import sys
 import time
 import traceback
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 from dictionary_db.connect import SessionLocal
@@ -24,7 +24,7 @@ from .image_input import image_input_enabled
 from . import assistant_settings
 from .prompt_version import prompt_version
 from .learner_profile import load_profile
-from .services import run_tayal_chat, run_review_tayal_chat, run_study_plan_replan, stream_tayal_chat
+from .services import run_tayal_chat, run_review_tayal_chat, run_study_plan_replan, stream_output_seen, stream_tayal_chat
 from .study_plan_store import PlanNotFound, load_current_plan
 from .question_context import QuestionNotFound, load_question_context, record_asked_question
 from .question_review import run_question_review
@@ -96,6 +96,50 @@ def _refund_quota(uid, quota):
     """退還這次扣的額度。沒有成功扣到（不可用、不可信）就不退，否則會把別次的使用量減掉。"""
     if quota.allowed and quota.tracked:
         daily_quota.refund(uid, quota.day)
+
+
+def _begin_billing_tracking():
+    """開始呼叫模型之前清掉「這個請求是否已計費」的紀錄（工作執行緒會被重複使用）。搭配 _refund_if_uncharged。"""
+    last_call.set(None)
+    stream_output_seen.set(False)
+
+
+def _refund_if_uncharged(uid, quota, exc):
+    """失敗時只在【確定沒有計費】才退還額度（稽核 AI-2 的規則，稽核 BE3-01 擴及所有呼叫模型的端點）：
+    - 這個請求已經有一次成功的供應商呼叫（last_call，例如意圖路由或工具迴圈的前幾輪），或串流已經收到供應商的
+      輸出（stream_output_seen）：已經付費，不退。否則反覆讓最後一輪逾時或斷線，就能不佔額度地使用多次付費呼叫。
+    - 都沒有時，再看例外本身是否代表「請求沒送達或被拒絕」（config.llm.is_uncharged_failure：斷路器開啟、
+      整體截止時間到了還沒送出、連不上、429、5xx）；逾時與其他未知錯誤可能已計費，不退。
+    呼叫端在開始呼叫模型之前要先呼叫 _begin_billing_tracking()。"""
+    charged = last_call.get() is not None or stream_output_seen.get()
+    if not charged and is_uncharged_failure(exc):
+        _refund_quota(uid, quota)
+
+
+# 稽核 BE3-02：非串流端點一次請求整體最久多少秒。gunicorn --timeout 是 75 秒（docker-compose.prod.yml），
+# 被強制殺掉時 except 不會執行，使用者只看到 502、也不會有任何紀錄；單次 LLM 呼叫最多約 55 秒（config/llm.py），
+# 但路由＋工具迴圈會有好幾次呼叫，所以要對整個請求設上限。與串流端點的 STREAM_DEADLINE_SECONDS 同值，留 20 秒餘裕。
+REQUEST_DEADLINE_SECONDS = 55
+_DEADLINE_MESSAGE = "回覆花的時間太久，請重試。"
+
+
+@contextmanager
+def _request_deadline(seconds=None):
+    """在這個區塊內設定整體截止時間（config.llm.llm_deadline）：每次 LLM 呼叫的逾時被壓在剩餘時間內且不重試，
+    剩不到 2 秒就不再呼叫（LLMDeadlineError），工具迴圈執行工具前也會檢查（services._check_deadline）。"""
+    token = llm_deadline.set(time.monotonic() + (REQUEST_DEADLINE_SECONDS if seconds is None else seconds))
+    try:
+        yield
+    finally:
+        llm_deadline.reset(token)
+
+
+def _failure_response(exc):
+    """失敗對應的 (狀態碼, 給使用者的訊息)。整體截止時間到了（LLMDeadlineError 等 TimeoutError）回 504 與可讀的說明，
+    其餘交給 classify_llm_error。"""
+    if isinstance(exc, TimeoutError):
+        return 504, _DEADLINE_MESSAGE
+    return classify_llm_error(exc)
 
 
 def _quota_exceeded_response(quota):
@@ -213,19 +257,23 @@ def tayal_chat(request):
         if err_resp:
             return err_resp
 
+        _begin_billing_tracking()
         try:
-            result = run_tayal_chat(chat.client, chat.tribe_name, chat.user_message, **_chat_kwargs(chat))
+            # 稽核 BE3-02：路由＋工具迴圈可能有好幾次模型呼叫，整體設上限，不讓 gunicorn 先把 worker 殺掉
+            with _request_deadline():
+                result = run_tayal_chat(chat.client, chat.tribe_name, chat.user_message, **_chat_kwargs(chat))
             result["quota"] = chat.quota.as_dict()
             result["meta"] = _reply_meta()
             return JsonResponse(result)
 
-        except Exception:
-            _refund_quota(chat.uid, chat.quota)
+        except Exception as exc:
+            # 稽核 BE3-01：已計費的失敗不退還額度（規則見 _refund_if_uncharged）
+            _refund_if_uncharged(chat.uid, chat.quota, exc)
             # 原本直接把 str(e) 回給前端，不論 DEBUG 與否都會洩漏內部例外訊息
             # （可能包含 API 回應細節、內部路徑等），且完全沒有寫 log，出錯時
             # 伺服器端反而看不到記錄。改成記錄完整 traceback，只回通用訊息。
             logger.error("[tayal_chat] 處理失敗\n%s", traceback.format_exc())
-            status, detail = classify_llm_error(sys.exc_info()[1])
+            status, detail = _failure_response(exc)
             return JsonResponse({"detail": detail}, status=status)
 
     else:
@@ -244,12 +292,14 @@ def _sse(event: str, data: dict) -> bytes:
 def _chat_stream_events(chat):
     """串流端點的 SSE 內容：delta（文字片段）、done（完整結果）或 error（中途失敗，前端顯示「回覆中斷，重試」）。
 
-    退還額度的原則同 tayal_chat：失敗不是學生的錯，退還；使用者自己放棄（連線關閉，generator 被關閉）不退，
-    因為模型已經在處理。"""
+    退還額度的原則同 tayal_chat：只有確定沒有計費的失敗才退還（稽核 BE3-01，見 _refund_if_uncharged）——
+    供應商已經開始送文字之後才斷線或超過截止時間，這次呼叫已經付費，不退；使用者自己放棄（連線關閉，
+    generator 被關閉）也不退，因為模型已經在處理。"""
     deadline = time.monotonic() + STREAM_DEADLINE_SECONDS
     # 同一個截止時間也限制每次 LLM 呼叫的逾時（config.llm._with_deadline），這樣卡在等模型的時候也不會拖過去
     deadline_token = llm_deadline.set(deadline)
     prompt_version_var.set(prompt_version())    # generator 可能在別的 context 被消費：自己再設一次，用量紀錄才帶得到版本
+    _begin_billing_tracking()                   # 同上：在消費 generator 的 context 裡清掉計費紀錄
     try:
         for event in stream_tayal_chat(chat.client, chat.tribe_name, chat.user_message, **_chat_kwargs(chat)):
             if event["type"] == "done":
@@ -264,9 +314,9 @@ def _chat_stream_events(chat):
     except GeneratorExit:
         raise
     except Exception as exc:
-        _refund_quota(chat.uid, chat.quota)
+        _refund_if_uncharged(chat.uid, chat.quota, exc)
         logger.error("[tayal_chat_stream] 串流中途失敗\n%s", traceback.format_exc())
-        status, detail = (504, "回覆花的時間太久，請重試。") if isinstance(exc, TimeoutError) else classify_llm_error(exc)
+        status, detail = _failure_response(exc)
         yield _sse("error", {"detail": detail, "status": status})
     finally:
         try:
@@ -338,6 +388,7 @@ def review_tayal_chat(request):
         if not quota.allowed:
             return _quota_exceeded_response(quota)
 
+        _begin_billing_tracking()
         try:
             # 依空格切詞，一次查詢所有詞（避免 N 次資料庫連線）
             words = [w for w in user_message.split(" ") if w]
@@ -347,16 +398,18 @@ def review_tayal_chat(request):
                 for w in words
             ]
 
+            # 只有一次模型呼叫（上限約 55 秒，見 config/llm.py），不另設整體截止時間，保留 SDK 的一次重試
             result = run_review_tayal_chat(client, tribe_name, user_message, relevant_words, uid=uid)
             result["quota"] = quota.as_dict()
             return JsonResponse(result)
 
-        except Exception:
-            _refund_quota(uid, quota)
+        except Exception as exc:
+            # 稽核 BE3-01：已計費的失敗不退還額度（規則見 _refund_if_uncharged）
+            _refund_if_uncharged(uid, quota, exc)
             # 原本有記 log 但仍把 str(e) 回給前端；跟 tayal_chat 一樣，例外訊息
             # 只留在伺服器端的 log，回應改成通用訊息。
             logger.error("[review_tayal_chat] 處理失敗\n%s", traceback.format_exc())
-            status, detail = classify_llm_error(sys.exc_info()[1])
+            status, detail = _failure_response(exc)
             return JsonResponse({"detail": detail}, status=status)
     else:
         return JsonResponse({"detail": "只接受 POST 請求"}, status=405)
@@ -419,17 +472,20 @@ def review_question(request):
         return _quota_unavailable_response()
     if not quota.allowed:
         return _quota_exceeded_response(quota)
+    _begin_billing_tracking()
     try:
         tribe = context["tribe"] if context["tribe"] in TRIBE_IDS else "tayal"
+        # 只有一次模型呼叫（上限約 55 秒，見 config/llm.py），不另設整體截止時間，保留 SDK 的一次重試
         result = run_question_review(
             client, TRIBE_MAP.get(tribe, "泰雅語"), context, SqlDictionaryLookup(TRIBE_IDS[tribe]), uid=uid)
         record_asked_question(uid, attempt_id, index)
         result["quota"] = quota.as_dict()
         return JsonResponse(result)
-    except Exception:
-        _refund_quota(uid, quota)
+    except Exception as exc:
+        # 稽核 BE3-01：已計費的失敗不退還額度（例如講解成功、之後寫入作答紀錄失敗）；規則見 _refund_if_uncharged
+        _refund_if_uncharged(uid, quota, exc)
         logger.error("[review_question] 處理失敗\n%s", traceback.format_exc())
-        status, detail = classify_llm_error(sys.exc_info()[1])
+        status, detail = _failure_response(exc)
         return JsonResponse({"detail": detail}, status=status)
 
 
@@ -507,18 +563,20 @@ def replan_study_plan(request):
 
     # 稽核 AI-2：供應商呼叫一旦完成就已經計費（用量照樣記入 AiUsageLog 與月預算），額度不能再退，
     # 否則驗證不過或被拒答時，每次最多兩次付費呼叫都不佔額度。只有「請求沒送達」的失敗才退。
-    last_call.set(None)       # 這個請求有沒有任何一次成功的供應商呼叫，靠它判斷
+    # 稽核 BE3-01：這個規則已抽成 _refund_if_uncharged，其他呼叫模型的端點共用同一套判斷。
+    _begin_billing_tracking()       # 這個請求有沒有任何一次成功的供應商呼叫，靠它判斷
 
     try:
-        result = run_study_plan_replan(client, TRIBE_MAP.get(tribe, "泰雅語"), plan, availability, uid=uid)
+        # 稽核 BE3-02：驗證不過會重試一次，最多兩次模型呼叫，整體設上限
+        with _request_deadline():
+            result = run_study_plan_replan(client, TRIBE_MAP.get(tribe, "泰雅語"), plan, availability, uid=uid)
     except LLMRefusalError:
         # 拒答是模型的決定（模型已實際處理並計費）：回 200 與固定說明，額度照扣
         return JsonResponse({"refused": True, "message": REFUSAL_MESSAGE, "quota": daily_quota.peek(uid).as_dict()})
     except Exception as exc:
-        if last_call.get() is None and is_uncharged_failure(exc):
-            _refund_quota(uid, quota)
+        _refund_if_uncharged(uid, quota, exc)
         logger.error("[replan_study_plan] 處理失敗\n%s", traceback.format_exc())
-        status, detail = classify_llm_error(exc)
+        status, detail = _failure_response(exc)
         return JsonResponse({"detail": detail}, status=status)
     if result is None:
         return JsonResponse({"detail": "這次沒有排出有效的新時間，請再試一次。", "code": "study_plan_replan_failed"}, status=422)

@@ -24,6 +24,13 @@
   font-weight: 700;
 }
 
+/* 稽核 WP-10 驗證後：訪客播不了單字發音時的「登入後才能播放」連結 */
+.yy-audio-login {
+  font-size: var(--yy-text-sm);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .yy-audio-retry-text {
   font-size: var(--yy-text-sm);
   font-weight: 700;

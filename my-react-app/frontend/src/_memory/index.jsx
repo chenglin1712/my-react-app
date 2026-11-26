@@ -15,9 +15,14 @@ const formatDate = (iso) => {
     return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("zh-TW");
 };
 
+// 稽核 WP-10 驗證後：同意時說明版本跟後端不符（409 consent_version_mismatch）的說明文字，
+// 與後端 memory_views.py 的訊息一致；收到時除了顯示，還會自動重新載入設定。
+const CONSENT_MISMATCH_TEXT = "說明已更新，請重新整理頁面後再同意";
+
 const errorText = (err, fallback) => {
     if (err?.data?.code === "learner_memory_disabled") return "學習記憶目前尚未開放。";
     if (err?.status === 429) return "操作太頻繁，請稍等一下再試。";
+    if (err?.status === 409 && err?.data?.code === "consent_version_mismatch") return CONSENT_MISMATCH_TEXT;
     if (err?.status === 400 && typeof err?.data?.detail === "string") return err.data.detail;   // 內容或路徑不合規定的說明，是給使用者看的
     return fallback;
 };
@@ -120,7 +125,7 @@ function NoteItem({ file, busy, onSave, onDelete }) {
                 <>
                     <p className="memory-note-body">{file.content}</p>
                     <div className="memory-actions">
-                        <button ref={editButtonRef} type="button" className="memory-btn" onClick={() => setEditing(true)}>
+                        <button ref={editButtonRef} data-note-edit type="button" className="memory-btn" onClick={() => setEditing(true)}>
                             <span className="visually-hidden">編輯 {file.path}</span><span aria-hidden="true">編輯</span>
                         </button>
                         <ConfirmButton label="刪除" confirmLabel="確定刪除" disabled={busy} onConfirm={() => onDelete(file.path)} />
@@ -139,6 +144,20 @@ export default function LearnerMemoryPage() {
     const [error, setError] = useState("");
     const [status, setStatus] = useState("");
     const [agree, setAgree] = useState(false);
+    const notesListRef = useRef(null);
+    const notesTitleRef = useRef(null);
+    // FE3-21：刪除後要把焦點放到哪（刪掉的那一則原本的位置）；資料更新、DOM 重畫完才能動焦點
+    const focusAfterRef = useRef(null);
+
+    useEffect(() => {
+        const pending = focusAfterRef.current;
+        if (!pending || !data) return;
+        focusAfterRef.current = null;
+        const edits = notesListRef.current?.querySelectorAll("[data-note-edit]") ?? [];
+        // 優先移到「下一則」（刪掉後同一個位置），刪的是最後一則就移到上一則；一則都不剩就移到區段標題
+        const target = pending.index == null ? null : edits[Math.min(pending.index, edits.length - 1)];
+        (target || notesTitleRef.current)?.focus();
+    }, [data]);
 
     const load = useCallback(async () => {
         setLoadFailed(false);
@@ -151,7 +170,7 @@ export default function LearnerMemoryPage() {
 
     useEffect(() => { load(); }, [load]);
 
-    const run = async (action, doneMessage, failMessage) => {
+    const run = async (action, doneMessage, failMessage, onFail) => {
         if (busy) return false;
         setBusy(true);
         setError("");
@@ -162,6 +181,7 @@ export default function LearnerMemoryPage() {
             return true;
         } catch (err) {
             setError(errorText(err, failMessage));
+            onFail?.(err);
             return false;
         } finally {
             setBusy(false);
@@ -183,13 +203,36 @@ export default function LearnerMemoryPage() {
         }
     };
 
-    const deleteNote = (path) => run(
-        () => apiDelete(`${MEMORY_URL}file/`, { params: { path } }), "已刪除這則筆記。", "刪除失敗，請稍後再試。");
-    const setConsent = (granted) => run(
-        () => apiPost(`${MEMORY_URL}consent/`, { granted }),
-        granted ? "已開啟學習記憶。" : "已關閉學習記憶，所有筆記都已刪除。",
-        "更新失敗，請稍後再試。");
-    const clearAll = () => run(() => apiDelete(MEMORY_URL), "已清除全部筆記。", "清除失敗，請稍後再試。");
+    const deleteNote = async (path) => {
+        const index = (data?.files || []).findIndex((f) => f.path === path);
+        const ok = await run(
+            () => apiDelete(`${MEMORY_URL}file/`, { params: { path } }), "已刪除這則筆記。", "刪除失敗，請稍後再試。");
+        // 先記下要移焦點，等 setData 之後的那次 render 再由 effect 執行
+        if (ok) focusAfterRef.current = { index: index >= 0 ? index : null };
+        return ok;
+    };
+    // FE3-22：同意請求帶上使用者實際看到的說明版本（MEMORY_TEXT_VERSION）；撤回不需要版本。
+    // 不論開啟或關閉成功都把勾選框清掉：關閉後要重新開啟，必須重新勾選同意，不能一鍵重開。
+    const setConsent = async (granted) => {
+        const ok = await run(
+            () => apiPost(`${MEMORY_URL}consent/`, granted ? { granted, version: MEMORY_TEXT_VERSION } : { granted }),
+            granted ? "已開啟學習記憶。" : "已關閉學習記憶，所有筆記都已刪除。",
+            "更新失敗，請稍後再試。",
+            (err) => {
+                // 說明版本過期：重新取得 consentVersion 與說明文字，勾選框清空，要看過新說明再同意
+                if (err?.status === 409 && err?.data?.code === "consent_version_mismatch") {
+                    setAgree(false);
+                    load();
+                }
+            });
+        if (ok) setAgree(false);
+        return ok;
+    };
+    const clearAll = async () => {
+        const ok = await run(() => apiDelete(MEMORY_URL), "已清除全部筆記。", "清除失敗，請稍後再試。");
+        if (ok) focusAfterRef.current = { index: null };   // 筆記全沒了，按鈕也跟著消失，焦點移到區段標題
+        return ok;
+    };
 
     if (loadFailed) {
         return (
@@ -272,14 +315,14 @@ export default function LearnerMemoryPage() {
             </section>
 
             <section aria-labelledby="memory-notes-title" className="memory-section">
-                <h2 id="memory-notes-title">助手記下的筆記</h2>
+                <h2 id="memory-notes-title" ref={notesTitleRef} tabIndex={-1}>助手記下的筆記</h2>
                 {files.length === 0 ? (
                     <p className="memory-muted">
                         {data.consented ? "還沒有筆記。和助手聊聊學習狀況，它會視情況記下重點。" : "沒有任何筆記。"}
                     </p>
                 ) : (
                     <>
-                        <ul className="memory-notes">
+                        <ul className="memory-notes" ref={notesListRef}>
                             {files.map((file) => (
                                 <NoteItem key={file.path} file={file} busy={busy} onSave={saveNote} onDelete={deleteNote} />
                             ))}

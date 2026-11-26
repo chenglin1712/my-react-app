@@ -246,16 +246,48 @@ class ReviewQuestionViewTest(TestCase):
     @patch("AIModel.views._get_client")
     @patch("AIModel.views.load_question_context")
     def test_model_exception_refunds_the_quota(self, load, get_client, _lookup, record):
+        # 稽核 BE3-01：只有確定沒計費的失敗才退（原本用 RuntimeError，現在它屬於「可能已計費」，改用連不上）
+        import anthropic
+        import httpx
+
         self._enable()
         load.return_value = {**RunQuestionReviewTest.CTX, "tribe": "tayal"}
         get_client.return_value = MagicMock()
-        with patch("AIModel.views.run_question_review", side_effect=RuntimeError("boom")), \
+        never_sent = anthropic.APIConnectionError(request=httpx.Request("POST", "https://api.anthropic.com/v1/messages"))
+        with patch("AIModel.views.run_question_review", side_effect=never_sent), \
                 patch("AIModel.views.daily_quota.refund") as refund, \
                 self.assertLogs("AIModel.views", level="ERROR"):
             response = self._post({"attempt_id": "abc", "index": 0})
         self.assertGreaterEqual(response.status_code, 500)
         refund.assert_called_once()
         record.assert_not_called()
+
+    @patch("AIModel.views.record_asked_question", side_effect=RuntimeError("firestore down"))
+    @patch("AIModel.views.SqlDictionaryLookup", return_value=_FakeLookup({}))
+    @patch("AIModel.views._get_client")
+    @patch("AIModel.views.load_question_context")
+    def test_failures_after_a_paid_call_or_that_may_be_charged_do_not_refund(self, load, get_client, _lookup, _record):
+        # 稽核 BE3-01：講解已經產生（模型已計費）之後寫作答紀錄失敗、或逾時／不明錯誤，都不退還額度
+        import anthropic
+        import httpx
+
+        self._enable()
+        load.return_value = {**RunQuestionReviewTest.CTX, "tribe": "tayal"}
+        client = MagicMock()
+        client.messages.create.return_value = _mock_response(json.dumps(
+            {"difference": "ok", "vocab": [], "grammar": "", "culture": "", "pitfalls": ""}))
+        get_client.return_value = client
+        with patch("AIModel.views.daily_quota.refund") as refund, self.assertLogs("AIModel.views", level="ERROR"):
+            self.assertGreaterEqual(self._post({"attempt_id": "abc", "index": 0}).status_code, 500)
+        refund.assert_not_called()
+
+        timeout = anthropic.APITimeoutError(request=httpx.Request("POST", "https://api.anthropic.com/v1/messages"))
+        for exc in (timeout, RuntimeError("bug")):
+            with self.subTest(exc=type(exc).__name__):
+                with patch("AIModel.views.run_question_review", side_effect=exc), \
+                        patch("AIModel.views.daily_quota.refund") as refund, self.assertLogs("AIModel.views", level="ERROR"):
+                    self._post({"attempt_id": "abc", "index": 0})
+                refund.assert_not_called()
 
     @patch("AIModel.views.load_question_context", side_effect=RuntimeError("firestore down"))
     def test_firestore_failure_is_503_with_generic_message(self, _load):

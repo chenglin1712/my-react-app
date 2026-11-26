@@ -128,6 +128,8 @@ def _mock_response(reply_text):
 def _mock_chat_client(reply_text="哈囉"):
     mock_client = MagicMock()
     mock_client.messages.create.return_value = _mock_response(reply_text)
+    # 端點設了整體截止時間（稽核 BE3-02），呼叫會經過 client.with_options(...)：讓它回傳同一個替身
+    mock_client.with_options.return_value = mock_client
     return mock_client
 
 
@@ -167,6 +169,7 @@ class TayalChatViewTest(TestCase):
     def test_upstream_failure_returns_generic_message_and_logs(self, mock_get_client):
         mock_client = MagicMock()
         mock_client.messages.create.side_effect = Exception("internal api key xyz")
+        mock_client.with_options.return_value = mock_client      # 整體截止時間（稽核 BE3-02）會經過 with_options
         mock_get_client.return_value = mock_client
 
         with self.assertLogs("AIModel.views", level="ERROR") as logs:
@@ -500,6 +503,65 @@ class ValidateStudyPlanTest(TestCase):
             with self.subTest(name):
                 with self.assertRaises(ValueError):
                     validate_study_plan(plan, self.TODAY)
+
+    def test_titles_and_task_text_go_through_output_validation(self):
+        # 稽核 BE3-05：計畫文字會加進行事曆、標題還會組進已簽章的回覆，網址與 HTML 要和一般回覆一樣被移除
+        plan = self._plan(
+            summary="<b>複習</b> 詞彙 https://evil.example.com/a",
+            description="到 www.evil.example 下載\n<script>alert(1)</script>練習\x00\x1b[31m紅字\x7f",
+        )
+        plan["title"] = "泰雅語一週計畫 [點我](https://evil.example.com) evil.example.com"
+        result = validate_study_plan(plan, self.TODAY)
+        texts = [result["title"], result["events"][0]["summary"], result["events"][0]["description"]]
+        for text in texts:
+            with self.subTest(text=text):
+                self.assertNotIn("evil", text)
+                self.assertNotIn("<", text)
+                self.assertNotIn("http", text)
+                self.assertFalse(any(ord(ch) < 32 or 0x7f <= ord(ch) <= 0x9f for ch in text))
+        self.assertTrue(result["title"].startswith("泰雅語一週計畫 點我"))
+        self.assertTrue(result["events"][0]["summary"].startswith("複習 詞彙"))
+        self.assertNotIn("\n", result["events"][0]["description"])
+
+    def test_lengths_are_capped_like_the_stored_plan_without_breaking_indigenous_spelling(self):
+        # 上限與 study_plan_store 一致（100／100／300）；截斷不拆開字母與它的組合符號（族語拼寫常用）
+        combining = "é"                        # é（e＋組合重音）
+        plan = self._plan(summary="複" * 99 + combining, description="ʉŋʔ" * 200)
+        plan["title"] = "泰雅語'ŋ " * 30
+        result = validate_study_plan(plan, self.TODAY)
+        event = result["events"][0]
+        self.assertLessEqual(len(result["title"]), 100)
+        self.assertLessEqual(len(event["summary"]), 100)
+        self.assertLessEqual(len(event["description"]), 300)
+        self.assertFalse(event["summary"].endswith("e"))         # 不會只留下 e 而丟掉組合符號
+        self.assertTrue(set(event["description"]) <= set("ʉŋʔ"))
+        self.assertIn("'ŋ", result["title"])
+
+    def test_text_that_is_nothing_but_a_link_or_markup_is_rejected(self):
+        # 清完是空的就視為缺欄位（會觸發「告訴模型錯在哪」的重試），不會留下只有「已移除連結」的計畫
+        for field, value in (
+            ("title", "https://evil.example.com"), ("title", "<b></b>"),
+            ("summary", "<img src=x>"), ("summary", "\x00\x01"), ("summary", "someone@example.com"),
+        ):
+            with self.subTest(field=field, value=value):
+                plan = self._plan()
+                if field == "title":
+                    plan["title"] = value
+                else:
+                    plan["events"][0]["summary"] = value
+                with self.assertRaises(ValueError):
+                    validate_study_plan(plan, self.TODAY)
+
+    def test_removed_links_leave_no_marker_in_calendar_text(self):
+        result = validate_study_plan(self._plan(summary="複習 https://evil.example.com/a 詞彙"), self.TODAY)
+        self.assertEqual(result["events"][0]["summary"], "複習 詞彙")
+
+    def test_plain_chinese_text_is_kept_as_is(self):
+        plan = self._plan(summary="  複習基礎詞彙  ", description="前往『初級測驗』練習，約 30 分鐘。")
+        result = validate_study_plan(plan, self.TODAY)
+        self.assertEqual(result["title"], "計畫")
+        self.assertEqual(result["events"][0]["summary"], "複習基礎詞彙")
+        self.assertEqual(result["events"][0]["description"], "前往『初級測驗』練習，約 30 分鐘。")
 
 
 class ReviewTayalChatViewTest(TestCase):

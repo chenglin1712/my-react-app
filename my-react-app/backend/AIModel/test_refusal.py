@@ -17,6 +17,7 @@ def _refused_client(*responses):
     refused.stop_reason = "refusal"
     refused.stop_details = MagicMock(category="other")
     client.messages.create.side_effect = list(responses) or [refused]
+    client.with_options.return_value = client       # 端點設了整體截止時間（稽核 BE3-02）會經過 with_options
     return client
 
 

@@ -56,6 +56,10 @@ def _timeout():
     return anthropic.APITimeoutError(request=httpx.Request("POST", "https://api.anthropic.com/v1/messages"))
 
 
+def _connection_error():
+    return anthropic.APIConnectionError(request=httpx.Request("POST", "https://api.anthropic.com/v1/messages"))
+
+
 def _drain(generator):
     """跑完一個 generator，回傳 (yield 出來的東西, return 值)。"""
     items = []
@@ -274,6 +278,10 @@ class StreamEndpointTests(TestCase):
         limit = patch.object(daily_quota, "daily_limit", return_value=3)
         limit.start()
         self.addCleanup(limit.stop)
+        # 這裡會故意製造供應商失敗：用獨立的斷路器，不讓全域斷路器跳開而影響其他測試
+        breaker = patch.object(llm, "_breaker", llm._CircuitBreaker(threshold=100, cooldown=60))
+        breaker.start()
+        self.addCleanup(breaker.stop)
 
     def _post(self, payload=None):
         return Client().post(
@@ -307,13 +315,44 @@ class StreamEndpointTests(TestCase):
         self.assertEqual(response.json()["code"], "ai_daily_quota_exceeded")
 
     @patch("AIModel.views._get_client")
-    def test_a_failure_halfway_becomes_an_error_event_and_gives_the_question_back(self, get_client):
+    def test_a_failure_halfway_becomes_an_error_event_and_keeps_the_question_counted(self, get_client):
+        # 稽核 BE3-01：供應商已經送出文字（已計費）之後才斷線，額度不退（原本這裡會退）
         get_client.return_value = _client(FakeStream(["半截"], fail=_timeout()))
         with self.assertLogs("AIModel.views", level="ERROR"):
             events = _parse_sse(self._post())
         self.assertEqual([name for name, _ in events], ["delta", "error"])
         self.assertEqual(events[-1][1]["status"], 504)
+        self.assertEqual(AiDailyUsage.objects.get(uid="u1").count, 1)
+
+    @patch("AIModel.views._get_client")
+    def test_a_dropped_connection_after_text_that_was_held_back_still_counts_as_charged(self, get_client):
+        # 稽核 BE3-01：像網址的結尾會被 StreamGuard 先扣住、前端還沒收到 delta，但供應商已經在輸出了，一樣不退
+        get_client.return_value = _client(FakeStream(["www"], fail=_connection_error()))
+        with self.assertLogs("AIModel.views", level="ERROR"):
+            events = _parse_sse(self._post())
+        self.assertEqual([name for name, _ in events], ["error"])
+        self.assertEqual(AiDailyUsage.objects.get(uid="u1").count, 1)
+
+    @patch("AIModel.views._get_client")
+    def test_a_connection_that_fails_before_any_output_gives_the_question_back(self, get_client):
+        # 請求沒送達（連不上）且沒有任何輸出：確定沒計費，退還
+        get_client.return_value = _client(FakeStream([], fail=_connection_error()))
+        with self.assertLogs("AIModel.views", level="ERROR"):
+            events = _parse_sse(self._post())
+        self.assertEqual([name for name, _ in events], ["error"])
         self.assertEqual(AiDailyUsage.objects.get(uid="u1").count, 0)
+
+    @patch("AIModel.views._get_client")
+    def test_a_billing_mark_left_by_an_earlier_request_on_the_same_thread_is_cleared(self, get_client):
+        # 工作執行緒會被重複使用：上一個請求留下的「已計費」標記不能讓這次確定沒計費的失敗不退
+        from AIModel.services import stream_output_seen
+
+        stream_output_seen.set(True)
+        get_client.return_value = _client(FakeStream([], fail=_connection_error()))
+        with self.assertLogs("AIModel.views", level="ERROR"):
+            _parse_sse(self._post())
+        self.assertEqual(AiDailyUsage.objects.get(uid="u1").count, 0)
+
 
     @patch("AIModel.views._get_client")
     def test_a_refusal_ends_with_done_flagged_refused_and_keeps_the_question_counted(self, get_client):
@@ -346,3 +385,100 @@ class StreamEndpointTests(TestCase):
         self.assertEqual(events[-1][0], "error")
         self.assertEqual(events[-1][1]["status"], 504)
         self.assertEqual(AiDailyUsage.objects.get(uid="u1").count, 0)
+
+
+class _CountingLookup(_FakeLookup):
+    def __init__(self, entries=None):
+        super().__init__(entries)
+        self.searches = 0
+
+    def search(self, forms):
+        self.searches += 1
+        return super().search(forms)
+
+
+class NonStreamDeadlineTests(TestCase):
+    """稽核 BE3-02：非串流的 tayal_chat（與計畫重排）對整個請求設上限，工具迴圈不會拖過 gunicorn 的 75 秒。
+    用假時鐘（time.monotonic）模擬每次模型呼叫花 30 秒，不真的等待。"""
+
+    def setUp(self):
+        cache.clear()
+        for target, value in (("verify_firebase_token", ({"uid": "u1"}, None)), ("load_profile", None)):
+            patcher = patch(f"AIModel.views.{target}", return_value=value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        limit = patch.object(daily_quota, "daily_limit", return_value=3)
+        limit.start()
+        self.addCleanup(limit.stop)
+        self.addCleanup(llm.set_usage_recorder, llm._usage_recorder)
+        llm.set_usage_recorder(None)
+        breaker = patch.object(llm, "_breaker", llm._CircuitBreaker(threshold=100, cooldown=60))
+        breaker.start()
+        self.addCleanup(breaker.stop)
+        self.now = 10_000.0
+        clock = patch("time.monotonic", side_effect=lambda: self.now)
+        clock.start()
+        self.addCleanup(clock.stop)
+
+    def _slow_client(self, *responses, seconds=30):
+        pending = list(responses)
+
+        def respond(**_kwargs):
+            self.now += seconds
+            return pending.pop(0)
+
+        client = MagicMock()
+        client.messages.create.side_effect = respond
+        client.with_options.return_value = client
+        return client
+
+    def _post(self):
+        return Client().post("/AIModel/tayal_chat/", data=json.dumps({"message": "lokah 是什麼"}), content_type="application/json")
+
+    def test_a_slow_tool_loop_stops_at_the_deadline_with_a_readable_504_and_keeps_the_question_counted(self):
+        lookup = _CountingLookup({"lokah": ["你好"]})
+        ask = lambda: _tool_use_response(("search_words", {"keywords": ["lokah"]}))
+        client = self._slow_client(ask(), ask(), ask(), _mock_response("不該走到這裡"))
+        with patch("AIModel.views._get_client", return_value=client), \
+                patch("AIModel.views.SqlDictionaryLookup", return_value=lookup), \
+                self.assertLogs("AIModel.views", level="ERROR"):
+            response = self._post()
+        self.assertEqual(response.status_code, 504)
+        self.assertEqual(response.json()["detail"], views._DEADLINE_MESSAGE)
+        # 第 1 次（0→30 秒）、第 2 次（30→60 秒）之後已超過 55 秒：第二輪的工具不執行，也不再呼叫模型
+        self.assertEqual(client.messages.create.call_count, 2)
+        self.assertEqual(lookup.searches, 1)
+        # 每次呼叫的逾時都被壓在剩餘時間內且不重試
+        for call in client.with_options.call_args_list:
+            self.assertEqual(call.kwargs["max_retries"], 0)
+        self.assertEqual([c.kwargs["timeout"] for c in client.with_options.call_args_list], [25, 25])
+        # 前面的呼叫已經付費：額度不退（稽核 BE3-01）
+        self.assertEqual(AiDailyUsage.objects.get(uid="u1").count, 1)
+        self.assertIsNone(llm.llm_deadline.get())            # 截止時間只在這個請求內有效
+
+    def test_too_little_time_before_the_first_call_sends_nothing_and_gives_the_question_back(self):
+        client = self._slow_client(_mock_response("x"))
+        with patch("AIModel.views._get_client", return_value=client), \
+                patch.object(views, "REQUEST_DEADLINE_SECONDS", 1), self.assertLogs("AIModel.views", level="ERROR"):
+            response = self._post()
+        self.assertEqual(response.status_code, 504)
+        client.messages.create.assert_not_called()
+        self.assertEqual(AiDailyUsage.objects.get(uid="u1").count, 0)
+
+    def test_a_fast_answer_is_unaffected(self):
+        client = self._slow_client(_mock_response("哈囉"), seconds=1)
+        with patch("AIModel.views._get_client", return_value=client):
+            response = self._post()
+        self.assertEqual((response.status_code, response.json()["message"]), (200, "哈囉"))
+
+    def test_the_replan_endpoint_runs_under_the_same_deadline(self):
+        from adminapi.models import FeatureFlag
+
+        FeatureFlag.objects.update_or_create(key="ai_plan_replan_enabled", defaults={"label": "x", "enabled": True})
+        plan = {"title": "計畫", "tasks": [{"id": "t1", "summary": "a", "description": "", "start": "s", "end": "e", "done": False}]}
+        seen = []
+        with patch("AIModel.views._get_client"), patch("AIModel.views.load_current_plan", return_value=plan), \
+                patch("AIModel.views.run_study_plan_replan", side_effect=lambda *a, **k: seen.append(llm.llm_deadline.get())):
+            Client().post("/AIModel/replan_study_plan/", data=json.dumps({}), content_type="application/json")
+        self.assertEqual(seen, [self.now + views.REQUEST_DEADLINE_SECONDS])
+        self.assertIsNone(llm.llm_deadline.get())

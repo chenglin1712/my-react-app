@@ -23,6 +23,8 @@ export default function MobileWordFilterOffcanvas({
   showFavoritesToggle = false, showOnlyFavorites = false, onToggleFavorites,
   extraActiveCount = 0,
   footer,
+  // 觸發鈕的 id（選填）：單詞查詢頁移除最後一個篩選 chip 後要把焦點放回這顆鈕（稽核 FE3-16）
+  triggerId,
 }) {
   const [draft, setDraft] = useState(null);
 
@@ -62,7 +64,7 @@ export default function MobileWordFilterOffcanvas({
 
   return (
     <>
-      <Button type="button" variant="outline-dark" className="mb-3 yy-btn-touch" onClick={handleOpen}>
+      <Button type="button" id={triggerId} variant="outline-dark" className="mb-3 yy-btn-touch" onClick={handleOpen}>
         {activeCount > 0 ? <>篩選 / 排序（<span className="wf-trigger-count">{activeCount}</span>）</> : '篩選 / 排序'}
       </Button>
 

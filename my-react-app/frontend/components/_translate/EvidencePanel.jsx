@@ -48,7 +48,7 @@ const EvidencePanel = ({ token, onPlayAudio, tribeSlug }) => {
                         <button
                             type="button"
                             className="yy-evidence-audio-btn"
-                            aria-label={`播放 ${token.lemma} 的發音`}
+                            aria-label={`播放 ${token.lemma || token.surface} 的發音`}
                             onClick={() => onPlayAudio?.(token.audioFileId)}
                         >
                             <CirclePlay size="1em" className="yy-icon" aria-hidden="true" />

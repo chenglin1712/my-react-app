@@ -4,7 +4,8 @@ import useSimilarWords, { prefixCandidates } from './useSimilarWords';
 import { apiPost } from '../../../utils/apiClient';
 
 vi.mock('../../../utils/apiClient', () => ({ apiPost: vi.fn() }));
-const res = (...names) => ({ exact_match_results: names.map((name) => ({ name, explanationItems: [{ chineseExplanation: `${name}義` }] })), fuzzy_match_results: {} });
+// 稽核 FE3-04：改打建議端點，回應是 { suggestions: [{ name, gloss }] }
+const res = (...names) => ({ suggestions: names.map((name) => ({ name, gloss: `${name}義` })) });
 
 describe('useSimilarWords（P2-8）', () => {
   beforeEach(() => apiPost.mockClear());
@@ -23,6 +24,26 @@ describe('useSimilarWords（P2-8）', () => {
     expect(result.current.prefix).toBe('bala');
     expect(result.current.items.map((i) => i.name)).toEqual(['balaq', 'balan', 'bala-x', 'balat', 'balaz']);
     expect(apiPost).toHaveBeenCalledTimes(1);
+    // 稽核 FE3-04：打的是建議端點、只要開頭符合的詞，不是會記搜尋事件的 /key/
+    expect(apiPost.mock.calls[0][0]).toMatch(/\/dictionary\/suggest\/$/);
+    expect(apiPost.mock.calls[0][1]).toEqual({ keyword: 'bala', tribe: '泰雅', limit: 6, prefix_only: true });
+  });
+
+  test('稽核 FE3-14：以字素切字，不會把 U+0332 組合底線從字母上切掉', () => {
+    const word = 'kn̲ga';
+    expect(prefixCandidates(word)).toEqual(['kn̲g', 'kn̲']);
+    // 沒有 Intl.Segmenter 的瀏覽器退回「基底字元＋組合符號」，結果相同
+    expect(prefixCandidates(word, { useSegmenter: false })).toEqual(['kn̲g', 'kn̲']);
+    // 撇號（喉塞音）是一個獨立的字，照常計算
+    expect(prefixCandidates("'aring")).toEqual(["'arin", "'ari"]);
+  });
+
+  test('稽核 FE3-02：比對用正規化鍵（大小寫、撇號寫法），顯示保留原字', async () => {
+    apiPost.mockResolvedValue(res('’Aring', "'arik"));
+    const { result } = renderHook(() => useSimilarWords("'aringx", '泰雅', true));
+    await waitFor(() => expect(result.current.done).toBe(true));
+    // 第一段開頭是 'aring：’Aring 正規化後符合（顯示仍是 ’Aring），'arik 不符合
+    expect(result.current.items.map((i) => i.name)).toEqual(['’Aring']);
   });
 
   test('第一段沒有就再試短一點的開頭；都沒有就回空清單（不編造）', async () => {

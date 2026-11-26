@@ -46,8 +46,14 @@ router.include_router(search.router)
 router.include_router(grammar.router)
 router.include_router(audio_proxy.router)
 
+# 稽核 FE3-01：唯讀詞條查詢（/key/、/suggest/、/all/）另成一個 router，main.py 掛「登入或訪客」依賴；
+# 上面的 router 其餘端點（多關鍵字查詢、收藏統計、文法、音檔代理）仍然要求登入。
+public_router = APIRouter()
+public_router.include_router(search.public_router)
+
 __all__ = [
     "router",
+    "public_router",
     "warm_cache",
     "search_all",
     "count_words_by_tribe",

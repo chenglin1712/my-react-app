@@ -24,6 +24,9 @@ MAX_USES = 3                 # 一則回覆最多搜尋幾次（每次約 0.01 �
 MAX_SOURCES = 3              # 回覆下方最多顯示幾個來源
 MAX_PAUSE_CONTINUATIONS = 3  # 伺服器端迴圈暫停（pause_turn）後最多接續幾次
 ENV_DOMAINS = "AI_OFFICIAL_DOMAINS"
+# 用量表（AiUsageLog）裡網路搜尋紀錄的 feature 名稱（稽核 BE3-06）：每次搜尋一筆，月預算依筆數乘單價估算。
+# 必須與 adminapi/ai_usage.WEB_SEARCH_FEATURE 相同（兩邊不互相 import，避免載入時的循環依賴；test_web_search 會核對）。
+USAGE_FEATURE = "web_search"
 
 # 預設只放三個官方網域（已逐一打開核對，見路線圖 #19）；實際要用哪些由環境變數 AI_OFFICIAL_DOMAINS 決定：
 #   cip.gov.tw      原住民族委員會（含 alilin.cip.gov.tw 電子書城）
@@ -114,8 +117,9 @@ def extract_sources(content, domains=None) -> list:
 
 
 def count_searches(content) -> int:
-    """這則回覆實際執行了幾次搜尋（內容區塊裡的 server_tool_use），只用於 log 與成本追蹤：
-    每次搜尋另計費（約 0.01 美元），月預算的估算（adminapi/ai_usage.py）只算 token，不含這一項。"""
+    """這則回覆實際執行了幾次搜尋（內容區塊裡的 server_tool_use），用於 log 與成本追蹤：
+    每次搜尋另計費（約 0.01 美元，不在 token 裡）。services._record_web_searches 每一輪回應各寫一筆用量紀錄
+    （feature=USAGE_FEATURE），月預算（adminapi/ai_budget.month_to_date_cost）依筆數乘單價計入（稽核 BE3-06）。"""
     return sum(1 for block in content or [] if _field(block, "type") == "server_tool_use" and _field(block, "name") == TOOL_NAME)
 
 

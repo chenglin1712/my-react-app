@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { CirclePlay } from "lucide-react";
+import { announce } from "@utils/announce";
 import "../../static/css/_morphology/index.css";
 
 // 每個分析結果都明確標示「來源與把握程度」（原本寫「信心」，對學習者太抽象），不把把握程度低的結果包裝成事實：
@@ -96,11 +98,19 @@ const Candidate = ({ candidate: c, onPlayAudio, lang }) => {
  */
 // lang：族語文字的 HTML lang（ISO 639-3，由呼叫端依族群帶入，見 tribeLangCode）；不知道是哪一族時維持 und
 const MorphologyResult = ({ result, onPlayAudio, compact = false, lang = "und" }) => {
+    // FE3-17：原本 aria-live 容器是跟內容一起掛上的，報讀器多半不會唸。改用全站常駐的公告區
+    // （AppShell 的 LiveAnnouncer，先存在於 DOM 再更新文字），每筆新結果只唸一次摘要。
+    useEffect(() => {
+        if (!result) return;
+        const count = (result.candidates ?? []).length;
+        announce(count > 0 ? `詞形分析完成，找到 ${count} 個可能的詞根` : "詞形分析完成，沒有找到可能的詞根");
+    }, [result]);
+
     if (!result) return null;
     const { token, candidates = [], notes = [] } = result;
 
     return (
-        <div className={`yy-morph-result${compact ? " yy-morph-compact" : ""}`} aria-live="polite">
+        <div className={`yy-morph-result${compact ? " yy-morph-compact" : ""}`}>
             <div className="yy-morph-token">
                 <strong lang={lang}>{result.input}</strong>
                 <span className={`yy-morph-status yy-morph-status-${token.status}`}>{TOKEN_STATUS[token.status]}</span>

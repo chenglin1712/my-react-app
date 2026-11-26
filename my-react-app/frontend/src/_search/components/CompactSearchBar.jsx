@@ -23,6 +23,10 @@ const CompactSearchBar = ({ query, setQuery, handleSearch, loading, tribeLabel, 
                     className="search-terminal-input"
                     placeholder="輸入中文或族語詞彙"
                     aria-label="快速查詢關鍵字"
+                    // 稽核 FE3-02：關掉自動大寫／自動修正／拼字檢查，族語拼寫（撇號、詞首小寫）不會被手機改掉
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={query}
                     maxLength={SEARCH_INPUT_MAX_LENGTH}
                     onChange={(e) => setQuery(e.target.value)}

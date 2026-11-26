@@ -11,6 +11,14 @@ const STATUS_LABEL = {
     unsupported: "語料庫查無此詞",
 };
 
+// 給報讀器的狀態文字（FE3-08）：與上面的 title 分開，title 多數報讀器不唸
+const SR_STATUS = {
+    headword: "有辭典佐證，辭典詞條",
+    attested: "有辭典佐證，見辭典例句",
+    derived: "有辭典佐證，詞綴變化形",
+    unsupported: "未找到佐證",
+};
+
 // lang：族語文字的 HTML lang（ISO 639-3，由呼叫端依族群帶入，見 tribeLangCode）
 // reveal：結果剛出來時讓詞一個接一個淡入（P3-1）。後端是一次回完整結果，這只是畫面上的逐詞出現，不是真的串流；
 // 每個詞的延遲有上限（--gt-i 最多算到 24），再長的句子後半段一起出現，總時間不超過約 0.7 秒；減少動態時沒有動畫（見 CSS）。
@@ -31,13 +39,15 @@ const GroundedText = ({ tokens = [], onTokenClick, activeIndex, lang = "und", re
                     role="button"
                     tabIndex={0}
                     aria-pressed={activeIndex === i}
-                    aria-label={t.status === "unsupported" ? `${t.surface}：${STATUS_LABEL.unsupported}` : undefined}
                     title={t.gloss || STATUS_LABEL[t.status] || undefined}
                     style={stagger}
                     onClick={() => onTokenClick?.(i)}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTokenClick?.(i); } }}
                 >
                     {t.surface}
+                    {/* FE3-08：佐證狀態不能只靠顏色與 title（多數報讀器不讀 title）；
+                        補一段視覺隱藏的文字，畫面不變，報讀器唸「詞（有辭典佐證）」。 */}
+                    <span className="visually-hidden">（{SR_STATUS[t.status] ?? "佐證狀態不明"}）</span>
                 </span>
             );
         })}

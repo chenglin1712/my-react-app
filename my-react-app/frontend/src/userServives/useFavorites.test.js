@@ -421,3 +421,41 @@ describe('useFavorites 公告不重複（FE1-19）', () => {
     expect(announce).toHaveBeenCalledWith('收藏失敗，「w」已還原，請稍後再試。', { assertive: true });
   });
 });
+
+describe('useFavorites 學習活動不能靠連點衝數字（FE3-20）', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    setFavoriteWord.mockReset();
+    setFavoriteWord.mockResolvedValue(undefined);
+  });
+  const total = (uid) => Object.values(readActivity(uid)).reduce((a, b) => a + b, 0);
+  const setup = () => {
+    let current = { uid: 'u', firestoreData: { favorites: [{ id: 1, content: [] }] } };
+    useAuth.mockImplementation(() => ({ userData: current, updateUserData: (u) => { current = u; } }));
+    return renderHook(() => useFavorites());
+  };
+
+  test('加入→取消→再加入同一個詞：同一天只計一次，取消也不扣', async () => {
+    const { result, rerender } = setup();
+    for (const _ of [1, 2, 3]) {
+      await act(async () => { await result.current.toggleFavorite('w', 1); });
+      rerender();
+      await act(async () => { await result.current.toggleFavorite('w', 1); });
+      rerender();
+    }
+    await act(async () => { await result.current.toggleFavorite('w', 1); });
+    expect(total('u')).toBe(1);
+  });
+
+  test('不同的詞各計一次；只取消收藏不會增加次數', async () => {
+    const { result, rerender } = setup();
+    await act(async () => { await result.current.toggleFavorite('a', 1); });
+    rerender();
+    await act(async () => { await result.current.toggleFavorite('b', 1); });
+    rerender();
+    expect(total('u')).toBe(2);
+    await act(async () => { await result.current.toggleFavorite('a', 1); });
+    expect(total('u')).toBe(2);
+  });
+});

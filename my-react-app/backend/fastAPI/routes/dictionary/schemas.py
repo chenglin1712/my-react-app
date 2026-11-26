@@ -67,6 +67,15 @@ class KeywordRequest(BaseModel):
     tribe: Optional[str] = Field(default='泰雅', max_length=50)
 
 
+class SuggestRequest(BaseModel):
+    """即時建議／「開頭相近的詞」（稽核 FE3-04）。limit 上限刻意很小：建議清單只顯示幾筆，
+    不需要、也不該讓這支端點變成另一個可以整批拉詞條的入口。"""
+    keyword: Optional[str] = Field(default='', max_length=100)
+    tribe: Optional[str] = Field(default='泰雅', max_length=50)
+    limit: int = Field(default=5, ge=1, le=20)
+    prefix_only: bool = False
+
+
 class MultiWordSearchRequest(BaseModel):
     # 原本直接吃 request.json() 後用 dict.get() 存取，沒有 Pydantic 驗證，words
     # 陣列長度、單一詞長度都沒有上限——請求成本只靠呼叫次數被限流，不靠內容大小；

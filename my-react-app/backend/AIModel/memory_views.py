@@ -2,7 +2,8 @@
 
 - GET    /AIModel/memory/           狀態與全部檔案（旗標關閉時照樣能看，才有辦法清除自己的資料）
 - DELETE /AIModel/memory/           全部清除（保留同意）
-- POST   /AIModel/memory/consent/   {"granted": true|false}；同意需要功能旗標開啟，撤回隨時可以並刪光記憶
+- POST   /AIModel/memory/consent/   {"granted": true|false, "version"?: 說明版本}；同意需要功能旗標開啟，
+                                    version 與 CONSENT_VERSION 不一致回 409（FE3-22）；撤回隨時可以並刪光記憶
 - PUT    /AIModel/memory/file/      {"path", "content"} 修改一個既有檔案（走和模型相同的路徑與內容檢查）
 - DELETE /AIModel/memory/file/?path=...  刪除一個檔案
 
@@ -28,6 +29,10 @@ RATE_GROUP = "learner_memory"
 
 class ConsentSerializer(serializers.Serializer):
     granted = serializers.BooleanField()
+    # FE3-22：使用者實際看到的同意說明版本（前端 MEMORY_TEXT_VERSION，與 GET 回傳的 consentVersion 同為字串）。
+    # 目前選填是為了相容尚未更新、不會送 version 的舊客戶端；建議下個版本改為必填。
+    # CharField 也接受整數輸入並轉成字串，型別不同的值一律視為不一致。
+    version = serializers.CharField(required=False, max_length=64)
 
 
 class FileWriteSerializer(serializers.Serializer):
@@ -102,6 +107,11 @@ def learner_memory_consent(request):
     if data["granted"]:
         if not memory_store.feature_enabled():
             return JsonResponse({"detail": "學習記憶目前尚未開放。", "code": "learner_memory_disabled"}, status=403)
+        # FE3-22：使用者看到的是舊版說明就不能記成同意新版；沒帶 version 的舊客戶端暫時照舊放行（相容）。
+        version = data.get("version")
+        if version is not None and version != memory_store.CONSENT_VERSION:
+            return JsonResponse(
+                {"detail": "說明已更新，請重新整理頁面後再同意", "code": "consent_version_mismatch"}, status=409)
         memory_store.grant_consent(uid)
     else:
         memory_store.revoke_consent(uid)

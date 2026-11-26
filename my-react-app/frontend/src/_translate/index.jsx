@@ -169,6 +169,12 @@ const TranslatePage = () => {
             if (myGeneration !== requestGenerationRef.current) return;
             if (isGuest) guestQuota.applyResponse(data?.guestQuota);
             setResult(data);
+            // FE3-07：結果區不是 live region，成功時用全站常駐的公告區唸出「翻譯完成」與佐證概況；
+            // 只在這個成功分支呼叫一次（結果被「換成原文」「清除」不會再唸），也不重複公告摘要行。
+            const coverage = data?.coverage;
+            announce(coverage?.total > 0
+                ? `翻譯完成，${coverage.total - (coverage.unsupported ?? 0)}/${coverage.total} 個詞有辭典語料佐證`
+                : "翻譯完成");
             // 翻譯的使用紀錄由後端在翻譯成功時自己寫（translation_request）；公開事件端點的白名單
             // 不收 translate_submit，從前端再送一筆只會固定回 400
         } catch (err) {

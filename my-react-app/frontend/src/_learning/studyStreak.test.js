@@ -120,3 +120,32 @@ describe('下一個台灣午夜', () => {
     });
 });
 });
+
+describe('同一項目同一天只計一次（FE3-20）', () => {
+    const day1 = at('2026-11-18T02:00:00Z');
+    const day2 = at('2026-11-19T02:00:00Z');
+    test('帶 itemKey：同一天同一項目只計一次並回傳 false；不同項目各計一次', () => {
+        expect(recordLearningActivity('a', 'favorite', day1, 'w1')).toBe(true);
+        expect(recordLearningActivity('a', 'favorite', day1, 'w1')).toBe(false);
+        expect(recordLearningActivity('a', 'favorite', day1, 'w2')).toBe(true);
+        expect(readActivity('a')).toEqual({ '2026-11-18': 2 });
+    });
+    test('沒帶 itemKey（測驗、遊戲）每次都計，且不洗掉已記下的項目', () => {
+        recordLearningActivity('a', 'favorite', day1, 'w1');
+        recordLearningActivity('a', 'quiz', day1);
+        recordLearningActivity('a', 'quiz', day1);
+        expect(recordLearningActivity('a', 'favorite', day1, 'w1')).toBe(false);
+        expect(readActivity('a')).toEqual({ '2026-11-18': 3 });
+    });
+    test('隔天同一個詞可以再計一次；每個帳號各自去重', () => {
+        recordLearningActivity('a', 'favorite', day1, 'w1');
+        expect(recordLearningActivity('a', 'favorite', day2, 'w1')).toBe(true);
+        expect(recordLearningActivity('b', 'favorite', day2, 'w1')).toBe(true);
+        expect(readActivity('a')).toEqual({ '2026-11-18': 1, '2026-11-19': 1 });
+    });
+    test('清除紀錄後去重名單一併清掉', () => {
+        recordLearningActivity('a', 'favorite', day1, 'w1');
+        clearActivity('a');
+        expect(recordLearningActivity('a', 'favorite', day1, 'w1')).toBe(true);
+    });
+});

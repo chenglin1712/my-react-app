@@ -19,6 +19,14 @@ describe('CompactSearchBar（捲出頁首後的精簡搜尋列）', () => {
         expect(props.setQuery).toHaveBeenCalledWith('abas');
     });
 
+    test('稽核 FE3-02：關掉自動大寫、自動修正與拼字檢查', () => {
+        setup();
+        const input = screen.getByLabelText('快速查詢關鍵字');
+        expect(input).toHaveAttribute('autocapitalize', 'off');
+        expect(input).toHaveAttribute('autocorrect', 'off');
+        expect(input).toHaveAttribute('spellcheck', 'false');
+    });
+
     test('按 Enter 與按搜尋鈕都會搜尋；輸入法組字中的 Enter 不算', () => {
         const { props } = setup({ query: 'abas' });
         const input = screen.getByLabelText('快速查詢關鍵字');

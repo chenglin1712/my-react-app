@@ -46,7 +46,7 @@ const CameraPrivacyNote = () => {
             )}
             <div id={bodyId} hidden={!expanded}>
                 <p className="camera-privacy">
-                    按下「提交辨識」後，圖片會上傳到本站伺服器，並送到 Google Cloud Vision 辨識圖中的物件。請避免上傳含有人臉、證件或個人資料的照片。
+                    選好圖片後，會先在本機縮小並移除照片中的位置等中繼資料。按下「提交辨識」後，縮小後的圖片會上傳到本站伺服器，並送到 Google Cloud Vision 辨識圖中的物件。請避免上傳含有人臉、證件或個人資料的照片。
                 </p>
                 {!seen && (
                     <button type="button" className="yy-btn-outline camera-privacy-ack" onClick={acknowledge}>

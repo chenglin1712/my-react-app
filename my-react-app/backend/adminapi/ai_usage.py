@@ -8,6 +8,7 @@ config/llm.py 同時被 Django 與 FastAPI import，不能直接依賴任何一�
 超長輸入有加價，實際金額以 Anthropic Console 為準。
 """
 import logging
+import os
 from collections import defaultdict
 from datetime import datetime, time, timedelta
 
@@ -34,6 +35,31 @@ MODEL_PRICES_PER_MTOK = {
 }
 CACHE_READ_MULTIPLIER = 0.1
 CACHE_WRITE_MULTIPLIER = 1.25
+
+# 稽核 BE3-06：官方網站查證（AIModel/web_search.py）的網路搜尋另外按次計費、不在 token 裡。
+# AIModel 每次搜尋寫一筆 feature=WEB_SEARCH_FEATURE 的用量紀錄（必須與 AIModel.web_search.USAGE_FEATURE 相同），
+# 月預算以「筆數 × 單價」計入。單價：Anthropic 官方價目每 1,000 次 10 美元（2026-10 時的數字），
+# 可用環境變數 AI_WEB_SEARCH_COST_USD 調整；沒設定、不是數字或是負數時用預設值（寧可高估，不可漏算）。
+WEB_SEARCH_FEATURE = "web_search"
+DEFAULT_WEB_SEARCH_COST_USD = 0.01
+_invalid_search_cost_reported: set[str] = set()
+
+
+def web_search_cost_usd() -> float:
+    """每次網路搜尋的估算費用（美金）。"""
+    raw = os.getenv("AI_WEB_SEARCH_COST_USD", "").strip()
+    if not raw:
+        return DEFAULT_WEB_SEARCH_COST_USD
+    try:
+        value = float(raw)
+    except ValueError:
+        value = float("nan")
+    if 0 <= value < float("inf"):
+        return value
+    if raw not in _invalid_search_cost_reported:
+        _invalid_search_cost_reported.add(raw)
+        logger.error("[AIUsage] 環境變數 AI_WEB_SEARCH_COST_USD=%r 不是非負數，改用預設值 %s", raw, DEFAULT_WEB_SEARCH_COST_USD)
+    return DEFAULT_WEB_SEARCH_COST_USD
 
 MAX_DAYS = 90
 # 百分位數只取最近這麼多筆成功呼叫的延遲，避免大範圍查詢把整張表讀進記憶體。
@@ -146,7 +172,10 @@ def summarize(days: int, *, reveal_uids: bool = False) -> dict:
     today = timezone.localdate(now, tz)
     since = timezone.make_aware(datetime.combine(today - timedelta(days=days - 1), time.min), tz)
     # 斷路器事件（feature="breaker"）也存在這張表，但它們不是 API 呼叫：不計入呼叫數、成功率與費用。
-    logs = AiUsageLog.objects.filter(created_at__gte=since).exclude(feature=BREAKER_FEATURE)
+    # 網路搜尋紀錄（稽核 BE3-06）同樣不是一次 API 呼叫（沒有 token、延遲是 0）：不混進呼叫數與延遲，另外在 webSearch 顯示。
+    period = AiUsageLog.objects.filter(created_at__gte=since)
+    logs = period.exclude(feature__in=(BREAKER_FEATURE, WEB_SEARCH_FEATURE))
+    searches = period.filter(feature=WEB_SEARCH_FEATURE).count()
 
     rows = (
         logs.annotate(day=TruncDate("created_at", tzinfo=tz))
@@ -206,6 +235,8 @@ def summarize(days: int, *, reveal_uids: bool = False) -> dict:
         "byModel": [b.as_dict(model=k) for k, b in sorted(by_model.items(), key=lambda kv: -kv[1].cost)],
         "byStatus": [{"status": k, "calls": v} for k, v in sorted(by_status.items(), key=lambda kv: -kv[1])],
         "topUsers": [b.as_dict(uid=_display_uid(k, reveal_uids)) for k, b in top_users],
+        # 稽核 BE3-06：網路搜尋次數與估算費用（不含在上面的 token 費用裡；月預算 budget 已經把它算進去）
+        "webSearch": {"searches": searches, "costUsd": round(searches * web_search_cost_usd(), 4)},
         "priceNote": "費用依公開價目估算（快取讀取 0.1 倍、快取寫入 1.25 倍），實際金額以 Anthropic Console 為準。",
         "breaker": breaker_summary(since),
         "budget": budget_summary(),

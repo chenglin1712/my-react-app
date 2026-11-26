@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import useSearchSuggestions, { extractSuggestions, SUGGESTION_DELAY_MS, MAX_SUGGESTIONS } from './useSearchSuggestions';
+import useSearchSuggestions, { extractSuggestions, readSuggestions, isSuggestable, SUGGESTION_DELAY_MS, MAX_SUGGESTIONS } from './useSearchSuggestions';
 import { apiPost } from '../../../utils/apiClient';
 
 vi.mock('../../../utils/apiClient', () => ({ apiPost: vi.fn() }));
@@ -38,14 +38,16 @@ describe('useSearchSuggestions', () => {
   afterEach(() => vi.useRealTimers());
 
   test('停止輸入 300ms 後才查一次，之前的輸入不會各自送出請求', async () => {
-    apiPost.mockResolvedValue({ exact_match_results: [w('balay', '真的')], fuzzy_match_results: {} });
+    apiPost.mockResolvedValue({ suggestions: [{ name: 'balay', gloss: '真的' }] });
     const { result, rerender } = renderHook(({ q }) => useSearchSuggestions(q, '泰雅'), { initialProps: { q: 'b' } });
     rerender({ q: 'ba' });
     rerender({ q: 'bal' });
     expect(apiPost).not.toHaveBeenCalled();
     await act(async () => { await vi.advanceTimersByTimeAsync(SUGGESTION_DELAY_MS); });
     expect(apiPost).toHaveBeenCalledTimes(1);
-    expect(apiPost.mock.calls[0][1]).toEqual({ keyword: 'bal', tribe: '泰雅' });
+    // 稽核 FE3-04：打的是建議端點（不記搜尋事件、另計額度），不是 /key/
+    expect(apiPost.mock.calls[0][0]).toMatch(/\/dictionary\/suggest\/$/);
+    expect(apiPost.mock.calls[0][1]).toEqual({ keyword: 'bal', tribe: '泰雅', limit: MAX_SUGGESTIONS });
     expect(result.current).toEqual([{ name: 'balay', gloss: '真的' }]);
   });
 
@@ -61,25 +63,25 @@ describe('useSearchSuggestions', () => {
   test('舊請求晚到時不會蓋掉新輸入：輸入換了，舊結果直接丟掉', async () => {
     let resolveOld;
     apiPost.mockImplementationOnce(() => new Promise((r) => { resolveOld = r; }));
-    apiPost.mockResolvedValueOnce({ exact_match_results: [w('new', '新')], fuzzy_match_results: {} });
+    apiPost.mockResolvedValueOnce({ suggestions: [{ name: 'new', gloss: '新' }] });
     const { result, rerender } = renderHook(({ q }) => useSearchSuggestions(q, '泰雅'), { initialProps: { q: 'old' } });
     await act(async () => { await vi.advanceTimersByTimeAsync(SUGGESTION_DELAY_MS); });
     rerender({ q: 'new' });
     await act(async () => { await vi.advanceTimersByTimeAsync(SUGGESTION_DELAY_MS); });
     expect(result.current.map((i) => i.name)).toEqual(['new']);
-    await act(async () => { resolveOld({ exact_match_results: [w('old', '舊')], fuzzy_match_results: {} }); });
+    await act(async () => { resolveOld({ suggestions: [{ name: 'old', gloss: '舊' }] }); });
     expect(result.current.map((i) => i.name)).toEqual(['new']);
   });
 
   test('請求還在途中換族語：舊族語的結果不會顯示在新族語底下', async () => {
     let resolveOld;
     apiPost.mockImplementationOnce(() => new Promise((r) => { resolveOld = r; }));
-    apiPost.mockResolvedValueOnce({ exact_match_results: [w('cyux', '看')], fuzzy_match_results: {} });
+    apiPost.mockResolvedValueOnce({ suggestions: [{ name: 'cyux', gloss: '看' }] });
     const { result, rerender } = renderHook(({ t }) => useSearchSuggestions('ba', t), { initialProps: { t: '泰雅' } });
     await act(async () => { await vi.advanceTimersByTimeAsync(SUGGESTION_DELAY_MS); });
     rerender({ t: '阿美' });
     await act(async () => { await vi.advanceTimersByTimeAsync(SUGGESTION_DELAY_MS); });
-    await act(async () => { resolveOld({ exact_match_results: [w('balay', '真的')], fuzzy_match_results: {} }); });
+    await act(async () => { resolveOld({ suggestions: [{ name: 'balay', gloss: '真的' }] }); });
     expect(result.current.map((i) => i.name)).toEqual(['cyux']);
   });
 
@@ -89,7 +91,7 @@ describe('useSearchSuggestions', () => {
     const { unmount } = renderHook(() => useSearchSuggestions('ba', '泰雅'));
     await act(async () => { await vi.advanceTimersByTimeAsync(SUGGESTION_DELAY_MS); });
     unmount();
-    await act(async () => { resolveOld({ exact_match_results: [w('balay', '真的')], fuzzy_match_results: {} }); });
+    await act(async () => { resolveOld({ suggestions: [{ name: 'balay', gloss: '真的' }] }); });
     expect(apiPost).toHaveBeenCalledTimes(1);
   });
 
@@ -98,5 +100,38 @@ describe('useSearchSuggestions', () => {
     const { result } = renderHook(() => useSearchSuggestions('ba', '泰雅'));
     await act(async () => { await vi.advanceTimersByTimeAsync(SUGGESTION_DELAY_MS); });
     expect(result.current).toEqual([]);
+  });
+
+  test('稽核 FE3-04：族語拼寫少於 2 個字不查，中文 1 個字就查', async () => {
+    apiPost.mockResolvedValue({ suggestions: [{ name: 'balay', gloss: '真的' }] });
+    const { rerender } = renderHook(({ q }) => useSearchSuggestions(q, '泰雅'), { initialProps: { q: 'b' } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(SUGGESTION_DELAY_MS * 2); });
+    expect(apiPost).not.toHaveBeenCalled();
+    rerender({ q: '水' });
+    await act(async () => { await vi.advanceTimersByTimeAsync(SUGGESTION_DELAY_MS); });
+    expect(apiPost).toHaveBeenCalledTimes(1);
+  });
+
+  test('稽核 FE3-04：輸入變了就取消上一個還在路上的請求', async () => {
+    const signals = [];
+    apiPost.mockImplementation((url, body, options) => {
+      signals.push(options.signal);
+      return new Promise(() => {});
+    });
+    const { rerender } = renderHook(({ q }) => useSearchSuggestions(q, '泰雅'), { initialProps: { q: 'ba' } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(SUGGESTION_DELAY_MS); });
+    rerender({ q: 'bal' });
+    expect(signals[0].aborted).toBe(true);
+  });
+
+  test('建議端點回傳格式不對時當作沒有建議', () => {
+    expect(readSuggestions(undefined)).toEqual([]);
+    expect(readSuggestions({ suggestions: [{ name: ' a ', gloss: 1 }, { name: '' }, {}] })).toEqual([{ name: 'a', gloss: '' }]);
+  });
+
+  test('isSuggestable：組合符號跟字母算同一個字', () => {
+    expect(isSuggestable('n̲')).toBe(false);
+    expect(isSuggestable('n̲g')).toBe(true);
+    expect(isSuggestable('')).toBe(false);
   });
 });

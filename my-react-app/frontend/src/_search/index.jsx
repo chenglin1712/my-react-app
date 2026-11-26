@@ -25,6 +25,9 @@ import { useScrolledPast } from '../hooks/useScrolledPast';
 import useAudioPlayback from '../../hooks/useAudioPlayback';
 import { apiUrl } from "../../utils/apiUrls";
 import { MAX_NAMES_PER_REQUEST, chunkNames } from "../_favorite/favoriteNames";
+import { describeSearchError, SEARCH_ERROR_KIND } from "./searchErrors";
+import { normalizeQuery } from "./searchText";
+import { restoreDetailFocus } from "./detailFocus";
 
 const PAGE_SIZE = 50;
 const WORD_FAVORITES_CATEGORY_ID = 1;
@@ -51,7 +54,8 @@ const SearchPage = () => {
   const [allOffset, setAllOffset] = useState(0);
   const [loadingMoreAll, setLoadingMoreAll] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  // 稽核 FE3-01：錯誤分類成 { kind, message, retryable }（限流／登入失效／服務暫停／條件有誤），見 searchErrors.js
+  const [error, setError] = useState(null);
   const [expandedWord, setExpandedWord] = useState(null);
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterLetter, setFilterLetter] = useState('');
@@ -85,7 +89,9 @@ const SearchPage = () => {
   const [morphPrefill, setMorphPrefill] = useState(null);
   const morphPrefillCountRef = useRef(0);
 
-  const { playAudio, playSentence, stopAudio, retryAudio, playingId, playingDuration, failedAudio } = useAudioPlayback(selectedTribe, setError);
+  // 稽核 FE3-05：不再把 setError 交給發音 hook——例句發音失敗改在那一句旁邊顯示（sentenceFailure），
+  // 不寫進查詢的錯誤狀態，紅框的「重試」不會變成重跑查詢，也不會蓋掉「查無結果」的空狀態
+  const { playAudio, playSentence, stopAudio, retryAudio, playingId, playingDuration, failedAudio, sentenceFailure } = useAudioPlayback(selectedTribe);
   const audioState = { stopAudio, retryAudio, playingId, playingDuration };
 
   // 句子 TTS 備用播放鈕只在這個族語沒有整句真人原音時才需要，跟 _translate
@@ -102,12 +108,24 @@ const SearchPage = () => {
   const [detail, setDetail] = useState(null);
   // 鍵盤開啟（Enter／空白鍵產生的 click，detail 為 0）不加動畫：鍵盤觸發的動作一律立即生效
   const [sheetAnimated, setSheetAnimated] = useState(true);
+  // 稽核 FE3-15：關閉詳情後焦點回到「最後看的那個詞」的字卡。detailOriginRef 是最初點開的按鈕（後備），
+  // lastDetailKeyRef 是最後顯示的詞（關閉時 detail 已經清成 null，所以另外記）。
+  const detailOriginRef = useRef(null);
+  const lastDetailKeyRef = useRef(null);
   const openDetail = useCallback((next, event) => {
     // click 的 detail 為 0 通常是鍵盤或程式化觸發，只是經驗判斷；同時，減少動態由 CSS 另外處理
     setSheetAnimated(event?.detail !== 0);
+    detailOriginRef.current = event?.currentTarget ?? (typeof document !== 'undefined' ? document.activeElement : null);
     setDetail(next);
   }, []);
   const closeDetail = useCallback(() => setDetail(null), []);
+  useEffect(() => {
+    if (detail?.keyName) lastDetailKeyRef.current = detail.keyName;
+  }, [detail]);
+  const handleDetailExited = useCallback(() => {
+    restoreDetailFocus(lastDetailKeyRef.current, detailOriginRef.current);
+    detailOriginRef.current = null;
+  }, []);
   // 詳情內換詞：照「點開那一區」目前的清單順序。鍵盤換詞不加動畫，滑鼠按鈕才淡入（P2-1）
   const stepDetail = useCallback((offset, viaKeyboard) => {
     setDetail((prev) => {
@@ -186,7 +204,7 @@ const SearchPage = () => {
     } catch (e) {
       if (myGeneration !== requestGenerationRef.current) return;
       console.error('載入更多失敗:', e);
-      setError('載入更多失敗，請稍後再試。');
+      setError(describeSearchError(e, { action: 'loadMore' }));
     } finally {
       loadingMoreLockRef.current = false;
       setLoadingMoreAll(false);
@@ -209,7 +227,8 @@ const SearchPage = () => {
     // 遞增 generation：任何還在跑的舊主查詢或它底下的「載入更多」都不再算數。
     const myGeneration = ++requestGenerationRef.current;
     const tribe = tribeOverride ?? selectedTribe;
-    const keyword = (queryOverride ?? query).trim();
+    // 稽核 FE3-02：送出前只做不改字形的整理（NFC、全形空白）；大小寫與撇號寫法交給後端的正規化鍵比對
+    const keyword = normalizeQuery(queryOverride ?? query);
     setPosFilter(''); // 每次新的查詢都從「全部詞類」開始，舊的選擇不會在之後的查詢裡自己復活
     if (!TRIBES_WITH_DATA.includes(tribe)) {
       setDefinitions({ exact_match_results: {}, fuzzy_match_results: {} });
@@ -217,7 +236,7 @@ const SearchPage = () => {
       return;
     }
     setLoading(true);
-    setError('');
+    setError(null);
     try {
       if (keyword === '') {
         const { pageWords, total, letters } = await fetchAllWordsPage(tribe, 0);
@@ -247,7 +266,7 @@ const SearchPage = () => {
       if (myGeneration !== requestGenerationRef.current) return;
       console.error('查詢失敗:', e);
       setOutcome(null);
-      setError('查詢失敗，請稍後再試。');
+      setError(describeSearchError(e));
     } finally {
       if (myGeneration === requestGenerationRef.current) setLoading(false);
     }
@@ -388,7 +407,11 @@ const SearchPage = () => {
   const exactVisibleTotal = exactSorted.length;
   const fuzzyVisibleTotal = fuzzySorted.length;
   const settled = TRIBES_WITH_DATA.includes(selectedTribe) && !loading && !error;
-  const hasCurrentResults = Object.keys(definitions.exact_match_results || {}).length + Object.keys(definitions.fuzzy_match_results || {}).length > 0;
+  // 稽核 FE3-13：瀏覽全部詞條時 definitions 永遠是空的，原本只看它，換篩選時骨架就插在既有清單上方把結果往下推。
+  // 已載入的全部詞條也算「已經有結果」：保留舊結果、淡化表示更新中，不插骨架。
+  const hasCurrentResults = allWords.length > 0
+    || Object.keys(definitions.exact_match_results || {}).length + Object.keys(definitions.fuzzy_match_results || {}).length > 0;
+  const refreshingResults = loading && hasCurrentResults;
   const keywordEmpty = settled && outcome?.mode === 'keyword' && exactVisibleTotal === 0 && fuzzyVisibleTotal === 0;
   const browseEmpty = settled && outcome?.mode === 'all' && outcome.sig === filterSignature && allWords.length === 0;
   const showAlphabetRail = TRIBES_WITH_DATA.includes(selectedTribe) && alphabet.length > 0 && (allWords.length > 0 || exactVisibleTotal > 0 || fuzzyVisibleTotal > 0);
@@ -440,11 +463,19 @@ const SearchPage = () => {
       {/* 已經有結果（載入更多或重新搜尋）時不插入整片骨架，避免把既有結果往下擠 */}
       {loading && !hasCurrentResults && <WordCardSkeleton label="搜尋中…" />}
       {error && (
-        <Alert variant="danger" className="d-flex justify-content-between align-items-center">
-          <span>{error}</span>
-          <Button type="button" variant="danger" size="sm" onClick={() => handleSearch()} disabled={loading}>
-            重試
-          </Button>
+        <Alert
+          variant={error.kind === SEARCH_ERROR_KIND.RATE_LIMITED ? 'warning' : 'danger'}
+          className="d-flex justify-content-between align-items-center gap-2"
+          data-error-kind={error.kind}
+        >
+          <span>{error.message}</span>
+          {error.kind === SEARCH_ERROR_KIND.AUTH ? (
+            <a className="btn btn-danger btn-sm" href="/login">重新登入</a>
+          ) : error.retryable && (
+            <Button type="button" variant="danger" size="sm" onClick={() => handleSearch()} disabled={loading}>
+              重試
+            </Button>
+          )}
         </Alert>
       )}
       {favoritesError && <Alert variant="danger">{favoritesError}</Alert>}
@@ -520,7 +551,8 @@ const SearchPage = () => {
       )}
 
       <div className={`search-results-area${showAlphabetRail ? ' has-rail' : ''}`}>
-      <div className="search-results-main">
+      {/* 稽核 FE3-13：更新中保留舊結果並淡化（opacity-50 是 Bootstrap 工具類），讀屏由 aria-busy 得知 */}
+      <div className={`search-results-main${refreshingResults ? ' opacity-50' : ''}`} aria-busy={refreshingResults || undefined}>
       {TRIBES_WITH_DATA.includes(selectedTribe) && allWords.length > 0 && (
         <WordResultsSection
           title="全部詞條"
@@ -602,6 +634,8 @@ const SearchPage = () => {
         playSentence={playSentence}
         hasSentenceAudio={hasSentenceAudio}
         failedAudio={failedAudio}
+        sentenceFailure={sentenceFailure}
+        onExited={handleDetailExited}
         {...audioState}
       />
 

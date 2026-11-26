@@ -43,7 +43,7 @@ describe('我的學習記憶頁（路線圖 #21）', () => {
 
     await user.click(screen.getByRole('checkbox'));
     await user.click(button);
-    expect(apiPost).toHaveBeenCalledWith('/AIModel/memory/consent/', { granted: true });
+    expect(apiPost).toHaveBeenCalledWith('/AIModel/memory/consent/', { granted: true, version: MEMORY_TEXT_VERSION });   // FE3-22：帶上說明版本
     expect(await screen.findByText('目前狀態：已開啟')).toBeInTheDocument();
   });
 
@@ -52,6 +52,30 @@ describe('我的學習記憶頁（路線圖 #21）', () => {
     setup();
     expect(await screen.findByText(/說明文字正在更新/)).toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+  });
+
+  test('WP-10：同意時收到 409（說明版本不符）顯示說明、自動重新載入設定並清空勾選框；其他錯誤維持原樣', async () => {
+    apiGet
+      .mockResolvedValueOnce(state({ consented: false, files: [], retentionDays: 180 }))
+      .mockResolvedValueOnce(state({ consented: false, files: [], retentionDays: 90 }));
+    apiPost
+      .mockRejectedValueOnce({ status: 409, data: { code: 'consent_version_mismatch', detail: '說明已更新，請重新整理頁面後再同意' } })
+      .mockRejectedValueOnce({ status: 500 });
+    const user = userEvent.setup();
+    setup();
+
+    await user.click(await screen.findByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: '開啟學習記憶' }));
+
+    expect(await screen.findByText('說明已更新，請重新整理頁面後再同意')).toBeInTheDocument();
+    expect(apiGet).toHaveBeenCalledTimes(2);                       // 重新取得 consentVersion 與說明文字
+    expect(await screen.findByText(/超過 90 天/)).toBeInTheDocument();
+    expect(screen.getByRole('checkbox')).not.toBeChecked();        // 勾選框清空
+
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: '開啟學習記憶' }));
+    expect(await screen.findByText('更新失敗，請稍後再試。')).toBeInTheDocument();
+    expect(apiGet).toHaveBeenCalledTimes(2);                       // 其他錯誤不重新載入
   });
 
   test('關閉要兩段式確認，確認後才送出並清空筆記', async () => {
@@ -182,5 +206,74 @@ describe('我的學習記憶頁：鍵盤焦點', () => {
 
     await user.click(within(item).getByRole('button', { name: '取消' }));
     expect(within(item).getByRole('button', { name: /刪除/ })).toHaveFocus();
+  });
+
+  // FE3-21：刪除單則筆記後，被刪的那顆按鈕會消失，焦點不能掉到頁面頂端
+  test('FE3-21：刪除第一則後，焦點移到（原本位置的）下一則的編輯鈕', async () => {
+    apiGet.mockResolvedValue(state());
+    apiDelete.mockResolvedValue(state({ files: [FILES[1]] }));
+    const user = userEvent.setup();
+    setup();
+    const item = (await screen.findByText('goals.txt')).closest('li');
+    await user.click(within(item).getByRole('button', { name: /刪除/ }));
+    await user.click(within(item).getByRole('button', { name: '確定刪除' }));
+    const next = (await screen.findByText('mistakes.txt')).closest('li');
+    expect(within(next).getByRole('button', { name: /編輯 mistakes.txt/ })).toHaveFocus();
+  });
+
+  test('FE3-21：刪除最後一則，焦點移到上一則；刪光了就移到「助手記下的筆記」標題', async () => {
+    apiGet.mockResolvedValue(state());
+    apiDelete.mockResolvedValueOnce(state({ files: [FILES[0]] })).mockResolvedValueOnce(state({ files: [] }));
+    const user = userEvent.setup();
+    setup();
+    let item = (await screen.findByText('mistakes.txt')).closest('li');
+    await user.click(within(item).getByRole('button', { name: /刪除/ }));
+    await user.click(within(item).getByRole('button', { name: '確定刪除' }));
+    item = (await screen.findByText('goals.txt')).closest('li');
+    expect(within(item).getByRole('button', { name: /編輯 goals.txt/ })).toHaveFocus();
+
+    await user.click(within(item).getByRole('button', { name: /刪除/ }));
+    await user.click(within(item).getByRole('button', { name: '確定刪除' }));
+    expect(await screen.findByText(/還沒有筆記/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '助手記下的筆記' })).toHaveFocus();
+  });
+
+  test('FE3-21：刪除失敗時不亂動焦點（留在確認鈕所在的位置）', async () => {
+    apiGet.mockResolvedValue(state());
+    apiDelete.mockRejectedValue({ status: 500 });
+    const user = userEvent.setup();
+    setup();
+    const item = (await screen.findByText('goals.txt')).closest('li');
+    await user.click(within(item).getByRole('button', { name: /刪除/ }));
+    await user.click(within(item).getByRole('button', { name: '確定刪除' }));
+    expect(await screen.findByText('刪除失敗，請稍後再試。')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '助手記下的筆記' })).not.toHaveFocus();
+  });
+});
+
+describe('我的學習記憶頁：同意（FE3-22）', () => {
+  beforeEach(() => {
+    [apiGet, apiPost, apiPut, apiDelete].forEach((m) => m.mockReset());
+  });
+
+  test('關閉學習記憶後勾選框回到未勾選，重新開啟要再勾一次；開啟請求帶說明版本、撤回不帶', async () => {
+    apiGet.mockResolvedValue(state({ consented: false, files: [] }));
+    apiPost.mockResolvedValueOnce(state()).mockResolvedValueOnce(state({ consented: false, files: [] }));
+    const user = userEvent.setup();
+    setup();
+
+    await user.click(await screen.findByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: '開啟學習記憶' }));
+    expect(apiPost).toHaveBeenLastCalledWith('/AIModel/memory/consent/', { granted: true, version: MEMORY_TEXT_VERSION });
+
+    await user.click(await screen.findByRole('button', { name: '關閉並刪除全部筆記' }));
+    await user.click(screen.getByRole('button', { name: '確定關閉並刪除' }));
+    expect(apiPost).toHaveBeenLastCalledWith('/AIModel/memory/consent/', { granted: false });
+
+    const box = await screen.findByRole('checkbox');
+    expect(box).not.toBeChecked();
+    apiPost.mockClear();
+    await user.click(screen.getByRole('button', { name: '開啟學習記憶' }));
+    expect(apiPost).not.toHaveBeenCalled();   // 沒重新勾選就不能重開
   });
 });

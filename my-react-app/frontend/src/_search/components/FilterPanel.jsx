@@ -37,6 +37,8 @@ const FilterPanel = ({
         showOnlyFavorites={showOnlyFavorites}
         onToggleFavorites={() => setShowOnlyFavorites(prev => !prev)}
         extraActiveCount={activeExtraCount}
+        // 稽核 FE3-16：跟桌面「進階篩選」鈕同一個 id，移除最後一個篩選 chip 後焦點回到這裡
+        triggerId="search-advanced-toggle"
       />
     );
   }

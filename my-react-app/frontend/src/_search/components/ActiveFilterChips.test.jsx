@@ -5,6 +5,11 @@ import ActiveFilterChips from './ActiveFilterChips';
 import FilterPanel from './FilterPanel';
 
 describe('ActiveFilterChips（P2-3）', () => {
+  // 手機版的 FilterPanel（Offcanvas）會讀 matchMedia，jsdom 沒有
+  beforeAll(() => {
+    window.matchMedia = vi.fn().mockImplementation((query) => ({ matches: false, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn() }));
+  });
+
   test('沒有條件時整列不出現', () => {
     const { container } = render(<ActiveFilterChips items={[]} />);
     expect(container).toBeEmptyDOMElement();
@@ -37,6 +42,42 @@ describe('ActiveFilterChips（P2-3）', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: '移除篩選：y' }));
     fireEvent.click(screen.getByRole('button', { name: '移除篩選：y' }));
     expect(document.activeElement).toBe(screen.getByRole('button', { name: '進階篩選' }));
+  });
+
+  // 稽核 FE3-16：手機版沒有桌面的「進階篩選」鈕
+  test('手機版移光最後一個 chip：焦點回到「篩選 / 排序」鈕（同一個 id），不會掉到頁面頂端', () => {
+    const Harness = () => {
+      const [items, setItems] = useState(['x']);
+      return (
+        <>
+          <FilterPanel
+            isMobile showFilterPanel={false} setShowFilterPanel={vi.fn()}
+            sortOrder="asc" setSortOrder={vi.fn()} filterLetter="" setFilterLetter={vi.fn()}
+            frequencyFilter="" setFrequencyFilter={vi.fn()} showOnlyFavorites={false} setShowOnlyFavorites={vi.fn()}
+            alphabet={['a']}
+          />
+          <ActiveFilterChips items={items.map((k) => ({ key: k, label: k, onRemove: () => setItems([]) }))} />
+        </>
+      );
+    };
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('button', { name: '移除篩選：x' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /篩選 \/ 排序/ }));
+  });
+
+  test('找不到篩選按鈕時退回搜尋框，焦點不會落回 body', () => {
+    const Harness = () => {
+      const [items, setItems] = useState(['x']);
+      return (
+        <>
+          <input aria-label="查詢關鍵字" data-hotkey-search />
+          <ActiveFilterChips items={items.map((k) => ({ key: k, label: k, onRemove: () => setItems([]) }))} />
+        </>
+      );
+    };
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('button', { name: '移除篩選：x' }));
+    expect(document.activeElement).toBe(screen.getByLabelText('查詢關鍵字'));
   });
 });
 

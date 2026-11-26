@@ -106,3 +106,19 @@ describe('EvidencePanel 的詞形分析', () => {
     expect(busy).toBeDisabled();
   });
 });
+
+describe('EvidencePanel 的發音鈕名稱（FE3-18）', () => {
+  test('有 lemma 時名稱用 lemma', () => {
+    render(<EvidencePanel token={{ ...derived, audioFileId: 'a1' }} onPlayAudio={vi.fn()} />);
+    expect(screen.getByRole('button', { name: '播放 lintun 的發音' })).toBeInTheDocument();
+  });
+
+  test('沒有 lemma 時退回詞形，名稱不會出現 undefined；點了仍會播', () => {
+    const onPlayAudio = vi.fn();
+    render(<EvidencePanel token={{ surface: 'lemintun', status: 'headword', gloss: '榕樹', audioFileId: 'a1' }} onPlayAudio={onPlayAudio} />);
+    const btn = screen.getByRole('button', { name: '播放 lemintun 的發音' });
+    expect(btn.getAttribute('aria-label')).not.toMatch(/undefined/);
+    fireEvent.click(btn);
+    expect(onPlayAudio).toHaveBeenCalledWith('a1');
+  });
+});

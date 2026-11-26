@@ -14,7 +14,10 @@ export async function createAuthorizedAudio(url) {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) {
-    throw new Error(`音檔載入失敗：HTTP ${res.status}`);
+    // 稽核 WP-10 驗證後：帶上 status，讓呼叫端分辨 401／403（訪客要登入才能播）與一般失敗
+    const err = new Error(`音檔載入失敗：HTTP ${res.status}`);
+    err.status = res.status;
+    throw err;
   }
   const blob = await res.blob();
   const objectUrl = URL.createObjectURL(blob);

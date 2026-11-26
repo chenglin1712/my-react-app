@@ -48,7 +48,7 @@ const FavoritePage = () => {
   const toggleExpand = useCallback((key) => setExpandedWord(prev => (prev === key ? null : key)), []);
 
   const [tabStates, updateTabState] = useTabState(favorites);
-  const { playAudio, failedAudio } = useAudioPlayback(selectedTribe);
+  const { playAudio, stopAudio, retryAudio, playingId, playingDuration, failedAudio } = useAudioPlayback(selectedTribe);
 
   const location = useLocation();
 
@@ -289,6 +289,10 @@ const FavoritePage = () => {
                   wordName={wordData.name}
                   categoryId={currentTab.id}
                   playAudio={playAudio}
+                  stopAudio={stopAudio}
+                  retryAudio={retryAudio}
+                  playingId={playingId}
+                  playingDuration={playingDuration}
                   failedAudio={failedAudio}
                   isFavorited={currentContentSet.has(wordData.name)}
                 />
