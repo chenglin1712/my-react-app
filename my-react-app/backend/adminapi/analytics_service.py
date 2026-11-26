@@ -13,7 +13,8 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone as dt_timezone
 from zoneinfo import ZoneInfo
 
-from django.db.models import Count
+from django.db import connection
+from django.db.models import CharField, Count, F, Func, Value
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Lower, TruncDate
 from django.utils import timezone
@@ -430,6 +431,12 @@ def build_quiz_quality_analytics(start_date, end_date, tribe):
     # window function 直接得多。
     # 稽核 BE2b-10：先在 SQL 端依 (uid, 題目, 對錯) 分組計數，再進 Python，不把每一筆事件都讀回來。
     records = []
+    if connection.vendor == "sqlite":
+        # SQLite 的 JSON_EXTRACT 會把字串 "false" 與布林 false 讀成同一個值，分組後 Python 端分不出來（CI 用 SQLite）。
+        # 先用 JSON_TYPE 只留下真正的布林（'true'／'false'），歷史髒資料的字串整筆不計。PostgreSQL 的 jsonb 本來就分得出。
+        qs = qs.annotate(
+            _correct_type=Func(F("payload"), Value("$.correct"), function="JSON_TYPE", output_field=CharField()),
+        ).filter(_correct_type__in=("true", "false"))
     grouped = (
         qs.values("uid", "payload__item_kind", "payload__item_id", "payload__correct")
         .annotate(n=Count("id"))

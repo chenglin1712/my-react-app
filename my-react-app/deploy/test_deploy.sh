@@ -70,7 +70,10 @@ EOF
 cat > "$SB/bin/curl" <<'EOF'
 #!/usr/bin/env bash
 echo "curl $*" >> "$SB_LOG"
-case "$*" in *"-w %{http_code}"*) printf '%s' "${ROUTE_CODE:-401}" ;; esac
+case "$*" in
+  *"-w %{http_code}"*/adminapi/internal/*) printf '%s' "${INTERNAL_CODE:-403}" ;;
+  *"-w %{http_code}"*) printf '%s' "${ROUTE_CODE:-401}" ;;
+esac
 case "$*" in *-skI*) printf 'HTTP/2 200\r\nserver: %s\r\n' "${SERVER_HEADER:-nginx}" ;; esac
 exit "${CURL_RC:-0}"
 EOF
@@ -107,7 +110,7 @@ chmod +x "$SB/bin/"*
 
 # ── 工具函式 ─────────────────────────────────────────────────────
 good_env() {
-  printf 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\nAUTH_DEV_BYPASS=False\nDATABASE_URL=postgresql://u:p@h/db\nREDIS_URL=redis://localhost:6379/0\nALLOWED_ORIGINS=https://app.example\nCSRF_TRUSTED_ORIGINS=https://app.example\nDJANGO_ALLOWED_HOSTS=app.example\nAI_MONTHLY_BUDGET_USD=50\n' > "$SB/repo/.env"
+  printf 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\nAUTH_DEV_BYPASS=False\nDATABASE_URL=postgresql://u:p@h/db\nREDIS_URL=redis://localhost:6379/0\nALLOWED_ORIGINS=https://app.example\nCSRF_TRUSTED_ORIGINS=https://app.example\nDJANGO_ALLOWED_HOSTS=app.example\nAI_MONTHLY_BUDGET_USD=50\nFIRESTORE_BACKUP_BUCKET=gs://example-backup\n' > "$SB/repo/.env"
   echo '{}' > "$SB/repo/serviceAccountKey.json"
 }
 
@@ -284,12 +287,12 @@ env_case "export 前綴的 AUTH_DEV_BYPASS=True 仍能辨識並中止" 'DJANGO_S
 env_case "等號兩邊有空白的 DJANGO_DEBUG = true 仍能辨識並中止" 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG = true\nDATABASE_URL=postgresql://u:p@h/db\n' 'DJANGO_DEBUG'
 env_case "帶引號與行尾註解的 AUTH_DEV_BYPASS=\"True\" # 開發用 仍能辨識並中止" 'DJANGO_SECRET_KEY=x\nAUTH_DEV_BYPASS="True"  # 開發用\nDATABASE_URL=postgresql://u:p@h/db\n' 'AUTH_DEV_BYPASS'
 env_case "缺少 DATABASE_URL 中止" 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\n' 'DATABASE_URL'
-good_env; printf 'DJANGO_SECRET_KEY=x\n# DJANGO_DEBUG=True\nDJANGO_DEBUG=False\nDATABASE_URL=postgresql://u:p@h/db\nREDIS_URL=redis://localhost:6379/0\nALLOWED_ORIGINS=https://app.example\nCSRF_TRUSTED_ORIGINS=https://app.example\nDJANGO_ALLOWED_HOSTS=app.example\nAI_MONTHLY_BUDGET_USD=50\n' > "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+good_env; printf 'DJANGO_SECRET_KEY=x\n# DJANGO_DEBUG=True\nDJANGO_DEBUG=False\nDATABASE_URL=postgresql://u:p@h/db\nREDIS_URL=redis://localhost:6379/0\nALLOWED_ORIGINS=https://app.example\nCSRF_TRUSTED_ORIGINS=https://app.example\nDJANGO_ALLOWED_HOSTS=app.example\nAI_MONTHLY_BUDGET_USD=50\nFIRESTORE_BACKUP_BUCKET=gs://example-backup\n' > "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1; rc=$?
 check "被註解掉的 DJANGO_DEBUG=True 不算數，不會誤擋（部署成功）" "$([ $rc = 0 ]; echo $?)"
 
 env_case "缺少 REDIS_URL 中止（限流計數會退回各 worker 的記憶體）" 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\nDATABASE_URL=postgresql://u:p@h/db\n' 'REDIS_URL'
 env_case "REDIS_URL 只有空引號也算沒設定，中止" 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\nDATABASE_URL=postgresql://u:p@h/db\nREDIS_URL=""  # 沒設\n' 'REDIS_URL'
-good_env; printf 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\nDATABASE_URL=postgresql://u:p@h/db\nALLOWED_ORIGINS=https://app.example\nCSRF_TRUSTED_ORIGINS=https://app.example\nDJANGO_ALLOWED_HOSTS=app.example\nAI_MONTHLY_BUDGET_USD=50\n' > "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1 ALLOW_NO_REDIS=1; rc=$?
+good_env; printf 'DJANGO_SECRET_KEY=x\nDJANGO_DEBUG=False\nDATABASE_URL=postgresql://u:p@h/db\nALLOWED_ORIGINS=https://app.example\nCSRF_TRUSTED_ORIGINS=https://app.example\nDJANGO_ALLOWED_HOSTS=app.example\nAI_MONTHLY_BUDGET_USD=50\nFIRESTORE_BACKUP_BUCKET=gs://example-backup\n' > "$SB/repo/.env"; fresh_dist; run_script deploy.sh SKIP_BACKUP=1 ALLOW_NO_REDIS=1; rc=$?
 check "ALLOW_NO_REDIS=1 明確放行：沒有 REDIS_URL 也能部署" "$([ $rc = 0 ]; echo $?)"
 
 # ── backup.sh ───────────────────────────────────────────────────
@@ -310,6 +313,12 @@ set_env_line AI_MONTHLY_BUDGET_USD "AI_MONTHLY_BUDGET_USD=0"; run_script deploy.
 check "AI_MONTHLY_BUDGET_USD 是 0：中止" "$([ $rc != 0 ] && out_has 'AI_MONTHLY_BUDGET_USD'; echo $?)"
 set_env_line AI_MONTHLY_BUDGET_USD ""; run_script deploy.sh SKIP_BACKUP=1 ALLOW_NO_AI_BUDGET=1; rc=$?
 check "ALLOW_NO_AI_BUDGET=1 明確放行：沒有預算也能部署" "$([ $rc = 0 ]; echo $?)"
+set_env_line FIRESTORE_BACKUP_BUCKET ""; run_script deploy.sh SKIP_BACKUP=1; rc=$?
+check "缺少 FIRESTORE_BACKUP_BUCKET：中止（稽核 BE5-12）" "$([ $rc != 0 ] && out_has 'FIRESTORE_BACKUP_BUCKET' && ! log_has '^docker run'; echo $?)"
+run_script deploy.sh SKIP_BACKUP=1 ALLOW_NO_FIRESTORE_BACKUP=1; rc=$?
+check "ALLOW_NO_FIRESTORE_BACKUP=1 明確放行：沒有備份 bucket 也能部署" "$([ $rc = 0 ]; echo $?)"
+set_env_line FIRESTORE_BACKUP_BUCKET "FIRESTORE_BACKUP_BUCKET=gs://example-backup"; run_script deploy.sh SKIP_BACKUP=1 INTERNAL_CODE=200; rc=$?
+check "內部端點沒被 nginx 擋（回 200）：反向代理檢查失敗（稽核 BE5-15）" "$([ $rc != 0 ] && out_has 'FAIL POST /adminapi/internal'; echo $?)"
 set_env_line AI_MONTHLY_BUDGET_USD "AI_MONTHLY_BUDGET_USD=12.5"; run_script deploy.sh SKIP_BACKUP=1; rc=$?
 check "AI_MONTHLY_BUDGET_USD=12.5（小數）：通過" "$([ $rc = 0 ]; echo $?)"
 
